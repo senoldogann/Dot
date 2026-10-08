@@ -857,6 +857,11 @@ files and the folder, left the third and exited 1; a second `--apply` left only 
    `dotx doctor` warns about it (a warning, not a failure).
 4. From the audit: how long to keep events and screenshots (retention windows), which model compacts (`[models] fast` is
    documented but never read), browser access to localhost and private addresses, CI.
+5. The Claude models (`anthropic`): no request to the Anthropic API has run yet. Save `ANTHROPIC_API_KEY`
+   (`dotx auth set ANTHROPIC_API_KEY`) and run the hosted test once
+   (`.venv/bin/python -m pytest tests/smoke/test_hosted_services.py -m hosted -k anthropic`: a few tiny requests of
+   `claude-haiku-5-5`). A Claude model is then a candidate for `[models] review` while `main` is of another family
+   (decision 3).
 
 ## Log
 
@@ -926,3 +931,15 @@ files and the folder, left the third and exited 1; a second `--apply` left only 
   throw-away home; no live model run. Found, not changed: two delegated runs that work at the same time and write one
   file can leave in it the change noted first (the plan calls that file a conflict); a `yolo` run can rewrite a
   journal, as it can the configuration and the database.
+- 2026-10-08: after the eight items, on the owner's request: the Claude models over the Anthropic API (`11dc6a0`).
+  Provider `anthropic` (`anthropic:<model>`, key `ANTHROPIC_API_KEY`) on the Messages codec of OpenCode Go's messages
+  route, with what only Anthropic takes behind `MessagesOptions` (adaptive thinking at the reasoning level, the prompt
+  cache, the model's own output limit); a model's traits are read from the Models API. Unit tests (475), the offline
+  wire tests (bodies, traits, errors), `dotx eval check` and the offline smoke suite (161) clean except
+  `test_a_live_stream_carries_the_runs_the_run_delegated_to` (model-driven, as in items 2 and 8), which passed when
+  rerun; no hosted run, as no `ANTHROPIC_API_KEY` is set here (decision 5). Found, not changed: `drop_old_images` edits
+  the history at every step, so on the models that bind thinking to its context the thinking sent before the edit is
+  dropped (the API lists it in `input_transformations`, which Dot does not log) and the prompt cache starts again
+  there; the system prompt carries the time to the minute, so the runs of a chat never share a cached prompt; the 4.5
+  generation runs without thinking (it has no adaptive thinking, and budget thinking is not sent); the documentation
+  gives a 429 for a reached spend limit no mark of its own, so Dot retries it like a rate limit before it fails.
