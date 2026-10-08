@@ -25,6 +25,10 @@ class ConfigError(DotError):
     """Configuration is missing, malformed or inconsistent."""
 
 
+class MissingSecretError(ConfigError):
+    """A secret, such as the API key of a provider, is set in none of the places Dot reads secrets from."""
+
+
 class JsonParseError(DotError):
     """A payload that must be a JSON object was not."""
 

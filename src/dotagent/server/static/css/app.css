@@ -1482,10 +1482,13 @@ details[open] > summary .chev {
   margin-top: 2px;
 }
 
-/* A link at the end of a note stays on one line; the text before it wraps. */
+/* A link at the end of a note stays on one line; the text before it wraps. It is underlined: in the neutral theme the
+   link and the text around it differ only in shade. */
 .note > a {
   flex-shrink: 0;
   white-space: nowrap;
+  text-decoration: underline;
+  text-underline-offset: 2px;
 }
 
 .note.warn {
@@ -1751,6 +1754,13 @@ details[open] > summary .chev {
   box-shadow: none;
 }
 
+/* The box is one line high when empty, so on a narrow page its hint stays on that line and is cut at the edge instead of
+   wrapping half out of view (Chrome ignores text-overflow on a placeholder, so there is no ellipsis). */
+.dock-inner .textarea::placeholder {
+  white-space: nowrap;
+  overflow: hidden;
+}
+
 .jump {
   position: fixed;
   right: 24px;
@@ -1960,19 +1970,11 @@ dialog.lightbox img {
     display: none;
   }
 
-  .composer-options {
-    flex-direction: column;
-    flex-wrap: nowrap;
-    align-items: stretch;
-  }
-
-  .composer-options .segmented {
-    align-self: flex-start;
-  }
-
+  /* The attach button and the kind of run share the first line; each menu and switch gets a whole line. */
   .composer-reasoning,
   .composer-pick {
     display: flex;
+    flex: 1 0 100%;
   }
 
   .composer-reasoning > .composer-pick {

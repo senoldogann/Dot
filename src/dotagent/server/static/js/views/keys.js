@@ -5,6 +5,7 @@ import { api } from "../api.js";
 import { el } from "../dom.js";
 import { icon } from "../icons.js";
 import { errorPanel, loadingPanel, pageHead } from "../panels.js";
+import { providerLabel, providerOf } from "../providers.js";
 import { forgetModels, getSnapshot, onChange, refresh } from "../state.js";
 import { attempt, confirmDialog, toast } from "../ui.js";
 
@@ -12,28 +13,24 @@ import { attempt, confirmDialog, toast } from "../ui.js";
 // (Ollama's run through the app on this Mac and need none).
 const PROVIDERS = {
   openai: {
-    label: "OpenAI",
     use: "The GPT models.",
     page: "https://platform.openai.com/api-keys",
     site: "platform.openai.com",
     needed: true,
   },
   anthropic: {
-    label: "Anthropic",
     use: "The Claude models.",
     page: "https://platform.claude.com/settings/keys",
     site: "platform.claude.com",
     needed: true,
   },
   opencode_go: {
-    label: "OpenCode Go",
     use: "The open models of an OpenCode Go subscription.",
     page: "https://opencode.ai/auth",
     site: "opencode.ai",
     needed: true,
   },
   ollama: {
-    label: "Ollama",
     use: "Optional: the hosted web search, and ollama.com without the Ollama app. The models the app runs need no key.",
     page: "https://ollama.com/settings/keys",
     site: "ollama.com",
@@ -59,12 +56,7 @@ function aboutProvider(provider) {
   if (about === undefined) {
     throw new Error(`unknown provider: ${provider}`);
   }
-  return about;
-}
-
-function providerOf(ref) {
-  const at = ref.indexOf(":");
-  return at === -1 ? "" : ref.slice(0, at);
+  return { ...about, label: providerLabel(provider) };
 }
 
 /** The roles of the configured models that run on `provider`, read from the daemon status (none before it arrives). */

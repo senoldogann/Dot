@@ -8,6 +8,7 @@ import { engageFailsafe, releaseFailsafe } from "../failsafe.js";
 import { icon } from "../icons.js";
 import { followTheme, foldSteps, hasOwnLayout, setFoldSteps, setShowInspector, showInspector } from "../layout.js";
 import { foldCard, foldGroup, inlineError, inlineLoading, pageHead, segmented } from "../panels.js";
+import { providerLabel, providerOf } from "../providers.js";
 import { reasoningSelect } from "../reasoning.js";
 import { approvalLabel } from "../runmodes.js";
 import { forgetModels, getSnapshot, loadModels, onChange, refresh } from "../state.js";
@@ -15,6 +16,9 @@ import { THEMES, chooseTheme, currentTheme, onThemeChange, themeInUse } from "..
 import { attempt, confirmDialog, toast } from "../ui.js";
 
 const NOT_SET = "—";
+// The roles a model is configured for, and the tab where a missing or refused key is put right.
+const MODEL_ROLES = ["main", "vision", "review"];
+const KEYS_TAB = "#/settings/keys";
 
 function section(title, actions, body) {
   return el("section", { class: "card" }, el("div", { class: "card-head" }, el("span", { class: "grow" }, title), actions), body);
@@ -349,9 +353,42 @@ function modelTable(provider, mainModel) {
   );
 }
 
-function providerBody(provider, mainModel) {
+/** The providers the configured models (main, vision and review) run on: a key missing for one of them stops runs. */
+function providersInUse(status) {
+  if (status === null) {
+    return [];
+  }
+  return MODEL_ROLES.map((role) => providerOf(status.models[role]));
+}
+
+/** Whether a provider that did not answer is a problem: one without a key is not, unless a configured model runs on it. */
+function isFailing(provider, inUse) {
+  return provider.error !== null && (provider.problem !== "no_key" || inUse);
+}
+
+/** Why a provider listed no models; a missing or refused key links to the tab that saves keys. */
+function problemNote(provider, inUse) {
+  if (provider.problem === "no_key") {
+    return el(
+      "div",
+      { class: inUse ? "note bad" : "note" },
+      icon("key"),
+      el("span", null, `No ${providerLabel(provider.provider)} key is set, so its models cannot be listed.`),
+      el("a", { href: KEYS_TAB }, "Add a key"),
+    );
+  }
+  return el(
+    "div",
+    { class: "note bad" },
+    icon("alert"),
+    el("span", null, provider.error),
+    provider.problem === "key_refused" ? el("a", { href: KEYS_TAB }, "Check the key") : null,
+  );
+}
+
+function providerBody(provider, mainModel, inUse) {
   if (provider.error !== null) {
-    return el("div", { class: "note bad" }, icon("alert"), el("span", null, provider.error));
+    return problemNote(provider, inUse);
   }
   if (provider.models.length === 0) {
     return el("div", { class: "hint" }, "This provider lists no models.");
@@ -359,30 +396,42 @@ function providerBody(provider, mainModel) {
   return modelTable(provider, mainModel);
 }
 
-/** One provider as a fold: open when it owns the default model or could not answer, so the cause is in sight. */
-function providerBlock(provider, mainModel) {
+function problemBadge(provider, inUse) {
+  if (provider.error === null) {
+    return null;
+  }
+  if (provider.problem === "no_key") {
+    return el("span", { class: inUse ? "badge b-bad" : "badge b-muted" }, "no key");
+  }
+  return el("span", { class: "badge b-bad" }, provider.problem === "key_refused" ? "key refused" : "unavailable");
+}
+
+/** One provider as a fold: open when it owns the default model or fails, so the cause is in sight. */
+function providerBlock(provider, mainModel, inUse) {
   const ownsMain = provider.models.some((model) => model.ref === mainModel);
   return foldGroup({
     id: `system-models-${provider.provider}`,
     head: el(
       "span",
       { class: "row grow" },
-      el("strong", null, provider.provider),
-      el("span", { class: "hint" }, plural(provider.models.length, "model", "models")),
-      provider.error === null ? null : el("span", { class: "badge b-bad" }, "unavailable"),
+      el("strong", null, providerLabel(provider.provider)),
+      provider.error === null ? el("span", { class: "hint" }, plural(provider.models.length, "model", "models")) : null,
+      problemBadge(provider, inUse),
     ),
-    body: providerBody(provider, mainModel),
-    openByDefault: ownsMain || provider.error !== null,
+    body: providerBody(provider, mainModel, inUse),
+    openByDefault: ownsMain || isFailing(provider, inUse),
   });
 }
 
-/** What the folded Models card shows: the providers, the models and any provider that did not answer. */
-function modelsSummary(providers) {
+/** What the folded Models card shows: the providers, the models, any provider that fails and any without a key. */
+function modelsSummary(providers, inUse) {
   const total = providers.reduce((count, provider) => count + provider.models.length, 0);
-  const failed = providers.filter((provider) => provider.error !== null).length;
+  const failing = providers.filter((provider) => isFailing(provider, inUse.includes(provider.provider))).length;
+  const keyless = providers.filter((provider) => provider.problem === "no_key" && !inUse.includes(provider.provider)).length;
   return [
     el("span", null, `${plural(providers.length, "provider", "providers")} · ${plural(total, "model", "models")}`),
-    failed > 0 ? el("span", { class: "badge b-bad" }, `${failed} unavailable`) : null,
+    failing > 0 ? el("span", { class: "badge b-bad" }, `${failing} unavailable`) : null,
+    keyless > 0 ? el("span", { class: "badge b-muted" }, `${keyless} without a key`) : null,
   ];
 }
 
@@ -398,20 +447,22 @@ function buildModels(isDisposed) {
   const card = foldCard({ id: "system-models", title: "Models", actions: reload, body, openByDefault: true });
   let painted = null;
 
-  // Called on every status update; the tables are only rebuilt when the list or the default model changed, so a menu
-  // that is open stays open.
+  // Called on every status update; the tables are only rebuilt when the list, the default model or the providers the
+  // configured models run on changed, so a menu that is open stays open.
   function paint() {
     if (providers === null) {
       return;
     }
     const status = getSnapshot().status;
     const mainModel = status === null ? "" : status.models.main;
-    if (painted !== null && painted.providers === providers && painted.mainModel === mainModel) {
+    const inUse = providersInUse(status);
+    const usage = inUse.join(" ");
+    if (painted !== null && painted.providers === providers && painted.mainModel === mainModel && painted.usage === usage) {
       return;
     }
-    painted = { providers, mainModel };
-    card.setSummary(...modelsSummary(providers));
-    body.replaceChildren(...providers.map((provider) => providerBlock(provider, mainModel)));
+    painted = { providers, mainModel, usage };
+    card.setSummary(...modelsSummary(providers, inUse));
+    body.replaceChildren(...providers.map((provider) => providerBlock(provider, mainModel, inUse.includes(provider.provider))));
   }
 
   async function load() {

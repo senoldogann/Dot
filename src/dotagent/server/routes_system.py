@@ -12,7 +12,7 @@ from fastapi.responses import FileResponse
 
 from dotagent import __version__
 from dotagent.config import AppConfig
-from dotagent.core.errors import DotError, NotFoundError
+from dotagent.core.errors import DotError, MissingSecretError, NotFoundError, ProviderAuthError
 from dotagent.core.paths import dot_home, failsafe_path, screenshots_dir
 from dotagent.desktop.perms import missing_panes, program_of_this_process, request_permissions
 from dotagent.desktop.types import Permissions
@@ -21,7 +21,15 @@ from dotagent.llm.router import KNOWN_PROVIDERS, ModelRef, ModelRouter
 from dotagent.llm.traits import effective_effort
 from dotagent.llm.types import Effort, ModelInfo
 from dotagent.server.context import ServerContext
-from dotagent.server.views import FailsafeView, HealthView, ModelOption, PermissionsView, ProviderModels, StatusView
+from dotagent.server.views import (
+    FailsafeView,
+    HealthView,
+    ModelOption,
+    PermissionsView,
+    ProviderModels,
+    ProviderProblem,
+    StatusView,
+)
 from dotagent.store.models import ApprovalRecord
 
 _IMAGE_NAME: re.Pattern[str] = re.compile(r"^[0-9a-f]{24}\.(png|jpg|webp|gif)$")
@@ -40,14 +48,26 @@ def _option(provider: str, info: ModelInfo, default_effort: Effort) -> ModelOpti
     )
 
 
+def _problem(exc: DotError) -> ProviderProblem:
+    """The kind of failure of a provider: the page sends a missing or refused key to Settings › API keys."""
+    if isinstance(exc, MissingSecretError):
+        return "no_key"
+    if isinstance(exc, ProviderAuthError):
+        return "key_refused"
+    return "failed"
+
+
 async def _provider_models(router: ModelRouter, provider: str, default_effort: Effort) -> ProviderModels:
     """The models of one provider; a provider that cannot be reached is reported, it does not fail the others."""
     try:
         infos: tuple[ModelInfo, ...] = await (await router.provider(provider)).list_models()
     except DotError as exc:
-        return ProviderModels(provider=provider, models=[], error=exc.message)
+        return ProviderModels(provider=provider, models=[], error=exc.message, problem=_problem(exc))
     return ProviderModels(
-        provider=provider, models=[_option(provider, info, default_effort) for info in infos], error=None
+        provider=provider,
+        models=[_option(provider, info, default_effort) for info in infos],
+        error=None,
+        problem=None,
     )
 
 

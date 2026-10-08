@@ -8,6 +8,7 @@ import { el, modelName } from "../dom.js";
 import { allModels, offersChoice, savedLevel } from "../efforts.js";
 import { icon } from "../icons.js";
 import { segmented } from "../panels.js";
+import { providerLabel } from "../providers.js";
 import { reasoningSelect } from "../reasoning.js";
 import { approvalsPicker, goalModePicker } from "../runmodes.js";
 import { onCompose } from "../shortcuts.js";
@@ -162,7 +163,7 @@ function buildComposer(ctx) {
         model.append(
           el(
             "optgroup",
-            { label: group.provider },
+            { label: providerLabel(group.provider) },
             group.models.map((info) => el("option", { value: info.ref, title: info.ref }, modelName(info.ref))),
           ),
         );

@@ -9,7 +9,7 @@ import subprocess
 from pathlib import Path
 from typing import Literal
 
-from dotagent.core.errors import ConfigError
+from dotagent.core.errors import MissingSecretError
 from dotagent.core.paths import env_file_path
 from dotagent.core.types import FrozenModel
 
@@ -126,7 +126,7 @@ def secret_state(name: str) -> SecretState:
 def require_secret(name: str, purpose: str) -> str:
     value: str | None = resolve_secret(name)
     if value is None:
-        raise ConfigError(
+        raise MissingSecretError(
             "missing API key",
             {
                 "name": name,
