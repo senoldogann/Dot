@@ -3,7 +3,8 @@
 The owner asked for Dot's autonomy to be smarter, steadier and sturdier **whatever model runs it**. This file is the
 handoff for that work: what is planned, why, in which order, what is done and how it was checked. If you continue the
 work, read it first, and keep the status table, the item sections and the log at the bottom true. It is the only record
-of where the work stands.
+of where the work stands. Part 1 (items 1 to 8, autonomy) is done; part 2 (items 9 to 20: standing goals, yolo without
+questions, faster steps, helper models) was planned on 2026-10-09 and has its own status table below.
 
 ## Principle
 
@@ -26,12 +27,14 @@ recover (6), learn (7), undo (8). Every later item is judged with the numbers of
 
 Status values: `planned`, `in progress`, `done` (implemented, tested, verified, committed), `parked` (the reason is in
 the item). Take the first item that is not `done`. All eight are done; what waits for the owner is in "Open owner
-decisions".
+decisions". Part 2 starts at item 9: take the first item of its table ("Status, part 2") that is not `done`, in the
+order its "Order and dependencies" paragraph gives.
 
 ## Where things stand before this roadmap
 
 - Baseline `8848d69` (tag `pre-audit-fixes`; the folder had no git before). Audit fixes on top of it, one commit per
-  wave: A `9e6eb5a` run integrity (tool calls stored per step, atomic message writes, no double start, a shutdown has its
+  wave: A `9e6eb5a` run integrity (tool calls stored per step, atomic message writes, no double start, a shutdown has
+  its
   own result text), C `159c75b` data upkeep (screenshots follow their chats, `dotx prune`, compaction of the database),
   D `a91aa47` Turkish-aware search (one fold), paging of the chat list, delete confirmations focus Cancel.
 - Audit leftovers nobody has started, the owner's call: B speed and cost (the model that compacts, the `wait_text`
@@ -48,7 +51,9 @@ decisions".
 2. Check the ground before you build on it: `.venv/bin/ruff format --check src tests`, `.venv/bin/ruff check`,
    `.venv/bin/mypy`, `.venv/bin/python -m pytest tests/unit -q` must all be clean.
 3. For the item you take: read the code it touches (the "Touchpoints" list is a start, not a limit), refine the design in
-   its section if reading proves it wrong, set the status to `in progress`, then implement, test, verify, commit.
+   its section if reading proves it wrong, set the status to `in progress`, then implement, test, verify, commit. The
+   designs of part 2 were written from a read-only audit, not from building: where the code disagrees with a design,
+   the code wins and the section is corrected first.
 4. After each commit: set the status and the commit hash in the table, tick what is done in the item, and add a line to
    the log. A reader must be able to resume from this file alone.
 5. Anything that needs the owner (a live paid run, a daemon restart, a default that changes how their agent behaves)
@@ -110,7 +115,8 @@ text; since wave A they differ.
   `Store.mark_interrupted_runs` now closes `blocked` runs too (a run waiting for an answer when the daemon died stayed
   `blocked` for ever).
 - Tests: `tests/unit/test_evals.py`, `test_endings.py`, `test_run_statistics.py`, `test_store_runs.py`, and
-  `tests/smoke/test_evals_runner.py` (the whole catalog through the real loop with the scripted model, the time and token
+  `tests/smoke/test_evals_runner.py` (the whole catalog through the real loop with the scripted model, the time and
+  token
   cuts, the refusal of `ask_user`, the home left untouched). None needs a service.
 
 **How to use it for the next items.** Run `dotx eval check` after any change to a tool, the policy or the loop: it takes
@@ -148,7 +154,8 @@ ends only when you stop it." And when it does fire, all it does is repeat one no
 - `agent/progress.py`, pure: an observation per acting step (fingerprint, all-failed flag, a digest of the results that
   includes the hashes of images), a window, and four detectors: exact repetition (today's), a cycle of period 2 or 3, a
   failure streak (`failure_streak` consecutive steps in which every call failed), and revisiting (nearly every result
-  in the last `revisit_window` steps was already seen earlier in the run). Plan stagnation (open plan, no step closed for
+  in the last `revisit_window` steps was already seen earlier in the run). Plan stagnation (open plan, no step closed
+  for
   a long time) is a weak signal; add it only if the first four leave a gap.
 - A ladder with a cooldown, so one hiccup is not an emergency: (1) a nudge that names the detected pattern; (2) a
   forced re-plan: for one step the model is offered only `update_plan`, `ask_user` and `finish`; (3) a consultation: one
@@ -156,7 +163,8 @@ ends only when you stop it." And when it does fire, all it does is repeat one no
   plan, the ledger and the pattern and answers with a diagnosis and up to three next steps, injected as a system note;
   (4) the model is made to ask the user one concrete question (`ask_user`), skipped for delegated and scheduled runs;
   (5) stop, with a result that says what was tried, where it stands and how to continue in the same thread. A long
-  healthy stretch steps the level down again, so a run that runs for hours is not killed by hiccups that are hours apart.
+  healthy stretch steps the level down again, so a run that runs for hours is not killed by hiccups that are hours
+  apart.
 - `stall` events carry `level`, `reason`, `detail`, `action` (keep `warnings` so the UI and `cli_ui.py` keep working;
   update `timeline.js` to show the reason).
 - Config in `[agent]`: `stall_escalation` (false restores the old behavior), `failure_streak`, `revisit_window`.
@@ -168,12 +176,14 @@ ends only when you stop it." And when it does fire, all it does is repeat one no
 - `agent/progress.py`, pure. `observe` turns the calls of one acting step (`CallSeen`: name, arguments, result, failed,
   image hashes) into an `Observation`; `advance(state, calls, limits, ladder)` returns the next `WatchState` and an
   `Alert` or `None`. Detectors: `repeat` (`stall_limit` steps with the same calls and the same results), `cycle` (period
-  2 or 3, two whole rounds, more than one distinct step), `failures` (`failure_streak` steps in a row in which every call
+  2 or 3, two whole rounds, more than one distinct step), `failures` (`failure_streak` steps in a row in which every
+  call
   failed), `revisiting` (at least `revisit_window - 1` of the last `revisit_window` steps only redo calls already made,
   with the same results). Every alert clears the window, so the next rung needs fresh evidence; 12 steps without an
   alert (`_DECAY_STEPS`) bring the level one rung down.
 - `ladder_for(escalation, can_ask)`: with `stall_escalation` nudge, replan, consult, ask, stop (ask only when
-  `can_ask_user`: no parent run, not a schedule, delegate or eval source, approvals not `yolo`); without it nudge, nudge,
+  `can_ask_user`: no parent run, not a schedule, delegate or eval source, approvals not `yolo`); without it nudge,
+  nudge,
   stop and only `repeat` counts, which is the old stall guard with the decay and a better end.
 - `agent/loop.py`: `_calls_seen` feeds the watchdog after every acting step and `_answer_alert` answers the rung. Nudge,
   replan and ask add a system note; replan and ask also limit the next step through `_only` (a registry of the allowed
@@ -190,7 +200,8 @@ ends only when you stop it." And when it does fire, all it does is repeat one no
   `EvalSettings.stall_escalation` records the setting in eval reports and the scorecard; `dotx eval run` checks the
   review model too when the ladder is on.
 - Tests: `tests/unit/test_progress.py` (detectors, both ladders, decay, the fresh start, the restriction, who can be
-  asked, the stop result) and `tests/smoke/test_progress_watchdog.py` (the real loop, with the scripted model playing the
+  asked, the stop result) and `tests/smoke/test_progress_watchdog.py` (the real loop, with the scripted model playing
+  the
   run and the review model: a nudge and recovery, the whole ladder to a stop with a useful result, a healthy 31-step
   run untouched, the plain ladder). None needs a service.
 
@@ -213,7 +224,8 @@ copy `progress_consultant_for`: one forced tool call to the review model with th
 - One `stall` event per alert. Events of the older guard (only `warnings`) still render.
 - Found while testing: an eval attempt could run stale bytecode of a file the reference had edited within the second it
   was compiled (`fix-add-bug` failed on `a83cdcc` too); attempts now run with `PYTHONDONTWRITEBYTECODE=1`. Also fixed:
-  `timeline.js` threw on every stall event (`warnings.join` on an int) and `cli_ui.py` refused plan steps marked `failed`
+  `timeline.js` threw on every stall event (`warnings.join` on an int) and `cli_ui.py` refused plan steps marked
+  `failed`
   or `skipped`.
 - No live model run: the ladder was tried only with the scripted model.
 
@@ -236,7 +248,8 @@ at the start of the context.
 - The window. `ModelInfo.context_length` is what one request of the model can hold. The Ollama provider reports the
   smaller of the model's window (`/api/show`) and `[providers.ollama] num_ctx`, which it sends with every request and
   which Ollama cuts a longer prompt to (whether Ollama applies `num_ctx` to `:cloud` models is not verified; taking the
-  smaller one is the safe side). The run's budget is `min([agent] context_tokens, 3/4 of the window)`; the last quarter is
+  smaller one is the safe side). The run's budget is `min([agent] context_tokens, 3/4 of the window)`; the last quarter
+  is
   room for the reply and for the error of the token estimate. Tool output shrinks in the same proportion (never below
   2000 characters): `ToolContext.output_chars` carries it, the tools that page their output (`read_file`, `web_fetch`,
   MCP results, browser and desktop text) size each page to it, and the executor clips the rest. A model whose
@@ -256,7 +269,8 @@ at the start of the context.
   `risk`: unknown tool, wrong mode, arguments that were not JSON or did not fit the schema), invalid JSON, empty
   replies, stalls, compactions. Refusals measure the model and not the environment (a missing file or a failing test is
   not the model's fault), so they decide the tier. No-tool replies are not counted: they cannot be told from a final
-  answer. Eval reports are not read: an attempt runs in a throw-away home, `RunMetrics` has no refusal count, and parsing
+  answer. Eval reports are not read: an attempt runs in a throw-away home, `RunMetrics` has no refusal count, and
+  parsing
   every report at each run start costs more than it tells.
 - `agent/scaffold.py`, pure: `scaffold_for(agent_config, info, profile)` returns the `Scaffold` of a run (window, budget,
   tool output, tier, the reason for the tier, the reminder interval). Tiers: `standard` and `weak`. `[agent] tiers`
@@ -591,7 +605,8 @@ README. `policy/types.py` did not change.
 - `store/db.py`: `runs_finished_since(since)`, and `mark_interrupted_runs` as above.
 - Daemon: `resume_safe()` after `recover()` when `resume = "safe"`; the `daemon_started` log line lists `resumed`.
 - Server: `RunDetail.resumable`, `POST /api/runs/{id}/resume`. The detail of a run reads whether the run is active
-  before it reads the run, so a run that ends in between never shows as neither active nor ended (a smoke test found it).
+  before it reads the run, so a run that ends in between never shows as neither active nor ended (a smoke test found
+  it).
 - CLI: `dotx resume RUN_ID [--no-input] [--thinking] [--verbose]` resumes in its own process like `dotx run` and prints
   the result; the terminal shows "↺ resumed by hand: the daemon stopped while run … worked", a line per call
   ("shell: cut off (it may have changed something)") and the plan.
@@ -846,6 +861,727 @@ a file past a cap of 16 bytes: the dry run listed `cannot`, `delete`, `restore` 
 files and the folder, left the third and exited 1; a second `--apply` left only that file; an unknown run exited 2 with
 `error: run not found`; `dotx prune` showed the journals.
 
+## Part 2: standing goals, yolo without questions, faster steps, helpers (planned 2026-10-09)
+
+The owner's second ask, after the eight items (the verbatim Turkish is in `PLAN.md`, part 8): browser and computer
+use must be faster; a goal such as "earn money with the information I gave you" or "go to X.com and do what it takes
+to grow my audience" must be worked on **until the outcome is there**, not until the run feels done; a `yolo` run must
+never ask what it can do itself (a run asked the owner to type a one-time code that had arrived in the owner's own
+webmail); a run on one provider should be able to ask a model of another provider for help, and a missing key or an
+exhausted quota must not break anything; and the agent should be able to do any job on this Mac, write code in a
+browser and research. The owner also asked whether TypeSafe's typed judgments (System One, used in their OSJarvis
+project) belong in Dot.
+
+**Principle for part 2.** The same as part 1: the harness measures, notices, steers and recovers. What is new is the
+unit of work: a *standing goal* outlives a run and is verified by evidence, not by the model's word. Nothing here
+widens what a run may do; `yolo` already waives every policy question. What changes is that the harness stops
+pretending to ask when nobody will answer, stops ending runs that are not finished, and does not wait on the model for
+what it can do itself. Every behavior change is measured with item 9's numbers or with the eval harness, and defaults
+that change the owner's agent are their call (see "Open owner decisions", 6 onward).
+
+### Status, part 2
+
+| #   | Item                                                                   | Status  | Commits |
+| --- | ---------------------------------------------------------------------- | ------- | ------- |
+| 9   | Time accounting: where the seconds of a run go                         | planned |         |
+| 10  | Yolo asks nobody: secret fields, questions and the end of a run        | planned |         |
+| 11  | Open-ended goals in one run: targets, budgets and an honest end        | planned |         |
+| 12  | Campaigns: a goal that works until its outcome is verified             | planned |         |
+| 13  | Faster browser and desktop steps                                       | planned |         |
+| 14  | Rich editors, drag and bulk text in the browser                        | planned |         |
+| 15  | Helper models: consult, delegate to another model, standby             | planned |         |
+| 16  | Typed judgments (TypeSafe) at the decision points                      | planned |         |
+| 17  | Pacing and public actions on social platforms                          | planned |         |
+| 18  | Skills written for Claude Code, and the X playbook                     | planned |         |
+| 19  | Prompt-cache hygiene for the hosted providers                          | planned |         |
+| 20  | An interactive terminal for programs that prompt                       | planned |         |
+
+**Order and dependencies.** 9 first: it is cheap and every later item is judged with it. 10, 11 and 12 are the owner's
+main ask and build on each other (12 needs the left questions of 10 and the targets of 11). 13 and 14 are the speed
+ask and depend on nothing. 15 before 16: both handle a provider that is not there. 17, 18, 19 and 20 are independent;
+18 is an afternoon. The owner may reorder; write the new order here when they do.
+
+**What the audit of 2026-10-09 measured and found** (four read-only subagent audits, re-read at the cited lines; the
+owner's data was not read, the numbers of 2026-10-08 are the audit's aggregate SQL):
+- One streamed model call per step (`agent/loop.py:869-871`); the tools of a turn run after the whole reply, browser
+  and desktop tools one at a time (`tools/browser.py:303`, `tools/desktop.py:372`, `agent/executor.py:194-220`). The
+  fixed part of every call is about 13.3 k estimated tokens with the `full` surface (3 321 system prompt, 9 954 tool
+  schemas); average input per step in the real history was about 37 k (103.1 M over 2 772 steps). Compaction took
+  12.7 % of run wall time, median 10.7 s per compaction, with the run's own model (`agent/loop.py:299`; `[models] fast`
+  is read nowhere).
+- Model-call duration is recorded nowhere; `tool_result.seconds` includes the approval wait (`agent/executor.py:100`,
+  `127-166`); the usage of review, goal-check, compaction and vision calls is discarded (`agent/review.py:383-400`,
+  `agent/loop.py:266`); `cached_tokens` is parsed and never stored. `browser_wait_text` failed 22.4 % of the time and
+  returns a whole page view when it succeeds (`tools/browser.py:400-424`).
+- A browser click costs about 160 ms of fixed waiting (40 ms grace per side-effect step, `browser/session.py:820-822`;
+  120 ms DOM-quiet window, `browser/driver.py:46-53`) plus Playwright round trips and one full aria snapshot, also when
+  nothing changed. A desktop click costs about 0.56 s fixed (two `lsappinfo` listings of about 38 ms each,
+  `desktop/session.py:227` and `:547`; 110 ms click pacing, `desktop/input.py:175-177`; 350 ms settle,
+  `desktop/session.py:636-637`) plus an unconditional closing accessibility walk (`desktop/session.py:638`, capped at
+  `ax_budget_s` 4 s).
+- A text reply ends a task run when `nudges >= finish_nudges`, and `nudges` is reset only by a send-back
+  (`agent/loop.py:936-946`, `954`, `962`, `973`): a status line written mid-run counts toward the end. `ask_user` goes
+  through `approvals.request` in every mode and waits `approval_timeout_s` (900 s) in `yolo` and in scheduled runs
+  too (`tools/meta.py:84-106`, `agent/approvals.py:45-66`). The browser refuses password and one-time-code fields at the
+  tool level in every mode (`browser/driver.py:280-286`, `348`, `351`), and the prompt says codes are never typed
+  (`agent/prompt.py:186`), while `yolo` waives the credential hard stop (`agent/gate.py:101-102`).
+- Nothing outlives a run: the prompt forbids saving progress (`agent/prompt.py:166-167`), a schedule the agent creates
+  takes no options (`tools/schedule.py:99-101`, `UNSET_OPTIONS`) and starts a new thread per firing
+  (`scheduler/runner.py:105-107`), and a delegated run always uses the parent's model (`agent/manager.py:150-162`).
+  "Repost" and "Quote" match no pattern (`policy/elements.py:28-29`), and no cap or spacing exists for public actions.
+- The owner's Claude Code skills `x-twitter-growth` and `baoyu-post-to-x` are refused by Dot's loader: their
+  `metadata` holds a date and a nested map, and `SkillFrontmatter.metadata` is `dict[str, str]` (`skills/types.py`;
+  reproduced with `parse_skill` on 2026-10-09; `find-skills` loads).
+- The browser has no `drag` step and no handling of `contenteditable` editors: `type` is `press_sequentially`, `fill`
+  is `locator.fill` (`browser/driver.py:349-352`). On X's composer the first character of `type` is lost and `fill`
+  reports done without a change (`PLAN.md`, follow-up of 2026-10-07).
+
+### 9. Time accounting: where the seconds of a run go
+
+**Status: planned.** **Goal.** Every model call and every tool call of a run leaves its duration and its tokens in the
+store, and `dotx stats` and `dotx eval` show where the time goes, per model and per tool.
+
+**Why.** Items 13, 14 and 19 promise speed; without this item their effect is a guess. Today the store has
+`tool_result.seconds` (with the approval wait inside), the timestamps of events, and the run's token totals; the model
+call itself, the compaction, the review calls and the cache reads leave nothing (see the audit list above).
+
+**Design.**
+- `ChatRequest` gets `purpose: CallPurpose`, with `CallPurpose` the literal of `step`, `compaction`, `review`,
+  `goal_check`, `progress`, `lessons`, `vision`, `attachment` and `consult`
+  (`llm/types.py`); every constructor names its purpose (`agent/loop.py`, `agent/review.py`, `agent/vision.py`,
+  `agent/attachments.py`, `agent/aside.py`, `agent/lessons.py`, `evals/scripted.py`, the smoke tests).
+- `ModelRouter.complete` (`llm/router.py:104-106`) measures the call and hands a `ModelCall(purpose, model, session_key,
+  seconds, input_tokens, output_tokens, cached_tokens, error)` to a recorder the runtime sets:
+  `runtime.calls.record(call)`. The recorder resolves the run from the session key (one active run per thread,
+  `agent/manager.py:348-353`; a review question's `session_key` is the thread id too, `agent/review.py:386`) and
+  writes a `model_call` event for that run. A call with no active run (`dotx eval check`, `dotx models profile`) is
+  logged, not stored. Failures are recorded with `error` set to the error type and `seconds` to the time spent.
+- The `assistant` event (`agent/loop.py:882-895`) gets `seconds` and `cached_tokens` too, so the timeline can show them
+  per step without joining events.
+- `tool_result` gets `waited_s`: the time `gate.authorize` spent waiting for an approval (`agent/executor.py:100`,
+  measured around it; `_PausedClock` at `:102` already knows it). `seconds` stays the whole call, as today.
+- `store/stats.py`: `ModelStats` gets `model_seconds`, `step_seconds_median`, `step_seconds_p90`, `compaction_seconds`,
+  `side_call_seconds` (every purpose but `step`), `cached_tokens`; a new `ToolStats(tool, calls, failed, seconds_total,
+  seconds_median, waited_s)` per tool name. Both are read from the events of the runs in the window, read-only, no
+  text. `dotx stats` prints a "Time" table per model and a "Tools" table (the 15 tools with the most seconds). A step's
+  seconds come from its `model_call` event (`purpose = "step"`); runs older than this item have none and are left out
+  of the time columns, with their count printed.
+- `dotx eval`: `RunMetrics` (`evals/results.py:22-34`, `evals/metrics.py:18-31`) gets `model_seconds` and
+  `tool_seconds`; the scorecard (`evals/scoring.py:88-115`) prints seconds per pass next to steps and tokens, and the
+  comparison table (`:160-170`) gets a seconds column. The replay of `dotx eval check` reports zero model seconds, as
+  the scripted model makes no call.
+- The eval runner stops depending on the live bus for the end of a run: `_supervise` (`evals/runner.py:188-211`)
+  checks `Subscription.dropped` and re-reads the store when events were dropped, as `server/stream.py:128-130` does.
+- Side-call tokens join the run's totals: `update_run_progress` adds the tokens of every `model_call` of the run, so
+  `dotx stats` and the Details panel stop under-counting (the eval token budget at `evals/runner.py:202-206` reads the
+  same totals).
+
+**Touchpoints.** `llm/types.py`, `llm/router.py`, `runtime.py` (the recorder), `agent/loop.py`, `agent/executor.py`,
+`agent/review.py`, `agent/vision.py`, `agent/attachments.py`, `agent/aside.py`, `agent/lessons.py`, `store/stats.py`,
+`store/db.py` (a `model_call` kind needs no schema change: events are JSON), `cli_stats.py`, `evals/results.py`,
+`evals/metrics.py`, `evals/scoring.py`, `evals/runner.py`, `evals/scripted.py`, `timeline.js` (seconds on a step),
+README "Measuring the agent".
+
+**Done when.** Unit tests of the aggregation on a hand-written event list (`tests/unit/test_run_statistics.py`:
+medians, p90, tools table, runs without `model_call` events left out); a smoke test with the scripted provider that
+checks one `model_call` event per step and one per compaction; `dotx stats` on a throw-away home prints the tables;
+`dotx eval check` clean; the numbers of one scripted eval run (seconds per task) written here as the baseline for
+items 13, 14 and 19.
+
+### 10. Yolo asks nobody: secret fields, questions and the end of a run
+
+**Status: planned.** **Goal.** A `yolo` run, a scheduled run and a delegated run never wait for a person. What the
+run can read and do itself, it does; a question for the owner is left in the thread and the run goes on.
+
+**Why.** On 2026-10-09 a `yolo` run applying for a job stopped at an e-mail verification code that had arrived in the
+owner's webmail, which the run could open, and asked the owner to type the six digits. Three things made it ask: the
+browser's tool-level refusal of one-time-code fields in every mode (`browser/driver.py:280-286`), the prompt line "one-
+time codes are never typed by you: use ask_user" (`agent/prompt.py:186`), and `ask_user`, which blocks for 900 s in
+`yolo` as in `ask` (`tools/meta.py:84-106`, `agent/approvals.py:45-66`). The owner's decision of 2026-10-07 already
+makes `yolo` waive the credential hard stop; the tool and the prompt did not follow. Separately, a task run ends on
+the third text-only reply even when tool calls came between them (`agent/loop.py:936-946`), so a status line counts
+toward the end of a run that is not finished.
+
+**Design.**
+- **Secret fields follow the approval mode.** The check moves out of `run_step` (`browser/driver.py:348`, `:351`) to
+  the tool: `BrowserSession.secret_fields(thread_id, refs) -> dict[str, str]` runs `_SENSITIVE_FIELD_SCRIPT` for the
+  refs of the `fill` and `type` steps and returns the kind of each secret field. `browser_act` calls it before `act`
+  unless the run is `yolo` (`ToolContext` gets `approvals: ApprovalMode`, the run's mode, set at `agent/loop.py:787`
+  where the context is built; the gate knows it already, `agent/gate.py:101-102`), and refuses as today ("refusing to
+  type into a one-time-code field: ask the user to
+  enter it themselves") with no browser action run. In `yolo` the steps run; the classification of a typing step keeps
+  the `credential` flag from the field's name (`policy/elements.py:30-37`), so the gate records the yolo approval as
+  for any waived hard stop. The desktop's secure-field refusal (`desktop/actions.py:409-414`) follows the same rule
+  through the same `ToolContext.approvals`; password managers stay refused in every mode (`desktop/session.py:132-137`)
+  unless
+  the owner decides otherwise (open decision 7). Screenshots keep blacking out secure fields.
+- **The prompt says what yolo may do.** The trust rules (`agent/prompt.py:180-190`) become a function of the approval
+  mode. In `ask` and `auto`: as today. In `yolo`: "Passwords, one-time codes and payment details: enter them when you
+  can read them yourself (a code in a mailbox you can open, a value the user gave you); never guess one, never read a
+  secret store the task does not need, and say in the answer which you entered." The `yolo` line of
+  `_APPROVALS_TEXT` says that nobody answers questions during the run and that a question is left for later.
+- **Questions that do not block.** `[agent] questions = "wait" | "leave"` decides what `ask_user` does in a run nobody
+  watches: a run in `yolo`, a scheduled run, an eval run (delegated runs have no `ask_user`, `agent/loop.py:737-738`).
+  With `leave` (the default, the owner's ask of 2026-10-09) `ask_user` creates the approval record with severity
+  `question` as today, so the card shows in the UI and in the timeline, but does not set the run to `blocked` and does
+  not wait: its result is "The question is left for the user, who is not asked to answer now. Continue with what does
+  not depend on the answer; if nothing can be done without it, finish and put under *What I need from you* exactly
+  what you need." A `wait` run behaves as today. `ask` and `auto` runs started by the owner always wait.
+  `ApprovalBroker.leave(run_id, tool, summary, severity, args)` writes the record and emits `approval_requested` with
+  `"blocking": false`; the answer path (`POST /api/approvals/{id}`) accepts an answer for a left question after the run
+  ended: it stores it, appends "Answer to the agent's question …: …" to the thread's instructions
+  (`agent/manager.py:423-433` reads them at the next run) and, when the thread has no active run, offers Continue
+  (a new run on the thread whose opening text is the answer, through the resume path of item 6 with `resumed=None`).
+  The web UI lists left questions of ended runs under the composer ("Dot asked you") until they are answered or
+  dismissed; `dotx run` prints them after the answer.
+- **The end of a run counts only consecutive text replies.** `nudges` is reset to 0 whenever a reply carries tool
+  calls (`agent/loop.py:900`), so only `finish_nudges + 1` text-only replies in a row end a task run. `finish` stays the
+  normal end; `FinishArgs` gets `needs_from_user: str` (may be empty) that the run page shows as "What Dot needs from
+  you" and that a campaign (item 12) carries into its ledger.
+- **Events and the record.** `approval_requested` with `blocking`; `question_left` is not a new kind: the record's
+  `status` stays `pending` until answered; a pending left question of an ended run is shown, never expired by the
+  broker's timer (it has none), and `dotx prune` leaves it.
+
+**Touchpoints.** `browser/driver.py`, `browser/session.py`, `tools/browser.py`, `tools/desktop.py`,
+`desktop/actions.py`, `tools/context.py` (the new `approvals` field), `agent/prompt.py`, `tools/meta.py`,
+`agent/approvals.py`, `agent/loop.py`, `agent/manager.py`, `server/routes_runs.py` (answers after the end, Continue),
+`store/db.py` (left questions by thread), `approvals.js`, `views/run.js`, `timeline.js`, `config.py`, `defaults.toml`,
+README "Safety" and "Autonomy", `tests/smoke/test_approval_modes.py`, `tests/smoke/test_browser.py`.
+
+**Decisions and limits.**
+- Nothing here lets `ask` or `auto` do more: secret fields are refused before any action in those modes, as today,
+  and their questions wait.
+- A left question is still a question: a run that cannot proceed without the answer finishes honestly (`success =
+  false`, the need in `needs_from_user`), and a campaign session (item 12) picks the answer up at its next session.
+- The one-time code of the 2026-10-09 run would now be read from the webmail tab and typed, with the `credential` yolo
+  approval in the timeline.
+
+**Done when.** Smoke tests with the scripted model: a `yolo` run whose `ask_user` gets the left result at once, the
+record pending, the run status never `blocked`, the answer after the end stored as an instruction and Continue
+starting a run with it; a scheduled run the same; an `ask` run waits as before (`test_approval_modes.py`). Browser
+smoke on the fixture page: an OTP field is refused in `ask` and filled in `yolo`, with the `credential` approval
+recorded. Unit test of the nudge reset. The prompt difference between the modes checked byte for byte in
+`tests/unit/test_scaffold.py` style. Timeline and the "Dot asked you" list checked in headless Chrome on a throw-away
+daemon.
+
+### 11. Open-ended goals in one run: targets, budgets and an honest end
+
+**Status: planned.** **Goal.** A run given an outcome instead of a task ("grow", "earn", "find a way", "as many as
+possible") turns it into measurable targets, works toward them, and ends only with the targets reached or with an
+honest account of what is missing; the owner can bound such a run in minutes or tokens when they want to.
+
+**Why.** The prompt was written for precise tasks: "take the smallest reasonable reading", "add nothing that was not
+asked for" (`agent/prompt.py:81-84`). Nothing tells the model what "done" means for an open goal, so a run can end
+after a few clicks and say so; the goal check (off by default) can only judge against the goal text. There is no
+budget of any kind (`agent/loop.py:831`, README "Status and known limits"); the owner wants runs that keep going, and
+a bound they can set when they do not.
+
+**Design.**
+- **Wording.** `_WORK` (`agent/prompt.py:76-108`) gets a section:
+  "# Open-ended goals. A precise request is done exactly as asked, with the smallest reasonable reading. A goal that
+  names an outcome instead of a task (grow, improve, earn, reach, as many as possible, find a way) asks for the
+  outcome: choose the approach yourself; before acting, write the targets you will reach and how you will verify them
+  with your own tools into the plan (`update_plan`, `targets`), and the budget you intend to spend; prefer the channel
+  that brings the first measurable result soonest; after each round measure, write the numbers, and change approach
+  when a round brought nothing; do not call finish before the targets are met, unless the budget is spent or the next
+  step needs something only the user can give; then finish with `success = false`, the numbers reached and what is
+  missing." The line "When a request can be read in several ways, take the smallest reasonable reading" becomes "When a
+  precise request can be read in several ways, …".
+- **Targets in the plan.** `PlanPayload` (`agent/plan.py:24-32`) gets `targets: str` (may be empty; at most 600
+  characters): the measurable outcome and how it is verified. `update_plan` takes it, the plan render shows it under
+  the steps, the live plan of the UI shows it as its first line, and a resumed run inherits it with the plan
+  (`agent/loop.py:727-729`).
+- **The goal check reads the targets.** `GoalRequest` (`agent/review.py`) gets `targets`; `_goal_prompt` tells the
+  checker to judge against the targets when they are set, from the facts and the digest, and against the goal text
+  otherwise. `achieved` needs the targets met or the answer to say honestly that they are not, with `success = false`.
+- **Budgets, opt-in.** `[agent] run_max_minutes = 0` and `run_max_tokens = 0` (0: none). After each step the loop
+  compares the run's wall time and `input_total + output_total` with them; at the first step past a limit it appends a
+  note ("The budget of this run is spent: N minutes / N tokens. Finish now with what was reached, the numbers and what
+  is missing.") and offers only the core tools, like the re-plan rung of item 2; if the next reply still does not
+  finish, the run ends `stopped` with a result built like the watchdog's (`agent/progress.py:321-336`) and a new
+  ending `budget` in `store/endings.py`. Event `budget_reached {minutes, tokens, limit}`. A campaign session
+  (item 12) uses the same mechanism per session.
+- **Delegated and scheduled runs** inherit nothing new: budgets are per run from the configuration; a campaign may set
+  its own (item 12).
+
+**Touchpoints.** `agent/prompt.py`, `agent/plan.py`, `tools/meta.py` (`update_plan`), `agent/review.py`,
+`agent/loop.py` (`_check_goal`, the budget check), `store/endings.py`, `store/stats.py` (the new ending counts),
+`views/run.js` (targets in the live plan), `timeline.js`, `config.py`, `defaults.toml`, README "How a run works" and
+"Autonomy".
+
+**Decisions and limits.**
+- Budgets stay 0 by default: the owner asked for runs that do not stop (open decision 6 holds the numbers they may
+  want for scheduled runs).
+- The wording cannot be measured offline; `dotx eval` gets one open-ended task whose check is a file with numbers
+  written by the run (`research`-like, local files), so a regression that stops early shows as a failed check.
+
+**Done when.** Unit tests of `PlanPayload.targets` rendering and of the budget decision (pure: time, tokens, limits);
+smoke with the scripted model: a run past `run_max_tokens` gets the note, the restricted tools and ends `budget` when
+it does not finish; the goal checker's prompt carries the targets (test in `tests/unit/test_verify.py` style); the
+eval task added and `dotx eval check` clean; README updated.
+
+### 12. Campaigns: a goal that works until its outcome is verified
+
+**Status: planned.** **Goal.** The owner switches on *Keep going until done* for a goal, and Dot works on it in
+sessions, through restarts and days, until the outcome is verified by evidence or the owner stops it. Nothing else
+stops it.
+
+**Why.** This is the owner's main ask of 2026-10-09: "a system that does not stop until I see the result; when I say
+earn money and give the information, it must not stop until the money is where it belongs". Today a run ends by
+`finish`, by text replies, by the watchdog or by the goal check's patience (`agent/loop.py:936-975`); a schedule the
+agent creates cannot carry the owner's approval mode (`tools/schedule.py:99-101`) and starts every firing in a new
+thread with only the goal text (`scheduler/runner.py:105-107`); the prompt forbids saving progress
+(`agent/prompt.py:166-167`); so no run knows what the last one did.
+
+**Design.**
+- **The campaign.** A row in a new table `campaigns`: `id`, `title`, `goal`, `targets` (text, set by the agent),
+  `status` (`active`, `achieved`, `stopped`), `thread_id` (the owner's conversation, where it was started),
+  `schedule_id` (its one schedule), `mode` (`task` only), `options` (`ScheduleOptions`: the model, effort, approvals
+  and goal mode of the opening run, so a `yolo` campaign stays `yolo`), `sessions`, `created_at`, `updated_at`,
+  `last_progress_at`, `achieved_evidence`. `RunRecord` gets `campaign_id: str | None`. The ledger is a table
+  `campaign_entries(id, campaign_id, run_id, ts, kind, text, numbers)` with `kind` in `progress`, `setback`, `note`,
+  `strategy`, `question`; `numbers` a JSON object of metric name to number.
+- **Starting one.** `StartRunRequest.standing: bool | None` (`server/views.py:74-84`), the composer's third switch
+  "Keep going until done" next to Approvals and Goal mode, and `dotx run --standing`. The daemon creates the campaign
+  (title: the first 60 characters of the goal), then starts the opening session as a run with `campaign_id` set. A
+  campaign is `task` mode only; `chat` and `research` refuse the switch (422).
+- **A session.** Every run of a campaign is a session. Its opening text is the brief: the goal, the targets, the newest
+  `strategy` entry, the last 12 ledger entries (newest last, with their numbers), the questions left for the owner
+  (item 10) with their answers or "unanswered since …", the session number and the time since the last session. Each
+  session is a new thread (as schedules do today): bounded context, and the brief is the memory. The system prompt gets
+  a `# Campaign` section only in campaign runs: "This is session N of a campaign. Do not start from zero: the brief
+  says what was done. Work toward the targets; write what you did, with numbers and evidence, with `campaign_note`
+  before you finish; verify the targets with your own reads before you claim them; when a round brought nothing, write
+  a new `strategy` entry and follow it; leave the user a question only for what only they can give, and go on with the
+  rest. Finish when this session's work is done; the campaign goes on."
+- **Tools, group `campaign`,** offered only in campaign runs (`tools/groups.py`): `campaign_targets(targets,
+  verification)` sets the targets and how they are verified (the opening session must call it before it finishes: a
+  finish without targets is sent back once, like the plan reminder); `campaign_note(kind, text, numbers)` appends a
+  ledger entry; `campaign_schedule(at | cron)` sets when the next session runs (`at` a time, or a cron with the
+  scheduler's minimum of 5 minutes); `campaign_achieved(evidence)` claims the outcome. All four are kind `meta`,
+  risk `safe`, except `campaign_schedule`, which carries `persistence` like `schedule_create`.
+- **It does not stop.** When a session ends and the campaign is `active`, the harness makes sure a next session is
+  scheduled: if the agent set none, `[agent] campaign_gap_minutes` (60) from now. The campaign's schedule is a normal
+  `ScheduleRecord` with `campaign_id` and the campaign's `options`; the scheduler starts the session with
+  `campaign_id` and the brief (`scheduler/runner.py:108-120`). A session that the daemon cut off is resumed by the
+  next session's brief, which says so. When the last session finished with `needs_from_user` set and every question
+  is unanswered, the next session waits for an answer or `[agent] campaign_wait_hours` (24), whichever comes first,
+  then runs anyway and tries another way. After `[agent] campaign_patience_sessions` (3) sessions without a `progress`
+  entry the brief says so and asks for a new strategy entry first.
+- **Verification, not a claim.** `campaign_achieved(evidence)` asks the goal checker (`agent/review.py:443`,
+  `goal_checker_for`) whether the targets are reached, from the targets, the verification method, the ledger's
+  `progress` entries with their numbers, the session's measured facts (`RunFacts`) and the evidence text. `achieved`:
+  status `achieved`, the schedule disabled, a `notify` to the owner, the campaign page shows the evidence. `continue`
+  or `blocked`: the call fails with the checker's reason and the session goes on. With item 16 on, the typed judge
+  answers first and only a likely claim reaches the review model. The owner can mark a campaign achieved by hand.
+- **Only the owner stops it.** `POST /api/campaigns/{id}/stop` and `dotx campaign stop ID` set `stopped` and disable
+  the schedule; a running session ends normally; `resume` sets it `active` again and schedules a session now. A stopped
+  or achieved campaign's thread stays.
+- **Budgets, opt-in.** `[agent] campaign_max_sessions = 0` (none); item 11's run budgets apply per session.
+- **UI and CLI.** A "Campaigns" view (`views/campaigns.js`): the list (title, status, sessions, next session, last
+  progress), a page per campaign (targets, the ledger with numbers, the sessions with links to their runs, the open
+  questions, Stop, Resume, Mark achieved). `dotx campaign list | show ID | stop ID | resume ID`. The run page of a
+  session carries a chip with the campaign and its session number.
+
+**Touchpoints.** `store/db.py` (tables `campaigns`, `campaign_entries`, `runs.campaign_id`, `schedules.campaign_id`),
+`store/models.py`, new `agent/campaign.py` (pure: the brief, the patience and wait decisions, the next-session rule),
+new `tools/campaign.py`, `tools/groups.py`, `agent/prompt.py`, `agent/loop.py` (the brief as the opening, the
+send-back for missing targets, the end-of-session hook), `agent/manager.py`, `scheduler/plans.py`, `scheduler/runner.py`,
+`server/views.py`, new `server/routes_campaigns.py`, `cli.py` and a new `cli_campaign.py`, `views/campaigns.js`,
+`sidebar.js`, `runmodes.js` (the switch), `config.py`, `defaults.toml`, README (a "Campaigns" section).
+
+**Decisions and limits.**
+- A campaign has no step limit and no end but the owner's: that is what was asked. The three opt-in numbers above are
+  the only brakes, and `dotx stats` shows what a campaign costs (item 9).
+- Sessions are new threads on purpose. The owner's conversation thread shows the opening session and is where they
+  talk to the campaign: a message sent there becomes an instruction of the next session (through the thread
+  instructions the brief carries, read from the campaign's `thread_id`).
+- Money and credentials: nothing new. A `yolo` campaign does them itself and records them; an `ask` campaign leaves
+  questions and waits for the owner at its sessions.
+- Live behavior cannot be tested here: the smoke tests use the scripted model and a scripted goal checker.
+
+**Done when.** Unit tests of `agent/campaign.py` (brief rendering, the next-session rule, patience, the wait on
+unanswered questions); smoke with the scripted model: an opening session without `campaign_targets` is sent back,
+one with it ends and a schedule exists at `campaign_gap_minutes`; a session fires through the real scheduler on a
+throw-away daemon with a short gap, gets the brief, writes an entry, and a `campaign_achieved` with a scripted
+`achieved` verdict closes the campaign and disables the schedule, a `continue` verdict fails the call; stop and
+resume through the API; the Campaigns view checked in headless Chrome in both themes at 1280 and 390 px; `dotx
+campaign` on a throw-away home; README.
+
+### 13. Faster browser and desktop steps
+
+**Status: planned.** **Goal.** Take the fixed waiting out of a browser or desktop action where no signal needs it,
+and make a failed wait or an unchanged page cost no extra step.
+
+**Why.** Measured on 2026-10-09 (read-only bench, this Mac; the Playwright and accessibility parts not measured): a
+browser click waits about 160 ms by construction, a five-click batch about 0.32 s; a desktop click about 0.56 s before
+any accessibility work, a five-click batch about 1.46 s, plus one unconditional closing walk capped at 4 s. On top,
+`browser_wait_text` failed 22.4 % of the time in the real history and returns no view when it fails, so a failed wait
+costs the wait, a model turn and a snapshot. Item 9 measures the effect of every change here.
+
+**Design, browser** (`browser/session.py`, `browser/driver.py`):
+- The settle after a batch (`:837`) runs only when a step may have changed the page: a batch of `hover` and
+  `scroll_into_view` steps only skips it; `nav_idle` (`:615`) always runs. The second settle when a batch leaves its
+  tab (`_full_view` at `:691`) goes: `act` builds the view of the new tab from the state it already settled. The
+  current tab's title is fetched once (`:674` duplicates `:661`).
+- The 40 ms grace (`:811-812`, `:820-822`) runs after steps that can open a popup or a dialog (`click`, `double_click`,
+  `right_click`, `press`, `check`, `uncheck`, `select`), not after `fill`, `type` and `hover`; the pending-adoption
+  wait (`:823-825`) stays.
+- The fixed 150 ms sleep after a wheel scroll (`:857`, `_SCROLL_SETTLE_S` at `:84`) goes; the settle at `:858` stays.
+- `browser_wait_text` (`tools/browser.py:400-424`, `BrowserSession.wait_text`) returns one line and the delta view:
+  "“Order placed” appeared after 1.3 s" with `_changes_view`; on timeout it returns a failed result that still carries
+  the delta view: "“Order placed” did not appear within 10 s; the page now:", so the model needs no snapshot to decide.
+- `settle_quiet_ms` (120) and `settle_max_ms` (1 500) stay knobs; the fixture timing test runs with 120 and 60 and the
+  numbers go to open decision 13.
+
+**Design, desktop** (`desktop/session.py`, `desktop/input.py`, `desktop/actions.py`):
+- One `lsappinfo` listing per act: `_preview_job` (`:227`) keeps its listing in the preview result and `act` reuses
+  it in `_open_env` (`:547`) when no approval waited in between (the listing is re-read after a wait).
+- The settle after a side-effect batch (`:636-637`, 350 ms) becomes a poll: `windows_on_screen` (3 ms measured) and the
+  focused element every 40 ms until two reads agree, with a floor of 80 ms and `settle_ms` as the cap. The closing
+  walk (`:638`) stays: the model needs the state after the batch.
+- Long text is pasted: a `type` step whose text is longer than `[desktop] paste_threshold_chars` (40; 0 never) goes
+  through the paste path (`input.py:365-377`) unless the target is a secure field; the clipboard is restored as today.
+  Typing stays key by key below the threshold (`input.py:300-316`).
+- The step gaps (`:61`, `:622-625`) and the click pacing (`input.py:175-177`) stay: no acknowledgement exists between
+  posted events, and the comment at `input.py:175` says why the move pause is there.
+- `screenshot_max_edge` (1 920) is a knob for open decision 13: a 1 710 × 1 112 JPEG is about 2 500 tokens on the
+  hosted providers; 1 366 would be about 1 600.
+
+**Touchpoints.** `browser/session.py`, `browser/driver.py`, `browser/types.py` (the popup-opening set),
+`tools/browser.py`, `desktop/session.py`, `desktop/input.py`, `desktop/actions.py`, `config.py`, `defaults.toml`,
+README "Browser use" and "Computer use", `tests/smoke/test_browser.py`, `tests/smoke/test_desktop.py`.
+
+**Done when.** `tests/smoke/test_browser.py` gets a timing test on the fixture pages (20 single-click acts and 5
+five-step batches, medians printed and asserted under 1.5 s and 3 s on this Mac) and the wait_text tests (success
+returns the line and the delta; timeout returns a failed result with the view); `tests/smoke/test_desktop.py` (under
+`DOT_DESKTOP_TESTS=1`) gets the same timing test against the fixture window and a paste test for long text; the
+medians before and after each change written here; the offline smoke suite clean; README updated.
+
+### 14. Rich editors, drag and bulk text in the browser
+
+**Status: planned.** **Goal.** Typing works in the editors of X, GitHub, Google Docs, Monaco and CodeMirror; the
+browser can drag an element onto another; a long text goes in as one insertion.
+
+**Why.** On X's composer `type` lost the first character and `fill` reported done without a change (follow-up of
+2026-10-07). The cause is in `browser/driver.py:349-352`: `type` is `press_sequentially` and `fill` is `locator.fill`;
+editors built on contenteditable (Draft.js and Lexical on X, ProseMirror, Monaco, CodeMirror 6) set their selection
+asynchronously after focus and ignore a programmatic `fill`. The browser has no `drag` step
+(`browser/types.py:9-22`), which web IDEs, boards and file uploads by drop need. This item is also the browser half of
+"write code in the browser".
+
+**Design.**
+- **Editable targets.** Before a `fill` or `type`, `run_step` asks the element once:
+  `el.isContentEditable || el.closest('[contenteditable]:not([contenteditable="false"])') !== null`. For an editable
+  target: `locator.focus()`, then poll (every 25 ms, at most 500 ms) until `document.activeElement` is the element or
+  inside it; then `type` uses `page.keyboard.insert_text(text)`, and `fill` selects all (`ControlOrMeta+A`) and
+  inserts the text the same way. A step whose target never took focus fails with "the editor did not take focus" and
+  the element. For `<input>` and `<textarea>` nothing changes: `fill` fills, `type` presses key by key.
+- **New steps.** `insert(ref, text)`: focus as above, then `insert_text` for any target: long text without key
+  events. `drag(ref, to_ref)`: `locator.drag_to(target)` (Playwright drives the mouse and dispatches the HTML5 drag
+  events); `Step` gets `to_ref: str | None`, `StepAction` gets `drag` and `insert`, `_TEXT_ACTIONS` and
+  `_TYPING_ACTIONS` include `insert`, the side-effect set includes both, `render.py` renders them, and the `browser_act`
+  description lists them with when to use which.
+- **Fixture pages** in `tests/smoke/test_browser.py` (`_PAGES`): `/editor`, a contenteditable `div` whose `focus`
+  handler moves the caret in a `setTimeout(…, 0)` and whose `beforeinput` and `input` handlers mirror the text into a
+  hidden `<textarea id="mirror">`, so a lost first character shows; `/board`, two lists with HTML5 drag and drop
+  handlers that move the dragged item.
+- **Guidance.** The `browser_act` description: `fill` for form fields, `type` where autocomplete must see the keys,
+  `insert` for long text and for editors, `drag` to move an element onto another.
+
+**Touchpoints.** `browser/driver.py`, `browser/types.py`, `browser/safety.py`, `browser/render.py`,
+`tools/browser.py`, README "Browser use", `tests/smoke/test_browser.py`.
+
+**Decisions and limits.**
+- X itself is not tested here (no form filling on external sites, a rule since part 1); the owner checks the composer
+  once (open decision 12).
+- Monaco and CodeMirror take `insert_text`; their auto-indent and auto-close can still change what is typed line by
+  line. The guidance says to insert whole blocks and read the editor back.
+
+**Done when.** Smoke tests on `/editor` (`type`, `fill` and `insert` leave the mirror equal to the text; `type` into a
+plain `<input>` unchanged) and `/board` (`drag` reorders); unit tests of the new step validation; the offline smoke
+suite clean; README updated.
+
+### 15. Helper models: consult, delegate to another model, standby
+
+**Status: planned.** **Goal.** A run on one model can ask a model of another provider for advice, hand a sub-task to
+it, or move to it when its own provider stops answering; a helper whose key is missing or whose quota is spent is
+simply not there, and the run goes on.
+
+**Why.** The owner asked for it on 2026-10-09 ("while DeepSeek works it should be able to ask Sonnet or Opus for help;
+without a key or with the quota spent nothing may break"). The seed exists: the review model is a second model the
+harness uses for approvals in `auto`, the goal check, the ladder's second opinion and lessons. But the running model
+cannot ask for help itself, `delegate` always uses the parent's model (`agent/manager.py:150-162`), `[models] fast`
+is read nowhere, and a missing key or an exhausted quota surfaces as an error in the middle of a run. The gain is
+largest for a weak model, which is this roadmap's principle.
+
+**Design.**
+- **Configuration.** `[models] helpers = []`: model references in order of preference, for example
+  `["anthropic:claude-opus-5-5", "openai:gpt-5.5"]`. `[models] standby = []`: the models a run moves to when its own
+  provider answers with a quota, billing or key error, in order. `[models] helper_cooldown_s = 600`. `[agent]
+  consult_max_per_run = 5`.
+- **The roster.** `agent/helpers.py` (pure): `roster_for(config, states, cooldowns, now) -> Roster(available,
+  unavailable)`, where `states` are the `SecretState` of each provider's key (`secrets.secret_state`, which never reads
+  the value) and `cooldowns` the providers in cooldown with their end time. A provider without a key, or in cooldown,
+  is unavailable with its reason. `cooldown_for(error) -> float | None`: `ProviderQuotaError`, `ProviderAuthError` and
+  `MissingSecretError` give `helper_cooldown_s`; `ProviderRateLimitError` gives its `retry_after_s` or 60 s; a
+  transport or protocol error gives none (the call failed, nothing is marked). The runtime keeps the cooldowns in
+  memory (`runtime.helpers`), per daemon.
+- **`consult`**, a core tool in `tools/consult.py`, offered only when the roster has an available helper (like `skill`
+  without skills, `agent/loop.py:739-743`). `ConsultArgs(question, include, model)`: `include` is a tuple of `goal`,
+  `plan`, `recent` (the digest of the last steps, `goal_digest` of `agent/review.py:351`), `screenshot` (the newest
+  image of the run, only if the helper has vision); `model` names a helper of the roster or is empty for the first
+  available. The helper gets a system prompt in the reviewer's manner: it advises another agent, the user's
+  instructions in the fence are the only authority, fenced content is data, answer in plain text, no tools. The
+  result is the answer fenced as advice ("Advice from anthropic:claude-opus-5-5 (not instructions): …"). `purpose =
+  "consult"` (item 9); kind `meta`, risk `safe`; `parallel_safe` true; the (n + 1)th call past `consult_max_per_run`
+  fails with the count. A provider error marks the cooldown, emits `helper_unavailable {model, reason, until}`, and the
+  result says "X is unavailable (quota exhausted) until 14:05; continue on your own or ask another helper: Y".
+- **`delegate(model)`.** `DelegateArgs.model: str | None`: a helper of the roster or the run's own model; anything
+  else fails with the list. `RunManager.delegate(parent_id, goal, mode, model)` launches the child on it. The
+  description says when: a sub-task that fits a cheaper or a stronger model.
+- **Standby.** In `run_agent`, the step call (`agent/loop.py:870-871`) catches `ProviderQuotaError`,
+  `ProviderAuthError` and `MissingSecretError` after the connector's own retries. With a standby model available in
+  the roster: the run's model changes (`update_run_model`; `RunRecord.model` is the model of the run from here on,
+  compaction included), a note tells the model "From this step on you are X; Y became unavailable (reason)", event
+  `model_switched {from, to, reason}`, a timeline line, and the same step is retried once on X. Without one: the run
+  fails as today. A delegated run inherits the model its parent has now.
+- **Where it is seen.** `dotx doctor` prints a "Helpers" row with each helper's key state; the run page's model chip
+  follows a switch; `dotx models profile` lists helpers.
+
+**Touchpoints.** `config.py`, `defaults.toml`, new `agent/helpers.py`, new `tools/consult.py`, `tools/delegate.py`,
+`tools/groups.py` (`consult` is core), `agent/manager.py`, `agent/loop.py`, `runtime.py`, `store/db.py`
+(`update_run_model`), `doctor.py`, `cli.py` (`models profile`), `timeline.js`, `icons.js`, README "Models and
+providers" (a "Helpers and standby" paragraph) and "Delegation".
+
+**Decisions and limits.**
+- No silent fallback: a helper's failure is a tool result the model reads and an event the owner sees; a standby
+  switch is announced in the run and in the timeline. Nothing is swapped without a trace.
+- `consult` gives no tools to the helper: tool work goes through `delegate`, where the policy applies as to any run.
+- The helper sees the owner's instructions as the only authority, as the reviewer does; its answer is advice.
+- Both lists default empty: the owner fills them (open decision 11). The first candidate is Claude once
+  `ANTHROPIC_API_KEY` is saved (decision 5).
+
+**Done when.** Unit tests of the roster and the cooldowns (states, errors, timing); smoke with the scripted provider
+and a second scripted provider registered under another name: a `consult` call answered and fenced, the budget
+reached, a helper raising `ProviderQuotaError` marked unavailable with the event and the result text, `delegate` on
+the second model, a standby switch mid-run with `model_switched` and the run ending `done`; `dotx doctor` on a
+throw-away home shows the row; timeline checked in headless Chrome; README.
+
+### 16. Typed judgments (TypeSafe) at the decision points
+
+**Status: planned.** **Goal.** Where the harness decides something today with a regular expression or with a full
+review-model call, a small typed judgment can answer instead: fast, with a probability, in any language.
+
+**Why.** The owner asked whether the decision system of TypeSafe (typesafe.ai, "System One" models such as Jev,
+which return typed answers and probabilities for Choice, Noul and Score questions) belongs in Dot; their OSJarvis
+project routes tasks with `choice`, verifies actions with `noul` and scores confidence with `score`. Dot's decision
+points fit that shape: the intent of a browser click is read from label patterns (`policy/elements.py:23-37`; "Repost"
+and "Quote" match none, Finnish and Turkish labels only where a pattern lists them), the goal check and the ladder's
+second opinion are full review-model calls (`agent/review.py`), and item 12's claim of an achieved target needs a
+judge. The recommendation is yes, at two points first, behind an interface, optional, and never as the loop's
+decision maker: the harness keeps the workflow, the judge supplies the semantic calls where code has none.
+
+**Design.**
+- **Configuration.** `[judge] provider = "none" | "typesafe"`, `api_key_env = "TYPESAFE_API_KEY"`, `base_url`,
+  `model`, `timeout_s = 5.0`, `public_action_threshold = 0.7`, `target_threshold = 0.9`. The base URL and the model
+  name are read from the live documentation at implementation time (the skill in the owner's OSJarvis worktree,
+  `docs/skills/typesafe-ai/SKILL.md`, says the live docs at `https://docs.typesafe.ai/llms.txt` are the source of
+  truth; they were not read for this plan). The key follows the secrets lookup (environment, `.env`, Keychain) and
+  the Settings › API keys tab lists it.
+- **Connector.** `llm/typesafe.py`: `TypeSafeClient` on `httpx`, retry policy as the other connectors, errors
+  classified into the `ProviderError` family; `ask(state: JsonObject, questions: tuple[Question, ...]) ->
+  tuple[Judgment, ...]` with `Question(id, kind: "choice" | "noul" | "score", instructions, criteria)` and
+  `Judgment(id, answer, probability, confidence)` as `FrozenModel`s. Independent questions over one state go in one
+  request.
+- **Interface.** `agent/judge.py`: `Judge` with `enrich_action(action, context) -> ActionInfo` and `target_reached(
+  targets, verification, entries, evidence) -> Verdict`; `NoJudge` returns the action unchanged and `unknown`;
+  `TypeSafeJudge` asks. The judge runs inside `RunGate.authorize` (`agent/gate.py:95-111`), the one async place every
+  action passes before the policy decides.
+- **Use 1, the intent of a browser click.** For a `browser_act` click whose label matched no pattern, one request with
+  four Noul questions over the state `{label, role, page_title, url, nearby_text}`: public post, send to someone,
+  payment, destructive. A probability at or above `public_action_threshold` adds the flag; the action's summary says
+  "(judge: public_post 0.93)". The patterns stay as the floor and decide alone when the judge is off or unavailable.
+- **Use 2, a campaign's claim.** `campaign_achieved` (item 12) asks `target_reached` first: below `target_threshold`
+  the call fails at once with the probability and the reason; at or above, the review model confirms as designed.
+  The goal check of a plain run is not changed in this item.
+- **Unavailable.** A key missing, a quota or an error marks the judge unavailable for `helper_cooldown_s` with one
+  event `judge_unavailable {reason, until}`, and the regex and review paths decide, with "(judge off)" in the summary.
+  No retry storm, nothing hidden.
+- **Measuring it.** `tests/unit/test_judge.py` tests the enrichment and the thresholds with a scripted judge;
+  `tests/smoke/test_hosted_services.py -m hosted -k typesafe` sends a few labels in English, Turkish and Finnish
+  ("Repost", "Yeniden gönder", "Lähetä", "Pay now", "Delete account") and prints the probabilities. Before the judge is
+  turned on by default, count on the owner's history (counts only, read-only): how many allowed browser clicks on
+  social hosts had labels that matched no pattern.
+
+**Touchpoints.** `config.py`, `defaults.toml`, new `llm/typesafe.py`, new `agent/judge.py`, `agent/gate.py`,
+`policy/elements.py`, `tools/campaign.py` (item 12), `runtime.py`, `secrets.py` and `routes_keys.py` (the key),
+`doctor.py`, `timeline.js`, README "Safety" (a "Typed judgments" paragraph), `.env.example`.
+
+**Decisions and limits.**
+- Off by default (`provider = "none"`): it is a paid external service and its calibration on Dot's labels is unknown
+  until the hosted test and the count above exist (open decision 9).
+- The judge never decides a step and never grants anything: it adds flags that make the policy ask, or stops a claim
+  the review model would have examined. Code owns the workflow, as TypeSafe's own guidance says.
+- One request per judged click adds its latency to that click; the threshold and the host list keep it to clicks that
+  matter (the patterns answer the rest).
+
+**Done when.** Unit tests with the scripted judge; the connector's offline body and error tests in
+`tests/smoke/test_wire_codecs.py` style; the hosted test written and skipped without the key; `dotx doctor` row;
+README and `.env.example`; the owner's count recorded in the log when they run it.
+
+### 17. Pacing and public actions on social platforms
+
+**Status: planned.** **Goal.** Reposts, quotes, follows and likes are seen as what they are, and a run keeps to a pace
+that a platform tolerates, so an account that Dot grows is not the account Dot gets suspended.
+
+**Why.** `_POST_ACTION` and `_SEND_ACTION` (`policy/elements.py:28-29`) catch Post, Tweet, Retweet, Publish, Share,
+Comment, Send and Reply; "Repost" and "Quote" (X's labels since 2023) match nothing, and Follow and Like carry no flag
+at all. No cap and no spacing exist for public actions (search of `browser/` and `tools/browser.py` for pacing, rate,
+quota, cooldown, throttle). A campaign that "does what it takes" on X would follow and like without limit; platforms
+suspend for exactly that.
+
+**Design.**
+- **Patterns.** `_POST_ACTION` adds `repost`, `quote`, `yeniden gönder`, `alıntı`; a new `_SOCIAL_ACTION` matches
+  `follow`, `unfollow`, `like`, `unlike`, `subscribe`, `connect`, `takip`, `beğen`, `abone` and gives a new flag
+  `social` (`policy/types.py:31-45`), risk `low`, in `TAINT_ESCALATION_FLAGS` (outward-facing). Finnish labels
+  (`Julkaise`, `Seuraa`, `Tykkää`, `Lähetä`) join the three patterns; item 16 covers the rest of the world's labels.
+- **The pace.** `[policy] public_actions_per_hour = 20`, `public_actions_per_day = 120` (flags `public_post` and
+  `external_send`), `social_actions_per_hour = 40`, `social_actions_per_day = 300` (flag `social`), and
+  `public_action_spacing_s = 20` between two public actions on one host; 0 means no limit. Counted per host, across
+  threads: `ActionInfo` gets `host: str` (empty when not a web action), set by `browser_act`'s classification from the
+  thread's current page; the gate writes an allowed public or social action to a table `paced_actions(host, flag, ts,
+  run_id)` and refuses the one past a limit: "Pace for x.com: 20 of 20 public actions this hour; the next is allowed
+  at 14:35. Do other work meanwhile, or schedule a session." A pace is a limit, not a question: `yolo` does not waive
+  it; the owner sets 0 to remove it.
+- **Prompt.** A `# Platforms` paragraph: "Work on a platform within its rules: no bulk follows or likes, no duplicate
+  posts, no automation the platform forbids; the pace limits of this run are enforced and shown when reached; growth
+  comes from posts people want to read and replies that add something." The `x-twitter-growth` skill (item 18) carries
+  the strategy.
+- **Where it is seen.** The timeline shows a paced refusal with the host and the next window; the campaign page
+  (item 12) shows the counts of the day per host.
+
+**Touchpoints.** `policy/elements.py`, `policy/types.py`, `policy/engine.py` (the pace check after the decision),
+`agent/gate.py`, `tools/browser.py`, `store/db.py` (`paced_actions`), `agent/prompt.py`, `config.py`, `defaults.toml`,
+README "Safety", `rules.js` (the flag list), `timeline.js`.
+
+**Decisions and limits.**
+- The default numbers are conservative guesses; the implementer verifies them against the platforms' published rules
+  before the defaults are set (open decision 8). They apply to every host; a per-host table is not built until the
+  owner asks.
+- The count sees only browser clicks the policy saw. A post made through an API in the shell is not counted.
+
+**Done when.** Unit tests of the patterns (English, Turkish, Finnish labels; Repost, Quote, Follow, Beğen flagged;
+"Reposted by" as text not an action) and of the pace windows (pure); a smoke test on a fixture page with Repost and
+Follow buttons that hits `public_actions_per_hour = 2`; the paced refusal text in the timeline; README.
+
+### 18. Skills written for Claude Code, and the X playbook
+
+**Status: planned.** **Goal.** The owner's Claude Code skills load in Dot as they are, so the X playbook they already
+own (`x-twitter-growth`, `baoyu-post-to-x`) is what a campaign on X works from.
+
+**Why.** Both skills are refused: `SkillFrontmatter.metadata` is `dict[str, str]` (`skills/types.py`), and their
+frontmatter holds `updated: 2026-03-10` (a YAML date) and a nested `openclaw` map. The Agent Skills specification lets
+`metadata` hold arbitrary values. Reproduced on 2026-10-09 with `parse_skill`; `find-skills` loads. And `[skills]
+dirs` is empty, so `~/.claude/skills` is not read until the owner lists it.
+
+**Design.**
+- `SkillFrontmatter.metadata: JsonObject` (`core/types.py`), so any YAML mapping passes; the prompt line of a skill
+  shows name and description only, as today.
+- `dotx skills list` prints the folders left out and why (the `problems` of `SkillCatalog`); `dotx doctor`'s skills row
+  counts them.
+- The comment of `[skills] dirs` in `defaults.toml` shows `dirs = ["~/.claude/skills"]` as the example; the owner's
+  `config.toml` is theirs to change (open decision 10).
+- The skill guidance in the prompt (`agent/prompt.py:221-225`) adds: "A skill written for another agent may name tools
+  Dot does not have (a CLI, a browser extension, a script runner): do the same steps with Dot's tools."
+- Documentation: README "Skills and plugins" says skills of Claude Code load unchanged, and names the two X skills as
+  the playbook a campaign on X works from.
+
+**Touchpoints.** `skills/types.py`, `cli_skills.py`, `doctor.py`, `agent/prompt.py`, `defaults.toml`, README,
+`tests/unit/test_skills.py`.
+
+**Done when.** A unit test parses a frontmatter with a date and a nested map; `dotx skills list` on a throw-away home
+with copies of the two skill folders lists both (copies in the temp home, never the owner's folder); a scripted run is
+offered both; README.
+
+### 19. Prompt-cache hygiene for the hosted providers
+
+**Status: planned.** **Goal.** On Anthropic and OpenAI the prefix of a run's prompt stays byte-identical from step to
+step, so the server's cache pays for the system prompt, the tools and the history instead of the owner.
+
+**Why.** Found with the Claude provider (log of 2026-10-08): the system prompt carries the time to the minute
+(`agent/prompt.py:338`), so two runs never share a cached prefix; `drop_old_images` edits the history at every step
+(`agent/loop.py:368`, `agent/compact.py:30-39`), so a screenshot leaving the window rewrites a message in the middle
+of the prefix and the cache starts again from there; `cached_tokens` is parsed and dropped, so nobody can see the hit
+rate. Anthropic's automatic top-level `cache_control` is already sent (`llm/codec_messages.py:164-165`). The Ollama
+cloud models the owner runs today gain nothing from this; a Claude helper or standby (item 15) does.
+
+**Design.**
+- The system prompt names the date (`%A %Y-%m-%d`) and the time zone; the exact time goes into the opening message
+  ("It is now 14:02 EEST") and into every note the harness appends (`_stored_note`), which are at the end of the
+  prompt anyway.
+- Images leave the history: a tool result with a screenshot is stored with a stub ("[screenshot 3, attached below]")
+  from the start, and the request appends one trailing user message "Current screenshots" with the newest
+  `keep_recent_screenshots` images of the run, kept in memory by the loop (the files are in the store as today). The
+  codecs do not change: it is one more user message with images. `drop_old_images` goes.
+- `shrink_old_tool_results` (`agent/compact.py:42-51`) shrinks a result to its final size in one pass (measured: a
+  result changed twice before it settled), so a message is rewritten once.
+- `dotx stats` shows `cached_tokens` per model (item 9 stores them).
+
+**Touchpoints.** `agent/prompt.py`, `agent/loop.py`, `agent/compact.py`, `store/db.py` (loading keeps the stubs),
+`llm/codec_messages.py`, `llm/codec_responses.py`, `llm/codec_chat.py` (no change expected; the tests prove it),
+README "Models and providers".
+
+**Decisions and limits.**
+- The vision relay for a blind main model (`agent/vision.py`) reads the images from the trailing message the same way.
+- Whether the trailing message confuses a model is checked on the scripted and the hosted tests; the hosted run spends
+  the owner's quota (open decision 1).
+
+**Done when.** Unit tests of the stub and the trailing message; wire tests of all three codecs with images in the
+trailing message; the hosted Anthropic test reports `cached_tokens > 0` on the second step of a three-step scripted
+run (when the owner runs it); the offline smoke suite clean; README.
+
+### 20. An interactive terminal for programs that prompt
+
+**Status: planned.** **Goal.** The agent can run a program that asks questions, keep a REPL or a dev server alive
+while it works, and answer a prompt, as a person at a terminal would.
+
+**Why.** `shell` runs `zsh -c` with stdin closed and in its own process group (`tools/shell.py:128-137`); nothing in
+the code base opens a pseudo-terminal (search for `pty`, `openpty`, `pexpect`, `termios`: none). So `npm create`,
+`ssh` with a host-key question, `python -i`, `psql`, interactive installers and a dev server that must stay up for a
+browser test are out of reach, and that is most of "any job on this computer" and half of "write code in the
+browser".
+
+**Design.**
+- A tool group `terminal` (`tools/terminal.py`), acting modes only: `terminal_open(command, cwd) -> session id`,
+  `terminal_send(session, text)` (the text is sent as typed; a newline is part of the text), `terminal_read(session,
+  wait_s)` (what arrived since the last read, after waiting up to `wait_s` for new output, at most 60 s),
+  `terminal_close(session)`. At most `[shell] terminal_sessions = 3` per thread; a session idles out after
+  `[shell] terminal_idle_s = 1800` and is closed when the daemon stops; a run's end does not close it (a dev server
+  outlives the run that started it, until the thread's idle limit).
+- `desktop`-independent implementation in `shell/terminal.py`: `pty.openpty()`, `asyncio.create_subprocess_exec` of
+  the user's shell with the slave as stdin, stdout and stderr, a reader task that keeps the last 192 KiB in a ring
+  buffer with ANSI escape sequences stripped by one regular expression (no terminal emulator), `TERM=dumb`, the same
+  environment filtering as `shell` (`[shell] pass_env`).
+- Policy: `terminal_open` is classified like `shell` on its command (`policy/shell.py`); `terminal_send` is classified
+  like `shell` on its text when the text ends a line (it may be a command), and as `credential` when the session's
+  newest output matched a password or passphrase prompt, so the hand-off and the `yolo` waiver work as for the
+  browser (item 10). Output is marked untrusted like shell output.
+- The prompt's channel order (`agent/prompt.py:90-94`) names the terminal after `shell`: "a program that prompts, a
+  REPL, or a server that must stay up".
+
+**Touchpoints.** new `shell/terminal.py`, new `tools/terminal.py`, `tools/groups.py`, `policy/shell.py`,
+`agent/prompt.py`, `config.py`, `defaults.toml`, README "Tools", `timeline.js`, `icons.js`.
+
+**Decisions and limits.**
+- No terminal emulator: cursor movement and full-screen programs (`vim`, `htop`) show as garbled text, and the tool
+  says so. Line-oriented programs are the target.
+- The shell guardrail is best-effort here as in `shell`; the README says so for both.
+
+**Done when.** Smoke tests: `python3 -i` answers an expression; `read -s` shows a password prompt that is handed off
+in `ask` mode and typed in `yolo`; a `python3 -m http.server` session serves a page to `web_fetch` while the run goes
+on and is closed by `terminal_close`; the idle reaper; unit tests of the ANSI stripping and the ring buffer; README.
+
 ## Open owner decisions
 
 1. Live evals: `dotx eval run --model REF` spends model quota. Run it for the models in use and keep the JSON; it is the
@@ -862,6 +1598,31 @@ files and the folder, left the third and exited 1; a second `--apply` left only 
    run the hosted test once (`.venv/bin/python -m pytest tests/smoke/test_hosted_services.py -m hosted -k anthropic`:
    a few tiny requests of `claude-haiku-5-5`). A Claude model is then a candidate for `[models] review` while `main` is
    of another family (decision 3).
+6. Standing goals (item 12): the composer switch "Keep going until done" is off by default and a campaign stops only
+   when the owner stops it; the defaults `campaign_gap_minutes = 60`, `campaign_wait_hours = 24`,
+   `campaign_patience_sessions = 3`, `campaign_max_sessions = 0`, and item 11's `run_max_minutes = 0`,
+   `run_max_tokens = 0` are proposals: say the numbers you want, or that none should bound a campaign.
+7. `yolo` and password managers (item 10): secure fields and one-time codes are typed in `yolo` by design of this
+   part; password-manager apps stay refused in every mode unless you say otherwise.
+8. Pace limits (item 17): the defaults (20 public actions an hour, 120 a day; 40 social an hour, 300 a day; 20 s
+   between public actions) are conservative guesses. Confirm them against the platforms' published rules, or set 0.
+9. TypeSafe (item 16): save `TYPESAFE_API_KEY`, read the live docs for the base URL and the model name, run the hosted
+   test, and run the read-only count on your history (how many allowed clicks on social hosts had labels no pattern
+   matched) before `[judge] provider = "typesafe"` becomes your default.
+10. Skills (item 18): put `dirs = ["~/.claude/skills"]` under `[skills]` in your `config.toml` once the loader accepts
+    your two X skills; Dot reads nothing there until you do.
+11. Helpers (item 15): fill `[models] helpers` and `[models] standby` in your `config.toml`. The natural first entry is
+    a Claude model once `ANTHROPIC_API_KEY` is saved (decision 5).
+12. Only you can check live: the X composer with item 14's `type` and `insert`, and a `yolo` run that reads a
+    one-time code from your webmail and types it (item 10).
+13. Speed knobs that wait for item 9's numbers: `[browser] settle_quiet_ms` (120 or 60), `[desktop]
+    screenshot_max_edge` (1920 or 1366), `[desktop] paste_threshold_chars`, `[agent] tool_output_chars` and
+    `keep_recent_tool_results`, besides `tool_surface = "grouped"` (decision 2) and the compaction model (decision 4,
+    and `agent/loop.py:290-298` records the decision that a run compacts with its own model).
+14. Research (not an item of part 2): a `research` run can save nothing, not even a note (`write_file` and
+    `memory_save` are acting-only, `tools/base.py:16-17`), and DuckDuckGo's bot check throttles long research runs
+    (README "Status and known limits"). Say whether a research run may save notes and files under the workspace,
+    and whether the hosted Ollama search (`OLLAMA_API_KEY`) should be the default backend; either is a small item.
 
 ## Log
 
@@ -959,3 +1720,12 @@ files and the folder, left the third and exited 1; a second `--apply` left only 
   links in notes are underlined; on a phone the composer's attach button no longer sits alone in the middle. Checked on
   a scripted throw-away daemon in both themes and skins at 1280 and 390 px. Python changed: the owner's daemon needs a
   restart for the key states.
+- 2026-10-09: part 2 planned (items 9 to 20) from the owner's second ask and four read-only subagent audits (browser
+  and desktop latency, the loop and model round trips, autonomy and guardrails, evals and capabilities), their cited
+  lines re-read before use. Nothing implemented. Ground checked: `ruff format --check` (254 files), `ruff check`,
+  `mypy` (187 files) and 475 unit tests clean in 5.1 s with `DOT_HOME` and `DOT_LOG_DIR` in a temp directory. Found
+  while planning, not changed: the owner's two X skills fail to load (`metadata` typing, item 18); `browser_act`
+  results do not taint the run although desktop results do (`tools/browser.py:289`, `policy/types.py:73-75`);
+  `check_drift` in `desktop/actions.py:145-159` has no caller; the comment at `desktop/screen.py:75-77` says
+  `windows_on_screen` takes 0.2 ms, measured 3 ms. Handed to the next agent; the owner's verbatim ask is in
+  `PLAN.md`, part 8.
