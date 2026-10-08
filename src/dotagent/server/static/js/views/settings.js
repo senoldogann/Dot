@@ -2,6 +2,7 @@
 
 import { el } from "../dom.js";
 import { icon } from "../icons.js";
+import * as keys from "./keys.js";
 import * as memory from "./memory.js";
 import * as rules from "./rules.js";
 import * as schedules from "./schedules.js";
@@ -11,6 +12,7 @@ const DEFAULT_TAB = "general";
 const TABS = [
   { id: "general", label: "General", icon: "sliders", mount: mountGeneral },
   { id: "models", label: "Models", icon: "layers", mount: mountModels },
+  { id: "keys", label: "API keys", icon: "key", mount: keys.mount },
   { id: "browser", label: "Browser", icon: "globe", mount: mountBrowser },
   { id: "rules", label: "Rules", icon: "shield", mount: rules.mount },
   { id: "memory", label: "Memory", icon: "database", mount: memory.mount },

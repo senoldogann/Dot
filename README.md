@@ -118,6 +118,17 @@ Anthropic key (`ANTHROPIC_API_KEY`) is created in the Claude Console at platform
 models, local or `:cloud` through the signed-in local server, need no key. A running daemon picks up a key added later
 when a run first uses that provider, without a restart.
 
+Settings › API keys in the web UI does what `dotx auth set` does for the key of each provider, and more: it shows
+where the key in use comes from (the daemon's environment, Dot's `.env` file or the Keychain) and, for a key of 16
+characters or more, its last four characters; a key never comes back from the daemon whole. **Check** asks the provider
+whether it takes the key in use: the model listing of OpenAI and Anthropic and the subscription of OpenCode Go cost
+nothing, the Ollama key is tried with one search of its hosted web search. **Add key** or **Replace** saves a key in
+`<home>/.env` and then runs **Check**; the trash button removes the key saved there (a key from the environment or the
+Keychain is left alone). The page warns when the daemon was started with the variable in its environment, which comes
+before a key saved in Dot. A saved or removed key is used from the next request of a run on, even in a run under way.
+The memory search (an OpenAI or ollama.com key) and the MCP servers read their keys when the daemon starts: after
+changing a key they use, restart the daemon (`dotx service install`).
+
 ## How a run works
 
 A run is a loop. The model answers with tool calls; Dot checks each call against the [policy](#safety), runs the ones
@@ -478,11 +489,12 @@ the latest screenshots; it sits beside the conversation from 960 px and opens as
 
 **Settings** (`#/settings`) is one page with tabs: **General** (the look of this browser, the two switches below, desktop
 notifications and the token this browser is signed in with), **Models** (one fold per provider, with the reasoning levels
-of each model and a menu to choose one), **Browser** (which Chrome Dot browses with and what Chrome has to allow first;
-see [Browser use](#browser-use)), **Rules**, **Memory**, **Schedules** and **System** (the daemon, the emergency stop and
-the health checks in a fold, closed, with the number of failures on its line). Which folds are open is kept in the
-browser. The tabs sit beside their content when the window has the room and above it otherwise; the earlier addresses of
-the memory, schedules, rules and system pages lead to their tabs.
+of each model and a menu to choose one), **API keys** (the key of each provider; see
+[Models and providers](#models-and-providers)), **Browser** (which Chrome Dot browses with and what Chrome has to allow
+first; see [Browser use](#browser-use)), **Rules**, **Memory**, **Schedules** and **System** (the daemon, the emergency
+stop and the health checks in a fold, closed, with the number of failures on its line). Which folds are open is kept in
+the browser. The tabs sit beside their content when the window has the room and above it otherwise; the earlier
+addresses of the memory, schedules, rules and system pages lead to their tabs.
 
 Settings › General › Appearance switches between two looks on the same layout: **Neutral** (cool, round and quiet; the
 default) and **Paper** (warm paper tones with a serif heading). Two switches follow the look until you set them

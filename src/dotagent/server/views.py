@@ -11,11 +11,13 @@ from dotagent.core.types import FrozenModel
 from dotagent.desktop.perms import Pane
 from dotagent.llm.types import Effort
 from dotagent.policy.types import ApprovalMode
+from dotagent.secrets import SecretSource
 from dotagent.store.models import ApprovalStatus, Behavior, MemoryRecord, RunMode, RunRecord, ScheduleRecord
 
 _GOAL_CHARS: int = 50_000
 _TEXT_CHARS: int = 20_000
 _NAME_CHARS: int = 120
+_KEY_CHARS: int = 1000
 # Base64 takes four characters for every three bytes.
 _UPLOAD_B64_CHARS: int = (MAX_ATTACHMENT_BYTES + 2) // 3 * 4
 
@@ -166,6 +168,12 @@ class BrowserModeRequest(FrozenModel):
     mode: BrowserMode
 
 
+class KeyRequest(FrozenModel):
+    """An API key to save: printable characters without spaces, as the keys of every provider are."""
+
+    value: str = Field(min_length=1, max_length=_KEY_CHARS, pattern=r"^[!-~]+$")
+
+
 # --------------------------------------------------------------------------------------------- responses
 
 
@@ -251,6 +259,25 @@ class BrowserView(FrozenModel):
     port: int | None
     inspect_page: str
     attach_timeout_s: float
+
+
+class KeyView(FrozenModel):
+    """The API key of one provider as the Settings page shows it; the value never leaves the daemon. ``source`` is where
+    the key in use comes from (``None``: it is not set), ``saved`` whether Dot's ``.env`` file holds one (the page saves
+    and removes only that one), ``tail`` the last characters of the key in use ("" when unset or too short)."""
+
+    provider: str
+    name: str
+    source: SecretSource | None
+    saved: bool
+    tail: str
+
+
+class KeysView(FrozenModel):
+    """The API key of every provider, and the ``.env`` file the Settings page saves keys in."""
+
+    env_file: str
+    keys: list[KeyView]
 
 
 class StatusView(FrozenModel):

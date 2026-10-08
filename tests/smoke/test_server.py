@@ -29,7 +29,7 @@ from dotagent.core.errors import NotFoundError
 from dotagent.core.types import JsonObject
 from dotagent.desktop.perms import check_permissions
 from dotagent.desktop.types import Permissions
-from dotagent.llm.types import ImageData, Message
+from dotagent.llm.types import ChatProvider, ImageData, Message
 from dotagent.runtime import Runtime, build_runtime, close_runtime
 from dotagent.server.app import create_app
 from dotagent.server.context import ServerContext
@@ -55,6 +55,10 @@ POLL_S: float = 0.25
 SSE_TIMEOUT_S: float = 120.0
 # Open connections are cut after three seconds; a server that ends its streams stops well before that.
 STOP_WITHIN_S: float = 2.0
+# The variable of the Anthropic key in the configuration of the tests: no environment or Keychain has one of that name,
+# so the tests of the keys never meet a real key.
+KEY_VARIABLE: str = "DOT_SMOKE_ANTHROPIC_KEY"
+FAKE_KEY: str = f"sk-ant-smoke-{secrets.token_hex(12)}"
 PNG_1X1: bytes = bytes.fromhex(
     "89504e470d0a1a0a0000000d49484452000000010000000108060000001f15c4890000000d49444154789c6360f8cfc0f01f0005000201"
     "a5f645400000000049454e44ae426082"
@@ -123,7 +127,8 @@ async def follow_sse(response: httpx.Response) -> AsyncIterator[SseMessage]:
 def home(tmp_path_factory: pytest.TempPathFactory) -> Path:
     path: Path = tmp_path_factory.mktemp("home")
     (path / "config.toml").write_text(
-        f'[models]\nmain = "{MODEL_REF}"\n\n[policy]\npreset = "cautious"\napproval_timeout_s = 120.0\n',
+        f'[models]\nmain = "{MODEL_REF}"\n\n[policy]\npreset = "cautious"\napproval_timeout_s = 120.0\n\n'
+        f'[providers.anthropic]\napi_key_env = "{KEY_VARIABLE}"\n',
         encoding="utf-8",
     )
     # The data directory of "the Chrome of the user": empty, so no Chrome runs there and the real one is never touched.
@@ -571,6 +576,77 @@ async def test_the_daemon_asks_macos_for_its_own_permissions_and_reports_them(cl
         screen_recording=True,
         panes=[],
     )
+
+
+# ------------------------------------------------------------------------------------------ API keys
+
+
+def _key_view(listing: httpx.Response, name: str) -> JsonObject:
+    views: list[JsonObject] = [view for view in listing.json()["keys"] if view["name"] == name]
+    assert len(views) == 1, [view["name"] for view in listing.json()["keys"]]
+    return views[0]
+
+
+async def test_a_key_is_saved_shown_by_its_end_only_used_at_once_and_removed(
+    client: httpx.AsyncClient, runtime: Runtime, home: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    listing: httpx.Response = await client.get("/api/keys")
+    assert listing.status_code == 200, listing.text
+    assert [view["provider"] for view in listing.json()["keys"]] == ["openai", "anthropic", "opencode_go", "ollama"]
+    assert listing.json()["env_file"] == str(home / ".env")
+    assert _key_view(listing, KEY_VARIABLE) == {
+        "provider": "anthropic",
+        "name": KEY_VARIABLE,
+        "source": None,
+        "saved": False,
+        "tail": "",
+    }
+    saved: httpx.Response = await client.post(f"/api/keys/{KEY_VARIABLE}", json={"value": FAKE_KEY})
+    assert saved.status_code == 200
+    assert saved.json() == {
+        "provider": "anthropic",
+        "name": KEY_VARIABLE,
+        "source": "env_file",
+        "saved": True,
+        "tail": FAKE_KEY[-4:],
+    }
+    assert FAKE_KEY not in saved.text
+    assert FAKE_KEY not in (await client.get("/api/keys")).text
+    assert (home / ".env").stat().st_mode & 0o777 == 0o600
+    # A changed key reaches the running daemon: the next request makes a new connector with it.
+    first: ChatProvider = await runtime.router.provider("anthropic")
+    replaced: httpx.Response = await client.post(f"/api/keys/{KEY_VARIABLE}", json={"value": f"{FAKE_KEY}-new"})
+    assert replaced.json()["tail"] == "-new"
+    assert await runtime.router.provider("anthropic") is not first
+    # The environment of the daemon comes before Dot's .env file.
+    with monkeypatch.context() as patch:
+        patch.setenv(KEY_VARIABLE, f"sk-ant-environment-{secrets.token_hex(12)}")
+        shadowed: JsonObject = _key_view(await client.get("/api/keys"), KEY_VARIABLE)
+        assert (shadowed["source"], shadowed["saved"]) == ("environment", True)
+    # A value that is not a key is refused without being repeated.
+    spaced: str = f"sk-ant {secrets.token_hex(12)}"
+    refused: httpx.Response = await client.post(f"/api/keys/{KEY_VARIABLE}", json={"value": spaced})
+    assert refused.status_code == 422
+    assert spaced not in refused.text
+    assert (await client.post("/api/keys/NOT_A_KEY", json={"value": FAKE_KEY})).status_code == 404
+    assert (await client.post("/api/keys/NOT_A_KEY/check")).status_code == 404
+    removed: httpx.Response = await client.delete(f"/api/keys/{KEY_VARIABLE}")
+    assert removed.status_code == 200
+    assert (removed.json()["source"], removed.json()["saved"]) == (None, False)
+    assert KEY_VARIABLE not in (home / ".env").read_text(encoding="utf-8")
+    assert (await client.delete(f"/api/keys/{KEY_VARIABLE}")).status_code == 404
+
+
+@pytest.mark.internet
+async def test_checking_a_key_the_provider_refuses_says_so(client: httpx.AsyncClient) -> None:
+    assert (await client.post(f"/api/keys/{KEY_VARIABLE}", json={"value": FAKE_KEY})).status_code == 200
+    try:
+        checked: httpx.Response = await client.post(f"/api/keys/{KEY_VARIABLE}/check")
+    finally:
+        await client.delete(f"/api/keys/{KEY_VARIABLE}")
+    assert checked.status_code == 200, checked.text
+    assert (checked.json()["name"], checked.json()["ok"]) == ("anthropic api", False)
+    assert "401" in checked.json()["detail"], checked.json()["detail"]
 
 
 # ------------------------------------------------------------------------------------------ event streams

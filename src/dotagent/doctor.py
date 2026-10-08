@@ -1,4 +1,5 @@
-"""Environment diagnostics for ``dotx doctor``: what works, what is missing and how to fix it."""
+"""Environment diagnostics for ``dotx doctor``: what works, what is missing and how to fix it. The check of one
+provider's key is the one the API keys page of the settings runs."""
 
 import asyncio
 import os
@@ -10,13 +11,14 @@ from pathlib import Path
 import httpx
 from playwright.async_api import Error as PlaywrightError
 from playwright.async_api import async_playwright
+from pydantic import JsonValue
 
 from dotagent.browser.attach import DebugEndpoint, read_debug_endpoint
 from dotagent.browser.keychain import KeychainMode, read_keychain_mode
 from dotagent.browser.login import CHROME_APP
 from dotagent.browser.profile_lock import profile_holder_pid
 from dotagent.config import AppConfig, McpServerConfig, MemoryConfig, ModelsConfig
-from dotagent.core.errors import BrowserError, ConfigError, ProviderError, ToolExecutionError
+from dotagent.core.errors import BrowserError, ConfigError, ProviderError, ToolExecutionError, WebError
 from dotagent.core.paths import (
     browser_profile_dir,
     chrome_data_dir,
@@ -44,6 +46,9 @@ from dotagent.secrets import resolve_secret
 from dotagent.skills.catalog import load_skills
 from dotagent.skills.types import SkillCatalog, SkillProblem
 from dotagent.tools.shell import read_login_env
+from dotagent.web.client import WebClient
+from dotagent.web.search import search_ollama
+from dotagent.web.types import SearchHit
 
 _PROBE_TIMEOUT_S: float = 5.0
 _ERROR_CHARS: int = 300
@@ -53,6 +58,8 @@ _ENGLISH_CENTRIC_EMBEDDERS: frozenset[str] = frozenset(
     {"mxbai-embed-large", "nomic-embed-text", "all-minilm", "snowflake-arctic-embed"}
 )
 _MULTILINGUAL_EMBEDDER: str = "bge-m3"
+# The search that checks a key of Ollama's hosted web search.
+_SEARCH_PROBE: str = "Ollama web search"
 
 
 class CheckResult(FrozenModel):
@@ -151,6 +158,46 @@ async def _check_anthropic_api(router: ModelRouter, required: bool) -> CheckResu
     except (ConfigError, ProviderError) as exc:
         return _result("anthropic api", False, required, exc.message)
     return _result("anthropic api", True, required, f"{len(models)} models are available to this key")
+
+
+async def _check_ollama_search(config: AppConfig) -> CheckResult:
+    """Run one search of Ollama's hosted web search, the service its key is for; it counts against the key's
+    allowance of searches."""
+    variable: str = config.providers.ollama.api_key_env
+    key: str | None = await asyncio.to_thread(resolve_secret, variable)
+    if key is None:
+        return _result("ollama web search", False, True, f"{variable} is not set")
+    client: WebClient = WebClient(config.web, config.browser.allowed_hosts, config.browser.blocked_hosts)
+    try:
+        hits: tuple[SearchHit, ...] = await search_ollama(client, key, _SEARCH_PROBE, 1)
+    except WebError as exc:
+        status: JsonValue = exc.context.get("status")
+        detail: str = exc.message if status is None else f"{exc.message} (HTTP {status})"
+        return _result("ollama web search", False, True, detail)
+    finally:
+        await client.aclose()
+    return _result("ollama web search", True, True, f"a test search with this key worked; results: {len(hits)}")
+
+
+async def check_provider_key(config: AppConfig, provider: str) -> CheckResult:
+    """Ask ``provider`` whether it takes the key in use now, through connectors made for this check alone. The calls
+    for OpenAI, OpenCode Go and Anthropic cost nothing; Ollama's key is for its hosted web search, so it is checked with
+    one search."""
+    if provider == "ollama":
+        return await _check_ollama_search(config)
+    router: ModelRouter = ModelRouter(config)
+    try:
+        match provider:
+            case "openai":
+                return await _check_openai_api(router, True)
+            case "opencode_go":
+                return await _check_opencode_go_api(router, True)
+            case "anthropic":
+                return await _check_anthropic_api(router, True)
+            case _:
+                raise ConfigError("no key check exists for this provider", {"provider": provider})
+    finally:
+        await router.aclose()
 
 
 def _model_is_installed(installed: tuple[str, ...], wanted: str) -> bool:

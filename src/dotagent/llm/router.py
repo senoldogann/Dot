@@ -42,6 +42,10 @@ class ModelRouter:
     def __init__(self, config: AppConfig) -> None:
         self._config: AppConfig = config
         self._providers: dict[str, ChatProvider] = {}
+        # The names served by a connector given through `register`; `retire` leaves them alone.
+        self._registered: set[str] = set()
+        # The connectors `retire` took out of service, closed with the others at `aclose`.
+        self._retired: list[ChatProvider] = []
         self._lock: asyncio.Lock = asyncio.Lock()
 
     async def _create(self, name: str) -> ChatProvider:
@@ -84,6 +88,18 @@ class ModelRouter:
             if name in self._providers:
                 raise ConfigError("a connector for this provider exists already", {"provider": name})
             self._providers[name] = provider
+            self._registered.add(name)
+
+    async def retire(self, name: str) -> None:
+        """Make the next request to the provider ``name`` create a new connector, with the key in use then. The old
+        connector is closed at ``aclose``, so a request it is serving is not cut. A connector given through
+        ``register`` stays in service."""
+        async with self._lock:
+            if name in self._registered:
+                return
+            retired: ChatProvider | None = self._providers.pop(name, None)
+            if retired is not None:
+                self._retired.append(retired)
 
     async def complete(self, ref: ModelRef, request: ChatRequest, sink: DeltaSink) -> ModelReply:
         provider: ChatProvider = await self.provider(ref.provider)
@@ -95,7 +111,8 @@ class ModelRouter:
 
     async def aclose(self) -> None:
         async with self._lock:
-            providers: list[ChatProvider] = list(self._providers.values())
+            providers: list[ChatProvider] = [*self._providers.values(), *self._retired]
             self._providers.clear()
+            self._retired.clear()
         for provider in providers:
             await provider.aclose()

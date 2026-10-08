@@ -26,6 +26,7 @@ from dotagent.server.context import ServerContext
 from dotagent.server.guard import LocalGuard
 from dotagent.server.routes_browser import browser_router
 from dotagent.server.routes_data import memories_router, rules_router, schedules_router
+from dotagent.server.routes_keys import keys_router
 from dotagent.server.routes_runs import runs_router
 from dotagent.server.routes_system import health_router, system_router
 from dotagent.server.routes_threads import threads_router
@@ -73,6 +74,7 @@ def create_app(ctx: ServerContext) -> FastAPI:
     app.include_router(memories_router(ctx))
     app.include_router(schedules_router(ctx))
     app.include_router(browser_router(ctx))
+    app.include_router(keys_router(ctx))
 
     @app.exception_handler(DotError)
     async def dot_error(request: Request, exc: DotError) -> JSONResponse:
@@ -85,7 +87,10 @@ def create_app(ctx: ServerContext) -> FastAPI:
 
     @app.exception_handler(RequestValidationError)
     async def invalid_request(request: Request, exc: RequestValidationError) -> JSONResponse:
-        problems: list[JsonValue] = _JSON_LIST.validate_python(jsonable_encoder(exc.errors()))
+        """What is wrong with each field, without the value that was refused: it may be a secret, an API key for one."""
+        problems: list[JsonValue] = _JSON_LIST.validate_python(
+            jsonable_encoder([{key: value for key, value in error.items() if key != "input"} for error in exc.errors()])
+        )
         return _error_response(422, "the request is not valid", {"errors": problems})
 
     app.add_middleware(LocalGuard, token=ctx.token, port=ctx.port)

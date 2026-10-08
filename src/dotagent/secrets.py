@@ -7,11 +7,28 @@ Keychain items are read from service ``dot-agent`` (account = variable name); ad
 import os
 import subprocess
 from pathlib import Path
+from typing import Literal
 
 from dotagent.core.errors import ConfigError
 from dotagent.core.paths import env_file_path
+from dotagent.core.types import FrozenModel
 
 KEYCHAIN_SERVICE: str = "dot-agent"
+# The end of a key that may be shown so the owner can tell two keys apart; a shorter key shows nothing of itself.
+_TAIL_CHARS: int = 4
+_TAIL_MIN_CHARS: int = 16
+
+type SecretSource = Literal["environment", "env_file", "keychain"]
+
+
+class SecretState(FrozenModel):
+    """A secret described without its value: ``source`` is where the value :func:`resolve_secret` returns comes from
+    (``None``: no source has one), ``saved`` whether ``<home>/.env`` holds a value, and ``tail`` the last characters of
+    the value in use ("" when there is none or it is too short to show any of it)."""
+
+    source: SecretSource | None
+    saved: bool
+    tail: str
 
 
 def parse_env_file(text: str) -> dict[str, str]:
@@ -46,6 +63,16 @@ def write_env_value(path: Path, name: str, value: str) -> None:
     os.chmod(path, 0o600)
 
 
+def remove_env_value(path: Path, name: str) -> bool:
+    """Drop ``name`` from the env file keeping every other entry; ``False`` when the file has no entry of that name."""
+    current: dict[str, str] = parse_env_file(path.read_text(encoding="utf-8")) if path.exists() else {}
+    if name not in current:
+        return False
+    path.write_text(render_env_file({key: value for key, value in current.items() if key != name}), encoding="utf-8")
+    os.chmod(path, 0o600)
+    return True
+
+
 def _from_env_file(path: Path, name: str) -> str | None:
     if not path.exists():
         return None
@@ -75,6 +102,25 @@ def resolve_secret(name: str) -> str | None:
     if from_file:
         return from_file
     return _from_keychain(name)
+
+
+def _tail(value: str) -> str:
+    return value[-_TAIL_CHARS:] if len(value) >= _TAIL_MIN_CHARS else ""
+
+
+def secret_state(name: str) -> SecretState:
+    """Where the secret called ``name`` comes from, read in the order of :func:`resolve_secret` (the Keychain only when
+    neither the environment nor the env file has it), without giving the value away."""
+    saved: str | None = _from_env_file(env_file_path(), name)
+    from_env: str | None = os.environ.get(name)
+    if from_env:
+        return SecretState(source="environment", saved=bool(saved), tail=_tail(from_env))
+    if saved:
+        return SecretState(source="env_file", saved=True, tail=_tail(saved))
+    from_keychain: str | None = _from_keychain(name)
+    if from_keychain:
+        return SecretState(source="keychain", saved=False, tail=_tail(from_keychain))
+    return SecretState(source=None, saved=False, tail="")
 
 
 def require_secret(name: str, purpose: str) -> str:
