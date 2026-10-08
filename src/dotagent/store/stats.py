@@ -31,6 +31,25 @@ FROM runs r JOIN events e ON e.run_id = r.id
 WHERE r.created_at >= ?
 GROUP BY r.model
 """
+# One row: the newest finished runs of one model and the counts of their events. A failed tool result without a risk was
+# refused before anything ran (an unknown tool, a tool of another mode, arguments that were not JSON or did not fit).
+_PROFILE_SQL: str = """
+WITH recent AS (
+    SELECT id, steps FROM runs WHERE model = ? AND finished_at IS NOT NULL ORDER BY created_at DESC LIMIT ?
+)
+SELECT (SELECT COUNT(*) FROM recent),
+       (SELECT COALESCE(SUM(steps), 0) FROM recent),
+       COALESCE(SUM(e.kind = 'tool_call'), 0),
+       COALESCE(SUM(e.kind = 'tool_result' AND json_extract(e.data, '$.ok') = 0), 0),
+       COALESCE(SUM(e.kind = 'tool_result' AND json_extract(e.data, '$.ok') = 0
+                    AND json_extract(e.data, '$.risk') = ''), 0),
+       COALESCE(SUM(e.kind = 'tool_call' AND instr(e.data, ?) > 0), 0),
+       COALESCE(SUM(e.kind = 'assistant' AND trim(json_extract(e.data, '$.text')) = ''
+                    AND json_array_length(e.data, '$.tool_calls') = 0), 0),
+       COALESCE(SUM(e.kind = 'stall'), 0),
+       COALESCE(SUM(e.kind = 'compacted'), 0)
+FROM events e WHERE e.run_id IN (SELECT id FROM recent)
+"""
 
 
 class EndingCount(FrozenModel):
@@ -60,6 +79,47 @@ class _EventCounts(FrozenModel):
     invalid_arguments: int
     stalls: int
     compactions: int
+
+
+class ModelProfile(FrozenModel):
+    """How reliably one model worked in its newest finished runs. ``refused_calls`` were refused before anything ran
+    (an unknown tool, a tool of another mode, arguments that were not JSON or did not fit the tool): they measure the
+    model, whereas a failed call may be the environment's doing. ``empty_replies`` had neither text nor a tool call."""
+
+    model: str
+    runs: int
+    steps: int
+    tool_calls: int
+    tool_errors: int
+    refused_calls: int
+    invalid_arguments: int
+    empty_replies: int
+    stalls: int
+    compactions: int
+
+
+def read_model_profile(database: Path, model: str, runs: int) -> ModelProfile:
+    """The profile of ``model`` over its newest ``runs`` finished runs. The database is opened read-only, so a running
+    daemon is not disturbed. Blocking."""
+    try:
+        with closing(sqlite3.connect(f"{database.as_uri()}?mode=ro", uri=True, timeout=_BUSY_TIMEOUT_S)) as connection:
+            row: tuple[object, ...] = connection.execute(_PROFILE_SQL, (model, runs, INVALID_ARGUMENTS_KEY)).fetchone()
+    except sqlite3.Error as error:
+        raise StoreError(
+            "the run history could not be read", {"database": str(database), "model": model, "error": str(error)}
+        ) from error
+    return ModelProfile(
+        model=model,
+        runs=int(str(row[0])),
+        steps=int(str(row[1])),
+        tool_calls=int(str(row[2])),
+        tool_errors=int(str(row[3])),
+        refused_calls=int(str(row[4])),
+        invalid_arguments=int(str(row[5])),
+        empty_replies=int(str(row[6])),
+        stalls=int(str(row[7])),
+        compactions=int(str(row[8])),
+    )
 
 
 def _read_rows(database: Path, since: float) -> tuple[list[tuple[object, ...]], list[tuple[object, ...]]]:

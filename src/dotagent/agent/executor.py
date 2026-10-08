@@ -115,9 +115,7 @@ async def _run_checked(
     return _with_approval_note(result, note), action
 
 
-async def _execute_one(
-    call: ToolCall, registry: ToolRegistry, ctx: ToolContext, gate: RunGate, output_chars: int
-) -> ToolOutcome:
+async def _execute_one(call: ToolCall, registry: ToolRegistry, ctx: ToolContext, gate: RunGate) -> ToolOutcome:
     started: float = time.monotonic()
     await ctx.runtime.bus.emit(
         ctx.run_id, "tool_call", {"call_id": call.id, "tool": call.name, "args": _safe_json(call.arguments)}, True
@@ -137,7 +135,7 @@ async def _execute_one(
         )
     else:
         result, action = await _run_checked(call, tool, ctx, gate)
-    clipped: ToolResult = result.model_copy(update={"text": truncate_middle(result.text, output_chars)})
+    clipped: ToolResult = result.model_copy(update={"text": truncate_middle(result.text, ctx.output_chars)})
     seconds: float = time.monotonic() - started
     files: list[str] = await ctx.runtime.store.save_images(clipped.images) if clipped.images else []
     await ctx.runtime.bus.emit(
@@ -182,10 +180,10 @@ async def execute_calls(
     registry: ToolRegistry,
     ctx: ToolContext,
     gate: RunGate,
-    output_chars: int,
     parallelism: int,
 ) -> list[ToolOutcome]:
-    """Run the calls of one model turn in order, overlapping read-only ones. Results keep the call order."""
+    """Run the calls of one model turn in order, overlapping read-only ones. Results keep the call order; the text of
+    each is clipped to the run's ``ctx.output_chars``."""
     finish_index: int | None = next((index for index, call in enumerate(calls) if call.name == FINISH_TOOL), None)
     runnable: Sequence[ToolCall] = calls if finish_index is None else calls[: finish_index + 1]
     skipped: list[ToolOutcome] = [] if finish_index is None else [_skipped(call) for call in calls[finish_index + 1 :]]
@@ -193,12 +191,12 @@ async def execute_calls(
 
     async def bounded(call: ToolCall) -> ToolOutcome:
         async with slots:
-            return await _execute_one(call, registry, ctx, gate, output_chars)
+            return await _execute_one(call, registry, ctx, gate)
 
     outcomes: list[ToolOutcome] = []
     for group in _group_calls(runnable, registry):
         if len(group) == 1:
-            outcomes.append(await _execute_one(group[0], registry, ctx, gate, output_chars))
+            outcomes.append(await _execute_one(group[0], registry, ctx, gate))
         else:
             outcomes.extend(await asyncio.gather(*(bounded(call) for call in group)))
     return [*outcomes, *skipped]

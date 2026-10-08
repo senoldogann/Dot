@@ -34,7 +34,7 @@ _LEDGER_INSTRUCTIONS: int = 20
 _ACTION_ARGS_CHARS: int = 160
 _ACTION_RESULT_CHARS: int = 160
 _PINNED_TEXT_CHARS: int = 4000
-_MECHANICAL_CHARS: int = 9000
+_REMINDER_ACTIONS: int = 5
 _IDENTIFIERS_SHOWN: int = 12
 
 _IDENTIFIER: re.Pattern[str] = re.compile(
@@ -173,9 +173,9 @@ def check_continuity(summary: str, reference: str, ledger: RunLedger) -> Continu
     )
 
 
-def mechanical_summary(transcript: str, reason: str) -> str:
-    """A summary written without a model: the newest part of the transcript, said to be one."""
-    tail: str = transcript[-_MECHANICAL_CHARS:]
+def mechanical_summary(transcript: str, reason: str, max_chars: int) -> str:
+    """A summary written without a model: the newest ``max_chars`` characters of the transcript, said to be one."""
+    tail: str = transcript[max(0, len(transcript) - max_chars) :]
     return (
         f"No model summary could be written ({reason}). The newest part of the earlier conversation follows as it was; "
         f"rely on the pinned facts above for what came before it.\n{tail}"
@@ -187,8 +187,8 @@ def _action_line(action: LedgerAction) -> str:
     return f"- {action.tool} {action.args} → {outcome}: {action.result}"
 
 
-def render_pinned(ledger: RunLedger, plan: Sequence[PlanItem]) -> str:
-    """The facts of the ledger as the model reads them in a continuity note."""
+def _task_sections(ledger: RunLedger, plan: Sequence[PlanItem]) -> list[str]:
+    """The task word for word, what the user said during the run and the plan."""
     sections: list[str] = [
         "## Task (the user's words, verbatim)",
         truncate_middle(ledger.goal, _PINNED_TEXT_CHARS),
@@ -199,14 +199,62 @@ def render_pinned(ledger: RunLedger, plan: Sequence[PlanItem]) -> str:
     if plan:
         sections.append("## Your plan as last recorded")
         sections.append(render_plan(plan))
+    return sections
+
+
+def _newest_fitting(lines: Sequence[str], max_chars: int) -> list[str]:
+    """The newest of ``lines`` (given oldest first) that fit together in ``max_chars`` characters, oldest first."""
+    kept: list[str] = []
+    used: int = 0
+    for line in reversed(lines):
+        used += len(line) + 1
+        if used > max_chars:
+            break
+        kept.append(line)
+    return kept[::-1]
+
+
+def _unlisted(count: int) -> str:
+    return f" ({count} earlier ones not listed)" if count > 0 else ""
+
+
+def render_pinned(ledger: RunLedger, plan: Sequence[PlanItem], max_chars: int) -> str:
+    """The facts of the ledger as the model reads them in a continuity note, in about ``max_chars`` characters (the
+    headings of the lists come on top).
+
+    The task, the user's instructions and the plan are always there in full. Of the files and addresses touched and of
+    the tool actions, the newest that fit are listed (the files and addresses take up to a third of the room left), and
+    the headings say how many earlier ones are not.
+    """
+    sections: list[str] = _task_sections(ledger, plan)
+    room: int = max_chars - len("\n".join(sections))
+    touched: list[str] = _newest_fitting([f"- {item}" for item in ledger.touched], room // 3)
+    actions: list[str] = _newest_fitting(
+        [_action_line(action) for action in ledger.actions], room - len("\n".join(touched))
+    )
     if ledger.actions:
-        earlier: int = ledger.action_count - len(ledger.actions)
-        note: str = f" ({earlier} earlier ones not listed)" if earlier > 0 else ""
-        sections.append(f"## Tool actions that already ran, recorded by the system (oldest first{note})")
-        sections.extend(_action_line(action) for action in ledger.actions)
+        unlisted: str = _unlisted(ledger.action_count - len(actions))
+        sections.append(f"## Tool actions that already ran, recorded by the system (oldest first{unlisted})")
+        sections.extend(actions)
     if ledger.touched:
-        sections.append("## Files and addresses touched so far")
-        sections.extend(f"- {item}" for item in ledger.touched)
+        sections.append(f"## Files and addresses touched so far{_unlisted(len(ledger.touched) - len(touched))}")
+        sections.extend(touched)
+    return "\n".join(sections)
+
+
+def reminder_note(ledger: RunLedger, plan: Sequence[PlanItem]) -> str:
+    """The note that brings the goal back to the end of a long run's context: the task word for word, what the user
+    said since, the plan and the newest actions. It asks for nothing new."""
+    sections: list[str] = [
+        "[system note] Reminder, nothing new is asked: keep working on the same task.",
+        *_task_sections(ledger, plan),
+    ]
+    if ledger.actions:
+        sections.append("## Your newest tool actions (oldest first)")
+        sections.extend(_action_line(action) for action in ledger.actions[-_REMINDER_ACTIONS:])
+    sections.append(
+        "Continue with the next step towards the task. Call finish with your complete final answer once it is reached."
+    )
     return "\n".join(sections)
 
 
@@ -226,9 +274,15 @@ def _check_lines(check: ContinuityCheck) -> list[str]:
 
 
 def continuity_note(
-    ledger: RunLedger, plan: Sequence[PlanItem], summary: str, author: str, check: ContinuityCheck | None
+    ledger: RunLedger,
+    plan: Sequence[PlanItem],
+    pinned_chars: int,
+    summary: str,
+    author: str,
+    check: ContinuityCheck | None,
 ) -> str:
-    """The message that replaces the earlier conversation: pinned facts, the summary and what its check found.
+    """The message that replaces the earlier conversation: pinned facts in about ``pinned_chars`` characters, the
+    summary and what its check found.
 
     ``check`` is ``None`` for a summary written without a model, which has nothing to validate.
     """
@@ -237,7 +291,12 @@ def continuity_note(
         "session. The earlier conversation was compacted into the facts below. Do not restart the task and do not "
         "repeat actions listed as already run; continue from where the summary's NEXT points.]"
     )
-    parts: list[str] = [header, render_pinned(ledger, plan), f"{SUMMARY_HEADING} ({author})", summary.strip()]
+    parts: list[str] = [
+        header,
+        render_pinned(ledger, plan, pinned_chars),
+        f"{SUMMARY_HEADING} ({author})",
+        summary.strip(),
+    ]
     lines: list[str] = [] if check is None else _check_lines(check)
     if lines:
         parts.append("## Consistency check")

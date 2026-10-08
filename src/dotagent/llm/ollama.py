@@ -293,24 +293,26 @@ def _parse_think_values(raw: JsonValue) -> tuple[str | bool, ...]:
     return tuple(value for value in values if isinstance(value, (str, bool)))
 
 
-def parse_model_details(model: str, shown: JsonObject) -> OllamaModelDetails:
+def parse_model_details(model: str, shown: JsonObject, num_ctx: int) -> OllamaModelDetails:
+    """What ``/api/show`` says about a model. Every request is sent with ``num_ctx``, the window Ollama gives the model,
+    so the context length is the smaller of that and the model's own window."""
     capabilities: JsonValue = shown.get("capabilities")
     caps: set[str] = {str(item) for item in capabilities} if isinstance(capabilities, list) else set()
     thinking: bool = "thinking" in caps
     values: tuple[str | bool, ...] = _parse_think_values(shown.get("thinking"))
-    context_length: int | None = None
+    trained: int | None = None
     details: JsonValue = shown.get("model_info")
     if isinstance(details, dict):
         for key, value in details.items():
             if key.endswith(".context_length") and isinstance(value, int) and not isinstance(value, bool):
-                context_length = value
+                trained = value
                 break
     info: ModelInfo = ModelInfo(
         id=model,
         vision="vision" in caps,
         tools="tools" in caps,
         thinking=thinking,
-        context_length=context_length,
+        context_length=num_ctx if trained is None else min(trained, num_ctx),
         efforts=think_ladder(thinking, values),
     )
     return OllamaModelDetails(info=info, think_values=values)
@@ -346,7 +348,7 @@ class OllamaProvider:
         if cached is not None:
             return cached
         shown: JsonObject = await self._post_json("/api/show", {"model": model}, "ollama.show")
-        details: OllamaModelDetails = parse_model_details(model, shown)
+        details: OllamaModelDetails = parse_model_details(model, shown, self._config.num_ctx)
         self._details_cache[model] = details
         return details
 

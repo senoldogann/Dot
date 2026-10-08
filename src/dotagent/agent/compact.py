@@ -6,7 +6,8 @@ from dotagent.core.jsonutil import dumps_compact
 from dotagent.core.text import truncate_middle
 from dotagent.llm.types import Message, ToolSpec
 
-_CHARS_PER_TOKEN: float = 3.2
+# Characters per token in the estimate; the loop calibrates the estimate against the provider's own counts.
+CHARS_PER_TOKEN: float = 3.2
 _TOKENS_PER_IMAGE: int = 1400
 _OLD_RESULT_CHARS: int = 700
 _OMITTED_IMAGE_NOTE: str = "\n[screenshot omitted: it is out of date]"
@@ -23,7 +24,7 @@ def estimate_tokens(messages: Sequence[Message], tools: Sequence[ToolSpec]) -> i
         for call in message.tool_calls:
             characters += len(call.name) + len(dumps_compact(call.arguments))
         images += len(message.images)
-    return round(characters / _CHARS_PER_TOKEN) + images * _TOKENS_PER_IMAGE
+    return round(characters / CHARS_PER_TOKEN) + images * _TOKENS_PER_IMAGE
 
 
 def drop_old_images(messages: Sequence[Message], keep_recent: int) -> list[Message]:
@@ -100,13 +101,22 @@ def repair_history(messages: Sequence[Message]) -> list[Message]:
     return repaired
 
 
-def split_for_summary(messages: Sequence[Message], keep_tail: int) -> tuple[list[Message], list[Message]]:
-    """Split into (older part to summarise, recent part to keep) at a point that never separates a tool exchange."""
-    if len(messages) <= keep_tail:
-        return [], list(messages)
-    cut: int = len(messages) - keep_tail
+def split_for_summary(
+    messages: Sequence[Message], keep_tail: int, max_tail_tokens: int
+) -> tuple[list[Message], list[Message]]:
+    """Split into (older part to summarise, recent part to keep) at a point that never separates a tool exchange.
+
+    The recent part keeps about the newest ``keep_tail`` messages (more when the cut would fall inside a tool exchange)
+    and fewer when those come to more than ``max_tail_tokens`` estimated tokens, but never less than the newest
+    exchange: the newest assistant message and what follows it. A history without one has nothing to summarise.
+    """
+    newest: int = max((index for index, message in enumerate(messages) if message.role == "assistant"), default=0)
+    cut: int = max(0, len(messages) - keep_tail)
     while cut > 0 and messages[cut].role == "tool":
         cut -= 1
+    cut = min(cut, newest)
+    while cut < newest and (messages[cut].role == "tool" or estimate_tokens(messages[cut:], ()) > max_tail_tokens):
+        cut += 1
     return list(messages[:cut]), list(messages[cut:])
 
 

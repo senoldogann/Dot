@@ -368,6 +368,7 @@ async def _prepare(runtime: Runtime, name: str, arguments: JsonObject) -> tuple[
         workspace=workspace_dir(),
         gate=_Recorder(),
         cancel=asyncio.Event(),
+        output_chars=runtime.config.agent.tool_output_chars,
     )
     return await runtime.registry.tools[name].prepare(arguments, ctx), ctx
 

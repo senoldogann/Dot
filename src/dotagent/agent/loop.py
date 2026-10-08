@@ -14,6 +14,7 @@ from dotagent.agent.attachments import (
     message_with_attachments,
 )
 from dotagent.agent.compact import (
+    CHARS_PER_TOKEN,
     drop_old_images,
     estimate_tokens,
     render_transcript,
@@ -29,6 +30,7 @@ from dotagent.agent.continuity import (
     history_text,
     mechanical_summary,
     new_ledger,
+    reminder_note,
     summary_part,
     with_actions,
     with_compaction,
@@ -69,6 +71,14 @@ from dotagent.agent.review import (
     goal_digest,
     progress_consultant_for,
     shorten_reason,
+)
+from dotagent.agent.scaffold import (
+    PROFILE_RUNS,
+    Scaffold,
+    reminder_due,
+    require_room,
+    scaffold_event,
+    scaffold_for,
 )
 from dotagent.agent.vision import text_for_blind_model
 from dotagent.config import AgentConfig
@@ -113,9 +123,13 @@ _SUMMARY_ATTEMPTS: int = 3
 _QUERY_EARLIER_RUNS: int = 3
 _SOFT_LIMIT_SHARE: float = 0.6
 _SUMMARY_TRANSCRIPT_CHARS: int = 120_000
-# A summary may take this share of [agent] context_tokens. Each compaction summarises the previous summary again, so
+# A summary may take this share of the run's context budget. Each compaction summarises the previous summary again, so
 # without a limit the summary grows until it alone fills the budget and every step compacts.
 _SUMMARY_SHARE: float = 0.1
+# Right after a compaction the prompt takes about this share of the budget at most: the fixed part, the continuity note
+# (its summary and its pinned facts may take a _SUMMARY_SHARE each) and the newest messages in what is left. The rest
+# is room for the steps that follow, so that a run with a small budget does not compact again at its next step.
+_COMPACTED_SHARE: float = 0.85
 _WORDS_PER_TOKEN: float = 0.75
 # A summary longer than its limit by more than this factor is asked for again.
 _SUMMARY_SLACK: float = 1.5
@@ -193,14 +207,17 @@ async def _current_plan(agent: AgentRun) -> tuple[PlanItem, ...]:
     return () if latest is None else plan_from_event(latest)
 
 
-async def _model_summary(agent: AgentRun, ref: ModelRef, transcript: str) -> tuple[str | None, int, str | None]:
-    """Ask the run's own model for a summary: ``(text or None, attempts made, last problem)``.
+async def _model_summary(
+    agent: AgentRun, ref: ModelRef, transcript: str, context_tokens: int
+) -> tuple[str | None, int, str | None]:
+    """Ask the run's own model for a summary that fits a run with a budget of ``context_tokens``: ``(text or None,
+    attempts made, last problem)``.
 
     An empty reply is asked again (the first try without reasoning, later ones with a little, since some models spend
     their whole answer on thinking); a summary far over its word limit is asked again too. A provider error or a
     timeout ends the attempts at once, as the provider already retried what can be retried.
     """
-    max_words: int = round(agent.runtime.config.agent.context_tokens * _SUMMARY_SHARE * _WORDS_PER_TOKEN)
+    max_words: int = round(context_tokens * _SUMMARY_SHARE * _WORDS_PER_TOKEN)
     prompt: str = _SUMMARY_PROMPT.format(max_words=max_words)
     problem: str | None = None
     for attempt in range(1, _SUMMARY_ATTEMPTS + 1):
@@ -239,11 +256,14 @@ async def _model_summary(agent: AgentRun, ref: ModelRef, transcript: str) -> tup
     return None, _SUMMARY_ATTEMPTS, problem
 
 
-async def _compact(agent: AgentRun, head: Sequence[Message], ledger: RunLedger) -> Compaction:
+async def _compact(
+    agent: AgentRun, head: Sequence[Message], ledger: RunLedger, context_tokens: int, part_chars: int
+) -> Compaction:
     """Fold ``head`` into a continuity note written by the run's own model, never by another one.
 
-    The ledger and the plan are pinned into the note; the model's summary is checked against ``head``. When the model
-    cannot write one, the note carries the newest part of the transcript instead and says so.
+    The ledger and the plan are pinned into the note in about ``part_chars`` characters; the model's summary is checked
+    against ``head``. When the model cannot write one, the note carries the newest ``part_chars`` characters of the
+    transcript instead and says so.
     """
     ref: ModelRef = parse_model_ref(agent.run.model)
     readable: list[Message] = [
@@ -251,10 +271,12 @@ async def _compact(agent: AgentRun, head: Sequence[Message], ledger: RunLedger) 
     ]
     transcript: str = truncate_middle(render_transcript(readable), _SUMMARY_TRANSCRIPT_CHARS)
     plan: tuple[PlanItem, ...] = await _current_plan(agent)
-    text, attempts, problem = await _model_summary(agent, ref, transcript)
+    text, attempts, problem = await _model_summary(agent, ref, transcript, context_tokens)
     if text is None:
         reason: str = problem if problem is not None else "no reply"
-        note: str = continuity_note(ledger, plan, mechanical_summary(transcript, reason), "mechanical, no model", None)
+        note: str = continuity_note(
+            ledger, plan, part_chars, mechanical_summary(transcript, reason, part_chars), "mechanical, no model", None
+        )
         return Compaction(
             note=user_message(note, ()),
             method="mechanical",
@@ -265,7 +287,7 @@ async def _compact(agent: AgentRun, head: Sequence[Message], ledger: RunLedger) 
         )
     check: ContinuityCheck = check_continuity(text, history_text(head), ledger)
     return Compaction(
-        note=user_message(continuity_note(ledger, plan, text, f"written by you, {ref.label}", check), ()),
+        note=user_message(continuity_note(ledger, plan, part_chars, text, f"written by you, {ref.label}", check), ()),
         method="model",
         model=ref.label,
         attempts=attempts,
@@ -306,19 +328,26 @@ async def _fit_context(
     specs: tuple[ToolSpec, ...],
     ratio: float,
     ledger: RunLedger,
+    context_tokens: int,
 ) -> tuple[list[Message], int, RunLedger]:
-    """Keep the prompt inside the budget: drop stale screenshots, shorten old output, then compact."""
+    """Keep the prompt inside the run's budget of ``context_tokens``: drop stale screenshots, shorten old output, then
+    compact. The messages a compaction keeps and the parts of its note are sized to the budget, so that a compaction
+    leaves room for the steps after it."""
     config: AgentConfig = agent.runtime.config.agent
     current: list[Message] = drop_old_images(history, config.keep_recent_screenshots)
     estimated: int = round(estimate_tokens([system, *current], specs) * ratio)
-    if estimated > config.context_tokens * _SOFT_LIMIT_SHARE:
+    if estimated > context_tokens * _SOFT_LIMIT_SHARE:
         current = shrink_old_tool_results(current, config.keep_recent_tool_results)
         estimated = round(estimate_tokens([system, *current], specs) * ratio)
-    if estimated > config.context_tokens:
-        head, tail = split_for_summary(current, _SUMMARY_KEEP_TAIL)
+    if estimated > context_tokens:
+        # The budget in the units of estimate_tokens, before its calibration against the provider's counts.
+        plain: float = context_tokens / ratio
+        tail_tokens: int = round(plain * (_COMPACTED_SHARE - 2 * _SUMMARY_SHARE)) - estimate_tokens([system], specs)
+        head, tail = split_for_summary(current, _SUMMARY_KEEP_TAIL, tail_tokens)
         if head:
             ledger = with_compaction(ledger)
-            compaction: Compaction = await _compact(agent, head, ledger)
+            part_chars: int = round(plain * _SUMMARY_SHARE * CHARS_PER_TOKEN)
+            compaction: Compaction = await _compact(agent, head, ledger, context_tokens, part_chars)
             current = [compaction.note, *tail]
             estimated = round(estimate_tokens([system, *current], specs) * ratio)
             if compaction.check is not None and not compaction.check.ok:
@@ -635,6 +664,9 @@ async def run_agent(agent: AgentRun) -> RunOutcome:
             )
         )
     )
+    scaffold: Scaffold = scaffold_for(config, info, await runtime.store.model_profile(ref.label, PROFILE_RUNS))
+    await runtime.bus.emit(run.id, "scaffold", scaffold_event(scaffold, config), True)
+    require_room(scaffold, estimate_tokens([system], specs))
     history: list[Message] = repair_history(
         await runtime.store.load_messages(run.thread_id, config.keep_recent_screenshots)
     )
@@ -651,6 +683,7 @@ async def run_agent(agent: AgentRun) -> RunOutcome:
         workspace=runtime.workspace,
         gate=agent.gate,
         cancel=agent.cancel,
+        output_chars=scaffold.tool_output_chars,
         spawner=agent.spawner,
     )
     checker: GoalChecker | None = (
@@ -668,6 +701,8 @@ async def run_agent(agent: AgentRun) -> RunOutcome:
     sent_back: int = 0
     used_tools: bool = False
     plan_reminded: bool = False
+    # The step of the newest reminder of the goal (weak tier); 0 before the first.
+    reminded_at: int = 0
     ledger: RunLedger = new_ledger(run.goal)
     limits: Limits = limits_for(config)
     can_ask: bool = can_ask_user(run.source, run.parent_run_id, run.approvals)
@@ -701,7 +736,9 @@ async def run_agent(agent: AgentRun) -> RunOutcome:
             history.append(await _stored_note(agent, _new_memories_note(changed)))
             await runtime.store.mark_memories_used([record.id for record in changed], time.time())
             await runtime.bus.emit(run.id, "memories", {"ids": [record.id for record in changed], "live": True}, True)
-        history, estimated, ledger = await _fit_context(agent, history, system, specs, ratio, ledger)
+        history, estimated, ledger = await _fit_context(
+            agent, history, system, specs, ratio, ledger, scaffold.context_tokens
+        )
         offered: tuple[ToolSpec, ...] = specs if allowed is None else tuple(s for s in specs if s.name in allowed)
         registry: ToolRegistry = runtime.registry if allowed is None else _only(runtime.registry, allowed)
         allowed = None
@@ -745,7 +782,7 @@ async def run_agent(agent: AgentRun) -> RunOutcome:
         if reply.tool_calls:
             used_tools = True
             outcomes: list[ToolOutcome] = await execute_calls(
-                reply.tool_calls, registry, context, agent.gate, config.tool_output_chars, config.parallel_tools
+                reply.tool_calls, registry, context, agent.gate, config.parallel_tools
             )
             results: list[Message] = await _tool_messages(agent, outcomes, info.vision)
             ledger = with_actions(
@@ -768,6 +805,13 @@ async def run_agent(agent: AgentRun) -> RunOutcome:
                         return answer
                     history.append(await _stored_note(agent, answer.note))
                     allowed = answer.allowed
+                elif reminder_due(scaffold, run.mode, steps, reminded_at):
+                    reminded_at = steps
+                    plan: tuple[PlanItem, ...] = await _current_plan(agent)
+                    history.append(await _stored_note(agent, reminder_note(ledger, plan)))
+                    await runtime.bus.emit(
+                        run.id, "reminder", {"step": steps, "open_steps": list(open_steps(plan))}, True
+                    )
                 continue
             ended = _finish_result(finished)
         else:

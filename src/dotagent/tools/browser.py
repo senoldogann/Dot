@@ -21,7 +21,7 @@ from dotagent.browser.render import (
 )
 from dotagent.browser.safety import assess_step, check_url, normalize_url, parse_element, url_flags
 from dotagent.browser.types import ActOutcome, FindResult, PageView, Screenshot, Step, TextView
-from dotagent.config import AppConfig, BrowserConfig
+from dotagent.config import BrowserConfig
 from dotagent.core.errors import ToolInputError
 from dotagent.llm.types import ImageData
 from dotagent.policy.elements import Element, StepAssessment, combine_assessments
@@ -58,8 +58,8 @@ def _nonce() -> str:
     return secrets.token_hex(_NONCE_BYTES)
 
 
-def _body_budget(config: AppConfig) -> int:
-    return min(config.browser.snapshot_max_chars, config.agent.tool_output_chars - _HEADROOM_CHARS)
+def _body_budget(ctx: ToolContext) -> int:
+    return min(ctx.runtime.config.browser.snapshot_max_chars, ctx.output_chars - _HEADROOM_CHARS)
 
 
 def _clip(text: str, limit: int) -> str:
@@ -92,7 +92,7 @@ def _navigate_action(tool: str, url: str) -> ActionInfo:
 
 
 def _page_result(view: PageView, ctx: ToolContext) -> ToolResult:
-    return ok(render_page_view(view, _nonce(), _body_budget(ctx.runtime.config)))
+    return ok(render_page_view(view, _nonce(), _body_budget(ctx)))
 
 
 def _screenshot_image(shot: Screenshot) -> ImageData:
@@ -286,7 +286,7 @@ def _act_tool() -> RegisteredTool:
 
     async def run(args: ActArgs, ctx: ToolContext) -> ToolResult:
         outcome: ActOutcome = await ctx.runtime.browser.act(ctx.thread_id, args.steps, args.accept_dialogs)
-        return ok(render_act_outcome(outcome, _nonce(), _body_budget(ctx.runtime.config)))
+        return ok(render_act_outcome(outcome, _nonce(), _body_budget(ctx)))
 
     return make_live_tool(
         name="browser_act",
@@ -350,9 +350,7 @@ def _read_text_tool() -> RegisteredTool:
 
     async def run(args: ReadTextArgs, ctx: ToolContext) -> ToolResult:
         config: BrowserConfig = ctx.runtime.config.browser
-        limit: int = min(
-            args.max_chars or config.read_text_chars, ctx.runtime.config.agent.tool_output_chars - _HEADROOM_CHARS
-        )
+        limit: int = min(args.max_chars or config.read_text_chars, ctx.output_chars - _HEADROOM_CHARS)
         text: TextView = await ctx.runtime.browser.read_text(ctx.thread_id, args.ref, args.offset or 0, limit)
         return ok(render_text_view(text, _nonce()))
 

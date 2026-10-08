@@ -46,8 +46,8 @@ def _clip(text: str, limit: int) -> str:
     return flat if len(flat) <= limit else f"{flat[: limit - 1]}…"
 
 
-def _text_budget(config: AppConfig) -> int:
-    return max(config.agent.tool_output_chars - _HEADROOM_CHARS, 1000)
+def _text_budget(output_chars: int) -> int:
+    return max(output_chars - _HEADROOM_CHARS, 1000)
 
 
 def _action(tool: str, summary: str, target: str, flags: tuple[Flag, ...]) -> ActionInfo:
@@ -209,7 +209,9 @@ def _fetch_tool() -> RegisteredTool:
                 f"start={args.start} is past the end of the document, which has {len(readable.text)} characters."
             )
         cut_at: int | None = _cut_at(document, kind, config.web.fetch_max_bytes)
-        text: str = render_document(shown_url, document, readable, cut_at, args.start, _text_budget(config), nonce)
+        text: str = render_document(
+            shown_url, document, readable, cut_at, args.start, _text_budget(ctx.output_chars), nonce
+        )
         if _needs_javascript(document, kind, readable):
             text += "\nNote: this page shows little text without JavaScript; browser_open renders it in a real Chrome."
         return mark_untrusted(ok(text))

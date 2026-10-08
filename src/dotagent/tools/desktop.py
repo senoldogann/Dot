@@ -388,7 +388,7 @@ def _read_tool() -> RegisteredTool:
         return _observe_action("desktop_read", f"Read the text of {args.ref}", args.app or "")
 
     async def run(args: ReadArgs, ctx: ToolContext) -> ToolResult:
-        ceiling: int = ctx.runtime.config.agent.tool_output_chars - _READ_HEADROOM_CHARS
+        ceiling: int = ctx.output_chars - _READ_HEADROOM_CHARS
         limit: int = min(args.max_chars or _DEFAULT_READ_CHARS, ceiling)
         read: TextRead = await ctx.runtime.desktop.read(ctx.thread_id, args.app, _ref_of(args.ref), args.offset, limit)
         return _screen_result(render_text_read(read, args.app or "application", _nonce()))

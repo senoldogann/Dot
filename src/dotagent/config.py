@@ -69,6 +69,10 @@ class ModelsConfig(FrozenModel):
     effort: Effort
 
 
+type Tier = Literal["standard", "weak"]
+type ScaffoldMode = Literal["fixed", "measured"]
+
+
 class AgentConfig(FrozenModel):
     goal_mode: bool
     goal_patience: int
@@ -84,6 +88,11 @@ class AgentConfig(FrozenModel):
     parallel_tools: int
     model_call_timeout_s: float
     max_concurrent_runs: int
+    scaffold: ScaffoldMode
+    tiers: dict[str, Tier]
+    profile_min_calls: int
+    weak_refusal_share: float
+    reminder_every: int
 
 
 class PolicyConfig(FrozenModel):

@@ -42,6 +42,7 @@ from dotagent.store.models import (
     ThreadRecord,
     ThreadSummary,
 )
+from dotagent.store.stats import ModelProfile, read_model_profile
 
 _SCHEMA: str = """
 CREATE TABLE IF NOT EXISTS threads (
@@ -824,6 +825,10 @@ class Store:
             (run_id, kind, limit),
         )
         return [_event(row) for row in rows]
+
+    async def model_profile(self, model: str, runs: int) -> ModelProfile:
+        """How reliably ``model`` worked in its newest ``runs`` finished runs, read on a read-only connection."""
+        return await asyncio.to_thread(read_model_profile, self._database, model, runs)
 
     # ----- approvals -------------------------------------------------------------------------
 

@@ -47,8 +47,8 @@ def classify_mcp_call(tool: McpTool, arguments: JsonObject) -> ActionInfo:
     )
 
 
-def _text_budget(config: AppConfig) -> int:
-    return max(config.agent.tool_output_chars - FENCE_OVERHEAD_CHARS, _MIN_TEXT_CHARS)
+def _text_budget(output_chars: int) -> int:
+    return max(output_chars - FENCE_OVERHEAD_CHARS, _MIN_TEXT_CHARS)
 
 
 def _register(hub: McpHub, tool: McpTool) -> RegisteredTool:
@@ -70,7 +70,7 @@ def _register(hub: McpHub, tool: McpTool) -> RegisteredTool:
                 tool.server,
                 tool.remote_name,
                 await hub.call(tool, raw),
-                _text_budget(config),
+                _text_budget(context.output_chars),
                 config.desktop.screenshot_max_edge,
                 config.desktop.jpeg_quality,
                 secrets.token_hex(_NONCE_BYTES),

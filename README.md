@@ -84,6 +84,8 @@ A model is written `provider:model`. The `[models]` table of the configuration s
   `[providers.opencode_go]` adds or corrects one (`chat`, `responses` or `messages`).
 
 `dotx models [ollama|openai|opencode_go]` lists what a provider offers, including the reasoning levels of each model.
+`dotx models profile [provider:model]` shows how reliably a model worked in its newest runs and the help its next run
+gets (see [How a run works](#how-a-run-works)); without a model it shows `[models] main`.
 
 **Reasoning level.** A model that can think offers a ladder of levels, lowest first, in the words of its provider mapped to
 one neutral scale: `off`, `on` (a plain thinking switch), `minimal`, `low`, `medium`, `high`, `xhigh`, `max`. A model that
@@ -112,15 +114,30 @@ it as the last message of the conversation, `dotx run` prints it. A `chat` turn 
 answer (a small model that is offered both writes the call out as text).
 
 - Old tool results and screenshots are trimmed, and the oldest part of the conversation is summarised by the run's own
-  model, so a run stays inside `context_tokens`. The summary may use a tenth of `context_tokens`, so a long run's
-  summary does not grow with each compaction until every step compacts. It is tried three times; when the model gives
+  model, so a run stays inside its context budget: `context_tokens`, or three quarters of the model's window when that
+  is less. The summary may use a tenth of the budget, so a long run's summary does not grow with each compaction until
+  every step compacts. A compaction keeps the newest messages that fit next to the system prompt, the tool definitions
+  and its note in 85 % of the budget, and never less than the model's last reply with its results, so the steps after
+  it have room. It is tried three times; when the model gives
   no text, or a summary far over that limit, a mechanical summary takes its place and the timeline says so with the reason. Next to the summary a continuity note
-  keeps the goal, the plan with the state of each step, the work already done, the paths touched and your messages, and
+  keeps the goal, the plan with the state of each step and your messages, and of the work already done and the paths
+  touched the newest that fit in another tenth of the budget (it says how many earlier ones it leaves out), and
   a check lists names, paths and links in the summary that the conversation never had. The `compacted` event names the
   model, how the summary came about and what the check found.
 - The plan has steps that are `pending`, `in_progress`, `done`, `failed` or `skipped`; `update_plan` writes it and
   `mark_plan_step` changes one step, so the plan in the web UI moves as the work does. A run that calls `finish` with
   steps still open is asked once to close them.
+- How much help a run gets depends on its model. The window is what one request of the model can hold; for Ollama it is
+  the smaller of the model's own window and `[providers.ollama] num_ctx`, which Dot sends with every request (the Models
+  table of the System page shows it). When three quarters of the window is less than `context_tokens`, the run's budget
+  is that, and `tool_output_chars`, the most one tool result may carry, shrinks in the same proportion (never below 2000
+  characters). A model whose window cannot hold the system prompt and the tool definitions is refused at the start, with
+  a hint. A model of the `weak` tier is reminded in task and research runs, every `reminder_every` steps, of the goal,
+  your messages, the plan and its newest actions. `tiers` in `[agent]` sets a model's tier by hand; with
+  `scaffold = "measured"` a model is weak when at least `profile_min_calls` tool calls of its newest 30 finished runs
+  were measured and at least `weak_refusal_share` of them were refused before they ran (an unknown tool, or arguments
+  that were not valid JSON or did not fit the tool). `scaffold = "fixed"`, the default, keeps every model standard.
+  The timeline shows a budget cut to the window, why a model is weak, and each reminder.
 - A run has no step limit. It ends when the model calls `finish`, when the progress watchdog stops it (see
   [Autonomy](#autonomy-approvals-goal-mode-and-the-end-of-a-run)), when a model call still fails after its retries, or
   when you stop it. In goal mode the goal check can also end it (see [Autonomy](#autonomy-approvals-goal-mode-and-the-end-of-a-run)).

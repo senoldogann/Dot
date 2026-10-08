@@ -437,6 +437,23 @@ export function createTimeline({ rootRunId, startedAt, onGrow, onPlan, onStats, 
       note(scope, record.ts, "list", `Dot wanted to finish with plan steps ${numbers} still open and was asked to close them first`, "warn");
     },
 
+    // How much help the run's model gets. Shown only where it differs from the configuration: a context budget cut to
+    // fit the model's window, and reminders of the goal for a model of the weak tier.
+    scaffold(scope, record) {
+      const data = record.data;
+      if (data.cut_to_window) {
+        const output = `tool output up to ${compact(data.tool_output_chars)} characters`;
+        note(scope, record.ts, "sliders", `Context budget ${compact(data.context_tokens)} tokens to fit the model's window of ${compact(data.window)}, ${output}`, "");
+      }
+      if (data.reminder_every !== null) {
+        note(scope, record.ts, "target", `The goal is repeated every ${data.reminder_every} steps: ${data.reason}`, "");
+      }
+    },
+
+    reminder(scope, record) {
+      note(scope, record.ts, "target", `Reminded of the goal at step ${record.data.step}`, "");
+    },
+
     memories(scope, record) {
       const count = plural(record.data.ids.length, "memory", "memories");
       const text = record.data.live === true ? `Picked up ${count} saved while the run worked` : `Recalled ${count}`;

@@ -40,6 +40,9 @@ class Spawner(Protocol):
 
 @dataclass(frozen=True)
 class ToolContext:
+    """``output_chars`` is the most one tool result of the run may carry; a tool that pages its output sizes each page
+    to fit it, so nothing is cut from the middle of a page."""
+
     runtime: "Runtime"
     run_id: str
     thread_id: str
@@ -47,4 +50,5 @@ class ToolContext:
     workspace: Path
     gate: Gate
     cancel: asyncio.Event
+    output_chars: int
     spawner: Spawner | None = None

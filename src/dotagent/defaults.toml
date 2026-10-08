@@ -75,6 +75,9 @@ max_concurrent = 4
 goal_mode = false
 goal_patience = 4
 tool_output_chars = 12000
+# The prompt budget of a run: past 60 % of it older tool output is shortened, past all of it the older part of the run is
+# summarized. A model whose window is smaller gets three quarters of its window instead (for Ollama the window is at most
+# [providers.ollama] num_ctx), and tool_output_chars shrinks in the same proportion.
 context_tokens = 48000
 keep_recent_tool_results = 6
 keep_recent_screenshots = 2
@@ -93,6 +96,17 @@ finish_nudges = 2
 parallel_tools = 4
 model_call_timeout_s = 420.0
 max_concurrent_runs = 3
+# How much help a model gets. "fixed": every model is standard. "measured": a model is weak when its newest 30 finished
+# runs made at least profile_min_calls tool calls and at least weak_refusal_share of them were refused before they ran
+# (an unknown tool, arguments that were not valid JSON or did not fit the tool). tiers sets a model's tier by hand,
+# whatever the mode, e.g. tiers = { "ollama:gemma4:cloud" = "weak" }. A weak model's task and research runs are reminded
+# of the goal, the plan and the newest results every reminder_every steps. `dotx models profile` shows the numbers.
+# "fixed" until evals show that the reminders help.
+scaffold = "fixed"
+tiers = {}
+profile_min_calls = 50
+weak_refusal_share = 0.1
+reminder_every = 6
 
 [policy]
 # aggressive: act without asking except for the hard stops; balanced: ask for external side effects;

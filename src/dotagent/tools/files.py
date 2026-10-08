@@ -33,6 +33,7 @@ from dotagent.tools.context import ToolContext
 _IMAGE_SUFFIXES: frozenset[str] = frozenset({".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp", ".tiff", ".heic"})
 _DEFAULT_LINE_LIMIT: int = 2000
 _MAX_LINE_CHARS: int = 2000
+_HEADROOM_CHARS: int = 200  # room next to a page for the line that says where it continues
 _LIST_LIMIT: int = 300
 _SKIPPED_DIRS: frozenset[str] = frozenset(
     {".git", "node_modules", "__pycache__", ".venv", ".mypy_cache", ".ruff_cache"}
@@ -134,7 +135,7 @@ def _read_file_tool() -> RegisteredTool:
             resolve_path(args.path, ctx),
             args.offset or 1,
             args.limit or _DEFAULT_LINE_LIMIT,
-            ctx.runtime.config.agent.tool_output_chars,
+            ctx.output_chars - _HEADROOM_CHARS,
             desktop.screenshot_max_edge,
             desktop.jpeg_quality,
         )

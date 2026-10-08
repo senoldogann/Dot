@@ -84,7 +84,8 @@ class StreamDelta(FrozenModel):
 
 
 class ModelInfo(FrozenModel):
-    """What a model offers. ``efforts`` are its reasoning levels, lowest first; fewer than two means no choice."""
+    """What a model offers. ``context_length`` is the number of tokens one request (prompt and reply) can hold, ``None``
+    when the provider does not say. ``efforts`` are its reasoning levels, lowest first; fewer than two means no choice."""
 
     id: str
     vision: bool

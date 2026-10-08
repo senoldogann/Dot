@@ -50,6 +50,7 @@ from dotagent.cli_eval import (
     cmd_eval_run,
 )
 from dotagent.cli_mcp import McpListCommand, cmd_mcp_list
+from dotagent.cli_profile import ModelsProfileCommand, cmd_models_profile
 from dotagent.cli_prune import PruneCommand, cmd_prune
 from dotagent.cli_schedule import (
     ScheduleAddCommand,
@@ -233,6 +234,7 @@ type Command = Annotated[
     RunCommand
     | ChatCommand
     | ModelsCommand
+    | ModelsProfileCommand
     | AuthSetCommand
     | AuthStatusCommand
     | DoctorCommand
@@ -307,8 +309,14 @@ def build_parser() -> argparse.ArgumentParser:
     chat.add_argument("--thinking", action="store_true", help="show the model's reasoning stream")
     chat.add_argument("--verbose", action="store_true", help="show tool output and token use")
 
-    models = commands.add_parser("models", help="list the models a provider offers")
-    models.add_argument("provider", nargs="?", default=None, choices=list(KNOWN_PROVIDERS))
+    models = commands.add_parser("models", help="list the models the providers offer, or profile one of them")
+    models_commands = models.add_subparsers(dest="models_action", required=False)
+    for provider_name in KNOWN_PROVIDERS:
+        models_commands.add_parser(provider_name, help=f"list the models {provider_name} offers")
+    models_profile = models_commands.add_parser(
+        "profile", help="how reliably a model worked in its newest runs, and the help its next run gets"
+    )
+    models_profile.add_argument("model", nargs="?", default=None, help="provider:model; [models] main when left out")
 
     auth = commands.add_parser("auth", help="manage API keys")
     auth_commands = auth.add_subparsers(dest="auth_action", required=True)
@@ -470,6 +478,11 @@ def parse_command(parser: argparse.ArgumentParser, arguments: list[str]) -> Comm
     skills_action: object = raw.pop("skills_action", None)
     service_action: object = raw.pop("service_action", None)
     eval_action: object = raw.pop("eval_action", None)
+    models_action: object = raw.pop("models_action", None)
+    if raw["name"] == "models" and models_action == "profile":
+        raw["name"] = "models-profile"
+    elif raw["name"] == "models":
+        raw["provider"] = models_action
     if raw["name"] == "auth":
         raw["name"] = f"auth-{action}"
     if raw["name"] == "browser":
@@ -833,6 +846,8 @@ async def dispatch(command: Command) -> int:
             return await cmd_chat(command)
         case ModelsCommand():
             return await cmd_models(command)
+        case ModelsProfileCommand():
+            return await cmd_models_profile(command)
         case AuthSetCommand():
             return await cmd_auth_set(command)
         case AuthStatusCommand():

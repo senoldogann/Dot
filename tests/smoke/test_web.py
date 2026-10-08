@@ -178,6 +178,7 @@ async def _call(runtime: Runtime, name: str, arguments: JsonObject) -> tuple[Too
         workspace=workspace_dir(),
         gate=_Recorder(),
         cancel=asyncio.Event(),
+        output_chars=runtime.config.agent.tool_output_chars,
     )
     prepared = await runtime.registry.tools[name].prepare(arguments, ctx)
     return await prepared.run(ctx), prepared.action
