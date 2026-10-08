@@ -90,6 +90,17 @@ export function clip(text, limit) {
   return flat.length <= limit ? flat : `${flat.slice(0, limit - 1)}…`;
 }
 
+/**
+ * `text` as it is compared when looking for a name: case, accents and the Turkish dotted and dotless i do not matter, so
+ * "İstanbul", "ISTANBUL" and "istanbul" are one word, and so are "Işık" and "isik". The same fold as `fold_search` in
+ * `core/text.py`: going up to capitals and back down lowers the dotless i like Python's `casefold`, and the two letters
+ * that still differ after it (ß, the final sigma) are set right by hand.
+ */
+export function foldSearch(text) {
+  const lower = text.toUpperCase().toLowerCase().replace(/ß/g, "ss").replace(/ς/g, "σ");
+  return lower.normalize("NFKD").replace(/\p{M}/gu, "").trim();
+}
+
 const DATE_TIME = new Intl.DateTimeFormat("en-GB", {
   day: "numeric",
   month: "short",

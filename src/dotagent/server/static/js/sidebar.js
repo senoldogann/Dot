@@ -2,13 +2,15 @@
 // way to the settings.
 
 import { ApiError, api, request } from "./api.js";
-import { clip, debounce, el, plural } from "./dom.js";
+import { clip, debounce, el, foldSearch, plural } from "./dom.js";
 import { brandMark, icon } from "./icons.js";
 import { requestCompose } from "./shortcuts.js";
 import { onLifecycle } from "./state.js";
 import { attempt, confirmDialog, toast } from "./ui.js";
 
+// The chats listed at first, the step by which "Show older chats" lists more, and the most the API lists at once.
 const LIST_LIMIT = 200;
+const LIST_CAP = 500;
 // The moments a run changes status; a run that waits for an approval is "blocked" until it is answered.
 const RELOAD_KINDS = new Set(["run_queued", "run_started", "run_finished", "approval_requested", "approval_decided"]);
 const DAY_LABELS = ["Today", "Yesterday", "Previous 7 days", "Older"];
@@ -39,7 +41,7 @@ function groupByDay(chats, now) {
 }
 
 function matchesQuery(chat, needle) {
-  return needle === "" || chat.title.toLowerCase().includes(needle);
+  return needle === "" || foldSearch(chat.title).includes(needle);
 }
 
 function mark(node, current) {
@@ -93,6 +95,7 @@ function chatPick(chat, checked, onToggle) {
  */
 export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
   let chats = null;
+  let listLimit = LIST_LIMIT;
   let failure = null;
   let needle = "";
   let routeRunId = null;
@@ -168,6 +171,35 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
     deleteButton.disabled = selected.size === 0;
   }
 
+  // The list is cut when the daemon filled the whole page: older chats may be waiting, and the search only sees the ones
+  // loaded.
+  function olderNote() {
+    if (chats === null || chats.length < listLimit) {
+      return [];
+    }
+    if (listLimit >= LIST_CAP) {
+      return [el("div", { class: "side-note" }, el("span", null, `Only the latest ${listLimit} chats are listed.`))];
+    }
+    return [
+      el(
+        "div",
+        { class: "side-note" },
+        el(
+          "button",
+          {
+            class: "btn sm",
+            type: "button",
+            onclick: () => {
+              listLimit = Math.min(listLimit + LIST_LIMIT, LIST_CAP);
+              load();
+            },
+          },
+          "Show older chats",
+        ),
+      ),
+    ];
+  }
+
   function paintChats() {
     rowNodes.clear();
     selectButton.hidden = selecting || chats === null || chats.length === 0;
@@ -204,7 +236,7 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
     const shown = shownChats();
     if (shown.length === 0) {
       const text = needle === "" ? "No chats yet. Start one with New chat." : `No chat matches “${search.value.trim()}”.`;
-      list.replaceChildren(el("div", { class: "side-note" }, text));
+      list.replaceChildren(el("div", { class: "side-note" }, text), ...olderNote());
       return;
     }
     list.replaceChildren(
@@ -220,6 +252,7 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
           }),
         ),
       ),
+      ...olderNote(),
     );
     markCurrent();
   }
@@ -338,7 +371,7 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
 
   async function load() {
     try {
-      const all = await api.get(`/threads?limit=${LIST_LIMIT}`);
+      const all = await api.get(`/threads?limit=${listLimit}`);
       if (disposed) {
         return;
       }
@@ -388,7 +421,7 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
   window.addEventListener("keydown", onEscape);
 
   search.addEventListener("input", () => {
-    needle = search.value.trim().toLowerCase();
+    needle = foldSearch(search.value);
     paintChats();
     paintBar();
   });

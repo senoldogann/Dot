@@ -529,7 +529,9 @@ dotx memory reindex      # embed every note again, for example after changing [m
 - `memory_update` lets the agent correct a note in place; you edit one on the Memory page or with
   `PATCH /api/memories/{id}`. The page also shows who wrote each note and how often runs used it.
 - Search combines SQLite full-text search (BM25) with cosine similarity of embeddings and fuses both rankings.
-  `embed_enabled = false` searches by words only.
+  `embed_enabled = false` searches by words only. The word search does not mind case, accents or the Turkish dotted and
+  dotless i (`toplanti` finds `Toplantı`), and a word of five letters or more also finds the words that start with its
+  first five letters, so Turkish endings meet the root (`toplantıda`, `toplantılar`).
 - Saving a note close to an existing one (`similar_threshold`) tells the model, which decides whether the old note is
   outdated.
 - The default embedding model, `bge-m3`, is multilingual: English and Turkish notes are found by meaning (on a small

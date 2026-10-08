@@ -22,6 +22,7 @@ import aiosqlite
 from dotagent.core.errors import NotFoundError, StoreError
 from dotagent.core.ids import new_id
 from dotagent.core.jsonutil import dumps_compact, parse_json_object
+from dotagent.core.text import fold_search
 from dotagent.core.types import JsonArray, JsonObject
 from dotagent.llm.types import Effort, ImageData, Message
 from dotagent.policy.types import ApprovalMode
@@ -117,9 +118,22 @@ def unpack_vector(blob: bytes) -> tuple[float, ...]:
     return struct.unpack(f"<{len(blob) // 4}f", blob)
 
 
+# A word of this many letters or more is looked up by its first letters: Turkish puts its endings after the root
+# ("toplantı", "toplantıda", "toplantılar"), so the words that start alike are taken as one.
+_STEM_CHARS: int = 5
+
+
+def _fts_term(term: str) -> str:
+    stem: str = term[:_STEM_CHARS]
+    quoted: str = '"' + stem.replace('"', '""') + '"'
+    return f"{quoted}*" if len(term) >= _STEM_CHARS else quoted
+
+
 def fts_query(terms: Sequence[str]) -> str:
-    """An OR query over ``terms``, each quoted so that it is read as plain text."""
-    return " OR ".join('"' + term.replace('"', '""') + '"' for term in terms)
+    """An OR query over ``terms`` (words folded like the indexed notes), each quoted so that it is read as plain text.
+    A word of five letters or more matches every indexed word that starts with its first five letters, a shorter one
+    only itself."""
+    return " OR ".join(_fts_term(term) for term in dict.fromkeys(terms))
 
 
 def image_file_name(image: ImageData) -> str:
@@ -419,6 +433,25 @@ async def _add_missing_columns(connection: aiosqlite.Connection) -> None:
     await _add_columns(connection, "schedules", _ADDED_SCHEDULE_COLUMNS)
 
 
+async def _refresh_memory_index(connection: aiosqlite.Connection) -> None:
+    """Make the search index of the notes say what the notes say, in the folded form the queries use, and write it
+    again whole when it does not (an index made by an older version, or by a process that did not fold yet). The index
+    only holds a copy of the notes, so nothing a person wrote is touched."""
+    async with connection.execute("SELECT id, content, tags FROM memories") as cursor:
+        wanted: list[tuple[str, str, str]] = sorted(
+            (str(note["id"]), fold_search(str(note["content"])), fold_search(str(note["tags"])))
+            for note in await cursor.fetchall()
+        )
+    async with connection.execute("SELECT id, content, tags FROM memories_fts") as cursor:
+        indexed: list[tuple[str, str, str]] = sorted(
+            (str(row["id"]), str(row["content"]), str(row["tags"])) for row in await cursor.fetchall()
+        )
+    if indexed == wanted:
+        return
+    await connection.execute("DELETE FROM memories_fts")
+    await connection.executemany("INSERT INTO memories_fts(id, content, tags) VALUES(?, ?, ?)", wanted)
+
+
 class Store:
     """Connector to the SQLite database."""
 
@@ -437,6 +470,7 @@ class Store:
         await connection.execute("PRAGMA busy_timeout=10000")
         await connection.executescript(_SCHEMA)
         await _add_missing_columns(connection)
+        await _refresh_memory_index(connection)
         await connection.commit()
         return cls(connection, path, image_dir)
 
@@ -959,7 +993,8 @@ class Store:
             (record.id, content, tag_text, now, now, source_run),
         )
         await self._db.execute(
-            "INSERT INTO memories_fts(id, content, tags) VALUES(?, ?, ?)", (record.id, content, tag_text)
+            "INSERT INTO memories_fts(id, content, tags) VALUES(?, ?, ?)",
+            (record.id, fold_search(content), fold_search(tag_text)),
         )
         if vector is not None:
             await self._db.execute(
@@ -979,7 +1014,8 @@ class Store:
         )
         await self._db.execute("DELETE FROM memories_fts WHERE id = ?", (memory_id,))
         await self._db.execute(
-            "INSERT INTO memories_fts(id, content, tags) VALUES(?, ?, ?)", (memory_id, content, tag_text)
+            "INSERT INTO memories_fts(id, content, tags) VALUES(?, ?, ?)",
+            (memory_id, fold_search(content), fold_search(tag_text)),
         )
         await self._db.execute("DELETE FROM memory_vectors WHERE id = ?", (memory_id,))
         if vector is not None:
@@ -996,7 +1032,7 @@ class Store:
         await self._db.execute(
             "UPDATE memories SET tags = ?, updated_at = ? WHERE id = ?", (tag_text, time.time(), memory_id)
         )
-        await self._db.execute("UPDATE memories_fts SET tags = ? WHERE id = ?", (tag_text, memory_id))
+        await self._db.execute("UPDATE memories_fts SET tags = ? WHERE id = ?", (fold_search(tag_text), memory_id))
         await self._db.commit()
         return await self.get_memory(memory_id)
 
@@ -1030,7 +1066,8 @@ class Store:
         return 0 if row is None else int(row["n"])
 
     async def search_memories_terms(self, terms: Sequence[str], limit: int) -> list[str]:
-        """Ids of the memories that contain any of ``terms`` (lowercase words), ranked by BM25, best first."""
+        """Ids of the memories that contain any of ``terms`` (folded words, see ``fts_query``), ranked by BM25, best
+        first."""
         if not terms:
             return []
         rows = await self._all(

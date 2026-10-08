@@ -209,7 +209,7 @@ export function mount(root, ctx) {
       message: `The ${record.behavior} rule for “${clip(record.tool_glob, QUOTE_CHARS)}” stops applying.`,
       confirmLabel: "Delete",
       danger: true,
-      focusCancel: false,
+      focusCancel: true,
     });
     if (!confirmed) {
       return;

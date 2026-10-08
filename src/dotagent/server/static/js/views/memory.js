@@ -247,7 +247,7 @@ export function mount(root, ctx) {
       message: clip(record.content, QUOTE_CHARS),
       confirmLabel: "Forget",
       danger: true,
-      focusCancel: false,
+      focusCancel: true,
     });
     if (!confirmed) {
       return;

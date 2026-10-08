@@ -13,6 +13,7 @@ from dataclasses import dataclass
 import ApplicationServices as AS
 
 from dotagent.core.errors import DesktopError, DesktopPermissionError
+from dotagent.core.text import fold_search
 from dotagent.desktop.types import AXElement, Node, Point, Rect, Snapshot, SnapshotScope
 
 _FAILURE: int = -25200
@@ -587,7 +588,9 @@ def enclosing(element: AXElement, pid: int, roles: Collection[str], hops: int) -
 
 
 def _fold(title: str) -> str:
-    return unicodedata.normalize("NFKC", title).strip().removesuffix("…").removesuffix("...").strip().casefold()
+    """A menu title as it is compared: without a trailing ellipsis, and whatever the case, the accents and the Turkish
+    dotted or dotless i ("Görünüm" is "gorunum", "İçe Aktar…" is "ice aktar")."""
+    return fold_search(unicodedata.normalize("NFKC", title).strip().removesuffix("…").removesuffix("..."))
 
 
 def _titles(items: Sequence[AXElement], pid: int) -> list[str]:

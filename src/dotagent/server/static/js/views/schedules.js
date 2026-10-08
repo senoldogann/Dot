@@ -479,7 +479,7 @@ export function mount(root, ctx) {
       message: `“${clip(record.name, 80)}” will not run again. Runs it started earlier stay in the history.`,
       confirmLabel: "Delete",
       danger: true,
-      focusCancel: false,
+      focusCancel: true,
     });
     if (!confirmed) {
       return;

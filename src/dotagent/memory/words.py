@@ -2,6 +2,8 @@
 
 import re
 
+from dotagent.core.text import fold_search
+
 _WORD: re.Pattern[str] = re.compile(r"\w{2,}")
 _COMBINING_DOT: str = "\u0307"  # Python lowercases the Turkish İ to "i" followed by this mark
 _MAX_TERMS: int = 24
@@ -29,6 +31,9 @@ def lowercase(text: str) -> str:
 
 
 def search_terms(text: str) -> tuple[str, ...]:
-    """The distinct words of ``text`` that can tell notes apart, lowercase, in the order they occur."""
-    topic: dict[str, None] = {word: None for word in _WORD.findall(lowercase(text)) if word not in _STOPWORDS}
+    """The distinct words of ``text`` that can tell notes apart, in the order they occur. They come folded (case,
+    accents and the Turkish dotted and dotless i do not matter), the way the notes are indexed; a function word is
+    recognised before the fold, so the Turkish ``şu`` is dropped and the word ``su`` is not."""
+    words: list[str] = [word for word in _WORD.findall(lowercase(text)) if word not in _STOPWORDS]
+    topic: dict[str, None] = {fold_search(word): None for word in words}
     return tuple(topic)[:_MAX_TERMS]
