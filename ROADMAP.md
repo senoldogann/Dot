@@ -954,3 +954,8 @@ files and the folder, left the third and exited 1; a second `--apply` left only 
   new page from disk, but the page cannot load its keys until a restart loads the new code. Found and fixed: the 422
   answer of a refused request repeated the refused value, which may be a key. Found, not changed: saving a key rewrites
   the whole `.env` (comments and `export` prefixes in it are lost) and not atomically, as `dotx auth set` always did.
+- 2026-10-08: design pass after the keys tab (`42a0d75`). The Models tab names the providers (OpenAI, Anthropic,
+  OpenCode Go, Ollama) and says "no key" or "key refused" with a link to Settings › API keys (`ProviderModels.problem`);
+  links in notes are underlined; on a phone the composer's attach button no longer sits alone in the middle. Checked on
+  a scripted throw-away daemon in both themes and skins at 1280 and 390 px. Python changed: the owner's daemon needs a
+  restart for the key states.
