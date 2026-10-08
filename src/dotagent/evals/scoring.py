@@ -137,7 +137,7 @@ def render_scorecard(card: Scorecard) -> list[str]:
         f"  run with effort {settings.effort}, goal mode {'on' if settings.goal_mode else 'off'}, "
         f"{settings.context_tokens} context tokens, preset {settings.preset}, "
         f"stall escalation {'on' if settings.stall_escalation else 'off'}, tier {settings.tier}, "
-        f"tool surface {settings.tool_surface}",
+        f"tool surface {settings.tool_surface}, answer path check {'on' if settings.verify_answer_paths else 'off'}",
         f"  passed {card.passed} of {card.attempts} attempts ({_percent(card.passed, card.attempts)}), "
         f"{card.seconds:.0f} s in all",
         "  by kind: " + ", ".join(f"{score.category} {score.passed}/{score.attempts}" for score in card.categories),

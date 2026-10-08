@@ -15,7 +15,7 @@ from dotagent.browser.attach import DebugEndpoint, read_debug_endpoint
 from dotagent.browser.keychain import KeychainMode, read_keychain_mode
 from dotagent.browser.login import CHROME_APP
 from dotagent.browser.profile_lock import profile_holder_pid
-from dotagent.config import AppConfig, McpServerConfig, MemoryConfig
+from dotagent.config import AppConfig, McpServerConfig, MemoryConfig, ModelsConfig
 from dotagent.core.errors import BrowserError, ConfigError, ProviderError, ToolExecutionError
 from dotagent.core.paths import (
     browser_profile_dir,
@@ -90,6 +90,20 @@ async def _check_model(router: ModelRouter, role: str, reference: str) -> CheckR
         if present
     )
     return _result(f"model {role}", True, True, f"{reference} ({capabilities or 'text only'})")
+
+
+def _review_row(models: ModelsConfig) -> CheckResult:
+    """The review model checks the main model's work (goal checks, second opinions, auto approvals). A main model that
+    is its own review model is worth a warning, never a failure."""
+    if models.review.strip() == models.main.strip():
+        return _result(
+            "review model",
+            False,
+            False,
+            f"{models.review} is also the main model, so it checks its own work and independent checking is weaker; "
+            "a review model of another family is better",
+        )
+    return _result("review model", True, False, f"{models.review} is not the main model")
 
 
 def _has_secret(variable: str) -> bool:
@@ -439,6 +453,7 @@ async def _service_checks(config: AppConfig) -> list[CheckResult]:
         results.append(await _check_memory(router, config))
         for role, reference in configured:
             results.append(await _check_model(router, role, reference))
+        results.append(_review_row(config.models))
     finally:
         await router.aclose()
     return results

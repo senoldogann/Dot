@@ -33,7 +33,8 @@ uv run dotx doctor
 `dotx doctor` checks the home directory, ripgrep, Chrome (with a throwaway start of it), the macOS version and the
 permissions the desktop tools need, the commands and secrets of the configured MCP servers (none is started), Ollama,
 the keys of OpenAI and OpenCode Go, the embedding model and the three configured models, and says how to fix what is
-missing. The examples below write `dotx`: run it as `uv run dotx`, or put `.venv/bin` on your `PATH`.
+missing. It warns, without failing, when the review model is also the main model. The examples below write `dotx`: run
+it as `uv run dotx`, or put `.venv/bin` on your `PATH`.
 
 ```bash
 dotx run "Find the opening hours of the Helsinki Central Library and save them to hours.md"
@@ -68,6 +69,9 @@ A model is written `provider:model`. The `[models]` table of the configuration s
 | `fast`   | summarising the older part of a long run                                                  | `ollama:gpt-oss:20b-cloud`  |
 | `review` | answering the policy's questions in `auto` approvals, and checking a run against its goal | `ollama:minimax-m2.7:cloud` |
 | `effort` | default reasoning level of a run on `main` (see below)                                    | `medium`                    |
+
+`review` checks the work of `main`. A model checking its own work is the weaker check, so pick a `review` model of
+another family than `main` when you can; `dotx doctor` warns while they are the same model, as they are by default.
 
 | Provider    | Reference             | Protocol                                                                                   | Key                                                       |
 | ----------- | --------------------- | ------------------------------------------------------------------------------------------ | --------------------------------------------------------- |
@@ -146,6 +150,12 @@ answer (a small model that is offered both writes the call out as text).
   turns the group on, and its result asks the model to call the tool again. A group stays on for the rest of the run.
   `auto` is `grouped` for a model of the weak tier and for a model whose window cut the context budget, and `full` for
   every other model. The timeline shows the groups a grouped run starts with and each group it turns on.
+- `verify_answer_paths` in `[agent]` checks the paths a final answer names: `~` paths and absolute paths under
+  `/Users`, `/tmp`, `/private`, `/var`, `/opt`, `/Applications` and `/Library`. When a task or research run ends with
+  success and its answer names such paths that do not exist and that no successful call of the run named (a file the
+  run removed or moved is not missing), the run is sent back once with the list: to create what is missing, to correct
+  the answer, or to finish again with the same answer if it names them on purpose. The check makes no model call. It
+  is off by default until evals show that it helps. The timeline shows each send-back.
 - A run has no step limit. It ends when the model calls `finish`, when the progress watchdog stops it (see
   [Autonomy](#autonomy-approvals-goal-mode-and-the-end-of-a-run)), when a model call still fails after its retries, or
   when you stop it. In goal mode the goal check can also end it (see [Autonomy](#autonomy-approvals-goal-mode-and-the-end-of-a-run)).
@@ -297,7 +307,11 @@ question is not put to you in its place.
 
 **Goal mode** is for `task` and `research` runs; a `chat` has no goal to check against, and asking for one is refused.
 When the model calls `finish`, the review model checks the answer against the goal, from the evidence of what the run
-did (a digest of its tool calls and the start of each result) and not from what the answer claims:
+did and not from what the answer claims. The evidence is a digest of the run's tool calls with the start of each result,
+and facts that Dot measured itself: the files its file tools wrote, its failed calls that no later success of the same
+call followed, the newest result of each command that tests, builds or lints, and the paths and addresses the answer
+names that the run never touched (paths that do not exist, addresses no call opened). Where the facts and the answer
+disagree, the checker goes by the facts. Its verdict is one of:
 
 - `achieved`: the run ends as done.
 - `continue`: the goal is not reached yet, so the run is sent back to work with the instruction of the checker. A run is
@@ -314,7 +328,9 @@ schedule leaves open, so what a schedule does while nobody is there depends on t
 `approval_timeout_s` and then counts as a refusal.
 
 **The end of a run.** There is no step limit. A run ends by `finish`; by the progress watchdog; by a model call that
-still fails after its retries; in goal mode by the goal check giving up; or when you stop it.
+still fails after its retries; in goal mode by the goal check giving up; or when you stop it. With
+`verify_answer_paths = true` in `[agent]`, a successful end whose answer names paths that do not exist is sent back
+once before it is accepted, and before goal mode checks it (see [How a run works](#how-a-run-works)).
 
 **The progress watchdog.** After every step in which a run used tools, Dot compares what it called and what came back
 (screenshots included) with the steps before. By default it looks for the same step `stall_limit` times in a row: the

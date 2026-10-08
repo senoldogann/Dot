@@ -437,6 +437,15 @@ export function createTimeline({ rootRunId, startedAt, onGrow, onPlan, onStats, 
       note(scope, record.ts, "list", `Dot wanted to finish with plan steps ${numbers} still open and was asked to close them first`, "warn");
     },
 
+    // The final answer named paths that do not exist and that the run never touched ([agent] verify_answer_paths): the
+    // run was sent back once to create them or to correct the answer.
+    answer_paths(scope, record) {
+      const missing = record.data.missing;
+      const noun = missing.length === 1 ? "a path" : `${missing.length} paths`;
+      const listed = clip(missing.join(", "), 300);
+      note(scope, record.ts, "file", `Dot's answer named ${noun} that do not exist (${listed}) and was asked to correct it`, "warn");
+    },
+
     // How much help the run's model gets. Shown only where it differs from the configuration: a context budget cut to
     // fit the model's window, and reminders of the goal for a model of the weak tier.
     scaffold(scope, record) {

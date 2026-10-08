@@ -148,6 +148,7 @@ def _report_of(config: AppConfig, model: str, started_at: float, outcomes: Seque
             stall_escalation=config.agent.stall_escalation,
             tier=config.agent.tiers.get(parse_model_ref(model).label, "standard"),
             tool_surface=config.agent.tool_surface,
+            verify_answer_paths=config.agent.verify_answer_paths,
         ),
         outcomes=tuple(outcomes),
     )

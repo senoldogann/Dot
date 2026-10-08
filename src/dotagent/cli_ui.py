@@ -107,6 +107,12 @@ class GoalCheckPayload(Payload):
     final: bool
 
 
+class AnswerPathsPayload(Payload):
+    """The paths a final answer named that do not exist: the run was sent back once to correct them."""
+
+    missing: list[str]
+
+
 class StallPayload(Payload):
     """A progress alert: what the watchdog saw (``detail``) and the rung it answered with (``action``), with the advice
     or the error of the review model for the consult rung. Events of the older stall guard carry only ``warnings``."""
@@ -252,6 +258,9 @@ class TerminalUi:
                 self._on_auto_approval(AutoApprovalPayload.model_validate(data))
             case "goal_check":
                 self._on_goal_check(GoalCheckPayload.model_validate(data))
+            case "answer_paths":
+                missing: str = ", ".join(AnswerPathsPayload.model_validate(data).missing)
+                self._line(self._paint(f"  ◎ the answer names paths that do not exist, back to work: {missing}", "33"))
             case "memories":
                 recalled = MemoriesPayload.model_validate(data)
                 noun: str = "note" if len(recalled.ids) == 1 else "notes"

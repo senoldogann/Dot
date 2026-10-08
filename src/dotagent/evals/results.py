@@ -54,7 +54,8 @@ class EvalSettings(FrozenModel):
     knowing whether they ran the same way. ``tier`` is the tier ``[agent] tiers`` set for the evaluated model, the only
     way to make it weak in an eval: an attempt's run history is empty. A report that does not record
     ``stall_escalation`` counts as run without it, one that does not record ``tier`` as run with the standard tier, one
-    that does not record ``tool_surface`` as run with every tool offered at every step."""
+    that does not record ``tool_surface`` as run with every tool offered at every step, one that does not record
+    ``verify_answer_paths`` as run without the check of the paths a final answer names."""
 
     effort: str
     goal_mode: bool
@@ -63,6 +64,7 @@ class EvalSettings(FrozenModel):
     stall_escalation: bool = False
     tier: Tier = "standard"
     tool_surface: ToolSurface = "full"
+    verify_answer_paths: bool = False
 
 
 class EvalReport(FrozenModel):

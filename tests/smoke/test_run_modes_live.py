@@ -26,6 +26,7 @@ from dotagent.agent.review import (
     goal_checker_for,
     reviewer_for,
 )
+from dotagent.agent.verify import RunFacts, render_facts
 from dotagent.config import load_config
 from dotagent.core.errors import ConfigError
 from dotagent.policy.types import ActionInfo
@@ -185,11 +186,17 @@ CREATED_REPORT: str = (
 )
 
 
+def _facts(written: str) -> str:
+    """The facts of a run whose only work was writing ``written`` and reading what it wrote."""
+    return render_facts(RunFacts(written=(written,), failures=(), checks=(), named=(written,)), (), ())
+
+
 @requires_model
 async def test_the_goal_checker_accepts_work_that_the_digest_shows(runtime: Runtime) -> None:
     request: GoalRequest = GoalRequest(
         goal="Create the file report.txt in the workspace and write the word done in it.",
         digest=CREATED_REPORT,
+        facts=_facts("report.txt"),
         answer="I created report.txt and checked that it holds the word done.",
         claimed_success=True,
     )
@@ -202,6 +209,7 @@ async def test_the_goal_checker_sends_the_agent_back_for_what_the_digest_does_no
     request: GoalRequest = GoalRequest(
         goal="Create two files in the workspace: a.txt holding the word one and b.txt holding the word two.",
         digest="1. write_file path=a.txt content=one -> ok: wrote 3 bytes to a.txt",
+        facts=_facts("a.txt"),
         answer="Both files are created.",
         claimed_success=True,
     )

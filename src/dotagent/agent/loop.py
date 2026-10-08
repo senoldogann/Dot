@@ -81,6 +81,16 @@ from dotagent.agent.scaffold import (
     scaffold_for,
     surface_for,
 )
+from dotagent.agent.verify import (
+    RunFacts,
+    answer_paths,
+    missing_paths,
+    new_facts,
+    paths_note,
+    render_facts,
+    unopened_addresses,
+    with_outcomes,
+)
 from dotagent.agent.vision import text_for_blind_model
 from dotagent.config import AgentConfig
 from dotagent.core.errors import ConfigError, ProviderError, RunCancelled
@@ -513,19 +523,33 @@ def _after_verdict(verdict: GoalVerdict, ended: RunOutcome, sent_back: int, pati
     return SendBack(note=_send_back_note(reason))
 
 
+async def _missing_in_answer(agent: AgentRun, answer: str, facts: RunFacts) -> tuple[str, ...]:
+    """The paths ``answer`` names that do not exist and that no successful call of the run named."""
+    return await asyncio.to_thread(missing_paths, answer_paths(answer), facts.named, agent.runtime.workspace)
+
+
 async def _check_goal(
-    agent: AgentRun, checker: GoalChecker, history: Sequence[Message], goal: Message, ended: RunOutcome, sent_back: int
+    agent: AgentRun,
+    checker: GoalChecker,
+    history: Sequence[Message],
+    goal: Message,
+    ended: RunOutcome,
+    sent_back: int,
+    facts: RunFacts,
 ) -> RunOutcome | SendBack:
-    """Goal mode: ask the checker whether the end a run reached is the goal reached.
+    """Goal mode: ask the checker whether the end a run reached is the goal reached, from a digest of the run and the
+    ``facts`` the harness measured.
 
     A checker that cannot answer ends the run as failed, with the answer kept and the problem stated: an ending that
     was not checked is not accepted.
     """
     run: RunRecord = agent.run
     patience: int = agent.runtime.config.agent.goal_patience
+    missing: tuple[str, ...] = await _missing_in_answer(agent, ended.result, facts)
     request: GoalRequest = GoalRequest(
         goal=run.goal,
         digest=goal_digest(render_transcript(_since_goal(history, goal))),
+        facts=redact_secrets(render_facts(facts, missing, unopened_addresses(ended.result, facts.named))),
         answer=ended.result,
         claimed_success=ended.status == "done",
     )
@@ -740,9 +764,11 @@ async def run_agent(agent: AgentRun) -> RunOutcome:
     sent_back: int = 0
     used_tools: bool = False
     plan_reminded: bool = False
+    paths_reminded: bool = False
     # The step of the newest reminder of the goal (weak tier); 0 before the first.
     reminded_at: int = 0
     ledger: RunLedger = new_ledger(run.goal)
+    facts: RunFacts = new_facts()
     limits: Limits = limits_for(config)
     can_ask: bool = can_ask_user(run.source, run.parent_run_id, run.approvals)
     ladder: tuple[Rung, ...] = ladder_for(config.stall_escalation, can_ask)
@@ -835,6 +861,7 @@ async def run_agent(agent: AgentRun) -> RunOutcome:
             ledger = with_actions(
                 ledger, [(outcome.call, not outcome.result.is_error, outcome.result.text) for outcome in outcomes]
             )
+            facts = with_outcomes(facts, outcomes)
             history.extend(results)
             await runtime.store.append_messages(run.thread_id, results)
             finished: ToolOutcome | None = next(
@@ -872,7 +899,8 @@ async def run_agent(agent: AgentRun) -> RunOutcome:
                 history.append(await _stored_note(agent, _NO_TOOL_NOTE if answered else _EMPTY_NOTE))
                 continue
         # The run wants to end here. A plan with open steps is sent back once, so the plan the user sees matches the
-        # work; then goal mode lets the checker decide whether the goal is really reached.
+        # work; so is, with verify_answer_paths, an answer that names paths that do not exist; then goal mode lets the
+        # checker decide whether the goal is really reached.
         if not plan_reminded and run.mode != "chat":
             unclosed: tuple[int, ...] = open_steps(await _current_plan(agent))
             if unclosed:
@@ -881,8 +909,17 @@ async def run_agent(agent: AgentRun) -> RunOutcome:
                 history.append(await _stored_note(agent, _plan_note(unclosed)))
                 await runtime.bus.emit(run.id, "plan_reminder", {"open_steps": list(unclosed)}, True)
                 continue
+        if config.verify_answer_paths and not paths_reminded and run.mode != "chat" and ended.status == "done":
+            missing: tuple[str, ...] = await _missing_in_answer(agent, ended.result, facts)
+            if missing:
+                paths_reminded = True
+                nudges = 0
+                watch = clear_window(watch)
+                history.append(await _stored_note(agent, paths_note(missing)))
+                await runtime.bus.emit(run.id, "answer_paths", {"missing": list(missing)}, True)
+                continue
         settled: RunOutcome | SendBack = (
-            ended if checker is None else await _check_goal(agent, checker, history, goal, ended, sent_back)
+            ended if checker is None else await _check_goal(agent, checker, history, goal, ended, sent_back, facts)
         )
         if isinstance(settled, RunOutcome):
             return settled

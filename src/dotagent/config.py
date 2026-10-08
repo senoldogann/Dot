@@ -95,6 +95,7 @@ class AgentConfig(FrozenModel):
     weak_refusal_share: float
     reminder_every: int
     tool_surface: ToolSurface
+    verify_answer_paths: bool
 
 
 class PolicyConfig(FrozenModel):
