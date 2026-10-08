@@ -1076,78 +1076,107 @@ checked on a scripted throw-away daemon at desktop width and at 375 px.
 
 ### 10. Yolo asks nobody: secret fields, questions and the end of a run
 
-**Status: in progress.** **Goal.** A `yolo` run, a scheduled run and a delegated run never wait for a person. What the
-run can read and do itself, it does; a question for the owner is left in the thread and the run goes on.
+**Status: in progress.** **Goal.** A `yolo` run types the secret fields it can fill from what it reads itself, and a
+run that nobody watches (`yolo`, scheduled, eval) does not stop for its own questions: a question for the owner is
+left with the run, the run goes on, and the owner's answer later carries the work on.
 
 **Why.** On 2026-10-09 a `yolo` run applying for a job stopped at an e-mail verification code that had arrived in the
 owner's webmail, which the run could open, and asked the owner to type the six digits. Three things made it ask: the
-browser's tool-level refusal of one-time-code fields in every mode (`browser/driver.py:280-286`), the prompt line "one-
-time codes are never typed by you: use ask_user" (`agent/prompt.py:186`), and `ask_user`, which blocks for 900 s in
-`yolo` as in `ask` (`tools/meta.py:84-106`, `agent/approvals.py:45-66`). The owner's decision of 2026-10-07 already
-makes `yolo` waive the credential hard stop; the tool and the prompt did not follow. Separately, a task run ends on
-the third text-only reply even when tool calls came between them (`agent/loop.py:936-946`), so a status line counts
-toward the end of a run that is not finished.
+browser refuses to type into password, one-time-code and card fields in every mode (`browser/driver.py:280-286`,
+called for `fill` and `type` at `:348` and `:351`); the prompt says one-time codes are never typed, "use ask_user"
+(`agent/prompt.py:186`); and `ask_user` blocks for up to 900 s in `yolo` as in `ask` (`tools/meta.py:82-108`,
+`agent/approvals.py:45-77`). The owner's decision of 2026-10-07 makes `yolo` waive the hand-offs of money and
+credentials (`agent/gate.py:101-102`, `policy/engine.py:26`); the tools and the prompt did not follow, and the prompt's
+`yolo` line and the comment of `[policy] approvals` still say that secrets, payments and sign-in details go to the
+user (`agent/prompt.py:63-67`, `defaults.toml:159-161`). Separately, a task run ends on its third text-only reply even
+when tool calls came between them: the count (`nudges`, `agent/loop.py:814`) is reset only by the plan reminder, the
+paths reminder and the goal check's send-back (`:968`, `:976`, `:987`), never by a step with tool calls (`:911-949`),
+so a status line written mid-run counts toward the end of a run that is not finished (`:951-960`).
 
-**Design.**
-- **Secret fields follow the approval mode.** The check moves out of `run_step` (`browser/driver.py:348`, `:351`) to
-  the tool: `BrowserSession.secret_fields(thread_id, refs) -> dict[str, str]` runs `_SENSITIVE_FIELD_SCRIPT` for the
-  refs of the `fill` and `type` steps and returns the kind of each secret field. `browser_act` calls it before `act`
-  unless the run is `yolo` (`ToolContext` gets `approvals: ApprovalMode`, the run's mode, set at `agent/loop.py:787`
-  where the context is built; the gate knows it already, `agent/gate.py:101-102`), and refuses as today ("refusing to
-  type into a one-time-code field: ask the user to
-  enter it themselves") with no browser action run. In `yolo` the steps run; the classification of a typing step keeps
-  the `credential` flag from the field's name (`policy/elements.py:30-37`), so the gate records the yolo approval as
-  for any waived hard stop. The desktop's secure-field refusal (`desktop/actions.py:409-414`) follows the same rule
-  through the same `ToolContext.approvals`; password managers stay refused in every mode (`desktop/session.py:132-137`)
-  unless
-  the owner decides otherwise (open decision 7). Screenshots keep blacking out secure fields.
-- **The prompt says what yolo may do.** The trust rules (`agent/prompt.py:180-190`) become a function of the approval
-  mode. In `ask` and `auto`: as today. In `yolo`: "Passwords, one-time codes and payment details: enter them when you
-  can read them yourself (a code in a mailbox you can open, a value the user gave you); never guess one, never read a
-  secret store the task does not need, and say in the answer which you entered." The `yolo` line of
-  `_APPROVALS_TEXT` says that nobody answers questions during the run and that a question is left for later.
-- **Questions that do not block.** `[agent] questions = "wait" | "leave"` decides what `ask_user` does in a run nobody
-  watches: a run in `yolo`, a scheduled run, an eval run (delegated runs have no `ask_user`, `agent/loop.py:737-738`).
-  With `leave` (the default, the owner's ask of 2026-10-09) `ask_user` creates the approval record with severity
-  `question` as today, so the card shows in the UI and in the timeline, but does not set the run to `blocked` and does
-  not wait: its result is "The question is left for the user, who is not asked to answer now. Continue with what does
-  not depend on the answer; if nothing can be done without it, finish and put under *What I need from you* exactly
-  what you need." A `wait` run behaves as today. `ask` and `auto` runs started by the owner always wait.
-  `ApprovalBroker.leave(run_id, tool, summary, severity, args)` writes the record and emits `approval_requested` with
-  `"blocking": false`; the answer path (`POST /api/approvals/{id}`) accepts an answer for a left question after the run
-  ended: it stores it, appends "Answer to the agent's question …: …" to the thread's instructions
-  (`agent/manager.py:423-433` reads them at the next run) and, when the thread has no active run, offers Continue
-  (a new run on the thread whose opening text is the answer, through the resume path of item 6 with `resumed=None`).
-  The web UI lists left questions of ended runs under the composer ("Dot asked you") until they are answered or
-  dismissed; `dotx run` prints them after the answer.
-- **The end of a run counts only consecutive text replies.** `nudges` is reset to 0 whenever a reply carries tool
-  calls (`agent/loop.py:900`), so only `finish_nudges + 1` text-only replies in a row end a task run. `finish` stays the
-  normal end; `FinishArgs` gets `needs_from_user: str` (may be empty) that the run page shows as "What Dot needs from
-  you" and that a campaign (item 12) carries into its ledger.
-- **Events and the record.** `approval_requested` with `blocking`; `question_left` is not a new kind: the record's
-  `status` stays `pending` until answered; a pending left question of an ended run is shown, never expired by the
-  broker's timer (it has none), and `dotx prune` leaves it.
+**Design** (corrected from the code before building; the first draft moved the browser's check in front of the batch,
+kept left questions `pending`, fed answers to the thread's instructions and continued through the resume path. The
+code does not allow the last three: the instructions are the goals of the thread's runs, `agent/manager.py:424-434`;
+the resume path takes only a run the daemon cut off, `:279-306`; the daemon expires every pending approval when it
+starts, `:90-94`).
+- **The run's approval mode reaches the tools.** `ToolContext` (`tools/context.py:41-54`) gets `approvals:
+  ApprovalMode` and `questions: QuestionMode`, both required and set where a context is built (`agent/loop.py:793-803`,
+  `agent/resume.py:241`, five smoke tests).
+- **Secret fields follow the approval mode.** The checks stay where they are, at the moment of the step, so a field is
+  judged as it is when the text goes in: the browser's in `run_step` for `fill` and `type` (`browser/driver.py:347-352`;
+  a refused step stops its batch after the steps before it ran, `browser/session.py:791-815`), the desktop's in the
+  actions that set a value, type, paste or press a key that types a character (`desktop/actions.py:409-414`,
+  `:481-518`). What happens at a secret field becomes the caller's: `BrowserSession.act` takes a `SecretFieldCheck`
+  (called with the ref, the kind of field and the page; it raises to refuse), `DesktopSession.act` a
+  `SecureFieldCheck` that rides in the step environment (the actions run in a worker thread). `browser_act` and
+  `desktop_act` pass the refusal of today in `ask` and `auto`, with the same text. In `yolo` the browser's check asks
+  the gate with a `credential` action (`financial` for a card field) unless the batch was authorized with that flag
+  already; `yolo` waives it and records it (`agent/gate.py:101-102`, `:121-134`), so every secret field a `yolo` run
+  types is in the timeline, whatever its label. The desktop's step review already flags typing into a secure field as
+  `credential` (`desktop/safety.py:204-215`, `tools/desktop.py:332-354`), so its `yolo` check only logs. Password
+  managers and the keychain stay refused in every mode (`desktop/session.py:132-137`; decision 7). Screenshots do not
+  change: the desktop blacks out password-manager windows (`desktop/shots.py:44`), not secure fields, and the browser
+  masks nothing.
+- **The prompt says what yolo may do.** The secrets line of the trust rules (`agent/prompt.py:186`) follows the
+  approval mode: in `ask` and `auto` as today; in `yolo`: "Passwords, one-time codes and payment details: enter them
+  when you can read them yourself (a code in a mailbox you can open, a value the user gave you). Never guess one, never
+  read a secret store the task does not need, and say in the answer which ones you entered." The `yolo` approvals line
+  loses "Secrets, payments and sign-in details still go to the user" (`:63-67`); the `ask_user` bullet says that the
+  system takes care of an approval instead of "asks the user itself" (`:105-107`); the comment of `[policy] approvals`
+  says what `yolo` lets through.
+- **Questions that do not block.** `[agent] questions = "leave" | "wait"` (default `leave`, the owner's ask of
+  2026-10-09) decides what `ask_user` does where `can_ask_user` is false (`agent/progress.py:121-124`): in a `yolo`,
+  scheduled or eval run (a delegated run has no `ask_user`, `agent/loop.py:133-134`, `:741-742`). With `leave`,
+  `ApprovalBroker.leave(run_id, tool, summary, severity, args)` stores the question with the new status `left` and
+  emits `question_left`, a new kind, so that nothing that reacts to `approval_requested` (the run page's waiting state,
+  the tab title, notifications, the CLI prompt, the eval supervisor) takes it for a question that holds the run.
+  `ask_user` returns at once: the question is left for the user, who does not answer during the run; go on with what
+  does not depend on the answer, and if nothing can be done without it, end the run and say exactly what is needed. The
+  run's status stays `running`. The prompt says the same in a line of its own (`questions` reaches `PromptInputs`); a
+  scheduled run whose questions are left loses "Do not ask questions" (`agent/prompt.py:193-196`). `wait`, and every
+  `ask` or `auto` run the owner started, behave as today.
+- **The answer carries the work on.** A `left` question is decided like any other (`POST
+  /api/approvals/{id}/decision`; `ApprovalBroker.resolve`, `agent/approvals.py:115-127`, accepts `left` as well as
+  `pending` and emits `approval_decided` for it). It is never expired (the daemon's start expires `pending` only,
+  `store/db.py:948-955`) and `dotx prune` does not touch approvals. Skip denies it and nothing else happens. An answer
+  goes to the thread as the owner's message, "Answer to your question “…”: …": into the thread's active run as a steer
+  (`agent/manager.py:171-173`) or, when no run is active on the thread, as the goal of a new run on it with the mode,
+  model, effort, approvals and goal mode of the run that asked (`RunManager.start`, `:99-134`); either way it is among
+  what the reviewer reads as the owner's words. The run page lists the run's open left questions above the composer
+  ("Dot asked you", from the new `questions` of `GET /api/runs/{id}`), during the run and after it; the timeline shows
+  each as a line where it was asked. `dotx run` prints a left question when it is left and lists the open ones after
+  the answer. An eval run counts left questions among its `unanswered_questions` (`evals/metrics.py:45`).
+- **The end of a run counts only consecutive text replies.** A step with tool calls sets `nudges` back to 0
+  (`agent/loop.py:911-949`), so `finish_nudges + 1` text-only replies in a row end a task run. `finish` stays the
+  normal end; `FinishArgs` (`tools/meta.py:42-52`) gets `needs_from_user` (optional, empty by default): what the run
+  could not do without the owner. It travels in the finish call's event, with no new column: the run page shows it
+  under the answer as "What Dot needs from you", `dotx run` prints it after the answer, and a campaign (item 12) reads
+  it from there.
 
-**Touchpoints.** `browser/driver.py`, `browser/session.py`, `tools/browser.py`, `tools/desktop.py`,
-`desktop/actions.py`, `tools/context.py` (the new `approvals` field), `agent/prompt.py`, `tools/meta.py`,
-`agent/approvals.py`, `agent/loop.py`, `agent/manager.py`, `server/routes_runs.py` (answers after the end, Continue),
-`store/db.py` (left questions by thread), `approvals.js`, `views/run.js`, `timeline.js`, `config.py`, `defaults.toml`,
-README "Safety" and "Autonomy", `tests/smoke/test_approval_modes.py`, `tests/smoke/test_browser.py`.
+**Touchpoints.** `tools/context.py` and the places that build a context, `browser/types.py`, `browser/driver.py`,
+`browser/session.py`, `tools/browser.py`, `desktop/actions.py`, `desktop/session.py`, `tools/desktop.py`,
+`agent/prompt.py`, `agent/progress.py`, `tools/meta.py`, `agent/approvals.py`, `agent/manager.py`, `agent/loop.py`,
+`store/models.py`, `store/db.py`, `server/views.py`, `server/routes_runs.py`, `cli.py`, `cli_ui.py`,
+`evals/metrics.py`, `config.py`, `defaults.toml`, `approvals.js`, `timeline.js`, `views/run.js`, README "How a run
+works", "Safety" and "Autonomy".
 
 **Decisions and limits.**
-- Nothing here lets `ask` or `auto` do more: secret fields are refused before any action in those modes, as today,
-  and their questions wait.
-- A left question is still a question: a run that cannot proceed without the answer finishes honestly (`success =
-  false`, the need in `needs_from_user`), and a campaign session (item 12) picks the answer up at its next session.
-- The one-time code of the 2026-10-09 run would now be read from the webmail tab and typed, with the `credential` yolo
+- Nothing here lets `ask` or `auto` do more: their secret fields are refused as before, and their questions wait.
+- A left question is still a question: a run that cannot go on without the answer ends honestly (`success = false`,
+  the need in `needs_from_user`), and the answer starts the next run on the thread.
+- In `yolo`, the text a run types into a secret field is in its `tool_call` event like any argument; it is what the
+  run read in a mailbox or got from the owner, which the store holds already.
+- The one-time code of the 2026-10-09 run would now be read from the webmail tab and typed, with a `credential` yolo
   approval in the timeline.
+- Found, not changed: in every mode, `press` with a key that types a character is not checked against secret fields
+  (`browser/driver.py:329-334`, `:355-356`).
 
 **Done when.** Smoke tests with the scripted model: a `yolo` run whose `ask_user` gets the left result at once, the
-record pending, the run status never `blocked`, the answer after the end stored as an instruction and Continue
-starting a run with it; a scheduled run the same; an `ask` run waits as before (`test_approval_modes.py`). Browser
-smoke on the fixture page: an OTP field is refused in `ask` and filled in `yolo`, with the `credential` approval
-recorded. Unit test of the nudge reset. The prompt difference between the modes checked byte for byte in
-`tests/unit/test_scaffold.py` style. Timeline and the "Dot asked you" list checked in headless Chrome on a throw-away
+record `left`, the run never `blocked`, the answer after the end starting a run on the thread whose goal carries it; a
+scheduled run the same; an `ask` run waits as before (`test_approval_modes.py`); a task run that writes text between
+tool steps is not ended by it. Browser smoke on a fixture page: a one-time-code field is refused in `ask` and filled in
+`yolo`, with the `credential` approval recorded. Unit tests: the prompt of `yolo` differs from that of `ask` only in
+the secrets line and the approvals line, and the left-questions line comes only with left questions
+(`tests/unit/test_run_modes.py`). The timeline and the "Dot asked you" list checked in headless Chrome on a throw-away
 daemon.
 
 ### 11. Open-ended goals in one run: targets, budgets and an honest end
