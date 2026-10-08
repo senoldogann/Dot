@@ -20,7 +20,7 @@ recover (6), learn (7), undo (8). Every later item is judged with the numbers of
 | 3   | Model-adaptive scaffold (`dotx models profile`)             | done    | de2cc1c |
 | 4   | Smaller, progressive tool surface                           | done    | d89d634 |
 | 5   | Verification of the end of a run                            | done    | e2051a5 |
-| 6   | Safe resume after a restart                                 | planned |         |
+| 6   | Safe resume after a restart                                 | done    | c3688e6, b6dd42f |
 | 7   | Learning from runs (lessons)                                | planned |         |
 | 8   | Undo journal for file edits                                 | planned |         |
 
@@ -528,30 +528,114 @@ the run done after one send-back), with no console error.
 
 ### 6. Safe resume after a restart
 
-**Goal.** A restart or a crash does not have to end a run.
+**Status: done** (`c3688e6`, `b6dd42f`). **Goal.** A restart or a crash does not have to end a run.
 
 **Why.** A graceful shutdown leaves the run `cancelled` with its own text; a crash is closed by `mark_interrupted_runs` as
 `failed` ("daemon stopped while the run was active"). Either way the owner continues by hand, and the thread keeps every
 step and the calls that were interrupted (`repair_history` gives them a placeholder result). The risk of automatic
 resume is real: a restart is also how the owner clears a stalled run, and a resumed run may repeat a side effect.
 
-**Design.**
-- Classify the interrupted calls with the policy vocabulary that exists: `READ_ONLY_KINDS` in `policy/types.py` (classify
-  with the tool's `prepare`, never run it); an unknown call counts as a side effect.
-- `pending_calls(messages)`, a pure function next to `repair_history`, lists the calls of the last assistant message that
-  have no result.
-- A resume starts a new run on the same thread (source `resume`) with a note: the original goal, what was interrupted,
-  "read-only calls may be repeated; check the state before repeating anything else". No new run status.
-- `[agent] resume = "off" | "safe"`, default `off`. `safe` resumes, at startup, only the runs a restart or crash
-  interrupted (never a user stop), recent ones, and only when every pending call is read-only. Always available by hand:
-  `dotx resume RUN_ID`, and a "Continue" button on the run page of an interrupted run.
+**Design** (refined while building it; the first draft is in git history at `cab742e`).
+- The calls of the step a run was in: `pending_calls(messages)` in `agent/compact.py` (pure), the calls of the newest
+  assistant message that only tool results follow, minus those with a result; none when a user message follows. A run
+  stores the results of a step once the whole step is over, so every call of a step that was cut off is pending, also
+  the ones that finished.
+- How each call ended comes from the run's events after the step's `assistant` event (a call id is unique only within
+  its step): `succeeded` or `failed` (a `tool_result`), `cut_off` (a `tool_call` without a result) or `not_started` (no
+  `tool_call`). When the newest `assistant` event is not the run's last step, nothing of the step ran: every call is
+  `not_started`.
+- Each call's policy kind comes from its tool's `prepare`, which classifies a call and runs nothing, with a gate that
+  refuses to be asked and no spawner. An unknown tool, `desktop_act` (its check looks at the screen, which can bring an
+  application to the front) and a `prepare` that fails give no kind, which counts as a side effect. Repeatable kinds:
+  `READ_ONLY_KINDS - {"delegate"}`, since a delegated run may have done anything its mode allows.
+- A resume is a new run on the same thread, source `resume`, with the goal (stored as it was), mode, model, effort,
+  approval mode and goal mode of the run it resumes. Its first message (`resume_note`) says how that run was cut off,
+  its goal, each call of the step with how it ended (a finished call with the start of its result; a call cut off that
+  only reads "may run again"; any other "may have changed something: check the state before you run it again"; a call
+  that had not started "nothing of it ran"), the plan, "which is your plan now", and to go on without redoing what is
+  done. The loop emits `resumed` (`from_run_id`, `cut_off`, `automatic`, and `calls` with `tool`, `end`, `repeatable`)
+  before anything that can fail, then the old plan as the run's first `plan` event, so `mark_plan_step`, the plan
+  reminder and the plan card carry on. No new run status.
+- What may be resumed (`can_resume`): a top-level run that the daemon cut off (ending `daemon_restarted` or
+  `daemon_shutdown`, never a run the owner stopped) and that is the newest run of its thread. By hand, whatever its
+  source: Continue on the run's page, `dotx resume RUN_ID`, `POST /api/runs/{id}/resume` (201; 409 otherwise). The
+  manager checks again under the thread claim, so two requests at once start one run.
+- `[agent] resume = "off" | "safe"` (default `off`) and `resume_within_s` (1800). With `safe` the daemon, right after
+  `recover()` and before the scheduler and the server start, resumes on its own (`resumes_on_start`) the runs of the web
+  UI that may be resumed, ended within the window, and whose calls that were cut off while they ran only read (a
+  finished call reports its result and one that had not started did nothing). Runs of `dotx run` (they may still be
+  alive in their own process), schedules, evals and delegations wait for the owner, and so do resumed runs: a run that
+  brings the daemon down is not resumed again and again.
 - Restart-to-clear-a-stalled-run: the owner stops the run first, then restarts; a run the owner stopped is never resumed.
+- `mark_interrupted_runs` ends a run that a crashed daemon left active at its newest event (its last sign of life), not
+  when the daemon starts again, and stores for it the `run_finished` event that every other end of a run stores; runs
+  closed that way before get it too. Without that event the web UI never saw such a run end: its page said "Connection
+  lost. Reconnecting…" for good.
 
-**Touchpoints.** `agent/manager.py` (`recover`, `shutdown`), `store/db.py` (`mark_interrupted_runs`), `agent/compact.py`,
-`policy/types.py`, `server/routes_runs.py`, `server/static/js/views/run.js`, `cli.py`, `config.py`, README.
+**Touchpoints.** `agent/resume.py` (new), `agent/manager.py`, `agent/loop.py`, `agent/compact.py`, `store/db.py`,
+`server/daemon.py`, `server/routes_runs.py`, `server/views.py`, `server/__init__.py` (`UI_SOURCE` moved there from
+`server/context.py`, so the agent layer names it without an import cycle), `tools/desktop.py` (`DESKTOP_ACT_TOOL`),
+`cli.py`, `cli_ui.py`, `config.py`, `defaults.toml`, `history.js`, `timeline.js`, `tools.js`, `views/run.js`, `app.css`,
+README. `policy/types.py` did not change.
 
-**Done when.** Unit tests of `pending_calls` and the classification; an integration test that interrupts a scripted run in
-the middle of a read-only call and of a write call and resumes both by the rules; the button and the CLI work.
+**What exists now.**
+- `agent/resume.py`, pure except `interrupted_calls` (reads the store, classifies the calls): `RESUME_SOURCE`,
+  `RESUMED_EVENT`, `REPEATABLE_KINDS`, `InterruptedCall`, `Resumption`, `cut_off_by`, `can_resume`, `repeatable`,
+  `resumes_on_start`, `resume_note`, `resumed_event_data`.
+- `agent/loop.py`: `RunOpening(text, files, resumed)` is how a run opens (`AgentRun.opening`); with `resumed`,
+  `run_agent` starts with the `resumed` and `plan` events. `agent/compact.py`: `pending_calls`.
+- `agent/manager.py`: `resumable(run)`, `resume(run_id)` (a `RunConflict` names the run's status, result and parent and
+  the thread's newest run), `resume_safe()`; `_launch` takes the `RunOpening` and checks a resume again under the
+  thread claim (`_require_newest`).
+- `store/db.py`: `runs_finished_since(since)`, and `mark_interrupted_runs` as above.
+- Daemon: `resume_safe()` after `recover()` when `resume = "safe"`; the `daemon_started` log line lists `resumed`.
+- Server: `RunDetail.resumable`, `POST /api/runs/{id}/resume`. The detail of a run reads whether the run is active
+  before it reads the run, so a run that ends in between never shows as neither active nor ended (a smoke test found it).
+- CLI: `dotx resume RUN_ID [--no-input] [--thinking] [--verbose]` resumes in its own process like `dotx run` and prints
+  the result; the terminal shows "↺ resumed by hand: the daemon stopped while run … worked", a line per call
+  ("shell: cut off (it may have changed something)") and the plan.
+- Web UI: Continue in the run's header while the run is `resumable` and not active; a resumed run has no goal bubble of
+  its own; its timeline opens with a note ("Resumed by hand: the daemon stopped while the run before this one worked.
+  Its last step: update_plan finished, write_file finished, shell cut off (it may have changed something)", and "Open
+  that run"); in the earlier turns of a later run, a resumed run reads "Resumed where the daemon cut the run above off".
+  When a run ends, a call of it that never reported back reads "cut off" (an alert and a badge; "Cut off: the run ended
+  before this call reported back"), and its step group counts it ("1 cut off"); it used to spin for good.
+- Tests: `tests/unit/test_resume.py` (`pending_calls`, which runs may be resumed, which ones the daemon resumes, the
+  note with each call's end and the plan, the note of a run cut off between steps); `tests/smoke/test_resume.py` (the
+  real loop with the scripted model, and `tests/fixtures/dot_crashing_run.py`, a process killed while its run works:
+  a run that a graceful shutdown cut off while it asked the owner goes on by itself with its plan when the daemon starts
+  again; a run that a crash cut off in a shell command after a finished `write_file` waits for the owner, is resumed by
+  hand and cannot be resumed twice); `test_server.py::test_only_a_run_the_daemon_cut_off_is_offered_to_be_resumed`;
+  `test_store_runs.py` (the end and the `run_finished` event of the runs a crashed daemon left).
+
+**How to use it for the next items.** To see a resume on a throw-away home: cut a run off (kill the process that runs
+it, as the smoke test kills `tests/fixtures/dot_crashing_run.py`), start the daemon or call `RunManager.recover()`, then
+`dotx resume RUN_ID` or Continue. To try the automatic resume, set `[agent] resume = "safe"`; the `daemon_started` line
+of the daemon log lists what it resumed. A resumed run is a new run whose `resumed` event names the run it goes on
+from: what is kept per run (the facts of item 5, the lessons of item 7, the journal of item 8) is split between the two.
+
+**Decisions and limits.**
+- `resume` stays `off` (open decision 2): only the owner's own restarts and crashes can show whether going on by
+  itself helps more than it surprises. By hand it is always there.
+- In goal mode, the goal check of a resumed run judges from what the resumed run did: its digest starts at the note.
+- The conversation shows every call of the step that was cut off as interrupted (`repair_history`'s placeholder), also
+  the ones that finished; the note says which finished. `repair_history` did not change.
+- A run of `dotx run` works in its own process, but a daemon that starts while it works marks it as cut off all the
+  same, and Continue would start a second run beside it. The daemon never resumes such a run on its own and the README
+  says not to resume it by hand while `dotx run` still shows it; the thread claim holds in one process only.
+- The goal reaches the instructions and the memory query of a resumed run twice (the note repeats it); harmless.
+- A plan step that was open when the run was cut off sends the first `finish` back once (the plan reminder), as for
+  any run.
+- No live run: every check used the scripted model, or a throw-away daemon whose model cannot be reached.
+
+**Done when.** Unit tests of `pending_calls` and the classification; an integration test that interrupts a scripted run
+in the middle of a read-only call and of a write call and resumes both by the rules; the button and the CLI work. All
+true: the read-only call is `ask_user` (resumed on its own), the call that may change something a shell command after a
+finished `write_file` (left to the owner, resumed by hand). Also clean: the unit tests (436), ruff, mypy, the offline
+smoke suite (151) and `dotx eval check`. The web UI was checked in headless Chrome on a throw-away daemon after a real
+crash (Continue, the note and the plan card of the resumed run, the earlier turns of a later run, the old run no longer
+offering Continue; no console error), and `dotx resume` on a throw-away home (the resumed line, the calls and the plan;
+a second resume refused with exit status 2).
 
 ### 7. Learning from runs
 
@@ -645,3 +729,14 @@ makes the damage reversible. It covers the file tools only; a shell `rm` or `sed
   second time ("Same but give me the content precisely") and the test expects one child run; the run itself ended done
   with the right content. Found: the README does not describe the send-back of a plan with open steps at the end of a
   run (`plan_reminder`), which runs before the path check.
+- 2026-10-08: item 6 done (`c3688e6`, `b6dd42f`). A run the daemon cut off goes on in a new run of its thread, by hand
+  (Continue, `dotx resume`, `POST /api/runs/{id}/resume`) or, with `[agent] resume = "safe"` (default off), by itself
+  when the daemon starts, for a run of the web UI cut off in calls that only read. Unit tests (436), `dotx eval check`
+  and the offline smoke suite (151, no flake) clean; the web UI checked in headless Chrome on a throw-away daemon after
+  a real crash, and `dotx resume` on a throw-away home; no live model run. Found and fixed: a run that a crashed daemon
+  left behind never got its `run_finished` event, so its page said "Connection lost. Reconnecting…" for good (old; runs
+  closed that way before get the event at the next start); a call that a crash cut off kept its spinner for good (old);
+  the detail of a run could show a run that ended in between as neither active nor ended; two requests to resume one
+  run at once could start two runs. Found, not changed: the conversation shows the finished calls of an interrupted step
+  as interrupted too (`repair_history`, old); a run of `dotx run` that a starting daemon marks as cut off can be
+  resumed by hand while it still works in its own process.
