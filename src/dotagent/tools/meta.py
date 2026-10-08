@@ -26,6 +26,8 @@ from dotagent.tools.context import ToolContext
 
 FINISH_TOOL: str = "finish"
 ASK_USER_TOOL: str = "ask_user"
+UPDATE_PLAN_TOOL: str = "update_plan"
+MARK_PLAN_STEP_TOOL: str = "mark_plan_step"
 # A chat turn ends with a plain reply. A model that is offered both that and finish tends to write the call out as text.
 _FINISH_MODES: frozenset[RunMode] = frozenset({"task", "research"})
 _NOTIFY_TIMEOUT_S: float = 15.0
@@ -172,13 +174,13 @@ async def _record_plan(ctx: ToolContext, steps: Sequence[PlanItem]) -> ToolResul
 
 def _update_plan_tool() -> RegisteredTool:
     def classify(args: UpdatePlanArgs, ctx: ToolContext) -> ActionInfo:
-        return _meta_action("update_plan", "Update the plan")
+        return _meta_action(UPDATE_PLAN_TOOL, "Update the plan")
 
     async def run(args: UpdatePlanArgs, ctx: ToolContext) -> ToolResult:
         return await _record_plan(ctx, [PlanItem(text=step.text, status=step.status) for step in args.steps])
 
     return make_tool(
-        name="update_plan",
+        name=UPDATE_PLAN_TOOL,
         description=(
             "Record or rewrite a short step-by-step plan for multi-step work. The user sees it live. Skip it for "
             "trivial tasks. To mark progress on one step use mark_plan_step instead."
@@ -200,7 +202,7 @@ class MarkPlanStepArgs(ToolArgs):
 
 def _mark_plan_step_tool() -> RegisteredTool:
     def classify(args: MarkPlanStepArgs, ctx: ToolContext) -> ActionInfo:
-        return _meta_action("mark_plan_step", f"Mark plan step {args.step} {args.status}")
+        return _meta_action(MARK_PLAN_STEP_TOOL, f"Mark plan step {args.step} {args.status}")
 
     async def run(args: MarkPlanStepArgs, ctx: ToolContext) -> ToolResult:
         latest: EventRecord | None = await ctx.runtime.store.last_event(ctx.run_id, PLAN_EVENT)
@@ -208,7 +210,7 @@ def _mark_plan_step_tool() -> RegisteredTool:
         return await _record_plan(ctx, with_step_status(current, args.step, args.status))
 
     return make_tool(
-        name="mark_plan_step",
+        name=MARK_PLAN_STEP_TOOL,
         description=(
             "Mark one step of your plan as in_progress, done, failed or skipped. Call it the moment a step changes, "
             "in the same reply as your next action, so the plan the user watches matches the work."

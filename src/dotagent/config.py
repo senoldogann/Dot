@@ -77,6 +77,9 @@ class AgentConfig(FrozenModel):
     keep_recent_tool_results: int
     keep_recent_screenshots: int
     stall_limit: int
+    stall_escalation: bool
+    failure_streak: int
+    revisit_window: int
     finish_nudges: int
     parallel_tools: int
     model_call_timeout_s: float

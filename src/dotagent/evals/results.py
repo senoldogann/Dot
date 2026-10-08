@@ -50,12 +50,14 @@ class TaskOutcome(FrozenModel):
 
 class EvalSettings(FrozenModel):
     """The settings of the run that change how a model fares, kept with the report so that two reports can be compared
-    knowing whether they ran the same way."""
+    knowing whether they ran the same way. A report that does not record ``stall_escalation`` counts as run without
+    it."""
 
     effort: str
     goal_mode: bool
     context_tokens: int
     preset: str
+    stall_escalation: bool = False
 
 
 class EvalReport(FrozenModel):

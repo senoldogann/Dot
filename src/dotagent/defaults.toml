@@ -69,7 +69,7 @@ attempts = 6
 max_concurrent = 4
 
 [agent]
-# A run has no step limit: it ends by finishing, by the stall guard (stall_limit) or by the stop button.
+# A run has no step limit: it ends by finishing, by the progress watchdog (below) or by the stop button.
 # Goal mode: a reviewer model checks the answer of a task or research run against the goal and sends the run back to work
 # until the goal is reached; a run is sent back to work at most goal_patience times, then it ends as failed.
 goal_mode = false
@@ -78,7 +78,17 @@ tool_output_chars = 12000
 context_tokens = 48000
 keep_recent_tool_results = 6
 keep_recent_screenshots = 2
+# The progress watchdog looks for the same step (same calls, same results) stall_limit times in a row and answers with
+# two nudges and then a stop whose result says what was tried. stall_escalation = true makes it look also for a cycle of
+# 2 or 3 steps, failure_streak steps in a row in which every call failed, and revisit_window steps that only repeated
+# calls already made with the same results, and answers with a ladder: a nudge, a re-plan (the next step may only plan
+# or finish), a second opinion of the review model ([models] review), a question to you (never in yolo, scheduled,
+# delegated or eval runs) and the stop. Twelve steps without an alert bring the ladder one rung down again. Off until
+# evals show that the ladder helps.
+stall_escalation = false
 stall_limit = 4
+failure_streak = 6
+revisit_window = 8
 finish_nudges = 2
 parallel_tools = 4
 model_call_timeout_s = 420.0

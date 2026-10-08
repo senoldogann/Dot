@@ -2,7 +2,6 @@
 
 import asyncio
 import time
-from collections import deque
 from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Literal
@@ -37,9 +36,40 @@ from dotagent.agent.continuity import (
 )
 from dotagent.agent.executor import ToolOutcome, execute_calls
 from dotagent.agent.gate import RunGate
-from dotagent.agent.plan import PLAN_EVENT, PlanItem, open_steps, plan_from_event
+from dotagent.agent.plan import PLAN_EVENT, PlanItem, open_steps, plan_from_event, render_plan
+from dotagent.agent.progress import (
+    Alert,
+    CallSeen,
+    Limits,
+    Rung,
+    WatchState,
+    advance,
+    ask_note,
+    can_ask_user,
+    clear_window,
+    consult_note,
+    image_hash,
+    ladder_for,
+    limits_for,
+    new_watch,
+    nudge_note,
+    replan_note,
+    restriction_for,
+    stop_result,
+)
 from dotagent.agent.prompt import build_system_prompt, collect_prompt_inputs
-from dotagent.agent.review import GoalChecker, GoalRequest, GoalVerdict, goal_checker_for, goal_digest, shorten_reason
+from dotagent.agent.review import (
+    GoalChecker,
+    GoalRequest,
+    GoalVerdict,
+    ProgressAdvice,
+    ProgressConsultant,
+    ProgressRequest,
+    goal_checker_for,
+    goal_digest,
+    progress_consultant_for,
+    shorten_reason,
+)
 from dotagent.agent.vision import text_for_blind_model
 from dotagent.config import AgentConfig
 from dotagent.core.errors import ConfigError, ProviderError, RunCancelled
@@ -65,12 +95,12 @@ from dotagent.memory.service import prompt_memories
 from dotagent.runtime import Runtime
 from dotagent.skills.catalog import load_skills
 from dotagent.skills.types import SkillCatalog
-from dotagent.store.endings import GOAL_CHECK_MARK, RESULT_EMPTY_REPLIES, RESULT_STALLED
+from dotagent.store.endings import GOAL_CHECK_MARK, RESULT_EMPTY_REPLIES
 from dotagent.store.models import EventRecord, MemoryRecord, RunRecord
 from dotagent.tools.context import Spawner, ToolContext
 from dotagent.tools.delegate import DELEGATE_TOOL
 from dotagent.tools.meta import ASK_USER_TOOL, FINISH_TOOL, FinishArgs
-from dotagent.tools.registry import specs_for_mode
+from dotagent.tools.registry import ToolRegistry, specs_for_mode
 from dotagent.tools.skill import SKILL_TOOL
 
 log = get_logger(__name__)
@@ -109,10 +139,7 @@ _PLAN_NOTE: str = (
     "[system note] Your plan still shows step(s) {steps} as not closed. Mark each of them done, failed or skipped "
     "with mark_plan_step (several calls in one reply), then end the run again with your complete final answer."
 )
-_STALL_NOTE: str = (
-    "[system note] You are repeating the same actions with the same results. Stop, reconsider, and try a different "
-    "approach (another tool, other arguments, or a different way to verify). If it is impossible, call finish."
-)
+_NO_PLAN: str = "The agent has not written a plan."
 
 
 @dataclass(frozen=True)
@@ -333,11 +360,24 @@ async def _tool_messages(agent: AgentRun, outcomes: Sequence[ToolOutcome], can_s
     return [tool_message(outcome.call, text, ()) for outcome, text in zip(outcomes, texts, strict=True)]
 
 
-def _fingerprint(outcomes: Sequence[ToolOutcome]) -> str:
-    return "|".join(
-        f"{outcome.call.name}:{dumps_compact(outcome.call.arguments)}:{outcome.result.text[:200]}"
+def _calls_seen(outcomes: Sequence[ToolOutcome]) -> tuple[CallSeen, ...]:
+    """The calls of a step as the progress watchdog sees them."""
+    return tuple(
+        CallSeen(
+            name=outcome.call.name,
+            arguments=dumps_compact(outcome.call.arguments),
+            result=outcome.result.text,
+            failed=outcome.result.is_error,
+            images=tuple(image_hash(image.data_b64) for image in outcome.result.images),
+        )
         for outcome in outcomes
     )
+
+
+def _only(registry: ToolRegistry, allowed: frozenset[str]) -> ToolRegistry:
+    """The tools of ``registry`` that ``allowed`` names; a call of any other one is answered as a call of an unknown
+    tool, so a step that is limited stays limited even for a model that calls a tool it was not offered."""
+    return ToolRegistry(tools={name: tool for name, tool in registry.tools.items() if name in allowed})
 
 
 async def _memory_query(runtime: Runtime, run: RunRecord) -> str:
@@ -473,6 +513,92 @@ async def _check_goal(
     return settled
 
 
+class StallAnswer(FrozenModel):
+    """How a run goes on after a progress alert: ``note`` is given to the model, and ``allowed`` names the tools of the
+    next step (``None``: all of them)."""
+
+    note: str
+    allowed: frozenset[str] | None
+
+
+def _stall_data(alert: Alert, extra: JsonObject) -> JsonObject:
+    """The ``stall`` event of an alert. ``warnings`` is the rung reached, under the name that older readers know."""
+    return {
+        "warnings": alert.level,
+        "level": alert.level,
+        "action": alert.rung,
+        "reason": alert.pattern,
+        "detail": alert.detail,
+        **extra,
+    }
+
+
+async def _consult(
+    agent: AgentRun,
+    consultant: ProgressConsultant,
+    alert: Alert,
+    history: Sequence[Message],
+    goal: Message,
+    ledger: RunLedger,
+    plan: str,
+) -> StallAnswer | RunOutcome:
+    """The consult rung: the review model looks at the run and its advice is given to the model as a note.
+
+    A review model that cannot answer ends the run as stalled, with the problem stated: the run is not told that a
+    second opinion was taken when none was.
+    """
+    run: RunRecord = agent.run
+    request: ProgressRequest = ProgressRequest(
+        goal=run.goal,
+        plan=plan if plan else _NO_PLAN,
+        digest=goal_digest(render_transcript(_since_goal(history, goal))),
+        pattern=alert.detail,
+    )
+    try:
+        advice: ProgressAdvice = await consultant(request)
+    except ProviderError as error:
+        log.error("progress_consult_failed", run_id=run.id, error=error.message, context=error.context)
+        await agent.runtime.bus.emit(
+            run.id, "stall", _stall_data(alert, {"error": shorten_reason(error.message)}), True
+        )
+        reason: str = f"{alert.detail} The review model could not give a second opinion: {error.message}"
+        return RunOutcome(status="failed", result=stop_result(reason, ledger, plan))
+    diagnosis: str = shorten_reason(advice.diagnosis)
+    next_steps: list[str] = [shorten_reason(step) for step in advice.next_steps]
+    await agent.runtime.bus.emit(
+        run.id, "stall", _stall_data(alert, {"diagnosis": diagnosis, "next_steps": list(next_steps)}), True
+    )
+    return StallAnswer(note=consult_note(alert, diagnosis, next_steps), allowed=None)
+
+
+async def _answer_alert(
+    agent: AgentRun,
+    consultant: ProgressConsultant,
+    alert: Alert,
+    can_ask: bool,
+    history: Sequence[Message],
+    goal: Message,
+    ledger: RunLedger,
+) -> StallAnswer | RunOutcome:
+    """What the rung an alert reached asks for: a note (with the tools of the next step limited for a re-plan or a
+    question), the advice of the review model, or the end of the run with what was tried."""
+    plan: str = render_plan(await _current_plan(agent))
+    match alert.rung:
+        case "consult":
+            return await _consult(agent, consultant, alert, history, goal, ledger, plan)
+        case "stop":
+            await agent.runtime.bus.emit(agent.run.id, "stall", _stall_data(alert, {}), True)
+            return RunOutcome(status="failed", result=stop_result(alert.detail, ledger, plan))
+        case "nudge":
+            note: str = nudge_note(alert)
+        case "replan":
+            note = replan_note(alert, can_ask)
+        case "ask":
+            note = ask_note(alert)
+    await agent.runtime.bus.emit(agent.run.id, "stall", _stall_data(alert, {}), True)
+    return StallAnswer(note=note, allowed=restriction_for(alert.rung, can_ask))
+
+
 async def run_agent(agent: AgentRun) -> RunOutcome:
     runtime: Runtime = agent.runtime
     run: RunRecord = agent.run
@@ -539,12 +665,19 @@ async def run_agent(agent: AgentRun) -> RunOutcome:
     output_total: int = 0
     ratio: float = 1.0
     nudges: int = 0
-    stall_warnings: int = 0
     sent_back: int = 0
     used_tools: bool = False
     plan_reminded: bool = False
-    recent: deque[str] = deque(maxlen=config.stall_limit)
     ledger: RunLedger = new_ledger(run.goal)
+    limits: Limits = limits_for(config)
+    can_ask: bool = can_ask_user(run.source, run.parent_run_id, run.approvals)
+    ladder: tuple[Rung, ...] = ladder_for(config.stall_escalation, can_ask)
+    consultant: ProgressConsultant = progress_consultant_for(
+        runtime.router, runtime.config.models.review, config.model_call_timeout_s, f"{run.thread_id}:progress"
+    )
+    watch: WatchState = new_watch()
+    # The tools of the next step when a progress alert limited them; None offers all of them.
+    allowed: frozenset[str] | None = None
 
     async def sink(delta: StreamDelta) -> None:
         await runtime.bus.emit(run.id, "delta", {"kind": delta.kind, "text": delta.text, "step": steps}, False)
@@ -569,10 +702,13 @@ async def run_agent(agent: AgentRun) -> RunOutcome:
             await runtime.store.mark_memories_used([record.id for record in changed], time.time())
             await runtime.bus.emit(run.id, "memories", {"ids": [record.id for record in changed], "live": True}, True)
         history, estimated, ledger = await _fit_context(agent, history, system, specs, ratio, ledger)
+        offered: tuple[ToolSpec, ...] = specs if allowed is None else tuple(s for s in specs if s.name in allowed)
+        registry: ToolRegistry = runtime.registry if allowed is None else _only(runtime.registry, allowed)
+        allowed = None
         request: ChatRequest = ChatRequest(
             model=ref.model,
             messages=(system, *history),
-            tools=specs,
+            tools=offered,
             temperature=None,
             max_output_tokens=None,
             effort=run.effort if run.effort is not None else runtime.config.models.effort,
@@ -609,7 +745,7 @@ async def run_agent(agent: AgentRun) -> RunOutcome:
         if reply.tool_calls:
             used_tools = True
             outcomes: list[ToolOutcome] = await execute_calls(
-                reply.tool_calls, runtime.registry, context, agent.gate, config.tool_output_chars, config.parallel_tools
+                reply.tool_calls, registry, context, agent.gate, config.tool_output_chars, config.parallel_tools
             )
             results: list[Message] = await _tool_messages(agent, outcomes, info.vision)
             ledger = with_actions(
@@ -622,14 +758,16 @@ async def run_agent(agent: AgentRun) -> RunOutcome:
                 None,
             )
             if finished is None:
-                recent.append(_fingerprint(outcomes))
-                if len(recent) == recent.maxlen and len(set(recent)) == 1:
-                    stall_warnings += 1
-                    recent.clear()
-                    if stall_warnings > 2:
-                        return RunOutcome(status="failed", result=RESULT_STALLED)
-                    history.append(await _stored_note(agent, _STALL_NOTE))
-                    await runtime.bus.emit(run.id, "stall", {"warnings": stall_warnings}, True)
+                alert: Alert | None
+                watch, alert = advance(watch, _calls_seen(outcomes), limits, ladder)
+                if alert is not None:
+                    answer: StallAnswer | RunOutcome = await _answer_alert(
+                        agent, consultant, alert, can_ask, history, goal, ledger
+                    )
+                    if isinstance(answer, RunOutcome):
+                        return answer
+                    history.append(await _stored_note(agent, answer.note))
+                    allowed = answer.allowed
                 continue
             ended = _finish_result(finished)
         else:
@@ -659,5 +797,5 @@ async def run_agent(agent: AgentRun) -> RunOutcome:
             return settled
         sent_back += 1
         nudges = 0
-        recent.clear()
+        watch = clear_window(watch)
         history.append(await _stored_note(agent, settled.note))

@@ -10,6 +10,8 @@ from typing import Literal, TextIO
 from pydantic import BaseModel, ConfigDict, JsonValue
 
 from dotagent.agent.gate import YOLO_DECIDER
+from dotagent.agent.plan import StepStatus
+from dotagent.agent.progress import Rung
 from dotagent.core.jsonutil import dumps_compact
 from dotagent.core.text import truncate_tail
 from dotagent.core.types import FrozenModel, JsonObject
@@ -72,7 +74,7 @@ class PolicyPayload(Payload):
 
 class PlanStepPayload(Payload):
     text: str
-    status: Literal["pending", "in_progress", "done"]
+    status: StepStatus
 
 
 class PlanPayload(Payload):
@@ -103,6 +105,18 @@ class GoalCheckPayload(Payload):
     check: int
     patience: int
     final: bool
+
+
+class StallPayload(Payload):
+    """A progress alert: what the watchdog saw (``detail``) and the rung it answered with (``action``), with the advice
+    or the error of the review model for the consult rung. Events of the older stall guard carry only ``warnings``."""
+
+    warnings: int
+    action: Rung | None = None
+    detail: str | None = None
+    diagnosis: str | None = None
+    next_steps: list[str] | None = None
+    error: str | None = None
 
 
 class NotePayload(Payload):
@@ -243,7 +257,7 @@ class TerminalUi:
                 noun: str = "note" if len(recalled.ids) == 1 else "notes"
                 self._line(self._paint(f"  ◆ {len(recalled.ids)} saved {noun} in context", "2"))
             case "stall":
-                self._line(self._paint("  ↻ repeating itself; nudged to change approach", "33"))
+                self._on_stall(StallPayload.model_validate(data))
             case "compacted":
                 self._line(self._paint("  ⇲ older context summarised", "2"))
             case "steer":
@@ -294,7 +308,7 @@ class TerminalUi:
                 self._line(self._paint(f"      {truncate_tail(extra, _RESULT_PREVIEW_CHARS)}", "2"))
 
     def _on_plan(self, plan: PlanPayload) -> None:
-        marks: dict[str, str] = {"pending": "○", "in_progress": "◐", "done": "●"}
+        marks: dict[StepStatus, str] = {"pending": "○", "in_progress": "◐", "done": "●", "failed": "✕", "skipped": "–"}
         self._line(self._paint("  plan", "1"))
         for step in plan.steps:
             self._line(f"    {marks[step.status]} {step.text}")
@@ -307,6 +321,28 @@ class TerminalUi:
         code: str = "32" if decided.status == "approved" else "31"
         reason: str = f" — {decided.note}" if decided.note else ""
         self._line(self._paint(f"  ⚖ {decided.decided_by} {verdict}: {decided.summary}{reason}", code))
+
+    def _on_stall(self, stall: StallPayload) -> None:
+        if stall.action is None or stall.detail is None:
+            self._line(self._paint("  ↻ repeating itself; nudged to change approach", "33"))
+            return
+        answers: dict[Rung, str] = {
+            "nudge": "nudged to change approach",
+            "replan": "next step may only plan or finish",
+            "consult": "second opinion from the review model",
+            "ask": "next step may only ask you or finish",
+            "stop": "stopped",
+        }
+        ends: bool = stall.action == "stop" or stall.error is not None
+        self._line(
+            self._paint(f"  ↻ not getting anywhere: {stall.detail} → {answers[stall.action]}", "31" if ends else "33")
+        )
+        if stall.error is not None:
+            self._line(self._paint(f"    the review model could not answer, so the run stops: {stall.error}", "31"))
+        if stall.diagnosis is not None:
+            self._line(self._paint(f"    {stall.diagnosis}", "2"))
+        for step in stall.next_steps or []:
+            self._line(self._paint(f"    → {step}", "2"))
 
     def _on_goal_check(self, check: GoalCheckPayload) -> None:
         reason: str = f" — {check.reason}" if check.reason else ""

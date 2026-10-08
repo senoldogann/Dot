@@ -121,9 +121,9 @@ answer (a small model that is offered both writes the call out as text).
 - The plan has steps that are `pending`, `in_progress`, `done`, `failed` or `skipped`; `update_plan` writes it and
   `mark_plan_step` changes one step, so the plan in the web UI moves as the work does. A run that calls `finish` with
   steps still open is asked once to close them.
-- A run has no step limit. It ends when the model calls `finish`, when `stall_limit` steps in a row end the same way (the
-  model is warned twice, and the third time the run stops), when a model call still fails after its retries, or when you
-  stop it. In goal mode the goal check can also end it (see [Autonomy](#autonomy-approvals-goal-mode-and-the-end-of-a-run)).
+- A run has no step limit. It ends when the model calls `finish`, when the progress watchdog stops it (see
+  [Autonomy](#autonomy-approvals-goal-mode-and-the-end-of-a-run)), when a model call still fails after its retries, or
+  when you stop it. In goal mode the goal check can also end it (see [Autonomy](#autonomy-approvals-goal-mode-and-the-end-of-a-run)).
 - A reply without a tool call ends the turn in `chat` mode and when the run has not used a tool yet. Otherwise it is
   nudged towards `finish`; after `finish_nudges` nudges the reply itself becomes the result.
 - A small model with the full tool list sometimes writes the `finish` call out as a plain message (`gpt-oss:20b-cloud`
@@ -288,18 +288,30 @@ the model, reasoning level, approval mode and goal mode of its schedule, and the
 schedule leaves open, so what a schedule does while nobody is there depends on them: with `ask`, a question waits
 `approval_timeout_s` and then counts as a refusal.
 
-**The end of a run.** There is no step limit. A run ends by `finish`; by the stall guard (`stall_limit` steps in a row
-that end the same way: warned twice, stopped the third time); by a model call that still fails after its retries; in goal
-mode by the goal check giving up; or when you stop it. What this leaves unbounded: a run that keeps changing its steps
-without getting anywhere is not caught by the stall guard and goes on using the model until you stop it. Give such a run
-a goal that can be checked, and keep an eye on the token count of a long one (`--verbose`, or the Details panel).
+**The end of a run.** There is no step limit. A run ends by `finish`; by the progress watchdog; by a model call that
+still fails after its retries; in goal mode by the goal check giving up; or when you stop it.
+
+**The progress watchdog.** After every step in which a run used tools, Dot compares what it called and what came back
+(screenshots included) with the steps before. By default it looks for the same step `stall_limit` times in a row: the
+model is told twice to change its approach, and the third time the run stops with a result that says what it did last,
+what it touched and where its plan stood, and how to go on in the same thread. With `stall_escalation = true` in
+`[agent]` it also notices a cycle of two or three steps, `failure_streak` steps in a row in which every call failed, and
+`revisit_window` steps that only repeated calls the run had already made, with the same results. It then answers with a
+ladder instead: a nudge; a re-plan, in which the next step may only plan or finish; a second opinion of the review model
+(`[models] review`), given to the model as advice (if that model cannot answer, the run stops and says so); a question
+to you (not in yolo, scheduled, delegated or eval runs, where nobody would answer); and the stop. Twelve steps without an
+alert bring the ladder one rung down again, so a long run is not stopped for hiccups that are hours apart. Every alert
+shows in the timeline with what was seen and what was done. The ladder is off by default until evals show that it
+helps; without it, a run that keeps changing its steps without getting anywhere goes on using the model until you stop
+it. Give such a run a goal that can be checked, and keep an eye on the token count of a long one (`--verbose`, or the
+Details panel).
 
 ## Measuring the agent
 
 How well Dot finishes work is measured, not guessed, in two ways.
 
 **`dotx stats [--days N]`** counts the runs that really happened (the last 30 days by default), per model: how they
-ended (finished, stopped by you, stopped by the stall guard, refused by the goal check, cut off when the daemon died or
+ended (finished, stopped by you, stopped by the progress watchdog, refused by the goal check, cut off when the daemon died or
 shut down, internal error, still active), steps, input and output tokens, tool calls and how many of them failed, calls
 whose arguments were not valid JSON, stalls and compactions. The database file is opened read-only, so it is safe to run
 while the daemon works, and the numbers hold no text of your chats.
@@ -787,6 +799,6 @@ src/dotagent/
 - Every model call carries the schemas of over forty tools, several thousand tokens. A model with a small context
   window or a metered key feels it; `allow` lists keep the MCP part short.
 - A run costs what its model costs: the loop makes many calls, and screenshots are expensive. A run has no step limit, so
-  what bounds the cost is the stop button, the stall guard, `goal_patience` for the send-backs of goal mode, and the
-  concurrency limits (`max_concurrent_runs`). A run that varies its steps without getting anywhere ends only when you
-  stop it.
+  what bounds the cost is the stop button, the progress watchdog, `goal_patience` for the send-backs of goal mode, and
+  the concurrency limits (`max_concurrent_runs`). Without `stall_escalation`, a run that varies its steps without getting
+  anywhere ends only when you stop it.

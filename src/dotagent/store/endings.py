@@ -12,7 +12,9 @@ from dotagent.store.models import RunStatus
 RESULT_STOPPED: str = "The run was stopped."
 RESULT_SHUTDOWN: str = "The daemon was shut down while this run was active."
 RESULT_RESTARTED: str = "daemon stopped while the run was active"
+# A stop for lack of progress: the bare text of older runs, and the start of the text that says what was tried.
 RESULT_STALLED: str = "Stopped: the agent kept repeating the same failing actions."
+PREFIX_STALLED: str = "Stopped: the agent was not making progress"
 RESULT_EMPTY_REPLIES: str = "The model returned empty replies and did not finish."
 PREFIX_EMERGENCY_STOP: str = "Emergency stop: "
 PREFIX_INTERNAL_ERROR: str = "Internal error: "
@@ -39,7 +41,7 @@ ENDING_LABELS: dict[Ending, str] = {
     "finished": "finished",
     "failed": "failed (the agent's own report, or an error of the model service)",
     "goal_check_refused": "refused by the goal check",
-    "stalled": "stopped by the stall guard",
+    "stalled": "stopped by the progress watchdog",
     "empty_replies": "empty replies from the model",
     "internal_error": "internal error",
     "daemon_restarted": "cut off when the daemon died",
@@ -50,7 +52,7 @@ ENDING_LABELS: dict[Ending, str] = {
 
 
 def _failed_ending(result: str) -> Ending:
-    if result == RESULT_STALLED:
+    if result == RESULT_STALLED or result.startswith(PREFIX_STALLED):
         return "stalled"
     if result == RESULT_EMPTY_REPLIES:
         return "empty_replies"

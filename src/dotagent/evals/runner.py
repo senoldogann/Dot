@@ -20,6 +20,7 @@ from dotagent.core.errors import EvalError
 from dotagent.core.logs import get_logger
 from dotagent.core.text import truncate_middle
 from dotagent.core.types import JsonObject
+from dotagent.evals import EVAL_SOURCE
 from dotagent.evals.checks import evaluate_checks, workspace_path
 from dotagent.evals.metrics import run_metrics
 from dotagent.evals.results import CheckOutcome, Cut, RunMetrics, TaskOutcome
@@ -34,7 +35,6 @@ from dotagent.store.models import EventRecord, RunRecord
 
 log = get_logger(__name__)
 
-EVAL_SOURCE: str = "eval"
 # The model the offline check names: a scripted model that stands in for the ``ollama`` connector.
 SCRIPTED_MODEL: str = "ollama:scripted"
 _SCRIPTED_PROVIDER: str = "ollama"
@@ -44,6 +44,10 @@ _MAX_EVENTS: int = 100_000
 _ANSWER_CHARS: int = 4000
 # What a run that does nothing says.
 _NOTHING_ANSWER: str = "Done."
+# Python tells a source from its cached bytecode by size and whole-second modification time. A replayed script edits a
+# file within the second in which it was compiled, so an edit that keeps the size would still run the old code; the
+# attempts write no bytecode cache.
+_ATTEMPT_ENV: dict[str, str] = {"PYTHONDONTWRITEBYTECODE": "1"}
 
 
 def eval_config(config: AppConfig) -> AppConfig:
@@ -238,7 +242,7 @@ async def _attempt(
 ) -> TaskOutcome:
     """One attempt in a throw-away home that is removed afterwards."""
     with scratch_home() as home, eval_environment(home, secrets):
-        runtime: Runtime = await open_runtime(config, dict(login_env))
+        runtime: Runtime = await open_runtime(config, {**login_env, **_ATTEMPT_ENV})
         try:
             outcome: TaskOutcome = await _run_in(runtime, task, model, stand_in, attempt)
         finally:

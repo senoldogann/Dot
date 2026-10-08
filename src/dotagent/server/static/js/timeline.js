@@ -473,8 +473,35 @@ export function createTimeline({ rootRunId, startedAt, onGrow, onPlan, onStats, 
       note(scope, record.ts, "alert", `The side question got no answer from ${record.data.model}: ${record.data.error}`, "bad");
     },
 
+    // The progress watchdog saw that the run is not getting anywhere (`detail`) and answered with a rung of its ladder
+    // (`action`); the consult rung brings the advice of the review model, or the `error` that ended the run. An event
+    // without `action` comes from the older stall guard, which only counted its `warnings`.
     stall(scope, record) {
-      note(scope, record.ts, "alert", `The run seems stuck: ${record.data.warnings.join(" ")}`, "warn");
+      const data = record.data;
+      if (data.action === undefined) {
+        note(scope, record.ts, "alert", `Dot repeated the same step and was told to change its approach (warning ${data.warnings})`, "warn");
+        return;
+      }
+      const answers = {
+        nudge: "Dot was told to change its approach.",
+        replan: "Its next step may only plan again or finish.",
+        consult: "The review model was asked for a second opinion.",
+        ask: "Its next step may only ask you a question or finish.",
+        stop: "The run stops; its result says what it tried.",
+      };
+      const parts = [`Not getting anywhere: ${clip(data.detail, 300)}`, answers[data.action]];
+      if (data.error !== undefined) {
+        parts.push(`It could not answer (${clip(data.error, 300)}), so the run stops.`);
+      }
+      if (data.diagnosis !== undefined) {
+        parts.push(clip(data.diagnosis, 400));
+      }
+      const steps = data.next_steps ?? [];
+      if (steps.length > 0) {
+        parts.push(`Next: ${steps.map((step, index) => `${index + 1}. ${clip(step, 300)}`).join(" ")}`);
+      }
+      const ends = data.action === "stop" || data.error !== undefined;
+      note(scope, record.ts, "alert", parts.join(" "), ends ? "bad" : "warn");
     },
   };
 

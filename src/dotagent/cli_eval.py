@@ -145,6 +145,7 @@ def _report_of(config: AppConfig, model: str, started_at: float, outcomes: Seque
             goal_mode=config.agent.goal_mode,
             context_tokens=config.agent.context_tokens,
             preset=config.policy.preset,
+            stall_escalation=config.agent.stall_escalation,
         ),
         outcomes=tuple(outcomes),
     )
@@ -155,7 +156,9 @@ async def cmd_eval_run(command: EvalRunCommand) -> int:
     model: str = command.model if command.model is not None else config.models.main
     parse_model_ref(model)
     tasks: tuple[EvalTask, ...] = select_tasks(command.tasks)
-    models: list[str] = [model, *([config.models.review] if config.agent.goal_mode else [])]
+    # The review model checks the goal in goal mode and gives the second opinion of the progress watchdog.
+    consults: bool = config.agent.goal_mode or config.agent.stall_escalation
+    models: list[str] = [model, *([config.models.review] if consults else [])]
     secrets: dict[str, str] = await asyncio.to_thread(lookup_secrets, secret_names(config, models))
     missing: list[str] = [name for name in required_secret_names(config, models) if name not in secrets]
     if missing:
