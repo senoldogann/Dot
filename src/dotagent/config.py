@@ -55,10 +55,20 @@ class OpenCodeGoConfig(FrozenModel):
     max_concurrent: int
 
 
+class AnthropicConfig(FrozenModel):
+    base_url: str
+    api_key_env: str
+    connect_timeout_s: float
+    read_timeout_s: float
+    attempts: int
+    max_concurrent: int
+
+
 class ProvidersConfig(FrozenModel):
     ollama: OllamaConfig
     openai: OpenAIConfig
     opencode_go: OpenCodeGoConfig
+    anthropic: AnthropicConfig
 
 
 class ModelsConfig(FrozenModel):

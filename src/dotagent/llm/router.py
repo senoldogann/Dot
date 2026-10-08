@@ -5,6 +5,7 @@ import asyncio
 from dotagent.config import AppConfig
 from dotagent.core.errors import ConfigError
 from dotagent.core.types import FrozenModel
+from dotagent.llm.anthropic import AnthropicProvider
 from dotagent.llm.ollama import OllamaProvider
 from dotagent.llm.openai import OpenAIProvider
 from dotagent.llm.opencode_go import OpenCodeGoProvider
@@ -21,7 +22,7 @@ class ModelRef(FrozenModel):
         return f"{self.provider}:{self.model}"
 
 
-KNOWN_PROVIDERS: tuple[str, ...] = ("ollama", "openai", "opencode_go")
+KNOWN_PROVIDERS: tuple[str, ...] = ("ollama", "openai", "opencode_go", "anthropic")
 
 
 def parse_model_ref(text: str) -> ModelRef:
@@ -58,6 +59,10 @@ class ModelRouter:
                 go = self._config.providers.opencode_go
                 go_key: str = await asyncio.to_thread(require_secret, go.api_key_env, "the opencode_go provider")
                 return OpenCodeGoProvider(go, go_key)
+            case "anthropic":
+                claude = self._config.providers.anthropic
+                claude_key: str = await asyncio.to_thread(require_secret, claude.api_key_env, "the anthropic provider")
+                return AnthropicProvider(claude, claude_key)
             case _:
                 raise ConfigError("unknown provider", {"provider": name})
 

@@ -5,8 +5,9 @@ what a person at this Mac would use: a shell and the file system, the web, its o
 screen, mouse and keyboard (computer use), AppleScript, a memory that lasts between runs, schedules, MCP tool servers
 and sub-agents.
 
-It runs on models from **Ollama** (local models, and cloud models through the local Ollama server), the **OpenAI** API
-or **OpenCode Go**. One local process serves the command line, a web UI and a REST API.
+It runs on models from **Ollama** (local models, and cloud models through the local Ollama server), the **OpenAI** API,
+**OpenCode Go** or the **Anthropic** API (the Claude models). One local process serves the command line, a web UI and a
+REST API.
 
 By default Dot acts without asking. It stops for what it must not decide alone (money, credentials, public posts,
 messages sent for you, privilege, system settings), everything it does is recorded, and it can be stopped at once. Read
@@ -20,7 +21,7 @@ messages sent for you, privilege, system settings), everything it does is record
 - Google Chrome, which the browser tools drive through Playwright
 - [Ollama](https://ollama.com), running. Cloud models (names that end in `:cloud`) need `ollama signin` once. Searching
   the memory by meaning needs an embedding model: `ollama pull bge-m3`
-- An API key for OpenAI or OpenCode Go, only if you use those providers
+- An API key for OpenAI, OpenCode Go or Anthropic, only if you use those providers
 
 ## Quick start
 
@@ -32,9 +33,9 @@ uv run dotx doctor
 
 `dotx doctor` checks the home directory, ripgrep, Chrome (with a throwaway start of it), the macOS version and the
 permissions the desktop tools need, the commands and secrets of the configured MCP servers (none is started), Ollama,
-the keys of OpenAI and OpenCode Go, the embedding model and the three configured models, and says how to fix what is
-missing. It warns, without failing, when the review model is also the main model. The examples below write `dotx`: run
-it as `uv run dotx`, or put `.venv/bin` on your `PATH`.
+the keys of OpenAI, OpenCode Go and Anthropic, the embedding model and the three configured models, and says how to fix
+what is missing. It warns, without failing, when the review model is also the main model. The examples below write
+`dotx`: run it as `uv run dotx`, or put `.venv/bin` on your `PATH`.
 
 ```bash
 dotx run "Find the opening hours of the Helsinki Central Library and save them to hours.md"
@@ -78,6 +79,7 @@ another family than `main` when you can; `dotx doctor` warns while they are the 
 | Ollama      | `ollama:<model>`      | native `/api/chat`                                                                         | none for the local server                                 |
 | OpenAI      | `openai:<model>`      | Responses API; `wire = "chat"` selects Chat Completions                                    | `OPENAI_API_KEY`, optional `OPENAI_ORG_ID`/`OPENAI_PROJECT_ID` |
 | OpenCode Go | `opencode_go:<model>` | each model is served on exactly one of Chat Completions, Responses and Messages            | `OPENCODE_API_KEY`                                        |
+| Anthropic   | `anthropic:<model>`   | Messages API                                                                               | `ANTHROPIC_API_KEY`                                       |
 
 - **Ollama**: `[providers.ollama] base_url` is `http://localhost:11434` by default. Cloud models go through the local server, so nothing else is
   needed once you are signed in. `OLLAMA_API_KEY` is only for the hosted web search and for talking to ollama.com
@@ -86,10 +88,18 @@ another family than `main` when you can; `dotx doctor` warns while they are the 
   encrypted reasoning items from step to step, so no state lives on the server.
 - **OpenCode Go**: Dot knows the route of the models in its catalog. `route_overrides = { "<model-id>" = "chat" }` in
   `[providers.opencode_go]` adds or corrects one (`chat`, `responses` or `messages`).
+- **Anthropic**: what a model can do (pictures, its window and output limit, whether it thinks and at which levels) is
+  read from the Models API, so a new Claude model needs no update of Dot. A model that thinks gets adaptive thinking at
+  the run's reasoning level, with the summary of its thinking shown; `off` turns thinking off where the model allows it,
+  and is rounded to `low` where it does not. A model without adaptive thinking (the 4.5 generation and older) runs
+  without thinking at its default level. The prompt is cached from one step of a run to the next (for five minutes),
+  and a request may use the model's whole output limit. The thinking of earlier steps is sent back; a block whose
+  earlier context has changed since (a run drops an old screenshot, the next run of a chat starts with a new system
+  prompt) is dropped by the API instead of failing the request (beta `thinking-binding-controls-2026-08-01`).
 
-`dotx models [ollama|openai|opencode_go]` lists what a provider offers, including the reasoning levels of each model.
-`dotx models profile [provider:model]` shows how reliably a model worked in its newest runs and the help its next run
-gets (see [How a run works](#how-a-run-works)); without a model it shows `[models] main`.
+`dotx models [ollama|openai|opencode_go|anthropic]` lists what a provider offers, including the reasoning levels of
+each model. `dotx models profile [provider:model]` shows how reliably a model worked in its newest runs and the help its
+next run gets (see [How a run works](#how-a-run-works)); without a model it shows `[models] main`.
 
 **Reasoning level.** A model that can think offers a ladder of levels, lowest first, in the words of its provider mapped to
 one neutral scale: `off`, `on` (a plain thinking switch), `minimal`, `low`, `medium`, `high`, `xhigh`, `max`. A model that
@@ -103,9 +113,10 @@ model has (`off` to its lowest, `max` to its highest).
 `dot-agent`, account = the variable name). `dotx auth set OPENAI_API_KEY` reads the value from the terminal without
 echoing it and writes the file with mode 0600; `dotx auth status` shows which keys are present. `.env.example` is a
 template for the file. An OpenAI key is created on platform.openai.com under API keys (`OPENAI_API_KEY`); the OpenCode
-Go key (`OPENCODE_API_KEY`) is the one the OpenCode Console at opencode.ai/auth shows once you have subscribed to Go.
-The Ollama models, local or `:cloud` through the signed-in local server, need no key. A running daemon picks up a key
-added later when a run first uses that provider, without a restart.
+Go key (`OPENCODE_API_KEY`) is the one the OpenCode Console at opencode.ai/auth shows once you have subscribed to Go; an
+Anthropic key (`ANTHROPIC_API_KEY`) is created in the Claude Console at platform.claude.com/settings/keys. The Ollama
+models, local or `:cloud` through the signed-in local server, need no key. A running daemon picks up a key added later
+when a run first uses that provider, without a restart.
 
 ## How a run works
 
@@ -826,7 +837,7 @@ service are marked:
 | `browser`  | Chrome; it runs headless against a local fixture server                                                              |
 | `internet` | the public internet; a few read-only requests                                                                        |
 | `desktop`  | a logged-in screen and `DOT_DESKTOP_TESTS=1`; it moves the real pointer and keyboard against a local AppKit window |
-| `hosted`   | your own `OPENAI_API_KEY`, `OPENCODE_API_KEY` and `OLLAMA_API_KEY`; a few tiny requests, skipped per missing key     |
+| `hosted`   | your own `OPENAI_API_KEY`, `OPENCODE_API_KEY`, `ANTHROPIC_API_KEY` and `OLLAMA_API_KEY`; a few tiny requests, skipped per missing key |
 
 `pytest -m "not live and not internet"` skips the first and third kind, `pytest -m "not hosted"` the requests that
 use your keys.
@@ -840,7 +851,7 @@ planned and tracked in [ROADMAP.md](ROADMAP.md); read it before continuing that 
 ```
 src/dotagent/
   agent/      run loop, run manager, approvals, context trimming, vision relay
-  llm/        providers (Ollama, OpenAI, OpenCode Go) and their wire codecs
+  llm/        providers (Ollama, OpenAI, OpenCode Go, Anthropic) and their wire codecs
   policy/     action descriptions, shell analysis, the decision engine
   tools/      the tools the model can call
   browser/    Playwright session, snapshots, safety

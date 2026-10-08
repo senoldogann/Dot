@@ -1,5 +1,5 @@
-"""The real hosted services with the user's own keys: OpenAI on both wires, OpenCode Go on all three routes and the
-hosted web search of Ollama.
+"""The real hosted services with the user's own keys: OpenAI on both wires, OpenCode Go on all three routes, the Claude
+models of Anthropic and the hosted web search of Ollama.
 
 ``test_wire_codecs.py`` makes the same calls against a local Ollama that stands in for these services. Here every test
 sends a handful of tiny requests (cents at most) and is skipped when its key cannot be resolved (environment, the
@@ -19,10 +19,12 @@ from test_wire_codecs import (
 )
 
 from dotagent.config import AppConfig, GoRoute, load_config
+from dotagent.llm.anthropic import AnthropicProvider
 from dotagent.llm.openai import OpenAIProvider
 from dotagent.llm.opencode_go import OpenCodeGoProvider, route_of
 from dotagent.llm.types import (
     ChatProvider,
+    ModelInfo,
     ModelReply,
     assistant_from_reply,
     system_message,
@@ -40,12 +42,16 @@ DEFAULTS: AppConfig = load_config(Path(__file__).with_name("no-such-config.toml"
 OPENAI_KEY: str | None = resolve_secret("OPENAI_API_KEY")
 OPENCODE_KEY: str | None = resolve_secret("OPENCODE_API_KEY")
 OLLAMA_KEY: str | None = resolve_secret("OLLAMA_API_KEY")
+ANTHROPIC_KEY: str | None = resolve_secret("ANTHROPIC_API_KEY")
 
 requires_openai = pytest.mark.skipif(OPENAI_KEY is None, reason="needs OPENAI_API_KEY")
 requires_opencode_go = pytest.mark.skipif(OPENCODE_KEY is None, reason="needs OPENCODE_API_KEY")
 requires_ollama_search = pytest.mark.skipif(OLLAMA_KEY is None, reason="needs OLLAMA_API_KEY")
+requires_anthropic = pytest.mark.skipif(ANTHROPIC_KEY is None, reason="needs ANTHROPIC_API_KEY")
 
 OPENAI_MODEL: str = "gpt-4.1-mini"
+# The smallest current Claude model; it thinks, so the round trip also replays a signed thinking block.
+ANTHROPIC_MODEL: str = "claude-haiku-5-5"
 
 # One vision model per route; the second Responses model takes the OpenAI-style options (original image detail,
 # images inside tool results), the first one the plain ones.
@@ -65,6 +71,11 @@ def openai_provider(wire: str) -> ChatProvider:
 def go_provider() -> ChatProvider:
     assert OPENCODE_KEY is not None
     return OpenCodeGoProvider(DEFAULTS.providers.opencode_go, OPENCODE_KEY)
+
+
+def anthropic_provider() -> ChatProvider:
+    assert ANTHROPIC_KEY is not None
+    return AnthropicProvider(DEFAULTS.providers.anthropic, ANTHROPIC_KEY)
 
 
 async def blue_screenshot_description(provider: ChatProvider, model: str) -> str:
@@ -108,6 +119,21 @@ async def test_opencode_go_round_trips_tools_and_reads_screenshots_on_each_route
         described: str = await blue_screenshot_description(provider, model)
     finally:
         await provider.aclose()
+    assert "21" in final.text and final.usage.input_tokens > 0
+    assert "blue" in described
+
+
+@pytest.mark.hosted
+@requires_anthropic
+async def test_anthropic_lists_its_models_round_trips_tools_and_reads_screenshots() -> None:
+    provider: ChatProvider = anthropic_provider()
+    try:
+        listed: tuple[ModelInfo, ...] = await provider.list_models()
+        final: ModelReply = await tool_round_trip(provider, ANTHROPIC_MODEL)
+        described: str = await blue_screenshot_description(provider, ANTHROPIC_MODEL)
+    finally:
+        await provider.aclose()
+    assert ANTHROPIC_MODEL in {info.id for info in listed}
     assert "21" in final.text and final.usage.input_tokens > 0
     assert "blue" in described
 

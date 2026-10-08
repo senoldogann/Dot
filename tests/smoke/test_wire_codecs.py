@@ -1,4 +1,4 @@
-"""Wire-format checks for the OpenAI / OpenCode Go connectors.
+"""Wire-format checks for the OpenAI, OpenCode Go and Anthropic connectors.
 
 The first half replays recorded-style streams (including the gateway's trailing events and error bodies, which a
 local server cannot produce). The second half makes real calls through a local Ollama's OpenAI- and
@@ -16,18 +16,20 @@ from dotagent.config import GoRoute, OpenAIConfig, OpenCodeGoConfig
 from dotagent.core.errors import ProviderHttpError, ProviderQuotaError, ProviderRateLimitError
 from dotagent.core.jsonutil import dumps_compact
 from dotagent.core.types import JsonObject
+from dotagent.llm.anthropic import claude_traits
 from dotagent.llm.codec_chat import ChatOptions, build_chat_body, chat_codec
-from dotagent.llm.codec_messages import build_messages_body, messages_codec
+from dotagent.llm.codec_messages import MessagesOptions, build_messages_body, messages_codec
 from dotagent.llm.codec_responses import ResponsesOptions, build_responses_body, responses_codec
 from dotagent.llm.connector import StreamCodec
 from dotagent.llm.http import SseEvent, is_retryable_provider_error
 from dotagent.llm.openai import OpenAIProvider, is_chat_model, openai_traits
 from dotagent.llm.opencode_go import CATALOG, OpenCodeGoProvider, go_traits, route_of
-from dotagent.llm.provider_errors import WireError, classify_openai, classify_opencode
+from dotagent.llm.provider_errors import WireError, classify_anthropic, classify_openai, classify_opencode
 from dotagent.llm.traits import ModelTraits
 from dotagent.llm.types import (
     ChatProvider,
     ChatRequest,
+    Effort,
     ImageData,
     Message,
     ModelReply,
@@ -44,6 +46,10 @@ from dotagent.llm.types import (
 OLLAMA_ROOT: str = "http://localhost:11434"
 LIVE_MODEL: str = "gpt-oss:20b-cloud"
 VISION_MODEL: str = "gemma4:cloud"
+# What OpenCode Go's messages route sends: a plain thinking switch, no cache marks, and its own output limit.
+GO_MESSAGES: MessagesOptions = MessagesOptions(adaptive_thinking=False, prompt_cache=False, default_max_tokens=32768)
+# What the Anthropic connector sends: adaptive thinking at the reasoning level, the prompt cache, the model's own limit.
+CLAUDE_MESSAGES: MessagesOptions = MessagesOptions(adaptive_thinking=True, prompt_cache=True, default_max_tokens=None)
 
 TEMPERATURE_TOOL: ToolSpec = ToolSpec(
     name="get_temperature",
@@ -315,6 +321,20 @@ def test_opencode_usage_limit_is_terminal_but_burst_is_retried() -> None:
     assert isinstance(burst, ProviderRateLimitError) and is_retryable_provider_error(burst)
 
 
+def test_anthropic_billing_is_terminal_but_an_overloaded_api_is_retried() -> None:
+    billing = classify_anthropic(402, WireError(kind="billing_error", code="", message="m", limit_name=""), None, {})
+    overloaded = classify_anthropic(
+        529, WireError(kind="overloaded_error", code="", message="m", limit_name=""), None, {}
+    )
+    assert isinstance(billing, ProviderQuotaError) and not is_retryable_provider_error(billing)
+    assert is_retryable_provider_error(overloaded)
+    codec = messages_codec(classify_anthropic)
+    frame = sse({"type": "error", "error": {"type": "overloaded_error", "message": "Overloaded"}}, "error")
+    with pytest.raises(ProviderHttpError) as caught:
+        codec.fold(codec.initial("m"), frame, {})
+    assert caught.value.status == 529 and is_retryable_provider_error(caught.value)
+
+
 # ------------------------------------------------------------------------------------ request bodies
 
 
@@ -352,7 +372,10 @@ def test_request_bodies_end_with_stream_and_follow_each_gateway_flavour() -> Non
     assert responses["instructions"] == "be brief"
     assert "temperature" not in responses
     toggled: JsonObject = build_messages_body(
-        request_for("minimax-m3", (user_message("hi", ()),), ()), go_traits("minimax-m3"), "opencode_go:minimax-m3"
+        request_for("minimax-m3", (user_message("hi", ()),), ()),
+        go_traits("minimax-m3"),
+        "opencode_go:minimax-m3",
+        GO_MESSAGES,
     )
     assert toggled["thinking"] == {"type": "adaptive"} and list(toggled)[-1] == "stream"
 
@@ -371,6 +394,7 @@ def test_messages_body_puts_a_screenshot_inside_its_tool_result() -> None:
             ),
             go_traits("qwen3.8-flash"),
             "opencode_go:qwen3.8-flash",
+            GO_MESSAGES,
         )
         return body["messages"][-1]
 
@@ -412,6 +436,93 @@ def test_routes_and_traits_follow_catalog_prefix_and_override() -> None:
     assert openai_traits("gpt-7").reasoning
     assert not is_chat_model("gpt-3.5-turbo-instruct")
     assert openai_traits("some-local-model").reasoning is False
+
+
+def claude_entry(
+    model: str, thinking: tuple[str, ...], efforts: tuple[str, ...], window: int, output: int
+) -> JsonObject:
+    """A model's entry as the Models API lists it, with the thinking types and effort levels it supports."""
+    return {
+        "id": model,
+        "type": "model",
+        "max_input_tokens": window,
+        "max_tokens": output,
+        "capabilities": {
+            "image_input": {"supported": True},
+            "effort": {
+                "supported": bool(efforts),
+                **{level: {"supported": level in efforts} for level in ("low", "medium", "high", "max")},
+                "xhigh": {"supported": True} if "xhigh" in efforts else None,
+            },
+            "thinking": {
+                "supported": bool(thinking),
+                "types": {kind: {"supported": kind in thinking} for kind in ("adaptive", "enabled", "disabled")},
+            },
+        },
+    }
+
+
+# A model that cannot turn thinking off, one that can, and one without adaptive thinking.
+OPUS_LIKE: JsonObject = claude_entry(
+    "claude-opus-5-5", ("adaptive",), ("low", "medium", "high", "xhigh", "max"), 1_000_000, 128_000
+)
+HAIKU_LIKE: JsonObject = claude_entry(
+    "claude-haiku-5-5", ("adaptive", "disabled"), ("low", "medium", "high", "max"), 1_000_000, 128_000
+)
+SONNET_45_LIKE: JsonObject = claude_entry("claude-sonnet-4-5", ("enabled", "disabled"), (), 200_000, 64_000)
+
+
+def test_claude_traits_come_from_the_models_api_entry() -> None:
+    opus: ModelTraits = claude_traits(OPUS_LIKE)
+    assert opus.efforts == ("low", "medium", "high", "xhigh", "max") and opus.reasoning and opus.vision
+    assert (opus.context_length, opus.max_output_tokens) == (1_000_000, 128_000) and not opus.temperature
+    assert claude_traits(HAIKU_LIKE).efforts == ("off", "low", "medium", "high", "max")
+    older: ModelTraits = claude_traits(SONNET_45_LIKE)
+    assert older.efforts == () and not older.reasoning and older.temperature
+    bare: ModelTraits = claude_traits(
+        {"id": "claude-next", "capabilities": None, "max_input_tokens": None, "max_tokens": None}
+    )
+    assert not bare.vision and not bare.reasoning and not bare.temperature
+    assert (bare.context_length, bare.max_output_tokens) == (200_000, 32_768)
+
+
+def test_claude_body_thinks_adaptively_caches_the_prompt_and_turns_thinking_off_where_it_can() -> None:
+    thought: JsonObject = {"type": "thinking", "thinking": "hmm", "signature": "SIG"}
+    call: ToolCall = ToolCall(id="toolu_1", name="get_temperature", arguments={"city": "Paris"})
+    tool_use: JsonObject = {"type": "tool_use", "id": "toolu_1", "name": "get_temperature", "input": {"city": "Paris"}}
+
+    def body(model: str, entry: JsonObject, effort: Effort, temperature: float | None) -> JsonObject:
+        """The body of a step that follows a tool call the same model made after thinking."""
+        earlier: Message = assistant_message("", None, (call,)).model_copy(
+            update={"raw": (thought, tool_use), "raw_origin": f"anthropic:{model}"}
+        )
+        messages: tuple[Message, ...] = (
+            system_message("be brief"),
+            user_message("weather?", ()),
+            earlier,
+            tool_message(call, "18 C", ()),
+        )
+        request: ChatRequest = request_for(model, messages, (TEMPERATURE_TOOL,)).model_copy(
+            update={"effort": effort, "temperature": temperature}
+        )
+        return build_messages_body(request, claude_traits(entry), f"anthropic:{model}", CLAUDE_MESSAGES)
+
+    thinking: JsonObject = body("claude-opus-5-5", OPUS_LIKE, "high", 0.2)
+    assert thinking["thinking"] == {
+        "type": "adaptive",
+        "display": "summarized",
+        "block_binding": {"prefix_mismatch_behavior": "drop_block"},
+    }
+    assert thinking["output_config"] == {"effort": "high"} and thinking["cache_control"] == {"type": "ephemeral"}
+    assert thinking["max_tokens"] == 128_000 and "temperature" not in thinking and list(thinking)[-1] == "stream"
+    assert thinking["system"] == "be brief" and thinking["messages"][1]["content"] == [thought, tool_use]
+    assert body("claude-opus-5-5", OPUS_LIKE, "off", None)["output_config"] == {"effort": "low"}
+    switched_off: JsonObject = body("claude-haiku-5-5", HAIKU_LIKE, "off", None)
+    assert switched_off["thinking"] == {"type": "disabled"} and "output_config" not in switched_off
+    assert switched_off["messages"][1]["content"] == [tool_use]
+    older: JsonObject = body("claude-sonnet-4-5", SONNET_45_LIKE, "high", 0.2)
+    assert "thinking" not in older and "output_config" not in older
+    assert older["temperature"] == 0.2 and older["max_tokens"] == 64_000
 
 
 # ------------------------------------------------------------------------------------ live calls

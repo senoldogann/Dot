@@ -25,7 +25,7 @@ host = "127.0.0.1"
 port = 8765
 
 [models]
-# "<provider>:<model>"; providers are ollama, openai and opencode_go.
+# "<provider>:<model>"; providers are ollama, openai, opencode_go and anthropic.
 # A run uses the model it was started with (main unless one is chosen) for every step and for compacting its own
 # history; the roles below are only used for what their comments say.
 main = "ollama:minimax-m2.7:cloud"
@@ -63,6 +63,15 @@ base_url = "https://opencode.ai/zen/go/v1"
 api_key_env = "OPENCODE_API_KEY"
 # Model id -> "chat" | "responses" | "messages" for ids the built-in catalog does not know (or knows differently).
 route_overrides = {}
+connect_timeout_s = 10.0
+read_timeout_s = 600.0
+attempts = 6
+max_concurrent = 4
+
+# The Claude models of Anthropic, over the Messages API.
+[providers.anthropic]
+base_url = "https://api.anthropic.com/v1"
+api_key_env = "ANTHROPIC_API_KEY"
 connect_timeout_s = 10.0
 read_timeout_s = 600.0
 attempts = 6

@@ -17,7 +17,7 @@ from dotagent.core.jsonutil import dumps_compact
 from dotagent.core.retry import RetryPolicy
 from dotagent.core.types import FrozenModel, JsonObject
 from dotagent.llm.codec_chat import ChatOptions, build_chat_body, chat_codec
-from dotagent.llm.codec_messages import build_messages_body, messages_codec
+from dotagent.llm.codec_messages import MessagesOptions, build_messages_body, messages_codec
 from dotagent.llm.codec_responses import ResponsesOptions, build_responses_body, responses_codec
 from dotagent.llm.connector import StreamCodec, get_json, retry_with_reset, stream_model_reply
 from dotagent.llm.http import build_client, request_context
@@ -35,6 +35,11 @@ _CHAT_OPTIONS: ChatOptions = ChatOptions(
 # OpenAI models behind the gateway take full-size screenshots inline; the other Responses models get them hoisted.
 _OPENAI_RESPONSES: ResponsesOptions = ResponsesOptions(image_detail="original", tool_output_images=True)
 _OTHER_RESPONSES: ResponsesOptions = ResponsesOptions(image_detail="auto", tool_output_images=False)
+# The gateway's messages route takes a plain thinking switch and no cache marks; the format insists on an output limit,
+# and this one is used when the request names none.
+_MESSAGES_OPTIONS: MessagesOptions = MessagesOptions(
+    adaptive_thinking=False, prompt_cache=False, default_max_tokens=32768
+)
 
 
 class GoModel(FrozenModel):
@@ -283,7 +288,7 @@ class OpenCodeGoProvider:
                 responses_body: JsonObject = build_responses_body(request, traits, origin, options)
                 return await self._stream(route, responses_body, responses_codec(classify_opencode), request, sink)
             case "messages":
-                messages_body: JsonObject = build_messages_body(request, traits, origin)
+                messages_body: JsonObject = build_messages_body(request, traits, origin, _MESSAGES_OPTIONS)
                 return await self._stream(route, messages_body, messages_codec(classify_opencode), request, sink)
 
     async def aclose(self) -> None:

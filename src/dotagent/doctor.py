@@ -143,6 +143,16 @@ async def _check_opencode_go_api(router: ModelRouter, required: bool) -> CheckRe
     return _result("opencode go api", True, required, windows or "subscription active")
 
 
+async def _check_anthropic_api(router: ModelRouter, required: bool) -> CheckResult:
+    """With a key present, list the models the key can use (a free call): proves the key and the network path."""
+    try:
+        provider: ChatProvider = await router.provider("anthropic")
+        models: tuple[ModelInfo, ...] = await provider.list_models()
+    except (ConfigError, ProviderError) as exc:
+        return _result("anthropic api", False, required, exc.message)
+    return _result("anthropic api", True, required, f"{len(models)} models are available to this key")
+
+
 def _model_is_installed(installed: tuple[str, ...], wanted: str) -> bool:
     """Whether ``wanted`` is among the ``installed`` names; Ollama reads a name without a tag as ``:latest``."""
     full: str = wanted if ":" in wanted else f"{wanted}:latest"
@@ -440,16 +450,20 @@ async def _service_checks(config: AppConfig) -> list[CheckResult]:
     router: ModelRouter = ModelRouter(config)
     openai_present: bool = await asyncio.to_thread(_has_secret, config.providers.openai.api_key_env)
     go_present: bool = await asyncio.to_thread(_has_secret, config.providers.opencode_go.api_key_env)
+    anthropic_present: bool = await asyncio.to_thread(_has_secret, config.providers.anthropic.api_key_env)
     results: list[CheckResult] = [
         await _check_ollama_server(config, "ollama" in used),
         _check_key("openai", config.providers.openai.api_key_env, openai_present, "openai" in used),
         _check_key("opencode go", config.providers.opencode_go.api_key_env, go_present, "opencode_go" in used),
+        _check_key("anthropic", config.providers.anthropic.api_key_env, anthropic_present, "anthropic" in used),
     ]
     try:
         if openai_present:
             results.append(await _check_openai_api(router, "openai" in used))
         if go_present:
             results.append(await _check_opencode_go_api(router, "opencode_go" in used))
+        if anthropic_present:
+            results.append(await _check_anthropic_api(router, "anthropic" in used))
         results.append(await _check_memory(router, config))
         for role, reference in configured:
             results.append(await _check_model(router, role, reference))

@@ -83,5 +83,5 @@ markers = [
     "browser: drives a real headless Chrome against a local fixture server",
     "internet: sends a few read-only requests to public sites (a search page and a documentation page)",
     "desktop: moves the real pointer and keyboard of this Mac against a local AppKit fixture window",
-    "hosted: sends a few tiny requests to the real OpenAI, OpenCode Go and Ollama search services with your own keys",
+    "hosted: sends a few tiny requests to the real OpenAI, OpenCode Go, Anthropic and Ollama search services with your own keys",
 ]

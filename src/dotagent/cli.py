@@ -131,6 +131,7 @@ _CLI_THREAD: str = "cli"
 _PROVIDER_KEYS: dict[str, str] = {
     "openai": "OPENAI_API_KEY",
     "opencode_go": "OPENCODE_API_KEY",
+    "anthropic": "ANTHROPIC_API_KEY",
     "ollama": "OLLAMA_API_KEY",
 }
 

@@ -77,6 +77,8 @@ def secret_names(config: AppConfig, models: Sequence[str]) -> tuple[str, ...]:
         names.extend((openai.api_key_env, openai.organization_env, openai.project_env))
     if "opencode_go" in providers:
         names.append(config.providers.opencode_go.api_key_env)
+    if "anthropic" in providers:
+        names.append(config.providers.anthropic.api_key_env)
     return tuple(names)
 
 
@@ -89,6 +91,8 @@ def required_secret_names(config: AppConfig, models: Sequence[str]) -> tuple[str
         names.append(config.providers.openai.api_key_env)
     if "opencode_go" in providers:
         names.append(config.providers.opencode_go.api_key_env)
+    if "anthropic" in providers:
+        names.append(config.providers.anthropic.api_key_env)
     return tuple(names)
 
 

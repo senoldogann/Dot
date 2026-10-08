@@ -47,6 +47,7 @@ _OPENAI_QUOTA: frozenset[str] = frozenset(
 _OPENCODE_QUOTA: frozenset[str] = frozenset(
     {"GoUsageLimitError", "CreditsError", "MonthlyLimitError", "UserLimitError"}
 )
+_ANTHROPIC_QUOTA: frozenset[str] = frozenset({"billing_error"})
 
 # HTTP-equivalent status of an error that arrived inside an already-open stream, by error code or type.
 _STREAM_STATUS: dict[str, int] = {
@@ -60,6 +61,8 @@ _STREAM_STATUS: dict[str, int] = {
     "service_unavailable_error": 503,
     "server_is_overloaded": 503,
     "overloaded_error": 529,
+    "timeout_error": 504,
+    "billing_error": 402,
     "authentication_error": 401,
     "invalid_api_key": 401,
     "permission_error": 403,
@@ -153,6 +156,15 @@ def classify_opencode(
         return ProviderQuotaError(
             error_message(status, wire), status, retry_after_s, {**detail, "limit_name": wire.limit_name}
         )
+    return classify_generic(status, wire, retry_after_s, detail)
+
+
+def classify_anthropic(
+    status: int, wire: WireError | None, retry_after_s: float | None, detail: JsonObject
+) -> ProviderHttpError:
+    """Anthropic: a billing problem (402, ``billing_error``) is terminal; an overloaded API (529) is retried."""
+    if status == 402 or (wire is not None and wire.kind in _ANTHROPIC_QUOTA):
+        return ProviderQuotaError(error_message(status, wire), status, retry_after_s, detail)
     return classify_generic(status, wire, retry_after_s, detail)
 
 

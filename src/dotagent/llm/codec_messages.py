@@ -1,4 +1,4 @@
-"""Anthropic-style Messages wire format (``POST /messages``), used by OpenCode Go's messages route.
+"""Anthropic's Messages wire format (``POST /messages``): the Anthropic API, and OpenCode Go's messages route.
 
 An assistant turn that came from the same model is replayed as the content blocks the server produced (thinking
 signatures included); any other turn is rebuilt from its neutral fields. A screenshot returned by a tool travels inside
@@ -15,7 +15,7 @@ from dotagent.core.types import FrozenModel, JsonObject
 from dotagent.llm.connector import StreamCodec, parse_event_object
 from dotagent.llm.http import SseEvent
 from dotagent.llm.provider_errors import StatusClassifier, WireError, error_from_stream, wire_error_from_object
-from dotagent.llm.traits import ModelTraits
+from dotagent.llm.traits import ModelTraits, choose_effort, label_rank
 from dotagent.llm.types import (
     ChatRequest,
     FinishReason,
@@ -38,8 +38,24 @@ from dotagent.llm.wire import (
     tool_call_id_of,
 )
 
-# The Messages format insists on an output limit; this is used when the request names none.
-_DEFAULT_MAX_TOKENS: int = 32768
+_THINKING_BLOCKS: frozenset[str] = frozenset({"thinking", "redacted_thinking"})
+
+
+class MessagesOptions(FrozenModel):
+    """How a server differs in filling in the Messages format.
+
+    ``adaptive_thinking`` (Anthropic): a model that reasons gets adaptive thinking with its summary shown and the
+    reasoning level as ``output_config.effort``, or thinking turned off at the lowest level of a model that allows it;
+    a replayed thinking block whose earlier context changed is dropped by the server instead of failing the request
+    (``block_binding``, which needs the ``thinking-binding-controls-2026-08-01`` beta header). Without it a model with
+    a thinking switch gets only the switch (OpenCode Go). ``prompt_cache``: the server caches the prompt up to its last
+    block, so the next step of a run reads it back at a fraction of the price. ``default_max_tokens``: the output limit
+    of a request that names none (``None``: the model's own); never more than the model's own.
+    """
+
+    adaptive_thinking: bool
+    prompt_cache: bool
+    default_max_tokens: int | None
 
 
 # --------------------------------------------------------------------------------------------- request
@@ -111,22 +127,53 @@ def encode_tools(tools: Sequence[ToolSpec]) -> list[JsonObject]:
     return [{"name": tool.name, "description": tool.description, "input_schema": tool.parameters} for tool in tools]
 
 
-def _max_tokens(request: ChatRequest, traits: ModelTraits) -> int:
-    wanted: int = request.max_output_tokens if request.max_output_tokens is not None else _DEFAULT_MAX_TOKENS
-    return min(wanted, traits.max_output_tokens)
+def _max_tokens(request: ChatRequest, traits: ModelTraits, options: MessagesOptions) -> int:
+    asked: int | None = request.max_output_tokens
+    wanted: int | None = asked if asked is not None else options.default_max_tokens
+    return traits.max_output_tokens if wanted is None else min(wanted, traits.max_output_tokens)
 
 
-def build_messages_body(request: ChatRequest, traits: ModelTraits, origin: str) -> JsonObject:
+def _without_thinking(message: Message) -> Message:
+    """The message without the thinking blocks it would be replayed with. A request that turns thinking off sends none
+    back: with thinking off, a model may refuse one whose earlier context changed. A turn left with no block is rebuilt
+    from its neutral fields."""
+    kept: tuple[JsonObject, ...] = tuple(
+        block for block in message.raw if get_str(block, "type") not in _THINKING_BLOCKS
+    )
+    return message.model_copy(update={"raw": kept})
+
+
+def _adaptive_fields(label: str | None) -> JsonObject:
+    """Adaptive thinking with its summary shown, at the level ``label`` (``None``: the model's default level)."""
+    thinking: JsonObject = {
+        "type": "adaptive",
+        "display": "summarized",
+        "block_binding": {"prefix_mismatch_behavior": "drop_block"},
+    }
+    return {"thinking": thinking} if label is None else {"thinking": thinking, "output_config": {"effort": label}}
+
+
+def build_messages_body(request: ChatRequest, traits: ModelTraits, origin: str, options: MessagesOptions) -> JsonObject:
     """The JSON object to POST. ``stream`` is the last key, which OpenCode's gateway relies on."""
     instructions, conversation = split_instructions(request.messages)
-    body: JsonObject = {"model": request.model, "max_tokens": _max_tokens(request, traits)}
+    adaptive: bool = options.adaptive_thinking and traits.reasoning
+    label: str | None = choose_effort(traits.efforts, request.effort) if adaptive else None
+    thinking_off: bool = label is not None and label_rank(label) == 0
+    replayed: list[Message] = [_without_thinking(message) for message in conversation] if thinking_off else conversation
+    body: JsonObject = {"model": request.model, "max_tokens": _max_tokens(request, traits, options)}
+    if options.prompt_cache:
+        body["cache_control"] = {"type": "ephemeral"}
     if instructions:
         body["system"] = instructions
-    body["messages"] = list(encode_messages(conversation, origin))
+    body["messages"] = list(encode_messages(replayed, origin))
     if request.tools:
         body["tools"] = list(encode_tools(request.tools))
     if traits.thinking_toggle:
         body["thinking"] = {"type": "disabled" if request.effort == "off" else "adaptive"}
+    elif thinking_off:
+        body["thinking"] = {"type": "disabled"}
+    elif adaptive:
+        body.update(_adaptive_fields(label))
     if request.temperature is not None and traits.temperature:
         body["temperature"] = request.temperature
     body["stream"] = True
@@ -270,7 +317,7 @@ def _finish_of(stop_reason: str, has_calls: bool) -> FinishReason:
         return "tool_calls"
     if stop_reason in ("", "end_turn", "stop_sequence"):
         return "stop"
-    if stop_reason == "max_tokens":
+    if stop_reason in ("max_tokens", "model_context_window_exceeded"):
         return "length"
     return "other"
 
