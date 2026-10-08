@@ -16,7 +16,7 @@ recover (6), learn (7), undo (8). Every later item is judged with the numbers of
 | #   | Item                                                        | Status  | Commits |
 | --- | ----------------------------------------------------------- | ------- | ------- |
 | 1   | Eval harness and run statistics (`dotx eval`, `dotx stats`) | done    | a83cdcc |
-| 2   | Progress watchdog and escalation ladder                     | planned |         |
+| 2   | Progress watchdog and escalation ladder                     | done    | 5f6cb29 |
 | 3   | Model-adaptive scaffold (`dotx models profile`)             | planned |         |
 | 4   | Smaller, progressive tool surface                           | planned |         |
 | 5   | Verification of the end of a run                            | planned |         |
@@ -64,9 +64,10 @@ the item). Take the first item that is not `done`.
   fallbacks, fix root causes. External calls retry with warnings and then raise the last error. Structured log fields,
   not interpolated messages.
 - Tests: real calls over mocks; integration or smoke tests before unit tests; unit tests only for pure transformations
-  and stable datasets; add the minimum the change needs. Use temp directories (`DOT_HOME`, `DOT_CHROME_DIR`) and never the
-  owner's data directory (`~/Library/Application Support/Dot`): not even to read message text. Counting rows is the
-  most that was ever done there.
+  and stable datasets; add the minimum the change needs. Use temp directories (`DOT_HOME`, `DOT_CHROME_DIR`, and
+  `DOT_LOG_DIR` for a daemon, whose log otherwise goes to the owner's `~/Library/Logs/Dot`) and never the owner's data
+  directory (`~/Library/Application Support/Dot`): not even to read message text. Counting rows is the most that was
+  ever done there.
 - Safety: never start, stop or restart the owner's launchd daemon. Nothing that deletes the owner's data may run by
   default: retention and cleanup are explicit commands. Commit locally, one commit per item or coherent step, with the
   agent's `Co-Authored-By` trailer; never push, never rewrite published history. `PLAN.md` (the owner's working notes,
@@ -133,8 +134,8 @@ runner with the scripted provider on a temp home; README documents the commands.
 
 ### 2. Progress watchdog and escalation ladder
 
-**Goal.** Notice a run that is not getting anywhere, in all its disguises, and answer with steps that can actually help
-before giving up.
+**Status: done** (`5f6cb29`). **Goal.** Notice a run that is not getting anywhere, in all its disguises, and answer with
+steps that can actually help before giving up.
 
 **Why.** The stall guard in `agent/loop.py` fires only when the last `stall_limit` (4) steps have identical calls *and*
 results; after three such warnings the run fails. It misses A-B-A-B cycles, a long streak of different failing calls and
@@ -161,9 +162,63 @@ ends only when you stop it." And when it does fire, all it does is repeat one no
 **Touchpoints.** `agent/loop.py` (the stall block around `recent`/`stall_warnings`; `_fingerprint`), `agent/review.py`,
 `agent/prompt.py`, `server/static/js/timeline.js:476`, `cli_ui.py:245`, `config.py`, `defaults.toml`, README.
 
+**What exists now.**
+- `agent/progress.py`, pure. `observe` turns the calls of one acting step (`CallSeen`: name, arguments, result, failed,
+  image hashes) into an `Observation`; `advance(state, calls, limits, ladder)` returns the next `WatchState` and an
+  `Alert` or `None`. Detectors: `repeat` (`stall_limit` steps with the same calls and the same results), `cycle` (period
+  2 or 3, two whole rounds, more than one distinct step), `failures` (`failure_streak` steps in a row in which every call
+  failed), `revisiting` (at least `revisit_window - 1` of the last `revisit_window` steps only redo calls already made,
+  with the same results). Every alert clears the window, so the next rung needs fresh evidence; 12 steps without an
+  alert (`_DECAY_STEPS`) bring the level one rung down.
+- `ladder_for(escalation, can_ask)`: with `stall_escalation` nudge, replan, consult, ask, stop (ask only when
+  `can_ask_user`: no parent run, not a schedule, delegate or eval source, approvals not `yolo`); without it nudge, nudge,
+  stop and only `repeat` counts, which is the old stall guard with the decay and a better end.
+- `agent/loop.py`: `_calls_seen` feeds the watchdog after every acting step and `_answer_alert` answers the rung. Nudge,
+  replan and ask add a system note; replan and ask also limit the next step through `_only` (a registry of the allowed
+  tools: a call to any other tool fails as an unknown tool and lists the allowed ones); consult calls `_consult`; stop
+  ends the run as failed with `stop_result` (the reason, the newest 8 actions with secrets masked, what it touched, the
+  plan, how to go on in the same thread).
+- `agent/review.py`: `progress_consultant_for` (forced tool `progress_advice`, session `<thread>:progress`) gives the
+  review model the goal, the plan, the ledger and the pattern, and returns a diagnosis and up to three next steps, which
+  reach the run as a system note. A `ProviderError` there stops the run and says why.
+- `stall` events carry `warnings`, `level`, `action`, `reason` (the pattern), `detail`, and for the consult `diagnosis`
+  and `next_steps` or `error`. `cli_ui.py` (`StallPayload`) and `timeline.js` show them; the stop is shown as bad.
+- `store/endings.py`: `PREFIX_STALLED`, so the new stop result counts as `stalled` in `dotx stats`.
+- Config `[agent]`: `stall_escalation = false`, `failure_streak = 6`, `revisit_window = 8` next to `stall_limit = 4`.
+  `EvalSettings.stall_escalation` records the setting in eval reports and the scorecard; `dotx eval run` checks the
+  review model too when the ladder is on.
+- Tests: `tests/unit/test_progress.py` (detectors, both ladders, decay, the fresh start, the restriction, who can be
+  asked, the stop result) and `tests/smoke/test_progress_watchdog.py` (the real loop, with the scripted model playing the
+  run and the review model: a nudge and recovery, the whole ladder to a stop with a useful result, a healthy 31-step
+  run untouched, the plain ladder). None needs a service.
+
+**How to use it for the next items.** To compare the ladder with the plain guard, run `dotx eval run --repeat 3` from a
+home whose `config.toml` sets `[agent] stall_escalation = true` and once without; the reports say which was which. The
+`stall` events (`kind = 'stall'`, `data.reason`, `data.level`) are the stall numbers item 3's profile wants. Item 5 can
+copy `progress_consultant_for`: one forced tool call to the review model with the run's material behind a nonce.
+
+**Decisions and limits.**
+- Off by default: it changes how the owner's agent behaves, so it waits for eval evidence (open decision 2). The decay
+  and the new stop result apply with it off too.
+- A failed consultation stops the run and says why instead of skipping the rung (no silent fallback), like the goal
+  check. The review model is `[models] review`, which is the main model unless the owner changes it (open decision 3).
+- The ask rung is left out where nobody would answer: yolo (the owner's mode), scheduled, delegated and eval runs. So
+  the owner's ladder, once switched on, is nudge, replan, consult, stop.
+- Revisiting looks at calls together with their results: reading a file that changed, or rerunning a test between two
+  different edits, is work and not a revisit.
+- Plan stagnation was not added: the four detectors cover the cases in the tests, and an open plan that does not move
+  is weak evidence on its own.
+- One `stall` event per alert. Events of the older guard (only `warnings`) still render.
+- Found while testing: an eval attempt could run stale bytecode of a file the reference had edited within the second it
+  was compiled (`fix-add-bug` failed on `a83cdcc` too); attempts now run with `PYTHONDONTWRITEBYTECODE=1`. Also fixed:
+  `timeline.js` threw on every stall event (`warnings.join` on an int) and `cli_ui.py` refused plan steps marked `failed`
+  or `skipped`.
+- No live model run: the ladder was tried only with the scripted model.
+
 **Done when.** Unit tests of the detectors and the ladder on scripted sequences; integration tests on the real loop with
 the scripted provider (flailing then recovering is not killed; flailing for good escalates in order and ends with a
-useful result; a healthy long run is untouched); the ladder is visible in the UI timeline.
+useful result; a healthy long run is untouched); the ladder is visible in the UI timeline. All true: the timeline was
+checked in headless Chrome on a throw-away daemon (a UI run that climbed all five rungs: four warnings and the stop).
 
 ### 3. Model-adaptive scaffold
 
@@ -329,3 +384,8 @@ makes the damage reversible. It covers the file tools only; a shell `rm` or `sed
   4 s; `dotx stats` ran against the real history (read-only counts). Real history now: 39 runs in 365 days, 35 on
   `ollama:deepseek-v4.1-flash:cloud` and 4 on `ollama:gemma4:cloud`; tool calls fail about 2 to 3 % of the time; 342
   compactions in 35 runs, so compaction is frequent (item 3 and 4 will want that number).
+- 2026-10-08: item 2 done (`5f6cb29`). The watchdog with four detectors and the five-rung ladder, off by default
+  (`stall_escalation`); with it off, the old guard plus decay and a stop result that says what was tried. Unit tests,
+  `dotx eval check` and the offline smoke suite clean except one model-driven test,
+  `test_a_live_stream_carries_the_runs_the_run_delegated_to`: `gpt-oss:20b-cloud` called `delegate` three times although
+  told once (no stall event in that run); it passed when rerun.
