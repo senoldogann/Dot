@@ -26,6 +26,7 @@ from dotagent.core.text import fold_search
 from dotagent.core.types import JsonArray, JsonObject
 from dotagent.llm.types import Effort, ImageData, Message
 from dotagent.policy.types import ApprovalMode
+from dotagent.store.endings import RESULT_RESTARTED
 from dotagent.store.models import (
     ApprovalRecord,
     ApprovalStatus,
@@ -780,11 +781,12 @@ class Store:
         return [_run(row) for row in rows]
 
     async def mark_interrupted_runs(self) -> int:
-        """Runs left 'running' by a crashed daemon become 'failed'. Returns how many changed."""
+        """Runs left active by a crashed daemon (queued, running, or blocked on a question) become 'failed'. Returns
+        how many changed."""
         cursor: aiosqlite.Cursor = await self._db.execute(
-            "UPDATE runs SET status = 'failed', result = 'daemon stopped while the run was active', finished_at = ?"
-            " WHERE status IN ('running', 'queued')",
-            (time.time(),),
+            "UPDATE runs SET status = 'failed', result = ?, finished_at = ?"
+            " WHERE status IN ('running', 'queued', 'blocked')",
+            (RESULT_RESTARTED, time.time()),
         )
         await self._db.commit()
         return cursor.rowcount

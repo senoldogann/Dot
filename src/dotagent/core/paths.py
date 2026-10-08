@@ -60,6 +60,11 @@ def chrome_data_dir() -> Path:
     return Path.home() / "Library" / "Application Support" / "Google" / "Chrome"
 
 
+def evals_dir() -> Path:
+    """Where the reports of eval runs are kept: one JSON file per run."""
+    return dot_home() / "evals"
+
+
 def pid_path() -> Path:
     return dot_home() / "daemon.pid"
 

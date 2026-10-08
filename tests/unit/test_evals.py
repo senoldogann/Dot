@@ -1,0 +1,264 @@
+"""The pieces of the eval harness that are plain judgments: the checks, the structure of the catalog and the score."""
+
+import json
+from pathlib import Path
+
+import pytest
+
+from dotagent.core.errors import EvalError
+from dotagent.evals.audit import catalog_problems, task_problems
+from dotagent.evals.catalog import all_tasks, select_tasks
+from dotagent.evals.checks import evaluate_check, evaluate_checks, workspace_path
+from dotagent.evals.reports import load_report, report_file_name, save_report
+from dotagent.evals.results import CheckOutcome, EvalReport, EvalSettings, RunMetrics, TaskOutcome
+from dotagent.evals.scoring import Scorecard, failure_reason, score_report
+from dotagent.evals.types import (
+    AnswerContains,
+    AnswerMatches,
+    Check,
+    CommandSucceeds,
+    EvalTask,
+    FileAbsent,
+    FileContains,
+    FileEquals,
+    FileExists,
+    JsonEquals,
+)
+
+ENV: dict[str, str] = {"PATH": "/usr/bin:/bin"}
+
+
+async def _holds(check: Check, workspace: Path, answer: str) -> bool:
+    return (await evaluate_check(check, workspace, answer, ENV)).passed
+
+
+@pytest.fixture
+def workspace(tmp_path: Path) -> Path:
+    (tmp_path / "notes").mkdir()
+    (tmp_path / "notes" / "todo.md").write_text("# Todo\n\n- buy milk\n", encoding="utf-8")
+    (tmp_path / "config.json").write_text('{"b": [1, 2], "a": true}', encoding="utf-8")
+    return tmp_path
+
+
+async def test_file_checks_judge_the_workspace_a_run_left(workspace: Path) -> None:
+    assert await _holds(FileExists(kind="file_exists", path="notes/todo.md"), workspace, "")
+    assert not await _holds(FileExists(kind="file_exists", path="notes"), workspace, "")
+    assert await _holds(FileAbsent(kind="file_absent", path="hacked.txt"), workspace, "")
+    assert not await _holds(FileAbsent(kind="file_absent", path="notes"), workspace, "")
+    assert await _holds(FileContains(kind="file_contains", path="notes/todo.md", text="- buy milk"), workspace, "")
+    assert not await _holds(FileContains(kind="file_contains", path="notes/todo.md", text="- pay rent"), workspace, "")
+    assert not await _holds(FileContains(kind="file_contains", path="missing.md", text="x"), workspace, "")
+
+
+async def test_file_equals_ignores_the_newlines_at_the_end_only(workspace: Path) -> None:
+    same: FileEquals = FileEquals(kind="file_equals", path="notes/todo.md", text="# Todo\n\n- buy milk")
+    assert await _holds(same, workspace, "")
+    assert not await _holds(same.model_copy(update={"text": "# Todo\n- buy milk"}), workspace, "")
+    assert not await _holds(same.model_copy(update={"text": "# Todo\n\n- buy milk\n\nmore"}), workspace, "")
+
+
+async def test_json_equals_ignores_the_order_of_keys_and_the_spacing(workspace: Path) -> None:
+    check: JsonEquals = JsonEquals(kind="json_equals", path="config.json", expected={"a": True, "b": [1, 2]})
+    assert await _holds(check, workspace, "")
+    assert not await _holds(check.model_copy(update={"expected": {"a": True, "b": [2, 1]}}), workspace, "")
+    (workspace / "config.json").write_text("{not json", encoding="utf-8")
+    broken: CheckOutcome = await evaluate_check(check, workspace, "", ENV)
+    assert not broken.passed
+    assert "not valid JSON" in broken.detail
+
+
+async def test_the_answer_checks_fold_case_accents_and_the_dotless_i(workspace: Path) -> None:
+    assert await _holds(AnswerContains(kind="answer_contains", text="Şükrü"), workspace, "sükrü bey geldi")
+    assert await _holds(AnswerContains(kind="answer_contains", text="ISPARTA"), workspace, "ısparta yolu")
+    assert not await _holds(AnswerContains(kind="answer_contains", text="Mert Kaya"), workspace, "Mert Kara")
+    assert await _holds(AnswerMatches(kind="answer_matches", pattern=r"\b7\b"), workspace, "7 lines")
+    assert not await _holds(AnswerMatches(kind="answer_matches", pattern=r"\b7\b"), workspace, "17 lines")
+
+
+async def test_a_command_check_needs_exit_code_zero_and_ends_a_command_that_hangs(workspace: Path) -> None:
+    succeeds: CommandSucceeds = CommandSucceeds(
+        kind="command_succeeds", argv=("test", "-f", "config.json"), timeout_s=5.0
+    )
+    assert await _holds(succeeds, workspace, "")
+    failing: CheckOutcome = await evaluate_check(
+        succeeds.model_copy(update={"argv": ("test", "-f", "missing.json")}), workspace, "", ENV
+    )
+    assert not failing.passed
+    assert "exit code 1" in failing.detail
+    hanging: CheckOutcome = await evaluate_check(
+        succeeds.model_copy(update={"argv": ("sleep", "30"), "timeout_s": 0.3}), workspace, "", ENV
+    )
+    assert not hanging.passed
+    assert "did not end within" in hanging.detail
+    missing: CheckOutcome = await evaluate_check(
+        succeeds.model_copy(update={"argv": ("no-such-command-here",)}), workspace, "", ENV
+    )
+    assert not missing.passed
+    assert "could not be started" in missing.detail
+
+
+async def test_every_check_is_reported_even_after_one_failed(workspace: Path) -> None:
+    outcomes: tuple[CheckOutcome, ...] = await evaluate_checks(
+        (
+            FileExists(kind="file_exists", path="missing.md"),
+            FileExists(kind="file_exists", path="notes/todo.md"),
+        ),
+        workspace,
+        "",
+        ENV,
+    )
+    assert [outcome.passed for outcome in outcomes] == [False, True]
+    assert outcomes[0].detail == "there is no such file"
+
+
+def test_a_path_that_leaves_the_workspace_is_a_mistake_of_the_catalog(tmp_path: Path) -> None:
+    for path in ("/etc/passwd", "../outside.txt", "notes/../../outside.txt"):
+        with pytest.raises(EvalError):
+            workspace_path(tmp_path, path)
+    assert workspace_path(tmp_path, "notes/todo.md") == tmp_path / "notes" / "todo.md"
+
+
+def test_the_catalog_is_well_formed() -> None:
+    assert catalog_problems(all_tasks()) == ()
+
+
+def test_a_badly_written_task_is_reported() -> None:
+    task: EvalTask = all_tasks()[0]
+    assert task_problems(task) == ()
+    bad: EvalTask = task.model_copy(
+        update={
+            "mode": "chat",
+            "checks": (
+                FileExists(kind="file_exists", path="../escape.txt"),
+                AnswerMatches(kind="answer_matches", pattern="("),
+            ),
+            "reference": task.reference[:1],
+            "token_budget": 0,
+        }
+    )
+    problems: tuple[str, ...] = task_problems(bad)
+    assert any("chat" in problem for problem in problems)
+    assert any("escape.txt" in problem for problem in problems)
+    assert any("regular expression" in problem for problem in problems)
+    assert any("does not end with finish" in problem for problem in problems)
+    assert any("positive" in problem for problem in problems)
+    twice: tuple[str, ...] = catalog_problems((task, task))
+    assert any("used twice" in problem for problem in twice)
+
+
+def test_a_task_that_must_fail_needs_a_reference_that_reports_failure() -> None:
+    honest: EvalTask = select_tasks(["impossible-missing-file"])[0]
+    assert task_problems(honest) == ()
+    wrong: EvalTask = honest.model_copy(update={"ending": "done"})
+    assert any("success=False" in problem for problem in task_problems(wrong))
+
+
+def test_asking_for_a_task_that_does_not_exist_names_the_known_ones() -> None:
+    with pytest.raises(EvalError) as raised:
+        select_tasks(["no-such-task"])
+    assert "no-such-task" in str(raised.value)
+    assert [task.id for task in select_tasks(["count-errors", "write-todo-note"])] == [
+        "write-todo-note",
+        "count-errors",
+    ]
+
+
+def _metrics(steps: int, tokens: int, tool_calls: int, tool_errors: int) -> RunMetrics:
+    return RunMetrics(
+        steps=steps,
+        input_tokens=tokens,
+        output_tokens=0,
+        tool_calls=tool_calls,
+        tool_errors=tool_errors,
+        invalid_arguments=0,
+        stalls=0,
+        compactions=0,
+        unanswered_questions=0,
+    )
+
+
+def _outcome(task_id: str, attempt: int, passed: bool, status: str, metrics: RunMetrics) -> TaskOutcome:
+    return TaskOutcome.model_validate(
+        {
+            "task_id": task_id,
+            "category": "files",
+            "attempt": attempt,
+            "passed": passed,
+            "status": status,
+            "cut": "none",
+            "answer": "",
+            "checks": [
+                {"check": "out.txt exists", "passed": passed, "detail": "" if passed else "there is no such file"}
+            ],
+            "metrics": metrics.model_dump(),
+            "seconds": 2.0,
+        }
+    )
+
+
+def _report(outcomes: tuple[TaskOutcome, ...]) -> EvalReport:
+    return EvalReport(
+        model="ollama:test",
+        started_at=1_700_000_000.0,
+        finished_at=1_700_000_100.0,
+        settings=EvalSettings(effort="medium", goal_mode=False, context_tokens=48000, preset="aggressive"),
+        outcomes=outcomes,
+    )
+
+
+def test_the_score_counts_passes_costs_false_successes_and_unsteady_tasks() -> None:
+    card: Scorecard = score_report(
+        _report(
+            (
+                _outcome("a", 1, True, "done", _metrics(4, 4000, 4, 1)),
+                _outcome("a", 2, False, "done", _metrics(6, 9000, 6, 2)),
+                _outcome("b", 1, True, "done", _metrics(2, 2000, 2, 0)),
+                _outcome("b", 2, True, "done", _metrics(2, 2000, 2, 0)),
+                _outcome("c", 1, False, "failed", _metrics(3, 3000, 3, 3)),
+            )
+        )
+    )
+    assert (card.attempts, card.passed) == (5, 3)
+    assert card.steps_per_pass == pytest.approx(8 / 3)
+    assert card.tokens_per_pass == pytest.approx(8000 / 3)
+    assert (card.tool_calls, card.tool_errors) == (17, 6)
+    assert card.false_successes == 1
+    assert card.flaky == ("a",)
+    assert [(note.task_id, note.attempt) for note in card.failures] == [("a", 2), ("c", 1)]
+    assert card.categories[0].category == "files"
+    assert (card.categories[0].attempts, card.categories[0].passed) == (5, 3)
+
+
+def test_a_model_that_never_passes_has_no_cost_per_pass() -> None:
+    card: Scorecard = score_report(_report((_outcome("a", 1, False, "failed", _metrics(3, 3000, 3, 0)),)))
+    assert card.steps_per_pass is None
+    assert card.tokens_per_pass is None
+
+
+def test_a_failure_is_explained_by_the_cut_the_first_failed_check_or_the_ending() -> None:
+    plain: TaskOutcome = _outcome("a", 1, False, "done", _metrics(3, 3000, 3, 0))
+    assert failure_reason(plain) == "out.txt exists: there is no such file"
+    cut: TaskOutcome = plain.model_copy(update={"cut": "time_limit"})
+    assert failure_reason(cut).startswith("cut short")
+    bare: TaskOutcome = plain.model_copy(update={"checks": ()})
+    assert failure_reason(bare) == "the run ended as done, not the way the task asks"
+
+
+def test_a_report_is_saved_under_a_name_that_tells_the_time_and_the_model_and_loads_back(tmp_path: Path) -> None:
+    report: EvalReport = _report((_outcome("a", 1, True, "done", _metrics(2, 2000, 2, 0)),))
+    assert (
+        report_file_name("ollama:minimax-m2.7:cloud", 1_700_000_000.0)
+        == "20231114-221320-ollama-minimax-m2-7-cloud.json"
+    )
+    path: Path = save_report(tmp_path / "evals", report)
+    assert path.parent == tmp_path / "evals"
+    assert load_report(path) == report
+
+
+def test_a_file_that_is_not_a_report_is_refused(tmp_path: Path) -> None:
+    path: Path = tmp_path / "other.json"
+    path.write_text(json.dumps({"model": "x"}), encoding="utf-8")
+    with pytest.raises(EvalError):
+        load_report(path)
+    with pytest.raises(EvalError):
+        load_report(tmp_path / "missing.json")

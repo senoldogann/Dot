@@ -15,6 +15,12 @@ from dotagent.llm.router import ModelRef, parse_model_ref
 from dotagent.llm.types import Effort, ModelInfo
 from dotagent.policy.types import ApprovalMode
 from dotagent.runtime import Runtime
+from dotagent.store.endings import (
+    PREFIX_EMERGENCY_STOP,
+    PREFIX_INTERNAL_ERROR,
+    RESULT_SHUTDOWN,
+    RESULT_STOPPED,
+)
 from dotagent.store.models import RunMode, RunRecord, RunStatus, ThreadRecord
 from dotagent.tools.context import DelegateOutcome
 from dotagent.tools.delegate import DELEGATE_SOURCE
@@ -25,9 +31,6 @@ _TITLE_CHARS: int = 60
 _RESULT_CHARS: int = 20_000
 # The earlier runs of a thread whose goals count as the user's instructions to a reviewer.
 _THREAD_INSTRUCTION_RUNS: int = 30
-# What a stopped run records: a stop asked for by the user (or a caller), and a stop because the daemon shut down.
-_STOPPED_RESULT: str = "The run was stopped."
-_SHUTDOWN_RESULT: str = "The daemon was shut down while this run was active."
 
 
 @dataclass(frozen=True)
@@ -320,14 +323,14 @@ class RunManager:
                 outcome: RunOutcome = await run_agent(AgentRun(runtime, run, gate, cancel, inbox, self, files))
                 status, result = outcome.status, outcome.result
         except (RunCancelled, asyncio.CancelledError):
-            status, result = "cancelled", _SHUTDOWN_RESULT if self._stopping else _STOPPED_RESULT
+            status, result = "cancelled", RESULT_SHUTDOWN if self._stopping else RESULT_STOPPED
         except FailSafeTriggered as exc:
-            status, result = "cancelled", f"Emergency stop: {exc.message}"
+            status, result = "cancelled", f"{PREFIX_EMERGENCY_STOP}{exc.message}"
         except DotError as exc:
             status, result = "failed", str(exc)
             log.error("run failed", run_id=run.id, error=exc.message, context=exc.context)
         except Exception as exc:
-            status, result = "failed", f"Internal error: {type(exc).__name__}: {exc}"
+            status, result = "failed", f"{PREFIX_INTERNAL_ERROR}{type(exc).__name__}: {exc}"
             log.exception("run crashed", run_id=run.id)
         finally:
             try:

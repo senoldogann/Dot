@@ -70,6 +70,16 @@ class ModelRouter:
             self._providers[name] = created
             return created
 
+    async def register(self, name: str, provider: ChatProvider) -> None:
+        """Serve the provider name ``name`` with ``provider`` instead of a connector made from the configuration (the
+        scripted model of the evals and of the tests). It has to come before the name is used for the first time."""
+        if name not in KNOWN_PROVIDERS:
+            raise ConfigError("unknown provider", {"provider": name, "providers": list(KNOWN_PROVIDERS)})
+        async with self._lock:
+            if name in self._providers:
+                raise ConfigError("a connector for this provider exists already", {"provider": name})
+            self._providers[name] = provider
+
     async def complete(self, ref: ModelRef, request: ChatRequest, sink: DeltaSink) -> ModelReply:
         provider: ChatProvider = await self.provider(ref.provider)
         return await provider.complete(request, sink)

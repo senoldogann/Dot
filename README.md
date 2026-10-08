@@ -294,6 +294,40 @@ mode by the goal check giving up; or when you stop it. What this leaves unbounde
 without getting anywhere is not caught by the stall guard and goes on using the model until you stop it. Give such a run
 a goal that can be checked, and keep an eye on the token count of a long one (`--verbose`, or the Details panel).
 
+## Measuring the agent
+
+How well Dot finishes work is measured, not guessed, in two ways.
+
+**`dotx stats [--days N]`** counts the runs that really happened (the last 30 days by default), per model: how they
+ended (finished, stopped by you, stopped by the stall guard, refused by the goal check, cut off when the daemon died or
+shut down, internal error, still active), steps, input and output tokens, tool calls and how many of them failed, calls
+whose arguments were not valid JSON, stalls and compactions. The database file is opened read-only, so it is safe to run
+while the daemon works, and the numbers hold no text of your chats.
+
+**`dotx eval`** plays a catalog of small tasks against a model and judges each by what is left in a workspace of its own:
+file edits, shell work, fixing code until its test passes, recovering from an error, multi-step work, read-only
+research, a task that cannot be done and has to end as an honest failure, an instruction hidden in a file that must not
+be followed, and a goal written in Turkish.
+
+| Command                                                  | What it does                                                                                                                                                                                                       |
+| -------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `dotx eval list`                                         | The tasks, with their kind, mode and number of checks.                                                                                                                                                             |
+| `dotx eval check`                                        | Needs no model and costs nothing. Replays the reference solution of every task through the real loop, tools and policy, and proves that a run that touches nothing and says "done" fails every task. Run it after changing a tool, the policy or the loop. |
+| `dotx eval run [--model REF] [--task ID]... [--repeat N]` | Plays the tasks against a model (the configured main model if none is given) and prints the score. It spends the tokens of that model: an attempt is cut after 300 s or 600000 tokens, and the notice before it starts states the ceiling. `--repeat` plays every task several times, which shows the tasks a model passes only now and then. |
+| `dotx eval report [FILE...]`                             | The score of saved runs, with a comparison table when there are several; without a file, every run saved under `<home>/evals/`.                                                                                    |
+
+Every attempt runs unattended in a throw-away Dot home (its own database and workspace, removed afterwards), with the
+Mac desktop, your MCP servers, skills, plugins and the memory embeddings switched off, and with every question of the
+policy or of the agent refused. Your own database, workspace and screenshots are never touched; the API keys the model
+needs are looked up first and handed over by name. The score holds the pass rate, per kind of task, what a pass costs in
+steps and tokens, how often a tool call failed, stalls, runs that were cut, runs that said they were done and were not,
+and the tasks that passed only in some attempts. `dotx eval run` saves its report after every attempt, so an
+interrupted run keeps what it measured.
+
+A task is data (`src/dotagent/evals/catalog.py`): the files the workspace starts with, the goal, checks (a file exists,
+holds or equals something, a JSON file equals a value, a command exits with 0, the answer contains something) and a
+reference solution as a script of tool calls. To add one, write it there and run `dotx eval check`.
+
 ## The daemon, the web UI and the service
 
 ```bash
@@ -688,6 +722,9 @@ service are marked:
 `pytest -m "not live and not internet"` skips the first and third kind, `pytest -m "not hosted"` the requests that
 use your keys.
 
+The smoke tests of the eval runner (`tests/smoke/test_evals_runner.py`) need no service at all: a scripted model
+plays the real loop, tools, policy and store.
+
 The work on the agent's autonomy (measuring it, noticing a stuck run, adapting to the model, resuming, learning) is
 planned and tracked in [ROADMAP.md](ROADMAP.md); read it before continuing that work.
 
@@ -701,6 +738,7 @@ src/dotagent/
   desktop/    accessibility tree, input, screen capture, permissions
   web/        search and fetch
   memory/     notes, ranking, embeddings
+  evals/      eval tasks, the runner that plays them, the scripted model, scoring
   scheduler/  schedules, timing, the runner
   mcp/        MCP client hub
   skills/     skill discovery, frontmatter and the catalog

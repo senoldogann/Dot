@@ -39,6 +39,16 @@ from dotagent.cli_daemon import (
     cmd_service_uninstall,
     cmd_url,
 )
+from dotagent.cli_eval import (
+    EvalCheckCommand,
+    EvalListCommand,
+    EvalReportCommand,
+    EvalRunCommand,
+    cmd_eval_check,
+    cmd_eval_list,
+    cmd_eval_report,
+    cmd_eval_run,
+)
 from dotagent.cli_mcp import McpListCommand, cmd_mcp_list
 from dotagent.cli_prune import PruneCommand, cmd_prune
 from dotagent.cli_schedule import (
@@ -54,6 +64,7 @@ from dotagent.cli_schedule import (
     cmd_schedule_list,
 )
 from dotagent.cli_skills import SkillsListCommand, cmd_skills_list
+from dotagent.cli_stats import StatsCommand, cmd_stats
 from dotagent.cli_ui import TerminalUi, UiOptions, read_line
 from dotagent.config import AppConfig, load_user_config
 from dotagent.core.errors import ConfigError, DotError
@@ -247,6 +258,11 @@ type Command = Annotated[
     | McpListCommand
     | SkillsListCommand
     | PruneCommand
+    | EvalListCommand
+    | EvalCheckCommand
+    | EvalRunCommand
+    | EvalReportCommand
+    | StatsCommand
     | DaemonCommand
     | OpenCommand
     | UrlCommand
@@ -396,6 +412,37 @@ def build_parser() -> argparse.ArgumentParser:
         help="delete those screenshots and give the free space back to the disk (without it, only report)",
     )
 
+    evaluation = commands.add_parser(
+        "eval", help="measure how well Dot finishes tasks with a model: tasks with checks, and a score"
+    )
+    eval_commands = evaluation.add_subparsers(dest="eval_action", required=True)
+    eval_commands.add_parser("list", help="list the eval tasks")
+    eval_commands.add_parser(
+        "check",
+        help="prove, offline and without a model, that every task can be passed and cannot be passed by doing nothing",
+    )
+    eval_run = eval_commands.add_parser(
+        "run", help="play the tasks against a model and print the score (this spends the tokens of that model)"
+    )
+    eval_run.add_argument(
+        "--model", default=None, help="provider:model; the main model of the configuration if omitted"
+    )
+    eval_run.add_argument(
+        "--task", dest="tasks", action="append", default=[], help="play only this task; give it again for more"
+    )
+    eval_run.add_argument(
+        "--repeat", type=int, default=1, help="play every task this many times: one attempt says little about a model"
+    )
+    eval_report = eval_commands.add_parser(
+        "report", help="show the score of saved eval runs and compare them (all saved runs if no file is given)"
+    )
+    eval_report.add_argument("files", nargs="*", help="report files written by 'dotx eval run'")
+
+    stats = commands.add_parser(
+        "stats", help="numbers about the runs that really happened: how they ended, tokens and tool errors per model"
+    )
+    stats.add_argument("--days", type=int, default=30, help="only the runs of the last N days")
+
     commands.add_parser("daemon", help="run Dot in this terminal: the API, the web UI, the agent and the schedules")
     commands.add_parser("open", help="open the web UI of the running daemon in your default browser, signed in")
     commands.add_parser("url", help="print the address of the web UI, with the sign-in token in it")
@@ -422,6 +469,7 @@ def parse_command(parser: argparse.ArgumentParser, arguments: list[str]) -> Comm
     mcp_action: object = raw.pop("mcp_action", None)
     skills_action: object = raw.pop("skills_action", None)
     service_action: object = raw.pop("service_action", None)
+    eval_action: object = raw.pop("eval_action", None)
     if raw["name"] == "auth":
         raw["name"] = f"auth-{action}"
     if raw["name"] == "browser":
@@ -438,6 +486,8 @@ def parse_command(parser: argparse.ArgumentParser, arguments: list[str]) -> Comm
         raw["name"] = f"skills-{skills_action}"
     if raw["name"] == "service":
         raw["name"] = f"service-{service_action}"
+    if raw["name"] == "eval":
+        raw["name"] = f"eval-{eval_action}"
     try:
         return _COMMAND_ADAPTER.validate_python(raw)
     except ValidationError as exc:
@@ -833,6 +883,16 @@ async def dispatch(command: Command) -> int:
             return await cmd_skills_list(command)
         case PruneCommand():
             return await cmd_prune(command)
+        case EvalListCommand():
+            return await cmd_eval_list(command)
+        case EvalCheckCommand():
+            return await cmd_eval_check(command)
+        case EvalRunCommand():
+            return await cmd_eval_run(command)
+        case EvalReportCommand():
+            return await cmd_eval_report(command)
+        case StatsCommand():
+            return await cmd_stats(command)
         case DaemonCommand():
             return await cmd_daemon(command)
         case OpenCommand():

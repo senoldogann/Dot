@@ -108,12 +108,18 @@ def _guarded_files() -> tuple[Path, ...]:
 
 
 async def build_runtime(config: AppConfig) -> Runtime:
-    """Create the on-disk layout and open every service. Pair with :func:`close_runtime`.
+    """Read the environment of the login shell, then open every service (:func:`open_runtime`)."""
+    login_env: dict[str, str] = await read_login_env(config.shell.login_env_timeout_s)
+    return await open_runtime(config, login_env)
+
+
+async def open_runtime(config: AppConfig, login_env: dict[str, str]) -> Runtime:
+    """Create the on-disk layout and open every service, with the environment of the login shell already read. Pair
+    with :func:`close_runtime`.
 
     When a service fails to open, the ones opened before it are closed again before the error is raised.
     """
     await asyncio.to_thread(ensure_layout)
-    login_env: dict[str, str] = await read_login_env(config.shell.login_env_timeout_s)
     protected: tuple[Path, ...] = await asyncio.to_thread(
         expand_protected, config.policy.protected_paths, _guarded_files()
     )

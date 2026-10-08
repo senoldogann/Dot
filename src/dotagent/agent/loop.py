@@ -65,6 +65,7 @@ from dotagent.memory.service import prompt_memories
 from dotagent.runtime import Runtime
 from dotagent.skills.catalog import load_skills
 from dotagent.skills.types import SkillCatalog
+from dotagent.store.endings import GOAL_CHECK_MARK, RESULT_EMPTY_REPLIES, RESULT_STALLED
 from dotagent.store.models import EventRecord, MemoryRecord, RunRecord
 from dotagent.tools.context import Spawner, ToolContext
 from dotagent.tools.delegate import DELEGATE_TOOL
@@ -388,7 +389,7 @@ def _since_goal(history: Sequence[Message], goal: Message) -> Sequence[Message]:
 
 def _with_check_note(answer: str, text: str) -> str:
     """The answer a run ended with, followed by what the goal check made of it."""
-    return f"{answer}\n\n---\nGoal check: {text}"
+    return f"{answer}{GOAL_CHECK_MARK}{text}"
 
 
 def _send_back_note(reason: str) -> str:
@@ -626,9 +627,7 @@ async def run_agent(agent: AgentRun) -> RunOutcome:
                     stall_warnings += 1
                     recent.clear()
                     if stall_warnings > 2:
-                        return RunOutcome(
-                            status="failed", result="Stopped: the agent kept repeating the same failing actions."
-                        )
+                        return RunOutcome(status="failed", result=RESULT_STALLED)
                     history.append(await _stored_note(agent, _STALL_NOTE))
                     await runtime.bus.emit(run.id, "stall", {"warnings": stall_warnings}, True)
                 continue
@@ -638,7 +637,7 @@ async def run_agent(agent: AgentRun) -> RunOutcome:
             if answered and (run.mode == "chat" or not used_tools or nudges >= config.finish_nudges):
                 ended = RunOutcome(status="done", result=reply.text)
             elif nudges >= config.finish_nudges:
-                return RunOutcome(status="failed", result="The model returned empty replies and did not finish.")
+                return RunOutcome(status="failed", result=RESULT_EMPTY_REPLIES)
             else:
                 nudges += 1
                 history.append(await _stored_note(agent, _NO_TOOL_NOTE if answered else _EMPTY_NOTE))

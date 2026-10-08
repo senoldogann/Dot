@@ -303,21 +303,30 @@ def load_defaults() -> JsonObject:
     return parsed
 
 
-def load_config(user_path: Path) -> AppConfig:
-    """Load defaults, overlay ``user_path`` if it exists, and validate the result."""
-    merged: JsonObject = load_defaults()
-    if user_path.exists():
-        merged = deep_merge(merged, _read_toml(user_path))
+def _validated(merged: JsonObject, source: str) -> AppConfig:
     try:
         return AppConfig.model_validate(merged)
     except ValidationError as exc:
         raise ConfigError(
             "configuration failed validation",
             {
-                "path": str(user_path),
+                "path": source,
                 "errors": exc.json(include_url=False, include_context=False, include_input=False),
             },
         ) from exc
+
+
+def load_config(user_path: Path) -> AppConfig:
+    """Load defaults, overlay ``user_path`` if it exists, and validate the result."""
+    merged: JsonObject = load_defaults()
+    if user_path.exists():
+        merged = deep_merge(merged, _read_toml(user_path))
+    return _validated(merged, str(user_path))
+
+
+def load_default_config() -> AppConfig:
+    """The packaged defaults alone, with no file of the user laid over them."""
+    return _validated(load_defaults(), "defaults.toml")
 
 
 def load_user_config() -> AppConfig:

@@ -153,5 +153,9 @@ class RunConflict(DotError):
     """A run cannot be started, steered or stopped, or an approval decided, in the state it is in."""
 
 
+class EvalError(DotError):
+    """An eval task or its reference solution is wrong, or the harness could not run it."""
+
+
 class ServiceError(DotError):
     """The daemon does not answer, or its launchd job cannot be installed, removed or inspected."""
