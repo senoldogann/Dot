@@ -76,9 +76,17 @@ order its "Order and dependencies" paragraph gives.
   (`~/Library/Application Support/Dot`): not even to read message text. Counting rows is the most that was ever done
   there.
 - Safety: never start, stop or restart the owner's launchd daemon. Nothing that deletes the owner's data may run by
-  default: retention and cleanup are explicit commands. Commit locally, one commit per item or coherent step, with the
-  agent's `Co-Authored-By` trailer; never push, never rewrite published history. `PLAN.md` (the owner's working notes,
-  untracked on purpose, excluded in `.git/info/exclude`) is not committed.
+  default: retention and cleanup are explicit commands. `PLAN.md` (the owner's working notes, untracked on purpose,
+  excluded in `.git/info/exclude`) is not committed.
+- Git, since 2026-10-09: the repository is `https://github.com/senoldogann/Dot` (`origin`, branch `main`). One branch
+  per item (`item-09-time-accounting`), commits with the agent's `Co-Authored-By` trailer, pushed to `origin`; one pull
+  request per item against `main`, its description ending with the attribution line the harness gives, carrying the
+  item's ROADMAP update (status, section, log). Run `/code-review` on the branch before opening the PR; once the Claude
+  GitHub app is installed on the repository, wait for its review and fix or answer what it finds; then squash-merge
+  (`gh pr merge --squash --delete-branch`) and write the merge commit's hash into the status table. Never force-push,
+  never rewrite `main`, never merge a PR whose checks fail. Linear mirrors the table: project `Dot` in the owner's
+  workspace, one issue per item, In Progress when the branch is made, Done when the PR is merged, the PR link in the
+  issue. The ROADMAP stays the record.
 - New configuration keys go into `src/dotagent/defaults.toml` with a comment, and into the matching model in
   `src/dotagent/config.py` (a key that does not exist is an error). User-visible behavior goes into `README.md`.
 - Search with `rg`. Use non-interactive commands. `git --no-pager diff`.
@@ -1729,3 +1737,6 @@ on and is closed by `terminal_close`; the idle reaper; unit tests of the ANSI st
   `check_drift` in `desktop/actions.py:145-159` has no caller; the comment at `desktop/screen.py:75-77` says
   `windows_on_screen` takes 0.2 ms, measured 3 ms. Handed to the next agent; the owner's verbatim ask is in
   `PLAN.md`, part 8.
+- 2026-10-09: the repository is on GitHub at `senoldogann/Dot` from here on (the folder had git since `8848d69`
+  and no remote). The house rules move from local-only commits to one branch and pull request per item, reviews,
+  squash merges and a Linear mirror of the status table; nothing else changed.
