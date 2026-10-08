@@ -33,6 +33,15 @@ function newBubble(container, step, live) {
   return { node, body, step, text: "" };
 }
 
+// How a call of the step a resumed run was in ended (agent/resume.py).
+const CALL_ENDS = { succeeded: "finished", failed: "failed", cut_off: "cut off", not_started: "not started" };
+
+/** One call of the step a resumed run was in, as "tool how it ended". */
+function callEnd(call) {
+  const end = `${call.tool} ${CALL_ENDS[call.end] ?? call.end}`;
+  return call.end === "cut_off" && !call.repeatable ? `${end} (it may have changed something)` : end;
+}
+
 /** The one line a live group shows for the call that ran last. */
 function describeCall(tool, args) {
   const detail = describeArguments(args);
@@ -444,6 +453,26 @@ export function createTimeline({ rootRunId, startedAt, onGrow, onPlan, onStats, 
       const noun = missing.length === 1 ? "a path" : `${missing.length} paths`;
       const listed = clip(missing.join(", "), 300);
       note(scope, record.ts, "file", `Dot's answer named ${noun} that do not exist (${listed}) and was asked to correct it`, "warn");
+    },
+
+    // The run goes on from where the daemon cut the run before it off ([agent] resume, or Continue): how that run was
+    // cut off, and how each call of the step it was in ended.
+    resumed(scope, record) {
+      const data = record.data;
+      const who = data.automatic ? "Resumed on its own when the daemon started" : "Resumed by hand";
+      const how = data.cut_off === "daemon_shutdown" ? "the daemon was shut down" : "the daemon stopped";
+      const calls = data.calls.length === 0 ? "" : `. Its last step: ${data.calls.map(callEnd).join(", ")}`;
+      place(
+        scope,
+        el(
+          "div",
+          { class: "note" },
+          icon("refresh"),
+          el("span", null, `${who}: ${how} while the run before this one worked${calls}`),
+          el("a", { class: "small", href: `#/runs/${data.from_run_id}` }, "Open that run"),
+        ),
+        record.ts,
+      );
     },
 
     // How much help the run's model gets. Shown only where it differs from the configuration: a context budget cut to

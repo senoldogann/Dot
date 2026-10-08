@@ -38,7 +38,7 @@ from dotagent.agent.continuity import (
 )
 from dotagent.agent.executor import ToolOutcome, execute_calls
 from dotagent.agent.gate import RunGate
-from dotagent.agent.plan import PLAN_EVENT, PlanItem, open_steps, plan_from_event, render_plan
+from dotagent.agent.plan import PLAN_EVENT, PlanItem, open_steps, plan_event_data, plan_from_event, render_plan
 from dotagent.agent.progress import (
     Alert,
     CallSeen,
@@ -60,6 +60,7 @@ from dotagent.agent.progress import (
     stop_result,
 )
 from dotagent.agent.prompt import build_system_prompt, collect_prompt_inputs
+from dotagent.agent.resume import RESUMED_EVENT, Resumption, resumed_event_data
 from dotagent.agent.review import (
     GoalChecker,
     GoalRequest,
@@ -168,6 +169,15 @@ _PLAN_NOTE: str = (
 _NO_PLAN: str = "The agent has not written a plan."
 
 
+class RunOpening(FrozenModel):
+    """How a run starts: ``text`` is its first message to the model (its goal, or the note of a resumed run), ``files``
+    the attachments that came with it, and ``resumed`` what a resumed run takes over from the run it resumes."""
+
+    text: str
+    files: tuple[StoredAttachment, ...]
+    resumed: Resumption | None
+
+
 @dataclass(frozen=True)
 class AgentRun:
     """Everything one run needs besides the shared runtime."""
@@ -178,7 +188,7 @@ class AgentRun:
     cancel: asyncio.Event
     inbox: asyncio.Queue[UserInput]
     spawner: Spawner
-    files: tuple[StoredAttachment, ...]  # the attachments that came with the goal
+    opening: RunOpening
 
 
 class RunOutcome(FrozenModel):
@@ -681,6 +691,13 @@ async def run_agent(agent: AgentRun) -> RunOutcome:
     runtime: Runtime = agent.runtime
     run: RunRecord = agent.run
     config: AgentConfig = runtime.config.agent
+    opening: RunOpening = agent.opening
+    # Before anything that can fail, so that a resumed run that ends at once still tells which run it goes on from.
+    if opening.resumed is not None:
+        await runtime.bus.emit(run.id, RESUMED_EVENT, resumed_event_data(opening.resumed), True)
+        # The plan of the run it resumes becomes this run's plan: the plan tools and the plan reminder go on with it.
+        if opening.resumed.plan:
+            await runtime.bus.emit(run.id, PLAN_EVENT, plan_event_data(opening.resumed.plan), True)
     ref: ModelRef = parse_model_ref(run.model)
     info: ModelInfo = await runtime.router.model_info(ref)
     if not info.tools and run.mode != "chat":
@@ -733,9 +750,9 @@ async def run_agent(agent: AgentRun) -> RunOutcome:
     )
     if grouped:
         await runtime.bus.emit(run.id, "tool_groups", groups_event(0, groups, on, (), surface_reason), True)
-    goal: Message = await message_with_attachments(runtime, run.thread_id, run.goal, agent.files, info.vision)
-    if agent.files:
-        await runtime.bus.emit(run.id, ATTACHMENTS_EVENT, {"files": attachment_summary(agent.files)}, True)
+    goal: Message = await message_with_attachments(runtime, run.thread_id, opening.text, opening.files, info.vision)
+    if opening.files:
+        await runtime.bus.emit(run.id, ATTACHMENTS_EVENT, {"files": attachment_summary(opening.files)}, True)
     history.append(goal)
     await runtime.store.append_messages(run.thread_id, [goal])
     context: ToolContext = ToolContext(

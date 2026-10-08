@@ -7,9 +7,6 @@ from dotagent.agent.manager import RunManager
 from dotagent.runtime import Runtime
 from dotagent.scheduler.runner import Scheduler
 
-# The ``source`` of the threads and runs that the UI starts.
-UI_SOURCE: str = "ui"
-
 
 @dataclass(frozen=True)
 class ServerContext:

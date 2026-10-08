@@ -12,6 +12,7 @@ from pydantic import BaseModel, ConfigDict, JsonValue
 from dotagent.agent.gate import YOLO_DECIDER
 from dotagent.agent.plan import StepStatus
 from dotagent.agent.progress import Rung
+from dotagent.agent.resume import CallEnd, CutOff
 from dotagent.core.jsonutil import dumps_compact
 from dotagent.core.text import truncate_tail
 from dotagent.core.types import FrozenModel, JsonObject
@@ -127,6 +128,22 @@ class StallPayload(Payload):
 
 class NotePayload(Payload):
     text: str
+
+
+class ResumedCallPayload(Payload):
+    tool: str
+    end: CallEnd
+    repeatable: bool
+
+
+class ResumedPayload(Payload):
+    """A run that goes on from where the daemon cut the run before it off: that run, how it was cut off, whether the
+    daemon resumed it on its own, and how each call of the step it was in ended."""
+
+    from_run_id: str
+    cut_off: CutOff
+    automatic: bool
+    calls: list[ResumedCallPayload]
 
 
 class MemoriesPayload(Payload):
@@ -271,6 +288,8 @@ class TerminalUi:
                 self._line(self._paint("  ⇲ older context summarised", "2"))
             case "steer":
                 self._line(self._paint(f"  ✎ {NotePayload.model_validate(data).text}", "35"))
+            case "resumed":
+                self._on_resumed(ResumedPayload.model_validate(data))
             case _:
                 return
 
@@ -321,6 +340,20 @@ class TerminalUi:
         self._line(self._paint("  plan", "1"))
         for step in plan.steps:
             self._line(f"    {marks[step.status]} {step.text}")
+
+    def _on_resumed(self, resumed: ResumedPayload) -> None:
+        who: str = "on its own when the daemon started" if resumed.automatic else "by hand"
+        how: str = "was shut down" if resumed.cut_off == "daemon_shutdown" else "stopped"
+        self._line(self._paint(f"  ↺ resumed {who}: the daemon {how} while run {resumed.from_run_id} worked", "35"))
+        ends: dict[CallEnd, str] = {
+            "succeeded": "finished",
+            "failed": "failed",
+            "cut_off": "cut off",
+            "not_started": "not started",
+        }
+        for call in resumed.calls:
+            risk: str = " (it may have changed something)" if call.end == "cut_off" and not call.repeatable else ""
+            self._line(self._paint(f"    {call.tool}: {ends[call.end]}{risk}", "2"))
 
     def _on_auto_approval(self, decided: AutoApprovalPayload) -> None:
         if decided.decided_by == YOLO_DECIDER:

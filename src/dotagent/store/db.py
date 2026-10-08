@@ -782,15 +782,30 @@ class Store:
         return [_run(row) for row in rows]
 
     async def mark_interrupted_runs(self) -> int:
-        """Runs left active by a crashed daemon (queued, running, or blocked on a question) become 'failed'. Returns
-        how many changed."""
+        """Runs left active by a crashed daemon (queued, running, or blocked on a question) become 'failed', finished
+        at their last sign of life: their newest event, else the time they were created. Each one also gets, at that
+        time, the ``run_finished`` event that every other end of a run stores, and that ends the stream of its events;
+        so does a run closed this way before that event was stored. Returns how many runs changed."""
         cursor: aiosqlite.Cursor = await self._db.execute(
-            "UPDATE runs SET status = 'failed', result = ?, finished_at = ?"
+            "UPDATE runs SET status = 'failed', result = ?,"
+            " finished_at = COALESCE((SELECT MAX(ts) FROM events WHERE events.run_id = runs.id), created_at)"
             " WHERE status IN ('running', 'queued', 'blocked')",
-            (RESULT_RESTARTED, time.time()),
+            (RESULT_RESTARTED,),
+        )
+        changed: int = cursor.rowcount
+        await self._db.execute(
+            "INSERT INTO events(run_id, ts, kind, data) SELECT id, finished_at, 'run_finished', ? FROM runs"
+            " WHERE status = 'failed' AND result = ?"
+            " AND NOT EXISTS (SELECT 1 FROM events WHERE events.run_id = runs.id AND events.kind = 'run_finished')",
+            (dumps_compact({"status": "failed", "result": RESULT_RESTARTED}), RESULT_RESTARTED),
         )
         await self._db.commit()
-        return cursor.rowcount
+        return changed
+
+    async def runs_finished_since(self, since: float) -> list[RunRecord]:
+        """The runs that finished at or after ``since``, oldest first."""
+        rows = await self._all("SELECT * FROM runs WHERE finished_at >= ? ORDER BY created_at", (since,))
+        return [_run(row) for row in rows]
 
     # ----- events ----------------------------------------------------------------------------
 

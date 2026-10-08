@@ -1,12 +1,25 @@
 """Run lifecycle: start, queue, steer, cancel and finish agent runs, each in its own asyncio task."""
 
 import asyncio
+import time
 from contextlib import AbstractAsyncContextManager, nullcontext
 from dataclasses import dataclass
 
 from dotagent.agent.attachments import StoredAttachment, UserInput
 from dotagent.agent.gate import RunGate
-from dotagent.agent.loop import AgentRun, RunOutcome, run_agent
+from dotagent.agent.loop import AgentRun, RunOpening, RunOutcome, run_agent
+from dotagent.agent.plan import PLAN_EVENT, plan_from_event
+from dotagent.agent.resume import (
+    RESUME_SOURCE,
+    CutOff,
+    InterruptedCall,
+    Resumption,
+    can_resume,
+    cut_off_by,
+    interrupted_calls,
+    resume_note,
+    resumes_on_start,
+)
 from dotagent.agent.review import reviewer_for
 from dotagent.core.errors import ConfigError, DotError, FailSafeTriggered, RunCancelled, RunConflict
 from dotagent.core.logs import get_logger
@@ -21,7 +34,7 @@ from dotagent.store.endings import (
     RESULT_SHUTDOWN,
     RESULT_STOPPED,
 )
-from dotagent.store.models import RunMode, RunRecord, RunStatus, ThreadRecord
+from dotagent.store.models import EventRecord, RunMode, RunRecord, RunStatus, ThreadRecord
 from dotagent.tools.context import DelegateOutcome
 from dotagent.tools.delegate import DELEGATE_SOURCE
 
@@ -29,6 +42,8 @@ log = get_logger(__name__)
 
 _TITLE_CHARS: int = 60
 _RESULT_CHARS: int = 20_000
+# How much of a run's result a refusal to resume it shows.
+_REFUSED_RESULT_CHARS: int = 200
 # The earlier runs of a thread whose goals count as the user's instructions to a reviewer.
 _THREAD_INSTRUCTION_RUNS: int = 30
 
@@ -99,7 +114,16 @@ class RunManager:
                 parse_model_ref(model if model is not None else self._runtime.config.models.main), effort
             )
         run, _ = await self._launch(
-            goal, mode, model, thread_id, source, parent_run_id, effort, approvals, goal_mode, files
+            goal,
+            mode,
+            model,
+            thread_id,
+            source,
+            parent_run_id,
+            effort,
+            approvals,
+            goal_mode,
+            RunOpening(text=goal, files=files, resumed=None),
         )
         return run
 
@@ -119,7 +143,16 @@ class RunManager:
         if parent.mode == "research" and mode != "research":
             raise RunConflict("a research run can only delegate research", {"run_id": parent.id, "mode": mode})
         _, handle = await self._launch(
-            goal, mode, parent.model, None, DELEGATE_SOURCE, parent.id, parent.effort, parent.approvals, False, ()
+            goal,
+            mode,
+            parent.model,
+            None,
+            DELEGATE_SOURCE,
+            parent.id,
+            parent.effort,
+            parent.approvals,
+            False,
+            RunOpening(text=goal, files=(), resumed=None),
         )
         try:
             await handle.finished.wait()
@@ -132,6 +165,46 @@ class RunManager:
     def steer(self, run_id: str, text: str, files: tuple[StoredAttachment, ...]) -> None:
         """Hand the running agent an extra instruction and its attachments; it reads them before its next step."""
         self._handle(run_id).inbox.put_nowait(UserInput(text=text, files=files))
+
+    async def resumable(self, run: RunRecord) -> bool:
+        """Whether ``run`` can be resumed: see :func:`dotagent.agent.resume.can_resume`."""
+        return can_resume(run, await self._newest_run_id(run.thread_id))
+
+    async def resume(self, run_id: str) -> RunRecord:
+        """Resume by hand a run that the daemon cut off: a new run on its thread goes on from where it stopped. Refused
+        unless :meth:`resumable` allows it; any source may be resumed this way."""
+        old: RunRecord = await self._runtime.store.get_run(run_id)
+        newest_run_id: str = await self._newest_run_id(old.thread_id)
+        if not can_resume(old, newest_run_id):
+            raise RunConflict(
+                "only the newest run of a thread that the daemon cut off, and that no other run started, can be "
+                "resumed",
+                {
+                    "run_id": old.id,
+                    "status": old.status,
+                    "result": truncate_tail(old.result, _REFUSED_RESULT_CHARS),
+                    "parent_run_id": old.parent_run_id,
+                    "newest_run_id": newest_run_id,
+                },
+            )
+        return await self._resume(old, await interrupted_calls(self._runtime, old), False)
+
+    async def resume_safe(self) -> tuple[RunRecord, ...]:
+        """Resume the runs that :func:`dotagent.agent.resume.resumes_on_start` allows among those that ended at most
+        ``[agent] resume_within_s`` seconds ago; for the daemon, when it starts. A run that cannot be resumed is logged
+        and left for the owner, so it never keeps the daemon from starting."""
+        since: float = time.time() - self._runtime.config.agent.resume_within_s
+        resumed: list[RunRecord] = []
+        for old in await self._runtime.store.runs_finished_since(since):
+            if cut_off_by(old) is None:
+                continue
+            try:
+                calls: tuple[InterruptedCall, ...] = await interrupted_calls(self._runtime, old)
+                if resumes_on_start(old, await self._newest_run_id(old.thread_id), calls):
+                    resumed.append(await self._resume(old, calls, True))
+            except DotError as exc:
+                log.warning("resume_on_start_failed", run_id=old.id, error=exc.message, context=exc.context)
+        return tuple(resumed)
 
     def cancel(self, run_id: str) -> None:
         handle: RunHandle = self._handle(run_id)
@@ -161,6 +234,46 @@ class RunManager:
             raise RunConflict("the run is not active", {"run_id": run_id})
         return handle
 
+    async def _newest_run_id(self, thread_id: str) -> str:
+        newest: list[RunRecord] = await self._runtime.store.list_runs(1, thread_id)
+        return newest[0].id
+
+    async def _require_newest(self, thread_id: str, run_id: str) -> None:
+        newest_run_id: str = await self._newest_run_id(thread_id)
+        if newest_run_id != run_id:
+            raise RunConflict(
+                "the thread went on after the run to resume", {"run_id": run_id, "newest_run_id": newest_run_id}
+            )
+
+    async def _resume(self, old: RunRecord, calls: tuple[InterruptedCall, ...], automatic: bool) -> RunRecord:
+        """Launch the run that resumes ``old`` on its thread, with its settings and its newest plan: its first message
+        is the note of :func:`dotagent.agent.resume.resume_note`. ``automatic`` is recorded in the ``resumed`` event."""
+        cut_off: CutOff | None = cut_off_by(old)
+        if cut_off is None:
+            raise RunConflict("the daemon did not cut this run off", {"run_id": old.id, "status": old.status})
+        plan: EventRecord | None = await self._runtime.store.last_event(old.id, PLAN_EVENT)
+        resumption: Resumption = Resumption(
+            from_run_id=old.id,
+            cut_off=cut_off,
+            automatic=automatic,
+            calls=calls,
+            plan=() if plan is None else plan_from_event(plan),
+        )
+        run, _ = await self._launch(
+            old.goal,
+            old.mode,
+            old.model,
+            old.thread_id,
+            RESUME_SOURCE,
+            None,
+            old.effort,
+            old.approvals,
+            old.goal_mode,
+            RunOpening(text=resume_note(old.goal, resumption), files=(), resumed=resumption),
+        )
+        log.info("run_resumed", run_id=run.id, from_run_id=old.id, cut_off=cut_off, automatic=automatic)
+        return run
+
     async def _launch(
         self,
         goal: str,
@@ -172,7 +285,7 @@ class RunManager:
         effort: Effort | None,
         approvals: ApprovalMode | None,
         goal_mode: bool | None,
-        files: tuple[StoredAttachment, ...],
+        opening: RunOpening,
     ) -> tuple[RunRecord, RunHandle]:
         """Create the run, register it and start its task. A run launched by an active, untrusted parent is untrusted."""
         runtime: Runtime = self._runtime
@@ -186,13 +299,17 @@ class RunManager:
         if thread_id is None:
             thread: ThreadRecord = await runtime.store.create_thread(thread_title(goal), source)
             return await self._register_run(
-                goal, mode, model_ref, thread.id, source, parent_run_id, level, approval_mode, with_goal_mode, files
+                goal, mode, model_ref, thread.id, source, parent_run_id, level, approval_mode, with_goal_mode, opening
             )
         self._claim_thread(thread_id)
         try:
             await runtime.store.get_thread(thread_id)
+            if opening.resumed is not None:
+                # Checked again under the claim: a run that started on the thread since, such as another resume of the
+                # same run, went on from it already.
+                await self._require_newest(thread_id, opening.resumed.from_run_id)
             return await self._register_run(
-                goal, mode, model_ref, thread_id, source, parent_run_id, level, approval_mode, with_goal_mode, files
+                goal, mode, model_ref, thread_id, source, parent_run_id, level, approval_mode, with_goal_mode, opening
             )
         finally:
             self._claimed.discard(thread_id)
@@ -215,7 +332,7 @@ class RunManager:
         level: Effort,
         approval_mode: ApprovalMode,
         with_goal_mode: bool,
-        files: tuple[StoredAttachment, ...],
+        opening: RunOpening,
     ) -> tuple[RunRecord, RunHandle]:
         """Create the run record and its gate, start its task and register its handle."""
         runtime: Runtime = self._runtime
@@ -266,7 +383,7 @@ class RunManager:
         inbox: asyncio.Queue[UserInput] = asyncio.Queue()
         finished: asyncio.Event = asyncio.Event()
         task: asyncio.Task[None] = asyncio.create_task(
-            self._drive(run, gate, cancel, inbox, files, finished), name=run.id
+            self._drive(run, gate, cancel, inbox, opening, finished), name=run.id
         )
         handle: RunHandle = RunHandle(run.id, thread_id, parent_run_id, task, gate, cancel, inbox, finished)
         self._handles[run.id] = handle
@@ -302,7 +419,7 @@ class RunManager:
         gate: RunGate,
         cancel: asyncio.Event,
         inbox: asyncio.Queue[UserInput],
-        files: tuple[StoredAttachment, ...],
+        opening: RunOpening,
         finished: asyncio.Event,
     ) -> None:
         """Task body and failure boundary of one run.
@@ -320,7 +437,7 @@ class RunManager:
                 await runtime.bus.emit(
                     run.id, "run_started", {"model": run.model, "parent_run_id": run.parent_run_id}, True
                 )
-                outcome: RunOutcome = await run_agent(AgentRun(runtime, run, gate, cancel, inbox, self, files))
+                outcome: RunOutcome = await run_agent(AgentRun(runtime, run, gate, cancel, inbox, self, opening))
                 status, result = outcome.status, outcome.result
         except (RunCancelled, asyncio.CancelledError):
             status, result = "cancelled", RESULT_SHUTDOWN if self._stopping else RESULT_STOPPED

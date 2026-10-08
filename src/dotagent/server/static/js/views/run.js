@@ -5,7 +5,7 @@ import { createAttachments, readyToSend } from "../attachments.js";
 import { createDetails } from "../details.js";
 import { clip, dateTimeFull, el, modelName } from "../dom.js";
 import { levelLabel } from "../efforts.js";
-import { continuedIn, earlierTurns, loadHistory } from "../history.js";
+import { continuedIn, earlierTurns, loadHistory, RESUME_SOURCE } from "../history.js";
 import { icon } from "../icons.js";
 import { createInspector } from "../inspector.js";
 import { userMessage } from "../messages.js";
@@ -55,6 +55,8 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
   let status = run.status;
   let model = run.model;
   let active = detail.active;
+  // The daemon cut the run off and a new run can go on from where it stopped.
+  let resumable = detail.resumable;
   let finishedAt = run.finished_at;
   let following = active;
   let ticker = null;
@@ -82,6 +84,22 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
     },
     icon("stop"),
     el("span", { class: "label" }, "Cancel"),
+  );
+  const resumeButton = el(
+    "button",
+    {
+      class: "btn primary",
+      type: "button",
+      title: "Start a run on this conversation that goes on from where the daemon cut this one off",
+      onclick: () =>
+        attempt(async () => {
+          const next = await api.post(`/runs/${runId}/resume`, null);
+          toast("ok", "Resuming the run…");
+          ctx.navigate(`/runs/${next.id}`);
+        }),
+    },
+    icon("arrowRight"),
+    el("span", { class: "label" }, "Continue"),
   );
   const parentChip =
     run.parent_run_id === null ? null : el("a", { class: "chip", href: `#/runs/${run.parent_run_id}` }, icon("branch"), "Delegated by another run");
@@ -268,6 +286,7 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
 
   function syncControls() {
     cancelButton.hidden = !active;
+    resumeButton.hidden = active || !resumable;
     dock.hidden = run.parent_run_id !== null;
     input.placeholder = active
       ? "Steer this run (Dot reads it before its next step), or ask on the side with /btw…"
@@ -358,6 +377,7 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
         return;
       }
       run = fresh.run;
+      resumable = fresh.resumable;
       status = run.status;
       model = run.model;
       finishedAt = run.finished_at;
@@ -423,6 +443,7 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
     modeChips,
     parentChip,
     inspector.toggle,
+    resumeButton,
     cancelButton,
   );
 
@@ -435,7 +456,8 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
       connectionNote,
       problem,
       earlierTurns(history.earlier),
-      userMessage(run.goal, dateTimeFull(run.created_at)),
+      // A resumed run's goal is the one of the run above it; its timeline opens with how it resumed that run.
+      run.source === RESUME_SOURCE ? null : userMessage(run.goal, dateTimeFull(run.created_at)),
       timeline.element,
       waitingList,
       continuedIn(history.later),

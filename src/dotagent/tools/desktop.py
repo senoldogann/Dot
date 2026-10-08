@@ -63,7 +63,7 @@ _LABEL_CHARS: int = 50
 _DEFAULT_READ_CHARS: int = 6000
 _QUICK_TIMEOUT_S: float = 45.0
 _SLOW_TIMEOUT_S: float = 120.0
-_ACT_TOOL: str = "desktop_act"
+DESKTOP_ACT_TOOL: str = "desktop_act"
 
 _REF_HELP: str = (
     "Refs (a12, …) come from the latest snapshot of that application; they stay valid until the window is rebuilt, "
@@ -325,7 +325,9 @@ def _act_tool() -> RegisteredTool:
         summary: str = f"{app}: " + "; ".join(
             _step_label(step, context) for step, context in zip(args.steps, contexts, strict=True)
         )
-        return _action(_ACT_TOOL, _batch_kind(args.steps, contexts), assessment.risk, summary, app, assessment.flags)
+        return _action(
+            DESKTOP_ACT_TOOL, _batch_kind(args.steps, contexts), assessment.risk, summary, app, assessment.flags
+        )
 
     async def run(args: ActArgs, ctx: ToolContext, authorized: ActionInfo) -> ToolResult:
         async def review(step_review: StepReview) -> None:
@@ -338,7 +340,7 @@ def _act_tool() -> RegisteredTool:
                 return
             await ctx.gate.authorize(
                 _action(
-                    _ACT_TOOL,
+                    DESKTOP_ACT_TOOL,
                     kind,
                     live.risk,
                     f"{step_review.context.app}: {_step_label(step_review.step, step_review.context)}",
@@ -352,7 +354,7 @@ def _act_tool() -> RegisteredTool:
         return _screen_result(render_act_outcome(outcome, source, _nonce()))
 
     return make_reviewed_tool(
-        name=_ACT_TOOL,
+        name=DESKTOP_ACT_TOOL,
         description=(
             "Operate a Mac application with real pointer and keyboard events, several steps per call. Prefer refs "
             "from the latest snapshot to coordinates. press activates a button, checkbox or menu item through "

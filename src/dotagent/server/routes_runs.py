@@ -12,7 +12,8 @@ from dotagent.agent.aside import AsideAnswer, answer_aside
 from dotagent.agent.attachments import StoredAttachment, load_attachments, store_attachment
 from dotagent.core.errors import InvalidValueError
 from dotagent.llm.router import parse_model_ref
-from dotagent.server.context import UI_SOURCE, ServerContext
+from dotagent.server import UI_SOURCE
+from dotagent.server.context import ServerContext
 from dotagent.server.stream import SSE_HEADERS, SSE_TYPE, follow_lifecycle, follow_run
 from dotagent.server.views import (
     ApprovalsQuery,
@@ -35,10 +36,15 @@ def runs_router(ctx: ServerContext) -> APIRouter:
     store: Store = ctx.runtime.store
 
     async def detail(run_id: str) -> RunDetail:
+        # A run's end is stored before it stops being active, so a run read after it was seen not to be active is read
+        # with its end; read the other way round, a run that ends in between would show as neither active nor ended.
+        active: bool = run_id in ctx.manager.active_run_ids()
+        run: RunRecord = await store.get_run(run_id)
         return RunDetail(
-            run=await store.get_run(run_id),
+            run=run,
             children=await store.list_child_runs(run_id),
-            active=run_id in ctx.manager.active_run_ids(),
+            active=active,
+            resumable=await ctx.manager.resumable(run),
         )
 
     @router.get("/runs")
@@ -95,6 +101,12 @@ def runs_router(ctx: ServerContext) -> APIRouter:
     async def ask_aside(run_id: str, request: AsideRequest) -> AsideAnswer:
         """A side question about the run, answered without the run seeing it (see ``agent.aside``)."""
         return await answer_aside(ctx.runtime, run_id, request.text)
+
+    @router.post("/runs/{run_id}/resume", status_code=201)
+    async def resume_run(run_id: str) -> RunRecord:
+        """Resume a run that the daemon cut off: a new run on its thread goes on from where it stopped (see
+        ``agent.resume``). Returns the new run."""
+        return await ctx.manager.resume(run_id)
 
     @router.post("/runs/{run_id}/cancel", status_code=202)
     async def cancel_run(run_id: str) -> RunDetail:

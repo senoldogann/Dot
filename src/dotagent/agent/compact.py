@@ -4,7 +4,7 @@ from collections.abc import Sequence
 
 from dotagent.core.jsonutil import dumps_compact
 from dotagent.core.text import truncate_middle
-from dotagent.llm.types import Message, ToolSpec
+from dotagent.llm.types import Message, ToolCall, ToolSpec
 
 # Characters per token in the estimate; the loop calibrates the estimate against the provider's own counts.
 CHARS_PER_TOKEN: float = 3.2
@@ -99,6 +99,20 @@ def repair_history(messages: Sequence[Message]) -> list[Message]:
     if open_calls:
         flush_pending()
     return repaired
+
+
+def pending_calls(messages: Sequence[Message]) -> tuple[ToolCall, ...]:
+    """The calls of the newest assistant message that have no result, when only tool results follow that message: the
+    calls a run was making when it was cut off. A run stores the results of a step only once the whole step is over,
+    so a cut-off step leaves all of its calls here, also those that finished. Empty when a message of another role
+    follows, since the conversation went on from there."""
+    start: int = len(messages)
+    while start > 0 and messages[start - 1].role == "tool":
+        start -= 1
+    if start == 0 or messages[start - 1].role != "assistant":
+        return ()
+    answered: set[str | None] = {message.tool_call_id for message in messages[start:]}
+    return tuple(call for call in messages[start - 1].tool_calls if call.id not in answered)
 
 
 def split_for_summary(

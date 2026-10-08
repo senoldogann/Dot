@@ -169,9 +169,13 @@ class BrowserModeRequest(FrozenModel):
 
 
 class RunDetail(FrozenModel):
+    """A run as its page shows it. ``resumable`` is true when the daemon cut the run off and a new run can go on from
+    where it stopped (see ``agent.resume``)."""
+
     run: RunRecord
     children: list[RunRecord]
     active: bool
+    resumable: bool
 
 
 class MemoryPage(FrozenModel):

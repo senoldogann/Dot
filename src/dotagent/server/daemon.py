@@ -26,6 +26,7 @@ from dotagent.server.app import create_app
 from dotagent.server.context import ServerContext
 from dotagent.server.guard import read_or_create_token, require_loopback
 from dotagent.server.links import base_url
+from dotagent.store.models import RunRecord
 
 log = get_logger(__name__)
 
@@ -152,6 +153,9 @@ async def run_daemon(config: AppConfig) -> None:
             cleanup.push_async_callback(manager.shutdown)
             cleanup.push_async_callback(scheduler.stop)
             recovered: int = await manager.recover()
+            # Before the scheduler and the server start: a resumed run takes its place before any new run, and no new
+            # message reaches its thread before it.
+            resumed: tuple[RunRecord, ...] = await manager.resume_safe() if config.agent.resume == "safe" else ()
             scheduler_loop: asyncio.Task[None] = await scheduler.start()
             stopping: asyncio.Event = asyncio.Event()
             context: ServerContext = ServerContext(
@@ -169,7 +173,12 @@ async def run_daemon(config: AppConfig) -> None:
             stopper: asyncio.Task[None] = asyncio.create_task(_stop_server_on(stop, server), name="stop-server")
             cleanup.push_async_callback(_cancelled, stopper)
             log.info(
-                "daemon_started", url=base_url(host, port), pid=os.getpid(), home=str(dot_home()), recovered=recovered
+                "daemon_started",
+                url=base_url(host, port),
+                pid=os.getpid(),
+                home=str(dot_home()),
+                recovered=recovered,
+                resumed=[run.id for run in resumed],
             )
             if not stop.is_set():
                 await server.serve(sockets=[listener])

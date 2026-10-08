@@ -1478,6 +1478,12 @@ details[open] > summary .chev {
   margin-top: 2px;
 }
 
+/* A link at the end of a note stays on one line; the text before it wraps. */
+.note > a {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
 .note.warn {
   color: var(--warn);
 }

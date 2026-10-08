@@ -7,7 +7,7 @@ import getpass
 import secrets
 import signal
 import sys
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Awaitable, Callable
 from pathlib import Path
 from typing import Annotated, Literal, get_args
 
@@ -147,6 +147,14 @@ class RunCommand(FrozenModel):
     verbose: bool
 
 
+class ResumeCommand(FrozenModel):
+    name: Literal["resume"]
+    run_id: str
+    no_input: bool
+    thinking: bool
+    verbose: bool
+
+
 class ChatCommand(FrozenModel):
     name: Literal["chat"]
     model: str | None
@@ -232,6 +240,7 @@ class MemoryReindexCommand(FrozenModel):
 
 type Command = Annotated[
     RunCommand
+    | ResumeCommand
     | ChatCommand
     | ModelsCommand
     | ModelsProfileCommand
@@ -296,6 +305,17 @@ def build_parser() -> argparse.ArgumentParser:
     run.add_argument("--no-input", action="store_true", help="never prompt; approvals are denied")
     run.add_argument("--thinking", action="store_true", help="show the model's reasoning stream")
     run.add_argument("--verbose", action="store_true", help="show tool output and token use")
+
+    resume = commands.add_parser(
+        "resume", help="go on with a run that a restart or a shutdown of the daemon cut off, and print the result"
+    )
+    resume.add_argument(
+        "run_id",
+        help="the id of the run that was cut off: the last line of 'dotx run' and the run page's address show it",
+    )
+    resume.add_argument("--no-input", action="store_true", help="never prompt; approvals are denied")
+    resume.add_argument("--thinking", action="store_true", help="show the model's reasoning stream")
+    resume.add_argument("--verbose", action="store_true", help="show tool output and token use")
 
     chat = commands.add_parser("chat", help="talk with Dot interactively")
     chat.add_argument("--model", default=None, help="provider:model")
@@ -530,13 +550,24 @@ async def execute_run(
     thread_id: str | None,
 ) -> RunRecord:
     """Start one run, show its events live and return the finished record. Ctrl-C stops the run."""
+    return await follow_run(
+        runtime,
+        manager,
+        ui,
+        lambda: manager.start(goal, mode, model, thread_id, "cli", None, effort, approvals, goal_mode, ()),
+    )
+
+
+async def follow_run(
+    runtime: Runtime, manager: RunManager, ui: TerminalUi, launch: Callable[[], Awaitable[RunRecord]]
+) -> RunRecord:
+    """Start a run with ``launch``, show its events live and return the finished record. Ctrl-C stops the run. The
+    events are followed before the run starts, so none of them is missed."""
     loop: asyncio.AbstractEventLoop = asyncio.get_running_loop()
     main_task: asyncio.Task[object] | None = asyncio.current_task()
     async with runtime.bus.subscribe(None) as subscription:
         pump: asyncio.Task[None] = asyncio.create_task(_pump(subscription, ui))
-        run: RunRecord = await manager.start(
-            goal, mode, model, thread_id, "cli", None, effort, approvals, goal_mode, ()
-        )
+        run: RunRecord = await launch()
         presses: list[int] = []
 
         def on_interrupt() -> None:
@@ -598,6 +629,26 @@ async def cmd_run(command: RunCommand) -> int:
             command.approvals,
             command.goal_mode,
             command.thread,
+        )
+    finally:
+        await close_runtime(runtime)
+    _print_result(run)
+    return 0 if run.status == "done" else 1
+
+
+async def cmd_resume(command: ResumeCommand) -> int:
+    """Resume a run that the daemon cut off in this process, like ``dotx run``: see ``RunManager.resume``."""
+    runtime: Runtime = await build_runtime(load_user_config())
+    try:
+        options: UiOptions = UiOptions(
+            interactive=sys.stdin.isatty() and not command.no_input,
+            stream_text=False,
+            show_thinking=command.thinking,
+            verbose=command.verbose,
+        )
+        manager: RunManager = RunManager(runtime)
+        run: RunRecord = await follow_run(
+            runtime, manager, TerminalUi(runtime, options), lambda: manager.resume(command.run_id)
         )
     finally:
         await close_runtime(runtime)
@@ -842,6 +893,8 @@ async def dispatch(command: Command) -> int:
     match command:
         case RunCommand():
             return await cmd_run(command)
+        case ResumeCommand():
+            return await cmd_resume(command)
         case ChatCommand():
             return await cmd_chat(command)
         case ModelsCommand():

@@ -25,7 +25,7 @@ from dotagent.config import load_default_config
 from dotagent.evals import EVAL_SOURCE
 from dotagent.policy.types import ApprovalMode
 from dotagent.scheduler import SCHEDULE_SOURCE
-from dotagent.server.context import UI_SOURCE
+from dotagent.server import UI_SOURCE
 from dotagent.store.endings import PREFIX_STALLED, classify_ending
 from dotagent.tools.delegate import DELEGATE_SOURCE
 from dotagent.tools.meta import ASK_USER_TOOL, FINISH_TOOL, MARK_PLAN_STEP_TOOL, UPDATE_PLAN_TOOL

@@ -36,6 +36,7 @@ from dotagent.server.context import ServerContext
 from dotagent.server.daemon import DotServer, bind_listener, serving_config
 from dotagent.server.links import ui_url
 from dotagent.server.views import PermissionsView
+from dotagent.store.endings import RESULT_RESTARTED, RESULT_STOPPED
 from dotagent.store.models import ApprovalRecord, EventRecord, RunRecord, ThreadRecord, ThreadSummary
 
 pytestmark = pytest.mark.asyncio(loop_scope="module")
@@ -635,6 +636,29 @@ async def test_the_stream_of_a_run_that_nothing_is_running_ends_after_what_it_st
     told: list[EventRecord] = await _tell(runtime, [(run.id, "run_queued", _queued(None)), (run.id, "run_started", {})])
     answer: httpx.Response = await asyncio.wait_for(client.get(f"/api/runs/{run.id}/stream"), 10.0)
     assert [item.id for item in parse_sse(answer.text)] == [event.id for event in told]
+
+
+async def test_only_a_run_the_daemon_cut_off_is_offered_to_be_resumed(
+    client: httpx.AsyncClient, runtime: Runtime
+) -> None:
+    cut: RunRecord = await _stored_run(runtime, None)
+    await runtime.store.finish_run(cut.id, "failed", RESULT_RESTARTED)
+    stopped: RunRecord = await _stored_run(runtime, None)
+    await runtime.store.finish_run(stopped.id, "cancelled", RESULT_STOPPED)
+    child: RunRecord = await _stored_run(runtime, cut.id)
+    await runtime.store.finish_run(child.id, "failed", RESULT_RESTARTED)
+    offered: list[bool] = []
+    for run in (cut, stopped, child):
+        detail: httpx.Response = await client.get(f"/api/runs/{run.id}")
+        assert detail.status_code == 200, detail.text
+        offered.append(detail.json()["resumable"])
+    assert offered == [True, False, False]
+    # Resuming is refused with what the run is, and nothing starts.
+    refused: httpx.Response = await client.post(f"/api/runs/{stopped.id}/resume")
+    assert refused.status_code == 409, refused.text
+    assert refused.json()["context"]["result"] == RESULT_STOPPED
+    assert [run.id for run in await runtime.store.list_runs(1, stopped.thread_id)] == [stopped.id]
+    assert (await client.post("/api/runs/run_missing/resume")).status_code == 404
 
 
 async def test_the_lifecycle_stream_carries_only_the_moments_a_client_refetches_for(

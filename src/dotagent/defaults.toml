@@ -118,6 +118,14 @@ tool_surface = "full"
 # again with the same answer. The paths looked at are ~ paths and absolute paths under /Users, /tmp, /private, /var,
 # /opt, /Applications and /Library. No model call is made for it. Off until evals show that it helps.
 verify_answer_paths = false
+# A run that a restart, a crash or a shutdown of the daemon cut off can go on as a new run on the same thread, which
+# is told what the run did, how each call of its last step ended, and its plan. By hand: `dotx resume RUN_ID`, or
+# Continue on the run's page. "safe" also resumes on its own, when the daemon starts, a run of the web UI that was cut
+# off at most resume_within_s seconds before and whose calls that were cut off while they ran only read. A run the
+# owner stopped, a run another run started and a run after which the thread went on are never resumed. "off" until
+# evals show that it helps.
+resume = "off"
+resume_within_s = 1800
 
 [policy]
 # aggressive: act without asking except for the hard stops; balanced: ask for external side effects;

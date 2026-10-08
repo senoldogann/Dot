@@ -72,6 +72,7 @@ class ModelsConfig(FrozenModel):
 type Tier = Literal["standard", "weak"]
 type ScaffoldMode = Literal["fixed", "measured"]
 type ToolSurface = Literal["full", "grouped", "auto"]
+type ResumeMode = Literal["off", "safe"]
 
 
 class AgentConfig(FrozenModel):
@@ -96,6 +97,8 @@ class AgentConfig(FrozenModel):
     reminder_every: int
     tool_surface: ToolSurface
     verify_answer_paths: bool
+    resume: ResumeMode
+    resume_within_s: int
 
 
 class PolicyConfig(FrozenModel):

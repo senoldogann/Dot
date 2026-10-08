@@ -11,6 +11,9 @@ const THREAD_LIMIT = 200;
 const SHOWN_TURNS = 40;
 const GOAL_CHARS = 90;
 const FINISHED = new Set(["done", "failed", "cancelled"]);
+// The source of a run that goes on from where the daemon cut the run before it off (agent/resume.py): its goal is that
+// run's goal, so it is not shown as asked again.
+export const RESUME_SOURCE = "resume";
 
 /** The runs of a thread that the user started, oldest first; delegated runs belong to the run that delegated them. */
 function conversation(runs) {
@@ -37,7 +40,11 @@ function turn(past) {
   const answer = FINISHED.has(past.status)
     ? answerMessage({ status: past.status, text: past.result, endedAt: past.finished_at, startedAt: past.created_at, href })
     : el("div", { class: "note" }, icon("clock"), el("span", null, "This run is still going."), el("a", { class: "small", href }, "Open run"));
-  return el("section", { class: "turn" }, userMessage(past.goal, dateTimeFull(past.created_at)), answer);
+  const asked =
+    past.source === RESUME_SOURCE
+      ? el("div", { class: "note" }, icon("refresh"), el("span", null, "Resumed where the daemon cut the run above off"))
+      : userMessage(past.goal, dateTimeFull(past.created_at));
+  return el("section", { class: "turn" }, asked, answer);
 }
 
 /** The earlier turns of the conversation as one block, or null when there are none. */

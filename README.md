@@ -166,7 +166,9 @@ answer (a small model that is offered both writes the call out as text).
   becomes the result as written. Use a larger model as `main` for task and research runs.
 - At most `max_concurrent_runs` runs go at once; the others wait. Delegated runs do not count.
 - Runs, their events and their conversations are stored in a SQLite database, so the web UI can replay them. A run
-  that a crashed daemon left behind is marked as failed the next time Dot starts.
+  that a crashed daemon left behind is marked as failed the next time Dot starts, as ended at its last event. It can be
+  resumed, and so can a run that a shutdown of the daemon cut off (see
+  [Autonomy](#autonomy-approvals-goal-mode-and-the-end-of-a-run)).
 - A message sent to a running run (steering) reaches the model at its next step. It also clears the run's untrusted
   mark (see [Safety](#safety)).
 - A run belongs to the daemon, not to the page that started it: leave the chat and it goes on, its status stays live in
@@ -346,6 +348,23 @@ shows in the timeline with what was seen and what was done. The ladder is off by
 helps; without it, a run that keeps changing its steps without getting anywhere goes on using the model until you stop
 it. Give such a run a goal that can be checked, and keep an eye on the token count of a long one (`--verbose`, or the
 Details panel).
+
+**Resuming a run that was cut off.** A run that a crash, a restart or a shutdown of the daemon cut off can go on where
+it stopped: Continue on the run's page, `dotx resume RUN_ID` (in this terminal, like `dotx run`), or
+`POST /api/runs/{id}/resume`. A new run starts in the same chat, with the goal, model, reasoning level, approval mode
+and goal mode of the run it resumes, and the conversation so far. Its first message tells the model how that run was
+cut off and how each call of the step it was in ended: finished (with the start of its result), cut off while it ran,
+or not started. A call that was cut off may have changed something unless it only reads, and the model is told to check
+before it runs it again. The plan of that run is the plan of the new one. Only the newest run of a chat can be
+resumed, and never a run that you stopped or that another run started.
+
+With `resume = "safe"` in `[agent]` the daemon also resumes runs on its own when it starts: runs of the web UI, cut off
+at most `resume_within_s` seconds before (30 minutes), whose calls that were cut off only read (a question to you
+counts: it is asked again). A run of `dotx run`, of a schedule or of an eval, a run that itself resumed another (so a
+run that brings the daemon down is not resumed again and again), and a run cut off in a call that may have changed
+something (a command, a write, a click, or a delegation, whose run may have done anything) wait for you. `resume` is
+`"off"` by default until evals show that it helps. The timeline of the new run shows how each call ended, with a link to
+the run it resumes.
 
 ## Measuring the agent
 
@@ -843,3 +862,8 @@ src/dotagent/
   what bounds the cost is the stop button, the progress watchdog, `goal_patience` for the send-backs of goal mode, and
   the concurrency limits (`max_concurrent_runs`). Without `stall_escalation`, a run that varies its steps without getting
   anywhere ends only when you stop it.
+- Resuming: in goal mode, the goal check of a resumed run judges from what the resumed run did, not from the steps of
+  the run it resumes. The conversation shows every call of the step that was cut off as interrupted, also the ones that
+  finished; the first message of the resumed run says which finished. A run of `dotx run` works in its own process, but
+  a daemon that starts while it works marks it as cut off all the same: do not resume it by hand while `dotx run` still
+  shows it (the daemon never resumes such a run on its own).
