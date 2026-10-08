@@ -18,6 +18,7 @@ from pydantic import JsonValue
 
 from dotagent.agent.continuity import identifiers
 from dotagent.agent.executor import ToolOutcome
+from dotagent.core.text import redact_secrets
 from dotagent.core.types import FrozenModel
 from dotagent.policy.paths import expand_path
 from dotagent.policy.types import ActionInfo
@@ -84,7 +85,9 @@ def new_facts() -> RunFacts:
 
 
 def _flat(text: str, limit: int) -> str:
-    flat: str = " ".join(text.split())
+    """``text`` on one line and at most ``limit`` characters, secrets masked before the cut, which could leave a part
+    of a secret too short to be recognised."""
+    flat: str = " ".join(redact_secrets(text).split())
     return flat if len(flat) <= limit else f"{flat[: limit - 1]}…"
 
 

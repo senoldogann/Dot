@@ -7,7 +7,7 @@ from dataclasses import dataclass
 
 from dotagent.agent.attachments import StoredAttachment, UserInput
 from dotagent.agent.gate import RunGate
-from dotagent.agent.lessons import LessonCase, learn
+from dotagent.agent.lessons import LessonCase, dismiss_lesson, learn, save_lesson
 from dotagent.agent.loop import AgentRun, RunEnd, RunOpening, run_agent
 from dotagent.agent.plan import PLAN_EVENT, plan_from_event
 from dotagent.agent.resume import (
@@ -27,6 +27,7 @@ from dotagent.core.logs import get_logger
 from dotagent.core.text import redact_secrets, truncate_tail
 from dotagent.llm.router import ModelRef, parse_model_ref
 from dotagent.llm.types import Effort, ModelInfo
+from dotagent.memory.service import SavedMemory
 from dotagent.policy.types import ApprovalMode
 from dotagent.runtime import Runtime
 from dotagent.store.endings import (
@@ -83,6 +84,8 @@ class RunManager:
         self._stopping: bool = False
         # Runs that ended and whose lessons are being drawn (:mod:`dotagent.agent.lessons`), by run id.
         self._learning: dict[str, asyncio.Task[None]] = {}
+        # Held while a lesson is saved or dismissed, by the owner or by ``auto``, so that each is decided once.
+        self._deciding: asyncio.Lock = asyncio.Lock()
 
     async def recover(self) -> int:
         """Close out what a previous process left behind. Returns the number of interrupted runs."""
@@ -232,6 +235,14 @@ class RunManager:
         task: asyncio.Task[None] | None = self._learning.get(run_id)
         if task is not None:
             await task
+
+    async def save_lesson(self, run_id: str, index: int) -> SavedMemory:
+        """Save a lesson proposed for a run that ended (see :func:`dotagent.agent.lessons.save_lesson`)."""
+        return await save_lesson(self._runtime, self._deciding, run_id, index)
+
+    async def dismiss_lesson(self, run_id: str, index: int) -> None:
+        """Dismiss a lesson proposed for a run that ended (see :func:`dotagent.agent.lessons.dismiss_lesson`)."""
+        await dismiss_lesson(self._runtime, self._deciding, run_id, index)
 
     async def shutdown(self) -> None:
         """Stop every live run. They end as cancelled with a result that says the daemon shut down, so the owner can tell
@@ -489,7 +500,7 @@ class RunManager:
         """Task body of drawing the lessons of a run that ended. Unexpected exceptions are logged with their traceback;
         the run keeps its end either way."""
         try:
-            await learn(self._runtime, case)
+            await learn(self._runtime, self._deciding, case)
         except Exception:
             log.exception("lessons crashed", run_id=case.run_id)
         finally:

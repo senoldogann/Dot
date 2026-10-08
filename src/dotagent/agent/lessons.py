@@ -13,10 +13,12 @@ embeddings, by its meaning) drops the lesson too.
 With ``propose`` the lessons stay on the run (a ``lessons_proposed`` event), and the run's page saves each to memory or
 dismisses it. With ``auto`` they are saved as notes tagged ``lesson`` whose source is the run, so later runs find them
 by relevance like the agent's other notes; after a run that read content third parties can author, which can plant a
-lesson, they are only proposed. Every function here is pure except :func:`learn`, :func:`run_lessons`,
-:func:`save_lesson` and :func:`dismiss_lesson`, which read or write the store and the memory.
+lesson, they are only proposed. A lesson is decided once: every save or dismissal, by the owner or by ``auto``, holds
+the run manager's lock while it looks at the lesson and acts. Every function here is pure except :func:`learn`,
+:func:`run_lessons`, :func:`save_lesson` and :func:`dismiss_lesson`, which read or write the store and the memory.
 """
 
+import asyncio
 import re
 from collections.abc import Sequence
 from typing import Literal
@@ -26,7 +28,7 @@ from pydantic import BaseModel, ConfigDict
 from dotagent.agent.review import LessonProposal, LessonRequest, LessonWriter, lesson_writer_for, shorten_reason
 from dotagent.agent.verify import CallFact
 from dotagent.config import LessonsMode
-from dotagent.core.errors import NotFoundError, ProviderError, RunConflict
+from dotagent.core.errors import DotError, NotFoundError, RunConflict
 from dotagent.core.logs import get_logger
 from dotagent.core.text import fold_search, redact_secrets
 from dotagent.core.types import FrozenModel
@@ -57,8 +59,8 @@ _LIKE_NOTES: int = 5
 _EVENTS_READ: int = 20
 _SIGNAL_CHARS: int = 300
 _EMAIL: re.Pattern[str] = re.compile(r"[\w.+-]+@[\w-]+(?:\.[\w-]+)+")
-# A path in someone's home folder; /Users/Shared belongs to nobody.
-_HOME_PATH: re.Pattern[str] = re.compile(r"/(?:Users|home)/(?!Shared(?:/|\b))[^/\s]+")
+# A path in someone's home folder, in any case as macOS finds it; /Users/Shared belongs to nobody.
+_HOME_PATH: re.Pattern[str] = re.compile(r"/(?:Users|home)/(?!Shared(?:/|\b))[^/\s]+", re.IGNORECASE)
 
 type LessonState = Literal["proposed", "saved", "dismissed"]
 type SavedBy = Literal["auto", "owner"]
@@ -265,31 +267,35 @@ async def _drawn(runtime: Runtime, case: LessonCase, signals: tuple[str, ...]) -
     return tuple(fresh)
 
 
-async def _failed(runtime: Runtime, run_id: str, error: ProviderError, what: str) -> None:
+async def _failed(runtime: Runtime, run_id: str, error: DotError, what: str) -> None:
     log.warning("lessons_failed", run_id=run_id, what=what, error=error.message, context=error.context)
     await runtime.bus.emit(run_id, LESSONS_FAILED, {"error": f"{what}: {shorten_reason(error.message)}"}, True)
 
 
-async def _save_all(runtime: Runtime, run_id: str, lessons: tuple[str, ...]) -> None:
-    """``auto``: save every lesson; an embedding service that fails stops it, and the lessons not saved stay
-    proposed."""
+async def _save_all(runtime: Runtime, deciding: asyncio.Lock, run_id: str, lessons: tuple[str, ...]) -> None:
+    """``auto``: save every lesson that the owner did not save or dismiss first, each under ``deciding``. An error (an
+    embedding service that fails) stops it, and the lessons not saved stay proposed."""
     for index, lesson in enumerate(lessons):
-        try:
-            saved: SavedMemory = await save_memory(runtime.memory, lesson, (LESSON_TAG,), run_id)
-        except ProviderError as error:
-            await _failed(runtime, run_id, error, "A lesson could not be saved")
-            return
-        await _emit_saved(runtime, run_id, index, saved, "auto")
+        async with deciding:
+            if (await _lesson_of(runtime.store, run_id, index)).state != "proposed":
+                continue
+            try:
+                saved: SavedMemory = await save_memory(runtime.memory, lesson, (LESSON_TAG,), run_id)
+            except DotError as error:
+                await _failed(runtime, run_id, error, "A lesson could not be saved")
+                return
+            await _emit_saved(runtime, run_id, index, saved, "auto")
 
 
 async def _emit_saved(runtime: Runtime, run_id: str, index: int, saved: SavedMemory, by: SavedBy) -> None:
     await runtime.bus.emit(run_id, LESSON_SAVED, {"index": index, "memory_id": saved.record.id, "by": by}, True)
 
 
-async def learn(runtime: Runtime, case: LessonCase) -> None:
-    """Draw the lessons of a run that ended and do with them what ``[agent] lessons`` says. A run along which nothing
-    went wrong is not asked about. A review model or an embedding service that fails ends it with a ``lessons_failed``
-    event; the run keeps its end either way."""
+async def learn(runtime: Runtime, deciding: asyncio.Lock, case: LessonCase) -> None:
+    """Draw the lessons of a run that ended and do with them what ``[agent] lessons`` says; ``auto`` saves each under
+    ``deciding``, the lock of the owner's decisions. A run along which nothing went wrong is not asked about. An error
+    on the way (a review model or an embedding service that fails, the review model's missing API key) ends it with a
+    ``lessons_failed`` event; the run keeps its end either way."""
     store: Store = runtime.store
     signals: tuple[str, ...] = run_signals(
         case,
@@ -302,14 +308,14 @@ async def learn(runtime: Runtime, case: LessonCase) -> None:
         return
     try:
         lessons: tuple[str, ...] = await _drawn(runtime, case, signals)
-    except ProviderError as error:
+    except DotError as error:
         await _failed(runtime, case.run_id, error, "The lessons of this run could not be drawn")
         return
     if not lessons:
         return
     await runtime.bus.emit(case.run_id, LESSONS_PROPOSED, {"lessons": list(lessons), "tainted": case.tainted}, True)
     if runtime.config.agent.lessons == "auto" and not case.tainted:
-        await _save_all(runtime, case.run_id, lessons)
+        await _save_all(runtime, deciding, case.run_id, lessons)
 
 
 def lessons_of(
@@ -319,7 +325,8 @@ def lessons_of(
     failed: EventRecord | None,
 ) -> RunLessons | None:
     """What became of the lessons of a run, from its lesson events; ``None`` when lessons were never drawn from it. A
-    lesson that was saved counts as saved, also when it was dismissed as well."""
+    lesson that was saved counts as saved, also when it was dismissed as well. A lesson ``auto`` could not save leaves
+    its error on the run until every lesson is saved or dismissed."""
     if proposed is None and failed is None:
         return None
     error: str | None = None if failed is None else _FailedData.model_validate(failed.data).error
@@ -330,18 +337,19 @@ def lessons_of(
         data.index: data.memory_id for data in (_SavedData.model_validate(event.data) for event in saved)
     }
     dropped: set[int] = {_DismissedData.model_validate(event.data).index for event in dismissed}
+    views: list[LessonView] = [
+        LessonView(
+            index=index,
+            text=text,
+            state="saved" if index in saved_as else "dismissed" if index in dropped else "proposed",
+            memory_id=saved_as.get(index),
+        )
+        for index, text in enumerate(drawn.lessons)
+    ]
     return RunLessons(
-        lessons=[
-            LessonView(
-                index=index,
-                text=text,
-                state="saved" if index in saved_as else "dismissed" if index in dropped else "proposed",
-                memory_id=saved_as.get(index),
-            )
-            for index, text in enumerate(drawn.lessons)
-        ],
+        lessons=views,
         tainted=drawn.tainted,
-        error=error,
+        error=error if any(view.state == "proposed" for view in views) else None,
     )
 
 
@@ -355,9 +363,8 @@ async def run_lessons(store: Store, run_id: str) -> RunLessons | None:
     )
 
 
-async def _proposed_lesson(store: Store, run_id: str, index: int) -> LessonView:
-    """The lesson ``index`` of a run, which has to be proposed still: a run or a lesson that does not exist is not
-    found, and a lesson that was saved or dismissed is a conflict."""
+async def _lesson_of(store: Store, run_id: str, index: int) -> LessonView:
+    """The lesson ``index`` of a run: a run or a lesson that does not exist is not found."""
     await store.get_run(run_id)
     lessons: RunLessons | None = await run_lessons(store, run_id)
     found: LessonView | None = next(
@@ -365,6 +372,13 @@ async def _proposed_lesson(store: Store, run_id: str, index: int) -> LessonView:
     )
     if found is None:
         raise NotFoundError("the run has no such lesson", {"run_id": run_id, "index": index})
+    return found
+
+
+async def _proposed_lesson(store: Store, run_id: str, index: int) -> LessonView:
+    """The lesson ``index`` of a run, which has to be proposed still: a lesson that was saved or dismissed is a
+    conflict."""
+    found: LessonView = await _lesson_of(store, run_id, index)
     if found.state != "proposed":
         raise RunConflict(
             f"the lesson was {found.state} already", {"run_id": run_id, "index": index, "memory_id": found.memory_id}
@@ -372,15 +386,20 @@ async def _proposed_lesson(store: Store, run_id: str, index: int) -> LessonView:
     return found
 
 
-async def save_lesson(runtime: Runtime, run_id: str, index: int) -> SavedMemory:
-    """Save a proposed lesson of a run as a note tagged ``lesson`` whose source is the run (the owner's choice)."""
-    lesson: LessonView = await _proposed_lesson(runtime.store, run_id, index)
-    saved: SavedMemory = await save_memory(runtime.memory, lesson.text, (LESSON_TAG,), run_id)
-    await _emit_saved(runtime, run_id, index, saved, "owner")
+async def save_lesson(runtime: Runtime, deciding: asyncio.Lock, run_id: str, index: int) -> SavedMemory:
+    """Save a proposed lesson of a run as a note tagged ``lesson`` whose source is the run (the owner's choice). It
+    holds ``deciding`` from the look at the lesson to its ``lesson_saved`` event, so a second decision on the same
+    lesson (another page, ``auto``) waits and then finds it decided."""
+    async with deciding:
+        lesson: LessonView = await _proposed_lesson(runtime.store, run_id, index)
+        saved: SavedMemory = await save_memory(runtime.memory, lesson.text, (LESSON_TAG,), run_id)
+        await _emit_saved(runtime, run_id, index, saved, "owner")
     return saved
 
 
-async def dismiss_lesson(runtime: Runtime, run_id: str, index: int) -> None:
-    """Dismiss a proposed lesson of a run: it is not saved, and the run's page no longer offers it."""
-    await _proposed_lesson(runtime.store, run_id, index)
-    await runtime.bus.emit(run_id, LESSON_DISMISSED, {"index": index}, True)
+async def dismiss_lesson(runtime: Runtime, deciding: asyncio.Lock, run_id: str, index: int) -> None:
+    """Dismiss a proposed lesson of a run, under ``deciding`` like :func:`save_lesson`: it is not saved, and the run's
+    page no longer offers it."""
+    async with deciding:
+        await _proposed_lesson(runtime.store, run_id, index)
+        await runtime.bus.emit(run_id, LESSON_DISMISSED, {"index": index}, True)

@@ -101,6 +101,13 @@ def test_the_facts_keep_the_newest_failures_and_each_written_file_once() -> None
     assert facts.written == ("/w/b.md", "/w/a.md")
 
 
+def test_a_secret_is_masked_before_a_long_target_or_result_is_cut() -> None:
+    # Cut first, the key would keep only its first few characters: too few to be recognised as a key.
+    key: str = "sk-abcdefghijklmnopqrstuvwx"
+    facts: RunFacts = with_outcomes(new_facts(), [_shell(f"{'x' * 150} {key}", fail(f"{'y' * 190} {key}"))])
+    assert facts.failures == (CallFact(tool="shell", target=f"{'x' * 150} ***", ok=False, result=f"{'y' * 190} ***"),)
+
+
 @pytest.mark.parametrize(
     ("command", "check"),
     [

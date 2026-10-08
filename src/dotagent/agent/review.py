@@ -349,8 +349,9 @@ def _lessons_prompt(request: LessonRequest, nonce: str) -> str:
 
 
 def goal_digest(transcript: str) -> str:
-    """A run's transcript as the checker reads it: the start and the end when it is long, secrets masked."""
-    return redact_secrets(truncate_middle(transcript, _DIGEST_CHARS))
+    """A run's transcript as the checker reads it: the start and the end when it is long, secrets masked (before the
+    cut, which could leave a part of a secret too short to be recognised)."""
+    return truncate_middle(redact_secrets(transcript), _DIGEST_CHARS)
 
 
 def _verdict_from[V: FrozenModel](reply: ModelReply, tool: str, verdict_type: type[V], model: str) -> V:

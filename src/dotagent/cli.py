@@ -610,10 +610,19 @@ def _print_result(run: RunRecord) -> None:
 
 
 async def _show_lessons(runtime: Runtime, manager: RunManager, ui: TerminalUi, run_id: str) -> None:
-    """Wait until the lessons of a run that ended are drawn, then show what became of them. Ctrl-C drops them."""
+    """Wait until the lessons of a run that ended are drawn, then show what became of them. Ctrl-C drops the ones not
+    drawn or saved yet, and the command still ends with the run's status."""
     if manager.learning(run_id):
         sys.stderr.write("drawing the lessons of this run (Ctrl-C skips it)\n")
-        await manager.learned(run_id)
+        loop: asyncio.AbstractEventLoop = asyncio.get_running_loop()
+        # Cancelling the wait cancels the drawing (see RunManager.learned).
+        waiting: asyncio.Task[None] = asyncio.create_task(manager.learned(run_id))
+        loop.add_signal_handler(signal.SIGINT, waiting.cancel)
+        try:
+            await asyncio.wait({waiting})
+        finally:
+            loop.remove_signal_handler(signal.SIGINT)
+            waiting.cancel()
     lessons: RunLessons | None = await run_lessons(runtime.store, run_id)
     if lessons is not None:
         ui.show_lessons(lessons)

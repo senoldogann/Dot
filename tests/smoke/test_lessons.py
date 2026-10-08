@@ -268,6 +268,38 @@ async def test_proposed_lessons_wait_on_the_run_until_the_owner_saves_or_dismiss
         assert await store.count_memories() == 1
 
 
+async def test_two_presses_of_save_at_once_save_the_lesson_once(login_env: dict[str, str]) -> None:
+    async with _home(_config("propose"), login_env, [*_stumbles(NOTES, ()), _lessons(LESSON)]) as home:
+        run: RunRecord = await _run(home)
+        async with _client(home) as client:
+            presses: tuple[httpx.Response, ...] = tuple(
+                await asyncio.gather(*(client.post(f"/api/runs/{run.id}/lessons/0/save") for _ in range(2)))
+            )
+        assert sorted(press.status_code for press in presses) == [200, 409], [press.text for press in presses]
+        assert len(await home.runtime.store.events_of_kind(run.id, "lesson_saved", _EVENTS_READ)) == 1
+        assert await home.runtime.store.count_memories() == 1
+
+
+async def test_auto_leaves_a_lesson_alone_that_the_owner_dismissed_while_it_saved(login_env: dict[str, str]) -> None:
+    async with (
+        _home(_config("auto"), login_env, [*_stumbles(NOTES, ()), _lessons(LESSON, OTHER)]) as home,
+        home.runtime.bus.subscribe(None) as heard,
+    ):
+        run: RunRecord = await home.manager.start(
+            GOAL, "task", SCRIPTED_MODEL, None, EVAL_SOURCE, None, None, "ask", False, ()
+        )
+        async with asyncio.timeout(_TIME_LIMIT_S):
+            while (await heard.queue.get()).kind != "lessons_proposed":
+                continue
+            # The owner dismisses the second lesson as soon as the page offers it, while the first is being saved.
+            await home.manager.dismiss_lesson(run.id, 1)
+            await home.manager.learned(run.id)
+        lessons: RunLessons | None = await run_lessons(home.runtime.store, run.id)
+        assert lessons is not None
+        assert [lesson.state for lesson in lessons.lessons] == ["saved", "dismissed"]
+        assert await home.runtime.store.count_memories() == 1
+
+
 async def test_auto_saves_the_lessons_of_a_run_and_drops_a_lesson_a_saved_note_already_says(
     login_env: dict[str, str],
 ) -> None:

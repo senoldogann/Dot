@@ -155,24 +155,23 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
     el("div", { class: "card-head" }, icon("sparkle"), el("span", null, "Lessons from this run")),
     lessonsBody,
   );
-  // True while a lesson is being saved or dismissed, so that a second press does not send it twice.
-  let decidingLesson = false;
+  // The lessons being saved or dismissed, by index, so that a second press does not send the same decision twice.
+  const decidingLessons = new Set();
 
   async function decideLesson(index, action) {
-    if (decidingLesson) {
+    if (decidingLessons.has(index)) {
       return;
     }
-    decidingLesson = true;
+    decidingLessons.add(index);
     try {
       await attempt(async () => {
-        const fresh = await api.post(`/runs/${runId}/lessons/${index}/${action}`, null);
-        if (!signal.aborted) {
-          paintLessons(fresh.lessons);
-        }
+        await api.post(`/runs/${runId}/lessons/${index}/${action}`, null);
         toast("ok", action === "save" ? "Saved to memory: later runs find it like any note." : "The lesson is dismissed.");
       });
+      // Decided now, or decided elsewhere meanwhile (another page, `auto`): show what became of every lesson.
+      await reconcile();
     } finally {
-      decidingLesson = false;
+      decidingLessons.delete(index);
     }
   }
 
@@ -439,10 +438,16 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
     }
   }
 
+  // Only the newest refresh paints: lesson events come in bursts, and an older answer that arrives last would put back
+  // what changed since.
+  let refreshes = 0;
+
   async function reconcile() {
+    refreshes += 1;
+    const mine = refreshes;
     try {
       const fresh = await api.get(`/runs/${runId}`);
-      if (signal.aborted) {
+      if (signal.aborted || mine !== refreshes) {
         return;
       }
       run = fresh.run;

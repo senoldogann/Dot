@@ -136,6 +136,7 @@ def test_a_signal_is_one_short_line_without_secrets() -> None:
         ("Send the weekly summary to someone@example.com every Monday.", "an e-mail address"),
         ("The reports live under /Users/alice/Documents/reports.", "a path in a home folder"),
         ("The reports live under /home/bob/reports on the server.", "a path in a home folder"),
+        ("The reports live under /users/alice/reports, as macOS also finds them.", "a path in a home folder"),
         ("Shared reports live under /Users/Shared/reports for every account.", None),
         ("The daemon's log is ~/Library/Logs/Dot/dotx.log, not the workspace.", None),
         (LESSON, None),
@@ -193,4 +194,21 @@ def test_each_proposed_lesson_shows_what_was_done_with_it() -> None:
         ],
         tainted=True,
         error="A lesson could not be saved: the embedder is down",
+    )
+
+
+def test_the_error_of_a_lesson_auto_could_not_save_goes_once_every_lesson_is_decided() -> None:
+    proposed: EventRecord = _event("lessons_proposed", {"lessons": [LESSON, CSV_LESSON], "tainted": False})
+    saved: list[EventRecord] = [
+        _event("lesson_saved", {"index": 0, "memory_id": "mem-1", "by": "auto"}),
+        _event("lesson_saved", {"index": 1, "memory_id": "mem-2", "by": "owner"}),
+    ]
+    failed: EventRecord = _event("lessons_failed", {"error": "A lesson could not be saved: the embedder is down"})
+    assert lessons_of(proposed, saved, [], failed) == RunLessons(
+        lessons=[
+            LessonView(index=0, text=LESSON, state="saved", memory_id="mem-1"),
+            LessonView(index=1, text=CSV_LESSON, state="saved", memory_id="mem-2"),
+        ],
+        tainted=False,
+        error=None,
     )
