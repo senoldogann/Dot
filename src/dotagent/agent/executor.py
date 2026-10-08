@@ -2,7 +2,7 @@
 
 import asyncio
 import time
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, replace
 
 from dotagent.agent.gate import RunGate
@@ -115,16 +115,32 @@ async def _run_checked(
     return _with_approval_note(result, note), action
 
 
-async def _execute_one(call: ToolCall, registry: ToolRegistry, ctx: ToolContext, gate: RunGate) -> ToolOutcome:
+def _turn_on_action(tool: str, group: str) -> ActionInfo:
+    return ActionInfo(
+        tool=tool, kind="meta", risk="safe", summary=f"Turn on the tool group {group}", target="", flags=()
+    )
+
+
+async def _execute_one(
+    call: ToolCall, registry: ToolRegistry, hidden: Mapping[str, str], ctx: ToolContext, gate: RunGate
+) -> ToolOutcome:
     started: float = time.monotonic()
     await ctx.runtime.bus.emit(
         ctx.run_id, "tool_call", {"call_id": call.id, "tool": call.name, "args": _safe_json(call.arguments)}, True
     )
     tool: RegisteredTool | None = registry.tools.get(call.name)
     action: ActionInfo | None = None
-    if tool is None:
+    group: str | None = hidden.get(call.name)
+    if group is not None:
+        # The model could not know the tool's parameters: it was not in the tool list. The run turns its group on.
+        action = _turn_on_action(call.name, group)
+        result: ToolResult = fail(
+            f"{call.name} did not run: it is in the tool group {group}, which was off. The group is on now: call "
+            f"{call.name} again."
+        )
+    elif tool is None:
         available: str = ", ".join(sorted(name for name, entry in registry.tools.items() if ctx.mode in entry.modes))
-        result: ToolResult = fail(f"Unknown tool '{call.name}'. Available tools: {available}.")
+        result = fail(f"Unknown tool '{call.name}'. Available tools: {available}.")
     elif ctx.mode not in tool.modes:
         result = fail(f"Tool '{call.name}' is not available in {ctx.mode} mode.")
     elif (broken := invalid_arguments_text(call.arguments)) is not None:
@@ -178,12 +194,14 @@ def _group_calls(calls: Sequence[ToolCall], registry: ToolRegistry) -> list[list
 async def execute_calls(
     calls: Sequence[ToolCall],
     registry: ToolRegistry,
+    hidden: Mapping[str, str],
     ctx: ToolContext,
     gate: RunGate,
     parallelism: int,
 ) -> list[ToolOutcome]:
     """Run the calls of one model turn in order, overlapping read-only ones. Results keep the call order; the text of
-    each is clipped to the run's ``ctx.output_chars``."""
+    each is clipped to the run's ``ctx.output_chars``. ``hidden`` maps the tools of the tool groups that are off to
+    their group: a call of one of them does not run, and its result says to call it again now that its group is on."""
     finish_index: int | None = next((index for index, call in enumerate(calls) if call.name == FINISH_TOOL), None)
     runnable: Sequence[ToolCall] = calls if finish_index is None else calls[: finish_index + 1]
     skipped: list[ToolOutcome] = [] if finish_index is None else [_skipped(call) for call in calls[finish_index + 1 :]]
@@ -191,12 +209,12 @@ async def execute_calls(
 
     async def bounded(call: ToolCall) -> ToolOutcome:
         async with slots:
-            return await _execute_one(call, registry, ctx, gate)
+            return await _execute_one(call, registry, hidden, ctx, gate)
 
     outcomes: list[ToolOutcome] = []
     for group in _group_calls(runnable, registry):
         if len(group) == 1:
-            outcomes.append(await _execute_one(group[0], registry, ctx, gate))
+            outcomes.append(await _execute_one(group[0], registry, hidden, ctx, gate))
         else:
             outcomes.extend(await asyncio.gather(*(bounded(call) for call in group)))
     return [*outcomes, *skipped]

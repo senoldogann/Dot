@@ -107,6 +107,12 @@ tiers = {}
 profile_min_calls = 50
 weak_refusal_share = 0.1
 reminder_every = 6
+# Which tools a run's model sees. "full": all of them at every step. "grouped": the core tools (files, shell, web, notes
+# search and saving, delegation, skills, the plan and finish) and the groups the thread already used. The other groups
+# (browser, desktop, schedule, memory_admin, one per MCP server) are listed in the prompt; a group is turned on when the
+# model calls use_tools or one of its tools, and stays on for the rest of the run. "auto": grouped for a model of the
+# weak tier or whose window cut the context budget, full otherwise. "full" until evals show that groups help.
+tool_surface = "full"
 
 [policy]
 # aggressive: act without asking except for the hard stops; balanced: ask for external side effects;

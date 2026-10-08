@@ -138,6 +138,14 @@ answer (a small model that is offered both writes the call out as text).
   were measured and at least `weak_refusal_share` of them were refused before they ran (an unknown tool, or arguments
   that were not valid JSON or did not fit the tool). `scaffold = "fixed"`, the default, keeps every model standard.
   The timeline shows a budget cut to the window, why a model is weak, and each reminder.
+- `tool_surface` in `[agent]` decides which tools a run's model sees. `full`, the default, offers all of them at every
+  step. `grouped` starts with the core tools (files, the shell, the web, searching and saving notes, delegation,
+  skills, the plan and `finish`) and the groups the thread already used. The other groups (`browser`, `desktop`,
+  `schedule`, `memory_admin`, and `mcp__<server>` for each MCP server) are listed in the system prompt with what they are
+  for and their tools. The model turns a group on with `use_tools`. A call to a tool whose group is off does not run: it
+  turns the group on, and its result asks the model to call the tool again. A group stays on for the rest of the run.
+  `auto` is `grouped` for a model of the weak tier and for a model whose window cut the context budget, and `full` for
+  every other model. The timeline shows the groups a grouped run starts with and each group it turns on.
 - A run has no step limit. It ends when the model calls `finish`, when the progress watchdog stops it (see
   [Autonomy](#autonomy-approvals-goal-mode-and-the-end-of-a-run)), when a model call still fails after its retries, or
   when you stop it. In goal mode the goal check can also end it (see [Autonomy](#autonomy-approvals-goal-mode-and-the-end-of-a-run)).
@@ -171,7 +179,7 @@ answer (a small model that is offered both writes the call out as text).
 | Desktop         | `desktop_apps`, `desktop_open_app`, `desktop_snapshot`, `desktop_read`, `desktop_act`, `desktop_screenshot`, `desktop_clipboard_read`, `desktop_clipboard_write` |
 | macOS           | `apple_script`, `notify`                                                                                           |
 | Memory, time    | `memory_save`, `memory_search`, `memory_forget`, `schedule_create`, `schedule_list`, `schedule_delete`             |
-| Orchestration   | `delegate`, `update_plan`, `ask_user`, `finish`                                                                    |
+| Orchestration   | `delegate`, `update_plan`, `ask_user`, `finish`, `use_tools`                                                       |
 | Skills          | `skill`                                                                                                            |
 | MCP             | `mcp__<server>__<tool>`                                                                                            |
 

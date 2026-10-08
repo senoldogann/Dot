@@ -454,6 +454,19 @@ export function createTimeline({ rootRunId, startedAt, onGrow, onPlan, onStats, 
       note(scope, record.ts, "target", `Reminded of the goal at step ${record.data.step}`, "");
     },
 
+    // The tool groups of a run whose tools come in groups ([agent] tool_surface): the ones it starts with, then each
+    // group a step turns on.
+    tool_groups(scope, record) {
+      const data = record.data;
+      if (data.step === 0) {
+        const off = data.off.length === 0 ? "" : `; ${data.off.join(", ")} off until the run needs them`;
+        note(scope, record.ts, "layers", `Tools offered by group: ${data.on.join(", ")} on${off} (${data.reason})`, "");
+      } else {
+        const noun = data.turned_on.length === 1 ? "group" : "groups";
+        note(scope, record.ts, "layers", `Turned on the tool ${noun} ${data.turned_on.join(", ")} at step ${data.step}`, "");
+      }
+    },
+
     memories(scope, record) {
       const count = plural(record.data.ids.length, "memory", "memories");
       const text = record.data.live === true ? `Picked up ${count} saved while the run worked` : `Recalled ${count}`;

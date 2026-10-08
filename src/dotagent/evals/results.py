@@ -2,7 +2,7 @@
 
 from typing import Literal
 
-from dotagent.config import Tier
+from dotagent.config import Tier, ToolSurface
 from dotagent.core.types import FrozenModel
 from dotagent.evals.types import TaskCategory
 from dotagent.store.models import RunStatus
@@ -53,7 +53,8 @@ class EvalSettings(FrozenModel):
     """The settings of the run that change how a model fares, kept with the report so that two reports can be compared
     knowing whether they ran the same way. ``tier`` is the tier ``[agent] tiers`` set for the evaluated model, the only
     way to make it weak in an eval: an attempt's run history is empty. A report that does not record
-    ``stall_escalation`` counts as run without it, one that does not record ``tier`` as run with the standard tier."""
+    ``stall_escalation`` counts as run without it, one that does not record ``tier`` as run with the standard tier, one
+    that does not record ``tool_surface`` as run with every tool offered at every step."""
 
     effort: str
     goal_mode: bool
@@ -61,6 +62,7 @@ class EvalSettings(FrozenModel):
     preset: str
     stall_escalation: bool = False
     tier: Tier = "standard"
+    tool_surface: ToolSurface = "full"
 
 
 class EvalReport(FrozenModel):

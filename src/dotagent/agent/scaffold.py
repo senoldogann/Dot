@@ -5,10 +5,14 @@ so a model with a small window is compacted before it overflows, and its tool ou
 The tier follows how reliably the model worked in its newest runs: a model whose tool calls are often refused before
 anything runs (an unknown tool, arguments that were not JSON or did not fit) is ``weak`` and is reminded of its goal
 every few steps; every other model is ``standard``. A tier can be set by hand, and is ``standard`` for every model while
-``[agent] scaffold`` is ``fixed``.
+``[agent] scaffold`` is ``fixed``. The tool surface follows ``[agent] tool_surface``: with ``auto`` a model of the weak
+tier, and one whose window cut the budget, start with the core tools and turn the other tool groups on when they need
+them.
 
 Everything here is pure; the loop reads the window and the profile and acts on the scaffold.
 """
+
+from typing import Literal
 
 from dotagent.config import AgentConfig, Tier
 from dotagent.core.errors import ConfigError
@@ -23,6 +27,9 @@ PROFILE_RUNS: int = 30
 _WINDOW_SHARE: float = 0.75
 # Tool output is never clipped below this, however small the window.
 _MIN_OUTPUT_CHARS: int = 2000
+
+# How a run offers its tools: all of them at every step, or the core tools and the groups that are on.
+type Surface = Literal["full", "grouped"]
 
 
 class Scaffold(FrozenModel):
@@ -97,6 +104,22 @@ def scaffold_event(scaffold: Scaffold, config: AgentConfig) -> JsonObject:
         "reason": scaffold.reason,
         "reminder_every": scaffold.reminder_every,
     }
+
+
+def surface_for(config: AgentConfig, scaffold: Scaffold) -> tuple[Surface, str]:
+    """How a run with ``scaffold`` offers its tools, and why."""
+    if config.tool_surface == "full":
+        return "full", '[agent] tool_surface is "full"'
+    if config.tool_surface == "grouped":
+        return "grouped", '[agent] tool_surface is "grouped"'
+    if scaffold.tier == "weak":
+        return "grouped", '[agent] tool_surface is "auto" and the model is in the weak tier'
+    if scaffold.context_tokens < config.context_tokens:
+        return "grouped", (
+            f'[agent] tool_surface is "auto" and the model\'s window cut the context budget to '
+            f"{scaffold.context_tokens:,} tokens"
+        )
+    return "full", '[agent] tool_surface is "auto", the model is standard and its window holds the whole budget'
 
 
 def reminder_due(scaffold: Scaffold, mode: RunMode, steps: int, reminded_at: int) -> bool:

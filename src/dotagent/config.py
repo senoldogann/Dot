@@ -71,6 +71,7 @@ class ModelsConfig(FrozenModel):
 
 type Tier = Literal["standard", "weak"]
 type ScaffoldMode = Literal["fixed", "measured"]
+type ToolSurface = Literal["full", "grouped", "auto"]
 
 
 class AgentConfig(FrozenModel):
@@ -93,6 +94,7 @@ class AgentConfig(FrozenModel):
     profile_min_calls: int
     weak_refusal_share: float
     reminder_every: int
+    tool_surface: ToolSurface
 
 
 class PolicyConfig(FrozenModel):

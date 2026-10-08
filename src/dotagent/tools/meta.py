@@ -1,4 +1,4 @@
-"""Meta tools: finishing a run, asking the user, notifying them and keeping a visible plan."""
+"""Meta tools: finishing a run, asking the user, notifying them, keeping a visible plan and turning on a tool group."""
 
 import asyncio
 from collections.abc import Sequence
@@ -21,13 +21,15 @@ from dotagent.core.errors import ToolExecutionError
 from dotagent.core.types import JsonObject
 from dotagent.policy.types import ActionInfo
 from dotagent.store.models import EventRecord, RunMode
-from dotagent.tools.base import ALL_MODES, RegisteredTool, ToolArgs, ToolResult, make_tool, ok
+from dotagent.tools.base import ALL_MODES, RegisteredTool, ToolArgs, ToolResult, fail, make_tool, ok
 from dotagent.tools.context import ToolContext
+from dotagent.tools.groups import CORE_GROUP, groups_of, tools_in
 
 FINISH_TOOL: str = "finish"
 ASK_USER_TOOL: str = "ask_user"
 UPDATE_PLAN_TOOL: str = "update_plan"
 MARK_PLAN_STEP_TOOL: str = "mark_plan_step"
+USE_TOOLS_TOOL: str = "use_tools"
 # A chat turn ends with a plain reply. A model that is offered both that and finish tends to write the call out as text.
 _FINISH_MODES: frozenset[RunMode] = frozenset({"task", "research"})
 _NOTIFY_TIMEOUT_S: float = 15.0
@@ -225,5 +227,55 @@ def _mark_plan_step_tool() -> RegisteredTool:
     )
 
 
+class UseToolsArgs(ToolArgs):
+    group: Annotated[str, StringConstraints(strip_whitespace=True, to_lower=True, min_length=1)] = Field(
+        description="The name of the tool group, as the tool groups in your instructions list it."
+    )
+
+
+def _use_tools_tool() -> RegisteredTool:
+    def classify(args: UseToolsArgs, ctx: ToolContext) -> ActionInfo:
+        return _meta_action(USE_TOOLS_TOOL, f"Turn on the tool group {args.group}")
+
+    async def run(args: UseToolsArgs, ctx: ToolContext) -> ToolResult:
+        # The run turns the group on when it reads this call's success; the tool only checks the name and says what
+        # the group holds.
+        tools: tuple[str, ...] = tuple(
+            name for name, tool in ctx.runtime.registry.tools.items() if ctx.mode in tool.modes
+        )
+        if args.group == CORE_GROUP:
+            return ok("The core tools are always on.")
+        members: tuple[str, ...] = tools_in(tools, args.group)
+        if not members:
+            return fail(
+                f"There is no tool group '{args.group}' in this run. Its tool groups: {', '.join(groups_of(tools))}."
+            )
+        return ok(
+            f"The tool group {args.group} is on: {', '.join(members)}. Their definitions are in your tool list from "
+            "your next step on."
+        )
+
+    return make_tool(
+        name=USE_TOOLS_TOOL,
+        description=(
+            "Turn on a tool group that is off, so that its tools are in your tool list from your next step on. The "
+            "groups and their tools are listed under Tool groups in your instructions."
+        ),
+        args_model=UseToolsArgs,
+        modes=ALL_MODES,
+        parallel_safe=True,
+        timeout_s=10.0,
+        classify=classify,
+        run=run,
+    )
+
+
 def build_meta_tools() -> tuple[RegisteredTool, ...]:
-    return (_finish_tool(), _ask_user_tool(), _notify_tool(), _update_plan_tool(), _mark_plan_step_tool())
+    return (
+        _finish_tool(),
+        _ask_user_tool(),
+        _notify_tool(),
+        _update_plan_tool(),
+        _mark_plan_step_tool(),
+        _use_tools_tool(),
+    )

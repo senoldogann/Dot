@@ -220,5 +220,8 @@ export function toolIconName(tool) {
   if (tool === "notify") {
     return "bell";
   }
+  if (tool === "use_tools") {
+    return "layers";
+  }
   return "sparkle";
 }

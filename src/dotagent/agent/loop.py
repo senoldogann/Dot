@@ -2,7 +2,7 @@
 
 import asyncio
 import time
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import Literal
 
@@ -79,6 +79,7 @@ from dotagent.agent.scaffold import (
     require_room,
     scaffold_event,
     scaffold_for,
+    surface_for,
 )
 from dotagent.agent.vision import text_for_blind_model
 from dotagent.config import AgentConfig
@@ -106,10 +107,11 @@ from dotagent.runtime import Runtime
 from dotagent.skills.catalog import load_skills
 from dotagent.skills.types import SkillCatalog
 from dotagent.store.endings import GOAL_CHECK_MARK, RESULT_EMPTY_REPLIES
-from dotagent.store.models import EventRecord, MemoryRecord, RunRecord
+from dotagent.store.models import EventRecord, MemoryRecord, RunMode, RunRecord
 from dotagent.tools.context import Spawner, ToolContext
 from dotagent.tools.delegate import DELEGATE_TOOL
-from dotagent.tools.meta import ASK_USER_TOOL, FINISH_TOOL, FinishArgs
+from dotagent.tools.groups import CORE_GROUP, groups_event, groups_of, hidden_tools, offered_specs, used_groups
+from dotagent.tools.meta import ASK_USER_TOOL, FINISH_TOOL, USE_TOOLS_TOOL, FinishArgs, UseToolsArgs
 from dotagent.tools.registry import ToolRegistry, specs_for_mode
 from dotagent.tools.skill import SKILL_TOOL
 
@@ -409,6 +411,29 @@ def _only(registry: ToolRegistry, allowed: frozenset[str]) -> ToolRegistry:
     return ToolRegistry(tools={name: tool for name, tool in registry.tools.items() if name in allowed})
 
 
+def _run_tools(registry: ToolRegistry, mode: RunMode, specs: Sequence[ToolSpec]) -> ToolRegistry:
+    """The tools a run can call: the ones it offers, and the ones of other modes, whose calls are answered as not
+    available in the run's mode. A tool of the run's mode that the run leaves out (use_tools when its tools are not
+    grouped, delegate and ask_user in a delegated run, skill when no skill is installed) is answered as unknown."""
+    offered: frozenset[str] = frozenset(spec.name for spec in specs)
+    return ToolRegistry(
+        tools={name: tool for name, tool in registry.tools.items() if name in offered or mode not in tool.modes}
+    )
+
+
+def _turned_on(outcomes: Sequence[ToolOutcome], hidden: Mapping[str, str], on: frozenset[str]) -> tuple[str, ...]:
+    """The tool groups that the calls of a step turn on, in the order of the calls: the group of a call of a tool whose
+    group was off, and the group of a use_tools call that succeeded."""
+    named: tuple[str, ...] = tuple(
+        hidden[outcome.call.name]
+        if outcome.call.name in hidden
+        else UseToolsArgs.model_validate(outcome.call.arguments).group
+        for outcome in outcomes
+        if outcome.call.name in hidden or (outcome.call.name == USE_TOOLS_TOOL and not outcome.result.is_error)
+    )
+    return tuple(dict.fromkeys(group for group in named if group not in on))
+
+
 async def _memory_query(runtime: Runtime, run: RunRecord) -> str:
     """What a run's notes are chosen by: its goal, then the goals of the latest earlier runs of its thread, so a short
     follow-up ("go on", "now the second one") still finds the notes of the work it continues."""
@@ -636,6 +661,8 @@ async def run_agent(agent: AgentRun) -> RunOutcome:
     info: ModelInfo = await runtime.router.model_info(ref)
     if not info.tools and run.mode != "chat":
         raise ConfigError("the selected model cannot call tools", {"model": ref.label, "mode": run.mode})
+    scaffold: Scaffold = scaffold_for(config, info, await runtime.store.model_profile(ref.label, PROFILE_RUNS))
+    surface, surface_reason = surface_for(config, scaffold)
     specs: tuple[ToolSpec, ...] = specs_for_mode(runtime.registry, run.mode) if info.tools else ()
     if run.parent_run_id is not None:
         specs = tuple(spec for spec in specs if spec.name not in _NOT_FOR_DELEGATED_RUNS)
@@ -644,6 +671,12 @@ async def run_agent(agent: AgentRun) -> RunOutcome:
         log.warning("skill_skipped", run_id=run.id, path=str(problem.path), reason=problem.reason)
     if not skills.skills:
         specs = tuple(spec for spec in specs if spec.name != SKILL_TOOL)
+    # Every tool group of the run, core first. A run with no group besides core has nothing to turn on.
+    groups: tuple[str, ...] = (CORE_GROUP, *groups_of([spec.name for spec in specs]))
+    grouped: bool = surface == "grouped" and len(groups) > 1
+    if not grouped:
+        specs = tuple(spec for spec in specs if spec.name != USE_TOOLS_TOOL)
+    callable_tools: ToolRegistry = _run_tools(runtime.registry, run.mode, specs)
     memory_seen_at: float = time.time()
     remembered: list[MemoryRecord] = await prompt_memories(runtime.memory, await _memory_query(runtime, run))
     if remembered:
@@ -664,12 +697,18 @@ async def run_agent(agent: AgentRun) -> RunOutcome:
             )
         )
     )
-    scaffold: Scaffold = scaffold_for(config, info, await runtime.store.model_profile(ref.label, PROFILE_RUNS))
     await runtime.bus.emit(run.id, "scaffold", scaffold_event(scaffold, config), True)
+    # Every tool of the run counts, also the ones of groups that are off: a group the run turns on later must fit too.
     require_room(scaffold, estimate_tokens([system], specs))
     history: list[Message] = repair_history(
         await runtime.store.load_messages(run.thread_id, config.keep_recent_screenshots)
     )
+    # The tool groups that are on; they only grow. A grouped run starts with core and the groups its thread used.
+    on: frozenset[str] = (
+        frozenset({CORE_GROUP, *used_groups(history)}) & frozenset(groups) if grouped else frozenset(groups)
+    )
+    if grouped:
+        await runtime.bus.emit(run.id, "tool_groups", groups_event(0, groups, on, (), surface_reason), True)
     goal: Message = await message_with_attachments(runtime, run.thread_id, run.goal, agent.files, info.vision)
     if agent.files:
         await runtime.bus.emit(run.id, ATTACHMENTS_EVENT, {"files": attachment_summary(agent.files)}, True)
@@ -711,7 +750,7 @@ async def run_agent(agent: AgentRun) -> RunOutcome:
         runtime.router, runtime.config.models.review, config.model_call_timeout_s, f"{run.thread_id}:progress"
     )
     watch: WatchState = new_watch()
-    # The tools of the next step when a progress alert limited them; None offers all of them.
+    # The tools of the next step when a progress alert limited them; None offers the tools of the groups that are on.
     allowed: frozenset[str] | None = None
 
     async def sink(delta: StreamDelta) -> None:
@@ -736,12 +775,16 @@ async def run_agent(agent: AgentRun) -> RunOutcome:
             history.append(await _stored_note(agent, _new_memories_note(changed)))
             await runtime.store.mark_memories_used([record.id for record in changed], time.time())
             await runtime.bus.emit(run.id, "memories", {"ids": [record.id for record in changed], "live": True}, True)
-        history, estimated, ledger = await _fit_context(
-            agent, history, system, specs, ratio, ledger, scaffold.context_tokens
+        # A step that a progress alert limited offers what the alert allows, and turns no group on.
+        offered: tuple[ToolSpec, ...] = (
+            offered_specs(specs, on) if allowed is None else tuple(spec for spec in specs if spec.name in allowed)
         )
-        offered: tuple[ToolSpec, ...] = specs if allowed is None else tuple(s for s in specs if s.name in allowed)
-        registry: ToolRegistry = runtime.registry if allowed is None else _only(runtime.registry, allowed)
+        registry: ToolRegistry = callable_tools if allowed is None else _only(callable_tools, allowed)
+        hidden: dict[str, str] = hidden_tools(specs, on) if allowed is None else {}
         allowed = None
+        history, estimated, ledger = await _fit_context(
+            agent, history, system, offered, ratio, ledger, scaffold.context_tokens
+        )
         request: ChatRequest = ChatRequest(
             model=ref.model,
             messages=(system, *history),
@@ -782,8 +825,12 @@ async def run_agent(agent: AgentRun) -> RunOutcome:
         if reply.tool_calls:
             used_tools = True
             outcomes: list[ToolOutcome] = await execute_calls(
-                reply.tool_calls, registry, context, agent.gate, config.parallel_tools
+                reply.tool_calls, registry, hidden, context, agent.gate, config.parallel_tools
             )
+            turned_on: tuple[str, ...] = _turned_on(outcomes, hidden, on)
+            if turned_on:
+                on = on | frozenset(turned_on)
+                await runtime.bus.emit(run.id, "tool_groups", groups_event(steps, groups, on, turned_on, ""), True)
             results: list[Message] = await _tool_messages(agent, outcomes, info.vision)
             ledger = with_actions(
                 ledger, [(outcome.call, not outcome.result.is_error, outcome.result.text) for outcome in outcomes]

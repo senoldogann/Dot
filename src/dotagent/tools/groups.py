@@ -1,0 +1,105 @@
+"""Tool groups: the tools of a run come in groups, and a run whose tools are grouped starts with only some of them on.
+
+The core group holds what most runs need: the files, the shell, the web, searching and saving notes, delegation,
+skills and the meta tools (the plan, questions, finish). The other groups are named after what they reach: ``browser``
+(Chrome), ``desktop`` (the Mac's applications and AppleScript), ``schedule`` (goals that run later), ``memory_admin``
+(correcting and forgetting notes) and one group per MCP server, ``mcp__<server>``. Which groups are on is up to the
+loop; everything here is pure.
+"""
+
+from collections.abc import Sequence
+
+from dotagent.core.types import JsonObject
+from dotagent.llm.types import Message, ToolSpec
+from dotagent.mcp.naming import PREFIX
+
+CORE_GROUP: str = "core"
+
+# The groups whose tools share a name prefix. A tool with none of these prefixes is in its group of _GROUP_OF_TOOL, or
+# in core.
+_PREFIX_GROUPS: tuple[tuple[str, str], ...] = (
+    ("browser_", "browser"),
+    ("desktop_", "desktop"),
+    ("schedule_", "schedule"),
+)
+_GROUP_OF_TOOL: dict[str, str] = {
+    "apple_script": "desktop",
+    "memory_update": "memory_admin",
+    "memory_forget": "memory_admin",
+}
+_PURPOSES: dict[str, str] = {
+    "browser": "Chrome, for pages that need JavaScript, a log-in or clicking",
+    "desktop": "the Mac's applications, windows, clipboard and AppleScript",
+    "schedule": "goals that run later, once or on a cron expression",
+    "memory_admin": "correcting or forgetting saved notes",
+}
+# A group's line in the prompt names this many of its tools at most and says how many more there are.
+_LISTED_TOOLS: int = 16
+
+
+def group_of(tool: str) -> str:
+    """The group of the tool named ``tool``. MCP server names have no underscore, so the server of an MCP tool is what
+    comes between its prefix and the next ``__``."""
+    if tool.startswith(PREFIX):
+        return PREFIX + tool.removeprefix(PREFIX).split("__", 1)[0]
+    named: str | None = _GROUP_OF_TOOL.get(tool)
+    if named is not None:
+        return named
+    return next((group for prefix, group in _PREFIX_GROUPS if tool.startswith(prefix)), CORE_GROUP)
+
+
+def groups_of(tools: Sequence[str]) -> tuple[str, ...]:
+    """The groups of ``tools`` other than core, in the order of their first tool."""
+    return tuple(dict.fromkeys(group for group in map(group_of, tools) if group != CORE_GROUP))
+
+
+def tools_in(tools: Sequence[str], group: str) -> tuple[str, ...]:
+    """The tools of ``tools`` that are in ``group``."""
+    return tuple(tool for tool in tools if group_of(tool) == group)
+
+
+def _purpose(group: str) -> str:
+    if group.startswith(PREFIX):
+        return f"the tools of the MCP server {group.removeprefix(PREFIX)}"
+    return _PURPOSES[group]
+
+
+def _listed(tools: Sequence[str]) -> str:
+    more: int = len(tools) - _LISTED_TOOLS
+    shown: str = ", ".join(tools[:_LISTED_TOOLS])
+    return shown if more <= 0 else f"{shown} and {more} more"
+
+
+def group_lines(tools: Sequence[str]) -> tuple[str, ...]:
+    """One line for each group of ``tools`` other than core: its name, what it is for and its tools."""
+    return tuple(f"- {group}: {_purpose(group)} ({_listed(tools_in(tools, group))})" for group in groups_of(tools))
+
+
+def used_groups(history: Sequence[Message]) -> frozenset[str]:
+    """The groups of the tools that the model called in ``history``."""
+    return frozenset(group_of(call.name) for message in history for call in message.tool_calls)
+
+
+def offered_specs(specs: Sequence[ToolSpec], on: frozenset[str]) -> tuple[ToolSpec, ...]:
+    """The specs of ``specs`` whose group is on."""
+    return tuple(spec for spec in specs if group_of(spec.name) in on)
+
+
+def hidden_tools(specs: Sequence[ToolSpec], on: frozenset[str]) -> dict[str, str]:
+    """The tools of ``specs`` whose group is off, each with its group."""
+    return {spec.name: group_of(spec.name) for spec in specs if group_of(spec.name) not in on}
+
+
+def groups_event(
+    step: int, groups: Sequence[str], on: frozenset[str], turned_on: Sequence[str], reason: str
+) -> JsonObject:
+    """The ``tool_groups`` event: at step 0 the groups a run starts with and ``reason``, the reason its tools are
+    grouped; later the groups a step turned on (``reason`` is then empty). ``groups`` are all the groups of the run,
+    core first."""
+    return {
+        "step": step,
+        "on": [group for group in groups if group in on],
+        "off": [group for group in groups if group not in on],
+        "turned_on": list(turned_on),
+        "reason": reason,
+    }
