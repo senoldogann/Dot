@@ -13,19 +13,20 @@ recover (6), learn (7), undo (8). Every later item is judged with the numbers of
 
 ## Status
 
-| #   | Item                                                        | Status  | Commits |
-| --- | ----------------------------------------------------------- | ------- | ------- |
-| 1   | Eval harness and run statistics (`dotx eval`, `dotx stats`) | done    | a83cdcc |
-| 2   | Progress watchdog and escalation ladder                     | done    | 5f6cb29 |
-| 3   | Model-adaptive scaffold (`dotx models profile`)             | done    | de2cc1c |
-| 4   | Smaller, progressive tool surface                           | done    | d89d634 |
-| 5   | Verification of the end of a run                            | done    | e2051a5 |
-| 6   | Safe resume after a restart                                 | done    | c3688e6, b6dd42f |
-| 7   | Learning from runs (lessons)                                | done    | a297764, 4db2539 |
-| 8   | Undo journal for file edits                                 | planned |         |
+| #   | Item                                                        | Status | Commits          |
+| --- | ----------------------------------------------------------- | ------ | ---------------- |
+| 1   | Eval harness and run statistics (`dotx eval`, `dotx stats`) | done   | a83cdcc          |
+| 2   | Progress watchdog and escalation ladder                     | done   | 5f6cb29          |
+| 3   | Model-adaptive scaffold (`dotx models profile`)             | done   | de2cc1c          |
+| 4   | Smaller, progressive tool surface                           | done   | d89d634          |
+| 5   | Verification of the end of a run                            | done   | e2051a5          |
+| 6   | Safe resume after a restart                                 | done   | c3688e6, b6dd42f |
+| 7   | Learning from runs (lessons)                                | done   | a297764, 4db2539 |
+| 8   | Undo journal for file edits                                 | done   | c9bb85d          |
 
 Status values: `planned`, `in progress`, `done` (implemented, tested, verified, committed), `parked` (the reason is in
-the item). Take the first item that is not `done`.
+the item). Take the first item that is not `done`. All eight are done; what waits for the owner is in "Open owner
+decisions".
 
 ## Where things stand before this roadmap
 
@@ -744,24 +745,106 @@ run` waited for a lesson writer that never answered: exit status 0.
 
 ### 8. Undo journal for file edits
 
-**Goal.** Let the agent try, and let the owner take it back.
+**Status: done** (`c9bb85d`). **Goal.** Let the agent try, and let the owner take it back.
 
 **Why.** The owner runs `yolo`, so a bad edit is not stopped on the way. A journal keeps the approval mode as it is and
-makes the damage reversible. It covers the file tools only; a shell `rm` or `sed -i` is not covered (say so in the docs).
+makes the damage reversible. It covers the file tools only; a shell `rm` or `sed -i` is not covered, and the README says
+so.
 
-**Design.**
-- `tools/files.py` (`write_file`, `edit_file`) records the previous content before it changes a file: a copy under
-  `<home>/undo/<run_id>/` and a line in a manifest (step, tool, path, existed, backup name, hash after). Caps per file
-  and per run; a file over the cap is recorded as "not backed up".
-- `dotx undo RUN_ID` lists what would change; `--apply` restores in reverse order, removes files the run created, and
-  skips a file that changed after the run's last write unless `--force`.
-- Retention only by explicit command: `dotx prune` reports the journal size; `--apply` removes journals older than
-  `[agent] undo_keep_days`.
+**Design** (refined while building it; the first draft is in git history at `4dbba0c`).
+- The note (`note_change`): before `write_file` or `edit_file` changes a file, `_atomic_write` appends one line to
+  `<home>/undo/<run_id>/journal.jsonl`: `seq`, `ts`, the tool, the path, whether something was there and its permission
+  bits, the copy (`backup`; `before` is its SHA-256, `copied` its size) or why none was kept (`skipped`), the folders
+  the change had to create (`created_dirs`), and the SHA-256 and size of what it writes (`after`, `size`). Only the
+  run's first change to a path keeps a copy (`backups/<seq>`): it holds what was there before the run. Folders are 0700,
+  files 0600. When the note fails (a full disk, a file where the journal folder belongs), the file is not changed and
+  the tool's error (`UndoError`) says why.
+- No step number (the draft had one): `seq` and `ts` order the changes, and the run's steps are in the database. No
+  link field: `expand_path` resolves links, so the file tools never write through one; the journal looks at the path
+  itself (`lstat`), and what is not a regular file is noted without a copy.
+- Caps: `[agent] undo_max_file_bytes` (10 MiB) per file and `undo_max_run_bytes` (100 MiB) per run. A file past one is
+  changed without a copy, and its note names the cap. The journal is always on: it changes nothing the agent does (caps
+  of 0 keep no copies; a file the run created can still be deleted).
+- The plan (`plan_undo`, pure): the changes of the run and of the runs it delegated to, ordered by `ts`, one step per
+  path, the path changed last first. The first change to a path tells what was there before, the last one what the runs
+  left. States: `ready` (the path holds what the runs left), `conflict` (it changed or was deleted since), `cannot` (no
+  copy was kept, or a folder is there now) and `as_before` (nothing to do). Actions: `restore` the copy of the first
+  change, or `delete` a file the runs created.
+- Carrying it out (`apply_undo`): the `ready` steps, with `--force` the `conflict` ones too, in the plan's order. A
+  restore checks the copy against `before` (a forged or damaged copy is refused before anything is written), writes it
+  through a temp file and a rename with its permission bits, and creates the folder above it again when it is gone; a
+  delete removes the file, or the link that is there now, never its target. Then the folders the runs created are
+  removed when they are empty, deepest first. Nothing replaces a folder.
+- `dotx undo RUN_ID [--apply] [--force]` refuses a run that is still active, or one of whose delegated runs is
+  (`RunConflict`), and a run the database does not have (not found); both exit 2. It exits 0 when nothing was left as
+  it is and 1 when a file was (`cannot`, or `conflict` without `--force`), and logs `run_undone {run_id, restored,
+  deleted, folders, left}` to `dotx.log`.
+- Retention only by explicit command: `dotx prune` reports the journals (how many, how large, and how many have their
+  last change, the time of the journal file, older than `[agent] undo_keep_days`, default 30); `--apply` deletes those.
 
-**Touchpoints.** `tools/files.py` (`_atomic_write`, `_edit_blocking`), a new `undo/` module, `cli.py`, `cli_prune.py`,
-`core/paths.py`, `config.py`, README.
+**Touchpoints.** `undo/journal.py`, `undo/restore.py` and `cli_undo.py` (new), `tools/files.py` (`_journal`,
+`_atomic_write`, `_edit_blocking`), `cli.py`, `cli_prune.py`, `core/paths.py`, `core/errors.py` (`UndoError`, the
+docstring of `RunConflict`), `runtime.py` (`Runtime.undo_dir`, the guarded files), `config.py`, `defaults.toml`, README.
 
-**Done when.** Unit tests on a temp workspace (modify, create, delete-by-undo, conflict); `dotx undo` documented.
+**What exists now.**
+- `undo/journal.py`: `JOURNAL_FILE`, `JournalTarget` (where a change is noted and the caps), `JournalEntry`,
+  `JournalFolder`, `run_journal`, `backup_path`, `digest`, `read_journal`, `note_change`, `list_journals`,
+  `remove_journals`.
+- `undo/restore.py`, pure except the reads and writes on disk: `RunChange`, `FileState`, `UndoStep`, `plan_undo`,
+  `due_steps`, `forced_steps`, `created_dirs`, `file_state`, `current_states`, `apply_undo`, `remove_empty_dirs`.
+- `tools/files.py`: `_journal(ctx, tool)` is the run's `JournalTarget`; `_atomic_write(path, content, journal)` notes
+  the change before it writes, and `edit_file` writes through it.
+- `cli_undo.py`: `UndoCommand`, `render_plan`, `render_outcome`, `cmd_undo`. `cli_prune.py`: `PruneFindings` counts the
+  journals; `dotx prune` reads the owner's config for `undo_keep_days`.
+- `core/paths.py`: `undo_dir()` (`<home>/undo`), which is among the guarded files of `runtime.py`.
+- Config: `[agent] undo_max_file_bytes`, `undo_max_run_bytes`, `undo_keep_days`.
+- Tests: `tests/unit/test_undo.py` (a changed file put back with its permission bits after an edit and a write; a
+  created file deleted and the folders made for it removed; a file changed after the run, and one deleted with its
+  folder, are conflicts that only `--force` takes back; the caps; a failed note leaves the file as it is; the change of
+  a delegated run goes back to the copy its parent kept; a forged copy is not written back); `tests/smoke/test_undo.py`
+  (the real loop with the scripted model: a run edits a file, writes one in a new folder and delegates a write;
+  `cmd_undo` shows the plan, takes all three back with the folder, logs `run_undone`, and a second time finds nothing to
+  do). Unit and smoke files share the basename, so run them in separate pytest invocations (as for `test_lessons` and
+  `test_resume`).
+
+**How to use it.**
+```
+dotx undo RUN_ID                    # what taking back the run's file changes would do; changes nothing
+dotx undo RUN_ID --apply            # restore, delete, remove the empty folders; exit 1 when a file is left
+dotx undo RUN_ID --apply --force    # also the files changed after the run; what changed in them since is lost
+dotx prune [--apply]                # the journals among the rest; --apply deletes those older than undo_keep_days
+```
+The run id is on the last line of `dotx run` and in the address of the run's page. A new tool that changes files must
+note the change with `note_change` (or write through `_atomic_write`) before it makes it, and must not make it when the
+note fails. On a throw-away home the scripted provider drives it without a model (`tests/smoke/test_undo.py`; a `dotx
+run` whose `ollama` provider is the scripted one works as well).
+
+**Decisions and limits.**
+- Only `write_file` and `edit_file` are in the journal. A shell command, an MCP server, the browser or the desktop
+  tools change files that `dotx undo` does not know about.
+- A copy is kept only at the run's first change to a path and within the caps; a file without one cannot be restored,
+  only deleted when the run created it.
+- The changes are ordered by when they were noted. A run's file tools never run in parallel, so each journal has one
+  writer; delegated runs can work at the same time (several `delegate` calls in one turn), and two of them writing one
+  file at the same moment can leave the change noted first in it. The plan then calls the file a conflict: nothing is
+  put back silently.
+- No button in the web UI: `dotx undo` is the only way.
+- The run must be in the database. The journals of a run whose chat was deleted stay until `dotx prune --apply` finds
+  them old; nothing deletes them by default.
+- A run that is still active is refused. A run of `dotx run` that a crash left active stays so until the daemon starts
+  again and ends it (item 6).
+- The journals are guarded like the configuration and the database: outside `yolo` the agent can neither read nor
+  change them. A `yolo` run can (the refusal of `secret_access` is waived there); the check of a copy against its
+  digest catches a copy changed alone, not a journal rewritten along with it.
+- No live run: every check used the scripted model.
+
+**Done when.** Unit tests on a temp workspace (modify, create, delete-by-undo, conflict); `dotx undo` documented. All
+true; also clean: the unit tests (475), ruff, mypy, `dotx eval check` and the offline smoke suite (159; one
+model-driven test, `test_a_live_stream_carries_the_runs_the_run_delegated_to`, failed once as in item 2 and passed when
+rerun). The CLI on a throw-away home, a scripted `dotx run` that edited a file, wrote one in a new folder and shortened
+a file past a cap of 16 bytes: the dry run listed `cannot`, `delete`, `restore` and the folder; `--apply` took back two
+files and the folder, left the third and exited 1; a second `--apply` left only that file; an unknown run exited 2 with
+`error: run not found`; `dotx prune` showed the journals.
 
 ## Open owner decisions
 
@@ -833,3 +916,13 @@ makes the damage reversible. It covers the file tools only; a shell `rm` or `sed
   than a provider's (a missing API key) went unreported; Ctrl-C while `dotx run` waited for the lessons ended it with
   130 although the run was done; an older answer could repaint the lessons on the page; secrets were masked after a
   digest or a fact was cut, so the part of a key left at the cut stayed readable.
+- 2026-10-08: item 8 done (`c9bb85d`). Before `write_file` or `edit_file` changes a file, the run notes the change in
+  its journal under `<home>/undo/`, with a copy of what was there at its first change to the file; `dotx undo RUN_ID`
+  shows, and with `--apply` takes back, the file changes of a run and of the runs it delegated to (`--force` for files
+  changed since); `dotx prune --apply` deletes the journals older than `[agent] undo_keep_days`. Unit tests (475),
+  `dotx eval check` and the offline smoke suite (159) clean except one model-driven test,
+  `test_a_live_stream_carries_the_runs_the_run_delegated_to` (as in item 2: `gpt-oss:20b-cloud` delegated more than
+  once, while the Ollama cloud reported errors inside the stream), which passed when rerun; the CLI checked on a
+  throw-away home; no live model run. Found, not changed: two delegated runs that work at the same time and write one
+  file can leave in it the change noted first (the plan calls that file a conflict); a `yolo` run can rewrite a
+  journal, as it can the configuration and the database.
