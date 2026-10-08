@@ -117,6 +117,7 @@ export function toolRow({ tool, args }) {
   const shots = el("div", { class: "shots" });
   const node = el("div", { class: "stack tight" }, details, shots);
   let result = null;
+  let cut = false;
   let built = false;
 
   function buildBody() {
@@ -125,7 +126,7 @@ export function toolRow({ tool, args }) {
     body.replaceChildren(
       section("Arguments", el("pre", { class: "out" }, argsText), argsText),
       result === null
-        ? el("div", { class: "small muted" }, "Still running…")
+        ? el("div", { class: "small muted" }, cut ? "Cut off: the run ended before this call reported back." : "Still running…")
         : section(
             result.ok ? "Result" : "Error",
             result.text === "" ? el("div", { class: "small muted" }, "(no text)") : textBlock(result.text, !result.ok),
@@ -160,5 +161,20 @@ export function toolRow({ tool, args }) {
     }
   }
 
-  return { node, finish };
+  /** The run is over: a call that never reported back was cut off. Returns whether this one was. */
+  function settle() {
+    if (result !== null || cut) {
+      return false;
+    }
+    cut = true;
+    state.replaceChildren(icon("alert"));
+    state.className = "tool-state cut";
+    badges.replaceChildren(el("span", { class: "badge b-warn" }, "cut off"));
+    if (details.open) {
+      buildBody();
+    }
+    return true;
+  }
+
+  return { node, finish, settle };
 }

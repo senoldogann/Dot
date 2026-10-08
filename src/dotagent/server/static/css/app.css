@@ -1365,6 +1365,10 @@ a.pill:hover {
   color: var(--bad);
 }
 
+.tool-state.cut {
+  color: var(--warn);
+}
+
 .tool-kind {
   color: var(--muted);
   display: grid;

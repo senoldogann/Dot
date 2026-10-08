@@ -58,7 +58,7 @@ function buildGroup(ts) {
   const body = el("div", { class: "steps-body" });
   const head = el("summary", { class: "steps-head" }, state, title, count, failed, el("span", { class: "chev" }, icon("chevron")), latest);
   const node = el("details", { class: "steps", open: !foldSteps() }, head, body);
-  return { node, body, state, title, count, failed, latest, live: null, tail: true, pending: 0, calls: 0, failedCalls: 0, start: ts, end: ts, longest: 0, last: "" };
+  return { node, body, state, title, count, failed, latest, live: null, tail: true, pending: 0, calls: 0, failedCalls: 0, cutCalls: 0, start: ts, end: ts, longest: 0, last: "" };
 }
 
 /** Show a group as it stands: "Working…" while it is the tail of the run or a call is out, "Worked for …" once it is over. */
@@ -70,8 +70,9 @@ function paintGroup(group) {
   }
   group.title.textContent = live ? "Working…" : `Worked for ${duration(Math.max(group.end - group.start, group.longest))}`;
   group.count.textContent = `· ${plural(group.calls, "tool call", "tool calls")}`;
-  group.failed.hidden = group.failedCalls === 0;
-  group.failed.textContent = `${group.failedCalls} failed`;
+  const troubles = [group.failedCalls > 0 ? `${group.failedCalls} failed` : "", group.cutCalls > 0 ? `${group.cutCalls} cut off` : ""];
+  group.failed.hidden = group.failedCalls === 0 && group.cutCalls === 0;
+  group.failed.textContent = troubles.filter((text) => text !== "").join(" · ");
   group.latest.hidden = !live;
   group.latest.textContent = live ? group.last : "";
 }
@@ -140,9 +141,14 @@ export function createTimeline({ rootRunId, startedAt, onGrow, onPlan, onStats, 
     }
   }
 
-  /** The run is over: no group works any more, even when a call never reported back. */
+  /** The run is over: no group works any more, and a call that never reported back was cut off. */
   function settleGroups(scope, ts) {
     endGroup(scope, ts);
+    for (const { row, group } of scope.calls.values()) {
+      if (row.settle()) {
+        group.cutCalls += 1;
+      }
+    }
     for (const group of scope.groups) {
       group.pending = 0;
       paintGroup(group);
