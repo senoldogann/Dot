@@ -1,11 +1,18 @@
-"""SQLite persistence (aiosqlite). One connection, WAL mode, FTS5 for memory search."""
+"""SQLite persistence (aiosqlite). One shared connection, WAL mode, FTS5 for memory search.
+
+Single statements share the connection. A unit of several statements that must be stored whole (a thread's messages)
+runs in a worker thread on a connection of its own, in one transaction: the shared connection commits for every
+coroutine at once, so a unit cut off after its first statement would be committed half done by the next write.
+"""
 
 import asyncio
 import base64
 import hashlib
+import sqlite3
 import struct
 import time
-from collections.abc import Sequence
+from collections.abc import Iterator, Sequence
+from contextlib import contextmanager
 from pathlib import Path
 from typing import Literal
 
@@ -88,6 +95,10 @@ _EXTENSIONS: dict[str, str] = {
 }
 
 
+# How long a write waits for another writer; the same 10 s as the busy timeout of the shared connection.
+_WRITE_WAIT_S: float = 10.0
+
+
 def _prepare_dirs(database: Path, image_dir: Path) -> None:
     database.parent.mkdir(parents=True, exist_ok=True)
     image_dir.mkdir(parents=True, exist_ok=True)
@@ -133,6 +144,51 @@ def encode_message(message: Message, image_dir: Path) -> str:
         {"media_type": image.media_type, "file": _write_image(image_dir, image)} for image in message.images
     ]
     return dumps_compact(dumped)
+
+
+@contextmanager
+def _write_transaction(database: Path) -> Iterator[sqlite3.Connection]:
+    """One write transaction on a connection of its own: all of it is stored or none of it.
+
+    The write lock is taken up front, so concurrent units wait for each other (up to ``_WRITE_WAIT_S``) instead of
+    reading stale numbers, and any error rolls the whole unit back before it is raised again.
+    """
+    connection: sqlite3.Connection = sqlite3.connect(database, timeout=_WRITE_WAIT_S, isolation_level=None)
+    try:
+        connection.execute("PRAGMA synchronous=NORMAL")
+        connection.execute("BEGIN IMMEDIATE")
+        yield connection
+        connection.execute("COMMIT")
+    except BaseException:
+        if connection.in_transaction:
+            connection.execute("ROLLBACK")
+        raise
+    finally:
+        connection.close()
+
+
+def _append_unit(database: Path, image_dir: Path, thread_id: str, messages: Sequence[Message], now: float) -> None:
+    bodies: list[str] = [encode_message(message, image_dir) for message in messages]
+    with _write_transaction(database) as connection:
+        top: tuple[int] = connection.execute(
+            "SELECT COALESCE(MAX(seq), -1) FROM messages WHERE thread_id = ?", (thread_id,)
+        ).fetchone()
+        rows: list[tuple[str, int, str]] = [
+            (thread_id, int(top[0]) + 1 + offset, body) for offset, body in enumerate(bodies)
+        ]
+        connection.executemany("INSERT INTO messages(thread_id, seq, body) VALUES(?, ?, ?)", rows)
+        connection.execute("UPDATE threads SET updated_at = ? WHERE id = ?", (now, thread_id))
+
+
+def _replace_unit(database: Path, image_dir: Path, thread_id: str, messages: Sequence[Message], now: float) -> None:
+    bodies: list[str] = [encode_message(message, image_dir) for message in messages]
+    with _write_transaction(database) as connection:
+        connection.execute("DELETE FROM messages WHERE thread_id = ?", (thread_id,))
+        connection.executemany(
+            "INSERT INTO messages(thread_id, seq, body) VALUES(?, ?, ?)",
+            [(thread_id, index, body) for index, body in enumerate(bodies)],
+        )
+        connection.execute("UPDATE threads SET updated_at = ? WHERE id = ?", (now, thread_id))
 
 
 def decode_message(body: str, image_dir: Path, load_images: bool) -> Message:
@@ -317,8 +373,9 @@ async def _add_missing_columns(connection: aiosqlite.Connection) -> None:
 class Store:
     """Connector to the SQLite database."""
 
-    def __init__(self, connection: aiosqlite.Connection, image_dir: Path) -> None:
+    def __init__(self, connection: aiosqlite.Connection, database: Path, image_dir: Path) -> None:
         self._db: aiosqlite.Connection = connection
+        self._database: Path = database
         self._image_dir: Path = image_dir
 
     @classmethod
@@ -332,7 +389,7 @@ class Store:
         await connection.executescript(_SCHEMA)
         await _add_missing_columns(connection)
         await connection.commit()
-        return cls(connection, image_dir)
+        return cls(connection, path, image_dir)
 
     async def close(self) -> None:
         await self._db.close()
@@ -450,30 +507,13 @@ class Store:
         return [thread_id for thread_id in named if thread_id in existing]
 
     async def append_messages(self, thread_id: str, messages: Sequence[Message]) -> None:
-        row: aiosqlite.Row | None = await self._one(
-            "SELECT COALESCE(MAX(seq), -1) AS top FROM messages WHERE thread_id = ?", (thread_id,)
-        )
-        start: int = (-1 if row is None else int(row["top"])) + 1
-        encoded: list[tuple[str, int, str]] = await asyncio.to_thread(
-            lambda: [
-                (thread_id, start + offset, encode_message(message, self._image_dir))
-                for offset, message in enumerate(messages)
-            ]
-        )
-        await self._db.executemany("INSERT INTO messages(thread_id, seq, body) VALUES(?, ?, ?)", encoded)
-        await self._db.execute("UPDATE threads SET updated_at = ? WHERE id = ?", (time.time(), thread_id))
-        await self._db.commit()
+        """Add ``messages`` after the thread's last one: all of them are stored or none, and concurrent appends to one
+        thread are numbered one after the other."""
+        await asyncio.to_thread(_append_unit, self._database, self._image_dir, thread_id, messages, time.time())
 
     async def replace_messages(self, thread_id: str, messages: Sequence[Message]) -> None:
-        encoded: list[tuple[str, int, str]] = await asyncio.to_thread(
-            lambda: [
-                (thread_id, index, encode_message(message, self._image_dir)) for index, message in enumerate(messages)
-            ]
-        )
-        await self._db.execute("DELETE FROM messages WHERE thread_id = ?", (thread_id,))
-        await self._db.executemany("INSERT INTO messages(thread_id, seq, body) VALUES(?, ?, ?)", encoded)
-        await self._db.execute("UPDATE threads SET updated_at = ? WHERE id = ?", (time.time(), thread_id))
-        await self._db.commit()
+        """Swap the thread's whole history for ``messages`` in one step: a failure or a stop leaves the old history."""
+        await asyncio.to_thread(_replace_unit, self._database, self._image_dir, thread_id, messages, time.time())
 
     async def load_messages(self, thread_id: str, keep_recent_images: int) -> list[Message]:
         """Load a thread's history; only the newest ``keep_recent_images`` screenshots are re-inflated."""

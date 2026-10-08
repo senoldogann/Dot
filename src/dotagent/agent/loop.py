@@ -587,6 +587,9 @@ async def run_agent(agent: AgentRun) -> RunOutcome:
         await runtime.store.update_run_progress(run.id, steps, input_total, output_total)
         assistant: Message = assistant_from_reply(reply, ref.label)
         history.append(assistant)
+        # Stored before the tools run: a stop or crash while they run then leaves the calls in the thread, and the next
+        # run reads them as interrupted (``repair_history``) instead of as never made.
+        await runtime.store.append_messages(run.thread_id, [assistant])
         await runtime.bus.emit(
             run.id,
             "assistant",
@@ -612,7 +615,7 @@ async def run_agent(agent: AgentRun) -> RunOutcome:
                 ledger, [(outcome.call, not outcome.result.is_error, outcome.result.text) for outcome in outcomes]
             )
             history.extend(results)
-            await runtime.store.append_messages(run.thread_id, [assistant, *results])
+            await runtime.store.append_messages(run.thread_id, results)
             finished: ToolOutcome | None = next(
                 (outcome for outcome in outcomes if outcome.call.name == FINISH_TOOL and not outcome.result.is_error),
                 None,
@@ -631,7 +634,6 @@ async def run_agent(agent: AgentRun) -> RunOutcome:
                 continue
             ended = _finish_result(finished)
         else:
-            await runtime.store.append_messages(run.thread_id, [assistant])
             answered: bool = bool(reply.text.strip())
             if answered and (run.mode == "chat" or not used_tools or nudges >= config.finish_nudges):
                 ended = RunOutcome(status="done", result=reply.text)

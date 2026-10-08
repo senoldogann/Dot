@@ -194,7 +194,14 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
     attempt(() => api.post(`/runs/${runId}/btw`, { text: question })).finally(done);
   }
 
+  // True from the moment a message is on its way until the answer is in: Enter does not look at the disabled button,
+  // so a second press must be refused here, or a follow-up would start two runs on one thread.
+  let sending = false;
+
   async function submit() {
+    if (sending) {
+      return;
+    }
     const text = input.value.trim();
     if (text === "") {
       input.focus();
@@ -214,35 +221,40 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
       return;
     }
     const files = attachments.ids();
+    sending = true;
     send.disabled = true;
-    await attempt(async () => {
-      if (active) {
-        const entry = holdMessage(text);
-        try {
-          await api.post(`/runs/${runId}/steer`, { text, attachments: files });
-        } catch (error) {
-          releaseMessage(entry);
-          throw error;
+    try {
+      await attempt(async () => {
+        if (active) {
+          const entry = holdMessage(text);
+          try {
+            await api.post(`/runs/${runId}/steer`, { text, attachments: files });
+          } catch (error) {
+            releaseMessage(entry);
+            throw error;
+          }
+          input.value = "";
+          autosize();
+          attachments.clear();
+          return;
         }
-        input.value = "";
-        autosize();
+        const next = await api.post("/runs", {
+          goal: text,
+          mode: run.mode,
+          model: run.model === "" ? null : run.model,
+          effort: run.effort,
+          approvals: run.approvals,
+          goal_mode: run.goal_mode,
+          thread_id: run.thread_id,
+          attachments: files,
+        });
         attachments.clear();
-        return;
-      }
-      const next = await api.post("/runs", {
-        goal: text,
-        mode: run.mode,
-        model: run.model === "" ? null : run.model,
-        effort: run.effort,
-        approvals: run.approvals,
-        goal_mode: run.goal_mode,
-        thread_id: run.thread_id,
-        attachments: files,
+        ctx.navigate(`/runs/${next.id}`);
       });
-      attachments.clear();
-      ctx.navigate(`/runs/${next.id}`);
-    });
-    send.disabled = false;
+    } finally {
+      sending = false;
+      send.disabled = false;
+    }
   }
 
   send.addEventListener("click", submit);

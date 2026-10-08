@@ -105,7 +105,14 @@ function buildComposer(ctx) {
     goal.style.height = `${Math.min(goal.scrollHeight, MAX_GOAL_PX)}px`;
   }
 
+  // True from the moment a run is being started until the answer is in: Enter does not look at the disabled button, so
+  // a second press must be refused here, or one goal would start two runs.
+  let starting = false;
+
   async function submit() {
+    if (starting) {
+      return;
+    }
     const text = goal.value.trim();
     if (text === "") {
       goal.focus();
@@ -115,22 +122,27 @@ function buildComposer(ctx) {
       return;
     }
     const info = selectedInfo();
+    starting = true;
     start.disabled = true;
-    await attempt(async () => {
-      const created = await api.post("/runs", {
-        goal: text,
-        mode: mode.value(),
-        model: model.value === "" ? null : model.value,
-        effort: info !== null && offersChoice(info) ? savedLevel(info) : null,
-        approvals: approvals.value(),
-        goal_mode: mode.value() === "chat" ? null : goalMode.value(),
-        thread_id: null,
-        attachments: attachments.ids(),
+    try {
+      await attempt(async () => {
+        const created = await api.post("/runs", {
+          goal: text,
+          mode: mode.value(),
+          model: model.value === "" ? null : model.value,
+          effort: info !== null && offersChoice(info) ? savedLevel(info) : null,
+          approvals: approvals.value(),
+          goal_mode: mode.value() === "chat" ? null : goalMode.value(),
+          thread_id: null,
+          attachments: attachments.ids(),
+        });
+        attachments.clear();
+        ctx.navigate(`/runs/${created.id}`);
       });
-      attachments.clear();
-      ctx.navigate(`/runs/${created.id}`);
-    });
-    start.disabled = false;
+    } finally {
+      starting = false;
+      start.disabled = false;
+    }
   }
 
   start.addEventListener("click", submit);

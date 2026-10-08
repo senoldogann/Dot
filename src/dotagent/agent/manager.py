@@ -25,6 +25,9 @@ _TITLE_CHARS: int = 60
 _RESULT_CHARS: int = 20_000
 # The earlier runs of a thread whose goals count as the user's instructions to a reviewer.
 _THREAD_INSTRUCTION_RUNS: int = 30
+# What a stopped run records: a stop asked for by the user (or a caller), and a stop because the daemon shut down.
+_STOPPED_RESULT: str = "The run was stopped."
+_SHUTDOWN_RESULT: str = "The daemon was shut down while this run was active."
 
 
 @dataclass(frozen=True)
@@ -56,6 +59,9 @@ class RunManager:
         self._runtime: Runtime = runtime
         self._slots: asyncio.Semaphore = asyncio.Semaphore(runtime.config.agent.max_concurrent_runs)
         self._handles: dict[str, RunHandle] = {}
+        # Threads that a run is being launched on and whose handle is not registered yet.
+        self._claimed: set[str] = set()
+        self._stopping: bool = False
 
     async def recover(self) -> int:
         """Close out what a previous process left behind. Returns the number of interrupted runs."""
@@ -138,6 +144,9 @@ class RunManager:
         return await self._runtime.store.get_run(run_id)
 
     async def shutdown(self) -> None:
+        """Stop every live run. They end as cancelled with a result that says the daemon shut down, so the owner can tell
+        them from runs stopped by hand; their thread keeps everything up to the step they were in."""
+        self._stopping = True
         handles: list[RunHandle] = list(self._handles.values())
         for handle in handles:
             self.cancel(handle.run_id)
@@ -173,11 +182,40 @@ class RunManager:
         with_goal_mode: bool = mode != "chat" and (runtime.config.agent.goal_mode if goal_mode is None else goal_mode)
         if thread_id is None:
             thread: ThreadRecord = await runtime.store.create_thread(thread_title(goal), source)
-            thread_id = thread.id
-        elif any(handle.thread_id == thread_id for handle in self._handles.values()):
-            raise RunConflict("a run is already active on this thread", {"thread_id": thread_id})
-        else:
+            return await self._register_run(
+                goal, mode, model_ref, thread.id, source, parent_run_id, level, approval_mode, with_goal_mode, files
+            )
+        self._claim_thread(thread_id)
+        try:
             await runtime.store.get_thread(thread_id)
+            return await self._register_run(
+                goal, mode, model_ref, thread_id, source, parent_run_id, level, approval_mode, with_goal_mode, files
+            )
+        finally:
+            self._claimed.discard(thread_id)
+
+    def _claim_thread(self, thread_id: str) -> None:
+        """Reserve a thread for a run that is about to be registered. The check and the claim have no await between
+        them, so two sends to one thread cannot both pass: the second meets the claim of the first, or its handle."""
+        if thread_id in self._claimed or any(handle.thread_id == thread_id for handle in self._handles.values()):
+            raise RunConflict("a run is already active on this thread", {"thread_id": thread_id})
+        self._claimed.add(thread_id)
+
+    async def _register_run(
+        self,
+        goal: str,
+        mode: RunMode,
+        model_ref: str,
+        thread_id: str,
+        source: str,
+        parent_run_id: str | None,
+        level: Effort,
+        approval_mode: ApprovalMode,
+        with_goal_mode: bool,
+        files: tuple[StoredAttachment, ...],
+    ) -> tuple[RunRecord, RunHandle]:
+        """Create the run record and its gate, start its task and register its handle."""
+        runtime: Runtime = self._runtime
         parent: RunHandle | None = None if parent_run_id is None else self._handles.get(parent_run_id)
         instructions: tuple[str, ...] = await self._instructions_for(goal, thread_id, parent_run_id, parent)
         run: RunRecord = await runtime.store.create_run(
@@ -267,7 +305,8 @@ class RunManager:
         """Task body and failure boundary of one run.
 
         Every way a run can end is turned into a stored status plus an event. Unexpected exceptions are logged with
-        their traceback and recorded as a failed run; they are not hidden, because nothing awaits this task.
+        their traceback and recorded as a failed run; they are not hidden, because nothing awaits this task. The handle
+        is released and ``finished`` is set even when recording the end fails, so a waiter and the thread never hang.
         """
         runtime: Runtime = self._runtime
         status: RunStatus = "failed"
@@ -281,7 +320,7 @@ class RunManager:
                 outcome: RunOutcome = await run_agent(AgentRun(runtime, run, gate, cancel, inbox, self, files))
                 status, result = outcome.status, outcome.result
         except (RunCancelled, asyncio.CancelledError):
-            status, result = "cancelled", "The run was stopped."
+            status, result = "cancelled", _SHUTDOWN_RESULT if self._stopping else _STOPPED_RESULT
         except FailSafeTriggered as exc:
             status, result = "cancelled", f"Emergency stop: {exc.message}"
         except DotError as exc:
@@ -291,9 +330,11 @@ class RunManager:
             status, result = "failed", f"Internal error: {type(exc).__name__}: {exc}"
             log.exception("run crashed", run_id=run.id)
         finally:
-            runtime.approvals.release_run(run.id)
-            clean: str = truncate_tail(redact_secrets(result), _RESULT_CHARS)
-            await runtime.store.finish_run(run.id, status, clean)
-            await runtime.bus.emit(run.id, "run_finished", {"status": status, "result": clean}, True)
-            self._handles.pop(run.id, None)
-            finished.set()
+            try:
+                runtime.approvals.release_run(run.id)
+                clean: str = truncate_tail(redact_secrets(result), _RESULT_CHARS)
+                await runtime.store.finish_run(run.id, status, clean)
+                await runtime.bus.emit(run.id, "run_finished", {"status": status, "result": clean}, True)
+            finally:
+                self._handles.pop(run.id, None)
+                finished.set()
