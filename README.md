@@ -688,6 +688,9 @@ service are marked:
 `pytest -m "not live and not internet"` skips the first and third kind, `pytest -m "not hosted"` the requests that
 use your keys.
 
+The work on the agent's autonomy (measuring it, noticing a stuck run, adapting to the model, resuming, learning) is
+planned and tracked in [ROADMAP.md](ROADMAP.md); read it before continuing that work.
+
 ```
 src/dotagent/
   agent/      run loop, run manager, approvals, context trimming, vision relay
