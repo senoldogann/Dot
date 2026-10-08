@@ -1,0 +1,218 @@
+/* The run page and the places that grew around it: groups of tool steps, the panel beside the conversation (a drawer on a
+   narrow page), and the rows of the appearance card. Colours come from the tokens of the skin in use, so every skin gets
+   these for free. Text sits on plain surfaces or on tints of at most 4%. */
+
+/* ---------- page frame ---------- */
+
+/* The composer is pinned to the bottom edge and carries its own spacing, so the page needs none below it. Without this the
+   sticky panel would be pushed up under the top bar when the page is scrolled all the way down. */
+.page[data-layout="run"] {
+  max-width: 1240px;
+  padding-bottom: 0;
+}
+
+.run-layout {
+  display: block;
+}
+
+.run-layout[data-inspector="on"] {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 320px;
+  gap: 28px;
+  align-items: start;
+}
+
+/* The conversation keeps one reading width, centred in the room the panel leaves it. */
+.run-main {
+  width: 100%;
+  min-width: 0;
+  max-width: 768px;
+  margin-inline: auto;
+}
+
+.run-main > * + * {
+  margin-top: 14px;
+}
+
+/* ---------- groups of tool steps ---------- */
+
+.steps {
+  min-width: 0;
+}
+
+.steps-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 8px 5px 4px;
+  border-radius: 8px;
+  color: var(--text-2);
+  font-size: 13px;
+  cursor: pointer;
+  list-style: none;
+  user-select: none;
+}
+
+.steps-head::-webkit-details-marker {
+  display: none;
+}
+
+.steps-head:hover {
+  background: color-mix(in srgb, var(--text) 4%, transparent);
+}
+
+.steps-state {
+  width: 18px;
+  display: grid;
+  place-items: center;
+  flex: none;
+  color: var(--ok);
+}
+
+.steps-title {
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.steps-count {
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.steps-latest {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 12px;
+}
+
+/* An open group already shows every step, so the line about the latest one would only say it twice. */
+.steps[open] .steps-latest {
+  display: none;
+}
+
+.steps-body {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 4px 0 2px 13px;
+  padding-left: 14px;
+  border-left: 2px solid var(--border);
+}
+
+/* ---------- inspector ---------- */
+
+.inspector {
+  position: sticky;
+  top: 68px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  max-height: calc(100vh - 84px);
+  max-height: calc(100dvh - 84px);
+  overflow-y: auto;
+  padding: 2px;
+}
+
+.inspector-head {
+  display: none;
+  align-items: center;
+  gap: 8px;
+}
+
+/* On a narrow page the panel slides in over the conversation. */
+.inspector[data-mode="drawer"] {
+  position: fixed;
+  inset: 0 0 0 auto;
+  z-index: 40;
+  width: min(360px, 92vw);
+  max-height: none;
+  padding: 14px 14px 24px;
+  border-left: 1px solid var(--border);
+  background: var(--bg);
+  box-shadow: 0 0 40px rgb(0 0 0 / 28%);
+}
+
+.inspector[data-mode="drawer"] .inspector-head {
+  display: flex;
+}
+
+.inspector-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 39;
+  background: rgb(0 0 0 / 42%);
+}
+
+.inspector-shot {
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface-2);
+  overflow: hidden;
+  cursor: zoom-in;
+}
+
+.inspector-shot img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.inspector-shot:hover {
+  border-color: var(--border-strong);
+}
+
+.inspector-strip {
+  display: flex;
+  gap: 6px;
+  padding: 3px;
+  overflow-x: auto;
+}
+
+.inspector-thumb {
+  flex: none;
+  width: 56px;
+  height: 38px;
+  padding: 0;
+  border: 2px solid transparent;
+  border-radius: 6px;
+  background: var(--surface-2);
+  overflow: hidden;
+  cursor: pointer;
+}
+
+.inspector-thumb img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.inspector-thumb[aria-pressed="true"] {
+  border-color: var(--accent);
+}
+
+.inspector-thumb:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* ---------- appearance card ---------- */
+
+.setting {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.setting + .setting {
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}

@@ -1,0 +1,87 @@
+[project]
+name = "dotagent"
+version = "0.1.0"
+description = "Dot: an always-on autonomous agent for macOS with browser and computer use, running on Ollama, OpenAI or OpenCode Go models."
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "aiosqlite>=0.22.1",
+    "croniter>=6.2.4",
+    "fastapi>=0.142.2",
+    "httpx>=0.28.1",
+    "mcp>=2.3.0",
+    "pillow>=12.3.0",
+    "playwright>=1.63.0",
+    "pydantic>=2.13.5",
+    "pyobjc-framework-applicationservices>=12.2.2",
+    "pyobjc-framework-cocoa>=12.2.2",
+    "pyobjc-framework-quartz>=12.2.2",
+    "pyobjc-framework-screencapturekit>=12.2.2",
+    "pyyaml>=6.0.3",
+    "structlog>=26.1.0",
+    "uvicorn>=0.54.0",
+]
+
+[project.scripts]
+dotx = "dotagent.cli:main"
+
+[build-system]
+requires = ["uv_build>=0.10.9,<0.11.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "mypy>=2.4.0",
+    "pytest>=9.1.1",
+    "pytest-asyncio>=1.4.0",
+    "ruff>=0.16.10",
+    "types-pyyaml>=6.0.12.20260906",
+]
+
+[tool.ruff]
+line-length = 120
+target-version = "py313"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "ANN", "ASYNC", "SIM", "RUF", "PLE", "PLW"]
+ignore = ["E501", "RUF001", "RUF002", "RUF003", "PLW0603"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["ANN"]
+# The timeout parameter of the connection methods is dictated by the httpcore network backend interface.
+"src/dotagent/web/client.py" = ["ASYNC109"]
+# The stop words are kept as one block of text that is split into words once.
+"src/dotagent/memory/words.py" = ["SIM905"]
+
+[tool.mypy]
+python_version = "3.13"
+strict = true
+plugins = ["pydantic.mypy"]
+mypy_path = "src"
+files = ["src"]
+
+[[tool.mypy.overrides]]
+module = [
+    "Quartz.*",
+    "ApplicationServices.*",
+    "AppKit.*",
+    "Foundation.*",
+    "CoreFoundation.*",
+    "ScreenCaptureKit.*",
+    "CoreMedia.*",
+    "objc.*",
+    "croniter.*",
+]
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+markers = [
+    "live: needs a running Ollama server with a signed-in cloud model",
+    "browser: drives a real headless Chrome against a local fixture server",
+    "internet: sends a few read-only requests to public sites (a search page and a documentation page)",
+    "desktop: moves the real pointer and keyboard of this Mac against a local AppKit fixture window",
+    "hosted: sends a few tiny requests to the real OpenAI, OpenCode Go and Ollama search services with your own keys",
+]

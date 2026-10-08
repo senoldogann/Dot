@@ -1,0 +1,116 @@
+"""Pure browser safety rules: which URLs may be opened and how much damage a step can do.
+
+The page is untrusted: an element's name decides how a click or a keystroke is classified, and the policy engine
+then decides whether the user must be asked, whether the step is refused, or whether it is handed to the user.
+"""
+
+import re
+from collections.abc import Sequence
+from urllib.parse import urlsplit
+
+from dotagent.browser.snapshot import SnapshotLine, parse_snapshot
+from dotagent.browser.types import Step, StepAction
+from dotagent.core.types import FrozenModel
+from dotagent.policy.elements import (
+    Element,
+    StepAssessment,
+    asks_to_pay,
+    assessment_for,
+    clicking_reasons,
+    looks_like_key,
+    quiet_assessment,
+    typing_reasons,
+)
+from dotagent.policy.types import Flag
+
+_ALLOWED_SCHEMES: frozenset[str] = frozenset({"http", "https"})
+_MAX_URL_CHARS: int = 2000
+_SCHEME: re.Pattern[str] = re.compile(r"^[A-Za-z][A-Za-z0-9+.-]*:")
+_HOST_LIKE: re.Pattern[str] = re.compile(r"^(localhost|[\w-]+(\.[\w-]+)+|\d{1,3}(\.\d{1,3}){3})(:\d+)?([/?#].*)?$")
+_UNSAFE_FILE_CHARS: re.Pattern[str] = re.compile(r"[^\w.\- ()]+")
+_MAX_FILE_NAME_CHARS: int = 120
+_TYPING_ACTIONS: frozenset[StepAction] = frozenset({"fill", "type", "press", "select"})
+_CLICKING_ACTIONS: frozenset[StepAction] = frozenset({"click", "double_click", "right_click", "click_at"})
+_QUIET_ACTIONS: frozenset[StepAction] = frozenset({"hover", "scroll_into_view"})
+_CLICKABLE_ROLES: frozenset[str] = frozenset({"button", "link", "menuitem", "tab", "option", "checkbox", "switch"})
+
+
+class UrlVerdict(FrozenModel):
+    allowed: bool
+    reason: str
+
+
+def normalize_url(raw: str) -> str:
+    """Turn what the model wrote into an absolute URL; a bare host such as ``example.com`` gets ``https://``."""
+    text: str = raw.strip()
+    if _SCHEME.match(text) is not None and not re.match(r"^[\w-]+(\.[\w-]+)*:\d+", text):
+        return text
+    if _HOST_LIKE.match(text) is not None:
+        scheme: str = "http" if text.startswith(("localhost", "127.0.0.1")) else "https"
+        return f"{scheme}://{text}"
+    return text
+
+
+def host_matches(host: str, entries: Sequence[str]) -> bool:
+    """Whether ``host`` is one of ``entries`` or a subdomain of one."""
+    lowered: str = host.lower().rstrip(".")
+    return any(lowered == entry or lowered.endswith(f".{entry}") for entry in (e.lower().lstrip(".") for e in entries))
+
+
+def check_url(url: str, allowed_hosts: Sequence[str], blocked_hosts: Sequence[str]) -> UrlVerdict:
+    """Whether the browser may open ``url``: web pages only, never a blocked host, only allowed hosts when set."""
+    if url == "about:blank":
+        return UrlVerdict(allowed=True, reason="blank page")
+    try:
+        parts = urlsplit(url)
+        host: str | None = parts.hostname
+    except ValueError as exc:
+        return UrlVerdict(allowed=False, reason=f"malformed URL ({exc})")
+    if parts.scheme not in _ALLOWED_SCHEMES:
+        return UrlVerdict(allowed=False, reason=f"scheme {parts.scheme!r} is not allowed; only http and https open")
+    if not host:
+        return UrlVerdict(allowed=False, reason="the URL has no host")
+    if host_matches(host, blocked_hosts):
+        return UrlVerdict(allowed=False, reason=f"host {host!r} is on the blocked list (browser.blocked_hosts)")
+    if allowed_hosts and not host_matches(host, allowed_hosts):
+        return UrlVerdict(allowed=False, reason=f"host {host!r} is not in browser.allowed_hosts")
+    return UrlVerdict(allowed=True, reason="allowed")
+
+
+def url_flags(url: str) -> tuple[Flag, ...]:
+    """A very long URL or one that embeds a key can carry data out of the machine."""
+    if len(url) > _MAX_URL_CHARS or looks_like_key(url):
+        return ("exfiltration",)
+    return ()
+
+
+def parse_element(line: str) -> Element | None:
+    """Role and accessible name from a snapshot line, or ``None`` when the line is not an element."""
+    parsed: tuple[SnapshotLine, ...] = parse_snapshot(line)
+    if not parsed or not parsed[0].role:
+        return None
+    return Element(role=parsed[0].role, name=parsed[0].name)
+
+
+def assess_step(step: Step, element: Element | None) -> StepAssessment:
+    """Risk and flags of one step, judged from the action and the element it targets."""
+    reasons: list[str] = []
+    if step.action in _TYPING_ACTIONS:
+        reasons = typing_reasons(element, step.text)
+    elif step.action in _CLICKING_ACTIONS or step.action in ("check", "uncheck"):
+        reasons = clicking_reasons(element, _CLICKABLE_ROLES)
+    if step.action in _QUIET_ACTIONS and not reasons:
+        return quiet_assessment()
+    return assessment_for(reasons)
+
+
+def dialog_is_financial(message: str) -> bool:
+    """A confirm() that asks to pay or purchase must never be accepted on the model's behalf."""
+    return asks_to_pay(message)
+
+
+def safe_download_name(suggested: str) -> str:
+    """A file name that stays inside the downloads folder: the leaf only, no hidden files, no odd characters."""
+    leaf: str = suggested.replace("\\", "/").rsplit("/", 1)[-1].strip()
+    cleaned: str = _UNSAFE_FILE_CHARS.sub("_", leaf).lstrip(".").strip()
+    return cleaned[:_MAX_FILE_NAME_CHARS] or "download"

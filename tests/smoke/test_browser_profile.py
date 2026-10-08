@@ -1,0 +1,122 @@
+"""A sign-in made in an ordinary Chrome window reaches the automated browser through the shared profile, and the import
+finds the cookie database that a real Chrome writes.
+
+The window and the automated sessions both run on the mock keychain, so no Keychain item is touched; the test fails when
+the two disagree about the key, because the automated Chrome then cannot read the cookie the window saved.
+"""
+
+import asyncio
+import socket
+import time
+from pathlib import Path
+
+import httpx
+import pytest
+from playwright.async_api import async_playwright
+
+from dotagent.browser.chrome_import import ImportReport, has_stored_cookies, import_chrome_profile
+from dotagent.browser.keychain import KeychainMode, read_keychain_mode
+from dotagent.browser.login import chrome_arguments
+from dotagent.browser.session import BrowserSession
+from dotagent.cli_browser import _readable_cookies
+from dotagent.config import BrowserConfig, load_config
+
+pytestmark = pytest.mark.browser
+
+_READY_TIMEOUT_S: float = 20.0
+_EXIT_TIMEOUT_S: float = 20.0
+_POLL_S: float = 0.2
+
+
+def free_port() -> int:
+    with socket.socket() as probe:
+        probe.bind(("127.0.0.1", 0))
+        return int(probe.getsockname()[1])
+
+
+async def wait_until_listening(port: int) -> None:
+    deadline: float = time.monotonic() + _READY_TIMEOUT_S
+    async with httpx.AsyncClient() as client:
+        while True:
+            try:
+                await client.get(f"http://127.0.0.1:{port}/json/version")
+                return
+            except httpx.TransportError:
+                if time.monotonic() > deadline:
+                    raise
+                await asyncio.sleep(_POLL_S)
+
+
+async def save_cookie_in_ordinary_chrome(profile: Path, url: str) -> None:
+    """Start Chrome the way ``dotx browser login`` does (hidden, with a debugging port), set one cookie, quit it."""
+    port: int = free_port()
+    keychain: KeychainMode = read_keychain_mode(profile)
+    command: list[str] = [
+        *chrome_arguments(profile, None, keychain),
+        "--headless=new",
+        f"--remote-debugging-port={port}",
+    ]
+    chrome: asyncio.subprocess.Process = await asyncio.create_subprocess_exec(
+        *command, stdout=asyncio.subprocess.DEVNULL, stderr=asyncio.subprocess.DEVNULL
+    )
+    try:
+        await wait_until_listening(port)
+        async with async_playwright() as playwright:
+            browser = await playwright.chromium.connect_over_cdp(f"http://127.0.0.1:{port}")
+            await browser.contexts[0].add_cookies(
+                [{"name": "dot_session", "value": "signed-in", "url": url, "expires": time.time() + 3600}]
+            )
+            quit_chrome = await browser.new_browser_cdp_session()
+            await quit_chrome.send("Browser.close")
+        await asyncio.wait_for(chrome.wait(), _EXIT_TIMEOUT_S)
+    finally:
+        if chrome.returncode is None:
+            chrome.kill()
+
+
+@pytest.fixture
+def profile(tmp_path: Path) -> Path:
+    directory: Path = tmp_path / "profile"
+    directory.mkdir(mode=0o700)
+    return directory
+
+
+@pytest.fixture
+def headless_config(tmp_path: Path) -> BrowserConfig:
+    settings: Path = tmp_path / "config.toml"
+    settings.write_text("[browser]\nheadless = true\n", encoding="utf-8")
+    return load_config(settings).browser
+
+
+@pytest.fixture
+def attach_config(tmp_path: Path) -> BrowserConfig:
+    settings: Path = tmp_path / "attach.toml"
+    settings.write_text('[browser]\nmode = "attach"\n', encoding="utf-8")
+    return load_config(settings).browser
+
+
+async def test_a_cookie_saved_in_the_sign_in_window_is_read_by_the_automated_browser(
+    profile: Path, headless_config: BrowserConfig, tmp_path: Path
+) -> None:
+    await save_cookie_in_ordinary_chrome(profile, "http://127.0.0.1:9")
+    session: BrowserSession = BrowserSession(headless_config, profile, tmp_path / "downloads")
+    try:
+        assert await session.stored_cookie_count() == 1
+    finally:
+        await session.aclose()
+
+
+async def test_the_check_of_an_import_runs_in_dots_own_chrome_whatever_the_browser_mode(
+    profile: Path, attach_config: BrowserConfig
+) -> None:
+    await save_cookie_in_ordinary_chrome(profile, "http://127.0.0.1:9")
+    assert await _readable_cookies(attach_config, profile) == 1
+
+
+async def test_the_sign_ins_of_a_profile_that_a_real_chrome_wrote_are_imported(profile: Path, tmp_path: Path) -> None:
+    await save_cookie_in_ordinary_chrome(profile, "http://127.0.0.1:9")
+    dot_profile: Path = tmp_path / "dot"
+    report: ImportReport = await asyncio.to_thread(import_chrome_profile, profile, "Default", dot_profile)
+    assert report.cookies == 1
+    assert has_stored_cookies(dot_profile)
+    assert read_keychain_mode(dot_profile) == "system"

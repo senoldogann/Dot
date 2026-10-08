@@ -1,0 +1,134 @@
+/* The settings page: the tabs down the left side and the pane of the chosen tab next to them. When the two would not fit
+   side by side, the tabs become a strip above the pane. */
+
+/* The settings may run wider than the other pages: the pane next to the tabs has to hold the model table whole. */
+.page:has(> .settings-frame) {
+  max-width: 1180px;
+}
+
+/* The frame measures the width the page gives the settings, whatever the window and the sidebar are doing. */
+.settings-frame {
+  container-type: inline-size;
+}
+
+.settings {
+  display: grid;
+  grid-template-columns: 196px minmax(0, 1fr);
+  gap: 36px;
+  align-items: start;
+}
+
+.settings-side {
+  position: sticky;
+  top: 76px;
+}
+
+.settings-title {
+  margin: 0;
+  padding: 2px 10px 14px;
+  font-size: 22px;
+  font-weight: 650;
+  letter-spacing: -0.015em;
+}
+
+.settings-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.settings-tab {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: var(--radius-control);
+  color: var(--text-2);
+}
+
+.settings-tab:hover {
+  background: color-mix(in srgb, var(--text) 4%, transparent);
+  color: var(--text);
+  text-decoration: none;
+}
+
+.settings-tab[aria-current="page"] {
+  background: color-mix(in srgb, var(--text) 7%, transparent);
+  color: var(--text);
+  font-weight: 550;
+}
+
+.settings-pane {
+  min-width: 0;
+  max-width: 860px;
+}
+
+.settings-pane > * + * {
+  margin-top: 14px;
+}
+
+/* The pane carries the name of the tab; the page itself is named by the title next to the tabs. */
+.settings-pane .page-head {
+  margin-bottom: 14px;
+}
+
+.settings-pane .page-title {
+  font-size: 18px;
+}
+
+/* ---------- browser tab ---------- */
+
+.browser-steps {
+  margin: 0;
+  padding-left: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.browser-steps li {
+  padding-left: 4px;
+}
+
+.browser-steps .code-line {
+  margin-top: 6px;
+}
+
+.browser-copy {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.browser-copy .code-line {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  overflow-x: auto;
+}
+
+@container (max-width: 1099.98px) {
+  .settings {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 18px;
+  }
+
+  .settings-side {
+    position: static;
+  }
+
+  .settings-title {
+    padding-bottom: 10px;
+  }
+
+  .settings-nav {
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+
+  .settings-tab {
+    padding: 7px 12px;
+  }
+}

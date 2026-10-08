@@ -1,0 +1,599 @@
+"""Desktop steps on the worker thread: what a step touches, then the step itself.
+
+Everything here blocks (accessibility calls, CGEvent posting) and runs on the session's single worker thread.
+``inspect_step`` only reads. ``execute_step`` re-reads everything it depends on, because a human approval may have taken
+minutes between the two, and is the only function that moves the pointer or presses keys.
+"""
+
+import time
+from collections.abc import Mapping
+from dataclasses import dataclass
+from math import hypot
+from pathlib import Path
+
+from dotagent.config import DesktopConfig
+from dotagent.core.errors import DesktopError, DesktopPermissionError, FailSafeTriggered
+from dotagent.core.logs import get_logger
+from dotagent.desktop import apps, ax, screen
+from dotagent.desktop import input as hid
+from dotagent.desktop.ax import ElementState
+from dotagent.desktop.input import EventSource, parse_chord
+from dotagent.desktop.safety import DESKTOP_CLICKABLE_ROLES, StepContext, app_role, types_a_character
+from dotagent.desktop.types import (
+    DEFAULT_SCROLL_PX,
+    AppInfo,
+    AXElement,
+    DisplayInfo,
+    Point,
+    Rect,
+    Step,
+    parse_ref,
+)
+from dotagent.policy.elements import Element
+
+_log = get_logger("dotagent.desktop.actions")
+
+_CORNER_PT: float = 2.0
+_DRIFT_PT: float = 12.0
+_HIT_TEST_HOPS: int = 4
+_MENU_ROLES: frozenset[str] = frozenset({"AXMenu", "AXMenuItem", "AXMenuBar", "AXMenuBarItem"})
+_TOGGLE_ROLES: frozenset[str] = frozenset({"AXCheckBox", "AXRadioButton"})
+_WIDE_TOGGLE_PT: float = 48.0
+_TOGGLE_BOX_PT: float = 10.0
+_ACTION_UNSUPPORTED: frozenset[int] = frozenset({-25206, -25208})
+_WHEEL_CHUNK_PX: int = 400
+_DRAG_PX_PER_MOVE: float = 12.0
+_MIN_DRAG_MOVES: int = 8
+_MAX_DRAG_MOVES: int = 40
+_HOVER_HOLD_S: float = 0.15
+_FOCUS_SETTLE_S: float = 0.05
+_LABEL_CLIP: int = 50
+_SCROLL_UNITS: dict[str, tuple[int, int]] = {"down": (0, -1), "up": (0, 1), "right": (-1, 0), "left": (1, 0)}
+_NO_APP: AppInfo = AppInfo(
+    pid=0, name="the desktop", bundle_id=None, bundle_path="", kind="background", frontmost=False
+)
+
+
+@dataclass(frozen=True, slots=True)
+class StepEnv:
+    """What the worker thread needs to resolve and perform the steps of one batch.
+
+    ``expected_front`` is the application that held the keyboard focus after the previous step and ``expected_pointer``
+    where the previous pointer step left the pointer; a difference means that something else interfered.
+    """
+
+    app: AppInfo
+    app_element: AXElement
+    elements: Mapping[int, AXElement]
+    running: tuple[AppInfo, ...]
+    displays: tuple[DisplayInfo, ...]
+    scale: float
+    source: EventSource
+    config: DesktopConfig
+    failsafe_file: Path
+    expected_front: int | None
+    expected_pointer: Point | None
+
+
+@dataclass(frozen=True, slots=True)
+class Target:
+    """What a step acts upon: the control (if one was found) and the application it belongs to."""
+
+    ref: int | None
+    state: ElementState | None
+    owner: AppInfo
+    point: Point | None
+
+
+@dataclass(frozen=True, slots=True)
+class Inspection:
+    """What a reviewer needs to judge a step: its context, and a short description of what it touches."""
+
+    context: StepContext
+    target: str
+
+
+@dataclass(frozen=True, slots=True)
+class Effect:
+    """What a step did: the sentence for the report, where it left the pointer, whether the UI needs time to react."""
+
+    detail: str
+    pointer: Point | None
+    opens_ui: bool
+    switched_to: AppInfo | None
+
+
+def _clip(text: str, limit: int) -> str:
+    flat: str = " ".join(text.split())
+    return flat if len(flat) <= limit else f"{flat[: limit - 1]}…"
+
+
+def _named(state: ElementState | None) -> str:
+    if state is None:
+        return "the point"
+    role: str = "secure field" if state.secure() else state.role.removeprefix("AX").lower()
+    return f'{role} "{_clip(state.label, _LABEL_CLIP)}"' if state.label else role
+
+
+def _where(target: Target, scale: float) -> str:
+    place: str = ""
+    if target.point is not None and target.ref is None:
+        place = f" at ({round(target.point.x * scale)}, {round(target.point.y * scale)})"
+    ref: str = f" a{target.ref}" if target.ref is not None else ""
+    return f"{_named(target.state)}{ref}{place} in {target.owner.name}"
+
+
+def _in_corner(point: Point) -> bool:
+    return point.x <= _CORNER_PT and point.y <= _CORNER_PT
+
+
+def check_stop(config: DesktopConfig, failsafe_file: Path) -> None:
+    """Stop everything when the user asked for it: the STOP file exists or the pointer sits in the top-left corner."""
+    if failsafe_file.exists():
+        raise FailSafeTriggered(
+            f"the file {failsafe_file} exists; delete it to allow desktop control again",
+            {"file": str(failsafe_file)},
+        )
+    if config.failsafe_corner and _in_corner(screen.pointer_location()):
+        raise FailSafeTriggered("the pointer is in the top-left corner of the screen", {})
+
+
+def check_failsafe(env: StepEnv) -> None:
+    check_stop(env.config, env.failsafe_file)
+
+
+def check_drift(env: StepEnv) -> None:
+    """Refuse to go on when the pointer is not where the previous step left it: someone else is using the mouse."""
+    expected: Point | None = env.expected_pointer
+    if expected is None:
+        return
+    actual: Point = screen.pointer_location()
+    if hypot(actual.x - expected.x, actual.y - expected.y) > _DRIFT_PT:
+        raise DesktopError(
+            "the pointer is no longer where the previous step left it, so someone else may be using the mouse; "
+            "the remaining steps were not run",
+            {
+                "expected": f"({expected.x:.0f}, {expected.y:.0f})",
+                "actual": f"({actual.x:.0f}, {actual.y:.0f})",
+            },
+        )
+
+
+def _check_corner(env: StepEnv, point: Point) -> None:
+    if env.config.failsafe_corner and _in_corner(point):
+        raise DesktopError(
+            "the target is in the top-left corner of the screen, which is the emergency-stop corner and is never clicked",
+            {"x": round(point.x * env.scale), "y": round(point.y * env.scale)},
+        )
+
+
+def _required(value: str | None, what: str) -> str:
+    if value is None:
+        raise DesktopError(f"the step has no {what}", {})
+    return value
+
+
+def _app_for(env: StepEnv, pid: int, window_owner: str) -> AppInfo:
+    known: AppInfo | None = next((app for app in env.running if app.pid == pid), None)
+    if known is not None:
+        return known
+    return AppInfo(
+        pid=pid, name=window_owner or f"pid {pid}", bundle_id=None, bundle_path="", kind="accessory", frontmost=False
+    )
+
+
+def _ref_number(raw: str) -> int:
+    try:
+        return parse_ref(raw)
+    except ValueError as error:
+        raise DesktopError(str(error), {"ref": raw}) from error
+
+
+def _element_for(env: StepEnv, raw: str) -> tuple[int, AXElement]:
+    number: int = _ref_number(raw)
+    element: AXElement | None = env.elements.get(number)
+    if element is None:
+        raise DesktopError(
+            f"a{number} is not an element of {env.app.name} that desktop_snapshot has shown; take a new snapshot of "
+            "that application (pass app when it is not the one you were working in)",
+            {"ref": raw, "pid": env.app.pid},
+        )
+    return number, element
+
+
+def _state_of(env: StepEnv, number: int, element: AXElement) -> ElementState:
+    try:
+        return ax.read_state(element, env.app.pid)
+    except DesktopPermissionError:
+        raise
+    except DesktopError as error:
+        raise DesktopError(
+            f"a{number} cannot be read any more ({error.message}); take a new snapshot",
+            {**error.context, "ref": f"a{number}"},
+        ) from error
+
+
+def _peek_ref(env: StepEnv, raw: str) -> Target:
+    number, element = _element_for(env, raw)
+    return Target(ref=number, state=_state_of(env, number, element), owner=env.app, point=None)
+
+
+def _to_points(env: StepEnv, x: float, y: float) -> Point:
+    point: Point = Point(x / env.scale, y / env.scale)
+    if not any(display.bounds.contains(point) for display in env.displays):
+        raise DesktopError(
+            f"({x:g}, {y:g}) is outside the screen; take a desktop_screenshot to see the coordinates",
+            {"x": x, "y": y},
+        )
+    return point
+
+
+def _hit_test(env: StepEnv, point: Point) -> tuple[ElementState | None, int | None]:
+    """The control under a point and the application it belongs to; ``(None, None)`` when the application will not say."""
+    try:
+        found: AXElement | None = ax.element_at(point, env.config.ax_timeout_s)
+        if found is None:
+            return None, None
+        pid: int = ax.pid_of(found)
+        control: AXElement = ax.enclosing(found, pid, DESKTOP_CLICKABLE_ROLES, _HIT_TEST_HOPS)
+        return ax.read_state(control, pid), pid
+    except DesktopPermissionError:
+        raise
+    except DesktopError as error:
+        _log.warning("hit_test_failed", x=point.x, y=point.y, error=error.message, **error.context)
+        return None, None
+
+
+def _peek_point(env: StepEnv, x: float, y: float) -> Target:
+    point: Point = _to_points(env, x, y)
+    window = screen.window_at(point, screen.windows_on_screen())
+    state, pid = _hit_test(env, point)
+    if pid is not None:
+        owner: AppInfo = _app_for(env, pid, window.owner if window is not None and window.pid == pid else "")
+    elif window is not None:
+        owner = _app_for(env, window.pid, window.owner)
+    else:
+        owner = _NO_APP
+    return Target(ref=None, state=state, owner=owner, point=point)
+
+
+def _window_frame(env: StepEnv) -> Rect:
+    window: AXElement | None = ax.focused_window(env.app_element, env.app.pid)
+    frame: Rect | None = None if window is None else ax.frame_of(window, env.app.pid)
+    if frame is None:
+        raise DesktopError(f"{env.app.name} has no window to scroll in; give a ref or x and y", {"pid": env.app.pid})
+    return frame
+
+
+def _peek(env: StepEnv, ref: str | None, x: float | None, y: float | None) -> Target:
+    if ref is not None:
+        return _peek_ref(env, ref)
+    if x is not None and y is not None:
+        return _peek_point(env, x, y)
+    return Target(ref=None, state=None, owner=env.app, point=_window_frame(env).center())
+
+
+def _context(target: Target) -> StepContext:
+    state: ElementState | None = target.state
+    return StepContext(
+        role=app_role(target.owner.name, target.owner.bundle_id),
+        app=target.owner.name,
+        element=None if state is None else Element(role=state.role, name=state.label),
+        secure=state is not None and state.secure(),
+    )
+
+
+def _inspection(env: StepEnv, target: Target) -> Inspection:
+    return Inspection(context=_context(target), target=_where(target, env.scale))
+
+
+def _keyboard_target(env: StepEnv) -> Target:
+    """The focused field of the application that has the keyboard, provided that is the one the steps expect."""
+    pid: int | None = apps.frontmost_pid()
+    if pid is None:
+        raise DesktopError("no application has the keyboard focus right now; activate one first", {})
+    if env.expected_front is not None and pid != env.expected_front:
+        taker: AppInfo = _app_for(env, pid, "")
+        raise DesktopError(
+            f"{taker.name} has the keyboard focus, not the application the previous step left in front; "
+            "the keys would go to the wrong place, so nothing was typed. Use activate to choose where the keys go",
+            {"pid": pid, "expected_pid": env.expected_front},
+        )
+    owner: AppInfo = env.app if pid == env.app.pid else _app_for(env, pid, "")
+    root: AXElement = env.app_element if pid == env.app.pid else ax.app_element(pid, env.config.ax_timeout_s)
+    focused: AXElement | None = ax.focused_element(root, pid)
+    state: ElementState | None = None if focused is None else ax.read_state(focused, pid)
+    return Target(ref=None, state=state, owner=owner, point=None)
+
+
+def inspect_step(env: StepEnv, step: Step) -> Inspection:
+    """What the step touches, read from the machine right now: the application, the control and whether it is secret."""
+    match step.action:
+        case "click" | "double_click" | "right_click" | "hover" | "scroll":
+            return _inspection(env, _peek(env, step.ref, step.x, step.y))
+        case "drag":
+            return _inspection(env, _peek(env, step.ref, step.x, step.y))
+        case "press" | "focus" | "set_value":
+            return _inspection(env, _peek_ref(env, _required(step.ref, "ref")))
+        case "type" | "paste":
+            if step.ref is not None:
+                return _inspection(env, _peek_ref(env, step.ref))
+            return _inspection(env, _keyboard_target(env))
+        case "key":
+            return _inspection(env, _keyboard_target(env))
+        case "menu" | "wait":
+            return _inspection(env, Target(ref=None, state=None, owner=env.app, point=None))
+        case "activate":
+            named: AppInfo | None = apps.find_app(_required(step.text, "application"), env.running)
+            return _inspection(env, Target(ref=None, state=None, owner=named or env.app, point=None))
+
+
+def _window_frame_of(env: StepEnv, element: AXElement) -> Rect | None:
+    window: object | None = ax.read_optional(element, "AXWindow", env.app.pid)
+    return None if window is None else ax.frame_of(window, env.app.pid)
+
+
+def _visible_frame(env: StepEnv, element: AXElement, state: ElementState) -> Rect | None:
+    """The frame of an element when its centre can be clicked: on a display and inside its window (menus excepted)."""
+    frame: Rect | None = state.frame
+    if frame is None or min(frame.width, frame.height) <= 1:
+        return None
+    centre: Point = frame.center()
+    if not any(display.bounds.contains(centre) for display in env.displays):
+        return None
+    if state.role in _MENU_ROLES:
+        return frame
+    window: Rect | None = _window_frame_of(env, element)
+    if window is not None and not window.contains(centre):
+        return None
+    return frame
+
+
+def _bring_into_view(env: StepEnv, number: int, element: AXElement) -> Rect:
+    state: ElementState = _state_of(env, number, element)
+    frame: Rect | None = _visible_frame(env, element, state)
+    if frame is not None:
+        return frame
+    try:
+        ax.show_in_view(element, env.app.pid)
+    except DesktopError as error:
+        raise DesktopError(
+            f"a{number} is outside the visible part of its window and cannot be scrolled into view ({error.message})",
+            {**error.context, "ref": f"a{number}"},
+        ) from error
+    frame = _visible_frame(env, element, _state_of(env, number, element))
+    if frame is None:
+        raise DesktopError(
+            f"a{number} is not visible on the screen (scrolled away, hidden or in a minimized window); "
+            "scroll to it or take a new snapshot",
+            {"ref": f"a{number}"},
+        )
+    return frame
+
+
+def _check_uncovered(env: StepEnv, number: int, state: ElementState, point: Point) -> None:
+    if state.role in _MENU_ROLES:
+        return
+    _, pid = _hit_test(env, point)
+    if pid is not None and pid != env.app.pid:
+        covering: AppInfo = _app_for(env, pid, "")
+        raise DesktopError(
+            f"a{number} is covered by a window of {covering.name}; close or move it, or activate {env.app.name} first",
+            {"ref": f"a{number}", "covering_pid": pid},
+        )
+
+
+def _press_point(frame: Rect, state: ElementState) -> Point:
+    """Where an element is pressed: its centre, except for a wide checkbox or radio button, whose empty trailing space
+    ignores clicks, so the box at its leading edge is pressed instead."""
+    centre: Point = frame.center()
+    if state.role in _TOGGLE_ROLES and frame.width > _WIDE_TOGGLE_PT:
+        return Point(frame.x + _TOGGLE_BOX_PT, centre.y)
+    return centre
+
+
+def _point_for(env: StepEnv, ref: str | None, x: float | None, y: float | None) -> Point:
+    """Where the pointer goes for a step: the press point of a ref's fresh frame, the given point, or the window centre."""
+    if ref is not None:
+        number, element = _element_for(env, ref)
+        frame: Rect = _bring_into_view(env, number, element)
+        state: ElementState = _state_of(env, number, element)
+        point: Point = _press_point(frame, state)
+        _check_uncovered(env, number, state, point)
+        return point
+    if x is not None and y is not None:
+        return _to_points(env, x, y)
+    return _window_frame(env).center()
+
+
+def _refuse_secure(inspection: Inspection, what: str) -> None:
+    if inspection.context.secure:
+        raise DesktopError(
+            f"{what} into a secure text field is refused: Dot never enters passwords or codes. "
+            "Ask the user to type it themselves",
+            {"target": inspection.target},
+        )
+
+
+def _focus(env: StepEnv, raw: str) -> None:
+    number, element = _element_for(env, raw)
+    ax.set_attribute(element, "AXFocused", True, env.app.pid)
+    time.sleep(_FOCUS_SETTLE_S)
+    if not _state_of(env, number, element).focused:
+        raise DesktopError(
+            f"a{number} did not take the keyboard focus; click it first", {"ref": f"a{number}", "pid": env.app.pid}
+        )
+
+
+def _effect(detail: str, pointer: Point | None, opens_ui: bool) -> Effect:
+    return Effect(detail=detail, pointer=pointer, opens_ui=opens_ui, switched_to=None)
+
+
+def _click(env: StepEnv, step: Step, inspection: Inspection, count: int) -> Effect:
+    point: Point = _point_for(env, step.ref, step.x, step.y)
+    _check_corner(env, point)
+    hid.post(hid.left_click_events(env.source, point, count, step.modifiers or ()))
+    verb: str = "clicked" if count == 1 else "double-clicked"
+    return _effect(f"{verb} {inspection.target}", point, True)
+
+
+def _right_click(env: StepEnv, step: Step, inspection: Inspection) -> Effect:
+    point: Point = _point_for(env, step.ref, step.x, step.y)
+    _check_corner(env, point)
+    hid.post(hid.right_click_events(env.source, point, step.modifiers or ()))
+    return _effect(f"right-clicked {inspection.target}", point, True)
+
+
+def _hover(env: StepEnv, step: Step, inspection: Inspection) -> Effect:
+    if step.modifiers:
+        raise DesktopError("hover does not take modifiers", {})
+    point: Point = _point_for(env, step.ref, step.x, step.y)
+    _check_corner(env, point)
+    hid.post(hid.move_events(env.source, point, _HOVER_HOLD_S))
+    return _effect(f"moved the pointer over {inspection.target}", point, False)
+
+
+def _press(env: StepEnv, step: Step) -> Effect:
+    number, element = _element_for(env, _required(step.ref, "ref"))
+    state: ElementState = _state_of(env, number, element)
+    try:
+        ax.press(element, env.app.pid)
+    except DesktopError as error:
+        code: object = error.context.get("code")
+        if isinstance(code, int) and code in _ACTION_UNSUPPORTED:
+            raise DesktopError(
+                f"a{number} ({_named(state)}) cannot be pressed through accessibility; use click on it",
+                {**error.context, "ref": f"a{number}"},
+            ) from error
+        raise
+    return _effect(f"pressed {_named(state)} a{number}", None, True)
+
+
+def _focus_step(env: StepEnv, step: Step, inspection: Inspection) -> Effect:
+    _focus(env, _required(step.ref, "ref"))
+    return _effect(f"focused {inspection.target}", None, False)
+
+
+def _normalised(text: str) -> str:
+    return text.replace("\r\n", "\n").replace("\r", "\n")
+
+
+def _set_value(env: StepEnv, step: Step, inspection: Inspection) -> Effect:
+    _refuse_secure(inspection, "setting a value")
+    number, element = _element_for(env, _required(step.ref, "ref"))
+    wanted: str = _required(step.text, "text")
+    ax.set_attribute(element, "AXValue", wanted, env.app.pid)
+    _, actual, _ = ax.read_text(element, env.app.pid)
+    if _normalised(actual) != _normalised(wanted):
+        raise DesktopError(
+            f"a{number} did not keep the value: it now reads {_clip(actual, 80)!r}. "
+            "Click the field and use type or paste instead",
+            {"ref": f"a{number}", "wanted_chars": len(wanted), "actual_chars": len(actual)},
+        )
+    return _effect(f"set the value of {inspection.target} ({len(wanted)} chars)", None, False)
+
+
+def _type(env: StepEnv, step: Step, inspection: Inspection) -> Effect:
+    _refuse_secure(inspection, "typing")
+    if step.ref is not None:
+        _focus(env, step.ref)
+    text: str = _required(step.text, "text")
+    hid.post(hid.text_events(env.source, text))
+    return _effect(f"typed {len(text)} chars into {inspection.target}", None, False)
+
+
+def _paste(env: StepEnv, step: Step, inspection: Inspection) -> Effect:
+    _refuse_secure(inspection, "pasting")
+    if step.ref is not None:
+        _focus(env, step.ref)
+    text: str = _required(step.text, "text")
+    hid.paste_text(env.source, text, env.config.paste_settle_ms / 1000)
+    return _effect(f"pasted {len(text)} chars into {inspection.target}", None, False)
+
+
+def _key(env: StepEnv, step: Step, inspection: Inspection) -> Effect:
+    key: str = _required(step.key, "key")
+    chord = parse_chord(key)
+    if types_a_character(chord):
+        _refuse_secure(inspection, "typing")
+    hid.post(hid.chord_events(env.source, chord))
+    return _effect(f"pressed {key} in {inspection.context.app}", None, True)
+
+
+def _scroll(env: StepEnv, step: Step, inspection: Inspection) -> Effect:
+    point: Point = _point_for(env, step.ref, step.x, step.y)
+    _check_corner(env, point)
+    direction: str = _required(step.direction, "direction")
+    unit_x, unit_y = _SCROLL_UNITS[direction]
+    amount: int = step.amount or DEFAULT_SCROLL_PX
+    remaining: int = amount
+    while remaining > 0:
+        chunk: int = min(remaining, _WHEEL_CHUNK_PX)
+        hid.post(hid.scroll_events(env.source, point, unit_x * chunk, unit_y * chunk))
+        remaining -= chunk
+    return _effect(f"scrolled {direction} {amount} px over {inspection.target}", point, False)
+
+
+def _event_number() -> int:
+    return int(time.monotonic() * 1000) % 1_000_000 + 1
+
+
+def _drag(env: StepEnv, step: Step, inspection: Inspection) -> Effect:
+    start: Point = _point_for(env, step.ref, step.x, step.y)
+    end: Point = _point_for(env, step.to_ref, step.to_x, step.to_y)
+    _check_corner(env, start)
+    _check_corner(env, end)
+    moves: int = max(
+        _MIN_DRAG_MOVES, min(_MAX_DRAG_MOVES, round(hypot(end.x - start.x, end.y - start.y) / _DRAG_PX_PER_MOVE))
+    )
+    hid.post(hid.drag_events(env.source, start, end, moves, _event_number()))
+    destination: str = f"({round(end.x * env.scale)}, {round(end.y * env.scale)})"
+    return _effect(f"dragged {inspection.target} to {destination}", end, True)
+
+
+def _menu(env: StepEnv, step: Step) -> Effect:
+    chosen: str = ax.choose_menu_item(env.app_element, env.app.pid, step.path or [])
+    return _effect(f"chose {chosen} in {env.app.name}", None, True)
+
+
+def _activate(env: StepEnv, step: Step) -> Effect:
+    app: AppInfo = apps.require_app(_required(step.text, "application"), apps.list_apps())
+    apps.activate(app, env.config.activate_timeout_s)
+    return Effect(detail=f"{app.name} is in front", pointer=None, opens_ui=True, switched_to=app)
+
+
+def execute_step(env: StepEnv, step: Step) -> Effect:
+    """Perform one step. The failsafe is checked first and the context re-read, since time passed after the review."""
+    check_failsafe(env)
+    inspection: Inspection = inspect_step(env, step)
+    match step.action:
+        case "click":
+            return _click(env, step, inspection, 1)
+        case "double_click":
+            return _click(env, step, inspection, 2)
+        case "right_click":
+            return _right_click(env, step, inspection)
+        case "hover":
+            return _hover(env, step, inspection)
+        case "press":
+            return _press(env, step)
+        case "focus":
+            return _focus_step(env, step, inspection)
+        case "set_value":
+            return _set_value(env, step, inspection)
+        case "type":
+            return _type(env, step, inspection)
+        case "paste":
+            return _paste(env, step, inspection)
+        case "key":
+            return _key(env, step, inspection)
+        case "scroll":
+            return _scroll(env, step, inspection)
+        case "drag":
+            return _drag(env, step, inspection)
+        case "menu":
+            return _menu(env, step)
+        case "activate":
+            return _activate(env, step)
+        case "wait":
+            raise DesktopError("wait is performed by the session, not on the worker thread", {})

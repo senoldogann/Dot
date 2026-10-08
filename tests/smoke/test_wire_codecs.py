@@ -1,0 +1,548 @@
+"""Wire-format checks for the OpenAI / OpenCode Go connectors.
+
+The first half replays recorded-style streams (including the gateway's trailing events and error bodies, which a
+local server cannot produce). The second half makes real calls through a local Ollama's OpenAI- and
+Anthropic-compatible routes, so every codec is exercised end to end with tools, reasoning replay and images.
+"""
+
+import base64
+import io
+
+import httpx
+import pytest
+from PIL import Image
+
+from dotagent.config import GoRoute, OpenAIConfig, OpenCodeGoConfig
+from dotagent.core.errors import ProviderHttpError, ProviderQuotaError, ProviderRateLimitError
+from dotagent.core.jsonutil import dumps_compact
+from dotagent.core.types import JsonObject
+from dotagent.llm.codec_chat import ChatOptions, build_chat_body, chat_codec
+from dotagent.llm.codec_messages import build_messages_body, messages_codec
+from dotagent.llm.codec_responses import ResponsesOptions, build_responses_body, responses_codec
+from dotagent.llm.connector import StreamCodec
+from dotagent.llm.http import SseEvent, is_retryable_provider_error
+from dotagent.llm.openai import OpenAIProvider, is_chat_model, openai_traits
+from dotagent.llm.opencode_go import CATALOG, OpenCodeGoProvider, go_traits, route_of
+from dotagent.llm.provider_errors import WireError, classify_openai, classify_opencode
+from dotagent.llm.traits import ModelTraits
+from dotagent.llm.types import (
+    ChatProvider,
+    ChatRequest,
+    ImageData,
+    Message,
+    ModelReply,
+    StreamDelta,
+    ToolCall,
+    ToolSpec,
+    assistant_from_reply,
+    assistant_message,
+    system_message,
+    tool_message,
+    user_message,
+)
+
+OLLAMA_ROOT: str = "http://localhost:11434"
+LIVE_MODEL: str = "gpt-oss:20b-cloud"
+VISION_MODEL: str = "gemma4:cloud"
+
+TEMPERATURE_TOOL: ToolSpec = ToolSpec(
+    name="get_temperature",
+    description="Return the current temperature in Celsius for a city.",
+    parameters={
+        "type": "object",
+        "properties": {"city": {"type": "string"}},
+        "required": ["city"],
+        "additionalProperties": False,
+    },
+)
+SCREENSHOT_TOOL: ToolSpec = ToolSpec(
+    name="screenshot",
+    description="Take a screenshot of the screen.",
+    parameters={"type": "object", "properties": {}, "required": [], "additionalProperties": False},
+)
+
+
+def request_for(model: str, messages: tuple[Message, ...], tools: tuple[ToolSpec, ...]) -> ChatRequest:
+    return ChatRequest(
+        model=model,
+        messages=messages,
+        tools=tools,
+        temperature=None,
+        max_output_tokens=None,
+        effort="low",
+        session_key="smoke-session",
+    )
+
+
+def sse(data: JsonObject, event: str | None) -> SseEvent:
+    return SseEvent(event=event, data=dumps_compact(data))
+
+
+def replay[S](codec: StreamCodec[S], model: str, events: list[SseEvent]) -> tuple[ModelReply, list[StreamDelta]]:
+    state: S = codec.initial(model)
+    deltas: list[StreamDelta] = []
+    for event in events:
+        state, new = codec.fold(state, event, {})
+        deltas.extend(new)
+    assert codec.is_final(state)
+    return codec.to_reply(state), deltas
+
+
+# ------------------------------------------------------------------------------------ recorded streams
+
+
+def chat_chunk(delta: JsonObject, finish: str | None) -> JsonObject:
+    return {"choices": [{"index": 0, "delta": delta, "finish_reason": finish}]}
+
+
+def test_chat_stream_assembles_tool_call_and_usage_chunk_without_choices() -> None:
+    chunk = chat_chunk
+    events: list[SseEvent] = [
+        sse(chunk({"role": "assistant", "content": ""}, None), None),
+        sse(chunk({"reasoning_content": "weigh "}, None), None),
+        sse(chunk({"content": "Checking."}, None), None),
+        sse(
+            chunk(
+                {
+                    "tool_calls": [
+                        {
+                            "index": 0,
+                            "id": "call_1",
+                            "type": "function",
+                            "function": {"name": "get_temperature", "arguments": ""},
+                        }
+                    ]
+                },
+                None,
+            ),
+            None,
+        ),
+        sse(chunk({"tool_calls": [{"index": 0, "function": {"arguments": '{"city":'}}]}, None), None),
+        sse(chunk({"tool_calls": [{"index": 0, "function": {"arguments": '"Paris"}'}}]}, None), None),
+        sse(chunk({}, "tool_calls"), None),
+        sse(
+            {
+                "choices": [],
+                "usage": {
+                    "prompt_tokens": 120,
+                    "completion_tokens": 30,
+                    "prompt_tokens_details": {"cached_tokens": 100},
+                },
+            },
+            None,
+        ),
+        SseEvent(event=None, data="[DONE]"),
+    ]
+    reply, deltas = replay(chat_codec(classify_opencode), "m", events)
+    assert reply.text == "Checking."
+    assert reply.thinking == "weigh "
+    assert [(call.id, call.name, call.arguments) for call in reply.tool_calls] == [
+        ("call_1", "get_temperature", {"city": "Paris"})
+    ]
+    assert reply.finish == "tool_calls"
+    assert (reply.usage.input_tokens, reply.usage.output_tokens, reply.usage.cached_tokens) == (120, 30, 100)
+    assert [delta.kind for delta in deltas] == ["thinking", "text"]
+
+
+def test_responses_stream_prefers_terminal_output_and_keeps_replayable_items() -> None:
+    reasoning: JsonObject = {
+        "type": "reasoning",
+        "id": "rs_1",
+        "summary": [{"type": "summary_text", "text": "Plan"}],
+        "encrypted_content": "ENC",
+    }
+    call: JsonObject = {
+        "type": "function_call",
+        "id": "fc_1",
+        "call_id": "call_1",
+        "name": "get_temperature",
+        "arguments": '{"city": "Paris"}',
+        "status": "completed",
+    }
+    events: list[SseEvent] = [
+        sse({"type": "response.created", "response": {"id": "resp_1"}}, "response.created"),
+        sse(
+            {"type": "response.reasoning_summary_text.delta", "delta": "Plan"}, "response.reasoning_summary_text.delta"
+        ),
+        sse({"type": "response.output_item.done", "output_index": 0, "item": reasoning}, "response.output_item.done"),
+        sse({"type": "response.output_item.done", "output_index": 1, "item": call}, "response.output_item.done"),
+        sse(
+            {
+                "type": "response.completed",
+                "response": {
+                    "status": "completed",
+                    "output": [reasoning, call],
+                    "usage": {"input_tokens": 50, "output_tokens": 20, "input_tokens_details": {"cached_tokens": 10}},
+                },
+            },
+            "response.completed",
+        ),
+    ]
+    reply, _ = replay(responses_codec(classify_openai), "m", events)
+    assert reply.finish == "tool_calls"
+    assert reply.thinking == "Plan"
+    assert reply.tool_calls[0].arguments == {"city": "Paris"}
+    assert reply.raw == (reasoning, call)
+    assert (reply.usage.input_tokens, reply.usage.output_tokens, reply.usage.cached_tokens) == (50, 20, 10)
+
+
+def test_responses_stream_malformed_arguments_become_stand_in() -> None:
+    call: JsonObject = {"type": "function_call", "call_id": "c", "name": "t", "arguments": '{"a": '}
+    events: list[SseEvent] = [
+        sse({"type": "response.output_item.done", "output_index": 0, "item": call}, "response.output_item.done"),
+        sse(
+            {"type": "response.completed", "response": {"status": "completed", "output": [call]}}, "response.completed"
+        ),
+    ]
+    reply, _ = replay(responses_codec(classify_openai), "m", events)
+    assert reply.tool_calls[0].arguments == {"__invalid_arguments__": '{"a": '}
+
+
+def test_responses_failed_event_raises_typed_error() -> None:
+    codec = responses_codec(classify_openai)
+    quota = sse(
+        {"type": "response.failed", "response": {"error": {"code": "insufficient_quota", "message": "no credit"}}},
+        "response.failed",
+    )
+    with pytest.raises(ProviderQuotaError):
+        codec.fold(codec.initial("m"), quota, {})
+    overloaded = sse(
+        {"type": "response.failed", "response": {"error": {"code": "server_error", "message": "boom"}}},
+        "response.failed",
+    )
+    with pytest.raises(ProviderHttpError) as caught:
+        codec.fold(codec.initial("m"), overloaded, {})
+    assert is_retryable_provider_error(caught.value)
+
+
+def test_messages_stream_with_thinking_signature_and_tool_use() -> None:
+    events: list[SseEvent] = [
+        sse(
+            {
+                "type": "message_start",
+                "message": {"usage": {"input_tokens": 10, "cache_read_input_tokens": 90, "output_tokens": 1}},
+            },
+            "message_start",
+        ),
+        sse(
+            {"type": "content_block_start", "index": 0, "content_block": {"type": "thinking", "thinking": ""}},
+            "content_block_start",
+        ),
+        sse(
+            {"type": "content_block_delta", "index": 0, "delta": {"type": "thinking_delta", "thinking": "hmm"}},
+            "content_block_delta",
+        ),
+        sse(
+            {"type": "content_block_delta", "index": 0, "delta": {"type": "signature_delta", "signature": "SIG"}},
+            "content_block_delta",
+        ),
+        sse({"type": "content_block_stop", "index": 0}, "content_block_stop"),
+        sse(
+            {
+                "type": "content_block_start",
+                "index": 1,
+                "content_block": {"type": "tool_use", "id": "tu_1", "name": "get_temperature", "input": {}},
+            },
+            "content_block_start",
+        ),
+        sse(
+            {
+                "type": "content_block_delta",
+                "index": 1,
+                "delta": {"type": "input_json_delta", "partial_json": '{"city":'},
+            },
+            "content_block_delta",
+        ),
+        sse(
+            {
+                "type": "content_block_delta",
+                "index": 1,
+                "delta": {"type": "input_json_delta", "partial_json": '"Paris"}'},
+            },
+            "content_block_delta",
+        ),
+        sse({"type": "content_block_stop", "index": 1}, "content_block_stop"),
+        sse(
+            {"type": "message_delta", "delta": {"stop_reason": "tool_use"}, "usage": {"output_tokens": 25}},
+            "message_delta",
+        ),
+        sse({"type": "message_stop"}, "message_stop"),
+    ]
+    reply, _ = replay(messages_codec(classify_opencode), "m", events)
+    assert reply.thinking == "hmm"
+    assert [(call.id, call.arguments) for call in reply.tool_calls] == [("tu_1", {"city": "Paris"})]
+    assert reply.finish == "tool_calls"
+    assert reply.usage.input_tokens == 100
+    assert reply.usage.cached_tokens == 90
+    assert reply.usage.output_tokens == 25
+    assert any(block.get("signature") == "SIG" for block in reply.raw)
+
+
+def test_stream_error_frame_without_http_error_is_raised() -> None:
+    codec = chat_codec(classify_opencode)
+    frame = sse(
+        {
+            "type": "error",
+            "error": {"type": "GoUsageLimitError", "message": "limit"},
+            "metadata": {"limitName": "rolling"},
+        },
+        None,
+    )
+    with pytest.raises(ProviderQuotaError):
+        codec.fold(codec.initial("m"), frame, {})
+
+
+# ------------------------------------------------------------------------------------ error classes
+
+
+def test_openai_quota_is_terminal_but_rate_limit_is_retried() -> None:
+    quota = classify_openai(
+        429, WireError(kind="insufficient_quota", code="insufficient_quota", message="m", limit_name=""), None, {}
+    )
+    burst = classify_openai(
+        429, WireError(kind="rate_limit_error", code="slow_down", message="m", limit_name=""), 2.0, {}
+    )
+    assert isinstance(quota, ProviderQuotaError) and not is_retryable_provider_error(quota)
+    assert isinstance(burst, ProviderRateLimitError) and is_retryable_provider_error(burst)
+
+
+def test_opencode_usage_limit_is_terminal_but_burst_is_retried() -> None:
+    quota = classify_opencode(
+        429, WireError(kind="GoUsageLimitError", code="", message="m", limit_name="weekly"), 3600.0, {}
+    )
+    burst = classify_opencode(429, WireError(kind="RateLimitError", code="", message="m", limit_name=""), 60.0, {})
+    assert isinstance(quota, ProviderQuotaError) and quota.context["limit_name"] == "weekly"
+    assert isinstance(burst, ProviderRateLimitError) and is_retryable_provider_error(burst)
+
+
+# ------------------------------------------------------------------------------------ request bodies
+
+
+def test_request_bodies_end_with_stream_and_follow_each_gateway_flavour() -> None:
+    traits: ModelTraits = go_traits("deepseek-v4-pro")
+    request: ChatRequest = request_for(
+        "deepseek-v4-pro", (system_message("be brief"), user_message("hi", ())), (TEMPERATURE_TOOL,)
+    )
+    gateway_chat: JsonObject = build_chat_body(
+        request,
+        traits,
+        ChatOptions(max_tokens_field="max_tokens", request_usage=False, replay_reasoning=True, cache_key_in_body=False),
+    )
+    assert list(gateway_chat)[-1] == "stream"
+    assert "stream_options" not in gateway_chat and "prompt_cache_key" not in gateway_chat
+    assert gateway_chat["reasoning_effort"] == "high"
+    openai_chat: JsonObject = build_chat_body(
+        request.model_copy(update={"max_output_tokens": 500}),
+        openai_traits("gpt-6.1-sol"),
+        ChatOptions(
+            max_tokens_field="max_completion_tokens", request_usage=True, replay_reasoning=False, cache_key_in_body=True
+        ),
+    )
+    assert openai_chat["stream_options"] == {"include_usage": True}
+    assert openai_chat["max_completion_tokens"] == 500 and openai_chat["prompt_cache_key"] == "smoke-session"
+    responses: JsonObject = build_responses_body(
+        request_for("gpt-6.1-sol", (system_message("be brief"), user_message("hi", ())), (TEMPERATURE_TOOL,)),
+        openai_traits("gpt-6.1-sol"),
+        "openai:gpt-6.1-sol",
+        ResponsesOptions(image_detail="original", tool_output_images=True),
+    )
+    assert list(responses)[-1] == "stream" and responses["store"] is False
+    assert responses["include"] == ["reasoning.encrypted_content"]
+    assert responses["reasoning"] == {"effort": "low", "summary": "auto"}
+    assert responses["instructions"] == "be brief"
+    assert "temperature" not in responses
+    toggled: JsonObject = build_messages_body(
+        request_for("minimax-m3", (user_message("hi", ()),), ()), go_traits("minimax-m3"), "opencode_go:minimax-m3"
+    )
+    assert toggled["thinking"] == {"type": "adaptive"} and list(toggled)[-1] == "stream"
+
+
+def test_messages_body_puts_a_screenshot_inside_its_tool_result() -> None:
+    """The gateway's Qwen models never see a picture that sits beside the result in the same turn."""
+    call: ToolCall = ToolCall(id="toolu_1", name="screenshot", arguments={})
+    picture: ImageData = solid_image(20, 20, 220)
+
+    def last_turn(result: Message) -> JsonObject:
+        body: JsonObject = build_messages_body(
+            request_for(
+                "qwen3.8-flash",
+                (user_message("look", ()), assistant_message("", None, (call,)), result),
+                (SCREENSHOT_TOOL,),
+            ),
+            go_traits("qwen3.8-flash"),
+            "opencode_go:qwen3.8-flash",
+        )
+        return body["messages"][-1]
+
+    with_picture: JsonObject = last_turn(tool_message(call, "screenshot captured", (picture,)))
+    assert with_picture == {
+        "role": "user",
+        "content": [
+            {
+                "type": "tool_result",
+                "tool_use_id": "toolu_1",
+                "content": [
+                    {"type": "text", "text": "screenshot captured"},
+                    {
+                        "type": "image",
+                        "source": {"type": "base64", "media_type": "image/png", "data": picture.data_b64},
+                    },
+                ],
+            }
+        ],
+    }
+    assert last_turn(tool_message(call, "done", ()))["content"][0]["content"] == "done"
+
+
+def test_routes_and_traits_follow_catalog_prefix_and_override() -> None:
+    assert route_of("grok-4.7", {}) == "responses"
+    assert route_of("qwen9-new", {}) == "messages"
+    assert route_of("brand-new-model", {}) == "chat"
+    assert route_of("brand-new-model", {"brand-new-model": "responses"}) == "responses"
+    assert route_of("glm-5.3", {"glm-5.3": "messages"}) == "messages"
+    assert all(model.traits.reasoning for model in CATALOG.values())
+    assert openai_traits("gpt-6-luna").efforts[0] == "none"
+    assert "none" not in openai_traits("gpt-6.1-sol").efforts
+    assert not openai_traits("gpt-4.1").reasoning
+    assert all(
+        not openai_traits(model).reasoning
+        for model in ("gpt-4", "gpt-4-turbo", "gpt-4-0125-preview", "gpt-3.5-turbo", "gpt-5-chat-latest")
+    )
+    assert openai_traits("gpt-3.5-turbo").efforts == ()
+    assert openai_traits("gpt-7").reasoning
+    assert not is_chat_model("gpt-3.5-turbo-instruct")
+    assert openai_traits("some-local-model").reasoning is False
+
+
+# ------------------------------------------------------------------------------------ live calls
+
+
+def ollama_is_up() -> bool:
+    try:
+        return httpx.get(f"{OLLAMA_ROOT}/api/version", timeout=2.0).status_code == 200
+    except httpx.HTTPError:
+        return False
+
+
+requires_ollama = pytest.mark.skipif(not ollama_is_up(), reason="needs a running local Ollama server")
+
+
+FIRST_ROUND_ATTEMPTS: int = 3
+
+
+async def ignore_delta(delta: StreamDelta) -> None:
+    return None
+
+
+def go_provider(model: str, route: GoRoute) -> ChatProvider:
+    config: OpenCodeGoConfig = OpenCodeGoConfig(
+        base_url=f"{OLLAMA_ROOT}/v1",
+        api_key_env="UNUSED",
+        route_overrides={model: route},
+        connect_timeout_s=10.0,
+        read_timeout_s=240.0,
+        attempts=3,
+        max_concurrent=2,
+    )
+    return OpenCodeGoProvider(config, "ollama")
+
+
+def openai_provider(wire: str) -> ChatProvider:
+    config: OpenAIConfig = OpenAIConfig(
+        base_url=f"{OLLAMA_ROOT}/v1",
+        api_key_env="UNUSED",
+        organization_env="UNUSED",
+        project_env="UNUSED",
+        wire="responses" if wire == "responses" else "chat",
+        connect_timeout_s=10.0,
+        read_timeout_s=240.0,
+        attempts=3,
+        max_concurrent=2,
+    )
+    return OpenAIProvider(config, "ollama", None, None)
+
+
+def solid_image(red: int, green: int, blue: int) -> ImageData:
+    buffer: io.BytesIO = io.BytesIO()
+    Image.new("RGB", (128, 128), (red, green, blue)).save(buffer, format="PNG")
+    return ImageData(media_type="image/png", data_b64=base64.b64encode(buffer.getvalue()).decode("ascii"))
+
+
+def greedy_request_for(model: str, messages: tuple[Message, ...], tools: tuple[ToolSpec, ...]) -> ChatRequest:
+    """Greedy decoding: a model that samples sometimes answers from its prior instead of the tool result."""
+    return request_for(model, messages, tools).model_copy(update={"temperature": 0.0})
+
+
+async def first_tool_call_reply(
+    provider: ChatProvider, model: str, history: tuple[Message, ...], tools: tuple[ToolSpec, ...]
+) -> ModelReply:
+    """The reply that calls the tool. A model now and then answers in prose instead, which says nothing about the wire
+    codec, so the question is asked again a few times."""
+    texts: list[str] = []
+    for _ in range(FIRST_ROUND_ATTEMPTS):
+        reply: ModelReply = await provider.complete(greedy_request_for(model, history, tools), ignore_delta)
+        if reply.finish == "tool_calls":
+            return reply
+        texts.append(reply.text)
+    raise AssertionError(f"the model never called the tool: {texts}")
+
+
+async def tool_round_trip(provider: ChatProvider, model: str) -> ModelReply:
+    system = system_message("You are terse. Use tools when they help.")
+    ask = user_message("What is the temperature in Paris right now? Use the tool.", ())
+    first: ModelReply = await first_tool_call_reply(provider, model, (system, ask), (TEMPERATURE_TOOL,))
+    call = first.tool_calls[0]
+    assert call.name == "get_temperature" and call.arguments == {"city": "Paris"}
+    history = (system, ask, assistant_from_reply(first, f"{provider.name}:{model}"), tool_message(call, "21", ()))
+    return await provider.complete(greedy_request_for(model, history, (TEMPERATURE_TOOL,)), ignore_delta)
+
+
+@pytest.mark.live
+@requires_ollama
+@pytest.mark.parametrize("route", ["chat", "responses", "messages"])
+async def test_gateway_routes_round_trip_tools_and_reasoning(route: GoRoute) -> None:
+    provider: ChatProvider = go_provider(LIVE_MODEL, route)
+    try:
+        final: ModelReply = await tool_round_trip(provider, LIVE_MODEL)
+    finally:
+        await provider.aclose()
+    assert "21" in final.text and final.finish == "stop"
+
+
+@pytest.mark.live
+@requires_ollama
+@pytest.mark.parametrize("wire", ["responses", "chat"])
+async def test_openai_wires_round_trip_tools_and_report_usage(wire: str) -> None:
+    provider: ChatProvider = openai_provider(wire)
+    try:
+        final: ModelReply = await tool_round_trip(provider, LIVE_MODEL)
+    finally:
+        await provider.aclose()
+    assert "21" in final.text and final.usage.input_tokens > 0
+
+
+@pytest.mark.live
+@requires_ollama
+@pytest.mark.parametrize("route", ["chat", "responses", "messages"])
+async def test_screenshots_in_tool_results_reach_the_model(route: GoRoute) -> None:
+    provider: ChatProvider = go_provider(VISION_MODEL, route)
+    system = system_message("Answer in one short sentence.")
+    ask = user_message("Take a screenshot with the tool, then tell me the single color that fills it.", ())
+    try:
+        first: ModelReply = await provider.complete(
+            request_for(VISION_MODEL, (system, ask), (SCREENSHOT_TOOL,)), ignore_delta
+        )
+        assert first.tool_calls, first.text
+        call = first.tool_calls[0]
+        history = (
+            system,
+            ask,
+            assistant_from_reply(first, f"opencode_go:{VISION_MODEL}"),
+            tool_message(call, "screenshot captured", (solid_image(20, 20, 220),)),
+        )
+        final: ModelReply = await provider.complete(
+            request_for(VISION_MODEL, history, (SCREENSHOT_TOOL,)), ignore_delta
+        )
+    finally:
+        await provider.aclose()
+    assert "blue" in final.text.lower()

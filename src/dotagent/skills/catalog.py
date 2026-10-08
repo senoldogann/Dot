@@ -1,0 +1,83 @@
+"""The catalog: every skills directory read into the usable skills, each name once, and the folders left out."""
+
+from collections.abc import Sequence
+from pathlib import Path
+
+from dotagent.config import SkillsConfig
+from dotagent.core.errors import SkillError
+from dotagent.core.jsonutil import dumps_compact
+from dotagent.core.paths import skills_dir
+from dotagent.core.types import FrozenModel, JsonObject
+from dotagent.plugins.types import Plugin
+from dotagent.skills.discover import find_skill_files
+from dotagent.skills.parse import parse_skill
+from dotagent.skills.types import Skill, SkillCatalog, SkillProblem
+
+
+class SkillRoot(FrozenModel):
+    """A directory of skills and where it was named: Dot's own folder, the configuration, or a plugin."""
+
+    path: Path
+    source: str
+
+
+def skill_roots(config: SkillsConfig, plugins: Sequence[Plugin]) -> tuple[SkillRoot, ...]:
+    """``<home>/skills``, then the ``[skills] dirs`` entries, then the skill folders of each plugin."""
+    roots: list[SkillRoot] = [SkillRoot(path=skills_dir(), source="home")]
+    roots.extend(SkillRoot(path=Path(entry).expanduser(), source="config") for entry in config.dirs)
+    for plugin in plugins:
+        roots.extend(SkillRoot(path=folder, source=f"plugin {plugin.name}") for folder in plugin.skill_dirs)
+    return tuple(roots)
+
+
+def _reason(error: SkillError) -> str:
+    details: JsonObject = {key: value for key, value in error.context.items() if key != "path"}
+    return error.message if not details else f"{error.message} ({dumps_compact(details)})"
+
+
+def _read_skill(file: Path, source: str) -> Skill:
+    try:
+        text: str = file.read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError) as exc:
+        raise SkillError("SKILL.md cannot be read as UTF-8 text", {"path": str(file), "error": str(exc)}) from exc
+    return parse_skill(file, text, source)
+
+
+def load_catalog(roots: Sequence[SkillRoot]) -> SkillCatalog:
+    """Read every root. A root that is missing, a folder that is not a skill, or a name used twice is reported and left
+    out while the other skills still load. A skill reached through two roots (a symlink and its target) counts once."""
+    skills: dict[str, Skill] = {}
+    problems: list[SkillProblem] = []
+    seen: set[Path] = set()
+    for root in roots:
+        if not root.path.is_dir():
+            problems.append(SkillProblem(path=root.path, reason="the skills directory does not exist"))
+            continue
+        try:
+            files: tuple[Path, ...] = find_skill_files(root.path)
+        except SkillError as exc:
+            problems.append(SkillProblem(path=root.path, reason=_reason(exc)))
+            continue
+        for file in files:
+            real: Path = file.resolve()
+            if real in seen:
+                continue
+            seen.add(real)
+            try:
+                skill: Skill = _read_skill(file, root.source)
+            except SkillError as exc:
+                problems.append(SkillProblem(path=file, reason=_reason(exc)))
+                continue
+            if skill.name in skills:
+                taken: Path = skills[skill.name].root
+                problems.append(
+                    SkillProblem(path=file, reason=f"another skill is already called {skill.name}: {taken}")
+                )
+                continue
+            skills[skill.name] = skill
+    return SkillCatalog(skills=tuple(skills.values()), problems=tuple(problems))
+
+
+def load_skills(config: SkillsConfig, plugins: Sequence[Plugin]) -> SkillCatalog:
+    """The skills of this installation, read fresh from disk."""
+    return load_catalog(skill_roots(config, plugins))

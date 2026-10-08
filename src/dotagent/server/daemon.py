@@ -1,0 +1,176 @@
+"""The Dot daemon: one process that serves the API and the UI, runs the agent and fires the schedules."""
+
+import asyncio
+import contextlib
+import fcntl
+import functools
+import os
+import signal
+import socket
+import time
+from collections.abc import Iterator
+from contextlib import AsyncExitStack
+from pathlib import Path
+
+import uvicorn
+from fastapi import FastAPI
+
+from dotagent.agent.manager import RunManager
+from dotagent.config import AppConfig
+from dotagent.core.errors import ConfigError, RunConflict
+from dotagent.core.logs import get_logger
+from dotagent.core.paths import dot_home, pid_path, token_path
+from dotagent.runtime import Runtime, build_runtime, close_runtime
+from dotagent.scheduler.runner import Scheduler
+from dotagent.server.app import create_app
+from dotagent.server.context import ServerContext
+from dotagent.server.guard import read_or_create_token, require_loopback
+from dotagent.server.links import base_url
+
+log = get_logger(__name__)
+
+# Open connections get this long to finish when the daemon stops. Event streams end as soon as it starts to stop (see
+# ``DotServer.shutdown``); this is the limit for a client that does anything else.
+_GRACE_S: int = 3
+_PRIVATE_FILE_MODE: int = 0o600
+_PID_BYTES: int = 32
+_STOP_SIGNALS: tuple[signal.Signals, ...] = (signal.SIGINT, signal.SIGTERM)
+
+
+class DotServer(uvicorn.Server):
+    """uvicorn's server without its own signal handling: the daemon decides what a signal means, so that runs and
+    services are closed in order before the process ends. It sets ``stopping`` when it starts to stop, which tells the
+    event streams, the only responses that would not end by themselves, to end."""
+
+    def __init__(self, config: uvicorn.Config, stopping: asyncio.Event) -> None:
+        super().__init__(config)
+        self._stopping: asyncio.Event = stopping
+
+    @contextlib.contextmanager
+    def capture_signals(self) -> Iterator[None]:
+        yield
+
+    async def shutdown(self, sockets: list[socket.socket] | None = None) -> None:
+        self._stopping.set()
+        await super().shutdown(sockets=sockets)
+
+
+def serving_config(app: FastAPI) -> uvicorn.Config:
+    return uvicorn.Config(
+        app,
+        log_config=None,
+        access_log=False,
+        lifespan="off",
+        ws="none",
+        proxy_headers=False,
+        server_header=False,
+        timeout_graceful_shutdown=_GRACE_S,
+    )
+
+
+def bind_listener(host: str, port: int) -> socket.socket:
+    """Open the listening socket before any service starts, so an address that is taken is reported at once."""
+    family: socket.AddressFamily = socket.AF_INET6 if ":" in host else socket.AF_INET
+    listener: socket.socket = socket.socket(family, socket.SOCK_STREAM)
+    try:
+        listener.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        listener.bind((host, port))
+    except OSError as exc:
+        listener.close()
+        raise ConfigError(
+            "the server cannot listen on its address",
+            {"host": host, "port": port, "error": str(exc), "fix": "change [server] port in the configuration"},
+        ) from exc
+    return listener
+
+
+@contextlib.contextmanager
+def instance_lock(path: Path) -> Iterator[None]:
+    """Hold the daemon's pid file for as long as the daemon runs; a second daemon is refused."""
+    descriptor: int = os.open(path, os.O_RDWR | os.O_CREAT, _PRIVATE_FILE_MODE)
+    try:
+        try:
+            fcntl.flock(descriptor, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError as exc:
+            holder: str = os.pread(descriptor, _PID_BYTES, 0).decode("ascii", errors="replace").strip()
+            raise RunConflict("another Dot daemon is already running", {"pid_file": str(path), "pid": holder}) from exc
+        os.ftruncate(descriptor, 0)
+        os.pwrite(descriptor, f"{os.getpid()}\n".encode("ascii"), 0)
+        yield
+    finally:
+        os.close(descriptor)
+
+
+def _end_with_scheduler(server: DotServer, scheduler_loop: asyncio.Task[None]) -> None:
+    """Schedules must not silently stop firing: when the scheduler loop ends by itself, so does the daemon."""
+    if scheduler_loop.cancelled():
+        return
+    log.error("scheduler_loop_ended", error=repr(scheduler_loop.exception()))
+    server.should_exit = True
+
+
+async def _stop_server_on(stop: asyncio.Event, server: DotServer) -> None:
+    """The first stop request ends the server gracefully, a second one forces it."""
+    await stop.wait()
+    log.info("stop_requested")
+    server.should_exit = True
+    stop.clear()
+    await stop.wait()
+    log.warning("stop_forced")
+    server.force_exit = True
+
+
+async def _cancelled(task: asyncio.Task[None]) -> None:
+    task.cancel()
+    await asyncio.wait({task})
+
+
+async def run_daemon(config: AppConfig) -> None:
+    """Serve until SIGINT or SIGTERM.
+
+    Raises when the address is taken, another daemon runs, or the scheduler loop failed. On the way out the scheduler
+    stops, the runs that are going on are cancelled, the schedules that finished are written and the services close.
+    """
+    host: str = config.server.host
+    require_loopback(host)
+    token: str = await asyncio.to_thread(read_or_create_token, token_path())
+    loop: asyncio.AbstractEventLoop = asyncio.get_running_loop()
+    stop: asyncio.Event = asyncio.Event()
+    with instance_lock(pid_path()):
+        async with AsyncExitStack() as cleanup:
+            for number in _STOP_SIGNALS:
+                loop.add_signal_handler(number, stop.set)
+                cleanup.callback(loop.remove_signal_handler, number)
+            listener: socket.socket = bind_listener(host, config.server.port)
+            cleanup.callback(listener.close)
+            port: int = listener.getsockname()[1]
+            runtime: Runtime = await build_runtime(config)
+            cleanup.push_async_callback(close_runtime, runtime)
+            manager: RunManager = RunManager(runtime)
+            scheduler: Scheduler = Scheduler(runtime, manager)
+            cleanup.push_async_callback(scheduler.drain)
+            cleanup.push_async_callback(manager.shutdown)
+            cleanup.push_async_callback(scheduler.stop)
+            recovered: int = await manager.recover()
+            scheduler_loop: asyncio.Task[None] = await scheduler.start()
+            stopping: asyncio.Event = asyncio.Event()
+            context: ServerContext = ServerContext(
+                runtime=runtime,
+                manager=manager,
+                scheduler=scheduler,
+                token=token,
+                host=host,
+                port=port,
+                started_at=time.time(),
+                stopping=stopping,
+            )
+            server: DotServer = DotServer(serving_config(create_app(context)), stopping)
+            scheduler_loop.add_done_callback(functools.partial(_end_with_scheduler, server))
+            stopper: asyncio.Task[None] = asyncio.create_task(_stop_server_on(stop, server), name="stop-server")
+            cleanup.push_async_callback(_cancelled, stopper)
+            log.info(
+                "daemon_started", url=base_url(host, port), pid=os.getpid(), home=str(dot_home()), recovered=recovered
+            )
+            if not stop.is_set():
+                await server.serve(sockets=[listener])
+            log.info("daemon_stopping")

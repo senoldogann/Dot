@@ -1,0 +1,364 @@
+/* The frame of the interface: a sidebar on the left (a drawer on narrow windows) and the stage with the page. The window
+   keeps the scroll, so the sticky bars and the follow-the-bottom behaviour of the run page work as they always did. */
+
+:root {
+  --sidebar-w: 272px;
+}
+
+.shell {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  min-height: 100vh;
+}
+
+.shell[data-nav="docked"][data-sidebar="open"] {
+  grid-template-columns: var(--sidebar-w) minmax(0, 1fr);
+}
+
+/* ---------- stage ---------- */
+
+.stage {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+.stage > .page {
+  flex: 1;
+  width: 100%;
+}
+
+.page:focus {
+  outline: none;
+}
+
+.stagebar {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  background: color-mix(in srgb, var(--bg) 86%, transparent);
+  backdrop-filter: saturate(1.4) blur(10px);
+}
+
+.stagebar-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 52px;
+  padding: 8px 16px;
+}
+
+.stagebar-left {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.stagebar-right {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* ---------- sidebar ---------- */
+
+.sidebar {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  height: 100dvh;
+  background: var(--sidebar);
+  border-right: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
+}
+
+.shell[data-nav="docked"][data-sidebar="closed"] .sidebar {
+  display: none;
+}
+
+.shell[data-nav="drawer"] .sidebar {
+  position: fixed;
+  inset: 0 auto 0 0;
+  width: min(86vw, 320px);
+  height: auto;
+  visibility: hidden;
+  transform: translateX(-100%);
+  transition:
+    transform 0.2s ease,
+    visibility 0s linear 0.2s;
+}
+
+.shell[data-nav="drawer"][data-sidebar="open"] .sidebar {
+  visibility: visible;
+  transform: none;
+  box-shadow: 0 0 40px rgb(0 0 0 / 28%);
+  transition: transform 0.2s ease;
+}
+
+.scrim {
+  display: none;
+}
+
+.shell[data-nav="drawer"][data-sidebar="open"] .scrim {
+  display: block;
+  position: fixed;
+  inset: 0;
+  z-index: 25;
+  background: rgb(0 0 0 / 42%);
+}
+
+.side-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: none;
+  padding: 12px 10px 6px 16px;
+}
+
+.side-head .brand {
+  flex: 1;
+  min-width: 0;
+}
+
+.side-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px 8px 12px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.icon-btn {
+  display: inline-grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  flex: none;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-control);
+  background: transparent;
+  color: var(--text-2);
+  cursor: pointer;
+}
+
+.icon-btn:hover {
+  background: color-mix(in srgb, var(--text) 6%, transparent);
+  color: var(--text);
+}
+
+.icon-btn .icon {
+  width: 19px;
+  height: 19px;
+}
+
+/* Rows never carry muted text while they are tinted: the tint would take it below the contrast limit. */
+.side-btn,
+.side-link,
+.side-run {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  padding: 7px 10px;
+  border-radius: var(--radius-control);
+  color: var(--text-2);
+}
+
+.side-btn {
+  color: var(--text);
+  font-weight: 550;
+}
+
+.side-btn:hover,
+.side-link:hover,
+.side-run:hover {
+  background: color-mix(in srgb, var(--text) 4%, transparent);
+  color: var(--text);
+  text-decoration: none;
+}
+
+.side-link[aria-current="page"],
+.side-run[aria-current="page"] {
+  background: color-mix(in srgb, var(--text) 7%, transparent);
+  color: var(--text);
+  font-weight: 550;
+}
+
+.sidebar kbd {
+  font: 500 11.5px/1 var(--font);
+  letter-spacing: 0.02em;
+  color: var(--muted);
+}
+
+.side-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 4px 0 8px;
+  padding: 0 10px;
+  border: 1px solid var(--control);
+  border-radius: var(--radius-control);
+  background: var(--surface);
+  color: var(--text-2);
+}
+
+.side-search:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent);
+}
+
+.side-search:focus-within kbd {
+  display: none;
+}
+
+.side-search-input {
+  flex: 1;
+  min-width: 0;
+  padding: 7px 0;
+  border: 0;
+  background: transparent;
+  outline: none;
+  appearance: none;
+}
+
+.side-search-input::placeholder {
+  color: var(--faint);
+  opacity: 1;
+}
+
+.side-links,
+.side-group {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.side-recent {
+  margin-top: 6px;
+}
+
+.side-label {
+  margin: 0;
+  padding: 12px 10px 4px;
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  color: var(--muted);
+}
+
+.side-run .status-dot {
+  width: 8px;
+  height: 8px;
+}
+
+.side-run .status-dot.s-done,
+.side-run .status-dot.s-cancelled {
+  background: transparent;
+}
+
+.side-run-goal {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* The head of the chat list: its label and the button that starts choosing chats to delete. */
+.side-list-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 2px 2px 0;
+}
+
+.side-list-head .side-label {
+  flex: 1;
+  padding-block: 0;
+}
+
+/* While chats are being chosen, this bar stands in for the head: the count, select all and delete. */
+.side-select-bar {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 8px 0 6px;
+  padding: 8px 8px 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  background: var(--surface);
+}
+
+.side-select-bar .row {
+  gap: 6px;
+}
+
+.side-select-bar .row:last-child {
+  justify-content: flex-end;
+}
+
+.side-count {
+  font-size: 12.5px;
+  color: var(--muted);
+}
+
+.side-pick {
+  cursor: pointer;
+}
+
+.side-pick:has(.side-check:checked) {
+  background: color-mix(in srgb, var(--text) 7%, transparent);
+  color: var(--text);
+}
+
+.side-pick:has(.side-check:focus-visible) {
+  box-shadow: inset 0 0 0 2px var(--accent);
+}
+
+.side-check {
+  flex: none;
+  width: 15px;
+  height: 15px;
+  margin: 0;
+  accent-color: var(--accent);
+}
+
+.side-note {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 10px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+/* The foot holds the way to the settings; the look itself is chosen there. */
+.side-foot {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  padding: 8px 8px 10px;
+  border-top: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
+}
+
+/* With the sidebar next to the page, the way back to the list is always in sight. */
+.shell[data-nav="docked"][data-sidebar="open"] .back {
+  display: none;
+}
+
+@media (max-width: 720px) {
+  .stagebar-row {
+    min-height: 48px;
+    gap: 8px;
+    padding: 6px 10px;
+  }
+}

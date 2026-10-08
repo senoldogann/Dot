@@ -1,0 +1,107 @@
+"""Switching ``[browser] mode`` in the user's config.toml: the comments and the other settings stay as written."""
+
+import stat
+import tomllib
+from pathlib import Path
+
+import pytest
+
+from dotagent.config import BrowserMode
+from dotagent.config_edit import set_browser_mode, with_browser_mode
+from dotagent.core.errors import ConfigError
+from dotagent.core.types import JsonObject
+
+
+def test_an_empty_file_gets_a_browser_table() -> None:
+    assert with_browser_mode("", "attach") == '[browser]\nmode = "attach"\n'
+
+
+def test_a_table_is_added_below_the_other_tables_with_a_blank_line_between() -> None:
+    text: str = '# my settings\n[models]\nmain = "ollama:x"\n'
+    assert with_browser_mode(text, "attach") == text + '\n[browser]\nmode = "attach"\n'
+
+
+def test_a_browser_table_without_a_mode_gets_one_right_below_its_header() -> None:
+    text: str = "[browser]\nheadless = true\n\n[agent]\nstall_limit = 4\n"
+    assert with_browser_mode(text, "attach") == (
+        '[browser]\nmode = "attach"\nheadless = true\n\n[agent]\nstall_limit = 4\n'
+    )
+
+
+def test_a_header_with_a_comment_is_found() -> None:
+    text: str = "[browser]  # where pages open\nheadless = true\n"
+    assert with_browser_mode(text, "attach") == '[browser]  # where pages open\nmode = "attach"\nheadless = true\n'
+
+
+def test_an_existing_mode_is_replaced_and_the_comment_after_it_stays() -> None:
+    text: str = '[browser]\nheadless = true\nmode = "own"  # "own" or "attach"\n'
+    assert with_browser_mode(text, "attach") == '[browser]\nheadless = true\nmode = "attach"  # "own" or "attach"\n'
+
+
+def test_a_mode_in_single_quotes_is_replaced() -> None:
+    assert with_browser_mode("[browser]\nmode = 'own'\n", "attach") == '[browser]\nmode = "attach"\n'
+
+
+def test_a_mode_of_another_table_is_left_alone() -> None:
+    text: str = '[agent]\nmode = "x"\n\n[browser]\nheadless = true\n\n[policy]\nmode = "y"\n'
+    assert with_browser_mode(text, "attach") == (
+        '[agent]\nmode = "x"\n\n[browser]\nmode = "attach"\nheadless = true\n\n[policy]\nmode = "y"\n'
+    )
+
+
+@pytest.mark.parametrize("mode", ["own", "attach"])
+@pytest.mark.parametrize(
+    "text",
+    [
+        "",
+        "[browser]\n",
+        '[browser]\nmode = "own"\n',
+        '[browser]\nmode = "attach"  # keep\nheadless = true\n',
+        '[models]\nmain = "ollama:x"\n',
+        '[models]\nmain = "ollama:x"\n\n[browser]\nheadless = true\n\n[agent]\nstall_limit = 4\n',
+    ],
+)
+def test_the_result_is_valid_toml_that_holds_the_new_mode(text: str, mode: BrowserMode) -> None:
+    result: JsonObject = tomllib.loads(with_browser_mode(text, mode))
+    browser: object = result["browser"]
+    assert isinstance(browser, dict)
+    assert browser["mode"] == mode
+
+
+def test_the_file_is_changed_in_place_and_keeps_its_permissions(tmp_path: Path) -> None:
+    path: Path = tmp_path / "config.toml"
+    path.write_text("# mine\n[browser]\nheadless = true\n", encoding="utf-8")
+    path.chmod(0o640)
+    set_browser_mode(path, "attach")
+    assert path.read_text(encoding="utf-8") == '# mine\n[browser]\nmode = "attach"\nheadless = true\n'
+    assert stat.S_IMODE(path.stat().st_mode) == 0o640
+    assert list(tmp_path.iterdir()) == [path]
+    set_browser_mode(path, "attach")
+    assert path.read_text(encoding="utf-8") == '# mine\n[browser]\nmode = "attach"\nheadless = true\n'
+    set_browser_mode(path, "own")
+    assert path.read_text(encoding="utf-8") == '# mine\n[browser]\nmode = "own"\nheadless = true\n'
+
+
+def test_a_missing_file_and_its_directory_are_created_private(tmp_path: Path) -> None:
+    path: Path = tmp_path / "Dot" / "config.toml"
+    set_browser_mode(path, "attach")
+    assert path.read_text(encoding="utf-8") == '[browser]\nmode = "attach"\n'
+    assert stat.S_IMODE(path.stat().st_mode) == 0o600
+    assert stat.S_IMODE(path.parent.stat().st_mode) == 0o700
+
+
+def test_a_file_that_is_not_toml_is_refused_and_left_as_it_was(tmp_path: Path) -> None:
+    path: Path = tmp_path / "config.toml"
+    path.write_text("[browser\nmode = \n", encoding="utf-8")
+    with pytest.raises(ConfigError, match="not valid TOML"):
+        set_browser_mode(path, "attach")
+    assert path.read_text(encoding="utf-8") == "[browser\nmode = \n"
+
+
+def test_a_browser_table_written_as_an_inline_table_is_refused_and_left_as_it_was(tmp_path: Path) -> None:
+    original: str = "browser = { headless = true }\n"
+    path: Path = tmp_path / "config.toml"
+    path.write_text(original, encoding="utf-8")
+    with pytest.raises(ConfigError, match='add mode = "attach" under \\[browser\\] by hand'):
+        set_browser_mode(path, "attach")
+    assert path.read_text(encoding="utf-8") == original

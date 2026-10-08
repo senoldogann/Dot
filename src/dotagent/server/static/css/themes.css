@@ -1,0 +1,84 @@
+/* Skins other than the base look. app.css is the "neutral" skin; each block here is chosen with data-theme on the page
+   element and changes the colour tokens first and the shape second. Light and dark follow the system. */
+
+/* ---------- paper: warm paper, a serif voice for answers and one terracotta accent ---------- */
+
+:root[data-theme="paper"] {
+  --bg: #faf9f5;
+  --sidebar: #f5f4ed;
+  --surface: #ffffff;
+  --surface-2: #f5f4ed;
+  --surface-3: #ece9de;
+  --border: #e8e6dc;
+  --border-strong: #d3d0c1;
+  --control: #8a8777;
+  --text: #141413;
+  --text-2: #3d3d3a;
+  --muted: #66655e;
+  --faint: #6e6d65;
+  --accent: #b5532f;
+  --accent-strong: #9a4426;
+  --accent-weak: #f6e6dc;
+  --on-accent: #ffffff;
+  --ok: #1f7a4d;
+  --ok-weak: #e5f1e6;
+  --warn: #8f5600;
+  --warn-weak: #fbefd3;
+  --warn-border: #e0bd6a;
+  --bad: #b3261e;
+  --bad-weak: #fbe9e6;
+  --bad-border: #eeb4ad;
+  --on-bad: #ffffff;
+  --shadow: 0 1px 2px rgb(20 20 19 / 5%), 0 6px 20px rgb(20 20 19 / 5%);
+  --radius: 12px;
+  --radius-control: 8px;
+  --radius-lg: 20px;
+  --voice: ui-serif, "New York", Georgia, "Times New Roman", serif;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root[data-theme="paper"] {
+    --bg: #262624;
+    --sidebar: #1f1e1d;
+    --surface: #30302e;
+    --surface-2: #383735;
+    --surface-3: #43423f;
+    --border: #3d3c39;
+    --border-strong: #55534e;
+    --control: #8a877d;
+    --text: #faf9f5;
+    --text-2: #dcd9cd;
+    --muted: #b9b7ab;
+    --faint: #aeac9f;
+    --accent: #d97757;
+    --accent-strong: #ec9b7e;
+    --accent-weak: #4a3328;
+    --on-accent: #1f1e1d;
+    --ok: #6fd39f;
+    --ok-weak: #193a2b;
+    --warn: #f0b955;
+    --warn-weak: #3b2c10;
+    --warn-border: #75561a;
+    --bad: #ff8f86;
+    --bad-weak: #44201d;
+    --bad-border: #7a3a35;
+    --on-bad: #2a0b0b;
+    --shadow: 0 1px 2px rgb(0 0 0 / 30%), 0 6px 18px rgb(0 0 0 / 25%);
+  }
+}
+
+:root[data-theme="paper"] .page-title,
+:root[data-theme="paper"] .run-title {
+  font-family: var(--voice);
+  font-weight: 500;
+  letter-spacing: -0.01em;
+}
+
+:root[data-theme="paper"] .prose {
+  font-size: 16px;
+  line-height: 1.7;
+}
+
+:root[data-theme="paper"] .btn.send {
+  border-radius: 10px;
+}

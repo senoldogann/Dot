@@ -1,0 +1,466 @@
+"""Browser use end to end: a real headless Chrome drives pages served by a local fixture server.
+
+Covers what the model relies on: compact snapshots with refs and viewport pruning, delta views after actions, batches
+that stop on surprises, popups, dialogs, downloads, iframes, cookie banners, secret-field refusal, URL rules, parallel
+threads and late-rendering pages.
+"""
+
+import asyncio
+import os
+import re
+import signal
+import subprocess
+import threading
+import time
+from collections.abc import AsyncIterator, Iterator
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from pathlib import Path
+
+import pytest
+import pytest_asyncio
+from playwright.async_api import async_playwright
+
+from dotagent.browser.render import render_page_view
+from dotagent.browser.safety import parse_element
+from dotagent.browser.session import BrowserSession
+from dotagent.browser.types import ActOutcome, PageView, Step
+from dotagent.browser.upstream import ignore_repeated_frame_detach
+from dotagent.config import BrowserConfig, load_config
+from dotagent.core.errors import BrowserError
+from dotagent.policy.elements import Element
+
+pytestmark = [pytest.mark.browser, pytest.mark.asyncio(loop_scope="module")]
+
+_ITEMS: str = "".join(f"<li><button>Item {n}</button></li>" for n in range(300))
+_NUMBERS: str = "".join(f"<option{' selected' if n == 250 else ''}>Number {n}</option>" for n in range(300))
+# The states arrive 600 ms after the click, the way a script fills a dropdown from a request.
+_LOAD_STATES: str = "setTimeout(() => ['Ohio', 'Texas'].forEach((name) => document.querySelector('[name=state]').add(new Option(name))), 600)"
+_PAGES: dict[str, str] = {
+    "/": f"""<!doctype html><title>Home</title>
+<h1>Dot fixture</h1>
+<button onclick="document.getElementById('n').textContent = String(Number(document.getElementById('n').textContent) + 1)">Increment</button>
+<span id="n">0</span>
+<a href="/popup" target="_blank">Open popup</a>
+<button onclick="alert('saved!')">Say alert</button>
+<button onclick="document.getElementById('c').textContent = confirm('Proceed?') ? 'accepted' : 'declined'">Ask confirm</button>
+<span id="c">unanswered</span>
+<a href="/file.txt">Download report</a>
+<iframe src="/frame" title="inner" width="400" height="120"></iframe>
+<input type="password" aria-label="Account password">
+<ul>{_ITEMS}</ul>""",
+    "/form": """<!doctype html><title>Form</title>
+<form action="/done" method="get">
+<label>Name <input name="name"></label>
+<label>Color <select name="color"><option value="red">Red</option><option value="blue">Blue</option></select></label>
+<label><input type="checkbox" name="agree"> I agree</label>
+<button type="submit">Submit form</button>
+</form>""",
+    "/dropdown": f"""<!doctype html><title>Dropdown</title>
+<label>Shipping <select name="ship"><option value="std">Standard (3-5 days)</option>
+<option value="exp">Express (next day)</option><option value="pick" disabled>Pick up in store</option></select></label>
+<label>State <select name="state"><option value="">Choose a state</option></select></label>
+<button onclick="{_LOAD_STATES}">Load states</button>
+<label>Number <select name="number">{_NUMBERS}</select></label>""",
+    "/done": """<!doctype html><title>Done</title><h1>Received</h1><p id="q"></p>
+<script>document.getElementById('q').textContent = decodeURIComponent(location.search)</script>""",
+    "/popup": "<!doctype html><title>Popup</title><h1>Popup page</h1><button>Close me</button>",
+    "/frame": """<!doctype html><title>Frame</title>
+<button onclick="document.getElementById('o').textContent = 'clicked inside frame'">Frame button</button>
+<span id="o"></span>""",
+    "/slow": """<!doctype html><title>Slow</title><div id="root"></div>
+<script>setTimeout(() => { document.getElementById('root').innerHTML =
+'<h1>Loaded late</h1><button>Late button</button><a href="/">one</a><a href="/">two</a>' }, 350)</script>""",
+    "/colon": """<!doctype html><title>Colon</title>
+<button>Buy now: confirm</button><a href="/done?x=1">Read: more</a> | <a href="javascript:void(0)">Script link</a>""",
+    "/cookies": """<!doctype html><title>Cookies</title>
+<div id="onetrust-banner-sdk" style="position:fixed;inset:0;background:#fffe;z-index:9999">
+<p>We use cookies</p><button>Accept all</button>
+<button onclick="this.parentElement.remove()">Reject all</button></div>
+<button onclick="document.getElementById('r').textContent = 'page action done'">Page action</button>
+<span id="r"></span>""",
+    "/modal": """<!doctype html><title>Modal</title>
+<button onclick="document.getElementById('m').textContent = 'bought'">Buy now</button>
+<span id="m"></span>
+<div role="dialog" aria-label="Newsletter" style="position:fixed;inset:0;background:#fff;z-index:9999">
+<p>Get our weekly deals</p><input aria-label="Email"><button>Subscribe</button>
+<button onclick="this.parentElement.remove()">No thanks</button></div>""",
+}
+
+
+class _Handler(BaseHTTPRequestHandler):
+    def do_GET(self) -> None:
+        path: str = self.path.split("?", 1)[0]
+        if path == "/file.txt":
+            body: bytes = b"report body"
+            self.send_response(200)
+            self.send_header("Content-Type", "text/plain")
+            self.send_header("Content-Disposition", 'attachment; filename="../evil/report.txt"')
+        elif path in _PAGES:
+            body = _PAGES[path].encode()
+            self.send_response(200)
+            self.send_header("Content-Type", "text/html; charset=utf-8")
+        else:
+            body = b"not found"
+            self.send_response(404)
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+    def log_message(self, format: str, *args: object) -> None:
+        return
+
+
+@pytest.fixture(scope="module")
+def site() -> Iterator[str]:
+    server: ThreadingHTTPServer = ThreadingHTTPServer(("127.0.0.1", 0), _Handler)
+    thread: threading.Thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    yield f"http://127.0.0.1:{server.server_address[1]}"
+    server.shutdown()
+    server.server_close()
+
+
+@pytest.fixture(scope="module")
+def downloads(tmp_path_factory: pytest.TempPathFactory) -> Path:
+    return tmp_path_factory.mktemp("downloads")
+
+
+@pytest.fixture(scope="module")
+def browser_config(tmp_path_factory: pytest.TempPathFactory) -> BrowserConfig:
+    settings: Path = tmp_path_factory.mktemp("settings") / "config.toml"
+    settings.write_text("[browser]\nheadless = true\n", encoding="utf-8")
+    return load_config(settings).browser
+
+
+@pytest_asyncio.fixture(scope="module", loop_scope="module")
+async def browser(
+    browser_config: BrowserConfig, tmp_path_factory: pytest.TempPathFactory, downloads: Path
+) -> AsyncIterator[BrowserSession]:
+    session: BrowserSession = BrowserSession(browser_config, tmp_path_factory.mktemp("profile"), downloads)
+    yield session
+    await session.aclose()
+
+
+def ref_of(body: str, label: str) -> str:
+    match: re.Match[str] | None = re.search(rf"{re.escape(label)}[^\n]*?\[ref=([^\]]+)\]", body)
+    assert match is not None, f"{label!r} not in:\n{body}"
+    return match.group(1)
+
+
+def saved_files(directory: Path) -> list[Path]:
+    return sorted(directory.iterdir())
+
+
+async def act(browser: BrowserSession, thread: str, steps: list[Step], accept: bool) -> ActOutcome:
+    return await browser.act(thread, steps, accept)
+
+
+async def test_snapshot_has_refs_and_prunes_what_is_far_below_the_fold(browser: BrowserSession, site: str) -> None:
+    view: PageView = await browser.open_url("prune", f"{site}/")
+    assert view.title == "Home"
+    assert view.status == 200
+    assert ref_of(view.body, 'button "Increment"')
+    assert "Item 250" not in view.body
+    assert view.offscreen_refs > 150
+
+
+async def test_click_returns_only_what_changed(browser: BrowserSession, site: str) -> None:
+    view: PageView = await browser.open_url("delta", f"{site}/")
+    outcome: ActOutcome = await act(
+        browser, "delta", [Step(action="click", ref=ref_of(view.body, 'button "Increment"'))], False
+    )
+    assert [report.outcome for report in outcome.steps] == ["done"]
+    assert outcome.stopped is None
+    assert outcome.view.mode == "delta"
+    assert '"1"' in outcome.view.body or ": 1" in outcome.view.body
+    assert len(outcome.view.body) < len(view.body) / 2
+
+
+async def test_form_batch_fills_selects_checks_and_submits(browser: BrowserSession, site: str) -> None:
+    view: PageView = await browser.open_url("form", f"{site}/form")
+    steps: list[Step] = [
+        Step(action="fill", ref=ref_of(view.body, 'textbox "Name"'), text="Ada"),
+        Step(action="select", ref=ref_of(view.body, 'combobox "Color"'), text="blue"),
+        Step(action="check", ref=ref_of(view.body, 'checkbox "I agree"')),
+        Step(action="click", ref=ref_of(view.body, 'button "Submit form"')),
+    ]
+    outcome: ActOutcome = await act(browser, "form", steps, False)
+    assert [report.outcome for report in outcome.steps] == ["done"] * 4, outcome
+    assert outcome.view.title == "Done"
+    assert "name=Ada" in outcome.view.body
+    assert "color=blue" in outcome.view.body
+
+
+async def test_batch_stops_when_the_page_opens_a_tab_and_the_tab_can_be_used(
+    browser: BrowserSession, site: str
+) -> None:
+    view: PageView = await browser.open_url("popup", f"{site}/")
+    steps: list[Step] = [
+        Step(action="click", ref=ref_of(view.body, 'link "Open popup"')),
+        Step(action="click", ref=ref_of(view.body, 'button "Increment"')),
+    ]
+    outcome: ActOutcome = await act(browser, "popup", steps, False)
+    assert [report.outcome for report in outcome.steps] == ["done", "skipped"]
+    assert outcome.stopped is not None
+    assert "new tab" in outcome.stopped
+    assert len(outcome.view.tabs) == 2
+    switched: PageView = await browser.switch_tab("popup", 2)
+    assert switched.title == "Popup"
+    assert 'button "Close me"' in switched.body
+    back: PageView = await browser.close_tab("popup", 2)
+    assert back.title == "Home"
+
+
+async def test_dialogs_are_resolved_and_reported(browser: BrowserSession, site: str) -> None:
+    view: PageView = await browser.open_url("dialog", f"{site}/")
+    alert: ActOutcome = await act(
+        browser, "dialog", [Step(action="click", ref=ref_of(view.body, 'button "Say alert"'))], False
+    )
+    assert any("alert dialog accepted: saved!" in note for note in alert.view.notes)
+    ask_ref: str = ref_of(view.body, 'button "Ask confirm"')
+    declined: ActOutcome = await act(browser, "dialog", [Step(action="click", ref=ask_ref)], False)
+    assert any("confirm dialog dismissed" in note for note in declined.view.notes)
+    assert "declined" in (await browser.read_text("dialog", None, 0, 4000)).text
+    accepted: ActOutcome = await act(browser, "dialog", [Step(action="click", ref=ask_ref)], True)
+    assert any("confirm dialog accepted" in note for note in accepted.view.notes)
+    assert "accepted" in (await browser.read_text("dialog", None, 0, 4000)).text
+
+
+async def test_download_is_saved_under_a_safe_name(browser: BrowserSession, site: str, downloads: Path) -> None:
+    view: PageView = await browser.open_url("download", f"{site}/")
+    outcome: ActOutcome = await act(
+        browser, "download", [Step(action="click", ref=ref_of(view.body, 'link "Download report"'))], False
+    )
+    assert outcome.stopped is not None
+    later: PageView = await browser.snapshot("download")
+    notes: str = " ".join((*outcome.view.notes, *later.notes))
+    assert "download saved to" in notes
+    saved: list[Path] = saved_files(downloads)
+    assert len(saved) == 1
+    assert saved[0].name.endswith("report.txt")
+    assert saved[0].parent == downloads
+    assert saved[0].read_text(encoding="utf-8") == "report body"
+    assert not (downloads.parent / "evil").exists()
+
+
+async def test_iframe_content_gets_refs_that_work(browser: BrowserSession, site: str) -> None:
+    view: PageView = await browser.open_url("frame", f"{site}/")
+    ref: str = ref_of(view.body, 'button "Frame button"')
+    await act(browser, "frame", [Step(action="click", ref=ref)], False)
+    assert "clicked inside frame" in (await browser.snapshot("frame")).body
+
+
+async def test_password_fields_are_never_typed_into(browser: BrowserSession, site: str) -> None:
+    view: PageView = await browser.open_url("secret", f"{site}/")
+    ref: str = ref_of(view.body, 'textbox "Account password"')
+    outcome: ActOutcome = await act(browser, "secret", [Step(action="fill", ref=ref, text="hunter2")], False)
+    assert outcome.steps[0].outcome == "failed"
+    assert "password field" in outcome.steps[0].detail
+    assert "hunter2" not in outcome.steps[0].description
+
+
+async def test_urls_outside_the_rules_are_refused(browser: BrowserSession, site: str) -> None:
+    for url in ("http://169.254.169.254/latest/meta-data/", "file:///etc/passwd", "javascript:alert(1)"):
+        with pytest.raises(BrowserError):
+            await browser.open_url("rules", url)
+
+
+async def test_threads_keep_separate_tabs(browser: BrowserSession, site: str) -> None:
+    first, second = await asyncio.gather(
+        browser.open_url("thread-a", f"{site}/popup"), browser.open_url("thread-b", f"{site}/form")
+    )
+    assert (first.title, second.title) == ("Popup", "Form")
+    assert (browser.current_url("thread-a") or "").endswith("/popup")
+    assert (browser.current_url("thread-b") or "").endswith("/form")
+
+
+async def test_find_reaches_offscreen_elements_and_refs_stay_usable(browser: BrowserSession, site: str) -> None:
+    await browser.open_url("find", f"{site}/")
+    found = await browser.find("find", "Item 250", 5)
+    assert len(found.hits) == 1
+    ref: str = ref_of(found.hits[0], "Item 250")
+    outcome: ActOutcome = await act(
+        browser, "find", [Step(action="scroll_into_view", ref=ref), Step(action="click", ref=ref)], False
+    )
+    assert [report.outcome for report in outcome.steps] == ["done", "done"]
+
+
+async def test_page_text_is_paged_and_screenshots_are_jpeg(browser: BrowserSession, site: str) -> None:
+    await browser.open_url("text", f"{site}/")
+    first = await browser.read_text("text", None, 0, 100)
+    assert len(first.text) == 100
+    assert first.total_chars > 1000
+    assert (await browser.read_text("text", None, 100, 100)).text != first.text
+    shot = await browser.screenshot("text")
+    assert shot.data[:2] == b"\xff\xd8"
+    assert (shot.width, shot.height) == (1280, 860)
+
+
+async def test_late_rendering_pages_are_shown_after_they_render(browser: BrowserSession, site: str) -> None:
+    view: PageView = await browser.open_url("slow", f"{site}/slow")
+    assert "Loaded late" in view.body
+
+
+async def test_cookie_banners_are_declined_instead_of_blocking_actions(browser: BrowserSession, site: str) -> None:
+    view: PageView = await browser.open_url("cookies", f"{site}/cookies")
+    outcome: ActOutcome = await act(
+        browser, "cookies", [Step(action="click", ref=ref_of(view.body, 'button "Page action"'))], False
+    )
+    assert outcome.steps[0].outcome == "done", outcome
+    assert "page action done" in (await browser.read_text("cookies", None, 0, 1000)).text
+
+
+async def test_a_dialog_in_front_of_the_page_is_shown_first_and_a_blocked_click_says_what_covers_it(
+    browser: BrowserSession, site: str
+) -> None:
+    view: PageView = await browser.open_url("modal", f"{site}/modal")
+    assert view.overlays == 1
+    assert 'dialog "Newsletter"' in view.overlay
+    assert 'button "No thanks"' in view.overlay
+    assert "Buy now" not in view.overlay
+    rendered: str = render_page_view(view, "n0nce", 20_000)
+    assert "a dialog is open in front of the page" in rendered.splitlines()[0]
+    assert rendered.index("in front of the page:") < rendered.index("the page:")
+
+    blocked: ActOutcome = await act(
+        browser, "modal", [Step(action="click", ref=ref_of(view.body, 'button "Buy now"'))], False
+    )
+    assert blocked.steps[0].outcome == "failed", blocked
+    assert "lies in front of the element" in blocked.steps[0].detail
+    assert 'role="dialog"' in blocked.steps[0].detail
+
+    closed: ActOutcome = await act(
+        browser, "modal", [Step(action="click", ref=ref_of(blocked.view.overlay, 'button "No thanks"'))], False
+    )
+    assert closed.steps[0].outcome == "done", closed
+    assert closed.view.overlays == 0
+    assert closed.view.overlay == ""
+    bought: ActOutcome = await act(
+        browser, "modal", [Step(action="click", ref=ref_of(view.body, 'button "Buy now"'))], False
+    )
+    assert bought.steps[0].outcome == "done", bought
+    assert "bought" in (await browser.read_text("modal", None, 0, 1000)).text
+
+
+async def test_view_leaves_scaffolding_out_and_links_serve_absolute_targets(browser: BrowserSession, site: str) -> None:
+    view: PageView = await browser.open_url("links", f"{site}/")
+    assert "/url:" not in view.body
+    assert "cursor=pointer" not in view.body
+    found = await browser.links("links", "popup", 10)
+    assert len(found.hits) == 1
+    assert found.hits[0].endswith(f"Open popup -> {site}/popup")
+    assert (await browser.links("links", "no such link anywhere", 10)).hits == ()
+
+
+async def test_names_with_a_colon_are_parsed_as_elements_and_links_keep_their_targets(
+    browser: BrowserSession, site: str
+) -> None:
+    view: PageView = await browser.open_url("colon", f"{site}/colon")
+    button: str | None = browser.peek_line("colon", ref_of(view.body, "Buy now: confirm"))
+    assert button is not None
+    assert parse_element(button) == Element(role="button", name="Buy now: confirm")
+    found = await browser.links("colon", "", 10)
+    assert [hit.split("  ", 1)[1] for hit in found.hits] == [f"Read: more -> {site}/done?x=1"]
+
+
+def line_of(body: str, label: str) -> str:
+    return next(line for line in body.splitlines() if label in line)
+
+
+async def test_collapsed_dropdowns_list_their_options_and_the_choice_shows_in_the_delta(
+    browser: BrowserSession, site: str
+) -> None:
+    view: PageView = await browser.open_url("dropdown-view", f"{site}/dropdown")
+    listed: str = line_of(view.body, 'combobox "Shipping"')
+    assert listed.endswith(
+        ': options "Standard (3-5 days)" [selected], "Express (next day)", "Pick up in store" [disabled]'
+    )
+    ref: str = ref_of(view.body, 'combobox "Shipping"')
+    assert parse_element(browser.peek_line("dropdown-view", ref) or "") == Element(role="combobox", name="Shipping")
+    outcome: ActOutcome = await act(
+        browser, "dropdown-view", [Step(action="select", ref=ref, text="Express (next day)")], False
+    )
+    assert [report.outcome for report in outcome.steps] == ["done"], outcome
+    assert '"Express (next day)" [selected]' in outcome.view.body
+    assert '"Standard (3-5 days)" [selected]' not in outcome.view.body
+
+
+async def test_a_missing_option_fails_fast_and_names_the_options(
+    browser: BrowserSession, browser_config: BrowserConfig, site: str
+) -> None:
+    view: PageView = await browser.open_url("dropdown-miss", f"{site}/dropdown")
+    step: Step = Step(action="select", ref=ref_of(view.body, 'combobox "Shipping"'), text="Overnight")
+    started: float = time.perf_counter()
+    outcome: ActOutcome = await act(browser, "dropdown-miss", [step], False)
+    elapsed: float = time.perf_counter() - started
+    assert outcome.steps[0].outcome == "failed"
+    assert '"Express (next day)"' in outcome.steps[0].detail
+    assert '"Standard (3-5 days)" [selected]' in outcome.steps[0].detail
+    assert elapsed < browser_config.action_timeout_s / 2, elapsed
+
+
+async def test_an_option_a_script_adds_a_moment_later_is_still_chosen(browser: BrowserSession, site: str) -> None:
+    view: PageView = await browser.open_url("dropdown-late", f"{site}/dropdown")
+    steps: list[Step] = [
+        Step(action="click", ref=ref_of(view.body, 'button "Load states"')),
+        Step(action="select", ref=ref_of(view.body, 'combobox "State"'), text="Texas"),
+    ]
+    outcome: ActOutcome = await act(browser, "dropdown-late", steps, False)
+    assert [report.outcome for report in outcome.steps] == ["done", "done"], outcome
+    assert '"Texas" [selected]' in line_of((await browser.snapshot("dropdown-late")).body, 'combobox "State"')
+
+
+async def test_a_long_dropdown_keeps_its_line_short_and_names_a_choice_it_cannot_show(
+    browser: BrowserSession, site: str
+) -> None:
+    view: PageView = await browser.open_url("dropdown-long", f"{site}/dropdown")
+    listed: str = line_of(view.body, 'combobox "Number"')
+    assert len(listed) < 400
+    assert listed.endswith('(selected: "Number 250")')
+    outcome: ActOutcome = await act(
+        browser,
+        "dropdown-long",
+        [Step(action="select", ref=ref_of(view.body, 'combobox "Number"'), text="Number 299")],
+        False,
+    )
+    assert outcome.steps[0].outcome == "done", outcome
+    assert line_of(outcome.view.body, 'combobox "Number"').endswith('(selected: "Number 299")')
+
+
+def driver_pids() -> list[int]:
+    """The Playwright driver is the only node process that is a child of the test process."""
+    listing: subprocess.CompletedProcess[str] = subprocess.run(
+        ["pgrep", "-P", str(os.getpid()), "-x", "node"], capture_output=True, text=True, check=False
+    )
+    return [int(pid) for pid in listing.stdout.split()]
+
+
+async def test_a_dead_driver_fails_one_call_and_the_browser_restarts(browser: BrowserSession, site: str) -> None:
+    """Runs last: it replaces the Chrome that the tests above used."""
+    await browser.open_url("driver", f"{site}/")
+    before: list[int] = driver_pids()
+    assert len(before) == 1, before
+    os.kill(before[0], signal.SIGKILL)
+    with pytest.raises(BrowserError, match="connection to the browser broke"):
+        await browser.open_url("driver", f"{site}/form")
+    view: PageView = await browser.open_url("driver", f"{site}/form")
+    assert view.title == "Form"
+    assert driver_pids() not in ([], before)
+
+
+async def test_a_frame_detached_twice_does_not_break_the_next_call() -> None:
+    # Pages that churn iframes can make Playwright handle one detachment twice (playwright-python #1268); unfixed, the
+    # second one leaves a ValueError that the next API call raises.
+    ignore_repeated_frame_detach()
+    async with async_playwright() as playwright:
+        browser = await playwright.chromium.launch(headless=True)
+        try:
+            page = await browser.new_page()
+            await page.set_content("<iframe srcdoc='<p>inner</p>'></iframe>")
+            frame = page.frames[1]
+            await page.evaluate("document.querySelector('iframe').remove()")
+            await page.wait_for_function("document.querySelectorAll('iframe').length === 0")
+            page._impl_obj._on_frame_detached(frame._impl_obj)
+            assert await page.locator("iframe").count() == 0
+        finally:
+            await browser.close()

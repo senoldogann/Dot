@@ -1,0 +1,108 @@
+"""Policy vocabulary: how an action is described and what the policy may decide about it."""
+
+from typing import Literal
+
+from dotagent.core.types import FrozenModel
+
+Risk = Literal["safe", "low", "medium", "high"]
+
+ActionKind = Literal[
+    "read",
+    "write",
+    "shell",
+    "network",
+    "browser_read",
+    "browser_navigate",
+    "browser_input",
+    "browser_click",
+    "desktop_observe",
+    "desktop_input",
+    "app_control",
+    "message",
+    "schedule",
+    "memory_read",
+    "memory_write",
+    "delegate",
+    "meta",
+    "mcp",
+    "mcp_read",
+]
+
+Flag = Literal[
+    "destructive",
+    "financial",
+    "credential",
+    "system_settings",
+    "privilege",
+    "external_send",
+    "public_post",
+    "install",
+    "secret_access",
+    "exfiltration",
+    "outside_workspace",
+    "persistence",
+]
+
+Preset = Literal["aggressive", "balanced", "cautious"]
+Verdict = Literal["allow", "ask", "handoff", "deny"]
+DecisionSource = Literal["auto_review", "mode", "hard_stop", "rule", "taint", "preset"]
+
+# Who answers a question the policy raised: ``ask`` the user, ``auto`` a reviewer model (which can hand the question on
+# to the user), ``yolo`` nobody (the action is allowed and only recorded).
+ApprovalMode = Literal["ask", "auto", "yolo"]
+# The answerer a question is routed to; ``waived`` means that nobody is asked.
+Route = Literal["user", "reviewer", "waived"]
+
+# Actions that only observe the world; research runs are limited to these. A research run may delegate because the
+# run it starts is research as well: the run manager refuses anything wider.
+READ_ONLY_KINDS: frozenset[ActionKind] = frozenset(
+    {
+        "read",
+        "network",
+        "browser_read",
+        "browser_navigate",
+        "desktop_observe",
+        "memory_read",
+        "mcp_read",
+        "delegate",
+        "meta",
+    }
+)
+
+# Observations of content that third parties can author; they mark a run as carrying untrusted input.
+TAINTING_KINDS: frozenset[ActionKind] = frozenset(
+    {"network", "browser_read", "browser_navigate", "desktop_observe", "mcp", "mcp_read"}
+)
+
+# Flags whose consequences reach beyond the machine, or beyond the run (persistence: what is remembered or scheduled
+# shapes every later run); untrusted input must never trigger them silently.
+TAINT_ESCALATION_FLAGS: frozenset[Flag] = frozenset(
+    {
+        "external_send",
+        "public_post",
+        "exfiltration",
+        "financial",
+        "credential",
+        "privilege",
+        "system_settings",
+        "persistence",
+    }
+)
+
+
+class ActionInfo(FrozenModel):
+    """A concrete action about to happen, as the policy sees it."""
+
+    tool: str
+    kind: ActionKind
+    risk: Risk
+    summary: str
+    target: str
+    flags: tuple[Flag, ...]
+
+
+class Decision(FrozenModel):
+    verdict: Verdict
+    source: DecisionSource
+    reason: str
+    rule_id: str | None

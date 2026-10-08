@@ -1,0 +1,235 @@
+# Packaged defaults. The user's ~/Library/Application Support/Dot/config.toml is deep-merged on top.
+# Every key must exist here; the typed config model has no implicit defaults.
+
+# MCP servers whose tools the agent can use, one [[mcp]] table each in config.toml. A server is either started by Dot
+# (command, over stdio) or reached at a URL (streamable HTTP, or the older SSE transport):
+#   [[mcp]]
+#   name = "notes"                      # lowercase letters, digits and hyphens; tools appear as mcp__notes__<tool>
+#   command = "npx"                     # started with the PATH of your login shell
+#   args = ["-y", "some-mcp-server"]
+#   env = { NOTES_TOKEN = "${NOTES_TOKEN}" }   # ${NAME} is looked up like an API key (environment, .env, Keychain)
+#   allow = ["search", "read_note"]     # offer only these tools; empty = all of them (at most 30)
+#   enabled = true
+#   startup_timeout_s = 60.0
+#   call_timeout_s = 120.0
+#
+#   [[mcp]]
+#   name = "docs"
+#   url = "https://mcp.example.com/mcp"             # a remote server; transport = "http" (default) or "sse"
+#   headers = { Authorization = "Bearer ${DOCS_TOKEN}" }   # ${NAME} as above; headers are never logged
+# Plugins add their own servers (see [plugins]); their names become <plugin>-<server>.
+mcp = []
+
+[server]
+host = "127.0.0.1"
+port = 8765
+
+[models]
+# "<provider>:<model>"; providers are ollama, openai and opencode_go.
+# A run uses the model it was started with (main unless one is chosen) for every step and for compacting its own
+# history; the roles below are only used for what their comments say.
+main = "ollama:minimax-m2.7:cloud"
+# Describes screenshots to a run whose model cannot see images.
+vision = "ollama:gemma4:cloud"
+# Not used by runs; kept so existing config files stay valid.
+fast = "ollama:gpt-oss:20b-cloud"
+# Answers for you where [policy] approvals = "auto", and checks the answer of a run in goal mode.
+review = "ollama:minimax-m2.7:cloud"
+effort = "medium"
+
+[providers.ollama]
+base_url = "http://localhost:11434"
+api_key_env = "OLLAMA_API_KEY"
+num_ctx = 65536
+keep_alive = "30m"
+connect_timeout_s = 10.0
+read_timeout_s = 300.0
+attempts = 6
+max_concurrent = 3
+
+[providers.openai]
+base_url = "https://api.openai.com/v1"
+api_key_env = "OPENAI_API_KEY"
+organization_env = "OPENAI_ORG_ID"
+project_env = "OPENAI_PROJECT_ID"
+wire = "responses"
+connect_timeout_s = 10.0
+read_timeout_s = 600.0
+attempts = 6
+max_concurrent = 4
+
+[providers.opencode_go]
+base_url = "https://opencode.ai/zen/go/v1"
+api_key_env = "OPENCODE_API_KEY"
+# Model id -> "chat" | "responses" | "messages" for ids the built-in catalog does not know (or knows differently).
+route_overrides = {}
+connect_timeout_s = 10.0
+read_timeout_s = 600.0
+attempts = 6
+max_concurrent = 4
+
+[agent]
+# A run has no step limit: it ends by finishing, by the stall guard (stall_limit) or by the stop button.
+# Goal mode: a reviewer model checks the answer of a task or research run against the goal and sends the run back to work
+# until the goal is reached; a run is sent back to work at most goal_patience times, then it ends as failed.
+goal_mode = false
+goal_patience = 4
+tool_output_chars = 12000
+context_tokens = 48000
+keep_recent_tool_results = 6
+keep_recent_screenshots = 2
+stall_limit = 4
+finish_nudges = 2
+parallel_tools = 4
+model_call_timeout_s = 420.0
+max_concurrent_runs = 3
+
+[policy]
+# aggressive: act without asking except for the hard stops; balanced: ask for external side effects;
+# cautious: ask for everything that is not read-only.
+preset = "aggressive"
+# Who answers a question the policy raises: "ask" = you; "auto" = the review model decides and passes on what it cannot
+# decide; "yolo" = nobody is asked, the action is allowed and recorded. Whatever the value, secrets and exfiltration are
+# refused, and money and credentials are handed to you.
+approvals = "ask"
+approval_timeout_s = 900.0
+protected_paths = [
+  "~/.ssh",
+  "~/.gnupg",
+  "~/Library/Keychains",
+  "~/.aws",
+  "~/.config/gcloud",
+  "~/Library/Application Support/Google/Chrome",
+]
+
+[shell]
+# Environment variables whose names look like secrets are removed from tool processes unless listed here.
+pass_env = []
+login_env_timeout_s = 20.0
+default_timeout_s = 120
+max_timeout_s = 1800
+
+[web]
+# "duckduckgo" needs no key; "ollama" uses the hosted web_search API and needs OLLAMA_API_KEY.
+search_backend = "duckduckgo"
+# DuckDuckGo answers a burst of searches with its bot check (HTTP 202). Searches start at least this far apart; one
+# that meets the check pauses all searches for 8 s and is tried again (search_attempts tries in all). For heavy research
+# set search_backend = "ollama".
+search_spacing_s = 1.0
+search_attempts = 3
+fetch_timeout_s = 25.0
+fetch_max_bytes = 3000000
+# A PDF can only be read whole, so it gets a larger limit than a page.
+pdf_max_bytes = 30000000
+# false = web_fetch and web_search reach the public internet only (no localhost, LAN or cloud metadata addresses).
+allow_private_hosts = false
+user_agent = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Safari/605.1.15"
+
+[browser]
+# "own": Dot starts a Chrome of its own on its own profile (sign in once with `dotx browser login`, or copy your sign-ins
+# with `dotx browser import-chrome`). "attach": Dot works in new tabs of the Chrome you already have open, signed in as
+# you are; Chrome 144 or later, switched on with `dotx browser attach`.
+mode = "own"
+# How long a connection to your open Chrome waits for you to click Allow in the dialog that Chrome shows.
+attach_timeout_s = 60.0
+# Used in "own" mode.
+channel = "chrome"
+headless = false
+viewport_width = 1280
+viewport_height = 860
+navigation_timeout_s = 30.0
+action_timeout_s = 8.0
+# Largest page observation handed to the model (the agent's tool_output_chars caps it further).
+snapshot_max_chars = 9000
+# Elements this far outside the viewport still appear in an observation.
+viewport_margin_px = 300
+# A page counts as settled after settle_quiet_ms without DOM changes, at the latest after settle_max_ms.
+settle_quiet_ms = 120
+settle_max_ms = 1500
+# Popups and dialogs are reported a few ms after a click returns; side-effect steps wait this long before checking.
+side_effect_grace_ms = 40
+navigation_attempts = 3
+navigation_backoff_ms = 80
+# Tabs one conversation thread may keep open; the oldest background tab is closed beyond that.
+max_tabs = 4
+tab_idle_s = 1800.0
+screenshot_quality = 60
+max_batch_steps = 5
+read_text_chars = 8000
+# Empty allowed_hosts = every site; a host entry also matches its subdomains. Both lists also apply to web_fetch and
+# web_search.
+allowed_hosts = []
+blocked_hosts = ["169.254.169.254", "metadata.google.internal"]
+decline_cookie_banners = true
+
+[desktop]
+enabled = true
+screenshot_max_edge = 1920
+jpeg_quality = 72
+settle_ms = 350
+failsafe_corner = true
+ax_timeout_s = 2.0
+ax_budget_s = 4.0
+ax_max_nodes = 1500
+ax_max_depth = 40
+snapshot_max_chars = 16000
+capture_timeout_s = 10.0
+paste_settle_ms = 250
+keep_awake = true
+keep_awake_s = 900
+max_batch_steps = 25
+launch_timeout_s = 20.0
+activate_timeout_s = 3.0
+osascript_timeout_s = 30.0
+
+[memory]
+# Who embeds the notes, for finding them by meaning: "ollama" (the local server; nothing leaves this Mac) or "openai"
+# (the OpenAI API with OPENAI_API_KEY; the text of every note and search is sent to OpenAI). embed_model names a model of
+# that provider, e.g. "text-embedding-3-small" for "openai". Nothing switches provider by itself when one fails.
+# bge-m3 is multilingual: Turkish and English notes are found by meaning. "embed_enabled = false" searches by words only.
+embed_provider = "ollama"
+embed_model = "bge-m3"
+embed_enabled = true
+# Every run starts with the notes tagged "core" (at most core_limit, newest first), the notes you wrote yourself in
+# Settings › Memory or with `dotx memory` (at most user_limit; past that, the ones that fit the goal best), and up to
+# inject_top_k notes the agent saved that fit the goal.
+inject_top_k = 6
+core_limit = 8
+user_limit = 12
+# Candidates each search (words, meaning) hands to the fusion, and the weakest cosine similarity that counts as a match.
+# A run's starting notes are chosen more strictly (inject_min_similarity): a wrong note there costs tokens every run.
+# The similarities are those of bge-m3 (related 0.55-0.75, unrelated mostly below 0.5); recalibrate for another model.
+# text-embedding-3-small scores lower (related 0.38-0.79, unrelated mostly below 0.3): set min_similarity = 0.40 with it.
+candidate_pool = 30
+min_similarity = 0.50
+inject_min_similarity = 0.55
+# A new note this close to an existing one is reported to the model, which decides whether the old one is outdated.
+similar_threshold = 0.85
+max_chars = 600
+
+[scheduler]
+# IANA name ("Europe/Helsinki") of the zone that cron expressions and one-time moments are read in; "" = this Mac's zone.
+timezone = ""
+# How often the daemon looks for schedules that are due.
+tick_s = 15.0
+# A cron expression may not fire more often than this.
+min_interval_s = 300
+# A schedule that is overdue by more than this (the daemon was off, the Mac asleep) skips that firing and waits for the next.
+misfire_grace_s = 3600
+# Schedules that are switched on.
+max_schedules = 50
+
+[skills]
+# Skills are folders of instructions for one kind of work, in the Agent Skills layout: <name>/SKILL.md with a YAML
+# frontmatter (name, description) and optional scripts/, references/ and assets/. The agent sees "name: description" for
+# each and reads the rest with the skill tool when a task matches. Dot always looks in <home>/skills and in the skills/
+# folder of every plugin; list more directories here (each holds skill folders; ~ expands), such as "~/.claude/skills".
+dirs = []
+
+[plugins]
+# Plugins in the Claude Code layout: <plugin>/.claude-plugin/plugin.json (name), skills/<name>/SKILL.md and .mcp.json
+# ({"mcpServers": {...}}; ${CLAUDE_PLUGIN_ROOT} is the plugin folder). Their skills and MCP servers are used; hooks,
+# commands and agents are not. Dot always looks in <home>/plugins; list more directories here (each holds plugins, or
+# is one plugin itself; ~ expands). Plugins are read when Dot starts, skills at the start of every run.
+dirs = []
+

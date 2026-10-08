@@ -1,0 +1,15 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+
+# Tool caches
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+
+# Local configuration and secrets
+.env
+
+# Per-machine Claude Code settings
+.claude/settings.local.json

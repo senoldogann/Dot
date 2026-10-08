@@ -1,0 +1,148 @@
+"""Routes for the state of the installation: health, status, models, checks, desktop permissions, the emergency stop
+and screenshots."""
+
+import asyncio
+import os
+import re
+import time
+from pathlib import Path
+
+from fastapi import APIRouter
+from fastapi.responses import FileResponse
+
+from dotagent import __version__
+from dotagent.config import AppConfig
+from dotagent.core.errors import DotError, NotFoundError
+from dotagent.core.paths import dot_home, failsafe_path, screenshots_dir
+from dotagent.desktop.perms import missing_panes, program_of_this_process, request_permissions
+from dotagent.desktop.types import Permissions
+from dotagent.doctor import CheckResult, run_quick_checks
+from dotagent.llm.router import KNOWN_PROVIDERS, ModelRef, ModelRouter
+from dotagent.llm.traits import effective_effort
+from dotagent.llm.types import Effort, ModelInfo
+from dotagent.server.context import ServerContext
+from dotagent.server.views import FailsafeView, HealthView, ModelOption, PermissionsView, ProviderModels, StatusView
+from dotagent.store.models import ApprovalRecord
+
+_IMAGE_NAME: re.Pattern[str] = re.compile(r"^[0-9a-f]{24}\.(png|jpg|webp|gif)$")
+_PENDING_LIMIT: int = 500
+
+
+def _option(provider: str, info: ModelInfo, default_effort: Effort) -> ModelOption:
+    return ModelOption(
+        ref=ModelRef(provider=provider, model=info.id).label,
+        vision=info.vision,
+        tools=info.tools,
+        thinking=info.thinking,
+        context_length=info.context_length,
+        efforts=list(info.efforts),
+        default_effort=effective_effort(info.efforts, default_effort),
+    )
+
+
+async def _provider_models(router: ModelRouter, provider: str, default_effort: Effort) -> ProviderModels:
+    """The models of one provider; a provider that cannot be reached is reported, it does not fail the others."""
+    try:
+        infos: tuple[ModelInfo, ...] = await (await router.provider(provider)).list_models()
+    except DotError as exc:
+        return ProviderModels(provider=provider, models=[], error=exc.message)
+    return ProviderModels(
+        provider=provider, models=[_option(provider, info, default_effort) for info in infos], error=None
+    )
+
+
+def health_router() -> APIRouter:
+    router: APIRouter = APIRouter(prefix="/api")
+
+    @router.get("/health")
+    async def health() -> HealthView:
+        return HealthView(ok=True, version=__version__)
+
+    return router
+
+
+def system_router(ctx: ServerContext) -> APIRouter:
+    router: APIRouter = APIRouter(prefix="/api")
+    config: AppConfig = ctx.runtime.config
+
+    async def engaged() -> bool:
+        return await asyncio.to_thread(failsafe_path().exists)
+
+    @router.get("/status")
+    async def status() -> StatusView:
+        pending: list[ApprovalRecord] = await ctx.runtime.store.list_approvals("pending", _PENDING_LIMIT)
+        now: float = time.time()
+        return StatusView(
+            version=__version__,
+            pid=os.getpid(),
+            started_at=ctx.started_at,
+            uptime_s=now - ctx.started_at,
+            home=str(dot_home()),
+            host=ctx.host,
+            port=ctx.port,
+            active_runs=ctx.manager.active_run_ids(),
+            pending_approvals=len(pending),
+            scheduler_running=ctx.scheduler is not None and ctx.scheduler.running(),
+            failsafe_engaged=await engaged(),
+            preset=config.policy.preset,
+            approvals=config.policy.approvals,
+            goal_mode=config.agent.goal_mode,
+            browser_mode=ctx.runtime.browser.mode,
+            desktop_enabled=config.desktop.enabled,
+            mcp_tools=len(ctx.runtime.mcp.tools),
+            models=config.models,
+        )
+
+    @router.get("/models")
+    async def models() -> list[ProviderModels]:
+        default_effort: Effort = config.models.effort
+        return list(
+            await asyncio.gather(
+                *(_provider_models(ctx.runtime.router, name, default_effort) for name in KNOWN_PROVIDERS)
+            )
+        )
+
+    @router.get("/doctor")
+    async def doctor() -> list[CheckResult]:
+        return await run_quick_checks(config)
+
+    @router.post("/desktop/permissions")
+    async def ask_for_desktop_permissions() -> PermissionsView:
+        """Make macOS ask, in the name of the program that runs this daemon, for what the desktop is missing."""
+        granted: Permissions = await asyncio.to_thread(request_permissions)
+        return PermissionsView(
+            program=str(program_of_this_process()),
+            accessibility=granted.accessibility,
+            input_events=granted.post_event,
+            screen_recording=granted.screen_recording,
+            panes=list(missing_panes(granted)),
+        )
+
+    @router.get("/failsafe")
+    async def failsafe_state() -> FailsafeView:
+        return FailsafeView(engaged=await engaged(), cancelled_runs=[])
+
+    @router.post("/failsafe")
+    async def engage_failsafe() -> FailsafeView:
+        """Block desktop control and stop every run that is going on."""
+        await asyncio.to_thread(failsafe_path().touch)
+        active: list[str] = ctx.manager.active_run_ids()
+        for run_id in active:
+            ctx.manager.cancel(run_id)
+        return FailsafeView(engaged=True, cancelled_runs=active)
+
+    @router.delete("/failsafe")
+    async def release_failsafe() -> FailsafeView:
+        await asyncio.to_thread(failsafe_path().unlink, True)
+        return FailsafeView(engaged=False, cancelled_runs=[])
+
+    @router.get("/images/{name}")
+    async def image(name: str) -> FileResponse:
+        if _IMAGE_NAME.fullmatch(name) is None:
+            raise NotFoundError("image not found", {"name": name})
+        path: Path = screenshots_dir() / name
+        if not await asyncio.to_thread(path.is_file):
+            raise NotFoundError("image not found", {"name": name})
+        return FileResponse(path)
+
+    return router

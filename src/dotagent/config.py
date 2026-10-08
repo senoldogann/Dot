@@ -1,0 +1,324 @@
+"""Typed configuration: the packaged ``defaults.toml`` deep-merged with the user's ``config.toml``."""
+
+import tomllib
+from importlib import resources
+from pathlib import Path
+from typing import Literal, Self
+
+from pydantic import Field, JsonValue, ValidationError, field_validator, model_validator
+
+from dotagent.core.errors import ConfigError
+from dotagent.core.paths import config_path
+from dotagent.core.types import FrozenModel, JsonObject
+from dotagent.llm.types import Effort
+from dotagent.policy.types import ApprovalMode, Preset
+
+
+class ServerConfig(FrozenModel):
+    host: str
+    port: int
+
+
+class OllamaConfig(FrozenModel):
+    base_url: str
+    api_key_env: str
+    num_ctx: int
+    keep_alive: str
+    connect_timeout_s: float
+    read_timeout_s: float
+    attempts: int
+    max_concurrent: int
+
+
+type GoRoute = Literal["chat", "responses", "messages"]
+
+
+class OpenAIConfig(FrozenModel):
+    base_url: str
+    api_key_env: str
+    organization_env: str
+    project_env: str
+    wire: Literal["responses", "chat"]
+    connect_timeout_s: float
+    read_timeout_s: float
+    attempts: int
+    max_concurrent: int
+
+
+class OpenCodeGoConfig(FrozenModel):
+    base_url: str
+    api_key_env: str
+    route_overrides: dict[str, GoRoute]
+    connect_timeout_s: float
+    read_timeout_s: float
+    attempts: int
+    max_concurrent: int
+
+
+class ProvidersConfig(FrozenModel):
+    ollama: OllamaConfig
+    openai: OpenAIConfig
+    opencode_go: OpenCodeGoConfig
+
+
+class ModelsConfig(FrozenModel):
+    main: str
+    vision: str
+    fast: str
+    review: str
+    effort: Effort
+
+
+class AgentConfig(FrozenModel):
+    goal_mode: bool
+    goal_patience: int
+    tool_output_chars: int
+    context_tokens: int
+    keep_recent_tool_results: int
+    keep_recent_screenshots: int
+    stall_limit: int
+    finish_nudges: int
+    parallel_tools: int
+    model_call_timeout_s: float
+    max_concurrent_runs: int
+
+
+class PolicyConfig(FrozenModel):
+    preset: Preset
+    approvals: ApprovalMode
+    approval_timeout_s: float
+    protected_paths: list[str]
+
+
+type BrowserMode = Literal["own", "attach"]
+
+
+class BrowserConfig(FrozenModel):
+    mode: BrowserMode
+    attach_timeout_s: float
+    channel: str
+    headless: bool
+    viewport_width: int
+    viewport_height: int
+    navigation_timeout_s: float
+    action_timeout_s: float
+    snapshot_max_chars: int
+    viewport_margin_px: int
+    settle_quiet_ms: int
+    settle_max_ms: int
+    side_effect_grace_ms: int
+    navigation_attempts: int
+    navigation_backoff_ms: int
+    max_tabs: int
+    tab_idle_s: float
+    screenshot_quality: int
+    max_batch_steps: int
+    read_text_chars: int
+    allowed_hosts: list[str]
+    blocked_hosts: list[str]
+    decline_cookie_banners: bool
+
+
+class DesktopConfig(FrozenModel):
+    enabled: bool
+    screenshot_max_edge: int
+    jpeg_quality: int
+    settle_ms: int
+    failsafe_corner: bool
+    ax_timeout_s: float
+    ax_budget_s: float
+    ax_max_nodes: int
+    ax_max_depth: int
+    snapshot_max_chars: int
+    capture_timeout_s: float
+    paste_settle_ms: int
+    keep_awake: bool
+    keep_awake_s: int
+    max_batch_steps: int
+    launch_timeout_s: float
+    activate_timeout_s: float
+    osascript_timeout_s: float
+
+
+type EmbedProvider = Literal["ollama", "openai"]
+
+
+class MemoryConfig(FrozenModel):
+    embed_provider: EmbedProvider
+    embed_model: str
+    embed_enabled: bool
+    inject_top_k: int
+    core_limit: int
+    user_limit: int
+    candidate_pool: int
+    min_similarity: float
+    inject_min_similarity: float
+    similar_threshold: float
+    max_chars: int
+
+
+class ShellConfig(FrozenModel):
+    pass_env: list[str]
+    login_env_timeout_s: float
+    default_timeout_s: int
+    max_timeout_s: int
+
+
+class WebConfig(FrozenModel):
+    search_backend: Literal["duckduckgo", "ollama"]
+    search_spacing_s: float
+    search_attempts: int
+    fetch_timeout_s: float
+    fetch_max_bytes: int
+    pdf_max_bytes: int
+    allow_private_hosts: bool
+    user_agent: str
+
+
+class SchedulerConfig(FrozenModel):
+    timezone: str
+    tick_s: float
+    min_interval_s: int
+    misfire_grace_s: int
+    max_schedules: int
+
+
+type McpTransport = Literal["stdio", "http", "sse"]
+
+# A lower-case letter, then lower-case letters, digits and hyphens; at most 24 characters. Plugin servers follow it too.
+MCP_NAME_PATTERN: str = r"^[a-z][a-z0-9-]{0,23}$"
+
+
+class McpServerConfig(FrozenModel):
+    """One MCP server Dot talks to (a ``[[mcp]]`` table): a ``command`` it starts and talks to over standard input and
+    output, or a ``url`` it connects to over streamable HTTP (``transport = "http"``, the default for a URL) or the older
+    SSE transport (``transport = "sse"``).
+
+    Values of ``env`` and ``headers`` may refer to secrets as ``${NAME}``; they are looked up like API keys
+    (environment, ``.env``, Keychain). ``allow`` lists the server's tools to offer to the model (empty: all of them, up
+    to a limit).
+    """
+
+    name: str = Field(pattern=MCP_NAME_PATTERN)
+    command: str | None = Field(default=None, min_length=1)
+    args: list[str] = Field(default_factory=list)
+    env: dict[str, str] = Field(default_factory=dict)
+    url: str | None = Field(default=None, pattern=r"^https?://\S+$")
+    headers: dict[str, str] = Field(default_factory=dict)
+    transport: McpTransport | None = None
+    allow: list[str] = Field(default_factory=list)
+    enabled: bool = True
+    startup_timeout_s: float = Field(default=60.0, gt=0)
+    call_timeout_s: float = Field(default=120.0, gt=0)
+
+    def transport_kind(self) -> McpTransport:
+        """The transport in use: the one written down, else stdio for a command and streamable HTTP for a URL."""
+        if self.transport is not None:
+            return self.transport
+        return "stdio" if self.command is not None else "http"
+
+    @model_validator(mode="after")
+    def _one_way_to_reach_it(self) -> Self:
+        if (self.command is None) == (self.url is None):
+            raise ValueError("an MCP server needs exactly one of command (stdio) and url (http or sse)")
+        kind: McpTransport = self.transport_kind()
+        if kind == "stdio" and self.command is None:
+            raise ValueError("transport stdio needs a command, not a url")
+        if kind != "stdio" and self.url is None:
+            raise ValueError(f"transport {kind} needs a url, not a command")
+        if self.command is None and (self.args or self.env):
+            raise ValueError("args and env belong to a command; a url takes headers")
+        if self.url is None and self.headers:
+            raise ValueError("headers belong to a url; a command takes args and env")
+        return self
+
+
+class SkillsConfig(FrozenModel):
+    """Where skills are looked for besides ``<home>/skills`` and the ``skills/`` folder of each plugin (``[skills]``).
+    Each entry is a directory whose children are skill folders (``<name>/SKILL.md``); ``~`` expands."""
+
+    dirs: list[str] = Field(default_factory=list)
+
+
+class PluginsConfig(FrozenModel):
+    """Where plugins are looked for besides ``<home>/plugins`` (``[plugins]``). Each entry is a directory whose children
+    are plugins in the Claude Code layout (``.claude-plugin/plugin.json``), or one such plugin itself; ``~`` expands."""
+
+    dirs: list[str] = Field(default_factory=list)
+
+
+class AppConfig(FrozenModel):
+    mcp: list[McpServerConfig]
+    server: ServerConfig
+    models: ModelsConfig
+    providers: ProvidersConfig
+    agent: AgentConfig
+    policy: PolicyConfig
+    shell: ShellConfig
+    web: WebConfig
+    browser: BrowserConfig
+    desktop: DesktopConfig
+    memory: MemoryConfig
+    scheduler: SchedulerConfig
+    skills: SkillsConfig
+    plugins: PluginsConfig
+
+    @field_validator("mcp")
+    @classmethod
+    def _unique_server_names(cls, servers: list[McpServerConfig]) -> list[McpServerConfig]:
+        names: list[str] = [server.name for server in servers]
+        repeated: list[str] = sorted({name for name in names if names.count(name) > 1})
+        if repeated:
+            raise ValueError(f"MCP server names must be unique; repeated: {', '.join(repeated)}")
+        return servers
+
+
+def deep_merge(base: JsonObject, overlay: JsonObject) -> JsonObject:
+    """Return a new mapping: ``overlay`` wins, nested mappings merge, everything else is replaced."""
+    merged: JsonObject = dict(base)
+    for key, value in overlay.items():
+        current: JsonValue = merged.get(key)
+        if isinstance(current, dict) and isinstance(value, dict):
+            merged[key] = deep_merge(current, value)
+        else:
+            merged[key] = value
+    return merged
+
+
+def _read_toml(path: Path) -> JsonObject:
+    try:
+        with path.open("rb") as handle:
+            parsed: JsonObject = tomllib.load(handle)
+    except tomllib.TOMLDecodeError as exc:
+        raise ConfigError("config file is not valid TOML", {"path": str(path), "error": str(exc)}) from exc
+    return parsed
+
+
+def load_defaults() -> JsonObject:
+    text: str = resources.files("dotagent").joinpath("defaults.toml").read_text(encoding="utf-8")
+    try:
+        parsed: JsonObject = tomllib.loads(text)
+    except tomllib.TOMLDecodeError as exc:
+        raise ConfigError("packaged defaults.toml is not valid TOML", {"error": str(exc)}) from exc
+    return parsed
+
+
+def load_config(user_path: Path) -> AppConfig:
+    """Load defaults, overlay ``user_path`` if it exists, and validate the result."""
+    merged: JsonObject = load_defaults()
+    if user_path.exists():
+        merged = deep_merge(merged, _read_toml(user_path))
+    try:
+        return AppConfig.model_validate(merged)
+    except ValidationError as exc:
+        raise ConfigError(
+            "configuration failed validation",
+            {
+                "path": str(user_path),
+                "errors": exc.json(include_url=False, include_context=False, include_input=False),
+            },
+        ) from exc
+
+
+def load_user_config() -> AppConfig:
+    return load_config(config_path())

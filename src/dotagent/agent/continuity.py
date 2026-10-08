@@ -1,0 +1,245 @@
+"""Continuity across compaction: what a run must not lose when its earlier conversation is folded into a summary.
+
+The loop keeps a :class:`RunLedger` of facts it observed itself (the goal word for word, the user's instructions, the
+tool actions that ran and how they ended, the files and addresses they touched). The ledger never comes from a model,
+so it cannot drift: every summary message carries it pinned above the model's own summary, and every new compaction
+pins it again from the loop's state instead of summarising the previous pin.
+
+:func:`check_continuity` validates a model's summary against the history it replaced: the sections it must have, and
+the identifiers (paths, addresses, ids) it names that appear nowhere in that history or the ledger, which are flagged as
+unverified instead of being trusted. When no model summary can be had, :func:`mechanical_summary` condenses the history
+without a model. Every function here is pure.
+"""
+
+import re
+from collections.abc import Sequence
+
+from dotagent.agent.plan import PlanItem, render_plan
+from dotagent.core.jsonutil import dumps_compact
+from dotagent.core.text import truncate_middle
+from dotagent.core.types import FrozenModel
+from dotagent.llm.types import Message, ToolCall
+
+CONTINUITY_MARK: str = "[Continuity note"
+SUMMARY_HEADING: str = "## Summary of the earlier conversation"
+SUMMARY_SECTIONS: tuple[str, ...] = ("GOAL", "DONE", "STATE", "PROBLEMS", "NEXT")
+
+# Tools whose calls say nothing about the work itself.
+_BOOKKEEPING_TOOLS: frozenset[str] = frozenset({"update_plan", "mark_plan_step", "finish", "notify"})
+# Argument names whose values are files or addresses a run touched.
+_TOUCH_KEYS: frozenset[str] = frozenset({"path", "paths", "url", "cwd", "file", "destination"})
+_LEDGER_ACTIONS: int = 40
+_LEDGER_TOUCHED: int = 60
+_LEDGER_INSTRUCTIONS: int = 20
+_ACTION_ARGS_CHARS: int = 160
+_ACTION_RESULT_CHARS: int = 160
+_PINNED_TEXT_CHARS: int = 4000
+_MECHANICAL_CHARS: int = 9000
+_IDENTIFIERS_SHOWN: int = 12
+
+_IDENTIFIER: re.Pattern[str] = re.compile(
+    r"https?://[^\s)\]>\"'`]+"  # addresses
+    r"|(?:~|/Users|/tmp|/private|/var|/opt|/Applications|/Library)(?:/[\w.@+\-]+)+"  # absolute paths
+    r"|\b(?:run|thr|mem|sch|apv|rule)_[a-z0-9]{6,}_[a-z0-9]{4,}\b"  # Dot's own ids
+)
+_TRAILING_PUNCTUATION: str = ".,;:!?"
+
+
+class LedgerAction(FrozenModel):
+    """One tool call that ran: what it was and how it ended."""
+
+    tool: str
+    args: str
+    ok: bool
+    result: str
+
+
+class RunLedger(FrozenModel):
+    """What the loop observed during a run, independent of any model. ``actions`` keeps the newest ones;
+    ``action_count`` counts all of them."""
+
+    goal: str
+    instructions: tuple[str, ...]
+    actions: tuple[LedgerAction, ...]
+    action_count: int
+    touched: tuple[str, ...]
+    compactions: int
+
+
+class ContinuityCheck(FrozenModel):
+    """The outcome of validating a summary. ``unverified`` lists identifiers the summary names that the history it
+    replaced never mentioned; ``missing_sections`` the required headings it lacks."""
+
+    ok: bool
+    missing_sections: tuple[str, ...]
+    unverified: tuple[str, ...]
+    summary_chars: int
+
+
+def new_ledger(goal: str) -> RunLedger:
+    return RunLedger(goal=goal, instructions=(), actions=(), action_count=0, touched=(), compactions=0)
+
+
+def with_instruction(ledger: RunLedger, text: str) -> RunLedger:
+    """The ledger after the user told the running agent ``text``."""
+    return ledger.model_copy(update={"instructions": (*ledger.instructions, text)[-_LEDGER_INSTRUCTIONS:]})
+
+
+def with_compaction(ledger: RunLedger) -> RunLedger:
+    return ledger.model_copy(update={"compactions": ledger.compactions + 1})
+
+
+def _touched_values(call: ToolCall) -> list[str]:
+    values: list[str] = []
+    for key, value in call.arguments.items():
+        if key not in _TOUCH_KEYS:
+            continue
+        if isinstance(value, str) and value.strip():
+            values.append(value.strip())
+        elif isinstance(value, list):
+            values.extend(item.strip() for item in value if isinstance(item, str) and item.strip())
+    return values
+
+
+def _first_line(text: str, limit: int) -> str:
+    flat: str = " ".join(text.split())
+    return flat if len(flat) <= limit else f"{flat[: limit - 1]}…"
+
+
+def with_actions(ledger: RunLedger, done: Sequence[tuple[ToolCall, bool, str]]) -> RunLedger:
+    """The ledger after the tool calls in ``done`` ran: ``(call, succeeded, result text)`` each."""
+    work: list[tuple[ToolCall, bool, str]] = [item for item in done if item[0].name not in _BOOKKEEPING_TOOLS]
+    if not work:
+        return ledger
+    actions: list[LedgerAction] = [
+        LedgerAction(
+            tool=call.name,
+            args=_first_line(dumps_compact(call.arguments), _ACTION_ARGS_CHARS),
+            ok=succeeded,
+            result=_first_line(text, _ACTION_RESULT_CHARS),
+        )
+        for call, succeeded, text in work
+    ]
+    touched: dict[str, None] = dict.fromkeys(ledger.touched)
+    for call, succeeded, _ in work:
+        if succeeded:
+            touched.update(dict.fromkeys(_touched_values(call)))
+    return ledger.model_copy(
+        update={
+            "actions": (*ledger.actions, *actions)[-_LEDGER_ACTIONS:],
+            "action_count": ledger.action_count + len(actions),
+            "touched": tuple(touched)[-_LEDGER_TOUCHED:],
+        }
+    )
+
+
+def identifiers(text: str) -> set[str]:
+    """Paths, addresses and Dot ids named in ``text``, without trailing punctuation."""
+    return {match.rstrip(_TRAILING_PUNCTUATION) for match in _IDENTIFIER.findall(text)}
+
+
+def history_text(messages: Sequence[Message]) -> str:
+    """Everything the messages say, untruncated: the reference a summary is checked against."""
+    parts: list[str] = []
+    for message in messages:
+        parts.append(message.content)
+        parts.extend(dumps_compact(call.arguments) for call in message.tool_calls)
+    return "\n".join(parts)
+
+
+def summary_part(text: str) -> str:
+    """The model-written part of a continuity note; other text is returned unchanged.
+
+    A new compaction summarises only this part of an earlier note: the pinned part is written again from the ledger.
+    """
+    if not text.startswith(CONTINUITY_MARK) or SUMMARY_HEADING not in text:
+        return text
+    after: str = text.split(SUMMARY_HEADING, 1)[1]
+    body: str = after.split("\n", 1)[1] if "\n" in after else ""
+    return body.split("\n## Consistency check", 1)[0].strip()
+
+
+def check_continuity(summary: str, reference: str, ledger: RunLedger) -> ContinuityCheck:
+    """Validate a model's summary against ``reference`` (the full text of the history it replaces) and the ledger."""
+    upper: str = summary.upper()
+    missing: tuple[str, ...] = tuple(section for section in SUMMARY_SECTIONS if section not in upper)
+    known: str = "\n".join([reference, ledger.goal, *ledger.instructions, *ledger.touched])
+    unverified: tuple[str, ...] = tuple(sorted(name for name in identifiers(summary) if name not in known))
+    return ContinuityCheck(
+        ok=bool(summary.strip()) and not missing and not unverified,
+        missing_sections=missing,
+        unverified=unverified,
+        summary_chars=len(summary),
+    )
+
+
+def mechanical_summary(transcript: str, reason: str) -> str:
+    """A summary written without a model: the newest part of the transcript, said to be one."""
+    tail: str = transcript[-_MECHANICAL_CHARS:]
+    return (
+        f"No model summary could be written ({reason}). The newest part of the earlier conversation follows as it was; "
+        f"rely on the pinned facts above for what came before it.\n{tail}"
+    )
+
+
+def _action_line(action: LedgerAction) -> str:
+    outcome: str = "ok" if action.ok else "FAILED"
+    return f"- {action.tool} {action.args} → {outcome}: {action.result}"
+
+
+def render_pinned(ledger: RunLedger, plan: Sequence[PlanItem]) -> str:
+    """The facts of the ledger as the model reads them in a continuity note."""
+    sections: list[str] = [
+        "## Task (the user's words, verbatim)",
+        truncate_middle(ledger.goal, _PINNED_TEXT_CHARS),
+    ]
+    if ledger.instructions:
+        sections.append("## What the user told you during this run (oldest first; these still apply)")
+        sections.extend(f"- {truncate_middle(text, 600)}" for text in ledger.instructions)
+    if plan:
+        sections.append("## Your plan as last recorded")
+        sections.append(render_plan(plan))
+    if ledger.actions:
+        earlier: int = ledger.action_count - len(ledger.actions)
+        note: str = f" ({earlier} earlier ones not listed)" if earlier > 0 else ""
+        sections.append(f"## Tool actions that already ran, recorded by the system (oldest first{note})")
+        sections.extend(_action_line(action) for action in ledger.actions)
+    if ledger.touched:
+        sections.append("## Files and addresses touched so far")
+        sections.extend(f"- {item}" for item in ledger.touched)
+    return "\n".join(sections)
+
+
+def _check_lines(check: ContinuityCheck) -> list[str]:
+    lines: list[str] = []
+    if check.unverified:
+        shown: str = ", ".join(check.unverified[:_IDENTIFIERS_SHOWN])
+        lines.append(
+            f"- The summary names identifiers that appear nowhere in the earlier conversation: {shown}. Treat them "
+            "as unverified and check before relying on them."
+        )
+    if check.missing_sections:
+        lines.append(
+            f"- The summary lacks the sections {', '.join(check.missing_sections)}; rely on the pinned facts above."
+        )
+    return lines
+
+
+def continuity_note(
+    ledger: RunLedger, plan: Sequence[PlanItem], summary: str, author: str, check: ContinuityCheck | None
+) -> str:
+    """The message that replaces the earlier conversation: pinned facts, the summary and what its check found.
+
+    ``check`` is ``None`` for a summary written without a model, which has nothing to validate.
+    """
+    header: str = (
+        f"{CONTINUITY_MARK} - compaction {ledger.compactions} of this run. This is the SAME run going on, not a new "
+        "session. The earlier conversation was compacted into the facts below. Do not restart the task and do not "
+        "repeat actions listed as already run; continue from where the summary's NEXT points.]"
+    )
+    parts: list[str] = [header, render_pinned(ledger, plan), f"{SUMMARY_HEADING} ({author})", summary.strip()]
+    lines: list[str] = [] if check is None else _check_lines(check)
+    if lines:
+        parts.append("## Consistency check")
+        parts.extend(lines)
+    return "\n\n".join(parts)

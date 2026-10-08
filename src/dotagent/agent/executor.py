@@ -1,0 +1,204 @@
+"""Tool execution: validate, authorise, run under a timeout, and turn every failure into a readable result."""
+
+import asyncio
+import time
+from collections.abc import Sequence
+from dataclasses import dataclass, replace
+
+from dotagent.agent.gate import RunGate
+from dotagent.core.errors import (
+    ApprovalRejected,
+    DotError,
+    FailSafeTriggered,
+    HandedOff,
+    PolicyDenied,
+    RunCancelled,
+    ToolInputError,
+)
+from dotagent.core.logs import get_logger
+from dotagent.core.text import redact_json, strip_blobs, truncate_middle
+from dotagent.core.types import JsonObject
+from dotagent.llm.types import ToolCall, invalid_arguments_text
+from dotagent.policy.types import ActionInfo
+from dotagent.tools.base import PreparedCall, RegisteredTool, ToolResult, fail, ok
+from dotagent.tools.context import Gate, ToolContext
+from dotagent.tools.meta import FINISH_TOOL
+from dotagent.tools.registry import ToolRegistry
+
+log = get_logger(__name__)
+
+_EVENT_TEXT_CHARS: int = 4000
+_BROKEN_ARGUMENTS_CHARS: int = 600
+
+
+@dataclass(frozen=True)
+class ToolOutcome:
+    call: ToolCall
+    result: ToolResult
+    seconds: float
+    action: ActionInfo | None
+
+
+def _safe_json(value: JsonObject) -> JsonObject:
+    sanitized = redact_json(strip_blobs(value))
+    return sanitized if isinstance(sanitized, dict) else {}
+
+
+def _describe_failure(exc: Exception, tool: RegisteredTool) -> str | None:
+    """The text the model sees for an expected failure, or ``None`` when the exception is not an expected one."""
+    if isinstance(exc, ToolInputError):
+        return exc.message
+    if isinstance(exc, PolicyDenied | ApprovalRejected):
+        return f"Not allowed: {exc.message}. Do not retry this action or look for a way around it."
+    if isinstance(exc, HandedOff):
+        return f"The user handled this step themselves ({exc.message}). Continue from there."
+    if isinstance(exc, DotError):
+        return str(exc)
+    if isinstance(exc, TimeoutError):
+        return f"{tool.spec.name} timed out after {tool.timeout_s:.0f}s."
+    if isinstance(exc, OSError):
+        return f"Operating system error: {exc}"
+    return None
+
+
+class _PausedClock:
+    """The gate a running tool asks again for a step it did not know about up front. The tool's own timeout stands
+    still while the user decides: waiting for an answer is not time the tool spent working."""
+
+    def __init__(self, inner: Gate, scope: asyncio.Timeout) -> None:
+        self._inner: Gate = inner
+        self._scope: asyncio.Timeout = scope
+
+    async def authorize(self, info: ActionInfo) -> str:
+        loop: asyncio.AbstractEventLoop = asyncio.get_running_loop()
+        deadline: float | None = self._scope.when()
+        remaining: float | None = None if deadline is None else max(deadline - loop.time(), 0.0)
+        self._scope.reschedule(None)
+        try:
+            return await self._inner.authorize(info)
+        finally:
+            self._scope.reschedule(None if remaining is None else loop.time() + remaining)
+
+    def add_instruction(self, text: str) -> None:
+        self._inner.add_instruction(text)
+
+
+def _with_approval_note(result: ToolResult, note: str) -> ToolResult:
+    """The result followed by what the user wrote when approving the action, so the model reads both together."""
+    if note == "":
+        return result
+    return result.model_copy(update={"text": f"{result.text}\n\n[The user approved this action and wrote: “{note}”]"})
+
+
+async def _run_checked(
+    call: ToolCall, tool: RegisteredTool, ctx: ToolContext, gate: RunGate
+) -> tuple[ToolResult, ActionInfo | None]:
+    action: ActionInfo | None = None
+    try:
+        prepared: PreparedCall = await tool.prepare(call.arguments, ctx)
+        action = prepared.action
+        note: str = await gate.authorize(action)
+        async with asyncio.timeout(tool.timeout_s) as scope:
+            result: ToolResult = await prepared.run(replace(ctx, gate=_PausedClock(ctx.gate, scope)))
+    except (RunCancelled, FailSafeTriggered):
+        raise
+    except (DotError, TimeoutError, OSError) as exc:
+        text: str | None = _describe_failure(exc, tool)
+        if text is None:
+            raise
+        handed_off: bool = isinstance(exc, HandedOff)
+        return (ok(text) if handed_off else fail(text)), action
+    if action is not None and not result.is_error:
+        gate.observe(action)
+    if result.untrusted:
+        gate.taint()
+    return _with_approval_note(result, note), action
+
+
+async def _execute_one(
+    call: ToolCall, registry: ToolRegistry, ctx: ToolContext, gate: RunGate, output_chars: int
+) -> ToolOutcome:
+    started: float = time.monotonic()
+    await ctx.runtime.bus.emit(
+        ctx.run_id, "tool_call", {"call_id": call.id, "tool": call.name, "args": _safe_json(call.arguments)}, True
+    )
+    tool: RegisteredTool | None = registry.tools.get(call.name)
+    action: ActionInfo | None = None
+    if tool is None:
+        available: str = ", ".join(sorted(name for name, entry in registry.tools.items() if ctx.mode in entry.modes))
+        result: ToolResult = fail(f"Unknown tool '{call.name}'. Available tools: {available}.")
+    elif ctx.mode not in tool.modes:
+        result = fail(f"Tool '{call.name}' is not available in {ctx.mode} mode.")
+    elif (broken := invalid_arguments_text(call.arguments)) is not None:
+        result = fail(
+            f"The arguments of {call.name} were not valid JSON, so nothing ran. "
+            f"Send the call again with one well-formed JSON object. What you sent: "
+            f"{truncate_middle(broken, _BROKEN_ARGUMENTS_CHARS)}"
+        )
+    else:
+        result, action = await _run_checked(call, tool, ctx, gate)
+    clipped: ToolResult = result.model_copy(update={"text": truncate_middle(result.text, output_chars)})
+    seconds: float = time.monotonic() - started
+    files: list[str] = await ctx.runtime.store.save_images(clipped.images) if clipped.images else []
+    await ctx.runtime.bus.emit(
+        ctx.run_id,
+        "tool_result",
+        {
+            "call_id": call.id,
+            "tool": call.name,
+            "ok": not clipped.is_error,
+            "text": redact_json(truncate_middle(clipped.text, _EVENT_TEXT_CHARS)),
+            "images": list(files),
+            "seconds": round(seconds, 2),
+            "summary": action.summary if action is not None else "",
+            "risk": action.risk if action is not None else "",
+        },
+        True,
+    )
+    return ToolOutcome(call=call, result=clipped, seconds=seconds, action=action)
+
+
+def _skipped(call: ToolCall) -> ToolOutcome:
+    return ToolOutcome(call=call, result=fail("Skipped: the run already finished."), seconds=0.0, action=None)
+
+
+def _group_calls(calls: Sequence[ToolCall], registry: ToolRegistry) -> list[list[ToolCall]]:
+    """Consecutive calls to parallel-safe tools form one group; every other call stands alone."""
+    groups: list[list[ToolCall]] = []
+    previous_parallel: bool = False
+    for call in calls:
+        tool: RegisteredTool | None = registry.tools.get(call.name)
+        parallel: bool = tool is not None and tool.parallel_safe
+        if parallel and previous_parallel:
+            groups[-1].append(call)
+        else:
+            groups.append([call])
+        previous_parallel = parallel
+    return groups
+
+
+async def execute_calls(
+    calls: Sequence[ToolCall],
+    registry: ToolRegistry,
+    ctx: ToolContext,
+    gate: RunGate,
+    output_chars: int,
+    parallelism: int,
+) -> list[ToolOutcome]:
+    """Run the calls of one model turn in order, overlapping read-only ones. Results keep the call order."""
+    finish_index: int | None = next((index for index, call in enumerate(calls) if call.name == FINISH_TOOL), None)
+    runnable: Sequence[ToolCall] = calls if finish_index is None else calls[: finish_index + 1]
+    skipped: list[ToolOutcome] = [] if finish_index is None else [_skipped(call) for call in calls[finish_index + 1 :]]
+    slots: asyncio.Semaphore = asyncio.Semaphore(parallelism)
+
+    async def bounded(call: ToolCall) -> ToolOutcome:
+        async with slots:
+            return await _execute_one(call, registry, ctx, gate, output_chars)
+
+    outcomes: list[ToolOutcome] = []
+    for group in _group_calls(runnable, registry):
+        if len(group) == 1:
+            outcomes.append(await _execute_one(group[0], registry, ctx, gate, output_chars))
+        else:
+            outcomes.extend(await asyncio.gather(*(bounded(call) for call in group)))
+    return [*outcomes, *skipped]
