@@ -18,7 +18,7 @@ recover (6), learn (7), undo (8). Every later item is judged with the numbers of
 | 1   | Eval harness and run statistics (`dotx eval`, `dotx stats`) | done    | a83cdcc |
 | 2   | Progress watchdog and escalation ladder                     | done    | 5f6cb29 |
 | 3   | Model-adaptive scaffold (`dotx models profile`)             | done    | de2cc1c |
-| 4   | Smaller, progressive tool surface                           | planned |         |
+| 4   | Smaller, progressive tool surface                           | done    | d89d634 |
 | 5   | Verification of the end of a run                            | planned |         |
 | 6   | Safe resume after a restart                                 | planned |         |
 | 7   | Learning from runs (lessons)                                | planned |         |
@@ -335,28 +335,106 @@ a 4 k window: the budget note and the refusal with its numbers), with no console
 
 ### 4. Smaller, progressive tool surface
 
-**Goal.** Offer a model the tools it needs now, and the rest on request.
+**Status: done** (`d89d634`). **Goal.** Offer a model the tools it needs now, and the rest on request.
 
-**Why.** Measured on the real registry (task mode, no MCP servers): 46 tools, about 8.2 k tokens in every model call.
-`desktop` 2.4 k, `browser` 2.1 k, `schedule` 0.5 k, memory administration 0.3 k: two thirds of it belongs to groups
-most runs never use. The core (meta, files, web, shell, memory search and save, delegate, skill) is about 2.7 k. MCP
-servers add their own tools on top. For a weak model forty tools are forty ways to pick wrongly.
+**Why.** Measured again for this item (`estimate_tokens` on the real registry, task mode, the desktop on, no MCP
+servers; the first draft said 8.2 k): 46 tools, 9 816 tokens in every model call. `desktop` 2 923, `browser` 2 543,
+`schedule` 610, memory administration 355: two thirds of it belongs to groups most runs never use. The core (meta,
+files, web, shell, memory search and save, delegate, skill) is 3 385. MCP servers add their own tools on top. For a
+weak model forty tools are forty ways to pick wrongly.
 
-**Design.**
-- Tool groups by name: `core`, `browser`, `desktop` (with `apple_script`), `schedule`, `memory_admin`, one group per MCP
-  server. A meta tool `use_tools(group)` enables a group for the rest of the run; a call to a known tool of a disabled
-  group is answered with an error that enables the group ("`browser_open` is in the group `browser`, now on: call it
-  again"), so a guess costs one step. Groups only grow within a run (the prompt prefix stays stable for caching). The
-  system prompt lists the groups with one line each. A thread that used a group earlier starts with it on.
-- `[agent] tool_surface = "full" | "grouped" | "auto"`; `auto` means grouped only when the scaffold (item 3) says so
-  (weak tier or small window). The default stays `full`/`auto` until `dotx eval` shows that grouped does not hurt; the
-  owner flips it.
+**Design** (refined while building it; the first draft is in git history at `cab742e`).
+- Groups by name (`tools/groups.py`): `browser_*`, `desktop_*` (with `apple_script`) and `schedule_*` are their groups,
+  `memory_update` and `memory_forget` are `memory_admin`, the tools of an MCP server are `mcp__<server>` (server names
+  have no underscore, so the group is what comes between `mcp__` and the next `__`), and every other tool is `core`:
+  the files, the shell, the web, `memory_save` and `memory_search`, `delegate`, `skill`, the meta tools and
+  `use_tools`. A new tool is core unless its name puts it in a group.
+- `[agent] tool_surface`. `full` (the default) offers every tool of the run at every step, as before: `use_tools` is
+  left out, the system prompt is the same byte for byte, and no event is written. `grouped` starts with the core tools
+  and the groups whose tools the thread's model called before (any call by name, also one that did not run; a
+  `use_tools` call does not count). `auto` (`surface_for` in `agent/scaffold.py`) is grouped for a model of the weak
+  tier and for one whose window cut the context budget, full otherwise. A run whose tools are all core is not grouped.
+- The prompt of a grouped run has a `# Tool groups` section: how groups work, then one line per group of the run with
+  what it is for and its tools (16 named at most, then "and N more"). It lists every group, on or off, so the system
+  prompt stays the same for the whole run; only the tool list grows.
+- A group is turned on by a `use_tools(group)` call that succeeds (the tool checks the name and says what the group
+  holds), or by a call of one of its tools while it is off. That call does not run, because the model did not have the
+  tool's definition and its arguments are a guess; its result says "`X` did not run: it is in the tool group G, which
+  was off. The group is on now: call `X` again", so a guess costs one step. It counts as a failed call (kind `meta`,
+  risk `safe`), not as a refusal, so it does not make a model weak (item 3). Groups only grow. Event `tool_groups`
+  (`step`, `on`, `off`, `turned_on`, `reason`): at step 0 the groups a run starts with and why, then at each step that
+  turned a group on.
+- Budget: the room check at the start of a run counts every tool of the run, also the ones that are off, because a
+  group turned on later must fit too; `_fit_context` estimates each step with the tools the step offers (before, it
+  counted every tool, also on a step that a progress alert limited).
+- A step that a progress alert limits (item 2) offers what the alert allows (always core tools) and turns no group on.
+- The tools a run can call (`_run_tools`) are the ones it offers, and the ones of other modes, which are answered as
+  not available in the run's mode. A tool of the run's mode that the run leaves out is unknown: `use_tools` when the
+  tools are not grouped, `delegate` and `ask_user` in a delegated run (before, such a call reached the tool, and the
+  manager refused a nested `delegate`), `skill` when no skill is installed.
 
-**Touchpoints.** `tools/registry.py`, `tools/meta.py`, `agent/loop.py` (the `specs` of a run), `agent/executor.py` (unknown
-or disabled tool), `agent/prompt.py`, `mcp/`, `config.py`, `defaults.toml`.
+**Touchpoints.** `tools/groups.py` (new), `tools/meta.py`, `agent/executor.py`, `agent/loop.py`, `agent/scaffold.py`,
+`agent/prompt.py`, `config.py`, `defaults.toml`, `evals/results.py`, `cli_eval.py`, `evals/scoring.py`, `timeline.js`,
+`icons.js`, README. `tools/registry.py` and `mcp/` did not change: the groups follow the tool names.
+
+**What exists now.**
+- `tools/groups.py`, pure: `CORE_GROUP`, `group_of`, `groups_of`, `tools_in`, `group_lines`, `used_groups`,
+  `offered_specs`, `hidden_tools`, `groups_event`.
+- `tools/meta.py`: `use_tools` (`USE_TOOLS_TOOL`, `UseToolsArgs`: the name is stripped and lower-cased; `core` is
+  always on; an unknown group fails and names the run's groups).
+- `agent/executor.py`: `execute_calls(calls, registry, hidden, ctx, gate, parallelism)`; `hidden` maps the tools of the
+  groups that are off to their group.
+- `agent/scaffold.py`: `Surface` and `surface_for(config, scaffold)`, which returns the surface and its reason.
+- `agent/prompt.py`: `_groups_section`, only when `use_tools` is among the run's tools.
+- `agent/loop.py`: `run_agent` decides the surface, leaves `use_tools` out when the tools are not grouped, keeps the
+  groups that are on (`on`), offers and hides the tools of each step, turns groups on (`_turned_on`) and writes the
+  `tool_groups` events; `_run_tools`.
+- Config `[agent] tool_surface = "full"`. `EvalSettings.tool_surface` (a report without it counts as `full`); the
+  scorecard prints it.
+- `timeline.js`: a note for `tool_groups` ("Tools offered by group: core on; browser, memory_admin, schedule off until
+  the run needs them (reason)", "Turned on the tool group schedule at step 1"); `icons.js`: `use_tools` has the
+  `layers` icon.
+- Tests: `tests/unit/test_tool_groups.py` (the group of each tool, the core set and its size, offered and hidden tools,
+  the prompt section as the only difference between grouped and full, a large MCP group, the groups a thread used,
+  `surface_for`, `_turned_on`, the event, the tools a run can call), `tests/smoke/test_tool_groups.py` (the real loop
+  with the scripted model: a call of an off tool, its result and the group's tools at the next step with the same
+  definitions, `use_tools`, the same system prompt at every step, the events; a weak-tier `auto` thread whose second
+  run starts with `schedule` on; `full` offers every tool, writes no event and answers `use_tools` as unknown). None
+  needs a service.
+
+**Sizes** (`estimate_tokens`, the desktop on, no MCP servers; the first step is the system prompt and the tools):
+
+| Mode     | Every tool      | Core, with `use_tools` | First step, `full` | First step, `grouped` |
+| -------- | --------------- | ---------------------- | ------------------ | --------------------- |
+| task     | 46 tools, 9 816 | 19 tools, 3 523        | 13 132             | 7 190 (45 % less)     |
+| chat     | 45 tools, 9 517 | 18 tools, 3 224        | 12 853             | 6 911 (46 % less)     |
+| research | 32 tools, 5 258 | 15 tools, 2 727        | 8 651              | 6 403 (26 % less)     |
+
+The `# Tool groups` section is 351 tokens of the grouped prompt (283 in research). In research mode the groups are
+`browser` (12 tools, 1 547), `desktop` (5, 1 053) and `schedule` (1, 69).
+
+**How to use it for the next items.** To try the grouped surface, set `[agent] tool_surface = "grouped"` (or `"auto"`
+with `[agent] tiers = { "REF" = "weak" }`) in a throw-away home's `config.toml`, and compare
+`dotx eval run --model REF --repeat 3` with and without it; the reports record `tool_surface` (eval attempts run with
+the desktop off, so their groups are `browser`, `memory_admin` and `schedule`). The `tool_groups` events say which
+groups a run needed and when. A new tool that most runs do not need belongs in a group: give it a group's prefix or
+list it in `_GROUP_OF_TOOL` (a new group also needs its line in `_PURPOSES`).
+
+**Decisions and limits.**
+- `full` stays the default (open decision 2): grouping changes what the owner's models see and waits for evals. With
+  `full` a run is as before: the same tools in the same order, the same prompt, no event.
+- The groups a thread used are read from the tool calls in the messages a run loads for its thread; a group turned on
+  with `use_tools` and never used does not carry over to the next run.
+- MCP groups are covered by unit tests only: no MCP server runs in the smoke tests.
+- `dotx models profile` shows the scaffold, not the surface; a grouped run's surface and its reason are in its first
+  `tool_groups` event.
+- No live model run: the groups were tried with the scripted model only.
 
 **Done when.** Unit tests of the grouping and enabling; an integration test on the scripted provider (disabled-group
-call, error, enabled, next step offers the schema); sizes measured again and noted here.
+call, error, enabled, next step offers the schema); sizes measured again and noted here. All true: also the offline
+smoke suite (145 tests; one model-driven test failed once and passed when rerun, see the log) and `dotx eval check`
+are clean, and the timeline was checked in headless Chrome on a throw-away daemon (a grouped run: the start note with
+its reason, the failed call, the groups turned on at steps 1 and 3), with no console error.
 
 ### 5. Verification of the end of a run
 
@@ -481,3 +559,12 @@ makes the damage reversible. It covers the file tools only; a shell `rm` or `sed
   `dotx eval check`, the offline smoke suite (142) and the timeline in headless Chrome clean; no live model run. Found:
   every `dotx` command logs to the owner's `~/Library/Logs/Dot/dotx.log` unless `DOT_LOG_DIR` is set, so the earlier
   `dotx eval check` runs of this work added lines there (nothing else); the house rule says so now.
+- 2026-10-08: item 4 done (`d89d634`). Tool groups, `use_tools` and `[agent] tool_surface` (default `full`, which
+  changes nothing). Measured again: a task run offers 46 tools of 9 816 tokens at every step (the first draft said
+  8.2 k); grouped, its first step takes 7 190 tokens of system prompt and tools instead of 13 132, a research run's
+  6 403 instead of 8 651. Unit tests (412), `dotx eval check`, the offline smoke suite (145) and the timeline in
+  headless Chrome clean; no live model run. One model-driven smoke test failed once and passed when rerun:
+  `test_a_shell_command_waits_for_the_approval_of_the_user_and_runs_once_it_is_given`, where `gpt-oss:20b-cloud`
+  called `ask_user` instead of `shell` (with the default `full` its tools and prompt are as before). Found: a delegated
+  run's model that calls `delegate` or `ask_user` by name now gets "unknown tool"; before, the call reached the tool,
+  and the manager refused a nested `delegate`.
