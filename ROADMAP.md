@@ -889,20 +889,20 @@ that change the owner's agent are their call (see "Open owner decisions", 6 onwa
 
 ### Status, part 2
 
-| #   | Item                                                                   | Status  | Commits |
-| --- | ---------------------------------------------------------------------- | ------- | ------- |
-| 9   | Time accounting: where the seconds of a run go                         | done    |         |
-| 10  | Yolo asks nobody: secret fields, questions and the end of a run        | planned |         |
-| 11  | Open-ended goals in one run: targets, budgets and an honest end        | planned |         |
-| 12  | Campaigns: a goal that works until its outcome is verified             | planned |         |
-| 13  | Faster browser and desktop steps                                       | planned |         |
-| 14  | Rich editors, drag and bulk text in the browser                        | planned |         |
-| 15  | Helper models: consult, delegate to another model, standby             | planned |         |
-| 16  | Typed judgments (TypeSafe) at the decision points                      | planned |         |
-| 17  | Pacing and public actions on social platforms                          | planned |         |
-| 18  | Skills written for Claude Code, and the X playbook                     | planned |         |
-| 19  | Prompt-cache hygiene for the hosted providers                          | planned |         |
-| 20  | An interactive terminal for programs that prompt                       | planned |         |
+| #   | Item                                                                   | Status      | Commits |
+| --- | ---------------------------------------------------------------------- | ----------- | ------- |
+| 9   | Time accounting: where the seconds of a run go                         | done        | 4741bed |
+| 10  | Yolo asks nobody: secret fields, questions and the end of a run        | in progress |         |
+| 11  | Open-ended goals in one run: targets, budgets and an honest end        | planned     |         |
+| 12  | Campaigns: a goal that works until its outcome is verified             | planned     |         |
+| 13  | Faster browser and desktop steps                                       | planned     |         |
+| 14  | Rich editors, drag and bulk text in the browser                        | planned     |         |
+| 15  | Helper models: consult, delegate to another model, standby             | planned     |         |
+| 16  | Typed judgments (TypeSafe) at the decision points                      | planned     |         |
+| 17  | Pacing and public actions on social platforms                          | planned     |         |
+| 18  | Skills written for Claude Code, and the X playbook                     | planned     |         |
+| 19  | Prompt-cache hygiene for the hosted providers                          | planned     |         |
+| 20  | An interactive terminal for programs that prompt                       | planned     |         |
 
 **Order and dependencies.** 9 first: it is cheap and every later item is judged with it. 10, 11 and 12 are the owner's
 main ask and build on each other (12 needs the left questions of 10 and the targets of 11). 13 and 14 are the speed
@@ -946,8 +946,8 @@ owner's data was not read, the numbers of 2026-10-08 are the audit's aggregate S
 
 ### 9. Time accounting: where the seconds of a run go
 
-**Status: done.** **Goal.** Every model call and every tool call of a run leaves its duration and its tokens in the
-store, and `dotx stats` and `dotx eval` show where the time goes, per model and per tool.
+**Status: done** (`4741bed`, PR #1). **Goal.** Every model call and every tool call of a run leaves its duration and
+its tokens in the store, and `dotx stats` and `dotx eval` show where the time goes, per model and per tool.
 
 **Why.** Items 13, 14 and 19 promise speed; without this item their effect is a guess. Today the store has
 `tool_result.seconds` (with the approval wait inside), the timestamps of events, and the run's token totals; the model
@@ -1076,7 +1076,7 @@ checked on a scripted throw-away daemon at desktop width and at 375 px.
 
 ### 10. Yolo asks nobody: secret fields, questions and the end of a run
 
-**Status: planned.** **Goal.** A `yolo` run, a scheduled run and a delegated run never wait for a person. What the
+**Status: in progress.** **Goal.** A `yolo` run, a scheduled run and a delegated run never wait for a person. What the
 run can read and do itself, it does; a question for the owner is left in the thread and the run goes on.
 
 **Why.** On 2026-10-09 a `yolo` run applying for a job stopped at an e-mail verification code that had arrived in the
@@ -1709,6 +1709,9 @@ on and is closed by `terminal_close`; the idle reaper; unit tests of the ANSI st
     `memory_save` are acting-only, `tools/base.py:16-17`), and DuckDuckGo's bot check throttles long research runs
     (README "Status and known limits"). Say whether a research run may save notes and files under the workspace,
     and whether the hosted Ollama search (`OLLAMA_API_KEY`) should be the default backend; either is a small item.
+15. The Claude GitHub app reviews nothing yet: on PR #1 it answered "Code review skipped" because your organization has
+    no extra usage to pay for it. Add extra usage (or raise the monthly limit) at claude.ai/admin-settings/usage; a
+    comment `@claude review` on a PR then asks for a review. Until then each PR is merged on `/code-review` alone.
 
 ## Log
 
@@ -1835,3 +1838,6 @@ on and is closed by `terminal_close`; the idle reaper; unit tests of the ANSI st
   run page; the eval supervisor cannot decline a question whose event its subscription dropped. Baseline in the item:
   25 scripted tasks in 0.61 s, median 0.01 s. A run's tokens now count its side calls, so the same run shows more than
   before.
+- 2026-10-09: item 9 merged as `4741bed` (PR #1, squash). The Claude GitHub app is installed and answered the PR, but
+  skipped the review: the owner's organization has no extra usage to pay for it (see "Open owner decisions"). Item 10
+  started on `item-10-yolo-asks-nobody`.
