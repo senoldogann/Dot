@@ -21,7 +21,7 @@ recover (6), learn (7), undo (8). Every later item is judged with the numbers of
 | 4   | Smaller, progressive tool surface                           | done    | d89d634 |
 | 5   | Verification of the end of a run                            | done    | e2051a5 |
 | 6   | Safe resume after a restart                                 | done    | c3688e6, b6dd42f |
-| 7   | Learning from runs (lessons)                                | planned |         |
+| 7   | Learning from runs (lessons)                                | done    | a297764, 4db2539 |
 | 8   | Undo journal for file edits                                 | planned |         |
 
 Status values: `planned`, `in progress`, `done` (implemented, tested, verified, committed), `parked` (the reason is in
@@ -639,26 +639,108 @@ a second resume refused with exit status 2).
 
 ### 7. Learning from runs
 
-**Goal.** What one run learned is available to the next, whichever model runs it.
+**Status: done** (`a297764`, review fixes `4db2539`). **Goal.** What one run learned is available to the next, whichever
+model runs it.
 
 **Why.** Knowledge that lives in the harness (memory notes, skills) survives a change of model. Memory and skills exist;
-nothing turns the hard-won discovery of a run (this site needs that click, this tool wants that flag) into a note.
+nothing turned the hard-won discovery of a run (this site needs that click, this tool wants that flag) into a note.
 Unverified lessons can poison later prompts, so nothing is saved without a human by default.
 
-**Design.**
-- After a task or research run that had something to learn (a failure followed by a different method that worked, an
-  escalation of item 2, a send-back), one judgement call to the review model returns at most three lessons: one
-  sentence each, general, about how to do things, never about the user's private data. Secrets are redacted.
-- `[agent] lessons = "off" | "propose" | "auto"`, default `propose`: the lessons become `lesson_proposed` events on the
-  run; the run page offers "Save to memory" and "Dismiss". `auto` saves them through `save_memory` with the tag `lesson`
-  and the run id as source (the similarity check already catches near duplicates).
-- Retrieval needs no change: `prompt_memories` already injects the notes that fit the goal.
+**Design** (refined while building it; the first draft is in git history at `cab742e`).
+- Which runs (`may_learn`): a top-level task or research run that ended `done` while `[agent] lessons` is not `off`.
+  Chats, delegated runs and runs that failed or were stopped are never asked; evals always run with `lessons = "off"`,
+  so no note carries over from one attempt to the next.
+- What counts as something to learn (`run_signals`, pure): a failed call, whether a later call of the same tool and
+  target worked (`RunFacts.resolved`, added to item 5's facts) or not; an alert of the progress watchdog (`stall`); a
+  goal check that sent the run back (`continue`, not final); an answer that named paths that did not exist
+  (`answer_paths`). A run without a signal is not asked; `plan_reminder` does not count. Each signal is one line of at
+  most 300 characters, secrets masked before it is cut.
+- When: after the run's end, in a task the manager starts once `_drive` is over, never inside the run, where a steer
+  message would be lost, Stop would lose the outcome, the thread would stay claimed and the answer would wait for the
+  review call. The loop returns `RunEnd(outcome, lessons)`; `RunManager.learned(run_id)` waits for the task, and
+  `shutdown()` cancels it.
+- The writer: a third judgement in `review.py` (`lesson_writer_for`, tool `propose_lessons`, fenced like the reviewer
+  and the goal checker, session key `<thread>:lessons`). It reads the goal, the run's digest (secrets masked before the
+  cut), the signals, the answer and the saved notes that fit the goal, and returns at most three one-sentence lessons.
+- The filter (`kept_lessons`, `lesson_problem`, `repeats`, pure): one line of 20 to 300 characters (or `[memory]
+  max_chars` when smaller), no secret (`redact_secrets` would change it), no e-mail address, no path in a home folder
+  (`/Users/<name>` or `/home/<name>` in any case; `/Users/Shared` is fine), and no repeat of the goal, of another lesson
+  or of a saved note (the same folded words, or most search terms shared). Then each lesson is looked up with `recall`
+  (5 notes): a note that repeats it, or whose embedding similarity reaches `[memory] similar_threshold`, drops it.
+- Events, all in the lifecycle stream (`LESSON_EVENTS`) so the run's page hears them after the run's end:
+  `lessons_proposed {lessons, tainted}`, `lesson_saved {index, memory_id, by}` (`owner` or `auto`), `lesson_dismissed
+  {index}`, `lessons_failed {error}` (any `DotError` on the way: a review model or an embedding service that fails, a
+  missing API key). `RunDetail.lessons` and the terminal derive what became of each lesson from them (`lessons_of`).
+- `[agent] lessons = "off" | "propose" | "auto"`, default `off` (the draft said `propose`). `propose` leaves the lessons
+  on the run; `auto` saves each as a note tagged `lesson` whose source is the run, except after a tainted run
+  (`RunGate.ever_tainted`, new: the run read content third parties can author, which could plant a lesson), whose
+  lessons are only proposed.
+- A lesson is decided once. Saving and dismissing, by the owner or by `auto`, hold the run manager's lock
+  (`RunManager._deciding`) from the look at the lesson to the event; `auto` skips a lesson the owner decided first, and
+  a second decision of the owner is a conflict.
+- Retrieval did not change: `prompt_memories` injects the notes that fit the goal, saved lessons among them.
 
-**Touchpoints.** `agent/loop.py` (after the end of a run), `agent/review.py` (a third judgement), `memory/service.py`,
-`server/routes_runs.py`, `views/run.js`, `config.py`, README.
+**Touchpoints.** `agent/lessons.py` (new), `agent/review.py`, `agent/loop.py`, `agent/manager.py`, `agent/gate.py`,
+`agent/verify.py`, `core/errors.py` (the docstring of `RunConflict`), `config.py`, `defaults.toml`, `evals/runner.py`,
+`server/routes_runs.py`, `server/views.py`, `server/stream.py`, `cli.py`, `cli_ui.py`, `views/run.js`, `run.css`,
+README. `memory/service.py` did not change.
+
+**What exists now.**
+- `agent/lessons.py`, pure except `learn`, `run_lessons`, `save_lesson` and `dismiss_lesson`: `LESSON_TAG`, the event
+  names and `LESSON_EVENTS`, `LessonCase`, `LessonView`, `RunLessons`, `may_learn`, `run_signals`, `lesson_problem`,
+  `repeats`, `kept_lessons`, `lessons_of`, `learn`, `run_lessons`, `save_lesson`, `dismiss_lesson`.
+- `agent/review.py`: `LESSONS_TOOL`, `LessonRequest`, `LessonProposal`, `LessonWriter`, `lesson_writer_for`;
+  `goal_digest` masks secrets before it cuts, and so does `agent/verify.py` for the facts it keeps.
+- `agent/manager.py`: `learning(run_id)`, `learned(run_id)`, `save_lesson(run_id, index)`, `dismiss_lesson(run_id,
+  index)`.
+- Server: `RunDetail.lessons`; `POST /api/runs/{id}/lessons/{index}/save` and `/dismiss` answer 200 with the run's fresh
+  detail (they change a run and create nothing of their own), 409 for a lesson saved or dismissed already, 404 for a
+  run or a lesson that does not exist.
+- Web UI: "Lessons from this run" on the run's page, hidden while the run works and shown without a reload when lessons
+  arrive. Save to memory and Dismiss turn into chips ("Saved to memory", "Dismissed"); the card of a tainted run says
+  that the run read untrusted content; an error stays while a lesson is still proposed. One decision per lesson at a
+  time; each ends with a refresh of the run, and only the newest refresh paints. The words of both buttons stay at
+  phone width (the small-screen rule hides every `.btn .label`).
+- CLI: `dotx run` and `dotx resume` print the answer, then "drawing the lessons of this run (Ctrl-C skips it)", then a
+  line per lesson ("◆ lesson saved as a note: …" or "◇ lesson proposed: …"), a hint that the run's page saves or
+  dismisses a proposed lesson, and the error if any. Ctrl-C skips the wait; the exit status stays the run's.
+- Tests: `tests/unit/test_lessons.py` (which runs may learn, the signals, what counts as a lesson, repeats, the filter,
+  what became of each lesson, a save error that goes once every lesson is decided); `tests/unit/test_verify.py` (a
+  secret masked before a long target or result is cut); `tests/smoke/test_lessons.py` (the real loop with the scripted
+  model as main and review model: proposed lessons wait until the owner saves or dismisses each through the API; two
+  saves at once save once; `auto` leaves alone a lesson the owner dismissed while it saved; `auto` saves and drops a
+  lesson a saved note already says; a run that read a web page only proposes; `off` and a run without a signal ask
+  nothing).
+
+**How to use it for the next items.** To see lessons on a throw-away home, set `[agent] lessons = "propose"` and a
+review model; a run must end `done` after a failed call. The scripted provider can be main and review model at once
+(`tests/smoke/test_lessons.py`): the turn after the run's `finish` answers the lesson writer with a `propose_lessons`
+call. A decision on a lesson goes through `RunManager`, never straight to `agent/lessons.py`, or it escapes the lock.
+
+**Decisions and limits.**
+- `lessons` stays `off` (open decision 2): `propose` spends one review call per run that qualifies, and only evals can
+  show whether saved lessons help more than they mislead.
+- The lock of decisions holds within one process. A `dotx run` with `auto` saves in its own process; a dismissal of the
+  same lesson on the daemon's page at the same moment is not ordered with it (the page shows that run's lessons only
+  after a reload, so the window is practically nil). A save holds the lock while the embedder works, so a stuck
+  embedding service makes other decisions wait for its timeout.
+- A save cut off between the note and its `lesson_saved` event (the daemon stops just then) leaves the note while the
+  lesson still shows as proposed; saving it again keeps one note (the same text is one note).
+- A lesson that says what a saved note says in other words is dropped only when `recall` finds that note among its 5
+  and the embeddings call them similar (or most search terms match); without embeddings, only the words count.
+- When the filter drops every proposed lesson, no event is stored: the run looks like one that was not asked (the
+  daemon log has `lessons_drawn` with `kept=0`).
+- A review model or an embedding service that fails is covered by unit tests of what the page and the terminal show,
+  not by a smoke test.
+- No live run: every check used the scripted model.
 
 **Done when.** Unit tests of the filtering (what counts as a lesson, secrets, duplicates); an integration test with the
-scripted provider; the run page shows proposals and saving one adds a note.
+scripted provider; the run page shows proposals and saving one adds a note. All true; also clean: the unit tests (467),
+ruff, mypy, the offline smoke suite (158, no flake) and `dotx eval check`. The web UI was checked in headless Chrome on
+a throw-away daemon twice: the card, save and dismiss, the note in memory, a reload, a tainted run, phone width; after
+the review fixes, a double click on Save to memory (one request, one note, no error) and a dismissal made through the
+API while the page was open (shown without a reload; a later save answers 409); no console error. Ctrl-C while `dotx
+run` waited for a lesson writer that never answered: exit status 0.
 
 ### 8. Undo journal for file edits
 
@@ -740,3 +822,14 @@ makes the damage reversible. It covers the file tools only; a shell `rm` or `sed
   run at once could start two runs. Found, not changed: the conversation shows the finished calls of an interrupted step
   as interrupted too (`repair_history`, old); a run of `dotx run` that a starting daemon marks as cut off can be
   resumed by hand while it still works in its own process.
+- 2026-10-08: item 7 done (`a297764`, review fixes `4db2539`). A task or research run that reached its goal after
+  something went wrong is followed by one call of the review model, which proposes at most three one-sentence lessons;
+  a filter drops what is not know-how or is known already; `[agent] lessons` (default off) leaves them on the run's
+  page (`propose`) or saves them as notes tagged `lesson` (`auto`, which only proposes after a run that read untrusted
+  content). Unit tests (467), `dotx eval check` and the offline smoke suite (158, no flake) clean; the web UI checked in
+  headless Chrome on a throw-away daemon; no live model run. Found and fixed before the commit: the small-screen rule
+  hid the words of both lesson buttons. Found by a review after it and fixed: two decisions on one lesson at once both
+  passed (reproduced: two saves, two 200s), and `auto` could save a lesson the owner had just dismissed; an error other
+  than a provider's (a missing API key) went unreported; Ctrl-C while `dotx run` waited for the lessons ended it with
+  130 although the run was done; an older answer could repaint the lessons on the page; secrets were masked after a
+  digest or a fact was cut, so the part of a key left at the cut stayed readable.

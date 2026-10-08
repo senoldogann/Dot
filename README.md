@@ -375,12 +375,14 @@ run could use from the start, such as that `pdftotext` keeps the columns of a ta
 than one line, of fewer than 20 or more than 300 characters (or `[memory] max_chars`), with a secret, an e-mail address
 or a path in a home folder, or that says what the goal, another lesson or a saved note already says, is dropped. With
 `propose` the lessons wait under "Lessons from this run" on the run's page: Save to memory keeps one as a note tagged
-`lesson` whose source is the run, Dismiss drops it (`POST /api/runs/{id}/lessons/{index}/save` and `/dismiss`); `dotx
-run` shows them after the answer. With `auto` they are saved at once, except after a run that read content others can
-write (web pages, mail, downloads), which could plant a lesson: those are only proposed, and the page says why. A saved
-lesson is a note of the agent like the others: a later run gets it when it fits its goal, and the Memory page edits or
-forgets it. Delegated runs, chats, runs that failed or were stopped, and evals (which always run without lessons) are
-not asked. `lessons` is `"off"` by default until evals show that it helps.
+`lesson` whose source is the run, Dismiss drops it (`POST /api/runs/{id}/lessons/{index}/save` and `/dismiss`). A lesson
+is decided once: a second save or dismissal of it, from another page or after `auto` saved it, is refused. `dotx run`
+and `dotx resume` show the lessons after the answer; Ctrl-C skips the wait, and the exit status stays the run's. With
+`auto` they are saved at once, except after a run that read content others can write (web pages, mail, downloads),
+which could plant a lesson: those are only proposed, and the page says why. A saved lesson is a note of the agent like
+the others: a later run gets it when it fits its goal, and the Memory page edits or forgets it. Delegated runs, chats,
+runs that failed or were stopped, and evals (which always run without lessons) are not asked. `lessons` is `"off"` by
+default until evals show that it helps.
 
 ## Measuring the agent
 
