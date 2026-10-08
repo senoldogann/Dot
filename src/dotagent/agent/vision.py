@@ -6,6 +6,7 @@ from dotagent.config import AgentConfig
 from dotagent.core.errors import ProviderError
 from dotagent.core.logs import get_logger
 from dotagent.core.text import truncate_middle
+from dotagent.llm.calls import CallOrigin
 from dotagent.llm.router import ModelRef, ModelRouter, parse_model_ref
 from dotagent.llm.types import ChatRequest, ImageData, ModelReply, StreamDelta, ToolCall, system_message, user_message
 from dotagent.tools.base import ToolResult
@@ -30,7 +31,12 @@ async def _discard(delta: StreamDelta) -> None:
 
 
 async def _describe(
-    router: ModelRouter, ref: ModelRef, caption: str, images: tuple[ImageData, ...], session_key: str
+    router: ModelRouter,
+    ref: ModelRef,
+    caption: str,
+    images: tuple[ImageData, ...],
+    session_key: str,
+    origin: CallOrigin,
 ) -> str:
     request: ChatRequest = ChatRequest(
         model=ref.model,
@@ -41,7 +47,7 @@ async def _describe(
         effort="off",
         session_key=session_key,
     )
-    reply: ModelReply = await router.complete(ref, request, _discard)
+    reply: ModelReply = await router.complete(ref, request, _discard, origin)
     text: str = reply.text.strip()
     if not text:
         raise ProviderError("the vision model returned no text", {"model": ref.label, "finish": reply.raw_finish})
@@ -53,15 +59,16 @@ async def text_for_blind_images(
     config: AgentConfig,
     vision_model: str,
     session_key: str,
+    origin: CallOrigin,
     caption: str,
     images: tuple[ImageData, ...],
 ) -> str:
     """The vision model's description of ``images`` as a note for a model without vision; when the vision model fails,
-    the note says so, so the agent knows it has not seen them."""
+    the note says so, so the agent knows it has not seen them. ``origin`` is the run the call is made for and why."""
     ref: ModelRef = parse_model_ref(vision_model)
     try:
         async with asyncio.timeout(config.model_call_timeout_s):
-            description: str = await _describe(router, ref, caption, images, session_key)
+            description: str = await _describe(router, ref, caption, images, session_key, origin)
     except (ProviderError, TimeoutError) as error:
         log.warning("vision_relay_failed", model=ref.label, caption=truncate_middle(caption, 120), error=str(error))
         return (
@@ -75,14 +82,23 @@ async def text_for_blind_images(
 
 
 async def text_for_blind_model(
-    router: ModelRouter, config: AgentConfig, vision_model: str, session_key: str, call: ToolCall, result: ToolResult
+    router: ModelRouter,
+    config: AgentConfig,
+    vision_model: str,
+    session_key: str,
+    run_id: str,
+    call: ToolCall,
+    result: ToolResult,
 ) -> str:
-    """The tool result as text for a model without vision: its own text plus a description of every image."""
+    """The tool result of a call of the run ``run_id`` as text for a model without vision: its own text plus a
+    description of every image."""
     if not result.images:
         return result.text
     caption: str = (
         f"The tool {call.name} returned {len(result.images)} image(s). Its text output: "
         f"{truncate_middle(result.text, _CAPTION_CHARS)}"
     )
-    note: str = await text_for_blind_images(router, config, vision_model, session_key, caption, result.images)
+    note: str = await text_for_blind_images(
+        router, config, vision_model, session_key, CallOrigin(run_id=run_id, purpose="vision"), caption, result.images
+    )
     return f"{result.text}\n{note}"

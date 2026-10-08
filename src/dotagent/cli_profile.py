@@ -9,6 +9,7 @@ from dotagent.agent.scaffold import PROFILE_RUNS, Scaffold, scaffold_for
 from dotagent.config import AppConfig, load_user_config
 from dotagent.core.paths import db_path
 from dotagent.core.types import FrozenModel
+from dotagent.llm.calls import log_model_call
 from dotagent.llm.router import ModelRef, ModelRouter, parse_model_ref
 from dotagent.llm.types import ModelInfo
 from dotagent.store.stats import ModelProfile, read_model_profile
@@ -57,7 +58,7 @@ def render_profile(profile: ModelProfile, scaffold: Scaffold) -> list[str]:
 async def cmd_models_profile(command: ModelsProfileCommand) -> int:
     config: AppConfig = load_user_config()
     ref: ModelRef = parse_model_ref(command.model if command.model is not None else config.models.main)
-    router: ModelRouter = ModelRouter(config)
+    router: ModelRouter = ModelRouter(config, log_model_call)
     try:
         info: ModelInfo = await router.model_info(ref)
     finally:

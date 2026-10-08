@@ -61,22 +61,34 @@ def _describe_failure(exc: Exception, tool: RegisteredTool) -> str | None:
     return None
 
 
+class _GateTime:
+    """The seconds one call spends at the gate: its own question (the gate's checks, an approval, the review model's
+    answer) and the questions its tool asks while it runs."""
+
+    def __init__(self) -> None:
+        self.seconds: float = 0.0
+
+
 class _PausedClock:
     """The gate a running tool asks again for a step it did not know about up front. The tool's own timeout stands
-    still while the user decides: waiting for an answer is not time the tool spent working."""
+    still while the user decides: waiting for an answer is not time the tool spent working. The time these questions
+    take is added to ``spent``."""
 
-    def __init__(self, inner: Gate, scope: asyncio.Timeout) -> None:
+    def __init__(self, inner: Gate, scope: asyncio.Timeout, spent: _GateTime) -> None:
         self._inner: Gate = inner
         self._scope: asyncio.Timeout = scope
+        self._spent: _GateTime = spent
 
     async def authorize(self, info: ActionInfo) -> str:
         loop: asyncio.AbstractEventLoop = asyncio.get_running_loop()
         deadline: float | None = self._scope.when()
         remaining: float | None = None if deadline is None else max(deadline - loop.time(), 0.0)
         self._scope.reschedule(None)
+        asked_at: float = time.monotonic()
         try:
             return await self._inner.authorize(info)
         finally:
+            self._spent.seconds += time.monotonic() - asked_at
             self._scope.reschedule(None if remaining is None else loop.time() + remaining)
 
     def add_instruction(self, text: str) -> None:
@@ -90,16 +102,29 @@ def _with_approval_note(result: ToolResult, note: str) -> ToolResult:
     return result.model_copy(update={"text": f"{result.text}\n\n[The user approved this action and wrote: “{note}”]"})
 
 
-async def _run_checked(
-    call: ToolCall, tool: RegisteredTool, ctx: ToolContext, gate: RunGate
-) -> tuple[ToolResult, ActionInfo | None]:
+@dataclass(frozen=True)
+class _Checked:
+    """What a call that reached its tool came to. ``waited_s`` is the time it spent at the gate (:class:`_GateTime`),
+    which its seconds include."""
+
+    result: ToolResult
+    action: ActionInfo | None
+    waited_s: float
+
+
+async def _run_checked(call: ToolCall, tool: RegisteredTool, ctx: ToolContext, gate: RunGate) -> _Checked:
     action: ActionInfo | None = None
+    at_gate: _GateTime = _GateTime()
     try:
         prepared: PreparedCall = await tool.prepare(call.arguments, ctx)
         action = prepared.action
-        note: str = await gate.authorize(action)
+        asked_at: float = time.monotonic()
+        try:
+            note: str = await gate.authorize(action)
+        finally:
+            at_gate.seconds += time.monotonic() - asked_at
         async with asyncio.timeout(tool.timeout_s) as scope:
-            result: ToolResult = await prepared.run(replace(ctx, gate=_PausedClock(ctx.gate, scope)))
+            result: ToolResult = await prepared.run(replace(ctx, gate=_PausedClock(ctx.gate, scope, at_gate)))
     except (RunCancelled, FailSafeTriggered):
         raise
     except (DotError, TimeoutError, OSError) as exc:
@@ -107,12 +132,12 @@ async def _run_checked(
         if text is None:
             raise
         handed_off: bool = isinstance(exc, HandedOff)
-        return (ok(text) if handed_off else fail(text)), action
+        return _Checked(result=ok(text) if handed_off else fail(text), action=action, waited_s=at_gate.seconds)
     if action is not None and not result.is_error:
         gate.observe(action)
     if result.untrusted:
         gate.taint()
-    return _with_approval_note(result, note), action
+    return _Checked(result=_with_approval_note(result, note), action=action, waited_s=at_gate.seconds)
 
 
 def _turn_on_action(tool: str, group: str) -> ActionInfo:
@@ -130,6 +155,7 @@ async def _execute_one(
     )
     tool: RegisteredTool | None = registry.tools.get(call.name)
     action: ActionInfo | None = None
+    waited_s: float = 0.0
     group: str | None = hidden.get(call.name)
     if group is not None:
         # The model could not know the tool's parameters: it was not in the tool list. The run turns its group on.
@@ -150,7 +176,8 @@ async def _execute_one(
             f"{truncate_middle(broken, _BROKEN_ARGUMENTS_CHARS)}"
         )
     else:
-        result, action = await _run_checked(call, tool, ctx, gate)
+        checked: _Checked = await _run_checked(call, tool, ctx, gate)
+        result, action, waited_s = checked.result, checked.action, checked.waited_s
     clipped: ToolResult = result.model_copy(update={"text": truncate_middle(result.text, ctx.output_chars)})
     seconds: float = time.monotonic() - started
     files: list[str] = await ctx.runtime.store.save_images(clipped.images) if clipped.images else []
@@ -164,6 +191,7 @@ async def _execute_one(
             "text": redact_json(truncate_middle(clipped.text, _EVENT_TEXT_CHARS)),
             "images": list(files),
             "seconds": round(seconds, 2),
+            "waited_s": round(waited_s, 2),
             "summary": action.summary if action is not None else "",
             "risk": action.risk if action is not None else "",
         },

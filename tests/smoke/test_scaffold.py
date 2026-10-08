@@ -21,6 +21,7 @@ from dotagent.evals import EVAL_SOURCE
 from dotagent.evals.runner import SCRIPTED_MODEL, eval_config, eval_environment, scratch_home, seed_workspace
 from dotagent.evals.scripted import ScriptedProvider
 from dotagent.evals.types import FileSeed, ScriptedCall, ScriptedTurn
+from dotagent.llm.calls import CALL_EVENT
 from dotagent.llm.router import parse_model_ref
 from dotagent.llm.types import ChatRequest, DeltaSink, ModelInfo, ModelReply, Usage
 from dotagent.runtime import Runtime, close_runtime, open_runtime
@@ -93,7 +94,8 @@ class WindowedProvider:
 
 class Played(FrozenModel):
     """A run that is over: its record, its scaffold, compaction and reminder events, the steps its compactions came
-    right before, and the requests of its steps and of its summaries."""
+    right before, the requests of its steps and of its summaries, and its model call, assistant and tool result
+    events."""
 
     record: RunRecord
     scaffolds: tuple[JsonObject, ...]
@@ -102,6 +104,9 @@ class Played(FrozenModel):
     reminders: tuple[JsonObject, ...]
     steps: tuple[ChatRequest, ...]
     summaries: tuple[ChatRequest, ...]
+    calls: tuple[JsonObject, ...]
+    assistants: tuple[JsonObject, ...]
+    results: tuple[JsonObject, ...]
 
 
 @pytest_asyncio.fixture(scope="module", loop_scope="module")
@@ -160,6 +165,9 @@ async def _play(
         reminders=_kind(events, "reminder"),
         steps=tuple(request for request in model.requests if request.session_key == record.thread_id),
         summaries=tuple(request for request in model.requests if request.session_key.endswith(_SUMMARY_KEY)),
+        calls=_kind(events, CALL_EVENT),
+        assistants=_kind(events, "assistant"),
+        results=_kind(events, "tool_result"),
     )
 
 
@@ -241,6 +249,32 @@ async def test_a_small_window_cuts_the_budget_and_the_tool_output_and_the_run_co
     assert min(gaps) > 1
     assert (roomy.compactions, roomy.summaries) == ((), ())
     assert max(estimate_tokens(step.messages, step.tools) for step in roomy.steps) > 18_000
+
+
+async def test_every_model_call_of_a_run_leaves_its_seconds_and_tokens_and_the_totals_hold_them_all(
+    login_env: dict[str, str],
+) -> None:
+    played: Played = await _play(_config({}, 6), login_env, 24_000, _reading(20))
+    assert played.record.status == "done"
+    assert len(played.compactions) >= 1
+    purposes: list[JsonValue] = [call["purpose"] for call in played.calls]
+    # One model_call event per step and one per compaction, in the order they were made.
+    assert purposes.count("step") == played.record.steps == len(played.steps) == len(played.assistants)
+    assert purposes.count("compaction") == len(played.compactions) == len(played.summaries)
+    assert set(purposes) == {"step", "compaction"}
+    for call in played.calls:
+        assert call["model"] == SCRIPTED_MODEL
+        assert call["error"] is None
+        assert isinstance(call["seconds"], float) and call["seconds"] >= 0.0
+    # The run's totals hold the tokens of the summaries too, not only those of its steps.
+    assert played.record.input_tokens == sum(int(str(call["input_tokens"])) for call in played.calls)
+    assert played.record.output_tokens == sum(int(str(call["output_tokens"])) for call in played.calls)
+    step_tokens: int = sum(int(str(assistant["input_tokens"])) for assistant in played.assistants)
+    assert played.record.input_tokens > step_tokens
+    for assistant in played.assistants:
+        assert isinstance(assistant["seconds"], float) and assistant["cached_tokens"] == 0
+    # Reading a file in the workspace asks nobody: no call waited at the gate longer than its own checks take.
+    assert played.results and all(float(str(result["waited_s"])) < 0.5 for result in played.results)
 
 
 async def test_a_model_of_the_weak_tier_is_reminded_of_its_goal_every_few_steps(login_env: dict[str, str]) -> None:

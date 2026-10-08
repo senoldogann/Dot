@@ -25,6 +25,7 @@ from dotagent.core.errors import ProviderProtocolError, ProviderTransportError
 from dotagent.core.logs import get_logger
 from dotagent.core.text import redact_secrets, truncate_middle
 from dotagent.core.types import FrozenModel, JsonObject
+from dotagent.llm.calls import CallOrigin
 from dotagent.llm.router import ModelRef, ModelRouter, parse_model_ref
 from dotagent.llm.types import (
     ChatRequest,
@@ -260,6 +261,7 @@ class _Question[V: FrozenModel]:
     review_model: str
     timeout_s: float
     session_key: str
+    origin: CallOrigin
     system: str
     prompt: str
     tool: ToolSpec
@@ -394,7 +396,7 @@ async def _attempt[V: FrozenModel](question: _Question[V], retry_note: str) -> V
     )
     try:
         async with asyncio.timeout(question.timeout_s):
-            reply: ModelReply = await question.router.complete(ref, request, _discard)
+            reply: ModelReply = await question.router.complete(ref, request, _discard, question.origin)
     except TimeoutError as exc:
         raise ProviderTransportError(
             "the review model did not answer in time", {"model": ref.label, "timeout_s": question.timeout_s}
@@ -420,8 +422,11 @@ async def _decide[V: FrozenModel](question: _Question[V]) -> V:
     return await _attempt(question, retry_note)
 
 
-def reviewer_for(router: ModelRouter, review_model: str, timeout_s: float, session_key: str) -> Reviewer:
-    """A reviewer that asks ``review_model``; the model reference is read when the first question comes."""
+def reviewer_for(
+    router: ModelRouter, review_model: str, timeout_s: float, session_key: str, run_id: str | None
+) -> Reviewer:
+    """A reviewer for the run ``run_id`` (``None`` outside any run: its calls are only logged) that asks
+    ``review_model``; the model reference is read when the first question comes."""
 
     async def review(request: ReviewRequest) -> ReviewVerdict:
         nonce: str = secrets.token_hex(6)
@@ -430,6 +435,7 @@ def reviewer_for(router: ModelRouter, review_model: str, timeout_s: float, sessi
             review_model=review_model,
             timeout_s=timeout_s,
             session_key=session_key,
+            origin=CallOrigin(run_id=run_id, purpose="review"),
             system=_REVIEW_SYSTEM,
             prompt=_review_prompt(request, nonce),
             tool=_REVIEW_SPEC,
@@ -440,8 +446,11 @@ def reviewer_for(router: ModelRouter, review_model: str, timeout_s: float, sessi
     return review
 
 
-def goal_checker_for(router: ModelRouter, review_model: str, timeout_s: float, session_key: str) -> GoalChecker:
-    """A goal checker that asks ``review_model``; the model reference is read when the first question comes."""
+def goal_checker_for(
+    router: ModelRouter, review_model: str, timeout_s: float, session_key: str, run_id: str | None
+) -> GoalChecker:
+    """A goal checker for the run ``run_id`` (``None`` outside any run: its calls are only logged) that asks
+    ``review_model``; the model reference is read when the first question comes."""
 
     async def check(request: GoalRequest) -> GoalVerdict:
         nonce: str = secrets.token_hex(6)
@@ -450,6 +459,7 @@ def goal_checker_for(router: ModelRouter, review_model: str, timeout_s: float, s
             review_model=review_model,
             timeout_s=timeout_s,
             session_key=session_key,
+            origin=CallOrigin(run_id=run_id, purpose="goal_check"),
             system=_GOAL_SYSTEM,
             prompt=_goal_prompt(request, nonce),
             tool=_GOAL_SPEC,
@@ -461,9 +471,10 @@ def goal_checker_for(router: ModelRouter, review_model: str, timeout_s: float, s
 
 
 def progress_consultant_for(
-    router: ModelRouter, review_model: str, timeout_s: float, session_key: str
+    router: ModelRouter, review_model: str, timeout_s: float, session_key: str, run_id: str | None
 ) -> ProgressConsultant:
-    """A consultant that asks ``review_model``; the model reference is read when the first question comes."""
+    """A consultant for the run ``run_id`` (``None`` outside any run: its calls are only logged) that asks
+    ``review_model``; the model reference is read when the first question comes."""
 
     async def consult(request: ProgressRequest) -> ProgressAdvice:
         nonce: str = secrets.token_hex(6)
@@ -472,6 +483,7 @@ def progress_consultant_for(
             review_model=review_model,
             timeout_s=timeout_s,
             session_key=session_key,
+            origin=CallOrigin(run_id=run_id, purpose="progress"),
             system=_PROGRESS_SYSTEM,
             prompt=_progress_prompt(request, nonce),
             tool=_PROGRESS_SPEC,
@@ -482,8 +494,11 @@ def progress_consultant_for(
     return consult
 
 
-def lesson_writer_for(router: ModelRouter, review_model: str, timeout_s: float, session_key: str) -> LessonWriter:
-    """A lesson writer that asks ``review_model``; the model reference is read when the first question comes."""
+def lesson_writer_for(
+    router: ModelRouter, review_model: str, timeout_s: float, session_key: str, run_id: str | None
+) -> LessonWriter:
+    """A lesson writer for the run ``run_id`` (``None`` outside any run: its calls are only logged) that asks
+    ``review_model``; the model reference is read when the first question comes."""
 
     async def write(request: LessonRequest) -> LessonProposal:
         nonce: str = secrets.token_hex(6)
@@ -492,6 +507,7 @@ def lesson_writer_for(router: ModelRouter, review_model: str, timeout_s: float, 
             review_model=review_model,
             timeout_s=timeout_s,
             session_key=session_key,
+            origin=CallOrigin(run_id=run_id, purpose="lessons"),
             system=_LESSONS_SYSTEM,
             prompt=_lessons_prompt(request, nonce),
             tool=_LESSONS_SPEC,

@@ -19,7 +19,6 @@ from dotagent.config import AppConfig, PluginsConfig, SkillsConfig
 from dotagent.core.errors import EvalError
 from dotagent.core.logs import get_logger
 from dotagent.core.text import truncate_middle
-from dotagent.core.types import JsonObject
 from dotagent.evals import EVAL_SOURCE
 from dotagent.evals.checks import evaluate_checks, workspace_path
 from dotagent.evals.metrics import run_metrics
@@ -27,6 +26,7 @@ from dotagent.evals.results import CheckOutcome, Cut, RunMetrics, TaskOutcome
 from dotagent.evals.scripted import ScriptedProvider
 from dotagent.evals.types import EvalTask, FileSeed
 from dotagent.events import Subscription
+from dotagent.llm.calls import CALL_EVENT
 from dotagent.llm.router import parse_model_ref
 from dotagent.llm.types import ChatProvider
 from dotagent.runtime import Runtime, close_runtime, open_runtime
@@ -165,13 +165,6 @@ def judge(
     )
 
 
-def _count(data: JsonObject, key: str, event: EventRecord) -> int:
-    value: object = data.get(key)
-    if not isinstance(value, int):
-        raise EvalError("an event lacks a number the harness counts", {"kind": event.kind, "key": key})
-    return value
-
-
 async def _decline(runtime: Runtime, event: EventRecord) -> None:
     """Answer a question of the policy, or of the agent, with a refusal: nobody is there."""
     approval_id: object = event.data.get("approval_id")
@@ -185,26 +178,39 @@ def _stop(manager: RunManager, run_id: str) -> None:
         manager.cancel(run_id)
 
 
+async def _stored_spending(runtime: Runtime, run_id: str) -> tuple[int, bool]:
+    """What the store says of a run: the tokens it and the runs it delegated to used so far, and whether it ended."""
+    run: RunRecord = await runtime.store.get_run(run_id)
+    runs: list[RunRecord] = [run, *await runtime.store.list_child_runs(run_id)]
+    return sum(entry.input_tokens + entry.output_tokens for entry in runs), run.finished_at is not None
+
+
 async def _supervise(
     runtime: Runtime, manager: RunManager, subscription: Subscription, run_id: str, task: EvalTask
 ) -> Cut:
     """Watch the run until it is over: refuse every question, and cut the run when it takes longer or spends more
-    tokens than the task allows. Returns why it was cut, or ``none``. The subscription is opened before the run starts,
-    so that no event is missed."""
-    spent: int = 0
+    tokens (of every model call of the run and of the runs it delegated to) than the task allows. Returns why it was
+    cut, or ``none``. The subscription is opened before the run starts, so that no event is missed. The tokens are read
+    from the store at every model call, as the recorder adds them there before the call's event goes out; when the
+    queue was full and events were dropped, the tokens and the end of the run are read from the store too."""
     cut: Cut = "none"
+    dropped: int = 0
     try:
         async with asyncio.timeout(task.time_limit_s):
             while True:
                 event: EventRecord = await subscription.queue.get()
-                if event.kind == "approval_requested":
-                    await _decline(runtime, event)
-                elif event.kind == "assistant":
-                    spent += _count(event.data, "input_tokens", event) + _count(event.data, "output_tokens", event)
+                ended: bool = event.kind == "run_finished" and event.run_id == run_id
+                missed: bool = subscription.dropped != dropped
+                dropped = subscription.dropped
+                if event.kind == CALL_EVENT or missed:
+                    spent, stored_end = await _stored_spending(runtime, run_id)
+                    ended = ended or stored_end
                     if spent > task.token_budget and cut == "none":
                         cut = "token_budget"
                         _stop(manager, run_id)
-                elif event.kind == "run_finished" and event.run_id == run_id:
+                if event.kind == "approval_requested":
+                    await _decline(runtime, event)
+                if ended:
                     return cut
     except TimeoutError:
         _stop(manager, run_id)

@@ -1,16 +1,21 @@
 """Model routing: ``provider:model`` references resolved to connectors that are created on first use."""
 
 import asyncio
+import time
 
 from dotagent.config import AppConfig
 from dotagent.core.errors import ConfigError
+from dotagent.core.logs import get_logger
 from dotagent.core.types import FrozenModel
 from dotagent.llm.anthropic import AnthropicProvider
+from dotagent.llm.calls import CANCELLED, CallOrigin, CallRecorder, ModelCall
 from dotagent.llm.ollama import OllamaProvider
 from dotagent.llm.openai import OpenAIProvider
 from dotagent.llm.opencode_go import OpenCodeGoProvider
 from dotagent.llm.types import ChatProvider, ChatRequest, DeltaSink, ModelInfo, ModelReply
 from dotagent.secrets import require_secret, resolve_secret
+
+log = get_logger(__name__)
 
 
 class ModelRef(FrozenModel):
@@ -36,11 +41,43 @@ def parse_model_ref(text: str) -> ModelRef:
     return ModelRef(provider=provider, model=model)
 
 
-class ModelRouter:
-    """Owns the provider connectors and sends each request to the one its model reference names."""
+def _answered(ref: ModelRef, request: ChatRequest, origin: CallOrigin, seconds: float, reply: ModelReply) -> ModelCall:
+    """A call that got its reply, with the tokens its provider reported."""
+    return ModelCall(
+        run_id=origin.run_id,
+        purpose=origin.purpose,
+        model=ref.label,
+        session_key=request.session_key,
+        seconds=seconds,
+        input_tokens=reply.usage.input_tokens,
+        output_tokens=reply.usage.output_tokens,
+        cached_tokens=reply.usage.cached_tokens,
+        error=None,
+    )
 
-    def __init__(self, config: AppConfig) -> None:
+
+def _failed(ref: ModelRef, request: ChatRequest, origin: CallOrigin, seconds: float, error: str) -> ModelCall:
+    """A call that ended without a reply: no provider reported tokens for it."""
+    return ModelCall(
+        run_id=origin.run_id,
+        purpose=origin.purpose,
+        model=ref.label,
+        session_key=request.session_key,
+        seconds=seconds,
+        input_tokens=0,
+        output_tokens=0,
+        cached_tokens=0,
+        error=error,
+    )
+
+
+class ModelRouter:
+    """Owns the provider connectors and sends each request to the one its model reference names. Every call it sends
+    is measured and handed to ``recorder``."""
+
+    def __init__(self, config: AppConfig, recorder: CallRecorder) -> None:
         self._config: AppConfig = config
+        self._recorder: CallRecorder = recorder
         self._providers: dict[str, ChatProvider] = {}
         # The names served by a connector given through `register`; `retire` leaves them alone.
         self._registered: set[str] = set()
@@ -101,9 +138,41 @@ class ModelRouter:
             if retired is not None:
                 self._retired.append(retired)
 
-    async def complete(self, ref: ModelRef, request: ChatRequest, sink: DeltaSink) -> ModelReply:
-        provider: ChatProvider = await self.provider(ref.provider)
-        return await provider.complete(request, sink)
+    async def complete(self, ref: ModelRef, request: ChatRequest, sink: DeltaSink, origin: CallOrigin) -> ModelReply:
+        """Send ``request`` to the provider of ``ref`` and hand the recorder what the call cost: its seconds and tokens,
+        or, for a call that failed, the type of its error (:data:`CANCELLED` for one that a stop or the caller's
+        timeout cut off; a connector that cannot be made, such as one without its key, fails the call too). The
+        seconds include the retries the connector makes and its waits between them. A failure is raised after it is
+        recorded; after a reply, a recorder that fails raises its own error, as any failed write of the run does."""
+        started: float = time.monotonic()
+        try:
+            provider: ChatProvider = await self.provider(ref.provider)
+            reply: ModelReply = await provider.complete(request, sink)
+        except asyncio.CancelledError:
+            await self._record_failure(_failed(ref, request, origin, time.monotonic() - started, CANCELLED))
+            raise
+        except Exception as error:
+            await self._record_failure(_failed(ref, request, origin, time.monotonic() - started, type(error).__name__))
+            raise
+        await self._recorder(_answered(ref, request, origin, time.monotonic() - started, reply))
+        return reply
+
+    async def _record_failure(self, call: ModelCall) -> None:
+        """Record a call that failed or was cut off. Its caller gets the call's own error or cancellation: a recorder
+        that fails here (the store cannot be written) is logged instead, so it cannot replace that outcome or turn a
+        cancellation into another error."""
+        try:
+            await self._recorder(call)
+        except Exception as error:
+            log.error(
+                "model_call_not_recorded",
+                run_id=call.run_id,
+                purpose=call.purpose,
+                model=call.model,
+                call_error=call.error,
+                error_type=type(error).__name__,
+                error=str(error),
+            )
 
     async def model_info(self, ref: ModelRef) -> ModelInfo:
         provider: ChatProvider = await self.provider(ref.provider)

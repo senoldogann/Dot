@@ -34,6 +34,7 @@ from dotagent.core.types import FrozenModel
 from dotagent.desktop.capture import rect_capture_supported
 from dotagent.desktop.perms import check_permissions
 from dotagent.desktop.types import Permissions
+from dotagent.llm.calls import log_model_call
 from dotagent.llm.ollama import OllamaProvider
 from dotagent.llm.opencode_go import GoUsage, OpenCodeGoProvider
 from dotagent.llm.router import ModelRef, ModelRouter, parse_model_ref
@@ -185,7 +186,7 @@ async def check_provider_key(config: AppConfig, provider: str) -> CheckResult:
     one search."""
     if provider == "ollama":
         return await _check_ollama_search(config)
-    router: ModelRouter = ModelRouter(config)
+    router: ModelRouter = ModelRouter(config, log_model_call)
     try:
         match provider:
             case "openai":
@@ -494,7 +495,7 @@ async def _service_checks(config: AppConfig) -> list[CheckResult]:
         ("review", config.models.review),
     )
     used: set[str] = {reference.partition(":")[0] for _, reference in configured}
-    router: ModelRouter = ModelRouter(config)
+    router: ModelRouter = ModelRouter(config, log_model_call)
     openai_present: bool = await asyncio.to_thread(_has_secret, config.providers.openai.api_key_env)
     go_present: bool = await asyncio.to_thread(_has_secret, config.providers.opencode_go.api_key_env)
     anthropic_present: bool = await asyncio.to_thread(_has_secret, config.providers.anthropic.api_key_env)

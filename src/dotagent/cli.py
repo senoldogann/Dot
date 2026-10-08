@@ -96,6 +96,7 @@ from dotagent.desktop.types import AppView, Permissions, ScreenshotView, Snapsho
 from dotagent.desktop.views import ViewRequest
 from dotagent.doctor import CheckResult, run_checks
 from dotagent.events import Subscription
+from dotagent.llm.calls import log_model_call
 from dotagent.llm.router import KNOWN_PROVIDERS, ModelRef, ModelRouter
 from dotagent.llm.types import Effort, ModelInfo
 from dotagent.memory.render import render_note
@@ -735,7 +736,7 @@ async def cmd_chat(command: ChatCommand) -> int:
 
 async def cmd_models(command: ModelsCommand) -> int:
     config: AppConfig = load_user_config()
-    router: ModelRouter = ModelRouter(config)
+    router: ModelRouter = ModelRouter(config, log_model_call)
     failures: int = 0
     try:
         for provider_name in [command.provider] if command.provider is not None else list(KNOWN_PROVIDERS):

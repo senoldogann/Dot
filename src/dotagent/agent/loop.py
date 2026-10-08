@@ -100,6 +100,7 @@ from dotagent.core.jsonutil import dumps_compact
 from dotagent.core.logs import get_logger
 from dotagent.core.text import redact_secrets, truncate_middle
 from dotagent.core.types import FrozenModel, JsonObject
+from dotagent.llm.calls import CallOrigin
 from dotagent.llm.router import ModelRef, parse_model_ref
 from dotagent.llm.types import (
     ChatRequest,
@@ -263,7 +264,9 @@ async def _model_summary(
         )
         try:
             async with asyncio.timeout(agent.runtime.config.agent.model_call_timeout_s):
-                reply: ModelReply = await agent.runtime.router.complete(ref, request, _discard)
+                reply: ModelReply = await agent.runtime.router.complete(
+                    ref, request, _discard, CallOrigin(run_id=agent.run.id, purpose="compaction")
+                )
         except (ProviderError, TimeoutError) as error:
             problem = error.message if isinstance(error, ProviderError) else "the summary request timed out"
             log.warning("summary_failed", run_id=agent.run.id, model=ref.label, attempt=attempt, error=problem)
@@ -410,6 +413,7 @@ async def _tool_messages(agent: AgentRun, outcomes: Sequence[ToolOutcome], can_s
                     runtime.config.agent,
                     runtime.config.models.vision,
                     agent.run.thread_id,
+                    agent.run.id,
                     outcome.call,
                     outcome.result,
                 )
@@ -779,7 +783,9 @@ async def run_agent(agent: AgentRun) -> RunEnd:
     )
     if grouped:
         await runtime.bus.emit(run.id, "tool_groups", groups_event(0, groups, on, (), surface_reason), True)
-    goal: Message = await message_with_attachments(runtime, run.thread_id, opening.text, opening.files, info.vision)
+    goal: Message = await message_with_attachments(
+        runtime, run.thread_id, run.id, opening.text, opening.files, info.vision
+    )
     if opening.files:
         await runtime.bus.emit(run.id, ATTACHMENTS_EVENT, {"files": attachment_summary(opening.files)}, True)
     history.append(goal)
@@ -797,14 +803,13 @@ async def run_agent(agent: AgentRun) -> RunEnd:
     )
     checker: GoalChecker | None = (
         goal_checker_for(
-            runtime.router, runtime.config.models.review, config.model_call_timeout_s, f"{run.thread_id}:goal"
+            runtime.router, runtime.config.models.review, config.model_call_timeout_s, f"{run.thread_id}:goal", run.id
         )
         if run.goal_mode
         else None
     )
     steps: int = 0
-    input_total: int = 0
-    output_total: int = 0
+    step_origin: CallOrigin = CallOrigin(run_id=run.id, purpose="step")
     ratio: float = 1.0
     nudges: int = 0
     sent_back: int = 0
@@ -819,7 +824,11 @@ async def run_agent(agent: AgentRun) -> RunEnd:
     can_ask: bool = can_ask_user(run.source, run.parent_run_id, run.approvals)
     ladder: tuple[Rung, ...] = ladder_for(config.stall_escalation, can_ask)
     consultant: ProgressConsultant = progress_consultant_for(
-        runtime.router, runtime.config.models.review, config.model_call_timeout_s, f"{run.thread_id}:progress"
+        runtime.router,
+        runtime.config.models.review,
+        config.model_call_timeout_s,
+        f"{run.thread_id}:progress",
+        run.id,
     )
     watch: WatchState = new_watch()
     # The tools of the next step when a progress alert limited them; None offers the tools of the groups that are on.
@@ -834,7 +843,9 @@ async def run_agent(agent: AgentRun) -> RunEnd:
         steered: list[UserInput] = _drain(agent.inbox)
         for sent in steered:
             text: str = sent.text
-            note: Message = await message_with_attachments(runtime, run.thread_id, text, sent.files, info.vision)
+            note: Message = await message_with_attachments(
+                runtime, run.thread_id, run.id, text, sent.files, info.vision
+            )
             history.append(note)
             agent.gate.clear_taint()
             agent.gate.add_instruction(text)
@@ -867,13 +878,14 @@ async def run_agent(agent: AgentRun) -> RunEnd:
             session_key=run.thread_id,
         )
         steps += 1
+        asked_at: float = time.monotonic()
         async with asyncio.timeout(config.model_call_timeout_s):
-            reply: ModelReply = await runtime.router.complete(ref, request, sink)
-        input_total += reply.usage.input_tokens
-        output_total += reply.usage.output_tokens
+            reply: ModelReply = await runtime.router.complete(ref, request, sink, step_origin)
+        step_seconds: float = time.monotonic() - asked_at
         if reply.usage.input_tokens > 0 and estimated > 0:
             ratio = min(3.0, max(0.4, reply.usage.input_tokens / (estimated / ratio)))
-        await runtime.store.update_run_progress(run.id, steps, input_total, output_total)
+        # The tokens join the run's totals as the router records the call; the side calls' tokens join them too.
+        await runtime.store.set_run_steps(run.id, steps)
         assistant: Message = assistant_from_reply(reply, ref.label)
         history.append(assistant)
         # Stored before the tools run: a stop or crash while they run then leaves the calls in the thread, and the next
@@ -889,6 +901,8 @@ async def run_agent(agent: AgentRun) -> RunEnd:
                 "tool_calls": [call.name for call in reply.tool_calls],
                 "input_tokens": reply.usage.input_tokens,
                 "output_tokens": reply.usage.output_tokens,
+                "cached_tokens": reply.usage.cached_tokens,
+                "seconds": round(step_seconds, 3),
                 "finish": reply.finish,
             },
             True,
