@@ -15,7 +15,7 @@ recover (6), learn (7), undo (8). Every later item is judged with the numbers of
 
 | #   | Item                                                        | Status  | Commits |
 | --- | ----------------------------------------------------------- | ------- | ------- |
-| 1   | Eval harness and run statistics (`dotx eval`, `dotx stats`) | planned |         |
+| 1   | Eval harness and run statistics (`dotx eval`, `dotx stats`) | done    | a83cdcc |
 | 2   | Progress watchdog and escalation ladder                     | planned |         |
 | 3   | Model-adaptive scaffold (`dotx models profile`)             | planned |         |
 | 4   | Smaller, progressive tool surface                           | planned |         |
@@ -79,39 +79,57 @@ the item). Take the first item that is not `done`.
 
 ### 1. Eval harness and run statistics
 
-**Goal.** A repeatable, model-independent measure of how well Dot finishes tasks, and the same numbers for the runs that
-really happened.
+**Status: done** (`a83cdcc`). **Goal.** A repeatable, model-independent measure of how well Dot finishes tasks, and the
+same numbers for the runs that really happened.
 
-**Why.** Nothing in the repo measures whether a task gets finished: the smoke tests prove that features work. Without
+**Why.** Nothing in the repo measured whether a task gets finished: the smoke tests prove that features work. Without
 numbers every other item is a guess and "works with any model" is a claim. Real data before the audit fixes: 32 runs
 (15 done, 14 cancelled, 2 failed, 1 running), about 103 M input tokens over 2,772 steps, so about 37 k input tokens per
 step. Why 14 runs were cancelled cannot be told from the old data, because a restart and a user stop wrote the same
 text; since wave A they differ.
 
-**Design.**
-- `src/dotagent/evals/`: `types.py` (`EvalTask`, a union of `Check` types that are data, not code: file exists, file
-  contains, file equals, JSON equals, command succeeds, answer contains, path absent; the expected ending), `catalog.py`
-  (about 20 tasks as data: file work, shell work, recovery from an error, multi-step work, research over a local HTTP
-  fixture, an impossible task whose right ending is an honest failure, "do not touch X", an injection bait inside a
-  file), `scripted.py` (a `ChatProvider` that replays scripted replies: the oracle of the self-check and the stand-in
-  model of the tests), `runner.py`, `scoring.py`.
-- The runner builds a runtime on a temp `DOT_HOME` (own database, own workspace), seeds the task's files, starts the
-  run through `RunManager` with approvals `ask` and a watcher that denies every question (unattended and safe), applies a
-  wall-clock limit and a token budget, then evaluates the checks. API keys are looked up (environment, `.env`, Keychain)
-  before the process switches `DOT_HOME`, so the real database and workspace are never touched and no secret is copied.
-- `dotx eval list | check | run [--model REF] [--task ID]... [--repeat N] | report FILE...`. `check` is offline and free:
-  every task's reference solution must pass its checks through the real loop and tools, and a "finish at once" run must
-  fail every task, so no task is trivially passable. `run` spends model tokens and prints a scorecard per model (pass
-  rate, steps, tokens per pass, tool error rate, stalls, timeouts, false claims of success) and saves it under
-  `<home>/evals/`.
-- `dotx stats [--days N]`: read-only SQL aggregates over the real runs: outcomes per model, steps, tokens, tool error
-  rate, invalid-argument rate, stalls, compactions, why runs stopped.
+**What exists now.**
+- `src/dotagent/evals/`: `types.py` (`EvalTask`, the `Check` union: file exists / absent / contains / equals, JSON
+  equals, command succeeds, answer contains / matches; `ScriptedTurn` for reference solutions), `catalog.py` (25 tasks
+  as data, each with a reference solution), `scripted.py` (`ScriptedProvider`, a `ChatProvider` that replays a script),
+  `checks.py` (judging a finished workspace), `runner.py` (one attempt = a throw-away `DOT_HOME`, a runtime opened with
+  `open_runtime`, `ModelRouter.register` for the scripted model, a supervisor that refuses every approval question and
+  cuts the run at `time_limit_s` or `token_budget`), `metrics.py` (`run_metrics` from the events), `results.py`,
+  `scoring.py` (`Scorecard`, rendering), `reports.py` (`<home>/evals/<UTC>-<model>.json`), `audit.py` (structure of the
+  catalog).
+- `dotx eval list | check | run [--model REF] [--task ID]... [--repeat N] | report [FILE...]` (`cli_eval.py`) and
+  `dotx stats [--days N]` (`cli_stats.py`, SQL in `store/stats.py`, opened `mode=ro`).
+- `store/endings.py`: the result texts a run is closed with (`RESULT_STOPPED`, `RESULT_SHUTDOWN`, `RESULT_STALLED`, ...),
+  used by the manager, the loop and the store, and `classify_ending(status, result)`. A later item that adds a new way
+  for a run to end adds its text and its `Ending` here, so that `dotx stats` can name it.
+- Also changed: `ModelRouter.register(name, provider)`, `runtime.open_runtime(config, login_env)` (`build_runtime` is
+  `read_login_env` + it), `config.load_default_config()`, `core.paths.evals_dir()`, `EvalError`, and
+  `Store.mark_interrupted_runs` now closes `blocked` runs too (a run waiting for an answer when the daemon died stayed
+  `blocked` for ever).
+- Tests: `tests/unit/test_evals.py`, `test_endings.py`, `test_run_statistics.py`, `test_store_runs.py`, and
+  `tests/smoke/test_evals_runner.py` (the whole catalog through the real loop with the scripted model, the time and token
+  cuts, the refusal of `ask_user`, the home left untouched). None needs a service.
 
-**Touchpoints.** `cli.py` (command union, parser, dispatch; follow `cli_prune.py`), `store/db.py` (one aggregate query),
-`runtime.py` (how a runtime is built), `agent/manager.py`, `secrets.py`, `README.md`.
+**How to use it for the next items.** Run `dotx eval check` after any change to a tool, the policy or the loop: it takes
+about 4 s. Compare a change with `dotx eval run --repeat 3` before and after, then `dotx eval report`. To add a task:
+append it to `_catalog()` in `catalog.py` (seed files, checks, a reference that ends with `finish`) and run
+`dotx eval check`; it tells what is wrong. A new kind of check is a new class in `types.py` plus a branch in
+`checks.py`.
 
-**Done when.** `dotx eval check` passes offline; unit tests for the checks and the scoring; an integration test drives
-the runner with the scripted provider on a temp home; README documents the commands.
+**Decisions and limits.**
+- The attempts run with approvals `ask` and a supervisor that denies every question, with the preset of the user's
+  configuration (`aggressive` by default), so a task must be passable inside the workspace without a question.
+- The "does nothing and says done" control is judged on the seeded workspace without a run (the result is the same and it
+  is fast); the reference is replayed through the real loop.
+- No task uses a local HTTP fixture yet: `web.allow_private_hosts` is all or nothing, so serving a page on loopback would
+  mean switching the SSRF guard off for the whole attempt. If a research-over-HTTP task is wanted, give `WebClient` an
+  allow-list of exact hosts first.
+- Check commands run code the model wrote (`python3 main.py`) outside the policy gate of the run. That is no more power
+  than the run had (it ran the same file), but it is why the tasks stay small and local.
+- A live `dotx eval run` has not been done: it spends the owner's quota. See "Open owner decisions".
+
+**Done when.** `dotx eval check` passes offline; unit tests for the checks and the scoring; an integration test drives the
+runner with the scripted provider on a temp home; README documents the commands. All true.
 
 ### 2. Progress watchdog and escalation ladder
 
@@ -307,3 +325,7 @@ makes the damage reversible. It covers the file tools only; a shell `rm` or `sed
 ## Log
 
 - 2026-10-08: roadmap written from the owner's go-ahead for all eight items, in this order. Nothing implemented yet.
+- 2026-10-08: item 1 done (`a83cdcc`). `dotx eval check` replays 25 reference solutions through the real loop in about
+  4 s; `dotx stats` ran against the real history (read-only counts). Real history now: 39 runs in 365 days, 35 on
+  `ollama:deepseek-v4.1-flash:cloud` and 4 on `ollama:gemma4:cloud`; tool calls fail about 2 to 3 % of the time; 342
+  compactions in 35 runs, so compaction is frequent (item 3 and 4 will want that number).
