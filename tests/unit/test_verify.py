@@ -76,6 +76,9 @@ def test_the_facts_keep_written_files_unresolved_failures_and_the_newest_result_
     )
     # A success of the same tool and target resolves a failure; a check that runs again replaces its entry.
     assert later.failures == facts.failures[:1]
+    assert later.resolved == facts.failures[1:]
+    again: RunFacts = with_outcomes(later, [_shell("pytest -q", fail(PYTEST_FAILED)), _shell("pytest -q", ok("ok"))])
+    assert (again.failures, again.resolved) == (later.failures, later.resolved)
     assert later.checks == (
         CallFact(tool="shell", target="pytest -q", ok=True, result="[exit 0 in 0.3s] … 4 passed in 0.10s"),
     )
@@ -156,6 +159,7 @@ def test_the_goal_check_reads_every_section_of_the_facts() -> None:
     facts: RunFacts = RunFacts(
         written=("/w/report.md",),
         failures=(CallFact(tool="read_file", target="/w/notes.txt", ok=False, result="file does not exist"),),
+        resolved=(CallFact(tool="shell", target="pytest -q", ok=False, result="[exit 1 in 0.4s]"),),
         checks=(CallFact(tool="shell", target="pytest -q", ok=True, result="[exit 0 in 0.3s] … 4 passed in 0.10s"),),
         named=("/w/report.md", "https://example.org/a"),
     )

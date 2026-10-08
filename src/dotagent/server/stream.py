@@ -7,6 +7,7 @@ repeat. Live-only events (the deltas of a reply being written) have no id.
 import asyncio
 from collections.abc import AsyncIterator, Iterable
 
+from dotagent.agent.lessons import LESSON_EVENTS
 from dotagent.events import EventBus
 from dotagent.server.context import ServerContext
 from dotagent.store.db import Store
@@ -16,9 +17,10 @@ SSE_TYPE: str = "text/event-stream"
 SSE_HEADERS: dict[str, str] = {"Cache-Control": "no-store", "X-Accel-Buffering": "no"}
 KEEPALIVE: bytes = b": keepalive\n\n"
 
-# What the lifecycle stream carries: the moments a client must refetch its lists for.
+# What the lifecycle stream carries: the moments a client must refetch its lists for, and what becomes of the lessons
+# of a run, which are drawn once its own stream has ended.
 LIFECYCLE_KINDS: frozenset[str] = frozenset(
-    {"run_queued", "run_started", "run_finished", "approval_requested", "approval_decided"}
+    {"run_queued", "run_started", "run_finished", "approval_requested", "approval_decided", *LESSON_EVENTS}
 )
 
 _PAGE: int = 500

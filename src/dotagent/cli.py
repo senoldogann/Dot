@@ -13,6 +13,7 @@ from typing import Annotated, Literal, get_args
 
 from pydantic import Field, TypeAdapter, ValidationError
 
+from dotagent.agent.lessons import RunLessons, run_lessons
 from dotagent.agent.manager import RunManager
 from dotagent.browser.login import open_profile_for_login
 from dotagent.cli_browser import (
@@ -608,6 +609,16 @@ def _print_result(run: RunRecord) -> None:
     )
 
 
+async def _show_lessons(runtime: Runtime, manager: RunManager, ui: TerminalUi, run_id: str) -> None:
+    """Wait until the lessons of a run that ended are drawn, then show what became of them. Ctrl-C drops them."""
+    if manager.learning(run_id):
+        sys.stderr.write("drawing the lessons of this run (Ctrl-C skips it)\n")
+        await manager.learned(run_id)
+    lessons: RunLessons | None = await run_lessons(runtime.store, run_id)
+    if lessons is not None:
+        ui.show_lessons(lessons)
+
+
 async def cmd_run(command: RunCommand) -> int:
     goal: str = await _read_goal(command.goal)
     runtime: Runtime = await build_runtime(load_user_config())
@@ -618,10 +629,12 @@ async def cmd_run(command: RunCommand) -> int:
             show_thinking=command.thinking,
             verbose=command.verbose,
         )
+        manager: RunManager = RunManager(runtime)
+        ui: TerminalUi = TerminalUi(runtime, options)
         run: RunRecord = await execute_run(
             runtime,
-            RunManager(runtime),
-            TerminalUi(runtime, options),
+            manager,
+            ui,
             goal,
             command.mode,
             command.model,
@@ -630,9 +643,11 @@ async def cmd_run(command: RunCommand) -> int:
             command.goal_mode,
             command.thread,
         )
+        # The answer comes first: the lessons are drawn after the run's end.
+        _print_result(run)
+        await _show_lessons(runtime, manager, ui, run.id)
     finally:
         await close_runtime(runtime)
-    _print_result(run)
     return 0 if run.status == "done" else 1
 
 
@@ -647,12 +662,12 @@ async def cmd_resume(command: ResumeCommand) -> int:
             verbose=command.verbose,
         )
         manager: RunManager = RunManager(runtime)
-        run: RunRecord = await follow_run(
-            runtime, manager, TerminalUi(runtime, options), lambda: manager.resume(command.run_id)
-        )
+        ui: TerminalUi = TerminalUi(runtime, options)
+        run: RunRecord = await follow_run(runtime, manager, ui, lambda: manager.resume(command.run_id))
+        _print_result(run)
+        await _show_lessons(runtime, manager, ui, run.id)
     finally:
         await close_runtime(runtime)
-    _print_result(run)
     return 0 if run.status == "done" else 1
 
 

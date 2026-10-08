@@ -5,6 +5,7 @@ from typing import Literal
 from pydantic import Field, JsonValue
 
 from dotagent.agent.attachments import MAX_ATTACHMENT_BYTES, MAX_ATTACHMENTS
+from dotagent.agent.lessons import RunLessons
 from dotagent.config import BrowserMode, ModelsConfig
 from dotagent.core.types import FrozenModel
 from dotagent.desktop.perms import Pane
@@ -170,12 +171,14 @@ class BrowserModeRequest(FrozenModel):
 
 class RunDetail(FrozenModel):
     """A run as its page shows it. ``resumable`` is true when the daemon cut the run off and a new run can go on from
-    where it stopped (see ``agent.resume``)."""
+    where it stopped (see ``agent.resume``); ``lessons`` is what became of the lessons drawn from the run once it ended,
+    ``None`` when none were (see ``agent.lessons``)."""
 
     run: RunRecord
     children: list[RunRecord]
     active: bool
     resumable: bool
+    lessons: RunLessons | None
 
 
 class MemoryPage(FrozenModel):

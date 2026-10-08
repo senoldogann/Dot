@@ -10,6 +10,7 @@ import { icon } from "../icons.js";
 import { createInspector } from "../inspector.js";
 import { userMessage } from "../messages.js";
 import { emptyPanel, errorPanel, foldCard, loadingPanel, statusBadge } from "../panels.js";
+import { onLifecycle } from "../state.js";
 import { createTimeline } from "../timeline.js";
 import { attempt, toast } from "../ui.js";
 
@@ -25,6 +26,9 @@ const BTW_PATTERN = /^\/btw(?:\s+([\s\S]*))?$/i;
 const MAX_INPUT_PX = 160;
 const TITLE_CHARS = 70;
 const QUOTE_CHARS = 160;
+// The events that change what became of the lessons of a run; they come on the lifecycle stream, after the run's end.
+const LESSON_KINDS = new Set(["lessons_proposed", "lesson_saved", "lesson_dismissed", "lessons_failed"]);
+const LESSON_STATES = { saved: { mark: "check", text: "Saved to memory" }, dismissed: { mark: "x", text: "Dismissed" } };
 
 function backLink() {
   return el("a", { class: "back", href: "#/runs" }, icon("arrowLeft"), "All runs");
@@ -140,6 +144,71 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
       output: Math.max(run.output_tokens, seen.output),
       finishedAt,
     });
+  }
+
+  // --------------------------------------------------------------------------------------------- lessons
+  // What a run that reached its goal the hard way can tell the runs after it, drawn once it ended (see agent.lessons).
+  const lessonsBody = el("div", { class: "lessons" });
+  const lessonsCard = el(
+    "section",
+    { class: "card", hidden: true, "aria-label": "Lessons from this run" },
+    el("div", { class: "card-head" }, icon("sparkle"), el("span", null, "Lessons from this run")),
+    lessonsBody,
+  );
+  // True while a lesson is being saved or dismissed, so that a second press does not send it twice.
+  let decidingLesson = false;
+
+  async function decideLesson(index, action) {
+    if (decidingLesson) {
+      return;
+    }
+    decidingLesson = true;
+    try {
+      await attempt(async () => {
+        const fresh = await api.post(`/runs/${runId}/lessons/${index}/${action}`, null);
+        if (!signal.aborted) {
+          paintLessons(fresh.lessons);
+        }
+        toast("ok", action === "save" ? "Saved to memory: later runs find it like any note." : "The lesson is dismissed.");
+      });
+    } finally {
+      decidingLesson = false;
+    }
+  }
+
+  function lessonRow(lesson) {
+    const text = el("span", { class: "lesson-text" }, lesson.text);
+    const settled = LESSON_STATES[lesson.state];
+    if (settled !== undefined) {
+      return el("div", { class: `lesson ${lesson.state}` }, text, el("span", { class: "chip" }, icon(settled.mark), settled.text));
+    }
+    // The words sit in the buttons themselves, as on an approval card, so that a phone keeps them.
+    const save = el("button", { class: "btn primary sm", type: "button", onclick: () => decideLesson(lesson.index, "save") }, icon("check"), "Save to memory");
+    const dismiss = el("button", { class: "btn sm", type: "button", onclick: () => decideLesson(lesson.index, "dismiss") }, "Dismiss");
+    return el("div", { class: "lesson" }, text, el("div", { class: "cluster" }, save, dismiss));
+  }
+
+  /** `lessons` is what became of the lessons of the run, or null when none were drawn from it. */
+  function paintLessons(lessons) {
+    lessonsCard.hidden = lessons === null;
+    if (lessons === null) {
+      return;
+    }
+    const proposed = lessons.lessons.some((lesson) => lesson.state === "proposed");
+    lessonsBody.replaceChildren(
+      ...lessons.lessons.map(lessonRow),
+      ...[
+        lessons.tainted && proposed
+          ? el(
+              "div",
+              { class: "note warn" },
+              icon("alert"),
+              el("span", null, "This run read content that others can write (web pages, mail, downloads), so its lessons are never saved on their own. Read each one before you save it."),
+            )
+          : null,
+        lessons.error === null ? null : el("div", { class: "note bad" }, icon("alert"), el("span", null, lessons.error)),
+      ].filter((node) => node !== null),
+    );
   }
 
   // ------------------------------------------------------------------------------------------------ dock
@@ -383,6 +452,7 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
       finishedAt = run.finished_at;
       paintStats();
       syncControls();
+      paintLessons(fresh.lessons);
     } catch (error) {
       console.warn("the run could not be refreshed", error);
     }
@@ -460,6 +530,7 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
       run.source === RESUME_SOURCE ? null : userMessage(run.goal, dateTimeFull(run.created_at)),
       timeline.element,
       waitingList,
+      lessonsCard,
       continuedIn(history.later),
       dock,
     ),
@@ -470,7 +541,13 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
   inspector.arrange();
   paintStats();
   syncControls();
+  paintLessons(detail.lessons);
   window.addEventListener("scroll", onScroll, { passive: true });
+  const stopLessons = onLifecycle((event) => {
+    if (LESSON_KINDS.has(event.kind) && event.run_id === runId) {
+      reconcile();
+    }
+  });
 
   follow({
     path: `/runs/${runId}/stream`,
@@ -509,6 +586,7 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
 
   return () => {
     window.removeEventListener("scroll", onScroll);
+    stopLessons();
     inspector.dispose();
     if (ticker !== null) {
       clearInterval(ticker);

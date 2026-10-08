@@ -150,7 +150,8 @@ class InvalidValueError(StoreError):
 
 
 class RunConflict(DotError):
-    """A run cannot be started, steered or stopped, or an approval decided, in the state it is in."""
+    """A run cannot be started, steered or stopped, an approval decided, or a lesson of a run saved or dismissed, in the
+    state it is in."""
 
 
 class EvalError(DotError):

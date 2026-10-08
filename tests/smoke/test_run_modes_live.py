@@ -188,7 +188,7 @@ CREATED_REPORT: str = (
 
 def _facts(written: str) -> str:
     """The facts of a run whose only work was writing ``written`` and reading what it wrote."""
-    return render_facts(RunFacts(written=(written,), failures=(), checks=(), named=(written,)), (), ())
+    return render_facts(RunFacts(written=(written,), failures=(), resolved=(), checks=(), named=(written,)), (), ())
 
 
 @requires_model

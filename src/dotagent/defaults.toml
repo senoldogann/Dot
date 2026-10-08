@@ -126,6 +126,13 @@ verify_answer_paths = false
 # evals show that it helps.
 resume = "off"
 resume_within_s = 1800
+# After a task or research run that ended with success although something went wrong on the way (a failed call, an
+# alert of the progress watchdog, a send-back by the goal check or for paths that do not exist), one call to the
+# review model draws at most three lessons from it: one sentence each, about how to do things. "propose" leaves them on
+# the run's page, where each can be saved to memory or dismissed; "auto" saves them as notes tagged lesson, except
+# after a run that read content third parties can author (web pages, files from others), whose lessons are only
+# proposed. Later runs find a saved lesson like any note of the agent. "off" until evals show that it helps.
+lessons = "off"
 
 [policy]
 # aggressive: act without asking except for the hard stops; balanced: ask for external side effects;

@@ -38,6 +38,7 @@ from dotagent.agent.continuity import (
 )
 from dotagent.agent.executor import ToolOutcome, execute_calls
 from dotagent.agent.gate import RunGate
+from dotagent.agent.lessons import LessonCase, may_learn
 from dotagent.agent.plan import PLAN_EVENT, PlanItem, open_steps, plan_event_data, plan_from_event, render_plan
 from dotagent.agent.progress import (
     Alert,
@@ -194,6 +195,14 @@ class AgentRun:
 class RunOutcome(FrozenModel):
     status: Literal["done", "failed"]
     result: str
+
+
+class RunEnd(FrozenModel):
+    """How a run ended, and what its lessons are drawn from once it has ended, when it may hold some
+    (:mod:`dotagent.agent.lessons`)."""
+
+    outcome: RunOutcome
+    lessons: LessonCase | None
 
 
 async def _discard(delta: StreamDelta) -> None:
@@ -687,7 +696,27 @@ async def _answer_alert(
     return StallAnswer(note=note, allowed=restriction_for(alert.rung, can_ask))
 
 
-async def run_agent(agent: AgentRun) -> RunOutcome:
+def _run_end(
+    agent: AgentRun, history: Sequence[Message], goal: Message, outcome: RunOutcome, facts: RunFacts
+) -> RunEnd:
+    """The end of a run, with what its lessons are drawn from when it may hold some."""
+    run: RunRecord = agent.run
+    if not may_learn(agent.runtime.config.agent.lessons, run.mode, run.parent_run_id, outcome.status):
+        return RunEnd(outcome=outcome, lessons=None)
+    case: LessonCase = LessonCase(
+        run_id=run.id,
+        thread_id=run.thread_id,
+        goal=run.goal,
+        digest=goal_digest(render_transcript(_since_goal(history, goal))),
+        failures=facts.failures,
+        resolved=facts.resolved,
+        answer=outcome.result,
+        tainted=agent.gate.ever_tainted,
+    )
+    return RunEnd(outcome=outcome, lessons=case)
+
+
+async def run_agent(agent: AgentRun) -> RunEnd:
     runtime: Runtime = agent.runtime
     run: RunRecord = agent.run
     config: AgentConfig = runtime.config.agent
@@ -893,7 +922,7 @@ async def run_agent(agent: AgentRun) -> RunOutcome:
                         agent, consultant, alert, can_ask, history, goal, ledger
                     )
                     if isinstance(answer, RunOutcome):
-                        return answer
+                        return _run_end(agent, history, goal, answer, facts)
                     history.append(await _stored_note(agent, answer.note))
                     allowed = answer.allowed
                 elif reminder_due(scaffold, run.mode, steps, reminded_at):
@@ -910,7 +939,7 @@ async def run_agent(agent: AgentRun) -> RunOutcome:
             if answered and (run.mode == "chat" or not used_tools or nudges >= config.finish_nudges):
                 ended = RunOutcome(status="done", result=reply.text)
             elif nudges >= config.finish_nudges:
-                return RunOutcome(status="failed", result=RESULT_EMPTY_REPLIES)
+                return _run_end(agent, history, goal, RunOutcome(status="failed", result=RESULT_EMPTY_REPLIES), facts)
             else:
                 nudges += 1
                 history.append(await _stored_note(agent, _NO_TOOL_NOTE if answered else _EMPTY_NOTE))
@@ -939,7 +968,7 @@ async def run_agent(agent: AgentRun) -> RunOutcome:
             ended if checker is None else await _check_goal(agent, checker, history, goal, ended, sent_back, facts)
         )
         if isinstance(settled, RunOutcome):
-            return settled
+            return _run_end(agent, history, goal, settled, facts)
         sent_back += 1
         nudges = 0
         watch = clear_window(watch)

@@ -34,6 +34,33 @@
   margin-top: 14px;
 }
 
+/* ---------- lessons drawn from a run ---------- */
+
+.lessons {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 12px 16px;
+}
+
+/* A lesson keeps its text on the left; its buttons go under it when the column is narrow. */
+.lesson {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+}
+
+.lesson-text {
+  flex: 1 1 260px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.lesson.dismissed .lesson-text {
+  color: var(--muted);
+}
+
 /* ---------- groups of tool steps ---------- */
 
 .steps {

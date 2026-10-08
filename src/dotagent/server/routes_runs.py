@@ -10,6 +10,7 @@ from fastapi.responses import StreamingResponse
 
 from dotagent.agent.aside import AsideAnswer, answer_aside
 from dotagent.agent.attachments import StoredAttachment, load_attachments, store_attachment
+from dotagent.agent.lessons import dismiss_lesson, run_lessons, save_lesson
 from dotagent.core.errors import InvalidValueError
 from dotagent.llm.router import parse_model_ref
 from dotagent.server import UI_SOURCE
@@ -45,6 +46,7 @@ def runs_router(ctx: ServerContext) -> APIRouter:
             children=await store.list_child_runs(run_id),
             active=active,
             resumable=await ctx.manager.resumable(run),
+            lessons=await run_lessons(store, run_id),
         )
 
     @router.get("/runs")
@@ -107,6 +109,18 @@ def runs_router(ctx: ServerContext) -> APIRouter:
         """Resume a run that the daemon cut off: a new run on its thread goes on from where it stopped (see
         ``agent.resume``). Returns the new run."""
         return await ctx.manager.resume(run_id)
+
+    @router.post("/runs/{run_id}/lessons/{index}/save")
+    async def save_run_lesson(run_id: str, index: int) -> RunDetail:
+        """Save a lesson proposed for a run that ended as a note tagged ``lesson`` (see ``agent.lessons``)."""
+        await save_lesson(ctx.runtime, run_id, index)
+        return await detail(run_id)
+
+    @router.post("/runs/{run_id}/lessons/{index}/dismiss")
+    async def dismiss_run_lesson(run_id: str, index: int) -> RunDetail:
+        """Dismiss a lesson proposed for a run that ended: it is not saved, and the run's page stops offering it."""
+        await dismiss_lesson(ctx.runtime, run_id, index)
+        return await detail(run_id)
 
     @router.post("/runs/{run_id}/cancel", status_code=202)
     async def cancel_run(run_id: str) -> RunDetail:

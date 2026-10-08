@@ -67,6 +67,8 @@ class RunGate:
         self._reviewer: Reviewer = reviewer
         self._instructions: tuple[str, ...] = instructions
         self.tainted: bool = False
+        # Whether the run read such content at any point: a fresh instruction clears ``tainted``, never this.
+        self.ever_tainted: bool = False
 
     @property
     def instructions(self) -> tuple[str, ...]:
@@ -79,6 +81,7 @@ class RunGate:
     def taint(self) -> None:
         """Record that the run has read content that third parties can author."""
         self.tainted = True
+        self.ever_tainted = True
 
     def observe(self, info: ActionInfo) -> None:
         """Taint the run when a finished action read content that third parties can author."""

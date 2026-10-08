@@ -52,9 +52,11 @@ _ATTEMPT_ENV: dict[str, str] = {"PYTHONDONTWRITEBYTECODE": "1"}
 
 def eval_config(config: AppConfig) -> AppConfig:
     """The configuration an eval run uses: the given one, without what must not take part in a measurement (the MCP
-    servers, skills and plugins of the user, the Mac desktop and the embeddings of the memory)."""
+    servers, skills and plugins of the user, the Mac desktop, the embeddings of the memory and the lessons, which would
+    carry what one attempt learnt into the next)."""
     return config.model_copy(
         update={
+            "agent": config.agent.model_copy(update={"lessons": "off"}),
             "mcp": [],
             "skills": SkillsConfig(dirs=[]),
             "plugins": PluginsConfig(dirs=[]),

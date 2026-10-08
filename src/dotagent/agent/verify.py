@@ -1,8 +1,9 @@
 """Checking the end of a run against what the harness observed, not against what the model says it did.
 
 The loop keeps :class:`RunFacts` from the outcomes of the tool calls, never from a model: the files the file tools
-wrote, the failed calls that no later success of the same tool and target followed, the newest commands that test,
-build or lint, and the paths and addresses that successful calls named. The goal check reads them next to its digest.
+wrote, the failed calls that no later success of the same tool and target followed, the failed calls that one did
+follow, the newest commands that test, build or lint, and the paths and addresses that successful calls named. The goal
+check reads them next to its digest; the lessons of a run (:mod:`dotagent.agent.lessons`) start from its failures.
 :func:`answer_paths` and :func:`missing_paths` find the paths a final answer names that do not exist and that no
 successful call named; with ``[agent] verify_answer_paths`` such an answer is sent back once. Every function here is
 pure except :func:`missing_paths`, which reads the file system.
@@ -59,12 +60,13 @@ class CallFact(FrozenModel):
 
 class RunFacts(FrozenModel):
     """What the harness observed of a run's work, newest last. ``failures`` are the failed calls that no later success
-    of the same tool and target followed, ``checks`` the commands that test, build or lint (one that runs again replaces
-    its entry), ``written`` the files the file tools wrote or edited, and ``named`` the paths and addresses that
-    successful calls named."""
+    of the same tool and target followed, ``resolved`` the failed calls that one did follow (the run found how to make
+    them work), ``checks`` the commands that test, build or lint (one that runs again replaces its entry), ``written``
+    the files the file tools wrote or edited, and ``named`` the paths and addresses that successful calls named."""
 
     written: tuple[str, ...]
     failures: tuple[CallFact, ...]
+    resolved: tuple[CallFact, ...]
     checks: tuple[CallFact, ...]
     named: tuple[str, ...]
 
@@ -78,7 +80,7 @@ class NamedPath(FrozenModel):
 
 
 def new_facts() -> RunFacts:
-    return RunFacts(written=(), failures=(), checks=(), named=())
+    return RunFacts(written=(), failures=(), resolved=(), checks=(), named=())
 
 
 def _flat(text: str, limit: int) -> str:
@@ -133,8 +135,14 @@ def _with_outcome(facts: RunFacts, outcome: ToolOutcome) -> RunFacts:
     failures: tuple[CallFact, ...] = tuple(
         fact for fact in facts.failures if (fact.tool, fact.target) != (tool, target)
     )
+    earlier: CallFact | None = next(
+        (fact for fact in facts.failures if (fact.tool, fact.target) == (tool, target)), None
+    )
+    resolved: tuple[CallFact, ...] = facts.resolved
     if not succeeded:
         failures = (*failures, CallFact(tool=tool, target=target, ok=False, result=_first_line(outcome.result.text)))
+    elif earlier is not None:
+        resolved = (*(fact for fact in resolved if (fact.tool, fact.target) != (tool, target)), earlier)
     checks: tuple[CallFact, ...] = facts.checks
     if action.kind == "shell" and _CHECK_COMMAND.search(action.target) is not None:
         checks = (
@@ -150,6 +158,7 @@ def _with_outcome(facts: RunFacts, outcome: ToolOutcome) -> RunFacts:
     return RunFacts(
         written=written[-_WRITTEN_KEPT:],
         failures=failures[-_FAILURES_KEPT:],
+        resolved=resolved[-_FAILURES_KEPT:],
         checks=checks[-_CHECKS_KEPT:],
         named=named[-_NAMED_KEPT:],
     )

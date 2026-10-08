@@ -7,7 +7,8 @@ from dataclasses import dataclass
 
 from dotagent.agent.attachments import StoredAttachment, UserInput
 from dotagent.agent.gate import RunGate
-from dotagent.agent.loop import AgentRun, RunOpening, RunOutcome, run_agent
+from dotagent.agent.lessons import LessonCase, learn
+from dotagent.agent.loop import AgentRun, RunEnd, RunOpening, run_agent
 from dotagent.agent.plan import PLAN_EVENT, plan_from_event
 from dotagent.agent.resume import (
     RESUME_SOURCE,
@@ -80,6 +81,8 @@ class RunManager:
         # Threads that a run is being launched on and whose handle is not registered yet.
         self._claimed: set[str] = set()
         self._stopping: bool = False
+        # Runs that ended and whose lessons are being drawn (:mod:`dotagent.agent.lessons`), by run id.
+        self._learning: dict[str, asyncio.Task[None]] = {}
 
     async def recover(self) -> int:
         """Close out what a previous process left behind. Returns the number of interrupted runs."""
@@ -219,14 +222,31 @@ class RunManager:
             await handle.finished.wait()
         return await self._runtime.store.get_run(run_id)
 
+    def learning(self, run_id: str) -> bool:
+        """Whether the lessons of a run that ended are being drawn."""
+        return run_id in self._learning
+
+    async def learned(self, run_id: str) -> None:
+        """Block until the lessons of a run that ended are drawn (returns immediately when none are being drawn).
+        Cancelling the caller cancels the drawing."""
+        task: asyncio.Task[None] | None = self._learning.get(run_id)
+        if task is not None:
+            await task
+
     async def shutdown(self) -> None:
         """Stop every live run. They end as cancelled with a result that says the daemon shut down, so the owner can tell
-        them from runs stopped by hand; their thread keeps everything up to the step they were in."""
+        them from runs stopped by hand; their thread keeps everything up to the step they were in. Lessons still being
+        drawn from runs that ended are dropped."""
         self._stopping = True
         handles: list[RunHandle] = list(self._handles.values())
         for handle in handles:
             self.cancel(handle.run_id)
         await asyncio.gather(*(handle.finished.wait() for handle in handles))
+        learning: list[asyncio.Task[None]] = list(self._learning.values())
+        for task in learning:
+            task.cancel()
+        if learning:
+            await asyncio.wait(learning)
 
     def _handle(self, run_id: str) -> RunHandle:
         handle: RunHandle | None = self._handles.get(run_id)
@@ -427,18 +447,21 @@ class RunManager:
         Every way a run can end is turned into a stored status plus an event. Unexpected exceptions are logged with
         their traceback and recorded as a failed run; they are not hidden, because nothing awaits this task. The handle
         is released and ``finished`` is set even when recording the end fails, so a waiter and the thread never hang.
+        The lessons of a run that may hold some are drawn after that, in a task of its own, so that they hold up
+        nothing.
         """
         runtime: Runtime = self._runtime
         status: RunStatus = "failed"
         result: str = ""
+        lessons: LessonCase | None = None
         try:
             async with self._place_for(run):
                 await runtime.store.set_run_status(run.id, "running")
                 await runtime.bus.emit(
                     run.id, "run_started", {"model": run.model, "parent_run_id": run.parent_run_id}, True
                 )
-                outcome: RunOutcome = await run_agent(AgentRun(runtime, run, gate, cancel, inbox, self, opening))
-                status, result = outcome.status, outcome.result
+                ended: RunEnd = await run_agent(AgentRun(runtime, run, gate, cancel, inbox, self, opening))
+                status, result, lessons = ended.outcome.status, ended.outcome.result, ended.lessons
         except (RunCancelled, asyncio.CancelledError):
             status, result = "cancelled", RESULT_SHUTDOWN if self._stopping else RESULT_STOPPED
         except FailSafeTriggered as exc:
@@ -458,3 +481,16 @@ class RunManager:
             finally:
                 self._handles.pop(run.id, None)
                 finished.set()
+        # Registered before anything awaits, so that a waiter that ``finished`` wakes finds it.
+        if lessons is not None and not self._stopping:
+            self._learning[run.id] = asyncio.create_task(self._learn(lessons))
+
+    async def _learn(self, case: LessonCase) -> None:
+        """Task body of drawing the lessons of a run that ended. Unexpected exceptions are logged with their traceback;
+        the run keeps its end either way."""
+        try:
+            await learn(self._runtime, case)
+        except Exception:
+            log.exception("lessons crashed", run_id=case.run_id)
+        finally:
+            self._learning.pop(case.run_id, None)

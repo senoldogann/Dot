@@ -73,6 +73,7 @@ type Tier = Literal["standard", "weak"]
 type ScaffoldMode = Literal["fixed", "measured"]
 type ToolSurface = Literal["full", "grouped", "auto"]
 type ResumeMode = Literal["off", "safe"]
+type LessonsMode = Literal["off", "propose", "auto"]
 
 
 class AgentConfig(FrozenModel):
@@ -99,6 +100,7 @@ class AgentConfig(FrozenModel):
     verify_answer_paths: bool
     resume: ResumeMode
     resume_within_s: int
+    lessons: LessonsMode
 
 
 class PolicyConfig(FrozenModel):

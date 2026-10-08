@@ -10,6 +10,7 @@ from typing import Literal, TextIO
 from pydantic import BaseModel, ConfigDict, JsonValue
 
 from dotagent.agent.gate import YOLO_DECIDER
+from dotagent.agent.lessons import RunLessons
 from dotagent.agent.plan import StepStatus
 from dotagent.agent.progress import Rung
 from dotagent.agent.resume import CallEnd, CutOff
@@ -236,6 +237,24 @@ class TerminalUi:
         self._out.write(text)
         self._out.flush()
         self._open_line = not text.endswith("\n")
+
+    def show_lessons(self, lessons: RunLessons) -> None:
+        """Show what became of the lessons drawn from a run that ended."""
+        self._indent = ""
+        for lesson in lessons.lessons:
+            mark: str = "◆ lesson saved as a note" if lesson.state == "saved" else "◇ lesson proposed"
+            self._line(self._paint(f"  {mark}: {lesson.text}", "35"))
+        if any(lesson.state == "proposed" for lesson in lessons.lessons):
+            untrusted: str = (
+                " (the run read content that third parties can author, so its lessons are never saved on their own)"
+                if lessons.tainted
+                else ""
+            )
+            self._line(
+                self._paint(f"    the run's page in the web UI saves or dismisses a proposed lesson{untrusted}", "2")
+            )
+        if lessons.error is not None:
+            self._line(self._paint(f"  ⚠ {lessons.error}", "33"))
 
     def streamed(self, text: str) -> bool:
         """True when ``text`` is what was just streamed to the terminal (so the caller need not print it again)."""

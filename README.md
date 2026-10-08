@@ -366,6 +366,22 @@ something (a command, a write, a click, or a delegation, whose run may have done
 `"off"` by default until evals show that it helps. The timeline of the new run shows how each call ended, with a link to
 the run it resumes.
 
+**Lessons.** With `lessons = "propose"` or `"auto"` in `[agent]`, a task or research run of its own that reached its
+goal after something went wrong on the way (a call failed, whether the run found its way around it or not; the progress
+watchdog raised an alert; the goal check sent it back; its answer named paths that did not exist) is followed, once it
+has ended, by one call of the review model (`[models] review`). It reads a digest of the run, what went wrong, the
+answer and the saved notes that fit the goal, and writes at most three lessons of one sentence: know-how that a later
+run could use from the start, such as that `pdftotext` keeps the columns of a table only with `-layout`. A lesson of more
+than one line, of fewer than 20 or more than 300 characters (or `[memory] max_chars`), with a secret, an e-mail address
+or a path in a home folder, or that says what the goal, another lesson or a saved note already says, is dropped. With
+`propose` the lessons wait under "Lessons from this run" on the run's page: Save to memory keeps one as a note tagged
+`lesson` whose source is the run, Dismiss drops it (`POST /api/runs/{id}/lessons/{index}/save` and `/dismiss`); `dotx
+run` shows them after the answer. With `auto` they are saved at once, except after a run that read content others can
+write (web pages, mail, downloads), which could plant a lesson: those are only proposed, and the page says why. A saved
+lesson is a note of the agent like the others: a later run gets it when it fits its goal, and the Memory page edits or
+forgets it. Delegated runs, chats, runs that failed or were stopped, and evals (which always run without lessons) are
+not asked. `lessons` is `"off"` by default until evals show that it helps.
+
 ## Measuring the agent
 
 How well Dot finishes work is measured, not guessed, in two ways.
