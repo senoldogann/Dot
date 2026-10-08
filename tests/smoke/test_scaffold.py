@@ -273,8 +273,8 @@ async def test_every_model_call_of_a_run_leaves_its_seconds_and_tokens_and_the_t
     assert played.record.input_tokens > step_tokens
     for assistant in played.assistants:
         assert isinstance(assistant["seconds"], float) and assistant["cached_tokens"] == 0
-    # Reading a file in the workspace asks nobody, so no call waited at the gate.
-    assert played.results and all(result["waited_s"] == 0.0 for result in played.results)
+    # Reading a file in the workspace asks nobody: no call waited at the gate longer than its own checks take.
+    assert played.results and all(float(str(result["waited_s"])) < 0.5 for result in played.results)
 
 
 async def test_a_model_of_the_weak_tier_is_reminded_of_its_goal_every_few_steps(login_env: dict[str, str]) -> None:

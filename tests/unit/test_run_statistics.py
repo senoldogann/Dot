@@ -41,7 +41,8 @@ def _call(args: JsonObject) -> tuple[str, JsonObject]:
 
 
 def _result(ok: bool) -> tuple[str, JsonObject]:
-    return "tool_result", {"call_id": "c", "tool": "shell", "ok": ok, "text": "", "images": []}
+    """A shell result as it was recorded before the wait at the gate was measured."""
+    return "tool_result", {"call_id": "c", "tool": "shell", "ok": ok, "text": "", "images": [], "seconds": 0.0}
 
 
 def _timed_result(tool: str, ok: bool, seconds: float, waited_s: float) -> tuple[str, JsonObject]:
@@ -68,6 +69,19 @@ def _model_call(purpose: str, seconds: float, cached_tokens: int) -> tuple[str, 
     }
 
 
+def _cut_step(seconds: float) -> tuple[str, JsonObject]:
+    """A step whose call a stop cut off: no reply, no tokens."""
+    return CALL_EVENT, {
+        "purpose": "step",
+        "model": "ollama:a",
+        "seconds": seconds,
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "cached_tokens": 0,
+        "error": "cancelled",
+    }
+
+
 @pytest_asyncio.fixture
 async def database(tmp_path: Path) -> AsyncIterator[Path]:
     path: Path = tmp_path / "dot.sqlite3"
@@ -91,6 +105,7 @@ async def database(tmp_path: Path) -> AsyncIterator[Path]:
             _model_call("step", 3.0, 0),
             _model_call("step", 2.0, 0),
             _model_call("step", 10.0, 50),
+            _cut_step(300.0),
             _model_call("compaction", 4.0, 0),
             _model_call("goal_check", 0.5, 0),
             *[_call({"step": number}) for number in range(4)],
@@ -149,7 +164,8 @@ def test_the_time_of_a_model_comes_from_the_calls_its_timed_runs_recorded(databa
     first: TimeStats = _by_model(stats)["ollama:a"].time
     # Of its two runs, the one stopped by hand recorded no model call and is left out.
     assert first.timed_runs == 1
-    assert first.model_seconds == pytest.approx(20.5)
+    # The step a stop cut off after 300 s counts in the seconds, not in how fast a step is answered.
+    assert first.model_seconds == pytest.approx(320.5)
     assert (first.step_seconds_median, first.step_seconds_p90) == (2.5, 10.0)
     assert first.compaction_seconds == pytest.approx(4.0)
     assert first.side_call_seconds == pytest.approx(4.5)
@@ -160,10 +176,10 @@ def test_the_time_of_a_model_comes_from_the_calls_its_timed_runs_recorded(databa
 
 def test_the_tools_are_listed_slowest_first_with_their_wait_at_the_gate(database: Path) -> None:
     tools: tuple[ToolStats, ...] = collect_statistics(database, time.time() - 30 * DAY_S).tools
-    # The results recorded without seconds (the shell calls of the first run) are not counted.
+    # browser_act and shell both took 9 s in all: the tie goes by name.
     assert [(entry.tool, entry.calls, entry.failed) for entry in tools] == [
         ("browser_act", 3, 1),
-        ("shell", 1, 1),
+        ("shell", 5, 3),
         ("read_file", 1, 0),
     ]
     browser: ToolStats = tools[0]
@@ -199,7 +215,7 @@ def test_the_statistics_are_rendered_per_model_in_plain_words(database: Path) ->
     assert "finished 1, stopped" in text
     assert "7 calls, 2 failed (29 %), 1 with arguments that were not valid JSON" in text
     time_row: str = next(line for line in lines if line.strip().startswith("ollama:a ") and "of 2" in line)
-    assert time_row.split() == ["ollama:a", "1", "of", "2", "20.5", "2.5", "10.0", "4.0", "4.5", "150"]
+    assert time_row.split() == ["ollama:a", "1", "of", "2", "320.5", "2.5", "10.0", "4.0", "4.5", "150"]
     assert "1 runs recorded no model calls" in text
     tool_row: str = next(line for line in lines if line.strip().startswith("browser_act"))
     assert tool_row.split() == ["browser_act", "3", "1", "9.0", "2.0", "1.5"]

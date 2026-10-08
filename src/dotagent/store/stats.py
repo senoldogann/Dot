@@ -12,12 +12,13 @@ from pydantic import TypeAdapter
 
 from dotagent.core.errors import StoreError
 from dotagent.core.types import FrozenModel
-from dotagent.llm.calls import CALL_EVENT
+from dotagent.llm.calls import CALL_EVENT, CallPurpose
 from dotagent.llm.types import INVALID_ARGUMENTS_KEY
 from dotagent.store.endings import ENDING_LABELS, Ending, classify_ending
 from dotagent.store.models import RunStatus
 
 _STATUS: TypeAdapter[RunStatus] = TypeAdapter(RunStatus)
+_PURPOSE: TypeAdapter[CallPurpose] = TypeAdapter(CallPurpose)
 _BUSY_TIMEOUT_S: float = 10.0
 # The order in which endings with the same number of runs are listed.
 _ENDING_ORDER: dict[Ending, int] = {ending: index for index, ending in enumerate(ENDING_LABELS)}
@@ -26,21 +27,21 @@ _ENDING_ORDER: dict[Ending, int] = {ending: index for index, ending in enumerate
 _SLOW_SHARE: float = 0.9
 
 _RUNS_SQL: str = "SELECT model, status, result, steps, input_tokens, output_tokens FROM runs WHERE created_at >= ?"
-# One row per model call of the runs: the model of its run, the run, what the call was for, its seconds and the tokens
-# the provider served from its cache.
+# One row per model call of the runs: the model of its run, the run, what the call was for, its seconds, the tokens the
+# provider served from its cache and whether it got a reply (no error).
 _CALLS_SQL: str = """
 SELECT r.model, r.id, json_extract(e.data, '$.purpose'), json_extract(e.data, '$.seconds'),
-       json_extract(e.data, '$.cached_tokens')
+       json_extract(e.data, '$.cached_tokens'), json_extract(e.data, '$.error') IS NULL
 FROM runs r JOIN events e ON e.run_id = r.id
 WHERE r.created_at >= ? AND e.kind = ?
 """
-# One row per tool call of the runs that came back with its seconds: the tool, whether it worked, its seconds and the
-# part of them it spent at the gate (NULL for a call recorded before that was measured).
+# One row per tool call of the runs that came back: the tool, whether it worked (``"ok": false`` is a failed call), its
+# seconds and the part of them it spent at the gate (NULL for a call recorded before that was measured).
 _TOOLS_SQL: str = """
 SELECT json_extract(e.data, '$.tool'), json_extract(e.data, '$.ok'), json_extract(e.data, '$.seconds'),
        json_extract(e.data, '$.waited_s')
 FROM runs r JOIN events e ON e.run_id = r.id
-WHERE r.created_at >= ? AND e.kind = 'tool_result' AND json_extract(e.data, '$.seconds') IS NOT NULL
+WHERE r.created_at >= ? AND e.kind = 'tool_result'
 """
 # One row per model: the events of its runs, counted. A tool result with ``"ok": false`` is a failed call.
 _EVENTS_SQL: str = """
@@ -82,13 +83,15 @@ class EndingCount(FrozenModel):
 
 class CallSample(FrozenModel):
     """One model call as the statistics count it: the model of its run (the review or vision model may have answered
-    it), the run, what it was for, its seconds and the tokens the provider served from its cache."""
+    it), the run, what it was for, its seconds, the tokens the provider served from its cache and whether it got a
+    reply (a call that failed or was cut off did not)."""
 
     model: str
     run_id: str
-    purpose: str
+    purpose: CallPurpose
     seconds: float
     cached_tokens: int
+    answered: bool
 
 
 class ToolSample(FrozenModel):
@@ -103,8 +106,10 @@ class ToolSample(FrozenModel):
 
 class TimeStats(FrozenModel):
     """Where the time of the runs of one model went, from the model calls they recorded. A run made before the calls
-    were measured recorded none and is left out: ``timed_runs`` counts the runs the numbers come from. A side call is
-    any call but a step (the compactions too); the step figures are ``None`` without a step call."""
+    were measured recorded none and is left out: ``timed_runs`` counts the runs the numbers come from. The seconds
+    count every call; the step median and 90th percentile only the steps that got a reply (a stop or a timeout that cut
+    one off says nothing about how fast the model answers), ``None`` without one. A side call is any call but a step
+    (the compactions too)."""
 
     timed_runs: int
     model_seconds: float
@@ -237,9 +242,10 @@ def _call_samples(rows: list[tuple[object, ...]]) -> list[CallSample]:
         CallSample(
             model=str(row[0]),
             run_id=str(row[1]),
-            purpose=str(row[2]),
+            purpose=_PURPOSE.validate_python(row[2]),
             seconds=_number(row[3], "seconds"),
             cached_tokens=int(_number(row[4], "cached_tokens")),
+            answered=row[5] == 1,
         )
         for row in rows
     ]
@@ -249,7 +255,7 @@ def _tool_samples(rows: list[tuple[object, ...]]) -> list[ToolSample]:
     return [
         ToolSample(
             tool=str(row[0]),
-            ok=row[1] == 1,
+            ok=row[1] != 0,
             seconds=_number(row[2], "seconds"),
             waited_s=0.0 if row[3] is None else _number(row[3], "waited_s"),
         )
@@ -267,7 +273,7 @@ def nearest_rank(values: Sequence[float], share: float) -> float | None:
 
 def time_stats(calls: Sequence[CallSample]) -> TimeStats:
     """Where the time of one model's runs went, from the calls they recorded."""
-    steps: list[float] = [call.seconds for call in calls if call.purpose == "step"]
+    steps: list[float] = [call.seconds for call in calls if call.purpose == "step" and call.answered]
     return TimeStats(
         timed_runs=len({call.run_id for call in calls}),
         model_seconds=sum(call.seconds for call in calls),
@@ -280,7 +286,7 @@ def time_stats(calls: Sequence[CallSample]) -> TimeStats:
 
 
 def tool_stats(samples: Sequence[ToolSample]) -> tuple[ToolStats, ...]:
-    """What each tool cost, the one with the most seconds in all first."""
+    """What each tool cost, the one with the most seconds in all first (by name when the seconds are equal)."""
     names: list[str] = list(dict.fromkeys(sample.tool for sample in samples))
     found: list[ToolStats] = []
     for name in names:
@@ -295,7 +301,7 @@ def tool_stats(samples: Sequence[ToolSample]) -> tuple[ToolStats, ...]:
                 waited_s=sum(sample.waited_s for sample in mine),
             )
         )
-    return tuple(sorted(found, key=lambda entry: entry.seconds_total, reverse=True))
+    return tuple(sorted(found, key=lambda entry: (-entry.seconds_total, entry.tool)))
 
 
 def _counts_by_model(events: list[tuple[object, ...]]) -> dict[str, _EventCounts]:

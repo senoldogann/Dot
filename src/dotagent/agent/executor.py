@@ -61,15 +61,23 @@ def _describe_failure(exc: Exception, tool: RegisteredTool) -> str | None:
     return None
 
 
+class _GateTime:
+    """The seconds one call spends at the gate: its own question (the gate's checks, an approval, the review model's
+    answer) and the questions its tool asks while it runs."""
+
+    def __init__(self) -> None:
+        self.seconds: float = 0.0
+
+
 class _PausedClock:
     """The gate a running tool asks again for a step it did not know about up front. The tool's own timeout stands
-    still while the user decides: waiting for an answer is not time the tool spent working. ``waited_s`` adds up the
-    time these questions took."""
+    still while the user decides: waiting for an answer is not time the tool spent working. The time these questions
+    take is added to ``spent``."""
 
-    def __init__(self, inner: Gate, scope: asyncio.Timeout) -> None:
+    def __init__(self, inner: Gate, scope: asyncio.Timeout, spent: _GateTime) -> None:
         self._inner: Gate = inner
         self._scope: asyncio.Timeout = scope
-        self.waited_s: float = 0.0
+        self._spent: _GateTime = spent
 
     async def authorize(self, info: ActionInfo) -> str:
         loop: asyncio.AbstractEventLoop = asyncio.get_running_loop()
@@ -80,7 +88,7 @@ class _PausedClock:
         try:
             return await self._inner.authorize(info)
         finally:
-            self.waited_s += time.monotonic() - asked_at
+            self._spent.seconds += time.monotonic() - asked_at
             self._scope.reschedule(None if remaining is None else loop.time() + remaining)
 
     def add_instruction(self, text: str) -> None:
@@ -96,37 +104,27 @@ def _with_approval_note(result: ToolResult, note: str) -> ToolResult:
 
 @dataclass(frozen=True)
 class _Checked:
-    """What a call that reached its tool came to. ``waited_s`` is the time it spent at the gate (an approval, the
-    review model's answer), which its seconds include."""
+    """What a call that reached its tool came to. ``waited_s`` is the time it spent at the gate (:class:`_GateTime`),
+    which its seconds include."""
 
     result: ToolResult
     action: ActionInfo | None
     waited_s: float
 
 
-def _waited(asked_at: float | None, answered_at: float | None, clock: _PausedClock | None) -> float:
-    """The time a call spent at the gate: its question until the answer came (until now, when the answer was a refusal
-    or a hand-off), and the questions its tool asked while it ran."""
-    if asked_at is None:
-        return 0.0
-    asked: float = (time.monotonic() if answered_at is None else answered_at) - asked_at
-    return asked + (0.0 if clock is None else clock.waited_s)
-
-
 async def _run_checked(call: ToolCall, tool: RegisteredTool, ctx: ToolContext, gate: RunGate) -> _Checked:
     action: ActionInfo | None = None
-    asked_at: float | None = None
-    answered_at: float | None = None
-    clock: _PausedClock | None = None
+    at_gate: _GateTime = _GateTime()
     try:
         prepared: PreparedCall = await tool.prepare(call.arguments, ctx)
         action = prepared.action
-        asked_at = time.monotonic()
-        note: str = await gate.authorize(action)
-        answered_at = time.monotonic()
+        asked_at: float = time.monotonic()
+        try:
+            note: str = await gate.authorize(action)
+        finally:
+            at_gate.seconds += time.monotonic() - asked_at
         async with asyncio.timeout(tool.timeout_s) as scope:
-            clock = _PausedClock(ctx.gate, scope)
-            result: ToolResult = await prepared.run(replace(ctx, gate=clock))
+            result: ToolResult = await prepared.run(replace(ctx, gate=_PausedClock(ctx.gate, scope, at_gate)))
     except (RunCancelled, FailSafeTriggered):
         raise
     except (DotError, TimeoutError, OSError) as exc:
@@ -134,18 +132,12 @@ async def _run_checked(call: ToolCall, tool: RegisteredTool, ctx: ToolContext, g
         if text is None:
             raise
         handed_off: bool = isinstance(exc, HandedOff)
-        return _Checked(
-            result=ok(text) if handed_off else fail(text),
-            action=action,
-            waited_s=_waited(asked_at, answered_at, clock),
-        )
+        return _Checked(result=ok(text) if handed_off else fail(text), action=action, waited_s=at_gate.seconds)
     if action is not None and not result.is_error:
         gate.observe(action)
     if result.untrusted:
         gate.taint()
-    return _Checked(
-        result=_with_approval_note(result, note), action=action, waited_s=_waited(asked_at, answered_at, clock)
-    )
+    return _Checked(result=_with_approval_note(result, note), action=action, waited_s=at_gate.seconds)
 
 
 def _turn_on_action(tool: str, group: str) -> ActionInfo:

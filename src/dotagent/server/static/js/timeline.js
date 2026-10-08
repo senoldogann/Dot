@@ -2,8 +2,8 @@
 // asked, what the delegated runs did and, at the end, the answer. Events of a delegated run land in a panel nested in the
 // tool call that started it. The tool calls between two messages sit in one group, "Worked for 12 s · 5 tool calls", that the
 // reader can fold away. A group is timed from the moment the work began (the start of the run or the last message) to the
-// moment it ended, so the groups of a run add up to the time the run took; the model turns that called its tools add their
-// own time to it, "Worked for 12 s (model 8 s)".
+// moment it ended, so the groups of a run add up to the time the run took; the part of that time the model's turns took is
+// in brackets, "Worked for 12 s (model 8 s)".
 
 import { approvalCard, fromEvent } from "./approvals.js";
 import { sentFiles } from "./attachments.js";
@@ -197,15 +197,21 @@ export function createTimeline({ rootRunId, startedAt, onGrow, onPlan, onStats, 
     return scope;
   }
 
-  /** The seconds of a model turn that called tools join the group of those calls (the finish call is not shown). */
+  /**
+   * The seconds of a model turn join the group whose time they were spent in: the open group, which lasts at least until
+   * the turn's event, or, with none open, the group the turn's tool calls start when it wrote nothing before them (the
+   * finish call is not shown). A turn that wrote a message with no group open was spent before that message, in no group.
+   */
   function addModelTime(scope, data) {
-    const shown = data.tool_calls.filter((name) => name !== FINISH_TOOL);
-    if (data.seconds === undefined || shown.length === 0) {
+    if (data.seconds === undefined) {
       return;
     }
-    const group = groupFor(scope);
-    group.modelSeconds += data.seconds;
-    paintGroup(group);
+    const startsGroup = data.text.trim() === "" && data.tool_calls.some((name) => name !== FINISH_TOOL);
+    const group = scope.group ?? (startsGroup ? groupFor(scope) : null);
+    if (group !== null) {
+      group.modelSeconds += data.seconds;
+      paintGroup(group);
+    }
   }
 
   function dropThinking(scope) {
@@ -292,6 +298,7 @@ export function createTimeline({ rootRunId, startedAt, onGrow, onPlan, onStats, 
     assistant(scope, record) {
       const data = record.data;
       dropThinking(scope);
+      addModelTime(scope, data);
       const bubble = scope.live !== null && scope.live.step === data.step ? scope.live : null;
       scope.live = null;
       const hasText = data.text.trim() !== "";
@@ -302,7 +309,6 @@ export function createTimeline({ rootRunId, startedAt, onGrow, onPlan, onStats, 
         if (scope.runId === rootRunId) {
           onStats({ step: data.step, input: data.input_tokens, output: data.output_tokens });
         }
-        addModelTime(scope, data);
         return;
       }
       // A message ends the group of steps before it: the steps that follow it make a new one.
@@ -318,7 +324,6 @@ export function createTimeline({ rootRunId, startedAt, onGrow, onPlan, onStats, 
       if (scope.runId === rootRunId) {
         onStats({ step: data.step, input: data.input_tokens, output: data.output_tokens });
       }
-      addModelTime(scope, data);
     },
 
     // A model call of the run (agent/loop.py and the router): a step's tokens came with its assistant event already, so

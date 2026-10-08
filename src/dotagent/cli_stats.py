@@ -60,14 +60,16 @@ def _seconds(value: float | None) -> str:
 
 
 def render_time(stats: Sequence[ModelStats]) -> list[str]:
-    """The time table: per model, where the seconds of its runs went, from the model calls they recorded."""
+    """The time table: per model, where the seconds of its runs went, from the model calls they recorded. A model none
+    of whose runs recorded a call has no row; the note under the table counts its runs."""
     width: int = max(len("model"), *(len(entry.model) for entry in stats))
     header: str = (
         f"  {'model':<{width}}  {'timed runs':>10}  {'model s':>9}  {'step median s':>13}  {'step p90 s':>10}  "
         f"{'compaction s':>12}  {'side calls s':>12}  {'cached tokens':>13}"
     )
+    timed: list[ModelStats] = [entry for entry in stats if entry.time.timed_runs > 0]
     rows: list[str] = []
-    for entry in stats:
+    for entry in timed:
         time: TimeStats = entry.time
         rows.append(
             f"  {entry.model:<{width}}  {f'{time.timed_runs} of {entry.runs}':>10}  {_seconds(time.model_seconds):>9}  "

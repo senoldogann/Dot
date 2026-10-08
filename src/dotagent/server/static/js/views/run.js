@@ -273,11 +273,15 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
   }
 
   // "/btw <question>" asks on the side: the run keeps working and never sees the question. Several can be in flight.
+  // The tokens of the answer count in the run's totals, read again once it is in (a finished run streams nothing more).
   function askAside(question) {
     input.value = "";
     autosize();
     const done = holdAside(question);
-    attempt(() => api.post(`/runs/${runId}/btw`, { text: question })).finally(done);
+    attempt(() => api.post(`/runs/${runId}/btw`, { text: question })).finally(() => {
+      done();
+      reconcile();
+    });
   }
 
   // True from the moment a message is on its way until the answer is in: Enter does not look at the disabled button,
