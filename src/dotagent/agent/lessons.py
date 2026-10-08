@@ -250,6 +250,7 @@ async def _drawn(runtime: Runtime, case: LessonCase, signals: tuple[str, ...]) -
         runtime.config.models.review,
         runtime.config.agent.model_call_timeout_s,
         f"{case.thread_id}:lessons",
+        case.run_id,
     )
     proposal: LessonProposal = await writer(
         LessonRequest(goal=case.goal, digest=case.digest, signals=signals, answer=case.answer, known=known)

@@ -891,7 +891,7 @@ that change the owner's agent are their call (see "Open owner decisions", 6 onwa
 
 | #   | Item                                                                   | Status  | Commits |
 | --- | ---------------------------------------------------------------------- | ------- | ------- |
-| 9   | Time accounting: where the seconds of a run go                         | planned |         |
+| 9   | Time accounting: where the seconds of a run go                         | done    |         |
 | 10  | Yolo asks nobody: secret fields, questions and the end of a run        | planned |         |
 | 11  | Open-ended goals in one run: targets, budgets and an honest end        | planned |         |
 | 12  | Campaigns: a goal that works until its outcome is verified             | planned |         |
@@ -946,55 +946,118 @@ owner's data was not read, the numbers of 2026-10-08 are the audit's aggregate S
 
 ### 9. Time accounting: where the seconds of a run go
 
-**Status: planned.** **Goal.** Every model call and every tool call of a run leaves its duration and its tokens in the
+**Status: done.** **Goal.** Every model call and every tool call of a run leaves its duration and its tokens in the
 store, and `dotx stats` and `dotx eval` show where the time goes, per model and per tool.
 
 **Why.** Items 13, 14 and 19 promise speed; without this item their effect is a guess. Today the store has
 `tool_result.seconds` (with the approval wait inside), the timestamps of events, and the run's token totals; the model
 call itself, the compaction, the review calls and the cache reads leave nothing (see the audit list above).
 
-**Design.**
-- `ChatRequest` gets `purpose: CallPurpose`, with `CallPurpose` the literal of `step`, `compaction`, `review`,
-  `goal_check`, `progress`, `lessons`, `vision`, `attachment` and `consult`
-  (`llm/types.py`); every constructor names its purpose (`agent/loop.py`, `agent/review.py`, `agent/vision.py`,
-  `agent/attachments.py`, `agent/aside.py`, `agent/lessons.py`, `evals/scripted.py`, the smoke tests).
-- `ModelRouter.complete` (`llm/router.py:104-106`) measures the call and hands a `ModelCall(purpose, model, session_key,
-  seconds, input_tokens, output_tokens, cached_tokens, error)` to a recorder the runtime sets:
-  `runtime.calls.record(call)`. The recorder resolves the run from the session key (one active run per thread,
-  `agent/manager.py:348-353`; a review question's `session_key` is the thread id too, `agent/review.py:386`) and
-  writes a `model_call` event for that run. A call with no active run (`dotx eval check`, `dotx models profile`) is
-  logged, not stored. Failures are recorded with `error` set to the error type and `seconds` to the time spent.
+**Design** (corrected from the code before building; the plan put `purpose` on `ChatRequest` and resolved the run
+from the session key, but the review questions' keys are `<thread>:review`, `<thread>:goal`, `<thread>:progress` and
+`<thread>:lessons`, and the lessons and a side question are asked after the run ended, when the thread may have a newer
+run; every call site knows its run, so it says which).
+- `ModelRouter.complete(ref, request, sink, origin)` (`llm/router.py:125`) takes `CallOrigin(run_id, purpose)`
+  (`llm/calls.py`), with `CallPurpose` the literal of `step`, `compaction`, `review`, `goal_check`, `progress`,
+  `lessons`, `vision`, `attachment`, `aside` and `consult`; every call site names both (`agent/loop.py`,
+  `agent/review.py` through the four question factories, `agent/vision.py`, `agent/attachments.py`, `agent/aside.py`).
+  `ChatRequest`, the providers and their wire tests do not change.
+- The router measures the call and hands a `ModelCall(run_id, purpose, model, session_key, seconds, input_tokens,
+  output_tokens, cached_tokens, error)` to the recorder it is built with (`ModelRouter(config, recorder)`). The
+  runtime's recorder adds the call's tokens to its run's totals and writes a `model_call` event for that run; a call
+  without a run is logged, not stored (the routers of `dotx doctor`, `dotx models` and `dotx models profile` make no
+  call). A failed call is recorded with `error` set to the error type and `seconds` to the time spent; a call cut off
+  (a stop, or the caller's timeout, which reaches the router as a cancellation) with `error = "cancelled"`.
 - The `assistant` event (`agent/loop.py:882-895`) gets `seconds` and `cached_tokens` too, so the timeline can show them
   per step without joining events.
 - `tool_result` gets `waited_s`: the time `gate.authorize` spent waiting for an approval (`agent/executor.py:100`,
   measured around it; `_PausedClock` at `:102` already knows it). `seconds` stays the whole call, as today.
-- `store/stats.py`: `ModelStats` gets `model_seconds`, `step_seconds_median`, `step_seconds_p90`, `compaction_seconds`,
-  `side_call_seconds` (every purpose but `step`), `cached_tokens`; a new `ToolStats(tool, calls, failed, seconds_total,
-  seconds_median, waited_s)` per tool name. Both are read from the events of the runs in the window, read-only, no
-  text. `dotx stats` prints a "Time" table per model and a "Tools" table (the 15 tools with the most seconds). A step's
-  seconds come from its `model_call` event (`purpose = "step"`); runs older than this item have none and are left out
-  of the time columns, with their count printed.
+- `store/stats.py`: `ModelStats.time` is a `TimeStats(timed_runs, model_seconds, step_seconds_median,
+  step_seconds_p90, compaction_seconds, side_call_seconds, cached_tokens)` (a side call is every purpose but `step`, the
+  compactions included); `ToolStats(tool, calls, failed, seconds_total, seconds_median, waited_s)` per tool name, over
+  the runs of every model; `collect_statistics` returns `RunStatistics(models, tools)`. Both are read from the events
+  of the runs in the window, read-only, no text. `dotx stats` prints a "Time" table per model and a "Tools" table (the
+  15 tools with the most seconds). A step's seconds come from its `model_call` event (`purpose = "step"`); runs older
+  than this item have none and are left out of the time columns (`timed_runs` of the runs is printed).
 - `dotx eval`: `RunMetrics` (`evals/results.py:22-34`, `evals/metrics.py:18-31`) gets `model_seconds` and
   `tool_seconds`; the scorecard (`evals/scoring.py:88-115`) prints seconds per pass next to steps and tokens, and the
   comparison table (`:160-170`) gets a seconds column. The replay of `dotx eval check` reports zero model seconds, as
   the scripted model makes no call.
 - The eval runner stops depending on the live bus for the end of a run: `_supervise` (`evals/runner.py:188-211`)
   checks `Subscription.dropped` and re-reads the store when events were dropped, as `server/stream.py:128-130` does.
-- Side-call tokens join the run's totals: `update_run_progress` adds the tokens of every `model_call` of the run, so
-  `dotx stats` and the Details panel stop under-counting (the eval token budget at `evals/runner.py:202-206` reads the
-  same totals).
+- Side-call tokens join the run's totals: the loop stores only the step count (`set_run_steps`), and the recorder adds
+  the tokens of every call of the run (`add_run_tokens`), the lessons drawn after its end included, so `dotx stats` and
+  the Details panel stop under-counting. The eval token budget (`evals/runner.py:202-206`) counts the `model_call`
+  events of every run instead of the `assistant` events, so it counts the same.
 
-**Touchpoints.** `llm/types.py`, `llm/router.py`, `runtime.py` (the recorder), `agent/loop.py`, `agent/executor.py`,
-`agent/review.py`, `agent/vision.py`, `agent/attachments.py`, `agent/aside.py`, `agent/lessons.py`, `store/stats.py`,
-`store/db.py` (a `model_call` kind needs no schema change: events are JSON), `cli_stats.py`, `evals/results.py`,
-`evals/metrics.py`, `evals/scoring.py`, `evals/runner.py`, `evals/scripted.py`, `timeline.js` (seconds on a step),
-README "Measuring the agent".
+**Touchpoints.** `llm/calls.py` (new), `llm/router.py`, `runtime.py` (the recorder), `cli.py`, `cli_profile.py` and
+`doctor.py` (their routers log), `agent/loop.py`, `agent/executor.py`, `agent/review.py`, `agent/manager.py`,
+`agent/vision.py`, `agent/attachments.py`, `agent/aside.py`, `agent/lessons.py`, `store/stats.py`, `store/db.py` (a
+`model_call` kind needs no schema change: events are JSON), `cli_stats.py`, `evals/results.py`, `evals/metrics.py`,
+`evals/scoring.py`, `evals/runner.py`, `timeline.js` (model time on a group of calls, side-call tokens), README
+"Measuring the agent" and the run page.
+
+**What exists now.**
+- `llm/calls.py`: `CallPurpose`, `CALL_EVENT` (`model_call`), `CANCELLED`, `CallOrigin`, `ModelCall`, `CallRecorder`,
+  `call_event_data` (the event's data: purpose, model, seconds, tokens, cached tokens, error) and `log_model_call` (the
+  recorder of the CLI routers).
+- `llm/router.py`: `ModelRouter(config, recorder)`; `complete` measures from before the connector is made to the reply,
+  so a missing key is a failed call too, and records before it returns or raises.
+- `runtime.py`: `_call_recorder(store, bus)` adds the call's tokens to its run (`Store.add_run_tokens`) and emits the
+  `model_call` event; a call without a run goes to the log.
+- `store/db.py`: `set_run_steps` and `add_run_tokens` replace `update_run_progress`.
+- `agent/loop.py`: the step's `assistant` event carries `seconds` (the model call, to its reply) and `cached_tokens`;
+  `agent/executor.py`: `tool_result.waited_s`, the seconds at the gate, which `seconds` includes.
+- `store/stats.py`: `CallSample`, `ToolSample`, `TimeStats`, `ToolStats`, `RunStatistics`, `nearest_rank`,
+  `time_stats`, `tool_stats`; `cli_stats.py`: `render_time`, `render_tools`.
+- `evals/metrics.py` (`model_seconds`, `tool_seconds` from the events), `evals/scoring.py` (`seconds_per_pass`, split
+  into model and tool seconds; the comparison's `seconds/pass` column), `evals/runner.py` (`_supervise` counts
+  `model_call` events and reads the store when its subscription dropped events).
+- `timeline.js`: a group of tool calls says "Worked for 4.8 s (model 3.6 s)"; the Details panel adds the tokens of the
+  side calls (`model_call` events whose purpose is not `step`) to those of the steps.
+- Tests: `tests/unit/test_run_statistics.py` (the time and tools tables on hand-written events: medians, p90, a run
+  without `model_call` events left out, the gate's seconds); `tests/smoke/test_scaffold.py`
+  (`test_every_model_call_of_a_run_leaves_its_seconds_and_tokens_and_the_totals_hold_them_all`: the real loop with the
+  scripted model and a small window, one `model_call` event per step and per compaction, in order, and the run's
+  totals equal to their sum).
+
+**How to use it.**
+```
+dotx stats [--days N]    # per model: the Time table; then the Tools table (the 15 tools with the most seconds)
+dotx eval run ...        # the score adds seconds per pass, split into model calls and tool calls
+```
+On the run page the title of a group of tool calls holds the model's part of its time, and the Details panel's tokens
+count every call of the run. A new call site of `ModelRouter.complete` names its run and purpose (`CallOrigin`); a call
+outside any run passes `run_id=None` and is only logged.
+
+**Baseline for items 13, 14 and 19** (2026-10-09, `dotx eval check`'s 25 reference solutions replayed through the real
+loop with the scripted model, temp home, three passes): 0.61 to 0.84 s for all 25 (the first pass is the cold one),
+median 0.01 s a task; the slowest are `shell-script-hello` 0.18 s (0.17 s in its shell calls), `fix-add-bug` 0.06 s,
+`rename-function` and `implement-slugify` 0.04 s; every other task 0.03 s or less (the cold pass's slowest: 0.39 s).
+Model seconds are 0.000 throughout, as the scripted model answers at once, so these are the harness's own costs. The
+catalog has no browser or desktop task: the timings of browser and desktop steps that items 13 and 14 promise to cut
+come from the fixture timing test of item 13. A scripted model of 1.2 s a call (throw-away daemon) gave the expected
+split on the run page ("Worked for 4.8 s (model 3.6 s)") and in `dotx stats` (7 calls: 8.4 s of model time, step
+median 1.2 s, side calls 1.2 s for the goal check).
+
+**Decisions and limits.**
+- The run's token totals hold the side calls now (compactions, reviews, the goal check, the watchdog's second opinion,
+  lessons, image descriptions, side questions), so a run shows more tokens than it would have before this item, and
+  `dotx stats`' "a step" average divides them by the steps.
+- The tool calls of runs made before this item have no `waited_s`: their approval wait counts as tool time.
+- A call that fails before the connector exists (a missing key, `MissingSecretError`) is recorded as a failed call too;
+  a call that a stop or a caller's timeout cuts off is `cancelled`, with the seconds it ran and no tokens (none were
+  reported).
+- The scripted replay of `dotx eval check` reports model seconds of about zero; only a run with a real model measures
+  the model.
 
 **Done when.** Unit tests of the aggregation on a hand-written event list (`tests/unit/test_run_statistics.py`:
 medians, p90, tools table, runs without `model_call` events left out); a smoke test with the scripted provider that
 checks one `model_call` event per step and one per compaction; `dotx stats` on a throw-away home prints the tables;
 `dotx eval check` clean; the numbers of one scripted eval run (seconds per task) written here as the baseline for
-items 13, 14 and 19.
+items 13, 14 and 19. All true; also clean: ruff format and check, mypy, the unit tests (478), `dotx eval check` (25
+tasks) and the offline smoke suite (179; the tests that call a cloud model through Ollama were left out, so no live
+model call was made); the run page checked on a scripted throw-away daemon at desktop width and at 375 px.
 
 ### 10. Yolo asks nobody: secret fields, questions and the end of a run
 
@@ -1740,3 +1803,11 @@ on and is closed by `terminal_close`; the idle reaper; unit tests of the ANSI st
 - 2026-10-09: the repository is on GitHub at `senoldogann/Dot` from here on (the folder had git since `8848d69`
   and no remote). The house rules move from local-only commits to one branch and pull request per item, reviews,
   squash merges and a Linear mirror of the status table; nothing else changed.
+- 2026-10-09: item 9 done. Every model call of a run leaves a `model_call` event (purpose, model, seconds, tokens,
+  cached tokens, error) and its tokens in the run's totals; a step's `assistant` event has its seconds, a tool result
+  the seconds it waited at the gate; `dotx stats` prints a Time table per model and a Tools table, the eval score
+  seconds per pass; the run page shows the model's part of a group's time. The design was corrected before building:
+  the call sites name their run (`CallOrigin`), as the review keys and the lessons after a run's end made a run
+  resolved from the session key wrong. Unit tests (478), `dotx eval check` and the offline smoke suite (179) clean,
+  with the tests that call a cloud model through Ollama left out: no live model call. Baseline in the item: 25 scripted
+  tasks in 0.61 s, median 0.01 s. A run's tokens now count its side calls, so the same run shows more than before.

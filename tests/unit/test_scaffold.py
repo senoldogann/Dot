@@ -139,7 +139,8 @@ async def _run(store: Store, thread_id: str, model: str, events: list[tuple[str,
     run: RunRecord = await store.create_run(thread_id, "goal", "task", model, None, "test", "medium", "ask", False)
     for kind, data in events:
         await store.add_event(run.id, kind, data)
-    await store.update_run_progress(run.id, len(events), 1000, 100)
+    await store.set_run_steps(run.id, len(events))
+    await store.add_run_tokens(run.id, 1000, 100)
     return run
 
 

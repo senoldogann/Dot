@@ -747,10 +747,15 @@ class Store:
         await self._db.execute("UPDATE runs SET status = ? WHERE id = ?", (status, run_id))
         await self._db.commit()
 
-    async def update_run_progress(self, run_id: str, steps: int, input_tokens: int, output_tokens: int) -> None:
+    async def set_run_steps(self, run_id: str, steps: int) -> None:
+        await self._db.execute("UPDATE runs SET steps = ? WHERE id = ?", (steps, run_id))
+        await self._db.commit()
+
+    async def add_run_tokens(self, run_id: str, input_tokens: int, output_tokens: int) -> None:
+        """Add the tokens of one model call of a run (a step or a side call) to its totals."""
         await self._db.execute(
-            "UPDATE runs SET steps = ?, input_tokens = ?, output_tokens = ? WHERE id = ?",
-            (steps, input_tokens, output_tokens, run_id),
+            "UPDATE runs SET input_tokens = input_tokens + ?, output_tokens = output_tokens + ? WHERE id = ?",
+            (input_tokens, output_tokens, run_id),
         )
         await self._db.commit()
 

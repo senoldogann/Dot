@@ -88,11 +88,11 @@ async def manager(runtime: Runtime) -> AsyncIterator[RunManager]:
 
 
 def _reviewer(runtime: Runtime) -> Reviewer:
-    return reviewer_for(runtime.router, MODEL_REF, QUESTION_TIMEOUT_S, f"{SESSION_KEY}:review")
+    return reviewer_for(runtime.router, MODEL_REF, QUESTION_TIMEOUT_S, f"{SESSION_KEY}:review", None)
 
 
 def _goal_checker(runtime: Runtime) -> GoalChecker:
-    return goal_checker_for(runtime.router, MODEL_REF, QUESTION_TIMEOUT_S, f"{SESSION_KEY}:goal")
+    return goal_checker_for(runtime.router, MODEL_REF, QUESTION_TIMEOUT_S, f"{SESSION_KEY}:goal", None)
 
 
 def _touch_goal(path: Path) -> str:

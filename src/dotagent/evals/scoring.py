@@ -24,8 +24,10 @@ class FailureNote(FrozenModel):
 
 
 class Scorecard(FrozenModel):
-    """The numbers of one report. ``steps_per_pass`` and ``tokens_per_pass`` are what the attempts that passed cost on
-    average (``None`` when none did). An attempt is a false success when the agent claimed to be done and was not."""
+    """The numbers of one report. ``steps_per_pass``, ``tokens_per_pass`` and ``seconds_per_pass`` are what the attempts
+    that passed cost on average (``None`` when none did); ``model_seconds_per_pass`` and ``tool_seconds_per_pass`` split
+    the time into model calls and tool calls, over the passes whose report measured them. An attempt is a false
+    success when the agent claimed to be done and was not."""
 
     model: str
     settings: EvalSettings
@@ -33,6 +35,9 @@ class Scorecard(FrozenModel):
     passed: int
     steps_per_pass: float | None
     tokens_per_pass: float | None
+    seconds_per_pass: float | None
+    model_seconds_per_pass: float | None
+    tool_seconds_per_pass: float | None
     tool_calls: int
     tool_errors: int
     invalid_arguments: int
@@ -81,8 +86,14 @@ def _flaky(outcomes: Sequence[TaskOutcome]) -> tuple[str, ...]:
     return tuple(name for name in names if results[name] == {True, False})
 
 
-def _mean(total: int, count: int) -> float | None:
+def _mean(total: float, count: int) -> float | None:
     return None if count == 0 else total / count
+
+
+def _measured_mean(values: Sequence[float | None]) -> float | None:
+    """The mean of the values that were measured; ``None`` when none was."""
+    measured: list[float] = [value for value in values if value is not None]
+    return _mean(sum(measured), len(measured))
 
 
 def score_report(report: EvalReport) -> Scorecard:
@@ -98,6 +109,9 @@ def score_report(report: EvalReport) -> Scorecard:
         tokens_per_pass=_mean(
             sum(outcome.metrics.input_tokens + outcome.metrics.output_tokens for outcome in passes), len(passes)
         ),
+        seconds_per_pass=_mean(sum(outcome.seconds for outcome in passes), len(passes)),
+        model_seconds_per_pass=_measured_mean([outcome.metrics.model_seconds for outcome in passes]),
+        tool_seconds_per_pass=_measured_mean([outcome.metrics.tool_seconds for outcome in passes]),
         tool_calls=sum(outcome.metrics.tool_calls for outcome in outcomes),
         tool_errors=sum(outcome.metrics.tool_errors for outcome in outcomes),
         invalid_arguments=sum(outcome.metrics.invalid_arguments for outcome in outcomes),
@@ -129,6 +143,17 @@ def _steps(count: float | None) -> str:
     return "-" if count is None else f"{count:.1f}"
 
 
+def _seconds(count: float | None) -> str:
+    return "-" if count is None else f"{count:.1f} s"
+
+
+def _time_split(card: Scorecard) -> str:
+    """Where the seconds of a pass went, when the report measured it."""
+    if card.model_seconds_per_pass is None or card.tool_seconds_per_pass is None:
+        return ""
+    return f" (model calls {_seconds(card.model_seconds_per_pass)}, tools {_seconds(card.tool_seconds_per_pass)})"
+
+
 def render_scorecard(card: Scorecard) -> list[str]:
     """The lines that show one scorecard."""
     settings: EvalSettings = card.settings
@@ -141,7 +166,8 @@ def render_scorecard(card: Scorecard) -> list[str]:
         f"  passed {card.passed} of {card.attempts} attempts ({_percent(card.passed, card.attempts)}), "
         f"{card.seconds:.0f} s in all",
         "  by kind: " + ", ".join(f"{score.category} {score.passed}/{score.attempts}" for score in card.categories),
-        f"  a pass costs {_steps(card.steps_per_pass)} steps and {_tokens(card.tokens_per_pass)} tokens",
+        f"  a pass costs {_steps(card.steps_per_pass)} steps, {_tokens(card.tokens_per_pass)} tokens and "
+        f"{_seconds(card.seconds_per_pass)}{_time_split(card)}",
         f"  tools: {card.tool_calls} calls, {card.tool_errors} failed ({_percent(card.tool_errors, card.tool_calls)}), "
         f"{card.invalid_arguments} with arguments that were not valid JSON",
         f"  stalls {card.stalls}, cut short {card.cuts}, claimed to be done but were not {card.false_successes}, "
@@ -160,11 +186,11 @@ def render_scorecard(card: Scorecard) -> list[str]:
 def render_comparison(cards: Sequence[Scorecard]) -> list[str]:
     """One row per scorecard: the numbers to compare models, or one model before and after a change."""
     width: int = max(len(card.model) for card in cards)
-    header: str = f"{'model':<{width}}  {'passed':>9}  {'steps/pass':>10}  {'tokens/pass':>11}  {'tool errors':>11}  {'stalls':>6}  {'false claims':>12}"
+    header: str = f"{'model':<{width}}  {'passed':>9}  {'steps/pass':>10}  {'tokens/pass':>11}  {'seconds/pass':>12}  {'tool errors':>11}  {'stalls':>6}  {'false claims':>12}"
     rows: list[str] = [
         f"{card.model:<{width}}  {f'{card.passed}/{card.attempts}':>9}  {_steps(card.steps_per_pass):>10}  "
-        f"{_tokens(card.tokens_per_pass):>11}  {_percent(card.tool_errors, card.tool_calls):>11}  "
-        f"{card.stalls:>6}  {card.false_successes:>12}"
+        f"{_tokens(card.tokens_per_pass):>11}  {_seconds(card.seconds_per_pass):>12}  "
+        f"{_percent(card.tool_errors, card.tool_calls):>11}  {card.stalls:>6}  {card.false_successes:>12}"
         for card in cards
     ]
     return [header, *rows]

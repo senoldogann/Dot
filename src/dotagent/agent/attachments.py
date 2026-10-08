@@ -25,6 +25,7 @@ from dotagent.core.ids import new_id
 from dotagent.core.images import EncodedImage, encode_image
 from dotagent.core.text import truncate_middle
 from dotagent.core.types import FrozenModel
+from dotagent.llm.calls import CallOrigin
 from dotagent.llm.types import ImageData, Message, user_message
 from dotagent.runtime import Runtime
 from dotagent.web.pdf import pdf_to_text
@@ -209,9 +210,10 @@ def _image_of(file: StoredAttachment) -> ImageData:
 
 
 async def message_with_attachments(
-    runtime: Runtime, session_key: str, text: str, files: Sequence[StoredAttachment], can_see: bool
+    runtime: Runtime, session_key: str, run_id: str | None, text: str, files: Sequence[StoredAttachment], can_see: bool
 ) -> Message:
-    """The user's message with its attachments in it, as the model gets it."""
+    """The user's message with its attachments in it, as the model gets it. A model that cannot see gets a description
+    of the images, asked of the vision model for the run ``run_id`` (``None`` outside any run)."""
     if not files:
         return user_message(text, ())
     content: str = f"{text}\n\n{await asyncio.to_thread(attachments_text, files)}"
@@ -226,6 +228,7 @@ async def message_with_attachments(
         runtime.config.agent,
         runtime.config.models.vision,
         session_key,
+        CallOrigin(run_id=run_id, purpose="attachment"),
         f"The user attached these images to a message: {names}. The message: {truncate_middle(text, 600)}",
         images,
     )

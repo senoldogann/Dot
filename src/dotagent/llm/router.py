@@ -1,11 +1,13 @@
 """Model routing: ``provider:model`` references resolved to connectors that are created on first use."""
 
 import asyncio
+import time
 
 from dotagent.config import AppConfig
-from dotagent.core.errors import ConfigError
+from dotagent.core.errors import ConfigError, DotError
 from dotagent.core.types import FrozenModel
 from dotagent.llm.anthropic import AnthropicProvider
+from dotagent.llm.calls import CANCELLED, CallOrigin, CallRecorder, ModelCall
 from dotagent.llm.ollama import OllamaProvider
 from dotagent.llm.openai import OpenAIProvider
 from dotagent.llm.opencode_go import OpenCodeGoProvider
@@ -36,11 +38,30 @@ def parse_model_ref(text: str) -> ModelRef:
     return ModelRef(provider=provider, model=model)
 
 
-class ModelRouter:
-    """Owns the provider connectors and sends each request to the one its model reference names."""
+def _measured(
+    ref: ModelRef, request: ChatRequest, origin: CallOrigin, seconds: float, reply: ModelReply | None, error: str | None
+) -> ModelCall:
+    """A call as the recorder gets it: a call without a reply used no tokens a provider reported."""
+    return ModelCall(
+        run_id=origin.run_id,
+        purpose=origin.purpose,
+        model=ref.label,
+        session_key=request.session_key,
+        seconds=seconds,
+        input_tokens=0 if reply is None else reply.usage.input_tokens,
+        output_tokens=0 if reply is None else reply.usage.output_tokens,
+        cached_tokens=0 if reply is None else reply.usage.cached_tokens,
+        error=error,
+    )
 
-    def __init__(self, config: AppConfig) -> None:
+
+class ModelRouter:
+    """Owns the provider connectors and sends each request to the one its model reference names. Every call it sends
+    is measured and handed to ``recorder``."""
+
+    def __init__(self, config: AppConfig, recorder: CallRecorder) -> None:
         self._config: AppConfig = config
+        self._recorder: CallRecorder = recorder
         self._providers: dict[str, ChatProvider] = {}
         # The names served by a connector given through `register`; `retire` leaves them alone.
         self._registered: set[str] = set()
@@ -101,9 +122,25 @@ class ModelRouter:
             if retired is not None:
                 self._retired.append(retired)
 
-    async def complete(self, ref: ModelRef, request: ChatRequest, sink: DeltaSink) -> ModelReply:
-        provider: ChatProvider = await self.provider(ref.provider)
-        return await provider.complete(request, sink)
+    async def complete(self, ref: ModelRef, request: ChatRequest, sink: DeltaSink, origin: CallOrigin) -> ModelReply:
+        """Send ``request`` to the provider of ``ref`` and hand the recorder what the call cost: its seconds and tokens,
+        or, for a call that failed, the type of its error (:data:`CANCELLED` for one that a stop or the caller's
+        timeout cut off; a connector that cannot be made, such as one without its key, fails the call too). The error
+        is raised after it is recorded."""
+        started: float = time.monotonic()
+        try:
+            provider: ChatProvider = await self.provider(ref.provider)
+            reply: ModelReply = await provider.complete(request, sink)
+        except asyncio.CancelledError:
+            await self._recorder(_measured(ref, request, origin, time.monotonic() - started, None, CANCELLED))
+            raise
+        except DotError as error:
+            await self._recorder(
+                _measured(ref, request, origin, time.monotonic() - started, None, type(error).__name__)
+            )
+            raise
+        await self._recorder(_measured(ref, request, origin, time.monotonic() - started, reply, None))
+        return reply
 
     async def model_info(self, ref: ModelRef) -> ModelInfo:
         provider: ChatProvider = await self.provider(ref.provider)

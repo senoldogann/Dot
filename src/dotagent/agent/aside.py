@@ -17,6 +17,7 @@ from dotagent.core.ids import new_id
 from dotagent.core.logs import get_logger
 from dotagent.core.text import truncate_middle
 from dotagent.core.types import FrozenModel
+from dotagent.llm.calls import CallOrigin
 from dotagent.llm.router import ModelRef, parse_model_ref
 from dotagent.llm.types import ChatRequest, Message, ModelReply, StreamDelta, system_message, user_message
 from dotagent.runtime import Runtime
@@ -86,7 +87,9 @@ async def _ask(runtime: Runtime, ref: ModelRef, run: RunRecord, record: str, que
         )
         try:
             async with asyncio.timeout(runtime.config.agent.model_call_timeout_s):
-                reply: ModelReply = await runtime.router.complete(ref, request, _discard)
+                reply: ModelReply = await runtime.router.complete(
+                    ref, request, _discard, CallOrigin(run_id=run.id, purpose="aside")
+                )
         except ProviderError as error:
             problem = error
         except TimeoutError as error:

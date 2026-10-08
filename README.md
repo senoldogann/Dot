@@ -429,8 +429,16 @@ How well Dot finishes work is measured, not guessed, in two ways.
 **`dotx stats [--days N]`** counts the runs that really happened (the last 30 days by default), per model: how they
 ended (finished, stopped by you, stopped by the progress watchdog, refused by the goal check, cut off when the daemon died or
 shut down, internal error, still active), steps, input and output tokens, tool calls and how many of them failed, calls
-whose arguments were not valid JSON, stalls and compactions. The database file is opened read-only, so it is safe to run
-while the daemon works, and the numbers hold no text of your chats.
+whose arguments were not valid JSON, stalls and compactions. A **Time** table follows, per model: the seconds its model
+calls took, the median and the 90th percentile of one step's model call, the seconds of the compactions and of all side
+calls (every call but a step: compactions, approvals the review model answered, the goal check, the watchdog's second
+opinion, lessons, descriptions of images, side questions), and the tokens the provider served from its prompt cache. Every
+model call of a run leaves a `model_call` event with its purpose, model, seconds and tokens, and its tokens count in the
+run's totals; runs made before calls were timed have none, are left out of the table and are counted below it. A
+**Tools** table lists the 15 tools whose calls took the most seconds: calls, failures, seconds in all, the median call and
+the seconds spent at the gate (waiting for your approval or the review model's answer), which the seconds include. The
+database file is opened read-only, so it is safe to run while the daemon works, and the numbers hold no text of your
+chats.
 
 **`dotx eval`** plays a catalog of small tasks against a model and judges each by what is left in a workspace of its own:
 file edits, shell work, fixing code until its test passes, recovering from an error, multi-step work, read-only
@@ -448,9 +456,10 @@ Every attempt runs unattended in a throw-away Dot home (its own database and wor
 Mac desktop, your MCP servers, skills, plugins and the memory embeddings switched off, and with every question of the
 policy or of the agent refused. Your own database, workspace and screenshots are never touched; the API keys the model
 needs are looked up first and handed over by name. The score holds the pass rate, per kind of task, what a pass costs in
-steps and tokens, how often a tool call failed, stalls, runs that were cut, runs that said they were done and were not,
-and the tasks that passed only in some attempts. `dotx eval run` saves its report after every attempt, so an
-interrupted run keeps what it measured.
+steps, tokens and seconds (split into model calls and tool calls), how often a tool call failed, stalls, runs that were
+cut, runs that said they were done and were not, and the tasks that passed only in some attempts. The token ceiling of
+an attempt counts every model call of the run and of the runs it delegated to, side calls included. `dotx eval run`
+saves its report after every attempt, so an interrupted run keeps what it measured.
 
 A task is data (`src/dotagent/evals/catalog.py`): the files the workspace starts with, the goal, checks (a file exists,
 holds or equals something, a JSON file equals a value, a command exits with 0, the answer contains something) and a
@@ -480,12 +489,14 @@ the model and, for a model that offers a choice, its reasoning level (kept in th
 starts the run, Shift+Enter adds a line. A run that waits for your approval shows above the composer.
 
 A run opens as a conversation. Your goal is the first message. The tool calls of one stretch of work fold into a single
-"Worked for 12 s · 5 tool calls" line (open it for every call, result and screenshot), while approvals, questions and
-policy notes stay in the open. The answer of the run is the last message, with a Copy button and when it finished and how
-long the run took. A strip under the title links the other runs of the same thread, and the box at the bottom steers a
-run that is going on or follows up on a finished one. A Details panel shows the status, the model and its reasoning
-level, the approval mode and goal mode, the model turns, the tool calls (with the failed ones), the tokens, the duration and the run id, then the plan and
-the latest screenshots; it sits beside the conversation from 960 px and opens as a drawer below that.
+"Worked for 12 s (model 8 s) · 5 tool calls" line, where the part in brackets is the time the model took to choose those
+calls (open it for every call, result and screenshot), while approvals, questions and policy notes stay in the open. The
+answer of the run is the last message, with a Copy button and when it finished and how long the run took. A strip under
+the title links the other runs of the same thread, and the box at the bottom steers a run that is going on or follows up
+on a finished one. A Details panel shows the status, the model and its reasoning level, the approval mode and goal mode,
+the model turns, the tool calls (with the failed ones), the tokens (of every model call of the run: its steps and its
+side calls, such as compactions, reviews and the goal check), the duration and the run id, then the plan and the latest
+screenshots; it sits beside the conversation from 960 px and opens as a drawer below that.
 
 **Settings** (`#/settings`) is one page with tabs: **General** (the look of this browser, the two switches below, desktop
 notifications and the token this browser is signed in with), **Models** (one fold per provider, with the reasoning levels

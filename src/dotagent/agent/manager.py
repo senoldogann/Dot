@@ -405,6 +405,7 @@ class RunManager:
                 runtime.config.models.review,
                 runtime.config.agent.model_call_timeout_s,
                 f"{thread_id}:review",
+                run.id,
             ),
             instructions,
         )

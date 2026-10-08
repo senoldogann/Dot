@@ -485,7 +485,7 @@ async def test_attached_files_are_kept_and_reach_the_message_the_model_reads(
         assert started.status_code == 404, started.text
 
     files = await load_attachments(runtime.workspace, [notes.json()["id"], pdf.json()["id"], photo.json()["id"]])
-    message: Message = await message_with_attachments(runtime, "thread_test", "Use the files.", files, True)
+    message: Message = await message_with_attachments(runtime, "thread_test", None, "Use the files.", files, True)
     assert message.content.startswith("Use the files.")
     assert f"SECRET = '{code}'" in message.content
     assert f"PDF says {code}-pdf" in message.content

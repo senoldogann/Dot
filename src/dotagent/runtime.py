@@ -27,6 +27,7 @@ from dotagent.core.paths import (
 )
 from dotagent.desktop.session import DesktopSession
 from dotagent.events import EventBus
+from dotagent.llm.calls import CALL_EVENT, CallRecorder, ModelCall, call_event_data, log_model_call
 from dotagent.llm.router import ModelRouter
 from dotagent.mcp.hub import McpHub, open_hub
 from dotagent.memory.service import MemoryIndex, close_memory_index, open_memory_index
@@ -111,6 +112,20 @@ def _guarded_files() -> tuple[Path, ...]:
     )
 
 
+def _call_recorder(store: Store, bus: EventBus) -> CallRecorder:
+    """What becomes of a measured model call: its tokens join the totals of its run, which gets a ``model_call`` event;
+    a call outside any run is logged."""
+
+    async def record(call: ModelCall) -> None:
+        if call.run_id is None:
+            await log_model_call(call)
+            return
+        await store.add_run_tokens(call.run_id, call.input_tokens, call.output_tokens)
+        await bus.emit(call.run_id, CALL_EVENT, call_event_data(call), True)
+
+    return record
+
+
 async def build_runtime(config: AppConfig) -> Runtime:
     """Read the environment of the login shell, then open every service (:func:`open_runtime`)."""
     login_env: dict[str, str] = await read_login_env(config.shell.login_env_timeout_s)
@@ -146,7 +161,7 @@ async def open_runtime(config: AppConfig, login_env: dict[str, str]) -> Runtime:
             store=store,
             bus=bus,
             approvals=ApprovalBroker(store, bus, config.policy.approval_timeout_s),
-            router=ModelRouter(config),
+            router=ModelRouter(config, _call_recorder(store, bus)),
             browser=BrowserSession(config.browser, browser_data_dir(config.browser.mode), downloads_dir()),
             desktop=DesktopSession(sized_for_agent(config), failsafe_path()),
             web=WebClient(config.web, config.browser.allowed_hosts, config.browser.blocked_hosts),

@@ -21,7 +21,9 @@ class CheckOutcome(FrozenModel):
 
 class RunMetrics(FrozenModel):
     """What a run did, counted from its events and its record. ``unanswered_questions`` are the questions the policy
-    or the agent raised that nobody could answer, because an eval run is unattended."""
+    or the agent raised that nobody could answer, because an eval run is unattended. ``model_seconds`` is the time its
+    model calls took (the steps and the side calls), ``tool_seconds`` the time its tool calls took; a report saved
+    before they were measured has neither."""
 
     steps: int
     input_tokens: int
@@ -32,6 +34,8 @@ class RunMetrics(FrozenModel):
     stalls: int
     compactions: int
     unanswered_questions: int
+    model_seconds: float | None = None
+    tool_seconds: float | None = None
 
 
 class TaskOutcome(FrozenModel):
