@@ -857,11 +857,11 @@ files and the folder, left the third and exited 1; a second `--apply` left only 
    `dotx doctor` warns about it (a warning, not a failure).
 4. From the audit: how long to keep events and screenshots (retention windows), which model compacts (`[models] fast` is
    documented but never read), browser access to localhost and private addresses, CI.
-5. The Claude models (`anthropic`): no request to the Anthropic API has run yet. Save `ANTHROPIC_API_KEY`
-   (`dotx auth set ANTHROPIC_API_KEY`) and run the hosted test once
-   (`.venv/bin/python -m pytest tests/smoke/test_hosted_services.py -m hosted -k anthropic`: a few tiny requests of
-   `claude-haiku-5-5`). A Claude model is then a candidate for `[models] review` while `main` is of another family
-   (decision 3).
+5. The Claude models (`anthropic`): no request to the Anthropic API has run yet. Save `ANTHROPIC_API_KEY` (Settings ›
+   API keys once the daemon runs the new code, its **Check** costs nothing; or `dotx auth set ANTHROPIC_API_KEY`) and
+   run the hosted test once (`.venv/bin/python -m pytest tests/smoke/test_hosted_services.py -m hosted -k anthropic`:
+   a few tiny requests of `claude-haiku-5-5`). A Claude model is then a candidate for `[models] review` while `main` is
+   of another family (decision 3).
 
 ## Log
 
@@ -943,3 +943,14 @@ files and the folder, left the third and exited 1; a second `--apply` left only 
   there; the system prompt carries the time to the minute, so the runs of a chat never share a cached prompt; the 4.5
   generation runs without thinking (it has no adaptive thinking, and budget thinking is not sent); the documentation
   gives a 429 for a reached spend limit no mark of its own, so Dot retries it like a rate limit before it fails.
+- 2026-10-08: on the owner's request: Settings › API keys (`361cb39`). The web UI saves, replaces, checks and removes
+  the key of each provider in `<home>/.env` (the file and the function of `dotx auth set`) and shows where the key in
+  use comes from and its last four characters, never the key; a saved or removed key reaches a running daemon at the
+  provider's next request (`ModelRouter.retire`). Unit tests (475), the offline smoke suite (163) clean except
+  `test_a_run_reads_a_file_through_a_delegated_run` (model-driven, as in item 5), which passed when rerun; the web UI
+  test in headless Chrome; the page checked on a throw-away daemon in both looks, light and dark, wide and at phone
+  width, with keys under variable names no environment or Keychain has (no key of the owner was read; the checks of the
+  fake keys got a 401 from api.anthropic.com and opencode.ai). The owner's daemon started before item 1: it serves the
+  new page from disk, but the page cannot load its keys until a restart loads the new code. Found and fixed: the 422
+  answer of a refused request repeated the refused value, which may be a key. Found, not changed: saving a key rewrites
+  the whole `.env` (comments and `export` prefixes in it are lost) and not atomically, as `dotx auth set` always did.
