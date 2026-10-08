@@ -133,6 +133,15 @@ resume_within_s = 1800
 # after a run that read content third parties can author (web pages, files from others), whose lessons are only
 # proposed. Later runs find a saved lesson like any note of the agent. "off" until evals show that it helps.
 lessons = "off"
+# Before write_file or edit_file changes a file, the run notes the change in its journal, and its first change to a file
+# keeps a copy of the file as it was, so that `dotx undo RUN_ID` can take the changes of the run back. A file larger
+# than undo_max_file_bytes, or one whose copy would bring the copies of the run past undo_max_run_bytes, is changed
+# without a copy and cannot be put back; a file the run created can always be deleted again. Changes made by shell
+# commands (rm, mv, sed -i) are not in the journal. `dotx prune --apply` deletes the journals whose last change is older
+# than undo_keep_days.
+undo_max_file_bytes = 10485760
+undo_max_run_bytes = 104857600
+undo_keep_days = 30
 
 [policy]
 # aggressive: act without asking except for the hard stops; balanced: ask for external side effects;

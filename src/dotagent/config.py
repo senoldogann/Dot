@@ -101,6 +101,9 @@ class AgentConfig(FrozenModel):
     resume: ResumeMode
     resume_within_s: int
     lessons: LessonsMode
+    undo_max_file_bytes: int
+    undo_max_run_bytes: int
+    undo_keep_days: int
 
 
 class PolicyConfig(FrozenModel):

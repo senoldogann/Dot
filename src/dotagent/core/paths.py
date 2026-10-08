@@ -65,6 +65,11 @@ def evals_dir() -> Path:
     return dot_home() / "evals"
 
 
+def undo_dir() -> Path:
+    """Where the journals of the file changes of runs are kept, one folder per run, for ``dotx undo``."""
+    return dot_home() / "undo"
+
+
 def pid_path() -> Path:
     return dot_home() / "daemon.pid"
 

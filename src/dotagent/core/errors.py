@@ -150,8 +150,12 @@ class InvalidValueError(StoreError):
 
 
 class RunConflict(DotError):
-    """A run cannot be started, steered or stopped, an approval decided, or a lesson of a run saved or dismissed, in the
-    state it is in."""
+    """A run cannot be started, steered or stopped, an approval decided, a lesson of a run saved or dismissed, or the
+    file changes of a run taken back, in the state it is in."""
+
+
+class UndoError(DotError):
+    """The journal of a run's file changes cannot be written or read, or a change cannot be taken back."""
 
 
 class EvalError(DotError):

@@ -68,6 +68,7 @@ from dotagent.cli_schedule import (
 from dotagent.cli_skills import SkillsListCommand, cmd_skills_list
 from dotagent.cli_stats import StatsCommand, cmd_stats
 from dotagent.cli_ui import TerminalUi, UiOptions, read_line
+from dotagent.cli_undo import UndoCommand, cmd_undo
 from dotagent.config import AppConfig, load_user_config
 from dotagent.core.errors import ConfigError, DotError
 from dotagent.core.logs import configure_logging
@@ -270,6 +271,7 @@ type Command = Annotated[
     | McpListCommand
     | SkillsListCommand
     | PruneCommand
+    | UndoCommand
     | EvalListCommand
     | EvalCheckCommand
     | EvalRunCommand
@@ -439,6 +441,22 @@ def build_parser() -> argparse.ArgumentParser:
         "--apply",
         action="store_true",
         help="delete those screenshots and give the free space back to the disk (without it, only report)",
+    )
+
+    undo = commands.add_parser(
+        "undo",
+        help="take back the file changes that write_file and edit_file made in a run and in the runs it delegated to",
+    )
+    undo.add_argument(
+        "run_id", help="the id of the run: the last line of 'dotx run' and the run page's address show it"
+    )
+    undo.add_argument(
+        "--apply", action="store_true", help="take the changes back (without it, only show what would be done)"
+    )
+    undo.add_argument(
+        "--force",
+        action="store_true",
+        help="with --apply, also take back the files that changed after the run's last change to them",
     )
 
     evaluation = commands.add_parser(
@@ -975,6 +993,8 @@ async def dispatch(command: Command) -> int:
             return await cmd_skills_list(command)
         case PruneCommand():
             return await cmd_prune(command)
+        case UndoCommand():
+            return await cmd_undo(command)
         case EvalListCommand():
             return await cmd_eval_list(command)
         case EvalCheckCommand():

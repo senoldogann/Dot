@@ -243,7 +243,8 @@ clears the mark. A delegated run starts as untrusted as its parent.
   (`[shell] pass_env` lists exceptions).
 - The agent can neither read nor change `~/.ssh`, `~/.gnupg`, `~/Library/Keychains`, `~/.aws`, `~/.config/gcloud` and the
   data directory of your Chrome (`[policy] protected_paths`), nor Dot's own key file, token, browser profile,
-  configuration and database. The configuration holds the policy and the MCP servers, the database the rules.
+  configuration, database and journals of file changes. The configuration holds the policy and the MCP servers, the
+  database the rules, the journals what `dotx undo` writes back.
 
 **Approvals.** An action that needs a yes becomes an approval: `allow? [y/N]` in the terminal, a card in the web UI. The
 run waits (its status is `blocked`) for up to `[policy] approval_timeout_s`; an approval nobody answers expires and
@@ -383,6 +384,21 @@ which could plant a lesson: those are only proposed, and the page says why. A sa
 the others: a later run gets it when it fits its goal, and the Memory page edits or forgets it. Delegated runs, chats,
 runs that failed or were stopped, and evals (which always run without lessons) are not asked. `lessons` is `"off"` by
 default until evals show that it helps.
+
+**Taking back the file changes of a run.** Before `write_file` or `edit_file` changes a file, the run notes the change
+in its journal (`undo/` in the home directory), and its first change to a file keeps a copy of the file as it was. When
+the change cannot be noted (a full disk, say), the file is not changed and the model is told why. `dotx undo RUN_ID`
+shows what taking back the changes of that run and of the runs it delegated to would do: a file the run changed is put
+back as it was (`restore`), with its permissions, a file it created is deleted (`delete`), and the folders it created
+are removed once they are empty. Nothing is changed until `dotx undo RUN_ID --apply`, which exits with 1 when it left a
+file as it is. A file that changed or was deleted after the run's last change to it is a conflict and is left as it is;
+`--apply --force` takes it back too, and what changed in it since is lost. A file larger than `undo_max_file_bytes`
+(10 MiB), or whose copy would bring the copies of the run past `undo_max_run_bytes` (100 MiB), is changed without a copy
+and cannot be put back; a file the run created can always be deleted again. A copy that is not the one the journal
+noted is not written back, and a folder that is now where a file was is never replaced. Only the two file tools are in
+the journal: what a shell command (`rm`, `mv`, `sed -i`), the browser or the desktop changed is not. A run that is still
+working is refused; a run of `dotx run` that a crash left working ends when the daemon starts again.
+`dotx prune --apply` deletes the journals whose last change is older than `undo_keep_days` (30 days).
 
 ## Measuring the agent
 
@@ -777,14 +793,17 @@ things: `DOT_HOME` (the home directory) and `DOT_LOG_DIR` (the logs).
 | `skills/`, `plugins/`                            | skills and plugins Dot always reads (more via `[skills]`/`[plugins]` dirs) |
 | `browser-profile/`                               | the Chrome profile of the browser tools                              |
 | `screenshots/`, `downloads/`                     | what the tools capture and download                                  |
+| `undo/`                                          | journals of the file changes of runs, for `dotx undo`                |
 | `daemon.pid`                                     | held while a daemon runs; a second daemon is refused                 |
 | `STOP`                                           | exists while the emergency stop is engaged                           |
 
 Deleting a chat deletes the screenshot files that only it named. Nothing else is removed by itself: old runs and their
-events stay until their chats are deleted. `dotx prune` lists the screenshot files that no chat names any more (what
-chats deleted earlier left behind) and the free space inside the database file; `dotx prune --apply` deletes those files
-and gives the space back to the disk, after which a delete returns its space by itself. The database is locked for a
-moment while it compacts, so run it when no run is active.
+events stay until their chats are deleted, and the journals of file changes until `dotx prune --apply` finds them old.
+`dotx prune` lists the screenshot files that no chat names any more (what chats deleted earlier left behind), the free
+space inside the database file and the journals of file changes (`dotx undo`) whose last change is older than
+`[agent] undo_keep_days`; `dotx prune --apply` deletes those files and journals and gives the space back to the disk,
+after which a delete returns its space by itself. The database is locked for a moment while it compacts, so run it when
+no run is active.
 
 Logs are structured and go to `~/Library/Logs/Dot/dotx.log`. The output of the launchd job goes to `daemon.out.log`
 and `daemon.err.log` in the same directory, and the stderr of each MCP server to `mcp-<name>.log`.
@@ -885,3 +904,7 @@ src/dotagent/
   finished; the first message of the resumed run says which finished. A run of `dotx run` works in its own process, but
   a daemon that starts while it works marks it as cut off all the same: do not resume it by hand while `dotx run` still
   shows it (the daemon never resumes such a run on its own).
+- Undo: only `write_file` and `edit_file` are in the journal, not shell commands, the browser or the desktop. A run
+  keeps a copy of a file at its first change to it only, within `undo_max_file_bytes` and `undo_max_run_bytes`. Runs
+  that change the same file are taken back in the order their changes were noted. The web UI has no undo button: use
+  `dotx undo`, which needs the run in the database (the journals of a deleted chat stay until `dotx prune --apply`).

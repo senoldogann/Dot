@@ -22,6 +22,7 @@ from dotagent.core.paths import (
     failsafe_path,
     screenshots_dir,
     token_path,
+    undo_dir,
     workspace_dir,
 )
 from dotagent.desktop.session import DesktopSession
@@ -71,6 +72,7 @@ class Runtime:
     shell_env: dict[str, str]
     workspace: Path
     schedule_zone: ZoneInfo
+    undo_dir: Path
 
 
 def _tool_groups(config: AppConfig) -> tuple[tuple[RegisteredTool, ...], ...]:
@@ -93,7 +95,8 @@ def _tool_groups(config: AppConfig) -> tuple[tuple[RegisteredTool, ...], ...]:
 
 def _guarded_files() -> tuple[Path, ...]:
     """What the agent must neither read nor change: secrets, the browser profiles (Dot's own and the Chrome of the
-    user), the settings that decide what it may do (policy, rules, MCP servers) and its own database."""
+    user), the settings that decide what it may do (policy, rules, MCP servers), its own database and the journals of
+    file changes (``dotx undo`` writes back what a journal says)."""
     database: Path = db_path()
     return (
         env_file_path(),
@@ -104,6 +107,7 @@ def _guarded_files() -> tuple[Path, ...]:
         database,
         database.with_name(f"{database.name}-wal"),
         database.with_name(f"{database.name}-shm"),
+        undo_dir(),
     )
 
 
@@ -154,6 +158,7 @@ async def open_runtime(config: AppConfig, login_env: dict[str, str]) -> Runtime:
             shell_env=shell_env,
             workspace=workspace_dir(),
             schedule_zone=schedule_zone,
+            undo_dir=undo_dir(),
         )
         cleanup.pop_all()
     return runtime

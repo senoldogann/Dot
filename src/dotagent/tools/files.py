@@ -29,6 +29,7 @@ from dotagent.tools.base import (
     ok_with_images,
 )
 from dotagent.tools.context import ToolContext
+from dotagent.undo.journal import JournalTarget, note_change, run_journal
 
 _IMAGE_SUFFIXES: frozenset[str] = frozenset({".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp", ".tiff", ".heic"})
 _DEFAULT_LINE_LIMIT: int = 2000
@@ -152,22 +153,36 @@ def _read_file_tool() -> RegisteredTool:
     )
 
 
-def _atomic_write(path: Path, content: str) -> int:
+def _journal(ctx: ToolContext, tool: str) -> JournalTarget:
+    """Where ``tool`` notes a change of this run for ``dotx undo``, and how much it may copy."""
+    return JournalTarget(
+        directory=run_journal(ctx.runtime.undo_dir, ctx.run_id),
+        tool=tool,
+        max_file_bytes=ctx.runtime.config.agent.undo_max_file_bytes,
+        max_run_bytes=ctx.runtime.config.agent.undo_max_run_bytes,
+    )
+
+
+def _atomic_write(path: Path, content: str, journal: JournalTarget) -> int:
+    """Replace ``path`` with ``content`` through a temporary file, keeping its permission bits. The change is noted in
+    ``journal`` first; when that fails, the file is not changed."""
     if path.is_dir():
         raise ToolExecutionError("path is a directory", {"path": str(path)})
+    data: bytes = content.encode("utf-8")
+    note_change(journal, path, data)
     path.parent.mkdir(parents=True, exist_ok=True)
     mode: int | None = path.stat().st_mode & 0o777 if path.exists() else None
     handle, temp_name = tempfile.mkstemp(dir=path.parent, prefix=f".{path.name}.")
     try:
-        with os.fdopen(handle, "w", encoding="utf-8") as stream:
-            stream.write(content)
+        with os.fdopen(handle, "wb") as stream:
+            stream.write(data)
         if mode is not None:
             os.chmod(temp_name, mode)
         os.replace(temp_name, path)
     except OSError:
         Path(temp_name).unlink(missing_ok=True)
         raise
-    return len(content.encode("utf-8"))
+    return len(data)
 
 
 class WriteFileArgs(ToolArgs):
@@ -181,7 +196,7 @@ def _write_file_tool() -> RegisteredTool:
 
     async def run(args: WriteFileArgs, ctx: ToolContext) -> ToolResult:
         path: Path = resolve_path(args.path, ctx)
-        written: int = await asyncio.to_thread(_atomic_write, path, args.content)
+        written: int = await asyncio.to_thread(_atomic_write, path, args.content, _journal(ctx, "write_file"))
         return ok(f"Wrote {written} bytes ({args.content.count(chr(10)) + 1} lines) to {path}")
 
     return make_tool(
@@ -212,7 +227,7 @@ def _closest_lines(text: str, needle: str) -> str:
     return "; ".join(repr(candidate) for candidate in candidates)
 
 
-def _edit_blocking(path: Path, old: str, new: str, replace_all: bool) -> str:
+def _edit_blocking(path: Path, old: str, new: str, replace_all: bool, journal: JournalTarget) -> str:
     if not path.is_file():
         raise ToolExecutionError("file does not exist", {"path": str(path)})
     text: str = path.read_text(encoding="utf-8")
@@ -227,7 +242,7 @@ def _edit_blocking(path: Path, old: str, new: str, replace_all: bool) -> str:
             f"the text occurs {occurrences} times; add surrounding context or set replace_all", {"path": str(path)}
         )
     updated: str = text.replace(old, new) if replace_all else text.replace(old, new, 1)
-    _atomic_write(path, updated)
+    _atomic_write(path, updated, journal)
     return f"Edited {path}: replaced {occurrences if replace_all else 1} occurrence(s)"
 
 
@@ -237,7 +252,12 @@ def _edit_file_tool() -> RegisteredTool:
 
     async def run(args: EditFileArgs, ctx: ToolContext) -> ToolResult:
         message: str = await asyncio.to_thread(
-            _edit_blocking, resolve_path(args.path, ctx), args.old, args.new, args.replace_all
+            _edit_blocking,
+            resolve_path(args.path, ctx),
+            args.old,
+            args.new,
+            args.replace_all,
+            _journal(ctx, "edit_file"),
         )
         return ok(message)
 
