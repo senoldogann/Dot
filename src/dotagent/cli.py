@@ -40,6 +40,7 @@ from dotagent.cli_daemon import (
     cmd_url,
 )
 from dotagent.cli_mcp import McpListCommand, cmd_mcp_list
+from dotagent.cli_prune import PruneCommand, cmd_prune
 from dotagent.cli_schedule import (
     ScheduleAddCommand,
     ScheduleDeleteCommand,
@@ -245,6 +246,7 @@ type Command = Annotated[
     | ScheduleDisableCommand
     | McpListCommand
     | SkillsListCommand
+    | PruneCommand
     | DaemonCommand
     | OpenCommand
     | UrlCommand
@@ -384,6 +386,15 @@ def build_parser() -> argparse.ArgumentParser:
     skills = commands.add_parser("skills", help="the skills and plugins the agent can use")
     skills_commands = skills.add_subparsers(dest="skills_action", required=True)
     skills_commands.add_parser("list", help="show every skill and plugin found, and the folders left out and why")
+
+    prune = commands.add_parser(
+        "prune", help="find the screenshot files that no chat names any more and the free space in the database file"
+    )
+    prune.add_argument(
+        "--apply",
+        action="store_true",
+        help="delete those screenshots and give the free space back to the disk (without it, only report)",
+    )
 
     commands.add_parser("daemon", help="run Dot in this terminal: the API, the web UI, the agent and the schedules")
     commands.add_parser("open", help="open the web UI of the running daemon in your default browser, signed in")
@@ -820,6 +831,8 @@ async def dispatch(command: Command) -> int:
             return await cmd_mcp_list(command)
         case SkillsListCommand():
             return await cmd_skills_list(command)
+        case PruneCommand():
+            return await cmd_prune(command)
         case DaemonCommand():
             return await cmd_daemon(command)
         case OpenCommand():

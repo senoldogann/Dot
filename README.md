@@ -654,6 +654,12 @@ things: `DOT_HOME` (the home directory) and `DOT_LOG_DIR` (the logs).
 | `daemon.pid`                                     | held while a daemon runs; a second daemon is refused                 |
 | `STOP`                                           | exists while the emergency stop is engaged                           |
 
+Deleting a chat deletes the screenshot files that only it named. Nothing else is removed by itself: old runs and their
+events stay until their chats are deleted. `dotx prune` lists the screenshot files that no chat names any more (what
+chats deleted earlier left behind) and the free space inside the database file; `dotx prune --apply` deletes those files
+and gives the space back to the disk, after which a delete returns its space by itself. The database is locked for a
+moment while it compacts, so run it when no run is active.
+
 Logs are structured and go to `~/Library/Logs/Dot/dotx.log`. The output of the launchd job goes to `daemon.out.log`
 and `daemon.err.log` in the same directory, and the stderr of each MCP server to `mcp-<name>.log`.
 

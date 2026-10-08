@@ -8,10 +8,11 @@ coroutine at once, so a unit cut off after its first statement would be committe
 import asyncio
 import base64
 import hashlib
+import re
 import sqlite3
 import struct
 import time
-from collections.abc import Iterator, Sequence
+from collections.abc import Iterable, Iterator, Sequence
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Literal
@@ -21,7 +22,7 @@ import aiosqlite
 from dotagent.core.errors import NotFoundError, StoreError
 from dotagent.core.ids import new_id
 from dotagent.core.jsonutil import dumps_compact, parse_json_object
-from dotagent.core.types import JsonObject
+from dotagent.core.types import JsonArray, JsonObject
 from dotagent.llm.types import Effort, ImageData, Message
 from dotagent.policy.types import ApprovalMode
 from dotagent.store.models import (
@@ -98,6 +99,10 @@ _EXTENSIONS: dict[str, str] = {
 # How long a write waits for another writer; the same 10 s as the busy timeout of the shared connection.
 _WRITE_WAIT_S: float = 10.0
 
+# A screenshot saved this recently may belong to a message or event that is not stored yet, so deleting a chat leaves it
+# for ``orphan_images`` to find later.
+_RECENT_IMAGE_S: float = 60.0
+
 
 def _prepare_dirs(database: Path, image_dir: Path) -> None:
     database.parent.mkdir(parents=True, exist_ok=True)
@@ -124,10 +129,54 @@ def image_file_name(image: ImageData) -> str:
 
 
 def _write_image(directory: Path, image: ImageData) -> str:
+    """Store the image under its content name. A file that is already there is touched: its last change then tells when
+    some message last wanted it, which is what keeps a delete or a sweep from removing it just as it is named again."""
     path: Path = directory / image_file_name(image)
-    if not path.exists():
+    if path.exists():
+        path.touch()
+    else:
         path.write_bytes(base64.b64decode(image.data_b64))
     return path.name
+
+
+# The shape of the names made by ``image_file_name``: how a screenshot file is told from any other file in its folder
+# and found in the text of a message or an event.
+_IMAGE_NAME: re.Pattern[str] = re.compile(rf"\b[0-9a-f]{{24}}\.(?:{'|'.join([*_EXTENSIONS.values(), 'bin'])})\b")
+
+
+def image_names_in(texts: Iterable[str]) -> set[str]:
+    """The screenshot file names that the stored messages or events in ``texts`` name."""
+    return {name for text in texts for name in _IMAGE_NAME.findall(text)}
+
+
+def _image_files(directory: Path) -> list[tuple[Path, float]]:
+    """The screenshot files in ``directory`` with their last change. Blocking: call it off the event loop."""
+    return [(path, path.stat().st_mtime) for path in directory.iterdir() if _IMAGE_NAME.fullmatch(path.name)]
+
+
+def unreferenced_images(
+    files: Sequence[tuple[Path, float]], referenced: set[str], now: float, grace_s: float
+) -> list[Path]:
+    """The files that no message or event names, oldest name first, leaving out those younger than ``grace_s`` seconds:
+    a screenshot just saved may not be named by its event yet."""
+    return sorted(path for path, changed in files if path.name not in referenced and now - changed > grace_s)
+
+
+def _remove_files(paths: Sequence[Path], unchanged_since: float) -> None:
+    """Delete the files that have not changed since ``unchanged_since`` (one that did was named again meanwhile), then
+    report the ones that could not be deleted. A file that is gone already is not an error. Blocking: call it off the
+    event loop."""
+    failed: JsonArray = []
+    for path in paths:
+        try:
+            if path.stat().st_mtime <= unchanged_since:
+                path.unlink()
+        except FileNotFoundError:
+            continue
+        except OSError as error:
+            failed.append(f"{path.name}: {error.strerror}")
+    if failed:
+        raise StoreError("some screenshot files could not be removed", {"files": failed})
 
 
 def _read_image(directory: Path, media_type: str, file_name: str) -> ImageData:
@@ -486,6 +535,7 @@ class Store:
             named + named,
         )
         delegated: tuple[str, ...] = tuple(str(row["thread_id"]) for row in hosts)
+        candidates: set[str] = await self._screenshots_of(doomed, named, delegated)
         await self._db.execute(f"{doomed} DELETE FROM events WHERE run_id IN (SELECT id FROM doomed)", named)
         await self._db.execute(f"{doomed} DELETE FROM approvals WHERE run_id IN (SELECT id FROM doomed)", named)
         await self._db.execute(f"{doomed} DELETE FROM runs WHERE id IN (SELECT id FROM doomed)", named)
@@ -504,7 +554,69 @@ class Store:
                 delegated,
             )
         await self._db.commit()
+        await self._release_images(candidates)
+        await self._return_free_pages()
         return [thread_id for thread_id in named if thread_id in existing]
+
+    async def _screenshots_of(self, doomed: str, named: tuple[str, ...], delegated: tuple[str, ...]) -> set[str]:
+        """The screenshot files named by what ``delete_threads`` is about to delete: the events of the doomed runs and
+        the messages of the named threads and of the threads of delegated runs."""
+        threads: tuple[str, ...] = named + delegated
+        rows: list[aiosqlite.Row] = await self._all(
+            f"{doomed} SELECT data AS text FROM events WHERE run_id IN (SELECT id FROM doomed)"
+            f" UNION ALL SELECT body FROM messages WHERE thread_id IN ({','.join('?' * len(threads))})",
+            named + threads,
+        )
+        return await asyncio.to_thread(image_names_in, [str(row["text"]) for row in rows])
+
+    async def _release_images(self, candidates: set[str]) -> None:
+        """Remove those of ``candidates`` that no stored message or event names any more: a file can be shared, because
+        a screenshot is stored under the hash of its content."""
+        if not candidates:
+            return
+        still_named: set[str] = await self.referenced_images()
+        await self.remove_images(
+            [self._image_dir / name for name in sorted(candidates - still_named)], time.time() - _RECENT_IMAGE_S
+        )
+
+    async def _return_free_pages(self) -> None:
+        """Hand the pages that a delete freed back to the disk. Does nothing until ``compact`` has switched the
+        database file to incremental vacuuming."""
+        async with self._db.execute("PRAGMA incremental_vacuum") as cursor:
+            await cursor.fetchall()
+
+    async def referenced_images(self) -> set[str]:
+        """The screenshot files that a stored message or event names."""
+        rows: list[aiosqlite.Row] = await self._all(
+            "SELECT body AS text FROM messages UNION ALL SELECT data FROM events", ()
+        )
+        return await asyncio.to_thread(image_names_in, [str(row["text"]) for row in rows])
+
+    async def orphan_images(self, now: float, grace_s: float) -> list[Path]:
+        """The screenshot files that nothing names: what chats deleted before their files went with them left behind.
+        Files younger than ``grace_s`` seconds are left out."""
+        files: list[tuple[Path, float]] = await asyncio.to_thread(_image_files, self._image_dir)
+        return unreferenced_images(files, await self.referenced_images(), now, grace_s)
+
+    async def remove_images(self, paths: Sequence[Path], unchanged_since: float) -> None:
+        """Delete the screenshot files among ``paths`` that no message has saved again since ``unchanged_since``."""
+        await asyncio.to_thread(_remove_files, paths, unchanged_since)
+
+    async def reclaimable_bytes(self) -> int:
+        """The size of the free pages inside the database file: what ``compact`` gives back to the disk."""
+        free: list[aiosqlite.Row] = await self._all("PRAGMA freelist_count", ())
+        size: list[aiosqlite.Row] = await self._all("PRAGMA page_size", ())
+        return int(free[0][0]) * int(size[0][0])
+
+    async def compact(self) -> None:
+        """Give the free pages of the database file back to the disk, and let later deletes do so by themselves. Needs
+        the connection to have no transaction open. The rewritten file reaches the disk through the write-ahead log, so
+        the log is emptied too; a connection that is reading at that moment leaves the rest of it for a later
+        checkpoint."""
+        await self._db.execute("PRAGMA auto_vacuum=INCREMENTAL")
+        await self._db.execute("VACUUM")
+        async with self._db.execute("PRAGMA wal_checkpoint(TRUNCATE)") as cursor:
+            await cursor.fetchall()
 
     async def append_messages(self, thread_id: str, messages: Sequence[Message]) -> None:
         """Add ``messages`` after the thread's last one: all of them are stored or none, and concurrent appends to one
