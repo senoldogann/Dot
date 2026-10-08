@@ -17,7 +17,7 @@ recover (6), learn (7), undo (8). Every later item is judged with the numbers of
 | --- | ----------------------------------------------------------- | ------- | ------- |
 | 1   | Eval harness and run statistics (`dotx eval`, `dotx stats`) | done    | a83cdcc |
 | 2   | Progress watchdog and escalation ladder                     | done    | 5f6cb29 |
-| 3   | Model-adaptive scaffold (`dotx models profile`)             | planned |         |
+| 3   | Model-adaptive scaffold (`dotx models profile`)             | done    | de2cc1c |
 | 4   | Smaller, progressive tool surface                           | planned |         |
 | 5   | Verification of the end of a run                            | planned |         |
 | 6   | Safe resume after a restart                                 | planned |         |
@@ -65,9 +65,10 @@ the item). Take the first item that is not `done`.
   not interpolated messages.
 - Tests: real calls over mocks; integration or smoke tests before unit tests; unit tests only for pure transformations
   and stable datasets; add the minimum the change needs. Use temp directories (`DOT_HOME`, `DOT_CHROME_DIR`, and
-  `DOT_LOG_DIR` for a daemon, whose log otherwise goes to the owner's `~/Library/Logs/Dot`) and never the owner's data
-  directory (`~/Library/Application Support/Dot`): not even to read message text. Counting rows is the most that was
-  ever done there.
+  `DOT_LOG_DIR` for a daemon and for every other `dotx` command, `dotx eval check` included: each one logs to
+  `<log dir>/dotx.log`, which otherwise is the owner's `~/Library/Logs/Dot`) and never the owner's data directory
+  (`~/Library/Application Support/Dot`): not even to read message text. Counting rows is the most that was ever done
+  there.
 - Safety: never start, stop or restart the owner's launchd daemon. Nothing that deletes the owner's data may run by
   default: retention and cleanup are explicit commands. Commit locally, one commit per item or coherent step, with the
   agent's `Co-Authored-By` trailer; never push, never rewrite published history. `PLAN.md` (the owner's working notes,
@@ -222,30 +223,115 @@ checked in headless Chrome on a throw-away daemon (a UI run that climbed all fiv
 
 ### 3. Model-adaptive scaffold
 
-**Goal.** Give each model the amount of help it needs, from facts, not from a global setting.
+**Status: done** (`de2cc1c`). **Goal.** Give each model the amount of help it needs, from facts, not from a global
+setting.
 
 **Why.** `ModelInfo` knows what a model *offers* (vision, tools, thinking, context length) and nothing about how
 *reliably* it works. `context_length` is not used by the loop at all: `[agent] context_tokens = 48000` is global, so a
 model with a smaller window overflows before compaction starts. Long runs drift from their goal because the goal sits
 at the start of the context.
 
-**Design.**
-- `agent/scaffold.py`: `ModelProfile` (measured: steps, tool calls, tool error rate, invalid-argument rate, stalls per 100
-  steps, empty and no-tool replies), computed by one SQL aggregate over a model's recent runs (from item 1's stats
-  function; eval runs saved under `<home>/evals/` count as samples too), and `scaffold_for(agent_config, info, profile)`, a pure
-  function that returns the settings of one run: effective `context_tokens` (never above a share of the model's window),
-  `tool_output_chars`, `keep_recent_tool_results`, `parallel_tools`, a reminder interval, a tool surface.
-- Reminders: every `reminder_every` steps the loop adds one system note with the goal word for word, the open plan steps
-  and the last results, the known cure for drift in long runs. Off for models that measure as reliable.
-- Too few samples means the config defaults, unchanged. A model with at least a stated number of tool calls and an
-  error rate above a threshold gets the weak tier. Optional explicit overrides per model in `config.toml`.
-- `dotx models profile [REF]` prints the measured profile and the scaffold chosen, so nothing is hidden.
+**Design** (refined after reading the code; the first draft is in git history at `cab742e`).
+- The window. `ModelInfo.context_length` is what one request of the model can hold. The Ollama provider reports the
+  smaller of the model's window (`/api/show`) and `[providers.ollama] num_ctx`, which it sends with every request and
+  which Ollama cuts a longer prompt to (whether Ollama applies `num_ctx` to `:cloud` models is not verified; taking the
+  smaller one is the safe side). The run's budget is `min([agent] context_tokens, 3/4 of the window)`; the last quarter is
+  room for the reply and for the error of the token estimate. Tool output shrinks in the same proportion (never below
+  2000 characters): `ToolContext.output_chars` carries it, the tools that page their output (`read_file`, `web_fetch`,
+  MCP results, browser and desktop text) size each page to it, and the executor clips the rest. A model whose
+  `/api/show` names no window counts as `num_ctx`. When the system prompt and the tool definitions alone take the whole
+  budget, the run fails at the start with the numbers and a hint instead of compacting at every step. Measured windows
+  (local Ollama `/api/show`): minimax-m2.7 196 608, deepseek-v4.1-flash 1 048 576, gemma4 262 144, gpt-oss:20b
+  131 072; with the default `num_ctx = 65536` every budget stays 48 000, so the owner's runs do not change.
+- Compaction follows the budget. The summary and the facts the continuity note pins may take a tenth of it each: the
+  task, the user's instructions and the plan are always whole; of the actions and the paths touched the newest that fit
+  are listed, with the count of the rest; a mechanical summary is the newest part of the transcript that fits. The
+  messages kept are the newest that fit next to the fixed part and the note in 85 % of the budget
+  (`_COMPACTED_SHARE`), never less than the newest exchange, so the steps after a compaction have room. Before, a
+  compaction kept the newest eight messages whatever their size: at an 18 000 budget a run compacted at 31 of 40 steps
+  and a prompt reached 18 408 tokens; now it compacts 9 times and the largest prompt is 17 811.
+- The profile. `store/stats.py` `read_model_profile`: one read-only SQL aggregate over the model's newest 30 finished
+  runs: runs, steps, tool calls, failed calls, calls refused before they ran (`tool_result` with `ok` false and an empty
+  `risk`: unknown tool, wrong mode, arguments that were not JSON or did not fit the schema), invalid JSON, empty
+  replies, stalls, compactions. Refusals measure the model and not the environment (a missing file or a failing test is
+  not the model's fault), so they decide the tier. No-tool replies are not counted: they cannot be told from a final
+  answer. Eval reports are not read: an attempt runs in a throw-away home, `RunMetrics` has no refusal count, and parsing
+  every report at each run start costs more than it tells.
+- `agent/scaffold.py`, pure: `scaffold_for(agent_config, info, profile)` returns the `Scaffold` of a run (window, budget,
+  tool output, tier, the reason for the tier, the reminder interval). Tiers: `standard` and `weak`. `[agent] tiers`
+  sets a model's tier by hand (in evals too); otherwise `[agent] scaffold = "measured"` makes a model with at least
+  `profile_min_calls` tool calls and a refused share of at least `weak_refusal_share` weak; fewer calls, or
+  `scaffold = "fixed"` (the default, open owner decision 2), mean standard.
+- Reminders (weak tier, task and research runs): after every `reminder_every` steps, at an acting step that neither
+  finished nor got a progress note, the loop adds one system note with the goal word for word, the user's instructions,
+  the plan and the newest results from the ledger. Event `reminder`.
+- Event `scaffold` at the start of every run, before the room check, so a refused run shows its numbers too; the
+  timeline shows it only when it differs from the configuration (a budget cut to the window, reminders on).
+- `dotx models profile [REF]` (REF defaults to `[models] main`) prints the profile and the scaffold with its reasons.
+  `dotx models [PROVIDER]` keeps working: the providers became subcommands of `models`, next to `profile`.
+- Not done here: `parallel_tools` and `keep_recent_tool_results` stay global (no evidence that they depend on the model),
+  and the tool surface is item 4, whose `auto` mode can read the tier and the window from the scaffold.
+- `EvalSettings.tier` records the tier forced for the evaluated model (`standard` when none).
 
-**Touchpoints.** `agent/loop.py` (reads `config.*` in about ten places at the start of `run_agent` and in
-`_fit_context`), `llm/types.py`, `store/db.py`, `cli.py`, `config.py`, `defaults.toml`, README.
+**Touchpoints.** `agent/loop.py` (`run_agent`, `_fit_context`, `_compact`, `_model_summary`), `agent/scaffold.py`,
+`agent/continuity.py` (the reminder text, the capped pinned facts), `agent/compact.py` (`split_for_summary`),
+`agent/executor.py`, `tools/context.py`, the paged tools (`tools/files.py`, `web.py`, `mcp.py`, `browser.py`,
+`desktop.py`), `llm/ollama.py`, `llm/types.py`, `store/stats.py`, `store/db.py`, `cli.py`, `cli_profile.py`,
+`evals/results.py`, `cli_eval.py`, `evals/scoring.py`, `timeline.js`, `config.py`, `defaults.toml`, README.
+
+**What exists now.**
+- `agent/scaffold.py`, pure: `Scaffold` (model, window, budget, tool output, tier, reason, reminder interval),
+  `context_budget`, `output_budget`, `choose_tier`, `scaffold_for(config, info, profile)`, `scaffold_event`,
+  `reminder_due`, `require_room` (a `ConfigError` with the model, the window, the budget, the fixed tokens and a hint),
+  `PROFILE_RUNS = 30`.
+- `store/stats.py`: `ModelProfile` and `read_model_profile(database, model, runs)` (SQLite opened `mode=ro`; a missing
+  database is a `StoreError`). `Store.model_profile` runs the same read off the event loop at the start of every run.
+- `agent/loop.py`: `run_agent` builds the scaffold, emits `scaffold`, refuses a run without room, gives the tools the
+  run's `output_chars`, and adds the reminders (`reminder_note` in `agent/continuity.py`; event `reminder` with `step`
+  and `open_steps`). `_fit_context` sizes a compaction to the budget (see the design); `_compact` takes the size of the
+  note's parts.
+- `llm/ollama.py` `parse_model_details`: the window is the smaller of the trained context and `num_ctx`; the Context
+  column of the System page shows it.
+- `dotx models profile [REF]` (`cli_profile.py`): steps, calls, failed and refused calls with their shares, invalid
+  arguments, empty replies, stalls and compactions of the newest 30 finished runs, then the window, the budget, the
+  tool output, the tier with its reason and the reminders of the next run. The provider listings are
+  `dotx models [ollama|openai|opencode_go]`.
+- Config `[agent]`: `scaffold = "fixed"`, `tiers = {}`, `profile_min_calls = 50`, `weak_refusal_share = 0.1`,
+  `reminder_every = 6`. `EvalSettings.tier` records a tier forced for the evaluated model.
+- `timeline.js`: the `scaffold` event as a note when the budget was cut to the window or reminders are on, and a note
+  for each `reminder`.
+- Tests: `tests/unit/test_scaffold.py` (budget, tool output, tiers, reminders, the room check, the Ollama window, the
+  profile on a temp database and its rendering), `tests/unit/test_continuity.py` (the capped pinned facts, what a
+  compaction keeps), `tests/smoke/test_scaffold.py` (the real loop with the scripted model: a 24 k window cuts the
+  budget and the pages and compacts every few steps inside the budget where a large window never compacts; weak-tier
+  reminders at steps 3 and 6 and none for a standard model; a 4 k window refused before the model is asked). None
+  needs a service.
+
+**How to use it for the next items.** The `Scaffold` of a run is where to read what its model needs: item 4's `auto`
+tool surface can take the tier and the budget from it. To see what a model would get, run `dotx models profile REF`
+(with `DOT_HOME` and `DOT_LOG_DIR` set to temp dirs unless the owner runs it). To try a tier without data, set
+`[agent] tiers = { "REF" = "weak" }` in a throw-away home's `config.toml`; to compare, run
+`dotx eval run --model REF --repeat 3` with and without it (the reports record the tier).
+
+**Decisions and limits.**
+- `scaffold = "fixed"` stays the default: measured tiers change how the owner's agent behaves and wait for evidence
+  (open decision 2). The budget cut to the window applies in both modes; with the owner's models and
+  `num_ctx = 65536` it changes nothing.
+- The tier is measured on refusals only (calls refused before they ran): a call that ran and failed may be the
+  environment's fault. A model with fewer than `profile_min_calls` measured calls is standard.
+- Whether Ollama applies `num_ctx` to `:cloud` models is not verified; the smaller window is the safe side.
+- The room check is literal: a fixed part as large as the budget refuses the run; one just below it runs and compacts
+  often.
+- Found while testing and fixed: the tools paged their output by the global `tool_output_chars`, and `read_file`'s
+  continuation line could push a page over it, so the executor cut the middle out of the page (`_HEADROOM_CHARS =
+  200`).
+- No live model run: the scaffold was tried with the scripted model only.
 
 **Done when.** Unit tests of `scaffold_for` on stable inputs; the loop uses the scaffold; a small-window model gets a
-smaller compaction threshold; `dotx models profile` works on a temp database.
+smaller compaction threshold; `dotx models profile` works on a temp database. All true: also the offline smoke suite
+(142 tests) and `dotx eval check` are clean, and the timeline was checked in headless Chrome on a throw-away daemon (a
+weak-tier run on a 24 k window: the budget note, the reminder interval, reminders at steps 3, 6 and 9 and a compaction;
+a 4 k window: the budget note and the refusal with its numbers), with no console error.
 
 ### 4. Smaller, progressive tool surface
 
@@ -372,7 +458,7 @@ makes the damage reversible. It covers the file tools only; a shell `rm` or `sed
 1. Live evals: `dotx eval run --model REF` spends model quota. Run it for the models in use and keep the JSON; it is the
    basis for flipping the defaults below.
 2. Defaults that change how the agent behaves and wait for evidence: `[agent] tool_surface` (item 4), `resume` (item 6),
-   `lessons` (item 7), `stall_escalation` (item 2).
+   `lessons` (item 7), `stall_escalation` (item 2), `scaffold = "measured"` (item 3).
 3. `[models] review`: use a model of another family than `main` (item 5). The default is the same model.
 4. From the audit: how long to keep events and screenshots (retention windows), which model compacts (`[models] fast` is
    documented but never read), browser access to localhost and private addresses, CI.
@@ -389,3 +475,9 @@ makes the damage reversible. It covers the file tools only; a shell `rm` or `sed
   `dotx eval check` and the offline smoke suite clean except one model-driven test,
   `test_a_live_stream_carries_the_runs_the_run_delegated_to`: `gpt-oss:20b-cloud` called `delegate` three times although
   told once (no stall event in that run); it passed when rerun.
+- 2026-10-08: item 3 done (`de2cc1c`). Budget from the window, tiers, reminders, `dotx models profile`, and compaction
+  sized to the budget: a 24 k window compacts 9 times in 40 steps, largest prompt 17 811 of 18 000; a 32 k window 3
+  times, 24 561 of 24 576; the default budget of 48 000 never compacts in that run, as before. Unit tests (389),
+  `dotx eval check`, the offline smoke suite (142) and the timeline in headless Chrome clean; no live model run. Found:
+  every `dotx` command logs to the owner's `~/Library/Logs/Dot/dotx.log` unless `DOT_LOG_DIR` is set, so the earlier
+  `dotx eval check` runs of this work added lines there (nothing else); the house rule says so now.
