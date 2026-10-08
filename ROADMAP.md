@@ -19,7 +19,7 @@ recover (6), learn (7), undo (8). Every later item is judged with the numbers of
 | 2   | Progress watchdog and escalation ladder                     | done    | 5f6cb29 |
 | 3   | Model-adaptive scaffold (`dotx models profile`)             | done    | de2cc1c |
 | 4   | Smaller, progressive tool surface                           | done    | d89d634 |
-| 5   | Verification of the end of a run                            | planned |         |
+| 5   | Verification of the end of a run                            | done    | e2051a5 |
 | 6   | Safe resume after a restart                                 | planned |         |
 | 7   | Learning from runs (lessons)                                | planned |         |
 | 8   | Undo journal for file edits                                 | planned |         |
@@ -438,27 +438,93 @@ its reason, the failed call, the groups turned on at steps 1 and 3), with no con
 
 ### 5. Verification of the end of a run
 
-**Goal.** Do not accept "done" on the model's word when the harness can check.
+**Status: done** (`e2051a5`). **Goal.** Do not accept "done" on the model's word when the harness can check.
 
 **Why.** Goal mode already asks the review model to compare the end with the goal, and gives it a digest of the steps.
 What it lacks is facts the harness measured itself, and without goal mode nothing checks the ending at all. By default
 `[models] review` is the same model as `main`, which shares its blind spots.
 
-**Design.**
-- Facts block for the checker (`GoalRequest.facts`): files touched, the failures nobody resolved (the last failed
-  call of a tool that no later success of the same tool and target followed), the last test/build/lint-looking shell
-  commands with their results, and the paths and addresses that the answer names but the run never touched and that do
-  not exist (reuse `identifiers()` of `agent/continuity.py`).
-- Every task or research run: when the answer names a path that does not exist, the run is sent back once with the
-  list (no extra model call). `[agent] verify_answer_paths`.
-- `dotx doctor` reports when `[models] review` is the same model as `main` ("independent checking is weaker"), with the
-  README advice to pick another model family. Informational, never a failure.
+**Design** (refined while building it; the first draft is in git history at `cab742e`).
+- Facts (`RunFacts` in `agent/verify.py`): the loop keeps them from the outcomes of each step's tool calls, never from
+  a model. A call that never ran (refused, an unknown tool, arguments that did not fit) and a bookkeeping call (kind
+  `meta`: the plan, `finish`, `use_tools`) add nothing. A call's target is its `ActionInfo.target`: the resolved path of
+  a file tool, the command of a shell call, the address of a web call.
+  - `written`: the files the file tools wrote or edited, each once at its newest place; the newest 30.
+  - `failures`: per tool and target, the last failure that no later success of the same tool and target followed, with
+    the first line of its result; the newest 10.
+  - `checks`: shell commands that test, build or lint (`_CHECK_COMMAND`: pytest, unittest, ruff, mypy, tsc, eslint,
+    jest, make, xcodebuild, `npm run test`, `cargo test`, `go vet` and the like, where a command stands, so
+    `cat pytest.ini` is not one), with succeeded or failed and the first and last line of the result (the exit status
+    and, for most checkers, the tally). A command that runs again replaces its entry; the newest 6.
+  - `named`: the paths and addresses that successful calls named (`identifiers()` of `agent/continuity.py` over every
+    string of the arguments, plus a file tool's target, whose name may hold spaces); the newest 300.
+- Goal mode: `GoalRequest.facts` is a FACTS block between the digest and the final answer, with the four lists above,
+  the paths the answer names that do not exist and that no successful call named, and the addresses it names that no
+  call opened. An empty section says "none", and secrets are redacted. The system prompt says that the facts come from
+  the harness and that, where they and the answer disagree, the facts are right. The facts always go to the goal
+  checker; no setting turns them off.
+- `[agent] verify_answer_paths` (default `false`): a task or research run that ends with success, and whose answer names
+  paths that do not exist and that no successful call of the run named, is sent back once with the list (`paths_note`):
+  create what is missing, correct the answer, or finish again with the same answer if it names them on purpose. It
+  comes after the plan reminder and before the goal check, makes no model call, and clears the watchdog's window as a
+  goal send-back does. Event `answer_paths` (`missing`).
+- The paths of an answer (`answer_paths`) are the ones `identifiers()` finds: `~` paths and absolute paths under
+  `/Users`, `/tmp`, `/private`, `/var`, `/opt`, `/Applications` and `/Library`. A path that goes on past a space
+  ("~/Library/Application Support/Dot") is also read up to four words further; it exists when any reading exists, and
+  it is reported by its first reading. A path that a successful call named is never missing (a file the run removed
+  or moved); a relative named value is resolved against the workspace (`missing_paths`).
+- `dotx doctor` has a `review model` row: a warning, never a failure, while `[models] review` is the main model.
 
-**Touchpoints.** `agent/review.py` (`GoalRequest`, `_goal_prompt`), `agent/loop.py` (the end of a run), `agent/continuity.py`,
-`cli.py` (doctor), README.
+**Touchpoints.** `agent/verify.py` (new), `agent/loop.py`, `agent/review.py`, `doctor.py`, `config.py`, `defaults.toml`,
+`evals/results.py`, `cli_eval.py`, `evals/scoring.py`, `cli_ui.py`, `timeline.js`, README. `agent/continuity.py` did not
+change (`identifiers()` is used as it is), and the doctor lives in `doctor.py`, not in `cli.py`.
+
+**What exists now.**
+- `agent/verify.py`, pure except `missing_paths`, which reads the file system (the loop calls it through
+  `asyncio.to_thread`): `CallFact`, `RunFacts`, `NamedPath`, `new_facts`, `with_outcomes`, `answer_paths`,
+  `missing_paths`, `unopened_addresses`, `render_facts`, `paths_note`.
+- `agent/loop.py`: `run_agent` keeps `facts` (updated after each step's calls, next to the ledger), sends back an answer
+  with missing paths (`paths_reminded`, `_missing_in_answer`) and passes the facts to `_check_goal`.
+- `agent/review.py`: `GoalRequest.facts`, the FACTS block in `_goal_prompt`, the rule about facts in `_GOAL_SYSTEM`.
+- `doctor.py`: `_review_row(models)`.
+- Config `[agent] verify_answer_paths = false`. `EvalSettings.verify_answer_paths` (a report without it counts as off);
+  the scorecard prints "answer path check on" or "off".
+- `cli_ui.py`: `AnswerPathsPayload`, printed as "◎ the answer names paths that do not exist, back to work: …".
+  `timeline.js`: a warning note for `answer_paths` ("Dot's answer named 2 paths that do not exist (…) and was asked to
+  correct it").
+- Tests: `tests/unit/test_verify.py` (the facts over two steps, their limits and order, what counts as a check, the
+  readings of an answer's paths, `missing_paths` on a temp directory, the rendered facts, the doctor row) and
+  `tests/smoke/test_answer_check.py` (the real loop, with the scripted model as the main and the review model: an answer
+  that names a file the run never wrote is sent back once and never twice; nothing happens with the check off or after
+  a failed end; the goal check gets the FACTS block with a written file, an unresolved failed read, a failed
+  `python -m unittest` with its exit status 5 and "NO TESTS RAN", a missing path and an address no call opened). The
+  two live goal-checker tests of `tests/smoke/test_run_modes_live.py` pass facts now.
+
+**How to use it for the next items.** To try the path check, set `[agent] verify_answer_paths = true` in a throw-away
+home's `config.toml` and compare `dotx eval run --model REF --repeat 3` with and without it; the reports record the key,
+and the `answer_paths` events say which runs were sent back and for which paths. `RunFacts` is where further measured
+facts go; they live in the loop for one run, and nothing stores them. Item 7 wants the failures that a later success
+resolved (a failure followed by a method that worked), which `with_outcomes` drops from `failures` today: keep them in
+`RunFacts` rather than read them again from the messages.
+
+**Decisions and limits.**
+- `verify_answer_paths` stays off (open decision 2): it costs a step whenever an answer names a missing path on purpose
+  (a report of what is gone), and only evals can say whether it catches more than it costs. The facts of the goal check
+  have no setting: goal mode is the owner's choice already, and its checker only reads more.
+- Precision over recall: only the roots `identifiers()` knows are checked, so `/etc`, `/usr` and relative paths in an
+  answer are never flagged.
+- A path that appears in the content a run wrote counts as named, because every string of a call's arguments is
+  searched; an answer that names a missing path that the run wrote into a file is not flagged. A failed call's paths
+  are not named.
+- A check is recognized only where a command stands: `bash -c "pytest"` or a script that runs the tests is not seen.
+- No live run of the path check. The FACTS prompt ran live once: the two goal-checker tests of
+  `test_run_modes_live.py` with the default review model, `ollama:minimax-m2.7:cloud` (two model calls; both passed).
 
 **Done when.** Unit tests of the facts and of the unverified-path check; an integration test (a run that claims a file it
-never wrote is sent back once); doctor shows the review-model note.
+never wrote is sent back once); doctor shows the review-model note. All true: also the offline smoke suite (148 tests;
+one model-driven test failed once and passed when rerun, see the log) and `dotx eval check` are clean, and the timeline
+was checked in headless Chrome on a throw-away daemon (a run whose answer named two missing paths: the warning note,
+the run done after one send-back), with no console error.
 
 ### 6. Safe resume after a restart
 
@@ -535,9 +601,11 @@ makes the damage reversible. It covers the file tools only; a shell `rm` or `sed
 
 1. Live evals: `dotx eval run --model REF` spends model quota. Run it for the models in use and keep the JSON; it is the
    basis for flipping the defaults below.
-2. Defaults that change how the agent behaves and wait for evidence: `[agent] tool_surface` (item 4), `resume` (item 6),
-   `lessons` (item 7), `stall_escalation` (item 2), `scaffold = "measured"` (item 3).
-3. `[models] review`: use a model of another family than `main` (item 5). The default is the same model.
+2. Defaults that change how the agent behaves and wait for evidence: `[agent] tool_surface` (item 4),
+   `verify_answer_paths` (item 5), `resume` (item 6), `lessons` (item 7), `stall_escalation` (item 2),
+   `scaffold = "measured"` (item 3).
+3. `[models] review`: use a model of another family than `main` (item 5). The default is the same model, and
+   `dotx doctor` warns about it (a warning, not a failure).
 4. From the audit: how long to keep events and screenshots (retention windows), which model compacts (`[models] fast` is
    documented but never read), browser access to localhost and private addresses, CI.
 
@@ -568,3 +636,12 @@ makes the damage reversible. It covers the file tools only; a shell `rm` or `sed
   called `ask_user` instead of `shell` (with the default `full` its tools and prompt are as before). Found: a delegated
   run's model that calls `delegate` or `ask_user` by name now gets "unknown tool"; before, the call reached the tool,
   and the manager refused a nested `delegate`.
+- 2026-10-08: item 5 done (`e2051a5`). The facts the harness measured go to the goal check in a FACTS block;
+  `[agent] verify_answer_paths` (default off) sends back once an answer that names paths that do not exist;
+  `dotx doctor` warns while the review model is the main model, as it is by default. Unit tests (431),
+  `dotx eval check`, the offline smoke suite (148) and the timeline in headless Chrome clean. Live: only the two
+  goal-checker smoke tests (two calls of `ollama:minimax-m2.7:cloud`, both passed). One model-driven smoke test failed
+  once and passed when rerun: `test_a_run_reads_a_file_through_a_delegated_run`, where `gpt-oss:20b-cloud` delegated a
+  second time ("Same but give me the content precisely") and the test expects one child run; the run itself ended done
+  with the right content. Found: the README does not describe the send-back of a plan with open steps at the end of a
+  run (`plan_reminder`), which runs before the path check.
