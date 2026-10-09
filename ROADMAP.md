@@ -895,8 +895,8 @@ that change the owner's agent are their call (see "Open owner decisions", 6 onwa
 | 10  | Yolo asks nobody: secret fields, questions and the end of a run        | done        | eacd180 |
 | 11  | Open-ended goals in one run: targets, limits and an honest end         | done        | 12ad395 |
 | 12  | Campaigns: a goal that works until its outcome is verified             | done        | c915ab2 |
-| 13  | Faster browser and desktop steps                                       | done        |         |
-| 14  | Rich editors, drag and bulk text in the browser                        | planned     |         |
+| 13  | Faster browser and desktop steps                                       | done        | a14f21a |
+| 14  | Rich editors, drag and bulk text in the browser                        | in progress |         |
 | 15  | Helper models: consult, delegate to another model, standby             | planned     |         |
 | 16  | Typed judgments (TypeSafe) at the decision points                      | planned     |         |
 | 17  | Pacing and public actions on social platforms                          | planned     |         |
@@ -1632,8 +1632,8 @@ updated.
 
 ### 13. Faster browser and desktop steps
 
-**Status: done.** **Goal.** Take the fixed waiting out of a browser or desktop action where no signal needs it, and
-make a failed wait or an unchanged page cost no extra step.
+**Status: done** (`a14f21a`, PR #6). **Goal.** Take the fixed waiting out of a browser or desktop action where no
+signal needs it, and make a failed wait or an unchanged page cost no extra step.
 
 **Why.** Measured on 2026-10-09 (read-only bench, this Mac; the Playwright and accessibility parts not measured): a
 browser click waits about 160 ms by construction, a five-click batch about 0.32 s; a desktop click about 0.56 s before
@@ -1733,7 +1733,7 @@ rule; the medians before and after written here; the offline smoke suite clean; 
 
 ### 14. Rich editors, drag and bulk text in the browser
 
-**Status: planned.** **Goal.** Typing works in the editors of X, GitHub, Google Docs, Monaco and CodeMirror; the
+**Status: in progress.** **Goal.** Typing works in the editors of X, GitHub, Google Docs, Monaco and CodeMirror; the
 browser can drag an element onto another; a long text goes in as one insertion.
 
 **Why.** On X's composer `type` lost the first character and `fill` reported done without a change (follow-up of
@@ -2098,10 +2098,10 @@ on and is closed by `terminal_close`; the idle reaper; unit tests of the ANSI st
     `memory_save` are acting-only, `tools/base.py:16-17`), and DuckDuckGo's bot check throttles long research runs
     (README "Status and known limits"). Say whether a research run may save notes and files under the workspace,
     and whether the hosted Ollama search (`OLLAMA_API_KEY`) should be the default backend; either is a small item.
-15. The Claude GitHub app reviews nothing yet: on PR #1, PR #2, PR #4 and PR #5 it answered "Code review skipped" (on
-    PR #3 it posted nothing) because your organization has no extra usage to pay for it. Add extra usage (or raise the monthly
-    limit) at claude.ai/admin-settings/usage; a comment `@claude review` on a PR then asks for a review. Until then each
-    PR is merged on `/code-review` alone.
+15. The Claude GitHub app reviews nothing yet: on PR #1, PR #2, PR #4, PR #5 and PR #6 it answered "Code review
+    skipped" (on PR #3 it posted nothing) because your organization has no extra usage to pay for it. Add extra usage
+    (or raise the monthly limit) at claude.ai/admin-settings/usage; a comment `@claude review` on a PR then asks for a
+    review. Until then each PR is merged on `/code-review` alone.
 
 ## Log
 
@@ -2346,3 +2346,5 @@ on and is closed by `terminal_close`; the idle reaper; unit tests of the ANSI st
   outlast; the URL rules are checked after loads, `act`, `back` and `browser_wait_text` only, not when `snapshot`,
   `find`, `links`, `read_text`, `screenshot`, `scroll`, `switch_tab`, `close_tab` or `upload` read a page that moved on
   by itself.
+- 2026-10-09: item 13 merged as `a14f21a` (PR #6, squash); the Claude GitHub app skipped its review again (decision 15).
+  Item 14 started on `item-14-rich-editors`.
