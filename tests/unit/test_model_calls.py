@@ -1,16 +1,17 @@
 """What the router records of a model call: a reply, a failure of any kind and a call cut off, also when the recording
-itself fails."""
+itself fails; and how it pauses a provider that cannot answer for a while."""
 
 import asyncio
+import time
 from collections.abc import Awaitable, Callable
 
 import pytest
 from structlog.testing import capture_logs
 
 from dotagent.config import load_default_config
-from dotagent.core.errors import ProviderTransportError
+from dotagent.core.errors import ProviderQuotaError, ProviderTransportError
 from dotagent.llm.calls import CANCELLED, CallOrigin, CallRecorder, ModelCall
-from dotagent.llm.router import ModelRef, ModelRouter
+from dotagent.llm.router import ModelRef, ModelRouter, Pause
 from dotagent.llm.types import ChatRequest, DeltaSink, ModelInfo, ModelReply, Usage
 
 REF: ModelRef = ModelRef(provider="ollama", model="fake")
@@ -150,3 +151,30 @@ async def test_a_recorder_that_fails_after_a_reply_raises_its_own_error() -> Non
     with pytest.raises(RuntimeError, match="cannot be written"):
         await router.complete(REF, REQUEST, no_sink, ORIGIN)
     assert [call.error for call in calls] == [None]
+
+
+async def test_a_provider_that_cannot_answer_is_paused_until_a_call_it_answers() -> None:
+    answers: list[Callable[[], Awaitable[ModelReply]]] = [spent, unreachable, reply]
+
+    async def in_turn() -> ModelReply:
+        return await answers.pop(0)()
+
+    router: ModelRouter = await router_with(in_turn, keeping([]))
+    cooldown_s: float = load_default_config().models.helper_cooldown_s
+    with pytest.raises(ProviderQuotaError):
+        await router.complete(REF, REQUEST, no_sink, ORIGIN)
+    paused: dict[str, Pause] = router.paused(time.time())
+    assert list(paused) == ["ollama"]
+    assert paused["ollama"].reason == "quota exhausted"
+    assert time.time() < paused["ollama"].until <= time.time() + cooldown_s
+    assert router.paused(paused["ollama"].until) == {}
+    # A transport error says nothing about the provider: the pause stays as it was.
+    with pytest.raises(ProviderTransportError):
+        await router.complete(REF, REQUEST, no_sink, ORIGIN)
+    assert router.paused(time.time()) == paused
+    assert await router.complete(REF, REQUEST, no_sink, ORIGIN) == REPLY
+    assert router.paused(time.time()) == {}
+
+
+async def spent() -> ModelReply:
+    raise ProviderQuotaError("credits exhausted", 429, None, {"model": "fake"})

@@ -4,7 +4,13 @@ import asyncio
 import time
 
 from dotagent.config import AppConfig
-from dotagent.core.errors import ConfigError
+from dotagent.core.errors import (
+    ConfigError,
+    MissingSecretError,
+    ProviderAuthError,
+    ProviderQuotaError,
+    ProviderRateLimitError,
+)
 from dotagent.core.logs import get_logger
 from dotagent.core.types import FrozenModel
 from dotagent.llm.anthropic import AnthropicProvider
@@ -41,6 +47,41 @@ def parse_model_ref(text: str) -> ModelRef:
     return ModelRef(provider=provider, model=model)
 
 
+class Pause(FrozenModel):
+    """A provider that cannot answer for a while: why, and until when (seconds since the epoch)."""
+
+    reason: str
+    until: float
+
+
+def unavailable_reason(error: Exception) -> str | None:
+    """Why the provider that raised ``error`` cannot answer for a while: its quota or its rate is spent, its key was
+    refused, or it has no key. ``None`` for an error that says nothing about that, such as a transport or protocol
+    error. The connector has retried what can be retried before such an error reaches its caller."""
+    if isinstance(error, ProviderQuotaError):
+        return "quota exhausted"
+    if isinstance(error, ProviderRateLimitError):
+        return "rate limited"
+    if isinstance(error, ProviderAuthError):
+        return "key refused"
+    if isinstance(error, MissingSecretError):
+        return "no key"
+    return None
+
+
+def pause_for(error: Exception, cooldown_s: float, now: float) -> Pause | None:
+    """The pause of the provider that raised ``error`` at ``now``: for the time a quota or rate error named, else for
+    ``cooldown_s``; ``None`` when the error says nothing about the provider being unable to answer."""
+    reason: str | None = unavailable_reason(error)
+    if reason is None:
+        return None
+    named: float | None = (
+        error.retry_after_s if isinstance(error, ProviderQuotaError | ProviderRateLimitError) else None
+    )
+    wait: float = cooldown_s if named is None or named <= 0 else named
+    return Pause(reason=reason, until=now + wait)
+
+
 def _answered(ref: ModelRef, request: ChatRequest, origin: CallOrigin, seconds: float, reply: ModelReply) -> ModelCall:
     """A call that got its reply, with the tokens its provider reported."""
     return ModelCall(
@@ -73,12 +114,17 @@ def _failed(ref: ModelRef, request: ChatRequest, origin: CallOrigin, seconds: fl
 
 class ModelRouter:
     """Owns the provider connectors and sends each request to the one its model reference names. Every call it sends
-    is measured and handed to ``recorder``."""
+    is measured and handed to ``recorder``.
+
+    A provider whose call failed with an error that says it cannot answer for a while (:func:`pause_for`) is paused
+    until a call it answers or the end of the pause. The router still sends it every call it is given: the pauses only
+    tell :mod:`dotagent.agent.helpers` which helper or standby model to choose."""
 
     def __init__(self, config: AppConfig, recorder: CallRecorder) -> None:
         self._config: AppConfig = config
         self._recorder: CallRecorder = recorder
         self._providers: dict[str, ChatProvider] = {}
+        self._pauses: dict[str, Pause] = {}
         # The names served by a connector given through `register`; `retire` leaves them alone.
         self._registered: set[str] = set()
         # The connectors `retire` took out of service, closed with the others at `aclose`.
@@ -143,7 +189,8 @@ class ModelRouter:
         or, for a call that failed, the type of its error (:data:`CANCELLED` for one that a stop or the caller's
         timeout cut off; a connector that cannot be made, such as one without its key, fails the call too). The
         seconds include the retries the connector makes and its waits between them. A failure is raised after it is
-        recorded; after a reply, a recorder that fails raises its own error, as any failed write of the run does."""
+        recorded; after a reply, a recorder that fails raises its own error, as any failed write of the run does. A
+        failure that says the provider cannot answer for a while pauses the provider, and a reply ends its pause."""
         started: float = time.monotonic()
         try:
             provider: ChatProvider = await self.provider(ref.provider)
@@ -152,10 +199,23 @@ class ModelRouter:
             await self._record_failure(_failed(ref, request, origin, time.monotonic() - started, CANCELLED))
             raise
         except Exception as error:
+            self._pause(ref, error)
             await self._record_failure(_failed(ref, request, origin, time.monotonic() - started, type(error).__name__))
             raise
+        self._pauses.pop(ref.provider, None)
         await self._recorder(_answered(ref, request, origin, time.monotonic() - started, reply))
         return reply
+
+    def _pause(self, ref: ModelRef, error: Exception) -> None:
+        pause: Pause | None = pause_for(error, self._config.models.helper_cooldown_s, time.time())
+        if pause is None:
+            return
+        self._pauses[ref.provider] = pause
+        log.warning("provider_paused", provider=ref.provider, model=ref.label, reason=pause.reason, until=pause.until)
+
+    def paused(self, now: float) -> dict[str, Pause]:
+        """The providers that cannot answer for a while at ``now`` (seconds since the epoch), with why and until when."""
+        return {name: pause for name, pause in self._pauses.items() if pause.until > now}
 
     async def _record_failure(self, call: ModelCall) -> None:
         """Record a call that failed or was cut off. Its caller gets the call's own error or cancellation: a recorder

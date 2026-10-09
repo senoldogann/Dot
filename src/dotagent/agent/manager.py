@@ -305,8 +305,9 @@ class RunManager:
             planned += 1
         return planned
 
-    async def delegate(self, parent_run_id: str, goal: str, mode: RunMode) -> DelegateOutcome:
-        """Run ``goal`` as a run of its own on the parent's model and wait until it ends.
+    async def delegate(self, parent_run_id: str, goal: str, mode: RunMode, model: str | None) -> DelegateOutcome:
+        """Run ``goal`` as a run of its own on ``model``, or on the parent's model as it is stored now when that is
+        ``None`` (after a switch to a standby model, the standby), and wait until it ends.
 
         The delegated run starts as untrusted as its parent is, can do no more than its parent (a research run only
         delegates research) and cannot delegate again. It answers the policy's questions the way its parent does and
@@ -323,7 +324,7 @@ class RunManager:
         _, handle = await self._launch(
             goal,
             mode,
-            parent.model,
+            parent.model if model is None else model,
             None,
             DELEGATE_SOURCE,
             parent.id,

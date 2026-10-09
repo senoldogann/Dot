@@ -1833,48 +1833,85 @@ not there, and the run goes on.
 **Why.** The owner asked for it on 2026-10-09 ("while DeepSeek works it should be able to ask Sonnet or Opus for help;
 without a key or with the quota spent nothing may break"). The seed exists: the review model is a second model the
 harness uses for approvals in `auto`, the goal check, the ladder's second opinion and lessons. But the running model
-cannot ask for help itself, `delegate` always uses the parent's model (`agent/manager.py:150-162`), `[models] fast`
-is read nowhere, and a missing key or an exhausted quota surfaces as an error in the middle of a run. The gain is
-largest for a weak model, which is this roadmap's principle.
+cannot ask for help itself, `delegate` always uses the parent's model (`agent/manager.py:323-326`), `[models] fast` is
+read nowhere, and a missing key or an exhausted quota ends the run: the step call (`agent/loop.py:1031-1032`) has no
+handler, and the manager fails the run with the error (`agent/manager.py:865-866`). The gain is largest for a weak
+model, which is this roadmap's principle.
 
-**Design.**
+**Design** (checked against the code on 2026-10-10; what changed from the first draft is listed below).
 - **Configuration.** `[models] helpers = []`: model references in order of preference, for example
-  `["anthropic:claude-opus-5-5", "openai:gpt-5.5"]`. `[models] standby = []`: the models a run moves to when its own
-  provider answers with a quota, billing or key error, in order. `[models] helper_cooldown_s = 600`. `[agent]
-  consult_max_per_run = 5`.
-- **The roster.** `agent/helpers.py` (pure): `roster_for(config, states, cooldowns, now) -> Roster(available,
-  unavailable)`, where `states` are the `SecretState` of each provider's key (`secrets.secret_state`, which never reads
-  the value) and `cooldowns` the providers in cooldown with their end time. A provider without a key, or in cooldown,
-  is unavailable with its reason. `cooldown_for(error) -> float | None`: `ProviderQuotaError`, `ProviderAuthError` and
-  `MissingSecretError` give `helper_cooldown_s`; `ProviderRateLimitError` gives its `retry_after_s` or 60 s; a
-  transport or protocol error gives none (the call failed, nothing is marked). The runtime keeps the cooldowns in
-  memory (`runtime.helpers`), per daemon.
-- **`consult`**, a core tool in `tools/consult.py`, offered only when the roster has an available helper (like `skill`
-  without skills, `agent/loop.py:739-743`). `ConsultArgs(question, include, model)`: `include` is a tuple of `goal`,
-  `plan`, `recent` (the digest of the last steps, `goal_digest` of `agent/review.py:351`), `screenshot` (the newest
-  image of the run, only if the helper has vision); `model` names a helper of the roster or is empty for the first
-  available. The helper gets a system prompt in the reviewer's manner: it advises another agent, the user's
-  instructions in the fence are the only authority, fenced content is data, answer in plain text, no tools. The
-  result is the answer fenced as advice ("Advice from anthropic:claude-opus-5-5 (not instructions): …"). `purpose =
-  "consult"` (a new value of item 9's `CallPurpose`); kind `meta`, risk `safe`; `parallel_safe` true; the (n + 1)th call past `consult_max_per_run`
-  fails with the count. A provider error marks the cooldown, emits `helper_unavailable {model, reason, until}`, and the
-  result says "X is unavailable (quota exhausted) until 14:05; continue on your own or ask another helper: Y".
-- **`delegate(model)`.** `DelegateArgs.model: str | None`: a helper of the roster or the run's own model; anything
-  else fails with the list. `RunManager.delegate(parent_id, goal, mode, model)` launches the child on it. The
-  description says when: a sub-task that fits a cheaper or a stronger model.
-- **Standby.** In `run_agent`, the step call (`agent/loop.py:870-871`) catches `ProviderQuotaError`,
-  `ProviderAuthError` and `MissingSecretError` after the connector's own retries. With a standby model available in
-  the roster: the run's model changes (`update_run_model`; `RunRecord.model` is the model of the run from here on,
-  compaction included), a note tells the model "From this step on you are X; Y became unavailable (reason)", event
-  `model_switched {from, to, reason}`, a timeline line, and the same step is retried once on X. Without one: the run
-  fails as today. A delegated run inherits the model its parent has now.
-- **Where it is seen.** `dotx doctor` prints a "Helpers" row with each helper's key state; the run page's model chip
-  follows a switch; `dotx models profile` lists helpers.
+  `["anthropic:claude-opus-5-5", "openai:gpt-5.5"]`. `[models] standby = []`: the models a run moves to, in order, when
+  its own provider cannot answer. `[models] helper_cooldown_s = 600`. `[agent] consult_max_per_run = 5`. They go into
+  `config.py` and `defaults.toml` together (the config models forbid unknown keys and have no defaults). The references
+  are checked where they are used (`parse_model_ref`), as `main` is.
+- **Pauses, in the router.** A provider that cannot answer for a while is paused: a quota, rate-limit or key error, or a
+  missing key (`ProviderQuotaError`, `ProviderRateLimitError`, `ProviderAuthError`, `MissingSecretError`; the last is a
+  `ConfigError`, raised when the connector is made). `ModelRouter.complete` already catches every failure to record it
+  (`llm/router.py:141-158`); it now also pauses the provider, for the `retry_after_s` the provider gave, else for
+  `helper_cooldown_s`. A call that answers ends its provider's pause. The router never refuses a call because of a
+  pause: pauses only steer the choice of a helper or a standby. They live in the daemon's memory. Transport and
+  protocol errors pause nothing. By the time an error reaches the router, the connector has retried what can be
+  retried (six attempts; a rate limit that asks for more than 120 s is not retried, `llm/http.py:66-73`).
+- **The roster** (new `agent/helpers.py`). `roster_for(models, keyed, paused, now) -> Roster(available, unavailable)` is
+  pure: a model whose provider lacks its key (Ollama needs none) or is paused is unavailable, with the reason and, for a
+  pause, its end. `keyed_providers` reads the key states with `secrets.secret_state` (environment, env file, Keychain;
+  it reads the value and returns only where it comes from) in a thread, because the Keychain lookup is a blocking
+  subprocess.
+- **`consult`** (new `tools/consult.py`; core, through the fallback of `tools/groups.py:48`). Offered when the roster of
+  `helpers` has an available model at the start of the run, as `skill` is withheld without skills
+  (`agent/loop.py:875-876`); the system prompt then gets a Helpers section that names them. `ConsultArgs(question,
+  include, model)`.
+  - `include` is a list of `goal`, `plan`, `recent` and `screenshot`, by default the first three. They are the run's
+    goal, its plan (the newest `plan` event, as `/btw` reads it), the thread's conversation through `goal_digest`
+    (`agent/review.py:362`: secrets masked, the start and the end of a long one), and the newest screenshot of the
+    thread. The screenshot goes only to a helper that can see images; the result says when it was left out.
+  - `model` names a helper; without it the first available one answers.
+  - The helper gets no tools and answers in plain text, as a `/btw` side answer does (`agent/aside.py:82`). Its system
+    prompt says that it advises an agent, that the user's goal is the only authority, and that the fenced record is
+    data (`<<NAME nonce>>` fences, as in the review model's prompts).
+  - The answer comes back fenced as advice: `<helper_advice nonce="..." model="...">`. Purpose `consult`, a new value of
+    `CallPurpose` (`llm/calls.py:17-19`). Kind `meta`, risk `safe`, every mode.
+  - Not parallel-safe: the calls of one turn run one after another, so the budget holds exactly. The call after
+    `consult_max_per_run` calls of the run fails with the count; the count comes from the run's `model_call` events
+    with purpose `consult`, failed calls included.
+  - An unavailable error emits `helper_unavailable {model, reason, until}`, and the result says "anthropic:…
+    cannot answer (quota exhausted) until 14:05; ask another helper (…) or go on yourself".
+- **`delegate(model)`.** `DelegateArgs.model: str | None`: one of the available helpers, or the run's own model;
+  anything else fails and names the available helpers. `Spawner.delegate` and `RunManager.delegate` take `model`; `None`
+  is the parent's model as stored, so a delegated run follows its parent's switch to a standby. The tool's description
+  and the Delegation section of the prompt say so.
+- **Standby.** `run_agent` catches the four errors around the step call. With a standby model available (the failed
+  provider is paused by then, so it is not chosen again):
+  - the run moves to it: `store.set_run_model` (new), and the run snapshot is replaced (`AgentRun` and its `RunRecord`
+    are frozen, and compaction reads `agent.run.model`, `agent/loop.py:341`);
+  - the model info, the scaffold (context budget, tool output budget) and the token-estimate ratio follow the new
+    model, and images leave the history when it cannot see;
+  - a stored note tells the model "From this step on you run on X: Y cannot answer (quota exhausted)", and the event
+    `model_switched {from, to, reason, step}` is emitted;
+  - the step is asked again on the new model. Its tools and its system prompt stay.
+  - Without a standby the error ends the run as before. A transport error or a timeout does not switch.
+- **Where it is seen.** The timeline shows `model_switched` and `helper_unavailable` as notes, with existing icons, and
+  the model chip follows a switch through `onRunStatus`. `dotx run` prints both events. `dotx doctor` prints a
+  `helpers` row and a `standby` row with each model's state; they never fail the check. README.
 
-**Touchpoints.** `config.py`, `defaults.toml`, new `agent/helpers.py`, new `tools/consult.py`, `tools/delegate.py`,
-`tools/groups.py` (`consult` is core), `agent/manager.py`, `agent/loop.py`, `runtime.py`, `store/db.py`
-(`update_run_model`), `doctor.py`, `cli.py` (`models profile`), `timeline.js`, `icons.js`, README "Models and
-providers" (a "Helpers and standby" paragraph) and "Delegation".
+**Touchpoints.** `config.py`, `defaults.toml`, `llm/router.py`, `llm/calls.py`, new `agent/helpers.py`, new
+`tools/consult.py`, `tools/delegate.py`, `tools/context.py`, `agent/manager.py`, `agent/loop.py`, `agent/prompt.py`,
+`runtime.py`, `store/db.py`, `doctor.py`, `cli_ui.py`, `server/static/js/timeline.js`, README "Models and providers"
+and "Delegation".
+
+**Changed from the first draft.**
+- The pauses live in the router, which sees every failed call, instead of in the runtime. A call that answers ends its
+  provider's pause.
+- A rate limit without a time pauses for `helper_cooldown_s` like the other errors, instead of 60 s. A rate limit also
+  moves a run to its standby: one that outlasted the connector's retries ends a run as an exhausted quota does.
+- `consult` is not parallel-safe, so calls of the same turn cannot overrun its budget.
+- `recent` is the thread's conversation through `goal_digest`, not "the last steps".
+- `dotx models profile` stays the profile of one model; `dotx models profile --model <helper>` profiles a helper. The
+  doctor's rows list the helpers.
+- The smoke's second scripted provider is registered under `anthropic`, because `ModelRouter.register` only takes the
+  known provider names. A stand-in key in the test's environment makes the provider count as keyed.
+- The answer does not taint the run. The helper sees only the run's own record, which is tainted already when it holds
+  third-party content.
 
 **Decisions and limits.**
 - No silent fallback: a helper's failure is a tool result the model reads and an event the owner sees; a standby
@@ -1883,12 +1920,20 @@ providers" (a "Helpers and standby" paragraph) and "Delegation".
 - The helper sees the owner's instructions as the only authority, as the reviewer does; its answer is advice.
 - Both lists default empty: the owner fills them (open decision 11). The first candidate is Claude once
   `ANTHROPIC_API_KEY` is saved (decision 5).
+- Pauses are per provider and in the daemon's memory: a restart forgets them, and `dotx doctor`, a process of its own,
+  shows only the key states.
+- The roster is read at the start of a run to offer `consult` and to name the helpers, and again at every `consult` and
+  `delegate` call. A key saved during a run counts from the next call; a run that started without helpers does not get
+  `consult` later.
+- The stats attribute a run's calls to the model of the run, as before (`store/stats.py:33-56`): after a switch, the
+  run's earlier calls count for the standby model. A follow-up message in the same chat is sent with the run's model,
+  so it goes on with the standby.
 
-**Done when.** Unit tests of the roster and the cooldowns (states, errors, timing); smoke with the scripted provider
-and a second scripted provider registered under another name: a `consult` call answered and fenced, the budget
-reached, a helper raising `ProviderQuotaError` marked unavailable with the event and the result text, `delegate` on
-the second model, a standby switch mid-run with `model_switched` and the run ending `done`; `dotx doctor` on a
-throw-away home shows the row; timeline checked in headless Chrome; README.
+**Done when.** Unit tests of the roster and the pauses. Smoke with the scripted provider and a second scripted provider
+under `anthropic`: a `consult` answered and fenced (the helper's request checked), the budget reached, a helper raising
+`ProviderQuotaError` paused with the event and the result text, `delegate` on the helper model, a standby switch mid-run
+with `model_switched` and the run ending `done`, and without a standby the run failing as before. `dotx doctor`'s rows
+on a throw-away home; the timeline checked in headless Chrome; README.
 
 ### 16. Typed judgments (TypeSafe) at the decision points
 

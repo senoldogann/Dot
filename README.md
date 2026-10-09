@@ -62,18 +62,35 @@ the run the same way, so that its end is recorded.
 
 ## Models and providers
 
-A model is written `provider:model`. The `[models]` table of the configuration sets five roles:
+A model is written `provider:model`. The `[models]` table of the configuration sets these keys:
 
-| Key      | Used for                                                                                  | Default                     |
-| -------- | ----------------------------------------------------------------------------------------- | --------------------------- |
-| `main`   | the agent loop                                                                            | `ollama:minimax-m2.7:cloud` |
-| `vision` | describing the images a tool returns, when `main` cannot see them                         | `ollama:gemma4:cloud`       |
-| `fast`   | summarising the older part of a long run                                                  | `ollama:gpt-oss:20b-cloud`  |
-| `review` | answering the policy's questions in `auto` approvals, and checking a run against its goal | `ollama:minimax-m2.7:cloud` |
-| `effort` | default reasoning level of a run on `main` (see below)                                    | `medium`                    |
+| Key                 | Used for                                                                                  | Default                     |
+| ------------------- | ----------------------------------------------------------------------------------------- | --------------------------- |
+| `main`              | the agent loop                                                                            | `ollama:minimax-m2.7:cloud` |
+| `vision`            | describing the images a tool returns, when `main` cannot see them                         | `ollama:gemma4:cloud`       |
+| `fast`              | nothing; kept so that existing config files stay valid                                    | `ollama:gpt-oss:20b-cloud`  |
+| `review`            | answering the policy's questions in `auto` approvals, and checking a run against its goal | `ollama:minimax-m2.7:cloud` |
+| `effort`            | default reasoning level of a run on `main` (see below)                                    | `medium`                    |
+| `helpers`           | models a run may ask for advice or hand a part of its work to (see below)                 | `[]`                        |
+| `standby`           | models a run moves to when the provider of its own model cannot answer (see below)        | `[]`                        |
+| `helper_cooldown_s` | how long a provider that could not answer is left out of `helpers` and `standby`          | `600`                       |
 
 `review` checks the work of `main`. A model checking its own work is the weaker check, so pick a `review` model of
 another family than `main` when you can; `dotx doctor` warns while they are the same model, as they are by default.
+
+**Helpers and standby.** `helpers` lists models, best first, that a run may turn to. The `consult` tool asks one of them
+a question and returns its answer, fenced as advice; `delegate` can run a part of the work on one of them. A helper has
+no tools and sees only what the question sends: the run's goal, its plan, the conversation (secrets masked, the start
+and the end of a long one) and the newest screenshot, which only a helper that can see images gets. A run may ask
+`[agent] consult_max_per_run` questions (5); `0` offers no `consult`. `standby` lists the models a run moves to when the
+provider of its own model answers with a quota, rate-limit or key error, or has no key: the run goes on from the same
+step on the first standby model that can answer, the model is told, and the timeline shows the switch, which the model
+chip follows. Without a standby model such an error ends the run, as it always did. A model is left out of both lists
+while its provider has no key (an Ollama model needs none), and after such an error for the time the provider named or
+for `helper_cooldown_s` seconds, until a call it answers; the process that runs the run keeps that in memory. Both lists
+are empty by default, and `dotx doctor` shows which of their models have a key. `dotx stats` counts every call of a run
+for the model of the run, so after a switch the calls before it count for the standby model too; an answered question, a
+resume and a follow-up message of the chat go on with the standby model.
 
 | Provider    | Reference             | Protocol                                                                                   | Key                                                       |
 | ----------- | --------------------- | ------------------------------------------------------------------------------------------ | --------------------------------------------------------- |
@@ -228,7 +245,7 @@ answer (a small model that is offered both writes the call out as text).
 | Desktop         | `desktop_apps`, `desktop_open_app`, `desktop_snapshot`, `desktop_read`, `desktop_act`, `desktop_screenshot`, `desktop_clipboard_read`, `desktop_clipboard_write` |
 | macOS           | `apple_script`, `notify`                                                                                           |
 | Memory, time    | `memory_save`, `memory_search`, `memory_forget`, `schedule_create`, `schedule_list`, `schedule_delete`             |
-| Orchestration   | `delegate`, `update_plan`, `ask_user`, `finish`, `use_tools`                                                       |
+| Orchestration   | `delegate`, `consult`, `update_plan`, `ask_user`, `finish`, `use_tools`                                            |
 | Skills          | `skill`                                                                                                            |
 | MCP             | `mcp__<server>__<tool>`                                                                                            |
 
@@ -942,10 +959,11 @@ every run.
 
 ## Delegation
 
-`delegate(goal, mode?)` hands a sub-goal to a separate run with a conversation of its own and returns its result, so a
-long investigation does not fill the parent's context. A delegated run cannot delegate again (the depth is one), does not
-take one of the `max_concurrent_runs` slots, starts as untrusted as its parent, and ends when the parent is cancelled. A
-research run can only delegate to research.
+`delegate(goal, mode?, model?)` hands a sub-goal to a separate run with a conversation of its own and returns its
+result, so a long investigation does not fill the parent's context. The run works on the parent's model, or on the
+helper model that `model` names when that one can answer (see [Helpers and standby](#models-and-providers)). A
+delegated run cannot delegate again (the depth is one), does not take one of the `max_concurrent_runs` slots, starts as
+untrusted as its parent, and ends when the parent is cancelled. A research run can only delegate to research.
 
 ## Configuration
 

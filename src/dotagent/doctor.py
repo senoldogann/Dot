@@ -5,6 +5,7 @@ import asyncio
 import os
 import platform
 import shutil
+import time
 from collections.abc import Sequence
 from pathlib import Path
 
@@ -13,11 +14,12 @@ from playwright.async_api import Error as PlaywrightError
 from playwright.async_api import async_playwright
 from pydantic import JsonValue
 
+from dotagent.agent.helpers import Roster, keyed_providers, roster_for, unavailable_text
 from dotagent.browser.attach import DebugEndpoint, read_debug_endpoint
 from dotagent.browser.keychain import KeychainMode, read_keychain_mode
 from dotagent.browser.login import CHROME_APP
 from dotagent.browser.profile_lock import profile_holder_pid
-from dotagent.config import AppConfig, McpServerConfig, MemoryConfig, ModelsConfig
+from dotagent.config import AppConfig, McpServerConfig, MemoryConfig, ModelsConfig, ProvidersConfig
 from dotagent.core.errors import BrowserError, ConfigError, ProviderError, ToolExecutionError, WebError
 from dotagent.core.paths import (
     browser_profile_dir,
@@ -112,6 +114,22 @@ def _review_row(models: ModelsConfig) -> CheckResult:
             "a review model of another family is better",
         )
     return _result("review model", True, False, f"{models.review} is not the main model")
+
+
+async def _models_row(name: str, setting: str, models: Sequence[str], providers: ProvidersConfig) -> CheckResult:
+    """Each helper or standby model and whether it can answer, as far as its provider's key tells (the pauses of the
+    running daemon are not seen from here). One that cannot answer is worth a warning, never a failure."""
+    if not models:
+        return _result(name, True, False, f"none ({setting} is empty)")
+    try:
+        roster: Roster = roster_for(models, await keyed_providers(providers, models), {})
+    except ConfigError as exc:
+        return _result(name, False, False, f"{exc.message}: {', '.join(models)}")
+    states: dict[str, str] = {model: f"{model} ready" for model in roster.available} | {
+        entry.model: unavailable_text(entry, time.time()) for entry in roster.unavailable
+    }
+    in_order: list[str] = [states[label] for label in dict.fromkeys(parse_model_ref(model).label for model in models)]
+    return _result(name, bool(roster.available), False, "; ".join(in_order))
 
 
 def _has_secret(variable: str) -> bool:
@@ -516,6 +534,8 @@ async def _service_checks(config: AppConfig) -> list[CheckResult]:
         for role, reference in configured:
             results.append(await _check_model(router, role, reference))
         results.append(_review_row(config.models))
+        results.append(await _models_row("helpers", "[models] helpers", config.models.helpers, config.providers))
+        results.append(await _models_row("standby", "[models] standby", config.models.standby, config.providers))
     finally:
         await router.aclose()
     return results
