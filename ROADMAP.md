@@ -1071,7 +1071,8 @@ medians, p90, tools table, runs without `model_call` events left out); a smoke t
 checks one `model_call` event per step and one per compaction; `dotx stats` on a throw-away home prints the tables;
 `dotx eval check` clean; the numbers of one scripted eval run (seconds per task) written here as the baseline for
 items 13, 14 and 19. All true; also clean: ruff format and check, mypy, the unit tests (483), `dotx eval check` (25
-tasks) and the offline smoke suite (179, with the tests that call a cloud model through Ollama left out); the run page
+tasks) and the offline smoke suite (179, with the tests that call a cloud model through Ollama left out but one: the
+attachment test of the web UI had no guard and called `gpt-oss:20b-cloud` in each run, found in item 11); the run page
 checked on a scripted throw-away daemon at desktop width and at 375 px.
 
 ### 10. Yolo asks nobody: secret fields, questions and the end of a run
@@ -1298,11 +1299,11 @@ left questions (`tests/unit/test_run_modes.py`); a field's marking, kind and fla
 (`tests/unit/test_secret_fields.py`, `tests/unit/test_desktop_secrets.py`). The tests of the answer during the last
 step, of the answer a stopped run did not read, of the run that only leaves questions, of the hand-off rule and the four
 `ask` cases each fail without their fix. All true; also clean: ruff format and check, mypy, the unit tests (515), `dotx
-eval check` (25 tasks) and the offline smoke suite (198, with the tests that call a cloud model through Ollama left out;
-no cloud model was called for this item); the run page checked on a scripted throw-away daemon at desktop width and at
-375 px (the left questions, the needs box, an empty answer kept back, a skip and an answer through the API that leave
-the page where it is, the last answer steered into the run the previous one started and the page following it, no "null"
-in a card).
+eval check` (25 tasks) and the offline smoke suite (198, with the tests that call a cloud model through Ollama left out
+but one: the attachment test of the web UI had no guard and called `gpt-oss:20b-cloud` in each run, found in item 11);
+the run page checked on a scripted throw-away daemon at desktop width and at 375 px (the left questions, the needs box,
+an empty answer kept back, a skip and an answer through the API that leave the page where it is, the last answer steered
+into the run the previous one started and the page following it, no "null" in a card).
 
 ### 11. Open-ended goals in one run: targets, limits and an honest end
 
@@ -1334,55 +1335,65 @@ and wrong lines).
 - **Targets in the plan.** `PlanPayload` (`agent/plan.py:30-35`) has `targets: str` with the default `""`, so plan
   events stored before it still read (`FrozenModel` refuses unknown fields and has no other defaults);
   `plan_event_data` writes the steps and the targets and `plan_from_event` reads both (`:42-54`). `update_plan` takes
-  `targets` (`UpdatePlanArgs`, `tools/meta.py:186-197`; at most 600 characters, and like `needs_from_user` it may be
-  left out): left out, the targets of the latest plan stay; an empty text removes them (`:215`). `mark_plan_step` keeps
-  them (`:245-248`). `render_plan` stays the step lines (pinned by `tests/unit/test_continuity.py:167`); `plan_lines`
+  `targets` (`UpdatePlanArgs`, `tools/meta.py:186-198`; at most 600 characters, and like `needs_from_user` it may be
+  left out): left out or empty, the targets of the latest plan stay, and new targets replace them (`:216`). An empty
+  text does not remove them: a provider sees `targets` as an optional text (the schema drops the null branch,
+  `tools/schema.py:35-41`), and a model that fills an unused one with "" would wipe them. `mark_plan_step` keeps them
+  (`:247-249`). `render_plan` stays the step lines (pinned by `tests/unit/test_continuity.py:167`); `plan_lines`
   (`agent/plan.py:84-87`) adds a `Targets:` line under them, and every text the model reads a plan in uses it: the tool
-  result (`tools/meta.py:207`), the continuity note and the reminder (`_task_sections`, `agent/continuity.py:190-202`),
+  result (`tools/meta.py:208`), the continuity note and the reminder (`_task_sections`, `agent/continuity.py:190-202`),
   the resume note (`agent/resume.py:154-155`), a side question's record (`agent/aside.py:65`) and the watchdog's stop
-  and second opinion (`agent/loop.py:723`). The live plan of the web UI shows the targets as its first line
-  (`planTargets`, `views/run.js:44-45`, painted at `:133-137` from `timeline.js:499-500`), and `dotx run` prints them
-  under the plan (`_on_plan`, `cli_ui.py:398-402`). A resumed run inherits them with the plan (`agent/manager.py:368`,
-  `agent/loop.py:780-784`).
+  and second opinion (`agent/loop.py:788`). The live plan of the web UI shows the targets as its first line
+  (`planTargets`, `views/run.js:44-45`, painted at `:133-138` from `timeline.js:501-502`), and `dotx run` prints them
+  under the plan (`_on_plan`, `cli_ui.py:400-404`). A resumed run inherits them with the plan (`agent/manager.py:368`,
+  `agent/loop.py:846-850`).
 - **The goal check reads the targets.** `GoalRequest` (`agent/review.py:183-193`) has `targets`, read from the run's
-  latest plan in `_check_goal` (`agent/loop.py:609`); `_goal_prompt` (`agent/review.py:319-332`) adds a fenced
-  `TARGETS` section after the goal when they are set. `_GOAL_SYSTEM` (`agent/review.py:87-118`) has one more rule
-  (`:113-115`): targets are the agent's own measurable reading of a goal that names an outcome, not added
+  latest plan when the checker is asked (`_ask_checker`, `agent/loop.py:608-656`, at `:628`); `_goal_prompt`
+  (`agent/review.py:319-332`) adds a fenced `TARGETS` section after the goal when they are set. `_GOAL_SYSTEM`
+  (`agent/review.py:87-118`) names the targets among the data whose words have no authority (`:105-107`) and has one
+  more rule (`:113-115`): targets are the agent's own measurable reading of a goal that names an outcome, not added
   requirements; the checker judges whether they are met from the digest, the facts and the numbers of the answer, and
   whether they fit the goal: targets that ask for less than the goal's words do not make the goal reached. The verdicts
   keep their meaning (`_after_verdict`, `agent/loop.py:562-581`): targets met is `achieved`, not met while the run can
   go on is `continue`, an honest failure after the sensible ways is `blocked`.
-- **Limits, opt-in.** `[agent] run_max_minutes` (a float, so a test can use a fraction) and `run_max_tokens`, both
-  `Field(ge=0)` (`config.py:92-93`) and 0, meaning none, by default (`defaults.toml:86-91`): the names of open decision
-  6. They bound task and research runs (`limits_of`, `agent/limits.py:38-43`); a chat turn ends with a reply and has no
-  `finish` to end with. At the top of every step, after the user's messages and the memories are read and before the
-  offered tools are chosen (`agent/loop.py:920-927`), the loop compares the seconds since `run_agent` started (a
-  monotonic clock, `:774`; a resumed run is a new run with a new clock) and the tokens of the run and of the runs it
-  delegated to (`Store.family_tokens`, `store/db.py:790-796`, one query over `input_tokens + output_tokens`; the
-  router's recorder adds every call before the call returns, `runtime.py:115-126`) with the limits (`limit_reached`,
-  `agent/limits.py:46-53`: a limit is reached once all of it is spent). The eval supervisor's spending is the same query
-  (`evals/runner.py:182-185`). At the first step past a limit the run stores a note (`limit_note`,
-  `agent/limits.py:67-74`: what it spent; finish now with the numbers reached, what is missing and how to go on) and
-  emits `limit_reached {seconds, tokens, max_minutes, max_tokens}`; from then on every step offers only `finish`,
-  `update_plan` and `mark_plan_step` (`LIMIT_TOOLS`, `agent/limits.py:19`; a call of any other tool is answered as
-  unknown, `_only`, `agent/loop.py:473-476`), and the run ends after that step's reply. A valid `finish` ends it as the
-  finish says (`:1001-1002`). Anything else (text, an empty reply, other calls) ends it `failed` (`_limit_end`,
-  `:767-770`, at `:1003-1004` and `:1026-1027`) with a result that starts with `PREFIX_LIMIT` (`store/endings.py:19`)
-  and goes on like the watchdog's stop: what it did last, what it touched, its plan with the targets and how to go on
-  (`limit_result`, `agent/limits.py:77-81`, through `stop_account`, `agent/progress.py:331-346`, the body
-  `stop_result` had). There is no new run status (`store/models.py:9`): the ending `limit` is told from the prefix
-  (`store/endings.py:61-62`), before the goal-check mark. After the note nothing sends the run back: no plan reminder,
-  no paths check and no goal check (`agent/loop.py:1042`, `:1051`, `:1067`), as the watchdog's stop returns before
-  them (`:1012-1013`). A message the user sends during that step is read in one more limited step, as item 10 made a
-  run read an answer that comes during its last step (`:1070-1075`). The limit wins over a re-plan or a question of
-  the watchdog in the step before: both set the one `allowed` (`:1015`), and the limit sets it after them
-  (`:925-927`).
+- **Limits, opt-in.** `[agent] run_max_minutes` (a float, so a test can use a fraction; neither infinite nor NaN) and
+  `run_max_tokens`, both `Field(ge=0)` (`config.py:92-93`) and 0, meaning none, by default (`defaults.toml:86-92`):
+  the names of open decision 6. They bound task and research runs (`limits_of`, `agent/limits.py:42-47`); a chat turn
+  ends with a reply and has no `finish` to end with. At the top of every step, after the user's messages and the
+  memories are read and before the offered tools are chosen (`agent/loop.py:986-993`), the loop compares the seconds
+  since `run_agent` started (a monotonic clock, `:840`, so waits for the owner count) and the tokens of the run and of
+  the runs it delegated to (`Store.family_tokens`, `store/db.py:790-796`, one query over `input_tokens +
+  output_tokens`; the router's recorder adds every call before the call returns, `runtime.py:115-126`) with the limits
+  (`limit_reached`, `agent/limits.py:50-57`: a limit is reached once all of it is spent). The eval supervisor's
+  spending is the same query (`evals/runner.py:182-185`). At the first step past a limit the run stores a note
+  (`limit_note`, `agent/limits.py:71-79`: what it spent; finish now with the numbers reached, what is missing and how
+  to go on; the plan tools before `finish`, as the executor skips every call after it) and emits `limit_reached
+  {seconds, tokens, max_minutes, max_tokens}`; from then on the step offers only `finish`, `update_plan` and
+  `mark_plan_step` (`LIMIT_TOOLS`, `agent/limits.py:22`; a call of any other tool is answered as unknown, `_only`,
+  `agent/loop.py:473-476`), and the run ends with that step's reply. A valid `finish` ends it as the finish says
+  (`:1067-1068`). Anything else (text, an empty reply, other calls) ends it at once `failed` (`_limit_end`,
+  `:832-836`, returned at `:1069-1070` and `:1092-1093`) with a result that starts with `PREFIX_LIMIT`
+  (`store/endings.py:19`), then the text of the reply when it had one, then goes on like the watchdog's stop: what it
+  did last, what it touched, its plan with the targets and how to go on (`limit_result`, `agent/limits.py:82-88`,
+  through `stop_account`, `agent/progress.py:331-346`, the body `stop_result` had). There is no new run status
+  (`store/models.py:9`): the ending `limit` is told from the prefix (`store/endings.py:61-62`), before the goal-check
+  mark. A finish past the limit is settled in one branch before anything that sends a run back
+  (`agent/loop.py:1107-1113`): no plan reminder and no paths check; in goal mode the checker judges it once and its
+  verdict is final
+  (`_check_goal_at_limit`, `:689-716`; `_after_limit_verdict`, `:584-600`: `achieved` is done, `blocked` and
+  `continue` are failed with the check's note, "the goal is not reached, and the run's limit is reached" for
+  `continue`), and its `goal_check` event has `limit: true` so the timeline and `dotx run` do not say "after N rounds".
+  What the user sends during that step comes too late for the run, as for one that has ended: the manager keeps an
+  answer to a left question in the thread for the next run and the run page marks any other message as not read
+  (`_keep_answers`, `agent/manager.py:589-601`). The limit wins over a re-plan or a question of the watchdog in the
+  step before: both set the one `allowed` (`:1081`), and the limit sets it after them (`:991-993`).
 - **Delegated, scheduled and eval runs.** Every task and research run is bounded by the configuration's limits, a
   delegated or scheduled one too. A delegated run's tokens count toward its parent, as the eval counts them (a
   delegated run cannot delegate again, `agent/loop.py:156`, so its children are all there is); the parent sees them
   when the `delegate` call returns, so one step can overshoot by what a child spent (a child is bounded by its own
-  limits). `eval_config` (`evals/runner.py:53-67`) sets both to 0: an eval run is cut by its task's `time_limit_s` and
-  `token_budget`, so the owner's limits do not change a measurement.
+  limits). The limits are those of one `run_agent` call: a resumed run, or one that an answer to a left question
+  starts, begins with a new clock and a new count. `eval_config` (`evals/runner.py:53-67`) sets both to 0: an eval run
+  is cut by its task's `time_limit_s` and `token_budget`, so the owner's limits do not change a measurement.
 
 **Touchpoints.** `agent/prompt.py`, `agent/plan.py`, `tools/meta.py`, `agent/continuity.py`, `agent/resume.py`,
 `agent/manager.py` (`_resume`), `agent/aside.py`, `agent/review.py`, `agent/progress.py` (`stop_account`), new
@@ -1393,32 +1404,34 @@ limits").
 
 **What exists now.**
 - `agent/plan.py`: `PlanPayload.targets`, `EMPTY_PLAN` and `plan_lines`; `plan_event_data` and `plan_from_event` carry
-  the targets. `tools/meta.py`: `update_plan` takes `targets` (kept when left out, removed by an empty text, at most 600
-  characters) and `mark_plan_step` keeps them; both answer with the plan and its targets.
+  the targets. `tools/meta.py`: `update_plan` takes `targets` (kept when left out or empty, replaced by new ones, at
+  most 600 characters) and `mark_plan_step` keeps them; both answer with the plan and its targets.
 - `agent/continuity.py`, `agent/resume.py`, `agent/aside.py`, `agent/manager.py` and `agent/loop.py` hold the plan as a
   `PlanPayload` and give it to the model through `plan_lines`: the continuity note and the reminder, the resume note, a
   side question's record, the watchdog's stop and its second opinion.
-- `agent/review.py`: `GoalRequest.targets`, the `TARGETS` section of the goal prompt and the targets rule of
-  `_GOAL_SYSTEM`. `agent/prompt.py`: `_OPEN_GOALS` after `_ENDING_TOOL` in task and research runs; "a precise request"
-  in `_WORK`.
+- `agent/review.py`: `GoalRequest.targets`, the `TARGETS` section of the goal prompt, and the targets among the data
+  and the targets rule of `_GOAL_SYSTEM`. `agent/prompt.py`: `_OPEN_GOALS` after `_ENDING_TOOL` in task and research
+  runs; "a precise request" in `_WORK`.
 - `agent/limits.py` (new, pure): `RunLimits`, `LimitReached`, `limits_of`, `limit_reached`, `limit_spent`,
   `limit_note`, `limit_result`, `limit_event_data`, `LIMIT_EVENT` (`limit_reached`) and `LIMIT_TOOLS`.
   `agent/progress.py`: `stop_account`, shared by the watchdog's stop and the end at a limit. `store/endings.py`:
   `PREFIX_LIMIT` and the ending `limit` ("stopped at its limit of minutes or tokens"). `store/db.py`:
   `Store.family_tokens`. `agent/loop.py`: the run's clock, the check at the top of each step, `_limit_seen`,
-  `_limit_end`, and the limit's guard on the plan reminder, the paths check and the goal check.
+  `_limit_end`, the branch that settles a finish past the limit, and the goal check split into `_ask_checker`,
+  `_check_goal` and `_check_goal_at_limit` (with `_after_limit_verdict`).
 - `config.py` and `defaults.toml`: `[agent] run_max_minutes` and `run_max_tokens` (0). `evals/runner.py`:
   `eval_config` sets both to 0, and the supervisor's spending is `family_tokens`. `evals/catalog.py`: the task
   `collect-contacts`.
-- `cli_ui.py`: the targets under the plan (`◎ …`) and the line `⏱ limit reached (…): told to finish now`.
+- `cli_ui.py`: the targets under the plan (`◎ …`), the line `⏱ limit reached (…): told to finish now`, and "goal
+  check: not reached at the limit".
 - Web UI: `views/run.js` (the targets as the first line of the plan card, with a target icon), `timeline.js` (the line
-  "The run reached its limit (…) and was told to finish now"), `app.css` (`.plan-targets`), `run.css` (the head of a
-  group of steps wraps on a phone).
-- Tests: `tests/unit/test_limits.py` (5), `tests/smoke/test_run_limits.py` (3, the scripted model in the real loop and
+  "The run reached its limit (…) and was told to finish now", and "Goal check: not reached, and the run is at its
+  limit, so it stops"), `app.css` (`.plan-targets`), `run.css` (the head of a group of steps wraps on a phone).
+- Tests: `tests/unit/test_limits.py` (5), `tests/smoke/test_run_limits.py` (6, the scripted model in the real loop and
   as the goal checker), `tests/unit/test_continuity.py` (targets: the round trip, an event stored without them,
-  `plan_lines`), `tests/unit/test_run_modes.py` (the open-goal section by mode, a negative limit refused),
-  `tests/unit/test_endings.py` (the ending `limit`); the resume tests carry targets (`tests/unit/test_resume.py`,
-  `tests/smoke/test_resume.py`).
+  `plan_lines`), `tests/unit/test_run_modes.py` (the open-goal section by mode, a negative, infinite or NaN limit
+  refused), `tests/unit/test_endings.py` (the ending `limit`); the resume tests carry targets
+  (`tests/unit/test_resume.py`, `tests/smoke/test_resume.py`).
 
 **How to use it.**
 ```
@@ -1435,30 +1448,41 @@ finish then ends "Failed" with "Stopped: the run reached its limit (…)" and ho
 - Both limits stay 0 by default: the owner asked for runs that do not stop, and open decision 6 keeps 0 for them.
 - A limit is checked between steps, so a step that is running when it passes goes on: a model call can take
   `model_call_timeout_s` (420 s), a `delegate` call waits for its run. Only the eval cuts a run in the middle of a step.
-- In goal mode a run past its limit is not checked: the checker can only send a run back, and the limit says not to go
-  on. Its answer stands as it finished, with the success it claims, and the `limit_reached` line in its timeline says
-  why it ended there.
+- In goal mode a finish past the limit is checked once, without a way back: the limit says not to go on, and goal mode
+  says not to take "done" on the model's word. A check costs one call of the review model past the limit.
+- The minutes are wall time, so waits for the owner's approvals and answers count: a run in `ask` that waited long for
+  an approval may be told at its next step to finish. The open-ended runs this item is for are unattended (`yolo`,
+  scheduled), where nothing waits for the owner.
+- The limits are per run: a resume after a daemon restart, or a run that an answer starts, begins again from 0, and a
+  delegated run has the full limits of its own. Item 12 keeps these limits per session of a campaign and bounds the
+  campaign by its count of sessions (`campaign_max_sessions`).
 - The run page shows a limit end as "Failed", as it shows a watchdog stop; `dotx stats` counts the ending `limit`.
 - The wording cannot be measured offline; `dotx eval` has one open-ended task (`collect-contacts`, category
   `multi_step`, mode `task`): collect as many contacts as the meeting notes give, checked per contact in the
   `contacts.csv` the run writes, so a run that stops after the first note fails it. How real models do on it is not
-  measured here: no cloud model was called for this item.
+  measured here: no eval of this item called a cloud model.
 - Fixed on the way (older than this item): on a phone the head of a group of steps did not wrap, so its count and the
   badge of failed calls went out of view (`.steps-head`, `run.css:70-83`).
 
 **Done when.** Unit tests of the targets (event round trip, an old event without them, `plan_lines`), of the limit
-decision (pure: seconds, tokens, both, none), of the ending `limit` and of the prompt (the open-goal section in task and
-research, not in chat); smoke with the scripted model: a run past `run_max_tokens` gets the note and the three tools and
-ends `limit` when it does not finish, one that finishes after the note ends as it says without a plan reminder or a
-goal check, `update_plan` targets survive a new plan without them and `mark_plan_step`, and reach the goal checker's
-prompt as a `TARGETS` section with the rule in its system prompt; the resume smoke test carries targets; the eval task
-added and `dotx eval check` clean; README updated. All true. Taking out the guard on the goal check, the guard on the
-plan reminder or the end at the limit after a step with calls each makes a smoke test fail (checked one at a time).
-Also clean: ruff format and check, mypy, the unit tests (524), `dotx eval check` (26 tasks, none passed by doing
-nothing) and the offline smoke suite (214 passed, with the 30 tests that call a cloud model through Ollama left out; no
-cloud model was called for this item); the run page checked on a scripted throw-away daemon at desktop width in the
-light and the dark theme and at 375 px (the targets on the plan card's first line, the limit line in the timeline, the
-run's end and its result, no horizontal overflow, a clean console).
+decision (pure: seconds, tokens, both, none), of the ending `limit` and the result of a limit end (with and without a
+last reply), of the configuration (a negative, endless or NaN limit refused) and of the prompt (the open-goal section in
+task and research, not in chat). Smoke with the scripted model (`tests/smoke/test_run_limits.py`): `update_plan` targets
+survive a new plan without them, an empty `targets` and `mark_plan_step`, and reach the goal checker's prompt as a
+`TARGETS` section with the data rule in its system prompt; a run past `run_max_tokens` gets the note, has a call of
+another tool refused and ends `limit` with its last reply when it does not finish; a text reply past the limit ends the
+run the same way; a finish past the limit is not sent back by the plan reminder, by a path of the answer that does not
+exist or by a message the user sent during the step, and goal mode judges it once (a `continue` ends the run failed with
+the check's note). The resume smoke test carries targets; the eval task added and `dotx eval check` clean; README
+updated. All true. Taking out the end at the limit after a finish (three smoke tests fail), after a step with calls
+(one) or after a text reply (one), or the cut of the tools past the limit (one), makes a smoke test fail (checked one at
+a time). Also clean: ruff format and check, mypy, the unit tests (524), `dotx eval check` (26 tasks, none passed by
+doing nothing) and the offline smoke suite (203 passed, with the tests marked `live`, `internet`, `hosted` or `desktop`
+and the 31 that call a cloud model through Ollama left out; the Ollama log shows no chat request during it); the run
+page checked on a scripted throw-away daemon at desktop width in the light and the dark theme and at 375 px (the targets
+on the plan card's first line, a plan without targets with no targets line and no "null", the limit line in the
+timeline, the goal check at the limit that says the run stops, the run's end and its result, no horizontal overflow, a
+clean console), and the lines of `dotx run` replayed from the same run.
 
 ### 12. Campaigns: a goal that works until its outcome is verified
 
@@ -2140,5 +2164,21 @@ on and is closed by `terminal_close`; the idle reaper; unit tests of the ANSI st
   limit, by default) bound a task or research run together with the runs it delegated to: past a limit the run is told
   so, may only finish or close its plan, and ends after that reply; one that does not finish ends with the new ending
   `limit`. Eval runs keep their task's own cut; `dotx eval` gets `collect-contacts`. Unit tests (524), `dotx eval
-  check` (26), the offline smoke suite (214) and the run page on a throw-away daemon clean; no cloud model called.
-  Fixed on the way: the head of a group of steps went out of view on a phone.
+  check` (26), the offline smoke suite (214) and the run page on a throw-away daemon clean. Fixed on the way: the head
+  of a group of steps went out of view on a phone.
+- 2026-10-09: item 11 review fixes (/code-review at max effort, fifteen findings verified). Past its limit a run ends
+  with the reply it gives: a finish is not sent back by the plan reminder, the check of the answer's paths or a message
+  sent during that step (an answer stays in its thread); goal mode checks it once, without a way back, and the timeline
+  and `dotx run` say the run stops at its limit; a reply that does not finish is kept in the `limit` result. The limit
+  note asks for the plan tools before `finish` in that reply. An `update_plan` with empty `targets` keeps the targets;
+  the goal checker's data rule names the targets; a limit of `inf` or `nan` is refused; a plan without targets no longer
+  shows "null" on the run page; `collect-contacts` checks each address once and a name in every row; the README and
+  `defaults.toml` say the minutes are wall time with the waits for the owner and that each run has limits of its own.
+  Unit tests (524), `dotx eval check` (26), the offline smoke suite (203) and the run page on a throw-away daemon clean.
+  Left: the refused calls past the limit fill "What it did last"; the tokens of a run and the runs it delegated to are
+  summed at each step (about 2 ms at 50,000 events, and only with a limit set). Found while checking: the smoke test of
+  a file attached in the web UI had no `requires_model` guard, so the offline smoke runs of items 9 and 10 called
+  `gpt-oss:20b-cloud` through it (it has the guard now); the first three smoke runs of this item left out only the
+  guarded tests and not those marked `live`, so the eight `live` wire tests called `gpt-oss:20b-cloud` and
+  `gemma4:cloud` as well (53 requests through Ollama in all); the review's agents ran the whole suite with its
+  cloud-model tests twice.

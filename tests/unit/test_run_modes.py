@@ -172,11 +172,12 @@ def test_open_ended_goals_are_held_to_their_targets_in_task_and_research_runs_on
     assert section not in _in_mode("chat")
 
 
-def test_a_negative_limit_of_a_run_is_refused(tmp_path: Path) -> None:
+def test_a_negative_or_endless_limit_of_a_run_is_refused(tmp_path: Path) -> None:
     path: Path = tmp_path / "config.toml"
-    path.write_text("[agent]\nrun_max_tokens = -1\n", encoding="utf-8")
-    with pytest.raises(ConfigError):
-        load_config(path)
+    for limit in ("run_max_tokens = -1", "run_max_minutes = -0.5", "run_max_minutes = inf", "run_max_minutes = nan"):
+        path.write_text(f"[agent]\n{limit}\n", encoding="utf-8")
+        with pytest.raises(ConfigError):
+            load_config(path)
 
 
 def test_a_step_limit_left_in_the_configuration_is_refused(tmp_path: Path) -> None:

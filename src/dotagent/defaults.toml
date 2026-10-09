@@ -83,10 +83,11 @@ max_concurrent = 4
 # until the goal is reached; a run is sent back to work at most goal_patience times, then it ends as failed.
 goal_mode = false
 goal_patience = 4
-# The limits of a task or research run: minutes of wall time, and tokens of every model call of the run and of the runs
-# it delegated to. Checked between steps: at the first step past one, the run is told to finish with what it reached and
-# what is missing, may only finish or close its plan, and ends after that reply (as failed when it did not finish). 0 is
-# no limit. Delegated and scheduled runs have the same limits; eval runs have their task's own.
+# The limits of a task or research run: minutes of wall time (waits for the user included), and tokens of every model
+# call of the run and of the runs it delegated to. Checked between steps: at the first step past one, the run is told to
+# finish with what it reached and what is missing, may only finish or close its plan, and ends after that reply (as
+# failed when it did not finish). 0 is no limit. Each run has its own: a resumed run starts again from 0. Delegated and
+# scheduled runs have the same limits; eval runs have their task's own.
 run_max_minutes = 0
 run_max_tokens = 0
 tool_output_chars = 12000

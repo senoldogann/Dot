@@ -134,7 +134,8 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
     const done = steps.filter((step) => step.status === "done").length;
     plan.element.hidden = steps.length === 0;
     plan.setSummary(`${done} of ${steps.length} done`);
-    planBody.replaceChildren(targets === "" ? null : planTargets(targets), ...steps.map(planStep));
+    // The native replaceChildren writes a null as the text "null", so a plan without targets passes nothing for them.
+    planBody.replaceChildren(...(targets === "" ? [] : [planTargets(targets)]), ...steps.map(planStep));
   }
 
   function paintStats() {

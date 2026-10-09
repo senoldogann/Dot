@@ -182,8 +182,9 @@ class RunManager:
 
     def steer(self, run_id: str, text: str, files: tuple[StoredAttachment, ...]) -> None:
         """Hand the running agent an extra instruction and its attachments; it reads them before its next step, and a
-        run about to end with its answer reads them first. A run whose end is being recorded reads nothing more, so a
-        message to it is refused like one to a run that has ended."""
+        run about to end with its answer reads them first, unless it is past its limit and ends with that reply. A run
+        whose end is being recorded reads nothing more, so a message to it is refused like one to a run that has
+        ended."""
         handle: RunHandle = self._handle(run_id)
         try:
             handle.inbox.put_nowait(UserInput(text=text, files=files, question_id=None))

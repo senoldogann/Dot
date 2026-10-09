@@ -1222,6 +1222,8 @@ async def test_the_web_ui_signs_in_from_the_address_dotx_open_builds_and_refuses
             await browser.close()
 
 
+@pytest.mark.browser
+@requires_model
 async def test_a_file_attached_in_the_web_ui_reaches_the_model(live: httpx.AsyncClient, runtime: Runtime) -> None:
     """Attach a file in the composer, see it uploaded, start the run, and get an answer only the file holds."""
     port: int | None = live.base_url.port

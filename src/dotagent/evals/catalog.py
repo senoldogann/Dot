@@ -29,7 +29,7 @@ from dotagent.evals.types import (
     TaskCategory,
 )
 from dotagent.store.models import RunMode
-from dotagent.tools.meta import FINISH_TOOL
+from dotagent.tools.meta import FINISH_TOOL, MARK_PLAN_STEP_TOOL, UPDATE_PLAN_TOOL
 
 # What every task is allowed to use before the run is cut: wall-clock time and tokens (input and output of every step).
 TIME_LIMIT_S: float = 300.0
@@ -614,12 +614,15 @@ def _catalog() -> tuple[EvalTask, ...]:
             (
                 _contains("contacts.csv", "name,email"),
                 *(_contains("contacts.csv", address) for address in _CONTACTS),
+                # Each address once, the header and a row for each address and nothing else, and a name in every row.
                 _runs("sh", "-c", f"test $(grep -c @ contacts.csv) -eq {len(_CONTACTS)}"),
+                _runs("sh", "-c", f"test $(grep -c . contacts.csv) -eq {len(_CONTACTS) + 1}"),
+                _runs("sh", "-c", "test -f contacts.csv && ! grep -q '^[[:space:]]*,' contacts.csv"),
             ),
             (
                 _turn(
                     _call(
-                        "update_plan",
+                        UPDATE_PLAN_TOOL,
                         steps=[
                             {"text": "Find every e-mail address in notes/ and its subfolders", "status": "in_progress"},
                             {"text": "Write contacts.csv", "status": "pending"},
@@ -642,10 +645,12 @@ def _catalog() -> tuple[EvalTask, ...]:
                             "Ela Yıldız,ela@example.com",
                         ),
                     ),
-                    _call("mark_plan_step", step=1, status="done"),
-                    _call("mark_plan_step", step=2, status="done"),
+                    _call(MARK_PLAN_STEP_TOOL, step=1, status="done"),
+                    _call(MARK_PLAN_STEP_TOOL, step=2, status="done"),
                 ),
-                _turn(_call("shell", command="grep -c @ contacts.csv"), _call("mark_plan_step", step=3, status="done")),
+                _turn(
+                    _call("shell", command="grep -c @ contacts.csv"), _call(MARK_PLAN_STEP_TOOL, step=3, status="done")
+                ),
                 _finish(
                     "contacts.csv has the 5 people the notes give an e-mail address for (Mert Kaya once, although two "
                     "notes name him; Ela Yıldız from notes/archive/). Zeynep and Selin have no address in the notes.",

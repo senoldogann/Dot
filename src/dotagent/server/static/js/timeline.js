@@ -464,15 +464,17 @@ export function createTimeline({ rootRunId, startedAt, onGrow, onPlan, onStats, 
       groupFor(scope).body.append(el("div", { class: tone }, icon(yolo ? "bolt" : "shield"), el("span", null, text)));
     },
 
-    // The checker of goal mode compared the answer with the goal: `final` says whether the run ends with this verdict.
+    // The checker of goal mode compared the answer with the goal: `final` says whether the run ends with this verdict,
+    // and `limit` that it judged the finish of a run past its limit, which cannot be sent back.
     goal_check(scope, record) {
-      const { decision, reason, check, patience, final } = record.data;
+      const { decision, reason, check, patience, final, limit } = record.data;
       const because = reason === "" ? "" : ` — ${clip(reason, 300)}`;
+      const stops = limit === true
+        ? ["bad", "Goal check: not reached, and the run is at its limit, so it stops"]
+        : ["bad", `Goal check: still not reached after ${patience} rounds of further work, so the run stops`];
       const lines = {
         achieved: ["ok", "Goal check: the goal is reached"],
-        continue: final
-          ? ["bad", `Goal check: still not reached after ${patience} rounds of further work, so the run stops`]
-          : ["warn", `Goal check ${check} of ${patience}: not reached yet, back to work`],
+        continue: final ? stops : ["warn", `Goal check ${check} of ${patience}: not reached yet, back to work`],
         blocked: ["bad", "Goal check: nothing more can be done without you"],
         error: ["bad", "Goal check: the check could not run"],
       };

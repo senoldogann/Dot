@@ -187,12 +187,13 @@ class UpdatePlanArgs(ToolArgs):
     steps: list[PlanStep] = Field(
         min_length=1, max_length=20, description="The complete plan; it replaces the previous plan."
     )
-    targets: Annotated[str, StringConstraints(strip_whitespace=True, max_length=_TARGETS_MAX_CHARS)] | None = Field(
-        default=None,
+    # Empty keeps the targets: a provider sees an optional text, and some models fill one they do not use with "".
+    targets: Annotated[str, StringConstraints(strip_whitespace=True, max_length=_TARGETS_MAX_CHARS)] = Field(
+        default="",
         description=(
             "For a goal that names an outcome rather than a task: the measurable targets you will reach and how your "
             "own tools will measure them, e.g. '20 new leads in leads.csv, counted with wc -l'. Leave it out to keep "
-            "the targets already recorded; an empty text removes them."
+            "the targets already recorded; new targets replace them."
         ),
     )
 
@@ -212,7 +213,7 @@ def _update_plan_tool() -> RegisteredTool:
         return _meta_action(UPDATE_PLAN_TOOL, "Update the plan")
 
     async def run(args: UpdatePlanArgs, ctx: ToolContext) -> ToolResult:
-        targets: str = (await _latest_plan(ctx)).targets if args.targets is None else args.targets
+        targets: str = args.targets or (await _latest_plan(ctx)).targets
         steps: tuple[PlanItem, ...] = tuple(PlanItem(text=step.text, status=step.status) for step in args.steps)
         return await _record_plan(ctx, PlanPayload(steps=steps, targets=targets))
 

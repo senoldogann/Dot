@@ -124,6 +124,8 @@ class GoalCheckPayload(Payload):
     check: int
     patience: int
     final: bool
+    # Only the check of a run past its limit has it.
+    limit: bool = False
 
 
 class AnswerPathsPayload(Payload):
@@ -461,6 +463,8 @@ class TerminalUi:
         match check.decision:
             case "achieved":
                 self._line(self._paint(f"  ◎ goal check: reached{reason}", "32"))
+            case "continue" if check.limit:
+                self._line(self._paint(f"  ◎ goal check: not reached at the limit{reason}", "31"))
             case "continue":
                 note: str = "back to work" if not check.final else "gave up"
                 self._line(self._paint(f"  ◎ goal check {check.check}/{check.patience}: not yet, {note}{reason}", "33"))

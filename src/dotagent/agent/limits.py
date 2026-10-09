@@ -1,5 +1,7 @@
-"""The limits of a run: how many minutes a task or research run may work and how many tokens it and the runs it
-delegated to may use, as ``[agent] run_max_minutes`` and ``run_max_tokens`` set them (0: no limit).
+"""The limits of a run: how many minutes a task or research run may take (its wall time, waits for the user
+included) and how many tokens it and the runs it delegated to may use, as ``[agent] run_max_minutes`` and
+``run_max_tokens`` set them (0: no limit). They are the limits of one run: a run that goes on from another (resumed,
+or started by an answer) starts with a new clock and a new count.
 
 The loop compares them with what the run spent between steps. At the first step past a limit the run is told so and
 may only finish or close its plan, and its next reply ends it. Everything here is pure; the loop reads the clock and the
@@ -9,6 +11,7 @@ store, stores the note and ends the run.
 from dotagent.agent.continuity import RunLedger
 from dotagent.agent.progress import stop_account
 from dotagent.config import AgentConfig
+from dotagent.core.text import truncate_middle
 from dotagent.core.types import FrozenModel, JsonObject
 from dotagent.store.endings import PREFIX_LIMIT
 from dotagent.store.models import RunMode
@@ -18,10 +21,11 @@ LIMIT_EVENT: str = "limit_reached"
 # What a run past its limit may still call: finish, and the plan tools, to close its plan in the same reply.
 LIMIT_TOOLS: frozenset[str] = frozenset({FINISH_TOOL, UPDATE_PLAN_TOOL, MARK_PLAN_STEP_TOOL})
 _SECONDS_PER_MINUTE: float = 60.0
+_REPLY_CHARS: int = 1500
 
 
 class RunLimits(FrozenModel):
-    """How many minutes a run may work and how many tokens it may use; 0 is no limit."""
+    """How many minutes a run may take and how many tokens it may use; 0 is no limit."""
 
     max_minutes: float
     max_tokens: int
@@ -69,15 +73,18 @@ def limit_note(reached: LimitReached) -> str:
     return (
         f"[system note] The limit of this run is reached: it has used {limit_spent(reached)}. Finish now, in this reply: "
         "call finish with what was reached (the numbers), what is missing and how to go on; success is true only if the "
-        "goal or its targets are met and verified. You may close the steps of your plan in the same reply. No other "
-        "tool runs any more, and the run ends after this reply."
+        "goal or its targets are met and verified. To close the steps of your plan, call the plan tools in this reply "
+        "before finish: a call after finish does not run. No other tool runs any more, and the run ends after this "
+        "reply."
     )
 
 
-def limit_result(reached: LimitReached, ledger: RunLedger, plan: str) -> str:
-    """What a run ends with when it did not finish after it was told that its limit is reached: the limit, then the
-    account of :func:`dotagent.agent.progress.stop_account`."""
-    head: str = f"{PREFIX_LIMIT} ({limit_spent(reached)}) and did not finish when it was told to."
+def limit_result(reached: LimitReached, ledger: RunLedger, plan: str, reply: str) -> str:
+    """What a run ends with when it did not finish after it was told that its limit is reached: the limit, the text of
+    its last reply when it wrote one, then the account of :func:`dotagent.agent.progress.stop_account`."""
+    told: str = f"{PREFIX_LIMIT} ({limit_spent(reached)}) and did not finish when it was told to."
+    said: str = reply.strip()
+    head: str = f"{told}\n\nIts last reply:\n{truncate_middle(said, _REPLY_CHARS)}" if said else told
     return stop_account(head, ledger, plan)
 
 

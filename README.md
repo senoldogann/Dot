@@ -155,7 +155,7 @@ answer (a small model that is offered both writes the call out as text).
   `mark_plan_step` changes one step, so the plan in the web UI moves as the work does. A run that calls `finish` with
   steps still open is asked once to close them. A plan can also hold the run's targets (`targets` of `update_plan`, at
   most 600 characters): for a goal that names an outcome, what the run will reach and how its own tools measure it.
-  They stay until a plan changes them (an `update_plan` without `targets` keeps them, an empty text removes them), are
+  They stay until new targets replace them (an `update_plan` without `targets`, or with an empty text, keeps them), are
   the first line of the plan in the web UI and are printed under "plan" by `dotx run`, go into every note that carries
   the plan (a compaction, a reminder, a resumed run) and, in goal mode, to the goal check.
 - How much help a run gets depends on its model. The window is what one request of the model can hold; for Ollama it is
@@ -399,17 +399,22 @@ when you stop it. With `verify_answer_paths = true` in `[agent]`, a successful e
 exist is sent back once before it is accepted, and before goal mode checks it (see [How a run works](#how-a-run-works)).
 
 **Limits of a run.** `run_max_minutes` and `run_max_tokens` in `[agent]` bound a task or research run; 0, the default,
-is no limit, and a chat turn has none. The minutes are the run's wall time, the tokens those of every model call of the
-run (side calls included) and of the runs it delegated to. Dot compares them between steps, so a step that is running
-when a limit passes goes on: a model call can take `model_call_timeout_s`, and a delegation waits for its run. At the
-first step past a limit the run is told what it used and to finish now with what it reached, what is missing and how to
-go on; that step may only call `finish`, `update_plan` and `mark_plan_step`, and the run ends after it. A `finish` ends
-it as it says; anything else ends it as failed, with a result that starts "Stopped: the run reached its limit" and says
-what it did last, what it touched and where its plan stood (`dotx stats` counts it as stopped at its limit). Past the
-limit nothing sends the run back, neither the open steps of its plan nor `verify_answer_paths` nor goal mode, so in goal
-mode such an end is not checked. A message you send during that step is read in one more such step. The timeline shows
-when the limit was reached. Delegated and scheduled runs have the same limits; an eval run is cut by its task's own
-(300 s, 600000 tokens), whatever yours are.
+is no limit, and a chat turn has none. The minutes are the run's wall time, waits for your approvals and answers
+included; the tokens are those of every model call of the run (side calls, such as your side questions, included) and
+of the runs it delegated to. Dot compares them between steps, so a step that is running when a limit passes goes on: a
+model call can take `model_call_timeout_s`, and a delegation waits for its run. At the first step past a limit the run
+is told what it used and to finish now with what it reached, what is missing and how to go on; that step may only call
+`finish`, `update_plan` and `mark_plan_step` (the plan tools before `finish`, as nothing after `finish` runs), and the
+run ends with its reply. A `finish` ends it as it says, and in goal mode the goal check judges that finish once, with
+no way back: a goal it does not find reached ends the run as failed. Any other reply ends the run as failed, with a
+result that starts "Stopped: the run reached its limit", keeps what the reply said and tells what the run did last,
+what it touched and where its plan stood (`dotx stats` counts it as stopped at its limit). Past the limit neither the
+open steps of the plan nor `verify_answer_paths` send the run back, and a message you send during that step comes too
+late for it, as for any run that has ended: an answer to a question it left stays in the thread for the next run. The
+timeline shows when the limit was reached. The limits are those of one run: a resumed run, or one that an answer
+starts, begins with a new clock and a new count, and a delegated run has the limits of its own while its tokens also
+count toward its parent's, which sees them when the delegation returns. Delegated and scheduled runs have the same
+limits; an eval run is cut by its task's own (300 s, 600000 tokens), whatever yours are.
 
 **The progress watchdog.** After every step in which a run used tools, Dot compares what it called and what came back
 (screenshots included) with the steps before. By default it looks for the same step `stall_limit` times in a row: the
@@ -994,7 +999,8 @@ src/dotagent/
 - A run costs what its model costs: the loop makes many calls, and screenshots are expensive. A run has no step limit, so
   what bounds the cost is the stop button, the progress watchdog, `goal_patience` for the send-backs of goal mode, the
   concurrency limits (`max_concurrent_runs`) and, when you set them, `run_max_minutes` and `run_max_tokens`. Without
-  `stall_escalation`, a run that varies its steps without getting anywhere ends only when you stop it.
+  `stall_escalation` and without those limits, a run that varies its steps without getting anywhere ends only when you
+  stop it.
 - Resuming: in goal mode, the goal check of a resumed run judges from what the resumed run did, not from the steps of
   the run it resumes. The conversation shows every call of the step that was cut off as interrupted, also the ones that
   finished; the first message of the resumed run says which finished. A run of `dotx run` works in its own process, but

@@ -72,12 +72,20 @@ def test_a_run_past_its_limit_is_told_what_it_spent_and_ends_with_its_own_ending
     reached: LimitReached = LimitReached(seconds=3672.0, tokens=512_000, limits=RunLimits(max_minutes=60, max_tokens=0))
     note: str = limit_note(reached)
     assert note.startswith("[system note] The limit of this run is reached: it has used 61.2 of 60 minutes. Finish now")
-    result: str = limit_result(reached, new_ledger("Grow the list"), "1. [in_progress] Collect\nTargets: 20 leads")
+    plan: str = "1. [in_progress] Collect\nTargets: 20 leads"
+    result: str = limit_result(reached, new_ledger("Grow the list"), plan, "  ")
     assert result.startswith(
-        "Stopped: the run reached its limit (61.2 of 60 minutes) and did not finish when it was told to.\n"
+        "Stopped: the run reached its limit (61.2 of 60 minutes) and did not finish when it was told to.\n\nIts plan:\n"
+        "1. [in_progress] Collect\nTargets: 20 leads\n"
     )
-    assert "Its plan:\n1. [in_progress] Collect\nTargets: 20 leads" in result
     assert classify_ending("failed", result) == "limit"
+    # What the run wrote instead of calling finish is kept.
+    replied: str = limit_result(reached, new_ledger("Grow the list"), plan, "3 leads so far; 17 missing.\n")
+    assert replied.startswith(
+        "Stopped: the run reached its limit (61.2 of 60 minutes) and did not finish when it was told to.\n\n"
+        "Its last reply:\n3 leads so far; 17 missing.\n\nIts plan:"
+    )
+    assert classify_ending("failed", replied) == "limit"
     tokens: LimitReached = LimitReached(
         seconds=5.0, tokens=512_000, limits=RunLimits(max_minutes=0, max_tokens=500_000)
     )
