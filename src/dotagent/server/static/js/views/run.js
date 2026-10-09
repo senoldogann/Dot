@@ -40,6 +40,11 @@ function backLink() {
 const STEP_MARKS = { done: "check", failed: "x", skipped: "arrowRight" };
 const STEP_LABELS = { pending: "Not started", in_progress: "In progress", done: "Done", failed: "Failed", skipped: "Skipped" };
 
+/** The targets of an open-ended goal, the first line of the plan: what the run works toward and how it measures it. */
+function planTargets(targets) {
+  return el("div", { class: "plan-targets", title: "Targets" }, icon("target"), el("span", { class: "text" }, targets));
+}
+
 function planStep(step) {
   const markIcon = STEP_MARKS[step.status];
   const mark = el("span", { class: "mark" }, markIcon === undefined ? null : icon(markIcon));
@@ -125,11 +130,11 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
   const plan = foldCard({ id: "run-plan", title: "Plan", actions: null, body: planBody, openByDefault: true });
   plan.element.hidden = true;
 
-  function paintPlan(steps) {
+  function paintPlan(steps, targets) {
     const done = steps.filter((step) => step.status === "done").length;
     plan.element.hidden = steps.length === 0;
     plan.setSummary(`${done} of ${steps.length} done`);
-    planBody.replaceChildren(...steps.map(planStep));
+    planBody.replaceChildren(targets === "" ? null : planTargets(targets), ...steps.map(planStep));
   }
 
   function paintStats() {

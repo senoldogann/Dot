@@ -893,7 +893,7 @@ that change the owner's agent are their call (see "Open owner decisions", 6 onwa
 | --- | ---------------------------------------------------------------------- | ----------- | ------- |
 | 9   | Time accounting: where the seconds of a run go                         | done        | 4741bed |
 | 10  | Yolo asks nobody: secret fields, questions and the end of a run        | done        | eacd180 |
-| 11  | Open-ended goals in one run: targets, budgets and an honest end        | in progress |         |
+| 11  | Open-ended goals in one run: targets, limits and an honest end         | done        |         |
 | 12  | Campaigns: a goal that works until its outcome is verified             | planned     |         |
 | 13  | Faster browser and desktop steps                                       | planned     |         |
 | 14  | Rich editors, drag and bulk text in the browser                        | planned     |         |
@@ -1304,61 +1304,161 @@ no cloud model was called for this item); the run page checked on a scripted thr
 the page where it is, the last answer steered into the run the previous one started and the page following it, no "null"
 in a card).
 
-### 11. Open-ended goals in one run: targets, budgets and an honest end
+### 11. Open-ended goals in one run: targets, limits and an honest end
 
-**Status: in progress.** **Goal.** A run given an outcome instead of a task ("grow", "earn", "find a way", "as many as
+**Status: done.** **Goal.** A run given an outcome instead of a task ("grow", "earn", "find a way", "as many as
 possible") turns it into measurable targets, works toward them, and ends only with the targets reached or with an honest
 account of what is missing; the owner can bound such a run in minutes or tokens when they want to.
 
-**Why.** The prompt was written for precise tasks: "take the smallest reasonable reading", "add nothing that was not
-asked for" (`agent/prompt.py:81-84`). Nothing tells the model what "done" means for an open goal, so a run can end
-after a few clicks and say so; the goal check (off by default) can only judge against the goal text. There is no
-budget of any kind (`agent/loop.py:831`, README "Status and known limits"); the owner wants runs that keep going, and
-a bound they can set when they do not.
+**Why.** The prompt was written for precise tasks (the lines are those of `92b7dfa`, before this item): "Add nothing
+that was not asked for", "take the smallest reasonable reading" (`agent/prompt.py:82-84`). Nothing told the model what
+"done" means for an open goal, so a run could end after a few clicks and say so; the goal check (off by default) could
+only judge against the goal text. The loop had no run-level limit of wall time or tokens: what bounded a run was the
+stop button, the watchdog, `goal_patience` and the concurrency limits (`README.md:968-971`); only the eval harness cut a
+run (`evals/runner.py:188-218`). The owner wants runs that keep going, and a bound they can set when they do not.
 
-**Design.**
-- **Wording.** `_WORK` (`agent/prompt.py:76-108`) gets a section:
-  "# Open-ended goals. A precise request is done exactly as asked, with the smallest reasonable reading. A goal that
-  names an outcome instead of a task (grow, improve, earn, reach, as many as possible, find a way) asks for the
-  outcome: choose the approach yourself; before acting, write the targets you will reach and how you will verify them
-  with your own tools into the plan (`update_plan`, `targets`), and the budget you intend to spend; prefer the channel
-  that brings the first measurable result soonest; after each round measure, write the numbers, and change approach
-  when a round brought nothing; do not call finish before the targets are met, unless the budget is spent or the next
-  step needs something only the user can give; then finish with `success = false`, the numbers reached and what is
-  missing." The line "When a request can be read in several ways, take the smallest reasonable reading" becomes "When a
-  precise request can be read in several ways, …".
-- **Targets in the plan.** `PlanPayload` (`agent/plan.py:24-32`) gets `targets: str` (may be empty; at most 600
-  characters): the measurable outcome and how it is verified. `update_plan` takes it, the plan render shows it under
-  the steps, the live plan of the UI shows it as its first line, and a resumed run inherits it with the plan
-  (`agent/loop.py:727-729`).
-- **The goal check reads the targets.** `GoalRequest` (`agent/review.py`) gets `targets`; `_goal_prompt` tells the
-  checker to judge against the targets when they are set, from the facts and the digest, and against the goal text
-  otherwise. `achieved` needs the targets met or the answer to say honestly that they are not, with `success = false`.
-- **Budgets, opt-in.** `[agent] run_max_minutes = 0` and `run_max_tokens = 0` (0: none). After each step the loop
-  compares the run's wall time and `input_total + output_total` with them; at the first step past a limit it appends a
-  note ("The budget of this run is spent: N minutes / N tokens. Finish now with what was reached, the numbers and what
-  is missing.") and offers only the core tools, like the re-plan rung of item 2; if the next reply still does not
-  finish, the run ends `stopped` with a result built like the watchdog's (`agent/progress.py:321-336`) and a new
-  ending `budget` in `store/endings.py`. Event `budget_reached {minutes, tokens, limit}`. A campaign session
-  (item 12) uses the same mechanism per session.
-- **Delegated and scheduled runs** inherit nothing new: budgets are per run from the configuration; a campaign may set
-  its own (item 12).
+**Design** (corrected on 2026-10-09 against the code before building; the first draft named a `stopped` status that
+does not exist, a result that would have been filed as a watchdog stop, a "core tools" set that is not the re-plan set,
+and wrong lines).
+- **Wording.** The open-goal rules are a section `# Open-ended goals` after `_ENDING_TOOL` (`_OPEN_GOALS`,
+  `agent/prompt.py:115-124`, joined by `_ending`, `:334-337`), so task and research runs get them and a chat, which has
+  no `finish` (`tools/meta.py:34-35`), does not. A precise request is done exactly as asked; a goal that names an
+  outcome instead of a task (grow, improve, earn, reach, as many as possible, find a way) asks for the outcome: the run
+  chooses the approach, records with `update_plan` before it acts the targets it will reach and how its own tools will
+  measure them, and prefers the channel that brings the first measurable result soonest. After each round it measures,
+  writes the numbers down and changes the approach when a round brought nothing, which is a reason to change the
+  approach, not to finish. It calls `finish` only once the targets are met, when the next step needs something only the
+  user can give (said in `needs_from_user`), or when the system says that the run's limit is reached; short of the
+  targets, with `success` false, the numbers reached and what is missing. In `_WORK` (`agent/prompt.py:83-84`) "When a
+  request can be read in several ways" became "When a precise request can be read in several ways".
+- **Targets in the plan.** `PlanPayload` (`agent/plan.py:30-35`) has `targets: str` with the default `""`, so plan
+  events stored before it still read (`FrozenModel` refuses unknown fields and has no other defaults);
+  `plan_event_data` writes the steps and the targets and `plan_from_event` reads both (`:42-54`). `update_plan` takes
+  `targets` (`UpdatePlanArgs`, `tools/meta.py:186-197`; at most 600 characters, and like `needs_from_user` it may be
+  left out): left out, the targets of the latest plan stay; an empty text removes them (`:215`). `mark_plan_step` keeps
+  them (`:245-248`). `render_plan` stays the step lines (pinned by `tests/unit/test_continuity.py:167`); `plan_lines`
+  (`agent/plan.py:84-87`) adds a `Targets:` line under them, and every text the model reads a plan in uses it: the tool
+  result (`tools/meta.py:207`), the continuity note and the reminder (`_task_sections`, `agent/continuity.py:190-202`),
+  the resume note (`agent/resume.py:154-155`), a side question's record (`agent/aside.py:65`) and the watchdog's stop
+  and second opinion (`agent/loop.py:723`). The live plan of the web UI shows the targets as its first line
+  (`planTargets`, `views/run.js:44-45`, painted at `:133-137` from `timeline.js:499-500`), and `dotx run` prints them
+  under the plan (`_on_plan`, `cli_ui.py:398-402`). A resumed run inherits them with the plan (`agent/manager.py:368`,
+  `agent/loop.py:780-784`).
+- **The goal check reads the targets.** `GoalRequest` (`agent/review.py:183-193`) has `targets`, read from the run's
+  latest plan in `_check_goal` (`agent/loop.py:609`); `_goal_prompt` (`agent/review.py:319-332`) adds a fenced
+  `TARGETS` section after the goal when they are set. `_GOAL_SYSTEM` (`agent/review.py:87-118`) has one more rule
+  (`:113-115`): targets are the agent's own measurable reading of a goal that names an outcome, not added
+  requirements; the checker judges whether they are met from the digest, the facts and the numbers of the answer, and
+  whether they fit the goal: targets that ask for less than the goal's words do not make the goal reached. The verdicts
+  keep their meaning (`_after_verdict`, `agent/loop.py:562-581`): targets met is `achieved`, not met while the run can
+  go on is `continue`, an honest failure after the sensible ways is `blocked`.
+- **Limits, opt-in.** `[agent] run_max_minutes` (a float, so a test can use a fraction) and `run_max_tokens`, both
+  `Field(ge=0)` (`config.py:92-93`) and 0, meaning none, by default (`defaults.toml:86-91`): the names of open decision
+  6. They bound task and research runs (`limits_of`, `agent/limits.py:38-43`); a chat turn ends with a reply and has no
+  `finish` to end with. At the top of every step, after the user's messages and the memories are read and before the
+  offered tools are chosen (`agent/loop.py:920-927`), the loop compares the seconds since `run_agent` started (a
+  monotonic clock, `:774`; a resumed run is a new run with a new clock) and the tokens of the run and of the runs it
+  delegated to (`Store.family_tokens`, `store/db.py:790-796`, one query over `input_tokens + output_tokens`; the
+  router's recorder adds every call before the call returns, `runtime.py:115-126`) with the limits (`limit_reached`,
+  `agent/limits.py:46-53`: a limit is reached once all of it is spent). The eval supervisor's spending is the same query
+  (`evals/runner.py:182-185`). At the first step past a limit the run stores a note (`limit_note`,
+  `agent/limits.py:67-74`: what it spent; finish now with the numbers reached, what is missing and how to go on) and
+  emits `limit_reached {seconds, tokens, max_minutes, max_tokens}`; from then on every step offers only `finish`,
+  `update_plan` and `mark_plan_step` (`LIMIT_TOOLS`, `agent/limits.py:19`; a call of any other tool is answered as
+  unknown, `_only`, `agent/loop.py:473-476`), and the run ends after that step's reply. A valid `finish` ends it as the
+  finish says (`:1001-1002`). Anything else (text, an empty reply, other calls) ends it `failed` (`_limit_end`,
+  `:767-770`, at `:1003-1004` and `:1026-1027`) with a result that starts with `PREFIX_LIMIT` (`store/endings.py:19`)
+  and goes on like the watchdog's stop: what it did last, what it touched, its plan with the targets and how to go on
+  (`limit_result`, `agent/limits.py:77-81`, through `stop_account`, `agent/progress.py:331-346`, the body
+  `stop_result` had). There is no new run status (`store/models.py:9`): the ending `limit` is told from the prefix
+  (`store/endings.py:61-62`), before the goal-check mark. After the note nothing sends the run back: no plan reminder,
+  no paths check and no goal check (`agent/loop.py:1042`, `:1051`, `:1067`), as the watchdog's stop returns before
+  them (`:1012-1013`). A message the user sends during that step is read in one more limited step, as item 10 made a
+  run read an answer that comes during its last step (`:1070-1075`). The limit wins over a re-plan or a question of
+  the watchdog in the step before: both set the one `allowed` (`:1015`), and the limit sets it after them
+  (`:925-927`).
+- **Delegated, scheduled and eval runs.** Every task and research run is bounded by the configuration's limits, a
+  delegated or scheduled one too. A delegated run's tokens count toward its parent, as the eval counts them (a
+  delegated run cannot delegate again, `agent/loop.py:156`, so its children are all there is); the parent sees them
+  when the `delegate` call returns, so one step can overshoot by what a child spent (a child is bounded by its own
+  limits). `eval_config` (`evals/runner.py:53-67`) sets both to 0: an eval run is cut by its task's `time_limit_s` and
+  `token_budget`, so the owner's limits do not change a measurement.
 
-**Touchpoints.** `agent/prompt.py`, `agent/plan.py`, `tools/meta.py` (`update_plan`), `agent/review.py`,
-`agent/loop.py` (`_check_goal`, the budget check), `store/endings.py`, `store/stats.py` (the new ending counts),
-`views/run.js` (targets in the live plan), `timeline.js`, `config.py`, `defaults.toml`, README "How a run works" and
-"Autonomy".
+**Touchpoints.** `agent/prompt.py`, `agent/plan.py`, `tools/meta.py`, `agent/continuity.py`, `agent/resume.py`,
+`agent/manager.py` (`_resume`), `agent/aside.py`, `agent/review.py`, `agent/progress.py` (`stop_account`), new
+`agent/limits.py` (pure: the decision, the note, the result, the event), `agent/loop.py`, `store/endings.py`,
+`store/db.py` (`family_tokens`), `evals/runner.py`, `evals/catalog.py`, `config.py`, `defaults.toml`, `cli_ui.py`,
+`views/run.js`, `timeline.js`, `app.css`, `run.css`, README ("How a run works", "Autonomy", "Status and known
+limits").
+
+**What exists now.**
+- `agent/plan.py`: `PlanPayload.targets`, `EMPTY_PLAN` and `plan_lines`; `plan_event_data` and `plan_from_event` carry
+  the targets. `tools/meta.py`: `update_plan` takes `targets` (kept when left out, removed by an empty text, at most 600
+  characters) and `mark_plan_step` keeps them; both answer with the plan and its targets.
+- `agent/continuity.py`, `agent/resume.py`, `agent/aside.py`, `agent/manager.py` and `agent/loop.py` hold the plan as a
+  `PlanPayload` and give it to the model through `plan_lines`: the continuity note and the reminder, the resume note, a
+  side question's record, the watchdog's stop and its second opinion.
+- `agent/review.py`: `GoalRequest.targets`, the `TARGETS` section of the goal prompt and the targets rule of
+  `_GOAL_SYSTEM`. `agent/prompt.py`: `_OPEN_GOALS` after `_ENDING_TOOL` in task and research runs; "a precise request"
+  in `_WORK`.
+- `agent/limits.py` (new, pure): `RunLimits`, `LimitReached`, `limits_of`, `limit_reached`, `limit_spent`,
+  `limit_note`, `limit_result`, `limit_event_data`, `LIMIT_EVENT` (`limit_reached`) and `LIMIT_TOOLS`.
+  `agent/progress.py`: `stop_account`, shared by the watchdog's stop and the end at a limit. `store/endings.py`:
+  `PREFIX_LIMIT` and the ending `limit` ("stopped at its limit of minutes or tokens"). `store/db.py`:
+  `Store.family_tokens`. `agent/loop.py`: the run's clock, the check at the top of each step, `_limit_seen`,
+  `_limit_end`, and the limit's guard on the plan reminder, the paths check and the goal check.
+- `config.py` and `defaults.toml`: `[agent] run_max_minutes` and `run_max_tokens` (0). `evals/runner.py`:
+  `eval_config` sets both to 0, and the supervisor's spending is `family_tokens`. `evals/catalog.py`: the task
+  `collect-contacts`.
+- `cli_ui.py`: the targets under the plan (`◎ …`) and the line `⏱ limit reached (…): told to finish now`.
+- Web UI: `views/run.js` (the targets as the first line of the plan card, with a target icon), `timeline.js` (the line
+  "The run reached its limit (…) and was told to finish now"), `app.css` (`.plan-targets`), `run.css` (the head of a
+  group of steps wraps on a phone).
+- Tests: `tests/unit/test_limits.py` (5), `tests/smoke/test_run_limits.py` (3, the scripted model in the real loop and
+  as the goal checker), `tests/unit/test_continuity.py` (targets: the round trip, an event stored without them,
+  `plan_lines`), `tests/unit/test_run_modes.py` (the open-goal section by mode, a negative limit refused),
+  `tests/unit/test_endings.py` (the ending `limit`); the resume tests carry targets (`tests/unit/test_resume.py`,
+  `tests/smoke/test_resume.py`).
+
+**How to use it.**
+```
+[agent]
+run_max_minutes = 0   # minutes a task or research run may work; 0: no limit
+run_max_tokens = 0    # tokens the run and the runs it delegated to may use; 0: no limit
+```
+A goal that names an outcome ("Collect as many leads as you can into leads.csv") is enough: the run records its targets
+with its plan, and the plan card of the run page shows them on its first line (`dotx run` prints them under the plan).
+Past a limit the timeline says so and the run's answer says what was reached and what is missing; a run that does not
+finish then ends "Failed" with "Stopped: the run reached its limit (…)" and how to go on.
 
 **Decisions and limits.**
-- Budgets stay 0 by default: the owner asked for runs that do not stop (open decision 6 holds the numbers they may
-  want for scheduled runs).
-- The wording cannot be measured offline; `dotx eval` gets one open-ended task whose check is a file with numbers
-  written by the run (`research`-like, local files), so a regression that stops early shows as a failed check.
+- Both limits stay 0 by default: the owner asked for runs that do not stop, and open decision 6 keeps 0 for them.
+- A limit is checked between steps, so a step that is running when it passes goes on: a model call can take
+  `model_call_timeout_s` (420 s), a `delegate` call waits for its run. Only the eval cuts a run in the middle of a step.
+- In goal mode a run past its limit is not checked: the checker can only send a run back, and the limit says not to go
+  on. Its answer stands as it finished, with the success it claims, and the `limit_reached` line in its timeline says
+  why it ended there.
+- The run page shows a limit end as "Failed", as it shows a watchdog stop; `dotx stats` counts the ending `limit`.
+- The wording cannot be measured offline; `dotx eval` has one open-ended task (`collect-contacts`, category
+  `multi_step`, mode `task`): collect as many contacts as the meeting notes give, checked per contact in the
+  `contacts.csv` the run writes, so a run that stops after the first note fails it. How real models do on it is not
+  measured here: no cloud model was called for this item.
+- Fixed on the way (older than this item): on a phone the head of a group of steps did not wrap, so its count and the
+  badge of failed calls went out of view (`.steps-head`, `run.css:70-83`).
 
-**Done when.** Unit tests of `PlanPayload.targets` rendering and of the budget decision (pure: time, tokens, limits);
-smoke with the scripted model: a run past `run_max_tokens` gets the note, the restricted tools and ends `budget` when
-it does not finish; the goal checker's prompt carries the targets (test in `tests/unit/test_verify.py` style); the
-eval task added and `dotx eval check` clean; README updated.
+**Done when.** Unit tests of the targets (event round trip, an old event without them, `plan_lines`), of the limit
+decision (pure: seconds, tokens, both, none), of the ending `limit` and of the prompt (the open-goal section in task and
+research, not in chat); smoke with the scripted model: a run past `run_max_tokens` gets the note and the three tools and
+ends `limit` when it does not finish, one that finishes after the note ends as it says without a plan reminder or a
+goal check, `update_plan` targets survive a new plan without them and `mark_plan_step`, and reach the goal checker's
+prompt as a `TARGETS` section with the rule in its system prompt; the resume smoke test carries targets; the eval task
+added and `dotx eval check` clean; README updated. All true. Taking out the guard on the goal check, the guard on the
+plan reminder or the end at the limit after a step with calls each makes a smoke test fail (checked one at a time).
+Also clean: ruff format and check, mypy, the unit tests (524), `dotx eval check` (26 tasks, none passed by doing
+nothing) and the offline smoke suite (214 passed, with the 30 tests that call a cloud model through Ollama left out; no
+cloud model was called for this item); the run page checked on a scripted throw-away daemon at desktop width in the
+light and the dark theme and at 375 px (the targets on the plan card's first line, the limit line in the timeline, the
+run's end and its result, no horizontal overflow, a clean console).
 
 ### 12. Campaigns: a goal that works until its outcome is verified
 
@@ -2031,3 +2131,14 @@ on and is closed by `terminal_close`; the idle reaper; unit tests of the ANSI st
   run's goal check, the task its continuity note pins and its title keep the task. Unit tests (515), `dotx eval check`
   and the offline smoke suite (198, with the new signal test, which fails without the handlers) clean; no cloud model
   called. The paste through a desktop Edit menu stays found and left.
+- 2026-10-09: item 11 done. A goal that names an outcome ("as many as", "grow", "find a way") is held to measurable
+  targets: task and research runs are told to record them with `update_plan` (`targets`) before they act, to measure
+  after each round and change the approach when a round brought nothing, and to finish only at the targets, at a need
+  only the owner can meet or at the run's limit, then with the numbers and what is missing. The targets stay with the
+  plan, show on the run page and in `dotx run`, and reach every note that carries the plan, a resumed run and the goal
+  check, which judges them as the run's own reading of the goal. `[agent] run_max_minutes` and `run_max_tokens` (0, no
+  limit, by default) bound a task or research run together with the runs it delegated to: past a limit the run is told
+  so, may only finish or close its plan, and ends after that reply; one that does not finish ends with the new ending
+  `limit`. Eval runs keep their task's own cut; `dotx eval` gets `collect-contacts`. Unit tests (524), `dotx eval
+  check` (26), the offline smoke suite (214) and the run page on a throw-away daemon clean; no cloud model called.
+  Fixed on the way: the head of a group of steps went out of view on a phone.

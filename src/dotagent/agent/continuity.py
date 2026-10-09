@@ -14,7 +14,7 @@ without a model. Every function here is pure.
 import re
 from collections.abc import Sequence
 
-from dotagent.agent.plan import PlanItem, render_plan
+from dotagent.agent.plan import PlanPayload, plan_lines
 from dotagent.core.jsonutil import dumps_compact
 from dotagent.core.text import truncate_middle
 from dotagent.core.types import FrozenModel
@@ -187,8 +187,8 @@ def _action_line(action: LedgerAction) -> str:
     return f"- {action.tool} {action.args} → {outcome}: {action.result}"
 
 
-def _task_sections(ledger: RunLedger, plan: Sequence[PlanItem]) -> list[str]:
-    """The task word for word, what the user said during the run and the plan."""
+def _task_sections(ledger: RunLedger, plan: PlanPayload) -> list[str]:
+    """The task word for word, what the user said during the run and the plan with its targets."""
     sections: list[str] = [
         "## Task (the user's words, verbatim)",
         truncate_middle(ledger.goal, _PINNED_TEXT_CHARS),
@@ -196,9 +196,9 @@ def _task_sections(ledger: RunLedger, plan: Sequence[PlanItem]) -> list[str]:
     if ledger.instructions:
         sections.append("## What the user told you during this run (oldest first; these still apply)")
         sections.extend(f"- {truncate_middle(text, 600)}" for text in ledger.instructions)
-    if plan:
+    if plan.steps:
         sections.append("## Your plan as last recorded")
-        sections.append(render_plan(plan))
+        sections.append(plan_lines(plan))
     return sections
 
 
@@ -218,7 +218,7 @@ def _unlisted(count: int) -> str:
     return f" ({count} earlier ones not listed)" if count > 0 else ""
 
 
-def render_pinned(ledger: RunLedger, plan: Sequence[PlanItem], max_chars: int) -> str:
+def render_pinned(ledger: RunLedger, plan: PlanPayload, max_chars: int) -> str:
     """The facts of the ledger as the model reads them in a continuity note, in about ``max_chars`` characters (the
     headings of the lists come on top).
 
@@ -242,7 +242,7 @@ def render_pinned(ledger: RunLedger, plan: Sequence[PlanItem], max_chars: int) -
     return "\n".join(sections)
 
 
-def reminder_note(ledger: RunLedger, plan: Sequence[PlanItem]) -> str:
+def reminder_note(ledger: RunLedger, plan: PlanPayload) -> str:
     """The note that brings the goal back to the end of a long run's context: the task word for word, what the user
     said since, the plan and the newest actions. It asks for nothing new."""
     sections: list[str] = [
@@ -275,7 +275,7 @@ def _check_lines(check: ContinuityCheck) -> list[str]:
 
 def continuity_note(
     ledger: RunLedger,
-    plan: Sequence[PlanItem],
+    plan: PlanPayload,
     pinned_chars: int,
     summary: str,
     author: str,

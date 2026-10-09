@@ -12,6 +12,7 @@ from pydantic import BaseModel, ConfigDict, JsonValue
 
 from dotagent.agent.gate import YOLO_DECIDER
 from dotagent.agent.lessons import RunLessons
+from dotagent.agent.limits import LimitReached, RunLimits, limit_spent
 from dotagent.agent.plan import StepStatus
 from dotagent.agent.progress import Rung
 from dotagent.agent.resume import CallEnd, CutOff
@@ -86,6 +87,17 @@ class PlanStepPayload(Payload):
 
 class PlanPayload(Payload):
     steps: list[PlanStepPayload]
+    # Plans stored before targets existed have none.
+    targets: str = ""
+
+
+class LimitPayload(Payload):
+    """A run past its limit: what it had spent when that was seen, and its limits (0: none)."""
+
+    seconds: float
+    tokens: int
+    max_minutes: float
+    max_tokens: int
 
 
 class ApprovalPayload(Payload):
@@ -313,6 +325,8 @@ class TerminalUi:
                 self._line(self._paint(f"  ⚠ {policy.verdict}: {policy.summary} ({policy.reason})", "33"))
             case "plan":
                 self._on_plan(PlanPayload.model_validate(data))
+            case "limit_reached":
+                self._on_limit(LimitPayload.model_validate(data))
             case "approval_requested":
                 await self._on_approval(ApprovalPayload.model_validate(data))
             case "question_left":
@@ -384,8 +398,18 @@ class TerminalUi:
     def _on_plan(self, plan: PlanPayload) -> None:
         marks: dict[StepStatus, str] = {"pending": "○", "in_progress": "◐", "done": "●", "failed": "✕", "skipped": "–"}
         self._line(self._paint("  plan", "1"))
+        if plan.targets:
+            self._line(self._paint(f"    ◎ {plan.targets}", "1"))
         for step in plan.steps:
             self._line(f"    {marks[step.status]} {step.text}")
+
+    def _on_limit(self, limit: LimitPayload) -> None:
+        reached: LimitReached = LimitReached(
+            seconds=limit.seconds,
+            tokens=limit.tokens,
+            limits=RunLimits(max_minutes=limit.max_minutes, max_tokens=limit.max_tokens),
+        )
+        self._line(self._paint(f"  ⏱ limit reached ({limit_spent(reached)}): told to finish now", "33"))
 
     def _on_resumed(self, resumed: ResumedPayload) -> None:
         who: str = "on its own when the daemon started" if resumed.automatic else "by hand"

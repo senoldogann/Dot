@@ -324,9 +324,14 @@ def _action_line(action: LedgerAction) -> str:
 
 
 def stop_result(reason: str, ledger: RunLedger, plan: str) -> str:
-    """What a run that is stopped for lack of progress ends with: ``reason``, what it did last, what it touched, where
-    its plan stands and how to go on, with secrets masked (the calls it lists are shown to the user)."""
-    lines: list[str] = [f"{PREFIX_STALLED}. {reason}", ""]
+    """What a run that is stopped for lack of progress ends with: ``reason`` and the account of :func:`stop_account`."""
+    return stop_account(f"{PREFIX_STALLED}. {reason}", ledger, plan)
+
+
+def stop_account(head: str, ledger: RunLedger, plan: str) -> str:
+    """What a run that the harness stops ends with: ``head``, what it did last, what it touched, where its plan stands
+    and how to go on, with secrets masked (the calls it lists are shown to the user)."""
+    lines: list[str] = [head, ""]
     if ledger.actions:
         lines.append("What it did last:")
         lines.extend(_action_line(action) for action in ledger.actions[-_STOP_ACTIONS:])

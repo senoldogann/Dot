@@ -19,7 +19,7 @@ from typing import Literal
 from pydantic import JsonValue
 
 from dotagent.agent.compact import pending_calls
-from dotagent.agent.plan import PlanItem, render_plan
+from dotagent.agent.plan import PlanPayload, plan_lines
 from dotagent.agent.progress import can_ask_user, question_mode
 from dotagent.core.errors import DotError, PolicyDenied, StoreError
 from dotagent.core.jsonutil import dumps_compact
@@ -77,13 +77,13 @@ class InterruptedCall(FrozenModel):
 
 class Resumption(FrozenModel):
     """What a resumed run takes over from the run it resumes: how that run was cut off, the calls of the step it was in
-    and its plan. ``automatic`` is true when the daemon resumed it on its own."""
+    and its plan with its targets. ``automatic`` is true when the daemon resumed it on its own."""
 
     from_run_id: str
     cut_off: CutOff
     automatic: bool
     calls: tuple[InterruptedCall, ...]
-    plan: tuple[PlanItem, ...]
+    plan: PlanPayload
 
 
 def cut_off_by(run: RunRecord) -> CutOff | None:
@@ -151,8 +151,8 @@ def resume_note(goal: str, resumption: Resumption) -> str:
             "The calls of the step it was in, which the conversation shows as interrupted:\n"
             + "\n".join(_call_line(call) for call in resumption.calls)
         )
-    if resumption.plan:
-        parts.append(f"Its plan, which is your plan now:\n{render_plan(resumption.plan)}")
+    if resumption.plan.steps:
+        parts.append(f"Its plan, which is your plan now:\n{plan_lines(resumption.plan)}")
     parts.append(
         "Pick up where it left off: do not redo what is done, check what a call that was cut off may have changed, and "
         "finish the goal."

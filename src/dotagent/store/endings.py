@@ -15,6 +15,8 @@ RESULT_RESTARTED: str = "daemon stopped while the run was active"
 # A stop for lack of progress: the bare text of older runs, and the start of the text that says what was tried.
 RESULT_STALLED: str = "Stopped: the agent kept repeating the same failing actions."
 PREFIX_STALLED: str = "Stopped: the agent was not making progress"
+# A run that reached a limit of [agent] run_max_minutes or run_max_tokens and did not finish when it was told to.
+PREFIX_LIMIT: str = "Stopped: the run reached its limit"
 RESULT_EMPTY_REPLIES: str = "The model returned empty replies and did not finish."
 PREFIX_EMERGENCY_STOP: str = "Emergency stop: "
 PREFIX_INTERNAL_ERROR: str = "Internal error: "
@@ -27,6 +29,7 @@ type Ending = Literal[
     "failed",
     "goal_check_refused",
     "stalled",
+    "limit",
     "empty_replies",
     "internal_error",
     "daemon_restarted",
@@ -42,6 +45,7 @@ ENDING_LABELS: dict[Ending, str] = {
     "failed": "failed (the agent's own report, or an error of the model service)",
     "goal_check_refused": "refused by the goal check",
     "stalled": "stopped by the progress watchdog",
+    "limit": "stopped at its limit of minutes or tokens",
     "empty_replies": "empty replies from the model",
     "internal_error": "internal error",
     "daemon_restarted": "cut off when the daemon died",
@@ -54,6 +58,8 @@ ENDING_LABELS: dict[Ending, str] = {
 def _failed_ending(result: str) -> Ending:
     if result == RESULT_STALLED or result.startswith(PREFIX_STALLED):
         return "stalled"
+    if result.startswith(PREFIX_LIMIT):
+        return "limit"
     if result == RESULT_EMPTY_REPLIES:
         return "empty_replies"
     if result == RESULT_RESTARTED:

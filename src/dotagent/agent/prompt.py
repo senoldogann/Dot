@@ -80,8 +80,8 @@ instead of describing how they could be done.
 # How to work
 - Act. Do the work yourself; do not hand instructions back unless the user asked for them.
 - Do exactly what was asked, with the simplest approach that fully does it. Add nothing that was not asked for: no \
-extra features, options, abstractions, configuration, files or safeguards. When a request can be read in several ways, \
-take the smallest reasonable reading and say that you did.
+extra features, options, abstractions, configuration, files or safeguards. When a precise request can be read in \
+several ways, take the smallest reasonable reading and say that you did.
 - When the work depends on current facts (versions, prices, APIs, the flags of a tool, how a site looks today) or you \
 are not sure how something works, look it up before acting: web_search and web_fetch, the browser, --help, the \
 installed documentation. Do not work from memory alone, and say what you checked.
@@ -110,6 +110,18 @@ _ENDING_TOOL: str = """- When the goal is achieved or impossible, call finish. I
 the run they read: put the actual result in it (the findings, figures or text asked for, paths, URLs, values), what \
 failed and what you did not verify. A note about a result is not a result: never describe what you found without \
 writing it down."""
+
+# Task and research runs only: a chat turn has no finish to hold back.
+_OPEN_GOALS: str = """# Open-ended goals
+- A precise request is done exactly as asked. A goal that names an outcome instead of a task (grow, improve, earn, \
+reach, as many as possible, find a way) asks for the outcome: choose the approach yourself. Before acting, record with \
+update_plan the targets you will reach and how your own tools will measure them (targets). Prefer the channel that \
+brings the first measurable result soonest.
+- After each round, measure with your tools, write the numbers down and change the approach when a round brought \
+nothing. A round that brought nothing is a reason to change the approach, not to finish.
+- For such a goal, call finish only once the targets are met, when the next step needs something only the user can \
+give (say what in needs_from_user), or when the system tells you that the run's limit is reached. Short of the \
+targets, finish with success false, the numbers reached and what is missing."""
 
 _ENDING_REPLY: str = """- When the goal is achieved or impossible, reply in plain text; that reply ends your turn and is the only part of \
 the work the user reads: put the actual result in it (the findings, figures or text asked for, paths, URLs, values), \
@@ -320,8 +332,9 @@ def _skills_section(skills: Sequence[Skill], tool_names: Sequence[str]) -> str:
 
 
 def _ending(mode: RunMode) -> str:
-    """A task or research run ends with the finish tool; a chat turn ends with a plain reply."""
-    return _ENDING_REPLY if mode == "chat" else _ENDING_TOOL
+    """A task or research run ends with the finish tool, and an open-ended goal holds it back until its targets are
+    met; a chat turn ends with a plain reply."""
+    return _ENDING_REPLY if mode == "chat" else f"{_ENDING_TOOL}\n\n{_OPEN_GOALS}"
 
 
 def build_system_prompt(inputs: PromptInputs) -> str:

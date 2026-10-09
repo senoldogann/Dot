@@ -1,20 +1,21 @@
 """Meta tools: finishing a run, asking the user, notifying them, keeping a visible plan and turning on a tool group."""
 
 import asyncio
-from collections.abc import Sequence
 from typing import Annotated
 
 from pydantic import Field, StringConstraints
 
 from dotagent.agent.approvals import ApprovalOutcome
 from dotagent.agent.plan import (
+    EMPTY_PLAN,
     PLAN_EVENT,
     PlanItem,
+    PlanPayload,
     StepStatus,
     count_done,
     plan_event_data,
     plan_from_event,
-    render_plan,
+    plan_lines,
     with_step_status,
 )
 from dotagent.core.errors import ToolExecutionError
@@ -33,6 +34,7 @@ USE_TOOLS_TOOL: str = "use_tools"
 # A chat turn ends with a plain reply. A model that is offered both that and finish tends to write the call out as text.
 _FINISH_MODES: frozenset[RunMode] = frozenset({"task", "research"})
 _NOTIFY_TIMEOUT_S: float = 15.0
+_TARGETS_MAX_CHARS: int = 600
 _LEFT_RESULT: str = (
     "The question is left for the user, who does not answer during this run; their answer will carry the work on "
     "later. Go on with what does not depend on it. If nothing can be done without it, end the run and say exactly what "
@@ -185,11 +187,24 @@ class UpdatePlanArgs(ToolArgs):
     steps: list[PlanStep] = Field(
         min_length=1, max_length=20, description="The complete plan; it replaces the previous plan."
     )
+    targets: Annotated[str, StringConstraints(strip_whitespace=True, max_length=_TARGETS_MAX_CHARS)] | None = Field(
+        default=None,
+        description=(
+            "For a goal that names an outcome rather than a task: the measurable targets you will reach and how your "
+            "own tools will measure them, e.g. '20 new leads in leads.csv, counted with wc -l'. Leave it out to keep "
+            "the targets already recorded; an empty text removes them."
+        ),
+    )
 
 
-async def _record_plan(ctx: ToolContext, steps: Sequence[PlanItem]) -> ToolResult:
-    await ctx.runtime.bus.emit(ctx.run_id, PLAN_EVENT, plan_event_data(steps), True)
-    return ok(f"Plan recorded ({count_done(steps)}/{len(steps)} done):\n{render_plan(steps)}")
+async def _latest_plan(ctx: ToolContext) -> PlanPayload:
+    latest: EventRecord | None = await ctx.runtime.store.last_event(ctx.run_id, PLAN_EVENT)
+    return EMPTY_PLAN if latest is None else plan_from_event(latest)
+
+
+async def _record_plan(ctx: ToolContext, plan: PlanPayload) -> ToolResult:
+    await ctx.runtime.bus.emit(ctx.run_id, PLAN_EVENT, plan_event_data(plan), True)
+    return ok(f"Plan recorded ({count_done(plan.steps)}/{len(plan.steps)} done):\n{plan_lines(plan)}")
 
 
 def _update_plan_tool() -> RegisteredTool:
@@ -197,13 +212,16 @@ def _update_plan_tool() -> RegisteredTool:
         return _meta_action(UPDATE_PLAN_TOOL, "Update the plan")
 
     async def run(args: UpdatePlanArgs, ctx: ToolContext) -> ToolResult:
-        return await _record_plan(ctx, [PlanItem(text=step.text, status=step.status) for step in args.steps])
+        targets: str = (await _latest_plan(ctx)).targets if args.targets is None else args.targets
+        steps: tuple[PlanItem, ...] = tuple(PlanItem(text=step.text, status=step.status) for step in args.steps)
+        return await _record_plan(ctx, PlanPayload(steps=steps, targets=targets))
 
     return make_tool(
         name=UPDATE_PLAN_TOOL,
         description=(
-            "Record or rewrite a short step-by-step plan for multi-step work. The user sees it live. Skip it for "
-            "trivial tasks. To mark progress on one step use mark_plan_step instead."
+            "Record or rewrite a short step-by-step plan for multi-step work, and the targets of a goal that names an "
+            "outcome. The user sees it live. Skip it for trivial tasks. To mark progress on one step use "
+            "mark_plan_step instead."
         ),
         args_model=UpdatePlanArgs,
         modes=ALL_MODES,
@@ -225,9 +243,9 @@ def _mark_plan_step_tool() -> RegisteredTool:
         return _meta_action(MARK_PLAN_STEP_TOOL, f"Mark plan step {args.step} {args.status}")
 
     async def run(args: MarkPlanStepArgs, ctx: ToolContext) -> ToolResult:
-        latest: EventRecord | None = await ctx.runtime.store.last_event(ctx.run_id, PLAN_EVENT)
-        current: tuple[PlanItem, ...] = () if latest is None else plan_from_event(latest)
-        return await _record_plan(ctx, with_step_status(current, args.step, args.status))
+        current: PlanPayload = await _latest_plan(ctx)
+        steps: tuple[PlanItem, ...] = with_step_status(current.steps, args.step, args.status)
+        return await _record_plan(ctx, current.model_copy(update={"steps": steps}))
 
     return make_tool(
         name=MARK_PLAN_STEP_TOOL,

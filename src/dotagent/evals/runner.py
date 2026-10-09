@@ -52,11 +52,12 @@ _ATTEMPT_ENV: dict[str, str] = {"PYTHONDONTWRITEBYTECODE": "1"}
 
 def eval_config(config: AppConfig) -> AppConfig:
     """The configuration an eval run uses: the given one, without what must not take part in a measurement (the MCP
-    servers, skills and plugins of the user, the Mac desktop, the embeddings of the memory and the lessons, which would
-    carry what one attempt learnt into the next)."""
+    servers, skills and plugins of the user, the Mac desktop, the embeddings of the memory, the lessons, which would
+    carry what one attempt learnt into the next, and the user's limits of a run: a task's own time and token limits cut
+    its runs)."""
     return config.model_copy(
         update={
-            "agent": config.agent.model_copy(update={"lessons": "off"}),
+            "agent": config.agent.model_copy(update={"lessons": "off", "run_max_minutes": 0.0, "run_max_tokens": 0}),
             "mcp": [],
             "skills": SkillsConfig(dirs=[]),
             "plugins": PluginsConfig(dirs=[]),
@@ -181,8 +182,7 @@ def _stop(manager: RunManager, run_id: str) -> None:
 async def _stored_spending(runtime: Runtime, run_id: str) -> tuple[int, bool]:
     """What the store says of a run: the tokens it and the runs it delegated to used so far, and whether it ended."""
     run: RunRecord = await runtime.store.get_run(run_id)
-    runs: list[RunRecord] = [run, *await runtime.store.list_child_runs(run_id)]
-    return sum(entry.input_tokens + entry.output_tokens for entry in runs), run.finished_at is not None
+    return await runtime.store.family_tokens(run_id), run.finished_at is not None
 
 
 async def _supervise(

@@ -89,6 +89,8 @@ type LessonsMode = Literal["off", "propose", "auto"]
 class AgentConfig(FrozenModel):
     goal_mode: bool
     goal_patience: int
+    run_max_minutes: float = Field(ge=0)
+    run_max_tokens: int = Field(ge=0)
     tool_output_chars: int
     context_tokens: int
     keep_recent_tool_results: int

@@ -10,7 +10,7 @@ from dotagent.agent.attachments import StoredAttachment, UserInput, attachment_s
 from dotagent.agent.gate import RunGate
 from dotagent.agent.lessons import LessonCase, dismiss_lesson, learn, save_lesson
 from dotagent.agent.loop import AgentRun, RunEnd, RunOpening, run_agent
-from dotagent.agent.plan import PLAN_EVENT, plan_from_event
+from dotagent.agent.plan import EMPTY_PLAN, PLAN_EVENT, plan_from_event
 from dotagent.agent.resume import (
     RESUME_SOURCE,
     CutOff,
@@ -365,7 +365,7 @@ class RunManager:
             cut_off=cut_off,
             automatic=automatic,
             calls=calls,
-            plan=() if plan is None else plan_from_event(plan),
+            plan=EMPTY_PLAN if plan is None else plan_from_event(plan),
         )
         run, _ = await self._launch(
             old.goal,

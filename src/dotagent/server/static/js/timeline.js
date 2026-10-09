@@ -43,6 +43,18 @@ function callEnd(call) {
   return call.end === "cut_off" && !call.repeatable ? `${end} (it may have changed something)` : end;
 }
 
+/** What a run spent of each of its limits that is set (agent/limits.py), e.g. "61.2 of 60 minutes and 512k of 500k tokens". */
+function limitSpent(data) {
+  const parts = [];
+  if (data.max_minutes > 0) {
+    parts.push(`${(data.seconds / 60).toFixed(1)} of ${data.max_minutes} minutes`);
+  }
+  if (data.max_tokens > 0) {
+    parts.push(`${compact(data.tokens)} of ${compact(data.max_tokens)} tokens`);
+  }
+  return parts.join(" and ");
+}
+
 /** The one line a live group shows for the call that ran last. */
 function describeCall(tool, args) {
   const detail = describeArguments(args);
@@ -81,7 +93,7 @@ function paintGroup(group) {
 
 /**
  * The timeline of the run `rootRunId`, which was created at `startedAt` (seconds). `push(record)` takes events in order; the
- * callbacks tell the page about what the timeline cannot show by itself: `onGrow()` after every event, `onPlan(steps)`,
+ * callbacks tell the page about what the timeline cannot show by itself: `onGrow()` after every event, `onPlan(steps, targets)`,
  * `onStats({ step, input, output })` after every model turn and every side call of the run (`step` 0: a compaction, a
  * review, a description of images), `onCalls({ calls, failed })` after every tool call of the run,
  * `onRunStatus({ status, model, endedAt })` (`endedAt` is null until the run is over), `onAnswer(node)` when the answer is
@@ -484,7 +496,8 @@ export function createTimeline({ rootRunId, startedAt, onGrow, onPlan, onStats, 
     plan(scope, record) {
       const steps = record.data.steps;
       if (scope.runId === rootRunId) {
-        onPlan(steps);
+        // Plans stored before targets existed have none.
+        onPlan(steps, record.data.targets ?? "");
         return;
       }
       const done = steps.filter((step) => step.status === "done").length;
@@ -496,6 +509,11 @@ export function createTimeline({ rootRunId, startedAt, onGrow, onPlan, onStats, 
     plan_reminder(scope, record) {
       const numbers = record.data.open_steps.join(", ");
       note(scope, record.ts, "list", `Dot wanted to finish with plan steps ${numbers} still open and was asked to close them first`, "warn");
+    },
+
+    // The run reached a limit of [agent] run_max_minutes or run_max_tokens: it was told to finish, and its next reply ends it.
+    limit_reached(scope, record) {
+      note(scope, record.ts, "clock", `The run reached its limit (${limitSpent(record.data)}) and was told to finish now`, "warn");
     },
 
     // The final answer named paths that do not exist and that the run never touched ([agent] verify_answer_paths): the

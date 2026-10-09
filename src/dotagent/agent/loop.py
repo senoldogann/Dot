@@ -39,7 +39,26 @@ from dotagent.agent.continuity import (
 from dotagent.agent.executor import ToolOutcome, execute_calls
 from dotagent.agent.gate import RunGate
 from dotagent.agent.lessons import LessonCase, may_learn
-from dotagent.agent.plan import PLAN_EVENT, PlanItem, open_steps, plan_event_data, plan_from_event, render_plan
+from dotagent.agent.limits import (
+    LIMIT_EVENT,
+    LIMIT_TOOLS,
+    LimitReached,
+    RunLimits,
+    limit_event_data,
+    limit_note,
+    limit_reached,
+    limit_result,
+    limits_of,
+)
+from dotagent.agent.plan import (
+    EMPTY_PLAN,
+    PLAN_EVENT,
+    PlanPayload,
+    open_steps,
+    plan_event_data,
+    plan_from_event,
+    plan_lines,
+)
 from dotagent.agent.progress import (
     Alert,
     CallSeen,
@@ -247,9 +266,9 @@ class Compaction(FrozenModel):
     check: ContinuityCheck | None
 
 
-async def _current_plan(agent: AgentRun) -> tuple[PlanItem, ...]:
+async def _current_plan(agent: AgentRun) -> PlanPayload:
     latest: EventRecord | None = await agent.runtime.store.last_event(agent.run.id, PLAN_EVENT)
-    return () if latest is None else plan_from_event(latest)
+    return EMPTY_PLAN if latest is None else plan_from_event(latest)
 
 
 async def _model_summary(
@@ -317,7 +336,7 @@ async def _compact(
         message.model_copy(update={"content": summary_part(message.content)}) for message in head
     ]
     transcript: str = truncate_middle(render_transcript(readable), _SUMMARY_TRANSCRIPT_CHARS)
-    plan: tuple[PlanItem, ...] = await _current_plan(agent)
+    plan: PlanPayload = await _current_plan(agent)
     text, attempts, problem = await _model_summary(agent, ref, transcript, context_tokens)
     if text is None:
         reason: str = problem if problem is not None else "no reply"
@@ -587,6 +606,7 @@ async def _check_goal(
     missing: tuple[str, ...] = await _missing_in_answer(agent, ended.result, facts)
     request: GoalRequest = GoalRequest(
         goal=run.goal,
+        targets=(await _current_plan(agent)).targets,
         digest=goal_digest(render_transcript(_since_goal(history, goal))),
         facts=redact_secrets(render_facts(facts, missing, unopened_addresses(ended.result, facts.named))),
         answer=ended.result,
@@ -700,7 +720,7 @@ async def _answer_alert(
 ) -> StallAnswer | RunOutcome:
     """What the rung an alert reached asks for: a note (with the tools of the next step limited for a re-plan or a
     question), the advice of the review model, or the end of the run with what was tried."""
-    plan: str = render_plan(await _current_plan(agent))
+    plan: str = plan_lines(await _current_plan(agent))
     match alert.rung:
         case "consult":
             return await _consult(agent, consultant, alert, history, goal, ledger, plan)
@@ -737,7 +757,21 @@ def _run_end(
     return RunEnd(outcome=outcome, lessons=case)
 
 
+async def _limit_seen(agent: AgentRun, limits: RunLimits, started: float) -> LimitReached | None:
+    """The limit the run has reached by now, if any, from the seconds since ``started`` and the tokens of the run and
+    of the runs it delegated to as the store holds them (a call's tokens are added before the call returns)."""
+    tokens: int = await agent.runtime.store.family_tokens(agent.run.id)
+    return limit_reached(limits, time.monotonic() - started, tokens)
+
+
+async def _limit_end(agent: AgentRun, reached: LimitReached, ledger: RunLedger) -> RunOutcome:
+    """The end of a run that did not finish in the step after it was told that its limit is reached."""
+    plan: str = plan_lines(await _current_plan(agent))
+    return RunOutcome(status="failed", result=limit_result(reached, ledger, plan), needs="")
+
+
 async def run_agent(agent: AgentRun) -> RunEnd:
+    started: float = time.monotonic()
     runtime: Runtime = agent.runtime
     run: RunRecord = agent.run
     config: AgentConfig = runtime.config.agent
@@ -746,7 +780,7 @@ async def run_agent(agent: AgentRun) -> RunEnd:
     if opening.resumed is not None:
         await runtime.bus.emit(run.id, RESUMED_EVENT, resumed_event_data(opening.resumed), True)
         # The plan of the run it resumes becomes this run's plan: the plan tools and the plan reminder go on with it.
-        if opening.resumed.plan:
+        if opening.resumed.plan.steps:
             await runtime.bus.emit(run.id, PLAN_EVENT, plan_event_data(opening.resumed.plan), True)
     ref: ModelRef = parse_model_ref(run.model)
     info: ModelInfo = await runtime.router.model_info(ref)
@@ -852,8 +886,12 @@ async def run_agent(agent: AgentRun) -> RunEnd:
         run.id,
     )
     watch: WatchState = new_watch()
-    # The tools of the next step when a progress alert limited them; None offers the tools of the groups that are on.
+    # The tools of the next step when a progress alert or the run's limit restricts them; None offers the tools of the
+    # groups that are on.
     allowed: frozenset[str] | None = None
+    run_limits: RunLimits | None = limits_of(config, run.mode)
+    # What the run had spent when it was seen past its limit; from then on every step may only finish, and ends the run.
+    past_limit: LimitReached | None = None
 
     async def sink(delta: StreamDelta) -> None:
         await runtime.bus.emit(run.id, "delta", {"kind": delta.kind, "text": delta.text, "step": steps}, False)
@@ -879,7 +917,15 @@ async def run_agent(agent: AgentRun) -> RunEnd:
             history.append(await _stored_note(agent, _new_memories_note(changed)))
             await runtime.store.mark_memories_used([record.id for record in changed], time.time())
             await runtime.bus.emit(run.id, "memories", {"ids": [record.id for record in changed], "live": True}, True)
-        # A step that a progress alert limited offers what the alert allows, and turns no group on.
+        if run_limits is not None and past_limit is None:
+            past_limit = await _limit_seen(agent, run_limits, started)
+            if past_limit is not None:
+                history.append(await _stored_note(agent, limit_note(past_limit)))
+                await runtime.bus.emit(run.id, LIMIT_EVENT, limit_event_data(past_limit), True)
+        if past_limit is not None:
+            # The limit wins over what a progress alert of the step before allowed.
+            allowed = LIMIT_TOOLS
+        # A step that a progress alert or the limit restricts offers what they allow, and turns no group on.
         offered: tuple[ToolSpec, ...] = (
             offered_specs(specs, on) if allowed is None else tuple(spec for spec in specs if spec.name in allowed)
         )
@@ -952,7 +998,11 @@ async def run_agent(agent: AgentRun) -> RunEnd:
                 (outcome for outcome in outcomes if outcome.call.name == FINISH_TOOL and not outcome.result.is_error),
                 None,
             )
-            if finished is None:
+            if finished is not None:
+                ended = _finish_result(finished)
+            elif past_limit is not None:
+                ended = await _limit_end(agent, past_limit, ledger)
+            else:
                 alert: Alert | None
                 watch, alert = advance(watch, _calls_seen(outcomes), limits, ladder)
                 if alert is not None:
@@ -965,16 +1015,17 @@ async def run_agent(agent: AgentRun) -> RunEnd:
                     allowed = answer.allowed
                 elif reminder_due(scaffold, run.mode, steps, reminded_at):
                     reminded_at = steps
-                    plan: tuple[PlanItem, ...] = await _current_plan(agent)
+                    plan: PlanPayload = await _current_plan(agent)
                     history.append(await _stored_note(agent, reminder_note(ledger, plan)))
                     await runtime.bus.emit(
-                        run.id, "reminder", {"step": steps, "open_steps": list(open_steps(plan))}, True
+                        run.id, "reminder", {"step": steps, "open_steps": list(open_steps(plan.steps))}, True
                     )
                 continue
-            ended = _finish_result(finished)
         else:
             answered: bool = bool(reply.text.strip())
-            if answered and (run.mode == "chat" or not used_tools or nudges >= config.finish_nudges):
+            if past_limit is not None:
+                ended = await _limit_end(agent, past_limit, ledger)
+            elif answered and (run.mode == "chat" or not used_tools or nudges >= config.finish_nudges):
                 ended = RunOutcome(status="done", result=reply.text, needs="")
             elif nudges >= config.finish_nudges:
                 return _run_end(
@@ -984,18 +1035,25 @@ async def run_agent(agent: AgentRun) -> RunEnd:
                 nudges += 1
                 history.append(await _stored_note(agent, _NO_TOOL_NOTE if answered else _EMPTY_NOTE))
                 continue
-        # The run wants to end here. A plan with open steps is sent back once, so the plan the user sees matches the
-        # work; so is, with verify_answer_paths, an answer that names paths that do not exist; then goal mode lets the
-        # checker decide whether the goal is really reached.
-        if not plan_reminded and run.mode != "chat":
-            unclosed: tuple[int, ...] = open_steps(await _current_plan(agent))
+        # The run wants to end here. A run past its limit ends with what it has: nothing sends it back. Otherwise a plan
+        # with open steps is sent back once, so the plan the user sees matches the work; so is, with
+        # verify_answer_paths, an answer that names paths that do not exist; then goal mode lets the checker decide
+        # whether the goal is really reached.
+        if past_limit is None and not plan_reminded and run.mode != "chat":
+            unclosed: tuple[int, ...] = open_steps((await _current_plan(agent)).steps)
             if unclosed:
                 plan_reminded = True
                 nudges = 0
                 history.append(await _stored_note(agent, _plan_note(unclosed)))
                 await runtime.bus.emit(run.id, "plan_reminder", {"open_steps": list(unclosed)}, True)
                 continue
-        if config.verify_answer_paths and not paths_reminded and run.mode != "chat" and ended.status == "done":
+        if (
+            past_limit is None
+            and config.verify_answer_paths
+            and not paths_reminded
+            and run.mode != "chat"
+            and ended.status == "done"
+        ):
             missing: tuple[str, ...] = await _missing_in_answer(agent, ended.result, facts)
             if missing:
                 paths_reminded = True
@@ -1005,7 +1063,9 @@ async def run_agent(agent: AgentRun) -> RunEnd:
                 await runtime.bus.emit(run.id, "answer_paths", {"missing": list(missing)}, True)
                 continue
         settled: RunOutcome | SendBack = (
-            ended if checker is None else await _check_goal(agent, checker, history, goal, ended, sent_back, facts)
+            ended
+            if checker is None or past_limit is not None
+            else await _check_goal(agent, checker, history, goal, ended, sent_back, facts)
         )
         if isinstance(settled, RunOutcome):
             if agent.inbox.empty():

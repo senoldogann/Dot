@@ -90,8 +90,8 @@ _GOAL_SYSTEM: str = (
     "You get the goal, a digest of the agent's steps (its tool calls and the start of each result), facts that the "
     "harness measured itself (the files the agent's file tools wrote, its failed calls that no later success of the "
     "same tool and target followed, its commands that test, build or lint with their results, and the paths and "
-    "addresses the final answer names that the run never touched) and its final answer. Answer by calling "
-    f"{GOAL_TOOL} exactly once:\n"
+    "addresses the final answer names that the run never touched), its final answer and, when the agent recorded them "
+    f"in its plan, its targets. Answer by calling {GOAL_TOOL} exactly once:\n"
     "- achieved: the answer holds what the goal asked for, and the digest shows the work behind it (the page was "
     "opened and read, the file exists, the check ran and passed).\n"
     "- continue: the goal can still be reached but is not reached yet: something that was asked for is missing, was "
@@ -110,6 +110,9 @@ _GOAL_SYSTEM: str = (
     "would have done.\n"
     "- Judge against the goal's own words. Do not add requirements, do not ask for polish nobody asked for and do not "
     "send the agent back for something the digest shows it did.\n"
+    "- Targets are the agent's own measurable reading of a goal that names an outcome, not added requirements. Judge "
+    "whether they are met from the digest, the facts and the numbers of the answer, and whether they fit the goal: "
+    "targets that ask for less than the goal's words do not make the goal reached.\n"
     "- An agent that reports a failure honestly after trying the sensible ways is blocked, not continue.\n"
     "- Give the reason in one or two sentences, in the language of the goal."
 )
@@ -178,10 +181,12 @@ class ReviewVerdict(FrozenModel):
 
 
 class GoalRequest(FrozenModel):
-    """What the goal checker is asked: the goal, a digest of the run, the facts the harness measured (rendered by
-    :func:`dotagent.agent.verify.render_facts`) and the answer the run ended with."""
+    """What the goal checker is asked: the goal, the targets of the run's plan (empty when it set none), a digest of the
+    run, the facts the harness measured (rendered by :func:`dotagent.agent.verify.render_facts`) and the answer the run
+    ended with."""
 
     goal: str
+    targets: str
     digest: str
     facts: str
     answer: str
@@ -313,9 +318,13 @@ def _review_prompt(request: ReviewRequest, nonce: str) -> str:
 
 def _goal_prompt(request: GoalRequest, nonce: str) -> str:
     claim: str = "success" if request.claimed_success else "failure"
+    targets: tuple[str, ...] = (
+        (_fenced("TARGETS (the agent's own, from its plan)", nonce, request.targets),) if request.targets else ()
+    )
     return "\n\n".join(
         (
             _fenced("GOAL", nonce, request.goal),
+            *targets,
             _fenced("DIGEST", nonce, request.digest),
             _fenced("FACTS (measured by the harness)", nonce, request.facts),
             _fenced(f"FINAL ANSWER (the agent claims {claim})", nonce, truncate_middle(request.answer, _ANSWER_CHARS)),

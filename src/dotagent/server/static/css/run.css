@@ -70,7 +70,9 @@
 .steps-head {
   display: flex;
   align-items: center;
-  gap: 8px;
+  /* On a phone a long title, the count and the badge of failed calls go on to a second line instead of out of view. */
+  flex-wrap: wrap;
+  gap: 2px 8px;
   padding: 5px 8px 5px 4px;
   border-radius: 8px;
   color: var(--text-2);

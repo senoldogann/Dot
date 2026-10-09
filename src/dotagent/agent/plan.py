@@ -1,4 +1,5 @@
-"""The visible plan of a run: its steps and their states, kept as ``plan`` events of the run.
+"""The visible plan of a run: its steps and their states, and the targets it works toward, kept as ``plan`` events of
+the run.
 
 The latest ``plan`` event of a run is the plan: the UI paints it live, the agent loop pins it into every summary, and
 ``mark_plan_step`` changes one step of it. Every function here is pure; reading and writing the events is the caller's.
@@ -27,19 +28,25 @@ class PlanItem(FrozenModel):
 
 
 class PlanPayload(FrozenModel):
-    """The data of a ``plan`` event."""
+    """The data of a ``plan`` event: the steps, and the targets of the run (the measurable outcome it works toward and
+    how it is measured; empty when the run set none, as in the events stored before targets existed)."""
 
     steps: tuple[PlanItem, ...]
+    targets: str = ""
 
 
-def plan_event_data(steps: Sequence[PlanItem]) -> JsonObject:
-    return {"steps": [{"text": step.text, "status": step.status} for step in steps]}
+# The plan of a run that has not recorded one.
+EMPTY_PLAN: PlanPayload = PlanPayload(steps=(), targets="")
 
 
-def plan_from_event(event: EventRecord) -> tuple[PlanItem, ...]:
-    """The steps a stored ``plan`` event holds. A malformed event is a store error, never an empty plan."""
+def plan_event_data(plan: PlanPayload) -> JsonObject:
+    return {"steps": [{"text": step.text, "status": step.status} for step in plan.steps], "targets": plan.targets}
+
+
+def plan_from_event(event: EventRecord) -> PlanPayload:
+    """The plan a stored ``plan`` event holds. A malformed event is a store error, never an empty plan."""
     try:
-        return PlanPayload.model_validate(event.data).steps
+        return PlanPayload.model_validate(event.data)
     except ValidationError as exc:
         raise StoreError(
             "a stored plan event is malformed",
@@ -72,3 +79,9 @@ def count_done(steps: Sequence[PlanItem]) -> int:
 def render_plan(steps: Sequence[PlanItem]) -> str:
     """``1. [done] text`` lines, as the model reads the plan back."""
     return "\n".join(f"{index + 1}. [{step.status}] {step.text}" for index, step in enumerate(steps))
+
+
+def plan_lines(plan: PlanPayload) -> str:
+    """The plan as the model reads it: the step lines of :func:`render_plan`, then the targets when the run set some."""
+    steps: str = render_plan(plan.steps)
+    return f"{steps}\nTargets: {plan.targets}" if plan.targets else steps
