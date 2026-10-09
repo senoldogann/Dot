@@ -274,7 +274,8 @@ snapshot_max_chars = 16000
 capture_timeout_s = 10.0
 paste_settle_ms = 250
 # A type step whose text is longer than this, without a line break or a tab, goes in through the clipboard (which is
-# put back afterwards) instead of a key per character; never into a secure field. 0 types everything key by key.
+# put back afterwards) instead of a key per character; never into a secure field or one for a credential or a payment,
+# and never a key-like text. 0 types everything key by key.
 paste_threshold_chars = 40
 keep_awake = true
 keep_awake_s = 900

@@ -496,9 +496,10 @@ async def bring_to_front(page: Page) -> None:
 
 
 async def wait_for_text(page: Page, text: str, timeout_ms: int) -> bool:
-    """Whether ``text`` became visible on the page within ``timeout_ms``."""
+    """Whether ``text`` became visible on the page within ``timeout_ms`` (in any of its matches: an earlier hidden one,
+    such as a template or a closed menu, does not hold the wait)."""
     try:
-        await page.get_by_text(text).first.wait_for(state="visible", timeout=timeout_ms)
+        await page.get_by_text(text).filter(visible=True).first.wait_for(state="visible", timeout=timeout_ms)
     except PlaywrightTimeoutError:
         return False
     except PlaywrightError as error:

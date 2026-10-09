@@ -895,7 +895,7 @@ that change the owner's agent are their call (see "Open owner decisions", 6 onwa
 | 10  | Yolo asks nobody: secret fields, questions and the end of a run        | done        | eacd180 |
 | 11  | Open-ended goals in one run: targets, limits and an honest end         | done        | 12ad395 |
 | 12  | Campaigns: a goal that works until its outcome is verified             | done        | c915ab2 |
-| 13  | Faster browser and desktop steps                                       | in progress |         |
+| 13  | Faster browser and desktop steps                                       | done        |         |
 | 14  | Rich editors, drag and bulk text in the browser                        | planned     |         |
 | 15  | Helper models: consult, delegate to another model, standby             | planned     |         |
 | 16  | Typed judgments (TypeSafe) at the decision points                      | planned     |         |
@@ -1632,8 +1632,8 @@ updated.
 
 ### 13. Faster browser and desktop steps
 
-**Status: in progress.** **Goal.** Take the fixed waiting out of a browser or desktop action where no signal needs
-it, and make a failed wait or an unchanged page cost no extra step.
+**Status: done.** **Goal.** Take the fixed waiting out of a browser or desktop action where no signal needs it, and
+make a failed wait or an unchanged page cost no extra step.
 
 **Why.** Measured on 2026-10-09 (read-only bench, this Mac; the Playwright and accessibility parts not measured): a
 browser click waits about 160 ms by construction, a five-click batch about 0.32 s; a desktop click about 0.56 s before
@@ -1656,28 +1656,46 @@ repository, numbers below); four of its points changed.
   stays.
 - `browser_scroll` no longer sleeps 150 ms after the wheel. Playwright's wheel returns before Chrome scrolls, but the
   page lands in one jump within 41 ms of the call (8 runs each of 600 px, 3 000 px and to the bottom, headless and
-  headed Chrome on this Mac), inside the DOM quiet window of the settle that follows.
+  headed Chrome on this Mac), inside the DOM quiet window of the settle that follows. The sleep also gave content
+  that a page fetches after a scroll more time: what arrives between about 145 and 270 ms after the wheel was shown
+  before and now shows in the next view. No signal says that a fetch is coming (the driver never waits for the
+  network, which analytics keep busy); a longer `settle_quiet_ms` buys that time back (open decision 13).
 - `browser_wait_text` returns a `TextWait` (appeared, waited_s, view) and the tool one line and the view of what
   changed: "The text appeared after 0.6 s · Tab 1 of 1 · …"; when the text does not come in time the call fails and
   still shows the page: "The text did not appear within 10 s; the page now · …". The model's text stays out of that
   line, which carries only what Dot produces (`browser/render.py`). A page that moved on during the wait is checked
-  against the URL rules, as after an act.
+  against the URL rules, as after an act. A failed result is not counted as a read by the gate, so the tool marks it as
+  carrying content a third party can write. The wait takes the first visible match: a hidden copy of the text earlier
+  in the page (a template, a closed menu) held it until the timeout. After a timeout the page is read as it is, with
+  no settle that could outlast the wait, and a note when it is still loading. A navigation that has not committed yet
+  still holds any reading of the page until it commits (probe: 5.7 s; `action_timeout_s` bounds it), as it did before,
+  so the URL rules are checked again once the page is read.
 - `settle_quiet_ms` (120) and `settle_max_ms` (1 500) stay knobs; the timing test runs with 120 and 60 for open
   decision 13.
 
 **Design, desktop** (`desktop/ax.py`, `desktop/session.py`, `desktop/actions.py`):
-- After a batch that changed something, the fixed `settle_ms` sleep becomes `ax.wait_until_quiet`: an `AXObserver`
-  on the application element, on the desktop worker's run loop, for value, title, created and destroyed elements,
-  focus, windows, sheets, menus, selection, rows, layout and busy state. The window is read once the application has
-  announced nothing for `[desktop] settle_quiet_ms` (120), at most after `settle_ms` (350, so never later than
-  before). An application that cannot be watched gets the whole `settle_ms`, with a warning in the log. The draft
-  polled the window list and the focused element instead, which sees no change inside a window. Probe (an off-screen
-  accessory app whose buttons were pressed through accessibility, no pointer): a label that changes at once 127 ms,
-  nothing changing 125 ms, five changes 60 ms apart 322 ms, a pid that is gone 354 ms. A single change later than
-  the quiet window (250 ms in the probe) is not waited for, as with the browser's DOM quiet window.
-- A `type` step whose text is longer than `[desktop] paste_threshold_chars` (40; 0 never) and holds no line break or
-  tab (typing presses Return and Tab for those) goes through the paste path, into a field that is known and not
-  secure; the clipboard is put back as for `paste`. Shorter text is typed key by key as before.
+- After a batch that changed something, the fixed `settle_ms` sleep becomes `ax.wait_until_quiet`: an `AXObserver` on
+  the application element, on the desktop worker's run loop, for 28 announcements (values, titles, elements and windows
+  that come, go, move or resize, focus, sheets, menus, selections, rows, layout, busy state, page loads and live regions
+  of web content). The window is read once the application has announced nothing for `[desktop] settle_quiet_ms` (120)
+  since it took the registration, at most `settle_ms` (350) after the wait began. Every call to the application gives up
+  after `settle_ms`, registering stops at `settle_ms`, and the removals stop at the first that is not answered: an
+  application that hangs during the wait adds at most `settle_ms` more. An application that cannot be watched gets the
+  whole `settle_ms`, with a warning in the log. One callback serves every wait (a callback wrapped per wait leaked about
+  6 KB each). The draft polled the window list and the focused element instead, which sees no change inside a window.
+  Probe (an off-screen accessory app whose buttons were pressed through accessibility, no pointer): a label that changes
+  at once 133 ms, five changes 60 ms apart 327 ms, a press 30 ms into the wait 171 ms, the 28 registrations and removals
+  0.9 ms, an app whose main thread is busy 190 ms of every 200 ms 198-362 ms (it answers the registrations in one gap),
+  a stopped (SIGSTOP) app 355 ms, an app stopped during the wait 487 ms (it was about 30 s before the removals stopped
+  at the first failure), a pid that is gone 351 ms. A change that comes later than the quiet window without anything
+  announced in between (250 ms in the probe) is not waited for, as with the browser's DOM quiet window; the old fixed
+  sleep showed such a change when it came within 350 ms. Waiting for a first announcement would not help: a change made
+  before the registration is never announced, so every click would wait the whole `settle_ms`.
+- A `type` step whose text is longer than `[desktop] paste_threshold_chars` (40; 0 never) and presses no Return or
+  Tab (for a line break or a tab) goes through the paste path, into a field that is known, not secure and not one
+  for a credential or a payment, and never with a key-like text (the policy's `typing_reasons`: the clipboard is
+  shared with every application); the clipboard is put back as for `paste`. Shorter text is typed key by key as
+  before.
 - One `lsappinfo` listing per act is dropped: the preview (classify) and the act each list the applications, 22 ms
   median (max 98 ms); reusing the preview's listing saves 22 ms of a 0.5 s act and, after an approval wait, could act
   on an application that quit meanwhile.
@@ -1693,17 +1711,23 @@ repository, numbers below); four of its points changed.
   touch the click path. One click act of 222 ms (probe): the click 22 ms, the popup grace 42, the DOM quiet window
   124, the capture 35, the two title reads 1. A 600 px `browser_scroll` (20 on the home page, two runs): 329-331 ms
   before, 169 ms after.
-- Desktop: not measured yet (the desktop tests move the real pointer; they run while the owner is away).
+- Desktop, the fixture window, 20 one-click acts and 5 five-click batches, the owner away: before (`00fb523`, three
+  runs) one click 0.546-0.573 s, five clicks 1.520-1.549 s; after (three runs) 0.308-0.345 s and 1.278-1.323 s. One
+  click act of 343 ms after (probe): the click with its pacing 125 ms, the settle 128, the closing view 32, the
+  application listing 32, the preparation 27. Five clicks: the clicks 623 ms and the gaps after steps that open
+  something (a third of `settle_ms` each, kept) take most of the 1.33 s. A `type` act (click, select all, type) of 40
+  characters typed key by key 1.04 s, 41 pasted 0.92 s, 200 pasted 0.92 s (typing costs 8 ms a character).
 
 **Touchpoints.** `browser/session.py`, `browser/driver.py`, `browser/render.py`, `browser/types.py`,
-`tools/browser.py`, `desktop/ax.py`, `desktop/session.py`, `desktop/actions.py`, `tools/desktop.py`, `config.py`,
-`defaults.toml`, README "Browser use" and "Computer use", `tests/smoke/test_browser.py`, `tests/smoke/test_desktop.py`,
-`tests/unit/test_desktop_secrets.py`.
+`tools/browser.py`, `desktop/ax.py`, `desktop/session.py`, `desktop/actions.py`, `desktop/input.py`,
+`desktop/types.py`, `tools/desktop.py`, `config.py`, `defaults.toml`, README "Browser use" and "Computer use",
+`tests/smoke/test_browser.py`, `tests/smoke/test_desktop.py`, `tests/unit/test_desktop_secrets.py`.
 
 **Done when.** `tests/smoke/test_browser.py` has the timing test (20 one-click acts and 5 five-click batches with
 `settle_quiet_ms` 120 and 60, medians printed, asserted under 1.5 s and 3 s), a scroll test (2 000 px down shows
-`Item 100` and not `Item 10`) and the wait tests (the line with the time and the changes; a timeout fails and still
-shows the page); `tests/smoke/test_desktop.py` (under `DOT_DESKTOP_TESTS=1`) has the same timing test against the
+`Item 100` and not `Item 10`) and the wait tests (the line with the time and the changes, past a hidden copy of the
+text; a timeout fails, is marked untrusted and still shows the page; one during a slow load returns without waiting
+for the rest); `tests/smoke/test_desktop.py` (under `DOT_DESKTOP_TESTS=1`) has the same timing test against the
 fixture window and a paste test for long text (it arrives whole, the clipboard is put back); a unit test of the paste
 rule; the medians before and after written here; the offline smoke suite clean; README updated.
 
@@ -2065,8 +2089,9 @@ on and is closed by `terminal_close`; the idle reaper; unit tests of the ANSI st
 12. Only you can check live: the X composer with item 14's `type` and `insert`, and a `yolo` run that reads a
     one-time code from your webmail and types it (item 10).
 13. Speed knobs that wait for item 9's numbers: `[browser] settle_quiet_ms` (120 or 60; item 13 has the timings of
-    both), `[desktop] settle_quiet_ms` (120: a change later than it is not waited for), `[desktop]
-    screenshot_max_edge` (1920 or 1366), `[desktop] paste_threshold_chars`, `[agent] tool_output_chars` and
+    both; a longer window also shows more of what a page fetches after a scroll), `[desktop] settle_quiet_ms` (120: a
+    change later than it is not waited for), `[desktop] screenshot_max_edge` (1920 or 1366), `[desktop]
+    paste_threshold_chars` (40: typing costs 8 ms a character, a paste about 0.25 s), `[agent] tool_output_chars` and
     `keep_recent_tool_results`, besides `tool_surface = "grouped"` (decision 2) and the compaction model (decision 4,
     and `agent/loop.py:290-298` records the decision that a run compacts with its own model).
 14. Research (not an item of part 2): a `research` run can save nothing, not even a note (`write_file` and
@@ -2297,3 +2322,27 @@ on and is closed by `terminal_close`; the idle reaper; unit tests of the ANSI st
   indexed and bounded.
 - 2026-10-09: item 12 merged as `c915ab2` (PR #5, squash); the Claude GitHub app skipped its review again (decision 15).
   Item 13 started on `item-13-faster-steps`.
+- 2026-10-09: item 13 done. `browser_scroll` no longer sleeps 150 ms after the wheel (a 600 px scroll 169 ms instead
+  of 330); a batch that closes its tab settles the new current tab once; `browser_wait_text` says after how long the
+  text appeared and shows what changed, and when it does not come the call fails and still shows the page. On the
+  desktop the fixed 350 ms settle after a batch waits for the application's accessibility announcements to stop
+  (`ax.wait_until_quiet`, `[desktop] settle_quiet_ms`): a click act 0.34 s instead of 0.56, five clicks 1.32 s instead
+  of 1.53. A `type` text longer than `paste_threshold_chars` goes in through the clipboard (200 characters 0.92 s
+  instead of about 2.3 typed). Four points of the first draft changed after probes; the section says why.
+- 2026-10-09: item 13 review fixes (/code-review at max effort: ten finders; the verify stage hit the session limit
+  again, so the 22 findings were checked against the code here). A wait that timed out is marked untrusted (the gate
+  counts no failed result as a read, and the page is in it), takes the first visible match (a hidden copy held it until
+  the timeout) and reads the page without a settle that could outlast it. The desktop settle uses one callback for every
+  wait (one per wait leaked about 6 KB), gives every call to the application `settle_ms` and stops the removals at the
+  first unanswered one (a hung application held the desktop worker about 30 s), opens the quiet window after the
+  registration and listens to 28 announcements instead of 15. No paste into a field for a credential or a payment, nor
+  of a key-like text; `type` uses the paste path of `paste`; the step schema says when typing pastes; the desktop
+  clipboard tests put the whole clipboard back. A second review of these fixes found two more: after a timeout a
+  navigation still pending commits while the page is read, so the URL rules are checked again afterwards (a blocked host
+  was shown), and registering stops at `settle_ms`. Unit tests (532), the browser smoke file (30), the offline smoke
+  suite (216, no cloud request), the desktop smoke file (16, with the owner away) and four mutations each caught by a
+  test. Left: what a page fetches after a scroll and shows 145-270 ms later (open decision 13). Found, not changed
+  (older than this item): the paste path puts the clipboard back after a fixed 250 ms, which a slow application may
+  outlast; the URL rules are checked after loads, `act`, `back` and `browser_wait_text` only, not when `snapshot`,
+  `find`, `links`, `read_text`, `screenshot`, `scroll`, `switch_tab`, `close_tab` or `upload` read a page that moved on
+  by itself.

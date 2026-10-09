@@ -747,9 +747,10 @@ missing ones and opens their Settings panes.
   by its ref or a point by its coordinates. `press`, `focus` and `set_value` work through accessibility without moving
   the pointer; `click`, `hover`, `scroll` and `drag` are real pointer events; `type`, `paste` and `key` are keyboard
   events. A `type` text longer than `paste_threshold_chars` (40) without a line break or a tab goes in through the
-  clipboard, which is put back afterwards, unless the field is secure or cannot be read. After steps that changed
-  something, the window is read once the application has announced no change for `settle_quiet_ms` (120 ms), at most
-  after `settle_ms` (350 ms).
+  clipboard, which is put back afterwards, unless the field is secure, is for a credential or a payment, or cannot be
+  read, or the text looks like a key. After steps that changed something, the window is read once the application has
+  announced no change for `settle_quiet_ms` (120 ms), at most after `settle_ms` (350 ms); a change it makes later
+  without announcing anything in between shows in the next view.
 - `desktop_screenshot` captures the screen with ScreenCaptureKit as a JPEG of at most `screenshot_max_edge` pixels.
 - `desktop.keep_awake` keeps the display awake while Dot works. Password managers are refused in every mode, and so
   are secure fields except in a `yolo` run (see [Safety](#safety)).

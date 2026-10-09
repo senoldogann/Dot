@@ -56,6 +56,7 @@ from dotagent.tools.base import (
     fail,
     make_reviewed_tool,
     make_tool,
+    mark_untrusted,
     ok,
     ok_with_images,
 )
@@ -440,6 +441,13 @@ class WaitTextArgs(ToolArgs):
     timeout_s: float | None = Field(default=None, ge=0.5, le=60.0, description="How long to wait (default 10).")
 
 
+def wait_text_result(wait: TextWait, nonce: str, body_budget: int) -> ToolResult:
+    """What a wait for a text tells the model. One that timed out fails and still shows the page, so it is marked as
+    carrying content a third party can write: the gate counts only results that did not fail as reads."""
+    rendered: str = render_text_wait(wait, nonce, body_budget)
+    return ok(rendered) if wait.appeared else mark_untrusted(fail(rendered))
+
+
 def _wait_text_tool() -> RegisteredTool:
     def classify(args: WaitTextArgs, ctx: ToolContext) -> ActionInfo:
         return _observe_action("browser_wait_text", f"Wait for {args.text!r}", ctx)
@@ -447,8 +455,7 @@ def _wait_text_tool() -> RegisteredTool:
     async def run(args: WaitTextArgs, ctx: ToolContext) -> ToolResult:
         timeout_s: float = args.timeout_s or _DEFAULT_WAIT_S
         wait: TextWait = await ctx.runtime.browser.wait_text(ctx.thread_id, args.text, timeout_s)
-        rendered: str = render_text_wait(wait, timeout_s, _nonce(), _body_budget(ctx))
-        return ok(rendered) if wait.appeared else fail(rendered)
+        return wait_text_result(wait, _nonce(), _body_budget(ctx))
 
     return make_tool(
         name="browser_wait_text",

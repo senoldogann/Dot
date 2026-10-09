@@ -649,13 +649,7 @@ class DesktopSession:
             if batch.side_effects:
                 quiet_s: float = self._config.settle_quiet_ms / 1000
                 await self._call(
-                    partial(
-                        ax.wait_until_quiet,
-                        batch.env.app_element,
-                        batch.env.app.pid,
-                        quiet_s,
-                        self._config.settle_ms / 1000,
-                    )
+                    partial(ax.wait_until_quiet, batch.env.app.pid, quiet_s, self._config.settle_ms / 1000)
                 )
             view, note, updated = await self._closing_view(batch.state, batch.env.app)
             self._remember(thread_id, updated)

@@ -88,6 +88,7 @@ _POPUP_WAIT_S: float = 1.0
 _MIN_REFS_AFTER_LOAD: int = 3
 _LATE_QUIET_MS: int = 300
 _LATE_MAX_MS: int = 2500
+_STILL_LOADING: str = "the page is still loading; what is shown may be incomplete"
 _BLANK_URLS: frozenset[str] = frozenset({"about:blank", "chrome://newtab/", "chrome://new-tab-page/"})
 _LAUNCH_ARGS: list[str] = [
     "--disable-blink-features=AutomationControlled",
@@ -615,7 +616,7 @@ class BrowserSession:
         try:
             await asyncio.wait_for(tab.nav_idle.wait(), timeout=config.navigation_timeout_s)
         except TimeoutError:
-            add_note(tab, "the page is still loading; what is shown may be incomplete")
+            add_note(tab, _STILL_LOADING)
         await wait_dom_quiet(tab.page, config.settle_quiet_ms, config.settle_max_ms, _ms(config.navigation_timeout_s))
 
     async def _viewport(self, tab: Tab) -> Viewport:
@@ -881,15 +882,22 @@ class BrowserSession:
             return await self._changes_view(thread, tab)
 
     async def wait_text(self, thread_id: str, text: str, timeout_s: float) -> TextWait:
-        """Wait until ``text`` is visible on the current tab, at most ``timeout_s``; the page is shown either way."""
+        """Wait until ``text`` is visible on the current tab, at most ``timeout_s``; the page is shown either way. After a
+        wait that timed out the page is shown as it is, without a settle that could outlast the wait. A navigation still
+        pending then holds the reading until it commits, so the URL rules are checked again once the page is read."""
         async with self._locked(thread_id) as thread:
             tab: Tab = await self._current_tab(thread)
             started: float = time.monotonic()
             appeared: bool = await wait_for_text(tab.page, text, _ms(timeout_s))
             waited_s: float = time.monotonic() - started
-            await self._settle(tab)
+            if appeared:
+                await self._settle(tab)
+            elif not tab.nav_idle.is_set():
+                add_note(tab, _STILL_LOADING)
             await self._enforce_landing(tab)
-            return TextWait(appeared=appeared, waited_s=waited_s, view=await self._changes_view(thread, tab))
+            view: PageView = await self._changes_view(thread, tab)
+            await self._enforce_landing(tab)
+            return TextWait(appeared=appeared, waited_s=waited_s, view=view)
 
     async def back(self, thread_id: str) -> PageView:
         async with self._locked(thread_id) as thread:

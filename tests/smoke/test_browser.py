@@ -21,7 +21,7 @@ import pytest
 import pytest_asyncio
 from playwright.async_api import async_playwright
 
-from dotagent.browser.render import render_page_view, render_text_wait
+from dotagent.browser.render import render_page_view
 from dotagent.browser.safety import parse_element, refuse_secret_field
 from dotagent.browser.session import BrowserSession
 from dotagent.browser.types import ActOutcome, PageView, Step, TextWait
@@ -29,8 +29,13 @@ from dotagent.browser.upstream import ignore_repeated_frame_detach
 from dotagent.config import BrowserConfig, load_config
 from dotagent.core.errors import BrowserError
 from dotagent.policy.elements import Element
+from dotagent.tools.base import ToolResult
+from dotagent.tools.browser import wait_text_result
 
 pytestmark = [pytest.mark.browser, pytest.mark.asyncio(loop_scope="module")]
+
+_SLOW_REST_S: float = 8.0
+_LATE_HEADERS_S: float = 3.0
 
 _ITEMS: str = "".join(f"<li><button>Item {n}</button></li>" for n in range(300))
 _NUMBERS: str = "".join(f"<option{' selected' if n == 250 else ''}>Number {n}</option>" for n in range(300))
@@ -71,9 +76,17 @@ _PAGES: dict[str, str] = {
     "/slow": """<!doctype html><title>Slow</title><div id="root"></div>
 <script>setTimeout(() => { document.getElementById('root').innerHTML =
 '<h1>Loaded late</h1><button>Late button</button><a href="/">one</a><a href="/">two</a>' }, 350)</script>""",
-    "/later": """<!doctype html><title>Later</title>
+    # A hidden copy of the awaited text comes first, the way a template or a closed menu would.
+    "/later": """<!doctype html><title>Later</title><p hidden>Order placed</p>
 <button onclick="setTimeout(() => { document.getElementById('s').textContent = 'Order placed' }, 800)">Place order</button>
 <p id="s">Working</p>""",
+    # The page leaves half a second after the click, for one whose end comes only after _SLOW_REST_S.
+    "/leaving": """<!doctype html><title>Leaving</title>
+<button onclick="setTimeout(() => { location.href = '/half-page' }, 500)">Leave</button>""",
+    # The page leaves half a second after the click for another host, whose answer comes after _LATE_HEADERS_S.
+    "/to-blocked": """<!doctype html><title>Leaving</title>
+<button onclick="setTimeout(() => { location.href = `http://localhost:${location.port}/late-headers` }, 500)">Leave</button>""",
+    "/late-headers": "<!doctype html><title>Blocked</title><h1>Blocked page</h1>",
     "/colon": """<!doctype html><title>Colon</title>
 <button>Buy now: confirm</button><a href="/done?x=1">Read: more</a> | <a href="javascript:void(0)">Script link</a>""",
     "/cookies": """<!doctype html><title>Cookies</title>
@@ -94,6 +107,17 @@ _PAGES: dict[str, str] = {
 class _Handler(BaseHTTPRequestHandler):
     def do_GET(self) -> None:
         path: str = self.path.split("?", 1)[0]
+        if path == "/late-headers":
+            time.sleep(_LATE_HEADERS_S)
+        if path == "/half-page":
+            self.send_response(200)
+            self.send_header("Content-Type", "text/html; charset=utf-8")
+            self.end_headers()
+            self.wfile.write(b"<!doctype html><title>Half</title><h1>Half a page</h1>")
+            self.wfile.flush()
+            time.sleep(_SLOW_REST_S)
+            self.wfile.write(b"<p>The rest</p>")
+            return
         if path == "/file.txt":
             body: bytes = b"report body"
             self.send_response(200)
@@ -322,8 +346,9 @@ async def test_a_wait_for_text_says_after_how_long_it_appeared_and_shows_what_ch
     assert wait.appeared
     assert 0.2 < wait.waited_s < 2.0, wait.waited_s
     assert "Order placed" in wait.view.body
-    rendered: str = render_text_wait(wait, 5.0, "n0nce", 20_000)
-    assert rendered.startswith(f"The text appeared after {wait.waited_s:.1f} s · Tab 1 of 1 · "), rendered
+    result: ToolResult = wait_text_result(wait, "n0nce", 20_000)
+    assert not result.is_error
+    assert result.text.startswith(f"The text appeared after {wait.waited_s:.1f} s · Tab 1 of 1 · "), result.text
 
 
 async def test_a_wait_for_text_that_does_not_come_fails_and_still_shows_the_page(
@@ -335,8 +360,42 @@ async def test_a_wait_for_text_that_does_not_come_fails_and_still_shows_the_page
     assert not wait.appeared
     assert 1.4 < wait.waited_s < 3.0, wait.waited_s
     assert "Order placed" in wait.view.body
-    rendered: str = render_text_wait(wait, 1.5, "n0nce", 20_000)
-    assert rendered.startswith("The text did not appear within 1.5 s; the page now · Tab 1 of 1 · "), rendered
+    result: ToolResult = wait_text_result(wait, "n0nce", 20_000)
+    assert result.is_error
+    assert result.untrusted  # the gate counts no failed result as a read, and this one shows the page
+    assert result.text.startswith(f"The text did not appear within {wait.waited_s:.1f} s; the page now · Tab 1 of 1 · ")
+
+
+async def test_a_wait_that_times_out_while_a_page_still_loads_shows_it_without_waiting_for_the_rest(
+    browser: BrowserSession, site: str
+) -> None:
+    view: PageView = await browser.open_url("wait-leaving", f"{site}/leaving")
+    await act(browser, "wait-leaving", [Step(action="click", ref=ref_of(view.body, 'button "Leave"'))], False)
+    started: float = time.monotonic()
+    wait: TextWait = await browser.wait_text("wait-leaving", "Arrived", 1.5)
+    took: float = time.monotonic() - started
+    assert not wait.appeared
+    assert took < 3.0, (took, wait.waited_s)
+    assert "the page is still loading; what is shown may be incomplete" in wait.view.notes
+    assert 'heading "Half a page"' in wait.view.body
+
+
+async def test_a_wait_that_times_out_checks_where_a_pending_navigation_went_before_showing_the_page(
+    browser_config: BrowserConfig, site: str, tmp_path: Path
+) -> None:
+    """The page leaves for a blocked host that answers after the wait timed out; reading the page waits for that
+    navigation to commit, so the URL rules are checked once more before anything is shown."""
+    config: BrowserConfig = browser_config.model_copy(update={"blocked_hosts": ["localhost"]})
+    (tmp_path / "profile").mkdir()
+    (tmp_path / "downloads").mkdir()
+    session: BrowserSession = BrowserSession(config, tmp_path / "profile", tmp_path / "downloads")
+    try:
+        view: PageView = await session.open_url("blocked", f"{site}/to-blocked")
+        await act(session, "blocked", [Step(action="click", ref=ref_of(view.body, 'button "Leave"'))], False)
+        with pytest.raises(BrowserError, match="may not be opened"):
+            await session.wait_text("blocked", "Arrived", 1.0)
+    finally:
+        await session.aclose()
 
 
 async def test_cookie_banners_are_declined_instead_of_blocking_actions(browser: BrowserSession, site: str) -> None:

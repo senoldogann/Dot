@@ -31,6 +31,7 @@ _ERRORS: dict[int, str] = {
     -25204: "the application did not answer (busy, hung, or it blocks accessibility)",
     -25205: "the element has no such attribute",
     -25206: "the element does not support this action",
+    -25207: "the application does not send this notification",
     -25208: "the application does not implement this",
     -25211: "accessibility is switched off for this process",
     -25212: "the attribute has no value",
@@ -66,8 +67,21 @@ _CHANGE_NOTIFICATIONS: tuple[str, ...] = (
     "AXSelectedChildrenChanged",
     "AXSelectedRowsChanged",
     "AXRowCountChanged",
+    "AXRowExpanded",
+    "AXRowCollapsed",
     "AXLayoutChanged",
     "AXElementBusyChanged",
+    "AXMainWindowChanged",
+    "AXWindowMoved",
+    "AXWindowResized",
+    "AXWindowMiniaturized",
+    "AXWindowDeminiaturized",
+    "AXMoved",
+    "AXResized",
+    "AXSelectedTextChanged",
+    "AXLoadComplete",  # web content (WebKit, Chromium, Electron)
+    "AXLayoutComplete",
+    "AXLiveRegionChanged",
 )
 _UNSUPPORTED_NOTIFICATION: int = -25207
 _TEXT_ROLES: frozenset[str] = frozenset(
@@ -572,22 +586,31 @@ def rest_accessibility(app: AXElement) -> None:
     _set_wake_flags(app, False)
 
 
-def wait_until_quiet(app: AXElement, pid: int, quiet_s: float, max_s: float) -> None:
+def _announced(observer: object, element: object, notification: str, refcon: object) -> None:
+    """Nothing to do: the run loop reports that an announcement arrived, and which one does not matter."""
+
+
+# Wrapped once: PyObjC keeps every wrapped callback alive, so a wrapper per settle would leak (about 6 KB each).
+_ANNOUNCED: object = objc.callbackFor(AS.AXObserverCreate)(_announced)
+
+
+def wait_until_quiet(pid: int, quiet_s: float, max_s: float) -> None:
     """Return once the application has announced no change of its interface for ``quiet_s`` (a value or a title, an
-    element or a window that came or went, the focus, a selection, the layout), at most after ``max_s``. The
-    announcements arrive on this thread's run loop. An application that announces nothing is quiet after ``quiet_s``;
-    one that cannot be watched gets the whole ``max_s``."""
+    element or a window that came, went, moved or resized, the focus, a selection, the layout, a page load), at most
+    ``max_s`` after the call; removing the registrations follows (well under a millisecond for an application that
+    answers). The announcements arrive on this thread's run loop. The quiet window opens once the application has taken
+    the registration, so a busy one is heard after it answers. Every call to the application gives up after ``max_s``
+    and registering stops at ``max_s``, so an application that stops answering adds at most ``max_s``. An application
+    that announces nothing is quiet after ``quiet_s``; one that cannot be watched gets the whole ``max_s``."""
     started: float = time.monotonic()
-    last: float = started
-
-    def noted(observer: object, element: object, notification: str, refcon: object) -> None:
-        nonlocal last
-        last = time.monotonic()
-
-    code, observer = AS.AXObserverCreate(pid, objc.callbackFor(AS.AXObserverCreate)(noted), None)
+    deadline: float = started + max_s
+    app: AXElement = app_element(pid, max_s)
+    code, observer = AS.AXObserverCreate(pid, _ANNOUNCED, None)
     watched: list[str] = []
     if int(code) == 0:
         for name in _CHANGE_NOTIFICATIONS:
+            if time.monotonic() >= deadline:
+                break
             code = AS.AXObserverAddNotification(observer, app, name, None)
             if int(code) == 0:
                 watched.append(name)
@@ -595,18 +618,21 @@ def wait_until_quiet(app: AXElement, pid: int, quiet_s: float, max_s: float) -> 
                 break  # gone or not answering: every further call would wait out the timeout as well
     if not watched:
         _log.warning("desktop_settle_unwatched", pid=pid, code=int(code), error=error_text(int(code)), wait_s=max_s)
-        time.sleep(max(0.0, started + max_s - time.monotonic()))
+        time.sleep(max(0.0, deadline - time.monotonic()))
         return
     loop: object = CF.CFRunLoopGetCurrent()
     source: object = AS.AXObserverGetRunLoopSource(observer)
     CF.CFRunLoopAddSource(loop, source, CF.kCFRunLoopDefaultMode)
+    last: float = time.monotonic()
     try:
-        while (left := min(last + quiet_s, started + max_s) - time.monotonic()) > 0:
-            CF.CFRunLoopRunInMode(CF.kCFRunLoopDefaultMode, left, True)
+        while (left := min(last + quiet_s, deadline) - time.monotonic()) > 0:
+            if CF.CFRunLoopRunInMode(CF.kCFRunLoopDefaultMode, left, True) == CF.kCFRunLoopRunHandledSource:
+                last = time.monotonic()
     finally:
         CF.CFRunLoopRemoveSource(loop, source, CF.kCFRunLoopDefaultMode)
         for name in watched:
-            AS.AXObserverRemoveNotification(observer, app, name)
+            if int(AS.AXObserverRemoveNotification(observer, app, name)) != 0:
+                break  # not answering: the rest would wait as well, and the released observer hears nothing more
 
 
 def pid_of(element: AXElement) -> int:

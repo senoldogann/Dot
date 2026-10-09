@@ -24,7 +24,7 @@ def test_a_step_at_a_password_manager_is_refused_and_one_elsewhere_is_not() -> N
     refuse_secrets(StepContext(role="other", app="TextEdit", element=None, secure=True))
 
 
-def test_a_long_typed_text_is_pasted_only_into_a_known_field_that_is_not_secure() -> None:
+def test_a_long_typed_text_is_pasted_only_into_a_known_ordinary_field_and_never_a_key() -> None:
     field: StepContext = StepContext(
         role="other", app="TextEdit", element=Element(role="AXTextField", name="Name"), secure=False
     )
@@ -36,3 +36,7 @@ def test_a_long_typed_text_is_pasted_only_into_a_known_field_that_is_not_secure(
     assert not _pastes(long_text + "\t", field, 40)
     assert not _pastes(long_text, field.model_copy(update={"secure": True}), 40)
     assert not _pastes(long_text, field.model_copy(update={"element": None}), 40)
+    api_key: StepContext = field.model_copy(update={"element": Element(role="AXTextField", name="OpenAI API key")})
+    assert not _pastes("sk-proj-" + "a" * 40, api_key, 40)
+    for name in ("Recovery code", "Card number"):
+        assert not _pastes(long_text, field.model_copy(update={"element": Element(role="AXTextField", name=name)}), 40)

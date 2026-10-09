@@ -297,6 +297,11 @@ def typed_units(text: str) -> tuple[str, ...]:
     return tuple(units)
 
 
+def presses_keys(text: str) -> bool:
+    """Whether typing ``text`` presses Return or Tab (for a line break or a tab), which a paste would not."""
+    return "\n" in text or "\t" in text
+
+
 def text_events(source: EventSource, text: str) -> tuple[TimedEvent, ...]:
     """Type ``text`` as Unicode strings, one key event per character (calculators, terminals and games read a single
     character per event); a newline presses Return and a tab presses Tab."""
