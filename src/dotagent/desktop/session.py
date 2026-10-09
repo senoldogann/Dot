@@ -548,6 +548,7 @@ class DesktopSession:
         """The environment of a batch (worker thread); the target comes to the front when the steps need it."""
         running: tuple[AppInfo, ...] = apps.list_apps()
         app: AppInfo = _pick_app(state, name, running)
+        _refuse_secrets(app)
         env: StepEnv = StepEnv(
             app=app,
             app_element=ax.app_element(app.pid, self._config.ax_timeout_s),
@@ -574,6 +575,7 @@ class DesktopSession:
             await asyncio.sleep(seconds)
             return Effect(detail=f"waited {seconds:g} s", pointer=None, opens_ui=False, switched_to=None)
         inspection: Inspection = await self._call(partial(actions.inspect_step, env, step))
+        actions.refuse_secrets(inspection.context)
         await reviewer(
             StepReview(
                 index=index,

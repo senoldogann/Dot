@@ -5,10 +5,10 @@ import re
 from collections.abc import Awaitable, Callable
 from typing import Literal
 
-from playwright.async_api import CDPSession, Locator, Page
+from playwright.async_api import CDPSession, ElementHandle, Frame, JSHandle, Locator, Page
 from playwright.async_api import Error as PlaywrightError
 
-from dotagent.browser.safety import secret_kind
+from dotagent.browser.safety import key_enters_text, secret_kind
 from dotagent.browser.snapshot import (
     SnapshotLine,
     closest_first,
@@ -53,12 +53,28 @@ _QUIET_SCRIPT: str = """([quietMs, maxMs]) => new Promise((resolve) => {
   const hardTimer = setTimeout(finish, maxMs);
 })"""
 
-# What a field says about the secret it takes: "password" for a password input, otherwise its autocomplete tokens; null
-# for an element that takes no typed text. The model never sees this check and cannot disable it.
+# What the field a step writes into says about the secret it takes: "password" for a password input, then its
+# autocomplete tokens; null for an element that takes no typed text. Given a label, or an element inside one, the
+# field is the label's control, which is where Playwright's fill writes (its retarget(node, "follow-label")). The
+# model never sees this check and cannot disable it.
 _FIELD_MARKING_SCRIPT: str = """(element) => {
-  if (!(element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement)) return null;
-  if (element instanceof HTMLInputElement && element.type === 'password') return 'password';
-  return element.getAttribute('autocomplete') || '';
+  let field = element;
+  if (!field.matches('input, textarea, select') && !field.isContentEditable)
+    field = field.closest('button, [role=button], [role=checkbox], [role=radio]') || field;
+  if (!field.matches('a, input, textarea, button, select, [role=link], [role=button], [role=checkbox], [role=radio]')
+      && !field.isContentEditable) {
+    const label = field.closest('label');
+    if (label && label.control) field = label.control;
+  }
+  if (!(field instanceof HTMLInputElement || field instanceof HTMLTextAreaElement)) return null;
+  const marking = field.getAttribute('autocomplete') || '';
+  return field instanceof HTMLInputElement && field.type === 'password' ? `password ${marking}` : marking;
+}"""
+# The element of a frame's document that has the keyboard focus, inside open shadow roots.
+_FOCUSED_SCRIPT: str = """() => {
+  let element = document.activeElement;
+  while (element && element.shadowRoot && element.shadowRoot.activeElement) element = element.shadowRoot.activeElement;
+  return element;
 }"""
 
 # Lists the options of a native <select> in page order, or null for any other element.
@@ -277,11 +293,30 @@ def _key_of(step: Step) -> str:
     return step.key
 
 
-async def _check_secret_field(page: Page, locator: Locator, ref: str, check: SecretFieldCheck) -> None:
-    """Hand a field that takes a secret to ``check`` before any text goes into it."""
-    kind: SecretKind | None = secret_kind(await locator.evaluate(_FIELD_MARKING_SCRIPT))
+async def _check_secret_field(page: Page, marking: object, ref: str | None, check: SecretFieldCheck) -> None:
+    """Hand a field that takes a secret, by its ``marking`` (:data:`_FIELD_MARKING_SCRIPT`), to ``check`` before any
+    text goes into it."""
+    kind: SecretKind | None = secret_kind(marking)
     if kind is not None:
         await check(SecretField(ref=ref, kind=kind, url=page.url))
+
+
+async def _focused_marking(page: Page) -> object:
+    """The marking of the element that has the keyboard focus, followed from the page into the frame that holds it:
+    the keys of ``type`` and ``press`` go there, whatever element their ref names."""
+    frame: Frame = page.main_frame
+    while True:
+        handle: JSHandle = await frame.evaluate_handle(_FOCUSED_SCRIPT)
+        try:
+            element: ElementHandle | None = handle.as_element()
+            if element is None:
+                return None
+            inner: Frame | None = await element.content_frame()
+            if inner is None:
+                return await element.evaluate(_FIELD_MARKING_SCRIPT)
+        finally:
+            await handle.dispose()
+        frame = inner
 
 
 async def _dropdown_offering(page: Page, locator: Locator, ref: str, wanted: str, timeout_ms: int) -> Dropdown | None:
@@ -316,7 +351,8 @@ async def _select_option(page: Page, locator: Locator, ref: str, wanted: str, ti
 
 async def run_step(page: Page, step: Step, timeout_ms: int, secret_field: SecretFieldCheck) -> None:
     """Perform one step against the latest snapshot. A field that takes a secret goes to ``secret_field`` first, which
-    raises to refuse the step."""
+    raises to refuse the step: the field ``fill`` writes into, and the one that has the keyboard focus when ``type``,
+    or ``press`` with a key that puts text in, is about to send its keys."""
     if step.action == "click_at":
         if step.x is None or step.y is None:
             raise BrowserError("click_at needs x and y", {"url": page.url})
@@ -326,8 +362,11 @@ async def run_step(page: Page, step: Step, timeout_ms: int, secret_field: Secret
             raise _failure("click_at failed", page, {"x": str(step.x), "y": str(step.y)}, error) from error
         return
     if step.action == "press" and step.ref is None:
+        key: str = _key_of(step)
         try:
-            await page.keyboard.press(_key_of(step))
+            if key_enters_text(key):
+                await _check_secret_field(page, await _focused_marking(page), None, secret_field)
+            await page.keyboard.press(key)
         except PlaywrightError as error:
             raise _failure("press failed", page, {"key": step.key}, error) from error
         return
@@ -344,14 +383,18 @@ async def run_step(page: Page, step: Step, timeout_ms: int, secret_field: Secret
             case "hover":
                 await locator.hover(timeout=timeout_ms)
             case "fill":
-                await _check_secret_field(page, locator, ref, secret_field)
+                await _check_secret_field(page, await locator.evaluate(_FIELD_MARKING_SCRIPT), ref, secret_field)
                 await locator.fill(_text_of(step), timeout=timeout_ms)
             case "type":
-                await _check_secret_field(page, locator, ref, secret_field)
+                await locator.focus(timeout=timeout_ms)
+                await _check_secret_field(page, await _focused_marking(page), ref, secret_field)
                 await locator.press_sequentially(_text_of(step), timeout=timeout_ms)
             case "select":
                 await _select_option(page, locator, ref, _text_of(step), timeout_ms)
             case "press":
+                if key_enters_text(_key_of(step)):
+                    await locator.focus(timeout=timeout_ms)
+                    await _check_secret_field(page, await _focused_marking(page), ref, secret_field)
                 await locator.press(_key_of(step), timeout=timeout_ms)
             case "check":
                 await locator.check(timeout=timeout_ms)

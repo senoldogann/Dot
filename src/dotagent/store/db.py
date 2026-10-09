@@ -71,6 +71,7 @@ CREATE TABLE IF NOT EXISTS approvals (
     status TEXT NOT NULL, tool TEXT NOT NULL, summary TEXT NOT NULL, severity TEXT NOT NULL,
     args TEXT NOT NULL, decided_by TEXT, note TEXT NOT NULL
 );
+CREATE INDEX IF NOT EXISTS approvals_run ON approvals(run_id, status);
 CREATE TABLE IF NOT EXISTS rules (
     id TEXT PRIMARY KEY, position INTEGER NOT NULL, enabled INTEGER NOT NULL, behavior TEXT NOT NULL,
     tool_glob TEXT NOT NULL, match_regex TEXT NOT NULL, description TEXT NOT NULL, created_at REAL NOT NULL

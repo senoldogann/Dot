@@ -55,11 +55,11 @@ class FinishArgs(ToolArgs):
         )
     )
     success: bool = Field(description="True only if the goal was fully achieved and you verified the result.")
-    needs_from_user: Annotated[str, StringConstraints(strip_whitespace=True)] = Field(
-        default="",
+    needs_from_user: Annotated[str, StringConstraints(strip_whitespace=True)] | None = Field(
+        default=None,
         description=(
             "What you could not do without the user: exactly what they need to give, decide or do, shown to them under "
-            "the answer. Leave it empty when nothing is needed."
+            "the answer. Leave it out when nothing is needed."
         ),
     )
 

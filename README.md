@@ -262,15 +262,18 @@ clears the mark. A delegated run starts as untrusted as its parent.
 
 **Secrets.**
 
-- In `ask` and `auto` the browser and desktop tools never type into password, one-time-code and card fields. A `yolo`
-  run types into them what it can read itself (see [Autonomy](#autonomy-approvals-goal-mode-and-the-end-of-a-run)).
-  Desktop screenshots black out the windows of password managers; secure fields and web pages are not masked.
+- In `ask` and `auto` the browser and desktop tools never type into password, one-time-code and card fields: the field
+  that would take the text is checked, whatever element the step names (a desktop `menu` step that pastes is not). A
+  `yolo` run types into them what it can read itself (see
+  [Autonomy](#autonomy-approvals-goal-mode-and-the-end-of-a-run)). The desktop tools never control a password manager
+  or Keychain Access, in any mode, and desktop screenshots black out their windows; secure fields and web pages are
+  not masked.
 - Environment variables whose names look like secrets are removed from the processes the shell tool starts
   (`[shell] pass_env` lists exceptions).
-- The agent can neither read nor change `~/.ssh`, `~/.gnupg`, `~/Library/Keychains`, `~/.aws`, `~/.config/gcloud` and the
-  data directory of your Chrome (`[policy] protected_paths`), nor Dot's own key file, token, browser profile,
-  configuration, database and journals of file changes. The configuration holds the policy and the MCP servers, the
-  database the rules, the journals what `dotx undo` writes back.
+- Outside a `yolo` run the agent can neither read nor change `~/.ssh`, `~/.gnupg`, `~/Library/Keychains`, `~/.aws`,
+  `~/.config/gcloud` and the data directory of your Chrome (`[policy] protected_paths`), nor Dot's own key file, token,
+  browser profile, configuration, database and journals of file changes. The configuration holds the policy and the MCP
+  servers, the database the rules, the journals what `dotx undo` writes back.
 
 **Approvals.** An action that needs a yes becomes an approval: `allow? [y/N]` in the terminal, a card in the web UI. The
 run waits (its status is `blocked`) for up to `[policy] approval_timeout_s`; an approval nobody answers expires and
@@ -323,8 +326,9 @@ run page carries a chip for it.
   or sends files from anywhere, and does money and credential steps itself. It types passwords, one-time codes and card
   numbers into the fields that take them when it can read them itself (a code in a mailbox it can open, a value you
   gave it); every such field is a `credential` record in its timeline (`financial` for a card field). That is the price
-  of the mode: a run that has read a hostile page can send your files out, pay or sign in without asking you. Password
-  managers and the keychain stay closed in every mode.
+  of the mode: a run that has read a hostile page can send your files out, pay or sign in without asking you. Only the
+  desktop tools stay away from password managers and Keychain Access in every mode; through the shell and the file
+  tools a yolo run reads the keychain like any other secret.
 
 Every automatic answer is an ordinary approval record (`decided_by` is `reviewer` or `yolo`, and the note holds the
 reason), an `approval_auto` event and a line in the timeline of the run, so you can see afterwards what went through and
@@ -333,7 +337,7 @@ why.
 **What only yolo waives.** Secrets and exfiltration stay denied in `ask` and `auto`. Money and credentials stay yours
 there: Dot stops and asks you to do that step yourself, and the review model is never asked about them. A `yolo` run
 does all of it and keeps a record. **What no mode waives:** a `research` run stays read-only, and a rule of yours with
-the hand-off behaviour still stops a yolo run.
+the hand-off behaviour still stops a yolo run, at secrets, money and credentials too.
 
 **If the review model fails** (the provider is down, or the model does not answer in the form asked for after two
 attempts) there is no fallback. That one tool call fails with the error as its result, the run goes on, and the
@@ -361,16 +365,18 @@ the model, reasoning level, approval mode and goal mode of its schedule, and the
 schedule leaves open, so what a schedule does while nobody is there depends on them: with `ask`, a question of the
 policy waits `approval_timeout_s` and then counts as a refusal.
 
-**Questions nobody answers during the run.** In a `yolo`, scheduled or eval run nobody answers the agent's own
-questions (`ask_user`) while it works, and `[agent] questions` decides what they do. With `leave` (the default) the
-question is stored as `left`, the timeline shows it where it was asked, and the run goes on with what does not depend on
-the answer, or ends and says what it needs; its status never turns `blocked`. The run's page lists its open questions
-under "Dot asked you", during the run and after it, and `dotx run` prints each one when it is left and lists the open
-ones after the answer. Your answer (`POST /api/approvals/{id}/decision`) goes to the conversation as your message,
-"Answer to your question “…”: …": into the run working there, or else as the goal of a new run on it with the mode,
-model, reasoning level, approval mode and goal mode of the run that asked, which the page then opens. Skip only closes
-the question, and a left question never expires. With `wait` such a question waits as in a run you watch, for
-`approval_timeout_s` at most. A run you started in `ask` or `auto` always waits for your answer.
+**Questions nobody answers during the run.** In a `yolo`, scheduled or eval run nobody answers the agent's own questions
+(`ask_user`) while it works, and `[agent] questions` decides what they do. With `leave` (the default) the question is
+stored as `left`, the timeline shows it where it was asked, and the run goes on with what does not depend on the answer,
+or ends and says what it needs; its status never turns `blocked`. The run's page lists its open questions under "Dot
+asked you", during the run and after it, and `dotx run` prints each one when it is left and lists the open ones after
+the answer. Your answer (`POST /api/approvals/{id}/decision`) goes to the conversation as your message, "Answer to your
+question “…”: …": into the run working there, or else as the goal of a new run on it with the mode, model, reasoning
+level, approval mode and goal mode of the run that asked, which the page then opens once no other question of the run is
+open there. A run reads an answer that comes during its last step before it ends; one that reaches a run that is then
+stopped or fails stays in the conversation as your message, for the next run there. An empty answer is refused. Skip
+only closes the question, and a left question never expires. With `wait` such a question waits as in a run you watch,
+for `approval_timeout_s` at most. A run you started in `ask` or `auto` always waits for your answer.
 
 **The end of a run.** There is no step limit. A run ends by `finish`; by the progress watchdog; by a model call that
 still fails after its retries; in goal mode by the goal check giving up; or when you stop it. With
@@ -706,8 +712,8 @@ missing ones and opens their Settings panes.
   the pointer; `click`, `hover`, `scroll` and `drag` are real pointer events; `type`, `paste` and `key` are keyboard
   events.
 - `desktop_screenshot` captures the screen with ScreenCaptureKit as a JPEG of at most `screenshot_max_edge` pixels.
-- `desktop.keep_awake` keeps the display awake while Dot works. Password managers are refused, and so are secure fields
-  except in a `yolo` run (see [Safety](#safety)).
+- `desktop.keep_awake` keeps the display awake while Dot works. Password managers are refused in every mode, and so
+  are secure fields except in a `yolo` run (see [Safety](#safety)).
 - `dotx desktop apps`, `dotx desktop snapshot [app] [--scope …] [--query …]` and `dotx desktop screenshot PATH` show what
   the agent would see.
 

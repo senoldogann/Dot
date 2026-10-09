@@ -23,7 +23,7 @@ from dotagent.tools.delegate import DELEGATE_SOURCE
 from dotagent.tools.meta import ASK_USER_TOOL
 
 PATIENCE: int = 4
-ENDED: RunOutcome = RunOutcome(status="done", result="the first file is written")
+ENDED: RunOutcome = RunOutcome(status="done", result="the first file is written", needs="")
 
 
 @pytest.mark.parametrize(
@@ -48,9 +48,9 @@ def _verdict(decision: Literal["achieved", "continue", "blocked"], reason: str) 
 
 
 def test_an_achieved_goal_ends_the_run_as_done_with_its_answer() -> None:
-    failed_claim: RunOutcome = RunOutcome(status="failed", result="all files are written")
+    failed_claim: RunOutcome = RunOutcome(status="failed", result="all files are written", needs="a review of them")
     outcome: RunOutcome | SendBack = _after_verdict(_verdict("achieved", "all files exist"), failed_claim, 0, PATIENCE)
-    assert outcome == RunOutcome(status="done", result="all files are written")
+    assert outcome == RunOutcome(status="done", result="all files are written", needs="a review of them")
 
 
 def test_a_blocked_goal_fails_the_run_and_keeps_its_answer() -> None:

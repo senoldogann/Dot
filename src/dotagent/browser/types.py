@@ -179,9 +179,10 @@ SecretKind = Literal[
 
 
 class SecretField(FrozenModel):
-    """A field that takes a secret, at the moment a step is about to type into it, on the page at ``url``."""
+    """A field that takes a secret, at the moment a step is about to type into it, on the page at ``url``. ``ref`` is
+    the ref the step names, ``None`` for a key pressed without one."""
 
-    ref: str
+    ref: str | None
     kind: SecretKind
     url: str
 

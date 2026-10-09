@@ -166,7 +166,7 @@ def judge(
 
 
 async def _decline(runtime: Runtime, event: EventRecord) -> None:
-    """Answer a question of the policy, or of the agent, with a refusal: nobody is there."""
+    """Answer a question that holds the run, of the policy or of the agent, with a refusal: nobody is there."""
     approval_id: object = event.data.get("approval_id")
     if not isinstance(approval_id, str):
         raise EvalError("an approval request without an id", {"run_id": event.run_id})
@@ -188,7 +188,8 @@ async def _stored_spending(runtime: Runtime, run_id: str) -> tuple[int, bool]:
 async def _supervise(
     runtime: Runtime, manager: RunManager, subscription: Subscription, run_id: str, task: EvalTask
 ) -> Cut:
-    """Watch the run until it is over: refuse every question, and cut the run when it takes longer or spends more
+    """Watch the run until it is over: refuse every question that holds it (a question the agent leaves holds
+    nothing and stays unanswered), and cut the run when it takes longer or spends more
     tokens (of every model call of the run and of the runs it delegated to) than the task allows. Returns why it was
     cut, or ``none``. The subscription is opened before the run starts, so that no event is missed. The tokens are read
     from the store at every model call, as the recorder adds them there before the call's event goes out; when the

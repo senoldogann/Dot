@@ -121,8 +121,8 @@ from dotagent.tools.desktop import sized_for_agent
 _NONCE_BYTES: int = 8
 _EFFORT_HELP: str = "reasoning level; the levels a model offers are listed by 'dotx models'"
 _APPROVALS_HELP: str = (
-    "who answers what the policy would ask: ask (you), auto (a review model) or yolo (nobody; secrets, money and "
-    "sign-ins still stop the run)"
+    "who answers what the policy would ask: ask (you), auto (a review model) or yolo (nobody; the run also reads "
+    "secrets, pays and signs in by itself, and only your hand-off rules stop it)"
 )
 _GOAL_MODE_HELP: str = (
     "a checker sends the run back to work until the goal is really reached (default: [agent] goal_mode)"

@@ -6,7 +6,7 @@ from dotagent.agent.review import Reviewer, ReviewRequest, ReviewVerdict, shorte
 from dotagent.core.errors import ApprovalRejected, HandedOff, PolicyDenied
 from dotagent.core.types import JsonObject
 from dotagent.events import EventBus
-from dotagent.policy.engine import YOLO_WAIVED_SOURCES, approval_severity, decide, route_for
+from dotagent.policy.engine import YOLO_WAIVED_SOURCES, approval_severity, decide, owner_handoff, route_for
 from dotagent.policy.types import TAINTING_KINDS, ActionInfo, ApprovalMode, Decision, Preset, Route
 from dotagent.store.db import Store
 from dotagent.store.models import RuleRecord, RunMode
@@ -99,6 +99,9 @@ class RunGate:
         if decision.verdict == "allow":
             return ""
         if self._approval_mode == "yolo" and decision.source in YOLO_WAIVED_SOURCES:
+            handoff: Decision | None = owner_handoff(info, rules)
+            if handoff is not None:
+                return await self._ask_user(info, handoff, "")
             return await self._waive(info, decision)
         if decision.verdict == "deny":
             await self._emit_policy(info, decision)

@@ -229,7 +229,7 @@ export function mount(root, ctx) {
       el(
         "span",
         null,
-        "The first enabled rule that matches an action decides it. Rules cannot lift the protections that are always on: reading secrets and sending them out is refused, research runs stay read-only, and money or credentials are always handed to you.",
+        "The first enabled rule that matches an action decides it. Rules cannot lift the protections that are always on: reading secrets and sending them out is refused, research runs stay read-only, and money or credentials are handed to you. A yolo run goes past all of these but the read-only research runs, and a hand-off rule still stops it there too.",
       ),
     ),
     form.element,

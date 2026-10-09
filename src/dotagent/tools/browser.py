@@ -295,7 +295,7 @@ def _secret_field_check(ctx: ToolContext, authorized: ActionInfo) -> SecretField
         flag: Flag = secret_field_flag(field.kind)
         if flag in authorized.flags:
             return
-        summary: str = f"Type into {secret_field_label(field.kind)} ({field.ref})"
+        summary: str = f"Type into {secret_field_label(field.kind)}" + ("" if field.ref is None else f" ({field.ref})")
         await ctx.gate.authorize(_action("browser_act", "browser_input", "high", summary, field.url, (flag,)))
 
     return enter

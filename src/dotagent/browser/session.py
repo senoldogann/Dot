@@ -75,7 +75,7 @@ from dotagent.browser.types import (
 )
 from dotagent.browser.upstream import ignore_repeated_frame_detach
 from dotagent.config import BrowserConfig, BrowserMode
-from dotagent.core.errors import BrowserError
+from dotagent.core.errors import ApprovalRejected, BrowserError, HandedOff, PolicyDenied
 from dotagent.core.logs import get_logger
 from dotagent.core.text import truncate_middle
 
@@ -809,6 +809,17 @@ class BrowserSession:
                 )
                 stopped = f"step {index} failed"
                 continue
+            except (PolicyDenied, ApprovalRejected) as error:
+                # The gate refused the step at a field that takes a secret.
+                detail: str = f"Not allowed: {error.message}. Do not retry this step or look for a way around it."
+                reports.append(StepReport(index=index, description=description, outcome="failed", detail=detail))
+                stopped = "a step was not allowed"
+                continue
+            except HandedOff as error:
+                detail = f"the user handled this step themselves ({error.message})"
+                reports.append(StepReport(index=index, description=description, outcome="done", detail=detail))
+                stopped = "the user took over this step; look at the page before going on"
+                continue
             if step.has_side_effects():
                 await self._let_events_land()
             reports.append(StepReport(index=index, description=description, outcome="done", detail=""))
@@ -829,7 +840,8 @@ class BrowserSession:
         self, thread_id: str, steps: Sequence[Step], accept_confirms: bool, secret_field: SecretFieldCheck
     ) -> ActOutcome:
         """Run the steps in order against the latest snapshot; stop at the first failure or surprise. ``secret_field``
-        decides what a step does at a field that takes a secret: a step it refuses fails and stops the batch."""
+        decides what a step does at a field that takes a secret: a step it refuses fails and stops the batch, and one
+        the user takes over stops it too."""
         async with self._locked(thread_id) as thread:
             tab: Tab = await self._current_tab(thread)
             tab.accept_confirms = accept_confirms

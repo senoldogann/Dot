@@ -17,6 +17,7 @@ from dotagent.evals.results import EvalReport, EvalSettings, TaskOutcome
 from dotagent.evals.runner import SCRIPTED_MODEL, eval_config, replay_reference
 from dotagent.evals.scoring import Scorecard, score_report
 from dotagent.evals.types import EvalTask, ScriptedCall, ScriptedTurn
+from dotagent.policy.types import QuestionMode
 from dotagent.tools.shell import read_login_env
 
 pytestmark = pytest.mark.asyncio(loop_scope="module")
@@ -101,7 +102,11 @@ async def test_a_run_that_writes_the_wrong_thing_but_says_it_is_done_fails_and_c
     assert card.false_successes == 1
 
 
-async def test_a_question_nobody_can_answer_is_left_and_counted(config: AppConfig, login_env: dict[str, str]) -> None:
+@pytest.mark.parametrize("questions", ["leave", "wait"])
+async def test_a_question_nobody_can_answer_is_left_or_declined_and_counted(
+    config: AppConfig, login_env: dict[str, str], questions: QuestionMode
+) -> None:
+    # Left, the run goes on at once; waited for, the harness declines it.
     asking: EvalTask = _with_reference(
         "read-config-port",
         [
@@ -110,7 +115,8 @@ async def test_a_question_nobody_can_answer_is_left_and_counted(config: AppConfi
             _finish("8431", True),
         ],
     )
-    outcome: TaskOutcome = await replay_reference(asking, config, login_env)
+    asked: AppConfig = config.model_copy(update={"agent": config.agent.model_copy(update={"questions": questions})})
+    outcome: TaskOutcome = await replay_reference(asking, asked, login_env)
     assert outcome.passed
     assert outcome.metrics.unanswered_questions == 1
 

@@ -166,7 +166,7 @@ preset = "aggressive"
 # decide; "yolo" = nobody is asked, the action is allowed and recorded. With ask and auto, secrets and exfiltration are
 # refused and money and credentials are handed to you, and Dot never types into a password, one-time-code or card
 # field. yolo lets all of that through and records it (a run types the codes it can read itself); a research run stays
-# read-only, your own hand-off rules still stop a run, and password managers stay closed to it.
+# read-only, your own hand-off rules still stop a run, and the desktop tools never control a password manager.
 approvals = "ask"
 approval_timeout_s = 900.0
 protected_paths = [

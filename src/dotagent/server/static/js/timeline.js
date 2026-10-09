@@ -104,8 +104,6 @@ export function createTimeline({ rootRunId, startedAt, onGrow, onPlan, onStats, 
       boundary: began,
       calls: new Map(),
       finishing: new Map(),
-      // What the latest finish call that took said the run needs from the user.
-      needs: "",
       group: null,
       groups: [],
       live: null,
@@ -272,6 +270,8 @@ export function createTimeline({ rootRunId, startedAt, onGrow, onPlan, onStats, 
 
     run_finished(scope, record) {
       const { status, result } = record.data;
+      // What the run said, as it ended, it needs from the user (older runs have none).
+      const needs = typeof record.data.needs === "string" ? record.data.needs.trim() : "";
       const isRoot = scope.runId === rootRunId;
       settleGroups(scope, record.ts);
       dropRepeatedReply(scope, result);
@@ -283,9 +283,9 @@ export function createTimeline({ rootRunId, startedAt, onGrow, onPlan, onStats, 
         href: isRoot ? null : `#/runs/${scope.runId}`,
       });
       place(scope, answer, record.ts);
-      if (isRoot && scope.needs !== "") {
+      if (isRoot && needs !== "") {
         const head = el("div", { class: "aside-head" }, icon("hand"), el("span", null, "What Dot needs from you"));
-        place(scope, el("div", { class: "needs", "aria-label": "What Dot needs from you" }, head, prose(scope.needs)), record.ts);
+        place(scope, el("div", { class: "needs", "aria-label": "What Dot needs from you" }, head, prose(needs)), record.ts);
       }
       if (isRoot) {
         onAnswer(answer);
@@ -377,7 +377,6 @@ export function createTimeline({ rootRunId, startedAt, onGrow, onPlan, onStats, 
       if (finishArgs !== undefined) {
         scope.finishing.delete(data.call_id);
         if (data.ok) {
-          scope.needs = typeof finishArgs.needs_from_user === "string" ? finishArgs.needs_from_user.trim() : "";
           return;
         }
         showCall(scope, { id: data.call_id, tool: data.tool, args: finishArgs });

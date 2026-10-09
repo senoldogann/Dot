@@ -16,7 +16,7 @@ import pytest_asyncio
 from dotagent.agent.approvals import ApprovalBroker
 from dotagent.agent.gate import REVIEWER_DECIDER, YOLO_DECIDER, RunGate
 from dotagent.agent.review import Reviewer, ReviewRequest, ReviewVerdict
-from dotagent.core.errors import ApprovalRejected, PolicyDenied
+from dotagent.core.errors import ApprovalRejected, HandedOff, PolicyDenied
 from dotagent.events import EventBus
 from dotagent.policy.types import ActionInfo, ApprovalMode, Preset
 from dotagent.store.db import Store
@@ -176,6 +176,18 @@ async def test_yolo_lets_secrets_and_money_through_and_keeps_a_record(room: Room
     assert sorted((record.tool, record.status, record.decided_by) for record in await _decided(room)) == sorted(
         [(SECRET.tool, "approved", YOLO_DECIDER), (PAYMENT.tool, "approved", YOLO_DECIDER)]
     )
+
+
+async def test_a_hand_off_rule_of_the_user_still_stops_a_yolo_run(room: Room) -> None:
+    await room.store.add_rule("handoff", "browser_act", "invoice", "Payments are mine")
+    gate: RunGate = _gate(room, "task", "aggressive", "yolo", _nobody)
+    question: Question = await _ask(room, gate, PAYMENT)
+    assert question.record.summary == f"{PAYMENT.summary} — Payments are mine"
+    await room.broker.resolve(question.record.id, True, "user", "paid it myself")
+    with pytest.raises(HandedOff):
+        await asyncio.wait_for(question.answer, WAIT_S)
+    # What no rule hands off still goes through.
+    assert await asyncio.wait_for(gate.authorize(SECRET), WAIT_S) == ""
 
 
 async def test_yolo_still_keeps_a_research_run_read_only(room: Room) -> None:

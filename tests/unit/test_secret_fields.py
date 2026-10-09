@@ -2,7 +2,7 @@
 
 import pytest
 
-from dotagent.browser.safety import secret_field_flag, secret_field_label, secret_kind
+from dotagent.browser.safety import key_enters_text, secret_field_flag, secret_field_label, secret_kind
 from dotagent.browser.types import SecretKind
 from dotagent.policy.types import Flag
 
@@ -14,6 +14,8 @@ from dotagent.policy.types import Flag
         ("one-time-code", "one-time-code"),
         ("section-pay billing CC-Number", "cc-number"),
         ("username current-password", "current-password"),
+        ("password current-password", "password"),
+        ("password cc-csc", "cc-csc"),
         ("email", None),
         ("", None),
         (None, None),
@@ -35,3 +37,23 @@ def test_a_card_field_is_about_money_and_every_other_secret_is_a_credential(
     kind: SecretKind, flag: Flag, label: str
 ) -> None:
     assert (secret_field_flag(kind), secret_field_label(kind)) == (flag, label)
+
+
+@pytest.mark.parametrize(
+    ("key", "enters"),
+    [
+        ("4", True),
+        ("Shift+A", True),
+        ("Digit4", True),
+        ("Space", True),
+        ("Control+V", True),
+        ("Meta+v", True),
+        ("Enter", False),
+        ("Tab", False),
+        ("Backspace", False),
+        ("Control+A", False),
+        ("F5", False),
+    ],
+)
+def test_a_key_that_puts_text_in_is_typing(key: str, enters: bool) -> None:
+    assert key_enters_text(key) is enters

@@ -38,6 +38,13 @@ _PAGES: dict[str, str] = {
 <button type="submit">Confirm</button>
 </form>""",
     "/verified": "<!doctype html><title>Verified</title><h1>Verified</h1>",
+    # The label stands apart from its field, so it has a ref of its own.
+    "/verify-apart": """<!doctype html><title>Verify</title><h1>Check your e-mail</h1>
+<form action="/verified" method="get">
+<label for="code" style="display: block">Code from the e-mail</label>
+<input id="code" name="code" autocomplete="one-time-code">
+<button type="submit">Confirm</button>
+</form>""",
 }
 
 
@@ -137,6 +144,24 @@ async def _code_field(ctx: ToolContext, gate: RunGate, site: _Site) -> str:
     return match.group(1)
 
 
+async def _apart_refs(ctx: ToolContext, gate: RunGate, site: _Site) -> dict[str, str]:
+    """The refs of the heading, the label and the code field of the page whose label stands apart."""
+    opened: ToolResult = await _call(
+        ctx, gate, "browser_open", {"url": f"http://127.0.0.1:{site.server_address[1]}/verify-apart"}
+    )
+    patterns: dict[str, str] = {
+        "heading": r'heading "Check your e-mail"[^\n]*?\[ref=([^\]]+)\]',
+        "label": r"generic \[ref=([^\]]+)\]: Code from the e-mail",
+        "field": r'textbox "Code from the e-mail"[^\n]*?\[ref=([^\]]+)\]',
+    }
+    refs: dict[str, str] = {}
+    for name, pattern in patterns.items():
+        match: re.Match[str] | None = re.search(pattern, opened.text)
+        assert match is not None, (name, opened.text)
+        refs[name] = match.group(1)
+    return refs
+
+
 async def _records(ctx: ToolContext) -> list[ApprovalRecord]:
     return [record for record in await ctx.runtime.store.list_approvals(None, 50) if record.run_id == ctx.run_id]
 
@@ -149,6 +174,29 @@ async def test_ask_mode_refuses_to_type_a_one_time_code(runtime: Runtime, site: 
     )
     assert "refusing to type into a one-time-code field" in acted.text
     assert site.submissions == []
+    assert await _records(ctx) == []
+
+
+@pytest.mark.parametrize(
+    "steps",
+    [
+        # fill writes into the control of the label it is given.
+        [{"action": "fill", "ref": "label", "text": CODE}],
+        # The keys of type and press go to the field that has the focus, whatever element their ref names.
+        [{"action": "click", "ref": "field"}, {"action": "type", "ref": "heading", "text": CODE}],
+        [{"action": "click", "ref": "field"}, {"action": "press", "ref": "heading", "key": "Digit4"}],
+        [{"action": "click", "ref": "field"}, {"action": "press", "key": "4"}],
+    ],
+    ids=["fill-the-label", "type-at-the-heading", "press-at-the-heading", "press-without-a-ref"],
+)
+async def test_ask_mode_refuses_the_code_whatever_element_the_step_names(
+    runtime: Runtime, site: _Site, steps: list[dict[str, str]]
+) -> None:
+    ctx, gate = await _context(runtime, "ask")
+    refs: dict[str, str] = await _apart_refs(ctx, gate, site)
+    named: list[JsonObject] = [{**step, "ref": refs[step["ref"]]} if "ref" in step else {**step} for step in steps]
+    acted: ToolResult = await _call(ctx, gate, "browser_act", {"steps": named})
+    assert "refusing to type into a one-time-code field" in acted.text
     assert await _records(ctx) == []
 
 

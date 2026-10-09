@@ -20,7 +20,6 @@ from dotagent.core.text import truncate_tail
 from dotagent.core.types import FrozenModel, JsonObject
 from dotagent.runtime import Runtime
 from dotagent.store.models import ApprovalRecord, EventRecord
-from dotagent.tools.meta import FINISH_TOOL
 
 _STDIN_POLL_S: float = 0.2
 _ARG_PREVIEW_CHARS: int = 140
@@ -52,6 +51,10 @@ class DeltaPayload(Payload):
     kind: Literal["text", "thinking", "reset"]
     text: str
     step: int
+
+
+class RunFinishedPayload(Payload):
+    needs: str
 
 
 class ToolCallPayload(Payload):
@@ -223,12 +226,12 @@ class TerminalUi:
         self._streamed_text: str = ""
         self._delegated: set[str] = set()
         self._indent: str = ""
-        # What the run's latest finish call said it needs from the user.
+        # What the run said, as it ended, it needs from the user.
         self._needs: str = ""
 
     @property
     def needs_from_user(self) -> str:
-        """What the run said it could not do without the user, from its latest finish call; empty when nothing."""
+        """What the run said, as it ended, it could not do without the user; empty when nothing."""
         return self._needs
 
     def _paint(self, text: str, code: str) -> str:
@@ -292,6 +295,9 @@ class TerminalUi:
                     self._delegated.add(event.run_id)
                     self._indent = _CHILD_INDENT
                     self._line(self._paint(f"↳ {event.run_id} · {payload.model}", "36"))
+            case "run_finished":
+                if not delegated:
+                    self._needs = RunFinishedPayload.model_validate(data).needs.strip()
             case "delta":
                 if not delegated:
                     self._on_delta(DeltaPayload.model_validate(data))
@@ -300,9 +306,6 @@ class TerminalUi:
             case "tool_call":
                 call = ToolCallPayload.model_validate(data)
                 self._line(f"  {self._paint('›', '36')} {self._paint(call.tool, '1')} {preview_args(call.args)}")
-                if call.tool == FINISH_TOOL and not delegated:
-                    needs: JsonValue = call.args.get("needs_from_user")
-                    self._needs = needs.strip() if isinstance(needs, str) else ""
             case "tool_result":
                 self._on_tool_result(ToolResultPayload.model_validate(data))
             case "policy":
