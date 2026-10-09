@@ -195,11 +195,12 @@ class RunManager:
         was made (``ui``, ``cli``).
 
         The answer to a question a run left carries the work on: it goes to the question's thread as the user's
-        message, into the run active there, or else as the goal of a new run on the thread, of ``source`` and with the
-        mode, model, effort, approvals and goal mode of the run that asked. A run of another process (``dotx run``)
-        working on the thread cannot be steered from here, so the answer is refused until it has ended. The answer is
-        delivered before the question is decided, so an answer that cannot be delivered leaves the question open; an
-        empty answer is refused. Skipping such a question only denies it.
+        message, into the run active there, or else, after the goal of the run that asked, as the goal of a new run on
+        the thread, of ``source`` and with the mode, model, effort, approvals and goal mode of the run that asked; so
+        that run's goal check, the task its continuity note pins and its title keep the task. A run of another process
+        (``dotx run``) working on the thread cannot be steered from here, so the answer is refused until it has ended.
+        The answer is delivered before the question is decided, so an answer that cannot be delivered leaves the
+        question open; an empty answer is refused. Skipping such a question only denies it.
         """
         async with self._answering:
             record: ApprovalRecord = await self._runtime.store.get_approval(approval_id)
@@ -337,8 +338,9 @@ class RunManager:
                 "a run of another process is working on this thread; answer the question once it has ended",
                 {"approval_id": question.id, "thread_id": asked.thread_id, "run_id": newest.id},
             )
+        goal: str = f"{asked.goal}\n\n{text}"
         run, _ = await self._launch(
-            text,
+            goal,
             asked.mode,
             asked.model,
             asked.thread_id,
@@ -347,7 +349,7 @@ class RunManager:
             asked.effort,
             asked.approvals,
             asked.goal_mode,
-            RunOpening(text=text, files=(), resumed=None),
+            RunOpening(text=goal, files=(), resumed=None),
         )
         log.info("question_answered", approval_id=question.id, run_id=run.id, delivered="run")
 

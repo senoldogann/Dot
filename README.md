@@ -44,7 +44,8 @@ dotx chat
 ```
 
 `run` carries out one goal and prints the result; `chat` keeps a conversation going (`/new` starts a fresh one, `/exit`
-leaves). Ctrl-C stops the run that is going on; a second Ctrl-C quits at once.
+leaves). Ctrl-C stops the run that is going on; a second Ctrl-C quits at once. Closing the terminal, or SIGTERM, stops
+the run the same way, so that its end is recorded.
 
 - `--mode research` makes the run read-only
 - `--model provider:model` picks the model for this run, for example `ollama:gpt-oss:20b-cloud`
@@ -371,8 +372,9 @@ stored as `left`, the timeline shows it where it was asked, and the run goes on 
 or ends and says what it needs; its status never turns `blocked`. The run's page lists its open questions under "Dot
 asked you", during the run and after it, and `dotx run` prints each one when it is left and lists the open ones after
 the answer. Your answer (`POST /api/approvals/{id}/decision`) goes to the conversation as your message, "Answer to your
-question “…”: …": into the run working there, or else as the goal of a new run on it with the mode, model, reasoning
-level, approval mode and goal mode of the run that asked, which the page then opens once no other question of the run is
+question “…”: …": into the run working there, or else as a new run on it, whose goal is the goal of the run that asked
+with your answer under it (so its goal check and its title keep the task), with the mode, model, reasoning level,
+approval mode and goal mode of the run that asked; the page then opens that run once no other question of the run is
 open there. A run reads an answer that comes during its last step before it ends; one that reaches a run that is then
 stopped or fails stays in the conversation as your message, for the next run there. An empty answer is refused. Skip
 only closes the question, and a left question never expires. With `wait` such a question waits as in a run you watch,
