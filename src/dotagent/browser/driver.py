@@ -54,6 +54,59 @@ _QUIET_SCRIPT: str = """([quietMs, maxMs]) => new Promise((resolve) => {
   const hardTimer = setTimeout(finish, maxMs);
 })"""
 
+# An editor is the editing host of a contenteditable element. Editors such as Draft.js and Lexical take text only
+# through their own input handling and drop what comes before they are ready after taking the focus, without an error:
+# a step that writes into one first waits until the editor and the selection have been quiet for quietMs (at most
+# maxMs), then watches the editor's content, and afterwards asks whether it changed once the editor is quiet again.
+_EDITOR_QUIET_JS: str = """
+  const quiet = (host, quietMs, maxMs) => new Promise((resolve) => {
+    let quietTimer = 0;
+    const settle = () => { clearTimeout(quietTimer); quietTimer = setTimeout(finish, quietMs); };
+    const finish = () => {
+      observer.disconnect();
+      document.removeEventListener('selectionchange', settle);
+      clearTimeout(quietTimer);
+      clearTimeout(hardTimer);
+      resolve(null);
+    };
+    const observer = new MutationObserver(settle);
+    observer.observe(host, { subtree: true, childList: true, attributes: true, characterData: true });
+    document.addEventListener('selectionchange', settle);
+    settle();
+    const hardTimer = setTimeout(finish, maxMs);
+  });"""
+_EDITOR_READY_SCRIPT: str = (
+    """async (element, [quietMs, maxMs]) => {"""
+    + _EDITOR_QUIET_JS
+    + """
+  if (!element.isContentEditable) return false;
+  const host = element.closest('[contenteditable]:not([contenteditable="false"])');
+  await quiet(host, quietMs, maxMs);
+  const watch = { changed: false };
+  watch.observer = new MutationObserver(() => { watch.changed = true; });
+  watch.observer.observe(host, { subtree: true, childList: true, characterData: true });
+  host.__dotEditorWatch = watch;
+  return true;
+}"""
+)
+_EDITOR_CHANGED_SCRIPT: str = (
+    """async (element, [quietMs, maxMs]) => {"""
+    + _EDITOR_QUIET_JS
+    + """
+  const host = element.closest('[contenteditable]:not([contenteditable="false"])');
+  const watch = host ? host.__dotEditorWatch : undefined;
+  if (!watch || !host.isConnected) return true;
+  await quiet(host, quietMs, maxMs);
+  const changed = watch.changed || watch.observer.takeRecords().length > 0;
+  watch.observer.disconnect();
+  delete host.__dotEditorWatch;
+  return changed;
+}"""
+)
+_EDITOR_QUIET_MS: int = 50
+_EDITOR_MAX_MS: int = 500
+_DRAG_MOVES: int = 10  # mouse moves on the way: some drag libraries start a drag only after the pointer moved
+
 # What the field a step writes into says about the secret it takes: "password" for a password input, then its
 # autocomplete tokens; null for an element that takes no typed text. Given a label, or an element inside one, the
 # field is the label's control, which is where Playwright's fill writes (its retarget(node, "follow-label")). The
@@ -282,6 +335,12 @@ def _ref_of(step: Step) -> str:
     return step.ref
 
 
+def _to_ref_of(step: Step) -> str:
+    if step.to_ref is None:
+        raise BrowserError("the step needs a to_ref", {"action": step.action})
+    return step.to_ref
+
+
 def _text_of(step: Step) -> str:
     if step.text is None:
         raise BrowserError("the step needs text", {"action": step.action})
@@ -350,10 +409,37 @@ async def _select_option(page: Page, locator: Locator, ref: str, wanted: str, ti
     await locator.select_option(wanted, timeout=timeout_ms)
 
 
+async def _write(page: Page, locator: Locator, ref: str, timeout_ms: int, write: Callable[[], Awaitable[None]]) -> None:
+    """Run ``write`` on an element that has the focus. In an editor, wait until it is ready first, and fail when the
+    write changed nothing in it instead of reporting done."""
+    element: ElementHandle | None = await locator.element_handle(timeout=timeout_ms)
+    if element is None:
+        raise BrowserError("the element is gone", {"ref": ref, "url": page.url})
+    try:
+        in_editor: bool = bool(await element.evaluate(_EDITOR_READY_SCRIPT, [_EDITOR_QUIET_MS, _EDITOR_MAX_MS]))
+        await write()
+        if in_editor and not await element.evaluate(_EDITOR_CHANGED_SCRIPT, [_EDITOR_QUIET_MS, _EDITOR_MAX_MS]):
+            raise BrowserError(
+                "the editor did not take the text: nothing in it changed. Look at the page, then try the step again",
+                {"ref": ref, "url": page.url},
+            )
+    finally:
+        await element.dispose()
+
+
+async def _replace_text(page: Page, text: str) -> None:
+    """Replace what the focused editor holds: select all, then insert the text (or delete the selection)."""
+    await page.keyboard.press("ControlOrMeta+A")
+    if text:
+        await page.keyboard.insert_text(text)
+    else:
+        await page.keyboard.press("Delete")
+
+
 async def run_step(page: Page, step: Step, timeout_ms: int, secret_field: SecretFieldCheck) -> None:
     """Perform one step against the latest snapshot. A field that takes a secret goes to ``secret_field`` first, which
     raises to refuse the step: the field ``fill`` writes into, and the one that has the keyboard focus when ``type``,
-    or ``press`` with a key that puts text in, is about to send its keys."""
+    ``insert``, or ``press`` with a key that puts text in, is about to send its text."""
     if step.action == "click_at":
         if step.x is None or step.y is None:
             raise BrowserError("click_at needs x and y", {"url": page.url})
@@ -385,11 +471,28 @@ async def run_step(page: Page, step: Step, timeout_ms: int, secret_field: Secret
                 await locator.hover(timeout=timeout_ms)
             case "fill":
                 await _check_secret_field(page, await locator.evaluate(_FIELD_MARKING_SCRIPT), ref, secret_field)
-                await locator.fill(_text_of(step), timeout=timeout_ms)
+                if await locator.evaluate("(element) => element.isContentEditable", timeout=timeout_ms):
+                    await locator.focus(timeout=timeout_ms)
+                    await _write(page, locator, ref, timeout_ms, lambda: _replace_text(page, _text_of(step)))
+                else:
+                    await locator.fill(_text_of(step), timeout=timeout_ms)
             case "type":
                 await locator.focus(timeout=timeout_ms)
                 await _check_secret_field(page, await _focused_marking(page), ref, secret_field)
-                await locator.press_sequentially(_text_of(step), timeout=timeout_ms)
+                await _write(
+                    page,
+                    locator,
+                    ref,
+                    timeout_ms,
+                    lambda: locator.press_sequentially(_text_of(step), timeout=timeout_ms),
+                )
+            case "insert":
+                await locator.focus(timeout=timeout_ms)
+                await _check_secret_field(page, await _focused_marking(page), ref, secret_field)
+                await _write(page, locator, ref, timeout_ms, lambda: page.keyboard.insert_text(_text_of(step)))
+            case "drag":
+                target: Locator = await live_locator(page, _to_ref_of(step), "drag")
+                await locator.drag_to(target, steps=_DRAG_MOVES, timeout=timeout_ms)
             case "select":
                 await _select_option(page, locator, ref, _text_of(step), timeout_ms)
             case "press":

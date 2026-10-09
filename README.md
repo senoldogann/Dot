@@ -711,8 +711,13 @@ Both modes share what follows.
   that are, the closest first, instead of waiting for the timeout. An option that a script adds within a second of the
   call is still found. A very long list is cut with the number of options left out and the current choice.
 - `browser_act` runs up to `max_batch_steps` steps in one call: `click`, `double_click`, `right_click`, `hover`, `fill`,
-  `type`, `select`, `press`, `check`, `uncheck`, `scroll_into_view` and `click_at`. After a step Dot waits until the page
-  has settled and reports popups, dialogs and downloads that appeared.
+  `type`, `insert`, `select`, `press`, `check`, `uncheck`, `scroll_into_view`, `drag` and `click_at`. After a step Dot
+  waits until the page has settled and reports popups, dialogs and downloads that appeared.
+- `fill` replaces a form field's value, `type` presses a key per character (autocomplete sees them), `insert` puts the
+  text in at once at the caret without key events (long text, post composers, code editors) and `drag` moves an
+  element onto the element `to_ref` (HTML5 drag and drop or a library driven by the mouse). In a rich editor (a
+  contenteditable area such as X's composer) `fill`, `type` and `insert` first wait until the editor has settled after
+  taking the focus, and a step after which nothing in the editor changed fails instead of reporting done.
 - `browser_wait_text` waits until a text is visible and says after how long. When the text does not come in time the
   call fails and still shows the page, as what changed since the last view, so no snapshot is needed to decide.
 - A dialog, or a cookie consent banner, open in the viewport is listed first, under "in front of the page",

@@ -1737,43 +1737,65 @@ rule; the medians before and after written here; the offline smoke suite clean; 
 browser can drag an element onto another; a long text goes in as one insertion.
 
 **Why.** On X's composer `type` lost the first character and `fill` reported done without a change (follow-up of
-2026-10-07). The cause is in `browser/driver.py:349-352`: `type` is `press_sequentially` and `fill` is `locator.fill`;
-editors built on contenteditable (Draft.js and Lexical on X, ProseMirror, Monaco, CodeMirror 6) set their selection
-asynchronously after focus and ignore a programmatic `fill`. The browser has no `drag` step
-(`browser/types.py:9-22`), which web IDEs, boards and file uploads by drop need. This item is also the browser half of
+2026-10-07). `type` is `press_sequentially` and `fill` is `locator.fill` (`browser/driver.py:386-392`); editors built
+on contenteditable (Draft.js and Lexical on X, ProseMirror, CodeMirror 6) take text only through their own input
+handling and get ready asynchronously after they take the focus. The browser has no `drag` step (`StepAction`,
+`browser/types.py:10-23`), which web IDEs, boards and file uploads by drop need. This item is also the browser half of
 "write code in the browser".
 
+The first draft of this design was checked against probes before building (a local editor that takes text only
+through `beforeinput`, as Draft.js and Lexical do, and gets ready a set time after the focus; scripts outside the
+repository). Three of its points changed:
+- Playwright's `fill` on a contenteditable already focuses, selects all and inserts the text as one `insertText`
+  input; that part of the draft was the code as it is.
+- With the editor ready 30 ms after the focus, `fill`, `type` and `keyboard.insert_text` all lose the text: the editor
+  drops what comes before it is ready, which explains both of X's symptoms. The draft's poll until
+  `document.activeElement` is the element does not help, since that holds as soon as `focus()` returns.
+- `type` stays key by key (autocomplete and mentions see the keys); `insert` is the step without key events.
+
 **Design.**
-- **Editable targets.** Before a `fill` or `type`, `run_step` asks the element once:
-  `el.isContentEditable || el.closest('[contenteditable]:not([contenteditable="false"])') !== null`. For an editable
-  target: `locator.focus()`, then poll (every 25 ms, at most 500 ms) until `document.activeElement` is the element or
-  inside it; then `type` uses `page.keyboard.insert_text(text)`, and `fill` selects all (`ControlOrMeta+A`) and
-  inserts the text the same way. A step whose target never took focus fails with "the editor did not take focus" and
-  the element. For `<input>` and `<textarea>` nothing changes: `fill` fills, `type` presses key by key.
-- **New steps.** `insert(ref, text)`: focus as above, then `insert_text` for any target: long text without key
-  events. `drag(ref, to_ref)`: `locator.drag_to(target)` (Playwright drives the mouse and dispatches the HTML5 drag
-  events); `Step` gets `to_ref: str | None`, `StepAction` gets `drag` and `insert`, `_TEXT_ACTIONS` and
-  `_TYPING_ACTIONS` include `insert`, the side-effect set includes both, `render.py` renders them, and the `browser_act`
-  description lists them with when to use which.
-- **Fixture pages** in `tests/smoke/test_browser.py` (`_PAGES`): `/editor`, a contenteditable `div` whose `focus`
-  handler moves the caret in a `setTimeout(…, 0)` and whose `beforeinput` and `input` handlers mirror the text into a
-  hidden `<textarea id="mirror">`, so a lost first character shows; `/board`, two lists with HTML5 drag and drop
-  handlers that move the dragged item.
+- **Editors.** An element is in an editor when it is contenteditable (`isContentEditable`); the editor is its editing
+  host (the nearest `[contenteditable]` that is not `"false"`). Before `fill`, `type` or `insert` writes into an
+  editor, the step focuses the element and waits until the editor and the selection have been quiet for 50 ms (at
+  most 500 ms): in the probe, editors ready 0 and 30 ms after the focus then take every step, after 57-88 ms of
+  waiting. Then `fill` presses `ControlOrMeta+A` and inserts the text (`Delete` for an empty text), `type` types key
+  by key, and `insert` inserts the text. An editor that gets ready later without changing anything first still drops
+  the text (150 ms in the probe), so the step watches the editor and fails with "the editor did not take the text"
+  when nothing in it changed by the time it is quiet again, instead of reporting done. `<input>` and `<textarea>` keep
+  `fill` and `type` as they are.
+- **New steps.** `insert(ref, text)` puts the text in as one insertion, without key events: for long text and for
+  editors (Monaco's input is a `<textarea>` and takes it; CodeMirror 6 is an editor as above); into an `<input>` or a
+  `<textarea>` it goes at the caret. `drag(ref, to_ref)` is `locator.drag_to(target, steps=10)`: Playwright drives the
+  mouse and the HTML5 drag events, with ten moves on the way for libraries that start a drag only after some
+  movement (probe: an HTML5 board moves its item in 114 ms). `Step` gets `to_ref`; `StepAction` gets `insert` and
+  `drag`. `insert` is a typing step: the field that has the focus is checked for a secret before the text goes in,
+  and credentials and key-like text are judged as for `type`. `drag` judges both elements as a click on each would
+  be. The popup grace follows `drag` (a drop can open a dialog), not `insert` (as with `fill` and `type`). The batch
+  counts as input when it has an `insert`.
+- **Fixture pages** in `tests/smoke/test_browser.py` (`_PAGES`): `/editor`, an editor that takes text only through
+  `beforeinput`, gets ready a set time after the focus (`?ready=`, 30 ms by default) and shows what it holds in a
+  line under it, next to a plain `<input>`; `/board`, two lists with HTML5 drag and drop handlers that move the
+  dragged item.
 - **Guidance.** The `browser_act` description: `fill` for form fields, `type` where autocomplete must see the keys,
   `insert` for long text and for editors, `drag` to move an element onto another.
 
 **Touchpoints.** `browser/driver.py`, `browser/types.py`, `browser/safety.py`, `browser/render.py`,
-`tools/browser.py`, README "Browser use", `tests/smoke/test_browser.py`.
+`tools/browser.py`, README "Browser use", `tests/smoke/test_browser.py`, `tests/unit/test_tool_errors.py`.
 
 **Decisions and limits.**
 - X itself is not tested here (no form filling on external sites, a rule since part 1); the owner checks the composer
   once (open decision 12).
+- An editor that gets ready more than 50 ms after the focus without changing anything meanwhile drops the text; the
+  step then fails and says so, and a second try finds it ready.
+- Google Docs takes its text through a hidden editor inside a frame; it is not tested here.
 - Monaco and CodeMirror take `insert_text`; their auto-indent and auto-close can still change what is typed line by
   line. The guidance says to insert whole blocks and read the editor back.
+- A drag library that starts a drag only on a long press or from the keyboard is not covered.
 
-**Done when.** Smoke tests on `/editor` (`type`, `fill` and `insert` leave the mirror equal to the text; `type` into a
-plain `<input>` unchanged) and `/board` (`drag` reorders); unit tests of the new step validation; the offline smoke
-suite clean; README updated.
+**Done when.** Smoke tests on `/editor` (`type`, `fill` and `insert` leave the editor's line equal to the text with
+the editor ready 30 ms after the focus; a write the editor drops fails the step; `type` into the plain `<input>`
+unchanged) and `/board` (`drag` moves the item); unit tests of the new step validation; the offline smoke suite
+clean; README updated.
 
 ### 15. Helper models: consult, delegate to another model, standby
 

@@ -87,6 +87,53 @@ _PAGES: dict[str, str] = {
     "/to-blocked": """<!doctype html><title>Leaving</title>
 <button onclick="setTimeout(() => { location.href = `http://localhost:${location.port}/late-headers` }, 500)">Leave</button>""",
     "/late-headers": "<!doctype html><title>Blocked</title><h1>Blocked page</h1>",
+    # An editor that takes text only through beforeinput, as Draft.js and Lexical do, and drops what comes before it is
+    # ready, ?ready= milliseconds after it takes the focus (30 by default).
+    "/editor": """<!doctype html><title>Editor</title>
+<div id="ed" contenteditable="true" role="textbox" aria-label="Post text" style="min-height:40px;border:1px solid"></div>
+<p id="holds">Editor holds: </p>
+<input aria-label="Plain field">
+<script>
+const ed = document.getElementById('ed');
+const readyMs = Number(new URLSearchParams(location.search).get('ready') ?? '30');
+let ready = false, model = '';
+const render = () => {
+  ed.textContent = model;
+  document.getElementById('holds').textContent = 'Editor holds: ' + model;
+  if (document.activeElement !== ed) return;
+  const range = document.createRange();
+  range.selectNodeContents(ed);
+  range.collapse(false);
+  getSelection().removeAllRanges();
+  getSelection().addRange(range);
+};
+ed.addEventListener('focus', () => { ready = false; setTimeout(() => { ready = true; render(); }, readyMs); });
+ed.addEventListener('beforeinput', (event) => {
+  event.preventDefault();
+  if (!ready) return;
+  const all = model !== '' && getSelection().toString() === model;
+  if (event.inputType === 'insertText') model = (all ? '' : model) + (event.data ?? '');
+  else if (event.inputType.startsWith('delete')) model = all ? '' : model.slice(0, -1);
+  render();
+});
+</script>""",
+    "/board": """<!doctype html><title>Board</title>
+<ul aria-label="To do"><li draggable="true" id="a">Write tests</li><li draggable="true" id="b">Ship it</li></ul>
+<ul aria-label="Done" style="min-height:40px;border:1px solid"><li>Plan</li></ul>
+<p id="moved">Nothing moved</p>
+<script>
+for (const item of document.querySelectorAll('[draggable=true]'))
+  item.addEventListener('dragstart', (event) => event.dataTransfer.setData('text/plain', item.id));
+for (const list of document.querySelectorAll('ul')) {
+  list.addEventListener('dragover', (event) => event.preventDefault());
+  list.addEventListener('drop', (event) => {
+    event.preventDefault();
+    const item = document.getElementById(event.dataTransfer.getData('text/plain'));
+    list.appendChild(item);
+    document.getElementById('moved').textContent = `Moved ${item.textContent} to ${list.getAttribute('aria-label')}`;
+  });
+}
+</script>""",
     "/colon": """<!doctype html><title>Colon</title>
 <button>Buy now: confirm</button><a href="/done?x=1">Read: more</a> | <a href="javascript:void(0)">Script link</a>""",
     "/cookies": """<!doctype html><title>Cookies</title>
@@ -396,6 +443,46 @@ async def test_a_wait_that_times_out_checks_where_a_pending_navigation_went_befo
             await session.wait_text("blocked", "Arrived", 1.0)
     finally:
         await session.aclose()
+
+
+async def test_type_insert_and_fill_reach_an_editor_that_gets_ready_after_the_focus(
+    browser: BrowserSession, site: str
+) -> None:
+    """Each editor step comes after a step in the plain field, so the editor takes the focus anew every time."""
+    view: PageView = await browser.open_url("editor", f"{site}/editor")
+    editor: str = ref_of(view.body, 'textbox "Post text"')
+    plain: str = ref_of(view.body, 'textbox "Plain field"')
+    for step, shown in (
+        (Step(action="type", ref=editor, text="Hello"), "Editor holds: Hello"),
+        (Step(action="type", ref=plain, text="key "), 'textbox "Plain field"'),
+        (Step(action="insert", ref=editor, text=" world, at once"), "Editor holds: Hello world, at once"),
+        (Step(action="type", ref=plain, text="by key"), "key by key"),
+        (Step(action="fill", ref=editor, text="Replaced"), "Editor holds: Replaced"),
+    ):
+        outcome: ActOutcome = await act(browser, "editor", [step], False)
+        assert [report.outcome for report in outcome.steps] == ["done"], (step, outcome.steps)
+        assert shown in (await browser.snapshot("editor")).body, step
+
+
+async def test_a_write_the_editor_drops_fails_the_step_instead_of_reporting_done(
+    browser: BrowserSession, site: str
+) -> None:
+    view: PageView = await browser.open_url("late-editor", f"{site}/editor?ready=400")
+    editor: str = ref_of(view.body, 'textbox "Post text"')
+    outcome: ActOutcome = await act(browser, "late-editor", [Step(action="insert", ref=editor, text="Lost")], False)
+    assert [report.outcome for report in outcome.steps] == ["failed"], outcome.steps
+    assert "the editor did not take the text" in outcome.steps[0].detail
+
+
+async def test_drag_moves_an_item_onto_another_list(browser: BrowserSession, site: str) -> None:
+    view: PageView = await browser.open_url("board", f"{site}/board")
+    item: re.Match[str] | None = re.search(r"listitem \[ref=([^\]]+)\]: Write tests", view.body)
+    assert item is not None, view.body
+    outcome: ActOutcome = await act(
+        browser, "board", [Step(action="drag", ref=item.group(1), to_ref=ref_of(view.body, 'list "Done"'))], False
+    )
+    assert [report.outcome for report in outcome.steps] == ["done"], outcome.steps
+    assert "Moved Write tests to Done" in (await browser.snapshot("board")).body
 
 
 async def test_cookie_banners_are_declined_instead_of_blocking_actions(browser: BrowserSession, site: str) -> None:
