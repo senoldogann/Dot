@@ -894,8 +894,8 @@ that change the owner's agent are their call (see "Open owner decisions", 6 onwa
 | 9   | Time accounting: where the seconds of a run go                         | done        | 4741bed |
 | 10  | Yolo asks nobody: secret fields, questions and the end of a run        | done        | eacd180 |
 | 11  | Open-ended goals in one run: targets, limits and an honest end         | done        | 12ad395 |
-| 12  | Campaigns: a goal that works until its outcome is verified             | done        |         |
-| 13  | Faster browser and desktop steps                                       | planned     |         |
+| 12  | Campaigns: a goal that works until its outcome is verified             | done        | c915ab2 |
+| 13  | Faster browser and desktop steps                                       | in progress |         |
 | 14  | Rich editors, drag and bulk text in the browser                        | planned     |         |
 | 15  | Helper models: consult, delegate to another model, standby             | planned     |         |
 | 16  | Typed judgments (TypeSafe) at the decision points                      | planned     |         |
@@ -1486,8 +1486,9 @@ clean console), and the lines of `dotx run` replayed from the same run.
 
 ### 12. Campaigns: a goal that works until its outcome is verified
 
-**Status: done.** **Goal.** The owner switches on *Keep going until done* for a goal, and Dot works on it in sessions,
-through restarts and days, until the outcome is verified by evidence or the owner stops it. Nothing else stops it.
+**Status: done** (`c915ab2`, PR #5). **Goal.** The owner switches on *Keep going until done* for a goal, and Dot works
+on it in sessions, through restarts and days, until the outcome is verified by evidence or the owner stops it. Nothing
+else stops it.
 
 **Why.** This is the owner's main ask of 2026-10-09: "a system that does not stop until I see the result; when I say
 earn money and give the information, it must not stop until the money is where it belongs". Before this item (the lines
@@ -1631,8 +1632,8 @@ updated.
 
 ### 13. Faster browser and desktop steps
 
-**Status: planned.** **Goal.** Take the fixed waiting out of a browser or desktop action where no signal needs it,
-and make a failed wait or an unchanged page cost no extra step.
+**Status: in progress.** **Goal.** Take the fixed waiting out of a browser or desktop action where no signal needs
+it, and make a failed wait or an unchanged page cost no extra step.
 
 **Why.** Measured on 2026-10-09 (read-only bench, this Mac; the Playwright and accessibility parts not measured): a
 browser click waits about 160 ms by construction, a five-click batch about 0.32 s; a desktop click about 0.56 s before
@@ -2044,8 +2045,8 @@ on and is closed by `terminal_close`; the idle reaper; unit tests of the ANSI st
     `memory_save` are acting-only, `tools/base.py:16-17`), and DuckDuckGo's bot check throttles long research runs
     (README "Status and known limits"). Say whether a research run may save notes and files under the workspace,
     and whether the hosted Ollama search (`OLLAMA_API_KEY`) should be the default backend; either is a small item.
-15. The Claude GitHub app reviews nothing yet: on PR #1, PR #2 and PR #4 it answered "Code review skipped" (on PR #3 it
-    posted nothing) because your organization has no extra usage to pay for it. Add extra usage (or raise the monthly
+15. The Claude GitHub app reviews nothing yet: on PR #1, PR #2, PR #4 and PR #5 it answered "Code review skipped" (on
+    PR #3 it posted nothing) because your organization has no extra usage to pay for it. Add extra usage (or raise the monthly
     limit) at claude.ai/admin-settings/usage; a comment `@claude review` on a PR then asks for a review. Until then each
     PR is merged on `/code-review` alone.
 
@@ -2266,3 +2267,5 @@ on and is closed by `terminal_close`; the idle reaper; unit tests of the ANSI st
   pages on a scripted throw-away daemon at four sizes clean. Left: deleting the campaign's conversation deletes its
   first session (see the item's limits); a CLI session across a daemon restart, as for any `dotx run`; query costs,
   indexed and bounded.
+- 2026-10-09: item 12 merged as `c915ab2` (PR #5, squash); the Claude GitHub app skipped its review again (decision 15).
+  Item 13 started on `item-13-faster-steps`.
