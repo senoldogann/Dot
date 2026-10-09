@@ -260,6 +260,10 @@ decline_cookie_banners = true
 enabled = true
 screenshot_max_edge = 1920
 jpeg_quality = 72
+# After steps that changed something, Dot reads the window once the application has announced no change of its
+# interface for settle_quiet_ms, at most after settle_ms; a step that opens a menu or a window waits a third of
+# settle_ms before the next one.
+settle_quiet_ms = 120
 settle_ms = 350
 failsafe_corner = true
 ax_timeout_s = 2.0

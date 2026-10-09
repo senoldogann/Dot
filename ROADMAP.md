@@ -1641,44 +1641,71 @@ any accessibility work, a five-click batch about 1.46 s, plus one unconditional 
 `browser_wait_text` failed 22.4 % of the time in the real history and returns no view when it fails, so a failed wait
 costs the wait, a model turn and a snapshot. Item 9 measures the effect of every change here.
 
-**Design, browser** (`browser/session.py`, `browser/driver.py`):
-- The settle after a batch (`:837`) runs only when a step may have changed the page: a batch of `hover` and
-  `scroll_into_view` steps only skips it; `nav_idle` (`:615`) always runs. The second settle when a batch leaves its
-  tab (`_full_view` at `:691`) goes: `act` builds the view of the new tab from the state it already settled. The
-  current tab's title is fetched once (`:674` duplicates `:661`).
-- The 40 ms grace (`:811-812`, `:820-822`) runs after steps that can open a popup or a dialog (`click`, `double_click`,
-  `right_click`, `press`, `check`, `uncheck`, `select`), not after `fill`, `type` and `hover`; the pending-adoption
-  wait (`:823-825`) stays.
-- The fixed 150 ms sleep after a wheel scroll (`:857`, `_SCROLL_SETTLE_S` at `:84`) goes; the settle at `:858` stays.
-- `browser_wait_text` (`tools/browser.py:400-424`, `BrowserSession.wait_text`) returns one line and the delta view:
-  "“Order placed” appeared after 1.3 s" with `_changes_view`; on timeout it returns a failed result that still carries
-  the delta view: "“Order placed” did not appear within 10 s; the page now:", so the model needs no snapshot to decide.
-- `settle_quiet_ms` (120) and `settle_max_ms` (1 500) stay knobs; the fixture timing test runs with 120 and 60 and the
-  numbers go to open decision 13.
+The first draft of this design was checked against the code and against probes before building (scripts outside the
+repository, numbers below); four of its points changed.
 
-**Design, desktop** (`desktop/session.py`, `desktop/input.py`, `desktop/actions.py`):
-- One `lsappinfo` listing per act: `_preview_job` (`:227`) keeps its listing in the preview result and `act` reuses
-  it in `_open_env` (`:547`) when no approval waited in between (the listing is re-read after a wait).
-- The settle after a side-effect batch (`:636-637`, 350 ms) becomes a poll: `windows_on_screen` (3 ms measured) and the
-  focused element every 40 ms until two reads agree, with a floor of 80 ms and `settle_ms` as the cap. The closing
-  walk (`:638`) stays: the model needs the state after the batch.
-- Long text is pasted: a `type` step whose text is longer than `[desktop] paste_threshold_chars` (40; 0 never) goes
-  through the paste path (`input.py:365-377`) unless the target is a secure field; the clipboard is restored as today.
-  Typing stays key by key below the threshold (`input.py:300-316`).
-- The step gaps (`:61`, `:622-625`) and the click pacing (`input.py:175-177`) stay: no acknowledgement exists between
-  posted events, and the comment at `input.py:175` says why the move pause is there.
+**Design, browser** (`browser/session.py`, `browser/driver.py`, `browser/render.py`, `tools/browser.py`):
+- The settle after an act stays whole, `nav_idle` and the DOM quiet window: a `hover` opens menus and a
+  `scroll_into_view` loads lazy content, so a batch of them does not skip it (the draft skipped it). When a batch
+  closes its own tab, the tab that becomes current is settled once (`_settled_view`), not twice. A popup is adopted
+  as a new tab but never made current, so that is the only way the batch leaves its tab.
+- The popup grace (`side_effect_grace_ms`, 40 ms) already ran only after the steps that can open a popup or a dialog
+  (`_SIDE_EFFECT_ACTIONS` in `browser/types.py`: `click`, `double_click`, `right_click`, `select`, `press`, `check`,
+  `uncheck`, `click_at`); `fill`, `type` and `hover` never wait. It stays: a batch must stop at a popup.
+- The current tab's title is read twice per view (`_assemble`); both reads cost about 1 ms together (probe), so it
+  stays.
+- `browser_scroll` no longer sleeps 150 ms after the wheel. Playwright's wheel returns before Chrome scrolls, but the
+  page lands in one jump within 41 ms of the call (8 runs each of 600 px, 3 000 px and to the bottom, headless and
+  headed Chrome on this Mac), inside the DOM quiet window of the settle that follows.
+- `browser_wait_text` returns a `TextWait` (appeared, waited_s, view) and the tool one line and the view of what
+  changed: "The text appeared after 0.6 s · Tab 1 of 1 · …"; when the text does not come in time the call fails and
+  still shows the page: "The text did not appear within 10 s; the page now · …". The model's text stays out of that
+  line, which carries only what Dot produces (`browser/render.py`). A page that moved on during the wait is checked
+  against the URL rules, as after an act.
+- `settle_quiet_ms` (120) and `settle_max_ms` (1 500) stay knobs; the timing test runs with 120 and 60 for open
+  decision 13.
+
+**Design, desktop** (`desktop/ax.py`, `desktop/session.py`, `desktop/actions.py`):
+- After a batch that changed something, the fixed `settle_ms` sleep becomes `ax.wait_until_quiet`: an `AXObserver`
+  on the application element, on the desktop worker's run loop, for value, title, created and destroyed elements,
+  focus, windows, sheets, menus, selection, rows, layout and busy state. The window is read once the application has
+  announced nothing for `[desktop] settle_quiet_ms` (120), at most after `settle_ms` (350, so never later than
+  before). An application that cannot be watched gets the whole `settle_ms`, with a warning in the log. The draft
+  polled the window list and the focused element instead, which sees no change inside a window. Probe (an off-screen
+  accessory app whose buttons were pressed through accessibility, no pointer): a label that changes at once 127 ms,
+  nothing changing 125 ms, five changes 60 ms apart 322 ms, a pid that is gone 354 ms. A single change later than
+  the quiet window (250 ms in the probe) is not waited for, as with the browser's DOM quiet window.
+- A `type` step whose text is longer than `[desktop] paste_threshold_chars` (40; 0 never) and holds no line break or
+  tab (typing presses Return and Tab for those) goes through the paste path, into a field that is known and not
+  secure; the clipboard is put back as for `paste`. Shorter text is typed key by key as before.
+- One `lsappinfo` listing per act is dropped: the preview (classify) and the act each list the applications, 22 ms
+  median (max 98 ms); reusing the preview's listing saves 22 ms of a 0.5 s act and, after an approval wait, could act
+  on an application that quit meanwhile.
+- The step gaps (`_STEP_GAP_S`, the third of `settle_ms` after a step that opens a menu or a window) and the click
+  pacing (`input.py:175-177`) stay: no acknowledgement exists between posted events.
 - `screenshot_max_edge` (1 920) is a knob for open decision 13: a 1 710 × 1 112 JPEG is about 2 500 tokens on the
   hosted providers; 1 366 would be about 1 600.
 
-**Touchpoints.** `browser/session.py`, `browser/driver.py`, `browser/types.py` (the popup-opening set),
-`tools/browser.py`, `desktop/session.py`, `desktop/input.py`, `desktop/actions.py`, `config.py`, `defaults.toml`,
-README "Browser use" and "Computer use", `tests/smoke/test_browser.py`, `tests/smoke/test_desktop.py`.
+**Measured** (medians; the timing tests print them, `-s`):
+- Browser, headless, fixture home page, 20 one-click acts and 5 five-click batches, three runs each: before,
+  `settle_quiet_ms` 120: one click 0.220-0.227 s, five clicks 0.551-0.567 s; 60: 0.149-0.150 s and 0.496-0.499 s.
+  After: 120: 0.220-0.231 s and 0.549-0.566 s; 60: 0.149-0.150 s and 0.450-0.498 s, the same, since this item does not
+  touch the click path. One click act of 222 ms (probe): the click 22 ms, the popup grace 42, the DOM quiet window
+  124, the capture 35, the two title reads 1. A 600 px `browser_scroll` (20 on the home page, two runs): 329-331 ms
+  before, 169 ms after.
+- Desktop: not measured yet (the desktop tests move the real pointer; they run while the owner is away).
 
-**Done when.** `tests/smoke/test_browser.py` gets a timing test on the fixture pages (20 single-click acts and 5
-five-step batches, medians printed and asserted under 1.5 s and 3 s on this Mac) and the wait_text tests (success
-returns the line and the delta; timeout returns a failed result with the view); `tests/smoke/test_desktop.py` (under
-`DOT_DESKTOP_TESTS=1`) gets the same timing test against the fixture window and a paste test for long text; the
-medians before and after each change written here; the offline smoke suite clean; README updated.
+**Touchpoints.** `browser/session.py`, `browser/driver.py`, `browser/render.py`, `browser/types.py`,
+`tools/browser.py`, `desktop/ax.py`, `desktop/session.py`, `desktop/actions.py`, `tools/desktop.py`, `config.py`,
+`defaults.toml`, README "Browser use" and "Computer use", `tests/smoke/test_browser.py`, `tests/smoke/test_desktop.py`,
+`tests/unit/test_desktop_secrets.py`.
+
+**Done when.** `tests/smoke/test_browser.py` has the timing test (20 one-click acts and 5 five-click batches with
+`settle_quiet_ms` 120 and 60, medians printed, asserted under 1.5 s and 3 s), a scroll test (2 000 px down shows
+`Item 100` and not `Item 10`) and the wait tests (the line with the time and the changes; a timeout fails and still
+shows the page); `tests/smoke/test_desktop.py` (under `DOT_DESKTOP_TESTS=1`) has the same timing test against the
+fixture window and a paste test for long text (it arrives whole, the clipboard is put back); a unit test of the paste
+rule; the medians before and after written here; the offline smoke suite clean; README updated.
 
 ### 14. Rich editors, drag and bulk text in the browser
 
@@ -2037,7 +2064,8 @@ on and is closed by `terminal_close`; the idle reaper; unit tests of the ANSI st
     a Claude model once `ANTHROPIC_API_KEY` is saved (decision 5).
 12. Only you can check live: the X composer with item 14's `type` and `insert`, and a `yolo` run that reads a
     one-time code from your webmail and types it (item 10).
-13. Speed knobs that wait for item 9's numbers: `[browser] settle_quiet_ms` (120 or 60), `[desktop]
+13. Speed knobs that wait for item 9's numbers: `[browser] settle_quiet_ms` (120 or 60; item 13 has the timings of
+    both), `[desktop] settle_quiet_ms` (120: a change later than it is not waited for), `[desktop]
     screenshot_max_edge` (1920 or 1366), `[desktop] paste_threshold_chars`, `[agent] tool_output_chars` and
     `keep_recent_tool_results`, besides `tool_surface = "grouped"` (decision 2) and the compaction model (decision 4,
     and `agent/loop.py:290-298` records the decision that a run compacts with its own model).

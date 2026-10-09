@@ -163,6 +163,7 @@ class DesktopConfig(FrozenModel):
     enabled: bool
     screenshot_max_edge: int
     jpeg_quality: int
+    settle_quiet_ms: int
     settle_ms: int
     failsafe_corner: bool
     ax_timeout_s: float

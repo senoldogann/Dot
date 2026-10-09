@@ -647,7 +647,16 @@ class DesktopSession:
             _log.info("desktop_act", thread=thread_id, app=env.app.name, steps=len(steps))
             batch: _Batch = await self._run_steps(memory.targeting(state, env.app.pid), env, steps, reviewer)
             if batch.side_effects:
-                await asyncio.sleep(self._config.settle_ms / 1000)
+                quiet_s: float = self._config.settle_quiet_ms / 1000
+                await self._call(
+                    partial(
+                        ax.wait_until_quiet,
+                        batch.env.app_element,
+                        batch.env.app.pid,
+                        quiet_s,
+                        self._config.settle_ms / 1000,
+                    )
+                )
             view, note, updated = await self._closing_view(batch.state, batch.env.app)
             self._remember(thread_id, updated)
             return ActOutcome(steps=batch.reports, stopped=batch.stopped, view=view, view_note=note)

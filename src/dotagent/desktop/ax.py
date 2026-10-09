@@ -11,10 +11,15 @@ from collections.abc import Collection, Sequence
 from dataclasses import dataclass
 
 import ApplicationServices as AS
+import CoreFoundation as CF
+import objc
 
 from dotagent.core.errors import DesktopError, DesktopPermissionError
+from dotagent.core.logs import get_logger
 from dotagent.core.text import fold_search
 from dotagent.desktop.types import AXElement, Node, Point, Rect, Snapshot, SnapshotScope
+
+_log = get_logger("dotagent.desktop.ax")
 
 _FAILURE: int = -25200
 _API_DISABLED: int = -25211
@@ -46,6 +51,25 @@ _CORE_ATTRS: tuple[str, ...] = (
 )
 _LABEL_ATTRS: tuple[str, ...] = ("AXTitle", "AXDescription", "AXPlaceholderValue")
 _WAKE_ATTRIBUTES: tuple[str, ...] = ("AXManualAccessibility", "AXEnhancedUserInterface")
+# What an application announces while its interface changes; a settle waits until none came for a moment.
+_CHANGE_NOTIFICATIONS: tuple[str, ...] = (
+    "AXValueChanged",
+    "AXTitleChanged",
+    "AXCreated",
+    "AXUIElementDestroyed",
+    "AXFocusedUIElementChanged",
+    "AXFocusedWindowChanged",
+    "AXWindowCreated",
+    "AXSheetCreated",
+    "AXMenuOpened",
+    "AXMenuClosed",
+    "AXSelectedChildrenChanged",
+    "AXSelectedRowsChanged",
+    "AXRowCountChanged",
+    "AXLayoutChanged",
+    "AXElementBusyChanged",
+)
+_UNSUPPORTED_NOTIFICATION: int = -25207
 _TEXT_ROLES: frozenset[str] = frozenset(
     {"AXTextField", "AXTextArea", "AXComboBox", "AXSearchField", "AXStaticText", "AXPopUpButton", "AXMenuButton"}
 )
@@ -546,6 +570,43 @@ def wake_accessibility(app: AXElement) -> None:
 def rest_accessibility(app: AXElement) -> None:
     """Tell an application that woke up for accessibility that nobody is reading its tree any more (it costs CPU)."""
     _set_wake_flags(app, False)
+
+
+def wait_until_quiet(app: AXElement, pid: int, quiet_s: float, max_s: float) -> None:
+    """Return once the application has announced no change of its interface for ``quiet_s`` (a value or a title, an
+    element or a window that came or went, the focus, a selection, the layout), at most after ``max_s``. The
+    announcements arrive on this thread's run loop. An application that announces nothing is quiet after ``quiet_s``;
+    one that cannot be watched gets the whole ``max_s``."""
+    started: float = time.monotonic()
+    last: float = started
+
+    def noted(observer: object, element: object, notification: str, refcon: object) -> None:
+        nonlocal last
+        last = time.monotonic()
+
+    code, observer = AS.AXObserverCreate(pid, objc.callbackFor(AS.AXObserverCreate)(noted), None)
+    watched: list[str] = []
+    if int(code) == 0:
+        for name in _CHANGE_NOTIFICATIONS:
+            code = AS.AXObserverAddNotification(observer, app, name, None)
+            if int(code) == 0:
+                watched.append(name)
+            elif int(code) != _UNSUPPORTED_NOTIFICATION:
+                break  # gone or not answering: every further call would wait out the timeout as well
+    if not watched:
+        _log.warning("desktop_settle_unwatched", pid=pid, code=int(code), error=error_text(int(code)), wait_s=max_s)
+        time.sleep(max(0.0, started + max_s - time.monotonic()))
+        return
+    loop: object = CF.CFRunLoopGetCurrent()
+    source: object = AS.AXObserverGetRunLoopSource(observer)
+    CF.CFRunLoopAddSource(loop, source, CF.kCFRunLoopDefaultMode)
+    try:
+        while (left := min(last + quiet_s, started + max_s) - time.monotonic()) > 0:
+            CF.CFRunLoopRunInMode(CF.kCFRunLoopDefaultMode, left, True)
+    finally:
+        CF.CFRunLoopRemoveSource(loop, source, CF.kCFRunLoopDefaultMode)
+        for name in watched:
+            AS.AXObserverRemoveNotification(observer, app, name)
 
 
 def pid_of(element: AXElement) -> int:

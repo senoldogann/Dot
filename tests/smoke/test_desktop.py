@@ -10,6 +10,7 @@ import asyncio
 import json
 import os
 import re
+import statistics
 import subprocess
 import sys
 import time
@@ -220,6 +221,30 @@ async def test_type_enters_turkish_text_key_by_key(session: DesktopSession, app:
     assert typed[-1].value == "Merhaba ğüşiöç İI"
 
 
+async def test_a_long_typed_text_goes_in_through_the_clipboard_which_is_put_back(
+    session: DesktopSession, app: FixtureApp
+) -> None:
+    name: str = _ref_of(await _body(session, app), r'textfield "Name"')
+    long_text: str = "Uzun metin panodan gelir: " + "ğüşiöç İI " * 8
+    original: str | None = await session.read_clipboard()
+    await session.write_clipboard("önceki pano")
+    try:
+        mark: int = _mark(app)
+        outcome: ActOutcome = await _act(
+            session,
+            app,
+            [Step(action="click", ref=name), Step(action="key", key="cmd+a"), Step(action="type", text=long_text)],
+        )
+        assert "pasted" in outcome.steps[-1].detail, outcome.steps
+        typed: list[FixtureEvent] = [event for event in _since(app, mark, "text") if event.field == "name"]
+        assert typed
+        assert typed[-1].value == long_text
+        assert await session.read_clipboard() == "önceki pano"
+    finally:
+        if original is not None:
+            await session.write_clipboard(original)
+
+
 async def test_set_value_replaces_the_value_and_read_returns_it(session: DesktopSession, app: FixtureApp) -> None:
     name: str = _ref_of(await _body(session, app), r'textfield "Name"')
     await _act(session, app, [Step(action="set_value", ref=name, text="değer AX ile")])
@@ -329,6 +354,28 @@ async def test_activate_switches_to_another_application_and_back(session: Deskto
     assert [view.bundle_id for view in front] == [_FINDER]
     await _act(session, app, [Step(action="activate", text=str(app.pid))])
     assert [view.pid for view in await session.list_apps() if view.frontmost] == [app.pid]
+
+
+async def _timed_act(session: DesktopSession, app: FixtureApp, steps: list[Step]) -> float:
+    started: float = time.perf_counter()
+    outcome: ActOutcome = await session.act(_THREAD, str(app.pid), steps, _allow, refuse_secure_field)
+    elapsed: float = time.perf_counter() - started
+    assert [report.outcome for report in outcome.steps] == ["done"] * len(steps), outcome
+    await asyncio.sleep(0.15)
+    return elapsed
+
+
+async def test_a_click_and_a_batch_of_five_clicks_stay_fast(session: DesktopSession, app: FixtureApp) -> None:
+    """20 acts of one click and 5 of five clicks on the fixture's button. The medians are printed (``-s`` shows them):
+    ROADMAP item 13 keeps them."""
+    click: Step = Step(action="click", ref=_ref_of(await _body(session, app), r'button "Increment"'))
+    singles: list[float] = [await _timed_act(session, app, [click]) for _ in range(20)]
+    batches: list[float] = [await _timed_act(session, app, [click] * 5) for _ in range(5)]
+    single: float = statistics.median(singles)
+    batch: float = statistics.median(batches)
+    print(f"\ndesktop: one click {single:.3f} s, five clicks {batch:.3f} s (medians)")
+    assert single < 1.5
+    assert batch < 3.0
 
 
 async def test_the_failsafe_file_stops_a_batch_and_work_resumes_when_it_is_removed(
