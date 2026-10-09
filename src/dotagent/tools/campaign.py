@@ -13,14 +13,15 @@ from pydantic import Field
 
 from dotagent.agent.campaign import entry_line
 from dotagent.agent.review import GoalChecker, GoalRequest, GoalVerdict, goal_checker_for
-from dotagent.agent.verify import answer_paths, missing_paths, render_facts, unopened_addresses
+from dotagent.agent.verify import RunFacts, answer_paths, missing_paths, render_facts, unopened_addresses
+from dotagent.config import AppConfig
 from dotagent.core.errors import ProviderError, ToolExecutionError
 from dotagent.core.logs import get_logger
 from dotagent.core.text import redact_secrets
 from dotagent.core.types import FrozenModel
 from dotagent.policy.types import ActionInfo
 from dotagent.scheduler.timing import Timing, describe_timing, plan_timing
-from dotagent.store.models import CampaignEntryKind, CampaignRecord, RunRecord
+from dotagent.store.models import CampaignEntry, CampaignEntryKind, CampaignRecord, RunRecord
 from dotagent.tools.base import ALL_MODES, RegisteredTool, ToolArgs, ToolResult, fail, make_tool, ok
 from dotagent.tools.context import ToolContext
 
@@ -211,9 +212,9 @@ async def _checked_request(campaign: CampaignRecord, evidence: str, ctx: ToolCon
     """The goal check's question: the campaign's goal and targets, the progress its ledger records, what this
     session's calls did and the claim."""
     now: float = time.time()
-    entries = await ctx.runtime.store.campaign_entries(campaign.id, _CHECKED_ENTRIES)
+    entries: list[CampaignEntry] = await ctx.runtime.store.campaign_entries(campaign.id, _CHECKED_ENTRIES)
     progress: list[str] = [entry_line(entry, now) for entry in entries if entry.kind == "progress"]
-    facts = ctx.facts()
+    facts: RunFacts = ctx.facts()
     missing: tuple[str, ...] = await asyncio.to_thread(
         missing_paths, answer_paths(evidence), facts.named, ctx.workspace
     )
@@ -237,7 +238,7 @@ def _achieved_tool() -> RegisteredTool:
             return ok(f"The campaign is achieved already: {campaign.evidence}")
         if not campaign.targets:
             return fail("The campaign has no targets yet: record them with campaign_targets, verify them, then claim.")
-        config = ctx.runtime.config
+        config: AppConfig = ctx.runtime.config
         checker: GoalChecker = goal_checker_for(
             ctx.runtime.router,
             config.models.review,
