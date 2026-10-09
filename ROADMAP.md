@@ -893,8 +893,8 @@ that change the owner's agent are their call (see "Open owner decisions", 6 onwa
 | --- | ---------------------------------------------------------------------- | ----------- | ------- |
 | 9   | Time accounting: where the seconds of a run go                         | done        | 4741bed |
 | 10  | Yolo asks nobody: secret fields, questions and the end of a run        | done        | eacd180 |
-| 11  | Open-ended goals in one run: targets, limits and an honest end         | done        |         |
-| 12  | Campaigns: a goal that works until its outcome is verified             | planned     |         |
+| 11  | Open-ended goals in one run: targets, limits and an honest end         | done        | 12ad395 |
+| 12  | Campaigns: a goal that works until its outcome is verified             | in progress |         |
 | 13  | Faster browser and desktop steps                                       | planned     |         |
 | 14  | Rich editors, drag and bulk text in the browser                        | planned     |         |
 | 15  | Helper models: consult, delegate to another model, standby             | planned     |         |
@@ -1307,9 +1307,9 @@ into the run the previous one started and the page following it, no "null" in a 
 
 ### 11. Open-ended goals in one run: targets, limits and an honest end
 
-**Status: done.** **Goal.** A run given an outcome instead of a task ("grow", "earn", "find a way", "as many as
-possible") turns it into measurable targets, works toward them, and ends only with the targets reached or with an honest
-account of what is missing; the owner can bound such a run in minutes or tokens when they want to.
+**Status: done** (`12ad395`, PR #4). **Goal.** A run given an outcome instead of a task ("grow", "earn", "find a way",
+"as many as possible") turns it into measurable targets, works toward them, and ends only with the targets reached or
+with an honest account of what is missing; the owner can bound such a run in minutes or tokens when they want to.
 
 **Why.** The prompt was written for precise tasks (the lines are those of `92b7dfa`, before this item): "Add nothing
 that was not asked for", "take the smallest reasonable reading" (`agent/prompt.py:82-84`). Nothing told the model what
@@ -1486,9 +1486,9 @@ clean console), and the lines of `dotx run` replayed from the same run.
 
 ### 12. Campaigns: a goal that works until its outcome is verified
 
-**Status: planned.** **Goal.** The owner switches on *Keep going until done* for a goal, and Dot works on it in
-sessions, through restarts and days, until the outcome is verified by evidence or the owner stops it. Nothing else
-stops it.
+**Status: in progress.** **Goal.** The owner switches on *Keep going until done* for a goal, and Dot works on it in
+sessions, through restarts and days, until the outcome is verified by evidence or the owner stops it. Nothing else stops
+it.
 
 **Why.** This is the owner's main ask of 2026-10-09: "a system that does not stop until I see the result; when I say
 earn money and give the information, it must not stop until the money is where it belongs". Today a run ends by
@@ -1987,10 +1987,10 @@ on and is closed by `terminal_close`; the idle reaper; unit tests of the ANSI st
     `memory_save` are acting-only, `tools/base.py:16-17`), and DuckDuckGo's bot check throttles long research runs
     (README "Status and known limits"). Say whether a research run may save notes and files under the workspace,
     and whether the hosted Ollama search (`OLLAMA_API_KEY`) should be the default backend; either is a small item.
-15. The Claude GitHub app reviews nothing yet: on PR #1 and PR #2 it answered "Code review skipped" because your
-    organization has no extra usage to pay for it. Add extra usage (or raise the monthly limit) at
-    claude.ai/admin-settings/usage; a comment `@claude review` on a PR then asks for a review. Until then each PR is
-    merged on `/code-review` alone.
+15. The Claude GitHub app reviews nothing yet: on PR #1, PR #2 and PR #4 it answered "Code review skipped" (on PR #3 it
+    posted nothing) because your organization has no extra usage to pay for it. Add extra usage (or raise the monthly
+    limit) at claude.ai/admin-settings/usage; a comment `@claude review` on a PR then asks for a review. Until then each
+    PR is merged on `/code-review` alone.
 
 ## Log
 
@@ -2182,3 +2182,5 @@ on and is closed by `terminal_close`; the idle reaper; unit tests of the ANSI st
   guarded tests and not those marked `live`, so the eight `live` wire tests called `gpt-oss:20b-cloud` and
   `gemma4:cloud` as well (53 requests through Ollama in all); the review's agents ran the whole suite with its
   cloud-model tests twice.
+- 2026-10-09: item 11 merged as `12ad395` (PR #4, squash); the Claude GitHub app skipped its review again (decision 15).
+  Item 12 started on `item-12-campaigns`.
