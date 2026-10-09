@@ -29,7 +29,7 @@ from dotagent.desktop.types import (
     Step,
     parse_ref,
 )
-from dotagent.policy.elements import Element
+from dotagent.policy.elements import Element, typing_reasons
 
 _log = get_logger("dotagent.desktop.actions")
 
@@ -521,11 +521,26 @@ def _set_value(env: StepEnv, step: Step, inspection: Inspection) -> Effect:
     return _effect(f"set the value of {inspection.target} ({len(wanted)} chars)", None, False)
 
 
+def _pastes(text: str, context: StepContext, threshold: int) -> bool:
+    """Whether a type step's text goes in through the clipboard, faster than a key per character: a text longer than
+    ``threshold`` (0: never) that presses no Return or Tab, into a field that is known, not secure and not one for a
+    credential or a payment, and nothing key-like (the clipboard is shared with every application)."""
+    return (
+        0 < threshold < len(text)
+        and context.element is not None
+        and not context.secure
+        and not hid.presses_keys(text)
+        and not typing_reasons(context.element, text)
+    )
+
+
 def _type(env: StepEnv, step: Step, inspection: Inspection) -> Effect:
+    text: str = _required(step.text, "text")
+    if _pastes(text, inspection.context, env.config.paste_threshold_chars):
+        return _paste(env, step, inspection)
     _check_secure(env, inspection, "typing")
     if step.ref is not None:
         _focus(env, step.ref)
-    text: str = _required(step.text, "text")
     hid.post(hid.text_events(env.source, text))
     return _effect(f"typed {len(text)} chars into {inspection.target}", None, False)
 

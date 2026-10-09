@@ -284,7 +284,8 @@ class Step(BaseModel):
         description=(
             "click | double_click | right_click | hover | press (activate a button or menu item through accessibility, "
             "without moving the pointer) | focus (give a field the keyboard focus) | set_value (replace a field's whole "
-            "value at once) | type (key by key into the focused field) | paste (via the clipboard, for long text) | key "
+            "value at once) | type (key by key into the focused field; a long text without a line break or a tab is "
+            "pasted) | paste (via the clipboard, for long text) | key "
             "(a key or chord such as cmd+s or return) | scroll | drag | menu (choose a menu bar item by its path) | "
             "wait | activate (bring an application to the front)."
         )

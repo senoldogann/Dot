@@ -713,6 +713,8 @@ Both modes share what follows.
 - `browser_act` runs up to `max_batch_steps` steps in one call: `click`, `double_click`, `right_click`, `hover`, `fill`,
   `type`, `select`, `press`, `check`, `uncheck`, `scroll_into_view` and `click_at`. After a step Dot waits until the page
   has settled and reports popups, dialogs and downloads that appeared.
+- `browser_wait_text` waits until a text is visible and says after how long. When the text does not come in time the
+  call fails and still shows the page, as what changed since the last view, so no snapshot is needed to decide.
 - A dialog, or a cookie consent banner, open in the viewport is listed first, under "in front of the page",
   and the line above the page says how many are open. A click that another element takes fails with the name of that
   element and what to do about it (close or answer the box, or press Escape).
@@ -744,7 +746,11 @@ missing ones and opens their Settings panes.
   `focus`, `set_value`, `type`, `paste`, `key`, `scroll`, `drag`, `menu`, `wait` and `activate`. A step names an element
   by its ref or a point by its coordinates. `press`, `focus` and `set_value` work through accessibility without moving
   the pointer; `click`, `hover`, `scroll` and `drag` are real pointer events; `type`, `paste` and `key` are keyboard
-  events.
+  events. A `type` text longer than `paste_threshold_chars` (40) without a line break or a tab goes in through the
+  clipboard, which is put back afterwards, unless the field is secure, is for a credential or a payment, or cannot be
+  read, or the text looks like a key. After steps that changed something, the window is read once the application has
+  announced no change for `settle_quiet_ms` (120 ms), at most after `settle_ms` (350 ms); a change it makes later
+  without announcing anything in between shows in the next view.
 - `desktop_screenshot` captures the screen with ScreenCaptureKit as a JPEG of at most `screenshot_max_edge` pixels.
 - `desktop.keep_awake` keeps the display awake while Dot works. Password managers are refused in every mode, and so
   are secure fields except in a `yolo` run (see [Safety](#safety)).

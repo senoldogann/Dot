@@ -10,6 +10,7 @@ import asyncio
 import json
 import os
 import re
+import statistics
 import subprocess
 import sys
 import time
@@ -19,11 +20,13 @@ from pathlib import Path
 
 import pytest
 import pytest_asyncio
+from AppKit import NSPasteboard
 from pydantic import BaseModel, ConfigDict
 
 from dotagent.config import DesktopConfig, load_config
 from dotagent.core.errors import FailSafeTriggered
 from dotagent.desktop.actions import refuse_secure_field
+from dotagent.desktop.input import PasteboardLike, PasteboardSnapshot, _restore_pasteboard, _snapshot_pasteboard
 from dotagent.desktop.perms import check_permissions
 from dotagent.desktop.session import DesktopSession, StepReview
 from dotagent.desktop.types import ActOutcome, AppView, Permissions, SnapshotView, Step, TextRead
@@ -162,6 +165,15 @@ def settings_file(tmp_path_factory: pytest.TempPathFactory) -> Path:
     return settings
 
 
+@pytest.fixture
+def owner_clipboard() -> Iterator[None]:
+    """Whatever the clipboard holds (text, an image, files) is put back after the test."""
+    pasteboard: PasteboardLike = NSPasteboard.generalPasteboard()
+    kept: PasteboardSnapshot = _snapshot_pasteboard(pasteboard)
+    yield
+    _restore_pasteboard(pasteboard, kept)
+
+
 @pytest_asyncio.fixture(scope="module", loop_scope="module")
 async def session(app: FixtureApp, failsafe_file: Path, settings_file: Path) -> AsyncIterator[DesktopSession]:
     config: DesktopConfig = load_config(settings_file).desktop
@@ -218,6 +230,26 @@ async def test_type_enters_turkish_text_key_by_key(session: DesktopSession, app:
     typed: list[FixtureEvent] = [event for event in _since(app, mark, "text") if event.field == "name"]
     assert typed
     assert typed[-1].value == "Merhaba ğüşiöç İI"
+
+
+@pytest.mark.usefixtures("owner_clipboard")
+async def test_a_long_typed_text_goes_in_through_the_clipboard_which_is_put_back(
+    session: DesktopSession, app: FixtureApp
+) -> None:
+    name: str = _ref_of(await _body(session, app), r'textfield "Name"')
+    long_text: str = "Uzun metin panodan gelir: " + "ğüşiöç İI " * 8
+    await session.write_clipboard("önceki pano")
+    mark: int = _mark(app)
+    outcome: ActOutcome = await _act(
+        session,
+        app,
+        [Step(action="click", ref=name), Step(action="key", key="cmd+a"), Step(action="type", text=long_text)],
+    )
+    assert "pasted" in outcome.steps[-1].detail, outcome.steps
+    typed: list[FixtureEvent] = [event for event in _since(app, mark, "text") if event.field == "name"]
+    assert typed
+    assert typed[-1].value == long_text
+    assert await session.read_clipboard() == "önceki pano"
 
 
 async def test_set_value_replaces_the_value_and_read_returns_it(session: DesktopSession, app: FixtureApp) -> None:
@@ -313,14 +345,10 @@ async def test_secure_fields_are_refused_and_stay_untouched(session: DesktopSess
     assert not _since(app, mark, "text")
 
 
+@pytest.mark.usefixtures("owner_clipboard")
 async def test_clipboard_round_trip(session: DesktopSession) -> None:
-    original: str | None = await session.read_clipboard()
-    try:
-        await session.write_clipboard("Dot panosu ✓ 😀")
-        assert await session.read_clipboard() == "Dot panosu ✓ 😀"
-    finally:
-        if original is not None:
-            await session.write_clipboard(original)
+    await session.write_clipboard("Dot panosu ✓ 😀")
+    assert await session.read_clipboard() == "Dot panosu ✓ 😀"
 
 
 async def test_activate_switches_to_another_application_and_back(session: DesktopSession, app: FixtureApp) -> None:
@@ -329,6 +357,28 @@ async def test_activate_switches_to_another_application_and_back(session: Deskto
     assert [view.bundle_id for view in front] == [_FINDER]
     await _act(session, app, [Step(action="activate", text=str(app.pid))])
     assert [view.pid for view in await session.list_apps() if view.frontmost] == [app.pid]
+
+
+async def _timed_act(session: DesktopSession, app: FixtureApp, steps: list[Step]) -> float:
+    started: float = time.perf_counter()
+    outcome: ActOutcome = await session.act(_THREAD, str(app.pid), steps, _allow, refuse_secure_field)
+    elapsed: float = time.perf_counter() - started
+    assert [report.outcome for report in outcome.steps] == ["done"] * len(steps), outcome
+    await asyncio.sleep(0.15)
+    return elapsed
+
+
+async def test_a_click_and_a_batch_of_five_clicks_stay_fast(session: DesktopSession, app: FixtureApp) -> None:
+    """20 acts of one click and 5 of five clicks on the fixture's button. The medians are printed (``-s`` shows them):
+    ROADMAP item 13 keeps them."""
+    click: Step = Step(action="click", ref=_ref_of(await _body(session, app), r'button "Increment"'))
+    singles: list[float] = [await _timed_act(session, app, [click]) for _ in range(20)]
+    batches: list[float] = [await _timed_act(session, app, [click] * 5) for _ in range(5)]
+    single: float = statistics.median(singles)
+    batch: float = statistics.median(batches)
+    print(f"\ndesktop: one click {single:.3f} s, five clicks {batch:.3f} s (medians)")
+    assert single < 1.5
+    assert batch < 3.0
 
 
 async def test_the_failsafe_file_stops_a_batch_and_work_resumes_when_it_is_removed(

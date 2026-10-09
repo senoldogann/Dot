@@ -71,6 +71,7 @@ from dotagent.browser.types import (
     StepReport,
     TabSummary,
     TextView,
+    TextWait,
     Viewport,
 )
 from dotagent.browser.upstream import ignore_repeated_frame_detach
@@ -82,12 +83,12 @@ from dotagent.core.text import truncate_middle
 _log = get_logger("dotagent.browser.session")
 
 _REAP_INTERVAL_S: float = 60.0
-_SCROLL_SETTLE_S: float = 0.15
 _POPUP_WAIT_S: float = 1.0
 # A page that shows fewer elements than this right after loading is probably still rendering.
 _MIN_REFS_AFTER_LOAD: int = 3
 _LATE_QUIET_MS: int = 300
 _LATE_MAX_MS: int = 2500
+_STILL_LOADING: str = "the page is still loading; what is shown may be incomplete"
 _BLANK_URLS: frozenset[str] = frozenset({"about:blank", "chrome://newtab/", "chrome://new-tab-page/"})
 _LAUNCH_ARGS: list[str] = [
     "--disable-blink-features=AutomationControlled",
@@ -615,7 +616,7 @@ class BrowserSession:
         try:
             await asyncio.wait_for(tab.nav_idle.wait(), timeout=config.navigation_timeout_s)
         except TimeoutError:
-            add_note(tab, "the page is still loading; what is shown may be incomplete")
+            add_note(tab, _STILL_LOADING)
         await wait_dom_quiet(tab.page, config.settle_quiet_ms, config.settle_max_ms, _ms(config.navigation_timeout_s))
 
     async def _viewport(self, tab: Tab) -> Viewport:
@@ -690,6 +691,10 @@ class BrowserSession:
 
     async def _full_view(self, thread: ThreadTabs, tab: Tab) -> PageView:
         await self._settle(tab)
+        return await self._settled_view(thread, tab)
+
+    async def _settled_view(self, thread: ThreadTabs, tab: Tab) -> PageView:
+        """The whole page, of a tab that has just settled."""
         capture: _Capture = await self._capture(tab)
         return await self._assemble(thread, tab, capture, capture.rendered, "full")
 
@@ -853,7 +858,9 @@ class BrowserSession:
             await self._settle(current)
             await self._enforce_landing(current)
             view: PageView = (
-                await self._changes_view(thread, current) if current is tab else await self._full_view(thread, current)
+                await self._changes_view(thread, current)
+                if current is tab
+                else await self._settled_view(thread, current)
             )
             return ActOutcome(steps=tuple(reports), stopped=stopped, view=view)
 
@@ -870,16 +877,27 @@ class BrowserSession:
             await scroll_page(
                 tab.page, direction, pixels, ref, viewport.width, viewport.height, _ms(self._config.action_timeout_s)
             )
-            await asyncio.sleep(_SCROLL_SETTLE_S)
+            # The wheel lands a few tens of milliseconds after the call returns, inside the DOM quiet window.
             await self._settle(tab)
             return await self._changes_view(thread, tab)
 
-    async def wait_text(self, thread_id: str, text: str, timeout_s: float) -> PageView:
+    async def wait_text(self, thread_id: str, text: str, timeout_s: float) -> TextWait:
+        """Wait until ``text`` is visible on the current tab, at most ``timeout_s``; the page is shown either way. After a
+        wait that timed out the page is shown as it is, without a settle that could outlast the wait. A navigation still
+        pending then holds the reading until it commits, so the URL rules are checked again once the page is read."""
         async with self._locked(thread_id) as thread:
             tab: Tab = await self._current_tab(thread)
-            await wait_for_text(tab.page, text, _ms(timeout_s))
-            await self._settle(tab)
-            return await self._changes_view(thread, tab)
+            started: float = time.monotonic()
+            appeared: bool = await wait_for_text(tab.page, text, _ms(timeout_s))
+            waited_s: float = time.monotonic() - started
+            if appeared:
+                await self._settle(tab)
+            elif not tab.nav_idle.is_set():
+                add_note(tab, _STILL_LOADING)
+            await self._enforce_landing(tab)
+            view: PageView = await self._changes_view(thread, tab)
+            await self._enforce_landing(tab)
+            return TextWait(appeared=appeared, waited_s=waited_s, view=view)
 
     async def back(self, thread_id: str) -> PageView:
         async with self._locked(thread_id) as thread:

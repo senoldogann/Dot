@@ -7,6 +7,7 @@ from typing import Literal
 
 from playwright.async_api import CDPSession, ElementHandle, Frame, JSHandle, Locator, Page
 from playwright.async_api import Error as PlaywrightError
+from playwright.async_api import TimeoutError as PlaywrightTimeoutError
 
 from dotagent.browser.safety import key_enters_text, secret_kind
 from dotagent.browser.snapshot import (
@@ -494,11 +495,16 @@ async def bring_to_front(page: Page) -> None:
         raise _failure("switching to the tab failed", page, {}, error) from error
 
 
-async def wait_for_text(page: Page, text: str, timeout_ms: int) -> None:
+async def wait_for_text(page: Page, text: str, timeout_ms: int) -> bool:
+    """Whether ``text`` became visible on the page within ``timeout_ms`` (in any of its matches: an earlier hidden one,
+    such as a template or a closed menu, does not hold the wait)."""
     try:
-        await page.get_by_text(text).first.wait_for(state="visible", timeout=timeout_ms)
+        await page.get_by_text(text).filter(visible=True).first.wait_for(state="visible", timeout=timeout_ms)
+    except PlaywrightTimeoutError:
+        return False
     except PlaywrightError as error:
-        raise _failure("the text did not appear", page, {"text": text}, error) from error
+        raise _failure("waiting for the text failed", page, {"text": text}, error) from error
+    return True
 
 
 async def upload_files(page: Page, ref: str, paths: list[str], timeout_ms: int) -> None:

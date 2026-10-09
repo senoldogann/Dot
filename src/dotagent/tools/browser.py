@@ -18,6 +18,7 @@ from dotagent.browser.render import (
     render_links,
     render_page_view,
     render_text_view,
+    render_text_wait,
 )
 from dotagent.browser.safety import (
     assess_step,
@@ -38,6 +39,7 @@ from dotagent.browser.types import (
     SecretFieldCheck,
     Step,
     TextView,
+    TextWait,
 )
 from dotagent.config import BrowserConfig
 from dotagent.core.errors import ToolInputError
@@ -51,8 +53,10 @@ from dotagent.tools.base import (
     RegisteredTool,
     ToolArgs,
     ToolResult,
+    fail,
     make_reviewed_tool,
     make_tool,
+    mark_untrusted,
     ok,
     ok_with_images,
 )
@@ -437,19 +441,28 @@ class WaitTextArgs(ToolArgs):
     timeout_s: float | None = Field(default=None, ge=0.5, le=60.0, description="How long to wait (default 10).")
 
 
+def wait_text_result(wait: TextWait, nonce: str, body_budget: int) -> ToolResult:
+    """What a wait for a text tells the model. One that timed out fails and still shows the page, so it is marked as
+    carrying content a third party can write: the gate counts only results that did not fail as reads."""
+    rendered: str = render_text_wait(wait, nonce, body_budget)
+    return ok(rendered) if wait.appeared else mark_untrusted(fail(rendered))
+
+
 def _wait_text_tool() -> RegisteredTool:
     def classify(args: WaitTextArgs, ctx: ToolContext) -> ActionInfo:
         return _observe_action("browser_wait_text", f"Wait for {args.text!r}", ctx)
 
     async def run(args: WaitTextArgs, ctx: ToolContext) -> ToolResult:
-        view: PageView = await ctx.runtime.browser.wait_text(
-            ctx.thread_id, args.text, args.timeout_s or _DEFAULT_WAIT_S
-        )
-        return _page_result(view, ctx)
+        timeout_s: float = args.timeout_s or _DEFAULT_WAIT_S
+        wait: TextWait = await ctx.runtime.browser.wait_text(ctx.thread_id, args.text, timeout_s)
+        return wait_text_result(wait, _nonce(), _body_budget(ctx))
 
     return make_tool(
         name="browser_wait_text",
-        description="Wait until some text is visible on the page (slow loads, progress screens), then show what changed.",
+        description=(
+            "Wait until some text is visible on the page (slow loads, progress screens), then show what changed. When "
+            "it does not appear in time the call fails and shows the page as it is."
+        ),
         args_model=WaitTextArgs,
         modes=ALL_MODES,
         parallel_safe=False,
