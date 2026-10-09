@@ -18,6 +18,7 @@ from dotagent.browser.render import (
     render_links,
     render_page_view,
     render_text_view,
+    render_text_wait,
 )
 from dotagent.browser.safety import (
     assess_step,
@@ -38,6 +39,7 @@ from dotagent.browser.types import (
     SecretFieldCheck,
     Step,
     TextView,
+    TextWait,
 )
 from dotagent.config import BrowserConfig
 from dotagent.core.errors import ToolInputError
@@ -51,6 +53,7 @@ from dotagent.tools.base import (
     RegisteredTool,
     ToolArgs,
     ToolResult,
+    fail,
     make_reviewed_tool,
     make_tool,
     ok,
@@ -442,14 +445,17 @@ def _wait_text_tool() -> RegisteredTool:
         return _observe_action("browser_wait_text", f"Wait for {args.text!r}", ctx)
 
     async def run(args: WaitTextArgs, ctx: ToolContext) -> ToolResult:
-        view: PageView = await ctx.runtime.browser.wait_text(
-            ctx.thread_id, args.text, args.timeout_s or _DEFAULT_WAIT_S
-        )
-        return _page_result(view, ctx)
+        timeout_s: float = args.timeout_s or _DEFAULT_WAIT_S
+        wait: TextWait = await ctx.runtime.browser.wait_text(ctx.thread_id, args.text, timeout_s)
+        rendered: str = render_text_wait(wait, timeout_s, _nonce(), _body_budget(ctx))
+        return ok(rendered) if wait.appeared else fail(rendered)
 
     return make_tool(
         name="browser_wait_text",
-        description="Wait until some text is visible on the page (slow loads, progress screens), then show what changed.",
+        description=(
+            "Wait until some text is visible on the page (slow loads, progress screens), then show what changed. When "
+            "it does not appear in time the call fails and shows the page as it is."
+        ),
         args_model=WaitTextArgs,
         modes=ALL_MODES,
         parallel_safe=False,

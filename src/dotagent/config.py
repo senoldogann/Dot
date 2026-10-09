@@ -172,6 +172,7 @@ class DesktopConfig(FrozenModel):
     snapshot_max_chars: int
     capture_timeout_s: float
     paste_settle_ms: int
+    paste_threshold_chars: int
     keep_awake: bool
     keep_awake_s: int
     max_batch_steps: int

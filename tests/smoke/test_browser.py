@@ -9,6 +9,7 @@ import asyncio
 import os
 import re
 import signal
+import statistics
 import subprocess
 import threading
 import time
@@ -20,10 +21,10 @@ import pytest
 import pytest_asyncio
 from playwright.async_api import async_playwright
 
-from dotagent.browser.render import render_page_view
+from dotagent.browser.render import render_page_view, render_text_wait
 from dotagent.browser.safety import parse_element, refuse_secret_field
 from dotagent.browser.session import BrowserSession
-from dotagent.browser.types import ActOutcome, PageView, Step
+from dotagent.browser.types import ActOutcome, PageView, Step, TextWait
 from dotagent.browser.upstream import ignore_repeated_frame_detach
 from dotagent.config import BrowserConfig, load_config
 from dotagent.core.errors import BrowserError
@@ -70,6 +71,9 @@ _PAGES: dict[str, str] = {
     "/slow": """<!doctype html><title>Slow</title><div id="root"></div>
 <script>setTimeout(() => { document.getElementById('root').innerHTML =
 '<h1>Loaded late</h1><button>Late button</button><a href="/">one</a><a href="/">two</a>' }, 350)</script>""",
+    "/later": """<!doctype html><title>Later</title>
+<button onclick="setTimeout(() => { document.getElementById('s').textContent = 'Order placed' }, 800)">Place order</button>
+<p id="s">Working</p>""",
     "/colon": """<!doctype html><title>Colon</title>
 <button>Buy now: confirm</button><a href="/done?x=1">Read: more</a> | <a href="javascript:void(0)">Script link</a>""",
     "/cookies": """<!doctype html><title>Cookies</title>
@@ -301,6 +305,40 @@ async def test_late_rendering_pages_are_shown_after_they_render(browser: Browser
     assert "Loaded late" in view.body
 
 
+async def test_a_scroll_shows_the_part_of_the_page_it_moved_to(browser: BrowserSession, site: str) -> None:
+    view: PageView = await browser.open_url("scroll", f"{site}/")
+    assert 'button "Item 100"' not in view.body
+    scrolled: PageView = await browser.scroll("scroll", "down", 2000, None)
+    assert 'button "Item 100"' in scrolled.body
+    assert 'button "Item 10"' not in scrolled.body
+
+
+async def test_a_wait_for_text_says_after_how_long_it_appeared_and_shows_what_changed(
+    browser: BrowserSession, site: str
+) -> None:
+    view: PageView = await browser.open_url("wait-ok", f"{site}/later")
+    await act(browser, "wait-ok", [Step(action="click", ref=ref_of(view.body, 'button "Place order"'))], False)
+    wait: TextWait = await browser.wait_text("wait-ok", "Order placed", 5.0)
+    assert wait.appeared
+    assert 0.2 < wait.waited_s < 2.0, wait.waited_s
+    assert "Order placed" in wait.view.body
+    rendered: str = render_text_wait(wait, 5.0, "n0nce", 20_000)
+    assert rendered.startswith(f"The text appeared after {wait.waited_s:.1f} s · Tab 1 of 1 · "), rendered
+
+
+async def test_a_wait_for_text_that_does_not_come_fails_and_still_shows_the_page(
+    browser: BrowserSession, site: str
+) -> None:
+    view: PageView = await browser.open_url("wait-miss", f"{site}/later")
+    await act(browser, "wait-miss", [Step(action="click", ref=ref_of(view.body, 'button "Place order"'))], False)
+    wait: TextWait = await browser.wait_text("wait-miss", "Payment failed", 1.5)
+    assert not wait.appeared
+    assert 1.4 < wait.waited_s < 3.0, wait.waited_s
+    assert "Order placed" in wait.view.body
+    rendered: str = render_text_wait(wait, 1.5, "n0nce", 20_000)
+    assert rendered.startswith("The text did not appear within 1.5 s; the page now · Tab 1 of 1 · "), rendered
+
+
 async def test_cookie_banners_are_declined_instead_of_blocking_actions(browser: BrowserSession, site: str) -> None:
     view: PageView = await browser.open_url("cookies", f"{site}/cookies")
     outcome: ActOutcome = await act(
@@ -425,6 +463,38 @@ async def test_a_long_dropdown_keeps_its_line_short_and_names_a_choice_it_cannot
     )
     assert outcome.steps[0].outcome == "done", outcome
     assert line_of(outcome.view.body, 'combobox "Number"').endswith('(selected: "Number 299")')
+
+
+async def timed_act(browser: BrowserSession, thread: str, steps: list[Step]) -> float:
+    started: float = time.perf_counter()
+    outcome: ActOutcome = await act(browser, thread, steps, False)
+    elapsed: float = time.perf_counter() - started
+    assert [report.outcome for report in outcome.steps] == ["done"] * len(steps), outcome
+    return elapsed
+
+
+@pytest.mark.parametrize("quiet_ms", [120, 60])
+async def test_a_click_and_a_batch_of_five_clicks_stay_fast(
+    browser_config: BrowserConfig, site: str, tmp_path: Path, quiet_ms: int
+) -> None:
+    """20 acts of one click and 5 of five clicks on the home page, in a Chrome of their own with the DOM quiet window
+    ``quiet_ms``. The medians are printed (``-s`` shows them): ROADMAP item 13 keeps them."""
+    config: BrowserConfig = browser_config.model_copy(update={"settle_quiet_ms": quiet_ms})
+    (tmp_path / "profile").mkdir()
+    (tmp_path / "downloads").mkdir()
+    session: BrowserSession = BrowserSession(config, tmp_path / "profile", tmp_path / "downloads")
+    try:
+        view: PageView = await session.open_url("timing", f"{site}/")
+        click: Step = Step(action="click", ref=ref_of(view.body, 'button "Increment"'))
+        singles: list[float] = [await timed_act(session, "timing", [click]) for _ in range(20)]
+        batches: list[float] = [await timed_act(session, "timing", [click] * 5) for _ in range(5)]
+    finally:
+        await session.aclose()
+    single: float = statistics.median(singles)
+    batch: float = statistics.median(batches)
+    print(f"\nsettle_quiet_ms {quiet_ms}: one click {single:.3f} s, five clicks {batch:.3f} s (medians)")
+    assert single < 1.5
+    assert batch < 3.0
 
 
 def driver_pids() -> list[int]:

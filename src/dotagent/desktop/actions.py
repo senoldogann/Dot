@@ -47,6 +47,8 @@ _MIN_DRAG_MOVES: int = 8
 _MAX_DRAG_MOVES: int = 40
 _HOVER_HOLD_S: float = 0.15
 _FOCUS_SETTLE_S: float = 0.05
+# Typing presses Return and Tab for these; a paste would put them in as characters.
+_KEYS_IN_TEXT: frozenset[str] = frozenset("\n\r\t")
 _LABEL_CLIP: int = 50
 _SCROLL_UNITS: dict[str, tuple[int, int]] = {"down": (0, -1), "up": (0, 1), "right": (-1, 0), "left": (1, 0)}
 _NO_APP: AppInfo = AppInfo(
@@ -521,11 +523,26 @@ def _set_value(env: StepEnv, step: Step, inspection: Inspection) -> Effect:
     return _effect(f"set the value of {inspection.target} ({len(wanted)} chars)", None, False)
 
 
+def _pastes(text: str, context: StepContext, threshold: int) -> bool:
+    """Whether a type step's text goes in through the clipboard, far faster than a key per character: a text longer
+    than ``threshold`` (0: never) without a line break or a tab (typing presses Return and Tab for those, a paste does
+    not), into a field that is known and not secure (the clipboard is shared with every application)."""
+    return (
+        0 < threshold < len(text)
+        and context.element is not None
+        and not context.secure
+        and not _KEYS_IN_TEXT.intersection(text)
+    )
+
+
 def _type(env: StepEnv, step: Step, inspection: Inspection) -> Effect:
     _check_secure(env, inspection, "typing")
     if step.ref is not None:
         _focus(env, step.ref)
     text: str = _required(step.text, "text")
+    if _pastes(text, inspection.context, env.config.paste_threshold_chars):
+        hid.paste_text(env.source, text, env.config.paste_settle_ms / 1000)
+        return _effect(f"typed {len(text)} chars into {inspection.target} (pasted, being long)", None, False)
     hid.post(hid.text_events(env.source, text))
     return _effect(f"typed {len(text)} chars into {inspection.target}", None, False)
 

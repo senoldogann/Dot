@@ -8,7 +8,7 @@ from collections import Counter
 from collections.abc import Sequence
 
 from dotagent.browser.snapshot import fence_untrusted, fit_to_budget
-from dotagent.browser.types import ActOutcome, PageView, Step, StepReport, TabSummary, TextView
+from dotagent.browser.types import ActOutcome, PageView, Step, StepReport, TabSummary, TextView, TextWait
 
 _TITLE_CHARS: int = 120
 _TAB_URL_CHARS: int = 160
@@ -101,6 +101,16 @@ def render_act_outcome(outcome: ActOutcome, nonce: str, body_budget: int) -> str
     inner.extend(_view_block(outcome.view, body_budget))
     header: str = f"{summary} · {_view_header(outcome.view)}"
     return "\n".join((header, fence_untrusted(outcome.view.url, "\n".join(inner), nonce)))
+
+
+def render_text_wait(wait: TextWait, timeout_s: float, nonce: str, body_budget: int) -> str:
+    """Whether the text a wait was for appeared, then the page after the wait."""
+    outcome: str = (
+        f"The text appeared after {wait.waited_s:.1f} s"
+        if wait.appeared
+        else f"The text did not appear within {timeout_s:g} s; the page now"
+    )
+    return f"{outcome} · {render_page_view(wait.view, nonce, body_budget)}"
 
 
 def render_text_view(view: TextView, nonce: str) -> str:

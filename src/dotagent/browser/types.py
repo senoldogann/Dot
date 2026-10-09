@@ -148,6 +148,15 @@ class ActOutcome(FrozenModel):
     view: PageView
 
 
+class TextWait(FrozenModel):
+    """What a wait for a text found: whether the text became visible in time, how long the wait took (the whole wait
+    when it did not appear) and the page after it."""
+
+    appeared: bool
+    waited_s: float
+    view: PageView
+
+
 class TextView(FrozenModel):
     """A slice of the visible text of a page or element."""
 
