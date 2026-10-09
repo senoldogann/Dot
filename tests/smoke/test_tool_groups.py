@@ -23,6 +23,7 @@ from dotagent.llm.router import parse_model_ref
 from dotagent.llm.types import ChatRequest, DeltaSink, ModelInfo, ModelReply, ToolSpec
 from dotagent.runtime import Runtime, _tool_groups, close_runtime, open_runtime
 from dotagent.store.models import EventRecord, RunRecord
+from dotagent.tools.campaign import CAMPAIGN_TOOLS
 from dotagent.tools.groups import group_of
 from dotagent.tools.meta import FINISH_TOOL, USE_TOOLS_TOOL
 from dotagent.tools.registry import build_registry, specs_for_mode
@@ -230,11 +231,12 @@ async def test_a_run_that_offers_every_tool_has_no_groups_and_answers_use_tools_
     (played,) = await _play(config, login_env, [[_use("schedule"), _turn(_LIST), DONE]])
     assert played.record.status == "done"
     assert played.groups == ()
-    # Every tool of the mode at every step, as before there were groups (skill is left out: no skill is installed).
+    # Every tool of the mode at every step, as before there were groups (skill is left out: no skill is installed; so
+    # are the campaign tools, which only a session of a campaign has).
     every: list[str] = [
         spec.name
         for spec in specs_for_mode(build_registry(_tool_groups(config)), "task")
-        if spec.name not in {USE_TOOLS_TOOL, "skill"}
+        if spec.name not in {USE_TOOLS_TOOL, "skill", *CAMPAIGN_TOOLS}
     ]
     assert all(_names(step) == every for step in played.steps)
     assert all("# Tool groups" not in step.messages[0].content for step in played.steps)

@@ -21,6 +21,7 @@ from pydantic import JsonValue
 from dotagent.agent.compact import pending_calls
 from dotagent.agent.plan import PlanPayload, plan_lines
 from dotagent.agent.progress import can_ask_user, question_mode
+from dotagent.agent.verify import new_facts
 from dotagent.core.errors import DotError, PolicyDenied, StoreError
 from dotagent.core.jsonutil import dumps_compact
 from dotagent.core.logs import get_logger
@@ -100,8 +101,14 @@ def cut_off_by(run: RunRecord) -> CutOff | None:
 
 def can_resume(run: RunRecord, newest_run_id: str) -> bool:
     """Whether ``run`` may be resumed: the daemon cut it off, no other run started it, and it is the newest run of its
-    thread (``newest_run_id``), so nothing went on after it there. A run the owner stopped is never resumed."""
-    return run.parent_run_id is None and run.id == newest_run_id and cut_off_by(run) is not None
+    thread (``newest_run_id``), so nothing went on after it there. A run the owner stopped is never resumed, nor is a
+    session of a campaign: the campaign goes on with its next session, whose brief says that this one was cut off."""
+    return (
+        run.parent_run_id is None
+        and run.campaign_id is None
+        and run.id == newest_run_id
+        and cut_off_by(run) is not None
+    )
 
 
 def repeatable(call: InterruptedCall) -> bool:
@@ -252,6 +259,7 @@ async def interrupted_calls(runtime: Runtime, run: RunRecord) -> tuple[Interrupt
         gate=_NoAnswers(),
         cancel=asyncio.Event(),
         output_chars=runtime.config.agent.tool_output_chars,
+        facts=new_facts,
         spawner=None,
     )
     return tuple(

@@ -1,7 +1,7 @@
 // One run as a conversation: the question, what Dot did about it, its answer, and the box to steer the run or to follow up on it.
 
 import { api, follow } from "../api.js";
-import { approvalCard, fromRecord } from "../approvals.js";
+import { approvalCard, fromRecord, LEFT_IN_CAMPAIGN, LEFT_IN_RUN } from "../approvals.js";
 import { createAttachments, readyToSend } from "../attachments.js";
 import { createDetails } from "../details.js";
 import { clip, dateTimeFull, debounce, el, modelName } from "../dom.js";
@@ -115,6 +115,16 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
   );
   const parentChip =
     run.parent_run_id === null ? null : el("a", { class: "chip", href: `#/runs/${run.parent_run_id}` }, icon("branch"), "Delegated by another run");
+  const campaign = detail.campaign;
+  const campaignChip =
+    campaign === null
+      ? null
+      : el(
+          "a",
+          { class: "chip", href: `#/campaigns/${campaign.id}`, title: `Session ${campaign.session} of the campaign “${campaign.title}”` },
+          icon("target"),
+          `Campaign · session ${campaign.session}`,
+        );
   const approvalChip = APPROVAL_CHIPS[run.approvals];
   const modeChips = [
     approvalChip === undefined
@@ -253,6 +263,7 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
           approval: fromRecord(question),
           heading: null,
           onSettled: (decided) => attempt(() => questionDecided(decided)),
+          leftNote: detail.campaign === null ? LEFT_IN_RUN : LEFT_IN_CAMPAIGN,
         });
         questionCards.set(question.id, card.node);
         questionsList.append(card.node);
@@ -574,6 +585,7 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
     modelChip,
     modeChips,
     parentChip,
+    campaignChip,
     inspector.toggle,
     resumeButton,
     cancelButton,

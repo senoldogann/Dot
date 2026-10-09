@@ -6,7 +6,7 @@ follow, the newest commands that test, build or lint, and the paths and addresse
 check reads them next to its digest; the lessons of a run (:mod:`dotagent.agent.lessons`) start from its failures.
 :func:`answer_paths` and :func:`missing_paths` find the paths a final answer names that do not exist and that no
 successful call named; with ``[agent] verify_answer_paths`` such an answer is sent back once. Every function here is
-pure except :func:`missing_paths`, which reads the file system.
+pure except :func:`missing_paths` and :func:`checked_facts`, which read the file system.
 """
 
 import os
@@ -250,6 +250,13 @@ def render_facts(facts: RunFacts, missing: Sequence[str], unopened: Sequence[str
         ("Addresses the final answer names that no call of the run opened", _listed(unopened)),
     )
     return "\n\n".join(f"{title}:\n" + ("\n".join(lines) if lines else "none") for title, lines in sections)
+
+
+def checked_facts(facts: RunFacts, answer: str, workspace: Path) -> str:
+    """The facts as the goal check reads them next to ``answer`` (:func:`render_facts`), secrets masked. Reads the file
+    system."""
+    missing: tuple[str, ...] = missing_paths(answer_paths(answer), facts.named, workspace)
+    return redact_secrets(render_facts(facts, missing, unopened_addresses(answer, facts.named)))
 
 
 def paths_note(missing: Sequence[str]) -> str:

@@ -1,7 +1,8 @@
 // The two choices of a run besides its goal: who answers the questions the safety policy raises (approvals) and whether a
 // checker keeps the run working until its goal is really reached (goal mode). The daemon has a default for both. A choice
 // made on the home page is kept per browser and goes with every run started from there until it is changed again; a person
-// who never chose anything leaves both to the daemon.
+// who never chose anything leaves both to the daemon. A third switch makes a task a campaign (Keep going until done); it is
+// chosen for one goal, so it is never kept.
 
 import { el } from "./dom.js";
 import { icon } from "./icons.js";
@@ -19,6 +20,8 @@ export const APPROVAL_OPTIONS = [
 ];
 const YOLO_NOTE = "YOLO: nothing asks for confirmation, so this run acts without waiting for you. It also reads secrets, sends files out, pays and signs in by itself.";
 const GOAL_MODE_HINT = "A checker compares the answer with the goal and sends the run back to work until the goal is really reached";
+const STANDING_HINT = "Keep going until done: Dot works on the goal in sessions until a check confirms the outcome or you stop it";
+const STANDING_NOTE = "Keep going: Dot works on this goal in sessions, also while you are away and after restarts, until a check confirms the outcome. Campaigns in the sidebar shows its progress; stop it there.";
 
 /** The words for an approval mode, for chips and facts. */
 export function approvalLabel(id) {
@@ -74,6 +77,40 @@ export function approvalsPicker() {
     sync: () => {
       control.set(shown());
       paint();
+    },
+  };
+}
+
+/**
+ * The switch that makes a new task a campaign: Dot keeps going on its goal in sessions until the outcome is verified. It
+ * starts off on every page. `value()` is whether it is on; `setAvailable(false)` hides it and turns it off, for the kinds of
+ * run that cannot be a campaign (a chat, research); `onToggle(on)` runs after every change; `note` is the line to show under
+ * the composer while it is on.
+ */
+export function standingPicker(onToggle) {
+  let on = false;
+  const toggle = el("button", { class: "switch", type: "button", role: "switch", "aria-checked": "false", "aria-label": "Keep going until done" });
+  const element = pick("Keep going", toggle);
+  element.title = STANDING_HINT;
+  const note = el("div", { class: "note", hidden: true }, icon("target"), el("span", null, STANDING_NOTE));
+
+  function set(value) {
+    on = value;
+    toggle.setAttribute("aria-checked", String(on));
+    note.hidden = !on;
+    onToggle(on);
+  }
+
+  toggle.addEventListener("click", () => set(!on));
+  return {
+    element,
+    note,
+    value: () => on,
+    setAvailable: (available) => {
+      element.hidden = !available;
+      if (!available && on) {
+        set(false);
+      }
     },
   };
 }

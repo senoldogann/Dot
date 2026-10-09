@@ -1,4 +1,5 @@
-"""The scheduler: starts the runs of the schedules that are due, for as long as the Dot daemon lives."""
+"""The scheduler: starts the runs of the schedules that are due, and the sessions of the campaigns that are, for
+as long as the Dot daemon lives."""
 
 import asyncio
 import time
@@ -75,9 +76,12 @@ class Scheduler:
             await asyncio.wait(set(self._watchers))
 
     async def tick(self, now: float) -> None:
-        """Fire every switched-on schedule that is due at ``now``."""
+        """Fire every switched-on schedule that is due at ``now``, and start the next session of every active campaign
+        that is. A campaign's session is never skipped as overdue: the campaign goes on where it stopped."""
         for record in await self._runtime.store.due_schedules(now):
             await self._fire(record, now)
+        for campaign in await self._runtime.store.due_campaigns(now):
+            await self._start_session(campaign.id)
 
     async def _tick_forever(self) -> None:
         tick_s: float = self._runtime.config.scheduler.tick_s
@@ -138,6 +142,12 @@ class Scheduler:
         watcher: asyncio.Task[None] = asyncio.create_task(self._watch(record.id, run.id), name=f"watch-{run.id}")
         self._watchers.add(watcher)
         watcher.add_done_callback(self._watcher_done)
+
+    async def _start_session(self, campaign_id: str) -> None:
+        try:
+            await self._manager.start_session(campaign_id)
+        except DotError as exc:
+            log.error("campaign_session_start_failed", campaign_id=campaign_id, error=exc.message, context=exc.context)
 
     async def _watch(self, schedule_id: str, run_id: str) -> None:
         """Write the outcome of a run to its schedule once the run is over."""

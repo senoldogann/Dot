@@ -8,6 +8,10 @@ import { toast } from "./ui.js";
 
 const STATUS_BADGE = { approved: "b-ok", denied: "b-bad", expired: "b-muted" };
 const STATUS_LABEL = { approved: "Approved", denied: "Denied", expired: "Expired", pending: "Waiting for you" };
+// What becomes of the answer to a question a run left (`leftNote` of a card): it carries the work on in the run's
+// conversation, or, for a session of a campaign, reaches the session while it works and the next session after that.
+export const LEFT_IN_RUN = "The run went on without your answer. Your answer goes to this conversation and carries the work on.";
+export const LEFT_IN_CAMPAIGN = "The session went on without your answer. While it works, your answer reaches it; after that, the campaign's next session reads it, and starts right away while the campaign is active.";
 
 /** The common shape of an approval, from a stored record. */
 export function fromRecord(record) {
@@ -83,10 +87,11 @@ function technicalDetails(args) {
 
 /**
  * A card for one approval. `onSettled(decided)` runs once the daemon answered a decision: `decided` is the decided
- * record when it took the decision, null when it refused it (made already, or not possible now).
+ * record when it took the decision, null when it refused it (made already, or not possible now). `leftNote` says what
+ * becomes of the answer to a question the run left (LEFT_IN_RUN or LEFT_IN_CAMPAIGN).
  * Returns the node and `settle(status, note)`, which turns the card into its decided form.
  */
-export function approvalCard({ approval, heading, onSettled }) {
+export function approvalCard({ approval, heading, onSettled, leftNote }) {
   const node = el("div", { class: "approval" });
   const isQuestion = approval.severity === "question";
   const isHandoff = approval.severity === "handoff";
@@ -177,7 +182,7 @@ export function approvalCard({ approval, heading, onSettled }) {
           heading,
         ),
         el("div", { class: "approval-text" }, text),
-        isLeft ? el("div", { class: "small muted" }, "The run went on without your answer. Your answer goes to this conversation and carries the work on.") : null,
+        isLeft ? el("div", { class: "small muted" }, leftNote) : null,
         isQuestion ? options : technicalDetails(approval.args),
         el(
           "div",

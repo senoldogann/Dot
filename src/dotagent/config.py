@@ -91,6 +91,10 @@ class AgentConfig(FrozenModel):
     goal_patience: int
     run_max_minutes: float = Field(ge=0, allow_inf_nan=False)
     run_max_tokens: int = Field(ge=0)
+    campaign_gap_minutes: float = Field(gt=0, allow_inf_nan=False)
+    campaign_wait_hours: float = Field(ge=0, allow_inf_nan=False)
+    campaign_patience_sessions: int = Field(ge=1)
+    campaign_max_sessions: int = Field(ge=0)
     tool_output_chars: int
     context_tokens: int
     keep_recent_tool_results: int

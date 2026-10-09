@@ -7,11 +7,18 @@ from dotagent.llm.types import Effort
 from dotagent.policy.types import ApprovalMode
 
 RunStatus = Literal["queued", "running", "done", "blocked", "failed", "cancelled"]
+# A run in one of these has not ended.
+WORKING_STATUSES: frozenset[RunStatus] = frozenset({"queued", "running", "blocked"})
 RunMode = Literal["task", "chat", "research"]
 # ``pending``: a run waits for the answer; ``left``: a question a run left for the user and went on without (it is never
 # expired; answering it carries the work on in its thread).
 ApprovalStatus = Literal["pending", "left", "approved", "denied", "expired"]
 Behavior = Literal["allow", "preapproved", "ask", "handoff"]
+# ``active``: its sessions go on; ``achieved``: the goal checker accepted its evidence, or the owner said so;
+# ``stopped``: the owner stopped it (also with the emergency stop of desktop control, which ends its session), or it ran
+# the sessions ``[agent] campaign_max_sessions`` allows.
+CampaignStatus = Literal["active", "achieved", "stopped"]
+CampaignEntryKind = Literal["progress", "setback", "note", "strategy", "question"]
 
 
 class ThreadRecord(FrozenModel):
@@ -41,7 +48,8 @@ class ThreadSummary(FrozenModel):
 class RunRecord(FrozenModel):
     """One run. ``effort`` is the reasoning level it was started with (``None`` for runs stored before it was kept);
     ``approvals`` and ``goal_mode`` are the approval mode and the goal mode it ran with (runs stored before they were
-    kept hold ``ask`` and ``False``, which is how those runs behaved)."""
+    kept hold ``ask`` and ``False``, which is how those runs behaved). ``campaign_id`` is the campaign the run is a
+    session of, ``None`` for any other run."""
 
     id: str
     thread_id: str
@@ -60,6 +68,7 @@ class RunRecord(FrozenModel):
     effort: Effort | None
     approvals: ApprovalMode
     goal_mode: bool
+    campaign_id: str | None
 
 
 class EventRecord(FrozenModel):
@@ -134,3 +143,43 @@ class ScheduleRecord(FrozenModel):
     thread_id: str | None
     last_status: str
     options: ScheduleOptions
+
+
+class CampaignRecord(FrozenModel):
+    """A goal that Dot works on in sessions, through restarts and days, until its outcome is verified or the owner
+    stops it. ``thread_id`` is the owner's conversation it was started in. ``targets`` and ``verification`` are what
+    its sessions recorded with ``campaign_targets`` (empty until then). ``cron`` repeats its sessions;
+    ``next_session_at`` is when the next one starts, ``None`` while none is planned. ``model``, ``effort`` and
+    ``approvals`` are the settings of the run that opened it, which every session keeps. ``files`` are the paths of
+    the files the owner attached to its goal. ``evidence`` is what the accepted claim of the outcome said, empty while
+    the campaign is not achieved."""
+
+    id: str
+    title: str
+    goal: str
+    targets: str
+    verification: str
+    status: CampaignStatus
+    thread_id: str
+    model: str
+    effort: Effort
+    approvals: ApprovalMode
+    files: tuple[str, ...]
+    cron: str | None
+    next_session_at: float | None
+    created_at: float
+    updated_at: float
+    evidence: str
+
+
+class CampaignEntry(FrozenModel):
+    """One entry of a campaign's ledger, written by a session with ``campaign_note`` (``run_id`` is that session) or by
+    the harness (``None``). ``numbers`` maps a measure to its value, such as ``{"leads": 12}``."""
+
+    id: str
+    campaign_id: str
+    run_id: str | None
+    ts: float
+    kind: CampaignEntryKind
+    text: str
+    numbers: dict[str, float]

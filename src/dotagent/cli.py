@@ -24,6 +24,19 @@ from dotagent.cli_browser import (
     cmd_browser_detach,
     cmd_browser_import_chrome,
 )
+from dotagent.cli_campaign import (
+    CampaignAchievedCommand,
+    CampaignListCommand,
+    CampaignResumeCommand,
+    CampaignShowCommand,
+    CampaignStopCommand,
+    cmd_campaign_achieved,
+    cmd_campaign_list,
+    cmd_campaign_resume,
+    cmd_campaign_show,
+    cmd_campaign_stop,
+    render_first_session_end,
+)
 from dotagent.cli_daemon import (
     DaemonCommand,
     OpenCommand,
@@ -145,6 +158,7 @@ class RunCommand(FrozenModel):
     effort: Effort | None
     approvals: ApprovalMode | None
     goal_mode: bool | None
+    standing: bool
     thread: str | None
     no_input: bool
     thinking: bool
@@ -270,6 +284,11 @@ type Command = Annotated[
     | ScheduleDeleteCommand
     | ScheduleEnableCommand
     | ScheduleDisableCommand
+    | CampaignListCommand
+    | CampaignShowCommand
+    | CampaignStopCommand
+    | CampaignResumeCommand
+    | CampaignAchievedCommand
     | McpListCommand
     | SkillsListCommand
     | PruneCommand
@@ -306,6 +325,14 @@ def build_parser() -> argparse.ArgumentParser:
         "--auto-approve", dest="approvals", action="store_const", const="auto", help="same as --approvals auto"
     )
     run.add_argument("--goal-mode", action=argparse.BooleanOptionalAction, default=None, help=_GOAL_MODE_HELP)
+    run.add_argument(
+        "--standing",
+        action="store_true",
+        help=(
+            "keep going until done: start a campaign on the goal with this run as its first session; the daemon runs "
+            "the sessions after it until the outcome is verified (a task, without goal mode)"
+        ),
+    )
     run.add_argument("--thread", default=None, help="continue an existing conversation thread")
     run.add_argument("--no-input", action="store_true", help="never prompt; approvals are denied")
     run.add_argument("--thinking", action="store_true", help="show the model's reasoning stream")
@@ -426,6 +453,24 @@ def build_parser() -> argparse.ArgumentParser:
     schedule_disable = schedule_commands.add_parser("disable", help="switch a schedule off without deleting it")
     schedule_disable.add_argument("schedule_id", help="the id shown by 'dotx schedule list'")
 
+    campaign = commands.add_parser(
+        "campaign", help="goals that Dot keeps working on in sessions until done ('dotx run --standing' starts one)"
+    )
+    campaign_commands = campaign.add_subparsers(dest="campaign_action", required=True)
+    campaign_commands.add_parser("list", help="show every campaign: where it stands and how many sessions it ran")
+    campaign_show = campaign_commands.add_parser("show", help="show a campaign: its targets, sessions and ledger")
+    campaign_show.add_argument("campaign_id", help="the id shown by 'dotx campaign list'")
+    campaign_stop = campaign_commands.add_parser("stop", help="stop a campaign: no session starts after it")
+    campaign_stop.add_argument("campaign_id", help="the id shown by 'dotx campaign list'")
+    campaign_resume = campaign_commands.add_parser(
+        "resume", help="let a stopped or achieved campaign go on: its next session starts now"
+    )
+    campaign_resume.add_argument("campaign_id", help="the id shown by 'dotx campaign list'")
+    campaign_achieved = campaign_commands.add_parser(
+        "achieved", help="mark a campaign achieved on your word, without the goal check"
+    )
+    campaign_achieved.add_argument("campaign_id", help="the id shown by 'dotx campaign list'")
+
     mcp = commands.add_parser("mcp", help="the MCP tool servers that Dot connects to")
     mcp_commands = mcp.add_subparsers(dest="mcp_action", required=True)
     mcp_commands.add_parser(
@@ -515,6 +560,7 @@ def parse_command(parser: argparse.ArgumentParser, arguments: list[str]) -> Comm
     desktop_action: object = raw.pop("desktop_action", None)
     memory_action: object = raw.pop("memory_action", None)
     schedule_action: object = raw.pop("schedule_action", None)
+    campaign_action: object = raw.pop("campaign_action", None)
     mcp_action: object = raw.pop("mcp_action", None)
     skills_action: object = raw.pop("skills_action", None)
     service_action: object = raw.pop("service_action", None)
@@ -534,6 +580,8 @@ def parse_command(parser: argparse.ArgumentParser, arguments: list[str]) -> Comm
         raw["name"] = f"memory-{memory_action}"
     if raw["name"] == "schedule":
         raw["name"] = f"schedule-{schedule_action}"
+    if raw["name"] == "campaign":
+        raw["name"] = f"campaign-{campaign_action}"
     if raw["name"] == "mcp":
         raw["name"] = f"mcp-{mcp_action}"
     if raw["name"] == "skills":
@@ -670,21 +718,42 @@ async def cmd_run(command: RunCommand) -> int:
         )
         manager: RunManager = RunManager(runtime)
         ui: TerminalUi = TerminalUi(runtime, options)
-        run: RunRecord = await execute_run(
-            runtime,
-            manager,
-            ui,
-            goal,
-            command.mode,
-            command.model,
-            command.effort,
-            command.approvals,
-            command.goal_mode,
-            command.thread,
+        run: RunRecord = (
+            await follow_run(
+                runtime,
+                manager,
+                ui,
+                lambda: manager.start_campaign(
+                    goal,
+                    command.mode,
+                    command.model,
+                    command.thread,
+                    "cli",
+                    command.effort,
+                    command.approvals,
+                    command.goal_mode,
+                    (),
+                ),
+            )
+            if command.standing
+            else await execute_run(
+                runtime,
+                manager,
+                ui,
+                goal,
+                command.mode,
+                command.model,
+                command.effort,
+                command.approvals,
+                command.goal_mode,
+                command.thread,
+            )
         )
         # The answer comes first: the lessons are drawn after the run's end.
         _print_result(run)
         ui.show_open_ends(ui.needs_from_user, await runtime.store.list_left_questions(run.id))
+        if run.campaign_id is not None:
+            sys.stderr.write(f"{render_first_session_end(await runtime.store.get_campaign(run.campaign_id))}\n")
         await _show_lessons(runtime, manager, ui, run.id)
     finally:
         await close_runtime(runtime)
@@ -1001,6 +1070,16 @@ async def dispatch(command: Command) -> int:
             return await cmd_schedule_enable(command)
         case ScheduleDisableCommand():
             return await cmd_schedule_disable(command)
+        case CampaignListCommand():
+            return await cmd_campaign_list(command)
+        case CampaignShowCommand():
+            return await cmd_campaign_show(command)
+        case CampaignStopCommand():
+            return await cmd_campaign_stop(command)
+        case CampaignResumeCommand():
+            return await cmd_campaign_resume(command)
+        case CampaignAchievedCommand():
+            return await cmd_campaign_achieved(command)
         case McpListCommand():
             return await cmd_mcp_list(command)
         case SkillsListCommand():

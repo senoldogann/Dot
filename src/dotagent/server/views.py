@@ -16,6 +16,8 @@ from dotagent.store.models import (
     ApprovalRecord,
     ApprovalStatus,
     Behavior,
+    CampaignEntry,
+    CampaignRecord,
     MemoryRecord,
     RunMode,
     RunRecord,
@@ -80,7 +82,9 @@ class SearchQuery(FrozenModel):
 
 
 class StartRunRequest(FrozenModel):
-    """Start a run. ``model``, ``effort``, ``approvals`` and ``goal_mode`` left out take the configured ones."""
+    """Start a run. ``model``, ``effort``, ``approvals`` and ``goal_mode`` left out take the configured ones.
+    ``standing`` ("Keep going until done") starts a campaign on the goal instead, with this run as its opening session:
+    a task, without goal mode (see ``RunManager.start_campaign``)."""
 
     goal: str = Field(min_length=1, max_length=_GOAL_CHARS)
     mode: RunMode = "task"
@@ -89,6 +93,7 @@ class StartRunRequest(FrozenModel):
     effort: Effort | None = None
     approvals: ApprovalMode | None = None
     goal_mode: bool | None = None
+    standing: bool = False
     attachments: list[str] = Field(default_factory=list, max_length=MAX_ATTACHMENTS)
 
 
@@ -185,11 +190,20 @@ class KeyRequest(FrozenModel):
 # --------------------------------------------------------------------------------------------- responses
 
 
+class CampaignChip(FrozenModel):
+    """The campaign a run is a session of, as the run's page names it; ``session`` is the run's number among the
+    campaign's sessions."""
+
+    id: str
+    title: str
+    session: int
+
+
 class RunDetail(FrozenModel):
     """A run as its page shows it. ``resumable`` is true when the daemon cut the run off and a new run can go on from
     where it stopped (see ``agent.resume``); ``lessons`` is what became of the lessons drawn from the run once it ended,
     ``None`` when none were (see ``agent.lessons``); ``questions`` are the questions the run left for the user that are
-    still open, oldest first."""
+    still open, oldest first; ``campaign`` is the campaign the run is a session of, ``None`` for any other run."""
 
     run: RunRecord
     children: list[RunRecord]
@@ -197,6 +211,33 @@ class RunDetail(FrozenModel):
     resumable: bool
     lessons: RunLessons | None
     questions: list[ApprovalRecord]
+    campaign: CampaignChip | None
+
+
+class CampaignSummary(FrozenModel):
+    """A campaign as the list of campaigns shows it: how many sessions it ran, the session working now (``None`` when
+    none is), when the next one starts, in this Mac's time zone (``None`` when none is planned), and the newest
+    ``progress`` entry of its ledger (``None`` before the first)."""
+
+    record: CampaignRecord
+    sessions: int
+    working: str | None
+    next_local: str | None
+    progress: CampaignEntry | None
+
+
+class CampaignDetail(FrozenModel):
+    """A campaign as its page shows it: its sessions, oldest first; the session working now and when the next one
+    starts, as its summary says them; the newest entries of its ledger, oldest first; the questions its sessions asked
+    the owner and what became of them, oldest first; and the tokens its sessions and the runs they delegated to used."""
+
+    record: CampaignRecord
+    sessions: list[RunRecord]
+    working: str | None
+    next_local: str | None
+    entries: list[CampaignEntry]
+    questions: list[ApprovalRecord]
+    tokens: int
 
 
 class MemoryPage(FrozenModel):

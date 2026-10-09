@@ -33,6 +33,8 @@ class PromptInputs(FrozenModel):
     memories: tuple[str, ...]
     tool_names: tuple[str, ...]
     skills: tuple[Skill, ...]
+    # The number of the session when the run is a session of a campaign, else None.
+    campaign_session: int | None
 
 
 _MODE_TEXT: dict[RunMode, str] = {
@@ -122,6 +124,27 @@ nothing. A round that brought nothing is a reason to change the approach, not to
 - For such a goal, call finish only once the targets are met, when the next step needs something only the user can \
 give (say what in needs_from_user), or when the system tells you that the run's limit is reached. Short of the \
 targets, finish with success false, the numbers reached and what is missing."""
+
+# Sessions of a campaign only, instead of the open-ended goals: a session ends when its own work is done.
+_CAMPAIGN: str = """# Campaign
+This run is session {session} of a campaign: the owner asked Dot to keep going on the goal until it is reached. From \
+session 2 on, your first message is the brief, which says what the sessions before did: do not start from zero.
+- Work toward the campaign's targets. While it has none, record them with campaign_targets (the outcome, measurable, \
+and how a session verifies it with its own reads) before you finish.
+- Before you finish, write what this session did with campaign_note: progress with the numbers you measured and \
+where, a setback when something failed, a strategy entry when you change the approach. The ledger is how the next \
+session knows what was done; the campaign's progress does not go in your notes.
+- Follow the newest strategy; when a round brought nothing, write a new strategy entry and follow it.
+- Verify the targets with your own reads before you claim them with campaign_achieved. The goal checker decides; its \
+reason says what is missing, and the campaign goes on.
+- Leave the owner a question with ask_user only for what only they can give, and go on with the rest. When the next \
+step needs it, say so in needs_from_user and finish: the next session waits for the answer, and tries another way when \
+none comes.
+- What the owner tells you during this session holds for the campaign: write it in the ledger (note), so the next \
+sessions follow it too.
+- Finish when this session's work is done, with success true when it did its part (the campaign need not be \
+reached yet) and false when it could not. The next session follows; campaign_schedule sets when, if the usual gap \
+does not suit."""
 
 _ENDING_REPLY: str = """- When the goal is achieved or impossible, reply in plain text; that reply ends your turn and is the only part of \
 the work the user reads: put the actual result in it (the findings, figures or text asked for, paths, URLs, values), \
@@ -331,15 +354,20 @@ def _skills_section(skills: Sequence[Skill], tool_names: Sequence[str]) -> str:
     return f"{_SKILLS_SECTION}\n{lines}"
 
 
-def _ending(mode: RunMode) -> str:
+def _ending(mode: RunMode, campaign_session: int | None) -> str:
     """A task or research run ends with the finish tool, and an open-ended goal holds it back until its targets are
-    met; a chat turn ends with a plain reply."""
-    return _ENDING_REPLY if mode == "chat" else f"{_ENDING_TOOL}\n\n{_OPEN_GOALS}"
+    met; a session of a campaign ends when its own work is done, and the campaign goes on; a chat turn ends with a plain
+    reply."""
+    if mode == "chat":
+        return _ENDING_REPLY
+    if campaign_session is not None:
+        return f"{_ENDING_TOOL}\n\n{_CAMPAIGN.format(session=campaign_session)}"
+    return f"{_ENDING_TOOL}\n\n{_OPEN_GOALS}"
 
 
 def build_system_prompt(inputs: PromptInputs) -> str:
     sections: list[str] = [
-        f"{_WORK}\n{_ending(inputs.mode)}",
+        f"{_WORK}\n{_ending(inputs.mode, inputs.campaign_session)}",
         f"{_REST}\n- {_SECRETS_ENTERED if inputs.approvals == 'yolo' else _SECRETS_REFUSED}\n{_CLOSING}",
         _mcp_section(inputs.tool_names),
         _groups_section(inputs.tool_names),
@@ -362,6 +390,7 @@ def collect_prompt_inputs(
     memories: Sequence[str],
     tool_names: Sequence[str],
     skills: Sequence[Skill],
+    campaign_session: int | None,
 ) -> PromptInputs:
     """Gather the facts about this machine and moment that the prompt states."""
     return PromptInputs(
@@ -379,4 +408,5 @@ def collect_prompt_inputs(
         memories=tuple(memories),
         tool_names=tuple(tool_names),
         skills=tuple(skills),
+        campaign_session=campaign_session,
     )

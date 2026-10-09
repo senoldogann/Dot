@@ -18,6 +18,7 @@ import pytest_asyncio
 
 from dotagent.agent.gate import YOLO_DECIDER, RunGate
 from dotagent.agent.review import ReviewRequest, ReviewVerdict
+from dotagent.agent.verify import new_facts
 from dotagent.config import load_config
 from dotagent.core.paths import workspace_dir
 from dotagent.core.types import JsonObject
@@ -108,7 +109,7 @@ async def _context(runtime: Runtime, approvals: ApprovalMode) -> tuple[ToolConte
     """A run of ``approvals`` in the store, its gate and the context its tools get."""
     thread: ThreadRecord = await runtime.store.create_thread("secret fields", "test")
     run: RunRecord = await runtime.store.create_run(
-        thread.id, GOAL, "task", "ollama:none", None, "test", "medium", approvals, False
+        thread.id, GOAL, "task", "ollama:none", None, "test", "medium", approvals, False, None
     )
     gate: RunGate = RunGate(
         runtime.store, runtime.bus, runtime.approvals, run.id, "task", "aggressive", approvals, _nobody, (GOAL,)
@@ -124,6 +125,7 @@ async def _context(runtime: Runtime, approvals: ApprovalMode) -> tuple[ToolConte
         gate=gate,
         cancel=asyncio.Event(),
         output_chars=runtime.config.agent.tool_output_chars,
+        facts=new_facts,
     )
     return ctx, gate
 

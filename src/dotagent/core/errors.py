@@ -154,8 +154,8 @@ class InvalidValueError(StoreError):
 
 
 class RunConflict(DotError):
-    """A run cannot be started, steered or stopped, an approval decided, a lesson of a run saved or dismissed, or the
-    file changes of a run taken back, in the state it is in."""
+    """A run cannot be started, steered or stopped, an approval decided, a lesson of a run saved or dismissed, the file
+    changes of a run taken back, or a campaign go on, stop or be marked achieved, in the state it is in."""
 
 
 class UndoError(DotError):

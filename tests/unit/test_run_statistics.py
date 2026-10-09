@@ -24,7 +24,9 @@ DAY_S: float = 86400.0
 async def _run(
     store: Store, thread_id: str, model: str, status: RunStatus, result: str, steps: int, tokens: int
 ) -> RunRecord:
-    run: RunRecord = await store.create_run(thread_id, "goal", "task", model, None, "test", "medium", "ask", False)
+    run: RunRecord = await store.create_run(
+        thread_id, "goal", "task", model, None, "test", "medium", "ask", False, None
+    )
     await store.set_run_steps(run.id, steps)
     await store.add_run_tokens(run.id, tokens, tokens // 10)
     await store.finish_run(run.id, status, result)

@@ -15,6 +15,7 @@ from dotagent.core.types import JsonObject
 from dotagent.llm.types import ToolCall, ToolSpec, assistant_message, tool_message, user_message
 from dotagent.runtime import _tool_groups
 from dotagent.tools.base import ToolResult, fail, ok
+from dotagent.tools.campaign import CAMPAIGN_TOOLS
 from dotagent.tools.groups import (
     CORE_GROUP,
     group_lines,
@@ -32,7 +33,10 @@ _DEFAULT: AppConfig = load_default_config()
 REGISTRY: ToolRegistry = build_registry(
     _tool_groups(_DEFAULT.model_copy(update={"desktop": _DEFAULT.desktop.model_copy(update={"enabled": True})}))
 )
-TASK_SPECS: tuple[ToolSpec, ...] = specs_for_mode(REGISTRY, "task")
+# What a task run is offered when it is not a session of a campaign: the loop leaves the campaign tools out.
+TASK_SPECS: tuple[ToolSpec, ...] = tuple(
+    spec for spec in specs_for_mode(REGISTRY, "task") if spec.name not in CAMPAIGN_TOOLS
+)
 TASK_TOOLS: list[str] = [spec.name for spec in TASK_SPECS]
 DEFAULTS: AgentConfig = _DEFAULT.agent
 GROUPED: AgentConfig = DEFAULTS.model_copy(update={"tool_surface": "grouped"})
@@ -104,7 +108,7 @@ def test_the_tools_of_the_groups_that_are_off_are_hidden_with_their_group() -> N
 
 def _inputs(tool_names: list[str]) -> PromptInputs:
     return collect_prompt_inputs(
-        "task", "cli", "aggressive", "ask", "wait", False, Path("/tmp/work"), [], tool_names, []
+        "task", "cli", "aggressive", "ask", "wait", False, Path("/tmp/work"), [], tool_names, [], None
     )
 
 

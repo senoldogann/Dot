@@ -142,6 +142,7 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
     el("div", { class: "row" }, count, cancelButton),
     el("div", { class: "row" }, allButton, deleteButton),
   );
+  const campaignsLink = el("a", { class: "side-link", href: "#/campaigns", onclick: onNavigate }, icon("target"), el("span", null, "Campaigns"));
   const settingsLink = el("a", { class: "side-link", href: "#/settings", onclick: onNavigate }, icon("sliders"), el("span", null, "Settings"));
 
   function rows() {
@@ -501,7 +502,7 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
       el("label", { class: "side-search" }, icon("search"), search, el("kbd", { "aria-hidden": "true" }, "⌘K")),
       el("nav", { class: "side-recent", "aria-label": "Chats" }, head, bar, list),
     ),
-    el("div", { class: "side-foot" }, settingsLink),
+    el("div", { class: "side-foot" }, campaignsLink, settingsLink),
   );
 
   return {
@@ -514,6 +515,7 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
       close.focus();
     },
     setRoute({ tab, runId }) {
+      mark(campaignsLink, tab === "campaigns");
       mark(settingsLink, tab === "settings");
       routeRunId = runId;
       routeThreadId = null;
