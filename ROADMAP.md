@@ -892,8 +892,8 @@ that change the owner's agent are their call (see "Open owner decisions", 6 onwa
 | #   | Item                                                                   | Status      | Commits |
 | --- | ---------------------------------------------------------------------- | ----------- | ------- |
 | 9   | Time accounting: where the seconds of a run go                         | done        | 4741bed |
-| 10  | Yolo asks nobody: secret fields, questions and the end of a run        | done        |         |
-| 11  | Open-ended goals in one run: targets, budgets and an honest end        | planned     |         |
+| 10  | Yolo asks nobody: secret fields, questions and the end of a run        | done        | eacd180 |
+| 11  | Open-ended goals in one run: targets, budgets and an honest end        | in progress |         |
 | 12  | Campaigns: a goal that works until its outcome is verified             | planned     |         |
 | 13  | Faster browser and desktop steps                                       | planned     |         |
 | 14  | Rich editors, drag and bulk text in the browser                        | planned     |         |
@@ -1076,9 +1076,9 @@ checked on a scripted throw-away daemon at desktop width and at 375 px.
 
 ### 10. Yolo asks nobody: secret fields, questions and the end of a run
 
-**Status: done.** **Goal.** A `yolo` run types the secret fields it can fill from what it reads itself, and a run that
-nobody watches (`yolo`, scheduled, eval) does not stop for its own questions: a question for the owner is left with the
-run, the run goes on, and the owner's answer later carries the work on.
+**Status: done** (`eacd180`, PR #2). **Goal.** A `yolo` run types the secret fields it can fill from what it reads
+itself, and a run that nobody watches (`yolo`, scheduled, eval) does not stop for its own questions: a question for the
+owner is left with the run, the run goes on, and the owner's answer later carries the work on.
 
 **Why.** On 2026-10-09 a `yolo` run applying for a job stopped at an e-mail verification code that had arrived in the
 owner's webmail, which the run could open, and asked the owner to type the six digits. Three things made it ask (the
@@ -1300,9 +1300,9 @@ in a card).
 
 ### 11. Open-ended goals in one run: targets, budgets and an honest end
 
-**Status: planned.** **Goal.** A run given an outcome instead of a task ("grow", "earn", "find a way", "as many as
-possible") turns it into measurable targets, works toward them, and ends only with the targets reached or with an
-honest account of what is missing; the owner can bound such a run in minutes or tokens when they want to.
+**Status: in progress.** **Goal.** A run given an outcome instead of a task ("grow", "earn", "find a way", "as many as
+possible") turns it into measurable targets, works toward them, and ends only with the targets reached or with an honest
+account of what is missing; the owner can bound such a run in minutes or tokens when they want to.
 
 **Why.** The prompt was written for precise tasks: "take the smallest reasonable reading", "add nothing that was not
 asked for" (`agent/prompt.py:81-84`). Nothing tells the model what "done" means for an open goal, so a run can end
@@ -1857,9 +1857,10 @@ on and is closed by `terminal_close`; the idle reaper; unit tests of the ANSI st
     `memory_save` are acting-only, `tools/base.py:16-17`), and DuckDuckGo's bot check throttles long research runs
     (README "Status and known limits"). Say whether a research run may save notes and files under the workspace,
     and whether the hosted Ollama search (`OLLAMA_API_KEY`) should be the default backend; either is a small item.
-15. The Claude GitHub app reviews nothing yet: on PR #1 it answered "Code review skipped" because your organization has
-    no extra usage to pay for it. Add extra usage (or raise the monthly limit) at claude.ai/admin-settings/usage; a
-    comment `@claude review` on a PR then asks for a review. Until then each PR is merged on `/code-review` alone.
+15. The Claude GitHub app reviews nothing yet: on PR #1 and PR #2 it answered "Code review skipped" because your
+    organization has no extra usage to pay for it. Add extra usage (or raise the monthly limit) at
+    claude.ai/admin-settings/usage; a comment `@claude review` on a PR then asks for a review. Until then each PR is
+    merged on `/code-review` alone.
 
 ## Log
 
@@ -2015,3 +2016,5 @@ on and is closed by `terminal_close`; the idle reaper; unit tests of the ANSI st
   restarts; an answer that starts a run is its goal, as a follow-up is. Found and left: a paste through a desktop Edit
   menu, `desktop_open_app` opening a password manager before it refuses it, the composer's reasoning level for a model
   without a choice of levels.
+- 2026-10-09: item 10 merged as `eacd180` (PR #2, squash); the Claude GitHub app skipped its review again (decision 15).
+  Item 11 started on `item-11-open-ended-goals`.
