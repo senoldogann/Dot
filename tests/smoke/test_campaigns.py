@@ -1,6 +1,8 @@
 """Campaigns in the real loop, the real scheduler and the API: an opening session records the targets before it ends,
 the scheduler starts the next session with the brief, only a claim the goal checker accepts ends the campaign, a
-session the daemon cut off is followed by a new one, and the owner stops, lets go on and marks a campaign achieved.
+session the daemon cut off is followed by a new one, the answer to a question an ended session left goes to no other
+run and brings the next session forward, a moment planned for the next session keeps the rhythm of the sessions, and
+the owner stops, lets go on and marks a campaign achieved.
 
 No network and no model service is used: the scripted model plays the sessions and answers for the goal checker too,
 and the notification of the owner is recorded instead of shown.
@@ -12,6 +14,7 @@ import secrets
 import time
 from collections.abc import AsyncIterator, Sequence
 from contextlib import asynccontextmanager
+from datetime import datetime, timedelta
 
 import httpx
 import pytest
@@ -31,16 +34,26 @@ from dotagent.llm.types import ChatRequest, DeltaSink, ModelInfo, ModelReply
 from dotagent.runtime import Runtime, close_runtime, open_runtime
 from dotagent.scheduler import SCHEDULE_SOURCE
 from dotagent.scheduler.runner import Scheduler
+from dotagent.server import UI_SOURCE
 from dotagent.server.app import create_app
 from dotagent.server.context import ServerContext
-from dotagent.store.models import WORKING_STATUSES, CampaignEntry, CampaignRecord, EventRecord, RunRecord, ThreadRecord
+from dotagent.store.models import (
+    WORKING_STATUSES,
+    ApprovalRecord,
+    CampaignEntry,
+    CampaignRecord,
+    EventRecord,
+    RunRecord,
+    ThreadRecord,
+)
 from dotagent.tools.campaign import (
     CAMPAIGN_ACHIEVED_TOOL,
     CAMPAIGN_NOTE_TOOL,
+    CAMPAIGN_SCHEDULE_TOOL,
     CAMPAIGN_TARGETS_TOOL,
     CAMPAIGN_TOOLS,
 )
-from dotagent.tools.meta import FINISH_TOOL
+from dotagent.tools.meta import ASK_USER_TOOL, FINISH_TOOL
 from dotagent.tools.shell import read_login_env
 
 pytestmark = pytest.mark.asyncio(loop_scope="module")
@@ -186,6 +199,14 @@ async def _ended_sessions(runtime: Runtime, campaign_id: str, count: int) -> lis
         await asyncio.sleep(_POLL_S)
 
 
+async def _blocked(runtime: Runtime, run_id: str) -> None:
+    """Return once the run waits for the owner."""
+    while True:
+        if (await runtime.store.get_run(run_id)).status == "blocked":
+            return
+        await asyncio.sleep(_POLL_S)
+
+
 async def test_the_opening_session_records_the_targets_before_it_ends_and_plans_the_next_session(
     login_env: dict[str, str],
 ) -> None:
@@ -313,7 +334,7 @@ async def test_a_session_the_daemon_cut_off_is_not_resumed_and_the_next_session_
         store = runtime.store
         thread: ThreadRecord = await store.create_thread("Leads", EVAL_SOURCE)
         campaign: CampaignRecord = await store.create_campaign(
-            "Leads", GOAL, thread.id, SCRIPTED_MODEL, runtime.config.models.effort, "ask"
+            "Leads", GOAL, thread.id, SCRIPTED_MODEL, runtime.config.models.effort, "ask", ()
         )
         await store.set_campaign_targets(campaign.id, TARGETS, VERIFICATION)
         cut: RunRecord = await store.create_run(
@@ -329,7 +350,7 @@ async def test_a_session_the_daemon_cut_off_is_not_resumed_and_the_next_session_
             campaign.id,
         )
         await store.set_run_status(cut.id, "running")
-        # What the daemon does when it starts again after it stopped while the session ran.
+        # What the daemon does when it starts again after it died while the session ran.
         assert await manager.recover() == 1
         assert not await manager.resumable(await store.get_run(cut.id))
         before: float = time.time()
@@ -341,12 +362,92 @@ async def test_a_session_the_daemon_cut_off_is_not_resumed_and_the_next_session_
         async with asyncio.timeout(_TIME_LIMIT_S):
             ended: RunRecord = await manager.wait(session.id)
         followed: CampaignRecord = await store.get_campaign(campaign.id)
-    assert planned.next_session_at is not None and before <= planned.next_session_at <= time.time()
+    # The session may be what brought the daemon down: the next one starts after the usual gap, not at once.
+    assert planned.next_session_at is not None and abs(planned.next_session_at - (before + 3600)) < 5
     assert ended.status == "done", ended
     (step,) = model.of(session.thread_id)
     assert "Session 1 was cut off by a stop of the daemon 0 min ago, before it ended" in _first_user(step)
     assert followed.next_session_at is not None and ended.finished_at is not None
     assert abs(followed.next_session_at - (ended.finished_at + 3600)) < 5
+
+
+async def test_an_answer_to_a_question_an_ended_session_left_goes_to_no_other_run_and_brings_the_next_session_forward(
+    login_env: dict[str, str],
+) -> None:
+    model: RecordingProvider = RecordingProvider(
+        ScriptedProvider(
+            _PROVIDER,
+            [
+                # The opening session leaves a question for the owner and ends needing its answer.
+                _turn(_call(ASK_USER_TOOL, {"question": "Which region do the leads come from?"}), _targets()),
+                _turn(
+                    _call(
+                        FINISH_TOOL,
+                        {"answer": "5 leads so far.", "success": True, "needs_from_user": "The region of the leads."},
+                    )
+                ),
+                # The owner's next message in the campaign's conversation: a run that waits for its own question.
+                _turn(_call(ASK_USER_TOOL, {"question": "Which CRM do you use?"})),
+            ],
+        )
+    )
+    async with _session(_config(60), login_env, model, Notices()) as (runtime, manager):
+        opening: RunRecord = await _start_campaign(manager)
+        assert opening.campaign_id is not None
+        async with asyncio.timeout(_TIME_LIMIT_S):
+            ended: RunRecord = await manager.wait(opening.id)
+        waiting: CampaignRecord = await runtime.store.get_campaign(opening.campaign_id)
+        follow_up: RunRecord = await manager.start(
+            "Also note the CRM.", "task", SCRIPTED_MODEL, opening.thread_id, UI_SOURCE, None, None, "ask", False, ()
+        )
+        async with asyncio.timeout(_TIME_LIMIT_S):
+            await _blocked(runtime, follow_up.id)
+        (left,) = await runtime.store.run_questions(opening.id, ASK_USER_TOOL)
+        decided: ApprovalRecord = await manager.decide(left.id, True, UI_SOURCE, "Europe")
+        forward: CampaignRecord = await runtime.store.get_campaign(opening.campaign_id)
+        on_thread: list[RunRecord] = await runtime.store.list_runs(10, opening.thread_id)
+        manager.cancel(follow_up.id)
+        async with asyncio.timeout(_TIME_LIMIT_S):
+            await manager.wait(follow_up.id)
+        steered: list[EventRecord] = await _events(runtime, follow_up.id, "steer")
+    assert (ended.status, left.status) == ("done", "left"), ended
+    # It ended needing the owner, with its question unanswered: the next session waits a day for the answer.
+    assert ended.finished_at is not None and waiting.next_session_at is not None
+    assert abs(waiting.next_session_at - (ended.finished_at + 24 * 3600)) < 5
+    assert (decided.status, decided.note) == ("approved", "Europe")
+    assert forward.next_session_at is not None and forward.next_session_at <= time.time()
+    # The owner's run on the conversation did not get the answer, and no run started for it.
+    assert steered == []
+    assert [run.id for run in on_thread] == [follow_up.id, opening.id]
+
+
+async def test_a_moment_planned_for_the_next_session_keeps_the_rhythm_of_the_sessions(
+    login_env: dict[str, str],
+) -> None:
+    # A day ahead in this Mac's time; whatever the zone of the schedules, it is hours ahead.
+    tomorrow: str = (datetime.now() + timedelta(days=1)).strftime("%Y-%m-%dT%H:%M")
+    model: RecordingProvider = RecordingProvider(
+        ScriptedProvider(
+            _PROVIDER,
+            [
+                _turn(_targets(), _call(CAMPAIGN_SCHEDULE_TOOL, {"cron": "0 9 * * *"})),
+                _turn(_call(CAMPAIGN_SCHEDULE_TOOL, {"at": tomorrow})),
+                _finish("The next session is planned for tomorrow."),
+            ],
+        )
+    )
+    async with _session(_config(60), login_env, model, Notices()) as (runtime, manager):
+        opening: RunRecord = await _start_campaign(manager)
+        assert opening.campaign_id is not None
+        async with asyncio.timeout(_TIME_LIMIT_S):
+            ended: RunRecord = await manager.wait(opening.id)
+        campaign: CampaignRecord = await runtime.store.get_campaign(opening.campaign_id)
+        results: list[EventRecord] = await _events(runtime, opening.id, "tool_result")
+    assert ended.status == "done", ended
+    assert campaign.cron == "0 9 * * *"
+    assert campaign.next_session_at is not None and campaign.next_session_at > time.time() + 3 * 3600
+    planned: list[JsonObject] = [event.data for event in results if event.data["tool"] == CAMPAIGN_SCHEDULE_TOOL]
+    assert str(planned[-1]["text"]).endswith("The rhythm 0 9 * * * goes on after it.")
 
 
 def _context(runtime: Runtime, manager: RunManager) -> ServerContext:

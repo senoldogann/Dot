@@ -15,7 +15,8 @@ RunMode = Literal["task", "chat", "research"]
 ApprovalStatus = Literal["pending", "left", "approved", "denied", "expired"]
 Behavior = Literal["allow", "preapproved", "ask", "handoff"]
 # ``active``: its sessions go on; ``achieved``: the goal checker accepted its evidence, or the owner said so;
-# ``stopped``: the owner stopped it, or it ran the sessions ``[agent] campaign_max_sessions`` allows.
+# ``stopped``: the owner stopped it (also with the emergency stop of desktop control, which ends its session), or it ran
+# the sessions ``[agent] campaign_max_sessions`` allows.
 CampaignStatus = Literal["active", "achieved", "stopped"]
 CampaignEntryKind = Literal["progress", "setback", "note", "strategy", "question"]
 
@@ -149,8 +150,9 @@ class CampaignRecord(FrozenModel):
     stops it. ``thread_id`` is the owner's conversation it was started in. ``targets`` and ``verification`` are what
     its sessions recorded with ``campaign_targets`` (empty until then). ``cron`` repeats its sessions;
     ``next_session_at`` is when the next one starts, ``None`` while none is planned. ``model``, ``effort`` and
-    ``approvals`` are the settings of the run that opened it, which every session keeps. ``evidence`` is what the
-    accepted claim of the outcome said, empty while the campaign is not achieved."""
+    ``approvals`` are the settings of the run that opened it, which every session keeps. ``files`` are the paths of
+    the files the owner attached to its goal. ``evidence`` is what the accepted claim of the outcome said, empty while
+    the campaign is not achieved."""
 
     id: str
     title: str
@@ -162,6 +164,7 @@ class CampaignRecord(FrozenModel):
     model: str
     effort: Effort
     approvals: ApprovalMode
+    files: tuple[str, ...]
     cron: str | None
     next_session_at: float | None
     created_at: float

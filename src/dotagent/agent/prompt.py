@@ -127,8 +127,8 @@ targets, finish with success false, the numbers reached and what is missing."""
 
 # Sessions of a campaign only, instead of the open-ended goals: a session ends when its own work is done.
 _CAMPAIGN: str = """# Campaign
-This run is session {session} of a campaign: the owner asked Dot to keep going on the goal until it is reached. The \
-brief, your first message, says what the sessions before did: do not start from zero.
+This run is session {session} of a campaign: the owner asked Dot to keep going on the goal until it is reached. From \
+session 2 on, your first message is the brief, which says what the sessions before did: do not start from zero.
 - Work toward the campaign's targets. While it has none, record them with campaign_targets (the outcome, measurable, \
 and how a session verifies it with its own reads) before you finish.
 - Before you finish, write what this session did with campaign_note: progress with the numbers you measured and \
@@ -140,8 +140,11 @@ reason says what is missing, and the campaign goes on.
 - Leave the owner a question with ask_user only for what only they can give, and go on with the rest. When the next \
 step needs it, say so in needs_from_user and finish: the next session waits for the answer, and tries another way when \
 none comes.
-- Finish when this session's work is done; the campaign goes on with the next session. campaign_schedule sets when \
-that is, when the usual gap does not suit."""
+- What the owner tells you during this session holds for the campaign: write it in the ledger (note), so the next \
+sessions follow it too.
+- Finish when this session's work is done, with success true when it did its part (the campaign need not be \
+reached yet) and false when it could not. The next session follows; campaign_schedule sets when, if the usual gap \
+does not suit."""
 
 _ENDING_REPLY: str = """- When the goal is achieved or impossible, reply in plain text; that reply ends your turn and is the only part of \
 the work the user reads: put the actual result in it (the findings, figures or text asked for, paths, URLs, values), \

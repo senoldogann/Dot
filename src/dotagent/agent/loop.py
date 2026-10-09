@@ -107,11 +107,10 @@ from dotagent.agent.scaffold import (
 from dotagent.agent.verify import (
     RunFacts,
     answer_paths,
+    checked_facts,
     missing_paths,
     new_facts,
     paths_note,
-    render_facts,
-    unopened_addresses,
     with_outcomes,
 )
 from dotagent.agent.vision import text_for_blind_model
@@ -634,12 +633,11 @@ async def _ask_checker(
     """
     run: RunRecord = agent.run
     patience: int = agent.runtime.config.agent.goal_patience
-    missing: tuple[str, ...] = await _missing_in_answer(agent, ended.result, facts)
     request: GoalRequest = GoalRequest(
         goal=run.goal,
         targets=(await _current_plan(agent)).targets,
         digest=goal_digest(render_transcript(_since_goal(history, goal))),
-        facts=redact_secrets(render_facts(facts, missing, unopened_addresses(ended.result, facts.named))),
+        facts=await asyncio.to_thread(checked_facts, facts, ended.result, agent.runtime.workspace),
         answer=ended.result,
         claimed_success=ended.status == "done",
     )

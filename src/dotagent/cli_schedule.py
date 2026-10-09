@@ -61,7 +61,7 @@ class ScheduleDisableCommand(FrozenModel):
 
 
 @contextlib.asynccontextmanager
-async def _schedule_store() -> AsyncIterator[Store]:
+async def store_alone() -> AsyncIterator[Store]:
     """The store alone, opened without the rest of the runtime and closed afterwards."""
     store: Store = await Store.open(db_path(), screenshots_dir())
     try:
@@ -70,13 +70,13 @@ async def _schedule_store() -> AsyncIterator[Store]:
         await store.close()
 
 
-async def _zone(config: AppConfig) -> ZoneInfo:
+async def local_zone(config: AppConfig) -> ZoneInfo:
     return await asyncio.to_thread(resolve_zone, config.scheduler.timezone)
 
 
 async def cmd_schedule_list(command: ScheduleListCommand) -> int:
-    zone: ZoneInfo = await _zone(load_user_config())
-    async with _schedule_store() as store:
+    zone: ZoneInfo = await local_zone(load_user_config())
+    async with store_alone() as store:
         records: list[ScheduleRecord] = sorted(await store.list_schedules(), key=schedule_order)
     for record in records:
         sys.stdout.write(f"{render_schedule_entry(record, await schedule_zone(record.options, zone))}\n")
@@ -86,7 +86,7 @@ async def cmd_schedule_list(command: ScheduleListCommand) -> int:
 
 async def cmd_schedule_add(command: ScheduleAddCommand) -> int:
     config: AppConfig = load_user_config()
-    zone: ZoneInfo = await _zone(config)
+    zone: ZoneInfo = await local_zone(config)
     request: ScheduleRequest = ScheduleRequest(
         name=command.title,
         goal=" ".join(command.goal),
@@ -95,7 +95,7 @@ async def cmd_schedule_add(command: ScheduleAddCommand) -> int:
         mode=command.mode,
         options=UNSET_OPTIONS,
     )
-    async with _schedule_store() as store:
+    async with store_alone() as store:
         record: ScheduleRecord = await create_schedule(store, config.scheduler, zone, request, time.time())
     sys.stdout.write(f"Scheduled: {render_schedule(record, await schedule_zone(record.options, zone))}\n")
     sys.stderr.write(f"{DAEMON_NOTE}\n")
@@ -103,8 +103,8 @@ async def cmd_schedule_add(command: ScheduleAddCommand) -> int:
 
 
 async def cmd_schedule_delete(command: ScheduleDeleteCommand) -> int:
-    zone: ZoneInfo = await _zone(load_user_config())
-    async with _schedule_store() as store:
+    zone: ZoneInfo = await local_zone(load_user_config())
+    async with store_alone() as store:
         record: ScheduleRecord = await remove_schedule(store, command.schedule_id)
     sys.stdout.write(f"Deleted: {render_schedule(record, await schedule_zone(record.options, zone))}\n")
     return 0
@@ -112,8 +112,8 @@ async def cmd_schedule_delete(command: ScheduleDeleteCommand) -> int:
 
 async def cmd_schedule_enable(command: ScheduleEnableCommand) -> int:
     config: AppConfig = load_user_config()
-    zone: ZoneInfo = await _zone(config)
-    async with _schedule_store() as store:
+    zone: ZoneInfo = await local_zone(config)
+    async with store_alone() as store:
         record: ScheduleRecord = await enable_schedule(store, config.scheduler, zone, command.schedule_id, time.time())
     sys.stdout.write(f"Switched on: {render_schedule(record, await schedule_zone(record.options, zone))}\n")
     sys.stderr.write(f"{DAEMON_NOTE}\n")
@@ -121,8 +121,8 @@ async def cmd_schedule_enable(command: ScheduleEnableCommand) -> int:
 
 
 async def cmd_schedule_disable(command: ScheduleDisableCommand) -> int:
-    zone: ZoneInfo = await _zone(load_user_config())
-    async with _schedule_store() as store:
+    zone: ZoneInfo = await local_zone(load_user_config())
+    async with store_alone() as store:
         record: ScheduleRecord = await disable_schedule(store, command.schedule_id)
     sys.stdout.write(f"Switched off: {render_schedule(record, await schedule_zone(record.options, zone))}\n")
     return 0

@@ -21,20 +21,20 @@ import aiosqlite
 
 from dotagent.core.errors import NotFoundError, StoreError
 from dotagent.core.ids import new_id
-from dotagent.core.jsonutil import dumps_compact, parse_json_object
+from dotagent.core.jsonutil import dumps_compact, parse_json_object, parse_json_value
 from dotagent.core.text import fold_search
 from dotagent.core.types import JsonArray, JsonObject
 from dotagent.llm.types import Effort, ImageData, Message
 from dotagent.policy.types import ApprovalMode
 from dotagent.store.endings import RESULT_RESTARTED
 from dotagent.store.models import (
+    WORKING_STATUSES,
     ApprovalRecord,
     ApprovalStatus,
     Behavior,
     CampaignEntry,
     CampaignEntryKind,
     CampaignRecord,
-    CampaignStatus,
     EventRecord,
     MemoryRecord,
     RuleRecord,
@@ -97,7 +97,8 @@ CREATE TABLE IF NOT EXISTS kv (key TEXT PRIMARY KEY, value TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS campaigns (
     id TEXT PRIMARY KEY, title TEXT NOT NULL, goal TEXT NOT NULL, targets TEXT NOT NULL, verification TEXT NOT NULL,
     status TEXT NOT NULL, thread_id TEXT NOT NULL, model TEXT NOT NULL, effort TEXT NOT NULL, approvals TEXT NOT NULL,
-    cron TEXT, next_session_at REAL, created_at REAL NOT NULL, updated_at REAL NOT NULL, evidence TEXT NOT NULL
+    files TEXT NOT NULL, cron TEXT, next_session_at REAL, created_at REAL NOT NULL, updated_at REAL NOT NULL,
+    evidence TEXT NOT NULL
 );
 CREATE TABLE IF NOT EXISTS campaign_entries (
     id TEXT PRIMARY KEY, campaign_id TEXT NOT NULL, run_id TEXT, ts REAL NOT NULL, kind TEXT NOT NULL,
@@ -331,22 +332,25 @@ def _run(row: aiosqlite.Row) -> RunRecord:
 
 
 def _campaign(row: aiosqlite.Row) -> CampaignRecord:
-    return CampaignRecord(
-        id=row["id"],
-        title=row["title"],
-        goal=row["goal"],
-        targets=row["targets"],
-        verification=row["verification"],
-        status=row["status"],
-        thread_id=row["thread_id"],
-        model=row["model"],
-        effort=row["effort"],
-        approvals=row["approvals"],
-        cron=row["cron"],
-        next_session_at=row["next_session_at"],
-        created_at=row["created_at"],
-        updated_at=row["updated_at"],
-        evidence=row["evidence"],
+    return CampaignRecord.model_validate(
+        {
+            "id": row["id"],
+            "title": row["title"],
+            "goal": row["goal"],
+            "targets": row["targets"],
+            "verification": row["verification"],
+            "status": row["status"],
+            "thread_id": row["thread_id"],
+            "model": row["model"],
+            "effort": row["effort"],
+            "approvals": row["approvals"],
+            "files": parse_json_value(row["files"], "campaign files"),
+            "cron": row["cron"],
+            "next_session_at": row["next_session_at"],
+            "created_at": row["created_at"],
+            "updated_at": row["updated_at"],
+            "evidence": row["evidence"],
+        }
     )
 
 
@@ -1396,7 +1400,14 @@ class Store:
     # ----- campaigns -------------------------------------------------------------------------
 
     async def create_campaign(
-        self, title: str, goal: str, thread_id: str, model: str, effort: Effort, approvals: ApprovalMode
+        self,
+        title: str,
+        goal: str,
+        thread_id: str,
+        model: str,
+        effort: Effort,
+        approvals: ApprovalMode,
+        files: Sequence[str],
     ) -> CampaignRecord:
         """Store a new campaign: active, without targets, with no session planned yet."""
         now: float = time.time()
@@ -1411,6 +1422,7 @@ class Store:
             model=model,
             effort=effort,
             approvals=approvals,
+            files=tuple(files),
             cron=None,
             next_session_at=None,
             created_at=now,
@@ -1419,7 +1431,8 @@ class Store:
         )
         await self._db.execute(
             "INSERT INTO campaigns(id, title, goal, targets, verification, status, thread_id, model, effort, approvals,"
-            " cron, next_session_at, created_at, updated_at, evidence) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            " files, cron, next_session_at, created_at, updated_at, evidence)"
+            " VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (
                 record.id,
                 record.title,
@@ -1431,6 +1444,7 @@ class Store:
                 record.model,
                 record.effort,
                 record.approvals,
+                dumps_compact(list(record.files)),
                 record.cron,
                 record.next_session_at,
                 record.created_at,
@@ -1452,46 +1466,47 @@ class Store:
         rows = await self._all("SELECT * FROM campaigns ORDER BY status = 'active' DESC, created_at DESC", ())
         return [_campaign(row) for row in rows]
 
-    async def _update_campaign(self, campaign_id: str, assignments: str, params: Sequence[object]) -> CampaignRecord:
+    async def _update_campaign(self, campaign_id: str, assignments: str, params: Sequence[object]) -> None:
         cursor: aiosqlite.Cursor = await self._db.execute(
             f"UPDATE campaigns SET {assignments}, updated_at = ? WHERE id = ?", (*params, time.time(), campaign_id)
         )
         await self._db.commit()
         if cursor.rowcount == 0:
             raise NotFoundError("campaign not found", {"campaign_id": campaign_id})
-        return await self.get_campaign(campaign_id)
 
-    async def set_campaign_targets(self, campaign_id: str, targets: str, verification: str) -> CampaignRecord:
-        return await self._update_campaign(campaign_id, "targets = ?, verification = ?", (targets, verification))
+    async def set_campaign_targets(self, campaign_id: str, targets: str, verification: str) -> None:
+        await self._update_campaign(campaign_id, "targets = ?, verification = ?", (targets, verification))
 
-    async def plan_campaign_sessions(
-        self, campaign_id: str, cron: str | None, next_session_at: float | None
-    ) -> CampaignRecord:
-        """Set the rhythm of the campaign's sessions (``cron``, ``None`` for none) and when the next one starts."""
-        return await self._update_campaign(campaign_id, "cron = ?, next_session_at = ?", (cron, next_session_at))
+    async def plan_campaign_sessions(self, campaign_id: str, cron: str, next_session_at: float) -> None:
+        """Give the campaign's sessions the rhythm ``cron``, with the next one at ``next_session_at``."""
+        await self._update_campaign(campaign_id, "cron = ?, next_session_at = ?", (cron, next_session_at))
 
-    async def set_next_session(self, campaign_id: str, next_session_at: float | None) -> CampaignRecord:
-        return await self._update_campaign(campaign_id, "next_session_at = ?", (next_session_at,))
+    async def set_next_session(self, campaign_id: str, next_session_at: float | None) -> None:
+        await self._update_campaign(campaign_id, "next_session_at = ?", (next_session_at,))
 
     async def set_campaign_status(
-        self, campaign_id: str, status: CampaignStatus, next_session_at: float | None
-    ) -> CampaignRecord:
-        return await self._update_campaign(campaign_id, "status = ?, next_session_at = ?", (status, next_session_at))
+        self, campaign_id: str, status: Literal["active", "stopped"], next_session_at: float | None
+    ) -> None:
+        """A campaign that is not achieved has no evidence."""
+        await self._update_campaign(
+            campaign_id, "status = ?, next_session_at = ?, evidence = ''", (status, next_session_at)
+        )
 
-    async def achieve_campaign(self, campaign_id: str, evidence: str) -> CampaignRecord:
+    async def achieve_campaign(self, campaign_id: str, evidence: str) -> None:
         """The campaign's outcome is verified: no session follows."""
-        return await self._update_campaign(
+        await self._update_campaign(
             campaign_id, "status = 'achieved', evidence = ?, next_session_at = NULL", (evidence,)
         )
 
     async def due_campaigns(self, now: float) -> list[CampaignRecord]:
         """The active campaigns whose next session is due at ``now`` and none of whose sessions is still working (in
         any process), the longest due first."""
+        working: tuple[RunStatus, ...] = tuple(sorted(WORKING_STATUSES))
         rows = await self._all(
             "SELECT * FROM campaigns WHERE status = 'active' AND next_session_at IS NOT NULL AND next_session_at <= ?"
             " AND NOT EXISTS (SELECT 1 FROM runs WHERE runs.campaign_id = campaigns.id"
-            " AND runs.status IN ('queued', 'running', 'blocked')) ORDER BY next_session_at",
-            (now,),
+            f" AND runs.status IN ({','.join('?' * len(working))})) ORDER BY next_session_at",
+            (now, *working),
         )
         return [_campaign(row) for row in rows]
 

@@ -5,7 +5,6 @@ import time
 from fastapi import APIRouter
 
 from dotagent.agent.campaign_control import mark_achieved, resume_campaign, stop_campaign
-from dotagent.core.errors import RunConflict
 from dotagent.scheduler.timing import format_local
 from dotagent.server.context import ServerContext
 from dotagent.server.views import CampaignDetail, CampaignSummary
@@ -49,7 +48,6 @@ def campaigns_router(ctx: ServerContext) -> APIRouter:
             sessions=sessions,
             working=_working(sessions),
             next_local=next_local(campaign),
-            progress=await store.latest_campaign_entry(campaign.id, "progress"),
             entries=await store.campaign_entries(campaign.id, _PAGE_ENTRIES),
             questions=await store.campaign_questions(campaign.id, ASK_USER_TOOL, _PAGE_QUESTIONS),
             tokens=await store.campaign_tokens(campaign.id),
@@ -58,13 +56,8 @@ def campaigns_router(ctx: ServerContext) -> APIRouter:
     async def stop_session(campaign_id: str) -> None:
         """Stop the campaign's session that is working in the daemon, if one is."""
         working: str | None = _working(await store.campaign_sessions(campaign_id))
-        if working is None or working not in ctx.manager.active_run_ids():
-            return
-        try:
+        if working is not None and working in ctx.manager.active_run_ids():
             ctx.manager.cancel(working)
-        except RunConflict:
-            # It ended in between.
-            return
 
     @router.get("/campaigns")
     async def list_campaigns() -> list[CampaignSummary]:

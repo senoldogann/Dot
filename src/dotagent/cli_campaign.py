@@ -3,27 +3,23 @@
 These read and change the store alone, so the daemon need not run; it is the daemon that runs the sessions.
 """
 
-import asyncio
-import contextlib
 import sys
 import time
-from collections.abc import AsyncIterator
 from typing import Literal
 from zoneinfo import ZoneInfo
 
 from dotagent.agent.campaign import entry_line
 from dotagent.agent.campaign_control import mark_achieved, resume_campaign, stop_campaign
+from dotagent.cli_schedule import local_zone, store_alone
 from dotagent.config import load_user_config
-from dotagent.core.paths import db_path, screenshots_dir
 from dotagent.core.types import FrozenModel
-from dotagent.scheduler.timing import format_local, resolve_zone
-from dotagent.store.db import Store
+from dotagent.scheduler.timing import format_local
 from dotagent.store.models import WORKING_STATUSES, CampaignEntry, CampaignRecord, RunRecord
 
 CAMPAIGN_DAEMON_NOTE: str = "The Dot daemon runs the sessions of a campaign, only while it is running (dotx daemon)."
 # How many of the newest entries of its ledger 'dotx campaign show' prints.
 _SHOWN_ENTRIES: int = 20
-_WORKING_NOTE: str = "A session that is working goes on until it ends; Stop on the campaign's page stops it too."
+_WORKING_NOTE: str = "Its session that is working goes on until it ends; Stop on the session's page stops it."
 
 
 class CampaignListCommand(FrozenModel):
@@ -48,20 +44,6 @@ class CampaignResumeCommand(FrozenModel):
 class CampaignAchievedCommand(FrozenModel):
     name: Literal["campaign-achieved"]
     campaign_id: str
-
-
-@contextlib.asynccontextmanager
-async def _campaign_store() -> AsyncIterator[Store]:
-    """The store alone, opened without the rest of the runtime and closed afterwards."""
-    store: Store = await Store.open(db_path(), screenshots_dir())
-    try:
-        yield store
-    finally:
-        await store.close()
-
-
-async def _zone() -> ZoneInfo:
-    return await asyncio.to_thread(resolve_zone, load_user_config().scheduler.timezone)
 
 
 def render_campaign(campaign: CampaignRecord, sessions: list[RunRecord], zone: ZoneInfo) -> str:
@@ -112,8 +94,8 @@ def render_first_session_end(campaign: CampaignRecord) -> str:
 
 
 async def cmd_campaign_list(command: CampaignListCommand) -> int:
-    zone: ZoneInfo = await _zone()
-    async with _campaign_store() as store:
+    zone: ZoneInfo = await local_zone(load_user_config())
+    async with store_alone() as store:
         campaigns: list[CampaignRecord] = await store.list_campaigns()
         for campaign in campaigns:
             sys.stdout.write(f"- {render_campaign(campaign, await store.campaign_sessions(campaign.id), zone)}\n")
@@ -123,8 +105,8 @@ async def cmd_campaign_list(command: CampaignListCommand) -> int:
 
 
 async def cmd_campaign_show(command: CampaignShowCommand) -> int:
-    zone: ZoneInfo = await _zone()
-    async with _campaign_store() as store:
+    zone: ZoneInfo = await local_zone(load_user_config())
+    async with store_alone() as store:
         campaign: CampaignRecord = await store.get_campaign(command.campaign_id)
         page: str = render_campaign_page(
             campaign,
@@ -139,18 +121,19 @@ async def cmd_campaign_show(command: CampaignShowCommand) -> int:
 
 
 async def cmd_campaign_stop(command: CampaignStopCommand) -> int:
-    zone: ZoneInfo = await _zone()
-    async with _campaign_store() as store:
+    zone: ZoneInfo = await local_zone(load_user_config())
+    async with store_alone() as store:
         campaign: CampaignRecord = await stop_campaign(store, command.campaign_id)
         sessions: list[RunRecord] = await store.campaign_sessions(campaign.id)
     sys.stdout.write(f"Stopped: {render_campaign(campaign, sessions, zone)}\n")
-    sys.stderr.write(f"{_WORKING_NOTE}\n")
+    if any(session.status in WORKING_STATUSES for session in sessions):
+        sys.stderr.write(f"{_WORKING_NOTE}\n")
     return 0
 
 
 async def cmd_campaign_resume(command: CampaignResumeCommand) -> int:
-    zone: ZoneInfo = await _zone()
-    async with _campaign_store() as store:
+    zone: ZoneInfo = await local_zone(load_user_config())
+    async with store_alone() as store:
         campaign: CampaignRecord = await resume_campaign(store, command.campaign_id, time.time())
         sessions: list[RunRecord] = await store.campaign_sessions(campaign.id)
     sys.stdout.write(f"Going on: {render_campaign(campaign, sessions, zone)}\n")
@@ -159,10 +142,11 @@ async def cmd_campaign_resume(command: CampaignResumeCommand) -> int:
 
 
 async def cmd_campaign_achieved(command: CampaignAchievedCommand) -> int:
-    zone: ZoneInfo = await _zone()
-    async with _campaign_store() as store:
+    zone: ZoneInfo = await local_zone(load_user_config())
+    async with store_alone() as store:
         campaign: CampaignRecord = await mark_achieved(store, command.campaign_id)
         sessions: list[RunRecord] = await store.campaign_sessions(campaign.id)
     sys.stdout.write(f"Marked achieved: {render_campaign(campaign, sessions, zone)}\n")
-    sys.stderr.write(f"{_WORKING_NOTE}\n")
+    if any(session.status in WORKING_STATUSES for session in sessions):
+        sys.stderr.write(f"{_WORKING_NOTE}\n")
     return 0

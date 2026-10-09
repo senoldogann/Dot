@@ -48,6 +48,32 @@ function nextStep(record, working, nextLocal) {
   return el("span", null, nextLocal === null ? "No session planned" : `Next session ${nextLocal}`);
 }
 
+/** Reload a page soon after a session starts or ends or a question is asked or decided, and with the status refresh
+ * while `isWorking()`; returns the function that stops it. */
+function followUpdates(reload, isWorking) {
+  let stopped = false;
+  const reloadSoon = debounce(() => {
+    if (!stopped) {
+      reload();
+    }
+  }, RELOAD_DELAY_MS);
+  const stopLifecycle = onLifecycle((event) => {
+    if (LIFECYCLE_KINDS.has(event.kind)) {
+      reloadSoon();
+    }
+  });
+  const stopChange = onChange(() => {
+    if (isWorking()) {
+      reloadSoon();
+    }
+  });
+  return () => {
+    stopped = true;
+    stopLifecycle();
+    stopChange();
+  };
+}
+
 // ------------------------------------------------------------------------------------------------- the list
 
 function campaignRow(summary) {
@@ -98,27 +124,12 @@ function mountList(root) {
     }
   }
 
-  const reloadSoon = debounce(() => {
-    if (!disposed) {
-      reload();
-    }
-  }, RELOAD_DELAY_MS);
   root.append(pageHead("Campaigns", "Goals that Dot keeps working on in sessions until a check confirms the outcome.", null), holder);
-  const stopLifecycle = onLifecycle((event) => {
-    if (LIFECYCLE_KINDS.has(event.kind)) {
-      reloadSoon();
-    }
-  });
-  const stopChange = onChange(() => {
-    if (working) {
-      reloadSoon();
-    }
-  });
+  const stopFollowing = followUpdates(reload, () => working);
   attempt(reload);
   return () => {
     disposed = true;
-    stopLifecycle();
-    stopChange();
+    stopFollowing();
   };
 }
 
@@ -214,6 +225,13 @@ function mountPage(root, ctx, campaignId) {
   let ticket = 0;
   let working = false;
   const holder = el("div", null, loadingPanel());
+  // The page keeps its parts, and a reload repaints all but the cards of the questions waiting for you: what you type
+  // in one, or the answer it is sending, stays.
+  const top = el("div", { class: "stack" });
+  const waiting = el("div", { class: "stack tight", hidden: true }, el("div", { class: "section-label" }, "Waiting for you"));
+  const rest = el("div", { class: "stack" });
+  const page = el("div", { class: "stack" }, top, waiting, rest);
+  const questionCards = new Map();
 
   async function act(path, done) {
     await api.post(`/campaigns/${campaignId}/${path}`, null);
@@ -281,50 +299,58 @@ function mountPage(root, ctx, campaignId) {
     );
   }
 
+  /** `open` are the questions that wait for you, oldest first; a card that is there already stays as it is. */
+  function paintQuestions(open) {
+    const ids = new Set(open.map((question) => question.id));
+    for (const [id, node] of questionCards) {
+      if (!ids.has(id)) {
+        node.remove();
+        questionCards.delete(id);
+      }
+    }
+    for (const question of open) {
+      if (!questionCards.has(question.id)) {
+        const card = approvalCard({
+          approval: fromRecord(question),
+          heading: el("a", { class: "small", href: `#/runs/${question.run_id}` }, "Open session"),
+          onSettled: () => attempt(reload),
+          leftNote: LEFT_IN_CAMPAIGN,
+        });
+        questionCards.set(question.id, card.node);
+        waiting.append(card.node);
+      }
+    }
+    waiting.hidden = questionCards.size === 0;
+  }
+
   function paint(detail) {
     const { record } = detail;
     ctx.setTitle(clip(record.title, TITLE_CHARS));
     working = detail.working !== null;
-    const open = detail.questions.filter((question) => WAITING_STATUSES.has(question.status));
     const decided = detail.questions.filter((question) => !WAITING_STATUSES.has(question.status));
-    const where = nextStep(record, detail.working, detail.next_local);
     const numbers = new Map(detail.sessions.map((session, index) => [session.id, index + 1]));
-    holder.replaceChildren(
-      el(
-        "div",
-        { class: "stack" },
-        pageHead(record.title, "", controls(record)),
-        el("div", { class: "row-meta" }, campaignBadge(record.status), el("span", null, plural(detail.sessions.length, "session", "sessions")), where),
-        outline(detail),
-        open.length === 0
-          ? null
-          : el(
-              "div",
-              { class: "stack tight" },
-              el("div", { class: "section-label" }, "Waiting for you"),
-              open.map(
-                (question) =>
-                  approvalCard({
-                    approval: fromRecord(question),
-                    heading: el("a", { class: "small", href: `#/runs/${question.run_id}` }, "Open session"),
-                    onSettled: () => attempt(reload),
-                    leftNote: LEFT_IN_CAMPAIGN,
-                  }).node,
-              ),
-            ),
-        section(
-          "Ledger",
-          [...detail.entries].reverse().map((entry) => entryRow(entry, numbers)),
-          "Empty: the sessions write what they did here.",
-        ),
-        section(
-          "Sessions",
-          detail.sessions.map((session, index) => sessionRow(session, index + 1)).reverse(),
-          "None yet.",
-        ),
-        decided.length === 0 ? null : section("Earlier questions", decided.map(decidedRow).reverse(), ""),
-      ),
+    top.replaceChildren(
+      pageHead(record.title, "", controls(record)),
+      el("div", { class: "row-meta" }, campaignBadge(record.status), el("span", null, plural(detail.sessions.length, "session", "sessions")), nextStep(record, detail.working, detail.next_local)),
+      outline(detail),
     );
+    paintQuestions(detail.questions.filter((question) => WAITING_STATUSES.has(question.status)));
+    rest.replaceChildren(
+      section(
+        "Ledger",
+        [...detail.entries].reverse().map((entry) => entryRow(entry, numbers)),
+        "Empty: the sessions write what they did here.",
+      ),
+      section(
+        "Sessions",
+        detail.sessions.map((session, index) => sessionRow(session, index + 1)).reverse(),
+        "None yet.",
+      ),
+      ...(decided.length === 0 ? [] : [section("Earlier questions", decided.map(decidedRow).reverse(), "")]),
+    );
+    if (page.parentNode !== holder) {
+      holder.replaceChildren(page);
+    }
   }
 
   async function reload() {
@@ -341,27 +367,12 @@ function mountPage(root, ctx, campaignId) {
     }
   }
 
-  const reloadSoon = debounce(() => {
-    if (!disposed) {
-      reload();
-    }
-  }, RELOAD_DELAY_MS);
   root.append(backLink(), holder);
-  const stopLifecycle = onLifecycle((event) => {
-    if (LIFECYCLE_KINDS.has(event.kind)) {
-      reloadSoon();
-    }
-  });
-  const stopChange = onChange(() => {
-    if (working) {
-      reloadSoon();
-    }
-  });
+  const stopFollowing = followUpdates(reload, () => working);
   attempt(reload);
   return () => {
     disposed = true;
-    stopLifecycle();
-    stopChange();
+    stopFollowing();
   };
 }
 

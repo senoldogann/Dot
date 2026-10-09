@@ -842,33 +842,42 @@ the composer (it is there for a task), or pass `--standing` to `dotx run`. The r
 your conversation; the daemon runs the sessions after it, each a run in a thread of its own, through restarts and days.
 
 - **Targets.** The first session records the campaign's targets and how a session verifies them (`campaign_targets`). A
-  session that wants to end while the campaign has no targets is sent back once to record them.
+  session that wants to end while the campaign has no targets is sent back once to record them; targets a later session
+  replaces stay in the ledger.
 - **The ledger and the brief.** Each session writes what it did, with numbers and evidence, in the campaign's ledger
   (`campaign_note`: progress, setback, strategy, question or note). The next session opens with a brief instead of a
-  conversation: the goal, the targets, what you wrote in the campaign's conversation since it started, the newest
-  strategy, the last 12 entries of the ledger, the questions left for you and what became of them, and how the last
-  session ended. The prompt of a session says to write its progress there, not in the notes of the memory.
+  conversation: the goal, the targets, the paths of the files you attached to the goal, what you wrote in the
+  campaign's conversation since it started, the newest strategy and progress, the last 12 entries of the ledger, the
+  questions left for you and what became of them, and how the last session ended. The prompt of a session says to
+  write its progress there, not in the notes of the memory, and what you tell it while it works too. The targets, the
+  ledger and the plan of the next session shape every session after, so writing them carries the `persistence` flag,
+  as saving a memory note does: once a session has read untrusted content, the policy asks first.
 - **The next session** starts `campaign_gap_minutes` (60) after the last one ended, unless a session planned it with
-  `campaign_schedule` (a moment, or a cron rhythm). A session that ended needing you, with questions it left for you
-  and none answered yet, is followed after `campaign_wait_hours` (24) instead; your answer, or your skip, starts the
-  next session right away, and its brief carries it. After `campaign_patience_sessions` (3) sessions in a row without a
-  progress entry, the brief asks for a new strategy first. All four live in `[agent]`.
+  `campaign_schedule` (a moment, after which a rhythm goes on, or a cron rhythm). A session that ended needing you, with
+  questions it left for you and none answered yet, is followed after `campaign_wait_hours` (24) instead; your answer, or
+  your skip, starts the next session right away, and its brief carries it (while the session that asked works in the
+  daemon, your answer goes to it). After `campaign_patience_sessions` (3) sessions in a row without a progress entry,
+  the brief asks for a new strategy first. All four live in `[agent]`.
 - **Only a verified outcome ends it.** `campaign_achieved` asks the goal checker (the review model) whether the targets
   are reached, from the targets and how they are verified, the progress in the ledger, what the session's own calls
-  measured and the session's evidence. Refused, the call fails with the checker's reason and the session goes on;
-  accepted, the campaign is achieved and you get a notification.
+  measured and the session's evidence. Refused, the call fails with the checker's reason and the session goes on (one
+  the checker finds out of reach asks you how to go on); accepted, the campaign is achieved and you get a
+  notification.
 - **Only you stop it.** Campaigns, in the sidebar, lists them; a campaign's page shows its targets, the questions
   waiting for you, its ledger and its sessions, with Stop (which also stops a session working then), Go on and Mark
-  achieved.
-  `dotx campaign` changes the campaign without the daemon, so a session working then goes on until it ends.
-  `campaign_max_sessions` (0: no limit) stops a campaign after that many sessions; Go on gives it one more.
+  achieved. The emergency stop of desktop control (the pointer in the top-left corner) stops the campaign of the session
+  it ends. `dotx campaign` changes the campaign without the daemon, so a session working then goes on until it ends
+  (Stop on its run page ends it). `campaign_max_sessions` (0: no limit) stops a campaign after that many sessions; Go on
+  gives it one more.
 
 Every session runs with the model, reasoning level and approval mode the campaign started with, and without goal mode:
 the campaign's own check takes its place, so starting one with goal mode on is refused. A run's limits
 (`run_max_minutes`, `run_max_tokens`) apply to each session. Sessions run only while the daemon runs; one the daemon cut
-off is not resumed as a run: the next session starts once the daemon is back, and its brief says the last one was cut
-off. The threads of the sessions after the first are not in the chat list; the campaign's page links them. What you
-write in the campaign's conversation is an instruction of the sessions after it.
+off is not resumed as a run: the next session starts once the daemon is back (after `campaign_gap_minutes` when the
+daemon died while it worked, so that a session that brings it down does not run again and again), and its brief says
+the last one was cut off. The threads of the sessions after the first are not in the chat list; the campaign's page
+links them. What you write in the campaign's conversation, and your answers to their questions, are instructions of
+the sessions after it.
 
 ## MCP servers
 

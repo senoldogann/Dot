@@ -50,11 +50,14 @@ from dotagent.policy.types import ApprovalMode
 from dotagent.runtime import Runtime
 from dotagent.scheduler import SCHEDULE_SOURCE
 from dotagent.scheduler.timing import next_firing
+from dotagent.store.db import Store
 from dotagent.store.endings import (
     PREFIX_EMERGENCY_STOP,
     PREFIX_INTERNAL_ERROR,
     RESULT_SHUTDOWN,
     RESULT_STOPPED,
+    Ending,
+    classify_ending,
 )
 from dotagent.store.models import (
     WORKING_STATUSES,
@@ -97,6 +100,11 @@ def thread_title(goal: str) -> str:
     lines: list[str] = goal.strip().splitlines()
     first_line: str = lines[0] if lines else "Untitled"
     return first_line if len(first_line) <= _TITLE_CHARS else f"{first_line[: _TITLE_CHARS - 1]}…"
+
+
+def _answer_text(question: ApprovalRecord, answer: str) -> str:
+    """The user's message that carries the answer to a question a run left."""
+    return f"Answer to your question “{question.summary}”: {answer}"
 
 
 class RunManager:
@@ -204,7 +212,7 @@ class RunManager:
             else await runtime.store.get_thread(thread_id)
         )
         campaign: CampaignRecord = await runtime.store.create_campaign(
-            thread_title(goal), goal, thread.id, model_ref, level, approval_mode
+            thread_title(goal), goal, thread.id, model_ref, level, approval_mode, [file.path for file in files]
         )
         try:
             run, _ = await self._launch(
@@ -277,17 +285,23 @@ class RunManager:
         return run
 
     async def resume_campaigns(self) -> int:
-        """Plan a session now for every active campaign with no session planned and none working: one whose session
-        the daemon stopped, since a session plans the next one only when it ends. For the daemon, when it starts, after
-        :meth:`recover` and the runs it resumes. Returns how many campaigns got a session."""
-        store = self._runtime.store
+        """Plan a session for every active campaign with no session planned and none working: one whose session the
+        daemon stopped, since a session plans the next one only when it ends. For the daemon, when it starts, after
+        :meth:`recover`. The session starts now, or ``[agent] campaign_gap_minutes`` later when the daemon died while the
+        last session worked: a session that brings the daemon down does not start again and again. Returns how many
+        campaigns got a session."""
+        store: Store = self._runtime.store
+        now: float = time.time()
+        gap_s: float = self._runtime.config.agent.campaign_gap_minutes * 60
         planned: int = 0
         for campaign in await store.list_campaigns():
             if campaign.status != "active" or campaign.next_session_at is not None:
                 continue
-            if any(session.status in WORKING_STATUSES for session in await store.campaign_sessions(campaign.id)):
+            sessions: list[RunRecord] = await store.campaign_sessions(campaign.id)
+            if any(session.status in WORKING_STATUSES for session in sessions):
                 continue
-            await store.set_next_session(campaign.id, time.time())
+            died: bool = bool(sessions) and cut_off_by(sessions[-1]) == "daemon_restarted"
+            await store.set_next_session(campaign.id, now + gap_s if died else now)
             planned += 1
         return planned
 
@@ -350,25 +364,30 @@ class RunManager:
         The answer is delivered before the question is decided, so an answer that cannot be delivered leaves the
         question open; an empty answer is refused. Skipping such a question only denies it.
 
-        A session of a campaign that has ended starts nothing: its answer, or its skip, is kept for the brief of the next
-        session, which it brings forward to now.
+        A question that a session of a campaign left starts nothing and goes to no other run: the answer reaches the
+        session while it runs in this process, and is otherwise kept for the brief of the next session. Once the session
+        has ended, the answer, or the skip, brings that next session forward to now.
         """
         async with self._answering:
             record: ApprovalRecord = await self._runtime.store.get_approval(approval_id)
-            waiting: str | None = None
-            if record.status == "left":
-                asked: RunRecord = await self._runtime.store.get_run(record.run_id)
-                if asked.campaign_id is not None and self._active_on(asked.thread_id) is None:
-                    waiting = asked.campaign_id
-            if record.status == "left" and approve:
-                if note.strip() == "":
-                    raise InvalidValueError("the answer to the question is empty", {"approval_id": approval_id})
-                if waiting is None:
+            if record.status != "left":
+                return await self._runtime.approvals.resolve(approval_id, approve, source, note)
+            if approve and note.strip() == "":
+                raise InvalidValueError("the answer to the question is empty", {"approval_id": approval_id})
+            asked: RunRecord = await self._runtime.store.get_run(record.run_id)
+            if asked.campaign_id is None:
+                if approve:
                     await self._carry_on(record, source, note)
-            decided: ApprovalRecord = await self._runtime.approvals.resolve(approval_id, approve, source, note)
-            if waiting is not None:
-                await self._bring_session_forward(waiting)
-            return decided
+                return await self._runtime.approvals.resolve(approval_id, approve, source, note)
+            campaign_id: str = asked.campaign_id
+            decided, ended = await self._decide_for_session(record, approve, source, note)
+        if ended:
+            ending: RunHandle | None = self._handles.get(asked.id)
+            if ending is not None:
+                # It plans the next session before it is finished: that plan is what comes forward.
+                await ending.finished.wait()
+            await self._bring_session_forward(campaign_id)
+        return decided
 
     async def resumable(self, run: RunRecord) -> bool:
         """Whether ``run`` can be resumed: see :func:`dotagent.agent.resume.can_resume`."""
@@ -478,7 +497,7 @@ class RunManager:
         """Deliver the answer to a question a run left (see :meth:`decide`). A run whose end is being recorded reads
         nothing more: the answer waits until it has ended and then goes on as one that came after."""
         asked: RunRecord = await self._runtime.store.get_run(question.run_id)
-        text: str = f"Answer to your question “{question.summary}”: {answer}"
+        text: str = _answer_text(question, answer)
         active: RunHandle | None = self._active_on(asked.thread_id)
         if active is not None:
             try:
@@ -512,6 +531,28 @@ class RunManager:
         )
         log.info("question_answered", approval_id=question.id, run_id=run.id, delivered="run")
 
+    async def _decide_for_session(
+        self, question: ApprovalRecord, approve: bool, source: str, note: str
+    ) -> tuple[ApprovalRecord, bool]:
+        """Decide a question that a session of a campaign left (see :meth:`decide`); also whether the session has ended,
+        which brings the next one forward."""
+        session: RunHandle | None = self._handles.get(question.run_id)
+        if approve and session is not None:
+            try:
+                session.inbox.put_nowait(
+                    UserInput(text=_answer_text(question, note), files=(), question_id=question.id)
+                )
+            except asyncio.QueueShutDown:
+                # It is recording its end and reads nothing more.
+                return await self._runtime.approvals.resolve(question.id, approve, source, note), True
+            log.info("question_answered", approval_id=question.id, run_id=session.run_id, delivered="steer")
+            return await self._runtime.approvals.resolve(question.id, approve, source, note), False
+        decided: ApprovalRecord = await self._runtime.approvals.resolve(question.id, approve, source, note)
+        # Read once the decision is stored: a session that has not recorded its end yet reads the decision when it plans
+        # the next session.
+        status: RunStatus = (await self._runtime.store.get_run(question.run_id)).status
+        return decided, status not in WORKING_STATUSES
+
     def _active_on(self, thread_id: str) -> RunHandle | None:
         """The run of this process that is active on ``thread_id``, if any."""
         return next((handle for handle in self._handles.values() if handle.thread_id == thread_id), None)
@@ -526,7 +567,7 @@ class RunManager:
 
     async def _brief(self, campaign: CampaignRecord, sessions: list[RunRecord], number: int, now: float) -> Brief:
         """What the brief of session ``number`` says; ``sessions`` are the campaign's sessions so far, oldest first."""
-        store = self._runtime.store
+        store: Store = self._runtime.store
         progress: CampaignEntry | None = await store.latest_campaign_entry(campaign.id, "progress")
         questions: list[ApprovalRecord] = await store.campaign_questions(campaign.id, ASK_USER_TOOL, BRIEF_QUESTIONS)
         conversation: list[RunRecord] = await store.list_runs(_THREAD_INSTRUCTION_RUNS, campaign.thread_id)
@@ -535,6 +576,7 @@ class RunManager:
             goal=campaign.goal,
             targets=campaign.targets,
             verification=campaign.verification,
+            files=campaign.files,
             session=number,
             now=now,
             # The owner's messages in the campaign's conversation: the goals of the runs they started there since (a
@@ -548,6 +590,7 @@ class RunManager:
                 and record.created_at > campaign.created_at
             ),
             strategy=await store.latest_campaign_entry(campaign.id, "strategy"),
+            progress=progress,
             entries=tuple(await store.campaign_entries(campaign.id, BRIEF_ENTRIES)),
             questions=tuple(
                 BriefQuestion(summary=asked.summary, asked_at=asked.created_at, status=asked.status, answer=asked.note)
@@ -682,14 +725,14 @@ class RunManager:
         opening: RunOpening,
         campaign_id: str | None,
     ) -> tuple[RunRecord, RunHandle]:
-        """Create the run record and its gate, start its task and register its handle. The instructions of a session
-        of a campaign are read from the campaign's conversation, where the owner talks to it."""
+        """Create the run record and its gate, start its task and register its handle."""
         runtime: Runtime = self._runtime
         parent: RunHandle | None = None if parent_run_id is None else self._handles.get(parent_run_id)
-        conversation: str = (
-            thread_id if campaign_id is None else (await runtime.store.get_campaign(campaign_id)).thread_id
+        instructions: tuple[str, ...] = (
+            await self._instructions_for(goal, thread_id, parent_run_id, parent)
+            if campaign_id is None
+            else await self._session_instructions(goal, campaign_id)
         )
-        instructions: tuple[str, ...] = await self._instructions_for(goal, conversation, parent_run_id, parent)
         run: RunRecord = await runtime.store.create_run(
             thread_id, goal, mode, model_ref, parent_run_id, source, level, approval_mode, with_goal_mode, campaign_id
         )
@@ -753,6 +796,18 @@ class RunManager:
         recent: list[RunRecord] = await self._runtime.store.list_runs(_THREAD_INSTRUCTION_RUNS, thread_id)
         earlier: list[str] = [record.goal for record in reversed(recent) if record.parent_run_id is None]
         return (*earlier, goal)
+
+    async def _session_instructions(self, goal: str, campaign_id: str) -> tuple[str, ...]:
+        """What the owner has told a session of a campaign that is about to start: the goals of the runs in the
+        campaign's conversation, where they talk to it, and its goal (:meth:`_instructions_for`), and their answers to
+        the questions its sessions left them."""
+        store: Store = self._runtime.store
+        campaign: CampaignRecord = await store.get_campaign(campaign_id)
+        asked: list[ApprovalRecord] = await store.campaign_questions(campaign.id, ASK_USER_TOOL, BRIEF_QUESTIONS)
+        answers: list[str] = [
+            _answer_text(question, question.note) for question in asked if question.status == "approved"
+        ]
+        return (*await self._instructions_for(goal, campaign.thread_id, None, None), *answers)
 
     async def _check_effort(self, ref: ModelRef, effort: Effort) -> None:
         """A level chosen for a run has to be one the model offers (a model with fewer than two has no choice)."""
@@ -824,7 +879,7 @@ class RunManager:
                     run.id, "run_finished", {"status": status, "result": clean, "needs": redact_secrets(needs)}, True
                 )
                 if run.campaign_id is not None and not self._stopping:
-                    await self._follow_session(run, run.campaign_id, needs)
+                    await self._follow_session(run, run.campaign_id, classify_ending(status, clean), needs)
             finally:
                 self._handles.pop(run.id, None)
                 finished.set()
@@ -832,16 +887,24 @@ class RunManager:
         if lessons is not None and not self._stopping:
             self._learning[run.id] = asyncio.create_task(self._learn(lessons))
 
-    async def _follow_session(self, run: RunRecord, campaign_id: str, needs: str) -> None:
-        """Plan what follows a session of a campaign that ended (one the daemon stopped is planned by
-        :meth:`resume_campaigns` when it starts again). A campaign that is no longer active plans nothing; one that ran
-        the sessions ``[agent] campaign_max_sessions`` allows stops; otherwise the next session starts as
+    async def _follow_session(self, run: RunRecord, campaign_id: str, ending: Ending, needs: str) -> None:
+        """Plan what follows a session of a campaign that ended as ``ending`` (one the daemon stopped is planned by
+        :meth:`resume_campaigns` when it starts again). A campaign that is no longer active plans nothing; the owner's
+        emergency stop of desktop control stops the campaign too, and so does running the sessions
+        ``[agent] campaign_max_sessions`` allows; otherwise the next session starts as
         :func:`dotagent.agent.campaign.next_session_at` says. A failure is logged: the run's end is recorded already,
         and the daemon plans the campaign again when it starts."""
         runtime: Runtime = self._runtime
         try:
             campaign: CampaignRecord = await runtime.store.get_campaign(campaign_id)
             if campaign.status != "active":
+                return
+            if ending == "emergency_stop":
+                await runtime.store.set_campaign_status(campaign.id, "stopped", None)
+                await runtime.store.add_campaign_entry(
+                    campaign.id, run.id, "note", "Stopped: the owner's emergency stop ended this session.", {}
+                )
+                log.info("campaign_stopped_by_an_emergency_stop", campaign_id=campaign.id, run_id=run.id)
                 return
             sessions: int = len(await runtime.store.campaign_sessions(campaign.id))
             limit: int = runtime.config.agent.campaign_max_sessions

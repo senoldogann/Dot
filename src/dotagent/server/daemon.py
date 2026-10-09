@@ -156,7 +156,7 @@ async def run_daemon(config: AppConfig) -> None:
             # Before the scheduler and the server start: a resumed run takes its place before any new run, and no new
             # message reaches its thread before it.
             resumed: tuple[RunRecord, ...] = await manager.resume_safe() if config.agent.resume == "safe" else ()
-            # After the resumed runs, which may be sessions of a campaign that go on.
+            # A session is never resumed as a run: a campaign whose session the daemon cut off goes on with a new one.
             campaigns: int = await manager.resume_campaigns()
             scheduler_loop: asyncio.Task[None] = await scheduler.start()
             stopping: asyncio.Event = asyncio.Event()

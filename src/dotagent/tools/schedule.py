@@ -85,13 +85,15 @@ class CreateArgs(ToolArgs):
     )
 
 
-def _create_tool() -> RegisteredTool:
-    def timing_of(args: CreateArgs, ctx: ToolContext) -> Timing:
-        zone: ZoneInfo = ctx.runtime.schedule_zone
-        return plan_timing(args.cron, args.at, zone, ctx.runtime.config.scheduler.min_interval_s, time.time())
+def tool_timing(cron: str | None, at: str | None, ctx: ToolContext) -> Timing:
+    """When the ``cron`` or the ``at`` a tool was given fires, in the Mac's time zone, held to the scheduler's
+    ``min_interval_s``."""
+    return plan_timing(cron, at, ctx.runtime.schedule_zone, ctx.runtime.config.scheduler.min_interval_s, time.time())
 
+
+def _create_tool() -> RegisteredTool:
     def classify(args: CreateArgs, ctx: ToolContext) -> ActionInfo:
-        when: str = describe_timing(timing_of(args, ctx), ctx.runtime.schedule_zone)
+        when: str = describe_timing(tool_timing(args.cron, args.at, ctx), ctx.runtime.schedule_zone)
         return _action("schedule_create", f'Schedule "{args.name}" ({when}, {args.mode}): {args.goal}', "medium")
 
     async def run(args: CreateArgs, ctx: ToolContext) -> ToolResult:

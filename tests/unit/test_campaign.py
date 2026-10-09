@@ -38,14 +38,17 @@ def _brief(
     without_progress: int,
 ) -> Brief:
     strategy: CampaignEntry | None = next((entry for entry in reversed(entries) if entry.kind == "strategy"), None)
+    progress: CampaignEntry | None = next((entry for entry in reversed(entries) if entry.kind == "progress"), None)
     return Brief(
         goal=GOAL,
         targets=targets,
         verification="wc -l leads.csv" if targets else "",
+        files=("/Users/me/Dot/attachments/att_1/fair.csv",) if session > 1 else (),
         session=session,
         now=NOW,
         instructions=("Only companies in Berlin.",) if session > 1 else (),
         strategy=strategy,
+        progress=progress,
         entries=entries,
         questions=questions,
         last=last,
@@ -64,13 +67,19 @@ def test_the_first_brief_has_the_goal_and_asks_for_the_targets() -> None:
 
 def test_a_later_brief_carries_the_ledger_the_questions_and_how_the_last_session_ended() -> None:
     entries: tuple[CampaignEntry, ...] = (
-        _entry("progress", "Wrote 12 leads from the fair list", {"leads": 12.0, "share": 0.25}, 26 * HOUR),
+        _entry(
+            "progress",
+            "Wrote 12 leads from the fair list",
+            {"leads": 12.0, "share": 0.25, "eur": 1234567.89},
+            26 * HOUR,
+        ),
         _entry("strategy", "Search the chamber of commerce next", {}, 3 * HOUR),
     )
     questions: tuple[BriefQuestion, ...] = (
         BriefQuestion(summary="Which CRM?", asked_at=NOW - 5 * HOUR, status="approved", answer="HubSpot"),
         BriefQuestion(summary="May I pay for a list?", asked_at=NOW - 4 * HOUR, status="denied", answer=""),
         BriefQuestion(summary="Your sender address?", asked_at=NOW - 30 * 60, status="left", answer=""),
+        BriefQuestion(summary="Go ahead?", asked_at=NOW - 20 * 60, status="expired", answer=""),
     )
     last: LastSession = LastSession(
         number=2, started_at=NOW - 2 * HOUR, finished_at=NOW - HOUR, status="done", result="12 of 50.", cut_off=False
@@ -78,18 +87,22 @@ def test_a_later_brief_carries_the_ledger_the_questions_and_how_the_last_session
     brief: str = render_brief(_brief(3, "50 leads in leads.csv", entries, questions, last, 1))
     assert brief.startswith(f"This is session 3 of a campaign. Its goal:\n{GOAL}\n\n")
     assert "Targets: 50 leads in leads.csv\nVerified by: wc -l leads.csv\n\n" in brief
+    assert "read them at these paths when you need them):\n- /Users/me/Dot/attachments/att_1/fair.csv\n\n" in brief
     assert "(instructions):\n- Only companies in Berlin.\n\n" in brief
     assert "Strategy (the newest): Search the chamber of commerce next\n\n" in brief
+    # The newest progress entry is among the entries listed, so it is not shown twice.
+    assert "Progress (the newest" not in brief
     assert (
         "Ledger (the newest entries, oldest first):\n"
-        "- [progress, 26 h ago] Wrote 12 leads from the fair list (leads 12, share 0.25)\n"
+        "- [progress, 26 h ago] Wrote 12 leads from the fair list (leads 12, share 0.25, eur 1234567.89)\n"
         "- [strategy, 3 h ago] Search the chamber of commerce next\n\n"
     ) in brief
     assert (
         "Questions left for the owner:\n"
         "- “Which CRM?”: answered: HubSpot\n"
         "- “May I pay for a list?”: skipped by the owner\n"
-        "- “Your sender address?”: unanswered since 30 min\n\n"
+        "- “Your sender address?”: unanswered since 30 min\n"
+        "- “Go ahead?”: not answered while the session waited for it\n\n"
     ) in brief
     assert brief.endswith("Session 2 ended 60 min ago (done).\nIts answer: 12 of 50.")
     # Fewer sessions without progress than the patience: no call for a new strategy.
@@ -107,6 +120,18 @@ def test_a_brief_after_a_cut_off_session_and_too_many_rounds_without_progress_as
         "No session wrote a progress entry for 3 sessions. Before anything else, write a new strategy entry with "
         "campaign_note (kind strategy) that tries another way, and follow it."
     )
+
+
+def test_a_brief_shows_the_newest_progress_also_when_newer_entries_push_it_out_of_the_ledger_it_lists() -> None:
+    progress: CampaignEntry = _entry("progress", "Wrote 30 leads", {"leads": 30.0}, 50 * HOUR)
+    notes: tuple[CampaignEntry, ...] = (_entry("note", "Checked the fair list again", {}, HOUR),)
+    brief: str = render_brief(
+        _brief(4, "50 leads in leads.csv", notes, (), None, 0).model_copy(update={"progress": progress})
+    )
+    assert (
+        "Progress (the newest, before the entries below):\n- [progress, 2 days ago] Wrote 30 leads (leads 30)\n\n"
+        "Ledger (the newest entries, oldest first):\n- [note, 60 min ago] Checked the fair list again"
+    ) in brief
 
 
 def test_the_next_session_follows_the_plan_else_waits_for_an_answer_else_comes_after_the_gap() -> None:

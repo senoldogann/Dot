@@ -95,7 +95,8 @@ run_max_tokens = 0
 # ended needing you, with questions it left for you and none answered yet, is followed after campaign_wait_hours, or as
 # soon as one is answered or skipped. After campaign_patience_sessions sessions without progress the brief asks for a
 # new strategy. campaign_max_sessions stops a campaign after that many sessions (0: never). The run limits above apply
-# to each session.
+# to each session. When the daemon died while a session worked, the next one starts campaign_gap_minutes after the
+# daemon is back.
 campaign_gap_minutes = 60
 campaign_wait_hours = 24
 campaign_patience_sessions = 3

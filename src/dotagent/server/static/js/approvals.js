@@ -11,7 +11,7 @@ const STATUS_LABEL = { approved: "Approved", denied: "Denied", expired: "Expired
 // What becomes of the answer to a question a run left (`leftNote` of a card): it carries the work on in the run's
 // conversation, or, for a session of a campaign, reaches the session while it works and the next session after that.
 export const LEFT_IN_RUN = "The run went on without your answer. Your answer goes to this conversation and carries the work on.";
-export const LEFT_IN_CAMPAIGN = "The session went on without your answer. While it works, your answer reaches it; after that, the campaign's next session reads it and starts right away.";
+export const LEFT_IN_CAMPAIGN = "The session went on without your answer. While it works, your answer reaches it; after that, the campaign's next session reads it, and starts right away while the campaign is active.";
 
 /** The common shape of an approval, from a stored record. */
 export function fromRecord(record) {

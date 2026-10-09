@@ -1,9 +1,10 @@
-"""Campaigns: the pure rules of a goal that Dot works on in sessions until its outcome is verified (item 12).
+"""Campaigns: the pure rules of a goal that Dot works on in sessions until its outcome is verified.
 
 Every session is a run that starts in a thread of its own; what carries the campaign from one session to the next is
-the brief, its opening message: the goal, the targets, the owner's messages, the newest strategy, the end of the
-ledger, the questions left for the owner and what became of them, and how the last session ended. The store keeps
-the campaign and its ledger; the manager starts the sessions and plans the next one with :func:`next_session_at`.
+the brief, its opening message: the goal, the targets, the files attached to the goal, the owner's messages, the
+newest strategy and progress, the end of the ledger, the questions left for the owner and what became of them, and how
+the last session ended. The store keeps the campaign and its ledger; the manager starts the sessions and plans the next
+one with :func:`next_session_at`.
 """
 
 from collections.abc import Sequence
@@ -23,8 +24,8 @@ _SECONDS_PER_DAY: float = 86400.0
 
 
 class BriefQuestion(FrozenModel):
-    """A question a session left for the owner: ``status`` is ``left`` until it is answered (``approved``, with the
-    answer) or skipped (``denied``)."""
+    """A question a session asked the owner: ``status`` is ``left`` until it is answered (``approved``, with the
+    answer) or skipped (``denied``); ``expired`` when the session waited for it and ended without it."""
 
     summary: str
     asked_at: float
@@ -44,17 +45,21 @@ class LastSession(FrozenModel):
 
 
 class Brief(FrozenModel):
-    """What the opening message of a session is made of. ``instructions`` are the messages the owner sent in the
-    campaign's conversation after its goal; ``without_progress`` is how many sessions in a row wrote no ``progress``
-    entry, and ``patience`` how many of them the campaign accepts before it asks for a new strategy."""
+    """What the opening message of a session is made of. ``files`` are the paths of the files the owner attached to
+    the goal; ``instructions`` are the messages the owner sent in the campaign's conversation after its goal;
+    ``strategy`` and ``progress`` are the newest entries of these kinds, which the brief shows also when they are
+    older than ``entries``; ``without_progress`` is how many sessions in a row wrote no ``progress`` entry, and
+    ``patience`` how many of them the campaign accepts before it asks for a new strategy."""
 
     goal: str
     targets: str
     verification: str
+    files: tuple[str, ...]
     session: int
     now: float
     instructions: tuple[str, ...]
     strategy: CampaignEntry | None
+    progress: CampaignEntry | None
     entries: tuple[CampaignEntry, ...]
     questions: tuple[BriefQuestion, ...]
     last: LastSession | None
@@ -72,7 +77,8 @@ def _ago(seconds: float) -> str:
 
 
 def _number(value: float) -> str:
-    return str(int(value)) if value.is_integer() else f"{value:g}"
+    """A measured value as it was written: a whole number without its point, any other in full."""
+    return str(int(value)) if value.is_integer() else repr(value)
 
 
 def entry_line(entry: CampaignEntry, now: float) -> str:
@@ -90,8 +96,10 @@ def _question_line(question: BriefQuestion, now: float) -> str:
             state = "skipped by the owner"
         case "left":
             state = f"unanswered since {_ago(now - question.asked_at)}"
-        case _:
-            state = question.status
+        case "expired":
+            state = "not answered while the session waited for it"
+        case "pending":
+            state = "waiting for the owner's answer"
     return f"- “{question.summary}”: {state}"
 
 
@@ -116,6 +124,11 @@ def render_brief(brief: Brief) -> str:
         parts.append(f"Targets: {brief.targets}{verified}")
     else:
         parts.append("Targets: not set yet. Record them with campaign_targets before you finish.")
+    if brief.files:
+        parts.append(
+            "Files the owner attached to the goal (the first session got their content; read them at these paths when "
+            "you need them):\n" + "\n".join(f"- {path}" for path in brief.files)
+        )
     if brief.instructions:
         parts.append(
             "What the owner wrote in the campaign's conversation since its goal (instructions):\n"
@@ -123,6 +136,9 @@ def render_brief(brief: Brief) -> str:
         )
     if brief.strategy is not None:
         parts.append(f"Strategy (the newest): {brief.strategy.text}")
+    shown: set[str] = {entry.id for entry in brief.entries}
+    if brief.progress is not None and brief.progress.id not in shown:
+        parts.append(f"Progress (the newest, before the entries below):\n{entry_line(brief.progress, brief.now)}")
     if brief.entries:
         parts.append(
             "Ledger (the newest entries, oldest first):\n"
