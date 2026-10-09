@@ -79,7 +79,6 @@ _RESULT_CHARS: int = 20_000
 _REFUSED_RESULT_CHARS: int = 200
 # The earlier runs of a thread whose goals count as the user's instructions to a reviewer.
 _THREAD_INSTRUCTION_RUNS: int = 30
-# The statuses of a run that has not ended.
 
 
 @dataclass(frozen=True)
@@ -280,7 +279,7 @@ class RunManager:
     async def resume_campaigns(self) -> int:
         """Plan a session now for every active campaign with no session planned and none working: one whose session
         the daemon stopped, since a session plans the next one only when it ends. For the daemon, when it starts, after
-        :meth:`recover`. Returns how many campaigns got a session."""
+        :meth:`recover` and the runs it resumes. Returns how many campaigns got a session."""
         store = self._runtime.store
         planned: int = 0
         for campaign in await store.list_campaigns():
@@ -538,12 +537,14 @@ class RunManager:
             verification=campaign.verification,
             session=number,
             now=now,
-            # The owner's messages in the campaign's conversation: the goals of the runs they started there since.
+            # The owner's messages in the campaign's conversation: the goals of the runs they started there since (a
+            # resumed run repeats the goal of the run it resumes).
             instructions=tuple(
                 record.goal
                 for record in reversed(conversation)
                 if record.parent_run_id is None
                 and record.campaign_id is None
+                and record.source != RESUME_SOURCE
                 and record.created_at > campaign.created_at
             ),
             strategy=await store.latest_campaign_entry(campaign.id, "strategy"),

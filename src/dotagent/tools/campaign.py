@@ -233,6 +233,8 @@ def _achieved_tool() -> RegisteredTool:
 
     async def run(args: AchievedArgs, ctx: ToolContext) -> ToolResult:
         campaign: CampaignRecord = await _campaign_of(ctx)
+        if campaign.status == "achieved":
+            return ok(f"The campaign is achieved already: {campaign.evidence}")
         if not campaign.targets:
             return fail("The campaign has no targets yet: record them with campaign_targets, verify them, then claim.")
         config = ctx.runtime.config

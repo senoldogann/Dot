@@ -165,9 +165,10 @@ def next_session_at(
     wait_hours: float,
 ) -> float:
     """When the session after one that ended at ``now`` starts: when the session planned it (``planned``, with
-    ``campaign_schedule`` or a rhythm), else, after a session that ended needing the owner with questions none of which
-    is answered yet (``questions`` are their statuses), ``wait_hours`` later (an answer brings it forward), else
-    ``gap_minutes`` later."""
+    ``campaign_schedule`` or a rhythm), else, after a session that ended needing the owner with questions that it left
+    for them, none answered or skipped yet (``questions`` are their statuses), ``wait_hours`` later (an answer or a skip
+    brings it forward), else ``gap_minutes`` later. A question that expired while the session waited for it can no
+    longer be answered, so nothing waits for it."""
     if planned is not None:
         return planned
     if needs.strip() and questions and all(status == "left" for status in questions):

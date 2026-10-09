@@ -849,10 +849,10 @@ your conversation; the daemon runs the sessions after it, each a run in a thread
   strategy, the last 12 entries of the ledger, the questions left for you and what became of them, and how the last
   session ended. The prompt of a session says to write its progress there, not in the notes of the memory.
 - **The next session** starts `campaign_gap_minutes` (60) after the last one ended, unless a session planned it with
-  `campaign_schedule` (a moment, or a cron rhythm). A session that ended needing you, with none of its questions
-  answered, is followed after `campaign_wait_hours` (24) instead; your answer, or your skip, starts the next session
-  right away, and its brief carries it. After `campaign_patience_sessions` (3) sessions in a row without a progress
-  entry, the brief asks for a new strategy first. All four live in `[agent]`.
+  `campaign_schedule` (a moment, or a cron rhythm). A session that ended needing you, with questions it left for you
+  and none answered yet, is followed after `campaign_wait_hours` (24) instead; your answer, or your skip, starts the
+  next session right away, and its brief carries it. After `campaign_patience_sessions` (3) sessions in a row without a
+  progress entry, the brief asks for a new strategy first. All four live in `[agent]`.
 - **Only a verified outcome ends it.** `campaign_achieved` asks the goal checker (the review model) whether the targets
   are reached, from the targets and how they are verified, the progress in the ledger, what the session's own calls
   measured and the session's evidence. Refused, the call fails with the checker's reason and the session goes on;

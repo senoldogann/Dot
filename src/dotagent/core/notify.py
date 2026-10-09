@@ -12,7 +12,8 @@ _NOTIFY_TIMEOUT_S: float = 15.0
 
 
 async def show_notification(title: str, message: str) -> None:
-    """Show a macOS notification through ``osascript``; the texts are passed as arguments, never as script source."""
+    """Show a macOS notification through ``osascript``; the texts are passed as arguments, never as script source.
+    Raises ``ToolExecutionError`` when it fails or does not end in time."""
     process: asyncio.subprocess.Process = await asyncio.create_subprocess_exec(
         "/usr/bin/osascript",
         "-e",
@@ -27,7 +28,12 @@ async def show_notification(title: str, message: str) -> None:
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE,
     )
-    _, stderr = await asyncio.wait_for(process.communicate(), timeout=_NOTIFY_TIMEOUT_S)
+    try:
+        _, stderr = await asyncio.wait_for(process.communicate(), timeout=_NOTIFY_TIMEOUT_S)
+    except TimeoutError as error:
+        process.kill()
+        await process.wait()
+        raise ToolExecutionError("the notification did not show in time", {"timeout_s": _NOTIFY_TIMEOUT_S}) from error
     if process.returncode != 0:
         raise ToolExecutionError(
             "the notification could not be shown",

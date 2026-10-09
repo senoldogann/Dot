@@ -1509,7 +1509,7 @@ Schedules and the `schedule_*` tools would have shown).
   `store/db.py:456`) makes a run a session; the count of sessions, the last progress and the last session are read from
   the runs and the ledger, never stored twice.
 - **Starting one.** `StartRunRequest.standing` (`server/views.py:96`), the composer's switch *Keep going* (a task only;
-  goal mode hides while it is on) and `dotx run --standing` call `RunManager.start_campaign` (`agent/manager.py:171`):
+  goal mode hides while it is on) and `dotx run --standing` call `RunManager.start_campaign` (`agent/manager.py:170`):
   a chat or research run, or goal mode asked for, is refused (422); the campaign is created and the opening session
   starts in the owner's thread with the goal as its first message. A campaign whose opening session cannot start is
   deleted again.
@@ -1521,7 +1521,7 @@ Schedules and the `schedule_*` tools would have shown).
   words); the newest strategy; the last 12 ledger entries with their numbers; the last 8 questions left for the owner
   with their answers, skips or "unanswered since …"; how the last session ended (or that the daemon cut it off); and,
   after `campaign_patience_sessions` sessions in a row without a progress entry, a call for a new strategy first. Only
-  one session of a campaign works at a time, in any process (`start_session`, `agent/manager.py:233`).
+  one session of a campaign works at a time, in any process (`start_session`, `agent/manager.py:232`).
 - **The prompt.** A session's prompt has a `# Campaign` section instead of the open-ended goals (`_CAMPAIGN`,
   `agent/prompt.py:129`; `_ending`, `:354`): session N, do not start from zero, record the targets while there are
   none, write progress with numbers and evidence (and setbacks and strategies) with `campaign_note` before finishing,
@@ -1532,12 +1532,14 @@ Schedules and the `schedule_*` tools would have shown).
   `campaign_schedule(at | cron)`, which only moves the campaign's own next session (the scheduler's minimum interval
   holds for a cron); `campaign_achieved(evidence)`. A session that wants to end while the campaign has no targets is
   sent back once (`campaign_targets_reminder`, `agent/loop.py:1148`), after the plan reminder.
-- **It does not stop.** When a session ends, before its waiters wake (`_drive`, `agent/manager.py:825`;
-  `_follow_session`, `:834`), the next one is planned by `next_session_at` (`agent/campaign.py:159`): when a session
+- **It does not stop.** When a session ends, before its waiters wake (`_drive`, `agent/manager.py:826`;
+  `_follow_session`, `:835`), the next one is planned by `next_session_at` (`agent/campaign.py:159`): when a session
   planned it (`campaign_schedule`, or the rhythm of a cron), then; after a session that ended with `needs_from_user` and
-  questions none of which is answered, `campaign_wait_hours` (24) later; else `campaign_gap_minutes` (60) later. An
+  questions it left for the owner, none answered or skipped yet, `campaign_wait_hours` (24) later (a question that
+  expired while a session waited for it can no longer be answered, so nothing waits for it); else
+  `campaign_gap_minutes` (60) later. An
   answer to, or a skip of, a question of a session that has ended starts no run in its thread: it is kept for the next
-  brief and brings the next session to now (`decide`, `agent/manager.py:342`). The scheduler's tick starts every active
+  brief and brings the next session to now (`decide`, `agent/manager.py:341`). The scheduler's tick starts every active
   campaign whose next session is due and none of whose sessions works (`due_campaigns`, `store/db.py:1487`;
   `scheduler/runner.py:83`), however late: a campaign's session is never skipped as overdue. When the daemon starts,
   after the runs it resumes, every active campaign with no session planned and none working gets one now

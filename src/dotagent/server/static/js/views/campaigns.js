@@ -9,11 +9,14 @@ import { levelLabel } from "../efforts.js";
 import { icon } from "../icons.js";
 import { emptyPanel, errorPanel, loadingPanel, pageHead, statusBadge } from "../panels.js";
 import { approvalLabel } from "../runmodes.js";
-import { onLifecycle } from "../state.js";
+import { onChange, onLifecycle } from "../state.js";
 import { attempt, confirmDialog, toast } from "../ui.js";
 
-// A session starting or ending, or a question decided, changes what the pages show; the ledger grows within a session.
-const LIFECYCLE_KINDS = new Set(["run_started", "run_finished", "approval_decided"]);
+// A session starting or ending, or a question asked or decided, changes what the pages show. While a session works, they
+// also follow the status refresh (every 15 s), which brings the entries it writes to the ledger.
+const LIFECYCLE_KINDS = new Set(["run_started", "run_finished", "approval_requested", "approval_decided"]);
+// The questions of a session that wait for the owner: one the session waits for, or one it left and went on without.
+const WAITING_STATUSES = new Set(["pending", "left"]);
 const RELOAD_DELAY_MS = 400;
 const STATUS_TONES = { active: "b-info", achieved: "b-ok", stopped: "b-muted" };
 const ENTRY_TONES = { progress: "b-ok", setback: "b-bad", strategy: "b-info", question: "b-warn", note: "b-muted" };
@@ -72,6 +75,7 @@ function campaignRow(summary) {
 function mountList(root) {
   let disposed = false;
   let ticket = 0;
+  let working = false;
   const holder = el("div", null, loadingPanel());
 
   async function reload() {
@@ -81,6 +85,7 @@ function mountList(root) {
       if (disposed || mine !== ticket) {
         return;
       }
+      working = summaries.some((summary) => summary.working !== null);
       holder.replaceChildren(
         summaries.length === 0
           ? emptyPanel("target", "No campaigns yet", "Switch on Keep going when you start a task, and Dot works on it until the outcome is verified.")
@@ -104,10 +109,16 @@ function mountList(root) {
       reloadSoon();
     }
   });
+  const stopChange = onChange(() => {
+    if (working) {
+      reloadSoon();
+    }
+  });
   attempt(reload);
   return () => {
     disposed = true;
     stopLifecycle();
+    stopChange();
   };
 }
 
@@ -180,7 +191,8 @@ function sessionRow(session, number) {
 }
 
 function decidedRow(question) {
-  const answer = question.status === "approved" ? `Answered: ${question.note}` : "Skipped";
+  const answers = { approved: `Answered: ${question.note}`, denied: "Skipped", expired: "Not answered while the session waited" };
+  const answer = answers[question.status] ?? question.status;
   return el(
     "div",
     { class: "list-row" },
@@ -193,13 +205,14 @@ function section(label, rows, emptyText) {
     "div",
     { class: "stack tight" },
     el("div", { class: "section-label" }, label),
-    rows.length === 0 ? el("div", { class: "card" }, el("div", { class: "row-text faint" }, emptyText)) : el("div", { class: "card" }, rows),
+    el("div", { class: "card" }, rows.length === 0 ? el("div", { class: "list-row" }, el("div", { class: "row-text faint" }, emptyText)) : rows),
   );
 }
 
 function mountPage(root, ctx, campaignId) {
   let disposed = false;
   let ticket = 0;
+  let working = false;
   const holder = el("div", null, loadingPanel());
 
   async function act(path, done) {
@@ -271,8 +284,9 @@ function mountPage(root, ctx, campaignId) {
   function paint(detail) {
     const { record } = detail;
     ctx.setTitle(clip(record.title, TITLE_CHARS));
-    const open = detail.questions.filter((question) => question.status === "left");
-    const decided = detail.questions.filter((question) => question.status !== "left");
+    working = detail.working !== null;
+    const open = detail.questions.filter((question) => WAITING_STATUSES.has(question.status));
+    const decided = detail.questions.filter((question) => !WAITING_STATUSES.has(question.status));
     const where = nextStep(record, detail.working, detail.next_local);
     const numbers = new Map(detail.sessions.map((session, index) => [session.id, index + 1]));
     holder.replaceChildren(
@@ -308,7 +322,7 @@ function mountPage(root, ctx, campaignId) {
           detail.sessions.map((session, index) => sessionRow(session, index + 1)).reverse(),
           "None yet.",
         ),
-        decided.length === 0 ? null : section("Questions answered", decided.map(decidedRow).reverse(), ""),
+        decided.length === 0 ? null : section("Earlier questions", decided.map(decidedRow).reverse(), ""),
       ),
     );
   }
@@ -338,10 +352,16 @@ function mountPage(root, ctx, campaignId) {
       reloadSoon();
     }
   });
+  const stopChange = onChange(() => {
+    if (working) {
+      reloadSoon();
+    }
+  });
   attempt(reload);
   return () => {
     disposed = true;
     stopLifecycle();
+    stopChange();
   };
 }
 
