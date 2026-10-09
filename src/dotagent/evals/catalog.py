@@ -29,7 +29,7 @@ from dotagent.evals.types import (
     TaskCategory,
 )
 from dotagent.store.models import RunMode
-from dotagent.tools.meta import FINISH_TOOL
+from dotagent.tools.meta import FINISH_TOOL, MARK_PLAN_STEP_TOOL, UPDATE_PLAN_TOOL
 
 # What every task is allowed to use before the run is cut: wall-clock time and tokens (input and output of every step).
 TIME_LIMIT_S: float = 300.0
@@ -209,6 +209,41 @@ _QUARTERS: tuple[tuple[str, str], ...] = (
     ("data/q3.csv", _lines("item,amount", "rent,1200", "tools,150")),
 )
 _SORT_AWK: str = 'awk -F, -v q=$q \'NR>1 {s+=$2} END {print "Q" q ": " s}\' data/q$q.csv'
+# Meeting notes in which five people have an e-mail address: one of them twice, one only in a subfolder, one person
+# without an address.
+_MEETINGS: tuple[tuple[str, str], ...] = (
+    (
+        "notes/2025-09-01-standup.md",
+        _lines(
+            "# Standup", "", "- Mert Kaya (mert.kaya@example.com) sends the slides.", "- Selin asked about the budget."
+        ),
+    ),
+    (
+        "notes/2025-09-08-kickoff.md",
+        _lines(
+            "# Kickoff",
+            "",
+            "Present: Ayşe Demir <ayse.demir@example.org>, Can Öztürk: can@ozturk.example.net, Zeynep (no address given).",
+        ),
+    ),
+    (
+        "notes/2025-09-15-review.md",
+        _lines(
+            "# Review",
+            "",
+            "- Deniz Arslan — deniz.arslan@example.com",
+            "- Mert Kaya (mert.kaya@example.com) presented.",
+        ),
+    ),
+    ("notes/archive/2024-12-retro.md", _lines("# Retro 2024", "", "Ela Yıldız, ela@example.com, ran the retro.")),
+)
+_CONTACTS: tuple[str, ...] = (
+    "mert.kaya@example.com",
+    "ayse.demir@example.org",
+    "can@ozturk.example.net",
+    "deniz.arslan@example.com",
+    "ela@example.com",
+)
 _TOTAL_AWK: str = "awk -F, 'FNR>1 {s+=$2} END {print \"Total: \" s}' data/q1.csv data/q2.csv data/q3.csv"
 
 
@@ -566,6 +601,61 @@ def _catalog() -> tuple[EvalTask, ...]:
                 ),
                 _shell("python3 main.py"),
                 _finish("main.py printed: Hello, Dot!", True),
+            ),
+        ),
+        _task(
+            "collect-contacts",
+            "multi_step",
+            "Collect as many contacts as the meeting notes in notes/ give: write contacts.csv with the header "
+            "name,email and one row for every person the notes give an e-mail address for, each person once.",
+            "task",
+            "done",
+            tuple(_seed(path, content) for path, content in _MEETINGS),
+            (
+                _contains("contacts.csv", "name,email"),
+                *(_contains("contacts.csv", address) for address in _CONTACTS),
+                # Each address once, the header and a row for each address and nothing else, and a name in every row.
+                _runs("sh", "-c", f"test $(grep -c @ contacts.csv) -eq {len(_CONTACTS)}"),
+                _runs("sh", "-c", f"test $(grep -c . contacts.csv) -eq {len(_CONTACTS) + 1}"),
+                _runs("sh", "-c", "test -f contacts.csv && ! grep -q '^[[:space:]]*,' contacts.csv"),
+            ),
+            (
+                _turn(
+                    _call(
+                        UPDATE_PLAN_TOOL,
+                        steps=[
+                            {"text": "Find every e-mail address in notes/ and its subfolders", "status": "in_progress"},
+                            {"text": "Write contacts.csv", "status": "pending"},
+                            {"text": "Count its rows against the addresses found", "status": "pending"},
+                        ],
+                        targets="contacts.csv has one row for every person in notes/ with an e-mail address, counted "
+                        "with grep against the addresses grep finds in the notes",
+                    )
+                ),
+                _shell("grep -rn @ notes"),
+                _turn(
+                    _write(
+                        "contacts.csv",
+                        _lines(
+                            "name,email",
+                            "Mert Kaya,mert.kaya@example.com",
+                            "Ayşe Demir,ayse.demir@example.org",
+                            "Can Öztürk,can@ozturk.example.net",
+                            "Deniz Arslan,deniz.arslan@example.com",
+                            "Ela Yıldız,ela@example.com",
+                        ),
+                    ),
+                    _call(MARK_PLAN_STEP_TOOL, step=1, status="done"),
+                    _call(MARK_PLAN_STEP_TOOL, step=2, status="done"),
+                ),
+                _turn(
+                    _call("shell", command="grep -c @ contacts.csv"), _call(MARK_PLAN_STEP_TOOL, step=3, status="done")
+                ),
+                _finish(
+                    "contacts.csv has the 5 people the notes give an e-mail address for (Mert Kaya once, although two "
+                    "notes name him; Ela Yıldız from notes/archive/). Zeynep and Selin have no address in the notes.",
+                    True,
+                ),
             ),
         ),
         _task(

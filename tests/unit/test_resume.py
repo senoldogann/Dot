@@ -2,7 +2,7 @@
 the daemon resumes on its own, and what the resumed run is told."""
 
 from dotagent.agent.compact import pending_calls
-from dotagent.agent.plan import PlanItem
+from dotagent.agent.plan import EMPTY_PLAN, PlanItem, PlanPayload
 from dotagent.agent.resume import (
     RESUME_SOURCE,
     CallEnd,
@@ -112,7 +112,13 @@ def test_the_resumed_run_is_told_how_each_call_of_the_step_ended_and_takes_over_
             _call("write_file", "write", "cut_off", ""),
             _call("move_file", "write", "not_started", ""),
         ),
-        plan=(PlanItem(text="Read the data", status="done"), PlanItem(text="Write the report", status="in_progress")),
+        plan=PlanPayload(
+            steps=(
+                PlanItem(text="Read the data", status="done"),
+                PlanItem(text="Write the report", status="in_progress"),
+            ),
+            targets="report.md holds every row of the data",
+        ),
     )
     note: str = resume_note(GOAL, resumption)
     assert note.startswith(
@@ -128,7 +134,10 @@ def test_the_resumed_run_is_told_how_each_call_of_the_step_ended_and_takes_over_
         "it again."
         "\n- move_file {}: it had not started, so nothing of it ran.\n\n"
     ) in note
-    assert "Its plan, which is your plan now:\n1. [done] Read the data\n2. [in_progress] Write the report\n\n" in note
+    assert (
+        "Its plan, which is your plan now:\n1. [done] Read the data\n2. [in_progress] Write the report\n"
+        "Targets: report.md holds every row of the data\n\n"
+    ) in note
     assert note.endswith("finish the goal.")
     assert resumed_event_data(resumption) == {
         "from_run_id": "run_1",
@@ -146,7 +155,7 @@ def test_the_resumed_run_is_told_how_each_call_of_the_step_ended_and_takes_over_
 
 def test_a_run_cut_off_between_steps_is_told_only_its_goal_and_to_go_on() -> None:
     resumption: Resumption = Resumption(
-        from_run_id="run_1", cut_off="daemon_shutdown", automatic=True, calls=(), plan=()
+        from_run_id="run_1", cut_off="daemon_shutdown", automatic=True, calls=(), plan=EMPTY_PLAN
     )
     assert resume_note(GOAL, resumption) == (
         "[system note] The run that worked on this goal was cut off: the Dot daemon was shut down while it ran. You go "

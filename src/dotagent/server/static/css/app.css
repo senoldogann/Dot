@@ -1105,6 +1105,24 @@ a.pill:hover {
   font-size: 12px;
 }
 
+.plan-targets {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  padding: 3px 0 8px;
+  margin-bottom: 4px;
+  border-bottom: 1px solid var(--border);
+  font-weight: 500;
+  overflow-wrap: anywhere;
+}
+
+.plan-targets .icon {
+  margin-top: 3px;
+  width: 14px;
+  height: 14px;
+  flex: none;
+}
+
 .plan-step {
   display: flex;
   align-items: flex-start;

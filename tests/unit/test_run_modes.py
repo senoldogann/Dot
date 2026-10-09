@@ -18,7 +18,7 @@ from dotagent.policy.engine import route_for
 from dotagent.policy.types import ApprovalMode, QuestionMode, Route
 from dotagent.scheduler import SCHEDULE_SOURCE
 from dotagent.store.db import Store
-from dotagent.store.models import RunRecord
+from dotagent.store.models import RunMode, RunRecord
 from dotagent.tools.delegate import DELEGATE_SOURCE
 from dotagent.tools.meta import ASK_USER_TOOL
 
@@ -156,6 +156,28 @@ def test_the_prompt_says_that_questions_are_left_only_in_a_run_that_leaves_them(
 def test_the_prompt_mentions_goal_mode_only_when_it_is_on() -> None:
     assert "Goal mode is on" in _prompt("ask", True)
     assert "Goal mode is on" not in _prompt("ask", False)
+
+
+def _in_mode(mode: RunMode) -> str:
+    return build_system_prompt(
+        collect_prompt_inputs(mode, "cli", "aggressive", "ask", "wait", False, Path("/tmp/work"), [], [], [])
+    )
+
+
+def test_open_ended_goals_are_held_to_their_targets_in_task_and_research_runs_only() -> None:
+    section: str = "# Open-ended goals"
+    assert section in _in_mode("task")
+    assert section in _in_mode("research")
+    # A chat turn ends with a reply and has no finish to hold back.
+    assert section not in _in_mode("chat")
+
+
+def test_a_negative_or_endless_limit_of_a_run_is_refused(tmp_path: Path) -> None:
+    path: Path = tmp_path / "config.toml"
+    for limit in ("run_max_tokens = -1", "run_max_minutes = -0.5", "run_max_minutes = inf", "run_max_minutes = nan"):
+        path.write_text(f"[agent]\n{limit}\n", encoding="utf-8")
+        with pytest.raises(ConfigError):
+            load_config(path)
 
 
 def test_a_step_limit_left_in_the_configuration_is_refused(tmp_path: Path) -> None:

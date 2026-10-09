@@ -18,9 +18,20 @@ from dotagent.agent.continuity import (
     with_instruction,
 )
 from dotagent.agent.executor import _group_calls
-from dotagent.agent.plan import PlanItem, open_steps, render_plan, with_step_status
+from dotagent.agent.plan import (
+    EMPTY_PLAN,
+    PlanItem,
+    PlanPayload,
+    open_steps,
+    plan_event_data,
+    plan_from_event,
+    plan_lines,
+    render_plan,
+    with_step_status,
+)
 from dotagent.core.errors import ToolInputError
 from dotagent.llm.types import Message, ToolCall, assistant_message, tool_message, user_message
+from dotagent.store.models import EventRecord
 from dotagent.tools.meta import build_meta_tools
 from dotagent.tools.registry import build_registry
 
@@ -67,12 +78,15 @@ def test_a_continuity_note_pins_the_facts_and_a_new_compaction_reads_only_its_su
     ledger = with_compaction(
         with_actions(new_ledger(GOAL), [(_call("write_file", {"path": "~/Reports/week41.md"}), True, "ok")])
     )
-    plan = (PlanItem(text="Write the report", status="done"), PlanItem(text="Mail it", status="in_progress"))
+    plan = PlanPayload(
+        steps=(PlanItem(text="Write the report", status="done"), PlanItem(text="Mail it", status="in_progress")),
+        targets="the team has the report: the mail is in the Sent folder",
+    )
     check = check_continuity(SUMMARY + " see https://made.up/x", GOAL, ledger)
     note: str = continuity_note(ledger, plan, 4000, SUMMARY, "written by you, ollama:m", check)
     assert note.startswith(CONTINUITY_MARK)
     assert GOAL in note
-    assert "1. [done] Write the report" in note
+    assert "1. [done] Write the report\n2. [in_progress] Mail it\nTargets: the team has the report" in note
     assert "write_file" in note
     assert "https://made.up/x" in note.split("## Consistency check", 1)[1]
     assert summary_part(note) == SUMMARY
@@ -83,11 +97,11 @@ def test_a_continuity_note_pins_the_facts_and_a_new_compaction_reads_only_its_su
 def test_the_pinned_facts_keep_the_task_whole_and_list_the_newest_actions_that_fit() -> None:
     reads = [(_call("read_file", {"path": f"~/notes/{index}.md"}), True, f"note {index}") for index in range(1, 31)]
     ledger = with_instruction(with_actions(new_ledger(GOAL), reads), "Use Turkish in the mail.")
-    roomy: str = render_pinned(ledger, (), 20_000)
+    roomy: str = render_pinned(ledger, EMPTY_PLAN, 20_000)
     assert '"~/notes/1.md"' in roomy
     assert "- ~/notes/1.md" in roomy
     assert "not listed" not in roomy
-    tight: str = render_pinned(ledger, (), 1000)
+    tight: str = render_pinned(ledger, EMPTY_PLAN, 1000)
     assert GOAL in tight
     assert "Use Turkish in the mail." in tight
     assert '"~/notes/30.md"' in tight
@@ -96,7 +110,7 @@ def test_the_pinned_facts_keep_the_task_whole_and_list_the_newest_actions_that_f
     # The headings of the two lists come on top of the cap.
     assert len(tight) < 1200
     # A cap the task alone fills keeps the task whole and lists nothing else.
-    bare: str = render_pinned(ledger, (), 100)
+    bare: str = render_pinned(ledger, EMPTY_PLAN, 100)
     assert GOAL in bare
     assert "(30 earlier ones not listed)" in bare
     assert "notes/30.md" not in bare
@@ -129,7 +143,10 @@ def test_a_compaction_keeps_the_newest_messages_that_fit_and_never_less_than_the
 def test_a_reminder_repeats_the_task_the_plan_and_only_the_newest_actions() -> None:
     reads = [(_call("read_file", {"path": f"~/notes/{index}.md"}), True, f"note {index}") for index in range(1, 8)]
     ledger = with_instruction(with_actions(new_ledger(GOAL), reads), "Use Turkish in the mail.")
-    plan = (PlanItem(text="Write the report", status="done"), PlanItem(text="Mail it", status="in_progress"))
+    plan = PlanPayload(
+        steps=(PlanItem(text="Write the report", status="done"), PlanItem(text="Mail it", status="in_progress")),
+        targets="",
+    )
     note: str = reminder_note(ledger, plan)
     assert note.startswith("[system note] Reminder, nothing new is asked")
     assert GOAL in note
@@ -152,6 +169,17 @@ def test_plan_steps_change_one_at_a_time_and_report_what_is_open() -> None:
         with_step_status(plan, 3, "done")
     with pytest.raises(ToolInputError):
         with_step_status((), 1, "done")
+
+
+def test_the_targets_of_a_plan_are_stored_with_it_and_read_under_its_steps() -> None:
+    plan = PlanPayload(steps=(PlanItem(text="a", status="done"),), targets="50 leads in leads.csv, counted with wc -l")
+    stored = EventRecord(id=1, run_id="run_1", ts=0.0, kind="plan", data=plan_event_data(plan))
+    assert plan_from_event(stored) == plan
+    assert plan_lines(plan) == "1. [done] a\nTargets: 50 leads in leads.csv, counted with wc -l"
+    assert plan_lines(plan.model_copy(update={"targets": ""})) == "1. [done] a"
+    # A plan stored before targets existed has none.
+    older = stored.model_copy(update={"data": {"steps": [{"text": "a", "status": "done"}]}})
+    assert plan_from_event(older) == PlanPayload(steps=plan.steps, targets="")
 
 
 def test_the_plan_changes_of_one_reply_apply_one_after_another() -> None:

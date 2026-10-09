@@ -11,7 +11,7 @@ from collections.abc import Sequence
 
 from dotagent.agent.compact import render_transcript
 from dotagent.agent.continuity import summary_part
-from dotagent.agent.plan import PLAN_EVENT, PlanItem, plan_from_event, render_plan
+from dotagent.agent.plan import EMPTY_PLAN, PLAN_EVENT, PlanPayload, plan_from_event, plan_lines
 from dotagent.core.errors import ProviderError
 from dotagent.core.ids import new_id
 from dotagent.core.logs import get_logger
@@ -51,18 +51,18 @@ class AsideAnswer(FrozenModel):
     attempts: int
 
 
-async def _plan_of(runtime: Runtime, run_id: str) -> tuple[PlanItem, ...]:
+async def _plan_of(runtime: Runtime, run_id: str) -> PlanPayload:
     event: EventRecord | None = await runtime.store.last_event(run_id, PLAN_EVENT)
-    return () if event is None else plan_from_event(event)
+    return EMPTY_PLAN if event is None else plan_from_event(event)
 
 
-def _record(run: RunRecord, plan: Sequence[PlanItem], messages: Sequence[Message]) -> str:
+def _record(run: RunRecord, plan: PlanPayload, messages: Sequence[Message]) -> str:
     readable: list[Message] = [
         message.model_copy(update={"content": summary_part(message.content)}) for message in messages
     ]
     sections: list[str] = [f"# The run's task\n{run.goal}", f"# Its status\n{run.status}, {run.steps} steps so far"]
-    if plan:
-        sections.append(f"# Its plan\n{render_plan(plan)}")
+    if plan.steps:
+        sections.append(f"# Its plan\n{plan_lines(plan)}")
     sections.append(f"# The conversation so far (oldest first)\n{render_transcript(readable)}")
     return truncate_middle("\n\n".join(sections), _RECORD_CHARS)
 

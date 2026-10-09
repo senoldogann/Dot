@@ -787,6 +787,14 @@ class Store:
         rows = await self._all("SELECT * FROM runs WHERE parent_run_id = ? ORDER BY created_at", (parent_run_id,))
         return [_run(row) for row in rows]
 
+    async def family_tokens(self, run_id: str) -> int:
+        """The tokens (input and output) of a run and of the runs started on its behalf, as their totals stand now."""
+        row = await self._one(
+            "SELECT COALESCE(SUM(input_tokens + output_tokens), 0) AS n FROM runs WHERE id = ? OR parent_run_id = ?",
+            (run_id, run_id),
+        )
+        return 0 if row is None else int(row["n"])
+
     async def mark_interrupted_runs(self) -> int:
         """Runs left active by a crashed daemon (queued, running, or blocked on a question) become 'failed', finished
         at their last sign of life: their newest event, else the time they were created. Each one also gets, at that

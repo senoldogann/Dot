@@ -10,7 +10,7 @@ from dotagent.agent.attachments import StoredAttachment, UserInput, attachment_s
 from dotagent.agent.gate import RunGate
 from dotagent.agent.lessons import LessonCase, dismiss_lesson, learn, save_lesson
 from dotagent.agent.loop import AgentRun, RunEnd, RunOpening, run_agent
-from dotagent.agent.plan import PLAN_EVENT, plan_from_event
+from dotagent.agent.plan import EMPTY_PLAN, PLAN_EVENT, plan_from_event
 from dotagent.agent.resume import (
     RESUME_SOURCE,
     CutOff,
@@ -182,8 +182,9 @@ class RunManager:
 
     def steer(self, run_id: str, text: str, files: tuple[StoredAttachment, ...]) -> None:
         """Hand the running agent an extra instruction and its attachments; it reads them before its next step, and a
-        run about to end with its answer reads them first. A run whose end is being recorded reads nothing more, so a
-        message to it is refused like one to a run that has ended."""
+        run about to end with its answer reads them first, unless it is past its limit and ends with that reply. A run
+        whose end is being recorded reads nothing more, so a message to it is refused like one to a run that has
+        ended."""
         handle: RunHandle = self._handle(run_id)
         try:
             handle.inbox.put_nowait(UserInput(text=text, files=files, question_id=None))
@@ -365,7 +366,7 @@ class RunManager:
             cut_off=cut_off,
             automatic=automatic,
             calls=calls,
-            plan=() if plan is None else plan_from_event(plan),
+            plan=EMPTY_PLAN if plan is None else plan_from_event(plan),
         )
         run, _ = await self._launch(
             old.goal,

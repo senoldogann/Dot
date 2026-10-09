@@ -145,15 +145,19 @@ answer (a small model that is offered both writes the call out as text).
   is less. The summary may use a tenth of the budget, so a long run's summary does not grow with each compaction until
   every step compacts. A compaction keeps the newest messages that fit next to the system prompt, the tool definitions
   and its note in 85 % of the budget, and never less than the model's last reply with its results, so the steps after
-  it have room. It is tried three times; when the model gives
-  no text, or a summary far over that limit, a mechanical summary takes its place and the timeline says so with the reason. Next to the summary a continuity note
-  keeps the goal, the plan with the state of each step and your messages, and of the work already done and the paths
-  touched the newest that fit in another tenth of the budget (it says how many earlier ones it leaves out), and
-  a check lists names, paths and links in the summary that the conversation never had. The `compacted` event names the
+  it have room. It is tried three times; when the model gives no text, or a summary far over that limit, a mechanical
+  summary takes its place and the timeline says so with the reason. Next to the summary a continuity note keeps the
+  goal, the plan with the state of each step and its targets, and your messages, and of the work already done and the
+  paths touched the newest that fit in another tenth of the budget (it says how many earlier ones it leaves out), and a
+  check lists names, paths and links in the summary that the conversation never had. The `compacted` event names the
   model, how the summary came about and what the check found.
 - The plan has steps that are `pending`, `in_progress`, `done`, `failed` or `skipped`; `update_plan` writes it and
   `mark_plan_step` changes one step, so the plan in the web UI moves as the work does. A run that calls `finish` with
-  steps still open is asked once to close them.
+  steps still open is asked once to close them. A plan can also hold the run's targets (`targets` of `update_plan`, at
+  most 600 characters): for a goal that names an outcome, what the run will reach and how its own tools measure it.
+  They stay until new targets replace them (an `update_plan` without `targets`, or with an empty text, keeps them), are
+  the first line of the plan in the web UI and are printed under "plan" by `dotx run`, go into every note that carries
+  the plan (a compaction, a reminder, a resumed run) and, in goal mode, to the goal check.
 - How much help a run gets depends on its model. The window is what one request of the model can hold; for Ollama it is
   the smaller of the model's own window and `[providers.ollama] num_ctx`, which Dot sends with every request (the Models
   table of the System page shows it). When three quarters of the window is less than `context_tokens`, the run's budget
@@ -180,8 +184,15 @@ answer (a small model that is offered both writes the call out as text).
   the answer, or to finish again with the same answer if it names them on purpose. The check makes no model call. It
   is off by default until evals show that it helps. The timeline shows each send-back.
 - A run has no step limit. It ends when the model calls `finish`, when the progress watchdog stops it (see
-  [Autonomy](#autonomy-approvals-goal-mode-and-the-end-of-a-run)), when a model call still fails after its retries, or
-  when you stop it. In goal mode the goal check can also end it (see [Autonomy](#autonomy-approvals-goal-mode-and-the-end-of-a-run)).
+  [Autonomy](#autonomy-approvals-goal-mode-and-the-end-of-a-run)), when a model call still fails after its retries, at
+  a limit of minutes or tokens you set, or when you stop it. In goal mode the goal check can also end it (see
+  [Autonomy](#autonomy-approvals-goal-mode-and-the-end-of-a-run)).
+- A goal that names an outcome instead of a task (grow, earn, reach, as many as possible, find a way) is held to the
+  outcome in task and research runs: the model is told to record measurable targets in its plan before it acts, to
+  measure after each round and change its approach when a round brought nothing, and to call `finish` only once the
+  targets are met, when the next step needs something only you can give, or at the run's limit, then with `success`
+  false, the numbers reached and what is missing. A precise request is still done exactly as asked. A chat is not told
+  this: its turn ends with its reply.
 - A reply without a tool call ends the turn in `chat` mode and when the run has not used a tool yet. Otherwise it is
   nudged towards `finish`; after `finish_nudges` nudges in a row the reply itself becomes the result. A step with tool
   calls starts the count again, so a status line written between tool steps does not end the run.
@@ -346,11 +357,13 @@ question is not put to you in its place.
 
 **Goal mode** is for `task` and `research` runs; a `chat` has no goal to check against, and asking for one is refused.
 When the model calls `finish`, the review model checks the answer against the goal, from the evidence of what the run
-did and not from what the answer claims. The evidence is a digest of the run's tool calls with the start of each result,
-and facts that Dot measured itself: the files its file tools wrote, its failed calls that no later success of the same
-call followed, the newest result of each command that tests, builds or lints, and the paths and addresses the answer
-names that the run never touched (paths that do not exist, addresses no call opened). Where the facts and the answer
-disagree, the checker goes by the facts. Its verdict is one of:
+did and not from what the answer claims. When the run's plan has targets, it judges them too: they are the run's own
+measurable reading of the goal, not requirements it added, and they make the goal reached only when they fit its words.
+The evidence is a digest of the run's tool calls with the start of each result, and facts that Dot measured itself: the
+files its file tools wrote, its failed calls that no later success of the same call followed, the newest result of each
+command that tests, builds or lints, and the paths and addresses the answer names that the run never touched (paths
+that do not exist, addresses no call opened). Where the facts and the answer disagree, the checker goes by the facts.
+Its verdict is one of:
 
 - `achieved`: the run ends as done.
 - `continue`: the goal is not reached yet, so the run is sent back to work with the instruction of the checker. A run is
@@ -381,9 +394,27 @@ only closes the question, and a left question never expires. With `wait` such a 
 for `approval_timeout_s` at most. A run you started in `ask` or `auto` always waits for your answer.
 
 **The end of a run.** There is no step limit. A run ends by `finish`; by the progress watchdog; by a model call that
-still fails after its retries; in goal mode by the goal check giving up; or when you stop it. With
-`verify_answer_paths = true` in `[agent]`, a successful end whose answer names paths that do not exist is sent back
-once before it is accepted, and before goal mode checks it (see [How a run works](#how-a-run-works)).
+still fails after its retries; in goal mode by the goal check giving up; at a limit of minutes or tokens you set; or
+when you stop it. With `verify_answer_paths = true` in `[agent]`, a successful end whose answer names paths that do not
+exist is sent back once before it is accepted, and before goal mode checks it (see [How a run works](#how-a-run-works)).
+
+**Limits of a run.** `run_max_minutes` and `run_max_tokens` in `[agent]` bound a task or research run; 0, the default,
+is no limit, and a chat turn has none. The minutes are the run's wall time, waits for your approvals and answers
+included; the tokens are those of every model call of the run (side calls, such as your side questions, included) and
+of the runs it delegated to. Dot compares them between steps, so a step that is running when a limit passes goes on: a
+model call can take `model_call_timeout_s`, and a delegation waits for its run. At the first step past a limit the run
+is told what it used and to finish now with what it reached, what is missing and how to go on; that step may only call
+`finish`, `update_plan` and `mark_plan_step` (the plan tools before `finish`, as nothing after `finish` runs), and the
+run ends with its reply. A `finish` ends it as it says, and in goal mode the goal check judges that finish once, with
+no way back: a goal it does not find reached ends the run as failed. Any other reply ends the run as failed, with a
+result that starts "Stopped: the run reached its limit", keeps what the reply said and tells what the run did last,
+what it touched and where its plan stood (`dotx stats` counts it as stopped at its limit). Past the limit neither the
+open steps of the plan nor `verify_answer_paths` send the run back, and a message you send during that step comes too
+late for it, as for any run that has ended: an answer to a question it left stays in the thread for the next run. The
+timeline shows when the limit was reached. The limits are those of one run: a resumed run, or one that an answer
+starts, begins with a new clock and a new count, and a delegated run has the limits of its own while its tokens also
+count toward its parent's, which sees them when the delegation returns. Delegated and scheduled runs have the same
+limits; an eval run is cut by its task's own (300 s, 600000 tokens), whatever yours are.
 
 **The progress watchdog.** After every step in which a run used tools, Dot compares what it called and what came back
 (screenshots included) with the steps before. By default it looks for the same step `stall_limit` times in a row: the
@@ -455,27 +486,27 @@ working is refused; a run of `dotx run` that a crash left working ends when the 
 How well Dot finishes work is measured, not guessed, in two ways.
 
 **`dotx stats [--days N]`** counts the runs that really happened (the last 30 days by default), per model: how they
-ended (finished, stopped by you, stopped by the progress watchdog, refused by the goal check, cut off when the daemon died or
-shut down, internal error, still active), steps, input and output tokens, tool calls and how many of them failed, calls
-whose arguments were not valid JSON, stalls and compactions. A **Time** table follows, per model of the runs as above
-(a side call that another model answered counts under the run's model): the seconds the model calls of its runs took,
-the median and the 90th percentile of one step's model call (of the steps that got a reply), the seconds of the
-compactions and of all side calls (every call but a step: compactions, approvals the review model answered, the goal
-check, the watchdog's second opinion, lessons, descriptions of images, side questions), and the tokens the provider
-served from its prompt cache. A call's seconds include the retries its connector made and the waits between them. Every
-model call of a run leaves a `model_call` event with its purpose, model, seconds and tokens (and, for a call that failed
-or was cut off, the error), and its tokens count in the run's totals; runs made before calls were timed have none, are
-left out of the table and are counted below it. A **Tools** table lists the 15 tools whose calls took the most seconds:
-calls, failures, seconds in all, the median call and the seconds spent at the gate (waiting for your approval or the
-review model's answer), which the seconds include. The seconds of `ask_user` are the wait for your answer (none for a
-question the run left), and those of
-`delegate` hold the whole delegated run, whose own tool calls are listed too. The database file is opened read-only, so
-it is safe to run while the daemon works, and the numbers hold no text of your chats.
+ended (finished, stopped by you, stopped by the progress watchdog, stopped at its limit, refused by the goal check, cut
+off when the daemon died or shut down, internal error, still active), steps, input and output tokens, tool calls and how
+many of them failed, calls whose arguments were not valid JSON, stalls and compactions. A **Time** table follows, per
+model of the runs as above (a side call that another model answered counts under the run's model): the seconds the model
+calls of its runs took, the median and the 90th percentile of one step's model call (of the steps that got a reply), the
+seconds of the compactions and of all side calls (every call but a step: compactions, approvals the review model
+answered, the goal check, the watchdog's second opinion, lessons, descriptions of images, side questions), and the
+tokens the provider served from its prompt cache. A call's seconds include the retries its connector made and the waits
+between them. Every model call of a run leaves a `model_call` event with its purpose, model, seconds and tokens (and,
+for a call that failed or was cut off, the error), and its tokens count in the run's totals; runs made before calls were
+timed have none, are left out of the table and are counted below it. A **Tools** table lists the 15 tools whose calls
+took the most seconds: calls, failures, seconds in all, the median call and the seconds spent at the gate (waiting for
+your approval or the review model's answer), which the seconds include. The seconds of `ask_user` are the wait for your
+answer (none for a question the run left), and those of `delegate` hold the whole delegated run, whose own tool calls
+are listed too. The database file is opened read-only, so it is safe to run while the daemon works, and the numbers hold
+no text of your chats.
 
 **`dotx eval`** plays a catalog of small tasks against a model and judges each by what is left in a workspace of its own:
-file edits, shell work, fixing code until its test passes, recovering from an error, multi-step work, read-only
-research, a task that cannot be done and has to end as an honest failure, an instruction hidden in a file that must not
-be followed, and a goal written in Turkish.
+file edits, shell work, fixing code until its test passes, recovering from an error, multi-step work, a goal that asks
+for as much as the files give, read-only research, a task that cannot be done and has to end as an honest failure, an
+instruction hidden in a file that must not be followed, and a goal written in Turkish.
 
 | Command                                                  | What it does                                                                                                                                                                                                       |
 | -------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
@@ -966,9 +997,10 @@ src/dotagent/
 - Every model call carries the schemas of over forty tools, several thousand tokens. A model with a small context
   window or a metered key feels it; `allow` lists keep the MCP part short.
 - A run costs what its model costs: the loop makes many calls, and screenshots are expensive. A run has no step limit, so
-  what bounds the cost is the stop button, the progress watchdog, `goal_patience` for the send-backs of goal mode, and
-  the concurrency limits (`max_concurrent_runs`). Without `stall_escalation`, a run that varies its steps without getting
-  anywhere ends only when you stop it.
+  what bounds the cost is the stop button, the progress watchdog, `goal_patience` for the send-backs of goal mode, the
+  concurrency limits (`max_concurrent_runs`) and, when you set them, `run_max_minutes` and `run_max_tokens`. Without
+  `stall_escalation` and without those limits, a run that varies its steps without getting anywhere ends only when you
+  stop it.
 - Resuming: in goal mode, the goal check of a resumed run judges from what the resumed run did, not from the steps of
   the run it resumes. The conversation shows every call of the step that was cut off as interrupted, also the ones that
   finished; the first message of the resumed run says which finished. A run of `dotx run` works in its own process, but

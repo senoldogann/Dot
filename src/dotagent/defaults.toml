@@ -78,11 +78,18 @@ attempts = 6
 max_concurrent = 4
 
 [agent]
-# A run has no step limit: it ends by finishing, by the progress watchdog (below) or by the stop button.
+# A run has no step limit: it ends by finishing, by the progress watchdog (below), at a limit below or by the stop button.
 # Goal mode: a reviewer model checks the answer of a task or research run against the goal and sends the run back to work
 # until the goal is reached; a run is sent back to work at most goal_patience times, then it ends as failed.
 goal_mode = false
 goal_patience = 4
+# The limits of a task or research run: minutes of wall time (waits for the user included), and tokens of every model
+# call of the run and of the runs it delegated to. Checked between steps: at the first step past one, the run is told to
+# finish with what it reached and what is missing, may only finish or close its plan, and ends after that reply (as
+# failed when it did not finish). 0 is no limit. Each run has its own: a resumed run starts again from 0. Delegated and
+# scheduled runs have the same limits; eval runs have their task's own.
+run_max_minutes = 0
+run_max_tokens = 0
 tool_output_chars = 12000
 # The prompt budget of a run: past 60 % of it older tool output is shortened, past all of it the older part of the run is
 # summarized. A model whose window is smaller gets three quarters of its window instead (for Ollama the window is at most

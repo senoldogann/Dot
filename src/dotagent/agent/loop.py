@@ -39,7 +39,26 @@ from dotagent.agent.continuity import (
 from dotagent.agent.executor import ToolOutcome, execute_calls
 from dotagent.agent.gate import RunGate
 from dotagent.agent.lessons import LessonCase, may_learn
-from dotagent.agent.plan import PLAN_EVENT, PlanItem, open_steps, plan_event_data, plan_from_event, render_plan
+from dotagent.agent.limits import (
+    LIMIT_EVENT,
+    LIMIT_TOOLS,
+    LimitReached,
+    RunLimits,
+    limit_event_data,
+    limit_note,
+    limit_reached,
+    limit_result,
+    limits_of,
+)
+from dotagent.agent.plan import (
+    EMPTY_PLAN,
+    PLAN_EVENT,
+    PlanPayload,
+    open_steps,
+    plan_event_data,
+    plan_from_event,
+    plan_lines,
+)
 from dotagent.agent.progress import (
     Alert,
     CallSeen,
@@ -247,9 +266,9 @@ class Compaction(FrozenModel):
     check: ContinuityCheck | None
 
 
-async def _current_plan(agent: AgentRun) -> tuple[PlanItem, ...]:
+async def _current_plan(agent: AgentRun) -> PlanPayload:
     latest: EventRecord | None = await agent.runtime.store.last_event(agent.run.id, PLAN_EVENT)
-    return () if latest is None else plan_from_event(latest)
+    return EMPTY_PLAN if latest is None else plan_from_event(latest)
 
 
 async def _model_summary(
@@ -317,7 +336,7 @@ async def _compact(
         message.model_copy(update={"content": summary_part(message.content)}) for message in head
     ]
     transcript: str = truncate_middle(render_transcript(readable), _SUMMARY_TRANSCRIPT_CHARS)
-    plan: tuple[PlanItem, ...] = await _current_plan(agent)
+    plan: PlanPayload = await _current_plan(agent)
     text, attempts, problem = await _model_summary(agent, ref, transcript, context_tokens)
     if text is None:
         reason: str = problem if problem is not None else "no reply"
@@ -562,12 +581,31 @@ def _after_verdict(verdict: GoalVerdict, ended: RunOutcome, sent_back: int, pati
     return SendBack(note=_send_back_note(reason))
 
 
+def _after_limit_verdict(verdict: GoalVerdict, ended: RunOutcome) -> RunOutcome:
+    """What the checker's verdict makes of the finish of a run past its limit: the run cannot be sent back to work, so
+    a goal that is not reached ends it as failed."""
+    reason: str = shorten_reason(verdict.reason)
+    if verdict.decision == "achieved":
+        return RunOutcome(status="done", result=ended.result, needs=ended.needs)
+    if verdict.decision == "blocked":
+        return RunOutcome(
+            status="failed",
+            result=_with_check_note(ended.result, f"the goal cannot be reached from here. {reason}"),
+            needs=ended.needs,
+        )
+    return RunOutcome(
+        status="failed",
+        result=_with_check_note(ended.result, f"the goal is not reached, and the run's limit is reached. {reason}"),
+        needs=ended.needs,
+    )
+
+
 async def _missing_in_answer(agent: AgentRun, answer: str, facts: RunFacts) -> tuple[str, ...]:
     """The paths ``answer`` names that do not exist and that no successful call of the run named."""
     return await asyncio.to_thread(missing_paths, answer_paths(answer), facts.named, agent.runtime.workspace)
 
 
-async def _check_goal(
+async def _ask_checker(
     agent: AgentRun,
     checker: GoalChecker,
     history: Sequence[Message],
@@ -575,9 +613,9 @@ async def _check_goal(
     ended: RunOutcome,
     sent_back: int,
     facts: RunFacts,
-) -> RunOutcome | SendBack:
-    """Goal mode: ask the checker whether the end a run reached is the goal reached, from a digest of the run and the
-    ``facts`` the harness measured.
+) -> GoalVerdict | RunOutcome:
+    """Goal mode: the checker's verdict on whether the end a run reached is the goal reached, from a digest of the run
+    and the ``facts`` the harness measured.
 
     A checker that cannot answer ends the run as failed, with the answer kept and the problem stated: an ending that
     was not checked is not accepted.
@@ -587,13 +625,14 @@ async def _check_goal(
     missing: tuple[str, ...] = await _missing_in_answer(agent, ended.result, facts)
     request: GoalRequest = GoalRequest(
         goal=run.goal,
+        targets=(await _current_plan(agent)).targets,
         digest=goal_digest(render_transcript(_since_goal(history, goal))),
         facts=redact_secrets(render_facts(facts, missing, unopened_addresses(ended.result, facts.named))),
         answer=ended.result,
         claimed_success=ended.status == "done",
     )
     try:
-        verdict: GoalVerdict = await checker(request)
+        return await checker(request)
     except ProviderError as error:
         log.error("goal_check_failed", run_id=run.id, error=error.message, context=error.context)
         await agent.runtime.bus.emit(
@@ -615,13 +654,29 @@ async def _check_goal(
             ),
             needs=ended.needs,
         )
-    settled: RunOutcome | SendBack = _after_verdict(verdict, ended, sent_back, patience)
+
+
+async def _check_goal(
+    agent: AgentRun,
+    checker: GoalChecker,
+    history: Sequence[Message],
+    goal: Message,
+    ended: RunOutcome,
+    sent_back: int,
+    facts: RunFacts,
+) -> RunOutcome | SendBack:
+    """What the checker makes of the end a run reached: it stands, or the run is sent back to work."""
+    asked: GoalVerdict | RunOutcome = await _ask_checker(agent, checker, history, goal, ended, sent_back, facts)
+    if isinstance(asked, RunOutcome):
+        return asked
+    patience: int = agent.runtime.config.agent.goal_patience
+    settled: RunOutcome | SendBack = _after_verdict(asked, ended, sent_back, patience)
     await agent.runtime.bus.emit(
-        run.id,
+        agent.run.id,
         "goal_check",
         {
-            "decision": verdict.decision,
-            "reason": shorten_reason(verdict.reason),
+            "decision": asked.decision,
+            "reason": shorten_reason(asked.reason),
             "check": sent_back + 1,
             "patience": patience,
             "final": isinstance(settled, RunOutcome),
@@ -629,6 +684,36 @@ async def _check_goal(
         True,
     )
     return settled
+
+
+async def _check_goal_at_limit(
+    agent: AgentRun,
+    checker: GoalChecker,
+    history: Sequence[Message],
+    goal: Message,
+    ended: RunOutcome,
+    sent_back: int,
+    facts: RunFacts,
+) -> RunOutcome:
+    """What the checker makes of the finish of a run past its limit: its verdict is final, as the run cannot be sent
+    back to work."""
+    asked: GoalVerdict | RunOutcome = await _ask_checker(agent, checker, history, goal, ended, sent_back, facts)
+    if isinstance(asked, RunOutcome):
+        return asked
+    await agent.runtime.bus.emit(
+        agent.run.id,
+        "goal_check",
+        {
+            "decision": asked.decision,
+            "reason": shorten_reason(asked.reason),
+            "check": sent_back + 1,
+            "patience": agent.runtime.config.agent.goal_patience,
+            "final": True,
+            "limit": True,
+        },
+        True,
+    )
+    return _after_limit_verdict(asked, ended)
 
 
 class StallAnswer(FrozenModel):
@@ -700,7 +785,7 @@ async def _answer_alert(
 ) -> StallAnswer | RunOutcome:
     """What the rung an alert reached asks for: a note (with the tools of the next step limited for a re-plan or a
     question), the advice of the review model, or the end of the run with what was tried."""
-    plan: str = render_plan(await _current_plan(agent))
+    plan: str = plan_lines(await _current_plan(agent))
     match alert.rung:
         case "consult":
             return await _consult(agent, consultant, alert, history, goal, ledger, plan)
@@ -737,7 +822,22 @@ def _run_end(
     return RunEnd(outcome=outcome, lessons=case)
 
 
+async def _limit_seen(agent: AgentRun, limits: RunLimits, started: float) -> LimitReached | None:
+    """The limit the run has reached by now, if any, from the seconds since ``started`` and the tokens of the run and
+    of the runs it delegated to as the store holds them (a call's tokens are added before the call returns)."""
+    tokens: int = await agent.runtime.store.family_tokens(agent.run.id)
+    return limit_reached(limits, time.monotonic() - started, tokens)
+
+
+async def _limit_end(agent: AgentRun, reached: LimitReached, ledger: RunLedger, reply: str) -> RunOutcome:
+    """The end of a run that did not finish in the step after it was told that its limit is reached; ``reply`` is the
+    text that step's reply had."""
+    plan: str = plan_lines(await _current_plan(agent))
+    return RunOutcome(status="failed", result=limit_result(reached, ledger, plan, reply), needs="")
+
+
 async def run_agent(agent: AgentRun) -> RunEnd:
+    started: float = time.monotonic()
     runtime: Runtime = agent.runtime
     run: RunRecord = agent.run
     config: AgentConfig = runtime.config.agent
@@ -746,7 +846,7 @@ async def run_agent(agent: AgentRun) -> RunEnd:
     if opening.resumed is not None:
         await runtime.bus.emit(run.id, RESUMED_EVENT, resumed_event_data(opening.resumed), True)
         # The plan of the run it resumes becomes this run's plan: the plan tools and the plan reminder go on with it.
-        if opening.resumed.plan:
+        if opening.resumed.plan.steps:
             await runtime.bus.emit(run.id, PLAN_EVENT, plan_event_data(opening.resumed.plan), True)
     ref: ModelRef = parse_model_ref(run.model)
     info: ModelInfo = await runtime.router.model_info(ref)
@@ -852,8 +952,12 @@ async def run_agent(agent: AgentRun) -> RunEnd:
         run.id,
     )
     watch: WatchState = new_watch()
-    # The tools of the next step when a progress alert limited them; None offers the tools of the groups that are on.
+    # The tools of the next step when a progress alert or the run's limit restricts them; None offers the tools of the
+    # groups that are on.
     allowed: frozenset[str] | None = None
+    run_limits: RunLimits | None = limits_of(config, run.mode)
+    # What the run had spent when it was seen past its limit; from then on every step may only finish, and ends the run.
+    past_limit: LimitReached | None = None
 
     async def sink(delta: StreamDelta) -> None:
         await runtime.bus.emit(run.id, "delta", {"kind": delta.kind, "text": delta.text, "step": steps}, False)
@@ -879,7 +983,15 @@ async def run_agent(agent: AgentRun) -> RunEnd:
             history.append(await _stored_note(agent, _new_memories_note(changed)))
             await runtime.store.mark_memories_used([record.id for record in changed], time.time())
             await runtime.bus.emit(run.id, "memories", {"ids": [record.id for record in changed], "live": True}, True)
-        # A step that a progress alert limited offers what the alert allows, and turns no group on.
+        if run_limits is not None and past_limit is None:
+            past_limit = await _limit_seen(agent, run_limits, started)
+            if past_limit is not None:
+                history.append(await _stored_note(agent, limit_note(past_limit)))
+                await runtime.bus.emit(run.id, LIMIT_EVENT, limit_event_data(past_limit), True)
+        if past_limit is not None:
+            # The limit wins over what a progress alert of the step before allowed.
+            allowed = LIMIT_TOOLS
+        # A step that a progress alert or the limit restricts offers what they allow, and turns no group on.
         offered: tuple[ToolSpec, ...] = (
             offered_specs(specs, on) if allowed is None else tuple(spec for spec in specs if spec.name in allowed)
         )
@@ -952,7 +1064,11 @@ async def run_agent(agent: AgentRun) -> RunEnd:
                 (outcome for outcome in outcomes if outcome.call.name == FINISH_TOOL and not outcome.result.is_error),
                 None,
             )
-            if finished is None:
+            if finished is not None:
+                ended = _finish_result(finished)
+            elif past_limit is not None:
+                return _run_end(agent, history, goal, await _limit_end(agent, past_limit, ledger, reply.text), facts)
+            else:
                 alert: Alert | None
                 watch, alert = advance(watch, _calls_seen(outcomes), limits, ladder)
                 if alert is not None:
@@ -965,16 +1081,17 @@ async def run_agent(agent: AgentRun) -> RunEnd:
                     allowed = answer.allowed
                 elif reminder_due(scaffold, run.mode, steps, reminded_at):
                     reminded_at = steps
-                    plan: tuple[PlanItem, ...] = await _current_plan(agent)
+                    plan: PlanPayload = await _current_plan(agent)
                     history.append(await _stored_note(agent, reminder_note(ledger, plan)))
                     await runtime.bus.emit(
-                        run.id, "reminder", {"step": steps, "open_steps": list(open_steps(plan))}, True
+                        run.id, "reminder", {"step": steps, "open_steps": list(open_steps(plan.steps))}, True
                     )
                 continue
-            ended = _finish_result(finished)
         else:
             answered: bool = bool(reply.text.strip())
-            if answered and (run.mode == "chat" or not used_tools or nudges >= config.finish_nudges):
+            if past_limit is not None:
+                return _run_end(agent, history, goal, await _limit_end(agent, past_limit, ledger, reply.text), facts)
+            elif answered and (run.mode == "chat" or not used_tools or nudges >= config.finish_nudges):
                 ended = RunOutcome(status="done", result=reply.text, needs="")
             elif nudges >= config.finish_nudges:
                 return _run_end(
@@ -984,11 +1101,21 @@ async def run_agent(agent: AgentRun) -> RunEnd:
                 nudges += 1
                 history.append(await _stored_note(agent, _NO_TOOL_NOTE if answered else _EMPTY_NOTE))
                 continue
-        # The run wants to end here. A plan with open steps is sent back once, so the plan the user sees matches the
-        # work; so is, with verify_answer_paths, an answer that names paths that do not exist; then goal mode lets the
-        # checker decide whether the goal is really reached.
+        # The run wants to end here. Past its limit it ends with this finish: nothing sends it back, goal mode's verdict
+        # on it is final, and what the user sent during the step comes too late for it (the manager keeps an answer in
+        # the thread for the next run).
+        if past_limit is not None:
+            at_limit: RunOutcome = (
+                ended
+                if checker is None
+                else await _check_goal_at_limit(agent, checker, history, goal, ended, sent_back, facts)
+            )
+            return _run_end(agent, history, goal, at_limit, facts)
+        # Otherwise a plan with open steps is sent back once, so the plan the user sees matches the work; so is, with
+        # verify_answer_paths, an answer that names paths that do not exist; then goal mode lets the checker decide
+        # whether the goal is really reached.
         if not plan_reminded and run.mode != "chat":
-            unclosed: tuple[int, ...] = open_steps(await _current_plan(agent))
+            unclosed: tuple[int, ...] = open_steps((await _current_plan(agent)).steps)
             if unclosed:
                 plan_reminded = True
                 nudges = 0

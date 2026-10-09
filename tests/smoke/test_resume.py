@@ -114,7 +114,11 @@ async def test_a_run_a_shutdown_cut_off_while_it_asked_goes_on_by_itself_with_it
     plan: ScriptedCall = ScriptedCall(
         tool=UPDATE_PLAN_TOOL,
         arguments={
-            "steps": [{"text": "Read data.csv", "status": "done"}, {"text": "Write report.md", "status": "in_progress"}]
+            "steps": [
+                {"text": "Read data.csv", "status": "done"},
+                {"text": "Write report.md", "status": "in_progress"},
+            ],
+            "targets": "report.md sums every row of data.csv",
         },
     )
     ask: ScriptedCall = ScriptedCall(
@@ -179,9 +183,10 @@ async def test_a_run_a_shutdown_cut_off_while_it_asked_goes_on_by_itself_with_it
             "calls": [{"tool": ASK_USER_TOOL, "end": "cut_off", "repeatable": True}],
         }
     ]
-    # The plan goes on: the first plan of the resumed run is the last one of the run it resumes, and its open step
-    # holds the first answer back.
+    # The plan goes on with its targets: the first plan of the resumed run is the last one of the run it resumes, and
+    # its open step holds the first answer back.
     assert _data(events, PLAN_EVENT)[0] == _data(cut_events, PLAN_EVENT)[-1]
+    assert _data(events, PLAN_EVENT)[-1]["targets"] == "report.md sums every row of data.csv"
     assert _data(events, "plan_reminder") == [{"open_steps": [2]}]
     note: str = _note(messages)
     assert note.startswith(f"{_NOTE_START}: the Dot daemon was shut down while it ran.")
@@ -189,7 +194,10 @@ async def test_a_run_a_shutdown_cut_off_while_it_asked_goes_on_by_itself_with_it
         f"\n- {ASK_USER_TOOL} {dumps_compact(ask.arguments)}: it was cut off while it ran. It only reads, so it may "
         "run again.\n"
     ) in note
-    assert "Its plan, which is your plan now:\n1. [done] Read data.csv\n2. [in_progress] Write report.md\n" in note
+    assert (
+        "Its plan, which is your plan now:\n1. [done] Read data.csv\n2. [in_progress] Write report.md\n"
+        "Targets: report.md sums every row of data.csv\n"
+    ) in note
 
 
 async def test_a_run_a_crash_cut_off_in_a_command_waits_for_the_owner_and_is_resumed_by_hand(
