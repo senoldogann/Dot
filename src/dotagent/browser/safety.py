@@ -20,6 +20,7 @@ from dotagent.policy.elements import (
     assessment_for,
     clicking_reasons,
     looks_like_key,
+    naming_reasons,
     quiet_assessment,
     typing_reasons,
 )
@@ -129,8 +130,9 @@ def parse_element(line: str) -> Element | None:
 
 
 def assess_step(step: Step, element: Element | None, target: Element | None) -> StepAssessment:
-    """Risk and flags of one step, judged from the action, the element it targets and, for a drag, the element it drops
-    onto (each judged as a click on it would be)."""
+    """Risk and flags of one step, judged from the action and the element it targets. A drag's element is judged as a
+    click on it would be; the element it drops onto is more often a list or a region than a button, and its name says
+    what the drop does, so it is judged by its name whatever its role, and as a field that takes typed text."""
     reasons: list[str] = []
     if step.action in _TYPING_ACTIONS:
         reasons = typing_reasons(element, step.text)
@@ -138,7 +140,9 @@ def assess_step(step: Step, element: Element | None, target: Element | None) -> 
         reasons = clicking_reasons(element, _CLICKABLE_ROLES)
     elif step.action == "drag":
         reasons = list(
-            dict.fromkeys(clicking_reasons(element, _CLICKABLE_ROLES) + clicking_reasons(target, _CLICKABLE_ROLES))
+            dict.fromkeys(
+                clicking_reasons(element, _CLICKABLE_ROLES) + naming_reasons(target) + typing_reasons(target, None)
+            )
         )
     if step.action in _QUIET_ACTIONS and not reasons:
         return quiet_assessment()

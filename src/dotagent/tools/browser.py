@@ -345,10 +345,10 @@ def _act_tool() -> RegisteredTool:
             "text at once at the caret, without keys: long text and rich editors such as post composers or code "
             "editors), select, press (Enter, Control+A, …), check, uncheck, scroll_into_view, drag (move ref onto "
             "to_ref), click_at (pixel x,y from a screenshot, only for canvases). In an editor (a contenteditable "
-            "area) fill, type and insert wait until it is ready and fail when it took nothing. Batch the steps you "
-            "can predict, such as filling a whole form and pressing submit. The result shows what changed on the "
-            "page. Passwords, card numbers and one-time codes go in only as your instructions on secrets say: "
-            "otherwise the browser refuses the step. " + _REF_HELP
+            "area) fill, type and insert wait until it is ready and fail when it did not take the text; insert goes "
+            "only into a text field or an editor. Batch the steps you can predict, such as filling a whole form and "
+            "pressing submit. The result shows what changed on the page. Passwords, card numbers and one-time codes "
+            "go in only as your instructions on secrets say: otherwise the browser refuses the step. " + _REF_HELP
         ),
         args_model=ActArgs,
         modes=ACTING_MODES,

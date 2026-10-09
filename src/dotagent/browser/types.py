@@ -79,6 +79,8 @@ class Step(BaseModel):
             raise ValueError(f"{action} needs a ref")
         if action in _TEXT_ACTIONS and self.text is None:
             raise ValueError(f"{action} needs text")
+        if action in ("type", "insert") and self.text == "":
+            raise ValueError(f"{action} needs text that is not empty; fill with an empty text clears a field")
         if action == "press" and self.key is None:
             raise ValueError("press needs a key")
         if action == "click_at" and (self.x is None or self.y is None or self.ref is not None):

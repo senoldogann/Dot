@@ -88,17 +88,20 @@ _PAGES: dict[str, str] = {
 <button onclick="setTimeout(() => { location.href = `http://localhost:${location.port}/late-headers` }, 500)">Leave</button>""",
     "/late-headers": "<!doctype html><title>Blocked</title><h1>Blocked page</h1>",
     # An editor that takes text only through beforeinput, as Draft.js and Lexical do, and drops what comes before it is
-    # ready, ?ready= milliseconds after it takes the focus (30 by default).
+    # ready, ?ready= milliseconds after it takes the focus (30 by default); it shows a change ?apply= milliseconds after
+    # the input (at once by default).
     "/editor": """<!doctype html><title>Editor</title>
 <div id="ed" contenteditable="true" role="textbox" aria-label="Post text" style="min-height:40px;border:1px solid"></div>
 <p id="holds">Editor holds: </p>
 <input aria-label="Plain field">
+<div contenteditable="true"><p>First note</p><p>Second note</p><input aria-label="Inner field"></div>
 <script>
 const ed = document.getElementById('ed');
 const readyMs = Number(new URLSearchParams(location.search).get('ready') ?? '30');
+const applyMs = Number(new URLSearchParams(location.search).get('apply') ?? '0');
 let ready = false, model = '';
 const render = () => {
-  ed.textContent = model;
+  ed.replaceChildren(document.createTextNode(model));
   document.getElementById('holds').textContent = 'Editor holds: ' + model;
   if (document.activeElement !== ed) return;
   const range = document.createRange();
@@ -112,9 +115,26 @@ ed.addEventListener('beforeinput', (event) => {
   event.preventDefault();
   if (!ready) return;
   const all = model !== '' && getSelection().toString() === model;
-  if (event.inputType === 'insertText') model = (all ? '' : model) + (event.data ?? '');
-  else if (event.inputType.startsWith('delete')) model = all ? '' : model.slice(0, -1);
-  render();
+  const apply = () => {
+    if (event.inputType === 'insertText') model = (all ? '' : model) + (event.data ?? '');
+    else if (event.inputType.startsWith('delete')) model = all ? '' : model.slice(0, -1);
+    render();
+  };
+  if (applyMs) setTimeout(apply, applyMs); else apply();
+});
+</script>""",
+    # A document in designMode is editable everywhere and has no editor: no element is contenteditable.
+    "/design": """<!doctype html><title>Design</title><p>Old text</p><input aria-label="Name">
+<script>document.designMode = 'on'</script>""",
+    # A search box built on contenteditable whose Enter opens the results.
+    "/search-box": """<!doctype html><title>Search</title>
+<div contenteditable="true" role="textbox" aria-label="Search">cats</div>
+<script>
+const box = document.querySelector('[role=textbox]');
+box.addEventListener('keydown', (event) => {
+  if (event.key !== 'Enter') return;
+  event.preventDefault();
+  location.href = '/done?q=' + encodeURIComponent(box.textContent);
 });
 </script>""",
     "/board": """<!doctype html><title>Board</title>
@@ -219,6 +239,13 @@ async def browser(
 def ref_of(body: str, label: str) -> str:
     match: re.Match[str] | None = re.search(rf"{re.escape(label)}[^\n]*?\[ref=([^\]]+)\]", body)
     assert match is not None, f"{label!r} not in:\n{body}"
+    return match.group(1)
+
+
+def value_of(body: str, label: str) -> str:
+    """What the snapshot shows after the ref of the first element ``label``: a field's value, an element's text."""
+    match: re.Match[str] | None = re.search(rf"{re.escape(label)}[^\n]*?\[ref=[^\]]+\]: (.*)$", body, re.M)
+    assert match is not None, f"{label!r} with a value not in:\n{body}"
     return match.group(1)
 
 
@@ -448,20 +475,93 @@ async def test_a_wait_that_times_out_checks_where_a_pending_navigation_went_befo
 async def test_type_insert_and_fill_reach_an_editor_that_gets_ready_after_the_focus(
     browser: BrowserSession, site: str
 ) -> None:
-    """Each editor step comes after a step in the plain field, so the editor takes the focus anew every time."""
+    """The first three editor steps give the editor the focus anew (the first step, then each after a step in the plain
+    field); the last three fill it while it has the focus, two of them with what it holds already, the empty text
+    included, which changes nothing in it."""
     view: PageView = await browser.open_url("editor", f"{site}/editor")
     editor: str = ref_of(view.body, 'textbox "Post text"')
     plain: str = ref_of(view.body, 'textbox "Plain field"')
-    for step, shown in (
-        (Step(action="type", ref=editor, text="Hello"), "Editor holds: Hello"),
-        (Step(action="type", ref=plain, text="key "), 'textbox "Plain field"'),
-        (Step(action="insert", ref=editor, text=" world, at once"), "Editor holds: Hello world, at once"),
-        (Step(action="type", ref=plain, text="by key"), "key by key"),
-        (Step(action="fill", ref=editor, text="Replaced"), "Editor holds: Replaced"),
+    for step, holds in (
+        (Step(action="type", ref=editor, text="Hello"), "Hello"),
+        (Step(action="type", ref=plain, text="key"), "Hello"),
+        (Step(action="insert", ref=editor, text=" world, at once"), "Hello world, at once"),
+        (Step(action="type", ref=plain, text=" by key"), "Hello world, at once"),
+        (Step(action="fill", ref=editor, text="Replaced"), "Replaced"),
+        (Step(action="fill", ref=editor, text="Replaced"), "Replaced"),
+        (Step(action="fill", ref=editor, text=""), ""),
+        (Step(action="fill", ref=editor, text=""), ""),
     ):
         outcome: ActOutcome = await act(browser, "editor", [step], False)
         assert [report.outcome for report in outcome.steps] == ["done"], (step, outcome.steps)
-        assert shown in (await browser.snapshot("editor")).body, step
+        shown: str = value_of((await browser.snapshot("editor")).body, "paragraph")
+        assert shown == f'"{("Editor holds: " + holds).rstrip()}"', step
+    assert value_of((await browser.snapshot("editor")).body, 'textbox "Plain field"') == "key by key"
+
+
+async def test_fill_reaches_a_paragraph_of_an_editor_without_a_role_and_a_field_inside_an_editor(
+    browser: BrowserSession, site: str
+) -> None:
+    view: PageView = await browser.open_url("notes", f"{site}/editor")
+    paragraph: re.Match[str] | None = re.search(r"paragraph \[ref=([^\]]+)\]: Second note", view.body)
+    assert paragraph is not None, view.body
+    steps: list[Step] = [
+        Step(action="fill", ref=paragraph.group(1), text="Replaced note"),
+        Step(action="fill", ref=ref_of(view.body, 'textbox "Inner field"'), text="inside"),
+    ]
+    outcome: ActOutcome = await act(browser, "notes", steps, False)
+    assert [report.outcome for report in outcome.steps] == ["done", "done"], outcome.steps
+    body: str = (await browser.snapshot("notes")).body
+    assert re.findall(r"paragraph \[ref=[^\]]+\]: (.*)", body)[1:] == ["First note", "Replaced note"]
+    assert value_of(body, 'textbox "Inner field"') == "inside"
+
+
+async def test_fill_writes_into_a_document_in_design_mode(browser: BrowserSession, site: str) -> None:
+    view: PageView = await browser.open_url("design", f"{site}/design")
+    paragraph: re.Match[str] | None = re.search(r"paragraph \[ref=([^\]]+)\]: Old text", view.body)
+    assert paragraph is not None, view.body
+    steps: list[Step] = [
+        Step(action="fill", ref=paragraph.group(1), text="New text"),
+        Step(action="fill", ref=ref_of(view.body, 'textbox "Name"'), text="Ada"),
+    ]
+    outcome: ActOutcome = await act(browser, "design", steps, False)
+    assert [report.outcome for report in outcome.steps] == ["done", "done"], outcome.steps
+    body: str = (await browser.snapshot("design")).body
+    assert "New text" in body
+    assert value_of(body, 'textbox "Name"') == "Ada"
+
+
+async def test_a_key_that_makes_an_editor_open_another_page_is_done(browser: BrowserSession, site: str) -> None:
+    view: PageView = await browser.open_url("search-box", f"{site}/search-box")
+    box: str = ref_of(view.body, 'textbox "Search"')
+    outcome: ActOutcome = await act(browser, "search-box", [Step(action="type", ref=box, text="\n")], False)
+    assert [report.outcome for report in outcome.steps] == ["done"], outcome.steps
+    assert "?q=cats" in (await browser.snapshot("search-box")).body
+
+
+async def test_an_insert_at_an_element_that_takes_no_text_fails_instead_of_writing_where_the_focus_is(
+    browser: BrowserSession, site: str
+) -> None:
+    view: PageView = await browser.open_url("no-text", f"{site}/editor")
+    steps: list[Step] = [
+        Step(action="type", ref=ref_of(view.body, 'textbox "Plain field"'), text="kept"),
+        Step(action="insert", ref=ref_of(view.body, "paragraph"), text=" lost"),
+    ]
+    outcome: ActOutcome = await act(browser, "no-text", steps, False)
+    assert [report.outcome for report in outcome.steps] == ["done", "failed"], outcome.steps
+    assert "insert needs a text field or an editor" in outcome.steps[1].detail
+    assert value_of((await browser.snapshot("no-text")).body, 'textbox "Plain field"') == "kept"
+
+
+async def test_a_click_into_an_editor_then_a_write_waits_until_the_editor_is_ready(
+    browser: BrowserSession, site: str
+) -> None:
+    """The click gives the editor the focus, so the write that follows finds the focus in it already."""
+    view: PageView = await browser.open_url("clicked-editor", f"{site}/editor?ready=70")
+    editor: str = ref_of(view.body, 'textbox "Post text"')
+    steps: list[Step] = [Step(action="click", ref=editor), Step(action="type", ref=editor, text="Hello")]
+    outcome: ActOutcome = await act(browser, "clicked-editor", steps, False)
+    assert [report.outcome for report in outcome.steps] == ["done", "done"], outcome.steps
+    assert value_of((await browser.snapshot("clicked-editor")).body, "paragraph") == '"Editor holds: Hello"'
 
 
 async def test_a_write_the_editor_drops_fails_the_step_instead_of_reporting_done(
@@ -472,6 +572,16 @@ async def test_a_write_the_editor_drops_fails_the_step_instead_of_reporting_done
     outcome: ActOutcome = await act(browser, "late-editor", [Step(action="insert", ref=editor, text="Lost")], False)
     assert [report.outcome for report in outcome.steps] == ["failed"], outcome.steps
     assert "the editor did not take the text" in outcome.steps[0].detail
+
+
+async def test_an_editor_that_shows_the_text_a_moment_after_the_write_took_it(
+    browser: BrowserSession, site: str
+) -> None:
+    view: PageView = await browser.open_url("slow-editor", f"{site}/editor?apply=150")
+    editor: str = ref_of(view.body, 'textbox "Post text"')
+    outcome: ActOutcome = await act(browser, "slow-editor", [Step(action="insert", ref=editor, text="Late")], False)
+    assert [report.outcome for report in outcome.steps] == ["done"], outcome.steps
+    assert value_of((await browser.snapshot("slow-editor")).body, "paragraph") == '"Editor holds: Late"'
 
 
 async def test_drag_moves_an_item_onto_another_list(browser: BrowserSession, site: str) -> None:

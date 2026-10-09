@@ -88,6 +88,13 @@ def clicking_reasons(element: Element | None, clickable_roles: Collection[str]) 
     """Reasons a click on ``element`` is sensitive; only elements of ``clickable_roles`` are judged by their name."""
     if element is None or element.role not in clickable_roles:
         return []
+    return naming_reasons(element)
+
+
+def naming_reasons(element: Element | None) -> list[str]:
+    """Reasons acting on ``element`` is sensitive, from its name whatever its role: buying, deleting, sending, posting."""
+    if element is None:
+        return []
     reasons: list[str] = []
     for label, pattern in (
         ("financial", _FINANCIAL_ACTION),

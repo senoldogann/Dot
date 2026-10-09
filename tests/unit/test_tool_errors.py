@@ -65,6 +65,10 @@ def test_a_target_on_a_step_that_is_not_a_drag_is_refused() -> None:
 def test_insert_takes_a_ref_and_text_and_drag_a_ref_and_a_target() -> None:
     assert "insert needs text" in refused({"steps": [{"action": "insert", "ref": "e4"}]})
     assert "insert needs a ref" in refused({"steps": [{"action": "insert", "text": "long text"}]})
+    for action in ("insert", "type"):
+        assert f"{action} needs text that is not empty" in refused(
+            {"steps": [{"action": action, "ref": "e4", "text": ""}]}
+        )
     accepted: ActArgs = ActArgs.model_validate(
         {
             "steps": [
