@@ -19,8 +19,26 @@ from dotagent.browser.render import (
     render_page_view,
     render_text_view,
 )
-from dotagent.browser.safety import assess_step, check_url, normalize_url, parse_element, url_flags
-from dotagent.browser.types import ActOutcome, FindResult, PageView, Screenshot, Step, TextView
+from dotagent.browser.safety import (
+    assess_step,
+    check_url,
+    normalize_url,
+    parse_element,
+    refuse_secret_field,
+    secret_field_flag,
+    secret_field_label,
+    url_flags,
+)
+from dotagent.browser.types import (
+    ActOutcome,
+    FindResult,
+    PageView,
+    Screenshot,
+    SecretField,
+    SecretFieldCheck,
+    Step,
+    TextView,
+)
 from dotagent.config import BrowserConfig
 from dotagent.core.errors import ToolInputError
 from dotagent.llm.types import ImageData
@@ -33,7 +51,7 @@ from dotagent.tools.base import (
     RegisteredTool,
     ToolArgs,
     ToolResult,
-    make_live_tool,
+    make_reviewed_tool,
     make_tool,
     ok,
     ok_with_images,
@@ -267,6 +285,22 @@ def _act_kind(steps: list[Step]) -> ActionKind:
     return "browser_read"
 
 
+def _secret_field_check(ctx: ToolContext, authorized: ActionInfo) -> SecretFieldCheck:
+    """What a batch does at a field that takes a secret: ask and auto refuse it. Yolo types into it after asking the
+    gate, which waives the hand-off and records it, unless the batch was authorized for that kind of secret already."""
+    if ctx.approvals != "yolo":
+        return refuse_secret_field
+
+    async def enter(field: SecretField) -> None:
+        flag: Flag = secret_field_flag(field.kind)
+        if flag in authorized.flags:
+            return
+        summary: str = f"Type into {secret_field_label(field.kind)}" + ("" if field.ref is None else f" ({field.ref})")
+        await ctx.gate.authorize(_action("browser_act", "browser_input", "high", summary, field.url, (flag,)))
+
+    return enter
+
+
 def _act_tool() -> RegisteredTool:
     async def classify(args: ActArgs, ctx: ToolContext) -> ActionInfo:
         limit: int = ctx.runtime.config.browser.max_batch_steps
@@ -284,19 +318,21 @@ def _act_tool() -> RegisteredTool:
         target: str = ctx.runtime.browser.current_url(ctx.thread_id) or ""
         return _action("browser_act", kind, assessment.risk, summary, target, assessment.flags)
 
-    async def run(args: ActArgs, ctx: ToolContext) -> ToolResult:
-        outcome: ActOutcome = await ctx.runtime.browser.act(ctx.thread_id, args.steps, args.accept_dialogs)
+    async def run(args: ActArgs, ctx: ToolContext, authorized: ActionInfo) -> ToolResult:
+        outcome: ActOutcome = await ctx.runtime.browser.act(
+            ctx.thread_id, args.steps, args.accept_dialogs, _secret_field_check(ctx, authorized)
+        )
         return ok(render_act_outcome(outcome, _nonce(), _body_budget(ctx)))
 
-    return make_live_tool(
+    return make_reviewed_tool(
         name="browser_act",
         description=(
             "Do up to a few steps on the current page in one call: click, double_click, right_click, hover, fill "
             "(replace a field's value), type (key by key, for autocomplete), select, press (Enter, Control+A, …), "
             "check, uncheck, scroll_into_view, click_at (pixel x,y from a screenshot, only for canvases). Batch the "
             "steps you can predict, such as filling a whole form and pressing submit. The result shows what changed "
-            "on the page. Never type passwords, card numbers or one-time codes: the browser refuses, and you should "
-            "ask the user to enter them. " + _REF_HELP
+            "on the page. Passwords, card numbers and one-time codes go in only as your instructions on secrets say: "
+            "otherwise the browser refuses the step. " + _REF_HELP
         ),
         args_model=ActArgs,
         modes=ACTING_MODES,

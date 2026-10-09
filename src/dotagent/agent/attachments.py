@@ -68,10 +68,12 @@ class StoredAttachment(FrozenModel):
 
 
 class UserInput(FrozenModel):
-    """What the user sends to a running run: an instruction and the files that came with it."""
+    """What the user sends to a running run: an instruction and the files that came with it. ``question_id`` names the
+    question a run left when the text answers it, else it is ``None``."""
 
     text: str
     files: tuple[StoredAttachment, ...]
+    question_id: str | None
 
 
 def attachments_root(workspace: Path) -> Path:

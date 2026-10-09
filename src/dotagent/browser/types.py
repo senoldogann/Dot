@@ -1,5 +1,6 @@
 """Value types shared by the browser connector and the browser tools."""
 
+from collections.abc import Awaitable, Callable
 from typing import Literal, Self
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
@@ -161,6 +162,33 @@ class FindResult(FrozenModel):
 
     url: str
     hits: tuple[str, ...]
+
+
+# The secret a field takes, as the page marks it: a password input, or one of these autocomplete tokens.
+SecretKind = Literal[
+    "password",
+    "current-password",
+    "new-password",
+    "one-time-code",
+    "cc-number",
+    "cc-csc",
+    "cc-exp",
+    "cc-exp-month",
+    "cc-exp-year",
+]
+
+
+class SecretField(FrozenModel):
+    """A field that takes a secret, at the moment a step is about to type into it, on the page at ``url``. ``ref`` is
+    the ref the step names, ``None`` for a key pressed without one."""
+
+    ref: str | None
+    kind: SecretKind
+    url: str
+
+
+# What a step does at a field that takes a secret: it returns to let the text in, and raises to refuse.
+type SecretFieldCheck = Callable[[SecretField], Awaitable[None]]
 
 
 class Viewport(FrozenModel):

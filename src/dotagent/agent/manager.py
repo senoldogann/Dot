@@ -2,10 +2,11 @@
 
 import asyncio
 import time
+from collections.abc import Sequence
 from contextlib import AbstractAsyncContextManager, nullcontext
 from dataclasses import dataclass
 
-from dotagent.agent.attachments import StoredAttachment, UserInput
+from dotagent.agent.attachments import StoredAttachment, UserInput, attachment_summary
 from dotagent.agent.gate import RunGate
 from dotagent.agent.lessons import LessonCase, dismiss_lesson, learn, save_lesson
 from dotagent.agent.loop import AgentRun, RunEnd, RunOpening, run_agent
@@ -22,11 +23,18 @@ from dotagent.agent.resume import (
     resumes_on_start,
 )
 from dotagent.agent.review import reviewer_for
-from dotagent.core.errors import ConfigError, DotError, FailSafeTriggered, RunCancelled, RunConflict
+from dotagent.core.errors import (
+    ConfigError,
+    DotError,
+    FailSafeTriggered,
+    InvalidValueError,
+    RunCancelled,
+    RunConflict,
+)
 from dotagent.core.logs import get_logger
 from dotagent.core.text import redact_secrets, truncate_tail
 from dotagent.llm.router import ModelRef, parse_model_ref
-from dotagent.llm.types import Effort, ModelInfo
+from dotagent.llm.types import Effort, ModelInfo, user_message
 from dotagent.memory.service import SavedMemory
 from dotagent.policy.types import ApprovalMode
 from dotagent.runtime import Runtime
@@ -36,7 +44,7 @@ from dotagent.store.endings import (
     RESULT_SHUTDOWN,
     RESULT_STOPPED,
 )
-from dotagent.store.models import EventRecord, RunMode, RunRecord, RunStatus, ThreadRecord
+from dotagent.store.models import ApprovalRecord, EventRecord, RunMode, RunRecord, RunStatus, ThreadRecord
 from dotagent.tools.context import DelegateOutcome
 from dotagent.tools.delegate import DELEGATE_SOURCE
 
@@ -48,6 +56,8 @@ _RESULT_CHARS: int = 20_000
 _REFUSED_RESULT_CHARS: int = 200
 # The earlier runs of a thread whose goals count as the user's instructions to a reviewer.
 _THREAD_INSTRUCTION_RUNS: int = 30
+# The statuses of a run that has not ended.
+_WORKING: frozenset[RunStatus] = frozenset({"queued", "running", "blocked"})
 
 
 @dataclass(frozen=True)
@@ -86,6 +96,8 @@ class RunManager:
         self._learning: dict[str, asyncio.Task[None]] = {}
         # Held while a lesson is saved or dismissed, by the owner or by ``auto``, so that each is decided once.
         self._deciding: asyncio.Lock = asyncio.Lock()
+        # Held while an approval or a question is decided, so that the answer to a question a run left goes on once.
+        self._answering: asyncio.Lock = asyncio.Lock()
 
     async def recover(self) -> int:
         """Close out what a previous process left behind. Returns the number of interrupted runs."""
@@ -169,8 +181,33 @@ class RunManager:
         return DelegateOutcome(run=await self._runtime.store.get_run(handle.run_id), tainted=handle.gate.tainted)
 
     def steer(self, run_id: str, text: str, files: tuple[StoredAttachment, ...]) -> None:
-        """Hand the running agent an extra instruction and its attachments; it reads them before its next step."""
-        self._handle(run_id).inbox.put_nowait(UserInput(text=text, files=files))
+        """Hand the running agent an extra instruction and its attachments; it reads them before its next step, and a
+        run about to end with its answer reads them first. A run whose end is being recorded reads nothing more, so a
+        message to it is refused like one to a run that has ended."""
+        handle: RunHandle = self._handle(run_id)
+        try:
+            handle.inbox.put_nowait(UserInput(text=text, files=files, question_id=None))
+        except asyncio.QueueShutDown as exc:
+            raise RunConflict("the run is not active", {"run_id": run_id}) from exc
+
+    async def decide(self, approval_id: str, approve: bool, source: str, note: str) -> ApprovalRecord:
+        """Record the user's decision on an approval or a question (``ApprovalBroker.resolve``); ``source`` is where it
+        was made (``ui``, ``cli``).
+
+        The answer to a question a run left carries the work on: it goes to the question's thread as the user's
+        message, into the run active there, or else as the goal of a new run on the thread, of ``source`` and with the
+        mode, model, effort, approvals and goal mode of the run that asked. A run of another process (``dotx run``)
+        working on the thread cannot be steered from here, so the answer is refused until it has ended. The answer is
+        delivered before the question is decided, so an answer that cannot be delivered leaves the question open; an
+        empty answer is refused. Skipping such a question only denies it.
+        """
+        async with self._answering:
+            record: ApprovalRecord = await self._runtime.store.get_approval(approval_id)
+            if record.status == "left" and approve:
+                if note.strip() == "":
+                    raise InvalidValueError("the answer to the question is empty", {"approval_id": approval_id})
+                await self._carry_on(record, source, note)
+            return await self._runtime.approvals.resolve(approval_id, approve, source, note)
 
     async def resumable(self, run: RunRecord) -> bool:
         """Whether ``run`` can be resumed: see :func:`dotagent.agent.resume.can_resume`."""
@@ -275,6 +312,44 @@ class RunManager:
             raise RunConflict(
                 "the thread went on after the run to resume", {"run_id": run_id, "newest_run_id": newest_run_id}
             )
+
+    async def _carry_on(self, question: ApprovalRecord, source: str, answer: str) -> None:
+        """Deliver the answer to a question a run left (see :meth:`decide`). A run whose end is being recorded reads
+        nothing more: the answer waits until it has ended and then goes on as one that came after."""
+        asked: RunRecord = await self._runtime.store.get_run(question.run_id)
+        text: str = f"Answer to your question “{question.summary}”: {answer}"
+        active: RunHandle | None = next(
+            (handle for handle in self._handles.values() if handle.thread_id == asked.thread_id), None
+        )
+        if active is not None:
+            try:
+                active.inbox.put_nowait(UserInput(text=text, files=(), question_id=question.id))
+            except asyncio.QueueShutDown:
+                await active.finished.wait()
+                await self._carry_on(question, source, answer)
+                return
+            log.info("question_answered", approval_id=question.id, run_id=active.run_id, delivered="steer")
+            return
+        newest: RunRecord = (await self._runtime.store.list_runs(1, asked.thread_id))[0]
+        if newest.status in _WORKING:
+            # A run of another process (``dotx run``) works on the thread, and only that process can steer it.
+            raise RunConflict(
+                "a run of another process is working on this thread; answer the question once it has ended",
+                {"approval_id": question.id, "thread_id": asked.thread_id, "run_id": newest.id},
+            )
+        run, _ = await self._launch(
+            text,
+            asked.mode,
+            asked.model,
+            asked.thread_id,
+            source,
+            None,
+            asked.effort,
+            asked.approvals,
+            asked.goal_mode,
+            RunOpening(text=text, files=(), resumed=None),
+        )
+        log.info("question_answered", approval_id=question.id, run_id=run.id, delivered="run")
 
     async def _resume(self, old: RunRecord, calls: tuple[InterruptedCall, ...], automatic: bool) -> RunRecord:
         """Launch the run that resumes ``old`` on its thread, with its settings and its newest plan: its first message
@@ -457,14 +532,16 @@ class RunManager:
         """Task body and failure boundary of one run.
 
         Every way a run can end is turned into a stored status plus an event. Unexpected exceptions are logged with
-        their traceback and recorded as a failed run; they are not hidden, because nothing awaits this task. The handle
-        is released and ``finished`` is set even when recording the end fails, so a waiter and the thread never hang.
-        The lessons of a run that may hold some are drawn after that, in a task of its own, so that they hold up
-        nothing.
+        their traceback and recorded as a failed run; they are not hidden, because nothing awaits this task. The inbox
+        is shut before anything awaits, so that what is sent from then on is refused, and answers the run got too late
+        to read are kept in its thread (:meth:`_keep_answers`). The handle is released and ``finished`` is set even when
+        recording the end fails, so a waiter and the thread never hang. The lessons of a run that may hold some are
+        drawn after that, in a task of its own, so that they hold up nothing.
         """
         runtime: Runtime = self._runtime
         status: RunStatus = "failed"
         result: str = ""
+        needs: str = ""
         lessons: LessonCase | None = None
         try:
             async with self._place_for(run):
@@ -473,7 +550,12 @@ class RunManager:
                     run.id, "run_started", {"model": run.model, "parent_run_id": run.parent_run_id}, True
                 )
                 ended: RunEnd = await run_agent(AgentRun(runtime, run, gate, cancel, inbox, self, opening))
-                status, result, lessons = ended.outcome.status, ended.outcome.result, ended.lessons
+                status, result, needs, lessons = (
+                    ended.outcome.status,
+                    ended.outcome.result,
+                    ended.outcome.needs,
+                    ended.lessons,
+                )
         except (RunCancelled, asyncio.CancelledError):
             status, result = "cancelled", RESULT_SHUTDOWN if self._stopping else RESULT_STOPPED
         except FailSafeTriggered as exc:
@@ -487,15 +569,33 @@ class RunManager:
         finally:
             try:
                 runtime.approvals.release_run(run.id)
+                inbox.shutdown()
+                await self._keep_answers(run, [inbox.get_nowait() for _ in range(inbox.qsize())])
                 clean: str = truncate_tail(redact_secrets(result), _RESULT_CHARS)
                 await runtime.store.finish_run(run.id, status, clean)
-                await runtime.bus.emit(run.id, "run_finished", {"status": status, "result": clean}, True)
+                await runtime.bus.emit(
+                    run.id, "run_finished", {"status": status, "result": clean, "needs": redact_secrets(needs)}, True
+                )
             finally:
                 self._handles.pop(run.id, None)
                 finished.set()
         # Registered before anything awaits, so that a waiter that ``finished`` wakes finds it.
         if lessons is not None and not self._stopping:
             self._learning[run.id] = asyncio.create_task(self._learn(lessons))
+
+    async def _keep_answers(self, run: RunRecord, unread: Sequence[UserInput]) -> None:
+        """Keep in the thread, as the user's messages, the answers to questions that reached a run too late for it to
+        read them (it was stopped, failed or was cut off before its next step). Those questions are decided, so the next
+        run on the thread finds the answers there. Other messages it did not read are dropped; the run page marks them
+        as not read."""
+        for sent in unread:
+            if sent.question_id is None:
+                continue
+            await self._runtime.store.append_messages(run.thread_id, [user_message(sent.text, ())])
+            await self._runtime.bus.emit(
+                run.id, "steer", {"text": sent.text, "files": attachment_summary(sent.files)}, True
+            )
+            log.warning("answer_kept_in_thread", run_id=run.id, approval_id=sent.question_id)
 
     async def _learn(self, case: LessonCase) -> None:
         """Task body of drawing the lessons of a run that ended. Unexpected exceptions are logged with their traceback;

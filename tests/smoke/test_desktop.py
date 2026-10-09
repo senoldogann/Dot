@@ -23,6 +23,7 @@ from pydantic import BaseModel, ConfigDict
 
 from dotagent.config import DesktopConfig, load_config
 from dotagent.core.errors import FailSafeTriggered
+from dotagent.desktop.actions import refuse_secure_field
 from dotagent.desktop.perms import check_permissions
 from dotagent.desktop.session import DesktopSession, StepReview
 from dotagent.desktop.types import ActOutcome, AppView, Permissions, SnapshotView, Step, TextRead
@@ -176,7 +177,7 @@ async def _body(session: DesktopSession, app: FixtureApp) -> str:
 
 
 async def _act(session: DesktopSession, app: FixtureApp, steps: list[Step]) -> ActOutcome:
-    outcome: ActOutcome = await session.act(_THREAD, str(app.pid), steps, _allow)
+    outcome: ActOutcome = await session.act(_THREAD, str(app.pid), steps, _allow, refuse_secure_field)
     await asyncio.sleep(0.15)
     return outcome
 
@@ -337,7 +338,7 @@ async def test_the_failsafe_file_stops_a_batch_and_work_resumes_when_it_is_remov
     await asyncio.to_thread(_arm_failsafe, failsafe_file)
     try:
         with pytest.raises(FailSafeTriggered):
-            await session.act(_THREAD, str(app.pid), [Step(action="click", ref=button)], _allow)
+            await session.act(_THREAD, str(app.pid), [Step(action="click", ref=button)], _allow, refuse_secure_field)
     finally:
         await asyncio.to_thread(_disarm_failsafe, failsafe_file)
     mark: int = _mark(app)

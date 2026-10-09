@@ -47,6 +47,7 @@ def runs_router(ctx: ServerContext) -> APIRouter:
             active=active,
             resumable=await ctx.manager.resumable(run),
             lessons=await run_lessons(store, run_id),
+            questions=await store.list_left_questions(run_id),
         )
 
     @router.get("/runs")
@@ -140,6 +141,8 @@ def runs_router(ctx: ServerContext) -> APIRouter:
 
     @router.post("/approvals/{approval_id}/decision")
     async def decide_approval(approval_id: str, request: DecisionRequest) -> ApprovalRecord:
-        return await ctx.runtime.approvals.resolve(approval_id, request.approve, UI_SOURCE, request.note)
+        """Decide an approval or answer a question; the answer to a question a run left carries the work on in its
+        thread (see ``RunManager.decide``)."""
+        return await ctx.manager.decide(approval_id, request.approve, UI_SOURCE, request.note)
 
     return router

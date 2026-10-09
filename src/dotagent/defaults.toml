@@ -101,7 +101,13 @@ stall_escalation = false
 stall_limit = 4
 failure_streak = 6
 revisit_window = 8
+# A reply without a tool call is nudged towards finish; the finish_nudges + 1st such reply in a row ends a task run with
+# that reply as its result (a step with tool calls starts the count again).
 finish_nudges = 2
+# What ask_user does in a run nobody can answer during the run (yolo, scheduled and eval runs): "leave" stores the
+# question for you (the run's page lists it, your answer goes on with the work in the run's thread) and the run goes on
+# at once; "wait" waits for an answer as a run you started in ask or auto mode always does (approval_timeout_s at most).
+questions = "leave"
 parallel_tools = 4
 model_call_timeout_s = 420.0
 max_concurrent_runs = 3
@@ -157,8 +163,10 @@ undo_keep_days = 30
 # cautious: ask for everything that is not read-only.
 preset = "aggressive"
 # Who answers a question the policy raises: "ask" = you; "auto" = the review model decides and passes on what it cannot
-# decide; "yolo" = nobody is asked, the action is allowed and recorded. Whatever the value, secrets and exfiltration are
-# refused, and money and credentials are handed to you.
+# decide; "yolo" = nobody is asked, the action is allowed and recorded. With ask and auto, secrets and exfiltration are
+# refused and money and credentials are handed to you, and Dot never types into a password, one-time-code or card
+# field. yolo lets all of that through and records it (a run types the codes it can read itself); a research run stays
+# read-only, your own hand-off rules still stop a run, and the desktop tools never control a password manager.
 approvals = "ask"
 approval_timeout_s = 900.0
 protected_paths = [

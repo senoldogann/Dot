@@ -20,6 +20,7 @@ from pydantic import JsonValue
 
 from dotagent.agent.compact import pending_calls
 from dotagent.agent.plan import PlanItem, render_plan
+from dotagent.agent.progress import can_ask_user, question_mode
 from dotagent.core.errors import DotError, PolicyDenied, StoreError
 from dotagent.core.jsonutil import dumps_compact
 from dotagent.core.logs import get_logger
@@ -243,6 +244,10 @@ async def interrupted_calls(runtime: Runtime, run: RunRecord) -> tuple[Interrupt
         run_id=run.id,
         thread_id=run.thread_id,
         mode=run.mode,
+        approvals=run.approvals,
+        questions=question_mode(
+            runtime.config.agent.questions, can_ask_user(run.source, run.parent_run_id, run.approvals)
+        ),
         workspace=runtime.workspace,
         gate=_NoAnswers(),
         cancel=asyncio.Event(),

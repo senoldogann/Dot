@@ -4,11 +4,15 @@ from collections.abc import Sequence
 
 from pydantic import JsonValue
 
+from dotagent.agent.approvals import QUESTION_LEFT_EVENT
 from dotagent.core.errors import EvalError
 from dotagent.evals.results import RunMetrics
 from dotagent.llm.calls import CALL_EVENT
 from dotagent.llm.types import invalid_arguments_text
 from dotagent.store.models import EventRecord, RunRecord
+
+# A question nobody answered: one the run waited for (which the harness declines), or one it left and went on without.
+_UNANSWERED_KINDS: frozenset[str] = frozenset({"approval_requested", QUESTION_LEFT_EVENT})
 
 
 def _has_broken_arguments(event: EventRecord) -> bool:
@@ -42,7 +46,7 @@ def run_metrics(run: RunRecord, events: Sequence[EventRecord]) -> RunMetrics:
         invalid_arguments=sum(1 for event in events if event.kind == "tool_call" and _has_broken_arguments(event)),
         stalls=sum(1 for event in events if event.kind == "stall"),
         compactions=sum(1 for event in events if event.kind == "compacted"),
-        unanswered_questions=sum(1 for event in events if event.kind == "approval_requested"),
+        unanswered_questions=sum(1 for event in events if event.kind in _UNANSWERED_KINDS),
         model_seconds=round(_seconds(events, CALL_EVENT), 3),
         tool_seconds=round(_seconds(events, "tool_result"), 3),
     )

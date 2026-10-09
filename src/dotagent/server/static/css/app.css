@@ -2044,6 +2044,18 @@ dialog.lightbox img {
   font-size: 12px;
 }
 
+/* What the run could not do without the user, under its answer. */
+.needs {
+  padding: 8px 12px;
+  border-left: 3px solid var(--warn-border);
+  background: var(--warn-weak);
+  border-radius: 0 8px 8px 0;
+}
+
+.needs .aside-head {
+  color: var(--warn);
+}
+
 /* Files attached to a message: chips with their upload state under the message box, and under a sent message. */
 .attach-list {
   display: flex;

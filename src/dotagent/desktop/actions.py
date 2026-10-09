@@ -6,7 +6,7 @@ minutes between the two, and is the only function that moves the pointer or pres
 """
 
 import time
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from math import hypot
 from pathlib import Path
@@ -18,7 +18,7 @@ from dotagent.desktop import apps, ax, screen
 from dotagent.desktop import input as hid
 from dotagent.desktop.ax import ElementState
 from dotagent.desktop.input import EventSource, parse_chord
-from dotagent.desktop.safety import DESKTOP_CLICKABLE_ROLES, StepContext, app_role, types_a_character
+from dotagent.desktop.safety import DESKTOP_CLICKABLE_ROLES, StepContext, app_role, enters_text
 from dotagent.desktop.types import (
     DEFAULT_SCROLL_PX,
     AppInfo,
@@ -55,11 +55,40 @@ _NO_APP: AppInfo = AppInfo(
 
 
 @dataclass(frozen=True, slots=True)
+class Inspection:
+    """What a reviewer needs to judge a step: its context, and a short description of what it touches."""
+
+    context: StepContext
+    target: str
+
+
+# What a step does at a secure text field, on the worker thread: called with the step's inspection and what the step
+# does ("typing", "pasting", "setting a value"), it returns to let the text in and raises to refuse.
+type SecureFieldCheck = Callable[[Inspection, str], None]
+
+
+def refuse_secure_field(inspection: Inspection, what: str) -> None:
+    """The secure-field check of the ask and auto modes: nothing goes into a secure text field."""
+    raise DesktopError(
+        f"{what} into a secure text field is refused: Dot never enters passwords or codes. "
+        "Ask the user to type it themselves",
+        {"target": inspection.target},
+    )
+
+
+def enter_secure_field(inspection: Inspection, what: str) -> None:
+    """The secure-field check of yolo: the text goes in. The step's review flagged it as a credential, which yolo
+    records."""
+    _log.info("secure_field_entered", action=what, target=inspection.target)
+
+
+@dataclass(frozen=True, slots=True)
 class StepEnv:
     """What the worker thread needs to resolve and perform the steps of one batch.
 
     ``expected_front`` is the application that held the keyboard focus after the previous step and ``expected_pointer``
     where the previous pointer step left the pointer; a difference means that something else interfered.
+    ``secure_field`` decides what a step does at a secure text field.
     """
 
     app: AppInfo
@@ -73,6 +102,7 @@ class StepEnv:
     failsafe_file: Path
     expected_front: int | None
     expected_pointer: Point | None
+    secure_field: SecureFieldCheck
 
 
 @dataclass(frozen=True, slots=True)
@@ -83,14 +113,6 @@ class Target:
     state: ElementState | None
     owner: AppInfo
     point: Point | None
-
-
-@dataclass(frozen=True, slots=True)
-class Inspection:
-    """What a reviewer needs to judge a step: its context, and a short description of what it touches."""
-
-    context: StepContext
-    target: str
 
 
 @dataclass(frozen=True, slots=True)
@@ -306,6 +328,13 @@ def _keyboard_target(env: StepEnv) -> Target:
     return Target(ref=None, state=state, owner=owner, point=None)
 
 
+def refuse_secrets(context: StepContext) -> None:
+    """Refuse, in every approval mode, a step that touches an application holding passwords or keys: such an
+    application is never controlled."""
+    if context.role == "secrets":
+        raise DesktopError(f"{context.app} holds passwords or keys; it is never controlled", {"app": context.app})
+
+
 def inspect_step(env: StepEnv, step: Step) -> Inspection:
     """What the step touches, read from the machine right now: the application, the control and whether it is secret."""
     match step.action:
@@ -406,13 +435,9 @@ def _point_for(env: StepEnv, ref: str | None, x: float | None, y: float | None) 
     return _window_frame(env).center()
 
 
-def _refuse_secure(inspection: Inspection, what: str) -> None:
+def _check_secure(env: StepEnv, inspection: Inspection, what: str) -> None:
     if inspection.context.secure:
-        raise DesktopError(
-            f"{what} into a secure text field is refused: Dot never enters passwords or codes. "
-            "Ask the user to type it themselves",
-            {"target": inspection.target},
-        )
+        env.secure_field(inspection, what)
 
 
 def _focus(env: StepEnv, raw: str) -> None:
@@ -479,10 +504,13 @@ def _normalised(text: str) -> str:
 
 
 def _set_value(env: StepEnv, step: Step, inspection: Inspection) -> Effect:
-    _refuse_secure(inspection, "setting a value")
+    _check_secure(env, inspection, "setting a value")
     number, element = _element_for(env, _required(step.ref, "ref"))
     wanted: str = _required(step.text, "text")
     ax.set_attribute(element, "AXValue", wanted, env.app.pid)
+    if inspection.context.secure:
+        # A secure field is never read, so what it kept cannot be checked.
+        return _effect(f"set the value of {inspection.target} ({len(wanted)} chars, not read back)", None, False)
     _, actual, _ = ax.read_text(element, env.app.pid)
     if _normalised(actual) != _normalised(wanted):
         raise DesktopError(
@@ -494,7 +522,7 @@ def _set_value(env: StepEnv, step: Step, inspection: Inspection) -> Effect:
 
 
 def _type(env: StepEnv, step: Step, inspection: Inspection) -> Effect:
-    _refuse_secure(inspection, "typing")
+    _check_secure(env, inspection, "typing")
     if step.ref is not None:
         _focus(env, step.ref)
     text: str = _required(step.text, "text")
@@ -503,7 +531,7 @@ def _type(env: StepEnv, step: Step, inspection: Inspection) -> Effect:
 
 
 def _paste(env: StepEnv, step: Step, inspection: Inspection) -> Effect:
-    _refuse_secure(inspection, "pasting")
+    _check_secure(env, inspection, "pasting")
     if step.ref is not None:
         _focus(env, step.ref)
     text: str = _required(step.text, "text")
@@ -514,8 +542,8 @@ def _paste(env: StepEnv, step: Step, inspection: Inspection) -> Effect:
 def _key(env: StepEnv, step: Step, inspection: Inspection) -> Effect:
     key: str = _required(step.key, "key")
     chord = parse_chord(key)
-    if types_a_character(chord):
-        _refuse_secure(inspection, "typing")
+    if enters_text(chord):
+        _check_secure(env, inspection, "typing")
     hid.post(hid.chord_events(env.source, chord))
     return _effect(f"pressed {key} in {inspection.context.app}", None, True)
 
@@ -566,6 +594,7 @@ def execute_step(env: StepEnv, step: Step) -> Effect:
     """Perform one step. The failsafe is checked first and the context re-read, since time passed after the review."""
     check_failsafe(env)
     inspection: Inspection = inspect_step(env, step)
+    refuse_secrets(inspection.context)
     match step.action:
         case "click":
             return _click(env, step, inspection, 1)

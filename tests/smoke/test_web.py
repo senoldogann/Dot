@@ -175,6 +175,8 @@ async def _call(runtime: Runtime, name: str, arguments: JsonObject) -> tuple[Too
         run_id="web-test",
         thread_id="web-test",
         mode="task",
+        approvals="ask",
+        questions="wait",
         workspace=workspace_dir(),
         gate=_Recorder(),
         cancel=asyncio.Event(),

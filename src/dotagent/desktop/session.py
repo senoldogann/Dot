@@ -28,7 +28,7 @@ from dotagent.core.logs import get_logger
 from dotagent.core.types import FrozenModel
 from dotagent.desktop import actions, apps, ax, memory, perms, safety, screen, shots, views
 from dotagent.desktop import input as hid
-from dotagent.desktop.actions import Effect, Inspection, StepEnv
+from dotagent.desktop.actions import Effect, Inspection, SecureFieldCheck, StepEnv
 from dotagent.desktop.memory import AppMemory, ThreadDesktop
 from dotagent.desktop.render import describe_step
 from dotagent.desktop.safety import StepContext
@@ -542,10 +542,13 @@ class DesktopSession:
 
     # -- acting ----------------------------------------------------------------------------------------------------
 
-    def _open_env(self, state: ThreadDesktop, name: str | None, steps: Sequence[Step]) -> StepEnv:
+    def _open_env(
+        self, state: ThreadDesktop, name: str | None, steps: Sequence[Step], secure_field: SecureFieldCheck
+    ) -> StepEnv:
         """The environment of a batch (worker thread); the target comes to the front when the steps need it."""
         running: tuple[AppInfo, ...] = apps.list_apps()
         app: AppInfo = _pick_app(state, name, running)
+        _refuse_secrets(app)
         env: StepEnv = StepEnv(
             app=app,
             app_element=ax.app_element(app.pid, self._config.ax_timeout_s),
@@ -558,6 +561,7 @@ class DesktopSession:
             failsafe_file=self._failsafe_file,
             expected_front=None,
             expected_pointer=None,
+            secure_field=secure_field,
         )
         actions.check_failsafe(env)
         if _needs_front(steps):
@@ -571,6 +575,7 @@ class DesktopSession:
             await asyncio.sleep(seconds)
             return Effect(detail=f"waited {seconds:g} s", pointer=None, opens_ui=False, switched_to=None)
         inspection: Inspection = await self._call(partial(actions.inspect_step, env, step))
+        actions.refuse_secrets(inspection.context)
         await reviewer(
             StepReview(
                 index=index,
@@ -625,12 +630,20 @@ class DesktopSession:
                 env = await self._call(partial(_remeasure, env))
         return _Batch(reports=tuple(reports), stopped=stopped, env=env, state=state, side_effects=side_effects)
 
-    async def act(self, thread_id: str, app: str | None, steps: Sequence[Step], reviewer: StepReviewer) -> ActOutcome:
-        """Perform a batch of steps in one application, each reviewed first, and show the window afterwards."""
+    async def act(
+        self,
+        thread_id: str,
+        app: str | None,
+        steps: Sequence[Step],
+        reviewer: StepReviewer,
+        secure_field: SecureFieldCheck,
+    ) -> ActOutcome:
+        """Perform a batch of steps in one application, each reviewed first, and show the window afterwards.
+        ``secure_field`` decides what a step does at a secure text field: a step it refuses fails and stops the batch."""
         async with self._lock:
             await self._prepare(self._prepare_acting)
             state: ThreadDesktop = self._thread(thread_id)
-            env: StepEnv = await self._call(partial(self._open_env, state, app, steps))
+            env: StepEnv = await self._call(partial(self._open_env, state, app, steps, secure_field))
             _log.info("desktop_act", thread=thread_id, app=env.app.name, steps=len(steps))
             batch: _Batch = await self._run_steps(memory.targeting(state, env.app.pid), env, steps, reviewer)
             if batch.side_effects:

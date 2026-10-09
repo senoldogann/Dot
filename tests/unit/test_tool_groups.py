@@ -103,7 +103,9 @@ def test_the_tools_of_the_groups_that_are_off_are_hidden_with_their_group() -> N
 
 
 def _inputs(tool_names: list[str]) -> PromptInputs:
-    return collect_prompt_inputs("task", "cli", "aggressive", "ask", False, Path("/tmp/work"), [], tool_names, [])
+    return collect_prompt_inputs(
+        "task", "cli", "aggressive", "ask", "wait", False, Path("/tmp/work"), [], tool_names, []
+    )
 
 
 def test_the_prompt_lists_the_groups_only_when_the_tools_are_grouped() -> None:

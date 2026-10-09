@@ -6,10 +6,12 @@ then decides whether the user must be asked, whether the step is refused, or whe
 
 import re
 from collections.abc import Sequence
+from typing import get_args
 from urllib.parse import urlsplit
 
 from dotagent.browser.snapshot import SnapshotLine, parse_snapshot
-from dotagent.browser.types import Step, StepAction
+from dotagent.browser.types import SecretField, SecretKind, Step, StepAction
+from dotagent.core.errors import BrowserError
 from dotagent.core.types import FrozenModel
 from dotagent.policy.elements import (
     Element,
@@ -33,6 +35,40 @@ _TYPING_ACTIONS: frozenset[StepAction] = frozenset({"fill", "type", "press", "se
 _CLICKING_ACTIONS: frozenset[StepAction] = frozenset({"click", "double_click", "right_click", "click_at"})
 _QUIET_ACTIONS: frozenset[StepAction] = frozenset({"hover", "scroll_into_view"})
 _CLICKABLE_ROLES: frozenset[str] = frozenset({"button", "link", "menuitem", "tab", "option", "checkbox", "switch"})
+_SECRET_KINDS: dict[str, SecretKind] = {kind: kind for kind in get_args(SecretKind)}
+# Keys that move, delete, submit or modify rather than put a character in (Playwright's key names, lower case).
+_KEYS_WITHOUT_TEXT: frozenset[str] = frozenset(
+    {
+        "enter",
+        "numpadenter",
+        "tab",
+        "escape",
+        "backspace",
+        "delete",
+        "insert",
+        "home",
+        "end",
+        "pageup",
+        "pagedown",
+        "arrowup",
+        "arrowdown",
+        "arrowleft",
+        "arrowright",
+        "shift",
+        "control",
+        "alt",
+        "meta",
+        "controlormeta",
+        "capslock",
+        "numlock",
+        "scrolllock",
+        "contextmenu",
+        "pause",
+        "printscreen",
+    }
+)
+_FUNCTION_KEY: re.Pattern[str] = re.compile(r"^f\d{1,2}$")
+_SHORTCUT_MODIFIERS: frozenset[str] = frozenset({"control", "meta", "controlormeta"})
 
 
 class UrlVerdict(FrozenModel):
@@ -102,6 +138,43 @@ def assess_step(step: Step, element: Element | None) -> StepAssessment:
     if step.action in _QUIET_ACTIONS and not reasons:
         return quiet_assessment()
     return assessment_for(reasons)
+
+
+def secret_kind(marking: object) -> SecretKind | None:
+    """The secret a field takes, from what the page says about the field (``password`` for a password input, then its
+    autocomplete tokens): a card secret when one is named, since money outranks the rest, so a masked card code is a
+    card field; otherwise the first one named. ``None`` when it takes none."""
+    if not isinstance(marking, str):
+        return None
+    kinds: list[SecretKind] = [_SECRET_KINDS[token] for token in marking.lower().split() if token in _SECRET_KINDS]
+    return next((kind for kind in kinds if kind.startswith("cc-")), kinds[0] if kinds else None)
+
+
+def secret_field_label(kind: SecretKind) -> str:
+    return f"a {kind} field"
+
+
+def key_enters_text(key: str) -> bool:
+    """Whether pressing ``key`` (Playwright's syntax: ``1``, ``Shift+A``, ``Digit1``, ``Control+V``) can put text into
+    the focused field: a character key without Control or Meta, or a paste."""
+    *modifiers, name = key.lower().split("+")
+    held: set[str] = set(modifiers)
+    if held & _SHORTCUT_MODIFIERS:
+        return name == "v"
+    return name not in _KEYS_WITHOUT_TEXT and _FUNCTION_KEY.match(name) is None
+
+
+def secret_field_flag(kind: SecretKind) -> Flag:
+    """A card field is about money; every other secret is a credential."""
+    return "financial" if kind.startswith("cc-") else "credential"
+
+
+async def refuse_secret_field(field: SecretField) -> None:
+    """The secret-field check of the ask and auto modes: no text goes into a field that takes a secret."""
+    raise BrowserError(
+        f"refusing to type into {secret_field_label(field.kind)}: ask the user to enter it themselves",
+        {"action": "type", "ref": field.ref, "url": field.url},
+    )
 
 
 def dialog_is_financial(message: str) -> bool:

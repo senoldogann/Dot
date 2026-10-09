@@ -173,9 +173,11 @@ def hidden_regions(windows: Sequence[WindowInfo]) -> tuple[Rect, ...]:
     return tuple(window.bounds for window in windows if window.on_screen and is_secrets_app(window.owner, None))
 
 
-def types_a_character(chord: Chord) -> bool:
-    """Whether the chord enters a character into a text field (a shortcut with cmd or ctrl does not)."""
-    return len(chord.key) == 1 and not ({"cmd", "ctrl"} & set(chord.modifiers))
+def enters_text(chord: Chord) -> bool:
+    """Whether the chord puts text into a field: a character (a shortcut with cmd or ctrl does not), or the clipboard
+    pasted with cmd+v."""
+    modifiers: set[str] = set(chord.modifiers)
+    return (len(chord.key) == 1 and not ({"cmd", "ctrl"} & modifiers)) or (chord.key == "v" and "cmd" in modifiers)
 
 
 def reaches_a_shell(step: Step, context: StepContext) -> bool:
@@ -219,7 +221,7 @@ def _typing_parts(
 def _chord_parts(chord: Chord, context: StepContext) -> list[StepAssessment]:
     modifiers: frozenset[str] = frozenset(chord.modifiers)
     parts: list[StepAssessment] = []
-    if types_a_character(chord):
+    if enters_text(chord):
         parts.append(assessment_for(typing_reasons(context.element, None) + (["credential"] if context.secure else [])))
     if chord.key == "q" and modifiers == {"cmd"}:
         parts.append(StepAssessment(risk="medium", flags=(), reasons=("quits the application",)))

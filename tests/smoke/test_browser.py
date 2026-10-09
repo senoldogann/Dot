@@ -21,7 +21,7 @@ import pytest_asyncio
 from playwright.async_api import async_playwright
 
 from dotagent.browser.render import render_page_view
-from dotagent.browser.safety import parse_element
+from dotagent.browser.safety import parse_element, refuse_secret_field
 from dotagent.browser.session import BrowserSession
 from dotagent.browser.types import ActOutcome, PageView, Step
 from dotagent.browser.upstream import ignore_repeated_frame_detach
@@ -152,7 +152,7 @@ def saved_files(directory: Path) -> list[Path]:
 
 
 async def act(browser: BrowserSession, thread: str, steps: list[Step], accept: bool) -> ActOutcome:
-    return await browser.act(thread, steps, accept)
+    return await browser.act(thread, steps, accept, refuse_secret_field)
 
 
 async def test_snapshot_has_refs_and_prunes_what_is_far_below_the_fold(browser: BrowserSession, site: str) -> None:

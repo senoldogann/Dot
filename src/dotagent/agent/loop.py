@@ -56,6 +56,7 @@ from dotagent.agent.progress import (
     limits_for,
     new_watch,
     nudge_note,
+    question_mode,
     replan_note,
     restriction_for,
     stop_result,
@@ -108,6 +109,7 @@ from dotagent.llm.types import (
     ModelInfo,
     ModelReply,
     StreamDelta,
+    ToolCall,
     ToolSpec,
     assistant_from_reply,
     system_message,
@@ -116,6 +118,7 @@ from dotagent.llm.types import (
 )
 from dotagent.memory.render import render_note
 from dotagent.memory.service import prompt_memories
+from dotagent.policy.types import QuestionMode
 from dotagent.runtime import Runtime
 from dotagent.skills.catalog import load_skills
 from dotagent.skills.types import SkillCatalog
@@ -194,8 +197,12 @@ class AgentRun:
 
 
 class RunOutcome(FrozenModel):
+    """How a run ended: its status, its answer and what the finish call that ended it said the run needs from the user
+    (empty when nothing, and for a run that did not end by finishing)."""
+
     status: Literal["done", "failed"]
     result: str
+    needs: str
 
 
 class RunEnd(FrozenModel):
@@ -208,6 +215,12 @@ class RunEnd(FrozenModel):
 
 async def _discard(delta: StreamDelta) -> None:
     return None
+
+
+def _acts(calls: Sequence[ToolCall], questions: QuestionMode) -> bool:
+    """Whether a step does something: a question left for the user does not, since it changes nothing until someone
+    answers it, so a run that only leaves questions between text replies still ends."""
+    return questions == "wait" or any(call.name != ASK_USER_TOOL for call in calls)
 
 
 def _drain(inbox: asyncio.Queue[UserInput]) -> list[UserInput]:
@@ -489,7 +502,7 @@ def _plan_note(unclosed: Sequence[int]) -> str:
 
 def _finish_result(outcome: ToolOutcome) -> RunOutcome:
     args: FinishArgs = FinishArgs.model_validate(outcome.call.arguments)
-    return RunOutcome(status="done" if args.success else "failed", result=args.answer)
+    return RunOutcome(status="done" if args.success else "failed", result=args.answer, needs=args.needs_from_user or "")
 
 
 class SendBack(FrozenModel):
@@ -531,10 +544,12 @@ def _after_verdict(verdict: GoalVerdict, ended: RunOutcome, sent_back: int, pati
     """What the checker's verdict makes of the end a run reached: it stands, or the run is sent back to work."""
     reason: str = shorten_reason(verdict.reason)
     if verdict.decision == "achieved":
-        return RunOutcome(status="done", result=ended.result)
+        return RunOutcome(status="done", result=ended.result, needs=ended.needs)
     if verdict.decision == "blocked":
         return RunOutcome(
-            status="failed", result=_with_check_note(ended.result, f"the goal cannot be reached from here. {reason}")
+            status="failed",
+            result=_with_check_note(ended.result, f"the goal cannot be reached from here. {reason}"),
+            needs=ended.needs,
         )
     if sent_back >= patience:
         return RunOutcome(
@@ -542,6 +557,7 @@ def _after_verdict(verdict: GoalVerdict, ended: RunOutcome, sent_back: int, pati
             result=_with_check_note(
                 ended.result, f"the goal is still not reached after {patience} rounds of further work. {reason}"
             ),
+            needs=ended.needs,
         )
     return SendBack(note=_send_back_note(reason))
 
@@ -597,6 +613,7 @@ async def _check_goal(
             result=_with_check_note(
                 ended.result, f"the check could not run ({error.message}); this answer is not verified."
             ),
+            needs=ended.needs,
         )
     settled: RunOutcome | SendBack = _after_verdict(verdict, ended, sent_back, patience)
     await agent.runtime.bus.emit(
@@ -663,7 +680,7 @@ async def _consult(
             run.id, "stall", _stall_data(alert, {"error": shorten_reason(error.message)}), True
         )
         reason: str = f"{alert.detail} The review model could not give a second opinion: {error.message}"
-        return RunOutcome(status="failed", result=stop_result(reason, ledger, plan))
+        return RunOutcome(status="failed", result=stop_result(reason, ledger, plan), needs="")
     diagnosis: str = shorten_reason(advice.diagnosis)
     next_steps: list[str] = [shorten_reason(step) for step in advice.next_steps]
     await agent.runtime.bus.emit(
@@ -689,7 +706,7 @@ async def _answer_alert(
             return await _consult(agent, consultant, alert, history, goal, ledger, plan)
         case "stop":
             await agent.runtime.bus.emit(agent.run.id, "stall", _stall_data(alert, {}), True)
-            return RunOutcome(status="failed", result=stop_result(alert.detail, ledger, plan))
+            return RunOutcome(status="failed", result=stop_result(alert.detail, ledger, plan), needs="")
         case "nudge":
             note: str = nudge_note(alert)
         case "replan":
@@ -756,6 +773,8 @@ async def run_agent(agent: AgentRun) -> RunEnd:
     if remembered:
         await runtime.store.mark_memories_used([record.id for record in remembered], memory_seen_at)
         await runtime.bus.emit(run.id, "memories", {"ids": [record.id for record in remembered]}, True)
+    can_ask: bool = can_ask_user(run.source, run.parent_run_id, run.approvals)
+    questions: QuestionMode = question_mode(config.questions, can_ask)
     system: Message = system_message(
         build_system_prompt(
             collect_prompt_inputs(
@@ -763,6 +782,7 @@ async def run_agent(agent: AgentRun) -> RunEnd:
                 run.source,
                 runtime.config.policy.preset,
                 run.approvals,
+                questions,
                 run.goal_mode,
                 runtime.workspace,
                 [render_note(record) for record in remembered],
@@ -795,6 +815,8 @@ async def run_agent(agent: AgentRun) -> RunEnd:
         run_id=run.id,
         thread_id=run.thread_id,
         mode=run.mode,
+        approvals=run.approvals,
+        questions=questions,
         workspace=runtime.workspace,
         gate=agent.gate,
         cancel=agent.cancel,
@@ -821,7 +843,6 @@ async def run_agent(agent: AgentRun) -> RunEnd:
     ledger: RunLedger = new_ledger(run.goal)
     facts: RunFacts = new_facts()
     limits: Limits = limits_for(config)
-    can_ask: bool = can_ask_user(run.source, run.parent_run_id, run.approvals)
     ladder: tuple[Rung, ...] = ladder_for(config.stall_escalation, can_ask)
     consultant: ProgressConsultant = progress_consultant_for(
         runtime.router,
@@ -910,6 +931,9 @@ async def run_agent(agent: AgentRun) -> RunEnd:
         ended: RunOutcome | None = None
         if reply.tool_calls:
             used_tools = True
+            # Only text replies in a row end a task run; a step that acts starts the count again.
+            if _acts(reply.tool_calls, questions):
+                nudges = 0
             outcomes: list[ToolOutcome] = await execute_calls(
                 reply.tool_calls, registry, hidden, context, agent.gate, config.parallel_tools
             )
@@ -951,9 +975,11 @@ async def run_agent(agent: AgentRun) -> RunEnd:
         else:
             answered: bool = bool(reply.text.strip())
             if answered and (run.mode == "chat" or not used_tools or nudges >= config.finish_nudges):
-                ended = RunOutcome(status="done", result=reply.text)
+                ended = RunOutcome(status="done", result=reply.text, needs="")
             elif nudges >= config.finish_nudges:
-                return _run_end(agent, history, goal, RunOutcome(status="failed", result=RESULT_EMPTY_REPLIES), facts)
+                return _run_end(
+                    agent, history, goal, RunOutcome(status="failed", result=RESULT_EMPTY_REPLIES, needs=""), facts
+                )
             else:
                 nudges += 1
                 history.append(await _stored_note(agent, _NO_TOOL_NOTE if answered else _EMPTY_NOTE))
@@ -982,7 +1008,11 @@ async def run_agent(agent: AgentRun) -> RunEnd:
             ended if checker is None else await _check_goal(agent, checker, history, goal, ended, sent_back, facts)
         )
         if isinstance(settled, RunOutcome):
-            return _run_end(agent, history, goal, settled, facts)
+            if agent.inbox.empty():
+                return _run_end(agent, history, goal, settled, facts)
+            # The user sent something during this step, such as the answer to a question the run left: the run reads it
+            # before it ends. Nothing awaits between this check and the moment the manager shuts the inbox.
+            continue
         sent_back += 1
         nudges = 0
         watch = clear_window(watch)

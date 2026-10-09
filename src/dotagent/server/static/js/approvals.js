@@ -1,4 +1,5 @@
-// The card that asks the user: an approval of an action, a hand-off of a step, or a question from the agent.
+// The card that asks the user: an approval of an action, a hand-off of a step, or a question from the agent, which the
+// run waits for (`pending`) or left for the user and went on without (`left`).
 
 import { api } from "./api.js";
 import { clip, el } from "./dom.js";
@@ -53,6 +54,11 @@ function iconOf(severity) {
   return severity === "handoff" ? "hand" : "shield";
 }
 
+/** The parts of a card that are there: `replaceChildren` would turn a part left out (null) into the text "null". */
+function present(...parts) {
+  return parts.filter((part) => part !== null);
+}
+
 function technicalDetails(args) {
   const chips = [];
   if (typeof args.kind === "string") {
@@ -76,13 +82,16 @@ function technicalDetails(args) {
 }
 
 /**
- * A card for one approval. `onSettled` runs after the daemon accepted a decision (or said it was made already).
+ * A card for one approval. `onSettled(decided)` runs once the daemon answered a decision: `decided` is the decided
+ * record when it took the decision, null when it refused it (made already, or not possible now).
  * Returns the node and `settle(status, note)`, which turns the card into its decided form.
  */
 export function approvalCard({ approval, heading, onSettled }) {
   const node = el("div", { class: "approval" });
   const isQuestion = approval.severity === "question";
   const isHandoff = approval.severity === "handoff";
+  // An answer to a question the run left goes on with the work in the run's conversation, so it needs words.
+  const isLeft = approval.status === "left";
   let busy = false;
 
   async function decide(approve, note) {
@@ -93,8 +102,9 @@ export function approvalCard({ approval, heading, onSettled }) {
     node.querySelectorAll("button, input").forEach((control) => {
       control.disabled = true;
     });
+    let decided;
     try {
-      await api.post(`/approvals/${approval.id}/decision`, { approve, note });
+      decided = await api.post(`/approvals/${approval.id}/decision`, { approve, note });
     } catch (error) {
       busy = false;
       node.querySelectorAll("button, input").forEach((control) => {
@@ -102,11 +112,11 @@ export function approvalCard({ approval, heading, onSettled }) {
       });
       toast("error", error.message);
       if (error.status === 409) {
-        onSettled();
+        onSettled(null);
       }
       return;
     }
-    onSettled();
+    onSettled(decided);
   }
 
   function renderPending() {
@@ -119,7 +129,13 @@ export function approvalCard({ approval, heading, onSettled }) {
       placeholder: isQuestion ? "Your answer" : "Note for Dot (optional)",
       "aria-label": isQuestion ? "Your answer" : "Note for Dot",
     });
-    const submit = (approve) => decide(approve, note.value.trim());
+    const submit = (approve) => {
+      if (isLeft && approve && note.value.trim() === "") {
+        note.focus();
+        return;
+      }
+      decide(approve, note.value.trim());
+    };
     note.addEventListener("keydown", (event) => {
       if (event.key === "Enter") {
         event.preventDefault();
@@ -150,23 +166,26 @@ export function approvalCard({ approval, heading, onSettled }) {
     const yes = isQuestion ? "Send answer" : isHandoff ? "I did it" : "Approve";
     const no = isQuestion ? "Skip" : isHandoff ? "Skip this step" : "Deny";
     node.replaceChildren(
-      el(
-        "div",
-        { class: "approval-head" },
-        icon(iconOf(approval.severity)),
-        el("span", null, titleOf(approval.severity)),
-        isQuestion || isHandoff ? null : el("span", { class: `badge ${approval.severity === "high" ? "b-bad" : "b-warn"}` }, approval.severity),
-        el("span", { class: "spacer" }),
-        heading,
-      ),
-      el("div", { class: "approval-text" }, text),
-      isQuestion ? options : technicalDetails(approval.args),
-      el(
-        "div",
-        { class: "approval-actions" },
-        note,
-        el("button", { class: "btn", type: "button", onclick: () => submit(false) }, no),
-        el("button", { class: "btn primary", type: "button", onclick: () => submit(true) }, yes),
+      ...present(
+        el(
+          "div",
+          { class: "approval-head" },
+          icon(iconOf(approval.severity)),
+          el("span", null, isLeft ? "Dot asked you" : titleOf(approval.severity)),
+          isQuestion || isHandoff ? null : el("span", { class: `badge ${approval.severity === "high" ? "b-bad" : "b-warn"}` }, approval.severity),
+          el("span", { class: "spacer" }),
+          heading,
+        ),
+        el("div", { class: "approval-text" }, text),
+        isLeft ? el("div", { class: "small muted" }, "The run went on without your answer. Your answer goes to this conversation and carries the work on.") : null,
+        isQuestion ? options : technicalDetails(approval.args),
+        el(
+          "div",
+          { class: "approval-actions" },
+          note,
+          el("button", { class: "btn", type: "button", onclick: () => submit(false) }, no),
+          el("button", { class: "btn primary", type: "button", onclick: () => submit(true) }, yes),
+        ),
       ),
     );
   }
@@ -175,21 +194,23 @@ export function approvalCard({ approval, heading, onSettled }) {
     node.className = "approval decided";
     const text = isQuestion && typeof approval.args.question === "string" ? approval.args.question : approval.summary;
     node.replaceChildren(
-      el(
-        "div",
-        { class: "approval-head" },
-        icon(iconOf(approval.severity)),
-        el("span", null, isQuestion ? "Question" : isHandoff ? "Hand-off" : "Approval"),
-        el("span", { class: `badge ${STATUS_BADGE[status] ?? "b-muted"}` }, STATUS_LABEL[status] ?? status),
-        el("span", { class: "spacer" }),
-        heading,
+      ...present(
+        el(
+          "div",
+          { class: "approval-head" },
+          icon(iconOf(approval.severity)),
+          el("span", null, isQuestion ? "Question" : isHandoff ? "Hand-off" : "Approval"),
+          el("span", { class: `badge ${STATUS_BADGE[status] ?? "b-muted"}` }, STATUS_LABEL[status] ?? status),
+          el("span", { class: "spacer" }),
+          heading,
+        ),
+        el("div", { class: "approval-text muted" }, clip(text, 400)),
+        note === "" ? null : el("div", { class: "small" }, el("span", { class: "muted" }, isQuestion ? "Answer: " : "Note: "), note),
       ),
-      el("div", { class: "approval-text muted" }, clip(text, 400)),
-      note === "" ? null : el("div", { class: "small" }, el("span", { class: "muted" }, isQuestion ? "Answer: " : "Note: "), note),
     );
   }
 
-  if (approval.status === "pending") {
+  if (approval.status === "pending" || isLeft) {
     renderPending();
   } else {
     settle(approval.status, approval.note);

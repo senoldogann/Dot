@@ -71,6 +71,7 @@ CREATE TABLE IF NOT EXISTS approvals (
     status TEXT NOT NULL, tool TEXT NOT NULL, summary TEXT NOT NULL, severity TEXT NOT NULL,
     args TEXT NOT NULL, decided_by TEXT, note TEXT NOT NULL
 );
+CREATE INDEX IF NOT EXISTS approvals_run ON approvals(run_id, status);
 CREATE TABLE IF NOT EXISTS rules (
     id TEXT PRIMARY KEY, position INTEGER NOT NULL, enabled INTEGER NOT NULL, behavior TEXT NOT NULL,
     tool_glob TEXT NOT NULL, match_regex TEXT NOT NULL, description TEXT NOT NULL, created_at REAL NOT NULL
@@ -891,6 +892,27 @@ class Store:
         await self._insert_approval(record)
         return record
 
+    async def create_left_approval(
+        self, run_id: str, tool: str, summary: str, severity: str, args: JsonObject
+    ) -> ApprovalRecord:
+        """Store a question that a run left for the user and went on without: ``left`` until it is answered or skipped,
+        never listed as pending and never expired."""
+        record: ApprovalRecord = ApprovalRecord(
+            id=new_id("apr"),
+            run_id=run_id,
+            created_at=time.time(),
+            decided_at=None,
+            status="left",
+            tool=tool,
+            summary=summary,
+            severity=severity,
+            args=args,
+            decided_by=None,
+            note="",
+        )
+        await self._insert_approval(record)
+        return record
+
     async def create_decided_approval(
         self,
         run_id: str,
@@ -923,8 +945,10 @@ class Store:
     async def decide_approval(
         self, approval_id: str, status: ApprovalStatus, decided_by: str, note: str
     ) -> ApprovalRecord:
+        """Decide an approval that is still open (``pending`` or ``left``); a decided one keeps its decision."""
         await self._db.execute(
-            "UPDATE approvals SET status = ?, decided_at = ?, decided_by = ?, note = ? WHERE id = ? AND status = 'pending'",
+            "UPDATE approvals SET status = ?, decided_at = ?, decided_by = ?, note = ?"
+            " WHERE id = ? AND status IN ('pending', 'left')",
             (status, time.time(), decided_by, note, approval_id),
         )
         await self._db.commit()
@@ -943,6 +967,13 @@ class Store:
             rows = await self._all(
                 "SELECT * FROM approvals WHERE status = ? ORDER BY created_at DESC LIMIT ?", (status, limit)
             )
+        return [_approval(row) for row in rows]
+
+    async def list_left_questions(self, run_id: str) -> list[ApprovalRecord]:
+        """The questions ``run_id`` left for the user that are not answered or skipped yet, oldest first."""
+        rows = await self._all(
+            "SELECT * FROM approvals WHERE run_id = ? AND status = 'left' ORDER BY created_at", (run_id,)
+        )
         return [_approval(row) for row in rows]
 
     async def expire_pending_approvals(self) -> int:

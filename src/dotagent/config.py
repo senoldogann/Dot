@@ -11,7 +11,7 @@ from dotagent.core.errors import ConfigError
 from dotagent.core.paths import config_path
 from dotagent.core.types import FrozenModel, JsonObject
 from dotagent.llm.types import Effort
-from dotagent.policy.types import ApprovalMode, Preset
+from dotagent.policy.types import ApprovalMode, Preset, QuestionMode
 
 
 class ServerConfig(FrozenModel):
@@ -98,6 +98,7 @@ class AgentConfig(FrozenModel):
     failure_streak: int
     revisit_window: int
     finish_nudges: int
+    questions: QuestionMode
     parallel_tools: int
     model_call_timeout_s: float
     max_concurrent_runs: int

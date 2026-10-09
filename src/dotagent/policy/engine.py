@@ -21,8 +21,8 @@ from dotagent.policy.types import (
 from dotagent.store.models import Behavior, RuleRecord, RunMode
 
 _DENY_FLAGS: frozenset[Flag] = frozenset({"secret_access", "exfiltration"})
-# What a yolo run lets through as well: the always-on refusals and the hand-offs of money and credentials. A research
-# run stays read-only (``mode``) and the user's own rules still hold.
+# What a yolo run lets through as well: the always-on refusals and the hand-offs of money and credentials, unless a
+# hand-off rule of the user matches the action (:func:`owner_handoff`). A research run stays read-only (``mode``).
 YOLO_WAIVED_SOURCES: frozenset[DecisionSource] = frozenset({"auto_review", "hard_stop"})
 _HARD_HANDOFF_FLAGS: frozenset[Flag] = frozenset({"financial", "credential"})
 _AGGRESSIVE_ASK_FLAGS: frozenset[Flag] = frozenset({"privilege", "system_settings", "public_post", "external_send"})
@@ -99,6 +99,16 @@ def match_rule(info: ActionInfo, rules: list[RuleRecord]) -> RuleRecord | None:
         if matched:
             return rule
     return None
+
+
+def owner_handoff(info: ActionInfo, rules: list[RuleRecord]) -> Decision | None:
+    """The hand-off the user's own rules ask for: the decision of the rule that matches the action (:func:`match_rule`)
+    when that rule hands it off, else ``None``. A yolo run checks it before it waives the always-on layers, so that a
+    hand-off rule stops the run there too."""
+    rule: RuleRecord | None = match_rule(info, rules)
+    if rule is None or rule.behavior != "handoff":
+        return None
+    return Decision(verdict="handoff", source="rule", reason=rule.description or f"rule {rule.id}", rule_id=rule.id)
 
 
 def preset_verdict(preset: Preset, info: ActionInfo) -> tuple[Verdict, str]:
