@@ -31,6 +31,10 @@ from dotagent.store.models import (
     ApprovalRecord,
     ApprovalStatus,
     Behavior,
+    CampaignEntry,
+    CampaignEntryKind,
+    CampaignRecord,
+    CampaignStatus,
     EventRecord,
     MemoryRecord,
     RuleRecord,
@@ -58,7 +62,7 @@ CREATE TABLE IF NOT EXISTS runs (
     model TEXT NOT NULL, status TEXT NOT NULL, created_at REAL NOT NULL, finished_at REAL,
     result TEXT NOT NULL, steps INTEGER NOT NULL, input_tokens INTEGER NOT NULL,
     output_tokens INTEGER NOT NULL, parent_run_id TEXT, source TEXT NOT NULL, effort TEXT,
-    approvals TEXT NOT NULL DEFAULT 'ask', goal_mode INTEGER NOT NULL DEFAULT 0
+    approvals TEXT NOT NULL DEFAULT 'ask', goal_mode INTEGER NOT NULL DEFAULT 0, campaign_id TEXT
 );
 CREATE INDEX IF NOT EXISTS runs_created ON runs(created_at DESC);
 CREATE TABLE IF NOT EXISTS events (
@@ -90,6 +94,16 @@ CREATE TABLE IF NOT EXISTS schedules (
     next_run_at REAL, thread_id TEXT, last_status TEXT NOT NULL
 );
 CREATE TABLE IF NOT EXISTS kv (key TEXT PRIMARY KEY, value TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS campaigns (
+    id TEXT PRIMARY KEY, title TEXT NOT NULL, goal TEXT NOT NULL, targets TEXT NOT NULL, verification TEXT NOT NULL,
+    status TEXT NOT NULL, thread_id TEXT NOT NULL, model TEXT NOT NULL, effort TEXT NOT NULL, approvals TEXT NOT NULL,
+    cron TEXT, next_session_at REAL, created_at REAL NOT NULL, updated_at REAL NOT NULL, evidence TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS campaign_entries (
+    id TEXT PRIMARY KEY, campaign_id TEXT NOT NULL, run_id TEXT, ts REAL NOT NULL, kind TEXT NOT NULL,
+    text TEXT NOT NULL, numbers TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS campaign_entries_ts ON campaign_entries(campaign_id, ts);
 """
 
 _EXTENSIONS: dict[str, str] = {
@@ -312,6 +326,41 @@ def _run(row: aiosqlite.Row) -> RunRecord:
         effort=row["effort"],
         approvals=row["approvals"],
         goal_mode=bool(row["goal_mode"]),
+        campaign_id=row["campaign_id"],
+    )
+
+
+def _campaign(row: aiosqlite.Row) -> CampaignRecord:
+    return CampaignRecord(
+        id=row["id"],
+        title=row["title"],
+        goal=row["goal"],
+        targets=row["targets"],
+        verification=row["verification"],
+        status=row["status"],
+        thread_id=row["thread_id"],
+        model=row["model"],
+        effort=row["effort"],
+        approvals=row["approvals"],
+        cron=row["cron"],
+        next_session_at=row["next_session_at"],
+        created_at=row["created_at"],
+        updated_at=row["updated_at"],
+        evidence=row["evidence"],
+    )
+
+
+def _campaign_entry(row: aiosqlite.Row) -> CampaignEntry:
+    return CampaignEntry.model_validate(
+        {
+            "id": row["id"],
+            "campaign_id": row["campaign_id"],
+            "run_id": row["run_id"],
+            "ts": row["ts"],
+            "kind": row["kind"],
+            "text": row["text"],
+            "numbers": parse_json_object(row["numbers"], "campaign entry numbers"),
+        }
     )
 
 
@@ -399,11 +448,12 @@ def _option_values(options: ScheduleOptions) -> tuple[str | None, str | None, st
 
 
 # Columns of ``runs`` added after the first version, with the definition that gives the rows of an older database the
-# value those runs had in effect: no reasoning level kept, ``ask``, no goal mode.
+# value those runs had in effect: no reasoning level kept, ``ask``, no goal mode, no campaign.
 _ADDED_RUN_COLUMNS: tuple[tuple[str, str], ...] = (
     ("effort", "TEXT"),
     ("approvals", "TEXT NOT NULL DEFAULT 'ask'"),
     ("goal_mode", "INTEGER NOT NULL DEFAULT 0"),
+    ("campaign_id", "TEXT"),
 )
 # Columns of ``memories`` added later: notes of an older database were never counted as used.
 _ADDED_MEMORY_COLUMNS: tuple[tuple[str, str], ...] = (
@@ -430,10 +480,11 @@ async def _add_columns(connection: aiosqlite.Connection, table: str, added: Sequ
 
 
 async def _add_missing_columns(connection: aiosqlite.Connection) -> None:
-    """Give a database created by an older version the columns added since."""
+    """Give a database created by an older version the columns added since, and the indexes on them."""
     await _add_columns(connection, "runs", _ADDED_RUN_COLUMNS)
     await _add_columns(connection, "memories", _ADDED_MEMORY_COLUMNS)
     await _add_columns(connection, "schedules", _ADDED_SCHEDULE_COLUMNS)
+    await connection.execute("CREATE INDEX IF NOT EXISTS runs_campaign ON runs(campaign_id, created_at)")
 
 
 async def _refresh_memory_index(connection: aiosqlite.Connection) -> None:
@@ -536,13 +587,16 @@ class Store:
 
     async def list_thread_summaries(self, limit: int) -> list[ThreadSummary]:
         """The chats, latest activity first: every thread with a run a person started on it, with the latest of those
-        runs. Threads holding only delegated runs are left out."""
+        runs. Threads holding only delegated runs are left out, and so are the threads of a campaign's sessions after the
+        first, which start in threads of their own: the campaign's page lists them, and the campaign's conversation
+        stays a chat."""
         rows: list[aiosqlite.Row] = await self._all(
             "WITH ranked AS ("
             " SELECT thread_id, id, status, mode, created_at,"
             "  ROW_NUMBER() OVER (PARTITION BY thread_id ORDER BY created_at DESC, rowid DESC) AS place,"
             "  COUNT(*) OVER (PARTITION BY thread_id) AS run_count"
-            " FROM runs WHERE parent_run_id IS NULL)"
+            " FROM runs WHERE parent_run_id IS NULL"
+            " AND (campaign_id IS NULL OR thread_id IN (SELECT thread_id FROM campaigns)))"
             " SELECT t.id, t.title, t.source, t.created_at, MAX(t.updated_at, r.created_at) AS updated_at,"
             "  r.run_count, r.id AS latest_run_id, r.status AS latest_status, r.mode AS latest_mode"
             " FROM threads AS t JOIN ranked AS r ON r.thread_id = t.id AND r.place = 1"
@@ -697,6 +751,7 @@ class Store:
         effort: Effort,
         approvals: ApprovalMode,
         goal_mode: bool,
+        campaign_id: str | None,
     ) -> RunRecord:
         record: RunRecord = RunRecord(
             id=new_id("run"),
@@ -716,11 +771,12 @@ class Store:
             effort=effort,
             approvals=approvals,
             goal_mode=goal_mode,
+            campaign_id=campaign_id,
         )
         await self._db.execute(
             "INSERT INTO runs(id, thread_id, goal, mode, model, status, created_at, finished_at, result, steps,"
-            " input_tokens, output_tokens, parent_run_id, source, effort, approvals, goal_mode)"
-            " VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            " input_tokens, output_tokens, parent_run_id, source, effort, approvals, goal_mode, campaign_id)"
+            " VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (
                 record.id,
                 record.thread_id,
@@ -739,6 +795,7 @@ class Store:
                 record.effort,
                 record.approvals,
                 int(record.goal_mode),
+                record.campaign_id,
             ),
         )
         await self._db.commit()
@@ -1335,3 +1392,177 @@ class Store:
     async def delete_schedule(self, schedule_id: str) -> None:
         await self._db.execute("DELETE FROM schedules WHERE id = ?", (schedule_id,))
         await self._db.commit()
+
+    # ----- campaigns -------------------------------------------------------------------------
+
+    async def create_campaign(
+        self, title: str, goal: str, thread_id: str, model: str, effort: Effort, approvals: ApprovalMode
+    ) -> CampaignRecord:
+        """Store a new campaign: active, without targets, with no session planned yet."""
+        now: float = time.time()
+        record: CampaignRecord = CampaignRecord(
+            id=new_id("cmp"),
+            title=title,
+            goal=goal,
+            targets="",
+            verification="",
+            status="active",
+            thread_id=thread_id,
+            model=model,
+            effort=effort,
+            approvals=approvals,
+            cron=None,
+            next_session_at=None,
+            created_at=now,
+            updated_at=now,
+            evidence="",
+        )
+        await self._db.execute(
+            "INSERT INTO campaigns(id, title, goal, targets, verification, status, thread_id, model, effort, approvals,"
+            " cron, next_session_at, created_at, updated_at, evidence) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (
+                record.id,
+                record.title,
+                record.goal,
+                record.targets,
+                record.verification,
+                record.status,
+                record.thread_id,
+                record.model,
+                record.effort,
+                record.approvals,
+                record.cron,
+                record.next_session_at,
+                record.created_at,
+                record.updated_at,
+                record.evidence,
+            ),
+        )
+        await self._db.commit()
+        return record
+
+    async def get_campaign(self, campaign_id: str) -> CampaignRecord:
+        row: aiosqlite.Row | None = await self._one("SELECT * FROM campaigns WHERE id = ?", (campaign_id,))
+        if row is None:
+            raise NotFoundError("campaign not found", {"campaign_id": campaign_id})
+        return _campaign(row)
+
+    async def list_campaigns(self) -> list[CampaignRecord]:
+        """Every campaign: the active ones first, each part the newest first."""
+        rows = await self._all("SELECT * FROM campaigns ORDER BY status = 'active' DESC, created_at DESC", ())
+        return [_campaign(row) for row in rows]
+
+    async def _update_campaign(self, campaign_id: str, assignments: str, params: Sequence[object]) -> CampaignRecord:
+        cursor: aiosqlite.Cursor = await self._db.execute(
+            f"UPDATE campaigns SET {assignments}, updated_at = ? WHERE id = ?", (*params, time.time(), campaign_id)
+        )
+        await self._db.commit()
+        if cursor.rowcount == 0:
+            raise NotFoundError("campaign not found", {"campaign_id": campaign_id})
+        return await self.get_campaign(campaign_id)
+
+    async def set_campaign_targets(self, campaign_id: str, targets: str, verification: str) -> CampaignRecord:
+        return await self._update_campaign(campaign_id, "targets = ?, verification = ?", (targets, verification))
+
+    async def plan_campaign_sessions(
+        self, campaign_id: str, cron: str | None, next_session_at: float | None
+    ) -> CampaignRecord:
+        """Set the rhythm of the campaign's sessions (``cron``, ``None`` for none) and when the next one starts."""
+        return await self._update_campaign(campaign_id, "cron = ?, next_session_at = ?", (cron, next_session_at))
+
+    async def set_next_session(self, campaign_id: str, next_session_at: float | None) -> CampaignRecord:
+        return await self._update_campaign(campaign_id, "next_session_at = ?", (next_session_at,))
+
+    async def set_campaign_status(
+        self, campaign_id: str, status: CampaignStatus, next_session_at: float | None
+    ) -> CampaignRecord:
+        return await self._update_campaign(campaign_id, "status = ?, next_session_at = ?", (status, next_session_at))
+
+    async def achieve_campaign(self, campaign_id: str, evidence: str) -> CampaignRecord:
+        """The campaign's outcome is verified: no session follows."""
+        return await self._update_campaign(
+            campaign_id, "status = 'achieved', evidence = ?, next_session_at = NULL", (evidence,)
+        )
+
+    async def due_campaigns(self, now: float) -> list[CampaignRecord]:
+        """The active campaigns whose next session is due at ``now`` and none of whose sessions is still working (in
+        any process), the longest due first."""
+        rows = await self._all(
+            "SELECT * FROM campaigns WHERE status = 'active' AND next_session_at IS NOT NULL AND next_session_at <= ?"
+            " AND NOT EXISTS (SELECT 1 FROM runs WHERE runs.campaign_id = campaigns.id"
+            " AND runs.status IN ('queued', 'running', 'blocked')) ORDER BY next_session_at",
+            (now,),
+        )
+        return [_campaign(row) for row in rows]
+
+    async def delete_campaign(self, campaign_id: str) -> None:
+        """Delete a campaign and its ledger; its sessions stay as runs of their threads."""
+        await self._db.execute("DELETE FROM campaign_entries WHERE campaign_id = ?", (campaign_id,))
+        await self._db.execute("DELETE FROM campaigns WHERE id = ?", (campaign_id,))
+        await self._db.commit()
+
+    async def add_campaign_entry(
+        self, campaign_id: str, run_id: str | None, kind: CampaignEntryKind, text: str, numbers: dict[str, float]
+    ) -> CampaignEntry:
+        entry: CampaignEntry = CampaignEntry(
+            id=new_id("cme"),
+            campaign_id=campaign_id,
+            run_id=run_id,
+            ts=time.time(),
+            kind=kind,
+            text=text,
+            numbers=numbers,
+        )
+        measured: JsonObject = {name: value for name, value in entry.numbers.items()}
+        await self._db.execute(
+            "INSERT INTO campaign_entries(id, campaign_id, run_id, ts, kind, text, numbers) VALUES(?, ?, ?, ?, ?, ?, ?)",
+            (entry.id, entry.campaign_id, entry.run_id, entry.ts, entry.kind, entry.text, dumps_compact(measured)),
+        )
+        await self._db.commit()
+        return entry
+
+    async def campaign_entries(self, campaign_id: str, limit: int) -> list[CampaignEntry]:
+        """The newest ``limit`` entries of the campaign's ledger, oldest first."""
+        rows = await self._all(
+            "SELECT * FROM campaign_entries WHERE campaign_id = ? ORDER BY ts DESC, rowid DESC LIMIT ?",
+            (campaign_id, limit),
+        )
+        return [_campaign_entry(row) for row in reversed(rows)]
+
+    async def latest_campaign_entry(self, campaign_id: str, kind: CampaignEntryKind) -> CampaignEntry | None:
+        row = await self._one(
+            "SELECT * FROM campaign_entries WHERE campaign_id = ? AND kind = ? ORDER BY ts DESC, rowid DESC LIMIT 1",
+            (campaign_id, kind),
+        )
+        return None if row is None else _campaign_entry(row)
+
+    async def campaign_sessions(self, campaign_id: str) -> list[RunRecord]:
+        """The sessions of the campaign, oldest first."""
+        rows = await self._all("SELECT * FROM runs WHERE campaign_id = ? ORDER BY created_at", (campaign_id,))
+        return [_run(row) for row in rows]
+
+    async def campaign_questions(self, campaign_id: str, tool: str, limit: int) -> list[ApprovalRecord]:
+        """The newest ``limit`` questions that the campaign's sessions asked the owner with ``tool``, whatever became of
+        them, oldest first."""
+        rows = await self._all(
+            "SELECT approvals.* FROM approvals JOIN runs ON runs.id = approvals.run_id"
+            " WHERE runs.campaign_id = ? AND approvals.tool = ? ORDER BY approvals.created_at DESC LIMIT ?",
+            (campaign_id, tool, limit),
+        )
+        return [_approval(row) for row in reversed(rows)]
+
+    async def run_questions(self, run_id: str, tool: str) -> list[ApprovalRecord]:
+        """The questions ``run_id`` asked the owner with ``tool``, whatever became of them, oldest first."""
+        rows = await self._all(
+            "SELECT * FROM approvals WHERE run_id = ? AND tool = ? ORDER BY created_at", (run_id, tool)
+        )
+        return [_approval(row) for row in rows]
+
+    async def campaign_tokens(self, campaign_id: str) -> int:
+        """The tokens (input and output) of the campaign's sessions and of the runs they delegated to."""
+        row = await self._one(
+            "SELECT COALESCE(SUM(input_tokens + output_tokens), 0) AS n FROM runs WHERE campaign_id = ?"
+            " OR parent_run_id IN (SELECT id FROM runs WHERE campaign_id = ?)",
+            (campaign_id, campaign_id),
+        )
+        return 0 if row is None else int(row["n"])

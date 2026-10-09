@@ -13,6 +13,7 @@ from dotagent.agent.attachments import (
     attachment_summary,
     message_with_attachments,
 )
+from dotagent.agent.campaign import session_number
 from dotagent.agent.compact import (
     CHARS_PER_TOKEN,
     drop_old_images,
@@ -143,6 +144,7 @@ from dotagent.skills.catalog import load_skills
 from dotagent.skills.types import SkillCatalog
 from dotagent.store.endings import GOAL_CHECK_MARK, RESULT_EMPTY_REPLIES
 from dotagent.store.models import EventRecord, MemoryRecord, RunMode, RunRecord
+from dotagent.tools.campaign import CAMPAIGN_TOOLS
 from dotagent.tools.context import Spawner, ToolContext
 from dotagent.tools.delegate import DELEGATE_TOOL
 from dotagent.tools.groups import CORE_GROUP, groups_event, groups_of, hidden_tools, offered_specs, used_groups
@@ -191,6 +193,12 @@ _PLAN_NOTE: str = (
     "with mark_plan_step (several calls in one reply), then end the run again with your complete final answer."
 )
 _NO_PLAN: str = "The agent has not written a plan."
+_CAMPAIGN_TARGETS_NOTE: str = (
+    "[system note] The campaign has no targets yet. Record them with campaign_targets (the outcome, measurable, and "
+    "how a session verifies it), then end the session again with your complete final answer."
+)
+# A session of a campaign that wanted to end while the campaign had no targets was sent back once.
+CAMPAIGN_TARGETS_EVENT: str = "campaign_targets_reminder"
 
 
 class RunOpening(FrozenModel):
@@ -600,6 +608,10 @@ def _after_limit_verdict(verdict: GoalVerdict, ended: RunOutcome) -> RunOutcome:
     )
 
 
+async def _session_number(agent: AgentRun, campaign_id: str) -> int:
+    return session_number(await agent.runtime.store.campaign_sessions(campaign_id), agent.run.id)
+
+
 async def _missing_in_answer(agent: AgentRun, answer: str, facts: RunFacts) -> tuple[str, ...]:
     """The paths ``answer`` names that do not exist and that no successful call of the run named."""
     return await asyncio.to_thread(missing_paths, answer_paths(answer), facts.named, agent.runtime.workspace)
@@ -857,6 +869,8 @@ async def run_agent(agent: AgentRun) -> RunEnd:
     specs: tuple[ToolSpec, ...] = specs_for_mode(runtime.registry, run.mode) if info.tools else ()
     if run.parent_run_id is not None:
         specs = tuple(spec for spec in specs if spec.name not in _NOT_FOR_DELEGATED_RUNS)
+    if run.campaign_id is None:
+        specs = tuple(spec for spec in specs if spec.name not in CAMPAIGN_TOOLS)
     skills: SkillCatalog = await asyncio.to_thread(load_skills, runtime.config.skills, runtime.plugins.plugins)
     for problem in skills.problems:
         log.warning("skill_skipped", run_id=run.id, path=str(problem.path), reason=problem.reason)
@@ -888,6 +902,7 @@ async def run_agent(agent: AgentRun) -> RunEnd:
                 [render_note(record) for record in remembered],
                 [spec.name for spec in specs],
                 skills.skills,
+                None if run.campaign_id is None else await _session_number(agent, run.campaign_id),
             )
         )
     )
@@ -910,6 +925,7 @@ async def run_agent(agent: AgentRun) -> RunEnd:
         await runtime.bus.emit(run.id, ATTACHMENTS_EVENT, {"files": attachment_summary(opening.files)}, True)
     history.append(goal)
     await runtime.store.append_messages(run.thread_id, [goal])
+    facts: RunFacts = new_facts()
     context: ToolContext = ToolContext(
         runtime=runtime,
         run_id=run.id,
@@ -921,6 +937,8 @@ async def run_agent(agent: AgentRun) -> RunEnd:
         gate=agent.gate,
         cancel=agent.cancel,
         output_chars=scaffold.tool_output_chars,
+        # The facts as they stand when a tool asks: each step replaces them.
+        facts=lambda: facts,
         spawner=agent.spawner,
     )
     checker: GoalChecker | None = (
@@ -937,11 +955,11 @@ async def run_agent(agent: AgentRun) -> RunEnd:
     sent_back: int = 0
     used_tools: bool = False
     plan_reminded: bool = False
+    targets_reminded: bool = False
     paths_reminded: bool = False
     # The step of the newest reminder of the goal (weak tier); 0 before the first.
     reminded_at: int = 0
     ledger: RunLedger = new_ledger(run.goal)
-    facts: RunFacts = new_facts()
     limits: Limits = limits_for(config)
     ladder: tuple[Rung, ...] = ladder_for(config.stall_escalation, can_ask)
     consultant: ProgressConsultant = progress_consultant_for(
@@ -1111,9 +1129,9 @@ async def run_agent(agent: AgentRun) -> RunEnd:
                 else await _check_goal_at_limit(agent, checker, history, goal, ended, sent_back, facts)
             )
             return _run_end(agent, history, goal, at_limit, facts)
-        # Otherwise a plan with open steps is sent back once, so the plan the user sees matches the work; so is, with
-        # verify_answer_paths, an answer that names paths that do not exist; then goal mode lets the checker decide
-        # whether the goal is really reached.
+        # Otherwise a plan with open steps is sent back once, so the plan the user sees matches the work; so is a
+        # session of a campaign that has no targets yet, and, with verify_answer_paths, an answer that names paths that
+        # do not exist; then goal mode lets the checker decide whether the goal is really reached.
         if not plan_reminded and run.mode != "chat":
             unclosed: tuple[int, ...] = open_steps((await _current_plan(agent)).steps)
             if unclosed:
@@ -1122,6 +1140,16 @@ async def run_agent(agent: AgentRun) -> RunEnd:
                 history.append(await _stored_note(agent, _plan_note(unclosed)))
                 await runtime.bus.emit(run.id, "plan_reminder", {"open_steps": list(unclosed)}, True)
                 continue
+        if (
+            run.campaign_id is not None
+            and not targets_reminded
+            and not (await runtime.store.get_campaign(run.campaign_id)).targets
+        ):
+            targets_reminded = True
+            nudges = 0
+            history.append(await _stored_note(agent, _CAMPAIGN_TARGETS_NOTE))
+            await runtime.bus.emit(run.id, CAMPAIGN_TARGETS_EVENT, {}, True)
+            continue
         if config.verify_answer_paths and not paths_reminded and run.mode != "chat" and ended.status == "done":
             missing: tuple[str, ...] = await _missing_in_answer(agent, ended.result, facts)
             if missing:

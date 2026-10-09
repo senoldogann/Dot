@@ -1,7 +1,7 @@
 // The home page: one composer in the middle of the window. The recent runs live in the sidebar; a run that waits for an
 // answer is the only other thing this page ever shows, above the composer.
 
-import { approvalCard, fromRecord } from "../approvals.js";
+import { approvalCard, fromRecord, LEFT_IN_RUN } from "../approvals.js";
 import { api } from "../api.js";
 import { createAttachments, readyToSend } from "../attachments.js";
 import { el, modelName } from "../dom.js";
@@ -10,7 +10,7 @@ import { icon } from "../icons.js";
 import { segmented } from "../panels.js";
 import { providerLabel } from "../providers.js";
 import { reasoningSelect } from "../reasoning.js";
-import { approvalsPicker, goalModePicker } from "../runmodes.js";
+import { approvalsPicker, goalModePicker, standingPicker } from "../runmodes.js";
 import { onCompose } from "../shortcuts.js";
 import { getSnapshot, loadModels, onChange, refresh } from "../state.js";
 import { attempt } from "../ui.js";
@@ -47,9 +47,12 @@ function buildComposer(ctx) {
   const goal = el("textarea", { class: "textarea", rows: "3", placeholder: "What should Dot do?", "aria-label": "Goal" });
   const approvals = approvalsPicker();
   const goalMode = goalModePicker();
-  // A chat has no goal to check, so the goal switch only belongs to the other two kinds of run.
+  // A campaign checks its outcome itself, so goal mode does not apply to one; the switch only shows for a task.
+  const standing = standingPicker((on) => goalMode.setAvailable(!on));
+  // A chat has no goal to check, so the goal switch only belongs to the other two kinds of run; only a task keeps going.
   const mode = segmented(MODES, "task", (id) => {
-    goalMode.setAvailable(id !== "chat");
+    standing.setAvailable(id === "task");
+    goalMode.setAvailable(id !== "chat" && !standing.value());
     goal.focus();
   });
   const defaultOption = el("option", { value: "" });
@@ -133,7 +136,8 @@ function buildComposer(ctx) {
           model: model.value === "" ? null : model.value,
           effort: info !== null && offersChoice(info) ? savedLevel(info) : null,
           approvals: approvals.value(),
-          goal_mode: mode.value() === "chat" ? null : goalMode.value(),
+          goal_mode: mode.value() === "chat" || standing.value() ? null : goalMode.value(),
+          standing: standing.value(),
           thread_id: null,
           attachments: attachments.ids(),
         });
@@ -193,10 +197,11 @@ function buildComposer(ctx) {
     el(
       "div",
       { class: "composer-bar" },
-      el("div", { class: "composer-options" }, attachments.button, mode.element, pick("Model", model), reasoning, approvals.element, goalMode.element),
+      el("div", { class: "composer-options" }, attachments.button, mode.element, pick("Model", model), reasoning, approvals.element, goalMode.element, standing.element),
       start,
     ),
     approvals.warning,
+    standing.note,
   );
   return { element, focus: () => goal.focus(), dispose: onChange(syncStatus) };
 }
@@ -222,6 +227,7 @@ function buildApprovals() {
           onSettled: () => {
             refresh().catch((error) => console.warn("status refresh failed", error));
           },
+          leftNote: LEFT_IN_RUN,
         });
         cards.set(record.id, card);
         list.append(card.node);

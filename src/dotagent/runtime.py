@@ -11,6 +11,7 @@ from dotagent.browser.modes import browser_data_dir
 from dotagent.browser.session import BrowserSession
 from dotagent.config import AppConfig
 from dotagent.core.logs import get_logger
+from dotagent.core.notify import Notifier, show_notification
 from dotagent.core.paths import (
     browser_profile_dir,
     chrome_data_dir,
@@ -39,6 +40,7 @@ from dotagent.store.db import Store
 from dotagent.tools.apple import build_apple_tool
 from dotagent.tools.base import RegisteredTool
 from dotagent.tools.browser import build_browser_tools
+from dotagent.tools.campaign import build_campaign_tools
 from dotagent.tools.delegate import build_delegate_tools
 from dotagent.tools.desktop import build_desktop_tools, sized_for_agent
 from dotagent.tools.files import build_file_tools
@@ -74,6 +76,7 @@ class Runtime:
     workspace: Path
     schedule_zone: ZoneInfo
     undo_dir: Path
+    notify: Notifier
 
 
 def _tool_groups(config: AppConfig) -> tuple[tuple[RegisteredTool, ...], ...]:
@@ -85,6 +88,7 @@ def _tool_groups(config: AppConfig) -> tuple[tuple[RegisteredTool, ...], ...]:
         build_web_tools(),
         build_memory_tools(),
         build_schedule_tools(),
+        build_campaign_tools(),
         build_delegate_tools(),
         build_meta_tools(),
         (build_skill_tool(),),
@@ -174,6 +178,7 @@ async def open_runtime(config: AppConfig, login_env: dict[str, str]) -> Runtime:
             workspace=workspace_dir(),
             schedule_zone=schedule_zone,
             undo_dir=undo_dir(),
+            notify=show_notification,
         )
         cleanup.pop_all()
     return runtime

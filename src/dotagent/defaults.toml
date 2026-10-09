@@ -90,6 +90,16 @@ goal_patience = 4
 # scheduled runs have the same limits; eval runs have their task's own.
 run_max_minutes = 0
 run_max_tokens = 0
+# Campaigns ("Keep going until done"): a campaign works on its goal in sessions until the goal checker accepts its
+# evidence or the owner stops it. A session that planned no next one is followed after campaign_gap_minutes; one that
+# ended waiting for answers to all of its questions is followed after campaign_wait_hours, or as soon as one is
+# answered or skipped. After campaign_patience_sessions sessions without progress the brief asks for a new strategy.
+# campaign_max_sessions stops a campaign after that many sessions (0: never). The run limits above apply to each
+# session.
+campaign_gap_minutes = 60
+campaign_wait_hours = 24
+campaign_patience_sessions = 3
+campaign_max_sessions = 0
 tool_output_chars = 12000
 # The prompt budget of a run: past 60 % of it older tool output is shortened, past all of it the older part of the run is
 # summarized. A model whose window is smaller gets three quarters of its window instead (for Ollama the window is at most

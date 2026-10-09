@@ -1,6 +1,5 @@
 """Meta tools: finishing a run, asking the user, notifying them, keeping a visible plan and turning on a tool group."""
 
-import asyncio
 from typing import Annotated
 
 from pydantic import Field, StringConstraints
@@ -18,7 +17,6 @@ from dotagent.agent.plan import (
     plan_lines,
     with_step_status,
 )
-from dotagent.core.errors import ToolExecutionError
 from dotagent.core.types import JsonObject
 from dotagent.policy.types import ActionInfo
 from dotagent.store.models import EventRecord, RunMode
@@ -33,7 +31,6 @@ MARK_PLAN_STEP_TOOL: str = "mark_plan_step"
 USE_TOOLS_TOOL: str = "use_tools"
 # A chat turn ends with a plain reply. A model that is offered both that and finish tends to write the call out as text.
 _FINISH_MODES: frozenset[RunMode] = frozenset({"task", "research"})
-_NOTIFY_TIMEOUT_S: float = 15.0
 _TARGETS_MAX_CHARS: int = 600
 _LEFT_RESULT: str = (
     "The question is left for the user, who does not answer during this run; their answer will carry the work on "
@@ -133,35 +130,12 @@ class NotifyArgs(ToolArgs):
     message: str = Field(description="Notification text.")
 
 
-async def _show_notification(title: str, message: str) -> None:
-    process: asyncio.subprocess.Process = await asyncio.create_subprocess_exec(
-        "/usr/bin/osascript",
-        "-e",
-        "on run argv",
-        "-e",
-        "display notification (item 2 of argv) with title (item 1 of argv)",
-        "-e",
-        "end run",
-        title,
-        message,
-        stdin=asyncio.subprocess.DEVNULL,
-        stdout=asyncio.subprocess.PIPE,
-        stderr=asyncio.subprocess.PIPE,
-    )
-    _, stderr = await asyncio.wait_for(process.communicate(), timeout=_NOTIFY_TIMEOUT_S)
-    if process.returncode != 0:
-        raise ToolExecutionError(
-            "the notification could not be shown",
-            {"returncode": process.returncode, "stderr": stderr.decode("utf-8", errors="replace")[:300]},
-        )
-
-
 def _notify_tool() -> RegisteredTool:
     def classify(args: NotifyArgs, ctx: ToolContext) -> ActionInfo:
         return _meta_action("notify", f"Show a notification: {args.title}")
 
     async def run(args: NotifyArgs, ctx: ToolContext) -> ToolResult:
-        await _show_notification(args.title, args.message)
+        await ctx.runtime.notify(args.title, args.message)
         return ok("Notification shown.")
 
     return make_tool(

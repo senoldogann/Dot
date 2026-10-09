@@ -894,7 +894,7 @@ that change the owner's agent are their call (see "Open owner decisions", 6 onwa
 | 9   | Time accounting: where the seconds of a run go                         | done        | 4741bed |
 | 10  | Yolo asks nobody: secret fields, questions and the end of a run        | done        | eacd180 |
 | 11  | Open-ended goals in one run: targets, limits and an honest end         | done        | 12ad395 |
-| 12  | Campaigns: a goal that works until its outcome is verified             | in progress |         |
+| 12  | Campaigns: a goal that works until its outcome is verified             | done        |         |
 | 13  | Faster browser and desktop steps                                       | planned     |         |
 | 14  | Rich editors, drag and bulk text in the browser                        | planned     |         |
 | 15  | Helper models: consult, delegate to another model, standby             | planned     |         |
@@ -1486,91 +1486,121 @@ clean console), and the lines of `dotx run` replayed from the same run.
 
 ### 12. Campaigns: a goal that works until its outcome is verified
 
-**Status: in progress.** **Goal.** The owner switches on *Keep going until done* for a goal, and Dot works on it in
-sessions, through restarts and days, until the outcome is verified by evidence or the owner stops it. Nothing else stops
-it.
+**Status: done.** **Goal.** The owner switches on *Keep going until done* for a goal, and Dot works on it in sessions,
+through restarts and days, until the outcome is verified by evidence or the owner stops it. Nothing else stops it.
 
 **Why.** This is the owner's main ask of 2026-10-09: "a system that does not stop until I see the result; when I say
-earn money and give the information, it must not stop until the money is where it belongs". Today a run ends by
-`finish`, by text replies, by the watchdog or by the goal check's patience (`agent/loop.py:936-975`); a schedule the
-agent creates cannot carry the owner's approval mode (`tools/schedule.py:99-101`) and starts every firing in a new
-thread with only the goal text (`scheduler/runner.py:105-107`); the prompt forbids saving progress
-(`agent/prompt.py:166-167`); so no run knows what the last one did.
+earn money and give the information, it must not stop until the money is where it belongs". Before this item (the lines
+are those of `12ad395`) a run ended by `finish`, by text replies, by the watchdog, by the goal check's patience or at a
+limit (`run_agent`, `agent/loop.py:839`); a schedule the agent creates cannot carry the owner's approval mode
+(`tools/schedule.py:99-101`) and starts every firing in a new thread with only the goal text
+(`scheduler/runner.py:105-107`); the prompt forbids saving progress (`agent/prompt.py:178`); so no run knew what the
+last one did.
 
-**Design.**
-- **The campaign.** A row in a new table `campaigns`: `id`, `title`, `goal`, `targets` (text, set by the agent),
-  `status` (`active`, `achieved`, `stopped`), `thread_id` (the owner's conversation, where it was started),
-  `schedule_id` (its one schedule), `mode` (`task` only), `options` (`ScheduleOptions`: the model, effort, approvals
-  and goal mode of the opening run, so a `yolo` campaign stays `yolo`), `sessions`, `created_at`, `updated_at`,
-  `last_progress_at`, `achieved_evidence`. `RunRecord` gets `campaign_id: str | None`. The ledger is a table
-  `campaign_entries(id, campaign_id, run_id, ts, kind, text, numbers)` with `kind` in `progress`, `setback`, `note`,
-  `strategy`, `question`; `numbers` a JSON object of metric name to number.
-- **Starting one.** `StartRunRequest.standing: bool | None` (`server/views.py:74-84`), the composer's third switch
-  "Keep going until done" next to Approvals and Goal mode, and `dotx run --standing`. The daemon creates the campaign
-  (title: the first 60 characters of the goal), then starts the opening session as a run with `campaign_id` set. A
-  campaign is `task` mode only; `chat` and `research` refuse the switch (422).
-- **A session.** Every run of a campaign is a session. Its opening text is the brief: the goal, the targets, the newest
-  `strategy` entry, the last 12 ledger entries (newest last, with their numbers), the questions left for the owner
-  (item 10) with their answers or "unanswered since …", the session number and the time since the last session. Each
-  session is a new thread (as schedules do today): bounded context, and the brief is the memory. The system prompt gets
-  a `# Campaign` section only in campaign runs: "This is session N of a campaign. Do not start from zero: the brief
-  says what was done. Work toward the targets; write what you did, with numbers and evidence, with `campaign_note`
-  before you finish; verify the targets with your own reads before you claim them; when a round brought nothing, write
-  a new `strategy` entry and follow it; leave the user a question only for what only they can give, and go on with the
-  rest. Finish when this session's work is done; the campaign goes on."
-- **Tools, group `campaign`,** offered only in campaign runs (`tools/groups.py`): `campaign_targets(targets,
-  verification)` sets the targets and how they are verified (the opening session must call it before it finishes: a
-  finish without targets is sent back once, like the plan reminder); `campaign_note(kind, text, numbers)` appends a
-  ledger entry; `campaign_schedule(at | cron)` sets when the next session runs (`at` a time, or a cron with the
-  scheduler's minimum of 5 minutes); `campaign_achieved(evidence)` claims the outcome. All four are kind `meta`,
-  risk `safe`, except `campaign_schedule`, which carries `persistence` like `schedule_create`.
-- **It does not stop.** When a session ends and the campaign is `active`, the harness makes sure a next session is
-  scheduled: if the agent set none, `[agent] campaign_gap_minutes` (60) from now. The campaign's schedule is a normal
-  `ScheduleRecord` with `campaign_id` and the campaign's `options`; the scheduler starts the session with
-  `campaign_id` and the brief (`scheduler/runner.py:108-120`). A session that the daemon cut off is resumed by the
-  next session's brief, which says so. When the last session finished with `needs_from_user` set and every question
-  is unanswered, the next session waits for an answer or `[agent] campaign_wait_hours` (24), whichever comes first,
-  then runs anyway and tries another way. After `[agent] campaign_patience_sessions` (3) sessions without a `progress`
-  entry the brief says so and asks for a new strategy entry first.
-- **Verification, not a claim.** `campaign_achieved(evidence)` asks the goal checker (`agent/review.py:443`,
-  `goal_checker_for`) whether the targets are reached, from the targets, the verification method, the ledger's
-  `progress` entries with their numbers, the session's measured facts (`RunFacts`) and the evidence text. `achieved`:
-  status `achieved`, the schedule disabled, a `notify` to the owner, the campaign page shows the evidence. `continue`
-  or `blocked`: the call fails with the checker's reason and the session goes on. With item 16 on, the typed judge
-  answers first and only a likely claim reaches the review model. The owner can mark a campaign achieved by hand.
-- **Only the owner stops it.** `POST /api/campaigns/{id}/stop` and `dotx campaign stop ID` set `stopped` and disable
-  the schedule; a running session ends normally; `resume` sets it `active` again and schedules a session now. A stopped
-  or achieved campaign's thread stays.
-- **Budgets, opt-in.** `[agent] campaign_max_sessions = 0` (none); item 11's run budgets apply per session.
-- **UI and CLI.** A "Campaigns" view (`views/campaigns.js`): the list (title, status, sessions, next session, last
-  progress), a page per campaign (targets, the ledger with numbers, the sessions with links to their runs, the open
-  questions, Stop, Resume, Mark achieved). `dotx campaign list | show ID | stop ID | resume ID`. The run page of a
-  session carries a chip with the campaign and its session number.
+**Design** (corrected on 2026-10-09 against the code before building; the first draft gave each campaign a
+`ScheduleRecord`, which the scheduler skips when overdue and disables after a one-time firing, and which Settings ›
+Schedules and the `schedule_*` tools would have shown).
+- **The campaign.** Table `campaigns` (`store/db.py:97-106`): `id`, `title` (the goal's first 60 characters), `goal`,
+  `targets` and `verification` (set by the agent), `status` (`active`, `achieved`, `stopped`), `thread_id` (the owner's
+  conversation), `model`, `effort` and `approvals` of the opening session (a `yolo` campaign stays `yolo`), `cron` and
+  `next_session_at` (its own timing: no schedule), `created_at`, `updated_at`, `evidence`. The ledger is
+  `campaign_entries(id, campaign_id, run_id, ts, kind, text, numbers)`, `kind` one of `progress`, `setback`, `note`,
+  `strategy`, `question`, `numbers` a JSON object of measure to number. `runs.campaign_id` (`_ADDED_RUN_COLUMNS`,
+  `store/db.py:456`) makes a run a session; the count of sessions, the last progress and the last session are read from
+  the runs and the ledger, never stored twice.
+- **Starting one.** `StartRunRequest.standing` (`server/views.py:96`), the composer's switch *Keep going* (a task only;
+  goal mode hides while it is on) and `dotx run --standing` call `RunManager.start_campaign` (`agent/manager.py:171`):
+  a chat or research run, or goal mode asked for, is refused (422); the campaign is created and the opening session
+  starts in the owner's thread with the goal as its first message. A campaign whose opening session cannot start is
+  deleted again.
+- **A session.** A run with `campaign_id`, goal the campaign's goal, mode `task`, without goal mode, with the campaign's
+  model, effort and approvals. Every session after the first starts in a thread of its own, "<title> · session N", as
+  an unattended run (`SCHEDULE_SOURCE`), and its first message is the brief (`render_brief`, `agent/campaign.py:111`):
+  the goal; the targets and how they are verified, or that they are not set; the goals of the runs the owner started in
+  the campaign's conversation since (its instructions, which are also what the session's reviewer takes as the owner's
+  words); the newest strategy; the last 12 ledger entries with their numbers; the last 8 questions left for the owner
+  with their answers, skips or "unanswered since …"; how the last session ended (or that the daemon cut it off); and,
+  after `campaign_patience_sessions` sessions in a row without a progress entry, a call for a new strategy first. Only
+  one session of a campaign works at a time, in any process (`start_session`, `agent/manager.py:233`).
+- **The prompt.** A session's prompt has a `# Campaign` section instead of the open-ended goals (`_CAMPAIGN`,
+  `agent/prompt.py:129`; `_ending`, `:354`): session N, do not start from zero, record the targets while there are
+  none, write progress with numbers and evidence (and setbacks and strategies) with `campaign_note` before finishing,
+  not in the notes of the memory, verify before claiming, leave the owner a question only for what only they can give,
+  and finish when the session's work is done: the campaign goes on.
+- **Tools** (`tools/campaign.py`), all `meta` and `safe`, in the core group of a session and left out of every other
+  run (`agent/loop.py:873`): `campaign_targets(targets, verification)`; `campaign_note(kind, text, numbers)`;
+  `campaign_schedule(at | cron)`, which only moves the campaign's own next session (the scheduler's minimum interval
+  holds for a cron); `campaign_achieved(evidence)`. A session that wants to end while the campaign has no targets is
+  sent back once (`campaign_targets_reminder`, `agent/loop.py:1148`), after the plan reminder.
+- **It does not stop.** When a session ends, before its waiters wake (`_drive`, `agent/manager.py:825`;
+  `_follow_session`, `:834`), the next one is planned by `next_session_at` (`agent/campaign.py:159`): when a session
+  planned it (`campaign_schedule`, or the rhythm of a cron), then; after a session that ended with `needs_from_user` and
+  questions none of which is answered, `campaign_wait_hours` (24) later; else `campaign_gap_minutes` (60) later. An
+  answer to, or a skip of, a question of a session that has ended starts no run in its thread: it is kept for the next
+  brief and brings the next session to now (`decide`, `agent/manager.py:342`). The scheduler's tick starts every active
+  campaign whose next session is due and none of whose sessions works (`due_campaigns`, `store/db.py:1487`;
+  `scheduler/runner.py:83`), however late: a campaign's session is never skipped as overdue. When the daemon starts,
+  after the runs it resumes, every active campaign with no session planned and none working gets one now
+  (`resume_campaigns`, `server/daemon.py:160`). A session the daemon cut off is not resumed as a run (`can_resume`,
+  `agent/resume.py:102`): the next session's brief says it was cut off.
+- **Verification, not a claim.** `campaign_achieved` asks the goal checker (`goal_checker_for`, session key
+  "<thread>:campaign") with the goal, the targets and how they are verified, the progress entries of the ledger as the
+  digest, the facts the session's own calls measured (`ToolContext.facts`, `tools/context.py:60`) and the evidence as
+  the answer. `achieved`: the campaign is achieved with the evidence, the ledger notes the checker's reason and the
+  owner gets a notification (`Runtime.notify`, `core/notify.py:14`). `continue` or `blocked`: the call fails with the
+  checker's reason and the session goes on.
+- **Only the owner stops it.** `server/routes_campaigns.py`: `GET /api/campaigns`, `GET /api/campaigns/{id}`, `POST
+  …/stop` (409 when not active), `…/resume` (from stopped or achieved; 409 when active) and `…/achieved` (409 when
+  achieved), each noted in the ledger; stop and achieved also stop the campaign's session working in the daemon.
+  `dotx campaign list | show ID | stop ID | resume ID | achieved ID` change the store alone (`cli_campaign.py`), so a
+  session working then goes on until it ends and nothing follows it.
+- **UI.** Campaigns in the sidebar (`views/campaigns.js`): the list (title, status, sessions, the session working or
+  the next one, the newest progress with its numbers, active campaigns first) and a page per campaign (goal, targets,
+  how they are verified, the evidence once achieved, model, reasoning, approvals and tokens, the questions waiting for
+  the owner, the ledger, the sessions with links to their runs, the questions answered; Stop, Go on, Mark achieved). A
+  session's run page has a chip "Campaign · session N"; the timeline notes the targets reminder. The threads of the
+  sessions after the first are left out of the chat list (`list_thread_summaries`, `store/db.py:588`).
 
-**Touchpoints.** `store/db.py` (tables `campaigns`, `campaign_entries`, `runs.campaign_id`, `schedules.campaign_id`),
-`store/models.py`, new `agent/campaign.py` (pure: the brief, the patience and wait decisions, the next-session rule),
-new `tools/campaign.py`, `tools/groups.py`, `agent/prompt.py`, `agent/loop.py` (the brief as the opening, the
-send-back for missing targets, the end-of-session hook), `agent/manager.py`, `scheduler/plans.py`, `scheduler/runner.py`,
-`server/views.py`, new `server/routes_campaigns.py`, `cli.py` and a new `cli_campaign.py`, `views/campaigns.js`,
-`sidebar.js`, `runmodes.js` (the switch), `config.py`, `defaults.toml`, README (a "Campaigns" section).
+**Touchpoints.** `store/db.py`, `store/models.py`, `config.py`, `defaults.toml`, new `agent/campaign.py`, new
+`agent/campaign_control.py`, `agent/manager.py`, `agent/loop.py`, `agent/prompt.py`, `agent/resume.py`, new
+`tools/campaign.py`, `tools/context.py`, new `core/notify.py`, `tools/meta.py`, `runtime.py`, `scheduler/runner.py`,
+`server/daemon.py`, `server/views.py`, `server/routes_runs.py`, new `server/routes_campaigns.py`, `server/app.py`,
+`core/errors.py`, `cli.py`, new `cli_campaign.py`, `static/js/runmodes.js`, `views/runs.js`, new `views/campaigns.js`,
+`views/run.js`, `approvals.js`, `timeline.js`, `sidebar.js`, `main.js`, README ("Campaigns").
 
 **Decisions and limits.**
-- A campaign has no step limit and no end but the owner's: that is what was asked. The three opt-in numbers above are
-  the only brakes, and `dotx stats` shows what a campaign costs (item 9).
-- Sessions are new threads on purpose. The owner's conversation thread shows the opening session and is where they
-  talk to the campaign: a message sent there becomes an instruction of the next session (through the thread
-  instructions the brief carries, read from the campaign's `thread_id`).
+- A campaign has no step limit and no end but a verified outcome or the owner: that is what was asked. The brakes are
+  opt-in: `[agent] campaign_max_sessions` (0, none) stops a campaign after that many sessions (Go on gives it one
+  more), and item 11's `run_max_minutes` and `run_max_tokens` bound each session. The campaign's page shows the tokens
+  of its sessions and of the runs they delegated to.
+- Sessions are new threads on purpose: a bounded context, and the brief is the memory. The owner's conversation holds
+  the opening session and is where they talk to the campaign: what they start there is a run of its own (it does not
+  stop the campaign), and its goal is an instruction of the sessions after it. Stopping a session's run does not stop
+  the campaign; Stop on the campaign's page does.
 - Money and credentials: nothing new. A `yolo` campaign does them itself and records them; an `ask` campaign leaves
-  questions and waits for the owner at its sessions.
-- Live behavior cannot be tested here: the smoke tests use the scripted model and a scripted goal checker.
+  questions and its sessions go on without the answers.
+- A question of a session that is still working is answered into that session, as for any run; the page of the
+  campaign and of the session say what becomes of the answer.
+- Live behavior is not tested here: the smoke tests play the sessions and the goal check with the scripted model, and
+  no campaign has run with a real model.
 
-**Done when.** Unit tests of `agent/campaign.py` (brief rendering, the next-session rule, patience, the wait on
-unanswered questions); smoke with the scripted model: an opening session without `campaign_targets` is sent back,
-one with it ends and a schedule exists at `campaign_gap_minutes`; a session fires through the real scheduler on a
-throw-away daemon with a short gap, gets the brief, writes an entry, and a `campaign_achieved` with a scripted
-`achieved` verdict closes the campaign and disables the schedule, a `continue` verdict fails the call; stop and
-resume through the API; the Campaigns view checked in headless Chrome in both themes at 1280 and 390 px; `dotx
-campaign` on a throw-away home; README.
+**Done when.** Unit tests of `agent/campaign.py` (`tests/unit/test_campaign.py`: the first brief, a later brief with
+instructions, strategy, numbers, the three states of a question and the last session, a brief after a session the daemon
+cut off and too many sessions without progress, the next-session rule, the sessions without progress, the session
+number). Smoke with the scripted model (`tests/smoke/test_campaigns.py`): an opening session that wants to end without
+targets is sent back once, records them and a progress entry, ends, and the next session is planned at
+`campaign_gap_minutes`, while another run of the same daemon is offered no campaign tool and keeps the open-goal
+section; the real scheduler starts the second session in its own thread with the brief (targets, the ledger with its
+numbers, how session 1 ended), a `continue` verdict fails `campaign_achieved` with the checker's reason, an `achieved`
+one closes the campaign, clears its next session, notes the reason and notifies the owner once, and the session's thread
+is not a chat; a session the daemon cut off is not resumable, the daemon plans a session now when it starts again
+(once), and that session's brief says the last one was cut off; through the API, a standing research run or one with
+goal mode is refused (422), a standing task starts a campaign whose run detail carries the chip, the list and the page
+show it, and stop, resume and achieved work and refuse a second time (409), an unknown campaign is 404. Each of five
+mutations (no targets reminder, a `continue` accepted, no planning after a session, the campaign tools in every run, a
+session resumable) makes a smoke test fail. `dotx campaign` checked on a throw-away home; the list, a campaign's page,
+the run page of two sessions and the composer's switch checked in headless Chrome on a scripted throw-away daemon at
+1280 and 390 px in the light and the dark theme (no horizontal overflow, no "null", a clean console). README updated.
 
 ### 13. Faster browser and desktop steps
 

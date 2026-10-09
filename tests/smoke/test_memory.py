@@ -17,6 +17,7 @@ import httpx
 import pytest
 import pytest_asyncio
 
+from dotagent.agent.verify import new_facts
 from dotagent.config import AppConfig, load_config
 from dotagent.core.errors import ConfigError, ProviderAuthError, ProviderTransportError, StoreError
 from dotagent.core.paths import workspace_dir
@@ -371,6 +372,7 @@ async def _prepare(runtime: Runtime, name: str, arguments: JsonObject) -> tuple[
         gate=_Recorder(),
         cancel=asyncio.Event(),
         output_chars=runtime.config.agent.tool_output_chars,
+        facts=new_facts,
     )
     return await runtime.registry.tools[name].prepare(arguments, ctx), ctx
 

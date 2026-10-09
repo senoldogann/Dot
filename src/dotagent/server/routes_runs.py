@@ -10,6 +10,7 @@ from fastapi.responses import StreamingResponse
 
 from dotagent.agent.aside import AsideAnswer, answer_aside
 from dotagent.agent.attachments import StoredAttachment, load_attachments, store_attachment
+from dotagent.agent.campaign import session_number
 from dotagent.agent.lessons import run_lessons
 from dotagent.core.errors import InvalidValueError
 from dotagent.llm.router import parse_model_ref
@@ -20,6 +21,7 @@ from dotagent.server.views import (
     ApprovalsQuery,
     AsideRequest,
     AttachmentUpload,
+    CampaignChip,
     DecisionRequest,
     EventsQuery,
     RunDetail,
@@ -29,12 +31,22 @@ from dotagent.server.views import (
     StreamQuery,
 )
 from dotagent.store.db import Store
-from dotagent.store.models import ApprovalRecord, EventRecord, RunRecord
+from dotagent.store.models import ApprovalRecord, CampaignRecord, EventRecord, RunRecord
 
 
 def runs_router(ctx: ServerContext) -> APIRouter:
     router: APIRouter = APIRouter(prefix="/api")
     store: Store = ctx.runtime.store
+
+    async def campaign_of(run: RunRecord) -> CampaignChip | None:
+        if run.campaign_id is None:
+            return None
+        campaign: CampaignRecord = await store.get_campaign(run.campaign_id)
+        return CampaignChip(
+            id=campaign.id,
+            title=campaign.title,
+            session=session_number(await store.campaign_sessions(campaign.id), run.id),
+        )
 
     async def detail(run_id: str) -> RunDetail:
         # A run's end is stored before it stops being active, so a run read after it was seen not to be active is read
@@ -48,6 +60,7 @@ def runs_router(ctx: ServerContext) -> APIRouter:
             resumable=await ctx.manager.resumable(run),
             lessons=await run_lessons(store, run_id),
             questions=await store.list_left_questions(run_id),
+            campaign=await campaign_of(run),
         )
 
     @router.get("/runs")
@@ -56,8 +69,22 @@ def runs_router(ctx: ServerContext) -> APIRouter:
 
     @router.post("/runs", status_code=201)
     async def start_run(request: StartRunRequest) -> RunRecord:
+        """Start a run, or with ``standing`` a campaign whose opening session the returned run is."""
         if request.model is not None:
             parse_model_ref(request.model)
+        files: tuple[StoredAttachment, ...] = await load_attachments(ctx.runtime.workspace, request.attachments)
+        if request.standing:
+            return await ctx.manager.start_campaign(
+                request.goal,
+                request.mode,
+                request.model,
+                request.thread_id,
+                UI_SOURCE,
+                request.effort,
+                request.approvals,
+                request.goal_mode,
+                files,
+            )
         return await ctx.manager.start(
             request.goal,
             request.mode,
@@ -68,7 +95,7 @@ def runs_router(ctx: ServerContext) -> APIRouter:
             request.effort,
             request.approvals,
             request.goal_mode,
-            await load_attachments(ctx.runtime.workspace, request.attachments),
+            files,
         )
 
     @router.get("/runs/{run_id}")

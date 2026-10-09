@@ -5,7 +5,7 @@
 // moment it ended, so the groups of a run add up to the time the run took; the part of that time the model's turns took is
 // in brackets, "Worked for 12 s (model 8 s)".
 
-import { approvalCard, fromEvent } from "./approvals.js";
+import { approvalCard, fromEvent, LEFT_IN_RUN } from "./approvals.js";
 import { sentFiles } from "./attachments.js";
 import { clip, compact, dateTimeFull, duration, el, plural } from "./dom.js";
 import { icon } from "./icons.js";
@@ -425,7 +425,7 @@ export function createTimeline({ rootRunId, startedAt, onGrow, onPlan, onStats, 
     },
 
     approval_requested(scope, record) {
-      const card = approvalCard({ approval: fromEvent(record.run_id, record.data), heading: null, onSettled: () => undefined });
+      const card = approvalCard({ approval: fromEvent(record.run_id, record.data), heading: null, onSettled: () => undefined, leftNote: LEFT_IN_RUN });
       cards.set(record.data.approval_id, { card, scope });
       place(scope, card.node, record.ts);
       markWaiting(scope, true);
@@ -511,6 +511,11 @@ export function createTimeline({ rootRunId, startedAt, onGrow, onPlan, onStats, 
     plan_reminder(scope, record) {
       const numbers = record.data.open_steps.join(", ");
       note(scope, record.ts, "list", `Dot wanted to finish with plan steps ${numbers} still open and was asked to close them first`, "warn");
+    },
+
+    // A session of a campaign wanted to end while the campaign had no targets: it was sent back once to record them.
+    campaign_targets_reminder(scope, record) {
+      note(scope, record.ts, "target", "Dot wanted to end the session before the campaign had targets and was asked to record them first", "warn");
     },
 
     // The run reached a limit of [agent] run_max_minutes or run_max_tokens: it was told to finish, and its next reply ends it.

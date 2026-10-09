@@ -79,7 +79,7 @@ async def room(tmp_path: Path) -> AsyncIterator[Room]:
         bus: EventBus = EventBus(store)
         thread: ThreadRecord = await store.create_thread("approval modes", "test")
         run: RunRecord = await store.create_run(
-            thread.id, INSTRUCTION, "task", "ollama:none", None, "test", "medium", "ask", False
+            thread.id, INSTRUCTION, "task", "ollama:none", None, "test", "medium", "ask", False, None
         )
         yield Room(store=store, bus=bus, broker=ApprovalBroker(store, bus, WAIT_S), run=run)
     finally:

@@ -17,6 +17,7 @@ import pytest
 import pytest_asyncio
 
 from dotagent.agent.prompt import build_system_prompt, collect_prompt_inputs
+from dotagent.agent.verify import new_facts
 from dotagent.config import load_config
 from dotagent.core.paths import workspace_dir
 from dotagent.core.types import JsonObject
@@ -132,6 +133,7 @@ async def _call(runtime: Runtime, name: str, arguments: JsonObject) -> tuple[Too
         gate=_Recorder(),
         cancel=asyncio.Event(),
         output_chars=runtime.config.agent.tool_output_chars,
+        facts=new_facts,
     )
     prepared = await runtime.registry.tools[name].prepare(arguments, ctx)
     return await prepared.run(ctx), prepared.action
@@ -194,6 +196,7 @@ async def test_the_prompt_lists_the_skills_and_tells_the_model_to_read_one_first
             [],
             list(runtime.registry.tools),
             catalog.skills,
+            None,
         )
     )
     assert "# Skills" in prompt

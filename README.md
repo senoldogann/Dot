@@ -397,6 +397,7 @@ for `approval_timeout_s` at most. A run you started in `ask` or `auto` always wa
 still fails after its retries; in goal mode by the goal check giving up; at a limit of minutes or tokens you set; or
 when you stop it. With `verify_answer_paths = true` in `[agent]`, a successful end whose answer names paths that do not
 exist is sent back once before it is accepted, and before goal mode checks it (see [How a run works](#how-a-run-works)).
+A goal that should go on across runs and days until its outcome is verified is a campaign (see [Campaigns](#campaigns)).
 
 **Limits of a run.** `run_max_minutes` and `run_max_tokens` in `[agent]` bound a task or research run; 0, the default,
 is no limit, and a chat turn has none. The minutes are the run's wall time, waits for your approvals and answers
@@ -827,6 +828,48 @@ defaults: a run cannot schedule itself into another approval mode.
   for the next.
 - A cron expression may not fire more often than every `min_interval_s`; at most `max_schedules` schedules can be on.
 
+## Campaigns
+
+```bash
+dotx run --standing "Collect 50 leads of Berlin design studios with a name and an e-mail address into ~/leads.csv"
+dotx campaign list
+dotx campaign show ID
+dotx campaign stop|resume|achieved ID
+```
+
+A campaign is a task that Dot keeps working on until its outcome is verified or you stop it. Switch on **Keep going** in
+the composer (it is there for a task), or pass `--standing` to `dotx run`. The run you start is its first session, in
+your conversation; the daemon runs the sessions after it, each a run in a thread of its own, through restarts and days.
+
+- **Targets.** The first session records the campaign's targets and how a session verifies them (`campaign_targets`). A
+  session that wants to end while the campaign has no targets is sent back once to record them.
+- **The ledger and the brief.** Each session writes what it did, with numbers and evidence, in the campaign's ledger
+  (`campaign_note`: progress, setback, strategy, question or note). The next session opens with a brief instead of a
+  conversation: the goal, the targets, what you wrote in the campaign's conversation since it started, the newest
+  strategy, the last 12 entries of the ledger, the questions left for you and what became of them, and how the last
+  session ended. The prompt of a session says to write its progress there, not in the notes of the memory.
+- **The next session** starts `campaign_gap_minutes` (60) after the last one ended, unless a session planned it with
+  `campaign_schedule` (a moment, or a cron rhythm). A session that ended needing you, with none of its questions
+  answered, is followed after `campaign_wait_hours` (24) instead; your answer, or your skip, starts the next session
+  right away, and its brief carries it. After `campaign_patience_sessions` (3) sessions in a row without a progress
+  entry, the brief asks for a new strategy first. All four live in `[agent]`.
+- **Only a verified outcome ends it.** `campaign_achieved` asks the goal checker (the review model) whether the targets
+  are reached, from the targets and how they are verified, the progress in the ledger, what the session's own calls
+  measured and the session's evidence. Refused, the call fails with the checker's reason and the session goes on;
+  accepted, the campaign is achieved and you get a notification.
+- **Only you stop it.** Campaigns, in the sidebar, lists them; a campaign's page shows its targets, the questions
+  waiting for you, its ledger and its sessions, with Stop (which also stops a session working then), Go on and Mark
+  achieved.
+  `dotx campaign` changes the campaign without the daemon, so a session working then goes on until it ends.
+  `campaign_max_sessions` (0: no limit) stops a campaign after that many sessions; Go on gives it one more.
+
+Every session runs with the model, reasoning level and approval mode the campaign started with, and without goal mode:
+the campaign's own check takes its place, so starting one with goal mode on is refused. A run's limits
+(`run_max_minutes`, `run_max_tokens`) apply to each session. Sessions run only while the daemon runs; one the daemon cut
+off is not resumed as a run: the next session starts once the daemon is back, and its brief says the last one was cut
+off. The threads of the sessions after the first are not in the chat list; the campaign's page links them. What you
+write in the campaign's conversation is an instruction of the sessions after it.
+
 ## MCP servers
 
 Dot can use the tools of [MCP](https://modelcontextprotocol.io) servers that it starts itself over stdio, or reaches
@@ -1001,6 +1044,10 @@ src/dotagent/
   concurrency limits (`max_concurrent_runs`) and, when you set them, `run_max_minutes` and `run_max_tokens`. Without
   `stall_escalation` and without those limits, a run that varies its steps without getting anywhere ends only when you
   stop it.
+- A campaign has no end but a verified outcome or you: by default a session every hour, each costing what a run
+  costs. What bounds it is Stop, `campaign_max_sessions` and the limits of each session; its page shows the tokens of
+  its sessions. The tests play the sessions and the goal check with the scripted model: no campaign has run with a real
+  model here.
 - Resuming: in goal mode, the goal check of a resumed run judges from what the resumed run did, not from the steps of
   the run it resumes. The conversation shows every call of the step that was cut off as interrupted, also the ones that
   finished; the first message of the resumed run says which finished. A run of `dotx run` works in its own process, but

@@ -19,6 +19,7 @@ from pathlib import Path
 import pytest
 import pytest_asyncio
 
+from dotagent.agent.verify import new_facts
 from dotagent.config import load_config
 from dotagent.core.errors import DotError, WebError, WebTransportError
 from dotagent.core.paths import workspace_dir
@@ -181,6 +182,7 @@ async def _call(runtime: Runtime, name: str, arguments: JsonObject) -> tuple[Too
         gate=_Recorder(),
         cancel=asyncio.Event(),
         output_chars=runtime.config.agent.tool_output_chars,
+        facts=new_facts,
     )
     prepared = await runtime.registry.tools[name].prepare(arguments, ctx)
     return await prepared.run(ctx), prepared.action
