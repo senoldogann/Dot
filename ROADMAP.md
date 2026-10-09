@@ -1096,8 +1096,8 @@ tool calls (`:911-949`), so a status line written mid-run counted toward the end
 
 **Design** (corrected from the code before building; the first draft moved the browser's check in front of the batch,
 kept left questions `pending`, fed answers to the thread's instructions and continued through the resume path. The code
-does not allow the last three: the instructions are the goals of the thread's runs, `agent/manager.py:499-510`; the
-resume path takes only a run the daemon cut off, `:357-359`; the daemon expires every pending approval when it starts,
+does not allow the last three: the instructions are the goals of the thread's runs, `agent/manager.py:501-512`; the
+resume path takes only a run the daemon cut off, `:359-361`; the daemon expires every pending approval when it starts,
 `:105`).
 - **The run's approval mode reaches the tools.** `ToolContext` (`tools/context.py:42`) gets `approvals: ApprovalMode`
   and `questions: QuestionMode`, both required and set where a context is built (`agent/loop.py:813-825`,
@@ -1154,27 +1154,28 @@ resume path takes only a run the daemon cut off, `:357-359`; the daemon expires 
   only when `ask_user` is among the run's tools); a scheduled run whose questions are left loses "Do not ask questions"
   (`:204-212`, `:277`). `wait`, and every `ask` or `auto` run the owner started, behave as before.
 - **The answer carries the work on.** A `left` question is decided like any other (`POST /api/approvals/{id}/decision`,
-  through `RunManager.decide`, `agent/manager.py:193-210`; `ApprovalBroker.resolve`, `agent/approvals.py:131`, accepts
+  through `RunManager.decide`, `agent/manager.py:193-211`; `ApprovalBroker.resolve`, `agent/approvals.py:131`, accepts
   `left` as well as `pending` and emits `approval_decided` for it); an empty answer is refused (422). It is never
   expired (the daemon's start expires `pending` only, `store/db.py:979-986`) and `dotx prune` does not touch approvals.
-  Skip denies it and nothing else happens. An answer goes to the thread as the owner's message, "Answer to your
-  question “…”: …" (`_carry_on`, `agent/manager.py:316-352`): into the thread's active run, which reads it before its
-  next step, also when it comes during the step that ends the run (`agent/loop.py:1010-1015`); or, when no run is
-  active on the thread, as the goal of a new run on it with the mode, model, effort, approvals and goal mode of the run
-  that asked. Once a run's end is being recorded it reads nothing more: the manager shuts its inbox
-  (`agent/manager.py:572`), so a message sent then is refused like one to a run that has ended (409, `steer`,
+  Skip denies it and nothing else happens. An answer goes to the thread as the owner's message, "Answer to your question
+  “…”: …" (`_carry_on`, `agent/manager.py:317-354`): into the thread's active run, which reads it before its next step,
+  also when it comes during the step that ends the run (`agent/loop.py:1010-1015`); or, when no run is active on the
+  thread, as a new run on it whose goal is the goal of the run that asked with the answer under it, so its goal check,
+  the task its continuity note pins and its title keep that task, with the mode, model, effort, approvals and goal mode
+  of the run that asked. Once a run's end is being recorded it reads nothing more: the manager shuts its inbox
+  (`agent/manager.py:574`), so a message sent then is refused like one to a run that has ended (409, `steer`,
   `:183-191`), and an answer waits for the end and starts the next run; an answer the run never read, because it was
   stopped, failed or cut off first, stays in the thread as the owner's message for the next run (`_keep_answers`,
-  `:586`). Either way the answer is among what the reviewer reads as the owner's words (`agent/loop.py:865-872`,
-  `agent/manager.py:499-510`). While a run of another process (`dotx run`) works on the thread, the answer is refused
+  `:588`). Either way the answer is among what the reviewer reads as the owner's words (`agent/loop.py:865-872`,
+  `agent/manager.py:501-512`). While a run of another process (`dotx run`) works on the thread, the answer is refused
   (409, `RunConflict`) and the question stays `left`: only that process can steer its run. The answer is delivered
   before the question is decided, under one lock, so an answer that cannot be delivered leaves the question open and a
-  question is answered once. The run page lists the run's open left questions above the composer ("Dot asked you",
-  from the new `questions` of `GET /api/runs/{id}`, which the index `approvals_run` serves, `store/db.py:74`), during
-  the run and after it; once the last open one is answered and the answer started a run, the page follows that run, and
-  a question answered elsewhere (another tab, `dotx`, the API) leaves the list through the run's `approval_decided`. The
-  timeline shows each question as a line where it was asked. `dotx run` prints a left question when it is left and
-  lists the open ones after the answer. An eval run counts left questions among its `unanswered_questions`
+  question is answered once. The run page lists the run's open left questions above the composer ("Dot asked you", from
+  the new `questions` of `GET /api/runs/{id}`, which the index `approvals_run` serves, `store/db.py:74`), during the run
+  and after it; once the last open one is answered and the answer started a run, the page follows that run, and a
+  question answered elsewhere (another tab, `dotx`, the API) leaves the list through the run's `approval_decided`. The
+  timeline shows each question as a line where it was asked. `dotx run` prints a left question when it is left and lists
+  the open ones after the answer. An eval run counts left questions among its `unanswered_questions`
   (`evals/metrics.py:15`, `:49`).
 - **The end of a run counts only consecutive text replies.** A step with tool calls sets `nudges` back to 0, unless all
   its calls left questions (`_acts`, `agent/loop.py:220-223`, at `:935-936`): `finish_nudges + 1` text-only replies in
@@ -1218,19 +1219,21 @@ resume path takes only a run the daemon cut off, `:357-359`; the daemon expires 
 - `agent/attachments.py`: `UserInput.question_id`. `agent/manager.py`: `RunManager.decide`, `_carry_on` and
   `_keep_answers`; a run's inbox shuts when its end is being recorded. `server/routes_runs.py`: the decision route goes
   through `decide`, and the run's detail has `questions` (`RunDetail.questions`, `server/views.py`).
-- `cli_ui.py`: the `question_left` line and `show_open_ends` (what Dot needs from you, from `run_finished`, and the open
-  questions), printed by `dotx run` and `dotx resume` after the answer (`cli.py`). `evals/metrics.py`: `question_left`
-  counts as an unanswered question.
+- `cli.py`: `follow_run` stops the run on SIGHUP and SIGTERM as on Ctrl-C. `cli_ui.py`: the `question_left` line and
+  `show_open_ends` (what Dot needs from you, from `run_finished`, and the open questions), printed by `dotx run` and
+  `dotx resume` after the answer (`cli.py`). `evals/metrics.py`: `question_left` counts as an unanswered question.
 - Web UI: `approvals.js` (a left question's card, "Dot asked you"; an empty answer is not sent; a card leaves out the
   parts it does not have instead of printing "null"), `timeline.js` (the line "Dot asked you “…” and went on without
   the answer" and the "What Dot needs from you" box under the answer, from `run_finished`), `views/run.js` (the run's
   open questions above the composer; the page follows the run that the answer to the last open one started; a question
   answered elsewhere leaves the list), `views/rules.js` (what a `yolo` run goes past), `app.css`.
 - Tests: `tests/smoke/test_left_questions.py` (9), `tests/smoke/test_secret_fields.py` (6, a real headless Chrome),
-  `tests/smoke/test_approval_modes.py` (a hand-off rule stops a `yolo` run), `tests/smoke/test_evals_runner.py` (an
-  eval run's question is left or declined, and counted), `tests/unit/test_secret_fields.py` (23),
-  `tests/unit/test_desktop_secrets.py` (7), `tests/unit/test_run_modes.py` (2 more); the asking test of
-  `tests/smoke/test_resume.py` sets `questions = "wait"`, as a `yolo` run now leaves its question.
+  `tests/smoke/test_approval_modes.py` (a hand-off rule stops a `yolo` run), `tests/smoke/test_cli_run_end.py` (2, a
+  real signal to a `dotx run` of the scripted model, `tests/fixtures/dot_cli_run.py`),
+  `tests/smoke/test_evals_runner.py` (an eval run's question is left or declined, and counted),
+  `tests/unit/test_secret_fields.py` (23), `tests/unit/test_desktop_secrets.py` (7), `tests/unit/test_run_modes.py` (2
+  more); the asking test of `tests/smoke/test_resume.py` sets `questions = "wait"`, as a `yolo` run now leaves its
+  question.
 
 **How to use it.**
 ```
@@ -1250,16 +1253,16 @@ thread, the answer is refused until it has ended.
 - Nothing here lets `ask` or `auto` do more: their secret fields are refused as before, and their questions wait.
 - A left question is still a question: a run that cannot go on without the answer ends honestly (`success = false`, the
   need in `needs_from_user`), and the answer starts the next run on the thread.
-- An answer that starts a run is that run's goal, as a follow-up message is: the goal check, the task the continuity
-  note pins and the run's title see the question and the answer, and the original task is in the thread before them.
 - In `yolo`, the text a run types into a secret field is in its `tool_call` event like any argument; it is what the run
   read in a mailbox or got from the owner, which the store holds already.
 - A left question shows only on its run's page and in `dotx run`: it holds nothing, so no notification, tab title or
   approvals list counts it (`question_left` is not a lifecycle kind, `server/stream.py:22-24`).
 - An answer delivered to a working run clears its untrusted mark, as every message of the owner does
   (`agent/loop.py:871`).
-- A `dotx run` that was killed leaves its run `running` until the daemon starts again; until then an answer to a
-  question on its thread is refused (409), as while such a run works.
+- A `dotx run` stops its run when its terminal closes (SIGHUP) or it gets SIGTERM, as on Ctrl-C (`follow_run`,
+  `cli.py:582`), so the run's end is recorded; one that is killed outright (SIGKILL) or crashes leaves its run `running`
+  until the daemon starts again, and until then an answer to a question on its thread is refused (409), as while such a
+  run works.
 - Messages from the composer that a run did not read before it ended are dropped, as before; only answers are kept.
 - The one-time code of the 2026-10-09 run would now be read from the webmail tab and typed, with a `credential` yolo
   approval in the timeline. That flow is not run live here: it is the owner's check (decision 12).
@@ -1271,28 +1274,30 @@ thread, the answer is refused until it has ended.
 - Found, not changed (all older than this item): a paste through a desktop app's Edit menu is not checked against
   secure fields, only Command-V is; `desktop_open_app` opens a password manager before it refuses to go on with it
   (`desktop/session.py:525-526`); the composer's follow-up sends the run's reasoning level, which `start` refuses for a
-  model that offers fewer than two (`views/run.js:380`, `agent/manager.py:511-518`); a follow-up message from the web
+  model that offers fewer than two (`views/run.js:380`, `agent/manager.py:513-520`); a follow-up message from the web
   UI on a thread that a `dotx run` of another process works on starts a second run there (`_claim_thread` sees only the
-  daemon's own runs, `agent/manager.py:423-428`).
+  daemon's own runs, `agent/manager.py:425-430`).
 
 **Done when.** Smoke tests with the scripted model (`tests/smoke/test_left_questions.py`): a `yolo` run of the web UI
 and a scheduled `ask` run leave their question at once, the record `left`, the run never `blocked`, and the answer after
-the end starts one run on the thread whose goal carries it, with the asking run's settings; an empty answer is refused;
-an answer while the run works is steered into it, and one sent during the run's last step is read before it ends; an
-answer that a stopped run did not read stays in its thread; an `ask` run waits as before; a task run that writes text
-between tool steps is not ended by it, and one that only leaves questions between text replies still ends; an answer is
-refused while a run of another process works on the thread. Browser smoke on fixture pages
-(`tests/smoke/test_secret_fields.py`): a one-time-code field whose label names nothing secret is refused in `ask` and
-filled in `yolo`, the form sent with the code, with the `credential` approval recorded; in `ask` the code is refused
-whatever element the step names (a fill of its label, a type or a press at a heading after focusing the field, a press
-without a target). A hand-off rule of the owner stops a `yolo` run (`tests/smoke/test_approval_modes.py`); an eval run's
-question is left or declined and counted (`tests/smoke/test_evals_runner.py`). Unit tests: the prompt of `yolo` differs
-from that of `ask` only in the secrets line and the approvals line, and the left-questions line comes only with left
-questions (`tests/unit/test_run_modes.py`); a field's marking, kind and flag, and the keys that put text in
+the end starts one run on the thread whose goal is the asking run's goal with the answer under it, with the asking run's
+settings; an empty answer is refused; an answer while the run works is steered into it, and one sent during the run's
+last step is read before it ends; an answer that a stopped run did not read stays in its thread; an `ask` run waits as
+before; a task run that writes text between tool steps is not ended by it, and one that only leaves questions between
+text replies still ends; an answer is refused while a run of another process works on the thread. Browser smoke on
+fixture pages (`tests/smoke/test_secret_fields.py`): a one-time-code field whose label names nothing secret is refused
+in `ask` and filled in `yolo`, the form sent with the code, with the `credential` approval recorded; in `ask` the code
+is refused whatever element the step names (a fill of its label, a type or a press at a heading after focusing the
+field, a press without a target). A hand-off rule of the owner stops a `yolo` run
+(`tests/smoke/test_approval_modes.py`); an eval run's question is left or declined and counted
+(`tests/smoke/test_evals_runner.py`); a `dotx run` told to end by SIGHUP or SIGTERM records its run as cancelled
+(`tests/smoke/test_cli_run_end.py`; without the handlers both leave the run `running`). Unit tests: the prompt of `yolo`
+differs from that of `ask` only in the secrets line and the approvals line, and the left-questions line comes only with
+left questions (`tests/unit/test_run_modes.py`); a field's marking, kind and flag, and the keys that put text in
 (`tests/unit/test_secret_fields.py`, `tests/unit/test_desktop_secrets.py`). The tests of the answer during the last
 step, of the answer a stopped run did not read, of the run that only leaves questions, of the hand-off rule and the four
 `ask` cases each fail without their fix. All true; also clean: ruff format and check, mypy, the unit tests (515), `dotx
-eval check` (25 tasks) and the offline smoke suite (196, with the tests that call a cloud model through Ollama left out;
+eval check` (25 tasks) and the offline smoke suite (198, with the tests that call a cloud model through Ollama left out;
 no cloud model was called for this item); the run page checked on a scripted throw-away daemon at desktop width and at
 375 px (the left questions, the needs box, an empty answer kept back, a skip and an answer through the API that leave
 the page where it is, the last answer steered into the run the previous one started and the page following it, no "null"
@@ -2015,3 +2020,10 @@ on and is closed by `terminal_close`; the idle reaper; unit tests of the ANSI st
   restarts; an answer that starts a run is its goal, as a follow-up is. Found and left: a paste through a desktop Edit
   menu, `desktop_open_app` opening a password manager before it refuses it, the composer's reasoning level for a model
   without a choice of levels.
+- 2026-10-09: item 10 follow-ups, two findings of the item's review applied at the owner's request after the merge.
+  `dotx run` (and `dotx chat`, `dotx resume`) stops its run on SIGHUP and SIGTERM as on Ctrl-C, so a closed terminal no
+  longer leaves the run `running` and the answers on its thread refused until the daemon restarts (a run killed outright
+  still does); an answer that starts a run puts the asking run's goal first, so that run's goal check, the task its
+  continuity note pins and its title keep the task. Unit tests (515), `dotx eval check` and the offline smoke suite
+  (198, with the new signal test, which fails without the handlers) clean; no cloud model called. The paste through a
+  desktop Edit menu stays found and left.
