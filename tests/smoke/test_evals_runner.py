@@ -101,9 +101,7 @@ async def test_a_run_that_writes_the_wrong_thing_but_says_it_is_done_fails_and_c
     assert card.false_successes == 1
 
 
-async def test_a_question_nobody_can_answer_is_refused_and_counted(
-    config: AppConfig, login_env: dict[str, str]
-) -> None:
+async def test_a_question_nobody_can_answer_is_left_and_counted(config: AppConfig, login_env: dict[str, str]) -> None:
     asking: EvalTask = _with_reference(
         "read-config-port",
         [

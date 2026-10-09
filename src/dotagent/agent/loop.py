@@ -56,6 +56,7 @@ from dotagent.agent.progress import (
     limits_for,
     new_watch,
     nudge_note,
+    question_mode,
     replan_note,
     restriction_for,
     stop_result,
@@ -116,6 +117,7 @@ from dotagent.llm.types import (
 )
 from dotagent.memory.render import render_note
 from dotagent.memory.service import prompt_memories
+from dotagent.policy.types import QuestionMode
 from dotagent.runtime import Runtime
 from dotagent.skills.catalog import load_skills
 from dotagent.skills.types import SkillCatalog
@@ -756,6 +758,8 @@ async def run_agent(agent: AgentRun) -> RunEnd:
     if remembered:
         await runtime.store.mark_memories_used([record.id for record in remembered], memory_seen_at)
         await runtime.bus.emit(run.id, "memories", {"ids": [record.id for record in remembered]}, True)
+    can_ask: bool = can_ask_user(run.source, run.parent_run_id, run.approvals)
+    questions: QuestionMode = question_mode(config.questions, can_ask)
     system: Message = system_message(
         build_system_prompt(
             collect_prompt_inputs(
@@ -763,6 +767,7 @@ async def run_agent(agent: AgentRun) -> RunEnd:
                 run.source,
                 runtime.config.policy.preset,
                 run.approvals,
+                questions,
                 run.goal_mode,
                 runtime.workspace,
                 [render_note(record) for record in remembered],
@@ -795,6 +800,8 @@ async def run_agent(agent: AgentRun) -> RunEnd:
         run_id=run.id,
         thread_id=run.thread_id,
         mode=run.mode,
+        approvals=run.approvals,
+        questions=questions,
         workspace=runtime.workspace,
         gate=agent.gate,
         cancel=agent.cancel,
@@ -821,7 +828,6 @@ async def run_agent(agent: AgentRun) -> RunEnd:
     ledger: RunLedger = new_ledger(run.goal)
     facts: RunFacts = new_facts()
     limits: Limits = limits_for(config)
-    can_ask: bool = can_ask_user(run.source, run.parent_run_id, run.approvals)
     ladder: tuple[Rung, ...] = ladder_for(config.stall_escalation, can_ask)
     consultant: ProgressConsultant = progress_consultant_for(
         runtime.router,
@@ -910,6 +916,8 @@ async def run_agent(agent: AgentRun) -> RunEnd:
         ended: RunOutcome | None = None
         if reply.tool_calls:
             used_tools = True
+            # Only text replies in a row end a task run; a step that acts starts the count again.
+            nudges = 0
             outcomes: list[ToolOutcome] = await execute_calls(
                 reply.tool_calls, registry, hidden, context, agent.gate, config.parallel_tools
             )

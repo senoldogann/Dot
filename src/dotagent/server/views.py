@@ -12,7 +12,15 @@ from dotagent.desktop.perms import Pane
 from dotagent.llm.types import Effort
 from dotagent.policy.types import ApprovalMode
 from dotagent.secrets import SecretSource
-from dotagent.store.models import ApprovalStatus, Behavior, MemoryRecord, RunMode, RunRecord, ScheduleRecord
+from dotagent.store.models import (
+    ApprovalRecord,
+    ApprovalStatus,
+    Behavior,
+    MemoryRecord,
+    RunMode,
+    RunRecord,
+    ScheduleRecord,
+)
 
 _GOAL_CHARS: int = 50_000
 _TEXT_CHARS: int = 20_000
@@ -180,13 +188,15 @@ class KeyRequest(FrozenModel):
 class RunDetail(FrozenModel):
     """A run as its page shows it. ``resumable`` is true when the daemon cut the run off and a new run can go on from
     where it stopped (see ``agent.resume``); ``lessons`` is what became of the lessons drawn from the run once it ended,
-    ``None`` when none were (see ``agent.lessons``)."""
+    ``None`` when none were (see ``agent.lessons``); ``questions`` are the questions the run left for the user that are
+    still open, oldest first."""
 
     run: RunRecord
     children: list[RunRecord]
     active: bool
     resumable: bool
     lessons: RunLessons | None
+    questions: list[ApprovalRecord]
 
 
 class MemoryPage(FrozenModel):

@@ -66,6 +66,7 @@ from dotagent.browser.types import (
     FindResult,
     PageView,
     Screenshot,
+    SecretFieldCheck,
     Step,
     StepReport,
     TabSummary,
@@ -789,7 +790,7 @@ class BrowserSession:
             return Screenshot(url=tab.page.url, width=viewport.width, height=viewport.height, data=data)
 
     async def _run_steps(
-        self, thread: ThreadTabs, tab: Tab, steps: Sequence[Step]
+        self, thread: ThreadTabs, tab: Tab, steps: Sequence[Step], secret_field: SecretFieldCheck
     ) -> tuple[list[StepReport], str | None]:
         config: BrowserConfig = self._config
         reports: list[StepReport] = []
@@ -801,7 +802,7 @@ class BrowserSession:
                 continue
             before: _Watch = self._watch(thread, tab)
             try:
-                await run_step(tab.page, step, _ms(config.action_timeout_s))
+                await run_step(tab.page, step, _ms(config.action_timeout_s), secret_field)
             except BrowserError as error:
                 reports.append(
                     StepReport(index=index, description=description, outcome="failed", detail=_error_detail(error))
@@ -824,13 +825,16 @@ class BrowserSession:
         if pending:
             await asyncio.wait(pending, timeout=_POPUP_WAIT_S)
 
-    async def act(self, thread_id: str, steps: Sequence[Step], accept_confirms: bool) -> ActOutcome:
-        """Run the steps in order against the latest snapshot; stop at the first failure or surprise."""
+    async def act(
+        self, thread_id: str, steps: Sequence[Step], accept_confirms: bool, secret_field: SecretFieldCheck
+    ) -> ActOutcome:
+        """Run the steps in order against the latest snapshot; stop at the first failure or surprise. ``secret_field``
+        decides what a step does at a field that takes a secret: a step it refuses fails and stops the batch."""
         async with self._locked(thread_id) as thread:
             tab: Tab = await self._current_tab(thread)
             tab.accept_confirms = accept_confirms
             try:
-                reports, stopped = await self._run_steps(thread, tab, steps)
+                reports, stopped = await self._run_steps(thread, tab, steps, secret_field)
             finally:
                 tab.accept_confirms = False
             current: Tab = await self._current_tab(thread)

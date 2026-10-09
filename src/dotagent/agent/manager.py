@@ -36,7 +36,7 @@ from dotagent.store.endings import (
     RESULT_SHUTDOWN,
     RESULT_STOPPED,
 )
-from dotagent.store.models import EventRecord, RunMode, RunRecord, RunStatus, ThreadRecord
+from dotagent.store.models import ApprovalRecord, EventRecord, RunMode, RunRecord, RunStatus, ThreadRecord
 from dotagent.tools.context import DelegateOutcome
 from dotagent.tools.delegate import DELEGATE_SOURCE
 
@@ -48,6 +48,8 @@ _RESULT_CHARS: int = 20_000
 _REFUSED_RESULT_CHARS: int = 200
 # The earlier runs of a thread whose goals count as the user's instructions to a reviewer.
 _THREAD_INSTRUCTION_RUNS: int = 30
+# The statuses of a run that has not ended.
+_WORKING: frozenset[RunStatus] = frozenset({"queued", "running", "blocked"})
 
 
 @dataclass(frozen=True)
@@ -86,6 +88,8 @@ class RunManager:
         self._learning: dict[str, asyncio.Task[None]] = {}
         # Held while a lesson is saved or dismissed, by the owner or by ``auto``, so that each is decided once.
         self._deciding: asyncio.Lock = asyncio.Lock()
+        # Held while an approval or a question is decided, so that the answer to a question a run left goes on once.
+        self._answering: asyncio.Lock = asyncio.Lock()
 
     async def recover(self) -> int:
         """Close out what a previous process left behind. Returns the number of interrupted runs."""
@@ -171,6 +175,23 @@ class RunManager:
     def steer(self, run_id: str, text: str, files: tuple[StoredAttachment, ...]) -> None:
         """Hand the running agent an extra instruction and its attachments; it reads them before its next step."""
         self._handle(run_id).inbox.put_nowait(UserInput(text=text, files=files))
+
+    async def decide(self, approval_id: str, approve: bool, source: str, note: str) -> ApprovalRecord:
+        """Record the user's decision on an approval or a question (``ApprovalBroker.resolve``); ``source`` is where it
+        was made (``ui``, ``cli``).
+
+        The answer to a question a run left carries the work on: it goes to the question's thread as the user's
+        message, into the run active there, or else as the goal of a new run on the thread, of ``source`` and with the
+        mode, model, effort, approvals and goal mode of the run that asked. A run of another process (``dotx run``)
+        working on the thread cannot be steered from here, so the answer is refused until it has ended. The answer is
+        delivered before the question is decided, so an answer that cannot be delivered leaves the question open.
+        Skipping such a question only denies it.
+        """
+        async with self._answering:
+            record: ApprovalRecord = await self._runtime.store.get_approval(approval_id)
+            if record.status == "left" and approve:
+                await self._carry_on(record, source, note)
+            return await self._runtime.approvals.resolve(approval_id, approve, source, note)
 
     async def resumable(self, run: RunRecord) -> bool:
         """Whether ``run`` can be resumed: see :func:`dotagent.agent.resume.can_resume`."""
@@ -275,6 +296,38 @@ class RunManager:
             raise RunConflict(
                 "the thread went on after the run to resume", {"run_id": run_id, "newest_run_id": newest_run_id}
             )
+
+    async def _carry_on(self, question: ApprovalRecord, source: str, answer: str) -> None:
+        """Deliver the answer to a question a run left (see :meth:`decide`)."""
+        asked: RunRecord = await self._runtime.store.get_run(question.run_id)
+        text: str = f"Answer to your question “{question.summary}”: {answer}"
+        active: RunHandle | None = next(
+            (handle for handle in self._handles.values() if handle.thread_id == asked.thread_id), None
+        )
+        if active is not None:
+            self.steer(active.run_id, text, ())
+            log.info("question_answered", approval_id=question.id, run_id=active.run_id, delivered="steer")
+            return
+        newest: RunRecord = (await self._runtime.store.list_runs(1, asked.thread_id))[0]
+        if newest.status in _WORKING:
+            # A run of another process (``dotx run``) works on the thread, and only that process can steer it.
+            raise RunConflict(
+                "a run of another process is working on this thread; answer the question once it has ended",
+                {"approval_id": question.id, "thread_id": asked.thread_id, "run_id": newest.id},
+            )
+        run, _ = await self._launch(
+            text,
+            asked.mode,
+            asked.model,
+            asked.thread_id,
+            source,
+            None,
+            asked.effort,
+            asked.approvals,
+            asked.goal_mode,
+            RunOpening(text=text, files=(), resumed=None),
+        )
+        log.info("question_answered", approval_id=question.id, run_id=run.id, delivered="run")
 
     async def _resume(self, old: RunRecord, calls: tuple[InterruptedCall, ...], automatic: bool) -> RunRecord:
         """Launch the run that resumes ``old`` on its thread, with its settings and its newest plan: its first message

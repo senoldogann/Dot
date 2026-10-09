@@ -121,8 +121,11 @@ async def test_a_run_a_shutdown_cut_off_while_it_asked_goes_on_by_itself_with_it
         tool=ASK_USER_TOOL, arguments={"question": "Which title should the report have?", "options": ["Report", "Data"]}
     )
     close_step: ScriptedCall = ScriptedCall(tool=MARK_PLAN_STEP_TOOL, arguments={"step": 2, "status": "done"})
+    # An owner whose yolo runs wait for their questions (``[agent] questions``), so the run is cut off while it waits.
+    config: AppConfig = _config()
+    waiting: AppConfig = config.model_copy(update={"agent": config.agent.model_copy(update={"questions": "wait"})})
     with scratch_home() as home, eval_environment(home, {}):
-        runtime: Runtime = await open_runtime(_config(), login_env)
+        runtime: Runtime = await open_runtime(waiting, login_env)
         try:
             await runtime.router.register(_PROVIDER, ScriptedProvider(_PROVIDER, [_turn((plan,)), _turn((ask,))]))
             manager: RunManager = RunManager(runtime)
@@ -140,7 +143,7 @@ async def test_a_run_a_shutdown_cut_off_while_it_asked_goes_on_by_itself_with_it
         finally:
             await close_runtime(runtime)
         # The daemon starts again. The plan has an open step, so the first answer is sent back once.
-        runtime = await open_runtime(_config(), login_env)
+        runtime = await open_runtime(waiting, login_env)
         try:
             await runtime.router.register(
                 _PROVIDER, ScriptedProvider(_PROVIDER, [_turn((FINISH,)), _turn((close_step, FINISH))])

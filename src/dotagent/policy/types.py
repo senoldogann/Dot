@@ -50,6 +50,9 @@ DecisionSource = Literal["auto_review", "mode", "hard_stop", "rule", "taint", "p
 # Who answers a question the policy raised: ``ask`` the user, ``auto`` a reviewer model (which can hand the question on
 # to the user), ``yolo`` nobody (the action is allowed and only recorded).
 ApprovalMode = Literal["ask", "auto", "yolo"]
+# What the agent's own question (``ask_user``) does in a run: ``wait`` for the answer, or ``leave`` it for the user and go
+# on. A run leaves its questions only where nobody can answer them during the run (``agent.progress.can_ask_user``).
+QuestionMode = Literal["leave", "wait"]
 # The answerer a question is routed to; ``waived`` means that nobody is asked.
 Route = Literal["user", "reviewer", "waived"]
 

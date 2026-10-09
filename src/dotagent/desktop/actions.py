@@ -6,7 +6,7 @@ minutes between the two, and is the only function that moves the pointer or pres
 """
 
 import time
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from math import hypot
 from pathlib import Path
@@ -55,11 +55,40 @@ _NO_APP: AppInfo = AppInfo(
 
 
 @dataclass(frozen=True, slots=True)
+class Inspection:
+    """What a reviewer needs to judge a step: its context, and a short description of what it touches."""
+
+    context: StepContext
+    target: str
+
+
+# What a step does at a secure text field, on the worker thread: called with the step's inspection and what the step
+# does ("typing", "pasting", "setting a value"), it returns to let the text in and raises to refuse.
+type SecureFieldCheck = Callable[[Inspection, str], None]
+
+
+def refuse_secure_field(inspection: Inspection, what: str) -> None:
+    """The secure-field check of the ask and auto modes: nothing goes into a secure text field."""
+    raise DesktopError(
+        f"{what} into a secure text field is refused: Dot never enters passwords or codes. "
+        "Ask the user to type it themselves",
+        {"target": inspection.target},
+    )
+
+
+def enter_secure_field(inspection: Inspection, what: str) -> None:
+    """The secure-field check of yolo: the text goes in. The step's review flagged it as a credential, which yolo
+    records."""
+    _log.info("secure_field_entered", action=what, target=inspection.target)
+
+
+@dataclass(frozen=True, slots=True)
 class StepEnv:
     """What the worker thread needs to resolve and perform the steps of one batch.
 
     ``expected_front`` is the application that held the keyboard focus after the previous step and ``expected_pointer``
     where the previous pointer step left the pointer; a difference means that something else interfered.
+    ``secure_field`` decides what a step does at a secure text field.
     """
 
     app: AppInfo
@@ -73,6 +102,7 @@ class StepEnv:
     failsafe_file: Path
     expected_front: int | None
     expected_pointer: Point | None
+    secure_field: SecureFieldCheck
 
 
 @dataclass(frozen=True, slots=True)
@@ -83,14 +113,6 @@ class Target:
     state: ElementState | None
     owner: AppInfo
     point: Point | None
-
-
-@dataclass(frozen=True, slots=True)
-class Inspection:
-    """What a reviewer needs to judge a step: its context, and a short description of what it touches."""
-
-    context: StepContext
-    target: str
 
 
 @dataclass(frozen=True, slots=True)
@@ -406,13 +428,9 @@ def _point_for(env: StepEnv, ref: str | None, x: float | None, y: float | None) 
     return _window_frame(env).center()
 
 
-def _refuse_secure(inspection: Inspection, what: str) -> None:
+def _check_secure(env: StepEnv, inspection: Inspection, what: str) -> None:
     if inspection.context.secure:
-        raise DesktopError(
-            f"{what} into a secure text field is refused: Dot never enters passwords or codes. "
-            "Ask the user to type it themselves",
-            {"target": inspection.target},
-        )
+        env.secure_field(inspection, what)
 
 
 def _focus(env: StepEnv, raw: str) -> None:
@@ -479,7 +497,7 @@ def _normalised(text: str) -> str:
 
 
 def _set_value(env: StepEnv, step: Step, inspection: Inspection) -> Effect:
-    _refuse_secure(inspection, "setting a value")
+    _check_secure(env, inspection, "setting a value")
     number, element = _element_for(env, _required(step.ref, "ref"))
     wanted: str = _required(step.text, "text")
     ax.set_attribute(element, "AXValue", wanted, env.app.pid)
@@ -494,7 +512,7 @@ def _set_value(env: StepEnv, step: Step, inspection: Inspection) -> Effect:
 
 
 def _type(env: StepEnv, step: Step, inspection: Inspection) -> Effect:
-    _refuse_secure(inspection, "typing")
+    _check_secure(env, inspection, "typing")
     if step.ref is not None:
         _focus(env, step.ref)
     text: str = _required(step.text, "text")
@@ -503,7 +521,7 @@ def _type(env: StepEnv, step: Step, inspection: Inspection) -> Effect:
 
 
 def _paste(env: StepEnv, step: Step, inspection: Inspection) -> Effect:
-    _refuse_secure(inspection, "pasting")
+    _check_secure(env, inspection, "pasting")
     if step.ref is not None:
         _focus(env, step.ref)
     text: str = _required(step.text, "text")
@@ -515,7 +533,7 @@ def _key(env: StepEnv, step: Step, inspection: Inspection) -> Effect:
     key: str = _required(step.key, "key")
     chord = parse_chord(key)
     if types_a_character(chord):
-        _refuse_secure(inspection, "typing")
+        _check_secure(env, inspection, "typing")
     hid.post(hid.chord_events(env.source, chord))
     return _effect(f"pressed {key} in {inspection.context.app}", None, True)
 

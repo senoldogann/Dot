@@ -5,6 +5,7 @@ import os
 import select
 import sys
 import threading
+from collections.abc import Sequence
 from typing import Literal, TextIO
 
 from pydantic import BaseModel, ConfigDict, JsonValue
@@ -18,7 +19,8 @@ from dotagent.core.jsonutil import dumps_compact
 from dotagent.core.text import truncate_tail
 from dotagent.core.types import FrozenModel, JsonObject
 from dotagent.runtime import Runtime
-from dotagent.store.models import EventRecord
+from dotagent.store.models import ApprovalRecord, EventRecord
+from dotagent.tools.meta import FINISH_TOOL
 
 _STDIN_POLL_S: float = 0.2
 _ARG_PREVIEW_CHARS: int = 140
@@ -221,6 +223,13 @@ class TerminalUi:
         self._streamed_text: str = ""
         self._delegated: set[str] = set()
         self._indent: str = ""
+        # What the run's latest finish call said it needs from the user.
+        self._needs: str = ""
+
+    @property
+    def needs_from_user(self) -> str:
+        """What the run said it could not do without the user, from its latest finish call; empty when nothing."""
+        return self._needs
 
     def _paint(self, text: str, code: str) -> str:
         return f"\x1b[{code}m{text}\x1b[0m" if self._color else text
@@ -256,6 +265,16 @@ class TerminalUi:
         if lessons.error is not None:
             self._line(self._paint(f"  ⚠ {lessons.error}", "33"))
 
+    def show_open_ends(self, needs: str, questions: Sequence[ApprovalRecord]) -> None:
+        """Show what a run that ended needs from the user and the questions it left that are still open."""
+        self._indent = ""
+        if needs:
+            self._line(self._paint(f"  ✋ what Dot needs from you: {needs}", "1;33"))
+        for question in questions:
+            self._line(self._paint(f"  ? left for you: {question.summary}", "35"))
+        if questions:
+            self._line(self._paint("    answer on the run's page in the web UI; the answer carries the work on", "2"))
+
     def streamed(self, text: str) -> bool:
         """True when ``text`` is what was just streamed to the terminal (so the caller need not print it again)."""
         return self._streamed_text.strip() == text.strip() and text.strip() != ""
@@ -281,6 +300,9 @@ class TerminalUi:
             case "tool_call":
                 call = ToolCallPayload.model_validate(data)
                 self._line(f"  {self._paint('›', '36')} {self._paint(call.tool, '1')} {preview_args(call.args)}")
+                if call.tool == FINISH_TOOL and not delegated:
+                    needs: JsonValue = call.args.get("needs_from_user")
+                    self._needs = needs.strip() if isinstance(needs, str) else ""
             case "tool_result":
                 self._on_tool_result(ToolResultPayload.model_validate(data))
             case "policy":
@@ -290,6 +312,8 @@ class TerminalUi:
                 self._on_plan(PlanPayload.model_validate(data))
             case "approval_requested":
                 await self._on_approval(ApprovalPayload.model_validate(data))
+            case "question_left":
+                self._on_left_question(ApprovalPayload.model_validate(data))
             case "approval_auto":
                 self._on_auto_approval(AutoApprovalPayload.model_validate(data))
             case "goal_check":
@@ -423,6 +447,13 @@ class TerminalUi:
             await self._ask_question(request)
             return
         await self._ask_approval(request)
+
+    def _on_left_question(self, question: ApprovalPayload) -> None:
+        options: JsonValue = question.args.get("options")
+        self._line(self._paint(f"  ? {question.summary}", "1;35"))
+        if isinstance(options, list) and options:
+            self._line(self._paint("    options: " + " | ".join(str(option) for option in options), "2"))
+        self._line(self._paint("    left for you: the run goes on without the answer", "2"))
 
     async def _ask_question(self, request: ApprovalPayload) -> None:
         options: JsonValue = request.args.get("options")

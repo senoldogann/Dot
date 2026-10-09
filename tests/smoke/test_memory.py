@@ -365,6 +365,8 @@ async def _prepare(runtime: Runtime, name: str, arguments: JsonObject) -> tuple[
         run_id="memory-test",
         thread_id="memory-test",
         mode="task",
+        approvals="ask",
+        questions="wait",
         workspace=workspace_dir(),
         gate=_Recorder(),
         cancel=asyncio.Event(),

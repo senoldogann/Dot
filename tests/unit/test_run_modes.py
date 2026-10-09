@@ -15,9 +15,12 @@ from dotagent.config import load_config
 from dotagent.core.errors import ConfigError
 from dotagent.llm.types import Message, assistant_message, user_message
 from dotagent.policy.engine import route_for
-from dotagent.policy.types import ApprovalMode, Route
+from dotagent.policy.types import ApprovalMode, QuestionMode, Route
+from dotagent.scheduler import SCHEDULE_SOURCE
 from dotagent.store.db import Store
 from dotagent.store.models import RunRecord
+from dotagent.tools.delegate import DELEGATE_SOURCE
+from dotagent.tools.meta import ASK_USER_TOOL
 
 PATIENCE: int = 4
 ENDED: RunOutcome = RunOutcome(status="done", result="the first file is written")
@@ -96,7 +99,7 @@ def test_a_conversation_whose_start_was_summarised_is_taken_whole() -> None:
 
 def _prompt(approvals: ApprovalMode, goal_mode: bool) -> str:
     return build_system_prompt(
-        collect_prompt_inputs("task", "cli", "aggressive", approvals, goal_mode, Path("/tmp/work"), [], [], [])
+        collect_prompt_inputs("task", "cli", "aggressive", approvals, "wait", goal_mode, Path("/tmp/work"), [], [], [])
     )
 
 
@@ -111,6 +114,43 @@ def test_the_prompt_keeps_the_model_from_asking_permission_for_an_action() -> No
     modes: tuple[ApprovalMode, ...] = ("ask", "auto", "yolo")
     for mode in modes:
         assert "Never use it to ask permission for an action" in _prompt(mode, False), mode
+
+
+def _lines(approvals: ApprovalMode) -> set[str]:
+    """The lines of a prompt but the clock, which may turn between two prompts."""
+    return {line for line in _prompt(approvals, False).splitlines() if not line.startswith("- Local time:")}
+
+
+def test_yolo_changes_only_the_secrets_line_and_the_approvals_line_of_the_prompt() -> None:
+    ask: set[str] = _lines("ask")
+    yolo: set[str] = _lines("yolo")
+    removed: list[str] = sorted(ask - yolo)
+    added: list[str] = sorted(yolo - ask)
+    assert len(removed) == 1 and removed[0].startswith(
+        "- Passwords, payment details and one-time codes are never typed"
+    )
+    assert len(added) == 2, added
+    assert added[0].startswith("- Approvals: yolo: nothing waits for the user")
+    assert added[1].startswith("- Passwords, one-time codes and payment details: enter them when you can read them")
+    assert _lines("auto") - _lines("ask") == {line for line in _lines("auto") if line.startswith("- Approvals: auto")}
+
+
+def _asking(source: str, questions: QuestionMode, tool_names: list[str]) -> str:
+    return build_system_prompt(
+        collect_prompt_inputs(
+            "task", source, "aggressive", "ask", questions, False, Path("/tmp/work"), [], tool_names, []
+        )
+    )
+
+
+def test_the_prompt_says_that_questions_are_left_only_in_a_run_that_leaves_them() -> None:
+    left: str = "ask_user leaves your question for the user"
+    assert left in _asking("cli", "leave", [ASK_USER_TOOL])
+    assert left not in _asking("cli", "wait", [ASK_USER_TOOL])
+    # A delegated run has no ask_user, so it has nothing to leave.
+    assert left not in _asking(DELEGATE_SOURCE, "leave", [])
+    assert "Do not ask questions" not in _asking(SCHEDULE_SOURCE, "leave", [ASK_USER_TOOL])
+    assert "Do not ask questions" in _asking(SCHEDULE_SOURCE, "wait", [ASK_USER_TOOL])
 
 
 def test_the_prompt_mentions_goal_mode_only_when_it_is_on() -> None:

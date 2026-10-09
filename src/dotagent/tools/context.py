@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Protocol
 
-from dotagent.policy.types import ActionInfo
+from dotagent.policy.types import ActionInfo, ApprovalMode, QuestionMode
 from dotagent.store.models import RunMode, RunRecord
 
 if TYPE_CHECKING:
@@ -41,12 +41,15 @@ class Spawner(Protocol):
 @dataclass(frozen=True)
 class ToolContext:
     """``output_chars`` is the most one tool result of the run may carry; a tool that pages its output sizes each page
-    to fit it, so nothing is cut from the middle of a page."""
+    to fit it, so nothing is cut from the middle of a page. ``approvals`` is the run's approval mode, which decides
+    what happens at a field that takes a secret; ``questions`` is what ``ask_user`` does in the run."""
 
     runtime: "Runtime"
     run_id: str
     thread_id: str
     mode: RunMode
+    approvals: ApprovalMode
+    questions: QuestionMode
     workspace: Path
     gate: Gate
     cancel: asyncio.Event

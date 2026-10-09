@@ -1,4 +1,5 @@
-// The card that asks the user: an approval of an action, a hand-off of a step, or a question from the agent.
+// The card that asks the user: an approval of an action, a hand-off of a step, or a question from the agent, which the
+// run waits for (`pending`) or left for the user and went on without (`left`).
 
 import { api } from "./api.js";
 import { clip, el } from "./dom.js";
@@ -6,7 +7,7 @@ import { icon } from "./icons.js";
 import { toast } from "./ui.js";
 
 const STATUS_BADGE = { approved: "b-ok", denied: "b-bad", expired: "b-muted" };
-const STATUS_LABEL = { approved: "Approved", denied: "Denied", expired: "Expired", pending: "Waiting for you" };
+const STATUS_LABEL = { approved: "Approved", denied: "Denied", expired: "Expired", pending: "Waiting for you", left: "Left for you" };
 
 /** The common shape of an approval, from a stored record. */
 export function fromRecord(record) {
@@ -83,6 +84,8 @@ export function approvalCard({ approval, heading, onSettled }) {
   const node = el("div", { class: "approval" });
   const isQuestion = approval.severity === "question";
   const isHandoff = approval.severity === "handoff";
+  // An answer to a question the run left goes on with the work in the run's conversation, so it needs words.
+  const isLeft = approval.status === "left";
   let busy = false;
 
   async function decide(approve, note) {
@@ -119,7 +122,13 @@ export function approvalCard({ approval, heading, onSettled }) {
       placeholder: isQuestion ? "Your answer" : "Note for Dot (optional)",
       "aria-label": isQuestion ? "Your answer" : "Note for Dot",
     });
-    const submit = (approve) => decide(approve, note.value.trim());
+    const submit = (approve) => {
+      if (isLeft && approve && note.value.trim() === "") {
+        note.focus();
+        return;
+      }
+      decide(approve, note.value.trim());
+    };
     note.addEventListener("keydown", (event) => {
       if (event.key === "Enter") {
         event.preventDefault();
@@ -154,12 +163,13 @@ export function approvalCard({ approval, heading, onSettled }) {
         "div",
         { class: "approval-head" },
         icon(iconOf(approval.severity)),
-        el("span", null, titleOf(approval.severity)),
+        el("span", null, isLeft ? "Dot asked you" : titleOf(approval.severity)),
         isQuestion || isHandoff ? null : el("span", { class: `badge ${approval.severity === "high" ? "b-bad" : "b-warn"}` }, approval.severity),
         el("span", { class: "spacer" }),
         heading,
       ),
       el("div", { class: "approval-text" }, text),
+      isLeft ? el("div", { class: "small muted" }, "The run went on without your answer. Your answer goes to this conversation and carries the work on.") : null,
       isQuestion ? options : technicalDetails(approval.args),
       el(
         "div",
@@ -189,7 +199,7 @@ export function approvalCard({ approval, heading, onSettled }) {
     );
   }
 
-  if (approval.status === "pending") {
+  if (approval.status === "pending" || isLeft) {
     renderPending();
   } else {
     settle(approval.status, approval.note);

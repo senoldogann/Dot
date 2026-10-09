@@ -8,7 +8,9 @@ from dotagent.policy.types import ApprovalMode
 
 RunStatus = Literal["queued", "running", "done", "blocked", "failed", "cancelled"]
 RunMode = Literal["task", "chat", "research"]
-ApprovalStatus = Literal["pending", "approved", "denied", "expired"]
+# ``pending``: a run waits for the answer; ``left``: a question a run left for the user and went on without (it is never
+# expired; answering it carries the work on in its thread).
+ApprovalStatus = Literal["pending", "left", "approved", "denied", "expired"]
 Behavior = Literal["allow", "preapproved", "ask", "handoff"]
 
 

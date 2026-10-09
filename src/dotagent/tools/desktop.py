@@ -14,6 +14,7 @@ from pydantic import Field
 
 from dotagent.config import AppConfig, DesktopConfig
 from dotagent.core.errors import ToolInputError
+from dotagent.desktop.actions import SecureFieldCheck, enter_secure_field, refuse_secure_field
 from dotagent.desktop.render import (
     describe_step,
     render_act_outcome,
@@ -349,7 +350,8 @@ def _act_tool() -> RegisteredTool:
                 )
             )
 
-        outcome: ActOutcome = await ctx.runtime.desktop.act(ctx.thread_id, args.app, args.steps, review)
+        secure_field: SecureFieldCheck = enter_secure_field if ctx.approvals == "yolo" else refuse_secure_field
+        outcome: ActOutcome = await ctx.runtime.desktop.act(ctx.thread_id, args.app, args.steps, review, secure_field)
         source: str = outcome.view.app.name if outcome.view is not None else (args.app or "application")
         return _screen_result(render_act_outcome(outcome, source, _nonce()))
 
@@ -364,8 +366,8 @@ def _act_tool() -> RegisteredTool:
             "chooses a menu bar item by its path; scroll moves an area (give it a ref); drag, double_click, "
             "right_click (its menu then appears in the snapshot), hover, wait, and activate (switch to another "
             "application). Batch the steps you can predict, such as filling a form and pressing its button. The "
-            "result shows what each step did and how the window changed. Never type passwords, codes or card numbers: "
-            "Dot refuses, and you should ask the user to enter them. " + _REF_HELP
+            "result shows what each step did and how the window changed. Passwords, codes and card numbers go into "
+            "secure fields only as your instructions on secrets say: otherwise Dot refuses the step. " + _REF_HELP
         ),
         args_model=ActArgs,
         modes=ACTING_MODES,

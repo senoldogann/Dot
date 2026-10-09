@@ -8,6 +8,7 @@ from typing import Literal
 from playwright.async_api import CDPSession, Locator, Page
 from playwright.async_api import Error as PlaywrightError
 
+from dotagent.browser.safety import secret_kind
 from dotagent.browser.snapshot import (
     SnapshotLine,
     closest_first,
@@ -17,7 +18,7 @@ from dotagent.browser.snapshot import (
     parse_snapshot,
     render_options,
 )
-from dotagent.browser.types import Dropdown, Step, Viewport
+from dotagent.browser.types import Dropdown, SecretField, SecretFieldCheck, SecretKind, Step, Viewport
 from dotagent.core.errors import BrowserError
 from dotagent.core.logs import get_logger
 from dotagent.core.text import truncate_middle
@@ -52,13 +53,12 @@ _QUIET_SCRIPT: str = """([quietMs, maxMs]) => new Promise((resolve) => {
   const hardTimer = setTimeout(finish, maxMs);
 })"""
 
-# Names the kind of secret field an element is, or null. The model never sees this check and cannot disable it.
-_SENSITIVE_FIELD_SCRIPT: str = """(element) => {
+# What a field says about the secret it takes: "password" for a password input, otherwise its autocomplete tokens; null
+# for an element that takes no typed text. The model never sees this check and cannot disable it.
+_FIELD_MARKING_SCRIPT: str = """(element) => {
   if (!(element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement)) return null;
-  if (element instanceof HTMLInputElement && element.type === 'password') return 'a password field';
-  const autocomplete = (element.getAttribute('autocomplete') || '').toLowerCase();
-  const secret = /(^|\\s)(current-password|new-password|one-time-code|cc-number|cc-csc|cc-exp|cc-exp-month|cc-exp-year)(\\s|$)/;
-  return secret.test(autocomplete) ? 'a ' + autocomplete + ' field' : null;
+  if (element instanceof HTMLInputElement && element.type === 'password') return 'password';
+  return element.getAttribute('autocomplete') || '';
 }"""
 
 # Lists the options of a native <select> in page order, or null for any other element.
@@ -277,13 +277,11 @@ def _key_of(step: Step) -> str:
     return step.key
 
 
-async def _refuse_secret_field(page: Page, locator: Locator, ref: str) -> None:
-    kind: object = await locator.evaluate(_SENSITIVE_FIELD_SCRIPT)
-    if isinstance(kind, str):
-        raise BrowserError(
-            f"refusing to type into {kind}: ask the user to enter it themselves",
-            {"action": "type", "ref": ref, "url": page.url},
-        )
+async def _check_secret_field(page: Page, locator: Locator, ref: str, check: SecretFieldCheck) -> None:
+    """Hand a field that takes a secret to ``check`` before any text goes into it."""
+    kind: SecretKind | None = secret_kind(await locator.evaluate(_FIELD_MARKING_SCRIPT))
+    if kind is not None:
+        await check(SecretField(ref=ref, kind=kind, url=page.url))
 
 
 async def _dropdown_offering(page: Page, locator: Locator, ref: str, wanted: str, timeout_ms: int) -> Dropdown | None:
@@ -316,8 +314,9 @@ async def _select_option(page: Page, locator: Locator, ref: str, wanted: str, ti
     await locator.select_option(wanted, timeout=timeout_ms)
 
 
-async def run_step(page: Page, step: Step, timeout_ms: int) -> None:
-    """Perform one step against the latest snapshot."""
+async def run_step(page: Page, step: Step, timeout_ms: int, secret_field: SecretFieldCheck) -> None:
+    """Perform one step against the latest snapshot. A field that takes a secret goes to ``secret_field`` first, which
+    raises to refuse the step."""
     if step.action == "click_at":
         if step.x is None or step.y is None:
             raise BrowserError("click_at needs x and y", {"url": page.url})
@@ -345,10 +344,10 @@ async def run_step(page: Page, step: Step, timeout_ms: int) -> None:
             case "hover":
                 await locator.hover(timeout=timeout_ms)
             case "fill":
-                await _refuse_secret_field(page, locator, ref)
+                await _check_secret_field(page, locator, ref, secret_field)
                 await locator.fill(_text_of(step), timeout=timeout_ms)
             case "type":
-                await _refuse_secret_field(page, locator, ref)
+                await _check_secret_field(page, locator, ref, secret_field)
                 await locator.press_sequentially(_text_of(step), timeout=timeout_ms)
             case "select":
                 await _select_option(page, locator, ref, _text_of(step), timeout_ms)

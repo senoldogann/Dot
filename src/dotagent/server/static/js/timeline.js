@@ -87,7 +87,7 @@ function paintGroup(group) {
  * `onRunStatus({ status, model, endedAt })` (`endedAt` is null until the run is over), `onAnswer(node)` when the answer is
  * on the page and `onImage(name)` for every screenshot a tool returned.
  */
-export function createTimeline({ rootRunId, startedAt, onGrow, onPlan, onStats, onCalls, onRunStatus, onAnswer, onImage }) {
+export function createTimeline({ rootRunId, startedAt, onGrow, onPlan, onStats, onCalls, onRunStatus, onAnswer, onImage, onQuestionLeft }) {
   const element = el("div", { class: "timeline" });
   const scopes = new Map();
   const cards = new Map();
@@ -104,6 +104,8 @@ export function createTimeline({ rootRunId, startedAt, onGrow, onPlan, onStats, 
       boundary: began,
       calls: new Map(),
       finishing: new Map(),
+      // What the latest finish call that took said the run needs from the user.
+      needs: "",
       group: null,
       groups: [],
       live: null,
@@ -281,6 +283,10 @@ export function createTimeline({ rootRunId, startedAt, onGrow, onPlan, onStats, 
         href: isRoot ? null : `#/runs/${scope.runId}`,
       });
       place(scope, answer, record.ts);
+      if (isRoot && scope.needs !== "") {
+        const head = el("div", { class: "aside-head" }, icon("hand"), el("span", null, "What Dot needs from you"));
+        place(scope, el("div", { class: "needs", "aria-label": "What Dot needs from you" }, head, prose(scope.needs)), record.ts);
+      }
       if (isRoot) {
         onAnswer(answer);
         onRunStatus({ status, model: null, endedAt: record.ts });
@@ -371,6 +377,7 @@ export function createTimeline({ rootRunId, startedAt, onGrow, onPlan, onStats, 
       if (finishArgs !== undefined) {
         scope.finishing.delete(data.call_id);
         if (data.ok) {
+          scope.needs = typeof finishArgs.needs_from_user === "string" ? finishArgs.needs_from_user.trim() : "";
           return;
         }
         showCall(scope, { id: data.call_id, tool: data.tool, args: finishArgs });
@@ -411,6 +418,16 @@ export function createTimeline({ rootRunId, startedAt, onGrow, onPlan, onStats, 
       cards.set(record.data.approval_id, { card, scope });
       place(scope, card.node, record.ts);
       markWaiting(scope, true);
+    },
+
+    // A question the run left for the user and went on without; it waits in the run's "Dot asked you" list.
+    question_left(scope, record) {
+      const data = record.data;
+      const question = typeof data.args.question === "string" ? data.args.question : data.summary;
+      note(scope, record.ts, "help", `Dot asked you “${clip(question, 300)}” and went on without the answer`, "warn");
+      if (scope.runId === rootRunId) {
+        onQuestionLeft();
+      }
     },
 
     approval_decided(scope, record) {

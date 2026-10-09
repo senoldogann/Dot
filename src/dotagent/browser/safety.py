@@ -6,10 +6,12 @@ then decides whether the user must be asked, whether the step is refused, or whe
 
 import re
 from collections.abc import Sequence
+from typing import get_args
 from urllib.parse import urlsplit
 
 from dotagent.browser.snapshot import SnapshotLine, parse_snapshot
-from dotagent.browser.types import Step, StepAction
+from dotagent.browser.types import SecretField, SecretKind, Step, StepAction
+from dotagent.core.errors import BrowserError
 from dotagent.core.types import FrozenModel
 from dotagent.policy.elements import (
     Element,
@@ -33,6 +35,7 @@ _TYPING_ACTIONS: frozenset[StepAction] = frozenset({"fill", "type", "press", "se
 _CLICKING_ACTIONS: frozenset[StepAction] = frozenset({"click", "double_click", "right_click", "click_at"})
 _QUIET_ACTIONS: frozenset[StepAction] = frozenset({"hover", "scroll_into_view"})
 _CLICKABLE_ROLES: frozenset[str] = frozenset({"button", "link", "menuitem", "tab", "option", "checkbox", "switch"})
+_SECRET_KINDS: tuple[SecretKind, ...] = get_args(SecretKind)
 
 
 class UrlVerdict(FrozenModel):
@@ -102,6 +105,32 @@ def assess_step(step: Step, element: Element | None) -> StepAssessment:
     if step.action in _QUIET_ACTIONS and not reasons:
         return quiet_assessment()
     return assessment_for(reasons)
+
+
+def secret_kind(marking: object) -> SecretKind | None:
+    """The secret a field takes, from what the page says about the field (``password`` for a password input, otherwise
+    its autocomplete tokens), or ``None`` when it takes none."""
+    if not isinstance(marking, str):
+        return None
+    tokens: list[str] = marking.lower().split()
+    return next((kind for kind in _SECRET_KINDS if kind in tokens), None)
+
+
+def secret_field_label(kind: SecretKind) -> str:
+    return "a password field" if kind == "password" else f"a {kind} field"
+
+
+def secret_field_flag(kind: SecretKind) -> Flag:
+    """A card field is about money; every other secret is a credential."""
+    return "financial" if kind.startswith("cc-") else "credential"
+
+
+async def refuse_secret_field(field: SecretField) -> None:
+    """The secret-field check of the ask and auto modes: no text goes into a field that takes a secret."""
+    raise BrowserError(
+        f"refusing to type into {secret_field_label(field.kind)}: ask the user to enter it themselves",
+        {"action": "type", "ref": field.ref, "url": field.url},
+    )
 
 
 def dialog_is_financial(message: str) -> bool:

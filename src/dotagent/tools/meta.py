@@ -33,6 +33,11 @@ USE_TOOLS_TOOL: str = "use_tools"
 # A chat turn ends with a plain reply. A model that is offered both that and finish tends to write the call out as text.
 _FINISH_MODES: frozenset[RunMode] = frozenset({"task", "research"})
 _NOTIFY_TIMEOUT_S: float = 15.0
+_LEFT_RESULT: str = (
+    "The question is left for the user, who does not answer during this run; their answer will carry the work on "
+    "later. Go on with what does not depend on it. If nothing can be done without it, end the run and say exactly what "
+    "you need."
+)
 
 
 def _meta_action(tool: str, summary: str) -> ActionInfo:
@@ -50,6 +55,13 @@ class FinishArgs(ToolArgs):
         )
     )
     success: bool = Field(description="True only if the goal was fully achieved and you verified the result.")
+    needs_from_user: Annotated[str, StringConstraints(strip_whitespace=True)] = Field(
+        default="",
+        description=(
+            "What you could not do without the user: exactly what they need to give, decide or do, shown to them under "
+            "the answer. Leave it empty when nothing is needed."
+        ),
+    )
 
 
 def _finish_tool() -> RegisteredTool:
@@ -85,6 +97,9 @@ def _ask_user_tool() -> RegisteredTool:
 
     async def run(args: AskUserArgs, ctx: ToolContext) -> ToolResult:
         details: JsonObject = {"question": args.question, "options": list(args.options or [])}
+        if ctx.questions == "leave":
+            await ctx.runtime.approvals.leave(ctx.run_id, ASK_USER_TOOL, args.question, "question", details)
+            return ok(_LEFT_RESULT)
         outcome: ApprovalOutcome = await ctx.runtime.approvals.request(
             ctx.run_id, ASK_USER_TOOL, args.question, "question", details
         )
@@ -98,7 +113,10 @@ def _ask_user_tool() -> RegisteredTool:
 
     return make_tool(
         name=ASK_USER_TOOL,
-        description="Ask the user a question and wait for the answer. Use sparingly: prefer deciding yourself.",
+        description=(
+            "Ask the user a question. The result is the answer, or says that the question was left for the user "
+            "because nobody answers during this run. Use sparingly: prefer deciding yourself."
+        ),
         args_model=AskUserArgs,
         modes=ALL_MODES,
         parallel_safe=False,

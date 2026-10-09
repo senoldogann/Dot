@@ -20,7 +20,7 @@ from dotagent.config import AgentConfig
 from dotagent.core.text import redact_secrets, truncate_middle
 from dotagent.core.types import FrozenModel
 from dotagent.evals import EVAL_SOURCE
-from dotagent.policy.types import ApprovalMode
+from dotagent.policy.types import ApprovalMode, QuestionMode
 from dotagent.scheduler import SCHEDULE_SOURCE
 from dotagent.store.endings import PREFIX_STALLED
 from dotagent.tools.delegate import DELEGATE_SOURCE
@@ -122,6 +122,11 @@ def can_ask_user(source: str, parent_run_id: str | None, approvals: ApprovalMode
     """Whether a run can put a question to a person: not a delegated or scheduled run (nobody is there to answer), and
     not a yolo run, whose user chose not to be asked."""
     return parent_run_id is None and source not in _UNATTENDED_SOURCES and approvals != "yolo"
+
+
+def question_mode(setting: QuestionMode, can_ask: bool) -> QuestionMode:
+    """What ``ask_user`` does in a run: where a person can answer, it waits; elsewhere ``[agent] questions`` decides."""
+    return "wait" if can_ask else setting
 
 
 def ladder_for(escalation: bool, can_ask: bool) -> tuple[Rung, ...]:

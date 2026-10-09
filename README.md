@@ -182,7 +182,10 @@ answer (a small model that is offered both writes the call out as text).
   [Autonomy](#autonomy-approvals-goal-mode-and-the-end-of-a-run)), when a model call still fails after its retries, or
   when you stop it. In goal mode the goal check can also end it (see [Autonomy](#autonomy-approvals-goal-mode-and-the-end-of-a-run)).
 - A reply without a tool call ends the turn in `chat` mode and when the run has not used a tool yet. Otherwise it is
-  nudged towards `finish`; after `finish_nudges` nudges the reply itself becomes the result.
+  nudged towards `finish`; after `finish_nudges` nudges in a row the reply itself becomes the result. A step with tool
+  calls starts the count again, so a status line written between tool steps does not end the run.
+- `finish` can say what the run could not do without you (`needs_from_user`): the run's page shows it under the answer
+  as "What Dot needs from you", and `dotx run` prints it after the answer.
 - A small model with the full tool list sometimes writes the `finish` call out as a plain message (`gpt-oss:20b-cloud`
   did in most trial runs). Dot does not reinterpret such text: it is nudged first when tools were used, otherwise it
   becomes the result as written. Use a larger model as `main` for task and research runs.
@@ -259,8 +262,9 @@ clears the mark. A delegated run starts as untrusted as its parent.
 
 **Secrets.**
 
-- The browser and desktop tools never fill or read password, one-time-code and card fields, and screenshots black out
-  secure fields.
+- In `ask` and `auto` the browser and desktop tools never type into password, one-time-code and card fields. A `yolo`
+  run types into them what it can read itself (see [Autonomy](#autonomy-approvals-goal-mode-and-the-end-of-a-run)).
+  Desktop screenshots black out the windows of password managers; secure fields and web pages are not masked.
 - Environment variables whose names look like secrets are removed from the processes the shell tool starts
   (`[shell] pass_env` lists exceptions).
 - The agent can neither read nor change `~/.ssh`, `~/.gnupg`, `~/Library/Keychains`, `~/.aws`, `~/.config/gcloud` and the
@@ -271,7 +275,9 @@ clears the mark. A delegated run starts as untrusted as its parent.
 **Approvals.** An action that needs a yes becomes an approval: `allow? [y/N]` in the terminal, a card in the web UI. The
 run waits (its status is `blocked`) for up to `[policy] approval_timeout_s`; an approval nobody answers expires and
 counts as a refusal. The note you write with your answer reaches the model. This is the default approval mode, `ask`; in
-`auto` and `yolo` the questions of the policy are answered for you.
+`auto` and `yolo` the questions of the policy are answered for you. A question of the agent itself (`ask_user`) waits
+the same way, except in a run nobody can answer during it (see
+[Autonomy](#autonomy-approvals-goal-mode-and-the-end-of-a-run)).
 
 **Emergency stop.** Any of these stops Dot from controlling the desktop:
 
@@ -314,8 +320,11 @@ run page carries a chip for it.
   into the action (its summary and target) is data to the review model, never an instruction.
 - `yolo`: nobody does. The action is allowed and recorded. The question that untrusted content raises (see
   [Safety](#safety)) is waived as well, and so are the refusals and hand-offs below: a yolo run reads secrets, uploads
-  or sends files from anywhere, and does money and credential steps itself. That is the price of the mode: a run that
-  has read a hostile page can send your files out, pay or sign in without asking you.
+  or sends files from anywhere, and does money and credential steps itself. It types passwords, one-time codes and card
+  numbers into the fields that take them when it can read them itself (a code in a mailbox it can open, a value you
+  gave it); every such field is a `credential` record in its timeline (`financial` for a card field). That is the price
+  of the mode: a run that has read a hostile page can send your files out, pay or sign in without asking you. Password
+  managers and the keychain stay closed in every mode.
 
 Every automatic answer is an ordinary approval record (`decided_by` is `reviewer` or `yolo`, and the note holds the
 reason), an `approval_auto` event and a line in the timeline of the run, so you can see afterwards what went through and
@@ -349,8 +358,19 @@ check itself fails, the run fails and keeps its answer. Each check is a `goal_ch
 
 A delegated run takes the approval mode of the run that started it and has no goal mode of its own. A scheduled run uses
 the model, reasoning level, approval mode and goal mode of its schedule, and the configured defaults for those the
-schedule leaves open, so what a schedule does while nobody is there depends on them: with `ask`, a question waits
-`approval_timeout_s` and then counts as a refusal.
+schedule leaves open, so what a schedule does while nobody is there depends on them: with `ask`, a question of the
+policy waits `approval_timeout_s` and then counts as a refusal.
+
+**Questions nobody answers during the run.** In a `yolo`, scheduled or eval run nobody answers the agent's own
+questions (`ask_user`) while it works, and `[agent] questions` decides what they do. With `leave` (the default) the
+question is stored as `left`, the timeline shows it where it was asked, and the run goes on with what does not depend on
+the answer, or ends and says what it needs; its status never turns `blocked`. The run's page lists its open questions
+under "Dot asked you", during the run and after it, and `dotx run` prints each one when it is left and lists the open
+ones after the answer. Your answer (`POST /api/approvals/{id}/decision`) goes to the conversation as your message,
+"Answer to your question “…”: …": into the run working there, or else as the goal of a new run on it with the mode,
+model, reasoning level, approval mode and goal mode of the run that asked, which the page then opens. Skip only closes
+the question, and a left question never expires. With `wait` such a question waits as in a run you watch, for
+`approval_timeout_s` at most. A run you started in `ask` or `auto` always waits for your answer.
 
 **The end of a run.** There is no step limit. A run ends by `finish`; by the progress watchdog; by a model call that
 still fails after its retries; in goal mode by the goal check giving up; or when you stop it. With
@@ -439,7 +459,8 @@ model call of a run leaves a `model_call` event with its purpose, model, seconds
 or was cut off, the error), and its tokens count in the run's totals; runs made before calls were timed have none, are
 left out of the table and are counted below it. A **Tools** table lists the 15 tools whose calls took the most seconds:
 calls, failures, seconds in all, the median call and the seconds spent at the gate (waiting for your approval or the
-review model's answer), which the seconds include. The seconds of `ask_user` are the wait for your answer, and those of
+review model's answer), which the seconds include. The seconds of `ask_user` are the wait for your answer (none for a
+question the run left), and those of
 `delegate` hold the whole delegated run, whose own tool calls are listed too. The database file is opened read-only, so
 it is safe to run while the daemon works, and the numbers hold no text of your chats.
 
@@ -457,13 +478,13 @@ be followed, and a goal written in Turkish.
 
 Every attempt runs unattended in a throw-away Dot home (its own database and workspace, removed afterwards), with the
 Mac desktop, your MCP servers, skills, plugins and the memory embeddings switched off, and with every question of the
-policy or of the agent refused. Your own database, workspace and screenshots are never touched; the API keys the model
-needs are looked up first and handed over by name. The score holds the pass rate, per kind of task, what a pass costs in
-steps, tokens and seconds (split into model calls and tool calls), how often a tool call failed, stalls, runs that were
-cut, runs that said they were done and were not, and the tasks that passed only in some attempts. The token ceiling of
-an attempt counts every model call of the run and of the runs it delegated to, side calls included; a report saved
-before model calls were timed counted the steps' tokens only and has no seconds. `dotx eval run` saves its report after
-every attempt, so an interrupted run keeps what it measured.
+policy or of the agent unanswered (one the run waits for is refused at once). Your own database, workspace and
+screenshots are never touched; the API keys the model needs are looked up first and handed over by name. The score holds
+the pass rate, per kind of task, what a pass costs in steps, tokens and seconds (split into model calls and tool calls),
+how often a tool call failed, stalls, runs that were cut, runs that said they were done and were not, and the tasks that
+passed only in some attempts. The token ceiling of an attempt counts every model call of the run and of the runs it
+delegated to, side calls included; a report saved before model calls were timed counted the steps' tokens only and has
+no seconds. `dotx eval run` saves its report after every attempt, so an interrupted run keeps what it measured.
 
 A task is data (`src/dotagent/evals/catalog.py`): the files the workspace starts with, the goal, checks (a file exists,
 holds or equals something, a JSON file equals a value, a command exits with 0, the answer contains something) and a
@@ -655,7 +676,8 @@ Both modes share what follows.
 - A dialog, or a cookie consent banner, open in the viewport is listed first, under "in front of the page",
   and the line above the page says how many are open. A click that another element takes fails with the name of that
   element and what to do about it (close or answer the box, or press Escape).
-- Password, one-time-code and card fields are never filled or read. Cookie banners are declined (`decline_cookie_banners`).
+- Password, one-time-code and card fields are filled only by a `yolo` run (see [Safety](#safety)). Cookie banners are
+  declined (`decline_cookie_banners`).
 - A conversation thread keeps at most `max_tabs` tabs open and closes idle ones after `tab_idle_s`.
 - `[browser] allowed_hosts` and `blocked_hosts` limit the sites of the browser tools and of `web_fetch`; a host also
   matches its subdomains, and an empty `allowed_hosts` means every site. The blocked list starts with the
@@ -684,7 +706,8 @@ missing ones and opens their Settings panes.
   the pointer; `click`, `hover`, `scroll` and `drag` are real pointer events; `type`, `paste` and `key` are keyboard
   events.
 - `desktop_screenshot` captures the screen with ScreenCaptureKit as a JPEG of at most `screenshot_max_edge` pixels.
-- `desktop.keep_awake` keeps the display awake while Dot works. Secure fields and password managers are refused.
+- `desktop.keep_awake` keeps the display awake while Dot works. Password managers are refused, and so are secure fields
+  except in a `yolo` run (see [Safety](#safety)).
 - `dotx desktop apps`, `dotx desktop snapshot [app] [--scope …] [--query …]` and `dotx desktop screenshot PATH` show what
   the agent would see.
 

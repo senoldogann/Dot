@@ -1,6 +1,7 @@
 // One run as a conversation: the question, what Dot did about it, its answer, and the box to steer the run or to follow up on it.
 
 import { api, follow } from "../api.js";
+import { approvalCard, fromRecord } from "../approvals.js";
 import { createAttachments, readyToSend } from "../attachments.js";
 import { createDetails } from "../details.js";
 import { clip, dateTimeFull, el, modelName } from "../dom.js";
@@ -208,6 +209,42 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
         lessons.error === null ? null : el("div", { class: "note bad" }, icon("alert"), el("span", null, lessons.error)),
       ].filter((node) => node !== null),
     );
+  }
+
+  // ------------------------------------------------------------------------------------------ questions
+  // The questions the run left for you and went on without, while they are open; an answer carries the work on in
+  // this conversation: into this run while it works, else into a new run on the thread, which the page then opens.
+  const questionsList = el("div", { class: "stack tight", hidden: true, "aria-label": "Dot asked you" });
+  const questionCards = new Map();
+
+  async function questionDecided() {
+    if (!active) {
+      const [newest] = await api.get(`/runs?thread_id=${encodeURIComponent(run.thread_id)}&limit=1`);
+      if (newest !== undefined && newest.id !== runId) {
+        ctx.navigate(`/runs/${newest.id}`);
+        return;
+      }
+    }
+    await reconcile();
+  }
+
+  /** `questions` are the stored questions the run left that are still open; a card that is there already stays as it is. */
+  function paintQuestions(questions) {
+    const open = new Set(questions.map((question) => question.id));
+    for (const [id, node] of questionCards) {
+      if (!open.has(id)) {
+        node.remove();
+        questionCards.delete(id);
+      }
+    }
+    for (const question of questions) {
+      if (!questionCards.has(question.id)) {
+        const card = approvalCard({ approval: fromRecord(question), heading: null, onSettled: () => attempt(questionDecided) });
+        questionCards.set(question.id, card.node);
+        questionsList.append(card.node);
+      }
+    }
+    questionsList.hidden = questionCards.size === 0;
   }
 
   // ------------------------------------------------------------------------------------------------ dock
@@ -462,6 +499,7 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
       paintStats();
       syncControls();
       paintLessons(fresh.lessons);
+      paintQuestions(fresh.questions);
     } catch (error) {
       console.warn("the run could not be refreshed", error);
     }
@@ -508,6 +546,7 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
     onRunStatus,
     onAnswer,
     onImage: inspector.addImage,
+    onQuestionLeft: () => reconcile(),
   });
   const problem =
     historyProblem === null
@@ -539,6 +578,7 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
       run.source === RESUME_SOURCE ? null : userMessage(run.goal, dateTimeFull(run.created_at)),
       timeline.element,
       waitingList,
+      questionsList,
       lessonsCard,
       continuedIn(history.later),
       dock,
@@ -551,6 +591,7 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
   paintStats();
   syncControls();
   paintLessons(detail.lessons);
+  paintQuestions(detail.questions);
   window.addEventListener("scroll", onScroll, { passive: true });
   const stopLessons = onLifecycle((event) => {
     if (LESSON_KINDS.has(event.kind) && event.run_id === runId) {

@@ -674,6 +674,7 @@ async def cmd_run(command: RunCommand) -> int:
         )
         # The answer comes first: the lessons are drawn after the run's end.
         _print_result(run)
+        ui.show_open_ends(ui.needs_from_user, await runtime.store.list_left_questions(run.id))
         await _show_lessons(runtime, manager, ui, run.id)
     finally:
         await close_runtime(runtime)
@@ -694,6 +695,7 @@ async def cmd_resume(command: ResumeCommand) -> int:
         ui: TerminalUi = TerminalUi(runtime, options)
         run: RunRecord = await follow_run(runtime, manager, ui, lambda: manager.resume(command.run_id))
         _print_result(run)
+        ui.show_open_ends(ui.needs_from_user, await runtime.store.list_left_questions(run.id))
         await _show_lessons(runtime, manager, ui, run.id)
     finally:
         await close_runtime(runtime)

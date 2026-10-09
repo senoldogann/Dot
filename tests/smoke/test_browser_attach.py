@@ -26,6 +26,7 @@ from dotagent.browser.keychain import KeychainMode, read_keychain_mode
 from dotagent.browser.login import chrome_arguments
 from dotagent.browser.modes import adopt_mode, browser_data_dir
 from dotagent.browser.profile_lock import profile_holder_pid
+from dotagent.browser.safety import refuse_secret_field
 from dotagent.browser.session import BrowserSession
 from dotagent.browser.types import ActOutcome, Attachment, PageView, Screenshot, Step
 from dotagent.config import BrowserConfig, load_config
@@ -228,7 +229,7 @@ async def test_the_agent_works_in_tabs_of_its_own_and_the_tabs_of_the_user_stay(
         assert view.title == "Home"
         assert [tab.url for tab in view.tabs] == [f"{site}/"]
         clicked: ActOutcome = await session.act(
-            "first", [Step(action="click", ref=ref_of(view.body, 'button "Increment"'))], False
+            "first", [Step(action="click", ref=ref_of(view.body, 'button "Increment"'))], False, refuse_secret_field
         )
         assert [report.outcome for report in clicked.steps] == ["done"]
         assert clicked.view.mode == "delta"
@@ -271,7 +272,7 @@ async def test_a_tab_that_a_tab_of_the_agent_opens_is_the_agents_and_closes_with
     try:
         view: PageView = await session.open_url("agent", f"{site}/")
         opened: ActOutcome = await session.act(
-            "agent", [Step(action="click", ref=ref_of(view.body, 'link "Open popup"'))], False
+            "agent", [Step(action="click", ref=ref_of(view.body, 'link "Open popup"'))], False, refuse_secret_field
         )
         assert [tab.url for tab in opened.view.tabs] == [f"{site}/", f"{site}/popup"]
         await wait_for_tabs(chrome.port, [f"{site}/mine", f"{site}/", f"{site}/popup"])
