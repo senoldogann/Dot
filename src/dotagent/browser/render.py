@@ -38,8 +38,10 @@ def describe_step(step: Step) -> str:
         case "press":
             target: str = f" on {step.ref}" if step.ref is not None else ""
             return f"press {_clip(step.key or '', _KEY_CHARS)}{target}"
-        case "fill" | "type":
+        case "fill" | "type" | "insert":
             return f"{step.action} {step.ref} ({len(step.text or '')} chars)"
+        case "drag":
+            return f"drag {step.ref} onto {step.to_ref}"
         case "select":
             return f"select {step.ref} {_clip(step.text or '', _OPTION_CHARS)!r}"
         case _:

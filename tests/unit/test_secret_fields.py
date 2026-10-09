@@ -1,9 +1,11 @@
-"""What a field of a web page says about the secret it takes, and what kind of action typing into it is."""
+"""What a field of a web page says about the secret it takes, what kind of action typing into it is, and how a drop
+onto an element is judged."""
 
 import pytest
 
-from dotagent.browser.safety import key_enters_text, secret_field_flag, secret_field_label, secret_kind
-from dotagent.browser.types import SecretKind
+from dotagent.browser.safety import assess_step, key_enters_text, secret_field_flag, secret_field_label, secret_kind
+from dotagent.browser.types import SecretKind, Step
+from dotagent.policy.elements import Element
 from dotagent.policy.types import Flag
 
 
@@ -57,3 +59,19 @@ def test_a_card_field_is_about_money_and_every_other_secret_is_a_credential(
 )
 def test_a_key_that_puts_text_in_is_typing(key: str, enters: bool) -> None:
     assert key_enters_text(key) is enters
+
+
+@pytest.mark.parametrize(
+    ("target", "flags"),
+    [
+        (Element(role="list", name="Delete forever"), ("destructive",)),
+        (Element(role="region", name="Send to customer"), ("external_send",)),
+        (Element(role="textbox", name="Account password"), ("credential",)),
+        (Element(role="list", name="Done"), ()),
+    ],
+)
+def test_a_drop_is_judged_by_the_name_of_what_it_drops_onto_whatever_its_role(
+    target: Element, flags: tuple[Flag, ...]
+) -> None:
+    dragged: Element = Element(role="listitem", name="Delete account")
+    assert assess_step(Step(action="drag", ref="e1", to_ref="e2"), dragged, target).flags == flags

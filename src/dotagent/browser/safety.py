@@ -20,6 +20,7 @@ from dotagent.policy.elements import (
     assessment_for,
     clicking_reasons,
     looks_like_key,
+    naming_reasons,
     quiet_assessment,
     typing_reasons,
 )
@@ -31,7 +32,7 @@ _SCHEME: re.Pattern[str] = re.compile(r"^[A-Za-z][A-Za-z0-9+.-]*:")
 _HOST_LIKE: re.Pattern[str] = re.compile(r"^(localhost|[\w-]+(\.[\w-]+)+|\d{1,3}(\.\d{1,3}){3})(:\d+)?([/?#].*)?$")
 _UNSAFE_FILE_CHARS: re.Pattern[str] = re.compile(r"[^\w.\- ()]+")
 _MAX_FILE_NAME_CHARS: int = 120
-_TYPING_ACTIONS: frozenset[StepAction] = frozenset({"fill", "type", "press", "select"})
+_TYPING_ACTIONS: frozenset[StepAction] = frozenset({"fill", "type", "press", "select", "insert"})
 _CLICKING_ACTIONS: frozenset[StepAction] = frozenset({"click", "double_click", "right_click", "click_at"})
 _QUIET_ACTIONS: frozenset[StepAction] = frozenset({"hover", "scroll_into_view"})
 _CLICKABLE_ROLES: frozenset[str] = frozenset({"button", "link", "menuitem", "tab", "option", "checkbox", "switch"})
@@ -128,13 +129,21 @@ def parse_element(line: str) -> Element | None:
     return Element(role=parsed[0].role, name=parsed[0].name)
 
 
-def assess_step(step: Step, element: Element | None) -> StepAssessment:
-    """Risk and flags of one step, judged from the action and the element it targets."""
+def assess_step(step: Step, element: Element | None, target: Element | None) -> StepAssessment:
+    """Risk and flags of one step, judged from the action and the element it targets. A drag's element is judged as a
+    click on it would be; the element it drops onto is more often a list or a region than a button, and its name says
+    what the drop does, so it is judged by its name whatever its role, and as a field that takes typed text."""
     reasons: list[str] = []
     if step.action in _TYPING_ACTIONS:
         reasons = typing_reasons(element, step.text)
     elif step.action in _CLICKING_ACTIONS or step.action in ("check", "uncheck"):
         reasons = clicking_reasons(element, _CLICKABLE_ROLES)
+    elif step.action == "drag":
+        reasons = list(
+            dict.fromkeys(
+                clicking_reasons(element, _CLICKABLE_ROLES) + naming_reasons(target) + typing_reasons(target, None)
+            )
+        )
     if step.action in _QUIET_ACTIONS and not reasons:
         return quiet_assessment()
     return assessment_for(reasons)

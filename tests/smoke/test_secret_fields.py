@@ -39,6 +39,14 @@ _PAGES: dict[str, str] = {
 <button type="submit">Confirm</button>
 </form>""",
     "/verified": "<!doctype html><title>Verified</title><h1>Verified</h1>",
+    # A note editor that hands the focus to the code field a moment after it takes it.
+    "/verify-note": """<!doctype html><title>Verify</title><h1>Check your e-mail</h1>
+<div id="note" contenteditable="true" role="textbox" aria-label="Note"></div>
+<label>Code from the e-mail <input id="code" name="code" autocomplete="one-time-code"></label>
+<script>
+const code = document.getElementById('code');
+document.getElementById('note').addEventListener('focus', () => setTimeout(() => code.focus(), 20));
+</script>""",
     # The label stands apart from its field, so it has a ref of its own.
     "/verify-apart": """<!doctype html><title>Verify</title><h1>Check your e-mail</h1>
 <form action="/verified" method="get">
@@ -186,18 +194,46 @@ async def test_ask_mode_refuses_to_type_a_one_time_code(runtime: Runtime, site: 
         [{"action": "fill", "ref": "label", "text": CODE}],
         # The keys of type and press go to the field that has the focus, whatever element their ref names.
         [{"action": "click", "ref": "field"}, {"action": "type", "ref": "heading", "text": CODE}],
+        [{"action": "click", "ref": "field"}, {"action": "insert", "ref": "heading", "text": CODE}],
         [{"action": "click", "ref": "field"}, {"action": "press", "ref": "heading", "key": "Digit4"}],
         [{"action": "click", "ref": "field"}, {"action": "press", "key": "4"}],
+        # A drop puts what it carries into the field it drops onto.
+        [{"action": "drag", "ref": "heading", "to_ref": "field"}],
     ],
-    ids=["fill-the-label", "type-at-the-heading", "press-at-the-heading", "press-without-a-ref"],
+    ids=[
+        "fill-the-label",
+        "type-at-the-heading",
+        "insert-at-the-heading",
+        "press-at-the-heading",
+        "press-without-a-ref",
+        "drag-onto-the-field",
+    ],
 )
 async def test_ask_mode_refuses_the_code_whatever_element_the_step_names(
     runtime: Runtime, site: _Site, steps: list[dict[str, str]]
 ) -> None:
     ctx, gate = await _context(runtime, "ask")
     refs: dict[str, str] = await _apart_refs(ctx, gate, site)
-    named: list[JsonObject] = [{**step, "ref": refs[step["ref"]]} if "ref" in step else {**step} for step in steps]
+    named: list[JsonObject] = [
+        {name: refs[value] if name in ("ref", "to_ref") else value for name, value in step.items()} for step in steps
+    ]
     acted: ToolResult = await _call(ctx, gate, "browser_act", {"steps": named})
+    assert "refusing to type into a one-time-code field" in acted.text
+    assert await _records(ctx) == []
+
+
+async def test_ask_mode_refuses_text_for_an_editor_once_the_focus_went_to_the_code_field(
+    runtime: Runtime, site: _Site
+) -> None:
+    ctx, gate = await _context(runtime, "ask")
+    opened: ToolResult = await _call(
+        ctx, gate, "browser_open", {"url": f"http://127.0.0.1:{site.server_address[1]}/verify-note"}
+    )
+    note: re.Match[str] | None = re.search(r'textbox "Note"[^\n]*?\[ref=([^\]]+)\]', opened.text)
+    assert note is not None, opened.text
+    acted: ToolResult = await _call(
+        ctx, gate, "browser_act", {"steps": [{"action": "insert", "ref": note.group(1), "text": CODE}]}
+    )
     assert "refusing to type into a one-time-code field" in acted.text
     assert await _records(ctx) == []
 

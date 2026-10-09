@@ -895,8 +895,8 @@ that change the owner's agent are their call (see "Open owner decisions", 6 onwa
 | 10  | Yolo asks nobody: secret fields, questions and the end of a run        | done        | eacd180 |
 | 11  | Open-ended goals in one run: targets, limits and an honest end         | done        | 12ad395 |
 | 12  | Campaigns: a goal that works until its outcome is verified             | done        | c915ab2 |
-| 13  | Faster browser and desktop steps                                       | done        |         |
-| 14  | Rich editors, drag and bulk text in the browser                        | planned     |         |
+| 13  | Faster browser and desktop steps                                       | done        | a14f21a |
+| 14  | Rich editors, drag and bulk text in the browser                        | done        |         |
 | 15  | Helper models: consult, delegate to another model, standby             | planned     |         |
 | 16  | Typed judgments (TypeSafe) at the decision points                      | planned     |         |
 | 17  | Pacing and public actions on social platforms                          | planned     |         |
@@ -1632,8 +1632,8 @@ updated.
 
 ### 13. Faster browser and desktop steps
 
-**Status: done.** **Goal.** Take the fixed waiting out of a browser or desktop action where no signal needs it, and
-make a failed wait or an unchanged page cost no extra step.
+**Status: done** (`a14f21a`, PR #6). **Goal.** Take the fixed waiting out of a browser or desktop action where no
+signal needs it, and make a failed wait or an unchanged page cost no extra step.
 
 **Why.** Measured on 2026-10-09 (read-only bench, this Mac; the Playwright and accessibility parts not measured): a
 browser click waits about 160 ms by construction, a five-click batch about 0.32 s; a desktop click about 0.56 s before
@@ -1733,47 +1733,96 @@ rule; the medians before and after written here; the offline smoke suite clean; 
 
 ### 14. Rich editors, drag and bulk text in the browser
 
-**Status: planned.** **Goal.** Typing works in the editors of X, GitHub, Google Docs, Monaco and CodeMirror; the
+**Status: done.** **Goal.** Typing works in the editors of X, GitHub, Google Docs, Monaco and CodeMirror; the
 browser can drag an element onto another; a long text goes in as one insertion.
 
 **Why.** On X's composer `type` lost the first character and `fill` reported done without a change (follow-up of
-2026-10-07). The cause is in `browser/driver.py:349-352`: `type` is `press_sequentially` and `fill` is `locator.fill`;
-editors built on contenteditable (Draft.js and Lexical on X, ProseMirror, Monaco, CodeMirror 6) set their selection
-asynchronously after focus and ignore a programmatic `fill`. The browser has no `drag` step
-(`browser/types.py:9-22`), which web IDEs, boards and file uploads by drop need. This item is also the browser half of
+2026-10-07). `type` is `press_sequentially` and `fill` is `locator.fill` (`browser/driver.py:386-392`); editors built
+on contenteditable (Draft.js and Lexical on X, ProseMirror, CodeMirror 6) take text only through their own input
+handling and get ready asynchronously after they take the focus. The browser has no `drag` step (`StepAction`,
+`browser/types.py:10-23`), which web IDEs, boards and file uploads by drop need. This item is also the browser half of
 "write code in the browser".
 
+The first draft of this design was checked against probes before building (a local editor that takes text only
+through `beforeinput`, as Draft.js and Lexical do, and gets ready a set time after the focus; scripts outside the
+repository). Three of its points changed:
+- Playwright's `fill` on a contenteditable already focuses, selects all and inserts the text as one `insertText`
+  input; that part of the draft was the code as it is.
+- With the editor ready 30 ms after the focus, `fill`, `type` and `keyboard.insert_text` all lose the text: the editor
+  drops what comes before it is ready, which explains both of X's symptoms. The draft's poll until
+  `document.activeElement` is the element does not help, since that holds as soon as `focus()` returns.
+- `type` stays key by key (autocomplete and mentions see the keys); `insert` is the step without key events.
+
 **Design.**
-- **Editable targets.** Before a `fill` or `type`, `run_step` asks the element once:
-  `el.isContentEditable || el.closest('[contenteditable]:not([contenteditable="false"])') !== null`. For an editable
-  target: `locator.focus()`, then poll (every 25 ms, at most 500 ms) until `document.activeElement` is the element or
-  inside it; then `type` uses `page.keyboard.insert_text(text)`, and `fill` selects all (`ControlOrMeta+A`) and
-  inserts the text the same way. A step whose target never took focus fails with "the editor did not take focus" and
-  the element. For `<input>` and `<textarea>` nothing changes: `fill` fills, `type` presses key by key.
-- **New steps.** `insert(ref, text)`: focus as above, then `insert_text` for any target: long text without key
-  events. `drag(ref, to_ref)`: `locator.drag_to(target)` (Playwright drives the mouse and dispatches the HTML5 drag
-  events); `Step` gets `to_ref: str | None`, `StepAction` gets `drag` and `insert`, `_TEXT_ACTIONS` and
-  `_TYPING_ACTIONS` include `insert`, the side-effect set includes both, `render.py` renders them, and the `browser_act`
-  description lists them with when to use which.
-- **Fixture pages** in `tests/smoke/test_browser.py` (`_PAGES`): `/editor`, a contenteditable `div` whose `focus`
-  handler moves the caret in a `setTimeout(…, 0)` and whose `beforeinput` and `input` handlers mirror the text into a
-  hidden `<textarea id="mirror">`, so a lost first character shows; `/board`, two lists with HTML5 drag and drop
-  handlers that move the dragged item.
+- **Editors.** An element is in an editor when it is contenteditable and not a form control; the editor is its editing
+  host (the nearest `[contenteditable]` that is not `"false"`). An `<input>` inside an editor and a document in
+  designMode (which has no such host) keep Playwright's own steps. `fill`, `type` and `insert` give the editor the focus
+  when it does not have it and wait until the editor and the selection have been quiet for 50 ms (at most 500 ms): in
+  the probe, editors ready 0 and 30 ms after the focus then take every step, after 57-88 ms of waiting. The wait runs
+  also when the editor has the focus already, since a click into it just before gave it the focus too and nothing tells
+  that apart from a focus taken long ago. Then the field that has the focus is checked for a secret (a page can move the
+  focus during the wait) and the text goes in: `fill` is Playwright's `fill`, which selects the element's content with a
+  DOM range (so a paragraph inside an editor works) and waits until the element is visible, enabled and editable; `type`
+  presses the keys on the page's keyboard; `insert` inserts the text. An editor that gets ready later without changing
+  anything first still drops the text (150 ms in the probe), so the step watches the editor's text: the editor took the
+  text when its text differs from before, at once or within 500 ms, or, for `fill`, when the element holds the text
+  (filling an editor with the text it holds, the empty text into an empty editor included, changes nothing). Otherwise
+  the step fails with "the editor did not take the text", or, when the editor left the page with its text unchanged,
+  says that it is not known whether the editor took it. A write after which the page opens another one (Enter in a
+  search box) is done.
+- **New steps.** `insert(ref, text)` puts the text in as one insertion, without key events: for long text and for
+  editors (Monaco's input is a `<textarea>` and takes it; CodeMirror 6 is an editor as above). Outside an editor it goes
+  only into a text `<input>` or a `<textarea>` that takes the focus, at the caret; at any other element the step fails,
+  since the text would go where the focus or the selection happens to be (a password field whose caret stayed, for one).
+  `type` and `insert` need a text that is not empty. `drag(ref, to_ref)` is `locator.drag_to(target, steps=10)`:
+  Playwright drives the mouse and the HTML5 drag events, with ten moves on the way for libraries that start a drag only
+  after some movement (probe: an HTML5 board moves its item in 114 ms). A drag that fails after pressing the button
+  releases it: Playwright leaves it pressed, and later clicks were reported done without reaching the page. `Step` gets
+  `to_ref`; `StepAction` gets `insert` and `drag`. `insert` is a typing step: the field that has the focus is checked
+  for a secret before the text goes in, and credentials and key-like text are judged as for `type`. The element `drag`
+  drops onto is checked for a secret like the field of `fill`. `drag` judges the dragged element as a click on it would
+  be, and the element it drops onto by its name whatever its role (a drop zone is more often a list or a region than a
+  button) and as a field that takes typed text. The popup grace follows `drag` (a drop can open a dialog), not `insert`
+  (as with `fill` and `type`). The batch counts as input when it has an `insert`.
+- **Fixture pages** in `tests/smoke/test_browser.py` (`_PAGES`): `/editor`, an editor that takes text only through
+  `beforeinput`, gets ready a set time after the focus (`?ready=`, 30 ms by default), shows a change a set time after
+  the input (`?apply=`, at once by default) and shows what it holds in a line under it, next to a plain `<input>` and an
+  editor without a role that holds two paragraphs and an `<input>`; `/design`, a document in designMode; `/search-box`,
+  a contenteditable search box whose Enter opens the results; `/board`, two lists with HTML5 drag and drop handlers that
+  move the dragged item. In `tests/smoke/test_secret_fields.py`: `/verify-note`, an editor that hands the focus to the
+  code field 20 ms after it takes it.
 - **Guidance.** The `browser_act` description: `fill` for form fields, `type` where autocomplete must see the keys,
   `insert` for long text and for editors, `drag` to move an element onto another.
 
 **Touchpoints.** `browser/driver.py`, `browser/types.py`, `browser/safety.py`, `browser/render.py`,
-`tools/browser.py`, README "Browser use", `tests/smoke/test_browser.py`.
+`policy/elements.py`, `tools/browser.py`, README "Browser use", `tests/smoke/test_browser.py`,
+`tests/smoke/test_secret_fields.py`, `tests/unit/test_tool_errors.py`, `tests/unit/test_secret_fields.py`.
 
 **Decisions and limits.**
 - X itself is not tested here (no form filling on external sites, a rule since part 1); the owner checks the composer
   once (open decision 12).
-- Monaco and CodeMirror take `insert_text`; their auto-indent and auto-close can still change what is typed line by
-  line. The guidance says to insert whole blocks and read the editor back.
+- An editor that gets ready more than 50 ms after the focus without changing anything meanwhile drops the text; the step
+  then fails and says so, and a second try finds it ready.
+- An editor that shows the text more than 0.5 s after the write is reported as not having taken it (a second try then
+  writes the text twice), and so is a write that changes no text in it and makes the page open another one only after
+  more than half a second; a widget inside the editor whose text changes by itself can make a dropped write look taken;
+  a `type` that starts before the editor is ready can lose its first keys and still change the editor.
+- `press` with a ref is not covered by the wait: a key pressed into an editor that is not ready yet is lost, as before.
+- Google Docs takes its text through a hidden editor inside a frame; it is not tested here.
+- Monaco and CodeMirror take `insert_text`; their auto-indent and auto-close can still change the text that goes in.
+- A drag library that starts a drag only on a long press or from the keyboard is not covered, and neither is an upload
+  by drop: `drag` carries no files.
 
-**Done when.** Smoke tests on `/editor` (`type`, `fill` and `insert` leave the mirror equal to the text; `type` into a
-plain `<input>` unchanged) and `/board` (`drag` reorders); unit tests of the new step validation; the offline smoke
-suite clean; README updated.
+**Done when.** Smoke tests on `/editor` (`type`, `fill` and `insert` leave the editor's line equal to the text with the
+editor ready 30 ms after the focus; a `fill` with the text the editor holds, and with the empty text into the empty
+editor, is done; a write the editor drops fails the step; an editor that shows the text 150 ms after the write took it;
+a click into the editor ready 70 ms after the focus, then a `type`, takes the text; `fill` reaches a paragraph of the
+editor without a role and the `<input>` inside it; `insert` at an element that takes no text fails; `type` into the
+plain `<input>` unchanged), `/design` (`fill` into a paragraph and an `<input>`), `/search-box` (a key after which the
+page opens another one is done) and `/board` (`drag` moves the item); in `tests/smoke/test_secret_fields.py`, an
+`insert` at the heading and a drop onto the code field are refused, and so is an editor's text once the editor handed
+the focus to the code field; unit tests of the new step validation and of how a drop is judged; the offline smoke suite
+clean; README updated.
 
 ### 15. Helper models: consult, delegate to another model, standby
 
@@ -2098,10 +2147,10 @@ on and is closed by `terminal_close`; the idle reaper; unit tests of the ANSI st
     `memory_save` are acting-only, `tools/base.py:16-17`), and DuckDuckGo's bot check throttles long research runs
     (README "Status and known limits"). Say whether a research run may save notes and files under the workspace,
     and whether the hosted Ollama search (`OLLAMA_API_KEY`) should be the default backend; either is a small item.
-15. The Claude GitHub app reviews nothing yet: on PR #1, PR #2, PR #4 and PR #5 it answered "Code review skipped" (on
-    PR #3 it posted nothing) because your organization has no extra usage to pay for it. Add extra usage (or raise the monthly
-    limit) at claude.ai/admin-settings/usage; a comment `@claude review` on a PR then asks for a review. Until then each
-    PR is merged on `/code-review` alone.
+15. The Claude GitHub app reviews nothing yet: on PR #1, PR #2, PR #4, PR #5 and PR #6 it answered "Code review
+    skipped" (on PR #3 it posted nothing) because your organization has no extra usage to pay for it. Add extra usage
+    (or raise the monthly limit) at claude.ai/admin-settings/usage; a comment `@claude review` on a PR then asks for a
+    review. Until then each PR is merged on `/code-review` alone.
 
 ## Log
 
@@ -2346,3 +2395,30 @@ on and is closed by `terminal_close`; the idle reaper; unit tests of the ANSI st
   outlast; the URL rules are checked after loads, `act`, `back` and `browser_wait_text` only, not when `snapshot`,
   `find`, `links`, `read_text`, `screenshot`, `scroll`, `switch_tab`, `close_tab` or `upload` read a page that moved on
   by itself.
+- 2026-10-09: item 13 merged as `a14f21a` (PR #6, squash); the Claude GitHub app skipped its review again (decision 15).
+  Item 14 started on `item-14-rich-editors`.
+- 2026-10-10: item 14 done. In a rich editor (a contenteditable area such as X's composer) `fill`, `type` and `insert`
+  wait until the editor has settled before the text goes in, and fail when it did not take the text instead of reporting
+  done; probes showed that Playwright's `fill` already inserts the text as one input and that an editor ready 30 ms
+  after the focus loses the text whatever the step, which explains both of X's symptoms. New steps: `insert` (the text
+  at once, without key events) and `drag` (`ref` onto `to_ref`, `locator.drag_to` with ten moves). Three points of the
+  first draft changed after probes; the section says which.
+- 2026-10-10: item 14 review fixes (/code-review at max effort: ten finder angles, 26 candidates, 15 verified, all
+  confirmed and fixed). The secret check of the field that has the focus runs after the editor's wait, right before the
+  text goes in (a page that moved the focus during the wait got the text into a code field), and `insert` outside an
+  editor goes only into a text field that has the focus (with the caret left in a password field, an `insert` at a
+  button wrote into it). `fill` into an editor is Playwright's `fill` again after the wait, which brings back a
+  paragraph inside an editor without a role, the wait until the element is editable, and a select-all that does not go
+  through the page's keys. Form controls inside an editor and documents in designMode keep Playwright's steps (the first
+  failed although the text went in, the second threw). The check compares the editor's text instead of counting any
+  mutation, waits up to 500 ms for a change and returns at once when there is one (an editor step 199-206 ms instead of
+  254-262), takes a `fill` that leaves the element holding its text, counts a navigation after the write as done, and
+  says when the editor left the page that it is not known whether it took the text. `type` and `insert` need a text that
+  is not empty. A drop onto a secret field is refused, a failed or cancelled drag releases the mouse button (later
+  clicks were reported done and never arrived), and the element a drag drops onto is judged by its name whatever its
+  role. A second review of these fixes found that skipping the wait for an editor that had the focus already let a batch
+  that clicks into the editor and then types write too early; the wait runs before every write into an editor. Unit
+  tests (539), the browser and secret-field smoke files (48), the offline smoke suite (228, no cloud request), 14
+  mutations of the fixes each caught by a test. Left (limits in the section): `press` into an editor that is not ready
+  yet still loses the key; an editor that shows the text after more than 0.5 s; a widget whose text changes inside the
+  editor; a `type` started before the editor is ready.

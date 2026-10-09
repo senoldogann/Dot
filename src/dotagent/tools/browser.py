@@ -269,20 +269,25 @@ class ActArgs(ToolArgs):
     )
 
 
-def _element_for(step: Step, ctx: ToolContext) -> Element | None:
-    if step.ref is None:
+def _element_at(ref: str | None, ctx: ToolContext) -> Element | None:
+    if ref is None:
         return None
-    line: str | None = ctx.runtime.browser.peek_line(ctx.thread_id, step.ref)
+    line: str | None = ctx.runtime.browser.peek_line(ctx.thread_id, ref)
     return parse_element(line) if line is not None else None
 
 
-def _step_label(step: Step, element: Element | None) -> str:
-    named: str = f" {_clip(element.name, _LABEL_CHARS)!r}" if element is not None and element.name else ""
-    return f"{describe_step(step)}{named}"
+def _named(element: Element | None) -> str:
+    return f" {_clip(element.name, _LABEL_CHARS)!r}" if element is not None and element.name else ""
+
+
+def _step_label(step: Step, element: Element | None, target: Element | None) -> str:
+    if step.action == "drag":
+        return f"drag {step.ref}{_named(element)} onto {step.to_ref}{_named(target)}"
+    return f"{describe_step(step)}{_named(element)}"
 
 
 def _act_kind(steps: list[Step]) -> ActionKind:
-    if any(step.action in ("fill", "type") for step in steps):
+    if any(step.action in ("fill", "type", "insert") for step in steps):
         return "browser_input"
     if any(step.has_side_effects() for step in steps):
         return "browser_click"
@@ -313,12 +318,16 @@ def _act_tool() -> RegisteredTool:
                 f"A batch holds at most {limit} steps; send the first {limit} and look at the result before the rest.",
                 {"steps": len(args.steps), "limit": limit},
             )
-        elements: list[Element | None] = [_element_for(step, ctx) for step in args.steps]
+        elements: list[Element | None] = [_element_at(step.ref, ctx) for step in args.steps]
+        targets: list[Element | None] = [_element_at(step.to_ref, ctx) for step in args.steps]
+        judged: list[tuple[Step, Element | None, Element | None]] = list(
+            zip(args.steps, elements, targets, strict=True)
+        )
         assessment: StepAssessment = combine_assessments(
-            [assess_step(step, element) for step, element in zip(args.steps, elements, strict=True)]
+            [assess_step(step, element, target) for step, element, target in judged]
         )
         kind: ActionKind = _act_kind(args.steps)
-        summary: str = "; ".join(_step_label(step, element) for step, element in zip(args.steps, elements, strict=True))
+        summary: str = "; ".join(_step_label(step, element, target) for step, element, target in judged)
         target: str = ctx.runtime.browser.current_url(ctx.thread_id) or ""
         return _action("browser_act", kind, assessment.risk, summary, target, assessment.flags)
 
@@ -332,11 +341,14 @@ def _act_tool() -> RegisteredTool:
         name="browser_act",
         description=(
             "Do up to a few steps on the current page in one call: click, double_click, right_click, hover, fill "
-            "(replace a field's value), type (key by key, for autocomplete), select, press (Enter, Control+A, …), "
-            "check, uncheck, scroll_into_view, click_at (pixel x,y from a screenshot, only for canvases). Batch the "
-            "steps you can predict, such as filling a whole form and pressing submit. The result shows what changed "
-            "on the page. Passwords, card numbers and one-time codes go in only as your instructions on secrets say: "
-            "otherwise the browser refuses the step. " + _REF_HELP
+            "(replace a form field's value), type (key by key, where autocomplete must see the keys), insert (the "
+            "text at once at the caret, without keys: long text and rich editors such as post composers or code "
+            "editors), select, press (Enter, Control+A, …), check, uncheck, scroll_into_view, drag (move ref onto "
+            "to_ref), click_at (pixel x,y from a screenshot, only for canvases). In an editor (a contenteditable "
+            "area) fill, type and insert wait until it is ready and fail when it did not take the text; insert goes "
+            "only into a text field or an editor. Batch the steps you can predict, such as filling a whole form and "
+            "pressing submit. The result shows what changed on the page. Passwords, card numbers and one-time codes "
+            "go in only as your instructions on secrets say: otherwise the browser refuses the step. " + _REF_HELP
         ),
         args_model=ActArgs,
         modes=ACTING_MODES,

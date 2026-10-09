@@ -20,6 +20,8 @@ type StepAction = Literal[
     "uncheck",
     "scroll_into_view",
     "click_at",
+    "insert",
+    "drag",
 ]
 
 _REF_ACTIONS: frozenset[str] = frozenset(
@@ -34,11 +36,13 @@ _REF_ACTIONS: frozenset[str] = frozenset(
         "check",
         "uncheck",
         "scroll_into_view",
+        "insert",
+        "drag",
     }
 )
-_TEXT_ACTIONS: frozenset[str] = frozenset({"fill", "type", "select"})
+_TEXT_ACTIONS: frozenset[str] = frozenset({"fill", "type", "select", "insert"})
 _SIDE_EFFECT_ACTIONS: frozenset[str] = frozenset(
-    {"click", "double_click", "right_click", "select", "press", "check", "uncheck", "click_at"}
+    {"click", "double_click", "right_click", "select", "press", "check", "uncheck", "click_at", "drag"}
 )
 
 
@@ -50,16 +54,18 @@ class Step(BaseModel):
     action: StepAction = Field(
         description=(
             "click | double_click | right_click | hover | fill (replace the value of a field) | type (key by key, for "
-            "autocomplete widgets) | select (choose an option by value or label) | press (a key or chord) | check | "
-            "uncheck | scroll_into_view | click_at (viewport pixel x,y from a screenshot, for canvases)."
+            "autocomplete widgets) | insert (put the text in at once, without keys: long text, editors) | select "
+            "(choose an option by value or label) | press (a key or chord) | check | uncheck | scroll_into_view | "
+            "drag (move the element ref onto to_ref) | click_at (viewport pixel x,y from a screenshot, for canvases)."
         )
     )
     ref: str | None = Field(default=None, description="Element ref from the latest snapshot, for example e12.")
+    to_ref: str | None = Field(default=None, description="For drag: the ref of the element to drop onto.")
     text: str | None = Field(
         default=None,
         description=(
-            "Text for fill and type. For select: the label or value of one of the options the snapshot lists, written "
-            "exactly as listed."
+            "Text for fill, type and insert. For select: the label or value of one of the options the snapshot lists, "
+            "written exactly as listed."
         ),
     )
     key: str | None = Field(default=None, description="Key or chord for press, for example Enter or Control+A.")
@@ -73,10 +79,14 @@ class Step(BaseModel):
             raise ValueError(f"{action} needs a ref")
         if action in _TEXT_ACTIONS and self.text is None:
             raise ValueError(f"{action} needs text")
+        if action in ("type", "insert") and self.text == "":
+            raise ValueError(f"{action} needs text that is not empty; fill with an empty text clears a field")
         if action == "press" and self.key is None:
             raise ValueError("press needs a key")
         if action == "click_at" and (self.x is None or self.y is None or self.ref is not None):
             raise ValueError("click_at needs x and y and no ref")
+        if action == "drag" and self.to_ref is None:
+            raise ValueError("drag needs a to_ref")
         unused: list[str] = []
         if self.text is not None and action not in _TEXT_ACTIONS:
             unused.append("text")
@@ -86,6 +96,8 @@ class Step(BaseModel):
             unused.append("x/y")
         if self.ref is not None and action not in _REF_ACTIONS and action != "press":
             unused.append("ref")
+        if self.to_ref is not None and action != "drag":
+            unused.append("to_ref")
         if unused:
             raise ValueError(f"{action} does not use {', '.join(unused)}")
         return self

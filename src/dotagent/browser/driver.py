@@ -54,6 +54,67 @@ _QUIET_SCRIPT: str = """([quietMs, maxMs]) => new Promise((resolve) => {
   const hardTimer = setTimeout(finish, maxMs);
 })"""
 
+# An editor is the editing host of a contenteditable element: the nearest element whose contenteditable attribute is not
+# "false". A form control inside one is no editor, and neither is a document in designMode, which has no such host.
+# Editors such as Draft.js and Lexical take text only through their own input handling and drop what comes before they
+# are ready after taking the focus, without an error. So the editor gets the focus when it does not have it, and the
+# step waits until the editor and the selection have been quiet for quietMs (at most maxMs) also when it has: a click
+# into the editor just before gave it the focus too, and nothing tells that apart from a focus taken long ago. Then the
+# editor's text is watched. The answer is "plain" for an element in no editor, "replaced" when the editor left the page
+# during the wait, "ready" otherwise.
+_EDITOR_READY_SCRIPT: str = """async (element, [quietMs, maxMs]) => {
+  if (!element.isContentEditable || element.matches('input, textarea')) return 'plain';
+  const host = element.closest('[contenteditable]:not([contenteditable="false"])');
+  if (!host) return 'plain';
+  if (!host.contains(host.getRootNode().activeElement)) host.focus();
+  await new Promise((resolve) => {
+    let quietTimer = 0;
+    const settle = () => { clearTimeout(quietTimer); quietTimer = setTimeout(finish, quietMs); };
+    const finish = () => {
+      observer.disconnect();
+      document.removeEventListener('selectionchange', settle);
+      clearTimeout(quietTimer);
+      clearTimeout(hardTimer);
+      resolve(null);
+    };
+    const observer = new MutationObserver(settle);
+    observer.observe(host, { subtree: true, childList: true, attributes: true, characterData: true });
+    document.addEventListener('selectionchange', settle);
+    settle();
+    const hardTimer = setTimeout(finish, maxMs);
+  });
+  if (!host.isConnected) return 'replaced';
+  if (element.__dotEditorWatch) element.__dotEditorWatch.observer.disconnect();
+  const watch = { host, before: host.textContent, changed: false, wake: null };
+  watch.observer = new MutationObserver(() => {
+    if (watch.changed || host.textContent === watch.before) return;
+    watch.changed = true;
+    if (watch.wake) watch.wake();
+  });
+  watch.observer.observe(host, { subtree: true, childList: true, characterData: true });
+  element.__dotEditorWatch = watch;
+  return 'ready';
+}"""
+# After the write: "took" once the editor's text differs from what it was when the watch began (at once, or as soon as
+# it does within maxMs), or when the element holds `expected` (fill's text, so filling an editor with what it holds
+# already is no failure; null for type and insert); "replaced" when the editor left the page with its text unchanged;
+# "dropped" otherwise. Text is compared without zero-width characters and with its white space collapsed.
+_EDITOR_TOOK_SCRIPT: str = """async (element, [maxMs, expected]) => {
+  const watch = element.__dotEditorWatch;
+  if (!watch) return 'dropped';
+  delete element.__dotEditorWatch;
+  const plain = (text) => text.replace(/[\\u200B-\\u200D\\uFEFF]/g, '').replace(/\\s+/g, ' ').trim();
+  const holds = () => expected !== null && plain(element.innerText) === plain(expected);
+  if (!watch.changed && !holds())
+    await new Promise((resolve) => { watch.wake = resolve; setTimeout(resolve, maxMs); });
+  watch.observer.disconnect();
+  if (watch.changed || holds()) return 'took';
+  return watch.host.isConnected ? 'dropped' : 'replaced';
+}"""
+_EDITOR_QUIET_MS: int = 50
+_EDITOR_MAX_MS: int = 500
+_DRAG_MOVES: int = 10  # mouse moves on the way: some drag libraries start a drag only after the pointer moved
+
 # What the field a step writes into says about the secret it takes: "password" for a password input, then its
 # autocomplete tokens; null for an element that takes no typed text. Given a label, or an element inside one, the
 # field is the label's control, which is where Playwright's fill writes (its retarget(node, "follow-label")). The
@@ -71,6 +132,10 @@ _FIELD_MARKING_SCRIPT: str = """(element) => {
   const marking = field.getAttribute('autocomplete') || '';
   return field instanceof HTMLInputElement && field.type === 'password' ? `password ${marking}` : marking;
 }"""
+# Whether the element has the keyboard focus and takes typed text: a text input or a textarea, not disabled or read-only.
+_TAKES_TEXT_SCRIPT: str = """(element) => element.getRootNode().activeElement === element
+  && ['text', 'search', 'url', 'tel', 'email', 'password', 'number', 'textarea'].includes(element.type)
+  && element.matches('input, textarea') && !element.disabled && !element.readOnly"""
 # The element of a frame's document that has the keyboard focus, inside open shadow roots.
 _FOCUSED_SCRIPT: str = """() => {
   let element = document.activeElement;
@@ -282,6 +347,12 @@ def _ref_of(step: Step) -> str:
     return step.ref
 
 
+def _to_ref_of(step: Step) -> str:
+    if step.to_ref is None:
+        raise BrowserError("the step needs a to_ref", {"action": step.action})
+    return step.to_ref
+
+
 def _text_of(step: Step) -> str:
     if step.text is None:
         raise BrowserError("the step needs text", {"action": step.action})
@@ -350,10 +421,56 @@ async def _select_option(page: Page, locator: Locator, ref: str, wanted: str, ti
     await locator.select_option(wanted, timeout=timeout_ms)
 
 
+async def _into_editor(
+    page: Page,
+    locator: Locator,
+    ref: str,
+    timeout_ms: int,
+    secret_field: SecretFieldCheck,
+    expected: str | None,
+    write: Callable[[], Awaitable[None]],
+) -> bool:
+    """Run ``write`` into the editor the element is in (:data:`_EDITOR_READY_SCRIPT`): once the editor has the focus and
+    is ready, the field that has the focus goes to ``secret_field``; after the write, a step the editor did not take
+    fails instead of reporting done (:data:`_EDITOR_TOOK_SCRIPT`, with ``expected`` as there). ``False``, with nothing
+    done, when the element is in no editor."""
+    element: ElementHandle = await locator.element_handle(timeout=timeout_ms)
+    try:
+        state: object = await element.evaluate(_EDITOR_READY_SCRIPT, [_EDITOR_QUIET_MS, _EDITOR_MAX_MS])
+        if state == "plain":
+            return False
+        if state == "replaced":
+            raise BrowserError(
+                "the editor was replaced when it took the focus; take a new snapshot", {"ref": ref, "url": page.url}
+            )
+        await _check_secret_field(page, await _focused_marking(page), ref, secret_field)
+        await write()
+        try:
+            took: object = await element.evaluate(_EDITOR_TOOK_SCRIPT, [_EDITOR_MAX_MS, expected])
+        except PlaywrightError as error:
+            if not _document_replaced(error):
+                raise
+            return True  # the write made the page navigate, as Enter in a search box does
+    finally:
+        await element.dispose()
+    if took == "dropped":
+        raise BrowserError(
+            "the editor did not take the text: its text did not change. Look at the page, then try the step again",
+            {"ref": ref, "url": page.url},
+        )
+    if took == "replaced":
+        raise BrowserError(
+            "the editor was replaced while the text went in, so it is not known whether it took the text: look at the "
+            "page before writing again",
+            {"ref": ref, "url": page.url},
+        )
+    return True
+
+
 async def run_step(page: Page, step: Step, timeout_ms: int, secret_field: SecretFieldCheck) -> None:
     """Perform one step against the latest snapshot. A field that takes a secret goes to ``secret_field`` first, which
-    raises to refuse the step: the field ``fill`` writes into, and the one that has the keyboard focus when ``type``,
-    or ``press`` with a key that puts text in, is about to send its keys."""
+    raises to refuse the step: the field ``fill`` writes into, the one ``drag`` drops onto, and the one that has the
+    keyboard focus when ``type``, ``insert``, or ``press`` with a key that puts text in, is about to send its text."""
     if step.action == "click_at":
         if step.x is None or step.y is None:
             raise BrowserError("click_at needs x and y", {"url": page.url})
@@ -385,11 +502,51 @@ async def run_step(page: Page, step: Step, timeout_ms: int, secret_field: Secret
                 await locator.hover(timeout=timeout_ms)
             case "fill":
                 await _check_secret_field(page, await locator.evaluate(_FIELD_MARKING_SCRIPT), ref, secret_field)
-                await locator.fill(_text_of(step), timeout=timeout_ms)
+                if not await _into_editor(
+                    page,
+                    locator,
+                    ref,
+                    timeout_ms,
+                    secret_field,
+                    _text_of(step),
+                    lambda: locator.fill(_text_of(step), timeout=timeout_ms),
+                ):
+                    await locator.fill(_text_of(step), timeout=timeout_ms)
             case "type":
-                await locator.focus(timeout=timeout_ms)
-                await _check_secret_field(page, await _focused_marking(page), ref, secret_field)
-                await locator.press_sequentially(_text_of(step), timeout=timeout_ms)
+                if not await _into_editor(
+                    page, locator, ref, timeout_ms, secret_field, None, lambda: page.keyboard.type(_text_of(step))
+                ):
+                    await locator.focus(timeout=timeout_ms)
+                    await _check_secret_field(page, await _focused_marking(page), ref, secret_field)
+                    await locator.press_sequentially(_text_of(step), timeout=timeout_ms)
+            case "insert":
+                if not await _into_editor(
+                    page,
+                    locator,
+                    ref,
+                    timeout_ms,
+                    secret_field,
+                    None,
+                    lambda: page.keyboard.insert_text(_text_of(step)),
+                ):
+                    await locator.focus(timeout=timeout_ms)
+                    await _check_secret_field(page, await _focused_marking(page), ref, secret_field)
+                    if not await locator.evaluate(_TAKES_TEXT_SCRIPT, timeout=timeout_ms):
+                        raise BrowserError(
+                            "insert needs a text field or an editor that takes the focus; this element takes no text",
+                            {"ref": ref, "url": page.url},
+                        )
+                    await page.keyboard.insert_text(_text_of(step))
+            case "drag":
+                target: Locator = await live_locator(page, _to_ref_of(step), "drag")
+                await _check_secret_field(
+                    page, await target.evaluate(_FIELD_MARKING_SCRIPT, timeout=timeout_ms), step.to_ref, secret_field
+                )
+                try:
+                    await locator.drag_to(target, steps=_DRAG_MOVES, timeout=timeout_ms)
+                except BaseException:
+                    await page.mouse.up()  # a drag that fails or is cancelled after the press leaves the button down
+                    raise
             case "select":
                 await _select_option(page, locator, ref, _text_of(step), timeout_ms)
             case "press":
