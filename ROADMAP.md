@@ -896,8 +896,8 @@ that change the owner's agent are their call (see "Open owner decisions", 6 onwa
 | 11  | Open-ended goals in one run: targets, limits and an honest end         | done        | 12ad395 |
 | 12  | Campaigns: a goal that works until its outcome is verified             | done        | c915ab2 |
 | 13  | Faster browser and desktop steps                                       | done        | a14f21a |
-| 14  | Rich editors, drag and bulk text in the browser                        | done        |         |
-| 15  | Helper models: consult, delegate to another model, standby             | planned     |         |
+| 14  | Rich editors, drag and bulk text in the browser                        | done        | 37808d5 |
+| 15  | Helper models: consult, delegate to another model, standby             | in progress |         |
 | 16  | Typed judgments (TypeSafe) at the decision points                      | planned     |         |
 | 17  | Pacing and public actions on social platforms                          | planned     |         |
 | 18  | Skills written for Claude Code, and the X playbook                     | planned     |         |
@@ -1733,8 +1733,8 @@ rule; the medians before and after written here; the offline smoke suite clean; 
 
 ### 14. Rich editors, drag and bulk text in the browser
 
-**Status: done.** **Goal.** Typing works in the editors of X, GitHub, Google Docs, Monaco and CodeMirror; the
-browser can drag an element onto another; a long text goes in as one insertion.
+**Status: done** (`37808d5`, PR #7). **Goal.** Typing works in the editors of X, GitHub, Google Docs, Monaco and
+CodeMirror; the browser can drag an element onto another; a long text goes in as one insertion.
 
 **Why.** On X's composer `type` lost the first character and `fill` reported done without a change (follow-up of
 2026-10-07). `type` is `press_sequentially` and `fill` is `locator.fill` (`browser/driver.py:386-392`); editors built
@@ -1826,9 +1826,9 @@ clean; README updated.
 
 ### 15. Helper models: consult, delegate to another model, standby
 
-**Status: planned.** **Goal.** A run on one model can ask a model of another provider for advice, hand a sub-task to
-it, or move to it when its own provider stops answering; a helper whose key is missing or whose quota is spent is
-simply not there, and the run goes on.
+**Status: in progress.** **Goal.** A run on one model can ask a model of another provider for advice, hand a sub-task to
+it, or move to it when its own provider stops answering; a helper whose key is missing or whose quota is spent is simply
+not there, and the run goes on.
 
 **Why.** The owner asked for it on 2026-10-09 ("while DeepSeek works it should be able to ask Sonnet or Opus for help;
 without a key or with the quota spent nothing may break"). The seed exists: the review model is a second model the
@@ -2147,7 +2147,7 @@ on and is closed by `terminal_close`; the idle reaper; unit tests of the ANSI st
     `memory_save` are acting-only, `tools/base.py:16-17`), and DuckDuckGo's bot check throttles long research runs
     (README "Status and known limits"). Say whether a research run may save notes and files under the workspace,
     and whether the hosted Ollama search (`OLLAMA_API_KEY`) should be the default backend; either is a small item.
-15. The Claude GitHub app reviews nothing yet: on PR #1, PR #2, PR #4, PR #5 and PR #6 it answered "Code review
+15. The Claude GitHub app reviews nothing yet: on PR #1, PR #2, PR #4, PR #5, PR #6 and PR #7 it answered "Code review
     skipped" (on PR #3 it posted nothing) because your organization has no extra usage to pay for it. Add extra usage
     (or raise the monthly limit) at claude.ai/admin-settings/usage; a comment `@claude review` on a PR then asks for a
     review. Until then each PR is merged on `/code-review` alone.
@@ -2422,3 +2422,5 @@ on and is closed by `terminal_close`; the idle reaper; unit tests of the ANSI st
   mutations of the fixes each caught by a test. Left (limits in the section): `press` into an editor that is not ready
   yet still loses the key; an editor that shows the text after more than 0.5 s; a widget whose text changes inside the
   editor; a `type` started before the editor is ready.
+- 2026-10-10: item 14 merged as `37808d5` (PR #7, squash); the Claude GitHub app skipped its review again (decision 15).
+  Item 15 started on `item-15-helper-models`.
