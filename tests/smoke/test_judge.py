@@ -162,6 +162,7 @@ async def _context(runtime: Runtime, campaign_id: str | None) -> ToolContext:
             "task",
             "aggressive",
             runtime.config.policy.pace,
+            runtime.config.policy.spend,
             "ask",
             _nobody,
             (GOAL,),

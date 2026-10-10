@@ -40,7 +40,7 @@ _LIST: ActionInfo = _action("schedule_list", "meta", "safe", ())
 def test_schedules_follow_the_policy_layers(
     info: ActionInfo, mode: RunMode, tainted: bool, preset: Preset, verdict: Verdict, source: str
 ) -> None:
-    decision: Decision = decide(info, mode, tainted, preset, [])
+    decision: Decision = decide(info, mode, tainted, preset, [], None)
     assert (decision.verdict, decision.source) == (verdict, source), decision.reason
 
 

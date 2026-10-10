@@ -79,9 +79,9 @@ async def test_the_tool_reads_only_the_listed_applications_and_is_a_high_risk_ac
     prepared, _ = await _prepare(runtime, {"app": "mail", "sender": "shop.com", "within_minutes": 3})
     assert (prepared.action.kind, prepared.action.risk, prepared.action.target) == ("app_control", "high", "Mail")
     assert prepared.action.summary == "Read a one-time code from Mail (from 'shop.com', the last 3 min)"
-    assert decide(prepared.action, "task", True, "aggressive", []).verdict == "allow"
-    assert decide(prepared.action, "task", False, "balanced", []).verdict == "ask"
-    assert decide(prepared.action, "research", False, "aggressive", []).source == "mode"
+    assert decide(prepared.action, "task", True, "aggressive", [], None).verdict == "allow"
+    assert decide(prepared.action, "task", False, "balanced", [], None).verdict == "ask"
+    assert decide(prepared.action, "research", False, "aggressive", [], None).source == "mode"
 
 
 @pytest.mark.skipif(

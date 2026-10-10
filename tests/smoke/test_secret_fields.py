@@ -127,6 +127,7 @@ async def _context(runtime: Runtime, approvals: ApprovalMode) -> tuple[ToolConte
         "task",
         "aggressive",
         runtime.config.policy.pace,
+        runtime.config.policy.spend,
         approvals,
         _nobody,
         (GOAL,),

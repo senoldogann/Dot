@@ -50,7 +50,8 @@ from dotagent.llm.types import ImageData
 from dotagent.policy.elements import Element, StepAssessment, assessment_for, combine_assessments
 from dotagent.policy.pace import pace_class
 from dotagent.policy.paths import PathClass, classify_path, expand_path
-from dotagent.policy.types import ActionInfo, ActionKind, Flag, Risk
+from dotagent.policy.spend import amount_in_label, render_amount, total_on_page
+from dotagent.policy.types import ActionInfo, ActionKind, Amount, Flag, Risk
 from dotagent.tools.base import (
     ACTING_MODES,
     ALL_MODES,
@@ -71,6 +72,8 @@ _HEADROOM_CHARS: int = 3500  # room next to the page body for steps, tabs, notes
 _SUMMARY_CHARS: int = 240
 _LABEL_CHARS: int = 50
 _DEFAULT_FIND_LIMIT: int = 10
+# How much of the page's text is read for the amount of a payment step.
+_AMOUNT_PAGE_CHARS: int = 20_000
 _DEFAULT_LINKS_LIMIT: int = 40
 _DEFAULT_WAIT_S: float = 10.0
 _VIEWPORT_SCROLL_RATIO: float = 0.8
@@ -314,6 +317,19 @@ def _secret_field_check(ctx: ToolContext, authorized: ActionInfo) -> SecretField
     return enter
 
 
+async def _payment_amount(ctx: ToolContext, elements: list[Element | None]) -> Amount | None:
+    """What a payment step moves: the amount in a control's label, else the total on the page; ``None`` when neither
+    says (the money hand-off then holds). Read for the pre-approved caps of ``[policy.spend]``."""
+    for element in elements:
+        if element is None:
+            continue
+        named: Amount | None = amount_in_label(element.name)
+        if named is not None:
+            return named
+    page: TextView = await ctx.browser.read_text(ctx.thread_id, None, 0, _AMOUNT_PAGE_CHARS)
+    return total_on_page(page.text)
+
+
 def _act_tool() -> RegisteredTool:
     async def classify(args: ActArgs, ctx: ToolContext) -> ActionInfo:
         limit: int = ctx.runtime.config.browser.max_batch_steps
@@ -353,7 +369,13 @@ def _act_tool() -> RegisteredTool:
         notes: list[str] = [judgment.note for judgment in judgments if judgment.note]
         if notes:
             summary = f"{summary} ({'; '.join(notes)})"
-        return _action("browser_act", kind, assessment.risk, summary, target, assessment.flags)
+        action: ActionInfo = _action("browser_act", kind, assessment.risk, summary, target, assessment.flags)
+        if "financial" not in assessment.flags:
+            return action
+        amount: Amount | None = await _payment_amount(ctx, [element for _, element, _ in judged])
+        if amount is None:
+            return action
+        return action.model_copy(update={"summary": f"{summary} (amount {render_amount(amount)})", "amount": amount})
 
     async def run(args: ActArgs, ctx: ToolContext, authorized: ActionInfo) -> ToolResult:
         outcome: ActOutcome = await ctx.browser.act(

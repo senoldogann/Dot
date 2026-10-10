@@ -2372,8 +2372,8 @@ Paste this to the agent that takes the work:
 | 29  | Eval reports that compare runs, and the defaults that wait for them      | done    | 1513bd4 |
 | 30  | Typed best-of-two at critical decisions; injection fixtures in the evals | planned |         |
 | 31  | One-time codes from the owner's own Mail and Messages                    | done    | 88abeed |
-| 32  | The owner's Chrome profile as the default of a campaign                  | in progress |     |
-| 33  | Pre-approved spending caps                                               | planned |         |
+| 32  | The owner's Chrome profile as the default of a campaign                  | done    | f302464 |
+| 33  | Pre-approved spending caps                                               | in progress |     |
 | 34  | Research runs that keep notes, and hosted search by default              | done    | e68b22d |
 | 35  | A plan with dependencies and parallel branches                           | done    | d6b40c1 |
 | 36  | Playbooks learned from runs that reached their goal                      | done    | fb99354 |
@@ -2715,10 +2715,27 @@ unlisted host the money hard stop holds in every mode.
 **Why.** dots allows advance approval for a specific purchase; Dot has only the hard stop. The owner's "earn money"
 goals need small spends (a domain, a listing fee).
 
-**Touchpoints.** `policy/*`, `agent/gate.py`, `policy/elements.py` (amount reading from the page), `defaults.toml`,
-`config.py`, README "Safety".
+**Design, as built.** `[policy.spend]` is a table of sites (the host without `www.`) to `SpendCap(per_purchase,
+per_day)`, plain numbers. The amount is read in the browser tool's classification of a payment step
+(`policy/spend.py`, not `elements.py`, whose rules are name-based): the amount in a control's label first ("Pay
+€19,90"), else the amount after the last total cue of the page's text ("Order total: $12.00"); a step whose amount
+cannot be read keeps the hand-off. The amount travels in `ActionInfo.amount` (the one field of `ActionInfo` with a
+default, since only payment steps know one) and in the step's summary, so the policy event, the approval record and the
+timeline show it. The engine gains `allowance`: the gate computes the site's state (the day's spends from the new
+`spends` table) and `spend_allowance` turns a step under both caps into a question with source `spend`, which takes the
+place of the money hand-off (`hard_stop` no longer stops the financial flag then; a credential flag still does) and no
+later layer loosens. A question in `yolo` is waived, so the run goes on; in `auto` the review model answers; in `ask`
+the owner is asked once (the plan said "passes in yolo and auto" and nothing of `ask`). The spend is recorded once the
+step is authorized, whichever way. Over a cap, unlisted, or without an amount, nothing changes: the hand-off holds in
+every mode but `yolo`, as before. No currency conversion: the caps compare the number on the page whatever its sign.
 
-**Done when.** Unit tests for under, over and unlisted; the timeline shows the amount; README.
+**Touchpoints.** `policy/spend.py` (new), `policy/types.py` (`Amount`, `ActionInfo.amount`, source `spend`),
+`policy/engine.py`, `agent/gate.py`, `agent/manager.py`, `tools/browser.py`, `store/db.py` (`spends`), `config.py`,
+`defaults.toml`, README "Safety".
+
+**Done when.** Unit tests for the amounts, the caps (under, over, the day, unlisted, no amount) and the engine; the
+gate's smoke test shows the question, the record of the spend, the hand-off over the day's cap and a yolo run spending
+within the caps; the timeline shows the amount; README.
 
 ### 34. Research runs that keep notes, and hosted search by default
 
@@ -3093,6 +3110,11 @@ item ends as a measured no, written in the log.
     you start while your Chrome is closed or without remote debugging is refused with the reason, and `dotx run
     --standing --browser own` keeps it on Dot's Chrome. The check that is yours: a campaign over three sessions on X
     keeps your session (the brief of each session names the Chrome). Set `campaign_browser = "own"` to go back.
+21. Pre-approved spending (item 33) is empty by default: `[policy.spend]` lists nothing, so every payment step is
+    handed to you as before (a `yolo` run does it itself). To pre-approve small spends, list the site with its caps in
+    your `config.toml`, for example `"namecheap.com" = { per_purchase = 20, per_day = 50 }` under `[policy.spend]`;
+    the caps compare the number on the page whatever its currency. The check that is yours: a live purchase under the
+    cap on a listed site in `auto` or `yolo`.
 
 ## Log
 
@@ -3483,3 +3505,5 @@ item ends as a measured no, written in the log.
 - 2026-10-10 (Fable 5.1): item 31 built on branch `item-31-one-time-codes` (MYP-173): `desktop/codes.py` (Mail through AppleScript, Messages through its database read-only, the code rule: a 4 to 8 digit number after a cue word, `G-` prefixed, opening the message, or the only six-digit number), `tools/codes.py` with `code_fetch` registered only when `[policy] code_sources` names an application (default empty; decision 19), a high-risk `app_control` action, result is the code with sender and age only; `dotx doctor` row `one-time codes`; the yolo sentence of the prompt names the tool. Design corrected: one connector module, Messages read from `chat.db` (no scripting for received messages), "ask asks once" is the owner's opt-in plus the presets. Gate: format, check, mypy clean; unit 610; `dotx eval check` ok; smoke (codes, doctor, tool groups, scaffold, research notes, approval modes) 24 passed, the live Mail test skipped (owner-run, `DOT_MAIL_TESTS=1`).
 - 2026-10-10 (Fable 5.1): item 31 merged 88abeed (PR #32, MYP-173 Done). Next: item 32 (the owner's Chrome profile as the default of a campaign).
 - 2026-10-10 (Fable 5.1): item 32 built on branch `item-32-campaign-browser` (MYP-174): `browser/pool.py` (the daemon's session plus one per other mode, made on first use), `ToolContext.browser` chosen when a run starts (its campaign's choice, a delegated run following its parent's campaign, else the daemon's), `CampaignRecord.browser` with `[agent] campaign_browser = "attach"` as the default (decision 20), `--browser`/API `browser`, a campaign on the owner's Chrome refused while that Chrome is closed or has no debugging port, the brief's second line names the Chrome, `dotx campaign show` and the campaign page show it; evals keep `own`. Design corrected: no `[campaign]` table, one pool instead of switching the shared session. Gate: format, check, mypy clean; unit 611; `dotx eval check` ok; smoke (campaigns, web, crawl, memory, codes, judge, pace, scheduler, terminal, skills, MCP, secret fields, server, resume, plan branches, scaffold) 137 passed, 1 skipped; the two live-model delegate tests (`gpt-oss:20b-cloud` through the owner's Ollama) fail on main too: the model passes `step=1` to `delegate` before any plan exists, item 35's check refuses that call, and the test helper expects one delegate result. Finding, not a regression (log of item 35 to be revisited: the live model wastes a turn on a step it has not planned).
+- 2026-10-10 (Fable 5.1): item 32 merged f302464 (PR #33, MYP-174 Done). Next: item 33 (pre-approved spending caps).
+- 2026-10-10 (Fable 5.1): item 33 built on branch `item-33-spending-caps` (MYP-175): `policy/spend.py` (amounts from a control's label or the page's total, `SpendCap` per site, `spend_allowance` turns a payment under both caps into a question with source `spend` that takes the money hand-off's place), `ActionInfo.amount` and the amount in the step's summary (timeline, policy event, approval record), the gate reads the day's spends from the new `spends` table and records the spend once the step is authorized, `[policy.spend]` empty by default (decision 21). Design corrected: the amount is read in the browser tool's classification, not in `elements.py`; `ask` asks once (the plan named only yolo and auto). Gate: format, check, mypy clean; unit 625; `dotx eval check` ok; smoke (approval modes, secret fields, judge, pace, terminal, memory, codes, browser, campaigns, scaffold, tool groups) 102 passed, 1 skipped.

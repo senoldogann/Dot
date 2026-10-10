@@ -341,13 +341,21 @@ alone, with who sent it and how old the message is; the message never reaches th
 the Mac: the aggressive preset allows it, balanced and cautious ask, a research run has no such tool. Typing the code
 into the field is still what the approval mode allows (only `yolo` types one-time codes).
 
+**Pre-approved spending.** `[policy.spend]` lists sites with caps, for example `"namecheap.com" = { per_purchase = 20,
+per_day = 50 }`. Dot reads the amount of a payment step from the control's label ("Pay €19.90") or from the total on the
+page; under both caps the step is a question instead of a hand-off (a `yolo` run goes on, `auto` lets the review model
+answer, `ask` asks you once), it is recorded with its amount, shown in the timeline, and counts against the site's day.
+Over a cap, on a site not listed, or when the page does not show the amount, the money hand-off holds as before. The
+caps are plain numbers compared with the number on the page, whatever its currency, so list sites that bill in one
+currency. Empty by default.
+
 **Decision order**, strictest first:
 
 1. *Auto-review* denies actions that read secrets or send data out (`secret_access`, `exfiltration`), whatever else is
    configured.
 2. The *run mode* denies what a research run may not do.
 3. *Hard stops* hand money and credentials to you (`financial`, `credential`): Dot stops and asks you to do that step
-   yourself.
+   yourself. A payment under the pre-approved caps of its site (below) is a question instead of a hand-off.
 4. *Your rules* come next. The first enabled rule, in order, whose tool pattern and regular expression match the action
    decides: `allow`, `preapproved`, `ask` or `handoff`. Rules are managed in the web UI or through `/api/rules`.
 5. *The preset* decides everything that is left:

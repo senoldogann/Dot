@@ -39,5 +39,5 @@ _READ: ActionInfo = _action("memory_read", "safe", ())
 def test_memory_actions_follow_the_policy_layers(
     info: ActionInfo, mode: RunMode, tainted: bool, preset: Preset, verdict: Verdict, source: str
 ) -> None:
-    decision: Decision = decide(info, mode, tainted, preset, [])
+    decision: Decision = decide(info, mode, tainted, preset, [], None)
     assert (decision.verdict, decision.source) == (verdict, source), decision.reason

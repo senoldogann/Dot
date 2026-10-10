@@ -16,10 +16,10 @@ import pytest_asyncio
 from dotagent.agent.approvals import ApprovalBroker
 from dotagent.agent.gate import REVIEWER_DECIDER, YOLO_DECIDER, RunGate
 from dotagent.agent.review import Reviewer, ReviewRequest, ReviewVerdict
-from dotagent.config import PaceConfig
+from dotagent.config import PaceConfig, SpendCap
 from dotagent.core.errors import ApprovalRejected, HandedOff, PolicyDenied
 from dotagent.events import EventBus
-from dotagent.policy.types import ActionInfo, ApprovalMode, Preset
+from dotagent.policy.types import ActionInfo, Amount, ApprovalMode, Preset
 from dotagent.store.db import Store
 from dotagent.store.models import ApprovalRecord, EventRecord, RunMode, RunRecord, ThreadRecord
 
@@ -42,6 +42,11 @@ PAYMENT: ActionInfo = ActionInfo(
     summary="Pay the invoice",
     target="shop.example",
     flags=("financial",),
+)
+# A payment with its amount on a site with pre-approved caps (item 33).
+CAPS: dict[str, SpendCap] = {"shop.example": SpendCap(per_purchase=20.0, per_day=30.0)}
+PAID: ActionInfo = PAYMENT.model_copy(
+    update={"target": "https://shop.example/checkout", "amount": Amount(value=12.0, currency="EUR")}
 )
 SECRET: ActionInfo = ActionInfo(
     tool="read_file",
@@ -105,7 +110,17 @@ def _answering(decision: Literal["approve", "deny", "escalate"], asked: list[Rev
 
 def _gate(room: Room, run_mode: RunMode, preset: Preset, approvals: ApprovalMode, reviewer: Reviewer) -> RunGate:
     return RunGate(
-        room.store, room.bus, room.broker, room.run.id, run_mode, preset, NO_PACE, approvals, reviewer, (INSTRUCTION,)
+        room.store,
+        room.bus,
+        room.broker,
+        room.run.id,
+        run_mode,
+        preset,
+        NO_PACE,
+        {},
+        approvals,
+        reviewer,
+        (INSTRUCTION,),
     )
 
 
@@ -193,6 +208,47 @@ async def test_a_hand_off_rule_of_the_user_still_stops_a_yolo_run(room: Room) ->
         await asyncio.wait_for(question.answer, WAIT_S)
     # What no rule hands off still goes through.
     assert await asyncio.wait_for(gate.authorize(SECRET), WAIT_S) == ""
+
+
+async def test_a_payment_under_its_pre_approved_caps_is_a_question_and_counts_against_the_day(room: Room) -> None:
+    gate: RunGate = RunGate(
+        room.store,
+        room.bus,
+        room.broker,
+        room.run.id,
+        "task",
+        "aggressive",
+        NO_PACE,
+        CAPS,
+        "ask",
+        _nobody,
+        (INSTRUCTION,),
+    )
+    question: Question = await _ask(room, gate, PAID)
+    assert question.record.severity == "high"
+    assert "12.00 EUR on shop.example is within its pre-approved caps" in question.record.summary
+    await room.broker.resolve(question.record.id, True, "user", "fine")
+    assert await asyncio.wait_for(question.answer, WAIT_S) == "fine"
+    assert await room.store.spent_since("shop.example", 0.0) == 12.0
+    # The second purchase would take the day over 30: the money hand-off holds again.
+    over: Question = await _ask(room, gate, PAID.model_copy(update={"amount": Amount(value=19.0, currency="EUR")}))
+    assert over.record.severity == "handoff"
+    await room.broker.resolve(over.record.id, True, "user", "paid it myself")
+    with pytest.raises(HandedOff):
+        await asyncio.wait_for(over.answer, WAIT_S)
+    # A yolo run spends within the caps without a question; an unlisted site or no amount keeps the hand-off's waiver.
+    yolo: RunGate = RunGate(
+        room.store, room.bus, room.broker, room.run.id, "task", "aggressive", NO_PACE, CAPS, "yolo", _nobody, ()
+    )
+    assert (
+        await asyncio.wait_for(
+            yolo.authorize(PAID.model_copy(update={"amount": Amount(value=5.0, currency="EUR")})), WAIT_S
+        )
+        == ""
+    )
+    assert await room.store.spent_since("shop.example", 0.0) == 17.0
+    assert await asyncio.wait_for(yolo.authorize(PAYMENT), WAIT_S) == ""
+    assert await room.store.spent_since("shop.example", 0.0) == 17.0
 
 
 async def test_yolo_still_keeps_a_research_run_read_only(room: Room) -> None:
