@@ -67,7 +67,7 @@ CLICK_QUESTIONS: tuple[tuple[NoulQuestion, str], ...] = (
         "destructive",
     ),
 )
-_CLAIM_QUESTION: NoulQuestion = NoulQuestion(
+CLAIM_QUESTION: NoulQuestion = NoulQuestion(
     id="targets_reached",
     instructions=(
         "Does the claim show, with what this session read and measured, that every target is reached as the "
@@ -168,8 +168,8 @@ class TypeSafeJudge:
         return click_judgment(probabilities, self._config.public_action_threshold)
 
     async def judge_claim(self, claim: JsonObject, run_id: str) -> ClaimJudgment:
-        probabilities: dict[str, float] | None = await self._ask(claim, (_CLAIM_QUESTION,), run_id)
-        return ClaimJudgment(probability=None if probabilities is None else probabilities[_CLAIM_QUESTION.id])
+        probabilities: dict[str, float] | None = await self._ask(claim, (CLAIM_QUESTION,), run_id)
+        return ClaimJudgment(probability=None if probabilities is None else probabilities[CLAIM_QUESTION.id])
 
     async def retire(self) -> None:
         async with self._lock:

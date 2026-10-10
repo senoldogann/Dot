@@ -38,8 +38,8 @@ const PROVIDERS = {
   },
   typesafe: {
     use: "Optional: the typed judge ([judge] provider = \"typesafe\"), which reads click labels no rule knows and campaign claims. Check sends one small judgment.",
-    page: "https://typesafe.ai",
-    site: "typesafe.ai",
+    page: "https://console.typesafe.ai",
+    site: "console.typesafe.ai",
     needed: false,
   },
 };
