@@ -21,6 +21,16 @@ const FINISH_TOOL = "finish";
 const VERDICT_TEXT = { ask: "Needs approval", handoff: "Handed to you", deny: "Blocked by policy" };
 // The ways a model turn ends that need no word of their own.
 const ORDINARY_ENDS = new Set(["stop", "tool_calls", ""]);
+// The words of a delegated run's status ring, for its tooltip and for a screen reader.
+const RING_LABELS = { blocked: "waiting" };
+
+/** Show the status of a delegated run on the ring of its chip. */
+function paintRing(ring, status) {
+  const label = RING_LABELS[status] ?? status;
+  ring.className = `status-ring s-${status}`;
+  ring.title = label;
+  ring.setAttribute("aria-label", label);
+}
 
 /** Whether two texts read the same, whatever their line breaks and spacing. */
 function sameText(first, second) {
@@ -186,18 +196,19 @@ export function createTimeline({ rootRunId, startedAt, onGrow, onPlan, onStats, 
 
   function childScope(runId, data, ts) {
     const parent = scopes.get(data.parent_run_id) ?? scopes.get(rootRunId);
-    const status = el("span", { class: "badge s-running" }, "running");
+    const status = el("span", { role: "img" });
+    paintRing(status, "running");
     const meta = el("span", { class: "chip" }, data.mode ?? "task");
     const inner = el("div", { class: "timeline" });
+    // A chip with the delegated run's status ring and goal; opened, the run's steps hang under it.
     const summary = el(
       "summary",
       null,
-      el("span", { class: "chev" }, icon("chevron")),
-      icon("branch"),
-      el("span", null, "Delegated"),
-      el("span", { class: "truncate grow muted" }, clip(data.goal ?? "", GOAL_CHARS)),
-      meta,
       status,
+      el("span", { class: "visually-hidden" }, "Delegated run:"),
+      el("span", { class: "truncate" }, clip(data.goal ?? "", GOAL_CHARS)),
+      meta,
+      el("span", { class: "chev" }, icon("chevron")),
     );
     const node = el("details", { class: "child", open: true }, summary, inner);
     summary.addEventListener("click", () => {
@@ -238,8 +249,7 @@ export function createTimeline({ rootRunId, startedAt, onGrow, onPlan, onStats, 
       onRunStatus({ status: waiting ? "blocked" : "running", model: null, endedAt: null });
       return;
     }
-    scope.panel.status.className = `badge s-${waiting ? "blocked" : "running"}`;
-    scope.panel.status.textContent = waiting ? "waiting" : "running";
+    paintRing(scope.panel.status, waiting ? "blocked" : "running");
   }
 
   function showThinking(scope, characters) {
@@ -304,8 +314,7 @@ export function createTimeline({ rootRunId, startedAt, onGrow, onPlan, onStats, 
         onRunStatus({ status, model: null, endedAt: record.ts });
         return;
       }
-      scope.panel.status.className = `badge s-${status}`;
-      scope.panel.status.textContent = status;
+      paintRing(scope.panel.status, status);
       // The parent resumes when the delegated run is over; the time in between was spent on the delegation.
       scope.parent.boundary = record.ts;
       if (status === "done" && !scope.touched) {

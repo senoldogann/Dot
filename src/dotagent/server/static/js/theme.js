@@ -9,14 +9,14 @@ export const THEMES = [
     label: "Neutral",
     hint: "White and graphite with a black accent, plain like a chat app.",
     foldSteps: true,
-    inspector: true,
+    inspector: false,
   },
   {
     id: "paper",
     label: "Paper",
     hint: "Warm paper, serif answers and one terracotta accent.",
     foldSteps: false,
-    inspector: true,
+    inspector: false,
   },
 ];
 

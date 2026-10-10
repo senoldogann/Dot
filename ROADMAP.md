@@ -897,17 +897,19 @@ that change the owner's agent are their call (see "Open owner decisions", 6 onwa
 | 12  | Campaigns: a goal that works until its outcome is verified             | done        | c915ab2 |
 | 13  | Faster browser and desktop steps                                       | done        | a14f21a |
 | 14  | Rich editors, drag and bulk text in the browser                        | done        | 37808d5 |
-| 15  | Helper models: consult, delegate to another model, standby             | done        |         |
+| 15  | Helper models: consult, delegate to another model, standby             | done        | 530ac62 |
 | 16  | Typed judgments (TypeSafe) at the decision points                      | planned     |         |
 | 17  | Pacing and public actions on social platforms                          | planned     |         |
 | 18  | Skills written for Claude Code, and the X playbook                     | planned     |         |
 | 19  | Prompt-cache hygiene for the hosted providers                          | planned     |         |
 | 20  | An interactive terminal for programs that prompt                       | planned     |         |
+| 21  | A plain chat screen: Dot's face, task chips, one composer line         | done        |         |
 
 **Order and dependencies.** 9 first: it is cheap and every later item is judged with it. 10, 11 and 12 are the owner's
 main ask and build on each other (12 needs the left questions of 10 and the targets of 11). 13 and 14 are the speed
 ask and depend on nothing. 15 before 16: both handle a provider that is not there. 17, 18, 19 and 20 are independent;
-18 is an afternoon. The owner may reorder; write the new order here when they do.
+18 is an afternoon. The owner may reorder; write the new order here when they do. On 2026-10-10 the owner asked for
+a plain chat screen like the reference they sent; it is item 21, done before 16 to 20.
 
 **What the audit of 2026-10-09 measured and found** (four read-only subagent audits, re-read at the cited lines; the
 owner's data was not read, the numbers of 2026-10-08 are the audit's aggregate SQL):
@@ -1826,7 +1828,7 @@ clean; README updated.
 
 ### 15. Helper models: consult, delegate to another model, standby
 
-**Status: done.** **Goal.** A run on one model can ask a model of another provider for advice, hand a sub-task to it,
+**Status: done** (`530ac62`, PR #8). **Goal.** A run on one model can ask a model of another provider for advice, hand a sub-task to it,
 or move to it when its own model stops answering; a helper whose key is missing or whose quota is spent is simply not
 there, and the run goes on.
 
@@ -2186,6 +2188,40 @@ browser".
 in `ask` mode and typed in `yolo`; a `python3 -m http.server` session serves a page to `web_fetch` while the run goes
 on and is closed by `terminal_close`; the idle reaper; unit tests of the ANSI stripping and the ring buffer; README.
 
+### 21. A plain chat screen
+
+**Status: done.** **Goal.** The web interface reads like a chat with an agent, as in the reference the owner sent on
+2026-10-10 (OpenAI's Codex handing tasks to a dot named Alfred): Dot's face and name at the head of a conversation, the
+owner's messages in one accent colour, delegated runs as small task chips with a status ring, one composer line, no side
+panel unless asked for, and the same on a phone.
+
+**Why.** The run page opened with the Details and Screen panels beside the conversation and a head line with the
+status, the goal (which the first message under it repeats), the model and the approval mode; a delegated run was a
+row with a bar, whose mode-and-model chip broke the line on a phone; the composer of a new chat had two rows of controls.
+
+**Design (no change outside the static files).**
+- `theme.js`: both looks start with the side panel closed; the button in the run's head opens it, and the choice is kept.
+- `app.css`: `--bubble` and `--on-bubble` (a warm yellow with dark ink in Neutral, the accent tint in Paper) colour the
+  owner's bubbles and Dot's face (`avatar()`, `icons.js`).
+- The run's head (`views/run.js`): Dot's face and name in the middle with the status badge and the start under them,
+  the chips and buttons on the right (on a line of their own on a phone); the goal stays the page's heading for a screen
+  reader. While the run works, the core of the face blinks. The run page has no "All runs" link: the sidebar (a drawer
+  on a phone) lists the chats.
+- Delegated runs (`timeline.js`): the panel's summary is a chip with a status ring (`paintRing`: turning while the run
+  works, amber while it waits, green with a check when done, red when failed, dashed when cancelled), the goal, and the
+  mode and model in quiet text that gives way first on a short line.
+- A new chat (`views/runs.js`): Dot's face and "What should I work on?" above the composer, whose bar is one line
+  (attach, mode, model, reasoning, **Options**). Options opens the approval mode, goal mode and keep going, and the
+  approval mode in use shows on its button (`approvalsPicker(onPaint)`, `runmodes.js`).
+- The top bar (`shell.js`): a live connection is its dot alone; the emergency stop is a red square whose words are in
+  its tooltip.
+
+**Decisions and limits.** Dot's answers stay text on the page, not bubbles: reports, tables and code read better at the
+full width. The reference's pinned chats and projects have no counterpart in Dot and were not built.
+
+**Done when.** Headless Chrome on a scripted daemon (wide light, wide dark, phone): no horizontal overflow, no "null"
+text, no console error; the Options panel with YOLO saved; every status ring. README.
+
 ## Open owner decisions
 
 1. Live evals: `dotx eval run --model REF` spends model quota. Run it for the models in use and keep the JSON; it is the
@@ -2229,8 +2265,8 @@ on and is closed by `terminal_close`; the idle reaper; unit tests of the ANSI st
     `memory_save` are acting-only, `tools/base.py:16-17`), and DuckDuckGo's bot check throttles long research runs
     (README "Status and known limits"). Say whether a research run may save notes and files under the workspace,
     and whether the hosted Ollama search (`OLLAMA_API_KEY`) should be the default backend; either is a small item.
-15. The Claude GitHub app reviews nothing yet: on PR #1, PR #2, PR #4, PR #5, PR #6 and PR #7 it answered "Code review
-    skipped" (on PR #3 it posted nothing) because your organization has no extra usage to pay for it. Add extra usage
+15. The Claude GitHub app reviews nothing yet: on PR #1, PR #2, PR #4, PR #5, PR #6, PR #7 and PR #8 it answered "Code
+    review skipped" (on PR #3 it posted nothing) because your organization has no extra usage to pay for it. Add extra usage
     (or raise the monthly limit) at claude.ai/admin-settings/usage; a comment `@claude review` on a PR then asks for a
     review. Until then each PR is merged on `/code-review` alone.
 16. The review model has no standby (item 15): with `[models] review` on the provider of `main` (the default), a run
@@ -2528,3 +2564,13 @@ on and is closed by `terminal_close`; the idle reaper; unit tests of the ANSI st
   cloud request), 31 mutations each caught by a test (each with a bytecode cache of its own: two mutants of the same
   size written in the same second had shared a stale `.pyc`).
   Item 15 started on `item-15-helper-models`.
+- 2026-10-10: item 15 merged as `530ac62` (PR #8, squash); the Claude GitHub app skipped its review again (decision 15).
+  The owner asked for a plain chat screen like OpenAI's dot in Codex (a screenshot) and for at most five subagents per
+  task; the screen is item 21, done before 16 to 20. Item 21 started on `item-21-chat-screen`.
+- 2026-10-10: item 21 done. A run opens under Dot's face and name with its state and start; the goal is the first
+  message, in the yellow bubble of the owner's messages; a delegated run is a chip with a status ring; the Details
+  panel stays closed until asked for. A new chat is Dot's face and a composer with one line of options (approvals,
+  goal mode and keep going behind Options, the approval mode on its button). The connection is a dot and the emergency
+  stop a red square. Static files only. Unit tests (548), the offline smoke suite (239, no cloud request), headless
+  Chrome on a scripted daemon (wide light and dark, phone; Options with YOLO; every ring): no overflow, no console
+  error. The review subagent was stopped before it reported; the diff was reviewed in the main session.

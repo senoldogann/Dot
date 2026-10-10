@@ -51,9 +51,10 @@ function pick(caption, control) {
 /**
  * The control that picks the approval mode of a new run. `value()` is the mode this browser chose, or null while it follows the
  * daemon (that is what a run is started with, so a later change of the daemon's default still applies); `sync()` shows the
- * choice or the daemon's default again after the status changed; `warning` is the line to show under the composer.
+ * choice or the daemon's default again after the status changed; `warning` is the line to show with the control.
+ * `onPaint(mode)` runs whenever the mode shown changes, with null while neither a choice nor the daemon's status is known.
  */
-export function approvalsPicker() {
+export function approvalsPicker(onPaint) {
   function shown() {
     const { status } = getSnapshot();
     return savedApprovals() ?? (status === null ? null : status.approvals);
@@ -67,6 +68,7 @@ export function approvalsPicker() {
   function paint() {
     control.element.dataset.mode = String(control.value());
     warning.hidden = control.value() !== "yolo";
+    onPaint(control.value());
   }
 
   paint();

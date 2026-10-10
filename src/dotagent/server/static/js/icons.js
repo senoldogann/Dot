@@ -188,6 +188,17 @@ export function brandMark() {
   );
 }
 
+/** Dot's face: the mark on a round badge of the bubble colour, at the head of a conversation and of the home page. */
+export function avatar() {
+  return svg(
+    "svg",
+    { class: "avatar", viewBox: "0 0 40 40", "aria-hidden": "true" },
+    svg("circle", { class: "face", cx: 20, cy: 20, r: 20 }),
+    svg("circle", { class: "ring", cx: 20, cy: 20, r: 11 }),
+    svg("circle", { class: "core", cx: 20, cy: 20, r: 5 }),
+  );
+}
+
 /** An inline SVG icon; its size follows the font size of the surrounding text. */
 export function icon(name) {
   const shapes = SHAPES[name];

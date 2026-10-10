@@ -27,6 +27,9 @@
   --bad-weak: #fdecec;
   --bad-border: #f0b4b4;
   --on-bad: #ffffff;
+  /* The owner's messages and Dot's face: one warm accent, with dark ink on it in light and dark alike. */
+  --bubble: #ffcd3c;
+  --on-bubble: #1a1a1a;
   --shadow: 0 1px 2px rgb(0 0 0 / 4%), 0 4px 16px rgb(0 0 0 / 4%);
   --radius: 14px;
   --radius-control: 10px;
@@ -63,6 +66,8 @@
     --bad-weak: #3d1a1a;
     --bad-border: #703030;
     --on-bad: #2a0b0b;
+    --bubble: #f0bf3a;
+    --on-bubble: #1a1a1a;
     --shadow: 0 1px 2px rgb(0 0 0 / 30%), 0 6px 18px rgb(0 0 0 / 25%);
   }
 }
@@ -225,6 +230,28 @@ textarea {
   fill: var(--accent);
 }
 
+/* Dot's face (icons.js): a badge in the colour of the owner's bubbles with the mark in the ink of their text. */
+.avatar {
+  width: 40px;
+  height: 40px;
+  flex: none;
+}
+
+.avatar .face {
+  fill: var(--bubble);
+}
+
+.avatar .ring {
+  fill: none;
+  stroke: var(--on-bubble);
+  stroke-opacity: 0.35;
+  stroke-width: 2.2;
+}
+
+.avatar .core {
+  fill: var(--on-bubble);
+}
+
 .pill {
   display: inline-flex;
   align-items: center;
@@ -254,6 +281,22 @@ a.pill:hover {
   background: var(--accent);
   border-color: transparent;
   color: var(--on-accent);
+}
+
+/* A live connection shows as its dot alone (shell.js). */
+.pill.quiet {
+  padding-inline: 6px;
+  border-color: transparent;
+  background: none;
+}
+
+.pill.quiet .label,
+.btn.failsafe .label {
+  display: none;
+}
+
+.btn.failsafe {
+  padding-inline: 7px;
 }
 
 .live-dot {
@@ -961,8 +1004,36 @@ a.pill:hover {
   align-self: end;
 }
 
-.home > .composer {
+.home > .home-start {
   grid-row: 2;
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+
+/* Dot greets above the composer, as at the head of a conversation. */
+.home-who {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  text-align: center;
+}
+
+.home-who .avatar {
+  width: 56px;
+  height: 56px;
+  margin-bottom: 6px;
+}
+
+.home-name {
+  font-size: 20px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+}
+
+.home-hint {
+  color: var(--muted);
 }
 
 .composer {
@@ -1040,6 +1111,29 @@ a.pill:hover {
   display: inline-flex;
 }
 
+/* In the bar the menus are named by their labels for a screen reader and by their tooltips, so the bar stays one line. */
+.composer-options .composer-pick-label {
+  position: absolute;
+  width: 1px;
+  min-width: 0;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* Approvals, goal mode and keep going, opened with the Options button of the bar. */
+.composer-more {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
+}
+
+.composer-more > .note {
+  flex: 1 0 100%;
+}
+
 /* ---------- run page ---------- */
 
 .back {
@@ -1050,26 +1144,60 @@ a.pill:hover {
   margin-bottom: 12px;
 }
 
-/* The head of a conversation: what state it is in and what it was about, on one line; the numbers live in the side panel. */
+/* The head of a conversation: Dot's face and name in the middle with the run's state and start under them, the run's
+   chips and buttons on the right; the numbers live in the side panel. */
 .chat-head {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px 10px;
-  padding-bottom: 14px;
-  border-bottom: 1px solid var(--border);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: start;
+  gap: 8px 12px;
+  padding-bottom: 6px;
 }
 
-.run-title {
-  flex: 1 1 200px;
-  min-width: 0;
-  overflow: hidden;
-  font-size: 15px;
+.chat-who {
+  grid-column: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.chat-who .avatar {
+  margin-bottom: 4px;
+}
+
+/* While the run works, Dot's core blinks. */
+.chat-head:has(.badge.s-running) .avatar .core {
+  animation: blink 1.4s ease-in-out infinite;
+}
+
+.chat-who-name {
   font-weight: 650;
-  letter-spacing: -0.005em;
-  line-height: 1.4;
+}
+
+.chat-who-sub {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.chat-tools {
+  grid-column: 3;
+  justify-self: end;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.chat-tools .chip {
+  max-width: 100%;
+  overflow: hidden;
   text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .plan-list {
@@ -1207,7 +1335,8 @@ a.pill:hover {
   margin-left: auto;
   padding: 10px 16px;
   border-radius: 20px;
-  background: var(--accent-weak);
+  background: var(--bubble);
+  color: var(--on-bubble);
 }
 
 .bubble.live .stream {
@@ -1618,39 +1747,98 @@ details[open] > summary .chev {
   gap: 6px;
 }
 
-.child {
-  border-left: 2px solid var(--accent);
-  padding-left: 12px;
-  margin-left: 6px;
-}
-
+/* A delegated run is a chip with its status ring and goal; opened, the run's steps hang under it. */
 .child > summary {
-  display: flex;
-  flex-wrap: wrap;
+  display: inline-flex;
   align-items: center;
-  gap: 2px 8px;
+  gap: 8px;
+  max-width: 100%;
+  padding: 4px 12px 4px 8px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
   cursor: pointer;
   list-style: none;
-  padding: 4px 0;
-  color: var(--text-2);
-  font-weight: 550;
+}
+
+.child > summary:hover {
+  border-color: var(--border-strong);
 }
 
 .child > summary::-webkit-details-marker {
   display: none;
 }
 
-/* The mode and model chip may wrap to a second line on a narrow screen, and shortens when even that is too wide. */
-.child > summary .chip {
-  display: block;
+.child > summary .truncate {
+  flex: 0 1 auto;
   min-width: 0;
-  max-width: 100%;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 
-.child .timeline {
-  margin-top: 8px;
+/* The mode and model of the delegated run, quiet beside its goal; they give way first when the line is short. */
+.child > summary .chip {
+  flex: 0 3 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--muted);
+}
+
+.child > .timeline {
+  margin: 10px 0 0 15px;
+  padding-left: 16px;
+  border-left: 1px solid var(--border);
+}
+
+/* The status of a delegated run on its chip: a ring that turns while the run works and blinks amber while it waits for
+   an answer, green with a check when it is done, red when it failed, dashed when it was cancelled. */
+.status-ring {
+  position: relative;
+  width: 14px;
+  height: 14px;
+  flex: none;
+  border: 2px solid var(--border-strong);
+  border-radius: 50%;
+}
+
+.status-ring.s-running,
+.status-ring.s-queued {
+  border-top-color: var(--text);
+  animation: spin 0.9s linear infinite;
+}
+
+.status-ring.s-blocked {
+  border-color: var(--warn);
+  animation: blink 1.4s ease-in-out infinite;
+}
+
+.status-ring.s-done {
+  border-color: var(--ok);
+  background: var(--ok);
+}
+
+.status-ring.s-done::after {
+  content: "";
+  position: absolute;
+  left: 3px;
+  top: 0;
+  width: 3px;
+  height: 6px;
+  border: solid var(--surface);
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+}
+
+.status-ring.s-failed {
+  border-color: var(--bad);
+  background: var(--bad);
+  box-shadow: inset 0 0 0 2px var(--surface);
+}
+
+.status-ring.s-cancelled {
+  border-style: dashed;
 }
 
 /* The answer is Dot's last message: text on the page like the others, with a quiet line under it about how the run ended. */
@@ -1974,14 +2162,19 @@ dialog.lightbox img {
     padding: 5px 8px;
   }
 
-  /* On a phone the status and the buttons share one line and the title gets a line of its own. */
-  .chat-status {
-    margin-right: auto;
+  /* On a phone Dot's face and name come first and the run's chips and buttons get a centred line under them. */
+  .chat-head {
+    grid-template-columns: minmax(0, 1fr);
   }
 
-  .run-title {
-    order: 3;
-    flex: 1 0 100%;
+  .chat-who,
+  .chat-tools {
+    grid-column: 1;
+    justify-self: center;
+  }
+
+  .chat-tools {
+    justify-content: center;
   }
 
   .chat-model {
