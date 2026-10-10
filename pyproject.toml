@@ -17,6 +17,7 @@ dependencies = [
     "pyobjc-framework-cocoa>=12.2.2",
     "pyobjc-framework-quartz>=12.2.2",
     "pyobjc-framework-screencapturekit>=12.2.2",
+    "pywebpush>=2.5.0",
     "pyyaml>=6.0.3",
     "structlog>=26.1.0",
     "uvicorn>=0.54.0",
@@ -72,6 +73,8 @@ module = [
     "CoreMedia.*",
     "objc.*",
     "croniter.*",
+    "py_vapid.*",
+    "pywebpush.*",
 ]
 ignore_missing_imports = true
 

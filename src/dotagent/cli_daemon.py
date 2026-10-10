@@ -144,7 +144,12 @@ async def cmd_open(command: OpenCommand) -> int:
 
 
 async def cmd_url(command: UrlCommand) -> int:
-    sys.stdout.write(f"{await reachable_ui_url(load_user_config())}\n")
+    """The signed-in address on this Mac, then one per name of ``[server] reach`` for the phone on your own network."""
+    config: AppConfig = load_user_config()
+    address: str = await reachable_ui_url(config)
+    sys.stdout.write(f"{address}\n")
+    for name in config.server.reach:
+        sys.stdout.write(f"https://{name}/{address.rsplit('/', 1)[1]}\n")
     return 0
 
 

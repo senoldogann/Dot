@@ -925,6 +925,26 @@ The build is signed ad hoc; a build other Macs open without a warning needs an A
 `uv run python desktop/icons/render.py` draws the app icon and the three menu bar icons, and `npm run icons` makes
 the bundle's set from the app icon.
 
+## Dot on the phone
+
+The web UI is a progressive web app: open it on the phone, add it to the home screen, and it opens on Activity with
+the sidebar's sections, the chats and the run pages at a phone width. It needs to reach the Mac, and a push needs a
+secure address, so the way there is your own network:
+
+1. The daemon stays on the loopback address. With Tailscale on the Mac and the phone, `tailscale serve --bg 8765`
+   presents it as `https://<mac>.<tailnet>.ts.net`, with a certificate of its own, to your tailnet only.
+2. Put that name in `[server] reach = ["<mac>.<tailnet>.ts.net"]` and restart the daemon: a request with that
+   `Host`, and a page from `https://` that name, is served like a local one. `dotx url` then prints the signed-in
+   address for the phone too (the token stays in the fragment).
+3. On the phone, Settings › General › Notifications on: the browser subscribes to the daemon's web push, and from
+   then on the daemon tells the phone what the desktop notifications say (an approval or a question asked, a run of
+   its own ended), page open or closed; a tap opens the run. The daemon signs the pushes with a key pair it makes
+   on first start (`<home>/vapid-key.pem`); subscriptions live in the store and go when their push service says they
+   are gone. Settings › General › Notifications off drops the subscription.
+
+The service worker (`sw.js`) keeps the shell files as a fallback for when the Mac is out of reach and caches nothing
+under `/api`. Without Tailscale, the same works on the Mac itself (`localhost` counts as secure) and on nothing else.
+
 ## Browser use
 
 Dot works in Chrome in one of two ways, set by `[browser] mode`: in a Chrome of its own (`own`, the default) or in new

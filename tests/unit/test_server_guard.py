@@ -77,7 +77,28 @@ def test_only_a_bearer_header_carries_the_token(header: str | None, expected: st
 def test_a_request_is_served_only_from_this_mac_to_pages_of_this_server_with_the_token(
     path: str, host: str | None, origin: str | None, authorization: str | None, refused_with: int | None
 ) -> None:
-    refusal: Refusal | None = check_request(path, host, origin, authorization, TOKEN, PORT)
+    refusal: Refusal | None = check_request(path, host, origin, authorization, TOKEN, PORT, frozenset())
+    assert (None if refusal is None else refusal.status) == refused_with
+
+
+REACH: frozenset[str] = frozenset({"mac.tail1234.ts.net"})
+
+
+@pytest.mark.parametrize(
+    ("host", "origin", "refused_with"),
+    [
+        ("mac.tail1234.ts.net", None, None),
+        ("MAC.tail1234.ts.net", "https://mac.tail1234.ts.net", None),
+        ("mac.tail1234.ts.net", "http://mac.tail1234.ts.net", 403),
+        ("other.tail1234.ts.net", None, 421),
+        (LOCAL_HOST, "https://mac.tail1234.ts.net", None),
+    ],
+)
+def test_a_name_of_reach_is_served_like_the_loopback_address_over_https(
+    host: str, origin: str | None, refused_with: int | None
+) -> None:
+    """``[server] reach``: the names a reverse proxy on the owner's network presents the daemon as (item 52)."""
+    refusal: Refusal | None = check_request("/api/status", host, origin, GOOD_AUTH, TOKEN, PORT, REACH)
     assert (None if refusal is None else refusal.status) == refused_with
 
 

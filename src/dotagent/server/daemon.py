@@ -20,6 +20,7 @@ from dotagent.config import AppConfig
 from dotagent.core.errors import ConfigError, RunConflict
 from dotagent.core.logs import get_logger
 from dotagent.core.paths import dot_home, pid_path, token_path
+from dotagent.notify.push import watch_pushes
 from dotagent.runtime import Runtime, build_runtime, close_runtime
 from dotagent.scheduler.runner import Scheduler
 from dotagent.server.app import create_app
@@ -174,6 +175,11 @@ async def run_daemon(config: AppConfig) -> None:
             scheduler_loop.add_done_callback(functools.partial(_end_with_scheduler, server))
             stopper: asyncio.Task[None] = asyncio.create_task(_stop_server_on(stop, server), name="stop-server")
             cleanup.push_async_callback(_cancelled, stopper)
+            # The phone hears what the desktop notifications say: every push subscription gets the lifecycle events.
+            pusher: asyncio.Task[None] = asyncio.create_task(
+                watch_pushes(runtime.store, runtime.bus, runtime.push_keys, stopping), name="push"
+            )
+            cleanup.push_async_callback(_cancelled, pusher)
             log.info(
                 "daemon_started",
                 url=base_url(host, port),

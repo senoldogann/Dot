@@ -177,6 +177,16 @@ class CampaignRecord(FrozenModel):
     browser: BrowserMode | None
 
 
+class PushSubscription(FrozenModel):
+    """A browser's web push subscription (item 52): the push service's endpoint and the keys the message is encrypted
+    with, as ``PushSubscription.toJSON()`` gives them."""
+
+    endpoint: str
+    p256dh: str
+    auth: str
+    created_at: float
+
+
 class CampaignEntry(FrozenModel):
     """One entry of a campaign's ledger, written by a session with ``campaign_note`` (``run_id`` is that session) or by
     the harness (``None``). ``numbers`` maps a measure to its value, such as ``{"leads": 12}``."""

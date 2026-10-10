@@ -34,6 +34,11 @@ def token_path() -> Path:
     return dot_home() / "api-token"
 
 
+def vapid_path() -> Path:
+    """The daemon's web push key pair (PEM), made on first start."""
+    return dot_home() / "vapid-key.pem"
+
+
 def workspace_dir() -> Path:
     """The agent's working directory: shell commands and file tools default to it."""
     return dot_home() / "workspace"
