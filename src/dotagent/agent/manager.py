@@ -605,7 +605,7 @@ class RunManager:
                 and record.source != RESUME_SOURCE
                 and record.created_at > campaign.created_at
             ),
-            strategy=await store.latest_campaign_entry(campaign.id, "strategy"),
+            strategies=tuple(await store.campaign_entries_of_kind(campaign.id, "strategy")),
             progress=progress,
             entries=tuple(await store.campaign_entries(campaign.id, BRIEF_ENTRIES)),
             questions=tuple(

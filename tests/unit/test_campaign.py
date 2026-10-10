@@ -1,5 +1,5 @@
-"""The pure rules of a campaign: the brief a session opens with, when the next session starts, and how many sessions
-in a row brought no progress."""
+"""The pure rules of a campaign: the brief a session opens with, when the next session starts, how many sessions in a
+row brought no progress, and which routes a stuck campaign refuses."""
 
 from dotagent.agent.campaign import (
     Brief,
@@ -7,6 +7,8 @@ from dotagent.agent.campaign import (
     LastSession,
     next_session_at,
     render_brief,
+    route_refused,
+    routes_without_progress,
     session_number,
     sessions_without_progress,
 )
@@ -37,7 +39,6 @@ def _brief(
     last: LastSession | None,
     without_progress: int,
 ) -> Brief:
-    strategy: CampaignEntry | None = next((entry for entry in reversed(entries) if entry.kind == "strategy"), None)
     progress: CampaignEntry | None = next((entry for entry in reversed(entries) if entry.kind == "progress"), None)
     return Brief(
         goal=GOAL,
@@ -48,7 +49,7 @@ def _brief(
         session=session,
         now=NOW,
         instructions=("Only companies in Berlin.",) if session > 1 else (),
-        strategy=strategy,
+        strategies=tuple(entry for entry in entries if entry.kind == "strategy"),
         progress=progress,
         entries=entries,
         questions=questions,
@@ -122,9 +123,36 @@ def test_a_brief_after_a_cut_off_session_and_too_many_rounds_without_progress_as
     assert "Session 4 was cut off by a stop of the daemon 3 h ago, before it ended" in brief
     assert "Its answer" not in brief
     assert brief.endswith(
-        "No session wrote a progress entry for 3 sessions. Before anything else, write a new strategy entry with "
-        "campaign_note (kind strategy) that tries another way, and follow it."
+        "No session wrote a progress entry for 3 sessions. No strategy entry says which route they took.\n"
+        "Before anything else, take a different route: another channel (a site's API, a command or a skill instead of "
+        "its pages), another source or another approach. Write it as a new strategy entry with campaign_note (kind "
+        "strategy), then follow it."
     )
+
+
+def test_a_stuck_brief_lists_the_routes_tried_since_the_newest_progress_and_refuses_them() -> None:
+    entries: tuple[CampaignEntry, ...] = (
+        _entry("strategy", "Scrape the fair's exhibitor list", {}, 30 * HOUR),
+        _entry("progress", "Wrote 12 leads from the exhibitor list.", {"leads": 12}, 28 * HOUR),
+        _entry("strategy", "Search the chamber of commerce", {}, 20 * HOUR),
+        _entry("setback", "The chamber's search needs a membership.", {}, 19 * HOUR),
+        _entry("strategy", "Search the Chamber of Commerce", {}, 5 * HOUR),
+    )
+    tried: tuple[CampaignEntry, ...] = routes_without_progress(
+        tuple(entry for entry in entries if entry.kind == "strategy"), entries[1].ts
+    )
+    assert [entry.text for entry in tried] == ["Search the chamber of commerce", "Search the Chamber of Commerce"]
+    assert route_refused("search the chamber of commerce", tried)
+    assert not route_refused("Scrape the fair's exhibitor list", tried)
+    brief: str = render_brief(_brief(6, "50 leads in leads.csv", entries, (), None, 3))
+    assert "Strategy (the newest): Search the Chamber of Commerce\n\n" in brief
+    assert (
+        "No session wrote a progress entry for 3 sessions. The routes tried since the newest progress, oldest first, "
+        "brought nothing and are refused (campaign_note does not take them again):\n"
+        "- [strategy, 20 h ago] Search the chamber of commerce\n"
+        "- [strategy, 5 h ago] Search the Chamber of Commerce\n"
+        "Before anything else, take a different route:"
+    ) in brief
 
 
 def test_a_brief_shows_the_newest_progress_also_when_newer_entries_push_it_out_of_the_ledger_it_lists() -> None:

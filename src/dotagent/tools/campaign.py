@@ -13,7 +13,7 @@ from typing import Annotated
 
 from pydantic import Field, StringConstraints
 
-from dotagent.agent.campaign import entry_line
+from dotagent.agent.campaign import entry_line, route_refused, routes_without_progress, sessions_without_progress
 from dotagent.agent.judge import ClaimJudgment, claim_refused, describe_claim
 from dotagent.agent.plan import EMPTY_PLAN, PLAN_EVENT, PlanPayload, plan_from_event, render_plan
 from dotagent.agent.review import GoalChecker, GoalRequest, GoalVerdict, goal_checker_for, goal_digest, shorten_reason
@@ -139,6 +139,21 @@ class NoteArgs(ToolArgs):
     )
 
 
+async def _refused_routes(campaign: CampaignRecord, ctx: ToolContext) -> tuple[CampaignEntry, ...]:
+    """The strategies a session may not write again: once the sessions without progress reach the patience, every
+    route tried since the newest progress; before that, none."""
+    store = ctx.runtime.store
+    progress: CampaignEntry | None = await store.latest_campaign_entry(campaign.id, "progress")
+    last_progress_at: float | None = None if progress is None else progress.ts
+    # The sessions before this one: the brief counted them, and this session has not written its progress yet.
+    started: list[float] = [
+        session.created_at for session in await store.campaign_sessions(campaign.id) if session.id != ctx.run_id
+    ]
+    if sessions_without_progress(started, last_progress_at) < ctx.runtime.config.agent.campaign_patience_sessions:
+        return ()
+    return routes_without_progress(await store.campaign_entries_of_kind(campaign.id, "strategy"), last_progress_at)
+
+
 def _note_tool() -> RegisteredTool:
     def classify(args: NoteArgs, ctx: ToolContext) -> ActionInfo:
         return _action(
@@ -149,6 +164,15 @@ def _note_tool() -> RegisteredTool:
 
     async def run(args: NoteArgs, ctx: ToolContext) -> ToolResult:
         campaign: CampaignRecord = await _campaign_of(ctx)
+        if args.kind == "strategy":
+            tried: tuple[CampaignEntry, ...] = await _refused_routes(campaign, ctx)
+            if route_refused(args.text, tried):
+                log.info("campaign_route_refused", campaign_id=campaign.id, run_id=ctx.run_id, strategy=args.text)
+                return fail(
+                    "Not written: that strategy is one of the routes already tried without progress. Write one that "
+                    "takes another route: another channel (a site's API, a command or a skill instead of its pages), "
+                    "another source or another approach."
+                )
         numbers: dict[str, float] = {measure.name: measure.value for measure in args.numbers}
         await ctx.runtime.store.add_campaign_entry(campaign.id, ctx.run_id, args.kind, args.text, numbers)
         return ok(f"Written in the campaign's ledger ({args.kind}).")

@@ -163,6 +163,10 @@ def _targets() -> ScriptedCall:
     return _call(CAMPAIGN_TARGETS_TOOL, {"targets": TARGETS, "verification": VERIFICATION})
 
 
+def _strategy(text: str) -> ScriptedCall:
+    return _call(CAMPAIGN_NOTE_TOOL, {"kind": "strategy", "text": text})
+
+
 def _progress(text: str, leads: int) -> ScriptedCall:
     return _call(CAMPAIGN_NOTE_TOOL, {"kind": "progress", "text": text, "numbers": [{"name": "leads", "value": leads}]})
 
@@ -326,6 +330,61 @@ async def test_a_session_started_by_the_scheduler_reads_the_brief_and_only_an_ac
     assert [entry.kind for entry in entries] == ["progress", "progress", "note"]
     assert entries[-1].text.startswith("The goal checker accepted the outcome: The newest progress entry")
     assert notices.shown == [("Campaign achieved", campaign.title)]
+
+
+async def test_a_stuck_campaign_refuses_the_route_it_tried_and_reaches_its_outcome_by_another(
+    login_env: dict[str, str],
+) -> None:
+    fair: str = "Scrape the fair's exhibitor list"
+    register: str = "Read the chamber of commerce register"
+    claim: str = "wc -l leads.csv counts 51 lines: 50 leads and the header."
+    model: RecordingProvider = RecordingProvider(
+        ScriptedProvider(
+            _PROVIDER,
+            [
+                # Session 1: a strategy, no progress.
+                _turn(_targets(), _strategy(fair)),
+                _finish("No leads yet: the fair's list is behind a sign-in."),
+                # Session 2: the same route again, refused; another one, taken; then the outcome.
+                _turn(_strategy(fair)),
+                _turn(_strategy(register)),
+                _turn(_progress("Wrote 50 leads from the register; wc -l counts 51 lines.", 50)),
+                _turn(_call(CAMPAIGN_ACHIEVED_TOOL, {"evidence": claim})),
+                _verdict("achieved", "The newest progress entry measures 50 leads, as the targets ask."),
+                _finish("The campaign is achieved: 50 leads are in leads.csv."),
+            ],
+        )
+    )
+    config: AppConfig = _config(60)
+    impatient: AppConfig = config.model_copy(
+        update={"agent": config.agent.model_copy(update={"campaign_patience_sessions": 1})}
+    )
+    async with _session(impatient, login_env, model, Notices()) as (runtime, manager):
+        opening: RunRecord = await _start_campaign(manager)
+        assert opening.campaign_id is not None
+        async with asyncio.timeout(_TIME_LIMIT_S):
+            await manager.wait(opening.id)
+            second: RunRecord = await manager.start_session(opening.campaign_id)
+            ended: RunRecord = await manager.wait(second.id)
+        campaign: CampaignRecord = await runtime.store.get_campaign(opening.campaign_id)
+        entries: list[CampaignEntry] = await runtime.store.campaign_entries(campaign.id, 10)
+        results: list[EventRecord] = await _events(runtime, second.id, "tool_result")
+    assert ended.status == "done", ended
+    brief: str = _first_user(model.of(second.thread_id)[0])
+    assert (
+        "No session wrote a progress entry for 1 session. The routes tried since the newest progress, oldest first, "
+        f"brought nothing and are refused (campaign_note does not take them again):\n- [strategy, 0 min ago] {fair}\n"
+        "Before anything else, take a different route:"
+    ) in brief
+    notes: list[JsonObject] = [event.data for event in results if event.data["tool"] == CAMPAIGN_NOTE_TOOL]
+    assert [note["ok"] for note in notes] == [False, True, True]
+    assert str(notes[0]["text"]).startswith("Not written: that strategy is one of the routes already tried")
+    assert [(entry.kind, entry.text) for entry in entries[:3]] == [
+        ("strategy", fair),
+        ("strategy", register),
+        ("progress", "Wrote 50 leads from the register; wc -l counts 51 lines."),
+    ]
+    assert campaign.status == "achieved"
 
 
 async def test_a_session_the_daemon_cut_off_is_not_resumed_and_the_next_session_says_so(

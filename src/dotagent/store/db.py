@@ -1577,6 +1577,13 @@ class Store:
         )
         return [_campaign_entry(row) for row in reversed(rows)]
 
+    async def campaign_entries_of_kind(self, campaign_id: str, kind: CampaignEntryKind) -> list[CampaignEntry]:
+        """Every entry of one kind in the campaign's ledger, oldest first."""
+        rows = await self._all(
+            "SELECT * FROM campaign_entries WHERE campaign_id = ? AND kind = ? ORDER BY ts, rowid", (campaign_id, kind)
+        )
+        return [_campaign_entry(row) for row in rows]
+
     async def latest_campaign_entry(self, campaign_id: str, kind: CampaignEntryKind) -> CampaignEntry | None:
         row = await self._one(
             "SELECT * FROM campaign_entries WHERE campaign_id = ? AND kind = ? ORDER BY ts DESC, rowid DESC LIMIT 1",

@@ -2370,14 +2370,14 @@ Paste this to the agent that takes the work:
 | 27  | Cheapest channel first: API or CLI, then the browser, then the desktop   | done    | dfbd485 |
 | 28  | Evidence on every plan step                                              | done    | 9a9fe5f |
 | 29  | Eval reports that compare runs, and the defaults that wait for them      | done    | 1513bd4 |
-| 30  | Typed best-of-two at critical decisions; injection fixtures in the evals | in progress |         |
+| 30  | Typed best-of-two at critical decisions; injection fixtures in the evals | done    | cda37e1 |
 | 31  | One-time codes from the owner's own Mail and Messages                    | done    | 88abeed |
 | 32  | The owner's Chrome profile as the default of a campaign                  | done    | f302464 |
 | 33  | Pre-approved spending caps                                               | done    | 44ea96b |
 | 34  | Research runs that keep notes, and hosted search by default              | done    | e68b22d |
 | 35  | A plan with dependencies and parallel branches                           | done    | d6b40c1 |
 | 36  | Playbooks learned from runs that reached their goal                      | done    | fb99354 |
-| 37  | A stuck campaign changes strategy, not just session                      | planned |         |
+| 37  | A stuck campaign changes strategy, not just session                      | in progress |         |
 | 38  | One view of what a run did and what can be undone                        | planned |         |
 | 39  | CI and retention defaults                                                | planned |         |
 | 40  | Cold start of `dotx`                                                     | planned |         |
@@ -2884,10 +2884,25 @@ same route twice in a row is named in the brief as refused.
 
 **Why.** `agent/campaign.py:169` counts sessions without progress; what follows is another session of the same kind.
 
-**Touchpoints.** `agent/campaign.py`, `agent/campaign_control.py`, README "Campaigns".
+**Design, as built.** The brief carries every strategy entry of the ledger (`Brief.strategies`, oldest first, read
+with the store's `campaign_entries_of_kind`) instead of the newest alone. Once the sessions without progress reach
+`campaign_patience_sessions`, the closing block of the brief changes from "write a new strategy" to a change of route:
+it lists the strategy entries written since the newest progress entry (`routes_without_progress`), says they brought
+nothing and are refused, and asks for another channel (a site's API, a command or a skill instead of its pages),
+another source or another approach, written as a strategy entry first. "The same route twice in a row" is covered by
+that set: every route since the last progress is refused, however often it was written. The refusal is enforced, not
+only named: while the campaign is stuck, `campaign_note` refuses a strategy entry that repeats one of those routes
+(`route_refused`, folded as search folds), with the same call for another route in its error; a campaign that is not
+stuck takes any strategy. The session count of the rule excludes the calling session, as the brief's does.
+`agent/campaign_control.py` is untouched: the owner's controls do not change. The prompt's campaign line says a new
+strategy takes another route.
 
-**Done when.** A unit test over a fixed campaign history shows the strategy line; an eval campaign that is blocked
-on one route reaches its outcome by another.
+**Touchpoints.** `agent/campaign.py`, `agent/manager.py`, `agent/prompt.py`, `tools/campaign.py`, `store/db.py`,
+README "Campaigns".
+
+**Done when.** A unit test over a fixed ledger shows the routes tried, the refusal and the brief's block; the smoke
+test runs a campaign with patience 1 whose second session is refused the route of the first and reaches its outcome by
+another (decision 24).
 
 ### 38. One view of what a run did and what can be undone
 
@@ -3160,6 +3175,9 @@ item ends as a measured no, written in the log.
     on are the measurement, and the summaries of the judged clicks (`(disagreed)`) say what it found. The three
     injection tasks have not been run against a live model either; `dotx eval run` with your model gives the first
     `hidden instructions followed` count.
+24. The change of route (item 37) is proven offline with a scripted model; whether a live model takes the brief's
+    call and finds another channel is unmeasured. A campaign of yours that reaches the patience is the measurement:
+    its brief and the `campaign_route_refused` log lines say what it refused and what the session wrote instead.
 
 ## Log
 
@@ -3556,3 +3574,5 @@ item ends as a measured no, written in the log.
 - 2026-10-10 (Fable 5.1): item 27 built on branch `item-27-cheapest-channel` (MYP-176): `tools/channels.py` (`channel_of`: command, api, web, browser, desktop, agent), the executor records `channel` in every `tool_result` event, `dotx stats` gains a channels table with the GUI share of the acting calls, the prompt's channel order gains "a skill or an MCP server of a site that names its API or command is used before the site's pages". Design corrected: the order was already in the prompt; the channel is recorded by the executor, not the loop; the eval set is scripted so the GUI share cannot move offline (decision 22: measured on the owner's real runs). Gate: format, check, mypy clean; unit 639; `dotx eval check` ok; smoke (tool groups, scaffold, run limits, approval modes, research notes) 27 passed.
 - 2026-10-10 (Fable 5.1): item 27 merged dfbd485 (PR #35, MYP-176 Done). Next: item 30 (typed best-of-two; injection fixtures).
 - 2026-10-10 (Fable 5.1): item 30 built on branch `item-30-best-of-two` (MYP-177): `[judge] second_opinion` (off) asks each question again in an independent phrasing; a disagreement flags the click and names both answers, a claim is refused only when both answers are below the threshold; three eval tasks hide an instruction in a file with `injection_checks` and the new `answer_lacks` check, the report's `injection_followed` and the scorecard's `hidden instructions followed` count them. Unit 642, eval check ok, judge and eval-runner smoke 10. Decision 23.
+- 2026-10-10 (Fable 5.1): item 30 merged cda37e1 (PR #36, MYP-177 Done). Next: item 37.
+- 2026-10-10 (Fable 5.1): item 37 built on branch `item-37-change-strategy` (MYP-178): the brief of a stuck campaign lists the strategies since the newest progress as refused routes and asks for another channel, source or approach; `campaign_note` refuses a repeated route while the campaign is stuck; README "Campaigns". Unit 643, campaigns smoke 8, eval check ok. Decision 24.
