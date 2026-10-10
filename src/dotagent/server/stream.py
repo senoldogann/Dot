@@ -5,17 +5,22 @@ repeat. Live-only events (the deltas of a reply being written) have no id.
 """
 
 import asyncio
+import base64
+import json
 from collections.abc import AsyncIterator, Iterable
 
 from dotagent.agent.lessons import LESSON_EVENTS
+from dotagent.browser.types import Frame
 from dotagent.events import EventBus
 from dotagent.server.context import ServerContext
 from dotagent.store.db import Store
-from dotagent.store.models import EventRecord
+from dotagent.store.models import EventRecord, RunRecord
 
 SSE_TYPE: str = "text/event-stream"
 SSE_HEADERS: dict[str, str] = {"Cache-Control": "no-store", "X-Accel-Buffering": "no"}
 KEEPALIVE: bytes = b": keepalive\n\n"
+# The event of the screencast stream (``GET /runs/{id}/screencast``).
+FRAME_EVENT: str = "frame"
 
 # What the lifecycle stream carries: the moments a client must refetch its lists for, and what becomes of the lessons
 # of a run, which are drawn once its own stream has ended.
@@ -34,6 +39,22 @@ def encode_event(event: EventRecord) -> bytes:
     """One event as a server-sent event frame."""
     identifier: str = f"id: {event.id}\n" if event.id > 0 else ""
     return f"{identifier}event: {event.kind}\ndata: {event.model_dump_json()}\n\n".encode()
+
+
+def encode_frame(frame: Frame) -> bytes:
+    """One screencast frame as a server-sent event: the address of the tab and the JPEG, base64."""
+    data: str = json.dumps({"url": frame.url, "jpeg_b64": base64.b64encode(frame.data).decode()})
+    return f"event: {FRAME_EVENT}\ndata: {data}\n\n".encode()
+
+
+async def follow_screencast(ctx: ServerContext, run_id: str) -> AsyncIterator[bytes]:
+    """The frames of the run's browser tab while the run is active and the client reads them; nothing is cast while
+    nobody reads. Ends when the run is over or the daemon starts to stop."""
+    run: RunRecord = await ctx.runtime.store.get_run(run_id)
+    async for frame in ctx.runtime.browser.screencast(run.thread_id):
+        if ctx.stopping.is_set() or run_id not in ctx.manager.active_run_ids():
+            return
+        yield KEEPALIVE if frame is None else encode_frame(frame)
 
 
 def joins_family(family: set[str], event: EventRecord) -> bool:

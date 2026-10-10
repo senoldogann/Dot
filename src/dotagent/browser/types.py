@@ -233,3 +233,10 @@ class Screenshot(FrozenModel):
     width: int
     height: int
     data: bytes
+
+
+class Frame(FrozenModel):
+    """One JPEG of a tab from Chrome's screencast, with the address the tab was on."""
+
+    url: str
+    data: bytes

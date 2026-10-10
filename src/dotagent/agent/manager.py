@@ -18,7 +18,7 @@ from dotagent.agent.campaign import (
     render_brief,
     sessions_without_progress,
 )
-from dotagent.agent.gate import RunGate
+from dotagent.agent.gate import HANDBACK_EVENT, TAKEOVER_EVENT, RunGate
 from dotagent.agent.lessons import LessonCase, dismiss_lesson, learn, save_lesson
 from dotagent.agent.loop import AgentRun, RunEnd, RunOpening, run_agent
 from dotagent.agent.plan import EMPTY_PLAN, PLAN_EVENT, plan_from_event
@@ -449,6 +449,33 @@ class RunManager:
         handle.cancel.set()
         self._runtime.approvals.release_run(run_id)
         handle.task.cancel()
+
+    def held(self, run_id: str) -> bool:
+        """Whether the user holds the run (took its browser over); false for a run that is not active."""
+        handle: RunHandle | None = self._handles.get(run_id)
+        return handle is not None and handle.gate.held
+
+    async def take_over(self, run_id: str, source: str) -> str | None:
+        """Hold the run at its next tool call and bring its tab to the front, for the user to use the browser
+        themselves; returns the tab's address, ``None`` when the run has no tab. Refused when the browser has no
+        window (``[browser] headless``), when the run is not active or when it is held already."""
+        if self._runtime.config.browser.headless:
+            raise RunConflict(
+                "the browser is headless, so there is no window to take over; set [browser] headless = false",
+                {"run_id": run_id},
+            )
+        handle: RunHandle = self._handle(run_id)
+        handle.gate.hold()
+        url: str | None = await self._runtime.browser.focus(handle.thread_id)
+        await self._runtime.bus.emit(run_id, TAKEOVER_EVENT, {"source": source, "url": url}, True)
+        return url
+
+    async def hand_back(self, run_id: str, source: str) -> float:
+        """Let the run go on after a takeover; returns how long it was held. Refused when it is not held."""
+        handle: RunHandle = self._handle(run_id)
+        held_s: float = handle.gate.release()
+        await self._runtime.bus.emit(run_id, HANDBACK_EVENT, {"source": source, "held_s": round(held_s, 1)}, True)
+        return held_s
 
     async def wait(self, run_id: str) -> RunRecord:
         """Block until the run is over (returns immediately for runs that already ended)."""

@@ -9,9 +9,10 @@ produced here as value types (``PageView``, ``ActOutcome``, ``TextView``); rende
 """
 
 import asyncio
+import base64
 import contextlib
 import time
-from collections.abc import AsyncIterator, Sequence
+from collections.abc import AsyncGenerator, AsyncIterator, Sequence
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from functools import partial
@@ -19,7 +20,7 @@ from pathlib import Path
 from typing import Literal
 from urllib.parse import urldefrag
 
-from playwright.async_api import Browser, BrowserContext, Page, Playwright, async_playwright
+from playwright.async_api import Browser, BrowserContext, CDPSession, Page, Playwright, async_playwright
 from playwright.async_api import Error as PlaywrightError
 from pydantic import JsonValue
 
@@ -64,6 +65,7 @@ from dotagent.browser.types import (
     ActOutcome,
     Attachment,
     FindResult,
+    Frame,
     PageView,
     Screenshot,
     SecretFieldCheck,
@@ -79,11 +81,16 @@ from dotagent.config import BrowserConfig
 from dotagent.core.errors import ApprovalRejected, BrowserError, HandedOff, PolicyDenied
 from dotagent.core.logs import get_logger
 from dotagent.core.text import truncate_middle
+from dotagent.core.types import JsonObject
 from dotagent.store.models import BrowserMode
 
 _log = get_logger("dotagent.browser.session")
 
 _REAP_INTERVAL_S: float = 60.0
+# The screencast of a tab (``screencast``): JPEG quality, the longest edge, and how often a silent cast says so.
+_CAST_QUALITY: int = 50
+_CAST_MAX_EDGE: int = 1280
+_CAST_POLL_S: float = 1.0
 _POPUP_WAIT_S: float = 1.0
 # A page that shows fewer elements than this right after loading is probably still rendering.
 _MIN_REFS_AFTER_LOAD: int = 3
@@ -794,6 +801,70 @@ class BrowserSession:
             viewport: Viewport = await self._viewport(tab)
             data: bytes = await screenshot_jpeg(tab.page, config.screenshot_quality, _ms(config.action_timeout_s))
             return Screenshot(url=tab.page.url, width=viewport.width, height=viewport.height, data=data)
+
+    def _tab_of(self, thread_id: str) -> Tab | None:
+        """The current tab of the thread without waiting for its lock, ``None`` when the thread has no open tab. Starts
+        nothing: a thread that never used the browser has no tab."""
+        thread: ThreadTabs | None = self._threads.get(thread_id)
+        if thread is None or not thread.tabs:
+            return None
+        tab: Tab = thread.tabs[thread.active]
+        return None if tab.page.is_closed() else tab
+
+    async def focus(self, thread_id: str) -> str | None:
+        """Bring the thread's current tab to the front of its window, for the user to take over; returns its address,
+        ``None`` when the thread has no tab."""
+        tab: Tab | None = self._tab_of(thread_id)
+        if tab is None:
+            return None
+        await bring_to_front(tab.page)
+        return tab.page.url
+
+    async def screencast(self, thread_id: str) -> AsyncGenerator[Frame | None]:
+        """Frames of the thread's current tab as Chrome paints it (``Page.startScreencast``), for as long as the caller
+        reads them: a tab that does not change sends nothing, and ``None`` comes once a second in between so the caller
+        can check whether it still wants frames. The cast follows the current tab when the model switches or closes it,
+        waits while the thread has no tab yet, and ends when the browser is closed."""
+        while not self._closed:
+            tab: Tab | None = self._tab_of(thread_id)
+            if tab is None:
+                await asyncio.sleep(_CAST_POLL_S)
+                yield None
+                continue
+            frames: asyncio.Queue[JsonObject] = asyncio.Queue()
+            try:
+                session: CDPSession = await tab.page.context.new_cdp_session(tab.page)
+            except PlaywrightError:
+                await asyncio.sleep(_CAST_POLL_S)
+                yield None
+                continue
+            try:
+                session.on("Page.screencastFrame", frames.put_nowait)
+                await session.send(
+                    "Page.startScreencast",
+                    {
+                        "format": "jpeg",
+                        "quality": _CAST_QUALITY,
+                        "maxWidth": _CAST_MAX_EDGE,
+                        "maxHeight": _CAST_MAX_EDGE,
+                        "everyNthFrame": 1,
+                    },
+                )
+                while self._tab_of(thread_id) is tab:
+                    try:
+                        frame: JsonObject = await asyncio.wait_for(frames.get(), _CAST_POLL_S)
+                    except TimeoutError:
+                        yield None
+                        continue
+                    await session.send("Page.screencastFrameAck", {"sessionId": frame["sessionId"]})
+                    yield Frame(url=tab.page.url, data=base64.b64decode(str(frame["data"])))
+            except PlaywrightError:
+                # The tab went away under the cast; the loop attaches to whatever tab is current now.
+                pass
+            finally:
+                with contextlib.suppress(PlaywrightError):
+                    await session.send("Page.stopScreencast")
+                    await session.detach()
 
     async def _run_steps(
         self, thread: ThreadTabs, tab: Tab, steps: Sequence[Step], secret_field: SecretFieldCheck

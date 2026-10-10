@@ -3,6 +3,7 @@
 import { api, follow } from "../api.js";
 import { approvalCard, fromRecord, LEFT_IN_CAMPAIGN, LEFT_IN_RUN } from "../approvals.js";
 import { createAttachments, readyToSend } from "../attachments.js";
+import { createComputer } from "../computer.js";
 import { createDetails } from "../details.js";
 import { clip, dateTime, dateTimeFull, debounce, el, modelName } from "../dom.js";
 import { levelLabel } from "../efforts.js";
@@ -598,6 +599,7 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
     }
     if (terminal) {
       active = false;
+      computer.setActive(false);
       messagesMissed();
       finishedAt = update.endedAt;
       syncControls();
@@ -714,7 +716,8 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
     }
   }
 
-  const inspector = createInspector({ layout, content: [details.element, plan.element, actionsCard.element] });
+  const computer = createComputer({ runId, active: detail.active, held: detail.held });
+  const inspector = createInspector({ layout, content: [computer.element, details.element, plan.element, actionsCard.element] });
   const timeline = createTimeline({
     rootRunId: runId,
     startedAt: run.created_at,
@@ -735,6 +738,7 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
     onAnswer,
     onImage: inspector.addImage,
     onQuestionLeft: debounce(() => reconcile(), QUESTIONS_SETTLE_MS),
+    onHeld: computer.setHeld,
   });
   const problem =
     historyProblem === null
@@ -828,6 +832,7 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
   return () => {
     window.removeEventListener("scroll", onScroll);
     stopLifecycle();
+    computer.dispose();
     inspector.dispose();
     if (ticker !== null) {
       clearInterval(ticker);

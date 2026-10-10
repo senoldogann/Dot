@@ -768,6 +768,16 @@ side calls, such as compactions, reviews and the goal check), the duration and t
 card and the latest screenshots. It stays closed until the panel button in the head of the run opens it (the choice is
 kept in the browser); open, it sits beside the conversation from 960 px and is a drawer below that.
 
+**Dot's computer**, at the top of that panel while a run is going on, shows the page of the run's browser as Chrome
+paints it (`GET /api/runs/{id}/screencast`, Chrome's own screencast, sent only while the view is open: **Watch** opens
+it, and a tab that does not change sends nothing) and a pill under it that says who has the browser. **Take over**
+holds the run at its next tool call, brings the tab to the front and the pill reads "You have control": the Chrome
+window is on your Mac, so sign in, pass a CAPTCHA or do a step yourself; **Return control** lets the run go on, and the
+result of the tool call that waited tells the model how long you had the browser and that the page may have changed,
+so it takes a snapshot first. The timeline keeps both moments (`takeover`, `handback`), and `dotx run` prints them. A
+takeover is refused while `[browser] headless = true` (there is no window to use), and the run page keeps the last
+frame once the run has ended.
+
 The Actions card is one view of what the run did and what can be undone: every acting step (a tool call that changed
 something: a file written, a command run, a click, a message sent; reads are left out) with the channel it went
 through, its target and the result the model got as its evidence; every approval and question of the run with its

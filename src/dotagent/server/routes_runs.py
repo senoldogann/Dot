@@ -17,7 +17,7 @@ from dotagent.llm.router import parse_model_ref
 from dotagent.server import UI_SOURCE
 from dotagent.server.actions import action_steps, file_edits
 from dotagent.server.context import ServerContext
-from dotagent.server.stream import SSE_HEADERS, SSE_TYPE, follow_lifecycle, follow_run
+from dotagent.server.stream import SSE_HEADERS, SSE_TYPE, follow_lifecycle, follow_run, follow_screencast
 from dotagent.server.views import (
     ApprovalsQuery,
     AsideRequest,
@@ -68,6 +68,7 @@ def runs_router(ctx: ServerContext) -> APIRouter:
             lessons=await run_lessons(store, run_id),
             questions=await store.list_left_questions(run_id),
             campaign=await campaign_of(run),
+            held=ctx.manager.held(run_id),
         )
 
     @router.get("/runs")
@@ -186,6 +187,27 @@ def runs_router(ctx: ServerContext) -> APIRouter:
     async def cancel_run(run_id: str) -> RunDetail:
         await store.get_run(run_id)
         ctx.manager.cancel(run_id)
+        return await detail(run_id)
+
+    @router.get("/runs/{run_id}/screencast")
+    async def run_screencast(run_id: str) -> StreamingResponse:
+        """The page of the run's browser as Chrome paints it, one ``frame`` event per paint, while the run is active
+        and this client reads (see ``stream.follow_screencast``)."""
+        await store.get_run(run_id)
+        return StreamingResponse(follow_screencast(ctx, run_id), media_type=SSE_TYPE, headers=SSE_HEADERS)
+
+    @router.post("/runs/{run_id}/takeover", status_code=202)
+    async def take_over_run(run_id: str) -> RunDetail:
+        """Hold the run at its next tool call and bring its tab to the front: the user uses the browser themselves
+        until ``handback``."""
+        await store.get_run(run_id)
+        await ctx.manager.take_over(run_id, UI_SOURCE)
+        return await detail(run_id)
+
+    @router.post("/runs/{run_id}/handback", status_code=202)
+    async def hand_back_run(run_id: str) -> RunDetail:
+        await store.get_run(run_id)
+        await ctx.manager.hand_back(run_id, UI_SOURCE)
         return await detail(run_id)
 
     @router.get("/stream")
