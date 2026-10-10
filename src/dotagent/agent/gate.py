@@ -3,16 +3,18 @@ approval modes answers the policy's questions without the user."""
 
 import asyncio
 import time
+from collections.abc import Mapping
 
 from dotagent.agent.approvals import ApprovalBroker, ApprovalOutcome
 from dotagent.agent.review import Reviewer, ReviewRequest, ReviewVerdict, shorten_reason
-from dotagent.config import PaceConfig
+from dotagent.config import PaceConfig, SpendCap
 from dotagent.core.errors import ApprovalRejected, HandedOff, PolicyDenied
 from dotagent.core.logs import get_logger
 from dotagent.core.types import JsonObject
 from dotagent.events import EventBus
 from dotagent.policy.engine import YOLO_WAIVED_SOURCES, approval_severity, decide, owner_handoff, route_for
 from dotagent.policy.pace import DAY_S, PacedAction, pace_refusal, paced_action, spacing_wait
+from dotagent.policy.spend import SpendState, render_amount, spend_allowance, spend_host, spend_state
 from dotagent.policy.types import TAINTING_KINDS, ActionInfo, ApprovalMode, Decision, Preset, Route
 from dotagent.store.db import Store
 from dotagent.store.models import RuleRecord, RunMode
@@ -31,6 +33,7 @@ def _describe(info: ActionInfo) -> JsonObject:
         "risk": info.risk,
         "summary": info.summary,
         "target": info.target,
+        "amount": None if info.amount is None else render_amount(info.amount),
         "flags": list(info.flags),
     }
 
@@ -62,6 +65,7 @@ class RunGate:
         mode: RunMode,
         preset: Preset,
         pace: PaceConfig,
+        spend: Mapping[str, SpendCap],
         approval_mode: ApprovalMode,
         reviewer: Reviewer,
         instructions: tuple[str, ...],
@@ -73,6 +77,7 @@ class RunGate:
         self._mode: RunMode = mode
         self._preset: Preset = preset
         self._pace: PaceConfig = pace
+        self._spend: Mapping[str, SpendCap] = spend
         self._approval_mode: ApprovalMode = approval_mode
         self._reviewer: Reviewer = reviewer
         self._instructions: tuple[str, ...] = instructions
@@ -138,7 +143,32 @@ class RunGate:
     async def _decide(self, info: ActionInfo) -> str:
         """What the policy says and who answers its question: the action goes through, or the call raises."""
         rules: list[RuleRecord] = await self._store.list_rules()
-        decision: Decision = decide(info, self._mode, self.tainted, self._preset, rules)
+        state: SpendState | None = await self._spend_state(info)
+        allowance: Decision | None = None if state is None else spend_allowance(state)
+        decision: Decision = decide(info, self._mode, self.tainted, self._preset, rules, allowance)
+        if decision.verdict == "allow":
+            return ""
+        if allowance is not None and decision is allowance and state is not None:
+            note: str = await self._authorize_decision(info, decision, rules)
+            await self._store.record_spend(
+                state.host, state.amount.value, state.amount.currency, time.time(), self._run_id
+            )
+            log.info("spend_recorded", run_id=self._run_id, host=state.host, amount=state.amount.value)
+            return note
+        return await self._authorize_decision(info, decision, rules)
+
+    async def _spend_state(self, info: ActionInfo) -> SpendState | None:
+        """The pre-approved caps' view of a payment step with an amount on a listed site; ``None`` otherwise."""
+        if "financial" not in info.flags or info.amount is None:
+            return None
+        host: str | None = spend_host(info.target)
+        if host is None or host not in self._spend:
+            return None
+        spent: float = await self._store.spent_since(host, time.time() - DAY_S)
+        return spend_state(self._spend, info.target, info.amount, spent)
+
+    async def _authorize_decision(self, info: ActionInfo, decision: Decision, rules: list[RuleRecord]) -> str:
+        """What the decision means in this approval mode: a waiver, a refusal, the review model or the user."""
         if decision.verdict == "allow":
             return ""
         if self._approval_mode == "yolo" and decision.source in YOLO_WAIVED_SOURCES:

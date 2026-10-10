@@ -429,12 +429,12 @@ async def test_the_policy_gates_what_the_model_may_remember(runtime: Runtime) ->
     plain, _ = await _prepare(runtime, "memory_save", {"content": DARK_MODE})
     keyed, _ = await _prepare(runtime, "memory_save", {"content": f"The OpenAI key is {KEY_LIKE}"})
     assert keyed.action.flags == ("persistence", "exfiltration")
-    assert decide(plain.action, "task", False, "aggressive", []).verdict == "allow"
-    tainted = decide(plain.action, "task", True, "aggressive", [])
+    assert decide(plain.action, "task", False, "aggressive", [], None).verdict == "allow"
+    tainted = decide(plain.action, "task", True, "aggressive", [], None)
     assert (tainted.verdict, tainted.source) == ("ask", "taint")
-    refused = decide(keyed.action, "task", False, "aggressive", [])
+    refused = decide(keyed.action, "task", False, "aggressive", [], None)
     assert (refused.verdict, refused.source) == ("deny", "auto_review")
     # A research run may keep memory notes (item 34): the mode does not gate a save.
-    assert decide(plain.action, "research", False, "aggressive", []).source == "preset"
+    assert decide(plain.action, "research", False, "aggressive", [], None).source == "preset"
     assert "memory_save" in {tool.spec.name for tool in tools_for_mode(runtime.registry, "research")}
     assert "memory_search" in {tool.spec.name for tool in tools_for_mode(runtime.registry, "research")}

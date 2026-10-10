@@ -215,7 +215,7 @@ def _action(read_only: bool | None, destructive: bool | None, open_world: bool |
 def test_the_policy_judges_mcp_actions_by_their_flags(
     info: ActionInfo, mode: RunMode, tainted: bool, preset: Preset, verdict: Verdict
 ) -> None:
-    decision: Decision = decide(info, mode, tainted, preset, [])
+    decision: Decision = decide(info, mode, tainted, preset, [], None)
     assert decision.verdict == verdict, decision
 
 

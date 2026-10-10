@@ -49,7 +49,7 @@ Preset = Literal["aggressive", "balanced", "cautious"]
 # What the pace of a site counts an action as (:mod:`dotagent.policy.pace`).
 PaceClass = Literal["public", "social"]
 Verdict = Literal["allow", "ask", "handoff", "deny"]
-DecisionSource = Literal["auto_review", "mode", "hard_stop", "rule", "taint", "preset", "pace"]
+DecisionSource = Literal["auto_review", "mode", "hard_stop", "rule", "taint", "preset", "pace", "spend"]
 
 # Who answers a question the policy raised: ``ask`` the user, ``auto`` a reviewer model (which can hand the question on
 # to the user), ``yolo`` nobody (the action is allowed and only recorded).
@@ -102,8 +102,17 @@ TAINT_ESCALATION_FLAGS: frozenset[Flag] = frozenset(
 )
 
 
+class Amount(FrozenModel):
+    """Money as a page shows it: the number and the currency sign or code next to it."""
+
+    value: float
+    currency: str
+
+
 class ActionInfo(FrozenModel):
-    """A concrete action about to happen, as the policy sees it."""
+    """A concrete action about to happen, as the policy sees it. ``amount`` is the money a payment step moves, when
+    the page says it; every other action has none (the default stands for that, since only the browser's payment
+    steps know an amount)."""
 
     tool: str
     kind: ActionKind
@@ -111,6 +120,7 @@ class ActionInfo(FrozenModel):
     summary: str
     target: str
     flags: tuple[Flag, ...]
+    amount: Amount | None = None
 
 
 class Decision(FrozenModel):

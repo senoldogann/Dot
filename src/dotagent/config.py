@@ -144,15 +144,24 @@ class PaceConfig(FrozenModel):
     public_spacing_s: float = Field(ge=0, le=3600)
 
 
+class SpendCap(FrozenModel):
+    """The caps of a site in ``[policy.spend]``: the most one purchase may be, and the most a day may add up to
+    (:mod:`dotagent.policy.spend`). Plain numbers, compared with the number on the page whatever its currency."""
+
+    per_purchase: float = Field(gt=0, allow_inf_nan=False)
+    per_day: float = Field(gt=0, allow_inf_nan=False)
+
+
 class PolicyConfig(FrozenModel):
     """``code_sources`` lists the applications ``code_fetch`` may read one-time codes from (``mail``, ``messages``);
-    empty, the tool does not exist."""
+    empty, the tool does not exist. ``spend`` maps a site (its host without ``www.``) to its pre-approved caps."""
 
     preset: Preset
     approvals: ApprovalMode
     approval_timeout_s: float
     protected_paths: list[str]
     code_sources: list[Literal["mail", "messages"]]
+    spend: dict[str, SpendCap]
     pace: PaceConfig
 
 

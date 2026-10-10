@@ -101,6 +101,7 @@ async def _yolo_context(runtime: Runtime) -> ToolContext:
             "task",
             "aggressive",
             runtime.config.policy.pace,
+            runtime.config.policy.spend,
             "yolo",
             _nobody,
             (GOAL,),

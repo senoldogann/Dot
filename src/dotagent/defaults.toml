@@ -249,6 +249,14 @@ protected_paths = [
 # newest matching message reaches the model. Empty: no such tool.
 code_sources = []
 
+[policy.spend]
+# Pre-approved spending: a site (its host, without www.) with the most one purchase may be and the most a day may add
+# up to, for example "namecheap.com" = { per_purchase = 20, per_day = 50 }. A payment step there under both caps is a
+# question instead of a hand-off to you (a yolo run goes on, auto lets the review model answer, ask asks once), is
+# recorded with its amount and counts against the day; over a cap, on a site not listed here, or when the page does not
+# show the amount, the money hand-off holds in every mode but yolo. The caps are plain numbers compared with the number
+# on the page, whatever its currency. Empty: no pre-approved spending.
+
 [policy.pace]
 # How many public browser actions (posts, replies, reposts, quotes, messages: the public_post and external_send flags)
 # and social ones (follows, likes, subscriptions: the social flag) one site gets, across runs and threads, in the last

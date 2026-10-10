@@ -111,6 +111,10 @@ CREATE TABLE IF NOT EXISTS paced_actions (
     host TEXT NOT NULL, pace TEXT NOT NULL, ts REAL NOT NULL, run_id TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS paced_actions_host ON paced_actions(host, pace, ts);
+CREATE TABLE IF NOT EXISTS spends (
+    host TEXT NOT NULL, amount REAL NOT NULL, currency TEXT NOT NULL, ts REAL NOT NULL, run_id TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS spends_host ON spends(host, ts);
 """
 
 _EXTENSIONS: dict[str, str] = {
@@ -1586,6 +1590,21 @@ class Store:
             "INSERT INTO paced_actions(host, pace, ts, run_id) VALUES(?, ?, ?, ?)", (host, pace, ts, run_id)
         )
         await self._db.commit()
+
+    async def record_spend(self, host: str, amount: float, currency: str, ts: float, run_id: str) -> None:
+        """Count a pre-approved spend against the site's day."""
+        await self._db.execute(
+            "INSERT INTO spends(host, amount, currency, ts, run_id) VALUES(?, ?, ?, ?, ?)",
+            (host, amount, currency, ts, run_id),
+        )
+        await self._db.commit()
+
+    async def spent_since(self, host: str, since: float) -> float:
+        """What the pre-approved spends on ``host`` after ``since`` add up to."""
+        row: aiosqlite.Row | None = await self._one(
+            "SELECT COALESCE(SUM(amount), 0) AS total FROM spends WHERE host = ? AND ts > ?", (host, since)
+        )
+        return float(row["total"]) if row is not None else 0.0
 
     async def paced_times(self, host: str, pace: PaceClass, since: float) -> list[float]:
         """The times of the ``pace`` actions on ``host`` after ``since``, oldest first."""

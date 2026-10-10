@@ -67,10 +67,12 @@ def mode_gate(info: ActionInfo, mode: RunMode) -> Decision | None:
     return None
 
 
-def hard_stop(info: ActionInfo) -> Decision | None:
+def hard_stop(info: ActionInfo, allowance: Decision | None) -> Decision | None:
     """Money and credentials are the user's to handle, regardless of rules (yolo runs do them, see
-    ``YOLO_WAIVED_SOURCES``)."""
-    hits: list[Flag] = _intersect(info, _HARD_HANDOFF_FLAGS)
+    ``YOLO_WAIVED_SOURCES``). A payment step with a pre-approved ``allowance`` (:mod:`dotagent.policy.spend`) is not
+    stopped for its money; a credential it also carries still stops it."""
+    waived: frozenset[Flag] = frozenset({"financial"}) if allowance is not None else frozenset()
+    hits: list[Flag] = [flag for flag in _intersect(info, _HARD_HANDOFF_FLAGS) if flag not in waived]
     if hits:
         return Decision(
             verdict="handoff",
@@ -136,17 +138,28 @@ def _escalates_on_taint(info: ActionInfo) -> bool:
     return bool(_intersect(info, TAINT_ESCALATION_FLAGS))
 
 
-def decide(info: ActionInfo, mode: RunMode, tainted: bool, preset: Preset, rules: list[RuleRecord]) -> Decision:
-    """Combine every policy layer into one decision, strictest layer first."""
+def decide(
+    info: ActionInfo,
+    mode: RunMode,
+    tainted: bool,
+    preset: Preset,
+    rules: list[RuleRecord],
+    allowance: Decision | None,
+) -> Decision:
+    """Combine every policy layer into one decision, strictest layer first. ``allowance`` is the question a
+    pre-approved spend asks instead of the money hand-off (:mod:`dotagent.policy.spend`), ``None`` for any other
+    action; it takes the hand-off's place and no later layer loosens it."""
     refusal: Decision | None = auto_review(info)
     if refusal is not None:
         return refusal
     gated: Decision | None = mode_gate(info, mode)
     if gated is not None:
         return gated
-    stopped: Decision | None = hard_stop(info)
+    stopped: Decision | None = hard_stop(info, allowance)
     if stopped is not None:
         return stopped
+    if allowance is not None:
+        return allowance
     rule: RuleRecord | None = match_rule(info, rules)
     if rule is not None:
         verdict: Verdict = _BEHAVIOR_VERDICT[rule.behavior]
