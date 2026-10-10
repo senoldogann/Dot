@@ -37,6 +37,7 @@ from dotagent.plugins.catalog import load_plugins
 from dotagent.plugins.types import PluginCatalog
 from dotagent.policy.paths import expand_protected
 from dotagent.scheduler.timing import resolve_zone
+from dotagent.secrets import resolve_secret
 from dotagent.store.db import Store
 from dotagent.terminal.session import Terminals
 from dotagent.tools.apple import build_apple_tool
@@ -50,6 +51,7 @@ from dotagent.tools.files import build_file_tools
 from dotagent.tools.mcp import build_mcp_tools
 from dotagent.tools.memory import build_memory_tools
 from dotagent.tools.meta import build_meta_tools
+from dotagent.tools.notes import build_notes_tools
 from dotagent.tools.registry import ToolRegistry, build_registry
 from dotagent.tools.schedule import build_schedule_tools
 from dotagent.tools.shell import build_shell_tool, child_env, read_login_env
@@ -57,6 +59,7 @@ from dotagent.tools.skill import build_skill_tool
 from dotagent.tools.terminal import build_terminal_tools
 from dotagent.tools.web import build_web_tools
 from dotagent.web.client import WebClient
+from dotagent.web.search import SearchBackend, resolved_backend
 
 log = get_logger(__name__)
 
@@ -73,6 +76,8 @@ class Runtime:
     desktop: DesktopSession
     terminals: Terminals
     web: WebClient
+    # The backend web_search uses, resolved once from [web] search_backend and the presence of Ollama's key.
+    search_backend: SearchBackend
     mcp: McpHub
     memory: MemoryIndex
     registry: ToolRegistry
@@ -93,6 +98,7 @@ def _tool_groups(config: AppConfig) -> tuple[tuple[RegisteredTool, ...], ...]:
         (build_shell_tool(),),
         build_browser_tools(),
         build_web_tools(),
+        build_notes_tools(),
         build_memory_tools(),
         build_schedule_tools(),
         build_campaign_tools(),
@@ -157,6 +163,7 @@ async def open_runtime(config: AppConfig, login_env: dict[str, str]) -> Runtime:
     )
     schedule_zone: ZoneInfo = await asyncio.to_thread(resolve_zone, config.scheduler.timezone)
     shell_env: dict[str, str] = child_env(login_env, config.shell.pass_env)
+    ollama_key: str | None = await asyncio.to_thread(resolve_secret, config.providers.ollama.api_key_env)
     plugins: PluginCatalog = await asyncio.to_thread(load_plugins, config.plugins, config.mcp)
     for problem in plugins.problems:
         log.warning("plugin_skipped", path=str(problem.path), reason=problem.reason)
@@ -180,6 +187,7 @@ async def open_runtime(config: AppConfig, login_env: dict[str, str]) -> Runtime:
             desktop=DesktopSession(sized_for_agent(config), failsafe_path()),
             terminals=Terminals(config.shell.terminal_sessions, config.shell.terminal_idle_s, shell_env),
             web=WebClient(config.web, config.browser.allowed_hosts, config.browser.blocked_hosts),
+            search_backend=resolved_backend(config.web.search_backend, ollama_key is not None),
             mcp=mcp,
             memory=memory,
             registry=registry,

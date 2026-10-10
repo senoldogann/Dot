@@ -231,12 +231,15 @@ def _scaffold(window: int | None, context_tokens: int, output_chars: int, cut: b
 async def test_a_small_window_cuts_the_budget_and_the_tool_output_and_the_run_compacts_to_stay_inside(
     login_env: dict[str, str],
 ) -> None:
-    # Forty pages fill the small budget even when the system prompt is all of the fixed part of the prompt.
+    # Forty pages fill the small budget even when the system prompt is all of the fixed part of the prompt. The window
+    # leaves the fixed part of the prompt (the core tools of items 41 and 34 included) room for two pages after every
+    # compaction; what a compaction keeps grows a little each time, so a smaller window would end up compacting at
+    # every step.
     turns: list[ScriptedTurn] = _reading(40)
-    small: Played = await _play(_config({}, 6), login_env, 24_000, turns)
+    small: Played = await _play(_config({}, 6), login_env, 26_000, turns)
     roomy: Played = await _play(_config({}, 6), login_env, None, turns)
 
-    assert small.scaffolds == (_scaffold(24_000, 18_000, 4500, True),)
+    assert small.scaffolds == (_scaffold(26_000, 19_500, 4875, True),)
     assert roomy.scaffolds == (_scaffold(None, 48_000, 12_000, False),)
     assert (small.record.status, roomy.record.status) == ("done", "done")
 
@@ -247,7 +250,7 @@ async def test_a_small_window_cuts_the_budget_and_the_tool_output_and_the_run_co
     for page in [*small_pages, *roomy_pages]:
         assert "chars omitted" not in page
         assert page.endswith("to continue]")
-    assert max(len(page) for page in small_pages) <= 4500 < min(len(page) for page in roomy_pages)
+    assert max(len(page) for page in small_pages) <= 4875 < min(len(page) for page in roomy_pages)
 
     # The small budget is kept by compacting with summaries of the fast model; the large one is never reached.
     assert len(small.compactions) > 1
@@ -255,7 +258,7 @@ async def test_a_small_window_cuts_the_budget_and_the_tool_output_and_the_run_co
     fast: str = parse_model_ref(_config({}, 6).models.fast).label
     assert all((compaction["model"], compaction["fast_problem"]) == (fast, None) for compaction in small.compactions)
     assert len(small.summaries) == len(small.compactions) == len(small.compacted_at)
-    assert max(estimate_tokens(step.messages, step.tools) for step in small.steps) <= 18_000
+    assert max(estimate_tokens(step.messages, step.tools) for step in small.steps) <= 19_500
     # Each compaction keeps only what fits the budget and leaves room for the steps after it, instead of folding the
     # history again at the very next step.
     gaps: list[int] = [

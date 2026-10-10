@@ -272,7 +272,7 @@ answer (a small model that is offered both writes the call out as text).
 
 | Area            | Tools                                                                                                              |
 | --------------- | ------------------------------------------------------------------------------------------------------------------ |
-| Shell and files | `shell`, `read_file`, `write_file`, `edit_file`, `list_dir`, `find_files`, `search_files`                          |
+| Shell and files | `shell`, `read_file`, `write_file`, `edit_file`, `list_dir`, `find_files`, `search_files`, `write_notes`           |
 | Terminal        | `terminal_open`, `terminal_send`, `terminal_read`, `terminal_close`                                                |
 | Web             | `web_search`, `web_fetch`, `web_crawl`, `web_extract`                                                              |
 | Browser         | `browser_open`, `browser_snapshot`, `browser_find`, `browser_links`, `browser_read_text`, `browser_wait_text`, `browser_act`, `browser_scroll`, `browser_screenshot`, `browser_upload`, `browser_back`, `browser_new_tab`, `browser_switch_tab`, `browser_close_tab` |
@@ -285,8 +285,9 @@ answer (a small model that is offered both writes the call out as text).
 
 The shell and the file tools work in `<home>/workspace` unless a path says otherwise. A shell command runs with the
 `PATH` of your login shell, in its own process group (cancelling a run ends the whole group) and under a timeout
-(`[shell] default_timeout_s`, at most `max_timeout_s`). `web_search` uses DuckDuckGo, which needs no key; `web_fetch`
-reads HTML and PDF and refuses localhost, LAN and cloud-metadata addresses unless `[web] allow_private_hosts` is set.
+(`[shell] default_timeout_s`, at most `max_timeout_s`). `web_search` uses the hosted search of Ollama when `OLLAMA_API_KEY`
+is set and DuckDuckGo, which needs no key, otherwise (`[web] search_backend`, default `auto`; `dotx doctor` shows the
+choice); `web_fetch` reads HTML and PDF and refuses localhost, LAN and cloud-metadata addresses unless `[web] allow_private_hosts` is set.
 
 **Crawling and extraction.** `web_crawl(url, scope, max_pages, max_depth)` reads many pages of one site in one call:
 breadth first from the start address, following the links within the scope (`prefix`, the pages under the start
@@ -303,6 +304,8 @@ fetched, with `"obey"` they are left out. The crawl goes through the same client
 and the browser's host lists hold for every page. When the pages do not fit one result, each becomes a Markdown file
 under `<workspace>/crawl/<host>-<time>/` with an `index.md`, and the result says so: the run reads the ones it needs with
 `read_file` or hands them to `web_extract`.
+
+**Notes of a run.** `write_notes(content, append)` keeps the notes of a run in one Markdown file, `<home>/workspace/notes/<run id>.md`: a long research run writes what it found there as it goes, with sources, instead of holding it all in its context, and names the file in its answer. The file is in the undo journal like any file write. It is the only file a `research` run may write.
 
 `web_extract(sources, fields)` pulls named fields out of pages or files as JSON without the pages entering the main
 model's context: for every source (an address, or a file in the workspace such as the Markdown files a crawl wrote) the
@@ -327,7 +330,8 @@ Before a tool acts, the policy is told what the action does, what it touches and
 allow, ask, hand off to you, or deny.
 
 **Run modes.** `task` (the default) and `chat` can do whatever the policy allows. `research` is read-only: it can read,
-search, browse and look at the screen, and a research run can only delegate to research runs.
+search, browse and look at the screen, and a research run can only delegate to research runs. The one file it may write
+is its notes file (`write_notes`, below), and it may save memory notes.
 
 **Decision order**, strictest first:
 
@@ -465,7 +469,7 @@ why.
 
 **What only yolo waives.** Secrets and exfiltration stay denied in `ask` and `auto`. Money and credentials stay yours
 there: Dot stops and asks you to do that step yourself, and the review model is never asked about them. A `yolo` run
-does all of it and keeps a record. **What no mode waives:** a `research` run stays read-only, and a rule of yours with
+does all of it and keeps a record. **What no mode waives:** a `research` run changes nothing but its notes file and memory, and a rule of yours with
 the hand-off behaviour still stops a yolo run, at secrets, money and credentials too.
 
 **If the review model fails** (the provider is down, or the model does not answer in the form asked for after two
@@ -1230,8 +1234,8 @@ src/dotagent/
   on real folders).
 - The shell guardrail is best-effort and not a sandbox (see [Safety](#safety)).
 - DuckDuckGo answers a burst of searches with its bot check (HTTP 202). Dot spaces its searches (`search_spacing_s`) and
-  retries a blocked one (`search_attempts`), but a long research run can still meet the check; the hosted Ollama search
-  (`search_backend = "ollama"`, needs `OLLAMA_API_KEY`) has no such limit and is the better choice for that work.
+  retries a blocked one (`search_attempts`), but a long research run can still meet the check. The hosted Ollama search
+  has no such limit: with `search_backend = "auto"` (the default) Dot uses it as soon as `OLLAMA_API_KEY` is set.
 - The thresholds of the memory search were measured on a small hand-written set of English and Turkish notes
   (indicative, not a benchmark); another language, another embedding model or a much larger memory may need other
   `min_similarity` values.

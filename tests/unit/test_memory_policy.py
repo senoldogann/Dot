@@ -31,7 +31,7 @@ _READ: ActionInfo = _action("memory_read", "safe", ())
             "deny",
             "auto_review",
         ),
-        (_WRITE, "research", False, "aggressive", "deny", "mode"),
+        (_WRITE, "research", False, "aggressive", "allow", "preset"),
         (_READ, "research", True, "aggressive", "allow", "preset"),
         (_READ, "task", True, "cautious", "allow", "preset"),
     ],

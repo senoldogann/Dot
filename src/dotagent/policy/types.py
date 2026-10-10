@@ -22,6 +22,7 @@ ActionKind = Literal[
     "schedule",
     "memory_read",
     "memory_write",
+    "notes_write",
     "delegate",
     "meta",
     "mcp",
@@ -74,6 +75,10 @@ READ_ONLY_KINDS: frozenset[ActionKind] = frozenset(
         "meta",
     }
 )
+
+# What a research run may do: observe, and keep its own notes (the run's notes file, ``notes_write``) and memory notes
+# (``memory_write``); nothing else of the world changes.
+RESEARCH_KINDS: frozenset[ActionKind] = READ_ONLY_KINDS | {"notes_write", "memory_write"}
 
 # Observations of content that third parties can author; they mark a run as carrying untrusted input.
 TAINTING_KINDS: frozenset[ActionKind] = frozenset(

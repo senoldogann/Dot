@@ -8,7 +8,7 @@ from pathlib import Path
 import pytest
 
 from dotagent.core.errors import UndoError
-from dotagent.tools.files import _atomic_write, _edit_blocking
+from dotagent.tools.files import _edit_blocking, atomic_write
 from dotagent.undo.journal import JournalTarget, backup_path, read_journal, run_journal
 from dotagent.undo.restore import (
     RunChange,
@@ -54,7 +54,7 @@ def test_a_changed_file_is_put_back_as_it_was_with_its_permission_bits(tmp_path:
     notes.chmod(0o640)
     target: JournalTarget = _target(root, RUN_ID, MIB, MIB)
     _edit_blocking(notes, "one", "two", False, target)
-    _atomic_write(notes, "three\n", target)
+    atomic_write(notes, "three\n", target)
     first, second = read_journal(run_journal(root, RUN_ID))
     assert (first.seq, first.existed, first.mode, first.backup, first.copied) == (0, True, 0o640, True, 4)
     # Only the run's first change to a path keeps a copy: it holds what was there before the run.
@@ -74,7 +74,7 @@ def test_a_created_file_is_deleted_and_the_folders_made_for_it_are_removed(tmp_p
     work: Path = tmp_path / "work"
     work.mkdir()
     made: Path = work / "a" / "b" / "new.txt"
-    _atomic_write(made, "new\n", _target(root, RUN_ID, MIB, MIB))
+    atomic_write(made, "new\n", _target(root, RUN_ID, MIB, MIB))
     changes: list[RunChange] = _changes(root, (RUN_ID,))
     assert changes[0].entry.created_dirs == (str(work / "a"), str(work / "a" / "b"))
     plan: list[UndoStep] = _plan(changes)
@@ -88,7 +88,7 @@ def test_a_file_changed_after_the_run_is_a_conflict_taken_back_only_with_force(t
     root: Path = tmp_path / "undo"
     notes: Path = tmp_path / "notes.txt"
     notes.write_text("one\n", encoding="utf-8")
-    _atomic_write(notes, "two\n", _target(root, RUN_ID, MIB, MIB))
+    atomic_write(notes, "two\n", _target(root, RUN_ID, MIB, MIB))
     notes.write_text("three\n", encoding="utf-8")
     plan: list[UndoStep] = _plan(_changes(root, (RUN_ID,)))
     assert [(step.state, step.reason) for step in plan] == [
@@ -104,7 +104,7 @@ def test_a_file_deleted_after_the_run_is_a_conflict_that_force_writes_back(tmp_p
     notes: Path = tmp_path / "sub" / "notes.txt"
     notes.parent.mkdir()
     notes.write_text("one\n", encoding="utf-8")
-    _atomic_write(notes, "two\n", _target(root, RUN_ID, MIB, MIB))
+    atomic_write(notes, "two\n", _target(root, RUN_ID, MIB, MIB))
     shutil.rmtree(notes.parent)
     plan: list[UndoStep] = _plan(_changes(root, (RUN_ID,)))
     assert [(step.state, step.reason) for step in plan] == [
@@ -122,7 +122,7 @@ def test_a_file_past_the_caps_is_changed_without_a_copy_and_cannot_be_put_back(t
     second.write_text("1234", encoding="utf-8")
     target: JournalTarget = _target(root, RUN_ID, 4, 6)
     for path in (big, first, second, new):
-        _atomic_write(path, "changed", target)
+        atomic_write(path, "changed", target)
     assert {path.read_text(encoding="utf-8") for path in (big, first, second, new)} == {"changed"}
     steps: dict[str, UndoStep] = {step.path: step for step in _plan(_changes(root, (RUN_ID,)))}
     assert (steps[str(big)].state, steps[str(big)].reason) == (
@@ -145,7 +145,7 @@ def test_the_file_is_left_as_it_is_when_its_change_cannot_be_noted(tmp_path: Pat
     notes: Path = tmp_path / "notes.txt"
     notes.write_text("one\n", encoding="utf-8")
     with pytest.raises(UndoError, match="the file was not changed"):
-        _atomic_write(notes, "two\n", _target(root, RUN_ID, MIB, MIB))
+        atomic_write(notes, "two\n", _target(root, RUN_ID, MIB, MIB))
     assert notes.read_text(encoding="utf-8") == "one\n"
 
 
@@ -153,8 +153,8 @@ def test_the_changes_of_a_delegated_run_are_taken_back_to_the_copy_its_parent_ke
     root: Path = tmp_path / "undo"
     notes: Path = tmp_path / "notes.txt"
     notes.write_text("one\n", encoding="utf-8")
-    _atomic_write(notes, "two\n", _target(root, RUN_ID, MIB, MIB))
-    _atomic_write(notes, "three\n", _target(root, CHILD_ID, MIB, MIB))
+    atomic_write(notes, "two\n", _target(root, RUN_ID, MIB, MIB))
+    atomic_write(notes, "three\n", _target(root, CHILD_ID, MIB, MIB))
     plan: list[UndoStep] = _plan(_changes(root, (RUN_ID, CHILD_ID)))
     assert [(step.state, step.origin.run_id, step.changes) for step in plan] == [("ready", RUN_ID, 2)]
     apply_undo(due_steps(plan), root)
@@ -165,7 +165,7 @@ def test_a_copy_that_is_not_the_one_noted_is_not_written_back(tmp_path: Path) ->
     root: Path = tmp_path / "undo"
     notes: Path = tmp_path / "notes.txt"
     notes.write_text("one\n", encoding="utf-8")
-    _atomic_write(notes, "two\n", _target(root, RUN_ID, MIB, MIB))
+    atomic_write(notes, "two\n", _target(root, RUN_ID, MIB, MIB))
     backup_path(run_journal(root, RUN_ID), 0).write_bytes(b"forged\n")
     with pytest.raises(UndoError, match="a change could not be taken back"):
         apply_undo(due_steps(_plan(_changes(root, (RUN_ID,)))), root)

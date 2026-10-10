@@ -260,13 +260,13 @@ class SearchArgs(ToolArgs):
 def _search_tool() -> RegisteredTool:
     def classify(args: SearchArgs, ctx: ToolContext) -> ActionInfo:
         flags: tuple[Flag, ...] = ("exfiltration",) if looks_like_key(args.query) else ()
-        backend: str = ctx.runtime.config.web.search_backend
+        backend: str = ctx.runtime.search_backend
         return _action("web_search", f"Search the web for {args.query}", backend, flags)
 
     async def run(args: SearchArgs, ctx: ToolContext) -> ToolResult:
         config: AppConfig = ctx.runtime.config
         hits: tuple[SearchHit, ...]
-        match config.web.search_backend:
+        match ctx.runtime.search_backend:
             case "duckduckgo":
                 hits = await search_duckduckgo(ctx.runtime.web, args.query, args.max_results)
             case "ollama":
@@ -276,7 +276,7 @@ def _search_tool() -> RegisteredTool:
                 hits = await search_ollama(ctx.runtime.web, key, args.query, args.max_results)
         if not hits:
             return ok(f"No results for {_clip(args.query, _SHOWN_URL_CHARS)!r}. Try other words or a broader query.")
-        header: str = f"{len(hits)} results for {_clip(args.query, _SHOWN_URL_CHARS)!r} ({config.web.search_backend}). Read the best ones with web_fetch."
+        header: str = f"{len(hits)} results for {_clip(args.query, _SHOWN_URL_CHARS)!r} ({ctx.runtime.search_backend}). Read the best ones with web_fetch."
         return mark_untrusted(ok("\n".join((header, fence_untrusted("web_search", render_hits(hits), _nonce())))))
 
     return make_tool(
