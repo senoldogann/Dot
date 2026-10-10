@@ -29,6 +29,7 @@ from dotagent.agent.helpers import (
 from dotagent.agent.plan import EMPTY_PLAN, PLAN_EVENT, PlanPayload, plan_from_event, plan_lines
 from dotagent.agent.review import goal_digest
 from dotagent.core.errors import MissingSecretError, ProviderError
+from dotagent.core.logs import get_logger
 from dotagent.core.text import redact_secrets, truncate_tail
 from dotagent.llm.calls import CallOrigin
 from dotagent.llm.router import ModelRef, parse_model_ref
@@ -46,6 +47,8 @@ from dotagent.policy.types import ActionInfo
 from dotagent.store.models import EventRecord, RunRecord
 from dotagent.tools.base import ALL_MODES, RegisteredTool, ToolArgs, ToolResult, fail, make_tool, ok
 from dotagent.tools.context import ToolContext
+
+log = get_logger(__name__)
 
 CONSULT_TOOL: str = "consult"
 _NONCE_BYTES: int = 8
@@ -146,8 +149,13 @@ async def _roster(ctx: ToolContext) -> Roster:
     return await current_roster(ctx.runtime.router, ctx.runtime.config.providers, ctx.runtime.config.models.helpers)
 
 
-def _chosen(asked: str | None, roster: Roster, now: float) -> str | ToolResult:
-    """The helper that answers, or the result that says why none can."""
+def _chosen(asked: str | None, own: str, helpers: Roster, now: float) -> str | ToolResult:
+    """The helper that answers, or the result that says why none can. The model the run works on (``own``) is not a
+    helper of the run, even when the helpers list it."""
+    roster: Roster = Roster(
+        available=tuple(model for model in helpers.available if model != own),
+        unavailable=tuple(entry for entry in helpers.unavailable if entry.model != own),
+    )
     if asked is None:
         if roster.available:
             return roster.available[0]
@@ -155,6 +163,8 @@ def _chosen(asked: str | None, roster: Roster, now: float) -> str | ToolResult:
     label: str = asked.strip()
     if label in roster.available:
         return label
+    if label == own:
+        return fail(f"{own} is the model you run on, not a helper ({roster_text(roster, now)}).")
     missing: Unavailable | None = next((entry for entry in roster.unavailable if entry.model == label), None)
     if missing is None:
         return fail(
@@ -189,7 +199,8 @@ async def _unavailable(ctx: ToolContext, model: str, entry: Unavailable) -> Tool
     await ctx.runtime.bus.emit(ctx.run_id, HELPER_UNAVAILABLE_EVENT, unavailable_event_data(entry), True)
     now: float = time.time()
     roster: Roster = await _roster(ctx)
-    others: tuple[str, ...] = tuple(name for name in roster.available if name != model)
+    own: str = (await ctx.runtime.store.get_run(ctx.run_id)).model
+    others: tuple[str, ...] = tuple(name for name in roster.available if name not in (model, own))
     ask: str = f"ask another helper ({', '.join(others)}) or go on yourself" if others else "go on yourself"
     return fail(f"{unavailable_text(entry, now)} cannot answer; {ask}.")
 
@@ -207,10 +218,10 @@ def _consult_tool() -> RegisteredTool:
         asked: int = await ctx.runtime.store.count_model_calls(ctx.run_id, "consult")
         if asked >= limit:
             return fail(f"This run has asked its helper models as many questions as it may ({limit}). Go on yourself.")
-        chosen: str | ToolResult = _chosen(args.model, await _roster(ctx), time.time())
+        run_record: RunRecord = await ctx.runtime.store.get_run(ctx.run_id)
+        chosen: str | ToolResult = _chosen(args.model, run_record.model, await _roster(ctx), time.time())
         if isinstance(chosen, ToolResult):
             return chosen
-        run_record: RunRecord = await ctx.runtime.store.get_run(ctx.run_id)
         text, image = await _question(ctx, args, run_record, secrets.token_hex(_NONCE_BYTES))
         try:
             reply, unseen = await _ask(ctx, parse_model_ref(chosen), text, image)
@@ -219,6 +230,7 @@ def _consult_tool() -> RegisteredTool:
             if entry is not None:
                 return await _unavailable(ctx, chosen, entry)
             problem: str = error.message if isinstance(error, ProviderError) else "it did not answer in time"
+            log.warning("consult_failed", run_id=ctx.run_id, model=chosen, error=problem)
             return fail(f"{chosen} gave no answer: {problem}. Ask again, ask another helper or go on yourself.")
         answer: str = reply.text.strip()
         if answer == "":

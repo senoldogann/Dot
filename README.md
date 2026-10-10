@@ -72,8 +72,8 @@ A model is written `provider:model`. The `[models]` table of the configuration s
 | `review`            | answering the policy's questions in `auto` approvals, and checking a run against its goal | `ollama:minimax-m2.7:cloud` |
 | `effort`            | default reasoning level of a run on `main` (see below)                                    | `medium`                    |
 | `helpers`           | models a run may ask for advice or hand a part of its work to (see below)                 | `[]`                        |
-| `standby`           | models a run moves to when the provider of its own model cannot answer (see below)        | `[]`                        |
-| `helper_cooldown_s` | how long a provider that could not answer is left out of `helpers` and `standby`          | `600`                       |
+| `standby`           | models a run moves to when its own model cannot answer (see below)                        | `[]`                        |
+| `helper_cooldown_s` | how long a model that could not answer is left out of `helpers` and `standby`             | `600`                       |
 
 `review` checks the work of `main`. A model checking its own work is the weaker check, so pick a `review` model of
 another family than `main` when you can; `dotx doctor` warns while they are the same model, as they are by default.
@@ -82,15 +82,29 @@ another family than `main` when you can; `dotx doctor` warns while they are the 
 a question and returns its answer, fenced as advice; `delegate` can run a part of the work on one of them. A helper has
 no tools and sees only what the question sends: the run's goal, its plan, the conversation (secrets masked, the start
 and the end of a long one) and the newest screenshot, which only a helper that can see images gets. A run may ask
-`[agent] consult_max_per_run` questions (5); `0` offers no `consult`. `standby` lists the models a run moves to when the
-provider of its own model answers with a quota, rate-limit or key error, or has no key: the run goes on from the same
-step on the first standby model that can answer, the model is told, and the timeline shows the switch, which the model
-chip follows. Without a standby model such an error ends the run, as it always did. A model is left out of both lists
-while its provider has no key (an Ollama model needs none), and after such an error for the time the provider named or
-for `helper_cooldown_s` seconds, until a call it answers; the process that runs the run keeps that in memory. Both lists
-are empty by default, and `dotx doctor` shows which of their models have a key. `dotx stats` counts every call of a run
-for the model of the run, so after a switch the calls before it count for the standby model too; an answered question, a
-resume and a follow-up message of the chat go on with the standby model.
+`[agent] consult_max_per_run` questions (5); `0` offers no `consult`. A delegated run asks none (its parent does), and
+the run's own model is never its helper.
+
+`standby` lists the models a run moves to when its own model answers with a quota, rate-limit or key error, or its
+provider has no key: the run goes on from the same step, with the tools that step had, on the first standby model that
+can take it over, the model is told, and the timeline shows the switch, which the model chip follows. The run's
+reasoning level becomes the nearest one the new model offers. A run takes each model once at most, in the order of the
+list, and never goes back to one it left. A standby model that cannot call tools while the run offers them, whose
+window cannot hold the instructions and the tools, or whose details cannot be read is passed over; when every one is,
+the run fails and says why for each. Without a standby model that can answer, the error ends the run. A transport
+error or a timeout moves nothing, and neither does a failure of the `review` or `vision` model: the review model has no
+standby, so with `review` on the same provider as `main` a goal check or an `auto` approval fails while that provider
+cannot answer.
+
+A model is left out of both lists while its provider has no key (an Ollama model needs none), and after such an error
+for the time the provider named (at most a day) or for `helper_cooldown_s` seconds, until a call to it is answered or
+a new key of its provider is saved. Each model is paused alone: a local Ollama model stays available while a cloud one
+is paused, and a provider whose key or quota fails all its models costs one failed call per model. The process that
+runs the run keeps the pauses in memory. Both lists are empty by default, and `dotx doctor` shows which of their models
+have a key. `dotx stats` counts every call of a run for the model of the run, so after a switch the calls before it
+count for the standby model too. An answered question, a resume and a follow-up message on the run page go on with the
+standby model and its level; `dotx chat` starts every turn on its own model (`main` unless `--model`), which moves to
+the standby again when it still cannot answer.
 
 | Provider    | Reference             | Protocol                                                                                   | Key                                                       |
 | ----------- | --------------------- | ------------------------------------------------------------------------------------------ | --------------------------------------------------------- |
@@ -962,8 +976,9 @@ every run.
 `delegate(goal, mode?, model?)` hands a sub-goal to a separate run with a conversation of its own and returns its
 result, so a long investigation does not fill the parent's context. The run works on the parent's model, or on the
 helper model that `model` names when that one can answer (see [Helpers and standby](#models-and-providers)). A
-delegated run cannot delegate again (the depth is one), does not take one of the `max_concurrent_runs` slots, starts as
-untrusted as its parent, and ends when the parent is cancelled. A research run can only delegate to research.
+delegated run cannot delegate again (the depth is one) or consult a helper, does not take one of the
+`max_concurrent_runs` slots, starts as untrusted as its parent, and ends when the parent is cancelled. The parent's
+result names the model the delegated run ended on. A research run can only delegate to research.
 
 ## Configuration
 

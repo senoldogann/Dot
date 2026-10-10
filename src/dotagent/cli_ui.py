@@ -153,7 +153,7 @@ class NotePayload(Payload):
 
 
 class ModelSwitchedPayload(Payload):
-    """A run that moved to a standby model because the provider of its own model could not answer."""
+    """A run that moved to a standby model because its own model could not answer."""
 
     previous: str = Field(alias="from")
     to: str
@@ -162,7 +162,7 @@ class ModelSwitchedPayload(Payload):
 
 class HelperUnavailablePayload(Payload):
     """A helper model that could not answer a question of the run: why, and until when (seconds since the epoch) when
-    its provider is paused."""
+    it is paused."""
 
     model: str
     reason: str

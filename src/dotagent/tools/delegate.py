@@ -75,9 +75,10 @@ def _fence(run: RunRecord, body: str, nonce: str) -> str:
 
 
 def render_outcome(outcome: DelegateOutcome, nonce: str) -> ToolResult:
-    """What the delegating run reads back: how the run ended and its report, fenced when it saw untrusted content."""
+    """What the delegating run reads back: how the run ended, on which model, and its report, fenced when it saw
+    untrusted content."""
     run: RunRecord = outcome.run
-    header: str = f"Delegated run {run.id} ended as {run.status} after {run.steps} steps."
+    header: str = f"Delegated run {run.id} on {run.model} ended as {run.status} after {run.steps} steps."
     report: str = run.result.strip() or _NO_REPORT
     text: str = f"{header}\n{_fence(run, report, nonce)}" if outcome.tainted else f"{header}\n{report}"
     result: ToolResult = ok(text) if run.status == "done" else fail(text)
@@ -109,7 +110,7 @@ def _delegate_tool() -> RegisteredTool:
             "report back. Use it to keep your own context small when a part is bulky (reading many pages or files, a "
             "deep research question) and to do independent parts at the same time: call it several times in one "
             "turn. The agent uses your tools and your model, or the helper model you name; it cannot ask the user "
-            "questions and cannot delegate again. Do not delegate what one or two tool calls can do."
+            "questions, consult a helper or delegate again. Do not delegate what one or two tool calls can do."
         ),
         args_model=DelegateArgs,
         modes=ALL_MODES,

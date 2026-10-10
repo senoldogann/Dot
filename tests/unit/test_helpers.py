@@ -1,9 +1,10 @@
 """Which helper and standby models can answer: the keys of their providers and the pauses after an error that says a
-provider cannot answer for a while, and how that is told to the model."""
+model cannot answer for a while, and how that is told to the model."""
 
 import re
 
 from dotagent.agent.helpers import Roster, Unavailable, roster_for, roster_text, unavailable_text, until_text
+from dotagent.config import AppConfig, ModelsConfig, load_default_config
 from dotagent.core.errors import (
     MissingSecretError,
     ProviderAuthError,
@@ -12,23 +13,33 @@ from dotagent.core.errors import (
     ProviderRateLimitError,
     ProviderTransportError,
 )
-from dotagent.llm.router import Pause, pause_for
+from dotagent.evals.runner import eval_config
+from dotagent.llm.router import MAX_PAUSE_S, Pause, pause_for
 
 NOW: float = 1_800_000_000.0
 COOLDOWN_S: float = 600.0
 
 
-def test_a_model_is_available_when_its_provider_has_its_key_and_is_not_paused() -> None:
+def test_a_model_is_available_when_its_provider_has_its_key_and_the_model_is_not_paused() -> None:
     roster: Roster = roster_for(
-        ["anthropic:claude-opus-5-5", "openai:gpt-5.5", "ollama:qwen3:8b", "anthropic:claude-sonnet-5-5"],
+        [
+            "anthropic:claude-opus-5-5",
+            "openai:gpt-5.5",
+            "ollama:gpt-oss:20b-cloud",
+            "ollama:qwen3:8b",
+            "anthropic:claude-sonnet-5-5",
+        ],
         frozenset({"anthropic", "ollama"}),
-        {"anthropic": Pause(reason="quota exhausted", until=NOW + COOLDOWN_S)},
+        {
+            "anthropic:claude-opus-5-5": Pause(reason="quota exhausted", until=NOW + COOLDOWN_S),
+            "ollama:gpt-oss:20b-cloud": Pause(reason="rate limited", until=NOW + 60.0),
+        },
     )
-    assert roster.available == ("ollama:qwen3:8b",)
+    assert roster.available == ("ollama:qwen3:8b", "anthropic:claude-sonnet-5-5")
     assert roster.unavailable == (
         Unavailable(model="anthropic:claude-opus-5-5", reason="quota exhausted", until=NOW + COOLDOWN_S),
         Unavailable(model="openai:gpt-5.5", reason="no key", until=None),
-        Unavailable(model="anthropic:claude-sonnet-5-5", reason="quota exhausted", until=NOW + COOLDOWN_S),
+        Unavailable(model="ollama:gpt-oss:20b-cloud", reason="rate limited", until=NOW + 60.0),
     )
 
 
@@ -37,7 +48,7 @@ def test_the_roster_names_each_model_once_in_its_order_as_a_label() -> None:
     assert roster == Roster(available=("ollama:qwen3:8b", "ollama:gemma4"), unavailable=())
 
 
-def test_a_provider_is_paused_for_the_time_it_named_else_for_the_cooldown() -> None:
+def test_a_model_is_paused_for_the_time_its_provider_named_at_most_a_day_else_for_the_cooldown() -> None:
     assert pause_for(ProviderQuotaError("credits", 429, 3600.0, {}), COOLDOWN_S, NOW) == Pause(
         reason="quota exhausted", until=NOW + 3600.0
     )
@@ -50,6 +61,16 @@ def test_a_provider_is_paused_for_the_time_it_named_else_for_the_cooldown() -> N
     assert pause_for(ProviderRateLimitError("slow down", 429, 0.0, {}), COOLDOWN_S, NOW) == Pause(
         reason="rate limited", until=NOW + COOLDOWN_S
     )
+    # A wait past a day, or an endless one, as a header may name it, is cut to a day; one that is not a number is not
+    # a wait.
+    for named in (2.0e9, float("inf")):
+        assert pause_for(ProviderRateLimitError("slow down", 429, named, {}), COOLDOWN_S, NOW) == Pause(
+            reason="rate limited", until=NOW + MAX_PAUSE_S
+        )
+    assert pause_for(ProviderRateLimitError("slow down", 429, float("nan"), {}), COOLDOWN_S, NOW) == Pause(
+        reason="rate limited", until=NOW + COOLDOWN_S
+    )
+    assert re.fullmatch(r"\d{4}-\d{2}-\d{2} \d{2}:\d{2}", until_text(NOW + MAX_PAUSE_S, NOW))
     assert pause_for(ProviderAuthError("bad key", 401, {}), COOLDOWN_S, NOW) == Pause(
         reason="key refused", until=NOW + COOLDOWN_S
     )
@@ -78,3 +99,12 @@ def test_the_model_reads_which_helpers_can_answer_and_until_when_the_others_cann
 def test_the_end_of_a_pause_is_a_time_of_day_today_and_a_date_later() -> None:
     assert re.fullmatch(r"\d{2}:\d{2}", until_text(NOW, NOW))
     assert re.fullmatch(r"\d{4}-\d{2}-\d{2} \d{2}:\d{2}", until_text(NOW + 3 * 86_400, NOW))
+
+
+def test_an_eval_run_has_no_helper_or_standby_model_of_the_owner() -> None:
+    owner: AppConfig = load_default_config()
+    models: ModelsConfig = owner.models.model_copy(
+        update={"helpers": ["anthropic:claude-opus-5-5"], "standby": ["openai:gpt-5.5"]}
+    )
+    measured: AppConfig = eval_config(owner.model_copy(update={"models": models}))
+    assert (measured.models.helpers, measured.models.standby) == ([], [])

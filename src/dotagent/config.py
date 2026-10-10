@@ -79,7 +79,8 @@ class ModelsConfig(FrozenModel):
     effort: Effort
     helpers: list[str]
     standby: list[str]
-    helper_cooldown_s: float = Field(gt=0, allow_inf_nan=False)
+    # At most a day, the longest pause of the router (dotagent.llm.router.MAX_PAUSE_S).
+    helper_cooldown_s: float = Field(gt=0, le=86_400, allow_inf_nan=False)
 
 
 type Tier = Literal["standard", "weak"]

@@ -1,6 +1,7 @@
 """Helper models in the real loop: a run asks a helper for advice and reads the answer fenced, up to its budget; a
-helper whose quota is spent is paused and the run is told; a delegated run starts on a helper; a run whose provider
-cannot answer moves to its standby model and finishes there, and without one it fails as before.
+helper whose quota is spent is paused and the run is told; a delegated run starts on a helper; a run whose model cannot
+answer moves to its standby models, once each and in their order, with the tools of the step it was at, and finishes
+there; without one that can take it over it fails with the error.
 
 No network and no model service is used: scripted models play the run's own model (under ``ollama``) and the helper
 (under ``anthropic``, with a stand-in key in the environment so that the provider counts as keyed).
@@ -19,16 +20,16 @@ from dotagent.config import AppConfig, load_default_config
 from dotagent.core.errors import ProviderQuotaError
 from dotagent.core.types import FrozenModel, JsonObject
 from dotagent.evals import EVAL_SOURCE
-from dotagent.evals.runner import SCRIPTED_MODEL, eval_config, eval_environment, scratch_home
+from dotagent.evals.runner import SCRIPTED_MODEL, eval_config, eval_environment, scratch_home, seed_workspace
 from dotagent.evals.scripted import ScriptedProvider
-from dotagent.evals.types import ScriptedCall, ScriptedTurn
+from dotagent.evals.types import FileSeed, ScriptedCall, ScriptedTurn
 from dotagent.llm.calls import CALL_EVENT
-from dotagent.llm.types import ChatProvider, ChatRequest, DeltaSink, ModelInfo, ModelReply
+from dotagent.llm.types import ChatProvider, ChatRequest, DeltaSink, Effort, ModelInfo, ModelReply
 from dotagent.runtime import Runtime, close_runtime, open_runtime
 from dotagent.store.models import EventRecord, RunRecord
 from dotagent.tools.consult import CONSULT_TOOL
 from dotagent.tools.delegate import DELEGATE_TOOL
-from dotagent.tools.meta import FINISH_TOOL
+from dotagent.tools.meta import FINISH_TOOL, MARK_PLAN_STEP_TOOL, UPDATE_PLAN_TOOL
 from dotagent.tools.shell import read_login_env
 
 pytestmark = pytest.mark.asyncio(loop_scope="module")
@@ -36,6 +37,10 @@ pytestmark = pytest.mark.asyncio(loop_scope="module")
 GOAL: str = "Pick a file format for the export of the contacts."
 HELPER: str = "anthropic:scripted-helper"
 SPENT_MAIN: str = "anthropic:scripted-spent"
+SPENT_OTHER: str = "anthropic:scripted-spent-too"
+# A model of the spent provider that cannot call tools.
+BLIND: str = "anthropic:scripted-blind"
+NOTES: FileSeed = FileSeed(path="notes.txt", content="Export the contacts as CSV.\n")
 QUESTION: str = "CSV or JSON for 40 contacts that a spreadsheet opens?"
 _STAND_IN_KEY: str = "stand-in-key-of-the-test"
 _TIME_LIMIT_S: float = 60.0
@@ -67,10 +72,14 @@ class RecordingProvider:
         await self._script.aclose()
 
 
-class SpentProvider:
-    """A provider whose quota is spent: every call fails the way the connector reports it, after its retries."""
+class SpendingProvider:
+    """A provider whose quota runs out: its first ``answered`` calls are answered by ``script``, and every later one
+    fails the way the connector reports a spent quota, after its retries. Its models offer three reasoning levels,
+    and all of them but ``BLIND`` can call tools."""
 
-    def __init__(self) -> None:
+    def __init__(self, script: ScriptedProvider, answered: int) -> None:
+        self._script: ScriptedProvider = script
+        self._answered: int = answered
         self.requests: list[ChatRequest] = []
 
     @property
@@ -79,10 +88,19 @@ class SpentProvider:
 
     async def complete(self, request: ChatRequest, sink: DeltaSink) -> ModelReply:
         self.requests.append(request)
+        if len(self.requests) <= self._answered:
+            return await self._script.complete(request, sink)
         raise ProviderQuotaError("credit balance is too low", 400, None, {"model": request.model})
 
     async def model_info(self, model: str) -> ModelInfo:
-        return ModelInfo(id=model, vision=False, tools=True, thinking=False, context_length=128_000, efforts=())
+        return ModelInfo(
+            id=model,
+            vision=False,
+            tools=model != BLIND.partition(":")[2],
+            thinking=False,
+            context_length=128_000,
+            efforts=("low", "medium", "high"),
+        )
 
     async def list_models(self) -> tuple[ModelInfo, ...]:
         return (await self.model_info("spent"),)
@@ -140,8 +158,13 @@ async def _session(
             await close_runtime(runtime)
 
 
-async def _play(runtime: Runtime, manager: RunManager, model: str) -> Played:
-    run: RunRecord = await manager.start(GOAL, "task", model, None, EVAL_SOURCE, None, None, "ask", False, ())
+def _spent() -> SpendingProvider:
+    """A provider whose quota is spent from its first call on."""
+    return SpendingProvider(ScriptedProvider("anthropic", []), 0)
+
+
+async def _play(runtime: Runtime, manager: RunManager, model: str, effort: Effort | None) -> Played:
+    run: RunRecord = await manager.start(GOAL, "task", model, None, EVAL_SOURCE, None, effort, "ask", False, ())
     async with asyncio.timeout(_TIME_LIMIT_S):
         record: RunRecord = await manager.wait(run.id)
     return Played(record=record, events=tuple(await runtime.store.list_events(record.id, 0, _MAX_EVENTS)))
@@ -174,11 +197,16 @@ async def test_a_run_asks_its_helper_and_reads_the_answer_fenced_as_advice(login
     helper: RecordingProvider = RecordingProvider(
         ScriptedProvider("anthropic", [_says("CSV: a spreadsheet opens it.")])
     )
-    async with _session(_config([HELPER], [], 5), login_env, {"ollama": main, "anthropic": helper}) as (runtime, runs):
-        played: Played = await _play(runtime, runs, SCRIPTED_MODEL)
+    # The run's own model leads the helpers: it is neither named nor asked.
+    config: AppConfig = _config([SCRIPTED_MODEL, HELPER], [], 5)
+    async with _session(config, login_env, {"ollama": main, "anthropic": helper}) as (runtime, runs):
+        played: Played = await _play(runtime, runs, SCRIPTED_MODEL, None)
     assert played.record.status == "done", played.record
     assert CONSULT_TOOL in _offered(main.requests[0])
-    assert f"# Helpers\n- The user set up other models to help you: {HELPER}." in main.requests[0].messages[0].content
+    assert (
+        f"# Helpers\n- The user set up other models to help you: {HELPER}.\n- consult asks one of them"
+        in main.requests[0].messages[0].content
+    )
     [result] = played.results(CONSULT_TOOL)
     assert result["ok"] is True
     text: str = str(result["text"])
@@ -208,7 +236,7 @@ async def test_a_run_asks_its_helpers_no_more_often_than_its_budget(login_env: d
     )
     helper: RecordingProvider = RecordingProvider(ScriptedProvider("anthropic", [_says("CSV.")]))
     async with _session(_config([HELPER], [], 1), login_env, {"ollama": main, "anthropic": helper}) as (runtime, runs):
-        played: Played = await _play(runtime, runs, SCRIPTED_MODEL)
+        played: Played = await _play(runtime, runs, SCRIPTED_MODEL, None)
     assert played.record.status == "done", played.record
     first, second = played.results(CONSULT_TOOL)
     assert first["ok"] is True
@@ -227,9 +255,9 @@ async def test_a_helper_whose_quota_is_spent_is_paused_and_the_run_is_told(login
             "ollama", [_consult({"question": QUESTION}), _consult({"question": QUESTION}), _finish("JSON, alone.")]
         )
     )
-    spent: SpentProvider = SpentProvider()
+    spent: SpendingProvider = _spent()
     async with _session(_config([HELPER], [], 5), login_env, {"ollama": main, "anthropic": spent}) as (runtime, runs):
-        played: Played = await _play(runtime, runs, SCRIPTED_MODEL)
+        played: Played = await _play(runtime, runs, SCRIPTED_MODEL, None)
     assert played.record.status == "done", played.record
     [unavailable] = played.data(HELPER_UNAVAILABLE_EVENT)
     assert (unavailable["model"], unavailable["reason"]) == (HELPER, "quota exhausted")
@@ -257,23 +285,49 @@ async def test_a_delegated_run_starts_on_the_helper_the_call_names(login_env: di
         )
     )
     helper: RecordingProvider = RecordingProvider(ScriptedProvider("anthropic", [_finish("CSV.")]))
-    async with _session(_config([HELPER], [], 5), login_env, {"ollama": main, "anthropic": helper}) as (runtime, runs):
-        played: Played = await _play(runtime, runs, SCRIPTED_MODEL)
+    config: AppConfig = _config([HELPER, SCRIPTED_MODEL], [], 5)
+    async with _session(config, login_env, {"ollama": main, "anthropic": helper}) as (runtime, runs):
+        played: Played = await _play(runtime, runs, SCRIPTED_MODEL, None)
         [child] = [run for run in await runtime.store.list_runs(20, None) if run.parent_run_id == played.record.id]
     assert played.record.status == "done", played.record
     assert (child.model, child.status, child.result) == (HELPER, "done", "CSV.")
+    # A delegated run asks no helper, although one besides its own model could answer: its parent does.
+    [asked] = helper.requests
+    assert CONSULT_TOOL not in _offered(asked) and "# Helpers" not in asked.messages[0].content
     [result] = played.results(DELEGATE_TOOL)
     assert result["ok"] is True and result["summary"] == f"Delegate to {HELPER}: Say which format."
+    assert str(result["text"]).startswith(f"Delegated run {child.id} on {HELPER} ended as done after 1 steps.")
+
+
+async def test_without_consult_the_instructions_name_the_helpers_for_delegate(login_env: dict[str, str]) -> None:
+    main: RecordingProvider = RecordingProvider(ScriptedProvider("ollama", [_finish("CSV.")]))
+    async with _session(_config([HELPER], [], 0), login_env, {"ollama": main}) as (runtime, runs):
+        played: Played = await _play(runtime, runs, SCRIPTED_MODEL, None)
+    assert played.record.status == "done", played.record
+    assert CONSULT_TOOL not in _offered(main.requests[0])
+    assert (
+        f"# Helpers\n- The user set up other models to help you: {HELPER}.\n- delegate runs a part of the work on one "
+        "of them when you name it with model.\n- A helper whose key is missing" in main.requests[0].messages[0].content
+    )
+
+
+async def test_a_run_does_not_take_its_own_model_for_a_helper(login_env: dict[str, str]) -> None:
+    main: RecordingProvider = RecordingProvider(ScriptedProvider("ollama", [_finish("CSV.")]))
+    async with _session(_config([SCRIPTED_MODEL], [], 5), login_env, {"ollama": main}) as (runtime, runs):
+        played: Played = await _play(runtime, runs, SCRIPTED_MODEL, None)
+    assert played.record.status == "done", played.record
+    assert CONSULT_TOOL not in _offered(main.requests[0])
+    assert "# Helpers" not in main.requests[0].messages[0].content
 
 
 async def test_a_run_whose_provider_cannot_answer_moves_to_its_standby_model_and_finishes(
     login_env: dict[str, str],
 ) -> None:
-    spent: SpentProvider = SpentProvider()
+    spent: SpendingProvider = _spent()
     standby: RecordingProvider = RecordingProvider(ScriptedProvider("ollama", [_finish("Done on the standby model.")]))
     config: AppConfig = _config([], [SCRIPTED_MODEL], 5)
     async with _session(config, login_env, {"anthropic": spent, "ollama": standby}) as (runtime, runs):
-        played: Played = await _play(runtime, runs, SPENT_MAIN)
+        played: Played = await _play(runtime, runs, SPENT_MAIN, None)
     assert (played.record.status, played.record.result) == ("done", "Done on the standby model."), played.record
     assert (played.record.model, played.record.steps) == (SCRIPTED_MODEL, 1)
     assert played.data(MODEL_SWITCHED_EVENT) == (
@@ -295,10 +349,69 @@ async def test_a_run_whose_provider_cannot_answer_moves_to_its_standby_model_and
     ]
 
 
-async def test_without_a_standby_model_the_run_fails_with_the_error_as_before(login_env: dict[str, str]) -> None:
-    spent: SpentProvider = SpentProvider()
+async def test_a_run_goes_through_its_standby_models_once_in_order_passing_over_one_that_cannot_take_it(
+    login_env: dict[str, str],
+) -> None:
+    spent: SpendingProvider = _spent()
+    standby: RecordingProvider = RecordingProvider(ScriptedProvider("ollama", [_finish("Done on the standby model.")]))
+    config: AppConfig = _config([], [BLIND, SPENT_OTHER, SPENT_MAIN, SCRIPTED_MODEL], 5)
+    # Every pause ends at once: the models the run left are still not taken again.
+    config = config.model_copy(update={"models": config.models.model_copy(update={"helper_cooldown_s": 0.001})})
+    async with _session(config, login_env, {"anthropic": spent, "ollama": standby}) as (runtime, runs):
+        played: Played = await _play(runtime, runs, SPENT_MAIN, "high")
+    assert (played.record.status, played.record.result) == ("done", "Done on the standby model."), played.record
+    assert (played.record.model, played.record.steps) == (SCRIPTED_MODEL, 1)
+    # The scripted model offers no reasoning levels, so the run's level follows it to none.
+    assert played.record.effort is None
+    assert played.data(MODEL_SWITCHED_EVENT) == (
+        {"from": SPENT_MAIN, "to": SPENT_OTHER, "reason": "quota exhausted", "step": 1},
+        {"from": SPENT_OTHER, "to": SCRIPTED_MODEL, "reason": "quota exhausted", "step": 1},
+    )
+    # The model that cannot call tools is never asked, and the run's first model is not asked again.
+    assert [request.model for request in spent.requests] == ["scripted-spent", "scripted-spent-too"]
+    assert [request.effort for request in spent.requests] == ["high", "high"]
+    steps: list[JsonObject] = [data for data in played.data(CALL_EVENT) if data["purpose"] == "step"]
+    assert [(call["model"], call["error"]) for call in steps] == [
+        (SPENT_MAIN, "ProviderQuotaError"),
+        (SPENT_OTHER, "ProviderQuotaError"),
+        (SCRIPTED_MODEL, None),
+    ]
+
+
+async def test_a_run_that_no_standby_model_can_take_over_fails_saying_why(login_env: dict[str, str]) -> None:
+    spent: SpendingProvider = _spent()
+    async with _session(_config([], [BLIND], 5), login_env, {"anthropic": spent}) as (runtime, runs):
+        played: Played = await _play(runtime, runs, SPENT_MAIN, None)
+    assert played.record.status == "failed"
+    assert played.record.result.startswith("the run's model cannot answer and no standby model can take the run over")
+    assert f'"passed_over": {{"{BLIND}": "it cannot call tools"}}' in played.record.result
+    assert played.data(MODEL_SWITCHED_EVENT) == ()
+    assert [request.model for request in spent.requests] == ["scripted-spent"]
+
+
+async def test_a_step_asked_again_on_the_standby_model_keeps_the_tools_a_progress_alert_allowed(
+    login_env: dict[str, str],
+) -> None:
+    read: ScriptedTurn = _turn(ScriptedCall(tool="read_file", arguments={"path": NOTES.path}))
+    # The same read eight times: a nudge after the fourth, a re-plan after the eighth, whose step may only plan or end;
+    # the provider's quota runs out at that step.
+    spending: SpendingProvider = SpendingProvider(ScriptedProvider("anthropic", [read] * 8), 8)
+    standby: RecordingProvider = RecordingProvider(ScriptedProvider("ollama", [_finish("CSV.")]))
+    config: AppConfig = _config([], [SCRIPTED_MODEL], 5)
+    config = config.model_copy(update={"agent": config.agent.model_copy(update={"stall_escalation": True})})
+    async with _session(config, login_env, {"anthropic": spending, "ollama": standby}) as (runtime, runs):
+        await asyncio.to_thread(seed_workspace, runtime.workspace, [NOTES])
+        played: Played = await _play(runtime, runs, SPENT_MAIN, None)
+    assert played.record.status == "done", played.record
+    assert [(stall["action"], stall["level"]) for stall in played.data("stall")] == [("nudge", 1), ("replan", 2)]
+    assert _offered(spending.requests[8]) == {UPDATE_PLAN_TOOL, MARK_PLAN_STEP_TOOL, FINISH_TOOL}
+    assert _offered(standby.requests[0]) == {UPDATE_PLAN_TOOL, MARK_PLAN_STEP_TOOL, FINISH_TOOL}
+
+
+async def test_without_a_standby_model_the_run_fails_with_the_error_of_its_model(login_env: dict[str, str]) -> None:
+    spent: SpendingProvider = _spent()
     async with _session(_config([], [], 5), login_env, {"anthropic": spent}) as (runtime, runs):
-        played: Played = await _play(runtime, runs, SPENT_MAIN)
+        played: Played = await _play(runtime, runs, SPENT_MAIN, None)
     assert played.record.status == "failed"
     assert played.record.result.startswith("credit balance is too low")
     assert played.data(MODEL_SWITCHED_EVENT) == ()

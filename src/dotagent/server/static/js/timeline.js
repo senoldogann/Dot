@@ -618,18 +618,21 @@ export function createTimeline({ rootRunId, startedAt, onGrow, onPlan, onStats, 
       note(scope, record.ts, "alert", `The side question got no answer from ${record.data.model}: ${record.data.error}`, "bad");
     },
 
-    // The provider of the run's model could not answer (`reason`: a spent quota or rate, a refused or missing key), so
-    // the run goes on with a standby model ([models] standby) from this step on.
+    // The run's model could not answer (`reason`: a spent quota or rate, a refused or missing key), so the run goes on
+    // with a standby model ([models] standby) from this step on; the chip of the run, or the header of a delegated
+    // run, names the new model.
     model_switched(scope, record) {
       const data = record.data;
       note(scope, record.ts, "refresh", `${data.from} cannot answer (${data.reason}); the run goes on with ${data.to}`, "warn");
       if (scope.runId === rootRunId) {
         onRunStatus({ status: "running", model: data.to, endedAt: null });
+        return;
       }
+      scope.panel.meta.textContent = scope.panel.meta.textContent.replace(` · ${data.from}`, ` · ${data.to}`);
     },
 
-    // A helper model ([models] helpers) could not answer a question of the run; `until` (seconds) is when its provider
-    // may be asked again, null for a missing key.
+    // A helper model ([models] helpers) could not answer a question of the run; `until` (seconds) is when it may be
+    // asked again, null for a missing key.
     helper_unavailable(scope, record) {
       const data = record.data;
       const until = data.until === null ? "" : ` until ${dateTime(data.until)}`;

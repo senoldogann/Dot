@@ -15,6 +15,7 @@ from dotagent.llm.router import ModelRef, ModelRouter, Pause
 from dotagent.llm.types import ChatRequest, DeltaSink, ModelInfo, ModelReply, Usage
 
 REF: ModelRef = ModelRef(provider="ollama", model="fake")
+OTHER: ModelRef = ModelRef(provider="ollama", model="other")
 ORIGIN: CallOrigin = CallOrigin(run_id="run_x", purpose="goal_check")
 REQUEST: ChatRequest = ChatRequest(
     model="fake",
@@ -153,8 +154,8 @@ async def test_a_recorder_that_fails_after_a_reply_raises_its_own_error() -> Non
     assert [call.error for call in calls] == [None]
 
 
-async def test_a_provider_that_cannot_answer_is_paused_until_a_call_it_answers() -> None:
-    answers: list[Callable[[], Awaitable[ModelReply]]] = [spent, unreachable, reply]
+async def test_a_model_that_cannot_answer_is_paused_until_a_call_it_answers_or_a_new_key() -> None:
+    answers: list[Callable[[], Awaitable[ModelReply]]] = [spent, unreachable, reply, reply, spent]
 
     async def in_turn() -> ModelReply:
         return await answers.pop(0)()
@@ -164,15 +165,23 @@ async def test_a_provider_that_cannot_answer_is_paused_until_a_call_it_answers()
     with pytest.raises(ProviderQuotaError):
         await router.complete(REF, REQUEST, no_sink, ORIGIN)
     paused: dict[str, Pause] = router.paused(time.time())
-    assert list(paused) == ["ollama"]
-    assert paused["ollama"].reason == "quota exhausted"
-    assert time.time() < paused["ollama"].until <= time.time() + cooldown_s
-    assert router.paused(paused["ollama"].until) == {}
-    # A transport error says nothing about the provider: the pause stays as it was.
+    assert list(paused) == [REF.label]
+    assert paused[REF.label].reason == "quota exhausted"
+    assert time.time() < paused[REF.label].until <= time.time() + cooldown_s
+    assert router.paused(paused[REF.label].until) == {}
+    # A transport error says nothing about the model: the pause stays as it was.
     with pytest.raises(ProviderTransportError):
         await router.complete(REF, REQUEST, no_sink, ORIGIN)
     assert router.paused(time.time()) == paused
+    # Another model of the provider (a local one beside a cloud one) has a pause of its own.
+    assert await router.complete(OTHER, REQUEST, no_sink, ORIGIN) == REPLY
+    assert router.paused(time.time()) == paused
     assert await router.complete(REF, REQUEST, no_sink, ORIGIN) == REPLY
+    assert router.paused(time.time()) == {}
+    # A new key of the provider ends the pauses of its models.
+    with pytest.raises(ProviderQuotaError):
+        await router.complete(REF, REQUEST, no_sink, ORIGIN)
+    await router.retire(REF.provider)
     assert router.paused(time.time()) == {}
 
 

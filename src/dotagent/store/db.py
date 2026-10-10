@@ -814,9 +814,10 @@ class Store:
         await self._db.execute("UPDATE runs SET steps = ? WHERE id = ?", (steps, run_id))
         await self._db.commit()
 
-    async def set_run_model(self, run_id: str, model: str) -> None:
-        """The model a run works on from now on (a standby model, once the provider of its own cannot answer)."""
-        await self._db.execute("UPDATE runs SET model = ? WHERE id = ?", (model, run_id))
+    async def set_run_model(self, run_id: str, model: str, effort: Effort | None) -> None:
+        """The model a run works on from now on (a standby model, once its own model cannot answer) and the reasoning
+        level it asks that model for (``None``: the configured default)."""
+        await self._db.execute("UPDATE runs SET model = ?, effort = ? WHERE id = ?", (model, effort, run_id))
         await self._db.commit()
 
     async def add_run_tokens(self, run_id: str, input_tokens: int, output_tokens: int) -> None:
