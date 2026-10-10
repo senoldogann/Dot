@@ -86,6 +86,22 @@ read_timeout_s = 600.0
 attempts = 6
 max_concurrent = 4
 
+[judge]
+# The typed judge answers two questions where code has no answer of its own, each with the probability of yes. Does a
+# click on a browser control whose label no pattern of the policy knows publish, send, pay or delete? At or above
+# public_action_threshold the click gets that flag, so the policy treats it as a click on "Post" or "Delete". Does a
+# campaign's claim of its targets hold? Below target_threshold the claim is refused before the goal checker is asked.
+# "none" leaves both to the patterns and the goal checker; "typesafe" asks TypeSafe's System One API, a paid service:
+# one request per judged click or claim, bounded by timeout_s. A missing key or a failed request leaves the decisions
+# to the patterns and the goal checker for [models] helper_cooldown_s, with a judge_unavailable event.
+provider = "none"
+api_key_env = "TYPESAFE_API_KEY"
+base_url = "https://api.typesafe.ai"
+model = "jev-latest"
+timeout_s = 5.0
+public_action_threshold = 0.7
+target_threshold = 0.9
+
 [agent]
 # A run has no step limit: it ends by finishing, by the progress watchdog (below), at a limit below or by the stop button.
 # Goal mode: a reviewer model checks the answer of a task or research run against the goal and sends the run back to work

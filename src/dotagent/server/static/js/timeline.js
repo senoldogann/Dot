@@ -648,6 +648,14 @@ export function createTimeline({ rootRunId, startedAt, onGrow, onPlan, onStats, 
       note(scope, record.ts, "key", `The helper ${data.model} cannot answer (${data.reason}${until})`, "warn");
     },
 
+    // The typed judge ([judge]) could not answer (`reason`, `error`); until `until` (seconds) nothing is asked of it and
+    // the policy's patterns and the goal checker decide alone.
+    judge_unavailable(scope, record) {
+      const data = record.data;
+      const text = `The typed judge cannot answer (${data.reason}) until ${dateTime(data.until)}; the policy's patterns and the goal checker decide alone: ${data.error}`;
+      note(scope, record.ts, "key", text, "warn");
+    },
+
     // The progress watchdog saw that the run is not getting anywhere (`detail`) and answered with a rung of its ladder
     // (`action`); the consult rung brings the advice of the review model, or the `error` that ended the run. An event
     // without `action` comes from the older stall guard, which only counted its `warnings`.

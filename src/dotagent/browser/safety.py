@@ -149,6 +149,21 @@ def assess_step(step: Step, element: Element | None, target: Element | None) -> 
     return assessment_for(reasons)
 
 
+def unexplained_clicks(steps: Sequence[tuple[Step, Element | None]]) -> tuple[Element, ...]:
+    """The controls the clicks of a batch land on whose names none of the patterns knows: the clicks the typed judge is
+    asked about (:mod:`dotagent.agent.judge`), each control once."""
+    return tuple(
+        dict.fromkeys(
+            element
+            for step, element in steps
+            if (step.action in _CLICKING_ACTIONS or step.action in ("check", "uncheck"))
+            and element is not None
+            and element.role in _CLICKABLE_ROLES
+            and not clicking_reasons(element, _CLICKABLE_ROLES)
+        )
+    )
+
+
 def secret_kind(marking: object) -> SecretKind | None:
     """The secret a field takes, from what the page says about the field (``password`` for a password input, then its
     autocomplete tokens): a card secret when one is named, since money outranks the rest, so a masked card code is a

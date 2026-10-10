@@ -7,6 +7,7 @@ from pathlib import Path
 from zoneinfo import ZoneInfo
 
 from dotagent.agent.approvals import ApprovalBroker
+from dotagent.agent.judge import Judge, judge_for
 from dotagent.browser.modes import browser_data_dir
 from dotagent.browser.session import BrowserSession
 from dotagent.config import AppConfig
@@ -65,6 +66,7 @@ class Runtime:
     bus: EventBus
     approvals: ApprovalBroker
     router: ModelRouter
+    judge: Judge
     browser: BrowserSession
     desktop: DesktopSession
     web: WebClient
@@ -168,6 +170,7 @@ async def open_runtime(config: AppConfig, login_env: dict[str, str]) -> Runtime:
             bus=bus,
             approvals=ApprovalBroker(store, bus, config.policy.approval_timeout_s),
             router=ModelRouter(config, _call_recorder(store, bus)),
+            judge=judge_for(config, bus),
             browser=BrowserSession(config.browser, browser_data_dir(config.browser.mode), downloads_dir()),
             desktop=DesktopSession(sized_for_agent(config), failsafe_path()),
             web=WebClient(config.web, config.browser.allowed_hosts, config.browser.blocked_hosts),
@@ -192,5 +195,6 @@ async def close_runtime(runtime: Runtime) -> None:
     await runtime.mcp.close()
     await runtime.web.aclose()
     await runtime.router.aclose()
+    await runtime.judge.aclose()
     await close_memory_index(runtime.memory)
     await runtime.store.close()

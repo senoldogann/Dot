@@ -592,7 +592,13 @@ async def test_a_key_is_saved_shown_by_its_end_only_used_at_once_and_removed(
 ) -> None:
     listing: httpx.Response = await client.get("/api/keys")
     assert listing.status_code == 200, listing.text
-    assert [view["provider"] for view in listing.json()["keys"]] == ["openai", "anthropic", "opencode_go", "ollama"]
+    assert [view["provider"] for view in listing.json()["keys"]] == [
+        "openai",
+        "anthropic",
+        "opencode_go",
+        "ollama",
+        "typesafe",
+    ]
     assert listing.json()["env_file"] == str(home / ".env")
     assert _key_view(listing, KEY_VARIABLE) == {
         "provider": "anthropic",

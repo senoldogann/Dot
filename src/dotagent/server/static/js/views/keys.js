@@ -10,7 +10,7 @@ import { forgetModels, getSnapshot, onChange, refresh } from "../state.js";
 import { attempt, confirmDialog, toast } from "../ui.js";
 
 // What the key of each provider is for and where it is made. `needed`: the models of the provider work only with a key
-// (Ollama's run through the app on this Mac and need none).
+// (Ollama's run through the app on this Mac and need none; the typed judge is off unless the configuration names it).
 const PROVIDERS = {
   openai: {
     use: "The GPT models.",
@@ -34,6 +34,12 @@ const PROVIDERS = {
     use: "Optional: the hosted web search, and ollama.com without the Ollama app. The models the app runs need no key.",
     page: "https://ollama.com/settings/keys",
     site: "ollama.com",
+    needed: false,
+  },
+  typesafe: {
+    use: "Optional: the typed judge ([judge] provider = \"typesafe\"), which reads click labels no rule knows and campaign claims. Check sends one small judgment.",
+    page: "https://typesafe.ai",
+    site: "typesafe.ai",
     needed: false,
   },
 };
@@ -358,7 +364,7 @@ export function mount(root, ctx) {
   }
 
   root.append(
-    pageHead("API keys", "The keys Dot signs in to the model providers with. The page never shows a whole key.", null),
+    pageHead("API keys", "The keys Dot signs in to the model providers and the typed judge with. The page never shows a whole key.", null),
     holder,
     el(
       "div",

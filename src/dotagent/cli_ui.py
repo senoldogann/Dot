@@ -169,6 +169,15 @@ class HelperUnavailablePayload(Payload):
     until: float | None
 
 
+class JudgeUnavailablePayload(Payload):
+    """The typed judge could not answer: why, until when (seconds since the epoch) nothing is asked of it, and the
+    error."""
+
+    reason: str
+    until: float
+    error: str
+
+
 class ResumedCallPayload(Payload):
     tool: str
     end: CallEnd
@@ -382,6 +391,16 @@ class TerminalUi:
                 helper = HelperUnavailablePayload.model_validate(data)
                 entry: Unavailable = Unavailable(model=helper.model, reason=helper.reason, until=helper.until)
                 self._line(self._paint(f"  ⚠ helper {unavailable_text(entry, time.time())} cannot answer", "33"))
+            case "judge_unavailable":
+                judge = JudgeUnavailablePayload.model_validate(data)
+                minutes: int = max(1, round((judge.until - time.time()) / 60))
+                self._line(
+                    self._paint(
+                        f"  ⚠ the typed judge cannot answer ({judge.reason}) for {minutes} min; the patterns and the "
+                        "goal checker decide alone",
+                        "33",
+                    )
+                )
             case _:
                 return
 

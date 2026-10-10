@@ -898,12 +898,12 @@ that change the owner's agent are their call (see "Open owner decisions", 6 onwa
 | 13  | Faster browser and desktop steps                                       | done        | a14f21a |
 | 14  | Rich editors, drag and bulk text in the browser                        | done        | 37808d5 |
 | 15  | Helper models: consult, delegate to another model, standby             | done        | 530ac62 |
-| 16  | Typed judgments (TypeSafe) at the decision points                      | planned     |         |
+| 16  | Typed judgments (TypeSafe) at the decision points                      | done        |         |
 | 17  | Pacing and public actions on social platforms                          | planned     |         |
 | 18  | Skills written for Claude Code, and the X playbook                     | planned     |         |
 | 19  | Prompt-cache hygiene for the hosted providers                          | planned     |         |
 | 20  | An interactive terminal for programs that prompt                       | planned     |         |
-| 21  | A plain chat screen: Dot's face, task chips, one composer line         | done        |         |
+| 21  | A plain chat screen: Dot's face, task chips, one composer line         | done        | bb89714 |
 
 **Order and dependencies.** 9 first: it is cheap and every later item is judged with it. 10, 11 and 12 are the owner's
 main ask and build on each other (12 needs the left questions of 10 and the targets of 11). 13 and 14 are the speed
@@ -1976,65 +1976,86 @@ throw-away home; the timeline checked in headless Chrome; README.
 
 ### 16. Typed judgments (TypeSafe) at the decision points
 
-**Status: planned.** **Goal.** Where the harness decides something today with a regular expression or with a full
+**Status: done.** **Goal.** Where the harness decides something today with a regular expression or with a full
 review-model call, a small typed judgment can answer instead: fast, with a probability, in any language.
 
 **Why.** The owner asked whether the decision system of TypeSafe (typesafe.ai, "System One" models such as Jev,
 which return typed answers and probabilities for Choice, Noul and Score questions) belongs in Dot; their OSJarvis
 project routes tasks with `choice`, verifies actions with `noul` and scores confidence with `score`. Dot's decision
-points fit that shape: the intent of a browser click is read from label patterns (`policy/elements.py:23-37`; "Repost"
-and "Quote" match none, Finnish and Turkish labels only where a pattern lists them), the goal check and the ladder's
-second opinion are full review-model calls (`agent/review.py`), and item 12's claim of an achieved target needs a
-judge. The recommendation is yes, at two points first, behind an interface, optional, and never as the loop's
+points fit that shape: the intent of a browser click is read from label patterns (`policy/elements.py:17-29`; "Repost"
+and "Quote" match none, Finnish labels none, Turkish ones only where a pattern lists them), the goal check and the
+ladder's second opinion are full review-model calls (`agent/review.py`), and item 12's claim of an achieved target
+needs a judge. The answer was yes, at two points first, behind an interface, optional, and never as the loop's
 decision maker: the harness keeps the workflow, the judge supplies the semantic calls where code has none.
 
-**Design.**
-- **Configuration.** `[judge] provider = "none" | "typesafe"`, `api_key_env = "TYPESAFE_API_KEY"`, `base_url`,
-  `model`, `timeout_s = 5.0`, `public_action_threshold = 0.7`, `target_threshold = 0.9`. The base URL and the model
-  name are read from the live documentation at implementation time (the skill in the owner's OSJarvis worktree,
-  `docs/skills/typesafe-ai/SKILL.md`, says the live docs at `https://docs.typesafe.ai/llms.txt` are the source of
-  truth; they were not read for this plan). The key follows the secrets lookup (environment, `.env`, Keychain) and
-  the Settings › API keys tab lists it.
-- **Connector.** `llm/typesafe.py`: `TypeSafeClient` on `httpx`, retry policy as the other connectors, errors
-  classified into the `ProviderError` family; `ask(state: JsonObject, questions: tuple[Question, ...]) ->
-  tuple[Judgment, ...]` with `Question(id, kind: "choice" | "noul" | "score", instructions, criteria)` and
-  `Judgment(id, answer, probability, confidence)` as `FrozenModel`s. Independent questions over one state go in one
-  request.
-- **Interface.** `agent/judge.py`: `Judge` with `enrich_action(action, context) -> ActionInfo` and `target_reached(
-  targets, verification, entries, evidence) -> Verdict`; `NoJudge` returns the action unchanged and `unknown`;
-  `TypeSafeJudge` asks. The judge runs inside `RunGate.authorize` (`agent/gate.py:95-111`), the one async place every
-  action passes before the policy decides.
-- **Use 1, the intent of a browser click.** For a `browser_act` click whose label matched no pattern, one request with
-  four Noul questions over the state `{label, role, page_title, url, nearby_text}`: public post, send to someone,
-  payment, destructive. A probability at or above `public_action_threshold` adds the flag; the action's summary says
-  "(judge: public_post 0.93)". The patterns stay as the floor and decide alone when the judge is off or unavailable.
-- **Use 2, a campaign's claim.** `campaign_achieved` (item 12) asks `target_reached` first: below `target_threshold`
-  the call fails at once with the probability and the reason; at or above, the review model confirms as designed.
-  The goal check of a plain run is not changed in this item.
-- **Unavailable.** A key missing, a quota or an error marks the judge unavailable for `helper_cooldown_s` with one
-  event `judge_unavailable {reason, until}`, and the regex and review paths decide, with "(judge off)" in the summary.
-  No retry storm, nothing hidden.
-- **Measuring it.** `tests/unit/test_judge.py` tests the enrichment and the thresholds with a scripted judge;
-  `tests/smoke/test_hosted_services.py -m hosted -k typesafe` sends a few labels in English, Turkish and Finnish
-  ("Repost", "Yeniden gönder", "Lähetä", "Pay now", "Delete account") and prints the probabilities. Before the judge is
-  turned on by default, count on the owner's history (counts only, read-only): how many allowed browser clicks on
-  social hosts had labels that matched no pattern.
+**Design** (checked against the code on 2026-10-10; what changed from the first draft is listed below).
+- **Configuration.** `[judge] provider = "none" | "typesafe"` (default `none`), `api_key_env = "TYPESAFE_API_KEY"`,
+  `base_url = "https://api.typesafe.ai"`, `model = "jev-latest"`, `timeout_s = 5.0` (at most 60),
+  `public_action_threshold = 0.7`, `target_threshold = 0.9`. The address, the model and the wire come from TypeSafe's
+  live API reference (`https://docs.typesafe.ai/llms.txt` and its `api.md`, read on 2026-10-10). The key follows the
+  secrets lookup (environment, `.env`, Keychain); Settings › API keys lists it last, and a key saved or removed there
+  retires the judge's connection and ends a pause, as it does for a provider.
+- **Connector** (`llm/typesafe.py`). `TypeSafeClient.nouls(state, questions) -> dict[str, float]`: one
+  `POST /v1/systemone` with the key as a bearer token and every question about a state in one request, through
+  `post_json` and `classify_generic` like the other connectors, with one retry (429, 529). An answer without a
+  probability from 0 to 1 for a question is a `ProviderProtocolError`.
+- **The judge** (`agent/judge.py`). `Judge` with `judge_click(ClickFacts(label, role, url)) -> ClickJudgment(reasons,
+  note)` and `judge_claim(state) -> ClaimJudgment(probability)`; `NoJudge` adds nothing; `TypeSafeJudge` asks, and
+  reads the key at its first judgment. The runtime holds one (`judge_for`). What it sends has its secrets masked
+  (`redact_json`), and a page's address goes without its query and fragment.
+- **Use 1, the intent of a browser click.** In `browser_act`'s classify (`tools/browser.py`), where the elements of the
+  steps are known: each control that a click, a double or right click, a check or an uncheck lands on, whose role is
+  clickable and whose name no pattern knows (`unexplained_clicks`, `browser/safety.py`), is judged once, with four Noul
+  questions over `{control: {label, role}, page}`: does it publish, send, pay, delete? The controls of one batch are
+  asked at once. A probability at or above `public_action_threshold` adds the reason a pattern would have given
+  (`post`, `send`, `financial`, `destructive`), so the flags and the risk follow as for "Post" or "Delete", and the
+  summary says "(judge: public_post 0.93)". A label a pattern knows is never sent.
+- **Use 2, a campaign's claim.** `campaign_achieved` sends what the goal checker reads (the goal, the targets and how
+  they are verified, the ledger's digest, the session's checked facts and the claim) with one question,
+  `targets_reached`. Below `target_threshold` the call fails at once with the probability, and the campaign goes on;
+  at or above, or with the judge off, the goal checker decides as before.
+- **Unavailable.** A missing or refused key, a rate limit, an error or `timeout_s` passing makes the judge unavailable
+  for `[models] helper_cooldown_s`: a warning in the log with the error, one persisted `judge_unavailable {reason,
+  until, error}` event (a note in the timeline, a line in `dotx run`), and "(judge off)" in the summary of every click
+  it does not judge meanwhile. Nothing is asked while it is unavailable; the patterns and the goal checker decide alone.
+- **Where it is seen.** `dotx doctor` has a `judge` row: off, or the service and whether its key is set (a failure
+  when the judge is on without a key). Settings › API keys lists TypeSafe; its **Check** sends one small judgment,
+  because the API documents no other call to check a key with. README "Safety" ("Typed judgments"), `.env.example`.
 
-**Touchpoints.** `config.py`, `defaults.toml`, new `llm/typesafe.py`, new `agent/judge.py`, `agent/gate.py`,
-`policy/elements.py`, `tools/campaign.py` (item 12), `runtime.py`, `secrets.py` and `routes_keys.py` (the key),
-`doctor.py`, `timeline.js`, README "Safety" (a "Typed judgments" paragraph), `.env.example`.
+**Touchpoints.** `config.py`, `defaults.toml`, new `llm/typesafe.py`, new `agent/judge.py`, `browser/safety.py`,
+`tools/browser.py`, `tools/campaign.py`, `runtime.py`, `server/routes_keys.py`, `doctor.py`, `cli_ui.py`,
+`server/static/js/timeline.js`, `providers.js`, `views/keys.js`, README "Safety", `.env.example`.
+
+**Changed from the first draft.**
+- A click is judged in `browser_act`'s classify, not in `RunGate.authorize`: the gate sees an `ActionInfo`, while the
+  label, the role and the step are known only where the steps are classified. The policy still decides, from the flags.
+- Only Noul questions (`nouls`), not a general `ask` with Choice and Score: neither use needs them.
+- A click's state is its label, its role and the page's address: the element map the classify reads has no page title
+  and no nearby text. No host list: with the judge on, every click whose label no pattern knows is judged.
+- `policy/elements.py`, `agent/gate.py` and `secrets.py` are unchanged (the lookup takes any variable name).
+- Tests: a stand-in for TypeSafe's API (`tests/smoke/test_judge.py`) that answers as the reference documents takes the
+  place of the scripted judge and the offline wire tests, so the connector, the judge, `browser_act` on a real headless
+  Chrome and the campaign tool are checked together.
 
 **Decisions and limits.**
 - Off by default (`provider = "none"`): it is a paid external service and its calibration on Dot's labels is unknown
-  until the hosted test and the count above exist (open decision 9).
+  until the hosted test and the count below exist (open decision 9).
 - The judge never decides a step and never grants anything: it adds flags that make the policy ask, or stops a claim
-  the review model would have examined. Code owns the workflow, as TypeSafe's own guidance says.
-- One request per judged click adds its latency to that click; the threshold and the host list keep it to clicks that
-  matter (the patterns answer the rest).
+  the goal checker would have examined. Code owns the workflow, as TypeSafe's own guidance says.
+- One request per judged control adds its latency to that click, at most `timeout_s`; a claim the judge refuses saves
+  the goal checker's call, one it lets through costs both.
+- Not run live: no request has reached TypeSafe yet, and the page where a key is made was not checked (Settings links
+  to `typesafe.ai`). The hosted test (`.venv/bin/python -m pytest tests/smoke/test_hosted_services.py -m hosted -k
+  typesafe`) sends "Repost", "Yeniden gönder", "Lähetä", "Pay now" and "Delete account" with the judge's own questions
+  and prints the probabilities. Before the judge becomes the owner's default, count on their history (counts only,
+  read-only): how many allowed browser clicks on social hosts had labels that matched no pattern.
 
-**Done when.** Unit tests with the scripted judge; the connector's offline body and error tests in
-`tests/smoke/test_wire_codecs.py` style; the hosted test written and skipped without the key; `dotx doctor` row;
-README and `.env.example`; the owner's count recorded in the log when they run it.
+**Done when.** Unit tests of which clicks are judged and of what the probabilities add (`tests/unit/test_judge.py`).
+Smoke on the stand-in and headless Chrome: an unknown label flagged with its note and the request checked (path, key,
+model, state without the query, the four questions), a known label not sent, a refused key unavailable for the
+cooldown with its events until a new key, a campaign claim refused before the goal checker. The hosted test written
+and skipped without the key; the `dotx doctor` row; README and `.env.example`. The owner's count goes into the log
+when they run it.
 
 ### 17. Pacing and public actions on social platforms
 
@@ -2190,10 +2211,10 @@ on and is closed by `terminal_close`; the idle reaper; unit tests of the ANSI st
 
 ### 21. A plain chat screen
 
-**Status: done.** **Goal.** The web interface reads like a chat with an agent, as in the reference the owner sent on
-2026-10-10 (OpenAI's Codex handing tasks to a dot named Alfred): Dot's face and name at the head of a conversation, the
-owner's messages in one accent colour, delegated runs as small task chips with a status ring, one composer line, no side
-panel unless asked for, and the same on a phone.
+**Status: done** (`bb89714`, PR #9). **Goal.** The web interface reads like a chat with an agent, as in the reference
+the owner sent on 2026-10-10 (OpenAI's Codex handing tasks to a dot named Alfred): Dot's face and name at the head of a
+conversation, the owner's messages in one accent colour, delegated runs as small task chips with a status ring, one
+composer line, no side panel unless asked for, and the same on a phone.
 
 **Why.** The run page opened with the Details and Screen panels beside the conversation and a head line with the
 status, the goal (which the first message under it repeats), the model and the approval mode; a delegated run was a
@@ -2246,9 +2267,10 @@ text, no console error; the Options panel with YOLO saved; every status ring. RE
    part; password-manager apps stay refused in every mode unless you say otherwise.
 8. Pace limits (item 17): the defaults (20 public actions an hour, 120 a day; 40 social an hour, 300 a day; 20 s
    between public actions) are conservative guesses. Confirm them against the platforms' published rules, or set 0.
-9. TypeSafe (item 16): save `TYPESAFE_API_KEY`, read the live docs for the base URL and the model name, run the hosted
-   test, and run the read-only count on your history (how many allowed clicks on social hosts had labels no pattern
-   matched) before `[judge] provider = "typesafe"` becomes your default.
+9. TypeSafe (item 16): save `TYPESAFE_API_KEY` (Settings › API keys, or `dotx auth set TYPESAFE_API_KEY`), run the
+   hosted test (a few paid requests: `.venv/bin/python -m pytest tests/smoke/test_hosted_services.py -m hosted -k
+   typesafe`), set the thresholds by what it prints, and run the read-only count on your history (how many allowed
+   clicks on social hosts had labels no pattern matched) before `[judge] provider = "typesafe"` becomes your default.
 10. Skills (item 18): put `dirs = ["~/.claude/skills"]` under `[skills]` in your `config.toml` once the loader accepts
     your two X skills; Dot reads nothing there until you do.
 11. Helpers (item 15): fill `[models] helpers` and `[models] standby` in your `config.toml`. The natural first entry is
@@ -2265,10 +2287,10 @@ text, no console error; the Options panel with YOLO saved; every status ring. RE
     `memory_save` are acting-only, `tools/base.py:16-17`), and DuckDuckGo's bot check throttles long research runs
     (README "Status and known limits"). Say whether a research run may save notes and files under the workspace,
     and whether the hosted Ollama search (`OLLAMA_API_KEY`) should be the default backend; either is a small item.
-15. The Claude GitHub app reviews nothing yet: on PR #1, PR #2, PR #4, PR #5, PR #6, PR #7 and PR #8 it answered "Code
-    review skipped" (on PR #3 it posted nothing) because your organization has no extra usage to pay for it. Add extra usage
-    (or raise the monthly limit) at claude.ai/admin-settings/usage; a comment `@claude review` on a PR then asks for a
-    review. Until then each PR is merged on `/code-review` alone.
+15. The Claude GitHub app reviews nothing yet: on PR #1, PR #2, PR #4, PR #5, PR #6, PR #7, PR #8 and PR #9 it answered
+    "Code review skipped" (on PR #3 it posted nothing) because your organization has no extra usage to pay for it. Add
+    extra usage (or raise the monthly limit) at claude.ai/admin-settings/usage; a comment `@claude review` on a PR then
+    asks for a review. Until then each PR is merged on the agent's own review.
 16. The review model has no standby (item 15): with `[models] review` on the provider of `main` (the default), a run
     in goal mode or with `auto` approvals that moved to its standby fails its goal check or its approvals while that
     provider cannot answer. Set `review` to a model of another provider (decision 3), or say that the review model
@@ -2574,3 +2596,14 @@ text, no console error; the Options panel with YOLO saved; every status ring. RE
   stop a red square. Static files only. Unit tests (548), the offline smoke suite (239, no cloud request), headless
   Chrome on a scripted daemon (wide light and dark, phone; Options with YOLO; every ring): no overflow, no console
   error. The review subagent was stopped before it reported; the diff was reviewed in the main session.
+- 2026-10-10: item 21 merged as `bb89714` (PR #9, squash); the Claude GitHub app skipped its review again (decision
+  15). The owner said to go on with the remaining items and to build only what each needs. Item 16 started on
+  `item-16-typed-judgments`.
+- 2026-10-10: item 16 done. With `[judge] provider = "typesafe"` (off by default), TypeSafe's System One API is asked
+  about a browser click whose label no pattern knows, which then gets the flag the judge finds ("Repost" as a public
+  post), and about a campaign's claim before the goal checker; a judge that cannot answer pauses for
+  `helper_cooldown_s` with an event, and the patterns decide alone. The design moved where the code showed it wrong
+  (the section lists what changed). Reviewed in the main session: the hosted test now asks the judge's own questions,
+  and a page's query and fragment are not sent. Unit tests (550), the offline smoke suite (242, the judge's three on a
+  stand-in for the API and headless Chrome; no cloud request). No request reached TypeSafe: the key, the hosted test
+  and the count are the owner's (decision 9).

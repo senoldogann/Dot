@@ -5,12 +5,14 @@ the fence is produced by Dot. Navigation is checked against the URL rules before
 steps is classified once, from the elements it targets in the latest snapshot.
 """
 
+import asyncio
 import base64
 import secrets
 from typing import Literal
 
 from pydantic import Field
 
+from dotagent.agent.judge import ClickFacts, ClickJudgment
 from dotagent.browser.render import (
     describe_step,
     render_act_outcome,
@@ -28,6 +30,7 @@ from dotagent.browser.safety import (
     refuse_secret_field,
     secret_field_flag,
     secret_field_label,
+    unexplained_clicks,
     url_flags,
 )
 from dotagent.browser.types import (
@@ -44,7 +47,7 @@ from dotagent.browser.types import (
 from dotagent.config import BrowserConfig
 from dotagent.core.errors import ToolInputError
 from dotagent.llm.types import ImageData
-from dotagent.policy.elements import Element, StepAssessment, combine_assessments
+from dotagent.policy.elements import Element, StepAssessment, assessment_for, combine_assessments
 from dotagent.policy.paths import PathClass, classify_path, expand_path
 from dotagent.policy.types import ActionInfo, ActionKind, Flag, Risk
 from dotagent.tools.base import (
@@ -329,6 +332,19 @@ def _act_tool() -> RegisteredTool:
         kind: ActionKind = _act_kind(args.steps)
         summary: str = "; ".join(_step_label(step, element, target) for step, element, target in judged)
         target: str = ctx.runtime.browser.current_url(ctx.thread_id) or ""
+        # The typed judge reads the clicks whose labels no pattern knows; it can only add reasons, never take one away.
+        judgments: list[ClickJudgment] = await asyncio.gather(
+            *(
+                ctx.runtime.judge.judge_click(ClickFacts(label=element.name, role=element.role, url=target), ctx.run_id)
+                for element in unexplained_clicks([(step, element) for step, element, _ in judged])
+            )
+        )
+        found: list[StepAssessment] = [assessment_for(judgment.reasons) for judgment in judgments if judgment.reasons]
+        if found:
+            assessment = combine_assessments([assessment, *found])
+        notes: list[str] = [judgment.note for judgment in judgments if judgment.note]
+        if notes:
+            summary = f"{summary} ({'; '.join(notes)})"
         return _action("browser_act", kind, assessment.risk, summary, target, assessment.flags)
 
     async def run(args: ActArgs, ctx: ToolContext, authorized: ActionInfo) -> ToolResult:
