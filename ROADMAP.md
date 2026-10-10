@@ -2367,13 +2367,13 @@ Paste this to the agent that takes the work:
 | 24  | The fast model does the side work                                        | done    | 9c16866 |
 | 25  | Early and speculative execution of read-only tools                       | parked  |         |
 | 26  | Speed knobs decided by measurement; snapshots that send only the change  | done    | 8566080 |
-| 27  | Cheapest channel first: API or CLI, then the browser, then the desktop   | planned |         |
+| 27  | Cheapest channel first: API or CLI, then the browser, then the desktop   | in progress |     |
 | 28  | Evidence on every plan step                                              | done    | 9a9fe5f |
 | 29  | Eval reports that compare runs, and the defaults that wait for them      | done    | 1513bd4 |
 | 30  | Typed best-of-two at critical decisions; injection fixtures in the evals | planned |         |
 | 31  | One-time codes from the owner's own Mail and Messages                    | done    | 88abeed |
 | 32  | The owner's Chrome profile as the default of a campaign                  | done    | f302464 |
-| 33  | Pre-approved spending caps                                               | in progress |     |
+| 33  | Pre-approved spending caps                                               | done    | 44ea96b |
 | 34  | Research runs that keep notes, and hosted search by default              | done    | e68b22d |
 | 35  | A plan with dependencies and parallel branches                           | done    | d6b40c1 |
 | 36  | Playbooks learned from runs that reached their goal                      | done    | fb99354 |
@@ -2561,9 +2561,20 @@ step so item 22 can count GUI steps.
 **Why.** Claude Cowork does this with connectors and is the reference of the local-Mac category; GUI steps are the
 slowest and least reliable.
 
-**Touchpoints.** `agent/prompt.py`, `agent/loop.py` (channel in the step event), `store/stats.py`, README.
+**Design, as built.** The prompt already set the order (shell and CLIs, then APIs and MCP tools, then the web and
+the browser, then AppleScript, then the desktop); it gains one sentence: a skill or an MCP server of a site that names
+its API or command is used before the site's pages. The channel is a pure function of the tool's name
+(`tools/channels.py`: `command`, `api`, `web`, `browser`, `desktop`, `agent`), recorded in every `tool_result` event
+by the executor (not the loop), and `dotx stats` gains a channels table with the share of the acting calls (every
+channel but `agent`) that went through a GUI. The eval set cannot measure the prompt change: its model is scripted and
+answers in call order, so the GUI share of a scripted run is fixed by its script. The live eval run that records the
+change is the owner's (decision 22); `dotx stats` shows the share of their real runs from this version on.
 
-**Done when.** GUI step share on the eval set falls; the prompt change has its eval run recorded.
+**Touchpoints.** `tools/channels.py` (new), `agent/executor.py`, `store/stats.py`, `cli_stats.py`,
+`agent/prompt.py`, README.
+
+**Done when.** Every tool result carries its channel; `dotx stats` shows the channels and the GUI share; unit tests
+for the channel of a tool and the share; the live measurement is recorded by the owner.
 
 ### 28. Evidence on every plan step
 
@@ -3115,6 +3126,10 @@ item ends as a measured no, written in the log.
     your `config.toml`, for example `"namecheap.com" = { per_purchase = 20, per_day = 50 }` under `[policy.spend]`;
     the caps compare the number on the page whatever its currency. The check that is yours: a live purchase under the
     cap on a listed site in `auto` or `yolo`.
+22. The channel order (item 27) is measured on your real runs, not offline: run `dotx stats` after a week on this
+    version and compare the GUI share of the acting calls with the share before (the events of older runs carry no
+    channel, so the share starts with this version). A live eval run of the long tasks (decision 1) on the same model
+    before and after is the stricter check and is yours to pay for.
 
 ## Log
 
@@ -3507,3 +3522,5 @@ item ends as a measured no, written in the log.
 - 2026-10-10 (Fable 5.1): item 32 built on branch `item-32-campaign-browser` (MYP-174): `browser/pool.py` (the daemon's session plus one per other mode, made on first use), `ToolContext.browser` chosen when a run starts (its campaign's choice, a delegated run following its parent's campaign, else the daemon's), `CampaignRecord.browser` with `[agent] campaign_browser = "attach"` as the default (decision 20), `--browser`/API `browser`, a campaign on the owner's Chrome refused while that Chrome is closed or has no debugging port, the brief's second line names the Chrome, `dotx campaign show` and the campaign page show it; evals keep `own`. Design corrected: no `[campaign]` table, one pool instead of switching the shared session. Gate: format, check, mypy clean; unit 611; `dotx eval check` ok; smoke (campaigns, web, crawl, memory, codes, judge, pace, scheduler, terminal, skills, MCP, secret fields, server, resume, plan branches, scaffold) 137 passed, 1 skipped; the two live-model delegate tests (`gpt-oss:20b-cloud` through the owner's Ollama) fail on main too: the model passes `step=1` to `delegate` before any plan exists, item 35's check refuses that call, and the test helper expects one delegate result. Finding, not a regression (log of item 35 to be revisited: the live model wastes a turn on a step it has not planned).
 - 2026-10-10 (Fable 5.1): item 32 merged f302464 (PR #33, MYP-174 Done). Next: item 33 (pre-approved spending caps).
 - 2026-10-10 (Fable 5.1): item 33 built on branch `item-33-spending-caps` (MYP-175): `policy/spend.py` (amounts from a control's label or the page's total, `SpendCap` per site, `spend_allowance` turns a payment under both caps into a question with source `spend` that takes the money hand-off's place), `ActionInfo.amount` and the amount in the step's summary (timeline, policy event, approval record), the gate reads the day's spends from the new `spends` table and records the spend once the step is authorized, `[policy.spend]` empty by default (decision 21). Design corrected: the amount is read in the browser tool's classification, not in `elements.py`; `ask` asks once (the plan named only yolo and auto). Gate: format, check, mypy clean; unit 625; `dotx eval check` ok; smoke (approval modes, secret fields, judge, pace, terminal, memory, codes, browser, campaigns, scaffold, tool groups) 102 passed, 1 skipped.
+- 2026-10-10 (Fable 5.1): item 33 merged 44ea96b (PR #34, MYP-175 Done). Next: item 27 (cheapest channel first).
+- 2026-10-10 (Fable 5.1): item 27 built on branch `item-27-cheapest-channel` (MYP-176): `tools/channels.py` (`channel_of`: command, api, web, browser, desktop, agent), the executor records `channel` in every `tool_result` event, `dotx stats` gains a channels table with the GUI share of the acting calls, the prompt's channel order gains "a skill or an MCP server of a site that names its API or command is used before the site's pages". Design corrected: the order was already in the prompt; the channel is recorded by the executor, not the loop; the eval set is scripted so the GUI share cannot move offline (decision 22: measured on the owner's real runs). Gate: format, check, mypy clean; unit 639; `dotx eval check` ok; smoke (tool groups, scaffold, run limits, approval modes, research notes) 27 passed.

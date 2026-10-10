@@ -14,6 +14,7 @@ from dotagent.core.types import FrozenModel
 from dotagent.store.endings import ENDING_LABELS
 from dotagent.store.stats import (
     ActStats,
+    ChannelStats,
     ModelStats,
     RunStatistics,
     SiteStats,
@@ -21,6 +22,7 @@ from dotagent.store.stats import (
     TimeStats,
     ToolStats,
     collect_statistics,
+    gui_share,
 )
 
 _DAY_S: float = 86400.0
@@ -141,6 +143,22 @@ def render_tools(tools: Sequence[ToolStats]) -> list[str]:
     ]
 
 
+def render_channels(channels: Sequence[ChannelStats]) -> list[str]:
+    """The channels table: how many calls went through a command, an API, the web, the browser, the desktop or the
+    run's own tools, and the share of the acting calls that went through a GUI (the cheapest channel first, item 27)."""
+    if not channels:
+        return ["Channels: no tool call recorded."]
+    width: int = max(len("channel"), *(len(entry.channel) for entry in channels))
+    header: str = f"  {'channel':<{width}}  {'calls':>6}  {'failed':>6}  {'seconds':>9}"
+    rows: list[str] = [
+        f"  {entry.channel:<{width}}  {entry.calls:>6}  {entry.failed:>6}  {_seconds(entry.seconds_total):>9}"
+        for entry in channels
+    ]
+    share: float | None = gui_share(channels)
+    gui: str = "no acting call" if share is None else f"{share * 100:.0f}% of the acting calls went through a GUI"
+    return [f"Channels (the browser and the desktop are the GUI; {gui}):", header, *rows]
+
+
 def render_sites(sites: Sequence[SiteStats]) -> list[str]:
     """The sites table: per page host or application, what the act calls on it did, the busiest first."""
     if not sites:
@@ -170,6 +188,7 @@ def render_stats(stats: RunStatistics, days: int, by: Literal["model", "site", "
         lines.extend(render_time(stats.models))
         if stats.tools:
             lines.extend(["", *render_tools(stats.tools)])
+        lines.extend(["", *render_channels(stats.channels)])
     if by != "model":
         lines.extend(["", *render_sites(stats.sites)] if by == "all" else render_sites(stats.sites))
     return lines

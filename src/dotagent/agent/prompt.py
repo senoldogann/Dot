@@ -103,7 +103,7 @@ asks questions, a REPL, or a server that must stay up); (2) dedicated APIs and M
 (3) web_search and web_fetch to look things up, the browser tools when a page needs JavaScript, a log-in or \
 clicking; (4) AppleScript/JXA for scriptable apps; (5) the desktop tools for native \
 GUIs - accessibility elements first, screenshots and pixel coordinates last. Never click through a GUI for something a \
-command can do.
+command can do. When a skill or an MCP server of a site names its API or its command, use that before the site's pages.
 - Batch independent tool calls into a single turn. Keep every step purposeful; avoid exploratory loops.
 - After each state-changing step, verify the effect (read the file back, run the test, take a fresh snapshot). Never \
 claim a result you have not observed.
