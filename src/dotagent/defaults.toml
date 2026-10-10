@@ -26,12 +26,13 @@ port = 8765
 
 [models]
 # "<provider>:<model>"; providers are ollama, openai, opencode_go and anthropic.
-# A run uses the model it was started with (main unless one is chosen) for every step and for compacting its own
-# history, until it moves to a standby model (below); the roles below are only used for what their comments say.
+# A run uses the model it was started with (main unless one is chosen) for every step, until it moves to a standby
+# model (below); the roles below are only used for what their comments say.
 main = "ollama:minimax-m2.7:cloud"
 # Describes screenshots to a run whose model cannot see images.
 vision = "ollama:gemma4:cloud"
-# Not used by runs; kept so existing config files stay valid.
+# Writes the summary of a compaction (the side work a run's slower model need not do). When it gives no usable summary
+# the run's own model writes it and the compaction event names the fast model's problem.
 fast = "ollama:gpt-oss:20b-cloud"
 # Answers for you where [policy] approvals = "auto", and checks the answer of a run in goal mode.
 review = "ollama:minimax-m2.7:cloud"

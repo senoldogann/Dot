@@ -542,6 +542,7 @@ async def _service_checks(config: AppConfig) -> list[CheckResult]:
     configured: tuple[tuple[str, str], ...] = (
         ("main", config.models.main),
         ("vision", config.models.vision),
+        ("fast", config.models.fast),
         ("review", config.models.review),
     )
     used: set[str] = {reference.partition(":")[0] for _, reference in configured}

@@ -2362,9 +2362,9 @@ Paste this to the agent that takes the work:
 
 | #   | Item                                                                     | Status  | Commits |
 | --- | ------------------------------------------------------------------------ | ------- | ------- |
-| 22  | Step efficiency: the numbers every later item is judged by               | in progress |         |
+| 22  | Step efficiency: the numbers every later item is judged by               | done    | accd6a8 |
 | 23  | Multi-action turns as the rule                                           | planned |         |
-| 24  | The fast model does the side work                                        | planned |         |
+| 24  | The fast model does the side work                                        | in progress |         |
 | 25  | Early and speculative execution of read-only tools                       | planned |         |
 | 26  | Speed knobs decided by measurement; snapshots that send only the change  | planned |         |
 | 27  | Cheapest channel first: API or CLI, then the browser, then the desktop   | planned |         |
@@ -2461,14 +2461,26 @@ model still decides). A side call on the fast model that fails falls to the main
 (`agent/loop.py:290-298`); `[models] fast` is documented and read nowhere (decision 4). gpt-oss:20b-cloud answers a
 tool step in 889 ms, the default main in 2 798 ms.
 
-**Design.** A `ModelRole.FAST` resolved in `runtime.py` like `review`; `agent/compact.py` and the side callers take
-the role, not the main model. `dotx doctor` checks the fast model like the others.
+**Design, as built.** The reading of the code cut the list of side callers to the one the audit measured. There is no
+model classification in `browser_wait_text` (it waits for text, `tools/browser.py`); the judge is TypeSafe or nothing
+by design (item 16, and items 42 to 45 extend it), not a chat model; the vision role has a model of its own; a
+pre-check of the goal is new behavior no number asked for. So: `agent/loop.py:_compact` asks `[models] fast` for the
+summary first; when the fast model gives no usable summary (a provider error, a timeout, no text, a summary far too
+long) and it is not the run's own model, the run's own model is asked, the warning `summary_fast_failed` is logged
+and the `compacted` event carries `fast_problem` (``None`` when the fast model wrote it); `model` in the event and in
+the `model_call` events of the compaction names the model that wrote it. The note's author line says "written by the
+fast model …" or "written by you, …". `dotx doctor` checks the fast model like main, vision and review.
+`defaults.toml` and README no longer say the role is unused. No new config key. The eval runner leaves `fast` as
+configured: an eval measures the product's behavior, and the scripted check's `ollama` stand-in answers the fast
+model's calls too (same provider name).
 
-**Touchpoints.** `runtime.py`, `agent/compact.py`, `agent/review.py`, `agent/vision.py`, `tools/browser.py`,
-`doctor.py`, `defaults.toml`, `config.py`, README "Models and providers".
+**Touchpoints.** `agent/loop.py`, `doctor.py`, `defaults.toml`, README "Models and providers" and "Tools",
+`tests/smoke/test_scaffold.py`.
 
-**Done when.** Item 9's numbers show compaction under 5 % of run time on the eval set; a smoke test runs one
-compaction on the fast model.
+**Done when.** A smoke test shows every compaction of a scripted run written by the fast model with `fast_problem`
+``None``, and one with a fast model whose provider fails written by the run's own model with the problem named (done:
+`test_scaffold.py`). Item 9's numbers for the owner's runs (compaction share of run time, decision 4 closed by this
+item) are read with `dotx stats` after the daemon restarts on this code: the owner's call, in "Open owner decisions".
 
 ### 25. Early and speculative execution of read-only tools
 
@@ -2836,7 +2848,7 @@ item ends as a measured no, written in the log.
 3. `[models] review`: use a model of another family than `main` (item 5). The default is the same model, and `dotx
    doctor` warns about it (a warning, not a failure). Done for the owner on 2026-10-10 at their word: their
    `config.toml` sets `review = "anthropic:claude-sonnet-5-5"`, and the warning is gone.
-4. From the audit: how long to keep events and screenshots (retention windows), which model compacts (`[models] fast` is
+4. From the audit: how long to keep events and screenshots (retention windows), which model compacts (closed by item 24 on 2026-10-10: the fast model writes the summary, the run's own model when it cannot; read the compaction share with `dotx stats` after the daemon restarts on that code), the fact that `[models] fast` was (`[models] fast` is
    documented but never read), browser access to localhost and private addresses, CI.
 5. The Claude models (`anthropic`), done on 2026-10-10: the owner's key is saved, and the hosted test (`.venv/bin/python
    -m pytest tests/smoke/test_hosted_services.py -m hosted -k anthropic`) passed: `claude-haiku-5-5` is listed, a tool
@@ -3256,3 +3268,5 @@ item ends as a measured no, written in the log.
   items in one call, X campaigns, typed checks before a model call, a step's model), with the docs and cookbooks each
   item starts from; part 3 is committed with them.
 - 2026-10-10 (Fable 5.1): item 22 built on branch `item-22-step-efficiency`: `tool_result` events record `site` and `steps`; `dotx stats` gains the acts line, the slowdown curve, the cache share and a Sites table (`--by model|site|all`); eval reports carry acts, single acts and cached tokens and show the two shares. Gate: format, check, mypy clean; unit 560; `dotx eval check` ok; offline smoke of the eval runner and scaffold 11 passed. The merge hash goes into the table with the next PR.
+- 2026-10-10 (Fable 5.1): item 22 merged accd6a8 (PR #22, MYP-163 Done). Item 24 (branch `item-24-fast-model`) started; its first commit records accd6a8.
+- 2026-10-10 (Fable 5.1): item 24 built on branch `item-24-fast-model`: the compaction summary is the fast model's side work, the run's own model writes it when the fast one fails and the `compacted` event names the problem (`fast_problem`); `dotx doctor` checks the fast model; defaults and README. Scope cut to what the audit measured (no wait_text or judge classification exists on a chat model; vision has its own role; no goal pre-check). Gate: format, check, mypy clean; unit 560; offline smoke 197 passed, 1 failed: `test_delegate.py::test_a_run_reads_a_file_through_a_delegated_run` (`@requires_model`, a real cloud model delegated three times instead of once; it passed on a rerun; unrelated to this item). The merge hash goes into the table with the next PR.

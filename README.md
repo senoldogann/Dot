@@ -68,7 +68,7 @@ A model is written `provider:model`. The `[models]` table of the configuration s
 | ------------------- | ----------------------------------------------------------------------------------------- | --------------------------- |
 | `main`              | the agent loop                                                                            | `ollama:minimax-m2.7:cloud` |
 | `vision`            | describing the images a tool returns, when `main` cannot see them                         | `ollama:gemma4:cloud`       |
-| `fast`              | nothing; kept so that existing config files stay valid                                    | `ollama:gpt-oss:20b-cloud`  |
+| `fast`              | writing the summary of a compaction (see [Tools](#tools))                                 | `ollama:gpt-oss:20b-cloud`  |
 | `review`            | answering the policy's questions in `auto` approvals, and checking a run against its goal | `ollama:minimax-m2.7:cloud` |
 | `effort`            | default reasoning level of a run on `main` (see below)                                    | `medium`                    |
 | `helpers`           | models a run may ask for advice or hand a part of its work to (see below)                 | `[]`                        |
@@ -174,13 +174,15 @@ figures or the text that was asked for, with the links to the sources), and it i
 it as the last message of the conversation, `dotx run` prints it. A `chat` turn has no `finish`: its plain reply is the
 answer (a small model that is offered both writes the call out as text).
 
-- Old tool results and screenshots are trimmed, and the oldest part of the conversation is summarised by the run's own
-  model, so a run stays inside its context budget: `context_tokens`, or three quarters of the model's window when that
-  is less. The summary may use a tenth of the budget, so a long run's summary does not grow with each compaction until
-  every step compacts. A compaction keeps the newest messages that fit next to the system prompt, the tool definitions
-  and its note in 85 % of the budget, and never less than the model's last reply with its results, so the steps after
-  it have room. It is tried three times; when the model gives no text, or a summary far over that limit, a mechanical
-  summary takes its place and the timeline says so with the reason. Next to the summary a continuity note keeps the
+- Old tool results and screenshots are trimmed, and the oldest part of the conversation is summarised by the fast
+  model (`[models] fast`, the side work the run's slower model need not do), so a run stays inside its context budget:
+  `context_tokens`, or three quarters of the model's window when that is less. The summary may use a tenth of the
+  budget, so a long run's summary does not grow with each compaction until every step compacts. A compaction keeps the
+  newest messages that fit next to the system prompt, the tool definitions and its note in 85 % of the budget, and
+  never less than the model's last reply with its results, so the steps after it have room. It is tried three times;
+  when the fast model gives no text, a summary far over that limit, an error or a timeout, the run's own model writes
+  it and the `compacted` event names the fast model's problem; when neither writes one, a mechanical summary takes its
+  place and the timeline says so with the reason. Next to the summary a continuity note keeps the
   goal, the plan with the state of each step and its targets, and your messages, and of the work already done and the
   paths touched the newest that fit in another tenth of the budget (it says how many earlier ones it leaves out), and a
   check lists names, paths and links in the summary that the conversation never had. The `compacted` event names the
