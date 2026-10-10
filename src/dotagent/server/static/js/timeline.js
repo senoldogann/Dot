@@ -656,6 +656,12 @@ export function createTimeline({ rootRunId, startedAt, onGrow, onPlan, onStats, 
       note(scope, record.ts, "key", text, "warn");
     },
 
+    // TypeSafe rejected a request of the typed judge or of judge_items, or answered outside its reference (`error`): an
+    // error of the code or the model, logged with the request; nothing is paused.
+    judge_error(scope, record) {
+      note(scope, record.ts, "key", `TypeSafe rejected a request (the log has it): ${record.data.error}`, "warn");
+    },
+
     // The progress watchdog saw that the run is not getting anywhere (`detail`) and answered with a rung of its ladder
     // (`action`); the consult rung brings the advice of the review model, or the `error` that ended the run. An event
     // without `action` comes from the older stall guard, which only counted its `warnings`.

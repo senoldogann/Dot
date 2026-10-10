@@ -31,7 +31,7 @@ from dotagent.tools.registry import ToolRegistry, build_registry, specs_for_mode
 _DEFAULT: AppConfig = load_default_config()
 # Every built-in tool: the desktop ones exist only when the desktop is enabled.
 REGISTRY: ToolRegistry = build_registry(
-    _tool_groups(_DEFAULT.model_copy(update={"desktop": _DEFAULT.desktop.model_copy(update={"enabled": True})}))
+    _tool_groups(_DEFAULT.model_copy(update={"desktop": _DEFAULT.desktop.model_copy(update={"enabled": True})}), True)
 )
 # What a task run is offered when it is not a session of a campaign: the loop leaves the campaign tools out.
 TASK_SPECS: tuple[ToolSpec, ...] = tuple(
@@ -97,6 +97,7 @@ def test_the_core_group_holds_what_most_runs_need_and_is_about_a_third_of_the_to
         "mark_plan_step",
         "use_tools",
         "skill",
+        "judge_items",
     }
     # web_crawl and web_extract (item 41) and write_notes (item 34) joined the core: measured share 0.412 before the
     # notes tool, with the descriptions of the crawler's tools trimmed.

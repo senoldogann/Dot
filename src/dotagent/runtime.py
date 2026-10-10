@@ -7,7 +7,7 @@ from pathlib import Path
 from zoneinfo import ZoneInfo
 
 from dotagent.agent.approvals import ApprovalBroker
-from dotagent.agent.judge import Judge, judge_for
+from dotagent.agent.judge import Judge, TypeSafeService, judge_for
 from dotagent.browser.pool import BrowserPool
 from dotagent.browser.session import BrowserSession
 from dotagent.config import AppConfig
@@ -49,6 +49,7 @@ from dotagent.tools.consult import build_consult_tools
 from dotagent.tools.delegate import build_delegate_tools
 from dotagent.tools.desktop import build_desktop_tools, sized_for_agent
 from dotagent.tools.files import build_file_tools
+from dotagent.tools.judge_items import build_judge_items_tool
 from dotagent.tools.mcp import build_mcp_tools
 from dotagent.tools.memory import build_memory_tools
 from dotagent.tools.meta import build_meta_tools
@@ -73,6 +74,8 @@ class Runtime:
     approvals: ApprovalBroker
     router: ModelRouter
     judge: Judge
+    # TypeSafe's service, shared by the judge and judge_items; ``None`` when neither is on.
+    typesafe: TypeSafeService | None
     # The browser sessions: ``browser`` is the main one (the configured mode), ``browsers`` gives the one of a mode.
     browser: BrowserSession
     browsers: BrowserPool
@@ -93,10 +96,10 @@ class Runtime:
     notify: Notifier
 
 
-def _tool_groups(config: AppConfig) -> tuple[tuple[RegisteredTool, ...], ...]:
+def _tool_groups(config: AppConfig, judge_items: bool) -> tuple[tuple[RegisteredTool, ...], ...]:
     """The tools of this installation: the terminal tools only exist when a chat may open a terminal session, the
-    code_fetch tool only when [policy] code_sources names an application, the Mac desktop tools only when the desktop
-    is enabled."""
+    code_fetch tool only when [policy] code_sources names an application, judge_items only when TypeSafe's key is saved
+    (``judge_items``), the Mac desktop tools only when the desktop is enabled."""
     core: tuple[tuple[RegisteredTool, ...], ...] = (
         build_file_tools(),
         (build_shell_tool(),),
@@ -112,6 +115,7 @@ def _tool_groups(config: AppConfig) -> tuple[tuple[RegisteredTool, ...], ...]:
         (build_skill_tool(),),
         *((build_terminal_tools(),) if config.shell.terminal_sessions > 0 else ()),
         *((build_code_tools(),) if config.policy.code_sources else ()),
+        *(((build_judge_items_tool(),),) if judge_items else ()),
     )
     if not config.desktop.enabled:
         return core
@@ -169,6 +173,7 @@ async def open_runtime(config: AppConfig, login_env: dict[str, str]) -> Runtime:
     schedule_zone: ZoneInfo = await asyncio.to_thread(resolve_zone, config.scheduler.timezone)
     shell_env: dict[str, str] = child_env(login_env, config.shell.pass_env)
     ollama_key: str | None = await asyncio.to_thread(resolve_secret, config.providers.ollama.api_key_env)
+    typesafe_key: str | None = await asyncio.to_thread(resolve_secret, config.judge.api_key_env)
     plugins: PluginCatalog = await asyncio.to_thread(load_plugins, config.plugins, config.mcp)
     for problem in plugins.problems:
         log.warning("plugin_skipped", path=str(problem.path), reason=problem.reason)
@@ -179,8 +184,13 @@ async def open_runtime(config: AppConfig, login_env: dict[str, str]) -> Runtime:
         cleanup.push_async_callback(mcp.close)
         memory: MemoryIndex = await open_memory_index(store, config)
         cleanup.push_async_callback(close_memory_index, memory)
-        registry: ToolRegistry = build_registry((*_tool_groups(config), build_mcp_tools(mcp)))
+        registry: ToolRegistry = build_registry((*_tool_groups(config, typesafe_key is not None), build_mcp_tools(mcp)))
         bus: EventBus = EventBus(store)
+        typesafe: TypeSafeService | None = (
+            TypeSafeService(config.judge, config.models.helper_cooldown_s, bus)
+            if typesafe_key is not None or config.judge.provider == "typesafe"
+            else None
+        )
         browsers: BrowserPool = BrowserPool(config.browser, downloads_dir())
         runtime: Runtime = Runtime(
             config=config,
@@ -188,7 +198,8 @@ async def open_runtime(config: AppConfig, login_env: dict[str, str]) -> Runtime:
             bus=bus,
             approvals=ApprovalBroker(store, bus, config.policy.approval_timeout_s),
             router=ModelRouter(config, _call_recorder(store, bus)),
-            judge=judge_for(config, bus),
+            judge=judge_for(config, typesafe),
+            typesafe=typesafe,
             browser=browsers.main,
             browsers=browsers,
             desktop=DesktopSession(sized_for_agent(config), failsafe_path()),
@@ -218,5 +229,7 @@ async def close_runtime(runtime: Runtime) -> None:
     await runtime.web.aclose()
     await runtime.router.aclose()
     await runtime.judge.aclose()
+    if runtime.typesafe is not None:
+        await runtime.typesafe.aclose()
     await close_memory_index(runtime.memory)
     await runtime.store.close()

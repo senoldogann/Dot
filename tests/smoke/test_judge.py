@@ -1,8 +1,9 @@
-"""The typed judge on TypeSafe's wire, against a local stand-in that answers as TypeSafe's API reference documents
-(``POST /v1/systemone``, a bearer key, Noul answers): a click on a control no pattern knows gets the flag the judge finds
-while a known one is left to the patterns, a refused key makes the judge unavailable for the cooldown until a new key,
-and a campaign claim the judge finds unlikely is refused before the goal checker. A real headless Chrome is used; no
-model is called.
+"""The typed judge and the judge_items tool on TypeSafe's wire, against a local stand-in that answers as TypeSafe's API
+reference documents (``POST /v1/systemone``, a bearer key, Noul and Score answers, 422 for a body it rejects): a click
+on a control no pattern knows gets the flag the judge finds while a known one is left to the patterns, a refused key
+makes the judge unavailable for the cooldown until a new key, a campaign claim the judge finds unlikely is refused
+before the goal checker, judge_items ranks a list with one question per item in one request, and a rejected request is
+an error event that pauses nothing. A real headless Chrome is used; no model is called.
 """
 
 import asyncio
@@ -18,7 +19,14 @@ import pytest_asyncio
 from pydantic import JsonValue
 
 from dotagent.agent.gate import RunGate
-from dotagent.agent.judge import JUDGE_UNAVAILABLE_EVENT, ClickFacts, ClickJudgment, TypeSafeJudge
+from dotagent.agent.judge import (
+    JUDGE_ERROR_EVENT,
+    JUDGE_UNAVAILABLE_EVENT,
+    ClickFacts,
+    ClickJudgment,
+    TypeSafeJudge,
+    TypeSafeService,
+)
 from dotagent.agent.review import ReviewRequest, ReviewVerdict
 from dotagent.agent.verify import new_facts
 from dotagent.config import JudgeConfig, load_config
@@ -30,6 +38,7 @@ from dotagent.store.models import CampaignRecord, EventRecord, RunRecord, Thread
 from dotagent.tools.base import PreparedCall, ToolResult
 from dotagent.tools.campaign import CAMPAIGN_ACHIEVED_TOOL
 from dotagent.tools.context import ToolContext
+from dotagent.tools.judge_items import JUDGE_ITEMS_TOOL
 
 pytestmark = [pytest.mark.browser, pytest.mark.asyncio(loop_scope="module")]
 
@@ -40,6 +49,11 @@ REFUSED_ENV: str = "DOT_TEST_TYPESAFE_REFUSED_KEY"
 # The probability of yes the stand-in gives, by the label of the control and the question; anything else gets 0.05.
 _YES: dict[str, dict[str, float]] = {"Boost": {"public_post": 0.95}}
 _CLAIM_PROBABILITY: float = 0.1
+# The stand-in finds a candidate of judge_items on topic when its text has this word; a question with this mark is a
+# body it rejects, as TypeSafe does with HTTP 422.
+_TOPIC: str = "python"
+_REJECTED: str = "[reject]"
+_LEVELS: tuple[str, ...] = ("unrelated", "mentions Python in passing", "about Python")
 _PAGE: bytes = b"""<!doctype html><title>Timeline</title><h1>Timeline</h1><p>A post worth sharing.</p>
 <button type="button">Boost</button> <button type="button">Post</button> <a href="/next">Next page</a>"""
 
@@ -57,12 +71,34 @@ class _Service(ThreadingHTTPServer):
         return f"http://127.0.0.1:{self.server_address[1]}"
 
 
+def _candidate(state: JsonValue, question: str) -> str | None:
+    candidates: JsonValue = state.get("candidates") if isinstance(state, dict) else None
+    text: JsonValue = candidates.get(question) if isinstance(candidates, dict) else None
+    return text if isinstance(text, str) else None
+
+
 def _answer(state: JsonValue, question: str) -> float:
     if question == "targets_reached":
         return _CLAIM_PROBABILITY
+    candidate: str | None = _candidate(state, question)
+    if candidate is not None:
+        return 0.9 if _TOPIC in candidate.lower() else 0.1
     control: JsonValue = state.get("control") if isinstance(state, dict) else None
     label: JsonValue = control.get("label") if isinstance(control, dict) else None
     return _YES.get(label, {}).get(question, 0.05) if isinstance(label, str) else 0.05
+
+
+def _score(state: JsonValue, question: str, criteria: list[str]) -> JsonObject:
+    candidate: str | None = _candidate(state, question)
+    on_topic: bool = candidate is not None and _TOPIC in candidate.lower()
+    weights: list[float] = [0.1, 0.1, 0.8] if on_topic else [0.7, 0.3, 0.0]
+    return {
+        "type": "score",
+        "score": sum(level * weight for level, weight in enumerate(weights)),
+        "confidence": max(weights),
+        "legend": {str(level): text for level, text in enumerate(criteria)},
+        "probabilities": {str(level): weight for level, weight in enumerate(weights)},
+    }
 
 
 class _Handler(BaseHTTPRequestHandler):
@@ -81,9 +117,19 @@ class _Handler(BaseHTTPRequestHandler):
             return
         questions: JsonValue = body["questions"]
         assert isinstance(questions, dict)
-        answers: JsonObject = {
-            question: {"type": "noul", "noul": _answer(body["state"], question)} for question in questions
-        }
+        if any(isinstance(spec, dict) and _REJECTED in str(spec["instructions"]) for spec in questions.values()):
+            detail: bytes = json.dumps({"detail": [{"loc": ["body", "questions"], "msg": "rejected"}]}).encode()
+            self._send(422, "application/json", detail)
+            return
+        answers: JsonObject = {}
+        for question, spec in questions.items():
+            assert isinstance(spec, dict)
+            if spec["type"] == "score":
+                criteria: JsonValue = spec["criteria"]
+                assert isinstance(criteria, list) and all(isinstance(level, str) for level in criteria)
+                answers[question] = _score(body["state"], question, [str(level) for level in criteria])
+            else:
+                answers[question] = {"type": "noul", "noul": _answer(body["state"], question)}
         reply: JsonObject = {
             "model": "jev-1.13.0",
             "answers": answers,
@@ -118,7 +164,7 @@ async def runtime(service: _Service, tmp_path_factory: pytest.TempPathFactory) -
     home: Path = tmp_path_factory.mktemp("home")
     (home / "config.toml").write_text(
         f'[browser]\nheadless = true\n\n[judge]\nprovider = "typesafe"\nbase_url = "{service.base}"\n'
-        f'api_key_env = "{KEY_ENV}"\n',
+        f'api_key_env = "{KEY_ENV}"\nitems_per_request = 3\n',
         encoding="utf-8",
     )
     patch: pytest.MonkeyPatch = pytest.MonkeyPatch()
@@ -224,7 +270,7 @@ async def test_a_refused_key_makes_the_judge_unavailable_for_the_cooldown_until_
 ) -> None:
     ctx: ToolContext = await _context(runtime, None)
     config: JudgeConfig = runtime.config.judge.model_copy(update={"api_key_env": REFUSED_ENV})
-    judge: TypeSafeJudge = TypeSafeJudge(config, 600.0, runtime.bus)
+    judge: TypeSafeJudge = TypeSafeJudge(TypeSafeService(config, 600.0, runtime.bus), config)
     facts: ClickFacts = ClickFacts(label="Boost", role="button", url=f"{service.base}/")
     before: int = len(service.requests)
     try:
@@ -265,3 +311,90 @@ async def test_a_campaign_claim_the_judge_finds_unlikely_is_refused_before_the_g
     assert isinstance(state, dict) and isinstance(body["questions"], dict)
     assert list(body["questions"]) == ["targets_reached"]
     assert state["claim"] == claim and "50 leads in leads.csv" in str(state["targets"])
+
+
+_POSTS: list[JsonObject] = [
+    {"id": "p1", "text": "uv 0.5 ships a lockfile format that replaces requirements.txt (Python)"},
+    {"id": "p2", "text": "My cat learned to open the fridge"},
+    {"id": "p3", "text": "Why Python wheels beat sdists: a packaging story"},
+    {"id": "p4", "text": "Weekend hike photos from the Alps"},
+]
+
+
+async def test_judge_items_ranks_a_list_with_one_question_per_item_in_requests_of_the_configured_size(
+    runtime: Runtime, service: _Service
+) -> None:
+    ctx: ToolContext = await _context(runtime, None)
+    before: int = len(service.requests)
+    question: str = "Is this post about Python?"
+    prepared: PreparedCall = await runtime.registry.tools[JUDGE_ITEMS_TOOL].prepare(
+        {"question": question, "items": _POSTS}, ctx
+    )
+    assert (prepared.action.kind, prepared.action.risk, prepared.action.flags) == ("network", "low", ())
+    assert prepared.action.summary == f"Judge 4 items with TypeSafe: {question}"
+    result: ToolResult = await prepared.run(ctx)
+    assert not result.is_error
+    lines: list[str] = result.text.splitlines()
+    # Four items at three per request: two requests, the on-topic posts first.
+    assert lines[0] == f"4 items judged on “{question}” in 2 requests; the probability of yes, the likeliest yes first:"
+    assert [line.split()[1] for line in lines[1:]] == ["p1", "p3", "p2", "p4"]
+    assert lines[1] == "1. p1 0.90 — uv 0.5 ships a lockfile format that replaces requirements.t…"
+    assert len(service.requests) == before + 2
+    path, authorization, body = service.requests[before]
+    assert (path, authorization, body["model"]) == ("/v1/systemone", f"Bearer {KEY}", runtime.config.judge.model)
+    assert body["state"] == {"candidates": {post["id"]: post["text"] for post in _POSTS[:3]}}
+    questions: JsonValue = body["questions"]
+    assert isinstance(questions, dict) and list(questions) == ["p1", "p2", "p3"]
+    assert questions["p3"] == {"type": "noul", "instructions": f"About the candidate at `candidates.p3`: {question}"}
+    _, _, second = service.requests[before + 1]
+    assert second["state"] == {"candidates": {"p4": _POSTS[3]["text"]}}
+    # With levels the same list is rated: a Score question per item, its criteria the levels, the likeliest named.
+    rated: PreparedCall = await runtime.registry.tools[JUDGE_ITEMS_TOOL].prepare(
+        {"question": "How much is this post about Python?", "items": _POSTS[:3], "levels": [*_LEVELS]}, ctx
+    )
+    scores: ToolResult = await rated.run(ctx)
+    assert not scores.is_error
+    scored: list[str] = scores.text.splitlines()
+    assert scored[0].startswith(
+        "3 items rated on “How much is this post about Python?” in 1 request; the expected level"
+    )
+    assert scored[1:] == [
+        "1. p1 1.70 (about Python) — uv 0.5 ships a lockfile format that replaces requirements.t…",
+        "2. p3 1.70 (about Python) — Why Python wheels beat sdists: a packaging story",
+        "3. p2 0.30 (unrelated) — My cat learned to open the fridge",
+    ]
+    _, _, rated_body = service.requests[-1]
+    rated_questions: JsonValue = rated_body["questions"]
+    assert isinstance(rated_questions, dict)
+    assert rated_questions["p2"] == {
+        "type": "score",
+        "instructions": "About the candidate at `candidates.p2`: How much is this post about Python?",
+        "criteria": [*_LEVELS],
+    }
+
+
+async def test_a_request_typesafe_rejects_is_an_error_event_and_pauses_neither_the_tool_nor_the_judge(
+    runtime: Runtime, service: _Service
+) -> None:
+    ctx: ToolContext = await _context(runtime, None)
+    rejected: PreparedCall = await runtime.registry.tools[JUDGE_ITEMS_TOOL].prepare(
+        {"question": f"{_REJECTED} Is this about Python?", "items": _POSTS[:2]}, ctx
+    )
+    result: ToolResult = await rejected.run(ctx)
+    assert result.is_error
+    assert result.text.startswith("TypeSafe rejected the request or answered outside its reference"), result.text
+    assert "HTTP 422" in result.text
+    errors: list[EventRecord] = await runtime.store.events_of_kind(ctx.run_id, JUDGE_ERROR_EVENT, 10)
+    paused: list[EventRecord] = await runtime.store.events_of_kind(ctx.run_id, JUDGE_UNAVAILABLE_EVENT, 10)
+    assert len(errors) == 1 and paused == []
+    assert str(errors[0].data["error"]).startswith("provider answered HTTP 422")
+    # The next request goes out: the judge still answers, and so does the tool.
+    before: int = len(service.requests)
+    facts: ClickFacts = ClickFacts(label="Boost", role="button", url=f"{service.base}/")
+    judgment: ClickJudgment = await runtime.judge.judge_click(facts, ctx.run_id)
+    assert judgment.reasons == ("post",)
+    again: PreparedCall = await runtime.registry.tools[JUDGE_ITEMS_TOOL].prepare(
+        {"question": "Is this about Python?", "items": _POSTS[:2]}, ctx
+    )
+    assert not (await again.run(ctx)).is_error
+    assert len(service.requests) == before + 2
