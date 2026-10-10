@@ -12,17 +12,14 @@ SKILL_NAME_PATTERN: str = r"^[a-z0-9]+(-[a-z0-9]+)*$"
 
 
 class SkillFrontmatter(FrozenModel):
-    """The YAML frontmatter of a SKILL.md as the Agent Skills specification defines it. Keys the specification does not
-    name are ignored, so a skill written for another agent still loads."""
+    """The keys of a SKILL.md's YAML frontmatter that Dot reads, as the Agent Skills specification defines them. Every
+    other key is ignored, whatever it holds, so a skill written for another agent still loads: skills written for Claude
+    Code put dates and nested maps under ``metadata``, where the specification asks for strings."""
 
     model_config = ConfigDict(frozen=True, extra="ignore")
 
     name: str = Field(min_length=1, max_length=64, pattern=SKILL_NAME_PATTERN)
     description: str = Field(min_length=1, max_length=1024)
-    license: str | None = None
-    compatibility: str | None = Field(default=None, max_length=500)
-    metadata: dict[str, str] = Field(default_factory=dict)
-    allowed_tools: str | None = Field(default=None, alias="allowed-tools")
 
 
 class Skill(FrozenModel):

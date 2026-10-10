@@ -60,6 +60,14 @@ def test_a_real_world_frontmatter_is_read_and_unknown_keys_are_ignored(tmp_path:
     assert (skill.root, skill.source) == (file.parent, "home")
 
 
+def test_a_skill_written_for_claude_code_loads_with_a_date_and_a_nested_map_in_its_metadata(tmp_path: Path) -> None:
+    text: str = (
+        "---\nname: x-growth\ndescription: Grow an audience on X.\nmetadata:\n  updated: 2026-03-10\n  openclaw:\n"
+        "    requires: {bins: [x-cli]}\nallowed-tools: [Bash, Read]\n---\nPost what people want to read.\n"
+    )
+    assert parse_skill(tmp_path / "x-growth" / "SKILL.md", text, "home").name == "x-growth"
+
+
 def test_a_byte_order_mark_before_the_frontmatter_is_tolerated(tmp_path: Path) -> None:
     file: Path = tmp_path / "tidy" / "SKILL.md"
     assert parse_skill(file, "﻿" + _simple("tidy"), "home").name == "tidy"
@@ -74,7 +82,6 @@ def test_a_byte_order_mark_before_the_frontmatter_is_tolerated(tmp_path: Path) -
         ("---\n- a list\n---\nbody\n", "not a mapping"),
         ("---\nname: Tidy\ndescription: x\n---\nbody\n", "does not follow the Agent Skills specification"),
         ("---\nname: tidy\n---\nbody\n", "does not follow the Agent Skills specification"),
-        ("---\nname: tidy\ndescription: x\nmetadata:\n  n: 1\n---\nbody\n", "does not follow"),
         ("---\nname: other\ndescription: x\n---\nbody\n", "not the name of its folder"),
         ("---\nname: tidy\ndescription: x\n---\n\n   \n", "no instructions after the frontmatter"),
     ],

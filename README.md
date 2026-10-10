@@ -993,10 +993,14 @@ MCP results are untrusted content, and the stderr of a stdio server goes to `<lo
 ## Skills and plugins
 
 A skill is a folder of instructions for one kind of work, in the Agent Skills layout: `<name>/SKILL.md` with a YAML
-frontmatter (`name`, `description`) and optional `scripts/`, `references/` and `assets/`. Every model sees the
-`name: description` line of each skill and reads the rest with the `skill` tool when a task matches. Dot always looks
-in `<home>/skills` and in the `skills/` folder of every plugin; `[skills] dirs` lists more directories (each holds
-skill folders; `~` expands).
+frontmatter (`name`, `description`) and optional `scripts/`, `references/` and `assets/`. Every model sees the `name:
+description` line of each skill and reads the rest with the `skill` tool when a task matches. Dot always looks in
+`<home>/skills` and in the `skills/` folder of every plugin; `[skills] dirs` lists more directories (each holds skill
+folders; `~` expands). Skills written for Claude Code load unchanged: Dot reads only `name` and `description` of the
+frontmatter, so other keys (a date or a nested map under `metadata`, a list of `allowed-tools`) do not leave a skill
+out. To use your own, put `dirs = ["~/.claude/skills"]` under `[skills]` in your `config.toml`; Dot reads nothing there
+until you do. The X skills of Claude Code (`x-twitter-growth`, `baoyu-post-to-x`) are then the playbook a campaign on X
+can work from, within the pace of [Safety](#safety).
 
 A plugin is a folder in the Claude Code layout: `.claude-plugin/plugin.json` (its name), `skills/<name>/SKILL.md` and
 `.mcp.json` (`{"mcpServers": {...}}`; `${CLAUDE_PLUGIN_ROOT}` is the plugin folder). Their skills and MCP servers are
