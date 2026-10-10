@@ -9,7 +9,7 @@ one with :func:`next_session_at`.
 
 from collections.abc import Sequence
 
-from dotagent.core.text import truncate_tail
+from dotagent.core.text import fold_search, truncate_tail
 from dotagent.core.types import FrozenModel
 from dotagent.store.models import ApprovalStatus, BrowserMode, CampaignEntry, CampaignRecord, RunRecord, RunStatus
 
@@ -47,10 +47,10 @@ class LastSession(FrozenModel):
 class Brief(FrozenModel):
     """What the opening message of a session is made of. ``files`` are the paths of the files the owner attached to
     the goal; ``instructions`` are the messages the owner sent in the campaign's conversation after its goal;
-    ``strategy`` and ``progress`` are the newest entries of these kinds, which the brief shows also when they are
-    older than ``entries``; ``without_progress`` is how many sessions in a row wrote no ``progress`` entry, and
-    ``patience`` how many of them the campaign accepts before it asks for a new strategy; ``browser`` is the Chrome
-    the session works in."""
+    ``strategies`` are every strategy entry of the ledger, oldest first, and ``progress`` the newest progress entry,
+    which the brief shows also when it is older than ``entries``; ``without_progress`` is how many sessions in a row
+    wrote no ``progress`` entry, and ``patience`` how many of them the campaign accepts before it asks for a
+    different route; ``browser`` is the Chrome the session works in."""
 
     goal: str
     browser: BrowserMode
@@ -60,7 +60,7 @@ class Brief(FrozenModel):
     session: int
     now: float
     instructions: tuple[str, ...]
-    strategy: CampaignEntry | None
+    strategies: tuple[CampaignEntry, ...]
     progress: CampaignEntry | None
     entries: tuple[CampaignEntry, ...]
     questions: tuple[BriefQuestion, ...]
@@ -145,8 +145,8 @@ def render_brief(brief: Brief) -> str:
             "What the owner wrote in the campaign's conversation since its goal (instructions):\n"
             + "\n".join(f"- {text}" for text in brief.instructions)
         )
-    if brief.strategy is not None:
-        parts.append(f"Strategy (the newest): {brief.strategy.text}")
+    if brief.strategies:
+        parts.append(f"Strategy (the newest): {brief.strategies[-1].text}")
     shown: set[str] = {entry.id for entry in brief.entries}
     if brief.progress is not None and brief.progress.id not in shown:
         parts.append(f"Progress (the newest, before the entries below):\n{entry_line(brief.progress, brief.now)}")
@@ -165,11 +165,47 @@ def render_brief(brief: Brief) -> str:
     if brief.last is not None:
         parts.append(_last_line(brief.last, brief.now))
     if brief.without_progress >= brief.patience:
-        parts.append(
-            f"No session wrote a progress entry for {brief.without_progress} sessions. Before anything else, write a "
-            "new strategy entry with campaign_note (kind strategy) that tries another way, and follow it."
-        )
+        parts.append(_change_of_route(brief))
     return "\n\n".join(parts)
+
+
+def routes_without_progress(
+    strategies: Sequence[CampaignEntry], last_progress_at: float | None
+) -> tuple[CampaignEntry, ...]:
+    """The strategy entries written since the newest progress entry (all of them when there is none): the routes that
+    brought nothing."""
+    return tuple(entry for entry in strategies if last_progress_at is None or entry.ts > last_progress_at)
+
+
+def route_refused(text: str, tried: Sequence[CampaignEntry]) -> bool:
+    """Whether a strategy repeats one of the routes ``tried``, folded as search folds (case, accents and the Turkish
+    i do not matter)."""
+    folded: str = fold_search(text)
+    return any(fold_search(entry.text) == folded for entry in tried)
+
+
+def _change_of_route(brief: Brief) -> str:
+    """What a brief says once the sessions without progress reach the patience: the routes tried since the newest
+    progress, which are refused, and the call for a different one."""
+    tried: tuple[CampaignEntry, ...] = routes_without_progress(
+        brief.strategies, None if brief.progress is None else brief.progress.ts
+    )
+    sessions: str = "session" if brief.without_progress == 1 else "sessions"
+    opening: str = f"No session wrote a progress entry for {brief.without_progress} {sessions}."
+    if tried:
+        listed: str = "\n".join(entry_line(entry, brief.now) for entry in tried)
+        routes: str = (
+            f" The routes tried since the newest progress, oldest first, brought nothing and are refused (campaign_note "
+            f"does not take them again):\n{listed}\n"
+        )
+    else:
+        routes = " No strategy entry says which route they took.\n"
+    return (
+        f"{opening}{routes}"
+        "Before anything else, take a different route: another channel (a site's API, a command or a skill instead of "
+        "its pages), another source or another approach. Write it as a new strategy entry with campaign_note (kind "
+        "strategy), then follow it."
+    )
 
 
 def campaign_browser(daemon_mode: BrowserMode, campaign: CampaignRecord) -> BrowserMode:

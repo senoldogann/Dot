@@ -1052,7 +1052,10 @@ your conversation; the daemon runs the sessions after it, each a run in a thread
   questions it left for you and none answered yet, is followed after `campaign_wait_hours` (24) instead; your answer, or
   your skip, starts the next session right away, and its brief carries it (while the session that asked works in the
   daemon, your answer goes to it). After `campaign_patience_sessions` (3) sessions in a row without a progress entry,
-  the brief asks for a new strategy first. All four live in `[agent]`.
+  the brief opens the next session with a change of route: it lists the strategies written since the newest progress,
+  which are refused (`campaign_note` does not take one of them again while the campaign is stuck), and asks for another
+  channel (a site's API, a command or a skill instead of its pages), another source or another approach, written as a
+  new strategy entry first. All four live in `[agent]`.
 - **Only a verified outcome ends it.** `campaign_achieved` asks the goal checker (the review model) whether the targets
   are reached, from the targets and how they are verified, the progress in the ledger, the session's plan with the
   evidence of its steps, what the session's own calls measured and the session's evidence. Refused, the call fails with the checker's reason and the session goes on (one

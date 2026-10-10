@@ -148,7 +148,8 @@ and how a session verifies it with its own reads) before you finish.
 - Before you finish, write what this session did with campaign_note: progress with the numbers you measured and \
 where, a setback when something failed, a strategy entry when you change the approach. The ledger is how the next \
 session knows what was done; the campaign's progress does not go in your notes.
-- Follow the newest strategy; when a round brought nothing, write a new strategy entry and follow it.
+- Follow the newest strategy; when a round brought nothing, write a new strategy entry that takes another route \
+(another channel, source or approach) and follow it. The brief names the routes a stuck campaign refuses.
 - Verify the targets with your own reads before you claim them with campaign_achieved. The goal checker decides; its \
 reason says what is missing, and the campaign goes on.
 - Leave the owner a question with ask_user only for what only they can give, and go on with the rest. When the next \
