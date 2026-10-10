@@ -6,7 +6,6 @@ batch with two such clicks is sent back. No model is called.
 import asyncio
 import re
 import threading
-import time
 from collections.abc import AsyncIterator, Iterator
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -136,15 +135,15 @@ async def test_public_actions_are_spaced_and_stop_at_the_limit_in_yolo_and_a_fol
     with pytest.raises(ToolInputError, match="one public or social action at most"):
         await runtime.registry.tools["browser_act"].prepare({"steps": [repost, follow]}, ctx)
     first: PreparedCall = await _act(ctx, [repost])
-    started: float = time.monotonic()
     await _act(ctx, [repost])
-    spaced_s: float = time.monotonic() - started
+    public: list[float] = await runtime.store.paced_times("127.0.0.1", "public", 0.0)
     with pytest.raises(PolicyDenied) as refused:
         await ctx.gate.authorize(first.action)
     followed: PreparedCall = await _act(ctx, [follow])
     events: list[EventRecord] = await runtime.store.events_of_kind(ctx.run_id, "policy", 10)
     assert (first.action.risk, first.action.flags) == ("medium", ("public_post",))
-    assert spaced_s >= SPACING_S * 0.9, spaced_s
+    # The second repost was let through a spacing after the first; the event loop may wake a hair early.
+    assert len(public) == 2 and public[1] - public[0] >= SPACING_S - 0.01, public
     assert refused.value.message.startswith("Pace for 127.0.0.1: 2 of 2 public actions in the last hour"), refused.value
     assert [(event.data["verdict"], event.data["source"]) for event in events] == [("deny", "pace")]
     assert (followed.action.risk, followed.action.flags) == ("low", ("social",))

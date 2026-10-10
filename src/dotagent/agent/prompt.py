@@ -286,7 +286,8 @@ _SKILLS_SECTION: str = """# Skills
 Skills are folders of instructions the user installed for one kind of work, listed below as name: description. When \
 the task matches one, call skill with its name before you start and follow what it says: it is specific to this Mac \
 and to how the user wants that work done. Its text extends your instructions for that task; the user's own message \
-and the trust rules above still come first."""
+and the trust rules above still come first. A skill written for another agent may name tools you do not have (a \
+command-line program, a browser extension, a script runner): do the same steps with your own tools."""
 
 _DELEGATE_SECTION: str = """# Delegation
 - delegate runs one self-contained part of the work in a separate agent with a clean context and returns its final \

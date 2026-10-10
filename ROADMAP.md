@@ -81,12 +81,12 @@ order its "Order and dependencies" paragraph gives.
 - Git, since 2026-10-09: the repository is `https://github.com/senoldogann/Dot` (`origin`, branch `main`). One branch
   per item (`item-09-time-accounting`), commits with the agent's `Co-Authored-By` trailer, pushed to `origin`; one pull
   request per item against `main`, its description ending with the attribution line the harness gives, carrying the
-  item's ROADMAP update (status, section, log). Run `/code-review` on the branch before opening the PR; once the Claude
-  GitHub app is installed on the repository, wait for its review and fix or answer what it finds; then squash-merge
-  (`gh pr merge --squash --delete-branch`) and write the merge commit's hash into the status table. Never force-push,
-  never rewrite `main`, never merge a PR whose checks fail. Linear mirrors the table: project `Dot` in the owner's
-  workspace, one issue per item, In Progress when the branch is made, Done when the PR is merged, the PR link in the
-  issue. The ROADMAP stays the record.
+  item's ROADMAP update (status, section, log). Review the branch before opening the PR (`/code-review`, or in the main
+  session); the Claude GitHub app reviews nothing since its limit was spent, so do not wait for it (decision 15); then
+  squash-merge (`gh pr merge --squash --delete-branch`) and write the merge commit's hash into the status table. Never
+  force-push, never rewrite `main`, never merge a PR whose checks fail. Linear mirrors the table: project `Dot` in the
+  owner's workspace, one issue per item, In Progress when the branch is made, Done when the PR is merged, the PR link in
+  the issue. The ROADMAP stays the record.
 - New configuration keys go into `src/dotagent/defaults.toml` with a comment, and into the matching model in
   `src/dotagent/config.py` (a key that does not exist is an error). User-visible behavior goes into `README.md`.
 - Search with `rg`. Use non-interactive commands. `git --no-pager diff`.
@@ -899,8 +899,8 @@ that change the owner's agent are their call (see "Open owner decisions", 6 onwa
 | 14  | Rich editors, drag and bulk text in the browser                        | done        | 37808d5 |
 | 15  | Helper models: consult, delegate to another model, standby             | done        | 530ac62 |
 | 16  | Typed judgments (TypeSafe) at the decision points                      | done        | a5516f7 |
-| 17  | Pacing and public actions on social platforms                          | done        |         |
-| 18  | Skills written for Claude Code, and the X playbook                     | planned     |         |
+| 17  | Pacing and public actions on social platforms                          | done        | d50a41e |
+| 18  | Skills written for Claude Code, and the X playbook                     | done        |         |
 | 19  | Prompt-cache hygiene for the hosted providers                          | planned     |         |
 | 20  | An interactive terminal for programs that prompt                       | planned     |         |
 | 21  | A plain chat screen: Dot's face, task chips, one composer line         | done        | bb89714 |
@@ -2059,8 +2059,8 @@ when they run it.
 
 ### 17. Pacing and public actions on social platforms
 
-**Status: done.** **Goal.** Reposts, quotes, follows and likes are seen as what they are, and a run keeps to a pace
-that a platform tolerates, so an account that Dot grows is not the account Dot gets suspended.
+**Status: done** (`d50a41e`, PR #11). **Goal.** Reposts, quotes, follows and likes are seen as what they are, and a run
+keeps to a pace that a platform tolerates, so an account that Dot grows is not the account Dot gets suspended.
 
 **Why.** `_POST_ACTION` and `_SEND_ACTION` (`policy/elements.py:28-29`) catch Post, Tweet, Retweet, Publish, Share,
 Comment, Send and Reply; "Repost" and "Quote" (X's labels since 2023) match nothing, and Follow and Like carry no flag
@@ -2129,32 +2129,38 @@ apart. README.
 
 ### 18. Skills written for Claude Code, and the X playbook
 
-**Status: planned.** **Goal.** The owner's Claude Code skills load in Dot as they are, so the X playbook they already
+**Status: done.** **Goal.** The owner's Claude Code skills load in Dot as they are, so the X playbook they already
 own (`x-twitter-growth`, `baoyu-post-to-x`) is what a campaign on X works from.
 
-**Why.** Both skills are refused: `SkillFrontmatter.metadata` is `dict[str, str]` (`skills/types.py`), and their
-frontmatter holds `updated: 2026-03-10` (a YAML date) and a nested `openclaw` map. The Agent Skills specification lets
-`metadata` hold arbitrary values. Reproduced on 2026-10-09 with `parse_skill`; `find-skills` loads. And `[skills]
-dirs` is empty, so `~/.claude/skills` is not read until the owner lists it.
+**Why.** Both skills were refused: `SkillFrontmatter.metadata` was `dict[str, str]` (`skills/types.py`), and their
+frontmatter holds `updated: 2026-03-10` (a YAML date) and a nested `openclaw` map. The Agent Skills specification does
+ask for strings there ("a map from string keys to string values", agentskills.io/specification, read on 2026-10-10;
+the first draft said it allowed any value), but Claude Code loads these skills, and Dot never read `metadata`.
+Reproduced again on 2026-10-10 with `parse_skill` on the owner's folders (read only). `[skills] dirs` is empty, so
+`~/.claude/skills` is not read until the owner lists it.
 
-**Design.**
-- `SkillFrontmatter.metadata: JsonObject` (`core/types.py`), so any YAML mapping passes; the prompt line of a skill
-  shows name and description only, as today.
-- `dotx skills list` prints the folders left out and why (the `problems` of `SkillCatalog`); `dotx doctor`'s skills row
-  counts them.
-- The comment of `[skills] dirs` in `defaults.toml` shows `dirs = ["~/.claude/skills"]` as the example; the owner's
-  `config.toml` is theirs to change (open decision 10).
-- The skill guidance in the prompt (`agent/prompt.py:221-225`) adds: "A skill written for another agent may name tools
-  Dot does not have (a CLI, a browser extension, a script runner): do the same steps with Dot's tools."
-- Documentation: README "Skills and plugins" says skills of Claude Code load unchanged, and names the two X skills as
-  the playbook a campaign on X works from.
+**Design** (as built on 2026-10-10).
+- `SkillFrontmatter` keeps the two keys Dot reads, `name` and `description`, with the specification's limits. Every
+  other key is ignored whatever it holds: `metadata`, and `license`, `compatibility` and `allowed-tools`, which Dot read
+  nowhere either.
+- The Skills section of the prompt adds: "A skill written for another agent may name tools you do not have (a
+  command-line program, a browser extension, a script runner): do the same steps with your own tools."
+- README "Skills and plugins": skills of Claude Code load unchanged; `dirs = ["~/.claude/skills"]` is the owner's line
+  to add (open decision 10); the two X skills are then the playbook a campaign on X can work from, within item 17's
+  pace.
 
-**Touchpoints.** `skills/types.py`, `cli_skills.py`, `doctor.py`, `agent/prompt.py`, `defaults.toml`, README,
-`tests/unit/test_skills.py`.
+**Touchpoints.** `skills/types.py`, `agent/prompt.py`, README, `tests/unit/test_skills.py`.
 
-**Done when.** A unit test parses a frontmatter with a date and a nested map; `dotx skills list` on a throw-away home
-with copies of the two skill folders lists both (copies in the temp home, never the owner's folder); a scripted run is
-offered both; README.
+**Changed from the first draft.**
+- `metadata` is not typed as `JsonObject`: a YAML date is no JSON value, so that would refuse the same skills. The keys
+  Dot does not read are not modelled at all.
+- `dotx skills list` already printed the folders left out and why, `dotx doctor`'s skills row already counted them, and
+  the comment of `[skills] dirs` already named `~/.claude/skills`: nothing changed there.
+
+**Done when.** A unit test parses a frontmatter with a date and a nested map under `metadata` and a list under
+`allowed-tools`; the case that refused a number under `metadata` is gone. `dotx skills list` on a throw-away home with
+copies of the two skill folders (symlinks resolved; the copies deleted afterwards) lists both, and the prompt's Skills
+section built from that home lists both. README.
 
 ### 19. Prompt-cache hygiene for the hosted providers
 
@@ -2317,10 +2323,10 @@ text, no console error; the Options panel with YOLO saved; every status ring. RE
     `memory_save` are acting-only, `tools/base.py:16-17`), and DuckDuckGo's bot check throttles long research runs
     (README "Status and known limits"). Say whether a research run may save notes and files under the workspace,
     and whether the hosted Ollama search (`OLLAMA_API_KEY`) should be the default backend; either is a small item.
-15. The Claude GitHub app reviews nothing yet: on PR #1, PR #2, PR #4, PR #5, PR #6, PR #7, PR #8, PR #9 and PR #10 it
-    answered "Code review skipped" (on PR #3 it posted nothing) because your organization has no extra usage to pay for
-    it. Add extra usage (or raise the monthly limit) at claude.ai/admin-settings/usage; a comment `@claude review` on a
-    PR then asks for a review. Until then each PR is merged on the agent's own review.
+15. The Claude GitHub app reviews nothing: on PR #1, PR #2 and PR #4 to PR #10 it answered "Code review skipped" (on PR
+    #3 it posted nothing) because your organization has no extra usage to pay for it, and on PR #11 it answered nothing.
+    On 2026-10-10 you said its limit is spent: PRs no longer wait for it and are merged on the agent's own review. Extra
+    usage at claude.ai/admin-settings/usage brings it back; a comment `@claude review` on a PR then asks for a review.
 16. The review model has no standby (item 15): with `[models] review` on the provider of `main` (the default), a run
     in goal mode or with `auto` approvals that moved to its standby fails its goal check or its approvals while that
     provider cannot answer. Set `review` to a model of another provider (decision 3), or say that the review model
@@ -2645,3 +2651,12 @@ text, no console error; the Options panel with YOLO saved; every status ring. RE
   such click at most. The defaults are lower than the draft's after X's published limits (decision 8; help.x.com
   refused a direct read, so they come from search results). Reviewed in the main session. Unit tests (553), the
   offline smoke suite (243, with the pace on a fixture page in headless Chrome; no cloud request).
+- 2026-10-10: item 17 merged as `d50a41e` (PR #11, squash). The Claude GitHub app did not answer on it, and the owner
+  said its review is gone (the limit is spent): PRs no longer wait for it (decision 15, house rules). Item 18 started on
+  `item-18-skills`.
+- 2026-10-10: item 18 done. Skills written for Claude Code load: the frontmatter model keeps only `name` and
+  `description`, so the owner's two X skills (a date and a nested map under `metadata`) are no longer left out; the
+  prompt tells the model to do a skill's steps with its own tools when the skill names tools Dot lacks. Checked on a
+  throw-away home with copies of the two folders: `dotx skills list` and the prompt's Skills section list both. Also
+  fixed: item 17's smoke test measured the spacing from the end of the first click and failed once in the full suite
+  (0.88 s); it now reads the two recorded times. Unit tests (553), the offline smoke suite (243, no cloud request).
