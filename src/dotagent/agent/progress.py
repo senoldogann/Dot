@@ -45,6 +45,59 @@ _UNATTENDED_SOURCES: frozenset[str] = frozenset({SCHEDULE_SOURCE, DELEGATE_SOURC
 
 _FULL_PATTERNS: tuple[Pattern, ...] = ("repeat", "cycle", "failures", "revisiting")
 _PLAIN_PATTERNS: tuple[Pattern, ...] = ("repeat",)
+# Acting steps in a row whose acts carried one step each, on the same page or application, before the run is steered
+# toward batches.
+SINGLE_ACTION_STEPS: int = 3
+
+
+class ActCall(FrozenModel):
+    """An act call of a step as the single-action counter sees it: the tool (``browser_act``, ``desktop_act``), how
+    many steps its batch carried and where it acted (the page's address for the browser, the application for the
+    desktop)."""
+
+    tool: str
+    steps: int
+    target: str
+
+
+class SingleAction(FrozenModel):
+    """A step that acted with one-step batches only, all on one target."""
+
+    tool: str
+    target: str
+
+
+def single_action(acts: Sequence[ActCall]) -> SingleAction | None:
+    """What a step's acts amount to: a :class:`SingleAction` when every act of the step carried one step and all acted
+    on the same target with the same tool; ``None`` for a step without an act, with a batch of several steps, or with
+    acts on different targets (a step that moves between pages is not a wasted round trip)."""
+    if not acts:
+        return None
+    tools: set[str] = {act.tool for act in acts}
+    targets: set[str] = {act.target for act in acts}
+    if len(tools) != 1 or len(targets) != 1 or any(act.steps != 1 for act in acts):
+        return None
+    return SingleAction(tool=acts[0].tool, target=acts[0].target)
+
+
+def single_action_streak(streak: int, previous: SingleAction | None, current: SingleAction | None) -> int:
+    """The streak after a step: one longer when the step was single-action on the same target as the step before, 1
+    when it was single-action on a new target, 0 when it was not single-action."""
+    if current is None:
+        return 0
+    return streak + 1 if previous is not None and previous.target == current.target else 1
+
+
+def single_action_steer(action: SingleAction) -> str:
+    """The note that steers a run toward batches, after :data:`SINGLE_ACTION_STEPS` single-action steps in a row."""
+    where: str = "this page" if action.tool == "browser_act" else "this application"
+    return (
+        f"[{SINGLE_ACTION_STEPS} steps in a row acted with one step each on {where} ({redact_secrets(action.target)}). "
+        f"Each {action.tool} call costs a model round trip; batch the steps you can predict without a new look "
+        f"into one call: fill every field of a form and then press its button, open a menu and pick its item, scroll "
+        f"and then click. One call per observation, not per click. The batch stops at the first surprise and shows "
+        f"what changed, so nothing is lost by batching.]"
+    )
 
 
 class Limits(FrozenModel):

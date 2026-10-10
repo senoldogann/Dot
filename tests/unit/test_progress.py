@@ -6,11 +6,14 @@ import pytest
 
 from dotagent.agent.continuity import LedgerAction, RunLedger
 from dotagent.agent.progress import (
+    SINGLE_ACTION_STEPS,
+    ActCall,
     Alert,
     CallSeen,
     Limits,
     Pattern,
     Rung,
+    SingleAction,
     WatchState,
     advance,
     can_ask_user,
@@ -19,6 +22,9 @@ from dotagent.agent.progress import (
     limits_for,
     new_watch,
     restriction_for,
+    single_action,
+    single_action_steer,
+    single_action_streak,
     stop_result,
 )
 from dotagent.config import load_default_config
@@ -216,3 +222,45 @@ def test_a_stopped_run_says_what_it_tried_with_secrets_masked_and_counts_as_stal
     assert bare.splitlines()[0] == f"{PREFIX_STALLED}. Nothing worked."
     assert "What it did last:" not in bare
     assert "Its plan:" not in bare
+
+
+def _act(tool: str, steps: int, target: str) -> ActCall:
+    return ActCall(tool=tool, steps=steps, target=target)
+
+
+def test_a_step_is_single_action_when_every_act_carried_one_step_on_one_target() -> None:
+    page: SingleAction = SingleAction(tool="browser_act", target="https://x.com/compose")
+    assert single_action([_act("browser_act", 1, "https://x.com/compose")]) == page
+    assert (
+        single_action(
+            [_act("browser_act", 1, "https://x.com/compose"), _act("browser_act", 1, "https://x.com/compose")]
+        )
+        == page
+    )
+    # A batch of several steps, no act, acts on two pages or with two tools: not a wasted round trip.
+    assert single_action([_act("browser_act", 3, "https://x.com/compose")]) is None
+    assert single_action([]) is None
+    assert single_action([_act("browser_act", 1, "https://x.com/a"), _act("browser_act", 1, "https://x.com/b")]) is None
+    assert single_action([_act("browser_act", 1, "Safari"), _act("desktop_act", 1, "Safari")]) is None
+
+
+def test_the_streak_grows_on_the_same_target_restarts_on_a_new_one_and_breaks_on_a_batch() -> None:
+    page: SingleAction = SingleAction(tool="browser_act", target="https://x.com/compose")
+    other: SingleAction = SingleAction(tool="browser_act", target="https://x.com/home")
+    streak: int = single_action_streak(0, None, page)
+    assert streak == 1
+    streak = single_action_streak(streak, page, page)
+    streak = single_action_streak(streak, page, page)
+    assert streak == SINGLE_ACTION_STEPS
+    assert single_action_streak(streak, page, other) == 1
+    assert single_action_streak(streak, page, None) == 0
+
+
+def test_the_steer_names_the_tool_and_the_target_without_its_secrets() -> None:
+    note: str = single_action_steer(
+        SingleAction(tool="browser_act", target="https://x.com/compose?token=abcdef0123456789")
+    )
+    assert note.startswith(f"[{SINGLE_ACTION_STEPS} steps in a row acted with one step each on this page")
+    assert "browser_act" in note and "abcdef0123456789" not in note
+    desktop: str = single_action_steer(SingleAction(tool="desktop_act", target="Safari"))
+    assert "this application (Safari)" in desktop and "desktop_act" in desktop

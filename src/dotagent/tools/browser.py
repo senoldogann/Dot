@@ -261,8 +261,10 @@ class ActArgs(ToolArgs):
     steps: list[Step] = Field(
         min_length=1,
         description=(
-            "Steps run in order against the latest snapshot. The batch stops at the first failure or when the page "
-            "surprises you (new tab, dialog, download, navigation); the remaining steps are then skipped. Example: "
+            "Steps run in order against the latest snapshot: every step you can predict without a new look at the "
+            "page (a call with one step costs a model round trip for one click). The batch stops at the first failure "
+            "or when the page surprises you (new tab, dialog, download, navigation); the remaining steps are then "
+            "skipped. Example: "
             '[{"action": "fill", "ref": "e5", "text": "Ada"}, {"action": "select", "ref": "e7", "text": "blue"}, '
             '{"action": "click", "ref": "e9"}].'
         ),

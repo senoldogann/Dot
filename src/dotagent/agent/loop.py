@@ -38,7 +38,7 @@ from dotagent.agent.continuity import (
     with_compaction,
     with_instruction,
 )
-from dotagent.agent.executor import ToolOutcome, execute_calls
+from dotagent.agent.executor import ToolOutcome, batch_steps, execute_calls
 from dotagent.agent.gate import RunGate
 from dotagent.agent.helpers import MODEL_SWITCHED_EVENT, Roster, current_roster
 from dotagent.agent.lessons import LessonCase, may_learn
@@ -63,10 +63,13 @@ from dotagent.agent.plan import (
     plan_lines,
 )
 from dotagent.agent.progress import (
+    SINGLE_ACTION_STEPS,
+    ActCall,
     Alert,
     CallSeen,
     Limits,
     Rung,
+    SingleAction,
     WatchState,
     advance,
     ask_note,
@@ -81,6 +84,9 @@ from dotagent.agent.progress import (
     question_mode,
     replan_note,
     restriction_for,
+    single_action,
+    single_action_steer,
+    single_action_streak,
     stop_result,
 )
 from dotagent.agent.prompt import build_system_prompt, clock_note, collect_prompt_inputs
@@ -147,6 +153,7 @@ from dotagent.skills.catalog import load_skills
 from dotagent.skills.types import SkillCatalog
 from dotagent.store.endings import GOAL_CHECK_MARK, RESULT_EMPTY_REPLIES
 from dotagent.store.models import EventRecord, MemoryRecord, RunMode, RunRecord
+from dotagent.store.stats import ACT_TOOLS
 from dotagent.tools.campaign import CAMPAIGN_TOOLS
 from dotagent.tools.consult import CONSULT_TOOL
 from dotagent.tools.context import Spawner, ToolContext
@@ -203,6 +210,8 @@ _CAMPAIGN_TARGETS_NOTE: str = (
 )
 # A session of a campaign that wanted to end while the campaign had no targets was sent back once.
 CAMPAIGN_TARGETS_EVENT: str = "campaign_targets_reminder"
+# The note that steers a run toward batches after single-action steps in a row (item 23).
+SINGLE_ACTION_EVENT: str = "single_action_steer"
 _SWITCH_NOTE: str = (
     "[system note] From this step on you run on {to}: {old} cannot answer ({reason}). Go on with the task from where "
     "it stands."
@@ -490,6 +499,20 @@ async def _tool_messages(agent: AgentRun, outcomes: Sequence[ToolOutcome], can_s
         )
     )
     return [tool_message(outcome.call, text, ()) for outcome, text in zip(outcomes, texts, strict=True)]
+
+
+def _act_calls(outcomes: Sequence[ToolOutcome]) -> tuple[ActCall, ...]:
+    """The act calls of a step as the single-action counter sees them: the batched browser and desktop calls, with
+    the steps they carried and the target of their policy action (the page's address, the application)."""
+    return tuple(
+        ActCall(
+            tool=outcome.call.name,
+            steps=batch_steps(outcome.call.arguments),
+            target=outcome.action.target if outcome.action is not None else "",
+        )
+        for outcome in outcomes
+        if outcome.call.name in ACT_TOOLS
+    )
 
 
 def _calls_seen(outcomes: Sequence[ToolOutcome]) -> tuple[CallSeen, ...]:
@@ -1090,6 +1113,9 @@ async def run_agent(agent: AgentRun) -> RunEnd:
     paths_reminded: bool = False
     # The step of the newest reminder of the goal (weak tier); 0 before the first.
     reminded_at: int = 0
+    # Acting steps in a row whose acts carried one step each on one page or application, and what the last one was.
+    single_streak: int = 0
+    single_last: SingleAction | None = None
     ledger: RunLedger = new_ledger(run.goal)
     limits: Limits = limits_for(config)
     ladder: tuple[Rung, ...] = ladder_for(config.stall_escalation, can_ask)
@@ -1236,6 +1262,9 @@ async def run_agent(agent: AgentRun) -> RunEnd:
                 ledger, [(outcome.call, not outcome.result.is_error, outcome.result.text) for outcome in outcomes]
             )
             facts = with_outcomes(facts, outcomes)
+            single_now: SingleAction | None = single_action(_act_calls(outcomes))
+            single_streak = single_action_streak(single_streak, single_last, single_now)
+            single_last = single_now
             history.extend(results)
             await runtime.store.append_messages(run.thread_id, results)
             finished: ToolOutcome | None = next(
@@ -1263,6 +1292,17 @@ async def run_agent(agent: AgentRun) -> RunEnd:
                     history.append(await _stored_note(agent, reminder_note(ledger, plan)))
                     await runtime.bus.emit(
                         run.id, "reminder", {"step": steps, "open_steps": list(open_steps(plan.steps))}, True
+                    )
+                elif config.steer_single_actions and single_now is not None and single_streak >= SINGLE_ACTION_STEPS:
+                    # Said once per streak: the count starts again, so a run that keeps clicking one at a time is told
+                    # again only after as many steps more.
+                    single_streak = 0
+                    history.append(await _stored_note(agent, single_action_steer(single_now)))
+                    await runtime.bus.emit(
+                        run.id,
+                        SINGLE_ACTION_EVENT,
+                        {"step": steps, "tool": single_now.tool, "target": redact_secrets(single_now.target)},
+                        True,
                     )
                 continue
         else:
