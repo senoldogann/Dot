@@ -1,0 +1,12 @@
+/* The page the shell shows while the daemon is down: the same face, the one command that starts it. */
+html, body { margin: 0; height: 100%; font: 15px/1.5 -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif; color: #0d0d0d; background: #ffffff; }
+main { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; height: 100%; padding: 24px; text-align: center; }
+h1 { margin: 8px 0 0; font-size: 22px; font-weight: 650; letter-spacing: -0.015em; }
+p { max-width: 420px; margin: 0; }
+pre { margin: 4px 0; padding: 10px 14px; border-radius: 10px; background: #f5f5f5; font: 13px ui-monospace, "SF Mono", Menlo, monospace; }
+.muted { color: #6a6a6a; font-size: 13px; }
+@media (prefers-color-scheme: dark) {
+  html, body { color: #ececec; background: #212121; }
+  pre { background: #2f2f2f; }
+  .muted { color: #a6a6a6; }
+}

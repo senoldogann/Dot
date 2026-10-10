@@ -13,3 +13,8 @@ __pycache__/
 
 # Per-machine Claude Code settings
 .claude/settings.local.json
+
+# Desktop shell (Tauri)
+desktop/node_modules/
+desktop/src-tauri/target/
+desktop/src-tauri/gen/

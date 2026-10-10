@@ -892,6 +892,39 @@ The REST API (all under `/api`; bodies and replies are JSON, event streams are s
 
 Errors come as `{"message": …, "context": {…}}`; invalid input is a 422 with the validation errors in the context.
 
+## The desktop shell
+
+`desktop/` is a native Mac window around the web UI, built with Tauri 2: a few megabytes, the one web UI, and a
+menu bar item. The daemon stays owned by launchd (`dotx service install`); the shell connects to it and never runs
+the agent itself.
+
+- **Signed in by itself.** The shell reads the daemon's address from `config.toml` (`[server]`, or the defaults) and
+  the token from the token file under the home directory, and opens the UI with the token in the fragment, never
+  typed. While the daemon is down, the window shows the one command that starts it and opens the UI by itself when
+  the daemon answers.
+- **The menu bar item** is Dot's face in the state of the whole of Dot (still, working, an amber ring while
+  something waits for you) with the count of what waits for you beside it, read from `GET /api/activity/count`
+  every second. A click opens the window; the menu has Open Dot, New chat and Quit. Closing the window keeps the
+  shell in the menu bar.
+- **⌘⇧Space** anywhere brings the window up on New chat.
+- **Notifications** are the system's: the web UI sends them through the shell (Settings › General › Notifications,
+  the same switch). A click brings Dot to the front, where Waiting for you leads to the run.
+- **Files** drop into the composer as in the browser.
+
+Build it on your Mac with the Rust toolchain and Node installed:
+
+```sh
+cd desktop
+npm install
+npm run build      # desktop/src-tauri/target/release/bundle/macos/Dot.app (and a .dmg)
+npm run dev        # a debug window with live reload of the shell
+```
+
+The build is signed ad hoc; a build other Macs open without a warning needs an Apple developer account
+(`bundle.macOS.signingIdentity` in `desktop/src-tauri/tauri.conf.json`). The icons come from the face of the web UI:
+`uv run python desktop/icons/render.py` draws the app icon and the three menu bar icons, and `npm run icons` makes
+the bundle's set from the app icon.
+
 ## Browser use
 
 Dot works in Chrome in one of two ways, set by `[browser] mode`: in a Chrome of its own (`own`, the default) or in new

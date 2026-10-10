@@ -34,7 +34,9 @@ _HTTP_UNAUTHORIZED: int = 401
 SECURITY_HEADERS: tuple[tuple[str, str], ...] = (
     (
         "Content-Security-Policy",
-        "default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' blob:; connect-src 'self'; "
+        "default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' blob:; "
+        # The desktop shell's bridge (Tauri IPC) is a connection the page makes; a browser never sees these sources.
+        "connect-src 'self' ipc: http://ipc.localhost; "
         "base-uri 'none'; form-action 'none'; frame-ancestors 'none'",
     ),
     ("X-Content-Type-Options", "nosniff"),

@@ -66,3 +66,22 @@ jobs:
           tests/smoke/test_scaffold.py
           tests/smoke/test_tool_groups.py
           tests/smoke/test_undo.py
+
+  # The desktop shell (desktop/): the Rust compiles and is clean; the bundle itself is built on the owner's Mac.
+  desktop:
+    runs-on: macos-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: desktop/src-tauri
+      - name: Format
+        run: cargo fmt --check
+        working-directory: desktop/src-tauri
+      - name: Clippy
+        run: cargo clippy --all-targets -- -D warnings
+        working-directory: desktop/src-tauri

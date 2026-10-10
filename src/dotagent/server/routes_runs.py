@@ -20,6 +20,7 @@ from dotagent.server.activity import current_activity
 from dotagent.server.context import ServerContext
 from dotagent.server.stream import SSE_HEADERS, SSE_TYPE, follow_lifecycle, follow_run, follow_screencast
 from dotagent.server.views import (
+    ActivityCount,
     ActivityView,
     ApprovalsQuery,
     AsideRequest,
@@ -216,6 +217,17 @@ def runs_router(ctx: ServerContext) -> APIRouter:
     async def activity() -> ActivityView:
         """Everything in motion in one list: what waits for the user, what works now, what ended today."""
         return await current_activity(store, ctx.manager)
+
+    @router.get("/activity/count")
+    async def activity_count() -> ActivityCount:
+        """The two numbers of the sidebar's sections and the state they add up to, for the menu bar item of the desktop
+        shell, which asks every second."""
+        view: ActivityView = await current_activity(store, ctx.manager)
+        waiting: int = len(view.waiting)
+        working: int = len(view.working)
+        return ActivityCount(
+            waiting=waiting, working=working, state="waiting" if waiting else "working" if working else "idle"
+        )
 
     @router.get("/stream")
     async def lifecycle_stream() -> StreamingResponse:

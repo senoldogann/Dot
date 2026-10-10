@@ -443,3 +443,12 @@ class ActivityView(FrozenModel):
     working: list[ActivityRow]
     recent: list[ActivityRow]
     generated_at: float
+
+
+class ActivityCount(FrozenModel):
+    """``GET /activity/count``: the numbers a menu bar item shows, and the state of the whole of Dot (the face of the
+    web UI shows the same: waiting when something waits for the user, working while a run is active, else idle)."""
+
+    waiting: int
+    working: int
+    state: Literal["idle", "working", "waiting"]

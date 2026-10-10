@@ -187,6 +187,9 @@ async def test_the_sections_show_what_waits_what_works_and_a_campaign_session_wi
     )
     assert next(row for row in activity["working"] if row["kind"] == "campaign")["title"] == "Find leads"
     assert activity["recent"] == []
+    count: httpx.Response = await client.get("/api/activity/count")
+    assert count.status_code == 200, count.text
+    assert count.json() == {"waiting": 1, "working": 2, "state": "waiting"}
 
     host: str = client.base_url.host
     port: int | None = client.base_url.port

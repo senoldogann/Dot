@@ -1,0 +1,14 @@
+{
+  "name": "dot-desktop",
+  "version": "0.1.0",
+  "private": true,
+  "description": "The desktop shell of Dot: a native window, a menu bar item and notifications around the web UI the daemon serves.",
+  "scripts": {
+    "dev": "tauri dev",
+    "build": "tauri build",
+    "icons": "tauri icon icons/app.png"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2"
+  }
+}
