@@ -2362,7 +2362,7 @@ Paste this to the agent that takes the work:
 
 | #   | Item                                                                     | Status  | Commits |
 | --- | ------------------------------------------------------------------------ | ------- | ------- |
-| 22  | Step efficiency: the numbers every later item is judged by               | planned |         |
+| 22  | Step efficiency: the numbers every later item is judged by               | in progress |         |
 | 23  | Multi-action turns as the rule                                           | planned |         |
 | 24  | The fast model does the side work                                        | planned |         |
 | 25  | Early and speculative execution of read-only tools                       | planned |         |
@@ -2405,14 +2405,30 @@ index; `cached_tokens / input_tokens`; tokens per step. `dotx eval` reports the 
 (`agent/loop.py:1195`, `store/stats.py:34`), but no ratio, no per-site split and no curve exists. OSWorld-Human's two
 findings (step inflation, late-step slowdown) cannot be seen in Dot's own data today.
 
-**Design.** Pure functions over the stored events in `store/stats.py`; one SQL per aggregate; a `StepEfficiency`
-FrozenModel; printed by `cli_stats.py`, served by the stats endpoint, painted on the run page. A browser or desktop
-turn counts as single-action when its `browser_act`/desktop act carried one step.
+**Design, as built.** The reading of the code corrected the plan in three places: there is no stats endpoint and the run
+page paints no statistics (`rg stats src/dotagent/server` finds nothing), so the numbers go to `dotx stats` and the
+eval report only; the events held no site, so the `tool_result` event now records `site` (the host of the page for a
+browser action, the application for a desktop one, empty for every other tool) and `steps` (the steps a batched call
+carried, 0 for a tool without a step list), both set in `agent/executor.py` from the policy action and the call's
+arguments; and "host" became "site", since a desktop act names an application. `store/stats.py` reads two more SQL
+aggregates (the act results of `browser_act` and `desktop_act`, the `assistant` events with a step number and
+seconds) into `ActSample` and `StepSample`, and adds `input_tokens` to the model-call rows. Pure functions:
+`act_stats` (calls, the single-step ones, the failed ones, the median call), `step_bands` (the median model-call
+seconds of the steps 1-5, 6-10, 11-20, 21-40, 41+ of their runs: the slowdown curve), `site_stats` (per site, the
+busiest first); `TimeStats.cached_share` is cached over input tokens of the calls that answered. `ModelStats` carries
+`acts` and `bands`, `RunStatistics` carries `sites`. `dotx stats --by model|site|all` (the parser's default `all`).
+The eval `RunMetrics` gains `acts`, `single_acts` and `cached_tokens` (``None`` in a report saved before they were
+counted), the `Scorecard` the two shares over every attempt that counted them, shown in the card and the comparison
+table. Acts and steps recorded before this item are left out, never guessed.
 
-**Touchpoints.** `store/stats.py`, `cli_stats.py`, `server/views.py`, `evals/*`, README "Statistics".
+**Touchpoints.** `agent/executor.py`, `store/stats.py`, `cli_stats.py`, `cli.py`, `evals/results.py`,
+`evals/metrics.py`, `evals/scoring.py`, README "Statistics" and "Evaluation", `tests/unit/test_run_statistics.py`,
+`tests/unit/test_evals.py`.
 
-**Done when.** `dotx stats --by host` and `--by model` print the five numbers; a unit test over a fixed event set
-checks them; the eval JSON carries them per task.
+**Done when.** `dotx stats --by site` and `--by model` print the numbers (done); the unit tests over a fixed event set
+check the acts, the curve, the sites, the cache share and their rendering (done: `test_run_statistics.py`,
+`test_evals.py`); the eval JSON carries `acts`, `single_acts` and `cached_tokens` per attempt and the report shows the
+shares (done). Not built: numbers on the run page (no statistics view exists; a later UI item if the owner wants it).
 
 ### 23. Multi-action turns as the rule
 
@@ -3239,3 +3255,4 @@ item ends as a measured no, written in the log.
 - 2026-10-10: at the owner's word, items 42 to 45 join part 3: TypeSafe where `yolo` gains (a tool that judges many
   items in one call, X campaigns, typed checks before a model call, a step's model), with the docs and cookbooks each
   item starts from; part 3 is committed with them.
+- 2026-10-10 (Fable 5.1): item 22 built on branch `item-22-step-efficiency`: `tool_result` events record `site` and `steps`; `dotx stats` gains the acts line, the slowdown curve, the cache share and a Sites table (`--by model|site|all`); eval reports carry acts, single acts and cached tokens and show the two shares. Gate: format, check, mypy clean; unit 560; `dotx eval check` ok; offline smoke of the eval runner and scaffold 11 passed. The merge hash goes into the table with the next PR.

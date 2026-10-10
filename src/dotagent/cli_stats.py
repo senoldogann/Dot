@@ -12,7 +12,16 @@ from pydantic import Field
 from dotagent.core.paths import db_path
 from dotagent.core.types import FrozenModel
 from dotagent.store.endings import ENDING_LABELS
-from dotagent.store.stats import ModelStats, RunStatistics, TimeStats, ToolStats, collect_statistics
+from dotagent.store.stats import (
+    ActStats,
+    ModelStats,
+    RunStatistics,
+    SiteStats,
+    StepBand,
+    TimeStats,
+    ToolStats,
+    collect_statistics,
+)
 
 _DAY_S: float = 86400.0
 # The tools listed: the ones whose calls took the most seconds in all.
@@ -22,6 +31,7 @@ _TOOLS_SHOWN: int = 15
 class StatsCommand(FrozenModel):
     name: Literal["stats"]
     days: int = Field(ge=1)
+    by: Literal["model", "site", "all"]
 
 
 def _count(count: int) -> str:
@@ -52,11 +62,37 @@ def render_model(stats: ModelStats) -> list[str]:
         f"  tools: {stats.tool_calls} calls, {stats.tool_errors} failed ({_percent(stats.tool_errors, stats.tool_calls)}), "
         f"{stats.invalid_arguments} with arguments that were not valid JSON",
         f"  stalls {stats.stalls}, compactions {stats.compactions}",
+        f"  acts: {_acts(stats.acts)}",
+        f"  step model call by step number: {_bands(stats.bands)}",
     ]
 
 
 def _seconds(value: float | None) -> str:
     return "-" if value is None else f"{value:.1f}"
+
+
+def _share(value: float | None) -> str:
+    return "-" if value is None else f"{round(100 * value)} %"
+
+
+def _acts(acts: ActStats) -> str:
+    """The act calls in one line: how many, the single-action share, the failed share and the median call."""
+    if acts.acts == 0:
+        return "none counted"
+    return (
+        f"{acts.acts} calls, {_percent(acts.single, acts.acts)} with one step, {_percent(acts.failed, acts.acts)} "
+        f"failed, median {_seconds(acts.seconds_median)} s"
+    )
+
+
+def _bands(bands: Sequence[StepBand]) -> str:
+    """The slowdown curve in one line: the median seconds of a step's model call per band of step numbers."""
+    if not bands:
+        return "no timed steps"
+    return ", ".join(
+        f"{band.first}-{band.last if band.last else ''} {_seconds(band.seconds_median)} s ({band.steps})"
+        for band in bands
+    )
 
 
 def render_time(stats: Sequence[ModelStats]) -> list[str]:
@@ -65,7 +101,7 @@ def render_time(stats: Sequence[ModelStats]) -> list[str]:
     width: int = max(len("model"), *(len(entry.model) for entry in stats))
     header: str = (
         f"  {'model':<{width}}  {'timed runs':>10}  {'model s':>9}  {'step median s':>13}  {'step p90 s':>10}  "
-        f"{'compaction s':>12}  {'side calls s':>12}  {'cached tokens':>13}"
+        f"{'compaction s':>12}  {'side calls s':>12}  {'cached tokens':>13}  {'cached':>6}"
     )
     timed: list[ModelStats] = [entry for entry in stats if entry.time.timed_runs > 0]
     rows: list[str] = []
@@ -75,7 +111,7 @@ def render_time(stats: Sequence[ModelStats]) -> list[str]:
             f"  {entry.model:<{width}}  {f'{time.timed_runs} of {entry.runs}':>10}  {_seconds(time.model_seconds):>9}  "
             f"{_seconds(time.step_seconds_median):>13}  {_seconds(time.step_seconds_p90):>10}  "
             f"{_seconds(time.compaction_seconds):>12}  {_seconds(time.side_call_seconds):>12}  "
-            f"{_count(time.cached_tokens):>13}"
+            f"{_count(time.cached_tokens):>13}  {_share(time.cached_share):>6}"
         )
     untimed: int = sum(entry.runs - entry.time.timed_runs for entry in stats)
     note: list[str] = (
@@ -105,21 +141,42 @@ def render_tools(tools: Sequence[ToolStats]) -> list[str]:
     ]
 
 
-def render_stats(stats: RunStatistics, days: int) -> list[str]:
+def render_sites(sites: Sequence[SiteStats]) -> list[str]:
+    """The sites table: per page host or application, what the act calls on it did, the busiest first."""
+    if not sites:
+        return ["Sites: no act call named a site (the browser and desktop act calls record one since item 22)."]
+    width: int = max(len("site"), *(len(entry.site) for entry in sites))
+    header: str = f"  {'site':<{width}}  {'acts':>6}  {'one step':>8}  {'failed':>6}  {'median s':>8}"
+    rows: list[str] = [
+        f"  {entry.site:<{width}}  {entry.acts.acts:>6}  {_percent(entry.acts.single, entry.acts.acts):>8}  "
+        f"{_percent(entry.acts.failed, entry.acts.acts):>6}  {_seconds(entry.acts.seconds_median):>8}"
+        for entry in sites
+    ]
+    return [
+        "Sites, from the browser and desktop act calls (one step: a round trip spent on a single action):",
+        header,
+        *rows,
+    ]
+
+
+def render_stats(stats: RunStatistics, days: int, by: Literal["model", "site", "all"]) -> list[str]:
     if not stats.models:
         return [f"No runs in the last {days} days."]
     runs: int = sum(entry.runs for entry in stats.models)
     lines: list[str] = [f"{runs} runs in the last {days} days.", ""]
-    for entry in stats.models:
-        lines.extend([*render_model(entry), ""])
-    lines.extend(render_time(stats.models))
-    if stats.tools:
-        lines.extend(["", *render_tools(stats.tools)])
+    if by != "site":
+        for entry in stats.models:
+            lines.extend([*render_model(entry), ""])
+        lines.extend(render_time(stats.models))
+        if stats.tools:
+            lines.extend(["", *render_tools(stats.tools)])
+    if by != "model":
+        lines.extend(["", *render_sites(stats.sites)] if by == "all" else render_sites(stats.sites))
     return lines
 
 
 async def cmd_stats(command: StatsCommand) -> int:
     since: float = time.time() - command.days * _DAY_S
     stats: RunStatistics = await asyncio.to_thread(collect_statistics, db_path(), since)
-    sys.stdout.write("\n".join(render_stats(stats, command.days)) + "\n")
+    sys.stdout.write("\n".join(render_stats(stats, command.days, command.by)) + "\n")
     return 0

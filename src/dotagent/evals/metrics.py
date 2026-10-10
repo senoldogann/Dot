@@ -10,6 +10,7 @@ from dotagent.evals.results import RunMetrics
 from dotagent.llm.calls import CALL_EVENT
 from dotagent.llm.types import invalid_arguments_text
 from dotagent.store.models import EventRecord, RunRecord
+from dotagent.store.stats import ACT_TOOLS
 
 # A question nobody answered: one the run waited for (which the harness declines), or one it left and went on without.
 _UNANSWERED_KINDS: frozenset[str] = frozenset({"approval_requested", QUESTION_LEFT_EVENT})
@@ -34,9 +35,29 @@ def _seconds(events: Sequence[EventRecord], kind: str) -> float:
     return total
 
 
+def _batch_steps(event: EventRecord) -> int:
+    """The steps a ``tool_result`` event of an act call recorded; 0 for an event recorded before they were counted."""
+    steps: JsonValue = event.data.get("steps")
+    return steps if isinstance(steps, int) else 0
+
+
+def _cached_tokens(events: Sequence[EventRecord]) -> int:
+    """The input tokens the provider served from its cache, over the model calls of the run."""
+    total: int = 0
+    for event in events:
+        if event.kind != CALL_EVENT:
+            continue
+        cached: JsonValue = event.data.get("cached_tokens")
+        if not isinstance(cached, int):
+            raise EvalError("a model call lacks the cached tokens the harness counts", {"event_id": event.id})
+        total += cached
+    return total
+
+
 def run_metrics(run: RunRecord, events: Sequence[EventRecord]) -> RunMetrics:
     """The numbers of one run: its record gives steps and tokens, its events give the rest."""
     results: list[EventRecord] = [event for event in events if event.kind == "tool_result"]
+    acts: list[EventRecord] = [event for event in results if event.data.get("tool") in ACT_TOOLS]
     return RunMetrics(
         steps=run.steps,
         input_tokens=run.input_tokens,
@@ -49,4 +70,7 @@ def run_metrics(run: RunRecord, events: Sequence[EventRecord]) -> RunMetrics:
         unanswered_questions=sum(1 for event in events if event.kind in _UNANSWERED_KINDS),
         model_seconds=round(_seconds(events, CALL_EVENT), 3),
         tool_seconds=round(_seconds(events, "tool_result"), 3),
+        acts=len(acts),
+        single_acts=sum(1 for event in acts if _batch_steps(event) == 1),
+        cached_tokens=_cached_tokens(events),
     )

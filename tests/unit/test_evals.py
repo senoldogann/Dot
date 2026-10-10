@@ -11,7 +11,7 @@ from dotagent.evals.catalog import all_tasks, select_tasks
 from dotagent.evals.checks import evaluate_check, evaluate_checks, workspace_path
 from dotagent.evals.reports import load_report, report_file_name, save_report
 from dotagent.evals.results import CheckOutcome, EvalReport, EvalSettings, RunMetrics, TaskOutcome
-from dotagent.evals.scoring import Scorecard, failure_reason, score_report
+from dotagent.evals.scoring import Scorecard, failure_reason, render_scorecard, score_report
 from dotagent.evals.types import (
     AnswerContains,
     AnswerMatches,
@@ -227,6 +227,22 @@ def test_the_score_counts_passes_costs_false_successes_and_unsteady_tasks() -> N
     assert [(note.task_id, note.attempt) for note in card.failures] == [("a", 2), ("c", 1)]
     assert card.categories[0].category == "files"
     assert (card.categories[0].attempts, card.categories[0].passed) == (5, 3)
+
+
+def test_the_shares_of_one_step_acts_and_cached_tokens_skip_the_attempts_that_did_not_count_them() -> None:
+    counted: RunMetrics = _metrics(4, 4000, 4, 0).model_copy(
+        update={"acts": 4, "single_acts": 1, "cached_tokens": 1000}
+    )
+    uncounted: RunMetrics = _metrics(2, 2000, 2, 0)
+    card: Scorecard = score_report(
+        _report((_outcome("a", 1, True, "done", counted), _outcome("b", 1, False, "failed", uncounted)))
+    )
+    assert card.single_act_share == pytest.approx(0.25)
+    assert card.cached_share == pytest.approx(0.25)
+    old: Scorecard = score_report(_report((_outcome("b", 1, True, "done", uncounted),)))
+    assert (old.single_act_share, old.cached_share) == (None, None)
+    assert "  act calls with one step 25 %, input tokens from the cache 25 %" in render_scorecard(card)
+    assert "  act calls with one step -, input tokens from the cache -" in render_scorecard(old)
 
 
 def test_a_model_that_never_passes_has_no_cost_per_pass() -> None:

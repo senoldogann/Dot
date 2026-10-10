@@ -582,6 +582,17 @@ answer (none for a question the run left), and those of `delegate` hold the whol
 are listed too. The database file is opened read-only, so it is safe to run while the daemon works, and the numbers hold
 no text of your chats.
 
+Two more numbers say how many round trips a run spends. Under each model, an **acts** line counts its `browser_act`
+and `desktop_act` calls, the share that carried one step (a round trip spent on a single click or keystroke: the
+batches of [Browser use](#browser-use) and [Computer use](#computer-use) exist to avoid it), the share that failed and
+the median call; a **step model call by step number** line gives the median seconds of a step's model call for the
+steps 1 to 5, 6 to 10, 11 to 20, 21 to 40 and from 41 on of their runs, which shows how much a run slows down as its
+context grows. The Time table ends with the share of the input tokens the provider served from its cache. A **Sites**
+table follows, per site (the host of the page for a browser act, the application for a desktop one, both recorded in
+the `tool_result` event with the steps of the batch): acts, the share with one step, the share that failed and the
+median call. `--by site` prints the sites table only, `--by model` everything but it. Acts and steps recorded before
+these were counted (before item 22 of the roadmap) are left out of the acts lines and the sites table.
+
 **`dotx eval`** plays a catalog of small tasks against a model and judges each by what is left in a workspace of its own:
 file edits, shell work, fixing code until its test passes, recovering from an error, multi-step work, a goal that asks
 for as much as the files give, read-only research, a task that cannot be done and has to end as an honest failure, an
@@ -599,10 +610,13 @@ Mac desktop, your MCP servers, skills, plugins and the memory embeddings switche
 policy or of the agent unanswered (one the run waits for is refused at once). Your own database, workspace and
 screenshots are never touched; the API keys the model needs are looked up first and handed over by name. The score holds
 the pass rate, per kind of task, what a pass costs in steps, tokens and seconds (split into model calls and tool calls),
-how often a tool call failed, stalls, runs that were cut, runs that said they were done and were not, and the tasks that
-passed only in some attempts. The token ceiling of an attempt counts every model call of the run and of the runs it
-delegated to, side calls included; a report saved before model calls were timed counted the steps' tokens only and has
-no seconds. `dotx eval run` saves its report after every attempt, so an interrupted run keeps what it measured.
+the share of the act calls that carried one step and the share of the input tokens served from the prompt cache (both
+as `dotx stats` counts them, over every attempt), how often a tool call failed, stalls, runs that were cut, runs that
+said they were done and were not, and the tasks that passed only in some attempts. The token ceiling of an attempt
+counts every model call of the run and of the runs it delegated to, side calls included; a report saved before model
+calls were timed counted the steps' tokens only and has no seconds, and one saved before acts and cached tokens were
+counted shows `-` for their shares. `dotx eval run` saves its report after every attempt, so an interrupted run keeps
+what it measured.
 
 A task is data (`src/dotagent/evals/catalog.py`): the files the workspace starts with, the goal, checks (a file exists,
 holds or equals something, a JSON file equals a value, a command exits with 0, the answer contains something) and a
