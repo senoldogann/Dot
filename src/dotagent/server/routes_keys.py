@@ -6,7 +6,7 @@ import asyncio
 
 from fastapi import APIRouter
 
-from dotagent.config import AppConfig
+from dotagent.config import JUDGE_SERVICE, AppConfig, providers_by_key
 from dotagent.core.errors import NotFoundError
 from dotagent.core.logs import get_logger
 from dotagent.core.paths import env_file_path
@@ -16,23 +16,6 @@ from dotagent.server.context import ServerContext
 from dotagent.server.views import KeyRequest, KeysView, KeyView
 
 log = get_logger(__name__)
-
-# The service of the typed judge ([judge]); its key is listed with the providers' and reaches the judge, not the router.
-JUDGE_SERVICE: str = "typesafe"
-
-
-def providers_by_key(config: AppConfig) -> dict[str, str]:
-    """The provider of each key, by the name of its variable, in the order the Settings page lists them: the providers
-    whose models need a key first, Ollama (whose models the local server runs without one) next, and the typed judge's
-    service last."""
-    providers = config.providers
-    return {
-        providers.openai.api_key_env: "openai",
-        providers.anthropic.api_key_env: "anthropic",
-        providers.opencode_go.api_key_env: "opencode_go",
-        providers.ollama.api_key_env: "ollama",
-        config.judge.api_key_env: JUDGE_SERVICE,
-    }
 
 
 def _view(provider: str, name: str) -> KeyView:

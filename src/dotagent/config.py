@@ -408,3 +408,21 @@ def load_default_config() -> AppConfig:
 
 def load_user_config() -> AppConfig:
     return load_config(config_path())
+
+
+# The service of the typed judge ([judge]); its key is listed with the providers' and reaches the judge, not the router.
+JUDGE_SERVICE: str = "typesafe"
+
+
+def providers_by_key(config: AppConfig) -> dict[str, str]:
+    """The provider of each key Dot manages (Settings › API keys, ``dotx auth``), by the name of its variable, in the
+    order they are listed: the providers whose models need a key first, Ollama (whose models the local server runs
+    without one) next, and the typed judge's service last."""
+    providers: ProvidersConfig = config.providers
+    return {
+        providers.openai.api_key_env: "openai",
+        providers.anthropic.api_key_env: "anthropic",
+        providers.opencode_go.api_key_env: "opencode_go",
+        providers.ollama.api_key_env: "ollama",
+        config.judge.api_key_env: JUDGE_SERVICE,
+    }

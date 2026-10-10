@@ -351,14 +351,14 @@ again at once. `dotx doctor` shows whether it is on and has its key.
 "Quote", "Yeniden gönder", "Lähetä"…) is a public action; one that follows, likes or subscribes ("Follow", "Like",
 "Takip et", "Beğen", "Seuraa", "Tykkää"…) is a social action, of low risk, which asks once the run has read untrusted
 content. Both are counted on their site (the page's host, without `www.`), across runs and threads, in a sliding hour
-and day (`[policy.pace]`: 10 public actions an hour and 50 a day, 20 social ones an hour and 100 a day, public ones at
-least 20 s apart; 0 removes a limit). The browser waits out the spacing. An action past a limit is refused in every
+and day, and nothing limits them by default: Dot posts, follows and likes as often as its task needs. `[policy.pace]`
+sets limits (`public_per_hour`, `public_per_day`, `social_per_hour`, `social_per_day`, and `public_spacing_s` between
+public actions, which the browser waits out; 0 removes a limit). An action past a limit that is set is refused in every
 approval mode, `yolo` too, with the time the next one is allowed, and the timeline shows the refusal. A `browser_act`
 call takes one public or social click at most, so that each one counts. Only the clicks the policy recognises are
-counted: a post sent with a keyboard shortcut or through an API from the shell is not. X publishes higher limits (an
+counted: a post sent with a keyboard shortcut or through an API from the shell is not. X publishes limits of its own (an
 unverified account: 50 posts and 200 replies a day, 400 follows, 500 messages), and its automation rules forbid
-automated likes and bulk or aggressive following, and warn that scripting its website can get an account suspended. The
-pace keeps Dot slow; it does not make automation allowed.
+automated likes and bulk or aggressive following, and warn that scripting its website can get an account suspended.
 
 **Approvals.** An action that needs a yes becomes an approval: `allow? [y/N]` in the terminal, a card in the web UI. The
 run waits (its status is `blocked`) for up to `[policy] approval_timeout_s`; an approval nobody answers expires and
@@ -1015,8 +1015,10 @@ description` line of each skill and reads the rest with the `skill` tool when a 
 folders; `~` expands). Skills written for Claude Code load unchanged: Dot reads only `name` and `description` of the
 frontmatter, so other keys (a date or a nested map under `metadata`, a list of `allowed-tools`) do not leave a skill
 out. To use your own, put `dirs = ["~/.claude/skills"]` under `[skills]` in your `config.toml`; Dot reads nothing there
-until you do. The X skills of Claude Code (`x-twitter-growth`, `baoyu-post-to-x`) are then the playbook a campaign on X
-can work from, within the pace of [Safety](#safety).
+until you do. An entry may also be one skill folder (`~/.claude/skills/x-twitter-growth`), to take some skills only:
+`~/.claude/skills` can hold skills written for Claude Code's own tools, such as the superpowers bundle or the skills
+synced from claude.ai. The X skills of Claude Code (`x-twitter-growth`, `baoyu-post-to-x`) are then the playbook a
+campaign on X can work from.
 
 A plugin is a folder in the Claude Code layout: `.claude-plugin/plugin.json` (its name), `skills/<name>/SKILL.md` and
 `.mcp.json` (`{"mcpServers": {...}}`; `${CLAUDE_PLUGIN_ROOT}` is the plugin folder). Their skills and MCP servers are
