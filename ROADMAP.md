@@ -3287,7 +3287,7 @@ third; 49 (the face as the state) and 50 (the visual system) next, form on top o
 | 49  | The face as the state                                                    | done    | 72f6168 |
 | 50  | The visual system                                                        | done    | fbf5b34 |
 | 51  | The desktop shell                                                        | done    | 8b4415d |
-| 52  | Dot on the phone                                                         | in progress |         |
+| 52  | Dot on the phone                                                         | done    | 2386ae7 |
 
 ### 46. Dot's computer: the live view and the handover
 
@@ -3742,6 +3742,8 @@ on the owner's tailnet for an approval and opens the run (owner's run, logged by
     Decided on 2026-10-11 at the owner's word: Tailscale, and the web UI as a PWA first; a store app (Capacitor around
     the same UI) only once the PWA has been used for a while. The daemon stays on loopback by default; `[server] host`
     documents the tailnet address.
+    As built (item 52): not `[server] host`, which the guard holds to loopback, but `tailscale serve --bg 8765` in
+    front of it and the name in `[server] reach`; the phone needs HTTPS for the service worker and the push anyway.
 32. A name and a face for Dot (item 49): the recommendation is a yellow dot that tells the state and an optional
     name, no eyes and no accessories; dots' critics (Fortune, 2026-10-02) said why. Say so if you want the character.
     Decided on 2026-10-11 at the owner's word: the yellow dot that tells the state, an optional name, no character.
@@ -4170,3 +4172,8 @@ on the owner's tailnet for an approval and opens the run (owner's run, logged by
 - 2026-10-11 (Fable 5.1): item 49 merged 72f6168 (PR #51, MYP-189 Done; gate green). Next: item 50 (the visual system).
 - 2026-10-11 (Fable 5.1): item 50 merged fbf5b34 (PR #52, MYP-190 Done; gate green). Next: item 51 (the desktop shell, Tauri 2).
 - 2026-10-11 (Fable 5.1): item 51 merged 8b4415d (PR #53, MYP-191 Done; gate + desktop jobs green; Dot.app built and opened on the owner's Mac). Next: item 52 (Dot on the phone).
+- 2026-10-11 (Fable 5.1): item 52 merged 2386ae7 (PR #54, MYP-192 Done; gate + desktop jobs green). Part 4 complete:
+  items 46 to 52 merged, decisions 30 to 32 taken and built. Open for the owner: the phone's own check of item 52
+  (Tailscale on, `tailscale serve --bg 8765`, the name in `[server] reach`, Notifications on in the phone's browser,
+  a push for a question that opens the run), to be logged here by hand; decision 27 (the labelled feed); decision 26's
+  follow-up (a prompt push or a longer task for judge_items); a signed desktop build (an Apple developer account).
