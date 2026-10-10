@@ -2385,7 +2385,7 @@ Paste this to the agent that takes the work:
 | 42  | TypeSafe as a tool of the agent: many items judged in one call           | done    | f0b1188 |
 | 43  | Typed judgments in X campaigns: what to answer, the best draft, a check  | done    | aa1c77d |
 | 44  | Typed checks before a model call: the page after an action, the goal     | done    | 1c72fa7 |
-| 45  | A step's model chosen by a typed judgment                                | in progress |         |
+| 45  | A step's model chosen by a typed judgment                                | done    | 1a080ca |
 
 **Order and dependencies.** 22 first: cheap, and every later item is judged with it. Then 24 and 23 (the two biggest
 measured time sinks: side calls on the main model, one-action turns). 29 next, because the defaults of items 2 to 7
@@ -3759,3 +3759,4 @@ neither a yes nor a measured no.
 - 2026-10-10 (Fable 5.1): item 44 built on branch `item-44-typed-checks` (MYP-184): `expect` on browser_act with `Judge.judge_page` (expected, login wall, CAPTCHA, error page), the goal check judged first in goal mode (`claim_state` shared), no click judgments in `yolo`; stand-in smoke tests for the three pages, yolo and a goal-mode run; decision 28.
 - 2026-10-10 (Fable 5.1): item 44 merged 1c72fa7 (PR #43, MYP-184 Done; gate green). Next: item 45.
 - 2026-10-10 (Fable 5.1): item 45 built on branch `item-45-step-model` (MYP-185): `agent/stepmodel.py` and the loop's `_routing`/`_route_step`, `[agent] step_router = false` and `step_router_threshold = 0.6`, `step_routed`/`step_route_failed` events, a scripted smoke run routed by the stand-in; the live measurement is decision 29.
+- 2026-10-10 (Fable 5.1): item 45 merged 1a080ca (PR #44, MYP-185 Done; gate green). Part 3 is built: every row 22 to 45 is done except 25 (parked). What waits for the owner is in "Open owner decisions" 26 to 29: the live measurements of judge_items (eval task filter-headlines), the post tools on the owner's own feed, the checks before a model call, and the step router, each a paid run on the owner's models.
