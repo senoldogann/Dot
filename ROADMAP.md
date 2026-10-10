@@ -28,7 +28,7 @@ recover (6), learn (7), undo (8). Every later item is judged with the numbers of
 Status values: `planned`, `in progress`, `done` (implemented, tested, verified, committed), `parked` (the reason is in
 the item). Take the first item that is not `done`. All eight are done; what waits for the owner is in "Open owner
 decisions". Part 2 starts at item 9: take the first item of its table ("Status, part 2") that is not `done`, in the
-order its "Order and dependencies" paragraph gives.
+order its "Order and dependencies" paragraph gives. All of part 2 is done as well (2026-10-10).
 
 ## Where things stand before this roadmap
 
@@ -901,8 +901,8 @@ that change the owner's agent are their call (see "Open owner decisions", 6 onwa
 | 16  | Typed judgments (TypeSafe) at the decision points                      | done        | a5516f7 |
 | 17  | Pacing and public actions on social platforms                          | done        | d50a41e |
 | 18  | Skills written for Claude Code, and the X playbook                     | done        | 6464881 |
-| 19  | Prompt-cache hygiene for the hosted providers                          | done        |         |
-| 20  | An interactive terminal for programs that prompt                       | planned     |         |
+| 19  | Prompt-cache hygiene for the hosted providers                          | done        | 0526a60 |
+| 20  | An interactive terminal for programs that prompt                       | done        |         |
 | 21  | A plain chat screen: Dot's face, task chips, one composer line         | done        | bb89714 |
 
 **Order and dependencies.** 9 first: it is cheap and every later item is judged with it. 10, 11 and 12 are the owner's
@@ -2164,9 +2164,9 @@ section built from that home lists both. README.
 
 ### 19. Prompt-cache hygiene for the hosted providers
 
-**Status: done** (smaller than the first draft). **Goal.** On Anthropic and OpenAI the prefix of a run's prompt stays
-byte-identical from step to step, so the server's cache pays for the system prompt, the tools and the history instead
-of the owner.
+**Status: done** (`0526a60`, PR #13; smaller than the first draft). **Goal.** On Anthropic and OpenAI the prefix of a
+run's prompt stays byte-identical from step to step, so the server's cache pays for the system prompt, the tools and the
+history instead of the owner.
 
 **Why.** Found with the Claude provider (log of 2026-10-08): the system prompt carries the time to the minute
 (`agent/prompt.py:338`), so two runs never share a cached prefix; `drop_old_images` edits the history at every step
@@ -2206,44 +2206,72 @@ offline smoke suite and `dotx eval check` clean with the note after every goal. 
 
 ### 20. An interactive terminal for programs that prompt
 
-**Status: planned.** **Goal.** The agent can run a program that asks questions, keep a REPL or a dev server alive
-while it works, and answer a prompt, as a person at a terminal would.
+**Status: done.** **Goal.** The agent can run a program that asks questions, keep a REPL or a dev server alive while it
+works, and answer a prompt, as a person at a terminal would.
 
 **Why.** `shell` runs `zsh -c` with stdin closed and in its own process group (`tools/shell.py:128-137`); nothing in
-the code base opens a pseudo-terminal (search for `pty`, `openpty`, `pexpect`, `termios`: none). So `npm create`,
+the code base opened a pseudo-terminal (search for `pty`, `openpty`, `pexpect`, `termios`: none). So `npm create`,
 `ssh` with a host-key question, `python -i`, `psql`, interactive installers and a dev server that must stay up for a
-browser test are out of reach, and that is most of "any job on this computer" and half of "write code in the
+browser test were out of reach, and that is most of "any job on this computer" and half of "write code in the
 browser".
 
-**Design.**
-- A tool group `terminal` (`tools/terminal.py`), acting modes only: `terminal_open(command, cwd) -> session id`,
-  `terminal_send(session, text)` (the text is sent as typed; a newline is part of the text), `terminal_read(session,
-  wait_s)` (what arrived since the last read, after waiting up to `wait_s` for new output, at most 60 s),
-  `terminal_close(session)`. At most `[shell] terminal_sessions = 3` per thread; a session idles out after
-  `[shell] terminal_idle_s = 1800` and is closed when the daemon stops; a run's end does not close it (a dev server
-  outlives the run that started it, until the thread's idle limit).
-- `desktop`-independent implementation in `shell/terminal.py`: `pty.openpty()`, `asyncio.create_subprocess_exec` of
-  the user's shell with the slave as stdin, stdout and stderr, a reader task that keeps the last 192 KiB in a ring
-  buffer with ANSI escape sequences stripped by one regular expression (no terminal emulator), `TERM=dumb`, the same
-  environment filtering as `shell` (`[shell] pass_env`).
-- Policy: `terminal_open` is classified like `shell` on its command (`policy/shell.py`); `terminal_send` is classified
-  like `shell` on its text when the text ends a line (it may be a command), and as `credential` when the session's
-  newest output matched a password or passphrase prompt, so the hand-off and the `yolo` waiver work as for the
-  browser (item 10). Output is marked untrusted like shell output.
-- The prompt's channel order (`agent/prompt.py:90-94`) names the terminal after `shell`: "a program that prompts, a
-  REPL, or a server that must stay up".
+**Design** (as built on 2026-10-10; what changed from the first draft is listed below).
+- A tool group `terminal` (`tools/terminal.py`), acting modes only, one call at a time: `terminal_open(command, cwd)`
+  returns the session's name (`t1`) and its first output (it waits up to 2 s); `terminal_send(session, text, wait_s)`
+  types the text (a `\n` presses Enter) and returns what the program printed back; `terminal_read(session, wait_s)`
+  returns what arrived since the last read after waiting up to `wait_s` (at most 60 s) for something new;
+  `terminal_close(session)`. A read returns once the program has printed nothing for 0.3 s, so a burst comes back
+  whole. When the program has ended, the result says so with its exit status and the session is closed.
+- `terminal/session.py`: `pty.openpty()`, `zsh -c <command>` with the slave as stdin, stdout and stderr, in a session
+  of its own whose controlling terminal is the pseudo-terminal (so `ssh` and `sudo`, which ask through `/dev/tty`,
+  reach it); the environment of `shell` plus `TERM=dumb` and `PYTHON_BASIC_REPL=1` (the REPL of Python 3.13 wants a
+  terminal with cursor control). A reader on the event loop keeps the newest 192 KiB of unread output and says how
+  much was left out; escape sequences are removed by one regular expression and line ends become `\n` (no terminal
+  emulator). Closing sends SIGTERM to the process group and SIGKILL after a second.
+- Sessions belong to a thread: at most `[shell] terminal_sessions = 3` (0 removes the tools), each closed after
+  `[shell] terminal_idle_s = 1800` without use (at least 60, so the reaper never closes a session during a read) and
+  all of them when the daemon stops. The end of a run closes none: a dev server outlives the run that started it.
+- Policy: `terminal_open` is classified like `shell` on its command (`secret_access` too when its working directory is
+  protected); `terminal_send` like `shell` on every line it completes, the first one with what was typed on that line
+  before, so a command typed in parts is judged whole; text that completes no line is low risk. While the program's
+  last line asks for a password, a passphrase, a passcode or a PIN, the text is a `credential` (high risk; the summary
+  names the session and its command, never the text): a `yolo` run types it and keeps the record, as for a password
+  field (item 10), and only the secret, since a line after it would go unjudged; `ask` and `auto` refuse before the
+  gate, as the browser refuses a password field, and the model is told to ask the user to run that step in their own
+  terminal.
+- The prompt's channel order names `terminal_open` with `shell`; the timeline shows the terminal tools with the
+  shell's icon (`icons.js`).
 
-**Touchpoints.** new `shell/terminal.py`, new `tools/terminal.py`, `tools/groups.py`, `policy/shell.py`,
-`agent/prompt.py`, `config.py`, `defaults.toml`, README "Tools", `timeline.js`, `icons.js`.
+**Changed from the first draft.**
+- The session code is `terminal/session.py`, not `shell/terminal.py`: there is no `shell` package.
+- `terminal_open` and `terminal_send` return the program's answer, so a question and its answer take one call.
+- A password prompt in `ask` and `auto` is refused instead of handed off: an approved hand-off would let the agent
+  type the secret, since nobody else can type into its pseudo-terminal.
+- The `http.server` check reads the page with httpx from the test, not with `web_fetch`, which refuses localhost unless
+  `[web] allow_private_hosts` is set; the first draft's check could not pass as written.
+- The output does not mark the run untrusted. Shell output does not either (`TAINTING_KINDS`); the first draft's "like
+  shell output" was wrong about `shell`.
+- `policy/shell.py` and `timeline.js` did not change: the tools reuse `assess_shell`, and the timeline draws a tool
+  step from its name.
+
+**Touchpoints.** new `terminal/session.py`, new `tools/terminal.py`, `tools/groups.py`, `runtime.py`,
+`agent/prompt.py`, `config.py`, `defaults.toml`, `icons.js`, README "Tools" and "Safety", the tool-group tests.
 
 **Decisions and limits.**
 - No terminal emulator: cursor movement and full-screen programs (`vim`, `htop`) show as garbled text, and the tool
   says so. Line-oriented programs are the target.
-- The shell guardrail is best-effort here as in `shell`; the README says so for both.
+- The password prompt is recognised from English words on the program's last line. A prompt worded otherwise is not
+  seen, and what is typed at it is judged as a command line.
+- The shell guardrail is best-effort here as in `shell`: a line typed into a REPL or a remote shell is judged as if
+  zsh ran it.
+- What is typed is echoed by the terminal as part of the output, as a person sees it; a program that asks for a secret
+  without turning the echo off shows the secret.
 
-**Done when.** Smoke tests: `python3 -i` answers an expression; `read -s` shows a password prompt that is handed off
-in `ask` mode and typed in `yolo`; a `python3 -m http.server` session serves a page to `web_fetch` while the run goes
-on and is closed by `terminal_close`; the idle reaper; unit tests of the ANSI stripping and the ring buffer; README.
+**Done when.** Smoke tests (`tests/smoke/test_terminal.py`, no model): `python3 -i` answers an expression and its
+session closes when it exits; behind a `read -s` password prompt a secret is refused in `ask`, sent back with a
+command after it, and typed in `yolo`, and it shows neither in the action, nor in the answer, nor in the yolo record; a
+`python3 -m http.server` session serves a page between calls and stops with `terminal_close`; the session limit and
+the idle reaper. Unit tests of the escape-sequence stripping, the password prompt and the typed lines. README.
 
 ### 21. A plain chat screen
 
@@ -2670,3 +2698,9 @@ text, no console error; the Options panel with YOLO saved; every status ring. RE
   a stored note after each goal, so the next run of a thread can start from the provider's cache. The trailing message
   of screenshots and the one-pass shrink were left out: neither is measured, and the first could cost more than it
   saves (the section says why). Unit tests (554), the offline smoke suite (243, no cloud request), `dotx eval check`.
+- 2026-10-10: item 19 merged as `0526a60` (PR #13, squash). Item 20 started on `item-20-terminal`.
+- 2026-10-10: item 20 done. A tool group `terminal` runs a program on a pseudo-terminal of its own (`terminal_open`,
+  `terminal_send`, `terminal_read`, `terminal_close`): a REPL, an installer that asks questions, a server that stays up
+  between calls. Each line typed is judged as a shell command; a password prompt takes a secret only in `yolo` (`ask`
+  and `auto` refuse, since nobody else can type into the session). Three sessions per chat, closed after 30 idle
+  minutes. Reviewed in the main session. Unit tests (558), the offline smoke suite (247, no cloud request).

@@ -38,6 +38,7 @@ from dotagent.plugins.types import PluginCatalog
 from dotagent.policy.paths import expand_protected
 from dotagent.scheduler.timing import resolve_zone
 from dotagent.store.db import Store
+from dotagent.terminal.session import Terminals
 from dotagent.tools.apple import build_apple_tool
 from dotagent.tools.base import RegisteredTool
 from dotagent.tools.browser import build_browser_tools
@@ -53,6 +54,7 @@ from dotagent.tools.registry import ToolRegistry, build_registry
 from dotagent.tools.schedule import build_schedule_tools
 from dotagent.tools.shell import build_shell_tool, child_env, read_login_env
 from dotagent.tools.skill import build_skill_tool
+from dotagent.tools.terminal import build_terminal_tools
 from dotagent.tools.web import build_web_tools
 from dotagent.web.client import WebClient
 
@@ -69,6 +71,7 @@ class Runtime:
     judge: Judge
     browser: BrowserSession
     desktop: DesktopSession
+    terminals: Terminals
     web: WebClient
     mcp: McpHub
     memory: MemoryIndex
@@ -83,7 +86,8 @@ class Runtime:
 
 
 def _tool_groups(config: AppConfig) -> tuple[tuple[RegisteredTool, ...], ...]:
-    """The tools of this installation: the Mac desktop tools only exist when the desktop is enabled."""
+    """The tools of this installation: the terminal tools only exist when a chat may open a terminal session, the Mac
+    desktop tools only when the desktop is enabled."""
     core: tuple[tuple[RegisteredTool, ...], ...] = (
         build_file_tools(),
         (build_shell_tool(),),
@@ -96,6 +100,7 @@ def _tool_groups(config: AppConfig) -> tuple[tuple[RegisteredTool, ...], ...]:
         build_consult_tools(),
         build_meta_tools(),
         (build_skill_tool(),),
+        *((build_terminal_tools(),) if config.shell.terminal_sessions > 0 else ()),
     )
     if not config.desktop.enabled:
         return core
@@ -173,6 +178,7 @@ async def open_runtime(config: AppConfig, login_env: dict[str, str]) -> Runtime:
             judge=judge_for(config, bus),
             browser=BrowserSession(config.browser, browser_data_dir(config.browser.mode), downloads_dir()),
             desktop=DesktopSession(sized_for_agent(config), failsafe_path()),
+            terminals=Terminals(config.shell.terminal_sessions, config.shell.terminal_idle_s, shell_env),
             web=WebClient(config.web, config.browser.allowed_hosts, config.browser.blocked_hosts),
             mcp=mcp,
             memory=memory,
@@ -190,6 +196,7 @@ async def open_runtime(config: AppConfig, login_env: dict[str, str]) -> Runtime:
 
 
 async def close_runtime(runtime: Runtime) -> None:
+    await runtime.terminals.aclose()
     await runtime.desktop.close()
     await runtime.browser.aclose()
     await runtime.mcp.close()
