@@ -284,8 +284,10 @@ class ActArgs(ToolArgs):
     steps: list[Step] = Field(
         min_length=1,
         description=(
-            "Steps run in order. The batch stops at the first failure or when the screen surprises you (a dialog, a "
-            "different application); the remaining steps are then skipped."
+            "Steps run in order: every step you can predict without a new look at the window (a call with one step "
+            "costs a model round trip for one click). The batch stops at the first failure or when the screen "
+            "surprises you (a dialog, a different application); the remaining steps are then skipped. Example: "
+            '[{"action": "set_value", "ref": "a3", "text": "notes.md"}, {"action": "press", "ref": "a7"}].'
         ),
     )
     app: str | None = Field(

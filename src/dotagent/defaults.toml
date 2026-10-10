@@ -174,6 +174,10 @@ tiers = {}
 profile_min_calls = 50
 weak_refusal_share = 0.1
 reminder_every = 6
+# After three acting steps in a row whose browser_act or desktop_act calls carried one step each on the same page or
+# application, the run is told once to batch the steps it can predict into one call (each call costs a model round
+# trip); false turns the note off.
+steer_single_actions = true
 # Which tools a run's model sees. "full": all of them at every step. "grouped": the core tools (files, shell, web, notes
 # search and saving, delegation, skills, the plan and finish) and the groups the thread already used. The other groups
 # (browser, desktop, schedule, memory_admin, one per MCP server) are listed in the prompt; a group is turned on when the

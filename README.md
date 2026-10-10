@@ -204,6 +204,10 @@ answer (a small model that is offered both writes the call out as text).
   `scaffold = "measured"` a model is weak when at least `profile_min_calls` tool calls of its newest 30 finished runs
   were measured and at least `weak_refusal_share` of them were refused before they ran (an unknown tool, or arguments
   that were not valid JSON or did not fit the tool). `scaffold = "fixed"`, the default, keeps every model standard.
+  Every model, after three acting steps in a row whose `browser_act` or `desktop_act` calls carried one step each on
+  the same page or application, is told once to batch the steps it can predict into one call (each call costs a model
+  round trip; `dotx stats` counts the single-step share), and the timeline shows the note; `steer_single_actions =
+  false` in `[agent]` turns it off.
   The timeline shows a budget cut to the window, why a model is weak, and each reminder.
 - `tool_surface` in `[agent]` decides which tools a run's model sees. `full`, the default, offers all of them at every
   step. `grouped` starts with the core tools (files, the shell, the web, searching and saving notes, delegation,

@@ -118,6 +118,7 @@ class AgentConfig(FrozenModel):
     profile_min_calls: int
     weak_refusal_share: float
     reminder_every: int
+    steer_single_actions: bool
     tool_surface: ToolSurface
     verify_answer_paths: bool
     resume: ResumeMode

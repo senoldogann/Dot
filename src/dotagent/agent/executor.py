@@ -55,7 +55,7 @@ def _site(call: ToolCall, action: ActionInfo | None) -> str:
     return action.target if call.name.startswith("desktop_") else ""
 
 
-def _batch_steps(arguments: JsonObject) -> int:
+def batch_steps(arguments: JsonObject) -> int:
     """How many steps a batched call (``browser_act``, ``desktop_act``) carried; 0 for a call without a step list."""
     steps: object = arguments.get("steps")
     return len(steps) if isinstance(steps, list) else 0
@@ -212,7 +212,7 @@ async def _execute_one(
             "summary": action.summary if action is not None else "",
             "risk": action.risk if action is not None else "",
             "site": _site(call, action),
-            "steps": _batch_steps(call.arguments),
+            "steps": batch_steps(call.arguments),
         },
         True,
     )

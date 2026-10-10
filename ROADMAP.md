@@ -2363,8 +2363,8 @@ Paste this to the agent that takes the work:
 | #   | Item                                                                     | Status  | Commits |
 | --- | ------------------------------------------------------------------------ | ------- | ------- |
 | 22  | Step efficiency: the numbers every later item is judged by               | done    | accd6a8 |
-| 23  | Multi-action turns as the rule                                           | planned |         |
-| 24  | The fast model does the side work                                        | in progress |         |
+| 23  | Multi-action turns as the rule                                           | in progress |         |
+| 24  | The fast model does the side work                                        | done    | 9c16866 |
 | 25  | Early and speculative execution of read-only tools                       | planned |         |
 | 26  | Speed knobs decided by measurement; snapshots that send only the change  | planned |         |
 | 27  | Cheapest channel first: API or CLI, then the browser, then the desktop   | planned |         |
@@ -2440,15 +2440,28 @@ one-line steer.
 **Why.** Measured: a 4-step form in one `act` 409 ms against 773 ms as four calls and three model round trips fewer
 (`PLAN.md` "Measurements"); item 13 batches exist (`browser/session.py`), the model does not use them by default.
 
-**Design.** Prompt lines in `agent/prompt.py` (browser and desktop sections) with one worked example each; a
-`single_action_streak` counter in the loop next to the progress watchdog (item 2) that emits a steer, off when
-`[agent] steer_single_actions = false`.
+**Design, as built.** The prompt's browser and desktop bullets say that a one-step `browser_act` or `desktop_act`
+is the exception, why (a model round trip per call) and what to batch, with one worked example each (a sign-up
+form, a save dialog); the two tools' `steps` descriptions say the same in one line. In `agent/progress.py`, pure
+functions next to the watchdog: `single_action(acts)` tells whether a step's acts were one-step batches on one target
+with one tool (a step that moves between pages or mixes tools is not a wasted round trip), `single_action_streak`
+counts such steps in a row on the same target (1 again on a new target, 0 on a batch or a step without an act), and
+`single_action_steer` writes the note. The loop derives the step's acts from the outcomes (`batch_steps` of the
+call's arguments, the policy action's target: the page's address or the application) and, at
+`SINGLE_ACTION_STEPS` (3) in a row, stores the note for the model and emits a `single_action_steer` event (step,
+tool, target with secrets masked); the count starts again, so a run that keeps clicking one at a time hears it once
+per three steps, never every step. The note never stacks with a progress alert or a reminder of the same step
+(it is the last `elif`). `[agent] steer_single_actions = true` by default, `false` turns it off. The eval set has
+no browser task (the harness runs without a browser or the desktop), so the measured half of "Done when" waits for
+the owner's own runs: `dotx stats --by site` shows the single-step share before and after the daemon restarts on this
+code.
 
 **Touchpoints.** `agent/prompt.py`, `agent/loop.py`, `agent/progress.py`, `tools/browser.py`, `tools/desktop.py`,
-`defaults.toml`, `config.py`, README.
+`defaults.toml`, `config.py`, README "Models and providers" (the scaffold paragraph), `tests/unit/test_progress.py`.
 
-**Done when.** On the eval set the single-action share (item 22) halves against the baseline run and success does
-not drop; the steer has a unit test.
+**Done when.** The steer has unit tests (done: `test_progress.py`, the detector, the streak and the note); the
+single-step share of the owner's runs (item 22, `dotx stats --by site`) halves after this code runs for a while and
+success does not drop (the owner's reading, "Open owner decisions").
 
 ### 24. The fast model does the side work
 
@@ -3270,3 +3283,4 @@ item ends as a measured no, written in the log.
 - 2026-10-10 (Fable 5.1): item 22 built on branch `item-22-step-efficiency`: `tool_result` events record `site` and `steps`; `dotx stats` gains the acts line, the slowdown curve, the cache share and a Sites table (`--by model|site|all`); eval reports carry acts, single acts and cached tokens and show the two shares. Gate: format, check, mypy clean; unit 560; `dotx eval check` ok; offline smoke of the eval runner and scaffold 11 passed. The merge hash goes into the table with the next PR.
 - 2026-10-10 (Fable 5.1): item 22 merged accd6a8 (PR #22, MYP-163 Done). Item 24 (branch `item-24-fast-model`) started; its first commit records accd6a8.
 - 2026-10-10 (Fable 5.1): item 24 built on branch `item-24-fast-model`: the compaction summary is the fast model's side work, the run's own model writes it when the fast one fails and the `compacted` event names the problem (`fast_problem`); `dotx doctor` checks the fast model; defaults and README. Scope cut to what the audit measured (no wait_text or judge classification exists on a chat model; vision has its own role; no goal pre-check). Gate: format, check, mypy clean; unit 560; offline smoke 197 passed, 1 failed: `test_delegate.py::test_a_run_reads_a_file_through_a_delegated_run` (`@requires_model`, a real cloud model delegated three times instead of once; it passed on a rerun; unrelated to this item). The merge hash goes into the table with the next PR.
+- 2026-10-10 (Fable 5.1): item 24 merged 9c16866 (PR #23, MYP-164 Done). Item 23 built on branch `item-23-multi-action`: prompt and tool descriptions make the one-step act the exception, with examples; `progress.py` single-action detector, streak and steer; the loop stores the note and emits `single_action_steer` after three such steps on one target; `[agent] steer_single_actions = true`. Gate: format, check, mypy clean; unit 563; `dotx eval check` ok; smoke scaffold, tool groups and run limits 14 passed. The eval set has no browser task, so the share is the owner's reading with `dotx stats --by site`.
