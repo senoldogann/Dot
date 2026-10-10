@@ -1856,7 +1856,8 @@ model, which is this roadmap's principle.
   Transport and protocol errors pause nothing. By the time an error reaches the router, the connector has retried
   what can be retried (six attempts; a rate limit that asks for more than 120 s is not retried, `llm/http.py:66-73`).
   Anthropic answers a spent prepaid balance with HTTP 400 `invalid_request_error` ("Your credit balance is too low to
-  access the Anthropic API", public reports of September 2026; the documented `billing_error` 402 is kept):
+  access the Anthropic API", reported in September 2026 in anthropic-sdk-typescript issue 618 and ruby_llm issue
+  1006; the documented `billing_error` 402 is kept):
   `classify_anthropic` makes it a quota error.
 - **The roster** (new `agent/helpers.py`). `roster_for(models, keyed, paused) -> Roster(available, unavailable)` is
   pure: a model whose provider lacks its key (Ollama needs none) or that is paused is unavailable, with the reason

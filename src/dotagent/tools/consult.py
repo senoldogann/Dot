@@ -199,7 +199,7 @@ async def _unavailable(ctx: ToolContext, model: str, entry: Unavailable) -> Tool
     await ctx.runtime.bus.emit(ctx.run_id, HELPER_UNAVAILABLE_EVENT, unavailable_event_data(entry), True)
     now: float = time.time()
     roster: Roster = await _roster(ctx)
-    own: str = (await ctx.runtime.store.get_run(ctx.run_id)).model
+    own: str = parse_model_ref((await ctx.runtime.store.get_run(ctx.run_id)).model).label
     others: tuple[str, ...] = tuple(name for name in roster.available if name not in (model, own))
     ask: str = f"ask another helper ({', '.join(others)}) or go on yourself" if others else "go on yourself"
     return fail(f"{unavailable_text(entry, now)} cannot answer; {ask}.")
@@ -219,7 +219,8 @@ def _consult_tool() -> RegisteredTool:
         if asked >= limit:
             return fail(f"This run has asked its helper models as many questions as it may ({limit}). Go on yourself.")
         run_record: RunRecord = await ctx.runtime.store.get_run(ctx.run_id)
-        chosen: str | ToolResult = _chosen(args.model, run_record.model, await _roster(ctx), time.time())
+        own: str = parse_model_ref(run_record.model).label
+        chosen: str | ToolResult = _chosen(args.model, own, await _roster(ctx), time.time())
         if isinstance(chosen, ToolResult):
             return chosen
         text, image = await _question(ctx, args, run_record, secrets.token_hex(_NONCE_BYTES))

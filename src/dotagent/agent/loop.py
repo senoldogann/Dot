@@ -494,7 +494,8 @@ def _only(registry: ToolRegistry, allowed: frozenset[str]) -> ToolRegistry:
 def _run_tools(registry: ToolRegistry, mode: RunMode, specs: Sequence[ToolSpec]) -> ToolRegistry:
     """The tools a run can call: the ones it offers, and the ones of other modes, whose calls are answered as not
     available in the run's mode. A tool of the run's mode that the run leaves out (use_tools when its tools are not
-    grouped, delegate and ask_user in a delegated run, skill when no skill is installed) is answered as unknown."""
+    grouped, delegate, ask_user and consult in a delegated run, skill when no skill is installed, consult without a
+    helper) is answered as unknown."""
     offered: frozenset[str] = frozenset(spec.name for spec in specs)
     return ToolRegistry(
         tools={name: tool for name, tool in registry.tools.items() if name in offered or mode not in tool.modes}
@@ -903,8 +904,8 @@ async def _to_standby(
     through its standby models once at most. The run's reasoning level follows the move: the level of the new model
     that is nearest to it.
 
-    ``None`` when ``error`` says nothing about the model being unable to answer, or when no standby model is available
-    (each lacks its key or is paused): the run then ends with ``error``. A standby model that cannot take the run over
+    ``None`` when ``error`` says nothing about the model being unable to answer, or when no standby model is left that
+    is available (each one the run has not worked on lacks its key or is paused): the run then ends with ``error``. A standby model that cannot take the run over
     (:func:`_fitted`) is passed over; when every available one is, the run fails with a :class:`ConfigError` that says
     why for each."""
     runtime: Runtime = agent.runtime
