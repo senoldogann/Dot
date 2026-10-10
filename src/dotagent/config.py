@@ -221,6 +221,9 @@ class ShellConfig(FrozenModel):
     login_env_timeout_s: float
     default_timeout_s: int
     max_timeout_s: int
+    terminal_sessions: int = Field(ge=0, le=10)
+    # At least the longest wait of a terminal read, so that no session is closed while it is read.
+    terminal_idle_s: float = Field(ge=60)
 
 
 class WebConfig(FrozenModel):

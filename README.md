@@ -257,6 +257,7 @@ answer (a small model that is offered both writes the call out as text).
 | Area            | Tools                                                                                                              |
 | --------------- | ------------------------------------------------------------------------------------------------------------------ |
 | Shell and files | `shell`, `read_file`, `write_file`, `edit_file`, `list_dir`, `find_files`, `search_files`                          |
+| Terminal        | `terminal_open`, `terminal_send`, `terminal_read`, `terminal_close`                                                |
 | Web             | `web_search`, `web_fetch`                                                                                          |
 | Browser         | `browser_open`, `browser_snapshot`, `browser_find`, `browser_links`, `browser_read_text`, `browser_wait_text`, `browser_act`, `browser_scroll`, `browser_screenshot`, `browser_upload`, `browser_back`, `browser_new_tab`, `browser_switch_tab`, `browser_close_tab` |
 | Desktop         | `desktop_apps`, `desktop_open_app`, `desktop_snapshot`, `desktop_read`, `desktop_act`, `desktop_screenshot`, `desktop_clipboard_read`, `desktop_clipboard_write` |
@@ -270,6 +271,16 @@ The shell and the file tools work in `<home>/workspace` unless a path says other
 `PATH` of your login shell, in its own process group (cancelling a run ends the whole group) and under a timeout
 (`[shell] default_timeout_s`, at most `max_timeout_s`). `web_search` uses DuckDuckGo, which needs no key; `web_fetch`
 reads HTML and PDF and refuses localhost, LAN and cloud-metadata addresses unless `[web] allow_private_hosts` is set.
+
+A terminal session is for a program that does not run to its end by itself: one that asks questions (an installer,
+`npm create`, `ssh`), a REPL (`python3 -i`, `psql`), or a server that must stay up while the run goes on.
+`terminal_open` starts it on a pseudo-terminal of its own, with the environment of the shell tool, and returns its
+first output; `terminal_send` types into it and returns the answer, `terminal_read` waits for more (a server's log),
+`terminal_close` ends it and everything it started. The output is read as plain text, without a terminal emulator, so
+full-screen programs such as vim or htop show as garbled text. The command and every line typed into it are judged as
+a `shell` command is. A chat keeps at most `[shell] terminal_sessions` sessions open (3; 0 removes the tools), each
+closed after `terminal_idle_s` without use (30 minutes) and all of them when the daemon stops; the end of a run closes
+none, so a server it started stays up for the next message.
 
 ## Safety
 
@@ -311,9 +322,10 @@ the run clears the mark. A delegated run starts as untrusted as its parent.
 - In `ask` and `auto` the browser and desktop tools never type into password, one-time-code and card fields: the field
   that would take the text is checked, whatever element the step names (a desktop `menu` step that pastes is not). A
   `yolo` run types into them what it can read itself (see
-  [Autonomy](#autonomy-approvals-goal-mode-and-the-end-of-a-run)). The desktop tools never control a password manager
-  or Keychain Access, in any mode, and desktop screenshots black out their windows; secure fields and web pages are
-  not masked.
+  [Autonomy](#autonomy-approvals-goal-mode-and-the-end-of-a-run)). In the same way `terminal_send` types nothing outside
+  `yolo` while the program's last line asks for a password, a passphrase or a PIN. The desktop tools never control a
+  password manager or Keychain Access, in any mode, and desktop screenshots black out their windows; secure fields and
+  web pages are not masked.
 - Environment variables whose names look like secrets are removed from the processes the shell tool starts
   (`[shell] pass_env` lists exceptions).
 - Outside a `yolo` run the agent can neither read nor change `~/.ssh`, `~/.gnupg`, `~/Library/Keychains`, `~/.aws`,
@@ -398,11 +410,12 @@ run page carries a chip for it.
 - `yolo`: nobody does. The action is allowed and recorded. The question that untrusted content raises (see
   [Safety](#safety)) is waived as well, and so are the refusals and hand-offs below: a yolo run reads secrets, uploads
   or sends files from anywhere, and does money and credential steps itself. It types passwords, one-time codes and card
-  numbers into the fields that take them when it can read them itself (a code in a mailbox it can open, a value you
-  gave it); every such field is a `credential` record in its timeline (`financial` for a card field). That is the price
-  of the mode: a run that has read a hostile page can send your files out, pay or sign in without asking you. Only the
-  desktop tools stay away from password managers and Keychain Access in every mode; through the shell and the file
-  tools a yolo run reads the keychain like any other secret.
+  numbers into the fields that take them when it can read them itself (a code in a mailbox it can open, a value you gave
+  it), and a password into a terminal program that asks for one; every such field is a `credential` record in its
+  timeline (`financial` for a card field). That is the price of the mode: a run that has read a hostile page can send
+  your files out, pay or sign in without asking you. Only the desktop tools stay away from password managers and
+  Keychain Access in every mode; through the shell and the file tools a yolo run reads the keychain like any other
+  secret.
 
 Every automatic answer is an ordinary approval record (`decided_by` is `reviewer` or `yolo`, and the note holds the
 reason), an `approval_auto` event and a line in the timeline of the run, so you can see afterwards what went through and

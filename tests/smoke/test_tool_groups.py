@@ -189,20 +189,20 @@ async def test_a_call_of_a_tool_whose_group_is_off_turns_the_group_on_and_the_ne
     assert "- schedule: goals that run later, once or on a cron expression (schedule_create, schedule_list, " in (
         played.steps[0].messages[0].content
     )
-    off: list[str] = ["browser", "memory_admin", "schedule"]
+    off: list[str] = ["browser", "memory_admin", "schedule", "terminal"]
     assert played.groups == (
         {"step": 0, "on": ["core"], "off": off, "turned_on": [], "reason": '[agent] tool_surface is "grouped"'},
         {
             "step": 1,
             "on": ["core", "schedule"],
-            "off": ["browser", "memory_admin"],
+            "off": ["browser", "memory_admin", "terminal"],
             "turned_on": ["schedule"],
             "reason": "",
         },
         {
             "step": 3,
             "on": ["core", "memory_admin", "schedule"],
-            "off": ["browser"],
+            "off": ["browser", "terminal"],
             "turned_on": ["memory_admin"],
             "reason": "",
         },
@@ -219,7 +219,13 @@ async def test_the_next_run_of_a_thread_starts_with_the_groups_the_thread_used(l
     reason: str = '[agent] tool_surface is "auto" and the model is in the weak tier'
     assert (first.groups[0]["on"], first.groups[0]["reason"]) == (["core"], reason)
     assert second.groups == (
-        {"step": 0, "on": ["core", "schedule"], "off": ["browser", "memory_admin"], "turned_on": [], "reason": reason},
+        {
+            "step": 0,
+            "on": ["core", "schedule"],
+            "off": ["browser", "memory_admin", "terminal"],
+            "turned_on": [],
+            "reason": reason,
+        },
     )
     assert set(_SCHEDULE_TOOLS) <= set(_names(second.steps[0]))
     assert not any(name.startswith("browser_") for name in _names(second.steps[0]))

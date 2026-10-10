@@ -223,7 +223,7 @@ export function toolIconName(tool) {
   if (tool.startsWith("desktop_") || tool === "apple_script") {
     return "monitor";
   }
-  if (tool === "shell") {
+  if (tool === "shell" || tool.startsWith("terminal_")) {
     return "terminal";
   }
   if (["read_file", "write_file", "edit_file", "list_dir", "find_files", "search_files"].includes(tool)) {

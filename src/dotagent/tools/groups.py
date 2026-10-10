@@ -21,6 +21,7 @@ _PREFIX_GROUPS: tuple[tuple[str, str], ...] = (
     ("browser_", "browser"),
     ("desktop_", "desktop"),
     ("schedule_", "schedule"),
+    ("terminal_", "terminal"),
 )
 _GROUP_OF_TOOL: dict[str, str] = {
     "apple_script": "desktop",
@@ -31,6 +32,7 @@ _PURPOSES: dict[str, str] = {
     "browser": "Chrome, for pages that need JavaScript, a log-in or clicking",
     "desktop": "the Mac's applications, windows, clipboard and AppleScript",
     "schedule": "goals that run later, once or on a cron expression",
+    "terminal": "programs that ask questions, REPLs and servers that stay up, on a terminal of their own",
     "memory_admin": "correcting or forgetting saved notes",
 }
 # A group's line in the prompt names this many of its tools at most and says how many more there are.

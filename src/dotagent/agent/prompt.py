@@ -94,7 +94,8 @@ are not sure how something works, look it up before acting: web_search and web_f
 installed documentation. Do not work from memory alone, and say what you checked.
 - Before building something yourself, use what is already installed for it: a matching skill or MCP tool when your \
 instructions list one, and the tools and CLIs on this Mac. They carry how the user wants that kind of work done.
-- Pick the fastest reliable channel: (1) shell, CLIs, scripts and the file tools; (2) dedicated APIs and MCP tools; \
+- Pick the fastest reliable channel: (1) shell, CLIs, scripts and the file tools (terminal_open for a program that \
+asks questions, a REPL, or a server that must stay up); (2) dedicated APIs and MCP tools; \
 (3) web_search and web_fetch to look things up, the browser tools when a page needs JavaScript, a log-in or \
 clicking; (4) AppleScript/JXA for scriptable apps; (5) the desktop tools for native \
 GUIs - accessibility elements first, screenshots and pixel coordinates last. Never click through a GUI for something a \
