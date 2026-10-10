@@ -82,7 +82,7 @@ from dotagent.cli_skills import SkillsListCommand, cmd_skills_list
 from dotagent.cli_stats import StatsCommand, cmd_stats
 from dotagent.cli_ui import TerminalUi, UiOptions, read_line
 from dotagent.cli_undo import UndoCommand, cmd_undo
-from dotagent.config import AppConfig, load_user_config
+from dotagent.config import AppConfig, load_user_config, providers_by_key
 from dotagent.core.errors import ConfigError, DotError
 from dotagent.core.logs import configure_logging
 from dotagent.core.paths import (
@@ -141,13 +141,6 @@ _GOAL_MODE_HELP: str = (
     "a checker sends the run back to work until the goal is really reached (default: [agent] goal_mode)"
 )
 _CLI_THREAD: str = "cli"
-
-_PROVIDER_KEYS: dict[str, str] = {
-    "openai": "OPENAI_API_KEY",
-    "opencode_go": "OPENCODE_API_KEY",
-    "anthropic": "ANTHROPIC_API_KEY",
-    "ollama": "OLLAMA_API_KEY",
-}
 
 
 class RunCommand(FrozenModel):
@@ -843,8 +836,9 @@ async def cmd_models(command: ModelsCommand) -> int:
 
 
 async def cmd_auth_set(command: AuthSetCommand) -> int:
-    if command.key not in _PROVIDER_KEYS.values():
-        raise ConfigError("unknown key name", {"key": command.key, "known": list(sorted(_PROVIDER_KEYS.values()))})
+    known: dict[str, str] = providers_by_key(load_user_config())
+    if command.key not in known:
+        raise ConfigError("unknown key name", {"key": command.key, "known": list(sorted(known))})
     if sys.stdin.isatty():
         value: str = await asyncio.to_thread(getpass.getpass, f"{command.key}: ")
     else:
@@ -857,7 +851,7 @@ async def cmd_auth_set(command: AuthSetCommand) -> int:
 
 
 async def cmd_auth_status(command: AuthStatusCommand) -> int:
-    for provider_name, variable in _PROVIDER_KEYS.items():
+    for variable, provider_name in providers_by_key(load_user_config()).items():
         state: str = "set" if await asyncio.to_thread(resolve_secret, variable) is not None else "missing"
         sys.stdout.write(f"{provider_name:<12} {variable:<18} {state}\n")
     return 0

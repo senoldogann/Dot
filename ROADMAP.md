@@ -2716,4 +2716,7 @@ text, no console error; the Options panel with YOLO saved; every status ring. RE
   and the Browser bullet of the prompt no longer tells the agent to keep to a platform's rules; a limit set in
   `config.toml` still holds in every mode, and a `browser_act` still takes one public or social click. Decisions 6, 7
   and 14, which the owner answered on 2026-10-09, are marked so; decision 10 is done (six skill folders of
-  `~/.claude/skills` in the owner's `config.toml`). Branch `decision-08-no-pace-limits`.
+  `~/.claude/skills` in the owner's `config.toml`). Found on the way: `dotx auth set TYPESAFE_API_KEY` answered "unknown
+  key name", since item 16 added the key to Settings › API keys only; `dotx auth set` and `dotx auth status` now take
+  the keys of that page from one list (`config.providers_by_key`), and a smoke test stores the key. Branch
+  `decision-08-no-pace-limits`.
