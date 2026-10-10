@@ -2376,12 +2376,12 @@ Paste this to the agent that takes the work:
 | 33  | Pre-approved spending caps                                               | planned |         |
 | 34  | Research runs that keep notes, and hosted search by default              | planned |         |
 | 35  | A plan with dependencies and parallel branches                           | done    | d6b40c1 |
-| 36  | Playbooks learned from runs that reached their goal                      | in progress |     |
+| 36  | Playbooks learned from runs that reached their goal                      | done    | fb99354 |
 | 37  | A stuck campaign changes strategy, not just session                      | planned |         |
 | 38  | One view of what a run did and what can be undone                        | planned |         |
 | 39  | CI and retention defaults                                                | planned |         |
 | 40  | Cold start of `dotx`                                                     | planned |         |
-| 41  | An own crawler: fetch, render, crawl, extract                            | planned |         |
+| 41  | An own crawler: fetch, render, crawl, extract                            | in progress |     |
 | 42  | TypeSafe as a tool of the agent: many items judged in one call           | planned |         |
 | 43  | Typed judgments in X campaigns: what to answer, the best draft, a check  | planned |         |
 | 44  | Typed checks before a model call: the page after an action, the goal     | planned |         |
@@ -2847,13 +2847,35 @@ browser page borrowed from `browser/session.py`. Limits in `[web.crawl]`: `max_p
 over `tool_output_chars` go to the run's folder as files and the tool returns the index. No external service, no
 key. The addresses rule (`web/addresses.py`) holds for every fetched and rendered page.
 
-**Touchpoints.** `web/crawl.py`, `web/text.py`, `web/client.py`, `web/gate.py`, `tools/web.py`, `browser/session.py`,
-`defaults.toml`, `config.py`, `doctor.py`, README "Tools" and "Research", `tests/smoke/test_crawl.py` on the fixture
-server (a 30-page site with a JavaScript-only page and a PDF).
+**Design, as built.** `web/crawl.py` holds the pure parts (`scope_of`, `in_scope`, `page_links` from the HTML's
+anchors with `<base>` honoured, `plan_frontier`, `looks_like_shell`, which `web_fetch`'s JavaScript note now shares,
+`robots_rules`) and `crawl()`, which runs them breadth first against the existing `WebClient` (so the address rules
+and the browser's host lists hold for every page, as for `web_fetch`) with a `RequestGate` per host, a semaphore of
+`concurrency`, `robots.txt` read once per host, and the page limit applied per level. The reader is `web/text.py`'s
+`html_to_text`: its output already is the markdown-like text of `web_fetch` (headings, lists, tables, links), so no
+`to_markdown` was written; the link graph is each page's in-scope links. Rendering is a callable the tool hands in: the
+run's own browser tab (`open_url`, then `read_text` of the whole page), one page at a time, so `web_crawl` is not
+parallel-safe; a browser that cannot render leaves the plain text and says so in the page's `problem`. The cache is per
+call (addresses seen), not per run: the crawl folder in the workspace is the durable copy. `web_extract` builds one tool
+spec from the fields the model names (a `value` and a `quote` per field, all required), asks the fast model once per
+source with the document as the user message, validates the answer and checks each quote against the source's
+normalised text; an unverified value is kept and flagged, not dropped. Sources are addresses or workspace files, read
+one after another (deterministic, and the fast model is fast). Limits in `[web.crawl]`: `max_pages 50`, `max_depth 3`,
+`concurrency 4`, `per_host_spacing_s 0.5`, `render auto`, `robots report`, `page_max_chars 20000`. Results over the
+tool's budget become `NNN.md` files plus `index.md` under `<workspace>/crawl/<host>-<time>/` and the tool returns the
+index with the paths. No `doctor.py` row: nothing to check that `web_fetch`'s rows do not. The research eval of the
+plan needs the network and a live model, so it is not in the offline harness (decision 1's live runs can add
+`--task` research goals later); the measurement here is the smoke test on the fixture site.
 
-**Done when.** The smoke test crawls the fixture site within the limits, renders the JavaScript page, extracts a
-typed table from three pages with source quotes, and a 30-minute research eval uses `web_crawl` instead of repeated
-`web_fetch` with fewer steps (item 22). README documents the tools and the limits.
+**Touchpoints.** `web/crawl.py`, `web/extract.py`, `tools/web.py`, `config.py` (`CrawlConfig`), `defaults.toml`
+(`[web.crawl]`), `llm/calls.py` (purpose `extract`), README "Tools", `tests/unit/test_crawl.py`,
+`tests/smoke/test_crawl.py` (a 30-page fixture site with a JavaScript-only page, a PDF, a robots.txt and a folder
+outside the scope; headless Chrome renders the JavaScript page).
+
+**Done when.** The smoke test crawls the fixture site within the limits (the depth cap of the config holds against a
+larger request), renders the JavaScript page, writes a crawl that does not fit one result to files, and extracts two
+typed fields from three pages with source quotes checked (one quote deliberately wrong and flagged); the pure parts
+have unit tests. README documents the tools and the limits. (All done.)
 
 ### 42. TypeSafe as a tool of the agent: many items judged in one call
 
@@ -3393,3 +3415,5 @@ item ends as a measured no, written in the log.
 - 2026-10-10 (Fable 5.1): item 35 built on branch `item-35-plan-branches` (MYP-169): `PlanItem.depends_on` with range, self and cycle checks; the plan result names the ready (independent) and held steps; `delegate` takes `step` and the loop closes that step from the report (done with evidence, or failed); web UI shows `after 1, 2`. No scheduler, no step budget, no graph drawing, no eval task (the scripted model answers in call order): the design section says why. Gate: format, check, mypy clean; unit 574; `dotx eval check` 31 ok; smoke (plan branches, helpers, run limits, resume, watchdog, campaigns, answer check, scaffold, tool groups, server) 76 passed; the two delegated steps overlap in the real loop.
 - 2026-10-10 (Fable 5.1): item 35 merged d6b40c1 (PR #28, MYP-169 Done). Next: item 36 (playbooks learned from runs that reached their goal).
 - 2026-10-10 (Fable 5.1): item 36 built on branch `item-36-playbooks` (MYP-170): `agent/playbooks.py` distils a goal-mode run that ended done on a site into `<home>/playbooks/playbook-<host>/SKILL.md` through the review model, the skills catalog reads the folder as a root, runs that read a playbook count its use and two failures retire it; `dotx playbooks list|show|drop`; default off (decision 17). Gate: format, check, mypy clean; unit 581; `dotx eval check` 31 ok; smoke (skills runtime, lessons, helpers, doctor, scaffold, plan branches) 34 passed.
+- 2026-10-10 (Fable 5.1): item 36 merged fb99354 (PR #29, MYP-170 Done). Next: item 41 (an own crawler).
+- 2026-10-10 (Fable 5.1): item 41 built on branch `item-41-own-crawler` (MYP-171): `web/crawl.py` (breadth-first crawl within a prefix or host scope, per-host pacing, robots.txt read and reported, a shell page rendered in Dot's own Chrome, PDFs read, one clean text per page), `web/extract.py` (typed fields with a quote each, checked against the source, on the fast model), tools `web_crawl` and `web_extract` (a crawl that does not fit one result becomes Markdown files in the workspace), `[web.crawl]` caps. Tool descriptions trimmed so the small-window scaffold test still compacts at a steady pace (core share 0.412; `test_tool_groups` bound 0.45). Gate: format, check, mypy clean; unit 587; `dotx eval check` ok; smoke (crawl against a local fixture site with headless Chrome, web, tool groups, scaffold, plan branches, helpers, doctor, server) 72 passed.

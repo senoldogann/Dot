@@ -281,6 +281,22 @@ pdf_max_bytes = 30000000
 allow_private_hosts = false
 user_agent = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Safari/605.1.15"
 
+[web.crawl]
+# The limits of web_crawl: the most pages one call may read and the deepest link it may follow (a call may ask for
+# less), how many fetches run at once, and how far apart the requests to one host start.
+max_pages = 50
+max_depth = 3
+concurrency = 4
+per_host_spacing_s = 0.5
+# "auto": a page that shows little text without JavaScript is rendered once in Dot's own browser and read from the
+# screen; "never": plain fetches only; "always": every HTML page is rendered.
+render = "auto"
+# "report": robots.txt is read and the addresses it disallows are named in the result, but fetched; "obey": they are
+# left out.
+robots = "report"
+# The most characters of text kept per page.
+page_max_chars = 20000
+
 [browser]
 # "own": Dot starts a Chrome of its own on its own profile (sign in once with `dotx browser login`, or copy your sign-ins
 # with `dotx browser import-chrome`). "attach": Dot works in new tabs of the Chrome you already have open, signed in as
