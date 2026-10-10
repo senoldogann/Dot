@@ -158,12 +158,12 @@ async def test_the_hosted_search_of_ollama_answers_with_titles_and_addresses() -
 
 @pytest.mark.hosted
 @requires_typesafe
-async def test_typesafe_judges_click_labels_in_english_turkish_and_finnish() -> None:
-    """The labels the policy's patterns miss or know only in some languages, with the probability of each flag the
-    judge asks about, in its own words: printed for the owner to set the thresholds by, and checked only for being
-    probabilities."""
+async def test_typesafe_judges_click_labels_the_patterns_do_not_know() -> None:
+    """Labels no pattern of the policy knows, as the judge gets them (a repost, a share, a payment and a deletion in
+    other languages), with the probability of each flag the judge asks about, in its own words: printed for the owner to
+    set the thresholds by, and checked only for being probabilities."""
     assert TYPESAFE_KEY is not None
-    labels: tuple[str, ...] = ("Repost", "Yeniden gönder", "Lähetä", "Pay now", "Delete account")
+    labels: tuple[str, ...] = ("Boost", "Teilen", "Compartir", "Jetzt bezahlen", "Konto löschen")
     questions: tuple[NoulQuestion, ...] = tuple(question for question, _ in CLICK_QUESTIONS)
     client: TypeSafeClient = TypeSafeClient(DEFAULTS.judge, TYPESAFE_KEY)
     try:

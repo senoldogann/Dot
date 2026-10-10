@@ -3,7 +3,7 @@ model cannot answer for a while, and how that is told to the model."""
 
 import re
 
-from dotagent.agent.helpers import Roster, Unavailable, roster_for, roster_text, unavailable_text, until_text
+from dotagent.agent.helpers import Roster, Unavailable, roster_for, roster_text, unavailable_text
 from dotagent.config import AppConfig, ModelsConfig, load_default_config
 from dotagent.core.errors import (
     MissingSecretError,
@@ -13,6 +13,7 @@ from dotagent.core.errors import (
     ProviderRateLimitError,
     ProviderTransportError,
 )
+from dotagent.core.text import until_text
 from dotagent.evals.runner import eval_config
 from dotagent.llm.router import MAX_PAUSE_S, Pause, pause_for
 

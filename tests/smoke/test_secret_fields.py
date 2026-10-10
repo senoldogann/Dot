@@ -120,7 +120,16 @@ async def _context(runtime: Runtime, approvals: ApprovalMode) -> tuple[ToolConte
         thread.id, GOAL, "task", "ollama:none", None, "test", "medium", approvals, False, None
     )
     gate: RunGate = RunGate(
-        runtime.store, runtime.bus, runtime.approvals, run.id, "task", "aggressive", approvals, _nobody, (GOAL,)
+        runtime.store,
+        runtime.bus,
+        runtime.approvals,
+        run.id,
+        "task",
+        "aggressive",
+        runtime.config.policy.pace,
+        approvals,
+        _nobody,
+        (GOAL,),
     )
     ctx: ToolContext = ToolContext(
         runtime=runtime,

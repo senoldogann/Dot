@@ -16,6 +16,7 @@ import pytest_asyncio
 from dotagent.agent.approvals import ApprovalBroker
 from dotagent.agent.gate import REVIEWER_DECIDER, YOLO_DECIDER, RunGate
 from dotagent.agent.review import Reviewer, ReviewRequest, ReviewVerdict
+from dotagent.config import PaceConfig
 from dotagent.core.errors import ApprovalRejected, HandedOff, PolicyDenied
 from dotagent.events import EventBus
 from dotagent.policy.types import ActionInfo, ApprovalMode, Preset
@@ -24,6 +25,10 @@ from dotagent.store.models import ApprovalRecord, EventRecord, RunMode, RunRecor
 
 WAIT_S: float = 10.0
 INSTRUCTION: str = "Save my notes in notes.md"
+# No pace: these tests are about who answers the policy's questions.
+NO_PACE: PaceConfig = PaceConfig(
+    public_per_hour=0, public_per_day=0, social_per_hour=0, social_per_day=0, public_spacing_s=0.0
+)
 
 # What the cautious preset asks about, a payment (a hard stop that is the user's in every mode), a read of a key (refused
 # in every mode) and a schedule (allowed by the aggressive preset until the run has read content from a stranger).
@@ -100,7 +105,7 @@ def _answering(decision: Literal["approve", "deny", "escalate"], asked: list[Rev
 
 def _gate(room: Room, run_mode: RunMode, preset: Preset, approvals: ApprovalMode, reviewer: Reviewer) -> RunGate:
     return RunGate(
-        room.store, room.bus, room.broker, room.run.id, run_mode, preset, approvals, reviewer, (INSTRUCTION,)
+        room.store, room.bus, room.broker, room.run.id, run_mode, preset, NO_PACE, approvals, reviewer, (INSTRUCTION,)
     )
 
 

@@ -898,8 +898,8 @@ that change the owner's agent are their call (see "Open owner decisions", 6 onwa
 | 13  | Faster browser and desktop steps                                       | done        | a14f21a |
 | 14  | Rich editors, drag and bulk text in the browser                        | done        | 37808d5 |
 | 15  | Helper models: consult, delegate to another model, standby             | done        | 530ac62 |
-| 16  | Typed judgments (TypeSafe) at the decision points                      | done        |         |
-| 17  | Pacing and public actions on social platforms                          | planned     |         |
+| 16  | Typed judgments (TypeSafe) at the decision points                      | done        | a5516f7 |
+| 17  | Pacing and public actions on social platforms                          | done        |         |
 | 18  | Skills written for Claude Code, and the X playbook                     | planned     |         |
 | 19  | Prompt-cache hygiene for the hosted providers                          | planned     |         |
 | 20  | An interactive terminal for programs that prompt                       | planned     |         |
@@ -1976,8 +1976,8 @@ throw-away home; the timeline checked in headless Chrome; README.
 
 ### 16. Typed judgments (TypeSafe) at the decision points
 
-**Status: done.** **Goal.** Where the harness decides something today with a regular expression or with a full
-review-model call, a small typed judgment can answer instead: fast, with a probability, in any language.
+**Status: done** (`a5516f7`, PR #10). **Goal.** Where the harness decides something today with a regular expression or
+with a full review-model call, a small typed judgment can answer instead: fast, with a probability, in any language.
 
 **Why.** The owner asked whether the decision system of TypeSafe (typesafe.ai, "System One" models such as Jev,
 which return typed answers and probabilities for Choice, Noul and Score questions) belongs in Dot; their OSJarvis
@@ -2046,8 +2046,8 @@ decision maker: the harness keeps the workflow, the judge supplies the semantic 
   the goal checker's call, one it lets through costs both.
 - Not run live: no request has reached TypeSafe yet, and the page where a key is made was not checked (Settings links
   to `typesafe.ai`). The hosted test (`.venv/bin/python -m pytest tests/smoke/test_hosted_services.py -m hosted -k
-  typesafe`) sends "Repost", "Yeniden gönder", "Lähetä", "Pay now" and "Delete account" with the judge's own questions
-  and prints the probabilities. Before the judge becomes the owner's default, count on their history (counts only,
+  typesafe`) sends a few labels no pattern knows (since item 17: "Boost", "Teilen", "Compartir", "Jetzt bezahlen",
+  "Konto löschen") with the judge's own questions and prints the probabilities. Before the judge becomes the owner's default, count on their history (counts only,
   read-only): how many allowed browser clicks on social hosts had labels that matched no pattern.
 
 **Done when.** Unit tests of which clicks are judged and of what the probabilities add (`tests/unit/test_judge.py`).
@@ -2059,7 +2059,7 @@ when they run it.
 
 ### 17. Pacing and public actions on social platforms
 
-**Status: planned.** **Goal.** Reposts, quotes, follows and likes are seen as what they are, and a run keeps to a pace
+**Status: done.** **Goal.** Reposts, quotes, follows and likes are seen as what they are, and a run keeps to a pace
 that a platform tolerates, so an account that Dot grows is not the account Dot gets suspended.
 
 **Why.** `_POST_ACTION` and `_SEND_ACTION` (`policy/elements.py:28-29`) catch Post, Tweet, Retweet, Publish, Share,
@@ -2068,39 +2068,64 @@ at all. No cap and no spacing exist for public actions (search of `browser/` and
 quota, cooldown, throttle). A campaign that "does what it takes" on X would follow and like without limit; platforms
 suspend for exactly that.
 
-**Design.**
-- **Patterns.** `_POST_ACTION` adds `repost`, `quote`, `yeniden gönder`, `alıntı`; a new `_SOCIAL_ACTION` matches
-  `follow`, `unfollow`, `like`, `unlike`, `subscribe`, `connect`, `takip`, `beğen`, `abone` and gives a new flag
-  `social` (`policy/types.py:31-45`), risk `low`, in `TAINT_ESCALATION_FLAGS` (outward-facing). Finnish labels
-  (`Julkaise`, `Seuraa`, `Tykkää`, `Lähetä`) join the three patterns; item 16 covers the rest of the world's labels.
-- **The pace.** `[policy] public_actions_per_hour = 20`, `public_actions_per_day = 120` (flags `public_post` and
-  `external_send`), `social_actions_per_hour = 40`, `social_actions_per_day = 300` (flag `social`), and
-  `public_action_spacing_s = 20` between two public actions on one host; 0 means no limit. Counted per host, across
-  threads: `ActionInfo` gets `host: str` (empty when not a web action), set by `browser_act`'s classification from the
-  thread's current page; the gate writes an allowed public or social action to a table `paced_actions(host, flag, ts,
-  run_id)` and refuses the one past a limit: "Pace for x.com: 20 of 20 public actions this hour; the next is allowed
-  at 14:35. Do other work meanwhile, or schedule a session." A pace is a limit, not a question: `yolo` does not waive
-  it; the owner sets 0 to remove it.
-- **Prompt.** A `# Platforms` paragraph: "Work on a platform within its rules: no bulk follows or likes, no duplicate
-  posts, no automation the platform forbids; the pace limits of this run are enforced and shown when reached; growth
-  comes from posts people want to read and replies that add something." The `x-twitter-growth` skill (item 18) carries
-  the strategy.
-- **Where it is seen.** The timeline shows a paced refusal with the host and the next window; the campaign page
-  (item 12) shows the counts of the day per host.
+**Design** (checked against the code on 2026-10-10; what changed from the first draft is listed below).
+- **Patterns** (`policy/elements.py`). `_POST_ACTION` adds `repost`, `yeniden gönder` and the Finnish `julkaise`, and
+  `quote` and `alıntı(la)` at the start of a label or of a sentence in it ("Quote", "12 Quotes. Quote"; "Get a quote"
+  stays a plain click); `_SEND_ACTION` adds `lähetä`. The new `_SOCIAL_ACTION` matches follow, unfollow, like, unlike,
+  subscribe, unsubscribe, connect, `takip et`, `takibi bırak`, `beğen`, `beğenmekten vazgeç`, `abone ol`, `seuraa` and
+  `tykkää` in the same place ("Follow @dot", "12 Likes. Like"; "Posts you might like" and "Following @dot" are no
+  action). It gives the reason `social`: the new flag `social`, of risk `low` when it is the only one, in
+  `TAINT_ESCALATION_FLAGS` (outward-facing).
+- **The pace** (new `policy/pace.py`, pure). `[policy.pace] public_per_hour = 10`, `public_per_day = 50`,
+  `social_per_hour = 20`, `social_per_day = 100`, `public_spacing_s = 20`; 0 removes a limit. A `browser_click` or
+  `browser_input` action with `public_post` or `external_send` is public, one with `social` is social. It counts on its
+  site, the host of the action's target (the page's address) without `www.`, across runs and threads, in a sliding
+  hour and day (`paced_actions(host, pace, ts, run_id)` in the store).
+- **In the gate** (`agent/gate.py`). Before the policy decides, an action past a limit is refused (`PolicyDenied` and a
+  `policy` event with source `pace`): "Pace for x.com: 10 of 10 public actions in the last hour; the next is allowed at
+  14:35. Do other work meanwhile, or leave the rest to a later session." No approval mode waives it. Once the action is
+  let through, a public one waits until `public_spacing_s` have passed since the last public one on its site, and the
+  action is recorded.
+- **One per batch** (`tools/browser.py`). A `browser_act` call with more than one public or social click (by the
+  patterns or the typed judge) is sent back ("A batch takes one public or social action at most…"), so that each one
+  counts.
+- **Prompt.** A bullet under Browser: keep to a platform's rules (no bulk follows or likes, no duplicate posts, nothing
+  its automation rules forbid), one public or social action per `browser_act`, and what a refusal of the pace means.
+- **Where it is seen.** The refusal is a `policy` event, which the timeline and `dotx run` show with its reason. README
+  "Safety" ("Pace on social platforms").
 
-**Touchpoints.** `policy/elements.py`, `policy/types.py`, `policy/engine.py` (the pace check after the decision),
-`agent/gate.py`, `tools/browser.py`, `store/db.py` (`paced_actions`), `agent/prompt.py`, `config.py`, `defaults.toml`,
-README "Safety", `rules.js` (the flag list), `timeline.js`.
+**Touchpoints.** `policy/elements.py`, `policy/types.py`, new `policy/pace.py`, `agent/gate.py`, `agent/manager.py`,
+`tools/browser.py`, `store/db.py`, `agent/prompt.py`, `core/text.py` (`until_text`, moved from `agent/helpers.py` so
+that the policy does not import the agent), `config.py`, `defaults.toml`, README "Safety".
+
+**Changed from the first draft.**
+- `ActionInfo` has no `host`: the pace reads the host from the target of a browser action, which is the page's address
+  (twenty constructors would have changed for one tool's sake).
+- The pace is checked in the gate, before the decision, not in `policy/engine.py`: the engine is pure and the count
+  needs the store.
+- The spacing waits instead of refusing: a refusal would cost the model a step for a wait of seconds.
+- One public or social click per batch: otherwise a batch of twenty likes would count once.
+- Lower defaults than the draft's (20 and 120 public, 40 and 300 social): X cut an unverified account's posts to 50 a
+  day in May 2026 (decision 8). The keys sit in `[policy.pace]` (`PaceConfig`), not as five `[policy]` keys.
+- `quote`, `alıntı` and the social words count only at the start of a label or of a sentence in it, so that ordinary
+  links and offers are not taken for them.
+- `rules.js` has no list of flags to change. The campaign page shows no counts per host: the refusal says what the run
+  needs to know.
+- The typed judge's tests use "Boost" and other labels the new patterns do not know.
 
 **Decisions and limits.**
-- The default numbers are conservative guesses; the implementer verifies them against the platforms' published rules
-  before the defaults are set (open decision 8). They apply to every host; a per-host table is not built until the
-  owner asks.
-- The count sees only browser clicks the policy saw. A post made through an API in the shell is not counted.
+- The defaults are guesses below X's published limits (decision 8). X's automation rules forbid automated likes and
+  bulk or aggressive following, and warn that scripting the website can get an account suspended: the pace makes Dot
+  slow, not allowed.
+- Only the clicks the policy recognises are counted: a post sent with a keyboard shortcut or through an API from the
+  shell is not, and an action that was let through counts even when its click then fails.
+- Two runs acting on one site at the same moment can both pass a limit before either is recorded.
 
-**Done when.** Unit tests of the patterns (English, Turkish, Finnish labels; Repost, Quote, Follow, Beğen flagged;
-"Reposted by" as text not an action) and of the pace windows (pure); a smoke test on a fixture page with Repost and
-Follow buttons that hits `public_actions_per_hour = 2`; the paced refusal text in the timeline; README.
+**Done when.** Unit tests of the patterns (English, Turkish and Finnish labels; Repost, Quote, Follow, Like and Beğen
+flagged; "Get a quote", "Posts you might like" and "Reposted by Dot" not) and of the pace (the windows, the spacing,
+what counts). A smoke test on a fixture page in headless Chrome with `public_per_hour = 2`: a batch with a repost and
+a follow sent back, two reposts spaced, the third refused in `yolo` with a `pace` policy event, a follow counted
+apart. README.
 
 ### 18. Skills written for Claude Code, and the X playbook
 
@@ -2265,8 +2290,13 @@ text, no console error; the Options panel with YOLO saved; every status ring. RE
    `run_max_tokens = 0` are proposals: say the numbers you want, or that none should bound a campaign.
 7. `yolo` and password managers (item 10): secure fields and one-time codes are typed in `yolo` by design of this
    part; password-manager apps stay refused in every mode unless you say otherwise.
-8. Pace limits (item 17): the defaults (20 public actions an hour, 120 a day; 40 social an hour, 300 a day; 20 s
-   between public actions) are conservative guesses. Confirm them against the platforms' published rules, or set 0.
+8. Pace limits (item 17): the defaults (`[policy.pace]`: 10 public actions an hour and 50 a day, 20 social ones an hour
+   and 100 a day, 20 s between public actions) sit below X's published limits as search results quoted the Help Center
+   on 2026-10-10 (help.x.com answered HTTP 403 to a direct read, so its pages were not read themselves): an unverified
+   account may send 50 posts and 200 replies a day (cut from 2 400 in May 2026, by news reports), 500 messages and 400
+   follows. The same sources say X's automation rules forbid automated likes outright and bulk or aggressive following,
+   and that scripting the website can get an account suspended. Decide whether Dot may like and follow on X at all, and
+   set your numbers, or 0.
 9. TypeSafe (item 16): save `TYPESAFE_API_KEY` (Settings › API keys, or `dotx auth set TYPESAFE_API_KEY`), run the
    hosted test (a few paid requests: `.venv/bin/python -m pytest tests/smoke/test_hosted_services.py -m hosted -k
    typesafe`), set the thresholds by what it prints, and run the read-only count on your history (how many allowed
@@ -2287,10 +2317,10 @@ text, no console error; the Options panel with YOLO saved; every status ring. RE
     `memory_save` are acting-only, `tools/base.py:16-17`), and DuckDuckGo's bot check throttles long research runs
     (README "Status and known limits"). Say whether a research run may save notes and files under the workspace,
     and whether the hosted Ollama search (`OLLAMA_API_KEY`) should be the default backend; either is a small item.
-15. The Claude GitHub app reviews nothing yet: on PR #1, PR #2, PR #4, PR #5, PR #6, PR #7, PR #8 and PR #9 it answered
-    "Code review skipped" (on PR #3 it posted nothing) because your organization has no extra usage to pay for it. Add
-    extra usage (or raise the monthly limit) at claude.ai/admin-settings/usage; a comment `@claude review` on a PR then
-    asks for a review. Until then each PR is merged on the agent's own review.
+15. The Claude GitHub app reviews nothing yet: on PR #1, PR #2, PR #4, PR #5, PR #6, PR #7, PR #8, PR #9 and PR #10 it
+    answered "Code review skipped" (on PR #3 it posted nothing) because your organization has no extra usage to pay for
+    it. Add extra usage (or raise the monthly limit) at claude.ai/admin-settings/usage; a comment `@claude review` on a
+    PR then asks for a review. Until then each PR is merged on the agent's own review.
 16. The review model has no standby (item 15): with `[models] review` on the provider of `main` (the default), a run
     in goal mode or with `auto` approvals that moved to its standby fails its goal check or its approvals while that
     provider cannot answer. Set `review` to a model of another provider (decision 3), or say that the review model
@@ -2607,3 +2637,11 @@ text, no console error; the Options panel with YOLO saved; every status ring. RE
   and a page's query and fragment are not sent. Unit tests (550), the offline smoke suite (242, the judge's three on a
   stand-in for the API and headless Chrome; no cloud request). No request reached TypeSafe: the key, the hosted test
   and the count are the owner's (decision 9).
+- 2026-10-10: item 16 merged as `a5516f7` (PR #10, squash); the Claude GitHub app skipped its review again (decision
+  15). Item 17 started on `item-17-pacing`.
+- 2026-10-10: item 17 done. Repost, Quote, Follow, Like and their Turkish and Finnish labels are flagged (the new flag
+  `social` for follows and likes); public and social browser actions keep a pace per site in the gate (10 and 50 public
+  an hour and a day, 20 and 100 social, public ones 20 s apart), which no approval mode waives, and a batch takes one
+  such click at most. The defaults are lower than the draft's after X's published limits (decision 8; help.x.com
+  refused a direct read, so they come from search results). Reviewed in the main session. Unit tests (553), the
+  offline smoke suite (243, with the pace on a fixture page in headless Chrome; no cloud request).

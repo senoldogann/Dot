@@ -26,7 +26,7 @@ from dotagent.core.text import fold_search
 from dotagent.core.types import JsonArray, JsonObject
 from dotagent.llm.calls import CALL_EVENT, CallPurpose
 from dotagent.llm.types import Effort, ImageData, Message
-from dotagent.policy.types import ApprovalMode
+from dotagent.policy.types import ApprovalMode, PaceClass
 from dotagent.store.endings import RESULT_RESTARTED
 from dotagent.store.models import (
     WORKING_STATUSES,
@@ -106,6 +106,10 @@ CREATE TABLE IF NOT EXISTS campaign_entries (
     text TEXT NOT NULL, numbers TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS campaign_entries_ts ON campaign_entries(campaign_id, ts);
+CREATE TABLE IF NOT EXISTS paced_actions (
+    host TEXT NOT NULL, pace TEXT NOT NULL, ts REAL NOT NULL, run_id TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS paced_actions_host ON paced_actions(host, pace, ts);
 """
 
 _EXTENSIONS: dict[str, str] = {
@@ -1565,6 +1569,20 @@ class Store:
             (campaign_id, kind),
         )
         return None if row is None else _campaign_entry(row)
+
+    async def record_paced_action(self, host: str, pace: PaceClass, ts: float, run_id: str) -> None:
+        """Count a public or social action of ``run_id`` on ``host`` (:mod:`dotagent.policy.pace`)."""
+        await self._db.execute(
+            "INSERT INTO paced_actions(host, pace, ts, run_id) VALUES(?, ?, ?, ?)", (host, pace, ts, run_id)
+        )
+        await self._db.commit()
+
+    async def paced_times(self, host: str, pace: PaceClass, since: float) -> list[float]:
+        """The times of the ``pace`` actions on ``host`` after ``since``, oldest first."""
+        rows = await self._all(
+            "SELECT ts FROM paced_actions WHERE host = ? AND pace = ? AND ts > ? ORDER BY ts", (host, pace, since)
+        )
+        return [float(row["ts"]) for row in rows]
 
     async def campaign_sessions(self, campaign_id: str) -> list[RunRecord]:
         """The sessions of the campaign, oldest first."""

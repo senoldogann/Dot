@@ -48,6 +48,7 @@ from dotagent.config import BrowserConfig
 from dotagent.core.errors import ToolInputError
 from dotagent.llm.types import ImageData
 from dotagent.policy.elements import Element, StepAssessment, assessment_for, combine_assessments
+from dotagent.policy.pace import pace_class
 from dotagent.policy.paths import PathClass, classify_path, expand_path
 from dotagent.policy.types import ActionInfo, ActionKind, Flag, Risk
 from dotagent.tools.base import (
@@ -326,9 +327,8 @@ def _act_tool() -> RegisteredTool:
         judged: list[tuple[Step, Element | None, Element | None]] = list(
             zip(args.steps, elements, targets, strict=True)
         )
-        assessment: StepAssessment = combine_assessments(
-            [assess_step(step, element, target) for step, element, target in judged]
-        )
+        assessed: list[StepAssessment] = [assess_step(step, element, target) for step, element, target in judged]
+        assessment: StepAssessment = combine_assessments(assessed)
         kind: ActionKind = _act_kind(args.steps)
         summary: str = "; ".join(_step_label(step, element, target) for step, element, target in judged)
         target: str = ctx.runtime.browser.current_url(ctx.thread_id) or ""
@@ -342,6 +342,14 @@ def _act_tool() -> RegisteredTool:
         found: list[StepAssessment] = [assessment_for(judgment.reasons) for judgment in judgments if judgment.reasons]
         if found:
             assessment = combine_assessments([assessment, *found])
+        # The pace of a site counts actions, so a batch carries one public or social action at most.
+        paced: int = sum(1 for part in [*assessed, *found] if pace_class(part.flags) is not None)
+        if paced > 1:
+            raise ToolInputError(
+                "A batch takes one public or social action at most (a post, a reply, a repost, a message, a follow, a "
+                "like): each one counts toward the pace of the site. Send them one call at a time.",
+                {"public_or_social_steps": paced},
+            )
         notes: list[str] = [judgment.note for judgment in judgments if judgment.note]
         if notes:
             summary = f"{summary} ({'; '.join(notes)})"

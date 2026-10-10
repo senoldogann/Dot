@@ -25,8 +25,19 @@ _DESTRUCTIVE_ACTION: re.Pattern[str] = re.compile(
     r"|close (?:my |your )?account|cancel (?:my |your )?(?:subscription|membership|order|account)"
     r"|sil|kald[ıi]r|hesab[ıi] (?:kapat|sil)|aboneli[ğg]i iptal|[çc][öo]p sepetini bo[şs]alt)\b"
 )
-_SEND_ACTION: re.Pattern[str] = re.compile(r"(?i)\b(?:send|reply|forward|g[öo]nder|yan[ıi]tla)\b")
-_POST_ACTION: re.Pattern[str] = re.compile(r"(?i)\b(?:post|publish|tweet|retweet|share|comment|payla[şs]|yay[ıi]nla)\b")
+_SEND_ACTION: re.Pattern[str] = re.compile(r"(?i)\b(?:send|reply|forward|g[öo]nder|yan[ıi]tla|l[äa]het[äa])\b")
+# A quote counts only at the start of a label or of a sentence in it ("Quote", "12 Quotes. Quote"), so that "Get a
+# quote" stays a plain click.
+_POST_ACTION: re.Pattern[str] = re.compile(
+    r"(?i)\b(?:post|publish|tweet|retweet|repost|share|comment|payla[şs]|yay[ıi]nla|yeniden g[öo]nder|julkaise)\b"
+    r"|(?:^|\.\s+)(?:quote|al[ıi]nt[ıi](?:la)?)\b"
+)
+# Follows, likes and subscriptions, in the same place of a label ("Follow @dot", "12 Likes. Like"), so that a link
+# called "Posts you might like" is no follow or like.
+_SOCIAL_ACTION: re.Pattern[str] = re.compile(
+    r"(?i)(?:^|\.\s+)(?:follow|unfollow|like|unlike|subscribe|unsubscribe|connect|takip et|takibi b[ıi]rak|be[ğg]en"
+    r"|be[ğg]enmekten vazge[çc]|abone ol|seuraa|tykk[äa][äa])\b"
+)
 _CREDENTIAL_FIELD: re.Pattern[str] = re.compile(
     r"(?i)\b(?:password|passcode|passphrase|pin(?: code)?|otp|one[- ]time|verification code|authenticator|2fa|mfa"
     r"|recovery code|[şs]ifre|parola|do[ğg]rulama kodu|g[üu]venlik kodu)\b"
@@ -43,8 +54,11 @@ _FLAG_OF_REASON: dict[str, Flag] = {
     "destructive": "destructive",
     "send": "external_send",
     "post": "public_post",
+    "social": "social",
 }
 _HIGH_REASONS: frozenset[str] = frozenset({"credential", "payment", "financial"})
+# A follow or a like is outward-facing but small: it keeps the risk of a plain click.
+_LOW_REASONS: frozenset[str] = frozenset({"social"})
 _RISK_ORDER: tuple[Risk, ...] = ("safe", "low", "medium", "high")
 
 
@@ -92,7 +106,8 @@ def clicking_reasons(element: Element | None, clickable_roles: Collection[str]) 
 
 
 def naming_reasons(element: Element | None) -> list[str]:
-    """Reasons acting on ``element`` is sensitive, from its name whatever its role: buying, deleting, sending, posting."""
+    """Reasons acting on ``element`` is sensitive, from its name whatever its role: buying, deleting, sending, posting,
+    following or liking."""
     if element is None:
         return []
     reasons: list[str] = []
@@ -101,6 +116,7 @@ def naming_reasons(element: Element | None) -> list[str]:
         ("destructive", _DESTRUCTIVE_ACTION),
         ("send", _SEND_ACTION),
         ("post", _POST_ACTION),
+        ("social", _SOCIAL_ACTION),
     ):
         if pattern.search(element.name):
             reasons.append(label)
@@ -113,13 +129,14 @@ def quiet_assessment() -> StepAssessment:
 
 
 def assessment_for(reasons: Sequence[str]) -> StepAssessment:
-    """Risk and flags of an acting step: low without reasons, medium with some, high when money or secrets are involved."""
+    """Risk and flags of an acting step: low without reasons or with only a follow or a like, medium with others, high
+    when money or secrets are involved."""
     flags: tuple[Flag, ...] = tuple(dict.fromkeys(_FLAG_OF_REASON[reason] for reason in reasons))
     if any(reason in _HIGH_REASONS for reason in reasons):
         return StepAssessment(risk="high", flags=flags, reasons=tuple(reasons))
-    if reasons:
+    if any(reason not in _LOW_REASONS for reason in reasons):
         return StepAssessment(risk="medium", flags=flags, reasons=tuple(reasons))
-    return StepAssessment(risk="low", flags=(), reasons=())
+    return StepAssessment(risk="low", flags=flags, reasons=tuple(reasons))
 
 
 def combine_assessments(assessments: Sequence[StepAssessment]) -> StepAssessment:

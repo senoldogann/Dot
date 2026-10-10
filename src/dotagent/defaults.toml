@@ -223,6 +223,19 @@ protected_paths = [
   "~/Library/Application Support/Google/Chrome",
 ]
 
+[policy.pace]
+# How many public browser actions (posts, replies, reposts, quotes, messages: the public_post and external_send flags)
+# and social ones (follows, likes, subscriptions: the social flag) one site gets, across runs and threads, in the last
+# hour and the last day, and how many seconds apart public ones are; 0 removes a limit. No approval mode waives a pace:
+# the action past one is refused with the time of the next. X's published limits are higher (an unverified account:
+# 50 posts and 200 replies a day, 400 follows, 500 messages), and its rules forbid automated likes and bulk or
+# aggressive following.
+public_per_hour = 10
+public_per_day = 50
+social_per_hour = 20
+social_per_day = 100
+public_spacing_s = 20.0
+
 [shell]
 # Environment variables whose names look like secrets are removed from tool processes unless listed here.
 pass_env = []
