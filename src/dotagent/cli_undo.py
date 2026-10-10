@@ -16,21 +16,9 @@ from dotagent.core.logs import get_logger
 from dotagent.core.paths import db_path, screenshots_dir, undo_dir
 from dotagent.core.types import FrozenModel
 from dotagent.store.db import Store
-from dotagent.store.endings import classify_ending
 from dotagent.store.models import RunRecord
-from dotagent.undo.journal import read_journal, run_journal
-from dotagent.undo.restore import (
-    FileState,
-    RunChange,
-    UndoStep,
-    apply_undo,
-    created_dirs,
-    current_states,
-    due_steps,
-    forced_steps,
-    plan_undo,
-    remove_empty_dirs,
-)
+from dotagent.undo.restore import UndoStep, apply_undo, due_steps, forced_steps, remove_empty_dirs
+from dotagent.undo.runs import UndoPlan, active_run_ids, plan_for, runs_with_children
 
 log = get_logger(__name__)
 
@@ -89,19 +77,6 @@ def render_outcome(done: Sequence[UndoStep], removed: Sequence[Path], left: Sequ
     return lines
 
 
-async def _with_children(store: Store, run: RunRecord) -> list[RunRecord]:
-    """``run`` and every run it delegated to, at any depth, ``run`` first."""
-    nested: list[list[RunRecord]] = [
-        await _with_children(store, child) for child in await store.list_child_runs(run.id)
-    ]
-    return [run, *(item for group in nested for item in group)]
-
-
-def _changes(root: Path, runs: Sequence[RunRecord]) -> list[RunChange]:
-    """Every change noted in the journals of ``runs`` below the undo dir ``root``. Blocking."""
-    return [RunChange(run_id=run.id, entry=entry) for run in runs for entry in read_journal(run_journal(root, run.id))]
-
-
 async def _show(run: RunRecord, runs: int, plan: list[UndoStep], folders: list[Path]) -> int:
     sys.stdout.write("\n".join(render_plan(run, runs, plan, folders)) + "\n")
     return 0
@@ -126,10 +101,10 @@ async def _undo(run: RunRecord, plan: list[UndoStep], steps: list[UndoStep], fol
 async def cmd_undo(command: UndoCommand) -> int:
     store: Store = await Store.open(db_path(), screenshots_dir())
     try:
-        runs: list[RunRecord] = await _with_children(store, await store.get_run(command.run_id))
+        runs: list[RunRecord] = await runs_with_children(store, await store.get_run(command.run_id))
     finally:
         await store.close()
-    active: list[str] = [run.id for run in runs if classify_ending(run.status, run.result) == "active"]
+    active: list[str] = active_run_ids(runs)
     if active:
         raise RunConflict(
             "the run is still active: take its changes back once it has ended (a run that a crash left active ends "
@@ -137,15 +112,12 @@ async def cmd_undo(command: UndoCommand) -> int:
             {"run_id": command.run_id, "active": [*active]},
         )
     root: Path = undo_dir()
-    changes: list[RunChange] = await asyncio.to_thread(_changes, root, runs)
-    if not changes:
+    planned: UndoPlan = await asyncio.to_thread(plan_for, root, runs)
+    if not planned.steps:
         sys.stdout.write(f"Run {command.run_id} changed no file with write_file or edit_file.\n")
         return 0
-    states: dict[str, FileState] = await asyncio.to_thread(
-        current_states, sorted({change.entry.path for change in changes})
-    )
-    plan: list[UndoStep] = plan_undo(changes, states)
-    folders: list[Path] = created_dirs(changes)
+    plan: list[UndoStep] = list(planned.steps)
+    folders: list[Path] = list(planned.folders)
     if not command.apply:
         return await _show(runs[0], len(runs), plan, folders)
     steps: list[UndoStep] = forced_steps(plan) if command.force else due_steps(plan)

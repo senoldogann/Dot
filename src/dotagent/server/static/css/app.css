@@ -2356,3 +2356,21 @@ dialog.lightbox img {
   outline: 2px dashed var(--accent);
   outline-offset: 2px;
 }
+
+/* ---------- the Actions panel of a run ---------- */
+
+.actions-group + .actions-group {
+  border-top: 1px solid var(--border);
+}
+
+.actions-group-title {
+  padding: 10px 16px 0;
+}
+
+.actions-group .hint {
+  padding: 6px 16px 12px;
+}
+
+.action-edit[data-state="ready"] .row-title {
+  color: var(--text);
+}

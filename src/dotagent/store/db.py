@@ -1635,6 +1635,11 @@ class Store:
         )
         return [_approval(row) for row in reversed(rows)]
 
+    async def run_approvals(self, run_id: str) -> list[ApprovalRecord]:
+        """Every approval and question of ``run_id``, whatever became of it, oldest first."""
+        rows = await self._all("SELECT * FROM approvals WHERE run_id = ? ORDER BY created_at, rowid", (run_id,))
+        return [_approval(row) for row in rows]
+
     async def run_questions(self, run_id: str, tool: str) -> list[ApprovalRecord]:
         """The questions ``run_id`` asked the owner with ``tool``, whatever became of them, oldest first."""
         rows = await self._all(

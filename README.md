@@ -626,7 +626,8 @@ and cannot be put back; a file the run created can always be deleted again. A co
 noted is not written back, and a folder that is now where a file was is never replaced. Only the two file tools are in
 the journal: what a shell command (`rm`, `mv`, `sed -i`), the browser or the desktop changed is not. A run that is still
 working is refused; a run of `dotx run` that a crash left working ends when the daemon starts again.
-`dotx prune --apply` deletes the journals whose last change is older than `undo_keep_days` (30 days).
+`dotx prune --apply` deletes the journals whose last change is older than `undo_keep_days` (30 days). The Actions card
+of the run's page shows the same plan, one file at a time, with a button for each file that is as the run left it.
 
 ## Measuring the agent
 
@@ -734,9 +735,17 @@ answer of the run is the last message, with a Copy button and when it finished a
 the head links the other runs of the same thread, and the box at the bottom steers a run that is going on or follows up
 on a finished one. A Details panel shows the status, the model and its reasoning level, the approval mode and goal mode,
 the model turns, the tool calls (with the failed ones), the tokens (of every model call of the run: its steps and its
-side calls, such as compactions, reviews and the goal check), the duration and the run id, then the plan and the latest
-screenshots. It stays closed until the panel button in the head of the run opens it (the choice is kept in the
-browser); open, it sits beside the conversation from 960 px and is a drawer below that.
+side calls, such as compactions, reviews and the goal check), the duration and the run id, then the plan, an Actions
+card and the latest screenshots. It stays closed until the panel button in the head of the run opens it (the choice is
+kept in the browser); open, it sits beside the conversation from 960 px and is a drawer below that.
+
+The Actions card is one view of what the run did and what can be undone: every acting step (a tool call that changed
+something: a file written, a command run, a click, a message sent; reads are left out) with the channel it went
+through, its target and the result the model got as its evidence; every approval and question of the run with its
+decision, who decided and the note; and every file the run, or a run it delegated to, changed with `write_file`,
+`edit_file` or `write_notes`, with its undo state as `dotx undo` reads it (can be taken back, changed since, cannot be
+taken back, as before the run). A file as the run left it has a button, Restore or Delete, that takes that one change
+back once the run has ended (`POST /api/runs/{id}/undo`); the card itself is `GET /api/runs/{id}/actions`.
 
 **Settings** (`#/settings`) is one page with tabs: **General** (the look of this browser, the two switches below, desktop
 notifications and the token this browser is signed in with), **Models** (one fold per provider, with the reasoning levels

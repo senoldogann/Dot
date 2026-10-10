@@ -13,7 +13,7 @@ import { userMessage } from "../messages.js";
 import { emptyPanel, errorPanel, foldCard, loadingPanel, statusBadge } from "../panels.js";
 import { onLifecycle } from "../state.js";
 import { createTimeline } from "../timeline.js";
-import { attempt, toast } from "../ui.js";
+import { attempt, confirmDialog, toast } from "../ui.js";
 
 const TERMINAL = new Set(["done", "failed", "cancelled"]);
 // The chips of a run that does not ask the user (the default needs none): the words and what they mean.
@@ -32,6 +32,14 @@ const LESSON_KINDS = new Set(["lessons_proposed", "lesson_saved", "lesson_dismis
 const LESSON_STATES = { saved: { mark: "check", text: "Saved to memory" }, dismissed: { mark: "x", text: "Dismissed" } };
 // A replayed run brings its question events in a burst: one refresh after it is enough.
 const QUESTIONS_SETTLE_MS = 120;
+// What the Actions panel says of a file change, by the state of its undo (see undo.restore.UndoStep).
+const EDIT_STATES = {
+  ready: { tone: "b-ok", text: "can be taken back" },
+  conflict: { tone: "b-warn", text: "changed since" },
+  cannot: { tone: "b-bad", text: "cannot be taken back" },
+  as_before: { tone: "b-muted", text: "as before the run" },
+};
+const APPROVAL_TONES = { approved: "b-ok", denied: "b-bad", expired: "b-muted", pending: "b-warn", left: "b-warn" };
 
 function backLink() {
   return el("a", { class: "back", href: "#/runs" }, icon("arrowLeft"), "All runs");
@@ -67,6 +75,49 @@ function planStep(step) {
  * around this one; `historyProblem` is the error that kept them from loading, or null. Returns the function that stops
  * everything the page started.
  */
+function actionStep(step) {
+  return el(
+    "div",
+    { class: "list-row action-step", "data-ok": String(step.ok) },
+    el(
+      "div",
+      { class: "row-main" },
+      el("div", { class: "row-title" }, step.summary === "" ? step.tool : step.summary),
+      step.evidence === "" ? null : el("div", { class: "row-text small muted" }, step.evidence),
+      el(
+        "div",
+        { class: "row-meta" },
+        el("span", { class: "badge b-info" }, step.channel),
+        el("span", null, step.tool),
+        step.target === "" ? null : el("span", { class: "mono" }, step.target),
+        el("span", { class: `badge ${step.ok ? "b-ok" : "b-bad"}` }, step.ok ? "ok" : "failed"),
+        el("span", null, dateTimeFull(step.at)),
+      ),
+    ),
+  );
+}
+
+function approvalRow(record) {
+  return el(
+    "div",
+    { class: "list-row action-approval" },
+    el(
+      "div",
+      { class: "row-main" },
+      el("div", { class: "row-title" }, record.summary),
+      record.note === "" ? null : el("div", { class: "row-text small muted" }, record.note),
+      el(
+        "div",
+        { class: "row-meta" },
+        el("span", { class: `badge ${APPROVAL_TONES[record.status] ?? "b-muted"}` }, record.status),
+        el("span", null, record.tool),
+        record.decided_by === null ? null : el("span", null, `by ${record.decided_by}`),
+        el("span", null, dateTimeFull(record.created_at)),
+      ),
+    ),
+  );
+}
+
 function showRun({ root, ctx, signal, detail, history, historyProblem, reload }) {
   const runId = detail.run.id;
   let run = detail.run;
@@ -551,13 +602,119 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
       finishedAt = update.endedAt;
       syncControls();
       reconcile();
+      loadActions();
     }
     paintStats();
   }
 
   // ------------------------------------------------------------------------------------------ assemble
   const layout = el("div", { class: "run-layout" });
-  const inspector = createInspector({ layout, content: [details.element, plan.element] });
+  // ------------------------------------------------------------------------------------------- actions
+  // What the run did and what can be undone: its acting steps, its approvals and its file changes (see server.actions).
+  const actionsBody = el("div", { class: "actions-list" });
+  const actionsCard = foldCard({ id: "run-actions", title: "Actions", actions: null, body: actionsBody, openByDefault: true });
+  // The paths being taken back, so that a second press does not send the same undo twice.
+  const undoing = new Set();
+
+  async function undoEdit(edit) {
+    if (undoing.has(edit.path)) {
+      return;
+    }
+    const confirmed = await confirmDialog({
+      title: edit.action === "restore" ? "Put the file back as it was?" : "Delete the file the run created?",
+      message: edit.path,
+      confirmLabel: edit.action === "restore" ? "Restore" : "Delete",
+      danger: true,
+      focusCancel: true,
+    });
+    if (!confirmed) {
+      return;
+    }
+    undoing.add(edit.path);
+    try {
+      await attempt(async () => {
+        const fresh = await api.post(`/runs/${runId}/undo`, { path: edit.path });
+        toast("ok", edit.action === "restore" ? "The file is back as it was." : "The file is deleted.");
+        paintActions(fresh);
+      });
+    } finally {
+      undoing.delete(edit.path);
+    }
+  }
+
+  function editRow(edit, ended) {
+    const state = EDIT_STATES[edit.state] ?? { tone: "b-muted", text: edit.state };
+    const button =
+      edit.state === "ready" && ended
+        ? el(
+            "button",
+            { class: "btn sm", type: "button", title: `Take back the change to ${edit.path}`, onclick: () => undoEdit(edit) },
+            icon("undo"),
+            el("span", { class: "label" }, edit.action === "restore" ? "Restore" : "Delete"),
+          )
+        : null;
+    return el(
+      "div",
+      { class: "list-row action-edit", "data-state": edit.state },
+      el(
+        "div",
+        { class: "row-main" },
+        el("div", { class: "row-title mono" }, edit.path),
+        edit.reason === null ? null : el("div", { class: "row-text small muted" }, edit.reason),
+        el(
+          "div",
+          { class: "row-meta" },
+          el("span", { class: `badge ${state.tone}` }, state.text),
+          el("span", null, edit.tool),
+          el("span", null, edit.changes === 1 ? "1 change" : `${edit.changes} changes`),
+          el("span", null, dateTimeFull(edit.noted_at)),
+        ),
+      ),
+      button === null ? null : el("div", { class: "row-actions" }, button),
+    );
+  }
+
+  function group(title, rows, emptyText) {
+    return el(
+      "div",
+      { class: "actions-group" },
+      el("div", { class: "small muted actions-group-title" }, title),
+      rows.length === 0 ? el("div", { class: "hint" }, emptyText) : el("div", { class: "list" }, ...rows),
+    );
+  }
+
+  function paintActions(view) {
+    const undoable = view.edits.filter((edit) => edit.state === "ready").length;
+    actionsCard.setSummary(
+      `${view.steps.length} acting, ${view.approvals.length} asked, ${view.edits.length} files` +
+        (undoable === 0 ? "" : ` (${undoable} can be taken back)`),
+    );
+    actionsBody.replaceChildren(
+      group("Acting steps", view.steps.map(actionStep), "No step changed anything."),
+      group("Approvals and questions", view.approvals.map(approvalRow), "Nothing was asked."),
+      group(
+        "Files changed",
+        view.edits.map((edit) => editRow(edit, view.ended)),
+        "No file was changed with the file tools (what the shell, the browser or the desktop changed is not noted).",
+      ),
+      view.ended || view.edits.length === 0 ? null : el("div", { class: "hint" }, "The buttons to take a change back come once the run has ended."),
+    );
+  }
+
+  async function loadActions() {
+    try {
+      const view = await api.get(`/runs/${runId}/actions`);
+      if (!signal.aborted) {
+        paintActions(view);
+      }
+    } catch (error) {
+      if (!signal.aborted) {
+        actionsBody.replaceChildren(el("div", { class: "note warn" }, icon("alert"), el("span", null, `The actions could not be loaded: ${error.message}`)));
+      }
+    }
+  }
+
+  const inspector = createInspector({ layout, content: [details.element, plan.element, actionsCard.element] });
   const timeline = createTimeline({
     rootRunId: runId,
     startedAt: run.created_at,
@@ -624,6 +781,7 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
   syncControls();
   paintLessons(detail.lessons);
   paintQuestions(detail.questions);
+  loadActions();
   window.addEventListener("scroll", onScroll, { passive: true });
   // Lessons change after the run, and a question may be answered or skipped in another tab.
   const stopLifecycle = onLifecycle((event) => {

@@ -2377,8 +2377,8 @@ Paste this to the agent that takes the work:
 | 34  | Research runs that keep notes, and hosted search by default              | done    | e68b22d |
 | 35  | A plan with dependencies and parallel branches                           | done    | d6b40c1 |
 | 36  | Playbooks learned from runs that reached their goal                      | done    | fb99354 |
-| 37  | A stuck campaign changes strategy, not just session                      | in progress |         |
-| 38  | One view of what a run did and what can be undone                        | planned |         |
+| 37  | A stuck campaign changes strategy, not just session                      | done    | 12c589f |
+| 38  | One view of what a run did and what can be undone                        | in progress |         |
 | 39  | CI and retention defaults                                                | planned |         |
 | 40  | Cold start of `dotx`                                                     | planned |         |
 | 41  | An own crawler: fetch, render, crawl, extract                            | done    | aedab8b |
@@ -2911,9 +2911,26 @@ approval decision, every file edit with its undo state (item 8), and one button 
 
 **Why.** Grok Bot has no audit log; dots' stop does not undo. Dot records all of it and shows it in pieces.
 
-**Touchpoints.** `server/views.py`, `server/static/js/views`, `undo/*`, README "Web UI".
+**Design, as built.** The panel is an Actions card in the Details panel of the run's page, beside the plan, fed by
+one endpoint, `GET /api/runs/{id}/actions` (`server/actions.py`, `RunActions`): the acting steps from the run's
+`tool_result` events (the executor now records the action's `kind` and `target` on the event; a step acts when its
+kind is not read-only, and an event from before the kind was recorded counts by its risk), each with its channel
+(item 27), target, summary, success and the clipped result as evidence; every approval and question of the run from
+the store (`run_approvals`), with its decision, decider and note; and the file changes as the undo plan of `dotx undo`
+reads them, over the run and the runs it delegated to. The plan, the journal reading and the undo of one path moved
+into `undo/runs.py`, which the CLI and the server share; `POST /api/runs/{id}/undo` with a path takes that one change
+back when the path is as the runs left it (`ready`) and every run has ended, and refuses the rest with the plan's
+reason (a conflict is 409, an unknown path 404). The card lists the three groups, a Restore or Delete button per file
+that can be taken back (behind a confirmation), and reloads itself when the run ends and after an undo. The `undo/`
+package's rules did not change: the shell, the browser and the desktop stay outside the journal.
 
-**Done when.** The headless UI test walks the panel; README.
+**Touchpoints.** `undo/runs.py` (new), `cli_undo.py`, `agent/executor.py`, `store/db.py`, `server/actions.py`
+(new), `server/views.py`, `server/routes_runs.py`, `server/static/js/views/run.js`, `icons.js`, `app.css`, README
+"The daemon, the web UI and the service" and "Taking back the file changes of a run".
+
+**Done when.** `tests/smoke/test_actions_panel.py` checks the endpoint's steps and edits and drives the headless UI
+through the card to take one change back; a unit test covers which results are acting steps; `dotx undo` behaves as
+before (its smoke test).
 
 ### 39. CI and retention defaults
 
@@ -3576,3 +3593,5 @@ item ends as a measured no, written in the log.
 - 2026-10-10 (Fable 5.1): item 30 built on branch `item-30-best-of-two` (MYP-177): `[judge] second_opinion` (off) asks each question again in an independent phrasing; a disagreement flags the click and names both answers, a claim is refused only when both answers are below the threshold; three eval tasks hide an instruction in a file with `injection_checks` and the new `answer_lacks` check, the report's `injection_followed` and the scorecard's `hidden instructions followed` count them. Unit 642, eval check ok, judge and eval-runner smoke 10. Decision 23.
 - 2026-10-10 (Fable 5.1): item 30 merged cda37e1 (PR #36, MYP-177 Done). Next: item 37.
 - 2026-10-10 (Fable 5.1): item 37 built on branch `item-37-change-strategy` (MYP-178): the brief of a stuck campaign lists the strategies since the newest progress as refused routes and asks for another channel, source or approach; `campaign_note` refuses a repeated route while the campaign is stuck; README "Campaigns". Unit 643, campaigns smoke 8, eval check ok. Decision 24.
+- 2026-10-10 (Fable 5.1): item 37 merged 12c589f (PR #37, MYP-178 Done). Next: item 38.
+- 2026-10-10 (Fable 5.1): item 38 built on branch `item-38-actions-panel` (MYP-179): Actions card on the run page from `GET /api/runs/{id}/actions` (acting steps with channel, target and evidence; approvals; file edits with undo state) and `POST /api/runs/{id}/undo` per file; `undo/runs.py` shared by the CLI and the server; README. Unit 645, actions-panel smoke 2, undo smoke 1.
