@@ -217,7 +217,9 @@ answer (a small model that is offered both writes the call out as text).
   Every model, after three acting steps in a row whose `browser_act` or `desktop_act` calls carried one step each on
   the same page or application, is told once to batch the steps it can predict into one call (each call costs a model
   round trip; `dotx stats` counts the single-step share), and the timeline shows the note; `steer_single_actions =
-  false` in `[agent]` turns it off.
+  false` in `[agent]` turns it off. Every tool result records its channel (a command, an API, the web, the browser, the
+  desktop, or the run's own tools), and `dotx stats` shows the calls per channel and the share of the acting calls that
+  went through a GUI: the prompt sends the agent to a command or an API first, the browser second, the desktop last.
   The timeline shows a budget cut to the window, why a model is weak, and each reminder.
 - `tool_surface` in `[agent]` decides which tools a run's model sees. `full`, the default, offers all of them at every
   step. `grouped` starts with the core tools (files, the shell, the web, searching and saving notes, delegation,

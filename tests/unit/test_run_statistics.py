@@ -280,4 +280,6 @@ def test_the_statistics_are_rendered_per_model_in_plain_words(database: Path) ->
     assert site_row.split() == ["x.com", "2", "50", "%", "0", "%", "2.5"]
     assert render_stats(stats, 30, "site")[2].startswith("Sites, from the browser and desktop act calls")
     assert not any(line.startswith("Sites") for line in render_stats(stats, 30, "model"))
-    assert render_stats(RunStatistics(models=(), tools=(), sites=()), 7, "all") == ["No runs in the last 7 days."]
+    assert render_stats(RunStatistics(models=(), tools=(), sites=(), channels=()), 7, "all") == [
+        "No runs in the last 7 days."
+    ]

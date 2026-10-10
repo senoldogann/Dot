@@ -22,6 +22,7 @@ from dotagent.core.types import JsonObject
 from dotagent.llm.types import ToolCall, invalid_arguments_text
 from dotagent.policy.types import ActionInfo
 from dotagent.tools.base import PreparedCall, RegisteredTool, ToolResult, fail, ok
+from dotagent.tools.channels import channel_of
 from dotagent.tools.context import Gate, ToolContext
 from dotagent.tools.meta import FINISH_TOOL
 from dotagent.tools.registry import ToolRegistry
@@ -213,6 +214,7 @@ async def _execute_one(
             "risk": action.risk if action is not None else "",
             "site": _site(call, action),
             "steps": batch_steps(call.arguments),
+            "channel": channel_of(call.name),
         },
         True,
     )

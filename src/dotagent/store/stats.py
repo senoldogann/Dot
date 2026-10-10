@@ -16,6 +16,7 @@ from dotagent.llm.calls import CALL_EVENT, CallPurpose
 from dotagent.llm.types import INVALID_ARGUMENTS_KEY
 from dotagent.store.endings import ENDING_LABELS, Ending, classify_ending
 from dotagent.store.models import RunStatus
+from dotagent.tools.channels import CHANNELS, Channel, channel_of, is_gui
 
 _STATUS: TypeAdapter[RunStatus] = TypeAdapter(RunStatus)
 _PURPOSE: TypeAdapter[CallPurpose] = TypeAdapter(CallPurpose)
@@ -203,6 +204,15 @@ class ToolStats(FrozenModel):
     waited_s: float
 
 
+class ChannelStats(FrozenModel):
+    """What the calls of one channel (:mod:`dotagent.tools.channels`) did in the runs of every model."""
+
+    channel: Channel
+    calls: int
+    failed: int
+    seconds_total: float
+
+
 class ModelStats(FrozenModel):
     """What the runs of one model did."""
 
@@ -229,6 +239,7 @@ class RunStatistics(FrozenModel):
     models: tuple[ModelStats, ...]
     tools: tuple[ToolStats, ...]
     sites: tuple[SiteStats, ...]
+    channels: tuple[ChannelStats, ...]
 
 
 class _EventCounts(FrozenModel):
@@ -458,6 +469,32 @@ def _counts_by_model(events: list[tuple[object, ...]]) -> dict[str, _EventCounts
     }
 
 
+def channel_stats(samples: Sequence[ToolSample]) -> tuple[ChannelStats, ...]:
+    """What each channel's calls did, in the order of the channels; a channel with no call is left out."""
+    found: list[ChannelStats] = []
+    for channel in CHANNELS:
+        mine: list[ToolSample] = [sample for sample in samples if channel_of(sample.tool) == channel]
+        if mine:
+            found.append(
+                ChannelStats(
+                    channel=channel,
+                    calls=len(mine),
+                    failed=sum(1 for sample in mine if not sample.ok),
+                    seconds_total=sum(sample.seconds for sample in mine),
+                )
+            )
+    return tuple(found)
+
+
+def gui_share(channels: Sequence[ChannelStats]) -> float | None:
+    """The share of the calls that went through a GUI (the browser, the desktop) among the calls that acted on the
+    world (every channel but ``agent``); ``None`` without such a call."""
+    acting: int = sum(entry.calls for entry in channels if entry.channel != "agent")
+    if acting == 0:
+        return None
+    return sum(entry.calls for entry in channels if is_gui(entry.channel)) / acting
+
+
 def collect_statistics(database: Path, since: float) -> RunStatistics:
     """Per model and per tool, what the runs created since ``since`` did. The database is opened read-only, so a
     running daemon is not disturbed, and no text of a run is read. Blocking."""
@@ -498,8 +535,10 @@ def collect_statistics(database: Path, since: float) -> RunStatistics:
                 bands=step_bands([sample for sample in steps if sample.model == model]),
             )
         )
+    tools: list[ToolSample] = _tool_samples(rows.tools)
     return RunStatistics(
         models=tuple(sorted(stats, key=lambda entry: entry.runs, reverse=True)),
-        tools=tool_stats(_tool_samples(rows.tools)),
+        tools=tool_stats(tools),
         sites=site_stats(acts),
+        channels=channel_stats(tools),
     )
