@@ -27,18 +27,24 @@ from dotagent.agent.judge import (
     TypeSafeJudge,
     TypeSafeService,
 )
+from dotagent.agent.manager import RunManager
 from dotagent.agent.review import ReviewRequest, ReviewVerdict
 from dotagent.agent.verify import new_facts
 from dotagent.config import JudgeConfig, load_config
 from dotagent.core.paths import workspace_dir
 from dotagent.core.types import JsonObject
+from dotagent.evals.runner import SCRIPTED_MODEL
+from dotagent.evals.scripted import ScriptedProvider
+from dotagent.evals.types import ScriptedCall, ScriptedTurn
+from dotagent.llm.router import parse_model_ref
 from dotagent.policy.types import ActionInfo
 from dotagent.runtime import Runtime, build_runtime, close_runtime
-from dotagent.store.models import CampaignEntry, CampaignRecord, EventRecord, RunRecord, ThreadRecord
+from dotagent.store.models import ApprovalMode, CampaignEntry, CampaignRecord, EventRecord, RunRecord, ThreadRecord
 from dotagent.tools.base import PreparedCall, ToolResult
 from dotagent.tools.campaign import CAMPAIGN_ACHIEVED_TOOL, CAMPAIGN_NOTE_TOOL
 from dotagent.tools.context import ToolContext
 from dotagent.tools.judge_items import JUDGE_ITEMS_TOOL
+from dotagent.tools.meta import FINISH_TOOL
 from dotagent.tools.posts import CHECK_DRAFT_TOOL, PICK_DRAFT_TOOL, POSTS_RANKED_EVENT, RANK_POSTS_TOOL
 
 pytestmark = [pytest.mark.browser, pytest.mark.asyncio(loop_scope="module")]
@@ -56,7 +62,18 @@ _TOPIC: str = "python"
 _REJECTED: str = "[reject]"
 _LEVELS: tuple[str, ...] = ("unrelated", "mentions Python in passing", "about Python")
 _PAGE: bytes = b"""<!doctype html><title>Timeline</title><h1>Timeline</h1><p>A post worth sharing.</p>
-<button type="button">Boost</button> <button type="button">Post</button> <a href="/next">Next page</a>"""
+<button type="button">Boost</button> <button type="button">Post</button> <a href="/next">Next page</a>
+<a href="/posted">Posted</a> <a href="/login">Sign in</a> <a href="/error">Broken</a>"""
+# The pages a click can land on, judged after a browser_act that names what it expects: a posted reply, a login wall and
+# an error page.
+_PAGES: dict[str, bytes] = {
+    "/next": b"<!doctype html><p>Next</p>",
+    "/posted": b"<!doctype html><title>Timeline</title><h1>Timeline</h1><p>Your reply was posted.</p>"
+    b"<p>Reply by @dot: uv locks per platform.</p>",
+    "/login": b"<!doctype html><title>Sign in</title><h1>Sign in to Timeline</h1><form><label>Username <input></label>"
+    b"<label>Password <input type=password></label><button>Sign in</button></form>",
+    "/error": b"<!doctype html><title>Error</title><h1>Something went wrong</h1><p>Error 500. Try again later.</p>",
+}
 
 
 class _Service(ThreadingHTTPServer):
@@ -109,6 +126,21 @@ def _check_answer(state: dict[str, JsonValue], question: str) -> float:
     return 0.9 if "http" in draft and "link" in rule else 0.1
 
 
+def _page_answer(state: dict[str, JsonValue], question: str) -> float:
+    """The page check's stand-in: the expectation shows when its words are on the page; a sign-in, a CAPTCHA or an
+    error in the text makes the wall, the puzzle or the error page."""
+    page: JsonValue = state["page"]
+    assert isinstance(page, dict)
+    text: str = str(page["text"]).lower()
+    if question == "expected":
+        return 0.9 if all(word in text for word in str(state["expected"]).lower().split()) else 0.1
+    if question == "login_wall":
+        return 0.95 if "sign in" in text else 0.05
+    if question == "captcha":
+        return 0.9 if "captcha" in text else 0.05
+    return 0.9 if "error" in text else 0.05
+
+
 def _choice(criteria: dict[str, JsonValue]) -> JsonObject:
     """The stand-in picks the longest option; the probabilities follow the lengths."""
     lengths: dict[str, int] = {option: len(str(text)) for option, text in criteria.items()}
@@ -126,6 +158,8 @@ def _answer(state: JsonValue, question: str) -> float:
         return _post_answer(post, question)
     if isinstance(state, dict) and "draft" in state:
         return _check_answer(state, question)
+    if isinstance(state, dict) and isinstance(state.get("page"), dict):
+        return _page_answer(state, question)
     candidate: str | None = _candidate(state, question)
     if candidate is not None:
         return 0.9 if _TOPIC in candidate.lower() else 0.1
@@ -151,7 +185,8 @@ class _Handler(BaseHTTPRequestHandler):
     server: _Service
 
     def do_GET(self) -> None:
-        page: bytes = _PAGE if self.path.partition("?")[0] == "/" else b"<!doctype html><p>Next</p>"
+        path: str = self.path.partition("?")[0]
+        page: bytes = _PAGE if path == "/" else _PAGES.get(path, b"<!doctype html><p>Nothing here</p>")
         self._send(200, "text/html; charset=utf-8", page)
 
     def do_POST(self) -> None:
@@ -213,8 +248,8 @@ def service() -> Iterator[_Service]:
 async def runtime(service: _Service, tmp_path_factory: pytest.TempPathFactory) -> AsyncIterator[Runtime]:
     home: Path = tmp_path_factory.mktemp("home")
     (home / "config.toml").write_text(
-        f'[browser]\nheadless = true\n\n[judge]\nprovider = "typesafe"\nbase_url = "{service.base}"\n'
-        f'api_key_env = "{KEY_ENV}"\nitems_per_request = 3\n',
+        f'[browser]\nheadless = true\n\n[models]\nreview = "{SCRIPTED_MODEL}"\n\n[judge]\nprovider = "typesafe"\n'
+        f'base_url = "{service.base}"\napi_key_env = "{KEY_ENV}"\nitems_per_request = 3\n',
         encoding="utf-8",
     )
     patch: pytest.MonkeyPatch = pytest.MonkeyPatch()
@@ -237,9 +272,13 @@ async def _nobody(request: ReviewRequest) -> ReviewVerdict:
 
 async def _context(runtime: Runtime, campaign_id: str | None) -> ToolContext:
     """A run in the store (a session of ``campaign_id`` when one is given) and the context its tools get."""
+    return await _context_in(runtime, campaign_id, "ask")
+
+
+async def _context_in(runtime: Runtime, campaign_id: str | None, approvals: ApprovalMode) -> ToolContext:
     thread: ThreadRecord = await runtime.store.create_thread("typed judge", "test")
     run: RunRecord = await runtime.store.create_run(
-        thread.id, GOAL, "task", "ollama:none", None, "test", "medium", "ask", False, campaign_id
+        thread.id, GOAL, "task", "ollama:none", None, "test", "medium", approvals, False, campaign_id
     )
     return ToolContext(
         runtime=runtime,
@@ -247,7 +286,7 @@ async def _context(runtime: Runtime, campaign_id: str | None) -> ToolContext:
         run_id=run.id,
         thread_id=thread.id,
         mode="task",
-        approvals="ask",
+        approvals=approvals,
         questions="wait",
         workspace=workspace_dir(),
         gate=RunGate(
@@ -259,7 +298,7 @@ async def _context(runtime: Runtime, campaign_id: str | None) -> ToolContext:
             "aggressive",
             runtime.config.policy.pace,
             runtime.config.policy.spend,
-            "ask",
+            approvals,
             _nobody,
             (GOAL,),
         ),
@@ -584,3 +623,108 @@ async def test_a_campaign_session_picks_the_best_draft_and_a_draft_with_a_link_i
     )
     assert not passed.is_error
     assert passed.text.startswith("The draft passes its 4 checks (none reached 0.50); the decision to post is yours.")
+
+
+async def _act(ctx: ToolContext, ref: str, expect: str | None) -> ToolResult:
+    arguments: JsonObject = {"steps": [{"action": "click", "ref": ref}]}
+    if expect is not None:
+        arguments["expect"] = expect
+    prepared: PreparedCall = await ctx.runtime.registry.tools["browser_act"].prepare(arguments, ctx)
+    return await prepared.run(ctx)
+
+
+async def _open(ctx: ToolContext, url: str) -> dict[str, str]:
+    """The fixture page, opened, and the refs of its links."""
+    opened: PreparedCall = await ctx.runtime.registry.tools["browser_open"].prepare({"url": url}, ctx)
+    page: ToolResult = await opened.run(ctx)
+    return {name: _ref(page.text, "link", name) for name in ("Posted", "Sign in", "Broken")}
+
+
+async def test_an_action_that_names_what_it_expects_gets_the_judges_numbers_about_the_page_after_it(
+    runtime: Runtime, service: _Service
+) -> None:
+    ctx: ToolContext = await _context(runtime, None)
+    expect: str = "reply was posted"
+    refs: dict[str, str] = await _open(ctx, f"{service.base}/")
+    before: int = len(service.requests)
+    posted: ToolResult = await _act(ctx, refs["Posted"], expect)
+    first, rest = posted.text.split("\n", 1)
+    assert first == (
+        "Typed check of the page after the steps: what you expected shows 0.90; login wall 0.05, CAPTCHA 0.05, error "
+        "page 0.05."
+    )
+    assert rest.startswith("Steps: 1 done, 0 failed, 0 skipped")
+    # The link's label is not a click any pattern knows, so the judge was asked about it, then about the page.
+    assert len(service.requests) == before + 2
+    _, _, body = service.requests[-1]
+    questions: JsonValue = body["questions"]
+    assert isinstance(questions, dict) and list(questions) == ["expected", "login_wall", "captcha", "error_page"]
+    state: JsonValue = body["state"]
+    assert isinstance(state, dict) and state["expected"] == expect
+    page: JsonValue = state["page"]
+    assert isinstance(page, dict) and page["url"] == f"{service.base}/posted" and page["title"] == "Timeline"
+    assert "Your reply was posted." in str(page["text"]) and "uv locks per platform" in str(page["text"])
+    refs = await _open(ctx, f"{service.base}/")
+    wall: ToolResult = await _act(ctx, refs["Sign in"], expect)
+    assert wall.text.startswith(
+        "Typed check of the page after the steps: what you expected shows 0.10; login wall 0.95, CAPTCHA 0.05, error "
+        "page 0.05."
+    )
+    refs = await _open(ctx, f"{service.base}/")
+    broken: ToolResult = await _act(ctx, refs["Broken"], expect)
+    assert "login wall 0.05, CAPTCHA 0.05, error page 0.90." in broken.text.split("\n", 1)[0]
+    # Without an expectation nothing is asked about the page.
+    refs = await _open(ctx, f"{service.base}/")
+    before = len(service.requests)
+    plain: ToolResult = await _act(ctx, refs["Posted"], None)
+    assert plain.text.startswith("Steps: 1 done") and len(service.requests) == before + 1
+
+
+async def test_in_yolo_a_click_no_pattern_knows_sends_nothing_to_the_judge(runtime: Runtime, service: _Service) -> None:
+    ctx: ToolContext = await _context_in(runtime, None, "yolo")
+    opened: PreparedCall = await runtime.registry.tools["browser_open"].prepare({"url": f"{service.base}/"}, ctx)
+    page: ToolResult = await opened.run(ctx)
+    before: int = len(service.requests)
+    boost: ActionInfo = await _classified(
+        ctx, "browser_act", {"steps": [{"action": "click", "ref": _ref(page.text, "button", "Boost")}]}
+    )
+    assert (boost.flags, len(service.requests)) == ((), before)
+    assert "judge" not in boost.summary
+
+
+async def test_in_goal_mode_a_claim_the_judge_finds_false_is_sent_back_without_the_review_model(
+    runtime: Runtime, service: _Service
+) -> None:
+    """Five finishes that claim success: the judge's stand-in gives 0.10 for the claim, below target_threshold, so each
+    is sent back with the judge's number until the patience is spent, and the review model (the same scripted model,
+    which would fail on a sixth call) is never asked."""
+    patience: int = runtime.config.agent.goal_patience
+    finish: ScriptedTurn = ScriptedTurn(
+        text="",
+        calls=(
+            ScriptedCall(tool=FINISH_TOOL, arguments={"answer": "All 50 leads are in leads.csv.", "success": True}),
+        ),
+    )
+    await runtime.router.register(
+        parse_model_ref(SCRIPTED_MODEL).provider,
+        ScriptedProvider(parse_model_ref(SCRIPTED_MODEL).provider, [finish] * (patience + 1)),
+    )
+    manager: RunManager = RunManager(runtime)
+    try:
+        run: RunRecord = await manager.start(GOAL, "task", SCRIPTED_MODEL, None, "test", None, None, "ask", True, ())
+        async with asyncio.timeout(60.0):
+            ended: RunRecord = await manager.wait(run.id)
+    finally:
+        await manager.shutdown()
+    checks: list[EventRecord] = await runtime.store.events_of_kind(run.id, "goal_check", 20)
+    assert ended.status == "failed", ended
+    assert len(checks) == patience + 1
+    assert all(check.data["decision"] == "continue" for check in checks)
+    assert all(
+        str(check.data["reason"]).startswith(
+            "The typed judge gives 0.10 for the goal being reached as the answer claims"
+        )
+        for check in checks
+    )
+    assert [check.data["final"] for check in checks] == [False] * patience + [True]
+    assert "the goal is still not reached after" in ended.result

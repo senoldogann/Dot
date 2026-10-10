@@ -43,6 +43,7 @@ from dotagent.agent.continuity import (
 from dotagent.agent.executor import ToolOutcome, batch_steps, execute_calls
 from dotagent.agent.gate import RunGate
 from dotagent.agent.helpers import MODEL_SWITCHED_EVENT, Roster, current_roster
+from dotagent.agent.judge import ClaimJudgment, claim_refused, claim_state, describe_claim
 from dotagent.agent.lessons import LessonCase, may_learn
 from dotagent.agent.limits import (
     LIMIT_EVENT,
@@ -756,6 +757,29 @@ async def _ask_checker(
         answer=ended.result,
         claimed_success=ended.status == "done",
     )
+    # The typed judge, when one is on, refuses a claim it finds clearly false before the review model is called.
+    if request.claimed_success:
+        judged: ClaimJudgment = await agent.runtime.judge.judge_claim(
+            claim_state(request.goal, request.plan, request.targets, request.digest, request.facts, request.answer),
+            run.id,
+        )
+        threshold: float = agent.runtime.config.judge.target_threshold
+        if claim_refused(judged, threshold):
+            log.info(
+                "goal_claim_judged",
+                run_id=run.id,
+                probability=judged.probability,
+                second=judged.second,
+                check=sent_back + 1,
+            )
+            return GoalVerdict(
+                decision="continue",
+                reason=(
+                    f"The typed judge gives {describe_claim(judged)} for the goal being reached as the answer claims (it "
+                    f"takes {threshold:.2f}). Verify the result with your own reads and finish with what they show."
+                ),
+                unproven_steps=(),
+            )
     try:
         return await checker(request)
     except ProviderError as error:

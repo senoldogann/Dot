@@ -14,14 +14,14 @@ from typing import Annotated
 from pydantic import Field, StringConstraints
 
 from dotagent.agent.campaign import entry_line, route_refused, routes_without_progress, sessions_without_progress
-from dotagent.agent.judge import ClaimJudgment, claim_refused, describe_claim
+from dotagent.agent.judge import ClaimJudgment, claim_refused, claim_state, describe_claim
 from dotagent.agent.plan import EMPTY_PLAN, PLAN_EVENT, PlanPayload, plan_from_event, render_plan
 from dotagent.agent.review import GoalChecker, GoalRequest, GoalVerdict, goal_checker_for, goal_digest, shorten_reason
 from dotagent.agent.verify import RunFacts, checked_facts
 from dotagent.config import AppConfig
 from dotagent.core.errors import ProviderError, ToolExecutionError
 from dotagent.core.logs import get_logger
-from dotagent.core.types import FrozenModel, JsonObject
+from dotagent.core.types import FrozenModel
 from dotagent.policy.types import ActionInfo, Flag
 from dotagent.scheduler.timing import Timing, describe_timing
 from dotagent.store.models import CampaignEntry, CampaignEntryKind, CampaignRecord, EventRecord, RunRecord
@@ -275,18 +275,6 @@ async def _checked_request(campaign: CampaignRecord, evidence: str, ctx: ToolCon
     )
 
 
-def _claim_state(request: GoalRequest) -> JsonObject:
-    """What the typed judge reads of a claim: what the goal checker reads."""
-    return {
-        "goal": request.goal,
-        "plan": request.plan,
-        "targets": request.targets,
-        "ledger": request.digest,
-        "session_facts": request.facts,
-        "claim": request.answer,
-    }
-
-
 def _achieved_tool() -> RegisteredTool:
     def classify(args: AchievedArgs, ctx: ToolContext) -> ActionInfo:
         return _action(CAMPAIGN_ACHIEVED_TOOL, f"Claim the campaign's outcome: {args.evidence}", ())
@@ -307,7 +295,10 @@ def _achieved_tool() -> RegisteredTool:
         )
         request: GoalRequest = await _checked_request(campaign, args.evidence, ctx)
         # The typed judge, when one is on, stops a claim it finds unlikely before the goal checker's model call.
-        claim: ClaimJudgment = await ctx.runtime.judge.judge_claim(_claim_state(request), ctx.run_id)
+        claim: ClaimJudgment = await ctx.runtime.judge.judge_claim(
+            claim_state(request.goal, request.plan, request.targets, request.digest, request.facts, request.answer),
+            ctx.run_id,
+        )
         threshold: float = config.judge.target_threshold
         if claim_refused(claim, threshold):
             log.info(

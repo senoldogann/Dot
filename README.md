@@ -414,7 +414,15 @@ below `target_threshold`, and a disagreement leaves it to the goal checker. It i
 at most `timeout_s` (5 s) each. The thresholds were set on answers of `jev-1.13.0`, the version `[judge] model` names;
 move them together. A missing or refused key, a spent quota or a failed request turns it off for `[models]
 helper_cooldown_s`, with a note in the timeline, and meanwhile the patterns and the goal checker decide alone; a key
-saved in Settings turns it on again at once. `dotx doctor` shows whether it is on and has its key.
+saved in Settings turns it on again at once. `dotx doctor` shows whether it is on and has its key. The click questions
+are asked in `ask` and `auto` only: in `yolo` a flag asks nothing, so a click there sends nothing to TypeSafe. Two more
+checks run before a model call when the judge is on. A `browser_act` that names what it expects to see after its steps
+(`expect`: "the reply shows under the post") gets, above its result, the probability that the page's text shows it and
+that the page is a login wall, a CAPTCHA or an error page, from one request over the page's visible text, so the next
+turn starts from those numbers instead of reading the whole page. And the goal check of a run in goal mode asks the
+judge first, as a campaign's claim does: an answer whose claim of success scores below `target_threshold` is sent back
+with the judge's number and without the review model's call; a clear yes and the uncertain middle go to the review
+model as before.
 
 Whatever `[judge] provider` says, saving `TYPESAFE_API_KEY` also gives the agent the `judge_items` tool (acting and
 research runs; the daemon reads the key when it starts): one question about every item of a list, answered in one
