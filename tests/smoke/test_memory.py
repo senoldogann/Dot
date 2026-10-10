@@ -363,6 +363,7 @@ async def runtime(tmp_path_factory: pytest.TempPathFactory) -> AsyncIterator[Run
 async def _prepare(runtime: Runtime, name: str, arguments: JsonObject) -> tuple[PreparedCall, ToolContext]:
     ctx: ToolContext = ToolContext(
         runtime=runtime,
+        browser=runtime.browser,
         run_id="memory-test",
         thread_id="memory-test",
         mode="task",

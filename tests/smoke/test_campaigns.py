@@ -24,6 +24,7 @@ from dotagent.agent.loop import CAMPAIGN_TARGETS_EVENT
 from dotagent.agent.manager import RunManager, thread_title
 from dotagent.agent.review import GOAL_TOOL
 from dotagent.config import AppConfig, load_default_config
+from dotagent.core.errors import BrowserError
 from dotagent.core.types import JsonObject
 from dotagent.evals import EVAL_SOURCE
 from dotagent.evals.runner import SCRIPTED_MODEL, eval_config, eval_environment, scratch_home
@@ -187,7 +188,7 @@ async def _events(runtime: Runtime, run_id: str, kind: str) -> list[EventRecord]
 
 
 async def _start_campaign(manager: RunManager) -> RunRecord:
-    return await manager.start_campaign(GOAL, "task", SCRIPTED_MODEL, None, EVAL_SOURCE, None, "ask", None, ())
+    return await manager.start_campaign(GOAL, "task", SCRIPTED_MODEL, None, EVAL_SOURCE, None, "ask", None, (), None)
 
 
 async def _ended_sessions(runtime: Runtime, campaign_id: str, count: int) -> list[RunRecord]:
@@ -305,6 +306,9 @@ async def test_a_session_started_by_the_scheduler_reads_the_brief_and_only_an_ac
     assert "# Campaign\nThis run is session 2 of a campaign" in _system(steps[0])
     brief: str = _first_user(steps[0])
     assert brief.startswith(f"This is session 2 of a campaign. Its goal:\n{GOAL}\n\n")
+    # The eval configuration keeps campaigns on Dot's own Chrome; the brief says so.
+    assert "Browser: Dot's own Chrome (own)" in brief
+    assert campaign.browser == "own"
     assert f"Targets: {TARGETS}\nVerified by: {VERIFICATION}\n\n" in brief
     assert "- [progress, 0 min ago] Wrote 5 leads to leads.csv. (leads 5)\n" in brief
     assert "Session 1 ended 0 min ago (done).\nIts answer: 5 of 50 leads are in leads.csv." in brief
@@ -334,7 +338,7 @@ async def test_a_session_the_daemon_cut_off_is_not_resumed_and_the_next_session_
         store = runtime.store
         thread: ThreadRecord = await store.create_thread("Leads", EVAL_SOURCE)
         campaign: CampaignRecord = await store.create_campaign(
-            "Leads", GOAL, thread.id, SCRIPTED_MODEL, runtime.config.models.effort, "ask", ()
+            "Leads", GOAL, thread.id, SCRIPTED_MODEL, runtime.config.models.effort, "ask", (), "own"
         )
         await store.set_campaign_targets(campaign.id, TARGETS, VERIFICATION)
         cut: RunRecord = await store.create_run(
@@ -525,3 +529,26 @@ async def test_the_owner_starts_stops_lets_go_on_and_marks_a_campaign_achieved_t
     assert achieved.json()["record"]["evidence"] == "The owner marked the campaign achieved."
     assert achieved_again.status_code == 409
     assert missing.status_code == 404
+
+
+async def test_a_campaign_that_asks_for_the_owners_chrome_is_refused_while_that_chrome_is_closed(
+    login_env: dict[str, str],
+) -> None:
+    """The scratch Chrome directory of the test has no Chrome running on it, so attaching cannot work and the campaign
+    is refused before it is stored; one on Dot's own Chrome starts, and its record says so."""
+    model: RecordingProvider = RecordingProvider(
+        ScriptedProvider(_PROVIDER, [_turn(_targets()), _finish("Nothing to do.")])
+    )
+    async with _session(_config(60.0), login_env, model, Notices()) as (runtime, manager):
+        with pytest.raises(BrowserError, match="Chrome is not running"):
+            await manager.start_campaign(
+                GOAL, "task", SCRIPTED_MODEL, None, EVAL_SOURCE, None, "ask", None, (), "attach"
+            )
+        assert await runtime.store.list_campaigns() == []
+        opening: RunRecord = await manager.start_campaign(
+            GOAL, "task", SCRIPTED_MODEL, None, EVAL_SOURCE, None, "ask", None, (), "own"
+        )
+        assert opening.campaign_id is not None
+        assert (await runtime.store.get_campaign(opening.campaign_id)).browser == "own"
+        async with asyncio.timeout(_TIME_LIMIT_S):
+            await manager.wait(opening.id)

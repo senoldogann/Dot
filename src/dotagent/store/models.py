@@ -6,6 +6,9 @@ from dotagent.core.types import FrozenModel, JsonObject
 from dotagent.llm.types import Effort
 from dotagent.policy.types import ApprovalMode
 
+# Which Chrome the browser tools work in: Dot's own, or the one the user has open (attached over its debugging port).
+type BrowserMode = Literal["own", "attach"]
+
 RunStatus = Literal["queued", "running", "done", "blocked", "failed", "cancelled"]
 # A run in one of these has not ended.
 WORKING_STATUSES: frozenset[RunStatus] = frozenset({"queued", "running", "blocked"})
@@ -152,7 +155,8 @@ class CampaignRecord(FrozenModel):
     ``next_session_at`` is when the next one starts, ``None`` while none is planned. ``model``, ``effort`` and
     ``approvals`` are the settings of the run that opened it, which every session keeps. ``files`` are the paths of
     the files the owner attached to its goal. ``evidence`` is what the accepted claim of the outcome said, empty while
-    the campaign is not achieved."""
+    the campaign is not achieved. ``browser`` is the Chrome its sessions work in: Dot's own (``own``) or the one the
+    owner has open (``attach``); ``None`` for a campaign from before the choice, whose sessions use the daemon's."""
 
     id: str
     title: str
@@ -170,6 +174,7 @@ class CampaignRecord(FrozenModel):
     created_at: float
     updated_at: float
     evidence: str
+    browser: BrowserMode | None
 
 
 class CampaignEntry(FrozenModel):

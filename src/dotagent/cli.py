@@ -136,7 +136,7 @@ from dotagent.policy.types import ApprovalMode
 from dotagent.runtime import Runtime, build_runtime, close_runtime
 from dotagent.secrets import resolve_secret, write_env_value
 from dotagent.store.db import Store
-from dotagent.store.models import MemoryRecord, RunMode, RunRecord
+from dotagent.store.models import BrowserMode, MemoryRecord, RunMode, RunRecord
 from dotagent.tools.desktop import sized_for_agent
 
 _NONCE_BYTES: int = 8
@@ -160,6 +160,7 @@ class RunCommand(FrozenModel):
     approvals: ApprovalMode | None
     goal_mode: bool | None
     standing: bool
+    browser: BrowserMode | None
     thread: str | None
     no_input: bool
     thinking: bool
@@ -335,6 +336,15 @@ def build_parser() -> argparse.ArgumentParser:
         help=(
             "keep going until done: start a campaign on the goal with this run as its first session; the daemon runs "
             "the sessions after it until the outcome is verified (a task, without goal mode)"
+        ),
+    )
+    run.add_argument(
+        "--browser",
+        default=None,
+        choices=list(get_args(BrowserMode)),
+        help=(
+            "with --standing: the Chrome the campaign works in, attach (the one you have open, signed in as you are) "
+            "or own (Dot's own); the default is [agent] campaign_browser"
         ),
     )
     run.add_argument("--thread", default=None, help="continue an existing conversation thread")
@@ -754,6 +764,7 @@ async def cmd_run(command: RunCommand) -> int:
                     command.approvals,
                     command.goal_mode,
                     (),
+                    command.browser,
                 ),
             )
             if command.standing

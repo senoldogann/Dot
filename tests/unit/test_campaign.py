@@ -41,6 +41,7 @@ def _brief(
     progress: CampaignEntry | None = next((entry for entry in reversed(entries) if entry.kind == "progress"), None)
     return Brief(
         goal=GOAL,
+        browser="attach" if session > 1 else "own",
         targets=targets,
         verification="wc -l leads.csv" if targets else "",
         files=("/Users/me/Dot/attachments/att_1/fair.csv",) if session > 1 else (),
@@ -60,6 +61,7 @@ def _brief(
 def test_the_first_brief_has_the_goal_and_asks_for_the_targets() -> None:
     assert render_brief(_brief(1, "", (), (), None, 0)) == (
         f"This is session 1 of a campaign. Its goal:\n{GOAL}\n\n"
+        "Browser: Dot's own Chrome (own), signed in to nothing unless a session signed in.\n\n"
         "Targets: not set yet. Record them with campaign_targets before you finish.\n\n"
         "Ledger: empty."
     )
@@ -86,6 +88,9 @@ def test_a_later_brief_carries_the_ledger_the_questions_and_how_the_last_session
     )
     brief: str = render_brief(_brief(3, "50 leads in leads.csv", entries, questions, last, 1))
     assert brief.startswith(f"This is session 3 of a campaign. Its goal:\n{GOAL}\n\n")
+    assert (
+        "Browser: the owner's own Chrome, signed in as they are (attach); their tabs are theirs to keep.\n\n" in brief
+    )
     assert "Targets: 50 leads in leads.csv\nVerified by: wc -l leads.csv\n\n" in brief
     assert "read them at these paths when you need them):\n- /Users/me/Dot/attachments/att_1/fair.csv\n\n" in brief
     assert "(instructions):\n- Only companies in Berlin.\n\n" in brief

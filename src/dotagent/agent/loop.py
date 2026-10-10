@@ -127,6 +127,7 @@ from dotagent.agent.verify import (
     with_outcomes,
 )
 from dotagent.agent.vision import text_for_blind_model
+from dotagent.browser.session import BrowserSession
 from dotagent.config import AgentConfig
 from dotagent.core.errors import ConfigError, MissingSecretError, ProviderError, RunCancelled, ToolInputError
 from dotagent.core.jsonutil import dumps_compact
@@ -157,7 +158,7 @@ from dotagent.runtime import Runtime
 from dotagent.skills.catalog import load_skills, playbook_root
 from dotagent.skills.types import SkillCatalog
 from dotagent.store.endings import GOAL_CHECK_MARK, RESULT_EMPTY_REPLIES
-from dotagent.store.models import EventRecord, MemoryRecord, RunMode, RunRecord
+from dotagent.store.models import CampaignRecord, EventRecord, MemoryRecord, RunMode, RunRecord
 from dotagent.store.stats import ACT_TOOLS
 from dotagent.tools.campaign import CAMPAIGN_TOOLS
 from dotagent.tools.consult import CONSULT_TOOL
@@ -706,6 +707,18 @@ def _after_limit_verdict(verdict: GoalVerdict, ended: RunOutcome) -> RunOutcome:
     )
 
 
+async def _browser_of(runtime: Runtime, run: RunRecord) -> BrowserSession:
+    """The browser session the run works in: the one its campaign asked for (a delegated run follows its parent's
+    campaign), else the daemon's."""
+    campaign_id: str | None = run.campaign_id
+    if campaign_id is None and run.parent_run_id is not None:
+        campaign_id = (await runtime.store.get_run(run.parent_run_id)).campaign_id
+    if campaign_id is None:
+        return runtime.browser
+    campaign: CampaignRecord = await runtime.store.get_campaign(campaign_id)
+    return runtime.browsers.session_for(campaign.browser)
+
+
 async def _session_number(agent: AgentRun, campaign_id: str) -> int:
     return session_number(await agent.runtime.store.campaign_sessions(campaign_id), agent.run.id)
 
@@ -1134,6 +1147,7 @@ async def run_agent(agent: AgentRun) -> RunEnd:
     facts: RunFacts = new_facts()
     context: ToolContext = ToolContext(
         runtime=runtime,
+        browser=await _browser_of(runtime, run),
         run_id=run.id,
         thread_id=run.thread_id,
         mode=run.mode,

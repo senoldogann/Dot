@@ -158,6 +158,11 @@ function outline(detail) {
       "div",
       { class: "row-meta" },
       el("span", { class: "chip", title: record.model }, modelName(record.model)),
+      el(
+        "span",
+        { class: "chip", title: "The Chrome its sessions work in" },
+        record.browser === "attach" ? "Browser: your Chrome" : record.browser === "own" ? "Browser: Dot's own" : "Browser: the daemon's",
+      ),
       el("span", { class: "chip" }, `Reasoning ${levelLabel(record.effort)}`),
       approvals,
       el("span", { class: "chip", title: "Tokens of its sessions and of the runs they delegated to" }, `${compact(detail.tokens)} tokens`),

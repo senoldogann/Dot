@@ -177,6 +177,7 @@ async def runtime(settings: Path, tmp_path_factory: pytest.TempPathFactory) -> A
 async def _call(runtime: Runtime, name: str, arguments: JsonObject) -> tuple[ToolResult, ActionInfo]:
     ctx: ToolContext = ToolContext(
         runtime=runtime,
+        browser=runtime.browser,
         run_id="web-test",
         thread_id="web-test",
         mode="task",

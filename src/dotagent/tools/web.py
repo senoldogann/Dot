@@ -358,8 +358,8 @@ def _renderer_for(ctx: ToolContext) -> Renderer:
     """A page shown in the run's browser tab: its visible text after JavaScript ran."""
 
     async def render(url: str, max_chars: int) -> str:
-        await ctx.runtime.browser.open_url(ctx.thread_id, url)
-        return (await ctx.runtime.browser.read_text(ctx.thread_id, None, 0, max_chars)).text
+        await ctx.browser.open_url(ctx.thread_id, url)
+        return (await ctx.browser.read_text(ctx.thread_id, None, 0, max_chars)).text
 
     return render
 

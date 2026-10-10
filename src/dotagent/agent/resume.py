@@ -248,6 +248,7 @@ async def interrupted_calls(runtime: Runtime, run: RunRecord) -> tuple[Interrupt
         }
     context: ToolContext = ToolContext(
         runtime=runtime,
+        browser=runtime.browser,
         run_id=run.id,
         thread_id=run.thread_id,
         mode=run.mode,

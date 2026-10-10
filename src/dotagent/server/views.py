@@ -6,7 +6,7 @@ from pydantic import Field, JsonValue
 
 from dotagent.agent.attachments import MAX_ATTACHMENT_BYTES, MAX_ATTACHMENTS
 from dotagent.agent.lessons import RunLessons
-from dotagent.config import BrowserMode, ModelsConfig
+from dotagent.config import ModelsConfig
 from dotagent.core.types import FrozenModel
 from dotagent.desktop.perms import Pane
 from dotagent.llm.types import Effort
@@ -16,6 +16,7 @@ from dotagent.store.models import (
     ApprovalRecord,
     ApprovalStatus,
     Behavior,
+    BrowserMode,
     CampaignEntry,
     CampaignRecord,
     MemoryRecord,
@@ -94,6 +95,8 @@ class StartRunRequest(FrozenModel):
     approvals: ApprovalMode | None = None
     goal_mode: bool | None = None
     standing: bool = False
+    # The Chrome a campaign works in; None takes [agent] campaign_browser. Only with standing.
+    browser: BrowserMode | None = None
     attachments: list[str] = Field(default_factory=list, max_length=MAX_ATTACHMENTS)
 
 

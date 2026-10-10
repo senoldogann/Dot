@@ -66,7 +66,8 @@ def render_campaign_page(
     now: float,
 ) -> str:
     """What 'dotx campaign show' prints: the campaign's line, goal, targets, sessions and the end of its ledger."""
-    lines: list[str] = [render_campaign(campaign, sessions, zone), f"goal: {campaign.goal}"]
+    chrome: str = "the daemon's" if campaign.browser is None else campaign.browser
+    lines: list[str] = [render_campaign(campaign, sessions, zone), f"goal: {campaign.goal}", f"browser: {chrome}"]
     if campaign.targets:
         lines += [f"targets: {campaign.targets}", f"verified by: {campaign.verification}"]
     else:

@@ -1047,6 +1047,12 @@ your conversation; the daemon runs the sessions after it, each a run in a thread
   (Stop on its run page ends it). `campaign_max_sessions` (0: no limit) stops a campaign after that many sessions; Go on
   gives it one more.
 
+**The browser of a campaign.** A campaign works in the Chrome you have open, signed in as you are (`attach`), unless you
+start it with `--browser own` (or `browser` in the API), and `[agent] campaign_browser` sets the default; runs you start
+by hand keep `[browser] mode`. A campaign that asks for your Chrome is refused at its start while that Chrome is closed
+or does not allow the connection (`dotx browser attach` sets it up), so its sessions do not fail one after the other.
+The brief of every session says which Chrome it works in, and so do `dotx campaign show` and the campaign's page.
+
 Every session runs with the model, reasoning level and approval mode the campaign started with, and without goal mode:
 the campaign's own check takes its place, so starting one with goal mode on is refused. A run's limits
 (`run_max_minutes`, `run_max_tokens`) apply to each session. Sessions run only while the daemon runs; one the daemon cut
