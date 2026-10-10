@@ -359,7 +359,11 @@ currency. Empty by default.
 3. *Hard stops* hand money and credentials to you (`financial`, `credential`): Dot stops and asks you to do that step
    yourself. A payment under the pre-approved caps of its site (below) is a question instead of a hand-off.
 4. *Your rules* come next. The first enabled rule, in order, whose tool pattern and regular expression match the action
-   decides: `allow`, `preapproved`, `ask` or `handoff`. Rules are managed in the web UI or through `/api/rules`.
+   decides, with one of four answers: *do it* (`allow`), *do it, whatever it has read* (`preapproved`: the question
+   untrusted content raises is skipped too), *ask me first* (`ask`) or *hand it to me* (`handoff`: Dot stops, says what
+   it needs done and waits; on a browser step you can take the browser over, do it and give it back; when you say you
+   did it, the run goes on from there). A rule reads as a sentence in Settings › Rules, "When Dot would use `shell`,
+   matching `^git push`: ask me first", and is managed there or through `/api/rules`.
 5. *The preset* decides everything that is left:
 
 | Preset                 | Asks before                                                                                                                 |

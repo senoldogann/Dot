@@ -1,30 +1,53 @@
-// Rules: your own answers to "may Dot do this?", checked in order before the safety preset decides.
+// Rules: your own answers to "may Dot do this?", checked in order before the safety preset decides. A rule reads as a
+// sentence: "When Dot would use {tool}, matching {pattern}: {answer}", and the answer is one of four.
 
 import { api } from "../api.js";
 import { clip, el } from "../dom.js";
 import { icon } from "../icons.js";
-import { emptyPanel, errorPanel, field, loadingPanel, pageHead } from "../panels.js";
+import { emptyPanel, errorPanel, field, loadingPanel, pageHead, segmented } from "../panels.js";
 import { attempt, confirmDialog, toast } from "../ui.js";
 
 const QUOTE_CHARS = 100;
-const BEHAVIORS = [
+// The four answers, in the order of the control. `label` is the answer as it reads in the sentence; `text` says what
+// Dot does then.
+const ANSWERS = [
   {
     id: "allow",
-    label: "Allow",
+    label: "Do it",
     tone: "b-ok",
-    text: "Run without asking. It still asks when untrusted content is in context and the action reaches outside this Mac.",
+    text: "Dot does it without asking. When untrusted content is in context and the action reaches outside this Mac, it still asks you.",
   },
-  { id: "preapproved", label: "Pre-approved", tone: "b-ok", text: "Run without asking, whatever is in context." },
-  { id: "ask", label: "Ask", tone: "b-warn", text: "Always ask you first." },
-  { id: "handoff", label: "Hand off", tone: "b-info", text: "Stop and hand the action over to you instead of doing it." },
+  {
+    id: "preapproved",
+    label: "Do it, whatever it has read",
+    tone: "b-ok",
+    text: "Dot does it without asking, even after reading untrusted content.",
+  },
+  { id: "ask", label: "Ask me first", tone: "b-warn", text: "Dot stops and asks you every time; the run waits for your answer." },
+  {
+    id: "handoff",
+    label: "Hand it to me",
+    tone: "b-info",
+    text: "Dot stops, tells you what it needs done and waits. In the browser you can take over, do the step and give the browser back; when you say you did it, the run goes on from there.",
+  },
 ];
 
-function behaviorOf(id) {
-  return BEHAVIORS.find((behavior) => behavior.id === id) ?? { id, label: id, tone: "b-muted", text: "" };
+function answerOf(id) {
+  return ANSWERS.find((answer) => answer.id === id) ?? { id, label: id, tone: "b-muted", text: "" };
+}
+
+/** The sentence a rule reads as, up to the answer: "When Dot would use shell, matching ^git push:". */
+function sentence(toolGlob, matchRegex) {
+  const parts = ["When Dot would use ", el("code", { class: "mono" }, toolGlob === "" ? "…" : toolGlob)];
+  if (matchRegex !== "") {
+    parts.push(", matching ", el("code", { class: "mono" }, matchRegex));
+  }
+  parts.push(":");
+  return parts;
 }
 
 function ruleRow(record, index, handlers) {
-  const behavior = behaviorOf(record.behavior);
+  const answer = answerOf(record.behavior);
   const toggle = el("button", {
     class: "switch",
     type: "button",
@@ -45,10 +68,6 @@ function ruleRow(record, index, handlers) {
     },
     icon("trash"),
   );
-  const pattern =
-    record.match_regex === ""
-      ? el("span", null, "every time")
-      : el("span", null, "when the action matches ", el("code", { class: "mono" }, record.match_regex));
   return el(
     "div",
     { class: record.enabled ? "list-row" : "list-row faint" },
@@ -58,12 +77,11 @@ function ruleRow(record, index, handlers) {
       { class: "row-main" },
       el(
         "div",
-        { class: "row" },
+        { class: "row rule-sentence" },
         el("span", { class: "chip", title: "Rules are checked in this order" }, `#${index + 1}`),
-        el("span", { class: `badge ${behavior.tone}` }, behavior.label),
-        el("code", { class: "mono" }, record.tool_glob),
+        el("span", null, ...sentence(record.tool_glob, record.match_regex)),
+        el("span", { class: `badge ${answer.tone}`, title: answer.text }, answer.label),
       ),
-      el("div", { class: "row-meta" }, pattern),
       record.description === "" ? null : el("div", { class: "row-text muted" }, record.description),
     ),
     el("div", { class: "row-actions" }, remove),
@@ -71,15 +89,6 @@ function ruleRow(record, index, handlers) {
 }
 
 function buildForm(onCreated) {
-  const behavior = el(
-    "select",
-    { class: "select", "aria-label": "Then" },
-    BEHAVIORS.map((option) => el("option", { value: option.id }, option.label)),
-  );
-  const behaviorHint = el("span", { class: "hint" }, BEHAVIORS[0].text);
-  behavior.addEventListener("change", () => {
-    behaviorHint.textContent = behaviorOf(behavior.value).text;
-  });
   const glob = el("input", {
     class: "input mono",
     type: "text",
@@ -106,6 +115,24 @@ function buildForm(onCreated) {
     placeholder: "Reading the state of a repository is harmless",
     "aria-label": "Why",
   });
+  const preview = el("span", { class: "rule-preview" });
+  const answerHint = el("span", { class: "hint" }, ANSWERS[0].text);
+  const answers = segmented(
+    ANSWERS.map(({ id, label, text }) => ({ id, label, hint: text })),
+    ANSWERS[0].id,
+    () => paintPreview(),
+  );
+  answers.element.classList.add("answers");
+  answers.element.setAttribute("aria-label", "Then");
+
+  function paintPreview() {
+    const answer = answerOf(answers.value());
+    answerHint.textContent = answer.text;
+    preview.replaceChildren(...sentence(glob.value.trim(), regex.value.trim()), " ", el("em", null, answer.label.toLowerCase()), ".");
+  }
+
+  glob.addEventListener("input", paintPreview);
+  regex.addEventListener("input", paintPreview);
   const create = el("button", { class: "btn primary", type: "button" }, icon("plus"), "Add rule");
 
   async function submit() {
@@ -117,7 +144,7 @@ function buildForm(onCreated) {
     create.disabled = true;
     try {
       await api.post("/rules", {
-        behavior: behavior.value,
+        behavior: answers.value(),
         tool_glob: globText,
         match_regex: regex.value.trim(),
         description: description.value.trim(),
@@ -125,6 +152,7 @@ function buildForm(onCreated) {
       glob.value = "";
       regex.value = "";
       description.value = "";
+      paintPreview();
       toast("ok", "Rule added at the end of the list.");
       await onCreated();
     } finally {
@@ -133,19 +161,21 @@ function buildForm(onCreated) {
   }
 
   create.addEventListener("click", () => attempt(submit));
+  paintPreview();
   const element = el(
     "section",
     { class: "card card-pad stack" },
+    el("div", { class: "rule-sentence rule-sentence-preview" }, icon("shield"), preview),
     el(
       "div",
       { class: "form-grid" },
-      el("label", { class: "field" }, el("span", { class: "field-label" }, "Then"), behavior, behaviorHint),
-      field("For the tool", glob, "A name or a pattern: shell, write_file, browser_*, desktop_*, mcp__*"),
+      field("When Dot would use", glob, "A tool name or a pattern: shell, write_file, browser_*, desktop_*, mcp__*"),
       field(
-        "When the action matches",
+        "matching",
         regex,
         "Optional regular expression, case-insensitive, searched in a one-line summary of the action and its target. Empty means every time.",
       ),
+      el("div", { class: "field wide" }, el("span", { class: "field-label" }, "Then"), answers.element, answerHint),
       field("Why", description, "Optional. Shown when the rule decides."),
     ),
     el("div", { class: "row" }, el("span", { class: "spacer" }), create),
@@ -206,7 +236,7 @@ export function mount(root, ctx) {
   async function remove(record) {
     const confirmed = await confirmDialog({
       title: "Delete this rule?",
-      message: `The ${record.behavior} rule for “${clip(record.tool_glob, QUOTE_CHARS)}” stops applying.`,
+      message: `“${answerOf(record.behavior).label}” for “${clip(record.tool_glob, QUOTE_CHARS)}” stops applying.`,
       confirmLabel: "Delete",
       danger: true,
       focusCancel: true,
