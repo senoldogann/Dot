@@ -8,6 +8,7 @@ import { buildShell } from "./shell.js";
 import { getSnapshot, onChange, refresh, runLifecycle } from "./state.js";
 import { applyStoredTheme } from "./theme.js";
 import { attempt, toast } from "./ui.js";
+import * as activity from "./views/activity.js";
 import * as campaigns from "./views/campaigns.js";
 import * as run from "./views/run.js";
 import * as runs from "./views/runs.js";
@@ -25,6 +26,7 @@ const MOVED = new Map([
 const ROUTES = [
   { tab: "runs", layout: "home", title: "New chat", pattern: /^\/runs$/, view: runs },
   { tab: "runs", layout: "run", title: "Run", pattern: /^\/runs\/([A-Za-z0-9_-]+)$/, view: run },
+  { tab: "activity", layout: "page", title: "Activity", pattern: /^\/activity$/, view: activity },
   { tab: "campaigns", layout: "page", title: "Campaigns", pattern: /^\/campaigns(?:\/([A-Za-z0-9_-]+))?$/, view: campaigns },
   { tab: "settings", layout: "page", title: "Settings", pattern: /^\/settings(?:\/([a-z]+))?$/, view: settings },
 ];

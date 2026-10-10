@@ -746,6 +746,14 @@ and a search over the titles (⌘K or `/`); below it, **Settings**. **Select** t
 with a run under way is refused: wait for the run to end, or cancel it. Escape leaves the selection. Under 860 px the
 sidebar becomes a drawer.
 
+Above the chats, two sections appear while they have rows: **Waiting for you** (the approvals and questions runs wait
+for, and a run whose browser you took over) and **Working** (the runs going on, a session of a campaign, a run
+delegated by another, and a schedule that fires within the hour), each row with its state dot, what it is, the channel
+it last worked in (browser, files, shell, desktop, mail) and what it needs; a row opens the run. **Activity**
+(`#/activity`, below the list next to Campaigns) is the same in full, with the runs that ended today and a filter by
+kind (runs, campaigns, schedules); it is `GET /api/activity`. Both follow the lifecycle stream, so a run moves between
+the sections the moment it starts, waits, is taken over or ends.
+
 **New chat** is Dot's face and one composer, centred in the window: the goal, then one line with the mode (Task, Chat
 or Research), the model and, for a model that offers a choice, its reasoning level (kept in the browser per model).
 **Options** at the end of that line opens the approval mode (Ask, Auto or YOLO; the mode in use always shows on the

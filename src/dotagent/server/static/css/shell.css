@@ -362,3 +362,24 @@
     padding: 6px 10px;
   }
 }
+
+/* The activity sections above the chats: a row is a chat row with a second, smaller line. */
+.side-activity-nav {
+  display: flex;
+  flex-direction: column;
+  margin-top: 4px;
+}
+
+.side-activity .side-run-goal {
+  display: flex;
+  flex-direction: column;
+  white-space: normal;
+}
+
+.side-activity-detail {
+  overflow: hidden;
+  font-size: 11.5px;
+  color: var(--muted);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

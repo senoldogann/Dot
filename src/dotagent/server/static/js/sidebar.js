@@ -12,7 +12,12 @@ import { attempt, confirmDialog, toast } from "./ui.js";
 const LIST_LIMIT = 200;
 const LIST_CAP = 500;
 // The moments a run changes status; a run that waits for an approval is "blocked" until it is answered.
-const RELOAD_KINDS = new Set(["run_queued", "run_started", "run_finished", "approval_requested", "approval_decided"]);
+const RELOAD_KINDS = new Set(["run_queued", "run_started", "run_finished", "approval_requested", "approval_decided", "takeover", "handback"]);
+// The sections above the chats: what waits for you and what works now (`GET /activity`), each hidden while empty.
+const ACTIVITY_SECTIONS = [
+  { key: "waiting", label: "Waiting for you" },
+  { key: "working", label: "Working" },
+];
 const DAY_LABELS = ["Today", "Yesterday", "Previous 7 days", "Older"];
 // What a status dot means, for screen readers; a chat whose latest run is done or cancelled shows no dot and needs no word.
 const STATUS_WORD = { queued: "queued", running: "running", blocked: "waiting for you", failed: "failed" };
@@ -67,6 +72,23 @@ function chatLink(chat, onNavigate) {
     },
     el("span", { class: `status-dot s-${chat.latest_status}` }),
     el("span", { class: "side-run-goal" }, title),
+  );
+}
+
+/** One row of the activity sections: the state dot, the title and what it needs or where it works. */
+function activityRow(row, onNavigate) {
+  const detail = [row.channel, row.detail].filter((part) => part !== "").join(" · ");
+  return el(
+    "a",
+    {
+      class: "side-run side-activity",
+      href: row.href,
+      title: clip(row.title, 240),
+      "aria-label": detail === "" ? row.title : `${row.title} (${detail})`,
+      onclick: onNavigate,
+    },
+    el("span", { class: `status-dot s-${row.section === "waiting" ? "blocked" : "running"}` }),
+    el("span", { class: "side-run-goal" }, clip(row.title, 120), detail === "" ? null : el("small", { class: "side-activity-detail" }, detail)),
   );
 }
 
@@ -142,6 +164,9 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
     el("div", { class: "row" }, count, cancelButton),
     el("div", { class: "row" }, allButton, deleteButton),
   );
+  let activity = null;
+  const activityNav = el("nav", { class: "side-activity-nav", "aria-label": "Activity", hidden: true });
+  const activityLink = el("a", { class: "side-link", href: "#/activity", onclick: onNavigate }, icon("bolt"), el("span", null, "Activity"));
   const campaignsLink = el("a", { class: "side-link", href: "#/campaigns", onclick: onNavigate }, icon("target"), el("span", null, "Campaigns"));
   const settingsLink = el("a", { class: "side-link", href: "#/settings", onclick: onNavigate }, icon("sliders"), el("span", null, "Settings"));
 
@@ -370,7 +395,37 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
     resolveThread(routeRunId);
   }
 
+  function paintActivity() {
+    const groups = activity === null ? [] : ACTIVITY_SECTIONS.filter(({ key }) => activity[key].length > 0);
+    activityNav.hidden = groups.length === 0;
+    activityNav.replaceChildren(
+      ...groups.map(({ key, label }) =>
+        el(
+          "section",
+          { class: "side-group", "data-section": key },
+          el("h3", { class: "side-label" }, `${label} · ${activity[key].length}`),
+          activity[key].map((row) => activityRow(row, onNavigate)),
+        ),
+      ),
+    );
+  }
+
+  async function loadActivity() {
+    try {
+      const view = await api.get("/activity");
+      if (disposed) {
+        return;
+      }
+      activity = view;
+    } catch (error) {
+      console.warn("the activity of the sidebar could not be refreshed", error);
+      return;
+    }
+    paintActivity();
+  }
+
   async function load() {
+    loadActivity();
     try {
       const all = await api.get(`/threads?limit=${listLimit}`);
       if (disposed) {
@@ -500,9 +555,10 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
         el("kbd", { "aria-hidden": "true" }, "⇧⌘O"),
       ),
       el("label", { class: "side-search" }, icon("search"), search, el("kbd", { "aria-hidden": "true" }, "⌘K")),
+      activityNav,
       el("nav", { class: "side-recent", "aria-label": "Chats" }, head, bar, list),
     ),
-    el("div", { class: "side-foot" }, campaignsLink, settingsLink),
+    el("div", { class: "side-foot" }, activityLink, campaignsLink, settingsLink),
   );
 
   return {
@@ -515,6 +571,7 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
       close.focus();
     },
     setRoute({ tab, runId }) {
+      mark(activityLink, tab === "activity");
       mark(campaignsLink, tab === "campaigns");
       mark(settingsLink, tab === "settings");
       routeRunId = runId;

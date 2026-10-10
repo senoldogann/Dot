@@ -2374,3 +2374,58 @@ dialog.lightbox img {
 .action-edit[data-state="ready"] .row-title {
   color: var(--text);
 }
+
+/* ---------- Activity page: one row per thing in motion ---------- */
+
+.activity-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.activity-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  padding: 10px 14px;
+  border-top: 1px solid var(--border);
+  color: var(--text);
+}
+
+.activity-row:hover {
+  background: color-mix(in srgb, var(--text) 4%, transparent);
+  text-decoration: none;
+}
+
+.activity-icon {
+  display: inline-flex;
+  flex: none;
+  color: var(--muted);
+}
+
+.activity-main {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+  gap: 2px;
+}
+
+.activity-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.activity-side {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 8px;
+}
+
+@media (max-width: 600px) {
+  .activity-side .badge {
+    display: none;
+  }
+}
