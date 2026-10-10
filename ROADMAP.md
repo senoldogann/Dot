@@ -900,8 +900,8 @@ that change the owner's agent are their call (see "Open owner decisions", 6 onwa
 | 15  | Helper models: consult, delegate to another model, standby             | done        | 530ac62 |
 | 16  | Typed judgments (TypeSafe) at the decision points                      | done        | a5516f7 |
 | 17  | Pacing and public actions on social platforms                          | done        | d50a41e |
-| 18  | Skills written for Claude Code, and the X playbook                     | done        |         |
-| 19  | Prompt-cache hygiene for the hosted providers                          | planned     |         |
+| 18  | Skills written for Claude Code, and the X playbook                     | done        | 6464881 |
+| 19  | Prompt-cache hygiene for the hosted providers                          | done        |         |
 | 20  | An interactive terminal for programs that prompt                       | planned     |         |
 | 21  | A plain chat screen: Dot's face, task chips, one composer line         | done        | bb89714 |
 
@@ -2129,8 +2129,8 @@ apart. README.
 
 ### 18. Skills written for Claude Code, and the X playbook
 
-**Status: done.** **Goal.** The owner's Claude Code skills load in Dot as they are, so the X playbook they already
-own (`x-twitter-growth`, `baoyu-post-to-x`) is what a campaign on X works from.
+**Status: done** (`6464881`, PR #12). **Goal.** The owner's Claude Code skills load in Dot as they are, so the X
+playbook they already own (`x-twitter-growth`, `baoyu-post-to-x`) is what a campaign on X works from.
 
 **Why.** Both skills were refused: `SkillFrontmatter.metadata` was `dict[str, str]` (`skills/types.py`), and their
 frontmatter holds `updated: 2026-03-10` (a YAML date) and a nested `openclaw` map. The Agent Skills specification does
@@ -2164,8 +2164,9 @@ section built from that home lists both. README.
 
 ### 19. Prompt-cache hygiene for the hosted providers
 
-**Status: planned.** **Goal.** On Anthropic and OpenAI the prefix of a run's prompt stays byte-identical from step to
-step, so the server's cache pays for the system prompt, the tools and the history instead of the owner.
+**Status: done** (smaller than the first draft). **Goal.** On Anthropic and OpenAI the prefix of a run's prompt stays
+byte-identical from step to step, so the server's cache pays for the system prompt, the tools and the history instead
+of the owner.
 
 **Why.** Found with the Claude provider (log of 2026-10-08): the system prompt carries the time to the minute
 (`agent/prompt.py:338`), so two runs never share a cached prefix; `drop_old_images` edits the history at every step
@@ -2174,30 +2175,34 @@ of the prefix and the cache starts again from there; `cached_tokens` is parsed a
 rate. Anthropic's automatic top-level `cache_control` is already sent (`llm/codec_messages.py:164-165`). The Ollama
 cloud models the owner runs today gain nothing from this; a Claude helper or standby (item 15) does.
 
-**Design.**
-- The system prompt names the date (`%A %Y-%m-%d`) and the time zone; the exact time goes into the opening message
-  ("It is now 14:02 EEST") and into every note the harness appends (`_stored_note`), which are at the end of the
-  prompt anyway.
-- Images leave the history: a tool result with a screenshot is stored with a stub ("[screenshot 3, attached below]")
-  from the start, and the request appends one trailing user message "Current screenshots" with the newest
-  `keep_recent_screenshots` images of the run, kept in memory by the loop (the files are in the store as today). The
-  codecs do not change: it is one more user message with images. `drop_old_images` goes.
-- `shrink_old_tool_results` (`agent/compact.py:42-51`) shrinks a result to its final size in one pass (measured: a
-  result changed twice before it settled), so a message is rewritten once.
-- `dotx stats` shows `cached_tokens` per model (item 9 stores them).
+**Design** (as built on 2026-10-10; what was left out of the first draft, and why, is listed below).
+- The system prompt names the day and the time zone ("Today: Saturday 2026-10-10, time zone EEST (UTC+0300)"), never
+  the time of day. A stored note after each run's goal gives it ("[system note] It is now 14:02 EEST.", `clock_note`).
+  A run builds its system prompt once, so nothing changes within a run; the next run of a thread (a chat's next turn,
+  a campaign's next session) now starts with the same bytes on the same day when it lists the same notes from memory,
+  and the provider can serve the whole earlier conversation from its cache.
+- `dotx stats` already shows the cached tokens per model (item 9).
 
-**Touchpoints.** `agent/prompt.py`, `agent/loop.py`, `agent/compact.py`, `store/db.py` (loading keeps the stubs),
-`llm/codec_messages.py`, `llm/codec_responses.py`, `llm/codec_chat.py` (no change expected; the tests prove it),
-README "Models and providers".
+**Left out of the first draft, and why.**
+- Moving every screenshot into one trailing "Current screenshots" message. The trailing message moves as the history
+  grows, so its images would be sent uncached at every step; today each screenshot is cached from the step after it
+  arrives until it leaves the window, and dropping it costs one rewrite of the steps after it. Neither cost is measured,
+  because no request has reached Anthropic yet (decision 5): measure the cached tokens of a run with screenshots on
+  Claude with `dotx stats` first.
+- Shrinking a tool result in one pass. A result with a screenshot changes when its image leaves the window and again
+  when it is shortened; one rewrite would mean dropping images earlier or keeping long results longer. Left for the same
+  measurement.
+
+**Touchpoints.** `agent/prompt.py`, `agent/loop.py`, README "Models and providers", `tests/unit/test_run_modes.py`.
 
 **Decisions and limits.**
-- The vision relay for a blind main model (`agent/vision.py`) reads the images from the trailing message the same way.
-- Whether the trailing message confuses a model is checked on the scripted and the hosted tests; the hosted run spends
-  the owner's quota (open decision 1).
+- The notes from memory in the system prompt are chosen by each run's goal: a chat turn whose message brings other
+  notes starts the cache again from the system prompt. Moving them out of the system prompt is a larger change.
+- The Ollama models the owner runs today gain nothing from this.
 
-**Done when.** Unit tests of the stub and the trailing message; wire tests of all three codecs with images in the
-trailing message; the hosted Anthropic test reports `cached_tokens > 0` on the second step of a three-step scripted
-run (when the owner runs it); the offline smoke suite clean; README.
+**Done when.** A unit test: the day line of the system prompt has no time of day, and the clock note gives it. The
+offline smoke suite and `dotx eval check` clean with the note after every goal. README. The hosted Anthropic test of
+`cached_tokens > 0` on a run's second step waits for the owner's key (decision 5).
 
 ### 20. An interactive terminal for programs that prompt
 
@@ -2660,3 +2665,8 @@ text, no console error; the Options panel with YOLO saved; every status ring. RE
   throw-away home with copies of the two folders: `dotx skills list` and the prompt's Skills section list both. Also
   fixed: item 17's smoke test measured the spacing from the end of the first click and failed once in the full suite
   (0.88 s); it now reads the two recorded times. Unit tests (553), the offline smoke suite (243, no cloud request).
+- 2026-10-10: item 18 merged as `6464881` (PR #12, squash). Item 19 started on `item-19-prompt-cache`.
+- 2026-10-10: item 19 done, smaller than planned. The system prompt names the day and the time zone; the time of day is
+  a stored note after each goal, so the next run of a thread can start from the provider's cache. The trailing message
+  of screenshots and the one-pass shrink were left out: neither is measured, and the first could cost more than it
+  saves (the section says why). Unit tests (554), the offline smoke suite (243, no cloud request), `dotx eval check`.

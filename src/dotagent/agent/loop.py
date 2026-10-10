@@ -4,6 +4,7 @@ import asyncio
 import time
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, replace
+from datetime import datetime
 from typing import Literal
 
 from dotagent.agent.attachments import (
@@ -82,7 +83,7 @@ from dotagent.agent.progress import (
     restriction_for,
     stop_result,
 )
-from dotagent.agent.prompt import build_system_prompt, collect_prompt_inputs
+from dotagent.agent.prompt import build_system_prompt, clock_note, collect_prompt_inputs
 from dotagent.agent.resume import RESUMED_EVENT, Resumption, resumed_event_data
 from dotagent.agent.review import (
     GoalChecker,
@@ -1034,6 +1035,7 @@ async def run_agent(agent: AgentRun) -> RunEnd:
         await runtime.bus.emit(run.id, ATTACHMENTS_EVENT, {"files": attachment_summary(opening.files)}, True)
     history.append(goal)
     await runtime.store.append_messages(run.thread_id, [goal])
+    history.append(await _stored_note(agent, clock_note(datetime.now().astimezone())))
     facts: RunFacts = new_facts()
     context: ToolContext = ToolContext(
         runtime=runtime,

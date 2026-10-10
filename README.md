@@ -124,10 +124,13 @@ the standby again when it still cannot answer.
   read from the Models API, so a new Claude model needs no update of Dot. A model that thinks gets adaptive thinking at
   the run's reasoning level, with the summary of its thinking shown; `off` turns thinking off where the model allows it,
   and is rounded to `low` where it does not. A model without adaptive thinking (the 4.5 generation and older) runs
-  without thinking at its default level. The prompt is cached from one step of a run to the next (for five minutes),
-  and a request may use the model's whole output limit. The thinking of earlier steps is sent back; a block whose
-  earlier context has changed since (a run drops an old screenshot, the next run of a chat starts with a new system
-  prompt) is dropped by the API instead of failing the request (beta `thinking-binding-controls-2026-08-01`).
+  without thinking at its default level. The prompt is cached from one step of a run to the next (for five minutes), and
+  from one run of a chat to the next when the system prompt is the same: it names the day and the time zone, while the
+  time of day is in a note after each goal, and the notes from memory it lists are chosen by each run's goal, so other
+  notes start the cache again. A request may use the model's whole output limit. The thinking of earlier steps is sent
+  back; a block whose earlier context has changed since (a run drops an old screenshot, the next run of a chat starts
+  with another system prompt) is dropped by the API instead of failing the request (beta
+  `thinking-binding-controls-2026-08-01`).
 
 `dotx models [ollama|openai|opencode_go|anthropic]` lists what a provider offers, including the reasoning levels of
 each model. `dotx models profile [provider:model]` shows how reliably a model worked in its newest runs and the help its

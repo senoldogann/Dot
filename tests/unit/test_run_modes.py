@@ -2,14 +2,16 @@
 of a run, what a database from before the switches gets, and what the model is told about them."""
 
 import asyncio
+import re
 import sqlite3
+from datetime import datetime
 from pathlib import Path
 from typing import Literal
 
 import pytest
 
 from dotagent.agent.loop import RunOutcome, SendBack, _after_verdict, _since_goal
-from dotagent.agent.prompt import build_system_prompt, collect_prompt_inputs
+from dotagent.agent.prompt import build_system_prompt, clock_note, collect_prompt_inputs
 from dotagent.agent.review import GoalVerdict
 from dotagent.config import load_config
 from dotagent.core.errors import ConfigError
@@ -118,9 +120,15 @@ def test_the_prompt_keeps_the_model_from_asking_permission_for_an_action() -> No
         assert "Never use it to ask permission for an action" in _prompt(mode, False), mode
 
 
+def test_the_prompt_names_the_day_and_a_note_after_the_goal_the_time_so_the_prompt_stays_the_same_all_day() -> None:
+    today: list[str] = [line for line in _prompt("ask", False).splitlines() if line.startswith("- Today:")]
+    assert len(today) == 1 and re.search(r"\d{2}:\d{2}", today[0]) is None, today
+    assert re.fullmatch(r"\[system note\] It is now \d{2}:\d{2} \S+\.", clock_note(datetime.now().astimezone()))
+
+
 def _lines(approvals: ApprovalMode) -> set[str]:
-    """The lines of a prompt but the clock, which may turn between two prompts."""
-    return {line for line in _prompt(approvals, False).splitlines() if not line.startswith("- Local time:")}
+    """The lines of a prompt but the date, which may turn between two prompts."""
+    return {line for line in _prompt(approvals, False).splitlines() if not line.startswith("- Today:")}
 
 
 def test_yolo_changes_only_the_secrets_line_and_the_approvals_line_of_the_prompt() -> None:
