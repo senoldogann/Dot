@@ -8,6 +8,7 @@ import { createDetails } from "../details.js";
 import { clip, dateTime, dateTimeFull, debounce, el, modelName } from "../dom.js";
 import { levelLabel } from "../efforts.js";
 import { continuedIn, earlierTurns, loadHistory, RESUME_SOURCE } from "../history.js";
+import { dotName, faceState, faceStateAtEnd, setFaceState } from "../face.js";
 import { avatar, icon } from "../icons.js";
 import { createInspector } from "../inspector.js";
 import { userMessage } from "../messages.js";
@@ -123,6 +124,7 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
   const runId = detail.run.id;
   let run = detail.run;
   let status = run.status;
+  const face = avatar(faceState(status));
   let model = run.model;
   let active = detail.active;
   // The daemon cut the run off and a new run can go on from where it stopped.
@@ -208,6 +210,10 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
 
   function paintStats() {
     statusSlot.replaceChildren(statusBadge(status));
+    // The tick of a run that just ended stays for its moment; every other state follows the status.
+    if (face.getAttribute("data-state") !== "done") {
+      setFaceState(face, faceState(status));
+    }
     modelChip.hidden = model === "";
     modelChip.textContent = run.effort === null ? modelName(model) : `${modelName(model)} · ${levelLabel(run.effort)}`;
     modelChip.title = model;
@@ -598,6 +604,10 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
       model = update.model;
     }
     if (terminal) {
+      // The tick is for an end that happens under the reader's eyes; a replayed end of a run opened later rests.
+      if (active) {
+        setFaceState(face, faceStateAtEnd(update.status));
+      }
       active = false;
       computer.setActive(false);
       messagesMissed();
@@ -752,8 +762,8 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
     el(
       "div",
       { class: "chat-who" },
-      avatar(),
-      el("div", { class: "chat-who-name" }, "Dot"),
+      face,
+      el("div", { class: "chat-who-name" }, dotName()),
       el("div", { class: "chat-who-sub" }, statusSlot, el("span", null, dateTime(run.created_at))),
     ),
     el("div", { class: "chat-tools" }, modelChip, modeChips, parentChip, campaignChip, inspector.toggle, resumeButton, cancelButton),

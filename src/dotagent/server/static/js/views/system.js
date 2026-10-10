@@ -5,6 +5,7 @@ import { notificationsAvailable, notificationsBlocked, notificationsOn, setNotif
 import { compact, copyText, dateTimeFull, duration, el, plural } from "../dom.js";
 import { offersChoice } from "../efforts.js";
 import { engageFailsafe, releaseFailsafe } from "../failsafe.js";
+import { dotName, NAME_CHARS, setDotName } from "../face.js";
 import { icon } from "../icons.js";
 import { followTheme, foldSteps, hasOwnLayout, setFoldSteps, setShowInspector, showInspector } from "../layout.js";
 import { foldCard, foldGroup, inlineError, inlineLoading, pageHead, segmented } from "../panels.js";
@@ -647,11 +648,49 @@ function buildBrowser(isDisposed) {
 }
 
 /** The look of this browser, how it draws your attention, and the token it is signed in with. */
+/** What Dot is called in the greeting of a new chat and at the head of a run: a preference of this browser. */
+function buildNameCard() {
+  const input = el("input", {
+    class: "input name-input",
+    type: "text",
+    maxlength: String(NAME_CHARS),
+    autocomplete: "off",
+    placeholder: "Dot",
+    value: dotName(),
+    "aria-label": "Name",
+  });
+  input.addEventListener("change", () => {
+    input.value = setDotName(input.value);
+    toast("ok", `Here, Dot answers to “${dotName()}”.`);
+  });
+  input.addEventListener("keydown", (event) => {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      input.blur();
+    }
+  });
+  return section(
+    "Name",
+    null,
+    el(
+      "div",
+      { class: "card-pad stack" },
+      el(
+        "div",
+        { class: "setting" },
+        el("div", { class: "row" }, el("span", { class: "grow" }, "What Dot is called"), input),
+        el("div", { class: "hint" }, "In the greeting of a new chat and at the head of a run. Kept in this browser; the daemon and the model never see it."),
+      ),
+    ),
+  );
+}
+
 export function mountGeneral(root, ctx) {
   const appearance = buildAppearance();
   root.append(
     pageHead("General", "The look of this browser, how it draws your attention, and the token it is signed in with.", null),
     appearance.element,
+    buildNameCard(),
     buildNotifications(),
     buildTokenCard(),
   );

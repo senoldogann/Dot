@@ -250,6 +250,50 @@ textarea {
 
 .avatar .core {
   fill: var(--on-bubble);
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+/* The face as the state (face.js): still when idle, a slow breath while it works, an amber ring while it waits for you,
+   a green tick for a moment when a run ends done, red when it failed. */
+.avatar .tick {
+  fill: none;
+  stroke: var(--ok);
+  stroke-width: 3;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  opacity: 0;
+}
+
+.avatar[data-state="working"] .core {
+  animation: breath 2.8s ease-in-out infinite;
+}
+
+.avatar[data-state="waiting"] .ring {
+  stroke: var(--warn);
+  stroke-opacity: 1;
+  animation: blink 1.4s ease-in-out infinite;
+}
+
+.avatar[data-state="done"] .ring {
+  animation: ring-ok 3s ease forwards;
+}
+
+.avatar[data-state="done"] .core {
+  animation: core-away 3s ease forwards;
+}
+
+.avatar[data-state="done"] .tick {
+  animation: tick-moment 3s ease forwards;
+}
+
+.avatar[data-state="failed"] .ring {
+  stroke: var(--bad);
+  stroke-opacity: 1;
+}
+
+.avatar[data-state="failed"] .core {
+  fill: var(--bad);
 }
 
 .pill {
@@ -1164,11 +1208,6 @@ a.pill:hover {
 
 .chat-who .avatar {
   margin-bottom: 4px;
-}
-
-/* While the run works, Dot's core blinks. */
-.chat-head:has(.badge.s-running) .avatar .core {
-  animation: blink 1.4s ease-in-out infinite;
 }
 
 .chat-who-name {
@@ -2137,6 +2176,47 @@ dialog.lightbox img {
   }
 }
 
+@keyframes breath {
+  50% {
+    transform: scale(1.4);
+  }
+}
+
+@keyframes tick-moment {
+  0%,
+  80% {
+    opacity: 1;
+  }
+
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes core-away {
+  0%,
+  80% {
+    opacity: 0;
+  }
+
+  100% {
+    opacity: 1;
+  }
+}
+
+@keyframes ring-ok {
+  0%,
+  80% {
+    stroke: var(--ok);
+    stroke-opacity: 1;
+  }
+
+  100% {
+    stroke: var(--on-bubble);
+    stroke-opacity: 0.35;
+  }
+}
+
 @keyframes pulse {
   0% {
     box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 45%, transparent);
@@ -2166,6 +2246,17 @@ dialog.lightbox img {
   *::after {
     animation: none !important;
     transition: none !important;
+  }
+}
+
+/* Without motion the tick of a run that ended done simply shows, in place of the core. */
+@media (prefers-reduced-motion: reduce) {
+  .avatar[data-state="done"] .tick {
+    opacity: 1;
+  }
+
+  .avatar[data-state="done"] .core {
+    opacity: 0;
   }
 }
 
