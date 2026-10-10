@@ -24,6 +24,7 @@ from dotagent.store.models import (
     RunRecord,
     ScheduleRecord,
 )
+from dotagent.undo.restore import UndoAction, UndoState
 
 _GOAL_CHARS: int = 50_000
 _TEXT_CHARS: int = 20_000
@@ -215,6 +216,53 @@ class RunDetail(FrozenModel):
     lessons: RunLessons | None
     questions: list[ApprovalRecord]
     campaign: CampaignChip | None
+
+
+class ActionStep(FrozenModel):
+    """One acting tool call of a run, as the Actions panel lists it: when it ran, the tool, the channel it went through
+    (``tools.channels``), the kind the policy gave it, its target (a path, an address, an application, a command) and
+    summary, whether it succeeded, and its evidence, the result the model got, clipped."""
+
+    event_id: int
+    at: float
+    tool: str
+    channel: str
+    kind: str
+    target: str
+    summary: str
+    ok: bool
+    evidence: str
+
+
+class FileEdit(FrozenModel):
+    """One file the run or a run it delegated to changed, with what taking the change back would do (see
+    ``undo.restore.UndoStep``): ``state`` is ``ready`` for a file as the runs left it, which one button takes back,
+    ``conflict``, ``cannot`` or ``as_before`` otherwise, with ``reason``. ``tool`` and ``run_id`` are the first change's,
+    ``changes`` how many the runs made."""
+
+    path: str
+    state: UndoState
+    action: UndoAction
+    reason: str | None
+    tool: str
+    run_id: str
+    noted_at: float
+    changes: int
+
+
+class RunActions(FrozenModel):
+    """What a run did and what can be undone: its acting steps, its approvals and questions with their decisions, and
+    the files it (or a run it delegated to) changed. ``ended`` says whether the run and its delegated runs have all
+    ended, which the undo of a file needs."""
+
+    steps: list[ActionStep]
+    approvals: list[ApprovalRecord]
+    edits: list[FileEdit]
+    ended: bool
+
+
+class UndoRequest(FrozenModel):
+    path: str = Field(min_length=1, max_length=_TEXT_CHARS)
 
 
 class CampaignSummary(FrozenModel):

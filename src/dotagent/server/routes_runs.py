@@ -15,6 +15,7 @@ from dotagent.agent.lessons import run_lessons
 from dotagent.core.errors import InvalidValueError
 from dotagent.llm.router import parse_model_ref
 from dotagent.server import UI_SOURCE
+from dotagent.server.actions import action_steps, file_edits
 from dotagent.server.context import ServerContext
 from dotagent.server.stream import SSE_HEADERS, SSE_TYPE, follow_lifecycle, follow_run
 from dotagent.server.views import (
@@ -24,14 +25,20 @@ from dotagent.server.views import (
     CampaignChip,
     DecisionRequest,
     EventsQuery,
+    RunActions,
     RunDetail,
     RunsQuery,
     StartRunRequest,
     SteerRequest,
     StreamQuery,
+    UndoRequest,
 )
 from dotagent.store.db import Store
 from dotagent.store.models import ApprovalRecord, CampaignRecord, EventRecord, RunRecord
+from dotagent.undo.runs import UndoPlan, active_run_ids, plan_for, runs_with_children, undo_path
+
+# As many events as the Actions panel reads of a run: the acting steps are among them.
+_ACTION_EVENTS: int = 20_000
 
 
 def runs_router(ctx: ServerContext) -> APIRouter:
@@ -102,6 +109,30 @@ def runs_router(ctx: ServerContext) -> APIRouter:
     @router.get("/runs/{run_id}")
     async def get_run(run_id: str) -> RunDetail:
         return await detail(run_id)
+
+    async def actions(run_id: str) -> RunActions:
+        run: RunRecord = await store.get_run(run_id)
+        runs: list[RunRecord] = await runs_with_children(store, run)
+        plan: UndoPlan = await asyncio.to_thread(plan_for, ctx.runtime.undo_dir, runs)
+        return RunActions(
+            steps=action_steps(await store.list_events(run_id, 0, _ACTION_EVENTS)),
+            approvals=await store.run_approvals(run_id),
+            edits=file_edits(plan.steps),
+            ended=not active_run_ids(runs) and run_id not in ctx.manager.active_run_ids(),
+        )
+
+    @router.get("/runs/{run_id}/actions")
+    async def run_actions(run_id: str) -> RunActions:
+        """What the run did and what can be undone (see ``server.actions``)."""
+        return await actions(run_id)
+
+    @router.post("/runs/{run_id}/undo")
+    async def undo_run_path(run_id: str, request: UndoRequest) -> RunActions:
+        """Take back the change of the run (or of a run it delegated to) to one file that is as the runs left it (see
+        ``undo.runs.undo_path``). Returns the panel's view afresh."""
+        runs: list[RunRecord] = await runs_with_children(store, await store.get_run(run_id))
+        await undo_path(ctx.runtime.undo_dir, runs, request.path)
+        return await actions(run_id)
 
     @router.get("/runs/{run_id}/events")
     async def run_events(run_id: str, query: Annotated[EventsQuery, Query()]) -> list[EventRecord]:
