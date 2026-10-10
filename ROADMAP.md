@@ -3281,8 +3281,8 @@ third; 49 (the face as the state) and 50 (the visual system) next, form on top o
 
 | #   | Item                                                                     | Status  | Commits |
 | --- | ------------------------------------------------------------------------ | ------- | ------- |
-| 46  | Dot's computer: the live view and the handover                           | in progress |         |
-| 47  | Activity: everything in motion in one list                               | planned |         |
+| 46  | Dot's computer: the live view and the handover                           | done    | f4d3754 |
+| 47  | Activity: everything in motion in one list                               | in progress |         |
 | 48  | Rules in four answers                                                    | planned |         |
 | 49  | The face as the state                                                    | planned |         |
 | 50  | The visual system                                                        | planned |         |
@@ -3351,8 +3351,20 @@ not ended, the pending approvals and questions, the campaigns with an active ses
 the hour; `GET /activity`; the sidebar reads it once and keeps it fresh from `GET /stream` (the global stream already
 carries run state changes). The sections fold, the choice kept in the browser; an empty section is not shown.
 
-**Touchpoints.** `server/views.py`, `server/routes_data.py`, `static/js/sidebar.js`, a new `views/activity.js`,
-`shell.css`, README (the sidebar paragraph).
+**Design, as built (2026-10-11).** `server/activity.py` builds `ActivityView` (rows with section, kind, title,
+detail, channel, since, href, run id, status) from the manager's live runs, the pending approvals and questions
+(kind `approval` or `question` by the record's severity), the questions runs left for the user (`left`, listed even
+when the run has ended), the runs the user holds (`takeover`, item 46), the live runs that wait for nothing (kind
+`campaign` for a session, with the campaign's title, `delegated` for a child run, `run` otherwise), the enabled
+schedules due within the hour and the runs that ended today; the channel of a run is that of its latest tool result.
+`GET /activity` lives in `routes_runs.py`. The sidebar loads it with the chats and again on the lifecycle events,
+which now include `takeover` and `handback`; the sections are hidden while empty and sit between the search and the
+chats, each row a chat row with a second line. `#/activity` (`views/activity.js`, the Activity link in the foot) shows
+the three sections with a segmented filter (all, runs, campaigns, schedules), a kind icon, the state badge and the
+age, and follows the lifecycle stream and the status refresh while something works. No new config.
+
+**Touchpoints.** `server/activity.py`, `server/views.py`, `server/routes_runs.py`, `server/stream.py`,
+`static/js/sidebar.js`, `views/activity.js`, `main.js`, `shell.css`, `app.css`, README, `tests/smoke/test_activity.py`.
 
 **Done when.** A smoke test with a run waiting for approval, a run working and a campaign in a session shows three
 rows in the right sections, and the row of the approval opens it; wide and phone, both looks.
@@ -3622,11 +3634,19 @@ tailnet for an approval and opens the run (owner's run, logged by hand in this f
     about 150 MB). The recommendation is Tauri 2: the shell is a window, a tray item and notifications, nothing that
     needs Node in the app, and the owner never has to write Rust beyond the generated project. An Apple developer
     account is needed for a signed build that other Macs open without a warning.
+    Decided on 2026-10-11 at the owner's word ("I trust you to decide; think it through for the future, performance
+    and quality"): Tauri 2. The shell is a window, a tray item, notifications and a file drop; none of that needs
+    Node in the app, the binary stays a few megabytes, the web UI is the one codebase, and the Rust is the generated
+    project plus a few dozen lines. Electron would cost 150 MB and a second runtime for nothing the shell does.
 31. Reaching the daemon from the phone (item 52): the daemon listens on `127.0.0.1` on purpose. The recommendation is
     Tailscale: `[server] host` set to the Mac's tailnet address, the token stays the sign-in, nothing is opened to the
     internet. Without it, the phone items are built and tested on the Mac's own network only.
+    Decided on 2026-10-11 at the owner's word: Tailscale, and the web UI as a PWA first; a store app (Capacitor around
+    the same UI) only once the PWA has been used for a while. The daemon stays on loopback by default; `[server] host`
+    documents the tailnet address.
 32. A name and a face for Dot (item 49): the recommendation is a yellow dot that tells the state and an optional
     name, no eyes and no accessories; dots' critics (Fortune, 2026-10-02) said why. Say so if you want the character.
+    Decided on 2026-10-11 at the owner's word: the yellow dot that tells the state, an optional name, no character.
 
 ## Log
 
@@ -4045,3 +4065,5 @@ tailnet for an approval and opens the run (owner's run, logged by hand in this f
 - 2026-10-10 (Fable 5.1): the live measurements behind decisions 26, 28 and 29 ran at the owner's word on `ollama:minimax-m2.7:cloud` with the TypeSafe key, each arm a throw-away home (reports under /tmp/dot-evals, not committed). Decision 26: `judge_items` never called on filter-headlines, no gain. Decision 28: the eval set exercises neither `expect` nor the goal check, the arms differ by variance only. Decision 29: the step router costs a step and a half, 8.5k tokens and 1.7 s a pass at the same success, so it stays off, resolved. Decision 27 needs the owner's own labeled feed and stays open. Branch `part-3-measurements` also sharpens the `step` description of `delegate`.
 - 2026-10-11 (Fable 5.1): Part 4 planned at the owner's word ("find OpenAI's Dot design, make ours like it and better; desktop and mobile apps are planned"): the product is OpenAI's dots (DevDay 2026-09-29), read from learn.chatgpt.com/docs/dots and reviews; items 46 to 52 (live view and takeover, Activity, four-answer rules, the face as the state, the visual system, the desktop shell, the phone) and decisions 30 to 32. The DeepSeek arms of decision 29 run in the background and are logged when they end.
 - 2026-10-11 (Fable 5.1): the DeepSeek arms of decision 29 ended (62/68 both; the router costs 2.2 steps, 18.2k tokens and 3.7 s a pass): off it stays. Item 46 started on `item-46-live-view` (MYP-186).
+- 2026-10-11 (Fable 5.1): item 46 merged f4d3754 (PR #48, MYP-186 Done; gate green). Next: item 47 (Activity).
+- 2026-10-11 (Fable 5.1): decisions 30 (Tauri 2), 31 (Tailscale, PWA first) and 32 (the state dot, no character) taken at the owner's word. Item 47 started on `item-47-activity`.

@@ -411,3 +411,35 @@ class StatusView(FrozenModel):
     desktop_enabled: bool
     mcp_tools: int
     models: ModelsConfig
+
+
+ActivitySection = Literal["waiting", "working", "recent"]
+# What a row of the Activity list is: a run of its own, a run delegated by another, a session of a campaign, an
+# approval or a question a run waits for, a run the user holds (``takeover``), a schedule due within the hour.
+ActivityKind = Literal["run", "delegated", "campaign", "approval", "question", "takeover", "schedule"]
+
+
+class ActivityRow(FrozenModel):
+    """One thing in motion, or ended today: ``detail`` says what it needs or where it stands, ``channel`` is where the
+    run last worked (browser, files, shell, desktop, mail; empty before its first tool result), ``since`` is when it
+    started waiting, working or ended, ``href`` opens it in the web UI."""
+
+    id: str
+    section: ActivitySection
+    kind: ActivityKind
+    title: str
+    detail: str
+    channel: str
+    since: float
+    href: str
+    run_id: str | None
+    status: str
+
+
+class ActivityView(FrozenModel):
+    """``GET /activity``: what waits for the user, what works now, what ended today (see ``server.activity``)."""
+
+    waiting: list[ActivityRow]
+    working: list[ActivityRow]
+    recent: list[ActivityRow]
+    generated_at: float

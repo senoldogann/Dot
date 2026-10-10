@@ -16,9 +16,11 @@ from dotagent.core.errors import InvalidValueError
 from dotagent.llm.router import parse_model_ref
 from dotagent.server import UI_SOURCE
 from dotagent.server.actions import action_steps, file_edits
+from dotagent.server.activity import current_activity
 from dotagent.server.context import ServerContext
 from dotagent.server.stream import SSE_HEADERS, SSE_TYPE, follow_lifecycle, follow_run, follow_screencast
 from dotagent.server.views import (
+    ActivityView,
     ApprovalsQuery,
     AsideRequest,
     AttachmentUpload,
@@ -209,6 +211,11 @@ def runs_router(ctx: ServerContext) -> APIRouter:
         await store.get_run(run_id)
         await ctx.manager.hand_back(run_id, UI_SOURCE)
         return await detail(run_id)
+
+    @router.get("/activity")
+    async def activity() -> ActivityView:
+        """Everything in motion in one list: what waits for the user, what works now, what ended today."""
+        return await current_activity(store, ctx.manager)
 
     @router.get("/stream")
     async def lifecycle_stream() -> StreamingResponse:

@@ -9,6 +9,7 @@ import base64
 import json
 from collections.abc import AsyncIterator, Iterable
 
+from dotagent.agent.gate import HANDBACK_EVENT, TAKEOVER_EVENT
 from dotagent.agent.lessons import LESSON_EVENTS
 from dotagent.browser.types import Frame
 from dotagent.events import EventBus
@@ -22,10 +23,20 @@ KEEPALIVE: bytes = b": keepalive\n\n"
 # The event of the screencast stream (``GET /runs/{id}/screencast``).
 FRAME_EVENT: str = "frame"
 
-# What the lifecycle stream carries: the moments a client must refetch its lists for, and what becomes of the lessons
-# of a run, which are drawn once its own stream has ended.
+# What the lifecycle stream carries: the moments a client must refetch its lists for (the Activity sections among
+# them: a takeover moves a run between them), and what becomes of the lessons of a run, which are drawn once its own
+# stream has ended.
 LIFECYCLE_KINDS: frozenset[str] = frozenset(
-    {"run_queued", "run_started", "run_finished", "approval_requested", "approval_decided", *LESSON_EVENTS}
+    {
+        "run_queued",
+        "run_started",
+        "run_finished",
+        "approval_requested",
+        "approval_decided",
+        TAKEOVER_EVENT,
+        HANDBACK_EVENT,
+        *LESSON_EVENTS,
+    }
 )
 
 _PAGE: int = 500
