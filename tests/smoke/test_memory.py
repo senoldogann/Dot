@@ -433,6 +433,7 @@ async def test_the_policy_gates_what_the_model_may_remember(runtime: Runtime) ->
     assert (tainted.verdict, tainted.source) == ("ask", "taint")
     refused = decide(keyed.action, "task", False, "aggressive", [])
     assert (refused.verdict, refused.source) == ("deny", "auto_review")
-    assert decide(plain.action, "research", False, "aggressive", []).source == "mode"
-    assert "memory_save" not in {tool.spec.name for tool in tools_for_mode(runtime.registry, "research")}
+    # A research run may keep memory notes (item 34): the mode does not gate a save.
+    assert decide(plain.action, "research", False, "aggressive", []).source == "preset"
+    assert "memory_save" in {tool.spec.name for tool in tools_for_mode(runtime.registry, "research")}
     assert "memory_search" in {tool.spec.name for tool in tools_for_mode(runtime.registry, "research")}

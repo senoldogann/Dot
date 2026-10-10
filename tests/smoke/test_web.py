@@ -154,7 +154,11 @@ def site() -> Iterator[str]:
 @pytest.fixture(scope="module")
 def settings(tmp_path_factory: pytest.TempPathFactory) -> Path:
     path: Path = tmp_path_factory.mktemp("settings") / "config.toml"
-    path.write_text(f"[web]\nallow_private_hosts = true\nfetch_max_bytes = {_CUT_BYTES}\n", encoding="utf-8")
+    # The backend is pinned: with auto, a key of Ollama on this Mac would send the test search to the hosted service.
+    path.write_text(
+        f'[web]\nsearch_backend = "duckduckgo"\nallow_private_hosts = true\nfetch_max_bytes = {_CUT_BYTES}\n',
+        encoding="utf-8",
+    )
     return path
 
 

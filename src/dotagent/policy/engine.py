@@ -7,7 +7,7 @@ from typing import Literal
 
 from dotagent.core.errors import ConfigError
 from dotagent.policy.types import (
-    READ_ONLY_KINDS,
+    RESEARCH_KINDS,
     TAINT_ESCALATION_FLAGS,
     ActionInfo,
     ApprovalMode,
@@ -56,12 +56,12 @@ def auto_review(info: ActionInfo) -> Decision | None:
 
 
 def mode_gate(info: ActionInfo, mode: RunMode) -> Decision | None:
-    """Research runs may only observe."""
-    if mode == "research" and info.kind not in READ_ONLY_KINDS:
+    """Research runs may only observe and keep their own notes."""
+    if mode == "research" and info.kind not in RESEARCH_KINDS:
         return Decision(
             verdict="deny",
             source="mode",
-            reason=f"research runs are read-only; {info.kind} actions are not allowed",
+            reason=f"research runs only observe and keep notes; {info.kind} actions are not allowed",
             rule_id=None,
         )
     return None

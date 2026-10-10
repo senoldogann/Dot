@@ -266,11 +266,13 @@ terminal_sessions = 3
 terminal_idle_s = 1800.0
 
 [web]
-# "duckduckgo" needs no key; "ollama" uses the hosted web_search API and needs OLLAMA_API_KEY.
-search_backend = "duckduckgo"
+# "duckduckgo" needs no key; "ollama" uses the hosted web_search API and needs OLLAMA_API_KEY (each search counts
+# against the key's allowance); "auto" is ollama when OLLAMA_API_KEY is set and duckduckgo otherwise (dotx doctor
+# shows the choice).
+search_backend = "auto"
 # DuckDuckGo answers a burst of searches with its bot check (HTTP 202). Searches start at least this far apart; one
-# that meets the check pauses all searches for 8 s and is tried again (search_attempts tries in all). For heavy research
-# set search_backend = "ollama".
+# that meets the check pauses all searches for 8 s and is tried again (search_attempts tries in all). The hosted
+# search of Ollama has no such check.
 search_spacing_s = 1.0
 search_attempts = 3
 fetch_timeout_s = 25.0

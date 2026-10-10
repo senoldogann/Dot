@@ -117,7 +117,7 @@ def _save_tool() -> RegisteredTool:
             "task, or what is easy to look up again."
         ),
         args_model=SaveArgs,
-        modes=ACTING_MODES,
+        modes=ALL_MODES,
         parallel_safe=False,
         timeout_s=_TIMEOUT_S,
         classify=classify,

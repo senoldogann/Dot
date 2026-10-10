@@ -3,6 +3,7 @@
 import json
 from dataclasses import dataclass, field
 from html.parser import HTMLParser
+from typing import Literal
 from urllib.parse import parse_qs, quote_plus, urlsplit
 
 from pydantic import BaseModel, ConfigDict, ValidationError
@@ -12,6 +13,11 @@ from dotagent.core.retry import retry_async
 from dotagent.web.client import WebClient
 from dotagent.web.text import decode_body
 from dotagent.web.types import SearchHit
+
+# The backend searches go to, and what the configuration may say: ``auto`` picks the hosted search of Ollama when its
+# key is present (it has no bot check) and DuckDuckGo otherwise.
+SearchBackend = Literal["duckduckgo", "ollama"]
+SearchChoice = Literal["auto", "duckduckgo", "ollama"]
 
 _DUCKDUCKGO_URL: str = "https://html.duckduckgo.com/html/"
 _DUCKDUCKGO_HOSTS: frozenset[str] = frozenset({"duckduckgo.com", "www.duckduckgo.com", "html.duckduckgo.com"})
@@ -118,6 +124,15 @@ def parse_duckduckgo(html: str) -> ResultsPage:
                 title=title, url=address, snippet=_flat("".join(draft.snippet), _MAX_SNIPPET_CHARS)
             )
     return ResultsPage(hits=tuple(hits.values()), announced_no_results=parser.announced_no_results)
+
+
+def resolved_backend(choice: SearchChoice, ollama_key_present: bool) -> SearchBackend:
+    """The backend ``choice`` names; ``auto`` is Ollama's hosted search with its key and DuckDuckGo without."""
+    match choice:
+        case "auto":
+            return "ollama" if ollama_key_present else "duckduckgo"
+        case "duckduckgo" | "ollama":
+            return choice
 
 
 def _is_throttled(exc: Exception) -> bool:

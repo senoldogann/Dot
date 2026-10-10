@@ -153,7 +153,7 @@ def _read_file_tool() -> RegisteredTool:
     )
 
 
-def _journal(ctx: ToolContext, tool: str) -> JournalTarget:
+def journal_for(ctx: ToolContext, tool: str) -> JournalTarget:
     """Where ``tool`` notes a change of this run for ``dotx undo``, and how much it may copy."""
     return JournalTarget(
         directory=run_journal(ctx.runtime.undo_dir, ctx.run_id),
@@ -163,7 +163,7 @@ def _journal(ctx: ToolContext, tool: str) -> JournalTarget:
     )
 
 
-def _atomic_write(path: Path, content: str, journal: JournalTarget) -> int:
+def atomic_write(path: Path, content: str, journal: JournalTarget) -> int:
     """Replace ``path`` with ``content`` through a temporary file, keeping its permission bits. The change is noted in
     ``journal`` first; when that fails, the file is not changed."""
     if path.is_dir():
@@ -196,7 +196,7 @@ def _write_file_tool() -> RegisteredTool:
 
     async def run(args: WriteFileArgs, ctx: ToolContext) -> ToolResult:
         path: Path = resolve_path(args.path, ctx)
-        written: int = await asyncio.to_thread(_atomic_write, path, args.content, _journal(ctx, "write_file"))
+        written: int = await asyncio.to_thread(atomic_write, path, args.content, journal_for(ctx, "write_file"))
         return ok(f"Wrote {written} bytes ({args.content.count(chr(10)) + 1} lines) to {path}")
 
     return make_tool(
@@ -242,7 +242,7 @@ def _edit_blocking(path: Path, old: str, new: str, replace_all: bool, journal: J
             f"the text occurs {occurrences} times; add surrounding context or set replace_all", {"path": str(path)}
         )
     updated: str = text.replace(old, new) if replace_all else text.replace(old, new, 1)
-    _atomic_write(path, updated, journal)
+    atomic_write(path, updated, journal)
     return f"Edited {path}: replaced {occurrences if replace_all else 1} occurrence(s)"
 
 
@@ -257,7 +257,7 @@ def _edit_file_tool() -> RegisteredTool:
             args.old,
             args.new,
             args.replace_all,
-            _journal(ctx, "edit_file"),
+            journal_for(ctx, "edit_file"),
         )
         return ok(message)
 

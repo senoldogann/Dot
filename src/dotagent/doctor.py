@@ -51,7 +51,7 @@ from dotagent.skills.catalog import load_skills, playbook_root
 from dotagent.skills.types import SkillCatalog, SkillProblem
 from dotagent.tools.shell import read_login_env
 from dotagent.web.client import WebClient
-from dotagent.web.search import search_ollama
+from dotagent.web.search import SearchBackend, SearchChoice, resolved_backend, search_ollama
 from dotagent.web.types import SearchHit
 
 _PROBE_TIMEOUT_S: float = 5.0
@@ -145,6 +145,17 @@ def _check_key(provider: str, variable: str, present: bool, needed: bool) -> Che
     if needed:
         return _result(name, False, True, f"{variable} is missing (dotx auth set {variable})")
     return _result(name, False, False, f"not set; add it to use {provider} models: dotx auth set {variable}")
+
+
+def _search_row(config: AppConfig, ollama_key_present: bool) -> CheckResult:
+    """The backend web_search uses: what [web] search_backend says, and what auto resolves to on this Mac."""
+    choice: SearchChoice = config.web.search_backend
+    backend: SearchBackend = resolved_backend(choice, ollama_key_present)
+    variable: str = config.providers.ollama.api_key_env
+    if choice != "auto":
+        return _result("web search", True, False, f"{backend} ([web] search_backend)")
+    reason: str = f"{variable} is set" if ollama_key_present else f"{variable} is not set"
+    return _result("web search", True, False, f"{backend} (auto: {reason})")
 
 
 async def _check_openai_api(router: ModelRouter, required: bool) -> CheckResult:
@@ -550,11 +561,13 @@ async def _service_checks(config: AppConfig) -> list[CheckResult]:
     openai_present: bool = await asyncio.to_thread(_has_secret, config.providers.openai.api_key_env)
     go_present: bool = await asyncio.to_thread(_has_secret, config.providers.opencode_go.api_key_env)
     anthropic_present: bool = await asyncio.to_thread(_has_secret, config.providers.anthropic.api_key_env)
+    ollama_present: bool = await asyncio.to_thread(_has_secret, config.providers.ollama.api_key_env)
     results: list[CheckResult] = [
         await _check_ollama_server(config, "ollama" in used),
         _check_key("openai", config.providers.openai.api_key_env, openai_present, "openai" in used),
         _check_key("opencode go", config.providers.opencode_go.api_key_env, go_present, "opencode_go" in used),
         _check_key("anthropic", config.providers.anthropic.api_key_env, anthropic_present, "anthropic" in used),
+        _search_row(config, ollama_present),
     ]
     try:
         if openai_present:

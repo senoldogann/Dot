@@ -244,7 +244,7 @@ class CrawlConfig(FrozenModel):
 
 
 class WebConfig(FrozenModel):
-    search_backend: Literal["duckduckgo", "ollama"]
+    search_backend: Literal["auto", "duckduckgo", "ollama"]
     search_spacing_s: float
     search_attempts: int
     fetch_timeout_s: float

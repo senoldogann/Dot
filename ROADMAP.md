@@ -2374,14 +2374,14 @@ Paste this to the agent that takes the work:
 | 31  | One-time codes from the owner's own Mail and Messages                    | planned |         |
 | 32  | The owner's Chrome profile as the default of a campaign                  | planned |         |
 | 33  | Pre-approved spending caps                                               | planned |         |
-| 34  | Research runs that keep notes, and hosted search by default              | planned |         |
+| 34  | Research runs that keep notes, and hosted search by default              | in progress |     |
 | 35  | A plan with dependencies and parallel branches                           | done    | d6b40c1 |
 | 36  | Playbooks learned from runs that reached their goal                      | done    | fb99354 |
 | 37  | A stuck campaign changes strategy, not just session                      | planned |         |
 | 38  | One view of what a run did and what can be undone                        | planned |         |
 | 39  | CI and retention defaults                                                | planned |         |
 | 40  | Cold start of `dotx`                                                     | planned |         |
-| 41  | An own crawler: fetch, render, crawl, extract                            | in progress |     |
+| 41  | An own crawler: fetch, render, crawl, extract                            | done    | aedab8b |
 | 42  | TypeSafe as a tool of the agent: many items judged in one call           | planned |         |
 | 43  | Typed judgments in X campaigns: what to answer, the best draft, a check  | planned |         |
 | 44  | Typed checks before a model call: the page after an action, the goal     | planned |         |
@@ -2690,17 +2690,32 @@ goals need small spends (a domain, a listing fee).
 
 ### 34. Research runs that keep notes, and hosted search by default
 
-**What.** A `research` run may write one notes file under the run's folder and save memory notes; `web.search_backend`
-defaults to `ollama` when `OLLAMA_API_KEY` is present, DuckDuckGo otherwise; long research uses the crawler of item
-41 instead of page-by-page fetches.
+**What.** A `research` run may write one notes file and save memory notes; `web.search_backend` has a third value,
+`auto` (the default), that is `ollama` when `OLLAMA_API_KEY` is present and `duckduckgo` otherwise; the research prompt
+sends long research to the crawler of item 41 instead of page-by-page fetches.
 
 **Why.** Decision 14: a research run can save nothing (`tools/base.py:16-17`), DuckDuckGo's bot check throttles long
 runs (README "Status and known limits").
 
-**Touchpoints.** `tools/base.py`, `tools/files.py`, `tools/memory.py`, `web/search.py`, `defaults.toml`, README.
+**Design, as built.** There is no run folder in the workspace, so the notes file is `<workspace>/notes/<run id>.md`,
+written by a new tool `write_notes(content, append)` (`tools/notes.py`) that is offered in task and research runs, goes
+through the undo journal like `write_file`, and has its own action kind `notes_write`. The mode gate of the policy
+(`policy/engine.py`) now allows `RESEARCH_KINDS`: the read-only kinds plus `notes_write` and `memory_write`, so a
+research run can keep notes and `memory_save` is offered in every mode (`memory_update` and `memory_forget` stay
+acting-only). The backend is resolved once when the runtime opens (`Runtime.search_backend`, from
+`web/search.py:resolved_backend` and the presence of the key through `resolve_secret`), `web_search` names it in its
+result, and `dotx doctor` has a `web search` row that says what `auto` resolved to and why. The research mode text of
+the prompt names `write_notes`, `memory_save` and `web_crawl`; the web section gained a bullet on `web_crawl` and
+`web_extract` (item 41 had added none). No 30-minute live research task: the throttle of DuckDuckGo cannot be measured
+offline and the hosted search needs the owner's key, so the smoke test is a scripted research run in the real loop that
+writes, appends, saves a fact and finishes, and the policy and backend rules are unit tests.
 
-**Done when.** A 30-minute offline research task on the fixture server ends with a notes file and no throttle; the
-backend choice is in `dotx doctor`.
+**Touchpoints.** `policy/types.py`, `policy/engine.py`, `tools/notes.py` (new), `tools/files.py` (the write helpers
+made public), `tools/memory.py`, `web/search.py`, `runtime.py`, `doctor.py`, `agent/prompt.py`, `config.py`,
+`defaults.toml`, README.
+
+**Done when.** A scripted research run in the real loop ends done with a notes file that holds both writes and a memory
+note, `write_file`/`edit_file`/`shell` are not offered to it, and the backend choice is in `dotx doctor`.
 
 ### 35. A plan with dependencies and parallel branches
 
@@ -3022,7 +3037,7 @@ item ends as a measured no, written in the log.
 14. Research (not an item of part 2): a `research` run can save nothing, not even a note (`write_file` and `memory_save`
     are acting-only, `tools/base.py:16-17`), and DuckDuckGo's bot check throttles long research runs (README "Status and
     known limits"). Decided by the owner on 2026-10-09: no change for now; note saving and the hosted Ollama search
-    (`OLLAMA_API_KEY`) as the default backend come later.
+    (`OLLAMA_API_KEY`) as the default backend come later. Done by item 34 (see decision 18).
 15. The Claude GitHub app, decided by the owner on 2026-10-10: it is not used; subagents in the session review each
     branch (house rules, Git). It had reviewed nothing since PR #1 ("Code review skipped": no extra usage paid for it).
 16. The review model has no standby (item 15): with `[models] review` on the provider of `main` (the default), a run in
@@ -3033,6 +3048,10 @@ item ends as a measured no, written in the log.
     run the same goal-mode browser goal twice on one site (the first run writes `<home>/playbooks/playbook-<host>/`,
     the second reads it) and compare the steps with `dotx stats --by site`. If the second run takes clearly fewer
     steps, flip the default in `defaults.toml` and say so in the README's playbook paragraph.
+18. The search backend default changed with item 34: `[web] search_backend = "auto"` sends `web_search` to Ollama's
+    hosted search as soon as `OLLAMA_API_KEY` is set on the Mac (each search counts against the key's allowance) and to
+    DuckDuckGo otherwise. If you prefer DuckDuckGo with the key present, set `search_backend = "duckduckgo"` in your
+    config; `dotx doctor` shows the choice. Nothing needs restarting beyond the usual daemon restart for a new version.
 
 ## Log
 
@@ -3417,3 +3436,5 @@ item ends as a measured no, written in the log.
 - 2026-10-10 (Fable 5.1): item 36 built on branch `item-36-playbooks` (MYP-170): `agent/playbooks.py` distils a goal-mode run that ended done on a site into `<home>/playbooks/playbook-<host>/SKILL.md` through the review model, the skills catalog reads the folder as a root, runs that read a playbook count its use and two failures retire it; `dotx playbooks list|show|drop`; default off (decision 17). Gate: format, check, mypy clean; unit 581; `dotx eval check` 31 ok; smoke (skills runtime, lessons, helpers, doctor, scaffold, plan branches) 34 passed.
 - 2026-10-10 (Fable 5.1): item 36 merged fb99354 (PR #29, MYP-170 Done). Next: item 41 (an own crawler).
 - 2026-10-10 (Fable 5.1): item 41 built on branch `item-41-own-crawler` (MYP-171): `web/crawl.py` (breadth-first crawl within a prefix or host scope, per-host pacing, robots.txt read and reported, a shell page rendered in Dot's own Chrome, PDFs read, one clean text per page), `web/extract.py` (typed fields with a quote each, checked against the source, on the fast model), tools `web_crawl` and `web_extract` (a crawl that does not fit one result becomes Markdown files in the workspace), `[web.crawl]` caps. Tool descriptions trimmed so the small-window scaffold test still compacts at a steady pace (core share 0.412; `test_tool_groups` bound 0.45). Gate: format, check, mypy clean; unit 587; `dotx eval check` ok; smoke (crawl against a local fixture site with headless Chrome, web, tool groups, scaffold, plan branches, helpers, doctor, server) 72 passed.
+- 2026-10-10 (Fable 5.1): item 41 merged aedab8b (PR #30, MYP-171 Done). Next: item 34.
+- 2026-10-10 (Fable 5.1): item 34 built on branch `item-34-research-notes` (MYP-172): `tools/notes.py` with `write_notes` (one Markdown file per run under `<workspace>/notes/`, in the undo journal, offered in task and research runs), the policy's mode gate allows `notes_write` and `memory_write` in research (`memory_save` in every mode), `[web] search_backend = "auto"` (the new default; decision 18) resolved once at runtime start, `dotx doctor` `web search` row, research prompt names `write_notes`/`memory_save`/`web_crawl`, web bullet on `web_crawl`/`web_extract`. The small-window scaffold smoke test moved from a 24 000 to a 26 000 token window: the three core tools of items 41 and 34 made the fixed prompt about 700 tokens larger, and what a compaction keeps grows a little each time, so the old window ended up compacting at every step. Gate: format, check, mypy clean; unit 597; `dotx eval check` ok; smoke (research notes, memory, web, doctor, approval modes, plan branches, undo, run limits, crawl, scaffold, tool groups) 64 passed.

@@ -87,6 +87,7 @@ def test_the_core_group_holds_what_most_runs_need_and_is_about_a_third_of_the_to
         "web_extract",
         "memory_save",
         "memory_search",
+        "write_notes",
         "delegate",
         "consult",
         "finish",
@@ -97,7 +98,8 @@ def test_the_core_group_holds_what_most_runs_need_and_is_about_a_third_of_the_to
         "use_tools",
         "skill",
     }
-    # web_crawl and web_extract (item 41) joined the core: measured share 0.412 with their descriptions trimmed.
+    # web_crawl and web_extract (item 41) and write_notes (item 34) joined the core: measured share 0.412 before the
+    # notes tool, with the descriptions of the crawler's tools trimmed.
     assert estimate_tokens([], core) < 0.45 * estimate_tokens([], TASK_SPECS)
 
 
