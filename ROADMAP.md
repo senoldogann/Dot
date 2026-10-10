@@ -74,7 +74,8 @@ order its "Order and dependencies" paragraph gives. All of part 2 is done as wel
   `DOT_LOG_DIR` for a daemon and for every other `dotx` command, `dotx eval check` included: each one logs to
   `<log dir>/dotx.log`, which otherwise is the owner's `~/Library/Logs/Dot`) and never the owner's data directory
   (`~/Library/Application Support/Dot`): not even to read message text. Counting rows is the most that was ever done
-  there, besides the owner's `config.toml`, edited for decision 10 at the owner's word.
+  there, besides the owner's `config.toml`, edited for decisions 3, 10, 11 and 16 at the owner's word, and the Anthropic
+  key read from its `.env` for the hosted test (never printed).
 - Safety: start, stop or restart the owner's launchd daemon only at the owner's word (on 2026-10-10 they let the agent
   restart it with `dotx service install`). Nothing that deletes the owner's data may run by default: retention and
   cleanup are explicit commands. `PLAN.md` (the owner's working notes, untracked on purpose, excluded in
@@ -2318,15 +2319,14 @@ text, no console error; the Options panel with YOLO saved; every status ring. RE
 2. Defaults that change how the agent behaves and wait for evidence: `[agent] tool_surface` (item 4),
    `verify_answer_paths` (item 5), `resume` (item 6), `lessons` (item 7), `stall_escalation` (item 2),
    `scaffold = "measured"` (item 3).
-3. `[models] review`: use a model of another family than `main` (item 5). The default is the same model, and
-   `dotx doctor` warns about it (a warning, not a failure).
+3. `[models] review`: use a model of another family than `main` (item 5). The default is the same model, and `dotx
+   doctor` warns about it (a warning, not a failure). Done for the owner on 2026-10-10 at their word: their
+   `config.toml` sets `review = "anthropic:claude-sonnet-5-5"`, and the warning is gone.
 4. From the audit: how long to keep events and screenshots (retention windows), which model compacts (`[models] fast` is
    documented but never read), browser access to localhost and private addresses, CI.
-5. The Claude models (`anthropic`): no request to the Anthropic API has run yet. Save `ANTHROPIC_API_KEY` (Settings ›
-   API keys once the daemon runs the new code, its **Check** costs nothing; or `dotx auth set ANTHROPIC_API_KEY`) and
-   run the hosted test once (`.venv/bin/python -m pytest tests/smoke/test_hosted_services.py -m hosted -k anthropic`:
-   a few tiny requests of `claude-haiku-5-5`). A Claude model is then a candidate for `[models] review` while `main` is
-   of another family (decision 3).
+5. The Claude models (`anthropic`), done on 2026-10-10: the owner's key is saved, and the hosted test (`.venv/bin/python
+   -m pytest tests/smoke/test_hosted_services.py -m hosted -k anthropic`) passed: `claude-haiku-5-5` is listed, a tool
+   round trip replays its signed thinking, a screenshot is read.
 6. Standing goals (item 12), decided by the owner on 2026-10-09: the composer switch "Keep going until done" is off by
    default, a campaign stops only when the owner stops it, and the proposed numbers stay (`campaign_gap_minutes = 60`,
    `campaign_wait_hours = 24`, `campaign_patience_sessions = 3`, `campaign_max_sessions = 0`, and item 11's
@@ -2348,8 +2348,10 @@ text, no console error; the Options panel with YOLO saved; every status ring. RE
     `rust-best-practices`), not the whole folder, which would also bring its `superpowers` bundle (process skills that
     tell the model to brainstorm, plan and ask before it acts) and its `synced` skills (claude.ai's, for tools Dot does
     not have). Add `"~/.claude/skills"` itself to take them all.
-11. Helpers (item 15): fill `[models] helpers` and `[models] standby` in your `config.toml`. The natural first entry is
-    a Claude model once `ANTHROPIC_API_KEY` is saved (decision 5).
+11. Helpers (item 15), done on 2026-10-10 at the owner's word: their `config.toml` sets `helpers =
+    ["anthropic:claude-opus-5-5"]` and `standby = ["anthropic:claude-sonnet-5-5"]`, and `dotx doctor` says both are
+    ready. Both spend Anthropic tokens: a helper on a consult or a delegated part, a standby model on the rest of a run
+    whose main model hit a quota.
 12. Only you can check live: the X composer with item 14's `type` and `insert`, and a `yolo` run that reads a
     one-time code from your webmail and types it (item 10).
 13. Speed knobs that wait for item 9's numbers: `[browser] settle_quiet_ms` (120 or 60; item 13 has the timings of
@@ -2366,10 +2368,10 @@ text, no console error; the Options panel with YOLO saved; every status ring. RE
     #3 it posted nothing) because your organization has no extra usage to pay for it, and on PR #11 it answered nothing.
     On 2026-10-10 you said its limit is spent: PRs no longer wait for it and are merged on the agent's own review. Extra
     usage at claude.ai/admin-settings/usage brings it back; a comment `@claude review` on a PR then asks for a review.
-16. The review model has no standby (item 15): with `[models] review` on the provider of `main` (the default), a run
-    in goal mode or with `auto` approvals that moved to its standby fails its goal check or its approvals while that
-    provider cannot answer. Set `review` to a model of another provider (decision 3), or say that the review model
-    should move to the standby models too (a small item).
+16. The review model has no standby (item 15): with `[models] review` on the provider of `main` (the default), a run in
+    goal mode or with `auto` approvals that moved to its standby fails its goal check or its approvals while that
+    provider cannot answer. Settled for the owner by decision 3: their review model is on Anthropic, their main model on
+    Ollama. The default stays as it is.
 
 ## Log
 
@@ -2720,3 +2722,9 @@ text, no console error; the Options panel with YOLO saved; every status ring. RE
   key name", since item 16 added the key to Settings › API keys only; `dotx auth set` and `dotx auth status` now take
   the keys of that page from one list (`config.providers_by_key`), and a smoke test stores the key. Branch
   `decision-08-no-pace-limits`.
+- 2026-10-10: decision 8 merged as `43ac113` (PR #16, squash). At the owner's word the agent restarted their daemon
+  (`dotx service install` with no `DOT_*` variable in its environment, so the job's plist still names only `PATH`; no
+  run was active): it runs `43ac113`, its database gained the tables of items 12 and 17, and `dotx doctor` is all ok,
+  the six skills included. Decision 5: the hosted Anthropic test passed. Decisions 3, 11 and 16: the owner's
+  `config.toml` sets Claude as `review` (Sonnet 5.5), `helpers` (Opus 5.5) and `standby` (Sonnet 5.5); the daemon was
+  restarted once more to read it.
