@@ -34,11 +34,12 @@ from dotagent.core.paths import workspace_dir
 from dotagent.core.types import JsonObject
 from dotagent.policy.types import ActionInfo
 from dotagent.runtime import Runtime, build_runtime, close_runtime
-from dotagent.store.models import CampaignRecord, EventRecord, RunRecord, ThreadRecord
+from dotagent.store.models import CampaignEntry, CampaignRecord, EventRecord, RunRecord, ThreadRecord
 from dotagent.tools.base import PreparedCall, ToolResult
-from dotagent.tools.campaign import CAMPAIGN_ACHIEVED_TOOL
+from dotagent.tools.campaign import CAMPAIGN_ACHIEVED_TOOL, CAMPAIGN_NOTE_TOOL
 from dotagent.tools.context import ToolContext
 from dotagent.tools.judge_items import JUDGE_ITEMS_TOOL
+from dotagent.tools.posts import CHECK_DRAFT_TOOL, PICK_DRAFT_TOOL, POSTS_RANKED_EVENT, RANK_POSTS_TOOL
 
 pytestmark = [pytest.mark.browser, pytest.mark.asyncio(loop_scope="module")]
 
@@ -77,9 +78,54 @@ def _candidate(state: JsonValue, question: str) -> str | None:
     return text if isinstance(text, str) else None
 
 
+def _post_text(state: JsonValue, question: str) -> str | None:
+    """The text of the post a rank_posts question (``<id>__<weight>``) is about."""
+    posts: JsonValue = state.get("posts") if isinstance(state, dict) else None
+    post: JsonValue = posts.get(question.split("__")[0]) if isinstance(posts, dict) else None
+    text: JsonValue = post.get("text") if isinstance(post, dict) else None
+    return text if isinstance(text, str) else None
+
+
+def _post_answer(text: str, question: str) -> float:
+    if question.endswith("__w_topic"):
+        return 0.9 if _TOPIC in text.lower() else 0.1
+    if question.endswith("__w_person"):
+        return 0.1 if "giveaway" in text.lower() else 0.9
+    return 0.8 if "?" in text else 0.3
+
+
+def _check_answer(state: dict[str, JsonValue], question: str) -> float:
+    """check_draft's stand-in: a draft without the topic is off topic, one equal to an earlier post repeats it, and a
+    link breaks a rule that mentions links."""
+    draft: str = str(state["draft"])
+    if question == "off_topic":
+        return 0.1 if _TOPIC in draft.lower() else 0.9
+    if question == "repeats":
+        earlier: JsonValue = state["earlier_posts"]
+        return 0.9 if isinstance(earlier, list) and draft in earlier else 0.1
+    rules: JsonValue = state["rules"]
+    assert isinstance(rules, list)
+    rule: str = str(rules[int(question.removeprefix("rule_"))])
+    return 0.9 if "http" in draft and "link" in rule else 0.1
+
+
+def _choice(criteria: dict[str, JsonValue]) -> JsonObject:
+    """The stand-in picks the longest option; the probabilities follow the lengths."""
+    lengths: dict[str, int] = {option: len(str(text)) for option, text in criteria.items()}
+    total: int = sum(lengths.values())
+    probabilities: dict[str, float] = {option: length / total for option, length in lengths.items()}
+    best: str = max(lengths, key=lengths.__getitem__)
+    return {"type": "choice", "choice": best, "confidence": probabilities[best], "probabilities": probabilities}
+
+
 def _answer(state: JsonValue, question: str) -> float:
     if question == "targets_reached":
         return _CLAIM_PROBABILITY
+    post: str | None = _post_text(state, question)
+    if post is not None:
+        return _post_answer(post, question)
+    if isinstance(state, dict) and "draft" in state:
+        return _check_answer(state, question)
     candidate: str | None = _candidate(state, question)
     if candidate is not None:
         return 0.9 if _TOPIC in candidate.lower() else 0.1
@@ -128,6 +174,10 @@ class _Handler(BaseHTTPRequestHandler):
                 criteria: JsonValue = spec["criteria"]
                 assert isinstance(criteria, list) and all(isinstance(level, str) for level in criteria)
                 answers[question] = _score(body["state"], question, [str(level) for level in criteria])
+            elif spec["type"] == "choice":
+                options: JsonValue = spec["criteria"]
+                assert isinstance(options, dict)
+                answers[question] = _choice(options)
             else:
                 answers[question] = {"type": "noul", "noul": _answer(body["state"], question)}
         reply: JsonObject = {
@@ -398,3 +448,139 @@ async def test_a_request_typesafe_rejects_is_an_error_event_and_pauses_neither_t
     )
     assert not (await again.run(ctx)).is_error
     assert len(service.requests) == before + 2
+
+
+_FEED: list[JsonObject] = [
+    {"id": "a", "author": "@mara", "text": "Lost an afternoon to uv lock versus pip freeze in Python. Never again."},
+    {"id": "b", "author": "@dealsbot", "text": "GIVEAWAY: retweet to win a laptop!"},
+    {"id": "c", "author": "@tomas", "text": "Which grinder do you use for espresso under 300 euros?"},
+]
+
+
+async def _campaign_context(runtime: Runtime) -> tuple[ToolContext, CampaignRecord]:
+    thread: ThreadRecord = await runtime.store.create_thread("x", "test")
+    campaign: CampaignRecord = await runtime.store.create_campaign(
+        "Python on X",
+        "Grow @dot_python on X to 500 followers. Rules: no links.",
+        thread.id,
+        "ollama:none",
+        "medium",
+        "ask",
+        (),
+        "own",
+    )
+    return await _context(runtime, campaign.id), campaign
+
+
+async def _run(ctx: ToolContext, tool: str, arguments: JsonObject) -> ToolResult:
+    prepared: PreparedCall = await ctx.runtime.registry.tools[tool].prepare(arguments, ctx)
+    return await prepared.run(ctx)
+
+
+async def test_a_campaign_session_ranks_posts_with_the_weights_of_its_ledger_and_keeps_the_scores(
+    runtime: Runtime, service: _Service
+) -> None:
+    ctx, campaign = await _campaign_context(runtime)
+    before: int = len(service.requests)
+    ranked: ToolResult = await _run(ctx, RANK_POSTS_TOOL, {"topic": "Python", "posts": _FEED})
+    assert not ranked.is_error, ranked.text
+    lines: list[str] = ranked.text.splitlines()
+    # Three questions per post and three questions per request (the fixture's items_per_request): one post a request.
+    assert lines[0].startswith("3 posts ranked in 3 requests by the weighted probability of yes to three questions")
+    assert "(on the topic ×1, by a person ×1, worth a reply ×1;" in lines[0]
+    # a: on topic, a person, no question (0.9, 0.9, 0.3); c: off topic, a person, a question (0.1, 0.9, 0.8); b: spam.
+    assert [line.split()[1] for line in lines[1:]] == ["a", "c", "b"]
+    assert lines[1] == (
+        "1. a 0.70 (topic 0.90, person 0.90, reply 0.30) @mara: Lost an afternoon to uv lock versus pip freeze in Python. N…"
+    )
+    # The first ranking wrote the weights in the ledger, where the owner changes them.
+    entries: list[CampaignEntry] = await runtime.store.campaign_entries(campaign.id, 10)
+    assert [(entry.kind, entry.numbers) for entry in entries] == [
+        ("note", {"w_topic": 1.0, "w_person": 1.0, "w_reply": 1.0})
+    ]
+    assert entries[0].text.startswith("Weights of rank_posts:")
+    # The last request asks the three questions about the last post, by its id in the state.
+    assert len(service.requests) == before + 3
+    _, _, body = service.requests[-1]
+    questions: JsonValue = body["questions"]
+    assert isinstance(questions, dict) and list(questions) == ["c__w_topic", "c__w_person", "c__w_reply"]
+    assert questions["c__w_reply"] == {
+        "type": "noul",
+        "instructions": (
+            "Is the post at `posts.c` worth a reply that adds something, such as an answer, an example or a question, "
+            "because it asks, claims or describes a problem, rather than a closed statement, a joke or an announcement?"
+        ),
+    }
+    state: JsonValue = body["state"]
+    assert isinstance(state, dict) and state["topic"] == "Python"
+    assert state["posts"] == {"c": {"author": _FEED[2]["author"], "text": _FEED[2]["text"]}}
+    events: list[EventRecord] = await runtime.store.events_of_kind(ctx.run_id, POSTS_RANKED_EVENT, 10)
+    assert len(events) == 1 and events[0].data["weights"] == {"w_topic": 1.0, "w_person": 1.0, "w_reply": 1.0}
+    posts: JsonValue = events[0].data["posts"]
+    assert isinstance(posts, list) and [post["id"] for post in posts if isinstance(post, dict)] == ["a", "c", "b"]
+    # A ledger entry with new weights changes the ranking without a change of the questions: replies count four times.
+    noted: ToolResult = await _run(
+        ctx,
+        CAMPAIGN_NOTE_TOOL,
+        {
+            "kind": "note",
+            "text": "Replies matter most.",
+            "numbers": [
+                {"name": "w_topic", "value": 1},
+                {"name": "w_person", "value": 1},
+                {"name": "w_reply", "value": 4},
+            ],
+        },
+    )
+    assert not noted.is_error
+    again: ToolResult = await _run(ctx, RANK_POSTS_TOOL, {"topic": "Python", "posts": _FEED})
+    assert [line.split()[1] for line in again.text.splitlines()[1:]] == ["c", "a", "b"]
+    assert "worth a reply ×4;" in again.text
+
+
+async def test_a_campaign_session_picks_the_best_draft_and_a_draft_with_a_link_is_refused_by_the_rule(
+    runtime: Runtime, service: _Service
+) -> None:
+    ctx, _ = await _campaign_context(runtime)
+    drafts: list[JsonObject] = [
+        {"id": "d1", "text": "Same here."},
+        {
+            "id": "d2",
+            "text": "uv locks per platform while pip freeze reads one environment; that is the whole difference.",
+        },
+    ]
+    picked: ToolResult = await _run(ctx, PICK_DRAFT_TOOL, {"topic": "Python", "post": _FEED[0], "drafts": drafts})
+    assert not picked.is_error
+    assert picked.text.startswith(
+        "Best draft: d2 (probability 0.90, confidence 0.90). All drafts, the likeliest first:\nd2 0.90"
+    )
+    _, _, body = service.requests[-1]
+    questions: JsonValue = body["questions"]
+    assert isinstance(questions, dict) and list(questions) == ["best"]
+    best: JsonValue = questions["best"]
+    assert isinstance(best, dict) and best["type"] == "choice"
+    assert best["criteria"] == {"d1": "Same here.", "d2": drafts[1]["text"]}
+    check: JsonObject = {
+        "topic": "Python",
+        "post": _FEED[0],
+        "draft": "See how uv does it in Python: https://example.com/uv",
+        "earlier_posts": ["uv locks per platform."],
+        "rules": ["no links in replies", "never sell"],
+    }
+    refused: ToolResult = await _run(ctx, CHECK_DRAFT_TOOL, check)
+    assert refused.is_error
+    assert refused.text.splitlines() == [
+        "Do not post the draft as it is: 1 of 4 checks reached 0.50. Change it and check again, or answer another post.",
+        "- off the topic or beside the point of the post: 0.10",
+        "- repeats an earlier post of the account: 0.10",
+        "- breaks the rule: no links in replies: 0.90 (fired)",
+        "- breaks the rule: never sell: 0.10",
+    ]
+    _, _, checked = service.requests[-1]
+    asked: JsonValue = checked["questions"]
+    assert isinstance(asked, dict) and list(asked) == ["off_topic", "repeats", "rule_0", "rule_1"]
+    passed: ToolResult = await _run(
+        ctx, CHECK_DRAFT_TOOL, {**check, "draft": "uv locks per platform in Python; pip freeze reads one environment."}
+    )
+    assert not passed.is_error
+    assert passed.text.startswith("The draft passes its 4 checks (none reached 0.50); the decision to post is yours.")

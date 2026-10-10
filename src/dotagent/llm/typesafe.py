@@ -1,13 +1,15 @@
-"""TypeSafe's System One API, for the typed judge and the judge_items tool: yes/no questions ("Noul" in TypeSafe's
-words) about a state, each answered with the probability of yes, and ratings on ordered levels ("Score"), each
-answered with the expected level and the probability of each.
+"""TypeSafe's System One API, for the typed judge and the tools built on it: yes/no questions ("Noul" in TypeSafe's
+words) about a state, each answered with the probability of yes; ratings on ordered levels ("Score"), each answered
+with the expected level and the probability of each; and picks of one option out of a named set ("Choice"), each
+answered with the option and the probability of each.
 
 One request carries the state and every question about it: ``POST {base_url}/v1/systemone`` with the key as a bearer
 token and the body ``{"state", "model", "questions": {id: {"type", "instructions", "criteria"?}}}``; the answer is
 ``{"model", "answers": {id: ...}, "usage"}``. A Noul answer is ``{"type": "noul", "noul": p}`` with ``p`` from 0 (no)
 to 1 (yes); a Score answer is ``{"type": "score", "score": s, "confidence": c, "legend": {"0": level, ...},
 "probabilities": {"0": p, ...}}`` with ``s`` the expected level, from 0 for the first level to one less than their
-number for the last. A refused key is HTTP 401, a body it rejects 422, a rate limit 429 and an overloaded service 529;
+number for the last; a Choice answer is ``{"type": "choice", "choice": option, "confidence": c, "probabilities":
+{option: p, ...}}``, its question carrying the options as ``criteria: {option: description}``. A refused key is HTTP 401, a body it rejects 422, a rate limit 429 and an overloaded service 529;
 the last two are retried.
 """
 
@@ -46,6 +48,23 @@ class ScoreQuestion(FrozenModel):
     id: str
     instructions: str
     levels: tuple[str, ...]
+
+
+class ChoiceQuestion(FrozenModel):
+    """A pick of one option out of ``options`` (name to description) about the state."""
+
+    id: str
+    instructions: str
+    options: dict[str, str]
+
+
+class ChoiceAnswer(FrozenModel):
+    """TypeSafe's answer to a :class:`ChoiceQuestion`: the option picked, the probability of each option and how
+    concentrated they are."""
+
+    choice: str
+    probabilities: dict[str, float]
+    confidence: float
 
 
 class ScoreAnswer(FrozenModel):
@@ -104,6 +123,36 @@ def _scores(reply: JsonObject, questions: tuple[ScoreQuestion, ...], url: str) -
     return found
 
 
+def _choices(reply: JsonObject, questions: tuple[ChoiceQuestion, ...], url: str) -> dict[str, ChoiceAnswer]:
+    """The choice answer to each question, by its id, read from TypeSafe's answer."""
+    answers: JsonObject = get_obj(reply, "answers")
+    found: dict[str, ChoiceAnswer] = {}
+    for question in questions:
+        answer: JsonValue = answers.get(question.id)
+        choice: JsonValue = answer.get("choice") if isinstance(answer, dict) else None
+        confidence: float | None = _number(answer.get("confidence"), 0, 1) if isinstance(answer, dict) else None
+        given: JsonValue = answer.get("probabilities") if isinstance(answer, dict) else None
+        probabilities: dict[str, float | None] = {
+            option: _number(given.get(option), 0, 1) if isinstance(given, dict) else None for option in question.options
+        }
+        if (
+            not isinstance(choice, str)
+            or choice not in question.options
+            or confidence is None
+            or any(p is None for p in probabilities.values())
+        ):
+            raise ProviderProtocolError(
+                "TypeSafe's answer has no choice for a question",
+                {"url": url, "question": question.id, "answer": answer},
+            )
+        found[question.id] = ChoiceAnswer(
+            choice=choice,
+            probabilities={option: p for option, p in probabilities.items() if p is not None},
+            confidence=confidence,
+        )
+    return found
+
+
 class TypeSafeClient:
     """A connection to TypeSafe's System One API with one key."""
 
@@ -134,6 +183,21 @@ class TypeSafeClient:
             },
         )
         return _scores(reply, questions, self._url)
+
+    async def choices(self, state: JsonValue, questions: tuple[ChoiceQuestion, ...]) -> dict[str, ChoiceAnswer]:
+        """Ask ``questions`` about ``state`` in one request; the choice answer to each, by its id."""
+        reply: JsonObject = await self._post(
+            state,
+            {
+                question.id: {
+                    "type": "choice",
+                    "instructions": question.instructions,
+                    "criteria": dict(question.options),
+                }
+                for question in questions
+            },
+        )
+        return _choices(reply, questions, self._url)
 
     async def _post(self, state: JsonValue, questions: JsonObject) -> JsonObject:
         payload: JsonObject = {"state": state, "model": self._model, "questions": questions}

@@ -60,7 +60,7 @@ def _action(tool: str, summary: str, flags: tuple[Flag, ...]) -> ActionInfo:
     )
 
 
-async def _campaign_of(ctx: ToolContext) -> CampaignRecord:
+async def campaign_of(ctx: ToolContext) -> CampaignRecord:
     """The campaign the calling run is a session of."""
     run: RunRecord = await ctx.runtime.store.get_run(ctx.run_id)
     if run.campaign_id is None:
@@ -88,7 +88,7 @@ def _targets_tool() -> RegisteredTool:
         return _action(CAMPAIGN_TARGETS_TOOL, f"Set the campaign's targets: {args.targets}", _SHAPES_LATER_SESSIONS)
 
     async def run(args: TargetsArgs, ctx: ToolContext) -> ToolResult:
-        campaign: CampaignRecord = await _campaign_of(ctx)
+        campaign: CampaignRecord = await campaign_of(ctx)
         await ctx.runtime.store.set_campaign_targets(campaign.id, args.targets, args.verification)
         if campaign.targets and (campaign.targets, campaign.verification) != (args.targets, args.verification):
             # The ledger keeps the targets they replace.
@@ -163,7 +163,7 @@ def _note_tool() -> RegisteredTool:
         )
 
     async def run(args: NoteArgs, ctx: ToolContext) -> ToolResult:
-        campaign: CampaignRecord = await _campaign_of(ctx)
+        campaign: CampaignRecord = await campaign_of(ctx)
         if args.kind == "strategy":
             tried: tuple[CampaignEntry, ...] = await _refused_routes(campaign, ctx)
             if route_refused(args.text, tried):
@@ -216,7 +216,7 @@ def _schedule_tool() -> RegisteredTool:
         return _action(CAMPAIGN_SCHEDULE_TOOL, f"Plan the campaign's next session: {when}", _SHAPES_LATER_SESSIONS)
 
     async def run(args: ScheduleArgs, ctx: ToolContext) -> ToolResult:
-        campaign: CampaignRecord = await _campaign_of(ctx)
+        campaign: CampaignRecord = await campaign_of(ctx)
         timing: Timing = tool_timing(args.cron, args.at, ctx)
         when: str = describe_timing(timing, ctx.runtime.schedule_zone)
         if timing.cron is not None:
@@ -292,7 +292,7 @@ def _achieved_tool() -> RegisteredTool:
         return _action(CAMPAIGN_ACHIEVED_TOOL, f"Claim the campaign's outcome: {args.evidence}", ())
 
     async def run(args: AchievedArgs, ctx: ToolContext) -> ToolResult:
-        campaign: CampaignRecord = await _campaign_of(ctx)
+        campaign: CampaignRecord = await campaign_of(ctx)
         if campaign.status == "achieved":
             return ok(f"The campaign is achieved already: {campaign.evidence}")
         if not campaign.targets:

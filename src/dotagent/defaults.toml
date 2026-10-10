@@ -114,6 +114,10 @@ max_concurrent = 4
 # Whatever provider says, the judge_items tool is offered to the agent when the key named by api_key_env is saved: one
 # question about every item of a list in one request (items_per_request items at most per request; timeout_s each),
 # ranked for the agent to filter or order search hits, posts, links or files without reading each in its own words.
+# A session of a campaign also gets rank_posts, pick_draft and check_draft (the posts worth answering on X or another
+# feed, the best of the drafts, a draft checked before it is posted); check_draft stops a draft when the probability
+# that it is off topic, repeats an earlier post or breaks a rule of the campaign reaches draft_check_threshold. The
+# threshold is provisional: set it on a labeled sample of your own feed (ROADMAP open decision 27).
 provider = "none"
 api_key_env = "TYPESAFE_API_KEY"
 base_url = "https://api.typesafe.ai"
@@ -123,6 +127,7 @@ public_action_threshold = 0.45
 target_threshold = 0.15
 second_opinion = false
 items_per_request = 100
+draft_check_threshold = 0.5
 
 [agent]
 # A run has no step limit: it ends by finishing, by the progress watchdog (below), at a limit below or by the stop button.
