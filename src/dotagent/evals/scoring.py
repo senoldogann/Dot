@@ -209,6 +209,38 @@ def render_scorecard(card: Scorecard) -> list[str]:
     return lines
 
 
+def _delta(first: float | None, second: float | None, unit: str) -> str:
+    """``second`` against ``first`` with its sign; ``-`` when either was not measured."""
+    if first is None or second is None:
+        return "-"
+    return f"{second - first:+.1f}{unit}"
+
+
+def _delta_pp(first: float | None, second: float | None) -> str:
+    """A difference of shares, in percentage points."""
+    return "-" if first is None or second is None else f"{round(100 * (second - first)):+d} pp"
+
+
+def _rate(part: int, whole: int) -> float | None:
+    return None if whole == 0 else part / whole
+
+
+def render_difference(first: Scorecard, second: Scorecard) -> list[str]:
+    """One line with the second scorecard against the first: the same model before and after a change, or two
+    models. Shares are given in percentage points; a number either side lacks shows ``-``."""
+    return [
+        f"Difference, {second.model} against {first.model}: "
+        f"passed {second.passed - first.passed:+d} ({_delta_pp(_rate(first.passed, first.attempts), _rate(second.passed, second.attempts))}), "
+        f"steps/pass {_delta(first.steps_per_pass, second.steps_per_pass, '')}, "
+        f"tokens/pass {_delta(None if first.tokens_per_pass is None else first.tokens_per_pass / 1000, None if second.tokens_per_pass is None else second.tokens_per_pass / 1000, ' k')}, "
+        f"seconds/pass {_delta(first.seconds_per_pass, second.seconds_per_pass, ' s')}, "
+        f"one-step acts {_delta_pp(first.single_act_share, second.single_act_share)}, "
+        f"cached {_delta_pp(first.cached_share, second.cached_share)}, "
+        f"tool errors {_delta_pp(_rate(first.tool_errors, first.tool_calls), _rate(second.tool_errors, second.tool_calls))}, "
+        f"stalls {second.stalls - first.stalls:+d}, false claims {second.false_successes - first.false_successes:+d}"
+    ]
+
+
 def render_comparison(cards: Sequence[Scorecard]) -> list[str]:
     """One row per scorecard: the numbers to compare models, or one model before and after a change."""
     width: int = max(len(card.model) for card in cards)

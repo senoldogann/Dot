@@ -7,11 +7,11 @@ import pytest
 
 from dotagent.core.errors import EvalError
 from dotagent.evals.audit import catalog_problems, task_problems
-from dotagent.evals.catalog import all_tasks, select_tasks
+from dotagent.evals.catalog import LONG_TASK_IDS, all_tasks, select_tasks
 from dotagent.evals.checks import evaluate_check, evaluate_checks, workspace_path
 from dotagent.evals.reports import load_report, report_file_name, save_report
 from dotagent.evals.results import CheckOutcome, EvalReport, EvalSettings, RunMetrics, TaskOutcome
-from dotagent.evals.scoring import Scorecard, failure_reason, render_scorecard, score_report
+from dotagent.evals.scoring import Scorecard, failure_reason, render_difference, render_scorecard, score_report
 from dotagent.evals.types import (
     AnswerContains,
     AnswerMatches,
@@ -278,3 +278,35 @@ def test_a_file_that_is_not_a_report_is_refused(tmp_path: Path) -> None:
         load_report(path)
     with pytest.raises(EvalError):
         load_report(tmp_path / "missing.json")
+
+
+def test_the_long_tasks_need_ten_or_more_tool_turns_and_every_one_has_checks() -> None:
+    long: list[EvalTask] = [task for task in all_tasks() if task.id in LONG_TASK_IDS]
+    assert [task.id for task in long] == list(LONG_TASK_IDS)
+    for task in long:
+        # The finish turn is the last one and does not count as work.
+        assert len(task.reference) - 1 >= 10, task.id
+        assert task.checks
+
+
+def test_the_difference_line_sets_the_second_report_against_the_first() -> None:
+    before: Scorecard = score_report(
+        _report(
+            (
+                _outcome("a", 1, True, "done", _metrics(10, 10000, 10, 2)),
+                _outcome("b", 1, False, "failed", _metrics(4, 4000, 4, 0)),
+            )
+        )
+    )
+    counted: RunMetrics = _metrics(6, 6000, 6, 0).model_copy(
+        update={"acts": 4, "single_acts": 1, "cached_tokens": 3000}
+    )
+    after: Scorecard = score_report(
+        _report((_outcome("a", 1, True, "done", counted), _outcome("b", 1, True, "done", _metrics(4, 4000, 4, 0))))
+    )
+    line: str = render_difference(before, after)[0]
+    assert line.startswith("Difference, ollama:test against ollama:test: passed +1 (+50 pp), steps/pass -5.0, ")
+    assert "tokens/pass -5.0 k" in line
+    assert "one-step acts -" in line and "cached -" in line
+    assert "tool errors -14 pp" in line
+    assert line.endswith("stalls +0, false claims +0")

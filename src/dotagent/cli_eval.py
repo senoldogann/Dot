@@ -31,7 +31,14 @@ from dotagent.evals.runner import (
     required_secret_names,
     secret_names,
 )
-from dotagent.evals.scoring import Scorecard, failure_reason, render_comparison, render_scorecard, score_report
+from dotagent.evals.scoring import (
+    Scorecard,
+    failure_reason,
+    render_comparison,
+    render_difference,
+    render_scorecard,
+    score_report,
+)
 from dotagent.evals.types import EvalTask
 from dotagent.llm.router import parse_model_ref
 from dotagent.tools.shell import child_env, read_login_env
@@ -209,4 +216,7 @@ async def cmd_eval_report(command: EvalReportCommand) -> int:
             _write([*render_scorecard(card), ""])
     if len(cards) > 1 or not command.files:
         _write(render_comparison(cards))
+    if len(cards) == 2:
+        # Two reports: the second against the first, the way a change is judged (the same model before and after).
+        _write(["", *render_difference(cards[0], cards[1])])
     return 0
