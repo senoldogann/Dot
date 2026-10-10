@@ -318,6 +318,20 @@ clears the mark. A delegated run starts as untrusted as its parent.
   browser profile, configuration, database and journals of file changes. The configuration holds the policy and the MCP
   servers, the database the rules, the journals what `dotx undo` writes back.
 
+**Typed judgments (optional, off by default).** The policy reads what a click does from the control's label, with
+patterns in English and Turkish ("Post", "Send", "Delete", "Pay now", "Paylaş"…); a label they do not know ("Repost",
+the Finnish "Lähetä") passes as an ordinary click. With `[judge] provider = "typesafe"` and `TYPESAFE_API_KEY` saved
+(Settings › API keys, or `dotx auth set TYPESAFE_API_KEY`), TypeSafe's System One API is asked about such a click in
+four yes/no questions (does it publish, send, pay or delete?) over the label, the role and the page's address (without
+its query and fragment). A probability of at least `public_action_threshold` (0.7) gives the click that flag, so the
+policy treats it as a click on "Post" or "Delete", and the action's summary says so: `(judge: public_post 0.93)`. The
+judge also reads a campaign's claim of its targets before the goal checker does, and refuses a claim below
+`target_threshold` (0.9) at once. It never allows anything and never decides a step; it only adds flags, or stops a
+claim early. It is a paid service: one request per judged click or claim, at most `timeout_s` (5 s) each. A missing or
+refused key, a spent quota or a failed request turns it off for `[models] helper_cooldown_s`, with a note in the
+timeline, and meanwhile the patterns and the goal checker decide alone; a key saved in Settings turns it on again at
+once. `dotx doctor` shows whether it is on and has its key.
+
 **Approvals.** An action that needs a yes becomes an approval: `allow? [y/N]` in the terminal, a card in the web UI. The
 run waits (its status is `blocked`) for up to `[policy] approval_timeout_s`; an approval nobody answers expires and
 counts as a refusal. The note you write with your answer reaches the model. This is the default approval mode, `ask`; in

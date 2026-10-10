@@ -19,7 +19,7 @@ from dotagent.browser.attach import DebugEndpoint, read_debug_endpoint
 from dotagent.browser.keychain import KeychainMode, read_keychain_mode
 from dotagent.browser.login import CHROME_APP
 from dotagent.browser.profile_lock import profile_holder_pid
-from dotagent.config import AppConfig, McpServerConfig, MemoryConfig, ModelsConfig, ProvidersConfig
+from dotagent.config import AppConfig, JudgeConfig, McpServerConfig, MemoryConfig, ModelsConfig, ProvidersConfig
 from dotagent.core.errors import BrowserError, ConfigError, ProviderError, ToolExecutionError, WebError
 from dotagent.core.paths import (
     browser_profile_dir,
@@ -41,11 +41,12 @@ from dotagent.llm.ollama import OllamaProvider
 from dotagent.llm.opencode_go import GoUsage, OpenCodeGoProvider
 from dotagent.llm.router import ModelRef, ModelRouter, parse_model_ref
 from dotagent.llm.types import ChatProvider, ModelInfo
+from dotagent.llm.typesafe import NoulQuestion, TypeSafeClient
 from dotagent.mcp.launch import referenced_secrets
 from dotagent.memory.embedder import OpenAIEmbedder, build_openai_embedder
 from dotagent.plugins.catalog import load_plugins
 from dotagent.plugins.types import PluginCatalog, PluginProblem
-from dotagent.secrets import resolve_secret
+from dotagent.secrets import require_secret, resolve_secret
 from dotagent.skills.catalog import load_skills
 from dotagent.skills.types import SkillCatalog, SkillProblem
 from dotagent.tools.shell import read_login_env
@@ -198,12 +199,43 @@ async def _check_ollama_search(config: AppConfig) -> CheckResult:
     return _result("ollama web search", True, True, f"a test search with this key worked; results: {len(hits)}")
 
 
+async def _check_typesafe_key(config: JudgeConfig) -> CheckResult:
+    """TypeSafe's key, with one small judgment: its API reference documents no other call to check a key with."""
+    try:
+        key: str = await asyncio.to_thread(require_secret, config.api_key_env, "the typed judge")
+        client: TypeSafeClient = TypeSafeClient(config, key)
+        try:
+            await client.nouls("A key check.", (NoulQuestion(id="check", instructions="Is this a key check?"),))
+        finally:
+            await client.aclose()
+    except (ConfigError, ProviderError) as exc:
+        return _result("typesafe api", False, True, exc.message)
+    return _result("typesafe api", True, True, f"{config.model} answers with this key")
+
+
+def _judge_row(config: JudgeConfig, present: bool) -> CheckResult:
+    """The typed judge: off, or the service it asks and whether its key is set (nothing is asked here)."""
+    if config.provider == "none":
+        return _result("judge", True, False, 'off ([judge] provider = "none")')
+    if not present:
+        return _result(
+            "judge",
+            False,
+            True,
+            f"{config.api_key_env} is missing (dotx auth set {config.api_key_env}); until it is set the policy's "
+            "patterns and the goal checker decide alone",
+        )
+    return _result("judge", True, True, f"{config.provider}:{config.model}; {config.api_key_env} is set")
+
+
 async def check_provider_key(config: AppConfig, provider: str) -> CheckResult:
     """Ask ``provider`` whether it takes the key in use now, through connectors made for this check alone. The calls
     for OpenAI, OpenCode Go and Anthropic cost nothing; Ollama's key is for its hosted web search, so it is checked with
-    one search."""
+    one search, and TypeSafe's, the typed judge's, with one small judgment."""
     if provider == "ollama":
         return await _check_ollama_search(config)
+    if provider == "typesafe":
+        return await _check_typesafe_key(config.judge)
     router: ModelRouter = ModelRouter(config, log_model_call)
     try:
         match provider:
@@ -538,6 +570,8 @@ async def _service_checks(config: AppConfig) -> list[CheckResult]:
         results.append(await _models_row("standby", "[models] standby", config.models.standby, config.providers))
     finally:
         await router.aclose()
+    judge_key: bool = config.judge.provider != "none" and await asyncio.to_thread(_has_secret, config.judge.api_key_env)
+    results.append(_judge_row(config.judge, judge_key))
     return results
 
 

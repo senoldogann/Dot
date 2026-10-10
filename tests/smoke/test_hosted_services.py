@@ -1,5 +1,5 @@
 """The real hosted services with the user's own keys: OpenAI on both wires, OpenCode Go on all three routes, the Claude
-models of Anthropic and the hosted web search of Ollama.
+models of Anthropic, the hosted web search of Ollama and TypeSafe's typed judgments.
 
 ``test_wire_codecs.py`` makes the same calls against a local Ollama that stands in for these services. Here every test
 sends a handful of tiny requests (cents at most) and is skipped when its key cannot be resolved (environment, the
@@ -18,6 +18,7 @@ from test_wire_codecs import (
     tool_round_trip,
 )
 
+from dotagent.agent.judge import CLICK_QUESTIONS
 from dotagent.config import AppConfig, GoRoute, load_config
 from dotagent.llm.anthropic import AnthropicProvider
 from dotagent.llm.openai import OpenAIProvider
@@ -31,6 +32,7 @@ from dotagent.llm.types import (
     tool_message,
     user_message,
 )
+from dotagent.llm.typesafe import NoulQuestion, TypeSafeClient
 from dotagent.secrets import resolve_secret
 from dotagent.web.client import WebClient
 from dotagent.web.search import search_ollama
@@ -43,11 +45,13 @@ OPENAI_KEY: str | None = resolve_secret("OPENAI_API_KEY")
 OPENCODE_KEY: str | None = resolve_secret("OPENCODE_API_KEY")
 OLLAMA_KEY: str | None = resolve_secret("OLLAMA_API_KEY")
 ANTHROPIC_KEY: str | None = resolve_secret("ANTHROPIC_API_KEY")
+TYPESAFE_KEY: str | None = resolve_secret(DEFAULTS.judge.api_key_env)
 
 requires_openai = pytest.mark.skipif(OPENAI_KEY is None, reason="needs OPENAI_API_KEY")
 requires_opencode_go = pytest.mark.skipif(OPENCODE_KEY is None, reason="needs OPENCODE_API_KEY")
 requires_ollama_search = pytest.mark.skipif(OLLAMA_KEY is None, reason="needs OLLAMA_API_KEY")
 requires_anthropic = pytest.mark.skipif(ANTHROPIC_KEY is None, reason="needs ANTHROPIC_API_KEY")
+requires_typesafe = pytest.mark.skipif(TYPESAFE_KEY is None, reason="needs TYPESAFE_API_KEY")
 
 OPENAI_MODEL: str = "gpt-4.1-mini"
 # The smallest current Claude model; it thinks, so the round trip also replays a signed thinking block.
@@ -150,3 +154,26 @@ async def test_the_hosted_search_of_ollama_answers_with_titles_and_addresses() -
     assert 1 <= len(hits) <= 5
     assert all(hit.title and hit.url.startswith(("http://", "https://")) for hit in hits)
     assert any("python" in f"{hit.title} {hit.snippet}".lower() for hit in hits)
+
+
+@pytest.mark.hosted
+@requires_typesafe
+async def test_typesafe_judges_click_labels_in_english_turkish_and_finnish() -> None:
+    """The labels the policy's patterns miss or know only in some languages, with the probability of each flag the
+    judge asks about, in its own words: printed for the owner to set the thresholds by, and checked only for being
+    probabilities."""
+    assert TYPESAFE_KEY is not None
+    labels: tuple[str, ...] = ("Repost", "Yeniden gönder", "Lähetä", "Pay now", "Delete account")
+    questions: tuple[NoulQuestion, ...] = tuple(question for question, _ in CLICK_QUESTIONS)
+    client: TypeSafeClient = TypeSafeClient(DEFAULTS.judge, TYPESAFE_KEY)
+    try:
+        answers: list[dict[str, float]] = [
+            await client.nouls({"control": {"label": label, "role": "button"}, "page": "https://x.com/home"}, questions)
+            for label in labels
+        ]
+    finally:
+        await client.aclose()
+    for label, probabilities in zip(labels, answers, strict=True):
+        print(label, probabilities)
+    assert all(set(found) == {question.id for question in questions} for found in answers)
+    assert all(0.0 <= value <= 1.0 for found in answers for value in found.values())

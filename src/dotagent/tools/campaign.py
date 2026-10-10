@@ -4,7 +4,7 @@ They exist only in the runs that are sessions of a campaign (the loop leaves the
 nothing but the session's own campaign, which the owner started to keep going: so each is a ``meta`` action of risk
 ``safe``. The targets, the ledger and the plan of the next session shape every session after this one, so writing them
 carries the ``persistence`` flag, as saving a memory note does: once the session has read untrusted content, the policy
-asks first. A claim of the outcome is the goal checker's to judge.
+asks first. A claim of the outcome is the goal checker's to judge, after the typed judge when one is on.
 """
 
 import asyncio
@@ -14,12 +14,13 @@ from typing import Annotated
 from pydantic import Field, StringConstraints
 
 from dotagent.agent.campaign import entry_line
+from dotagent.agent.judge import ClaimJudgment
 from dotagent.agent.review import GoalChecker, GoalRequest, GoalVerdict, goal_checker_for, goal_digest, shorten_reason
 from dotagent.agent.verify import RunFacts, checked_facts
 from dotagent.config import AppConfig
 from dotagent.core.errors import ProviderError, ToolExecutionError
 from dotagent.core.logs import get_logger
-from dotagent.core.types import FrozenModel
+from dotagent.core.types import FrozenModel, JsonObject
 from dotagent.policy.types import ActionInfo, Flag
 from dotagent.scheduler.timing import Timing, describe_timing
 from dotagent.store.models import CampaignEntry, CampaignEntryKind, CampaignRecord, RunRecord
@@ -243,6 +244,17 @@ async def _checked_request(campaign: CampaignRecord, evidence: str, ctx: ToolCon
     )
 
 
+def _claim_state(request: GoalRequest) -> JsonObject:
+    """What the typed judge reads of a claim: what the goal checker reads."""
+    return {
+        "goal": request.goal,
+        "targets": request.targets,
+        "ledger": request.digest,
+        "session_facts": request.facts,
+        "claim": request.answer,
+    }
+
+
 def _achieved_tool() -> RegisteredTool:
     def classify(args: AchievedArgs, ctx: ToolContext) -> ActionInfo:
         return _action(CAMPAIGN_ACHIEVED_TOOL, f"Claim the campaign's outcome: {args.evidence}", ())
@@ -261,8 +273,19 @@ def _achieved_tool() -> RegisteredTool:
             f"{ctx.thread_id}:campaign",
             ctx.run_id,
         )
+        request: GoalRequest = await _checked_request(campaign, args.evidence, ctx)
+        # The typed judge, when one is on, stops a claim it finds unlikely before the goal checker's model call.
+        claim: ClaimJudgment = await ctx.runtime.judge.judge_claim(_claim_state(request), ctx.run_id)
+        threshold: float = config.judge.target_threshold
+        if claim.probability is not None and claim.probability < threshold:
+            log.info("campaign_claim_judged", campaign_id=campaign.id, run_id=ctx.run_id, probability=claim.probability)
+            return fail(
+                f"Not accepted: the typed judge gives {claim.probability:.2f} for the targets being reached as their "
+                f"verification asks (it takes {threshold:.2f}). Verify them with your own reads in this session, then "
+                "claim again with what they show. The campaign goes on."
+            )
         try:
-            verdict: GoalVerdict = await checker(await _checked_request(campaign, args.evidence, ctx))
+            verdict: GoalVerdict = await checker(request)
         except ProviderError as error:
             log.error("campaign_check_failed", run_id=ctx.run_id, error=error.message, context=error.context)
             return fail(f"The claim could not be checked ({error.message}); the campaign goes on. Claim again later.")
