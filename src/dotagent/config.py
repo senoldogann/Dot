@@ -16,8 +16,13 @@ from dotagent.store.models import BrowserMode
 
 
 class ServerConfig(FrozenModel):
+    """``host`` and ``port`` are where the daemon listens, a loopback address only. ``reach`` names the hosts a reverse
+    proxy on the owner's own network presents the daemon as (``tailscale serve`` gives ``<mac>.<tailnet>.ts.net``); a
+    request with such a ``Host``, and an ``Origin`` of ``https://`` that host, is served like a local one."""
+
     host: str
     port: int
+    reach: list[str]
 
 
 class StoreConfig(FrozenModel):

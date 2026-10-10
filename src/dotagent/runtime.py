@@ -25,6 +25,7 @@ from dotagent.core.paths import (
     screenshots_dir,
     token_path,
     undo_dir,
+    vapid_path,
     workspace_dir,
 )
 from dotagent.desktop.session import DesktopSession
@@ -33,6 +34,7 @@ from dotagent.llm.calls import CALL_EVENT, CallRecorder, ModelCall, call_event_d
 from dotagent.llm.router import ModelRouter
 from dotagent.mcp.hub import McpHub, open_hub
 from dotagent.memory.service import MemoryIndex, close_memory_index, open_memory_index
+from dotagent.notify.push import PushKeys, read_or_create_keys
 from dotagent.plugins.catalog import load_plugins
 from dotagent.plugins.types import PluginCatalog
 from dotagent.policy.paths import expand_protected
@@ -91,6 +93,8 @@ class Runtime:
     plugins: PluginCatalog
     protected: tuple[Path, ...]
     shell_env: dict[str, str]
+    # The web push key pair the daemon signs with (item 52).
+    push_keys: PushKeys
     workspace: Path
     schedule_zone: ZoneInfo
     undo_dir: Path
@@ -131,6 +135,7 @@ def _guarded_files() -> tuple[Path, ...]:
     return (
         env_file_path(),
         token_path(),
+        vapid_path(),
         browser_profile_dir(),
         chrome_data_dir(),
         config_path(),
@@ -176,6 +181,7 @@ async def open_runtime(config: AppConfig, login_env: dict[str, str]) -> Runtime:
     ollama_key: str | None = await asyncio.to_thread(resolve_secret, config.providers.ollama.api_key_env)
     typesafe_key: str | None = await asyncio.to_thread(resolve_secret, config.judge.api_key_env)
     plugins: PluginCatalog = await asyncio.to_thread(load_plugins, config.plugins, config.mcp)
+    push_keys: PushKeys = await asyncio.to_thread(read_or_create_keys, vapid_path())
     for problem in plugins.problems:
         log.warning("plugin_skipped", path=str(problem.path), reason=problem.reason)
     async with AsyncExitStack() as cleanup:
@@ -212,6 +218,7 @@ async def open_runtime(config: AppConfig, login_env: dict[str, str]) -> Runtime:
             registry=registry,
             plugins=plugins,
             protected=protected,
+            push_keys=push_keys,
             shell_env=shell_env,
             workspace=workspace_dir(),
             schedule_zone=schedule_zone,

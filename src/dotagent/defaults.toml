@@ -23,6 +23,10 @@ mcp = []
 [server]
 host = "127.0.0.1"
 port = 8765
+# Host names a reverse proxy on your own network presents the daemon as, for the phone: with Tailscale,
+# `tailscale serve --bg 8765` gives https://<mac>.<tailnet>.ts.net, and that name goes here. The daemon itself stays on
+# the loopback address.
+reach = []
 
 [store]
 # Nothing in the database is deleted by itself. `dotx prune` reports, and `dotx prune --apply` deletes, the events (the

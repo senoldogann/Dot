@@ -1,5 +1,6 @@
 """The ASGI application: the JSON API, the live streams and the browser UI, behind the local guard."""
 
+import mimetypes
 from pathlib import Path
 
 from fastapi import FastAPI, Request
@@ -95,6 +96,8 @@ def create_app(ctx: ServerContext) -> FastAPI:
         )
         return _error_response(422, "the request is not valid", {"errors": problems})
 
-    app.add_middleware(LocalGuard, token=ctx.token, port=ctx.port)
+    app.add_middleware(LocalGuard, token=ctx.token, port=ctx.port, reach=frozenset(ctx.runtime.config.server.reach))
+    # The web app manifest has a type of its own that the platform's table may not know.
+    mimetypes.add_type("application/manifest+json", ".webmanifest")
     app.mount("/", StaticFiles(directory=STATIC_DIR, html=True), name="ui")
     return app

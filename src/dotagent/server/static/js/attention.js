@@ -7,6 +7,8 @@ import { readPref, writePref } from "./prefs.js";
 import { getSnapshot, onChange, onLifecycle } from "./state.js";
 
 const NOTIFY_KEY = "dot.notify";
+// Whether this browser is subscribed to the daemon's web push: then the pushes tell, and the page itself stays quiet.
+const PUSH_KEY = "dot.push";
 const BODY_CHARS = 140;
 const FINISHED_TITLE = { done: "A run is done", failed: "A run failed", cancelled: "A run was stopped" };
 const ASKING_TITLE = { question: "Dot has a question", handoff: "Dot needs your help" };
@@ -50,15 +52,50 @@ export function notificationsOn() {
   return notificationsAvailable() && (shell() !== null || Notification.permission === "granted") && readPref(NOTIFY_KEY) === "on";
 }
 
-/** Switch notifications on (the browser or the shell asks for its permission the first time) or off; resolves to whether they are on. */
+/** Whether this browser can take the daemon's web push: a service worker and a push manager, outside the shell. */
+function pushAvailable() {
+  return shell() === null && "serviceWorker" in navigator && "PushManager" in window;
+}
+
+function keyBytes(base64url) {
+  const padded = `${base64url}${"=".repeat((4 - (base64url.length % 4)) % 4)}`.replace(/-/g, "+").replace(/_/g, "/");
+  return Uint8Array.from(atob(padded), (char) => char.charCodeAt(0));
+}
+
+/** Subscribe this browser to the daemon's pushes, or drop the subscription; `on` says which. */
+async function setPush(on) {
+  const registration = await navigator.serviceWorker.ready;
+  const current = await registration.pushManager.getSubscription();
+  if (!on) {
+    if (current !== null) {
+      await api.del(`/push/subscriptions?endpoint=${encodeURIComponent(current.endpoint)}`);
+      await current.unsubscribe();
+    }
+    writePref(PUSH_KEY, "off");
+    return;
+  }
+  const { public_key: publicKey } = await api.get("/push/key");
+  const subscription = current ?? (await registration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: keyBytes(publicKey) }));
+  await api.post("/push/subscriptions", subscription.toJSON());
+  writePref(PUSH_KEY, "on");
+}
+
+/** Switch notifications on (the browser or the shell asks for its permission the first time) or off; resolves to whether they are on.
+ * A browser that can take web push is subscribed as well, so the phone hears from the daemon while the page is closed. */
 export async function setNotifications(on) {
   if (!on) {
     writePref(NOTIFY_KEY, "off");
+    if (pushAvailable()) {
+      await setPush(false);
+    }
     return false;
   }
   const bridge = shell();
   const permission = bridge === null ? await Notification.requestPermission() : (await bridge.isPermissionGranted()) ? "granted" : await bridge.requestPermission();
   writePref(NOTIFY_KEY, permission === "granted" ? "on" : "off");
+  if (permission === "granted" && pushAvailable()) {
+    await setPush(true);
+  }
   return permission === "granted";
 }
 
@@ -73,7 +110,7 @@ function awayFromPage() {
 }
 
 function worthATell() {
-  return notificationsOn() && awayFromPage();
+  return notificationsOn() && awayFromPage() && readPref(PUSH_KEY) !== "on";
 }
 
 /** In the desktop shell the notification is the system's; a click brings Dot to the front, where Waiting for you leads on. */

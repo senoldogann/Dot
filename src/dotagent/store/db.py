@@ -39,6 +39,7 @@ from dotagent.store.models import (
     CampaignRecord,
     EventRecord,
     MemoryRecord,
+    PushSubscription,
     RuleRecord,
     RunMode,
     RunRecord,
@@ -81,6 +82,9 @@ CREATE INDEX IF NOT EXISTS approvals_run ON approvals(run_id, status);
 CREATE TABLE IF NOT EXISTS rules (
     id TEXT PRIMARY KEY, position INTEGER NOT NULL, enabled INTEGER NOT NULL, behavior TEXT NOT NULL,
     tool_glob TEXT NOT NULL, match_regex TEXT NOT NULL, description TEXT NOT NULL, created_at REAL NOT NULL
+);
+CREATE TABLE IF NOT EXISTS push_subscriptions (
+    endpoint TEXT PRIMARY KEY, p256dh TEXT NOT NULL, auth TEXT NOT NULL, created_at REAL NOT NULL
 );
 CREATE TABLE IF NOT EXISTS memories (
     id TEXT PRIMARY KEY, content TEXT NOT NULL, tags TEXT NOT NULL,
@@ -1145,6 +1149,35 @@ class Store:
 
     async def delete_rule(self, rule_id: str) -> None:
         await self._db.execute("DELETE FROM rules WHERE id = ?", (rule_id,))
+        await self._db.commit()
+
+    # ----- push subscriptions ------------------------------------------------------------------
+
+    async def add_push_subscription(self, endpoint: str, p256dh: str, auth: str) -> PushSubscription:
+        """Keep a browser's subscription; the same endpoint again takes the new keys."""
+        record: PushSubscription = PushSubscription(endpoint=endpoint, p256dh=p256dh, auth=auth, created_at=time.time())
+        await self._db.execute(
+            "INSERT INTO push_subscriptions (endpoint, p256dh, auth, created_at) VALUES (?, ?, ?, ?) "
+            "ON CONFLICT(endpoint) DO UPDATE SET p256dh = excluded.p256dh, auth = excluded.auth",
+            (record.endpoint, record.p256dh, record.auth, record.created_at),
+        )
+        await self._db.commit()
+        return record
+
+    async def list_push_subscriptions(self) -> list[PushSubscription]:
+        rows = await self._all("SELECT * FROM push_subscriptions ORDER BY created_at", ())
+        return [
+            PushSubscription(
+                endpoint=str(row["endpoint"]),
+                p256dh=str(row["p256dh"]),
+                auth=str(row["auth"]),
+                created_at=float(row["created_at"]),
+            )
+            for row in rows
+        ]
+
+    async def delete_push_subscription(self, endpoint: str) -> None:
+        await self._db.execute("DELETE FROM push_subscriptions WHERE endpoint = ?", (endpoint,))
         await self._db.commit()
 
     # ----- memories --------------------------------------------------------------------------

@@ -28,9 +28,11 @@ from dotagent.server.views import (
     PermissionsView,
     ProviderModels,
     ProviderProblem,
+    PushKeyView,
+    PushSubscribeRequest,
     StatusView,
 )
-from dotagent.store.models import ApprovalRecord
+from dotagent.store.models import ApprovalRecord, PushSubscription
 
 _IMAGE_NAME: re.Pattern[str] = re.compile(r"^[0-9a-f]{24}\.(png|jpg|webp|gif)$")
 _PENDING_LIMIT: int = 500
@@ -87,6 +89,20 @@ def system_router(ctx: ServerContext) -> APIRouter:
 
     async def engaged() -> bool:
         return await asyncio.to_thread(failsafe_path().exists)
+
+    @router.get("/push/key")
+    async def push_key() -> PushKeyView:
+        """The key a page gives ``PushManager.subscribe``; the daemon signs its pushes with the private half."""
+        return PushKeyView(public_key=ctx.runtime.push_keys.public_key)
+
+    @router.post("/push/subscriptions", status_code=201)
+    async def push_subscribe(request: PushSubscribeRequest) -> PushSubscription:
+        return await ctx.runtime.store.add_push_subscription(request.endpoint, request.keys.p256dh, request.keys.auth)
+
+    @router.delete("/push/subscriptions", status_code=204)
+    async def push_unsubscribe(endpoint: str) -> None:
+        """Drop the subscription at ``endpoint`` (a query parameter: a DELETE carries no body)."""
+        await ctx.runtime.store.delete_push_subscription(endpoint)
 
     @router.get("/status")
     async def status() -> StatusView:

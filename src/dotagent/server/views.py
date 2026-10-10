@@ -445,6 +445,24 @@ class ActivityView(FrozenModel):
     generated_at: float
 
 
+class PushKeyView(FrozenModel):
+    """``GET /push/key``: the ``applicationServerKey`` a page subscribes with."""
+
+    public_key: str
+
+
+class PushKeysPart(FrozenModel):
+    p256dh: str = Field(min_length=1, max_length=200)
+    auth: str = Field(min_length=1, max_length=100)
+
+
+class PushSubscribeRequest(FrozenModel):
+    """``POST /push/subscriptions``: ``PushSubscription.toJSON()`` of the browser."""
+
+    endpoint: str = Field(min_length=1, max_length=2000, pattern=r"^https://")
+    keys: PushKeysPart
+
+
 class ActivityCount(FrozenModel):
     """``GET /activity/count``: the numbers a menu bar item shows, and the state of the whole of Dot (the face of the
     web UI shows the same: waiting when something waits for the user, working while a run is active, else idle)."""

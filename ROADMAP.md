@@ -3286,8 +3286,8 @@ third; 49 (the face as the state) and 50 (the visual system) next, form on top o
 | 48  | Rules in four answers                                                    | done    | 0811f52 |
 | 49  | The face as the state                                                    | done    | 72f6168 |
 | 50  | The visual system                                                        | done    | fbf5b34 |
-| 51  | The desktop shell                                                        | in progress |         |
-| 52  | Dot on the phone                                                         | planned |         |
+| 51  | The desktop shell                                                        | done    | 8b4415d |
+| 52  | Dot on the phone                                                         | in progress |         |
 
 ### 46. Dot's computer: the live view and the handover
 
@@ -3537,15 +3537,40 @@ address with the token, or nothing until then.
 which is exactly what a PWA is. The phone layout exists (the drawer under 860 px); what is missing is reach, install
 and push.
 
-**Design.** `static/manifest.webmanifest`, `static/sw.js` (shell files only, never API responses), `POST
-/push/subscribe` with VAPID keys made by `dotx` once and kept in the data dir, the daemon's notifier sends to every
-subscription what `attention.js` shows today; `[server] host` documents the Tailscale case.
+**Design, corrected before building.** Decision 31 said "`[server] host` set to the Mac's tailnet address"; the
+guard refuses any host but loopback on purpose (`require_loopback`), and an address of a tailnet over plain HTTP is no
+secure context, so neither a service worker nor a push would work there. The way is `tailscale serve`: the daemon
+stays on loopback, Tailscale presents it over HTTPS with a certificate, and the guard learns the name as `[server]
+reach` (a `Host` of that name, an `Origin` of `https://` it). Lighthouse's PWA category no longer exists (removed in
+Lighthouse 12); the shell is checked by what the browser does: the manifest is served with its type, the service
+worker registers, the start page is Activity. The desktop shell's pushes cannot carry a click; the phone's can, and
+do (the service worker opens the run).
+
+**Design, as built.** `static/manifest.webmanifest` (start on `/#/activity`, standalone, the face as icons at 192
+and 512, made from the desktop app icon) and `static/sw.js` (shell files network first with the copy as the fallback,
+nothing under `/api` cached; `push` shows the message, `notificationclick` focuses or opens the window on the route),
+registered from `main.js`; `index.html` links the manifest and the apple touch icon; the CSP gains `manifest-src
+'self'`. `[server] reach` (default empty) reaches `guard.check_request` and `LocalGuard` as a frozenset; `dotx url`
+prints one address per name. `notify/push.py`: `read_or_create_keys(vapid_path())` (py_vapid, PEM at
+`<home>/vapid-key.pem`, mode 0600, on the runtime as `push_keys`, in the guarded files), `push_message(event, run)`
+(the words of `attention.js`: a question, a hand-off, an approval, a run of its own ended), `send_push` (pywebpush,
+aes128gcm, VAPID, TTL 600 s, a thread), `watch_pushes` (a task of the daemon beside the scheduler, fed by the bus;
+a service that answers 404 or 410 makes the subscription go, any other refusal is a warning). Store table
+`push_subscriptions` keyed by endpoint; routes `GET /api/push/key`, `POST /api/push/subscriptions` (HTTPS endpoints
+only), `DELETE /api/push/subscriptions?endpoint=`. `attention.js`: Notifications on subscribes a browser that has a
+service worker and a push manager (outside the desktop shell) and posts the subscription; off drops it; a browser
+subscribed to push stays quiet itself. README section "Dot on the phone". Tests: `tests/unit/test_push.py` (keys made
+once and private; each event's message or none; gone; the store), the guard's reach cases, `tests/smoke/test_phone.py`
+(a local push service takes the encrypted, signed message of a question and of the end, a 410 deletes the
+subscription; the manifest, the icon and the worker are served and the worker registers in a headless Chrome at a
+phone width, which opens Activity).
 
 **Touchpoints.** `static/` (manifest, service worker), `server/routes_system.py`, `notify/` (push), `cli_*` (VAPID
 keys), README (a new section).
 
-**Done when.** Lighthouse's PWA check passes on the throw-away daemon; a push arrives on a phone on the owner's
-tailnet for an approval and opens the run (owner's run, logged by hand in this file).
+**Done when.** The manifest, the icons and the service worker are served and the worker registers on the throw-away
+daemon; a push for a question and for an end reaches a push service encrypted and signed; a push arrives on a phone
+on the owner's tailnet for an approval and opens the run (owner's run, logged by hand in this file).
 
 ## Open owner decisions
 
@@ -4144,3 +4169,4 @@ tailnet for an approval and opens the run (owner's run, logged by hand in this f
 - 2026-10-11 (Fable 5.1): item 48 merged 0811f52 (PR #50, MYP-188 Done; gate green). Next: item 49 (the face as the state).
 - 2026-10-11 (Fable 5.1): item 49 merged 72f6168 (PR #51, MYP-189 Done; gate green). Next: item 50 (the visual system).
 - 2026-10-11 (Fable 5.1): item 50 merged fbf5b34 (PR #52, MYP-190 Done; gate green). Next: item 51 (the desktop shell, Tauri 2).
+- 2026-10-11 (Fable 5.1): item 51 merged 8b4415d (PR #53, MYP-191 Done; gate + desktop jobs green; Dot.app built and opened on the owner's Mac). Next: item 52 (Dot on the phone).

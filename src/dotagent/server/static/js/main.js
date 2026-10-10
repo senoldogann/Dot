@@ -251,6 +251,11 @@ async function boot() {
 // The look goes on first, before any screen is drawn, so the page never shows in the wrong skin.
 applyStoredTheme();
 applyStoredDensity();
+// The service worker keeps the shell files for when the Mac is out of reach and shows the pushes of the daemon; a
+// browser that has none (or an insecure address) simply has neither.
+if ("serviceWorker" in navigator) {
+  navigator.serviceWorker.register("sw.js").catch((error) => console.warn("the service worker could not be registered", error));
+}
 onAuthLost(handleAuthLost);
 
 window.addEventListener("unhandledrejection", (event) => {

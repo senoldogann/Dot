@@ -34,7 +34,7 @@ _HTTP_UNAUTHORIZED: int = 401
 SECURITY_HEADERS: tuple[tuple[str, str], ...] = (
     (
         "Content-Security-Policy",
-        "default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' blob:; "
+        "default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' blob:; manifest-src 'self'; "
         # The desktop shell's bridge (Tauri IPC) is a connection the page makes; a browser never sees these sources.
         "connect-src 'self' ipc: http://ipc.localhost; "
         "base-uri 'none'; form-action 'none'; frame-ancestors 'none'",
@@ -74,15 +74,22 @@ def local_hosts(port: int) -> frozenset[str]:
     return frozenset({f"127.0.0.1:{port}", f"{_LOOPBACK_NAME}:{port}", f"[::1]:{port}"})
 
 
-def host_is_local(host_header: str | None, port: int) -> bool:
-    return host_header is not None and host_header.lower() in local_hosts(port)
+def host_is_local(host_header: str | None, port: int, reach: frozenset[str]) -> bool:
+    """Whether the request names this server: its loopback address, or one of the names a reverse proxy on the
+    owner's own network presents it as (``[server] reach``)."""
+    if host_header is None:
+        return False
+    name: str = host_header.lower()
+    return name in local_hosts(port) or name in {host.lower() for host in reach}
 
 
-def origin_is_local(origin: str | None, port: int) -> bool:
-    """A request without ``Origin`` did not come from a web page; one with it must come from a page of this server."""
+def origin_is_local(origin: str | None, port: int, reach: frozenset[str]) -> bool:
+    """A request without ``Origin`` did not come from a web page; one with it must come from a page of this server,
+    reached directly or through a name of ``reach`` over HTTPS."""
     if origin is None:
         return True
-    return origin.lower() in {f"http://{host}" for host in local_hosts(port)}
+    allowed: set[str] = {f"http://{host}" for host in local_hosts(port)} | {f"https://{host.lower()}" for host in reach}
+    return origin.lower() in allowed
 
 
 def bearer_token(authorization: str | None) -> str | None:
@@ -107,12 +114,18 @@ def needs_token(path: str) -> bool:
 
 
 def check_request(
-    path: str, host: str | None, origin: str | None, authorization: str | None, token: str, port: int
+    path: str,
+    host: str | None,
+    origin: str | None,
+    authorization: str | None,
+    token: str,
+    port: int,
+    reach: frozenset[str],
 ) -> Refusal | None:
     """Why a request must not be served, or ``None`` when it may be."""
-    if not host_is_local(host, port):
+    if not host_is_local(host, port, reach):
         return Refusal(status=_HTTP_MISDIRECTED, message="this server answers only to its loopback address")
-    if not origin_is_local(origin, port):
+    if not origin_is_local(origin, port, reach):
         return Refusal(status=_HTTP_FORBIDDEN, message="requests from other origins are refused")
     if needs_token(path) and not token_matches(token, bearer_token(authorization)):
         return Refusal(status=_HTTP_UNAUTHORIZED, message="a valid bearer token is required")
@@ -163,10 +176,11 @@ def _secured(send: Send, api: bool) -> Send:
 class LocalGuard:
     """ASGI middleware that applies :func:`check_request` to every request and adds the security headers."""
 
-    def __init__(self, app: ASGIApp, token: str, port: int) -> None:
+    def __init__(self, app: ASGIApp, token: str, port: int, reach: frozenset[str]) -> None:
         self._app: ASGIApp = app
         self._token: str = token
         self._port: int = port
+        self._reach: frozenset[str] = reach
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
         if scope["type"] == "lifespan":
@@ -179,7 +193,13 @@ class LocalGuard:
         path: str = scope["path"]
         secured: Send = _secured(send, is_api_path(path))
         refusal: Refusal | None = check_request(
-            path, headers.get("host"), headers.get("origin"), headers.get("authorization"), self._token, self._port
+            path,
+            headers.get("host"),
+            headers.get("origin"),
+            headers.get("authorization"),
+            self._token,
+            self._port,
+            self._reach,
         )
         if refusal is None:
             await self._app(scope, receive, secured)
