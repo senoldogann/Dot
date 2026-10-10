@@ -172,7 +172,7 @@ async def test_a_plugin_brings_its_mcp_server_into_the_registry(runtime: Runtime
 
 
 async def test_skills_are_found_in_the_home_and_in_the_plugins(runtime: Runtime, home: Path) -> None:
-    catalog: SkillCatalog = load_skills(runtime.config.skills, runtime.plugins.plugins)
+    catalog: SkillCatalog = load_skills(runtime.config.skills, runtime.plugins.plugins, None)
     assert [(skill.name, skill.source) for skill in catalog.skills] == [
         ("release-notes", "home"),
         ("deploy-site", "plugin acme-tools"),
@@ -183,7 +183,7 @@ async def test_skills_are_found_in_the_home_and_in_the_plugins(runtime: Runtime,
 
 
 async def test_the_prompt_lists_the_skills_and_tells_the_model_to_read_one_first(runtime: Runtime) -> None:
-    catalog: SkillCatalog = load_skills(runtime.config.skills, runtime.plugins.plugins)
+    catalog: SkillCatalog = load_skills(runtime.config.skills, runtime.plugins.plugins, None)
     prompt: str = build_system_prompt(
         collect_prompt_inputs(
             "task",

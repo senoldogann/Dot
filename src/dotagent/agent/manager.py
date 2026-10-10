@@ -21,6 +21,7 @@ from dotagent.agent.gate import RunGate
 from dotagent.agent.lessons import LessonCase, dismiss_lesson, learn, save_lesson
 from dotagent.agent.loop import AgentRun, RunEnd, RunOpening, run_agent
 from dotagent.agent.plan import EMPTY_PLAN, PLAN_EVENT, plan_from_event
+from dotagent.agent.playbooks import learn_playbook, playbook_case
 from dotagent.agent.resume import (
     RESUME_SOURCE,
     CutOff,
@@ -123,6 +124,8 @@ class RunManager:
         self._stopping: bool = False
         # Runs that ended and whose lessons are being drawn (:mod:`dotagent.agent.lessons`), by run id.
         self._learning: dict[str, asyncio.Task[None]] = {}
+        # Runs that ended whose playbook is being written or whose use of playbooks is being recorded, by run id.
+        self._distilling: dict[str, asyncio.Task[None]] = {}
         # Held while a lesson is saved or dismissed, by the owner or by ``auto``, so that each is decided once.
         self._deciding: asyncio.Lock = asyncio.Lock()
         # Held while an approval or a question is decided, so that the answer to a question a run left goes on once.
@@ -471,7 +474,7 @@ class RunManager:
         for handle in handles:
             self.cancel(handle.run_id)
         await asyncio.gather(*(handle.finished.wait() for handle in handles))
-        learning: list[asyncio.Task[None]] = list(self._learning.values())
+        learning: list[asyncio.Task[None]] = [*self._learning.values(), *self._distilling.values()]
         for task in learning:
             task.cancel()
         if learning:
@@ -888,6 +891,8 @@ class RunManager:
         # Registered before anything awaits, so that a waiter that ``finished`` wakes finds it.
         if lessons is not None and not self._stopping:
             self._learning[run.id] = asyncio.create_task(self._learn(lessons))
+        if not self._stopping and playbook_case(runtime.config, run, status) is not None:
+            self._distilling[run.id] = asyncio.create_task(self._distil(run, status))
 
     async def _follow_session(self, run: RunRecord, campaign_id: str, ending: Ending, needs: str) -> None:
         """Plan what follows a session of a campaign that ended as ``ending`` (one the daemon stopped is planned by
@@ -953,6 +958,22 @@ class RunManager:
                 run.id, "steer", {"text": sent.text, "files": attachment_summary(sent.files)}, True
             )
             log.warning("answer_kept_in_thread", run_id=run.id, approval_id=sent.question_id)
+
+    async def distilled(self, run_id: str) -> None:
+        """Block until the playbook work of a run that ended is done (returns immediately when there is none)."""
+        task: asyncio.Task[None] | None = self._distilling.get(run_id)
+        if task is not None:
+            await task
+
+    async def _distil(self, run: RunRecord, status: RunStatus) -> None:
+        """Task body of the playbook work of a run that ended (:func:`dotagent.agent.playbooks.learn_playbook`).
+        Unexpected exceptions are logged with their traceback; the run keeps its end either way."""
+        try:
+            await learn_playbook(self._runtime, run, status)
+        except Exception:
+            log.exception("playbook crashed", run_id=run.id)
+        finally:
+            self._distilling.pop(run.id, None)
 
     async def _learn(self, case: LessonCase) -> None:
         """Task body of drawing the lessons of a run that ended. Unexpected exceptions are logged with their traceback;

@@ -8,7 +8,7 @@ from pathlib import Path
 from pydantic import Field
 
 from dotagent.policy.types import ActionInfo
-from dotagent.skills.catalog import load_skills
+from dotagent.skills.catalog import load_skills, playbook_root
 from dotagent.skills.types import SKILL_FILE, Skill, SkillCatalog
 from dotagent.tools.base import ALL_MODES, RegisteredTool, ToolArgs, ToolResult, fail, make_tool, ok
 from dotagent.tools.context import ToolContext
@@ -65,7 +65,7 @@ def build_skill_tool() -> RegisteredTool:
 
     async def run(args: SkillArgs, ctx: ToolContext) -> ToolResult:
         catalog: SkillCatalog = await asyncio.to_thread(
-            load_skills, ctx.runtime.config.skills, ctx.runtime.plugins.plugins
+            load_skills, ctx.runtime.config.skills, ctx.runtime.plugins.plugins, playbook_root(ctx.runtime.config)
         )
         skill: Skill | None = catalog.find(args.name)
         if skill is None:

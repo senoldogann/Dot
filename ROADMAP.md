@@ -2375,8 +2375,8 @@ Paste this to the agent that takes the work:
 | 32  | The owner's Chrome profile as the default of a campaign                  | planned |         |
 | 33  | Pre-approved spending caps                                               | planned |         |
 | 34  | Research runs that keep notes, and hosted search by default              | planned |         |
-| 35  | A plan with dependencies and parallel branches                           | in progress |     |
-| 36  | Playbooks learned from runs that reached their goal                      | planned |         |
+| 35  | A plan with dependencies and parallel branches                           | done    | d6b40c1 |
+| 36  | Playbooks learned from runs that reached their goal                      | in progress |     |
 | 37  | A stuck campaign changes strategy, not just session                      | planned |         |
 | 38  | One view of what a run did and what can be undone                        | planned |         |
 | 39  | CI and retention defaults                                                | planned |         |
@@ -2750,14 +2750,32 @@ no longer offered.
 56.2; "Demystifying Agent Skills" (2026): the skill representation beats raw workflow memory by about 6 points. Dot's
 lessons (item 7) record what went wrong, nothing records how a goal was reached.
 
-**Design.** Distillation on the review model from the run's step events (pure function events → `Playbook`); the
-skills loader (item 18) reads the playbook folder like a skill dir; `dotx playbooks list|show|drop`.
+**Design, as built.** `agent/playbooks.py`, a sibling of `lessons.py`, with the same shape: the manager starts a
+task after a run ends (`playbook_case`: `[agent] playbooks` on, a task run of its own, not an eval, ended done or
+failed), the task records the playbooks the run read (`skill` calls that named a `playbook-…`) and, when the run ran in
+goal mode and ended done (so its goal check found the outcome achieved; a campaign session is a goal-mode run too),
+distils it. "Verified outcome" is therefore the goal check's verdict, not a plan's evidence. The site is the host or
+application that most `tool_result` events name (`site`, from item 22); a run that acted on none writes nothing, and a
+host that has a playbook is not distilled again (one playbook per host; `dotx playbooks drop` makes room for a new
+one). The review model gets the goal, the host, a digest of the acting steps on it (tool, arguments, ok or FAILED, the
+start of the result; the newest 80) and the answer, and returns a typed `PlaybookDraft` (description ≤ 200 characters,
+when, 1–20 steps, parameters); the rules say that page text is data and that no secret, code, address or home path goes
+in. The folder is `<home>/playbooks/playbook-<host-slug>/SKILL.md` (a flat skill folder, not `<host>/`, because the
+skills loader names a skill after its folder) with When, Steps, Parameters and Evidence, and a `playbook.json` with
+`uses` and `failures`; `skill_roots` adds the folder as a root with source `playbook` when playbooks are on, so the
+catalog, the prompt (with a note on what a `playbook-…` skill is), the `skill` tool and `dotx skills list` treat it
+like a skill. A playbook read by two runs that then failed is moved under `.retired`, where the loader does not look.
+`dotx playbooks list|show|drop`. Events `playbook_written`, `playbook_failed`, `playbook_retired`. The default is
+`false`: switching it on changes what the owner's runs do and costs a review-model call per qualifying run, and the
+"second run takes half the steps" measurement needs a live model on a site (decision 17).
 
-**Touchpoints.** `agent/lessons.py` (sibling module `agent/playbooks.py`), `skills/*`, `agent/prompt.py`,
-`cli_skills.py`, `defaults.toml` (`[agent] playbooks = true`), README.
+**Touchpoints.** `agent/playbooks.py`, `agent/review.py` (`PlaybookDraft`, `playbook_writer_for`),
+`agent/manager.py`, `agent/prompt.py`, `skills/catalog.py` (`skill_roots` with the playbook root, `playbook_root`),
+`core/paths.py`, `config.py`, `defaults.toml`, `cli_playbooks.py`, `cli.py`, `evals/runner.py` (evals run without
+playbooks), README "Skills and plugins", `tests/unit/test_playbooks.py`.
 
-**Done when.** On a fixture site the second run of the same goal takes half the steps of the first (item 22); the
-distillation has a unit test over a fixed event set.
+**Done when.** The distillation's pure parts (main site, digest, skill rendering that the loader parses, the record
+that retires at two failures) have unit tests over a fixed event set (done); the live measurement is decision 17.
 
 ### 37. A stuck campaign changes strategy, not just session
 
@@ -2989,6 +3007,10 @@ item ends as a measured no, written in the log.
     goal mode or with `auto` approvals that moved to its standby fails its goal check or its approvals while that
     provider cannot answer. Settled for the owner by decision 3: their review model is on Anthropic, their main model on
     Ollama. The default stays as it is.
+17. Playbooks (item 36) are off by default. To measure them: set `playbooks = true` under `[agent]` in a temp home,
+    run the same goal-mode browser goal twice on one site (the first run writes `<home>/playbooks/playbook-<host>/`,
+    the second reads it) and compare the steps with `dotx stats --by site`. If the second run takes clearly fewer
+    steps, flip the default in `defaults.toml` and say so in the README's playbook paragraph.
 
 ## Log
 
@@ -3369,3 +3391,5 @@ item ends as a measured no, written in the log.
 - 2026-10-10 (Fable 5.1): item 28 built on branch `item-28-plan-evidence` (MYP-168): `PlanItem.evidence`; a mark to done without evidence is refused with what counts, a rewritten plan keeps the evidence of the steps it keeps; the goal check (end of run, `campaign_achieved`) reads the plan with evidence and its verdict lists `unproven_steps`, carried by the `goal_check` event; the web UI shows the evidence under the step; evals count `unevidenced_steps` and `unproven_steps`. `agent/verify.py` unchanged (facts are the harness's, evidence the agent's). Gate: format, check, mypy clean; unit 570; `dotx eval check` 31 ok; offline smoke 208 passed, 10 skipped.
 - 2026-10-10 (Fable 5.1): item 28 merged 9a9fe5f (PR #27, MYP-168 Done). Next: item 35 (a plan with dependencies and parallel branches).
 - 2026-10-10 (Fable 5.1): item 35 built on branch `item-35-plan-branches` (MYP-169): `PlanItem.depends_on` with range, self and cycle checks; the plan result names the ready (independent) and held steps; `delegate` takes `step` and the loop closes that step from the report (done with evidence, or failed); web UI shows `after 1, 2`. No scheduler, no step budget, no graph drawing, no eval task (the scripted model answers in call order): the design section says why. Gate: format, check, mypy clean; unit 574; `dotx eval check` 31 ok; smoke (plan branches, helpers, run limits, resume, watchdog, campaigns, answer check, scaffold, tool groups, server) 76 passed; the two delegated steps overlap in the real loop.
+- 2026-10-10 (Fable 5.1): item 35 merged d6b40c1 (PR #28, MYP-169 Done). Next: item 36 (playbooks learned from runs that reached their goal).
+- 2026-10-10 (Fable 5.1): item 36 built on branch `item-36-playbooks` (MYP-170): `agent/playbooks.py` distils a goal-mode run that ended done on a site into `<home>/playbooks/playbook-<host>/SKILL.md` through the review model, the skills catalog reads the folder as a root, runs that read a playbook count its use and two failures retire it; `dotx playbooks list|show|drop`; default off (decision 17). Gate: format, check, mypy clean; unit 581; `dotx eval check` 31 ok; smoke (skills runtime, lessons, helpers, doctor, scaffold, plan branches) 34 passed.

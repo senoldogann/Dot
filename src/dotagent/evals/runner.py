@@ -52,13 +52,15 @@ _ATTEMPT_ENV: dict[str, str] = {"PYTHONDONTWRITEBYTECODE": "1"}
 
 def eval_config(config: AppConfig) -> AppConfig:
     """The configuration an eval run uses: the given one, without what must not take part in a measurement (the MCP
-    servers, skills and plugins of the user, the Mac desktop, the embeddings of the memory, the lessons, which would
-    carry what one attempt learnt into the next, the user's helper and standby models, which would answer for the
+    servers, skills and plugins of the user, the Mac desktop, the embeddings of the memory, the lessons and the
+    playbooks, which would carry what one attempt learnt into the next, the user's helper and standby models, which would answer for the
     model under measure, and the user's limits of a run: a task's own time and token limits cut its runs)."""
     return config.model_copy(
         update={
             "models": config.models.model_copy(update={"helpers": [], "standby": []}),
-            "agent": config.agent.model_copy(update={"lessons": "off", "run_max_minutes": 0.0, "run_max_tokens": 0}),
+            "agent": config.agent.model_copy(
+                update={"lessons": "off", "playbooks": False, "run_max_minutes": 0.0, "run_max_tokens": 0}
+            ),
             "mcp": [],
             "skills": SkillsConfig(dirs=[]),
             "plugins": PluginsConfig(dirs=[]),

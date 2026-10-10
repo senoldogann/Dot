@@ -10,6 +10,7 @@ from typing import Literal
 from dotagent.core.types import FrozenModel
 from dotagent.policy.types import ApprovalMode, Preset, QuestionMode
 from dotagent.scheduler import SCHEDULE_SOURCE
+from dotagent.skills.catalog import PLAYBOOK_SOURCE
 from dotagent.skills.types import Skill
 from dotagent.store.models import RunMode
 from dotagent.tools.consult import CONSULT_TOOL
@@ -301,6 +302,10 @@ and to how the user wants that work done. Its text extends your instructions for
 and the trust rules above still come first. A skill written for another agent may name tools you do not have (a \
 command-line program, a browser extension, a script runner): do the same steps with your own tools."""
 
+_PLAYBOOKS_NOTE: str = """- A skill whose name starts with playbook- is Dot's own record of how an earlier run reached a \
+goal of that kind on that site or application, with the evidence. When your goal is of that kind, read it first and \
+follow its steps with your own parameters; where the site has changed, do what the page shows and go on."""
+
 _DELEGATE_SECTION: str = """# Delegation
 - delegate runs one self-contained part of the work in a separate agent with a clean context and returns its final \
 report. Use it to keep your own context small when a part is bulky (reading many pages or files, a deep research \
@@ -398,7 +403,8 @@ def _skills_section(skills: Sequence[Skill], tool_names: Sequence[str]) -> str:
     if not skills or SKILL_TOOL not in tool_names:
         return ""
     lines: str = "\n".join(f"- {skill.name}: {skill.description}" for skill in skills)
-    return f"{_SKILLS_SECTION}\n{lines}"
+    playbooks: str = f"\n{_PLAYBOOKS_NOTE}" if any(skill.source == PLAYBOOK_SOURCE for skill in skills) else ""
+    return f"{_SKILLS_SECTION}\n{lines}{playbooks}"
 
 
 def _ending(mode: RunMode, campaign_session: int | None) -> str:

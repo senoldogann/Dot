@@ -84,6 +84,12 @@ def skills_dir() -> Path:
     return dot_home() / "skills"
 
 
+def playbooks_dir() -> Path:
+    """Where Dot keeps the playbooks it distilled from runs that reached their goal: one ``playbook-<host>/SKILL.md``
+    folder per host or application, the retired ones under ``.retired``."""
+    return dot_home() / "playbooks"
+
+
 def plugins_dir() -> Path:
     """Where the user's plugins live: one folder per plugin in the Claude Code layout."""
     return dot_home() / "plugins"

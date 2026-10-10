@@ -204,6 +204,12 @@ resume_within_s = 1800
 # after a run that read content third parties can author (web pages, files from others), whose lessons are only
 # proposed. Later runs find a saved lesson like any note of the agent. "off" until evals show that it helps.
 lessons = "off"
+# After a goal-mode run of its own that the goal check found achieved and that acted on a web site or an application,
+# the review model distils how it got there into a playbook: a skill folder playbook-<host>/SKILL.md under
+# <home>/playbooks with the steps, the parameters and the evidence, offered to later runs like a skill. One playbook
+# per host; a playbook read by two runs that then failed is retired (moved under .retired) and no longer offered.
+# false until a live comparison shows that the second run on a site takes fewer steps.
+playbooks = false
 # Before write_file or edit_file changes a file, the run notes the change in its journal, and its first change to a file
 # keeps a copy of the file as it was, so that `dotx undo RUN_ID` can take the changes of the run back. A file larger
 # than undo_max_file_bytes, or one whose copy would bring the copies of the run past undo_max_run_bytes, is changed

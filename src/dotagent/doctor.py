@@ -47,7 +47,7 @@ from dotagent.memory.embedder import OpenAIEmbedder, build_openai_embedder
 from dotagent.plugins.catalog import load_plugins
 from dotagent.plugins.types import PluginCatalog, PluginProblem
 from dotagent.secrets import require_secret, resolve_secret
-from dotagent.skills.catalog import load_skills
+from dotagent.skills.catalog import load_skills, playbook_root
 from dotagent.skills.types import SkillCatalog, SkillProblem
 from dotagent.tools.shell import read_login_env
 from dotagent.web.client import WebClient
@@ -525,7 +525,7 @@ async def _machine_checks(config: AppConfig) -> list[CheckResult]:
     """What this Mac provides: the home directory, tools, desktop support, the browser profile, the plugins and skills,
     and the MCP servers (the configured ones and those of the plugins)."""
     plugins: PluginCatalog = await asyncio.to_thread(load_plugins, config.plugins, config.mcp)
-    skills: SkillCatalog = await asyncio.to_thread(load_skills, config.skills, plugins.plugins)
+    skills: SkillCatalog = await asyncio.to_thread(load_skills, config.skills, plugins.plugins, playbook_root(config))
     return [
         *await asyncio.to_thread(_local_checks),
         *_check_desktop(config),
