@@ -7,7 +7,7 @@ import { offersChoice } from "../efforts.js";
 import { engageFailsafe, releaseFailsafe } from "../failsafe.js";
 import { dotName, NAME_CHARS, setDotName } from "../face.js";
 import { icon } from "../icons.js";
-import { followTheme, foldSteps, hasOwnLayout, setFoldSteps, setShowInspector, showInspector } from "../layout.js";
+import { chooseDensity, currentDensity, DENSITIES, followTheme, foldSteps, hasOwnLayout, setFoldSteps, setShowInspector, showInspector } from "../layout.js";
 import { foldCard, foldGroup, inlineError, inlineLoading, pageHead, segmented } from "../panels.js";
 import { providerLabel, providerOf } from "../providers.js";
 import { reasoningSelect } from "../reasoning.js";
@@ -144,6 +144,12 @@ function buildAppearance() {
 
   const options = THEMES.map((theme) => ({ id: theme.id, label: theme.label, hint: theme.hint }));
   const choice = segmented(options, currentTheme(), chooseTheme);
+  const density = segmented(
+    DENSITIES.map((option) => ({ id: option.id, label: option.label, hint: option.hint })),
+    currentDensity(),
+    chooseDensity,
+  );
+  density.element.setAttribute("aria-label", "Density");
   const stopListening = onThemeChange((id) => {
     choice.set(id);
     describe(id);
@@ -158,6 +164,12 @@ function buildAppearance() {
       "div",
       { class: "card-pad stack" },
       el("div", { class: "setting" }, el("div", { class: "row" }, el("span", { class: "grow" }, "Look"), choice.element), detail),
+      el(
+        "div",
+        { class: "setting" },
+        el("div", { class: "row" }, el("span", { class: "grow" }, "Density"), density.element),
+        el("div", { class: "hint" }, "How close the rows, cards and lists sit. Kept in this browser."),
+      ),
       fold.element,
       inspector.element,
       el("div", { class: "setting" }, el("div", { class: "row" }, layoutNote, reset)),

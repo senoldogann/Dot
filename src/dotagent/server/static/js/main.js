@@ -6,10 +6,12 @@ import { el } from "./dom.js";
 import { brandMark, icon } from "./icons.js";
 import { buildShell } from "./shell.js";
 import { getSnapshot, onChange, refresh, runLifecycle } from "./state.js";
+import { applyStoredDensity } from "./layout.js";
 import { applyStoredTheme } from "./theme.js";
 import { attempt, toast } from "./ui.js";
 import * as activity from "./views/activity.js";
 import * as campaigns from "./views/campaigns.js";
+import * as controls from "./views/controls.js";
 import * as run from "./views/run.js";
 import * as runs from "./views/runs.js";
 import * as settings from "./views/settings.js";
@@ -29,6 +31,8 @@ const ROUTES = [
   { tab: "activity", layout: "page", title: "Activity", pattern: /^\/activity$/, view: activity },
   { tab: "campaigns", layout: "page", title: "Campaigns", pattern: /^\/campaigns(?:\/([A-Za-z0-9_-]+))?$/, view: campaigns },
   { tab: "settings", layout: "page", title: "Settings", pattern: /^\/settings(?:\/([a-z]+))?$/, view: settings },
+  // Every control of the interface on one page, for checking a look; not linked from the sidebar.
+  { tab: "settings", layout: "page", title: "Controls", pattern: /^\/controls$/, view: controls },
 ];
 
 const root = document.getElementById("app");
@@ -246,6 +250,7 @@ async function boot() {
 
 // The look goes on first, before any screen is drawn, so the page never shows in the wrong skin.
 applyStoredTheme();
+applyStoredDensity();
 onAuthLost(handleAuthLost);
 
 window.addEventListener("unhandledrejection", (event) => {

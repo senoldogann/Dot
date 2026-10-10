@@ -26,7 +26,7 @@
 .settings-title {
   margin: 0;
   padding: 2px 10px 14px;
-  font-size: 22px;
+  font-size: var(--fs-2xl);
   font-weight: 650;
   letter-spacing: -0.015em;
 }
@@ -73,7 +73,7 @@
 }
 
 .settings-pane .page-title {
-  font-size: 18px;
+  font-size: var(--fs-xl);
 }
 
 /* ---------- browser tab ---------- */
@@ -184,7 +184,7 @@
   align-items: center;
   gap: 5px;
   margin-top: 8px;
-  font-size: 12.5px;
+  font-size: var(--fs-sm);
 }
 
 .key-row .row-actions {
@@ -266,4 +266,134 @@
 /* The name field of Settings › General sits at the end of its row, like a switch would. */
 .name-input {
   max-width: 220px;
+}
+
+/* The controls page (#/controls): the colour swatches and the rows of controls. */
+.swatches {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(132px, 1fr));
+  gap: var(--space-2);
+}
+
+.swatch {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.swatch-colour {
+  width: 28px;
+  height: 28px;
+  flex: none;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+}
+
+.row.wrap {
+  flex-wrap: wrap;
+}
+
+.stack.center {
+  align-items: center;
+}
+
+/* The swatches and type samples of the controls page take their token by attribute and class: the CSP allows no inline style. */
+.swatch-colour[data-token="bg"] {
+  background: var(--bg);
+}
+
+.swatch-colour[data-token="sidebar"] {
+  background: var(--sidebar);
+}
+
+.swatch-colour[data-token="surface"] {
+  background: var(--surface);
+}
+
+.swatch-colour[data-token="surface-2"] {
+  background: var(--surface-2);
+}
+
+.swatch-colour[data-token="surface-3"] {
+  background: var(--surface-3);
+}
+
+.swatch-colour[data-token="border"] {
+  background: var(--border);
+}
+
+.swatch-colour[data-token="border-strong"] {
+  background: var(--border-strong);
+}
+
+.swatch-colour[data-token="text"] {
+  background: var(--text);
+}
+
+.swatch-colour[data-token="text-2"] {
+  background: var(--text-2);
+}
+
+.swatch-colour[data-token="muted"] {
+  background: var(--muted);
+}
+
+.swatch-colour[data-token="accent"] {
+  background: var(--accent);
+}
+
+.swatch-colour[data-token="accent-weak"] {
+  background: var(--accent-weak);
+}
+
+.swatch-colour[data-token="bubble"] {
+  background: var(--bubble);
+}
+
+.swatch-colour[data-token="ok"] {
+  background: var(--ok);
+}
+
+.swatch-colour[data-token="ok-weak"] {
+  background: var(--ok-weak);
+}
+
+.swatch-colour[data-token="warn"] {
+  background: var(--warn);
+}
+
+.swatch-colour[data-token="warn-weak"] {
+  background: var(--warn-weak);
+}
+
+.swatch-colour[data-token="bad"] {
+  background: var(--bad);
+}
+
+.swatch-colour[data-token="bad-weak"] {
+  background: var(--bad-weak);
+}
+
+.type-sample.fs-xs {
+  font-size: var(--fs-xs);
+}
+
+.type-sample.fs-sm {
+  font-size: var(--fs-sm);
+}
+
+.type-sample.fs-md {
+  font-size: var(--fs-md);
+}
+
+.type-sample.fs-lg {
+  font-size: var(--fs-lg);
+}
+
+.type-sample.fs-xl {
+  font-size: var(--fs-xl);
+}
+
+.type-sample.fs-2xl {
+  font-size: var(--fs-2xl);
 }
