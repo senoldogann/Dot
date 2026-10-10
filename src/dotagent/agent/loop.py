@@ -270,8 +270,9 @@ def _drain(inbox: asyncio.Queue[UserInput]) -> list[UserInput]:
 class Compaction(FrozenModel):
     """How the earlier conversation was folded: the note that replaces it and how that note came about.
 
-    ``method`` is ``model`` when the run's model wrote the summary and ``mechanical`` when it could not (``problem``
-    says why) and the newest part of the transcript stands in for it.
+    ``method`` is ``model`` when a model wrote the summary (``model`` names it: the fast model of ``[models] fast``, or
+    the run's own model when the fast one gave no usable summary, which ``fast_problem`` explains) and ``mechanical``
+    when neither could (``problem`` says why) and the newest part of the transcript stands in for it.
     """
 
     note: Message
@@ -279,6 +280,7 @@ class Compaction(FrozenModel):
     model: str
     attempts: int
     problem: str | None
+    fast_problem: str | None
     check: ContinuityCheck | None
 
 
@@ -341,19 +343,31 @@ async def _model_summary(
 async def _compact(
     agent: AgentRun, head: Sequence[Message], ledger: RunLedger, context_tokens: int, part_chars: int
 ) -> Compaction:
-    """Fold ``head`` into a continuity note written by the run's own model, never by another one.
+    """Fold ``head`` into a continuity note written by the fast model (``[models] fast``), the side work of a run that
+    its own, slower model need not do; the run's own model writes it when the fast one gives no usable summary (a
+    provider error, a timeout, no text, a summary far too long), and the compaction event names the fast model's
+    problem, so that a fast model that never answers is seen, not hidden.
 
     The ledger and the plan are pinned into the note in about ``part_chars`` characters; the model's summary is checked
-    against ``head``. When the model cannot write one, the note carries the newest ``part_chars`` characters of the
+    against ``head``. When neither model writes one, the note carries the newest ``part_chars`` characters of the
     transcript instead and says so.
     """
-    ref: ModelRef = parse_model_ref(agent.run.model)
+    own: ModelRef = parse_model_ref(agent.run.model)
+    fast: ModelRef = parse_model_ref(agent.runtime.config.models.fast)
     readable: list[Message] = [
         message.model_copy(update={"content": summary_part(message.content)}) for message in head
     ]
     transcript: str = truncate_middle(render_transcript(readable), _SUMMARY_TRANSCRIPT_CHARS)
     plan: PlanPayload = await _current_plan(agent)
-    text, attempts, problem = await _model_summary(agent, ref, transcript, context_tokens)
+    writer: ModelRef = fast
+    text, attempts, problem = await _model_summary(agent, fast, transcript, context_tokens)
+    fast_problem: str | None = None
+    if text is None and fast.label != own.label:
+        fast_problem = problem if problem is not None else "no reply"
+        log.warning("summary_fast_failed", run_id=agent.run.id, fast=fast.label, own=own.label, problem=fast_problem)
+        writer = own
+        text, own_attempts, problem = await _model_summary(agent, own, transcript, context_tokens)
+        attempts += own_attempts
     if text is None:
         reason: str = problem if problem is not None else "no reply"
         note: str = continuity_note(
@@ -362,18 +376,23 @@ async def _compact(
         return Compaction(
             note=user_message(note, ()),
             method="mechanical",
-            model=ref.label,
+            model=writer.label,
             attempts=attempts,
             problem=reason,
+            fast_problem=fast_problem,
             check=None,
         )
     check: ContinuityCheck = check_continuity(text, history_text(head), ledger)
+    author: str = (
+        f"written by you, {writer.label}" if writer.label == own.label else f"written by the fast model {writer.label}"
+    )
     return Compaction(
-        note=user_message(continuity_note(ledger, plan, part_chars, text, f"written by you, {ref.label}", check), ()),
+        note=user_message(continuity_note(ledger, plan, part_chars, text, author, check), ()),
         method="model",
-        model=ref.label,
+        model=writer.label,
         attempts=attempts,
         problem=problem,
+        fast_problem=fast_problem,
         check=check,
     )
 
@@ -387,6 +406,7 @@ def _compaction_event(compaction: Compaction, summarised: int, ledger: RunLedger
         "model": compaction.model,
         "attempts": compaction.attempts,
         "problem": compaction.problem,
+        "fast_problem": compaction.fast_problem,
         "check": None
         if check is None
         else {

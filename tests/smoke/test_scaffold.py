@@ -16,6 +16,7 @@ import pytest_asyncio
 from dotagent.agent.compact import estimate_tokens
 from dotagent.agent.manager import RunManager
 from dotagent.config import AppConfig, Tier, load_default_config
+from dotagent.core.errors import ProviderError
 from dotagent.core.types import FrozenModel, JsonObject, JsonValue
 from dotagent.evals import EVAL_SOURCE
 from dotagent.evals.runner import SCRIPTED_MODEL, eval_config, eval_environment, scratch_home, seed_workspace
@@ -43,6 +44,7 @@ _PROVIDER: str = parse_model_ref(SCRIPTED_MODEL).provider
 _TIME_LIMIT_S: float = 60.0
 _MAX_EVENTS: int = 10_000
 _SUMMARY_KEY: str = ":summary"
+_BROKEN_FAST: str = "broken"
 # Every section the continuity check asks for, and no identifier the run's history does not hold.
 _SUMMARY: str = (
     "GOAL: find why the backup failed.\nDONE: read the log page by page.\nSTATE: no failure found so far.\n"
@@ -135,11 +137,25 @@ def _compacted_at(events: Sequence[EventRecord]) -> tuple[JsonValue, ...]:
     )
 
 
+class BrokenFastProvider(WindowedProvider):
+    """The scripted model next to a fast model, ``broken``, whose provider answers every call with an error."""
+
+    async def complete(self, request: ChatRequest, sink: DeltaSink) -> ModelReply:
+        if request.model == _BROKEN_FAST:
+            raise ProviderError("the fast model is down", {"model": request.model})
+        return await super().complete(request, sink)
+
+
 async def _play(
     config: AppConfig, login_env: dict[str, str], window: int | None, turns: Sequence[ScriptedTurn]
 ) -> Played:
     """``GOAL`` as an unattended run of a model with ``window`` that plays ``turns``, in a throw-away home."""
-    model: WindowedProvider = WindowedProvider(ScriptedProvider(_PROVIDER, turns), window)
+    return await _play_with(config, login_env, WindowedProvider(ScriptedProvider(_PROVIDER, turns), window))
+
+
+async def _play_with(config: AppConfig, login_env: dict[str, str], model: WindowedProvider) -> Played:
+    """``GOAL`` as an unattended run of ``model``, registered as the provider of the scripted model, in a throw-away
+    home."""
     with scratch_home() as home, eval_environment(home, {}):
         runtime: Runtime = await open_runtime(config, login_env)
         try:
@@ -233,9 +249,11 @@ async def test_a_small_window_cuts_the_budget_and_the_tool_output_and_the_run_co
         assert page.endswith("to continue]")
     assert max(len(page) for page in small_pages) <= 4500 < min(len(page) for page in roomy_pages)
 
-    # The small budget is kept by compacting with summaries of the run's own model; the large one is never reached.
+    # The small budget is kept by compacting with summaries of the fast model; the large one is never reached.
     assert len(small.compactions) > 1
     assert all(compaction["method"] == "model" for compaction in small.compactions)
+    fast: str = parse_model_ref(_config({}, 6).models.fast).label
+    assert all((compaction["model"], compaction["fast_problem"]) == (fast, None) for compaction in small.compactions)
     assert len(small.summaries) == len(small.compactions) == len(small.compacted_at)
     assert max(estimate_tokens(step.messages, step.tools) for step in small.steps) <= 18_000
     # Each compaction keeps only what fits the budget and leaves room for the steps after it, instead of folding the
@@ -251,6 +269,24 @@ async def test_a_small_window_cuts_the_budget_and_the_tool_output_and_the_run_co
     assert max(estimate_tokens(step.messages, step.tools) for step in roomy.steps) > 18_000
 
 
+async def test_a_fast_model_that_fails_leaves_the_summary_to_the_runs_own_model_and_is_named(
+    login_env: dict[str, str],
+) -> None:
+    config: AppConfig = _config({}, 6)
+    broken: AppConfig = config.model_copy(
+        update={"models": config.models.model_copy(update={"fast": f"{_PROVIDER}:{_BROKEN_FAST}"})}
+    )
+    played: Played = await _play_with(
+        broken, login_env, BrokenFastProvider(ScriptedProvider(_PROVIDER, _reading(40)), 24_000)
+    )
+    assert played.record.status == "done"
+    assert len(played.compactions) > 1
+    own: str = parse_model_ref(SCRIPTED_MODEL).label
+    for compaction in played.compactions:
+        assert (compaction["method"], compaction["model"]) == ("model", own)
+        assert compaction["fast_problem"] == "the fast model is down"
+
+
 async def test_every_model_call_of_a_run_leaves_its_seconds_and_tokens_and_the_totals_hold_them_all(
     login_env: dict[str, str],
 ) -> None:
@@ -262,8 +298,10 @@ async def test_every_model_call_of_a_run_leaves_its_seconds_and_tokens_and_the_t
     assert purposes.count("step") == played.record.steps == len(played.steps) == len(played.assistants)
     assert purposes.count("compaction") == len(played.compactions) == len(played.summaries)
     assert set(purposes) == {"step", "compaction"}
+    fast: str = parse_model_ref(_config({}, 6).models.fast).label
     for call in played.calls:
-        assert call["model"] == SCRIPTED_MODEL
+        # A step runs on the run's model; a compaction's summary is the fast model's side work.
+        assert call["model"] == (fast if call["purpose"] == "compaction" else SCRIPTED_MODEL)
         assert call["error"] is None
         assert isinstance(call["seconds"], float) and call["seconds"] >= 0.0
     # The run's totals hold the tokens of the summaries too, not only those of its steps.
