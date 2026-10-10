@@ -2945,7 +2945,10 @@ PyObjC, so Linux cannot install it), on every pull request and push to `main`, o
 --frozen`, the format check, the lint, mypy, the unit tests, `dotx eval check` and the smoke tests that need no
 service, listed by file in the workflow (the 19 files that use the scripted model, the real store and the real loop
 without Chrome, Ollama, the desktop or a key; about 16 s on a Mac). Each run gets a throw-away home through `DOT_HOME`,
-`DOT_LOG_DIR` and `DOT_CHROME_DIR`. Retention: a `[store]` section with `retention_days` (90) names how long the
+`DOT_LOG_DIR` and `DOT_CHROME_DIR`, `brew install ripgrep` (the search tool and its unit test need it; the image has
+Homebrew but not rg) and `TZ=UTC`: the runner's `/etc/localtime` is not a link into the zone database, so the zone
+resolution now honours `TZ` before reading that link (`scheduler/timing.py`, documented in `defaults.toml` and README
+"Schedules"). Retention: a `[store]` section with `retention_days` (90) names how long the
 events of an ended run are kept; `dotx prune` reports the runs that ended before that and still have events, and
 `dotx prune --apply` deletes those events first (the runs, their answers, numbers, approvals and conversations stay),
 so that the screenshots only they named are among the orphans it deletes next; a run without events shows an empty
@@ -3616,3 +3619,4 @@ item ends as a measured no, written in the log.
 - 2026-10-10 (Fable 5.1): item 38 built on branch `item-38-actions-panel` (MYP-179): Actions card on the run page from `GET /api/runs/{id}/actions` (acting steps with channel, target and evidence; approvals; file edits with undo state) and `POST /api/runs/{id}/undo` per file; `undo/runs.py` shared by the CLI and the server; README. Unit 645, actions-panel smoke 2, undo smoke 1.
 - 2026-10-10 (Fable 5.1): item 38 merged 8c9cdbc (PR #38, MYP-179 Done). Next: item 39.
 - 2026-10-10 (Fable 5.1): item 39 built on branch `item-39-ci-retention` (MYP-180): `.github/workflows/gate.yml` (macOS; format, lint, mypy, unit, eval check, 19 offline smoke files), `[store] retention_days = 90` and `dotx prune` deleting the events of old runs on `--apply`; README. Unit 646. Decision 25.
+- 2026-10-10 (Fable 5.1): item 39's gate went green on PR #39 at its third run: the first lacked ripgrep on the runner, the second could not tell the runner's time zone (`TZ` is honoured now).
