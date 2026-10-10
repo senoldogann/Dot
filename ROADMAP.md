@@ -41,8 +41,8 @@ order its "Order and dependencies" paragraph gives. All of part 2 is done as wel
   view, the 420 s model-call handler, tool schemas; item 4 here overlaps the last one), E hardening of the `ask` and
   `auto` approval modes, F infrastructure (CI, small memory and tool-exception issues, documentation drift).
 - The owner runs the daemon in `yolo` on purpose. Do not change, restrict or argue with that.
-- The owner's daemon runs the code it loaded when it started. Python changes take effect after the owner restarts it;
-  the static web files are served from disk.
+- The owner's daemon runs the code it loaded when it started. Python changes take effect after a restart (`dotx service
+  install`, house rules); the static web files are served from disk.
 
 ## How to continue
 
@@ -56,8 +56,9 @@ order its "Order and dependencies" paragraph gives. All of part 2 is done as wel
    the code wins and the section is corrected first.
 4. After each commit: set the status and the commit hash in the table, tick what is done in the item, and add a line to
    the log. A reader must be able to resume from this file alone.
-5. Anything that needs the owner (a live paid run, a daemon restart, a default that changes how their agent behaves)
-   goes into "Open owner decisions"; keep going with the next item meanwhile.
+5. Do what an item needs yourself, at the owner's word of 2026-10-10: hosted tests with their keys, restarts of their
+   daemon, edits of their `config.toml`. Only what the owner alone can do (a key, a check on their own accounts) goes
+   into "Open owner decisions"; keep going with the next item meanwhile.
 
 ### House rules (from the owner)
 
@@ -72,19 +73,20 @@ order its "Order and dependencies" paragraph gives. All of part 2 is done as wel
 - Tests: real calls over mocks; integration or smoke tests before unit tests; unit tests only for pure transformations
   and stable datasets; add the minimum the change needs. Use temp directories (`DOT_HOME`, `DOT_CHROME_DIR`, and
   `DOT_LOG_DIR` for a daemon and for every other `dotx` command, `dotx eval check` included: each one logs to
-  `<log dir>/dotx.log`, which otherwise is the owner's `~/Library/Logs/Dot`) and never the owner's data directory
-  (`~/Library/Application Support/Dot`): not even to read message text. Counting rows is the most that was ever done
-  there, besides the owner's `config.toml`, edited for decisions 3, 10, 11 and 16 at the owner's word, and the Anthropic
-  key read from its `.env` for the hosted test (never printed).
-- Safety: start, stop or restart the owner's launchd daemon only at the owner's word (on 2026-10-10 they let the agent
-  restart it with `dotx service install`). Nothing that deletes the owner's data may run by default: retention and
+  `<log dir>/dotx.log`, which otherwise is the owner's `~/Library/Logs/Dot`), so that no test writes into the owner's
+  data directory (`~/Library/Application Support/Dot`). Outside tests the agent may read it and edit the owner's
+  `config.toml` (the owner's word, 2026-10-10); a key read from its `.env` for a hosted test goes into the test's
+  environment and is never printed.
+- Safety: the agent restarts the owner's launchd daemon when a change needs it, with `dotx service install` run with no
+  `DOT_*` variable set (they would go into the job's plist) and after checking that no run is active. Nothing that
+  deletes the owner's data may run by default: retention and
   cleanup are explicit commands. `PLAN.md` (the owner's working notes, untracked on purpose, excluded in
   `.git/info/exclude`) is not committed.
 - Git, since 2026-10-09: the repository is `https://github.com/senoldogann/Dot` (`origin`, branch `main`). One branch
   per item (`item-09-time-accounting`), commits with the agent's `Co-Authored-By` trailer, pushed to `origin`; one pull
   request per item against `main`, its description ending with the attribution line the harness gives, carrying the
-  item's ROADMAP update (status, section, log). Review the branch before opening the PR (`/code-review`, or in the main
-  session); the Claude GitHub app reviews nothing since its limit was spent, so do not wait for it (decision 15); then
+  item's ROADMAP update (status, section, log). Review the branch with subagents (at most five; check each one's
+  evidence) and fix what holds before merging; the Claude GitHub app is not used (decision 15); then
   squash-merge (`gh pr merge --squash --delete-branch`) and write the merge commit's hash into the status table. Never
   force-push, never rewrite `main`, never merge a PR whose checks fail. Linear mirrors the table: project `Dot` in the
   owner's workspace, one issue per item, In Progress when the branch is made, Done when the PR is merged, the PR link in
@@ -1992,8 +1994,8 @@ decision maker: the harness keeps the workflow, the judge supplies the semantic 
 
 **Design** (checked against the code on 2026-10-10; what changed from the first draft is listed below).
 - **Configuration.** `[judge] provider = "none" | "typesafe"` (default `none`), `api_key_env = "TYPESAFE_API_KEY"`,
-  `base_url = "https://api.typesafe.ai"`, `model = "jev-latest"`, `timeout_s = 5.0` (at most 60),
-  `public_action_threshold = 0.7`, `target_threshold = 0.9`. The address, the model and the wire come from TypeSafe's
+  `base_url = "https://api.typesafe.ai"`, `model = "jev-1.13.0"`, `timeout_s = 5.0` (at most 60),
+  `public_action_threshold = 0.45`, `target_threshold = 0.15`. The address, the model and the wire come from TypeSafe's
   live API reference (`https://docs.typesafe.ai/llms.txt` and its `api.md`, read on 2026-10-10). The key follows the
   secrets lookup (environment, `.env`, Keychain); Settings › API keys lists it last, and a key saved or removed there
   retires the judge's connection and ends a pause, as it does for a provider.
@@ -2040,17 +2042,19 @@ decision maker: the harness keeps the workflow, the judge supplies the semantic 
   Chrome and the campaign tool are checked together.
 
 **Decisions and limits.**
-- Off by default (`provider = "none"`): it is a paid external service and its calibration on Dot's labels is unknown
-  until the hosted test and the count below exist (open decision 9).
+- Off by default (`provider = "none"`): it is a paid external service, though a cheap one (input tokens only). The
+  thresholds were set on live answers of `jev-1.13.0` (open decision 9, done); the owner's `config.toml` turns it on.
 - The judge never decides a step and never grants anything: it adds flags that make the policy ask, or stops a claim
   the goal checker would have examined. Code owns the workflow, as TypeSafe's own guidance says.
 - One request per judged control adds its latency to that click, at most `timeout_s`; a claim the judge refuses saves
   the goal checker's call, one it lets through costs both.
-- Not run live: no request has reached TypeSafe yet, and the page where a key is made was not checked (Settings links
-  to `typesafe.ai`). The hosted test (`.venv/bin/python -m pytest tests/smoke/test_hosted_services.py -m hosted -k
-  typesafe`) sends a few labels no pattern knows (since item 17: "Boost", "Teilen", "Compartir", "Jetzt bezahlen",
-  "Konto löschen") with the judge's own questions and prints the probabilities. Before the judge becomes the owner's default, count on their history (counts only,
-  read-only): how many allowed browser clicks on social hosts had labels that matched no pattern.
+- Run live on 2026-10-10 (open decision 9): the hosted tests (`.venv/bin/python -m pytest
+  tests/smoke/test_hosted_services.py -m hosted -k typesafe`) check that "Boost", "Teilen" and "Compartir" get
+  `public_post`, "Jetzt bezahlen" `financial` and "Konto löschen" `destructive` at `public_action_threshold`, each on
+  the page it belongs to, and that a claim the session read reaches `target_threshold` while one resting on a hope does
+  not. Keys are made at console.typesafe.ai, which Settings links to. The judge asks about every click whose label no
+  pattern knows, on any site and in every mode: in `yolo` its flags ask nothing, but each request adds its time to the
+  click, and a flagged click counts toward a batch's one public or social action.
 
 **Done when.** Unit tests of which clicks are judged and of what the probabilities add (`tests/unit/test_judge.py`).
 Smoke on the stand-in and headless Chrome: an unknown label flagged with its note and the request checked (path, key,
@@ -2339,10 +2343,10 @@ text, no console error; the Options panel with YOLO saved; every status ring. RE
    Center on 2026-10-10 (help.x.com answered HTTP 403 to a direct read): an unverified account may send 50 posts and 200
    replies a day, 500 messages and 400 follows; its automation rules forbid automated likes and bulk or aggressive
    following, and scripting the website can get an account suspended.
-9. TypeSafe (item 16): save `TYPESAFE_API_KEY` (Settings › API keys, or `dotx auth set TYPESAFE_API_KEY`), run the
-   hosted test (a few paid requests: `.venv/bin/python -m pytest tests/smoke/test_hosted_services.py -m hosted -k
-   typesafe`), set the thresholds by what it prints, and run the read-only count on your history (how many allowed
-   clicks on social hosts had labels no pattern matched) before `[judge] provider = "typesafe"` becomes your default.
+9. TypeSafe (item 16), done on 2026-10-10: the owner saved `TYPESAFE_API_KEY`; the thresholds were set on live answers
+   (0.45 for clicks, 0.15 for claims, model pinned to `jev-1.13.0`, PR #18), and the owner's `config.toml` sets
+   `[judge] provider = "typesafe"`. In `yolo` its flags ask nothing; it refuses a clearly false campaign claim before
+   the goal checker's call. Remove that table to turn it off.
 10. Skills (item 18), done on 2026-10-10 at the owner's word: the owner's `config.toml` lists the six skill folders of
     `~/.claude/skills` that stand alone (the two X skills, `find-skills`, `frontend-design`, `ui-ux-pro-max`,
     `rust-best-practices`), not the whole folder, which would also bring its `superpowers` bundle (process skills that
@@ -2364,10 +2368,8 @@ text, no console error; the Options panel with YOLO saved; every status ring. RE
     are acting-only, `tools/base.py:16-17`), and DuckDuckGo's bot check throttles long research runs (README "Status and
     known limits"). Decided by the owner on 2026-10-09: no change for now; note saving and the hosted Ollama search
     (`OLLAMA_API_KEY`) as the default backend come later.
-15. The Claude GitHub app reviews nothing: on PR #1, PR #2 and PR #4 to PR #10 it answered "Code review skipped" (on PR
-    #3 it posted nothing) because your organization has no extra usage to pay for it, and on PR #11 it answered nothing.
-    On 2026-10-10 you said its limit is spent: PRs no longer wait for it and are merged on the agent's own review. Extra
-    usage at claude.ai/admin-settings/usage brings it back; a comment `@claude review` on a PR then asks for a review.
+15. The Claude GitHub app, decided by the owner on 2026-10-10: it is not used; subagents in the session review each
+    branch (house rules, Git). It had reviewed nothing since PR #1 ("Code review skipped": no extra usage paid for it).
 16. The review model has no standby (item 15): with `[models] review` on the provider of `main` (the default), a run in
     goal mode or with `auto` approvals that moved to its standby fails its goal check or its approvals while that
     provider cannot answer. Settled for the owner by decision 3: their review model is on Anthropic, their main model on
@@ -2728,3 +2730,10 @@ text, no console error; the Options panel with YOLO saved; every status ring. RE
   the six skills included. Decision 5: the hosted Anthropic test passed. Decisions 3, 11 and 16: the owner's
   `config.toml` sets Claude as `review` (Sonnet 5.5), `helpers` (Opus 5.5) and `standby` (Sonnet 5.5); the daemon was
   restarted once more to read it.
+- 2026-10-10: decision 9 merged as `769dc45` (PR #18, squash): the judge's thresholds set on live answers of
+  `jev-1.13.0` (0.45 for clicks, 0.15 for claims) and the model pinned to it. Two subagents reviewed it (the owner's way
+  now, decision 15); the offline smoke caught a stand-in claim that no longer stopped at the judge and reached the
+  configured review model (one cloud call); fixed. At the owner's word the house rules no longer leave paid runs, daemon
+  restarts and the data directory to the owner. Their `config.toml` sets `[judge] provider = "typesafe"`; the daemon
+  was restarted to read it (no run active, the plist still names only `PATH`), and `dotx doctor` shows the judge on
+  `typesafe:jev-1.13.0` with its key.
