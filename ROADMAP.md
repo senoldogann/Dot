@@ -2384,8 +2384,8 @@ Paste this to the agent that takes the work:
 | 41  | An own crawler: fetch, render, crawl, extract                            | done    | aedab8b |
 | 42  | TypeSafe as a tool of the agent: many items judged in one call           | done    | f0b1188 |
 | 43  | Typed judgments in X campaigns: what to answer, the best draft, a check  | done    | aa1c77d |
-| 44  | Typed checks before a model call: the page after an action, the goal     | in progress |         |
-| 45  | A step's model chosen by a typed judgment                                | planned |         |
+| 44  | Typed checks before a model call: the page after an action, the goal     | done    | 1c72fa7 |
+| 45  | A step's model chosen by a typed judgment                                | in progress |         |
 
 **Order and dependencies.** 22 first: cheap, and every later item is judged with it. Then 24 and 23 (the two biggest
 measured time sinks: side calls on the main model, one-action turns). 29 next, because the defaults of items 2 to 7
@@ -3201,6 +3201,28 @@ is measured, not assumed.
 **Done when.** Item 22's numbers on the eval set show less time per task at the same success rate; otherwise the
 item ends as a measured no, written in the log.
 
+**Design, as built.** The mechanism is built and off (`[agent] step_router = false`); the measurement that decides
+whether it stays is the owner's (decision 29), since it spends model quota on both arms. `agent/stepmodel.py` holds
+the pure parts: the state (the goal, the number of the step, what the previous step brought back since the model last
+spoke, the tool calls that failed so far, the steps in a row that ended with a failure), one Choice over the models the
+run can take the step on (`fast`, `main`, `helper`, each described by the kind of step it is for; `main` is always an
+option), and the policy: `fast` or `helper` takes the step only when its probability reaches
+`step_router_threshold` (0.6; the likelier of the two when both do), else the run's own model. In `agent/loop.py` the
+candidates are fitted once at the start of the run (`_routing`: `[models] fast` and the first available helper of
+`[models] helpers`, each when it is not the run's own model, can call tools and has room for the system prompt and the
+tools, as a standby model is fitted); before each step `_route_step` asks `Runtime.typesafe` and picks the candidate,
+unless TypeSafe is paused or rejects the request, the candidate's window is smaller than the step's estimated history,
+or the history carries images the candidate cannot see. The step's request goes to the chosen model with the run's
+reasoning level mapped onto its ladder; the assistant message records which model answered; a `step_routed` event
+(the step, the model, the option, the probabilities, the confidence) is a note in the timeline. A routed model that
+cannot answer has the step asked again on the run's own model, with a `step_route_failed` event, and the standby logic
+stays for the run's own model. The run's scaffold, context fitting and prompt cache are the run's own model's: a routed
+step pays the cache miss the item's risk names. Proven offline in `tests/smoke/test_judge.py`: a scripted run of four
+steps against the stand-in, which routes by a marker the previous step echoed, sends step 2 to the fast model and step
+3 to the helper, keeps the others on the run's model, and asks one judgment per step with the step's state. Not
+measured here: whether it saves time at the same success rate on a live model (decision 29); until then the item is
+neither a yes nor a measured no.
+
 ## Open owner decisions
 
 1. Live evals: `dotx eval run --model REF` spends model quota. Run it for the models in use and keep the JSON; it is the
@@ -3318,6 +3340,12 @@ item ends as a measured no, written in the log.
     check and the goal check alone. Whether they save turns or seconds on the eval set is not measured here: run
     `dotx eval run --model REF --repeat 2` with the judge on and off (`[judge] provider` in `config.toml`) and compare
     the reports; the page check only acts when the model fills `expect`, so look at how often it did in the timelines.
+29. The step router (item 45) is built and off. Its question is the item's own: does a run take less time at the same
+    success rate when routine steps go to `[models] fast` and hard ones to a helper? Measure it on your models with the
+    eval set, both arms with the key saved: `dotx eval run --model REF --repeat 2` with `[agent] step_router = false`,
+    then with `true` (and a helper in `[models] helpers` if you want the hard steps routed too), and compare seconds
+    and success in `dotx eval report`. On Anthropic or OpenAI as the main model, count the cache miss: a routed step
+    sends the whole prefix again. Keep it off, or set `step_router_threshold` higher, when the numbers do not favour it.
 
 ## Log
 
@@ -3729,3 +3757,5 @@ item ends as a measured no, written in the log.
 - 2026-10-10 (Fable 5.1): item 43 built on branch `item-43-x-judgments` (MYP-183): `tools/posts.py` (rank_posts with ledger weights and a posts_ranked event, pick_draft on a Choice, check_draft with the draft threshold), Choice in `llm/typesafe.py`, campaign prompt bullet, README, decision 27. Hosted: precision@10 1.00 on the synthetic sample in 0.64 s.
 - 2026-10-10 (Fable 5.1): item 43 merged aa1c77d (PR #42, MYP-183 Done; gate green). Next: item 44.
 - 2026-10-10 (Fable 5.1): item 44 built on branch `item-44-typed-checks` (MYP-184): `expect` on browser_act with `Judge.judge_page` (expected, login wall, CAPTCHA, error page), the goal check judged first in goal mode (`claim_state` shared), no click judgments in `yolo`; stand-in smoke tests for the three pages, yolo and a goal-mode run; decision 28.
+- 2026-10-10 (Fable 5.1): item 44 merged 1c72fa7 (PR #43, MYP-184 Done; gate green). Next: item 45.
+- 2026-10-10 (Fable 5.1): item 45 built on branch `item-45-step-model` (MYP-185): `agent/stepmodel.py` and the loop's `_routing`/`_route_step`, `[agent] step_router = false` and `step_router_threshold = 0.6`, `step_routed`/`step_route_failed` events, a scripted smoke run routed by the stand-in; the live measurement is decision 29.

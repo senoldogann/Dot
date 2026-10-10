@@ -424,6 +424,16 @@ judge first, as a campaign's claim does: an answer whose claim of success scores
 with the judge's number and without the review model's call; a clear yes and the uncertain middle go to the review
 model as before.
 
+**A step's model chosen by a typed judgment (off by default).** With `[agent] step_router = true` and
+`TYPESAFE_API_KEY` saved, every step of a run starts with one Choice of TypeSafe's over the run's models, from the goal,
+what the last step brought back, the failures so far and the failures in a row: a routine step goes to `[models] fast`,
+a hard one to the first available helper of `[models] helpers`, and the run's own model takes a step unless another
+model's probability reaches `step_router_threshold` (0.6). A model that cannot take the run's tools, its window or its
+images is not offered; a routed model that cannot answer has the step asked again on the run's model. Each step another
+model takes is a `step_routed` note in the timeline. It stays off until a comparison on your runs shows less time per
+task at the same success: a change of model loses the prompt cache the hosted providers keep, and a weaker model can
+add steps.
+
 Whatever `[judge] provider` says, saving `TYPESAFE_API_KEY` also gives the agent the `judge_items` tool (acting and
 research runs; the daemon reads the key when it starts): one question about every item of a list, answered in one
 request and handed back ranked, so the model reads a short ordered list instead of weighing each search hit, post, link

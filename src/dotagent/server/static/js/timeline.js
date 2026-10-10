@@ -662,6 +662,18 @@ export function createTimeline({ rootRunId, startedAt, onGrow, onPlan, onStats, 
       note(scope, record.ts, "key", `TypeSafe rejected a request (the log has it): ${record.data.error}`, "warn");
     },
 
+    // A typed judgment sent a step to another model of the run (`model`, `option`, `probabilities`); or that model
+    // could not answer the step, which is asked again on the run's own model.
+    step_routed(scope, record) {
+      const data = record.data;
+      const odds = Object.entries(data.probabilities).map(([option, p]) => `${option} ${p.toFixed(2)}`).join(", ");
+      note(scope, record.ts, "refresh", `Step ${data.step} goes to ${data.model} (${odds})`, "");
+    },
+    step_route_failed(scope, record) {
+      const data = record.data;
+      note(scope, record.ts, "refresh", `${data.model} could not answer step ${data.step}; asked again on the run's model: ${data.error}`, "warn");
+    },
+
     // A session of a campaign ranked the posts it could answer (`topic`, `weights`, `posts` with their scores, the
     // highest first).
     posts_ranked(scope, record) {
