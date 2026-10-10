@@ -97,7 +97,9 @@ def delegated_evidence(result: ToolResult) -> str:
     header, _, rest = result.text.partition("\n")
     if result.untrusted:
         return f"{header} Its report is fenced in the delegate result."
-    report: str = " ".join(rest.split())
+    # The last line of a result that named a plan step says that the step closes: not part of the report.
+    lines: list[str] = [line for line in rest.split("\n") if not line.startswith("Plan step ")]
+    report: str = " ".join(" ".join(lines).split())
     return f"{header} Report: {truncate_tail(report, _EVIDENCE_REPORT_CHARS)}" if report else header
 
 
@@ -111,14 +113,16 @@ def render_outcome(outcome: DelegateOutcome, nonce: str, step: int | None) -> To
     """What the delegating run reads back: how the run ended, on which model, and its report, fenced when it saw
     untrusted content; with ``step``, that the plan step closes from it."""
     run: RunRecord = outcome.run
+    # The first line stays the plain header: it is what the evidence of the plan step starts with.
+    header: str = f"Delegated run {run.id} on {run.model} ended as {run.status} after {run.steps} steps."
+    report: str = run.result.strip() or _NO_REPORT
+    body: str = f"{header}\n{_fence(run, report, nonce)}" if outcome.tainted else f"{header}\n{report}"
     closing: str = (
         ""
         if step is None
-        else f" Plan step {step} is marked {'done' if run.status == 'done' else 'failed'} with this as its evidence."
+        else f"\nPlan step {step} is marked {'done' if run.status == 'done' else 'failed'} with this as its evidence."
     )
-    header: str = f"Delegated run {run.id} on {run.model} ended as {run.status} after {run.steps} steps.{closing}"
-    report: str = run.result.strip() or _NO_REPORT
-    text: str = f"{header}\n{_fence(run, report, nonce)}" if outcome.tainted else f"{header}\n{report}"
+    text: str = f"{body}{closing}"
     result: ToolResult = ok(text) if run.status == "done" else fail(text)
     return mark_untrusted(result) if outcome.tainted else result
 
