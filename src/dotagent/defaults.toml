@@ -247,6 +247,14 @@ playbooks = false
 undo_max_file_bytes = 10485760
 undo_max_run_bytes = 104857600
 undo_keep_days = 30
+# step_router: before each step, when TypeSafe's key is saved, one typed judgment over the run's models from the step's
+# state (the goal, what the last step brought, the failures so far) sends a routine step to [models] fast and a hard
+# one to the first available helper of [models] helpers; the run's own model takes a step unless another model's
+# probability reaches step_router_threshold. A step the other model cannot answer is asked again on the run's model.
+# Off: a change of model loses the prompt cache the hosted providers keep, and a weaker model can add steps; turn it
+# on when a comparison on your own runs shows less time per task at the same success (ROADMAP open decision 29).
+step_router = false
+step_router_threshold = 0.6
 
 [policy]
 # aggressive: act without asking except for the hard stops; balanced: ask for external side effects;

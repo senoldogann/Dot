@@ -138,6 +138,8 @@ class AgentConfig(FrozenModel):
     undo_max_file_bytes: int
     undo_max_run_bytes: int
     undo_keep_days: int
+    step_router: bool
+    step_router_threshold: float = Field(ge=0, le=1)
 
 
 class PaceConfig(FrozenModel):

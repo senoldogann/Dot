@@ -43,7 +43,7 @@ from dotagent.agent.continuity import (
 from dotagent.agent.executor import ToolOutcome, batch_steps, execute_calls
 from dotagent.agent.gate import RunGate
 from dotagent.agent.helpers import MODEL_SWITCHED_EVENT, Roster, current_roster
-from dotagent.agent.judge import ClaimJudgment, claim_refused, claim_state, describe_claim
+from dotagent.agent.judge import ClaimJudgment, TypeSafeService, claim_refused, claim_state, describe_claim
 from dotagent.agent.lessons import LessonCase, may_learn
 from dotagent.agent.limits import (
     LIMIT_EVENT,
@@ -118,6 +118,17 @@ from dotagent.agent.scaffold import (
     scaffold_for,
     surface_for,
 )
+from dotagent.agent.stepmodel import (
+    STEP_ROUTE_FAILED_EVENT,
+    STEP_ROUTED_EVENT,
+    StepChoice,
+    StepModel,
+    choose,
+    route_question,
+    route_state,
+    routed_event,
+    step_state,
+)
 from dotagent.agent.verify import (
     RunFacts,
     answer_paths,
@@ -152,6 +163,7 @@ from dotagent.llm.types import (
     tool_message,
     user_message,
 )
+from dotagent.llm.typesafe import ChoiceAnswer
 from dotagent.memory.render import render_note
 from dotagent.memory.service import prompt_memories
 from dotagent.policy.types import QuestionMode
@@ -1072,6 +1084,80 @@ async def _to_standby(
     ) from error
 
 
+@dataclass(frozen=True)
+class _Candidate:
+    """A model a step may be routed to, with what the run needs to know about it."""
+
+    option: StepModel
+    ref: ModelRef
+    info: ModelInfo
+    scaffold: Scaffold
+
+
+async def _routing(agent: AgentRun, ref: ModelRef, offers_tools: bool, fixed_tokens: int) -> tuple[_Candidate, ...]:
+    """The models a step of this run may be routed to (``[agent] step_router``): the fast model and the first
+    available helper, each when it is not the run's own model and can take the run over; empty when the router is off,
+    TypeSafe is not set up or no other model fits."""
+    runtime: Runtime = agent.runtime
+    if not runtime.config.agent.step_router or runtime.typesafe is None:
+        return ()
+    helpers: Roster = await current_roster(runtime.router, runtime.config.providers, runtime.config.models.helpers)
+    named: list[tuple[StepModel, str]] = [
+        ("fast", runtime.config.models.fast),
+        *(("helper", m) for m in helpers.available[:1]),
+    ]
+    candidates: list[_Candidate] = []
+    for option, label in named:
+        target: ModelRef = parse_model_ref(label)
+        if target.label == ref.label:
+            continue
+        fitted: tuple[ModelInfo, Scaffold] | str = await _fitted(agent, target, offers_tools, fixed_tokens)
+        if isinstance(fitted, str):
+            log.warning("step_route_candidate_skipped", run_id=agent.run.id, model=target.label, problem=fitted)
+            continue
+        candidates.append(_Candidate(option=option, ref=target, info=fitted[0], scaffold=fitted[1]))
+    return tuple(candidates)
+
+
+async def _route_step(
+    agent: AgentRun,
+    candidates: tuple[_Candidate, ...],
+    history: Sequence[Message],
+    step: int,
+    failures: int,
+    failures_in_a_row: int,
+    estimated: int,
+) -> _Candidate | None:
+    """The candidate that takes ``step``, by the typed judgment over the step's state and the policy's threshold;
+    ``None`` when the run's own model takes it, when TypeSafe is paused or rejects the request, or when the chosen
+    candidate cannot hold the step (its window is too small for the history, or it cannot see images the history
+    carries)."""
+    runtime: Runtime = agent.runtime
+    service: TypeSafeService | None = runtime.typesafe
+    if service is None:
+        return None
+    state: JsonObject = route_state(step_state(agent.run.goal, step, history, failures, failures_in_a_row))
+    try:
+        answers: dict[str, ChoiceAnswer] | None = await service.choices(
+            state, (route_question([*(candidate.option for candidate in candidates), "main"]),), agent.run.id
+        )
+    except ProviderError:
+        return None
+    if answers is None:
+        return None
+    choice: StepChoice = choose(answers, runtime.config.agent.step_router_threshold)
+    chosen: _Candidate | None = next((c for c in candidates if c.option == choice.model), None)
+    if chosen is None:
+        return None
+    if estimated > chosen.scaffold.context_tokens or (
+        not chosen.info.vision and any(message.images for message in history)
+    ):
+        log.info("step_route_unfit", run_id=agent.run.id, step=step, model=chosen.ref.label)
+        return None
+    await runtime.bus.emit(agent.run.id, STEP_ROUTED_EVENT, routed_event(step, chosen.ref.label, choice), True)
+    return chosen
+
+
 async def run_agent(agent: AgentRun) -> RunEnd:
     started: float = time.monotonic()
     runtime: Runtime = agent.runtime
@@ -1152,6 +1238,7 @@ async def run_agent(agent: AgentRun) -> RunEnd:
     await runtime.bus.emit(run.id, "scaffold", scaffold_event(scaffold, config), True)
     # Every tool of the run counts, also the ones of groups that are off: a group the run turns on later must fit too.
     require_room(scaffold, estimate_tokens([system], specs))
+    candidates: tuple[_Candidate, ...] = await _routing(agent, ref, bool(specs), estimate_tokens([system], specs))
     history: list[Message] = repair_history(
         await runtime.store.load_messages(run.thread_id, config.keep_recent_screenshots)
     )
@@ -1226,6 +1313,11 @@ async def run_agent(agent: AgentRun) -> RunEnd:
     run_limits: RunLimits | None = limits_of(config, run.mode)
     # What the run had spent when it was seen past its limit; from then on every step may only finish, and ends the run.
     past_limit: LimitReached | None = None
+    # The tool calls that failed so far, the steps in a row that ended with a failure, and whether the next step is asked
+    # on the run's own model whatever the judge says (after a routed model could not answer it).
+    failures: int = 0
+    failures_in_a_row: int = 0
+    route_skip: bool = False
 
     async def sink(delta: StreamDelta) -> None:
         await runtime.bus.emit(run.id, "delta", {"kind": delta.kind, "text": delta.text, "step": steps}, False)
@@ -1268,21 +1360,43 @@ async def run_agent(agent: AgentRun) -> RunEnd:
         history, estimated, ledger = await _fit_context(
             agent, history, system, offered, ratio, ledger, scaffold.context_tokens
         )
+        routed: _Candidate | None = (
+            None
+            if route_skip or not candidates
+            else await _route_step(agent, candidates, history, steps + 1, failures, failures_in_a_row, estimated)
+        )
+        route_skip = False
+        step_ref: ModelRef = ref if routed is None else routed.ref
+        effort: Effort = run.effort if run.effort is not None else runtime.config.models.effort
+        # The routed model's level nearest to the run's; the run's own where the model offers no choice.
+        routed_effort: Effort | None = None if routed is None else effective_effort(routed.info.efforts, effort)
         request: ChatRequest = ChatRequest(
-            model=ref.model,
+            model=step_ref.model,
             messages=(system, *history),
             tools=offered,
             temperature=None,
             max_output_tokens=None,
-            effort=run.effort if run.effort is not None else runtime.config.models.effort,
+            effort=effort if routed_effort is None else routed_effort,
             session_key=run.thread_id,
         )
         steps += 1
         asked_at: float = time.monotonic()
         try:
             async with asyncio.timeout(config.model_call_timeout_s):
-                reply: ModelReply = await runtime.router.complete(ref, request, sink, step_origin)
+                reply: ModelReply = await runtime.router.complete(step_ref, request, sink, step_origin)
         except (ProviderError, MissingSecretError) as error:
+            if routed is not None:
+                # The routed model could not answer: the step is asked again on the run's own model.
+                log.warning("step_route_failed", run_id=run.id, step=steps, model=routed.ref.label, error=str(error))
+                await runtime.bus.emit(
+                    run.id,
+                    STEP_ROUTE_FAILED_EVENT,
+                    {"step": steps, "model": routed.ref.label, "error": str(error)[:300]},
+                    True,
+                )
+                route_skip = True
+                steps -= 1
+                continue
             standby: _Standby | None = await _to_standby(
                 agent, ref, error, left, bool(specs), estimate_tokens([system], specs), steps
             )
@@ -1314,7 +1428,7 @@ async def run_agent(agent: AgentRun) -> RunEnd:
             ratio = min(3.0, max(0.4, reply.usage.input_tokens / (estimated / ratio)))
         # The tokens join the run's totals as the router records the call; the side calls' tokens join them too.
         await runtime.store.set_run_steps(run.id, steps)
-        assistant: Message = assistant_from_reply(reply, ref.label)
+        assistant: Message = assistant_from_reply(reply, step_ref.label)
         history.append(assistant)
         # Stored before the tools run: a stop or crash while they run then leaves the calls in the thread, and the next
         # run reads them as interrupted (``repair_history``) instead of as never made.
@@ -1353,6 +1467,9 @@ async def run_agent(agent: AgentRun) -> RunEnd:
                 ledger, [(outcome.call, not outcome.result.is_error, outcome.result.text) for outcome in outcomes]
             )
             facts = with_outcomes(facts, outcomes)
+            failed_now: int = sum(1 for outcome in outcomes if outcome.result.is_error)
+            failures += failed_now
+            failures_in_a_row = failures_in_a_row + 1 if failed_now else 0
             single_now: SingleAction | None = single_action(_act_calls(outcomes))
             single_streak = single_action_streak(single_streak, single_last, single_now)
             single_last = single_now

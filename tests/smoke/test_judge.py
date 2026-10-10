@@ -29,6 +29,7 @@ from dotagent.agent.judge import (
 )
 from dotagent.agent.manager import RunManager
 from dotagent.agent.review import ReviewRequest, ReviewVerdict
+from dotagent.agent.stepmodel import STEP_ROUTED_EVENT
 from dotagent.agent.verify import new_facts
 from dotagent.config import JudgeConfig, load_config
 from dotagent.core.paths import workspace_dir
@@ -37,6 +38,7 @@ from dotagent.evals.runner import SCRIPTED_MODEL
 from dotagent.evals.scripted import ScriptedProvider
 from dotagent.evals.types import ScriptedCall, ScriptedTurn
 from dotagent.llm.router import parse_model_ref
+from dotagent.llm.types import ChatRequest, DeltaSink, ModelInfo, ModelReply
 from dotagent.policy.types import ActionInfo
 from dotagent.runtime import Runtime, build_runtime, close_runtime
 from dotagent.store.models import ApprovalMode, CampaignEntry, CampaignRecord, EventRecord, RunRecord, ThreadRecord
@@ -61,6 +63,10 @@ _CLAIM_PROBABILITY: float = 0.1
 _TOPIC: str = "python"
 _REJECTED: str = "[reject]"
 _LEVELS: tuple[str, ...] = ("unrelated", "mentions Python in passing", "about Python")
+# The models of the step router in the scripted runs: the scripted provider answers under any model name.
+_PROVIDER: str = parse_model_ref(SCRIPTED_MODEL).provider
+FAST_MODEL: str = f"{_PROVIDER}:fast-scripted"
+HELPER_MODEL: str = f"{_PROVIDER}:helper-scripted"
 _PAGE: bytes = b"""<!doctype html><title>Timeline</title><h1>Timeline</h1><p>A post worth sharing.</p>
 <button type="button">Boost</button> <button type="button">Post</button> <a href="/next">Next page</a>
 <a href="/posted">Posted</a> <a href="/login">Sign in</a> <a href="/error">Broken</a>"""
@@ -141,13 +147,22 @@ def _page_answer(state: dict[str, JsonValue], question: str) -> float:
     return 0.9 if "error" in text else 0.05
 
 
-def _choice(criteria: dict[str, JsonValue]) -> JsonObject:
-    """The stand-in picks the longest option; the probabilities follow the lengths."""
+def _choice(state: JsonValue, criteria: dict[str, JsonValue]) -> JsonObject:
+    """The stand-in's choices. Over the models of a step (the options hold ``main``) it reads a marker in the last
+    result, ``ROUTE:fast`` or ``ROUTE:helper``, and gives that option 0.9, else ``main``; over anything else it picks
+    the longest option, with probabilities that follow the lengths."""
+    if "main" in criteria and isinstance(state, dict):
+        marker: str = str(state.get("last_result", ""))
+        wanted: str = "fast" if "ROUTE:fast" in marker else "helper" if "ROUTE:helper" in marker else "main"
+        best: str = wanted if wanted in criteria else "main"
+        rest: float = 0.1 / max(1, len(criteria) - 1)
+        probabilities: dict[str, float] = {option: (0.9 if option == best else rest) for option in criteria}
+        return {"type": "choice", "choice": best, "confidence": 0.9, "probabilities": probabilities}
     lengths: dict[str, int] = {option: len(str(text)) for option, text in criteria.items()}
     total: int = sum(lengths.values())
-    probabilities: dict[str, float] = {option: length / total for option, length in lengths.items()}
-    best: str = max(lengths, key=lengths.__getitem__)
-    return {"type": "choice", "choice": best, "confidence": probabilities[best], "probabilities": probabilities}
+    by_length: dict[str, float] = {option: length / total for option, length in lengths.items()}
+    longest: str = max(lengths, key=lengths.__getitem__)
+    return {"type": "choice", "choice": longest, "confidence": by_length[longest], "probabilities": by_length}
 
 
 def _answer(state: JsonValue, question: str) -> float:
@@ -212,7 +227,7 @@ class _Handler(BaseHTTPRequestHandler):
             elif spec["type"] == "choice":
                 options: JsonValue = spec["criteria"]
                 assert isinstance(options, dict)
-                answers[question] = _choice(options)
+                answers[question] = _choice(body["state"], options)
             else:
                 answers[question] = {"type": "noul", "noul": _answer(body["state"], question)}
         reply: JsonObject = {
@@ -233,6 +248,36 @@ class _Handler(BaseHTTPRequestHandler):
         return
 
 
+class _Recorder:
+    """The scripted model under any name, registered once for the module: each run sets the ``script`` it plays, and
+    the recorder keeps the model name of every request."""
+
+    def __init__(self) -> None:
+        self.script: ScriptedProvider | None = None
+        self.models: list[str] = []
+
+    @property
+    def name(self) -> str:
+        return _PROVIDER
+
+    async def complete(self, request: ChatRequest, sink: DeltaSink) -> ModelReply:
+        assert self.script is not None, "the test did not set a script"
+        self.models.append(request.model)
+        return await self.script.complete(request, sink)
+
+    async def model_info(self, model: str) -> ModelInfo:
+        return await ScriptedProvider(_PROVIDER, ()).model_info(model)
+
+    async def list_models(self) -> tuple[ModelInfo, ...]:
+        return await ScriptedProvider(_PROVIDER, ()).list_models()
+
+    async def aclose(self) -> None:
+        return None
+
+
+MODEL: _Recorder = _Recorder()
+
+
 @pytest.fixture(scope="module")
 def service() -> Iterator[_Service]:
     server: _Service = _Service()
@@ -248,7 +293,8 @@ def service() -> Iterator[_Service]:
 async def runtime(service: _Service, tmp_path_factory: pytest.TempPathFactory) -> AsyncIterator[Runtime]:
     home: Path = tmp_path_factory.mktemp("home")
     (home / "config.toml").write_text(
-        f'[browser]\nheadless = true\n\n[models]\nreview = "{SCRIPTED_MODEL}"\n\n[judge]\nprovider = "typesafe"\n'
+        f'[browser]\nheadless = true\n\n[models]\nreview = "{SCRIPTED_MODEL}"\nfast = "{FAST_MODEL}"\n'
+        f'helpers = ["{HELPER_MODEL}"]\n\n[agent]\nstep_router = true\n\n[judge]\nprovider = "typesafe"\n'
         f'base_url = "{service.base}"\napi_key_env = "{KEY_ENV}"\nitems_per_request = 3\n',
         encoding="utf-8",
     )
@@ -259,6 +305,7 @@ async def runtime(service: _Service, tmp_path_factory: pytest.TempPathFactory) -
     patch.setenv(KEY_ENV, KEY)
     patch.setenv(REFUSED_ENV, "a-key-the-stand-in-refuses")
     built: Runtime = await build_runtime(load_config(home / "config.toml"))
+    await built.router.register(_PROVIDER, MODEL)
     try:
         yield built
     finally:
@@ -705,10 +752,7 @@ async def test_in_goal_mode_a_claim_the_judge_finds_false_is_sent_back_without_t
             ScriptedCall(tool=FINISH_TOOL, arguments={"answer": "All 50 leads are in leads.csv.", "success": True}),
         ),
     )
-    await runtime.router.register(
-        parse_model_ref(SCRIPTED_MODEL).provider,
-        ScriptedProvider(parse_model_ref(SCRIPTED_MODEL).provider, [finish] * (patience + 1)),
-    )
+    MODEL.script = ScriptedProvider(_PROVIDER, [finish] * (patience + 1))
     manager: RunManager = RunManager(runtime)
     try:
         run: RunRecord = await manager.start(GOAL, "task", SCRIPTED_MODEL, None, "test", None, None, "ask", True, ())
@@ -728,3 +772,54 @@ async def test_in_goal_mode_a_claim_the_judge_finds_false_is_sent_back_without_t
     )
     assert [check.data["final"] for check in checks] == [False] * patience + [True]
     assert "the goal is still not reached after" in ended.result
+
+
+def _shell(command: str) -> ScriptedTurn:
+    return ScriptedTurn(text="", calls=(ScriptedCall(tool="shell", arguments={"command": command}),))
+
+
+async def test_a_typed_judgment_sends_a_routine_step_to_the_fast_model_and_a_hard_one_to_the_helper(
+    runtime: Runtime, service: _Service
+) -> None:
+    """Four steps of a scripted run with the step router on: the stand-in routes by a marker the previous step echoed,
+    so step 2 goes to the fast model, step 3 to the helper and the others stay on the run's model."""
+    turns: list[ScriptedTurn] = [
+        _shell("echo ROUTE:fast"),
+        _shell("echo ROUTE:helper"),
+        _shell("echo plain"),
+        ScriptedTurn(
+            text="", calls=(ScriptedCall(tool=FINISH_TOOL, arguments={"answer": "Echoed.", "success": True}),)
+        ),
+    ]
+    MODEL.script = ScriptedProvider(_PROVIDER, turns)
+    MODEL.models.clear()
+    before: int = len(service.requests)
+    manager: RunManager = RunManager(runtime)
+    try:
+        run: RunRecord = await manager.start(
+            "Echo three markers.", "task", SCRIPTED_MODEL, None, "test", None, None, "ask", False, ()
+        )
+        async with asyncio.timeout(60.0):
+            ended: RunRecord = await manager.wait(run.id)
+    finally:
+        await manager.shutdown()
+    assert ended.status == "done", ended
+    assert MODEL.models == ["scripted", "fast-scripted", "helper-scripted", "scripted"]
+    routed: list[EventRecord] = await runtime.store.events_of_kind(run.id, STEP_ROUTED_EVENT, 10)
+    assert [(event.data["step"], event.data["model"], event.data["option"]) for event in routed] == [
+        (2, FAST_MODEL, "fast"),
+        (3, HELPER_MODEL, "helper"),
+    ]
+    # One judgment per step, over the three models, from the step's state.
+    asked: list[JsonObject] = [body for _, _, body in service.requests[before:]]
+    assert len(asked) == 4
+    second: JsonObject = asked[1]
+    questions: JsonValue = second["questions"]
+    assert isinstance(questions, dict) and list(questions) == ["step_model"]
+    question: JsonValue = questions["step_model"]
+    assert isinstance(question, dict) and question["type"] == "choice"
+    assert isinstance(question["criteria"], dict) and list(question["criteria"]) == ["fast", "main", "helper"]
+    state: JsonValue = second["state"]
+    assert isinstance(state, dict) and state["step"] == 2 and state["failures"] == 0
+    assert "ROUTE:fast" in str(state["last_result"])
+    assert state["goal"] == "Echo three markers."
