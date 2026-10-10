@@ -52,6 +52,7 @@ AUTO: AgentConfig = DEFAULTS.model_copy(update={"tool_surface": "auto"})
         ("memory_save", "core"),
         ("memory_search", "core"),
         ("delegate", "core"),
+        ("consult", "core"),
         ("use_tools", "core"),
         ("browser_open", "browser"),
         ("desktop_act", "desktop"),
@@ -84,6 +85,7 @@ def test_the_core_group_holds_what_most_runs_need_and_is_about_a_third_of_the_to
         "memory_save",
         "memory_search",
         "delegate",
+        "consult",
         "finish",
         "ask_user",
         "notify",
@@ -108,7 +110,7 @@ def test_the_tools_of_the_groups_that_are_off_are_hidden_with_their_group() -> N
 
 def _inputs(tool_names: list[str]) -> PromptInputs:
     return collect_prompt_inputs(
-        "task", "cli", "aggressive", "ask", "wait", False, Path("/tmp/work"), [], tool_names, [], None
+        "task", "cli", "aggressive", "ask", "wait", False, Path("/tmp/work"), [], tool_names, [], None, []
     )
 
 

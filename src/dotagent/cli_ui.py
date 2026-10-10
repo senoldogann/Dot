@@ -5,12 +5,14 @@ import os
 import select
 import sys
 import threading
+import time
 from collections.abc import Sequence
 from typing import Literal, TextIO
 
-from pydantic import BaseModel, ConfigDict, JsonValue
+from pydantic import BaseModel, ConfigDict, Field, JsonValue
 
 from dotagent.agent.gate import YOLO_DECIDER
+from dotagent.agent.helpers import Unavailable, unavailable_text
 from dotagent.agent.lessons import RunLessons
 from dotagent.agent.limits import LimitReached, RunLimits, limit_spent
 from dotagent.agent.plan import StepStatus
@@ -148,6 +150,23 @@ class StallPayload(Payload):
 
 class NotePayload(Payload):
     text: str
+
+
+class ModelSwitchedPayload(Payload):
+    """A run that moved to a standby model because its own model could not answer."""
+
+    previous: str = Field(alias="from")
+    to: str
+    reason: str
+
+
+class HelperUnavailablePayload(Payload):
+    """A helper model that could not answer a question of the run: why, and until when (seconds since the epoch) when
+    it is paused."""
+
+    model: str
+    reason: str
+    until: float | None
 
 
 class ResumedCallPayload(Payload):
@@ -352,6 +371,17 @@ class TerminalUi:
                 self._line(self._paint(f"  ✎ {NotePayload.model_validate(data).text}", "35"))
             case "resumed":
                 self._on_resumed(ResumedPayload.model_validate(data))
+            case "model_switched":
+                switched = ModelSwitchedPayload.model_validate(data)
+                self._line(
+                    self._paint(
+                        f"  ⇄ {switched.previous} cannot answer ({switched.reason}); on {switched.to} now", "33"
+                    )
+                )
+            case "helper_unavailable":
+                helper = HelperUnavailablePayload.model_validate(data)
+                entry: Unavailable = Unavailable(model=helper.model, reason=helper.reason, until=helper.until)
+                self._line(self._paint(f"  ⚠ helper {unavailable_text(entry, time.time())} cannot answer", "33"))
             case _:
                 return
 

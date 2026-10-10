@@ -290,7 +290,9 @@ async def test_long_answers_are_cut_inside_the_fence() -> None:
 
 def _prompt(tool_names: tuple[str, ...]) -> str:
     return build_system_prompt(
-        collect_prompt_inputs("task", "cli", "balanced", "ask", "wait", False, Path("/tmp"), (), tool_names, (), None)
+        collect_prompt_inputs(
+            "task", "cli", "balanced", "ask", "wait", False, Path("/tmp"), (), tool_names, (), None, ()
+        )
     )
 
 

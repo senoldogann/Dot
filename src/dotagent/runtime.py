@@ -41,6 +41,7 @@ from dotagent.tools.apple import build_apple_tool
 from dotagent.tools.base import RegisteredTool
 from dotagent.tools.browser import build_browser_tools
 from dotagent.tools.campaign import build_campaign_tools
+from dotagent.tools.consult import build_consult_tools
 from dotagent.tools.delegate import build_delegate_tools
 from dotagent.tools.desktop import build_desktop_tools, sized_for_agent
 from dotagent.tools.files import build_file_tools
@@ -90,6 +91,7 @@ def _tool_groups(config: AppConfig) -> tuple[tuple[RegisteredTool, ...], ...]:
         build_schedule_tools(),
         build_campaign_tools(),
         build_delegate_tools(),
+        build_consult_tools(),
         build_meta_tools(),
         (build_skill_tool(),),
     )

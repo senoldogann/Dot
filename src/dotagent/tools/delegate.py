@@ -1,10 +1,12 @@
 """The delegate tool: hand one self-contained part of the work to a run of its own and read its report."""
 
 import secrets
+import time
 from typing import Literal
 
 from pydantic import Field
 
+from dotagent.agent.helpers import Roster, current_roster, roster_text
 from dotagent.core.errors import ToolExecutionError
 from dotagent.core.text import truncate_tail
 from dotagent.policy.types import ActionInfo
@@ -35,11 +37,35 @@ class DelegateArgs(ToolArgs):
             "only delegate research."
         ),
     )
+    model: str | None = Field(
+        default=None,
+        description=(
+            "One of the helper models named in your instructions, for a part that suits a stronger or a cheaper model; "
+            "leave it out to use your own model."
+        ),
+    )
 
 
 def default_child_mode(parent: RunMode) -> RunMode:
     """A research run hands research on; every other run hands a task."""
     return "research" if parent == "research" else "task"
+
+
+async def _model_for(asked: str | None, ctx: ToolContext) -> str | None:
+    """The model the delegated run starts on: ``None`` (the parent's own) unless ``asked`` names a helper model that can
+    answer now."""
+    if asked is None or asked.strip() == (await ctx.runtime.store.get_run(ctx.run_id)).model.strip():
+        return None
+    roster: Roster = await current_roster(
+        ctx.runtime.router, ctx.runtime.config.providers, ctx.runtime.config.models.helpers
+    )
+    if asked.strip() in roster.available:
+        return asked.strip()
+    raise ToolExecutionError(
+        f"{asked} is not a helper model that can take the work now ({roster_text(roster, time.time())}); leave model "
+        "out to use your own model",
+        {"run_id": ctx.run_id, "model": asked},
+    )
 
 
 def _fence(run: RunRecord, body: str, nonce: str) -> str:
@@ -49,9 +75,10 @@ def _fence(run: RunRecord, body: str, nonce: str) -> str:
 
 
 def render_outcome(outcome: DelegateOutcome, nonce: str) -> ToolResult:
-    """What the delegating run reads back: how the run ended and its report, fenced when it saw untrusted content."""
+    """What the delegating run reads back: how the run ended, on which model, and its report, fenced when it saw
+    untrusted content."""
     run: RunRecord = outcome.run
-    header: str = f"Delegated run {run.id} ended as {run.status} after {run.steps} steps."
+    header: str = f"Delegated run {run.id} on {run.model} ended as {run.status} after {run.steps} steps."
     report: str = run.result.strip() or _NO_REPORT
     text: str = f"{header}\n{_fence(run, report, nonce)}" if outcome.tainted else f"{header}\n{report}"
     result: ToolResult = ok(text) if run.status == "done" else fail(text)
@@ -61,8 +88,9 @@ def render_outcome(outcome: DelegateOutcome, nonce: str) -> ToolResult:
 def _delegate_tool() -> RegisteredTool:
     def classify(args: DelegateArgs, ctx: ToolContext) -> ActionInfo:
         shown: str = truncate_tail(" ".join(args.goal.split()), _SUMMARY_CHARS)
+        on: str = "" if args.model is None else f" to {args.model}"
         return ActionInfo(
-            tool=DELEGATE_TOOL, kind="delegate", risk="safe", summary=f"Delegate: {shown}", target="", flags=()
+            tool=DELEGATE_TOOL, kind="delegate", risk="safe", summary=f"Delegate{on}: {shown}", target="", flags=()
         )
 
     async def run(args: DelegateArgs, ctx: ToolContext) -> ToolResult:
@@ -70,7 +98,9 @@ def _delegate_tool() -> RegisteredTool:
         if spawner is None:
             raise ToolExecutionError("this run cannot start other runs", {"run_id": ctx.run_id})
         mode: RunMode = args.mode if args.mode is not None else default_child_mode(ctx.mode)
-        outcome: DelegateOutcome = await spawner.delegate(ctx.run_id, args.goal, mode)
+        outcome: DelegateOutcome = await spawner.delegate(
+            ctx.run_id, args.goal, mode, await _model_for(args.model, ctx)
+        )
         return render_outcome(outcome, secrets.token_hex(_NONCE_BYTES))
 
     return make_tool(
@@ -79,8 +109,8 @@ def _delegate_tool() -> RegisteredTool:
             "Run one self-contained part of the work in a separate agent with a clean context and get its final "
             "report back. Use it to keep your own context small when a part is bulky (reading many pages or files, a "
             "deep research question) and to do independent parts at the same time: call it several times in one "
-            "turn. The agent uses the same model and tools, cannot ask the user questions and cannot delegate again. "
-            "Do not delegate what one or two tool calls can do."
+            "turn. The agent uses your tools and your model, or the helper model you name; it cannot ask the user "
+            "questions, consult a helper or delegate again. Do not delegate what one or two tool calls can do."
         ),
         args_model=DelegateArgs,
         modes=ALL_MODES,

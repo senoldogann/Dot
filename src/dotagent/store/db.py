@@ -24,6 +24,7 @@ from dotagent.core.ids import new_id
 from dotagent.core.jsonutil import dumps_compact, parse_json_object, parse_json_value
 from dotagent.core.text import fold_search
 from dotagent.core.types import JsonArray, JsonObject
+from dotagent.llm.calls import CALL_EVENT, CallPurpose
 from dotagent.llm.types import Effort, ImageData, Message
 from dotagent.policy.types import ApprovalMode
 from dotagent.store.endings import RESULT_RESTARTED
@@ -813,6 +814,12 @@ class Store:
         await self._db.execute("UPDATE runs SET steps = ? WHERE id = ?", (steps, run_id))
         await self._db.commit()
 
+    async def set_run_model(self, run_id: str, model: str, effort: Effort | None) -> None:
+        """The model a run works on from now on (a standby model, once its own model cannot answer) and the reasoning
+        level it asks that model for (``None``: the configured default)."""
+        await self._db.execute("UPDATE runs SET model = ?, effort = ? WHERE id = ?", (model, effort, run_id))
+        await self._db.commit()
+
     async def add_run_tokens(self, run_id: str, input_tokens: int, output_tokens: int) -> None:
         """Add the tokens of one model call of a run (a step or a side call) to its totals."""
         await self._db.execute(
@@ -907,6 +914,14 @@ class Store:
             "SELECT * FROM events WHERE run_id = ? AND kind = ? ORDER BY id DESC LIMIT 1", (run_id, kind)
         )
         return None if row is None else _event(row)
+
+    async def count_model_calls(self, run_id: str, purpose: CallPurpose) -> int:
+        """How many model calls for ``purpose`` a run made, the ones that failed included."""
+        row: aiosqlite.Row | None = await self._one(
+            "SELECT COUNT(*) FROM events WHERE run_id = ? AND kind = ? AND json_extract(data, '$.purpose') = ?",
+            (run_id, CALL_EVENT, purpose),
+        )
+        return 0 if row is None else int(row[0])
 
     async def events_of_kind(self, run_id: str, kind: str, limit: int) -> list[EventRecord]:
         """The newest ``limit`` events of ``kind`` of a run, oldest first."""

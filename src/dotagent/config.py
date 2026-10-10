@@ -77,6 +77,10 @@ class ModelsConfig(FrozenModel):
     fast: str
     review: str
     effort: Effort
+    helpers: list[str]
+    standby: list[str]
+    # At most a day, the longest pause of the router (dotagent.llm.router.MAX_PAUSE_S).
+    helper_cooldown_s: float = Field(gt=0, le=86_400, allow_inf_nan=False)
 
 
 type Tier = Literal["standard", "weak"]
@@ -95,6 +99,7 @@ class AgentConfig(FrozenModel):
     campaign_wait_hours: float = Field(ge=0, allow_inf_nan=False)
     campaign_patience_sessions: int = Field(ge=1)
     campaign_max_sessions: int = Field(ge=0)
+    consult_max_per_run: int = Field(ge=0)
     tool_output_chars: int
     context_tokens: int
     keep_recent_tool_results: int

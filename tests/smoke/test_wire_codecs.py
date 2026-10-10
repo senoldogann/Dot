@@ -321,12 +321,30 @@ def test_opencode_usage_limit_is_terminal_but_burst_is_retried() -> None:
     assert isinstance(burst, ProviderRateLimitError) and is_retryable_provider_error(burst)
 
 
-def test_anthropic_billing_is_terminal_but_an_overloaded_api_is_retried() -> None:
+def test_anthropic_billing_and_a_spent_balance_are_terminal_but_an_overloaded_api_is_retried() -> None:
     billing = classify_anthropic(402, WireError(kind="billing_error", code="", message="m", limit_name=""), None, {})
+    # A spent prepaid balance, as the API words it.
+    no_credit = classify_anthropic(
+        400,
+        WireError(
+            kind="invalid_request_error",
+            code="",
+            message="Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to "
+            "upgrade or purchase credits.",
+            limit_name="",
+        ),
+        None,
+        {},
+    )
+    refused = classify_anthropic(
+        400, WireError(kind="invalid_request_error", code="", message="max_tokens: too large", limit_name=""), None, {}
+    )
     overloaded = classify_anthropic(
         529, WireError(kind="overloaded_error", code="", message="m", limit_name=""), None, {}
     )
     assert isinstance(billing, ProviderQuotaError) and not is_retryable_provider_error(billing)
+    assert isinstance(no_credit, ProviderQuotaError) and not is_retryable_provider_error(no_credit)
+    assert not isinstance(refused, ProviderQuotaError) and not is_retryable_provider_error(refused)
     assert is_retryable_provider_error(overloaded)
     codec = messages_codec(classify_anthropic)
     frame = sse({"type": "error", "error": {"type": "overloaded_error", "message": "Overloaded"}}, "error")

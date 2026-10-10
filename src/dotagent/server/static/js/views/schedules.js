@@ -381,7 +381,7 @@ function scheduleForm({ view, onSaved, onCancel }) {
       goalField,
       field("Approvals", approvals, "Unattended runs cannot wait for you: with Ask, a question stops the run until you answer."),
       field("Goal mode", goalMode, ""),
-      field("Model", model, "The model every step and every compaction of the run uses."),
+      field("Model", model, "The model every step and every compaction of the run uses, until it moves to a standby model."),
       effortField,
       field("Time zone", zone, "A name such as Europe/Istanbul; empty uses the configured zone."),
       record === null ? null : el("div", { class: "field" }, el("span", { class: "field-label" }, "Switched on"), enabled),

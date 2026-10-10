@@ -27,7 +27,7 @@ port = 8765
 [models]
 # "<provider>:<model>"; providers are ollama, openai, opencode_go and anthropic.
 # A run uses the model it was started with (main unless one is chosen) for every step and for compacting its own
-# history; the roles below are only used for what their comments say.
+# history, until it moves to a standby model (below); the roles below are only used for what their comments say.
 main = "ollama:minimax-m2.7:cloud"
 # Describes screenshots to a run whose model cannot see images.
 vision = "ollama:gemma4:cloud"
@@ -36,6 +36,15 @@ fast = "ollama:gpt-oss:20b-cloud"
 # Answers for you where [policy] approvals = "auto", and checks the answer of a run in goal mode.
 review = "ollama:minimax-m2.7:cloud"
 effort = "medium"
+# Models of other providers that a run may ask for advice (the consult tool) or run a delegated part of the work on, in
+# order of preference, for example ["anthropic:claude-opus-5-5", "openai:gpt-5.5"].
+helpers = []
+# The models a run moves to, in order and each once at most, when its own model cannot answer: a quota, rate-limit or
+# key error, or a missing key. Without one that can take the run over such an error ends the run.
+standby = []
+# A model that answered with such an error is left out of the helpers and the standby models for the time its provider
+# named (at most a day), or for this many seconds (at most 86400); a call it answers, or a new key, ends that.
+helper_cooldown_s = 600
 
 [providers.ollama]
 base_url = "http://localhost:11434"
@@ -101,6 +110,8 @@ campaign_gap_minutes = 60
 campaign_wait_hours = 24
 campaign_patience_sessions = 3
 campaign_max_sessions = 0
+# The most questions a run may ask the helper models ([models] helpers) with the consult tool; 0 offers no consult.
+consult_max_per_run = 5
 tool_output_chars = 12000
 # The prompt budget of a run: past 60 % of it older tool output is shortened, past all of it the older part of the run is
 # summarized. A model whose window is smaller gets three quarters of its window instead (for Ollama the window is at most

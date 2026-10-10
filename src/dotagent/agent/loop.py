@@ -3,7 +3,7 @@
 import asyncio
 import time
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Literal
 
 from dotagent.agent.attachments import (
@@ -39,6 +39,7 @@ from dotagent.agent.continuity import (
 )
 from dotagent.agent.executor import ToolOutcome, execute_calls
 from dotagent.agent.gate import RunGate
+from dotagent.agent.helpers import MODEL_SWITCHED_EVENT, Roster, current_roster
 from dotagent.agent.lessons import LessonCase, may_learn
 from dotagent.agent.limits import (
     LIMIT_EVENT,
@@ -115,15 +116,17 @@ from dotagent.agent.verify import (
 )
 from dotagent.agent.vision import text_for_blind_model
 from dotagent.config import AgentConfig
-from dotagent.core.errors import ConfigError, ProviderError, RunCancelled
+from dotagent.core.errors import ConfigError, MissingSecretError, ProviderError, RunCancelled
 from dotagent.core.jsonutil import dumps_compact
 from dotagent.core.logs import get_logger
 from dotagent.core.text import redact_secrets, truncate_middle
 from dotagent.core.types import FrozenModel, JsonObject
 from dotagent.llm.calls import CallOrigin
-from dotagent.llm.router import ModelRef, parse_model_ref
+from dotagent.llm.router import ModelRef, parse_model_ref, unavailable_reason
+from dotagent.llm.traits import effective_effort
 from dotagent.llm.types import (
     ChatRequest,
+    Effort,
     Message,
     ModelInfo,
     ModelReply,
@@ -144,6 +147,7 @@ from dotagent.skills.types import SkillCatalog
 from dotagent.store.endings import GOAL_CHECK_MARK, RESULT_EMPTY_REPLIES
 from dotagent.store.models import EventRecord, MemoryRecord, RunMode, RunRecord
 from dotagent.tools.campaign import CAMPAIGN_TOOLS
+from dotagent.tools.consult import CONSULT_TOOL
 from dotagent.tools.context import Spawner, ToolContext
 from dotagent.tools.delegate import DELEGATE_TOOL
 from dotagent.tools.groups import CORE_GROUP, groups_event, groups_of, hidden_tools, offered_specs, used_groups
@@ -153,8 +157,8 @@ from dotagent.tools.skill import SKILL_TOOL
 
 log = get_logger(__name__)
 
-# A delegated run reports to its parent: it neither delegates again nor asks the user.
-_NOT_FOR_DELEGATED_RUNS: frozenset[str] = frozenset({DELEGATE_TOOL, ASK_USER_TOOL})
+# A delegated run reports to its parent: it neither delegates again nor asks the user, and its parent asks the helpers.
+_NOT_FOR_DELEGATED_RUNS: frozenset[str] = frozenset({DELEGATE_TOOL, ASK_USER_TOOL, CONSULT_TOOL})
 
 _SUMMARY_KEEP_TAIL: int = 8
 _SUMMARY_ATTEMPTS: int = 3
@@ -198,6 +202,10 @@ _CAMPAIGN_TARGETS_NOTE: str = (
 )
 # A session of a campaign that wanted to end while the campaign had no targets was sent back once.
 CAMPAIGN_TARGETS_EVENT: str = "campaign_targets_reminder"
+_SWITCH_NOTE: str = (
+    "[system note] From this step on you run on {to}: {old} cannot answer ({reason}). Go on with the task from where "
+    "it stands."
+)
 
 
 class RunOpening(FrozenModel):
@@ -486,7 +494,8 @@ def _only(registry: ToolRegistry, allowed: frozenset[str]) -> ToolRegistry:
 def _run_tools(registry: ToolRegistry, mode: RunMode, specs: Sequence[ToolSpec]) -> ToolRegistry:
     """The tools a run can call: the ones it offers, and the ones of other modes, whose calls are answered as not
     available in the run's mode. A tool of the run's mode that the run leaves out (use_tools when its tools are not
-    grouped, delegate and ask_user in a delegated run, skill when no skill is installed) is answered as unknown."""
+    grouped, delegate, ask_user and consult in a delegated run, skill when no skill is installed, consult without a
+    helper) is answered as unknown."""
     offered: frozenset[str] = frozenset(spec.name for spec in specs)
     return ToolRegistry(
         tools={name: tool for name, tool in registry.tools.items() if name in offered or mode not in tool.modes}
@@ -846,6 +855,91 @@ async def _limit_end(agent: AgentRun, reached: LimitReached, ledger: RunLedger, 
     return RunOutcome(status="failed", result=limit_result(reached, ledger, plan, reply), needs="")
 
 
+@dataclass(frozen=True)
+class _Standby:
+    """A run that moved to a standby model: the run as it goes on, its model and what depends on the model, and why
+    the model before could not answer."""
+
+    agent: AgentRun
+    ref: ModelRef
+    info: ModelInfo
+    scaffold: Scaffold
+    reason: str
+
+
+async def _fitted(
+    agent: AgentRun, target: ModelRef, offers_tools: bool, fixed_tokens: int
+) -> tuple[ModelInfo, Scaffold] | str:
+    """The information and the scaffold of ``target`` for this run, or why it cannot take the run over: its information
+    cannot be read, it cannot call tools while the run offers them, or its window cannot hold the system prompt and
+    the tools (``fixed_tokens``)."""
+    runtime: Runtime = agent.runtime
+    try:
+        info: ModelInfo = await runtime.router.model_info(target)
+    except (ProviderError, MissingSecretError) as error:
+        return f"its model information could not be read: {error.message}"
+    if offers_tools and not info.tools:
+        return "it cannot call tools"
+    scaffold: Scaffold = scaffold_for(
+        runtime.config.agent, info, await runtime.store.model_profile(target.label, PROFILE_RUNS)
+    )
+    try:
+        require_room(scaffold, fixed_tokens)
+    except ConfigError as error:
+        return error.message
+    return info, scaffold
+
+
+async def _to_standby(
+    agent: AgentRun,
+    ref: ModelRef,
+    error: Exception,
+    left: frozenset[str],
+    offers_tools: bool,
+    fixed_tokens: int,
+    step: int,
+) -> _Standby | None:
+    """Move the run to the first standby model that can take it over, now that ``ref`` could not answer (``error``,
+    which paused it in the router). The models the run has worked on (``left``) are not taken again, so a run goes
+    through its standby models once at most. The run's reasoning level follows the move: the level of the new model
+    that is nearest to it.
+
+    ``None`` when ``error`` says nothing about the model being unable to answer, or when no standby model is left that
+    is available (each one the run has not worked on lacks its key or is paused): the run then ends with ``error``. A standby model that cannot take the run over
+    (:func:`_fitted`) is passed over; when every available one is, the run fails with a :class:`ConfigError` that says
+    why for each."""
+    runtime: Runtime = agent.runtime
+    reason: str | None = unavailable_reason(error)
+    if reason is None:
+        return None
+    standby: Roster = await current_roster(runtime.router, runtime.config.providers, runtime.config.models.standby)
+    candidates: list[str] = [model for model in standby.available if model not in left]
+    if not candidates:
+        log.warning("no_standby_model", run_id=agent.run.id, model=ref.label, reason=reason)
+        return None
+    passed_over: JsonObject = {}
+    for target in candidates:
+        moved: ModelRef = parse_model_ref(target)
+        fitted: tuple[ModelInfo, Scaffold] | str = await _fitted(agent, moved, offers_tools, fixed_tokens)
+        if isinstance(fitted, str):
+            log.warning("standby_passed_over", run_id=agent.run.id, model=target, problem=fitted)
+            passed_over[target] = fitted
+            continue
+        info, scaffold = fitted
+        effort: Effort | None = None if agent.run.effort is None else effective_effort(info.efforts, agent.run.effort)
+        await runtime.store.set_run_model(agent.run.id, target, effort)
+        await runtime.bus.emit(
+            agent.run.id, MODEL_SWITCHED_EVENT, {"from": ref.label, "to": target, "reason": reason, "step": step}, True
+        )
+        log.warning("model_switched", run_id=agent.run.id, from_model=ref.label, to_model=target, reason=reason)
+        run: RunRecord = agent.run.model_copy(update={"model": target, "effort": effort})
+        return _Standby(agent=replace(agent, run=run), ref=moved, info=info, scaffold=scaffold, reason=reason)
+    raise ConfigError(
+        "the run's model cannot answer and no standby model can take the run over",
+        {"model": ref.label, "reason": reason, "passed_over": passed_over},
+    ) from error
+
+
 async def run_agent(agent: AgentRun) -> RunEnd:
     started: float = time.monotonic()
     runtime: Runtime = agent.runtime
@@ -874,6 +968,22 @@ async def run_agent(agent: AgentRun) -> RunEnd:
         log.warning("skill_skipped", run_id=run.id, path=str(problem.path), reason=problem.reason)
     if not skills.skills:
         specs = tuple(spec for spec in specs if spec.name != SKILL_TOOL)
+    if config.consult_max_per_run == 0:
+        specs = tuple(spec for spec in specs if spec.name != CONSULT_TOOL)
+    # The helpers that can answer as the run starts, besides its own model; only for a run with a tool that uses them.
+    helpers: tuple[str, ...] = (
+        tuple(
+            model
+            for model in (
+                await current_roster(runtime.router, runtime.config.providers, runtime.config.models.helpers)
+            ).available
+            if model != ref.label
+        )
+        if any(spec.name in (CONSULT_TOOL, DELEGATE_TOOL) for spec in specs)
+        else ()
+    )
+    if not helpers:
+        specs = tuple(spec for spec in specs if spec.name != CONSULT_TOOL)
     # Every tool group of the run, core first. A run with no group besides core has nothing to turn on.
     groups: tuple[str, ...] = (CORE_GROUP, *groups_of([spec.name for spec in specs]))
     grouped: bool = surface == "grouped" and len(groups) > 1
@@ -901,6 +1011,7 @@ async def run_agent(agent: AgentRun) -> RunEnd:
                 [spec.name for spec in specs],
                 skills.skills,
                 None if run.campaign_id is None else await _session_number(agent, run.campaign_id),
+                helpers,
             )
         )
     )
@@ -969,8 +1080,10 @@ async def run_agent(agent: AgentRun) -> RunEnd:
     )
     watch: WatchState = new_watch()
     # The tools of the next step when a progress alert or the run's limit restricts them; None offers the tools of the
-    # groups that are on.
+    # groups that are on. A step asked again on a standby model keeps them.
     allowed: frozenset[str] | None = None
+    # The models the run has worked on: a move to a standby model never goes back to one of them.
+    left: frozenset[str] = frozenset({ref.label})
     run_limits: RunLimits | None = limits_of(config, run.mode)
     # What the run had spent when it was seen past its limit; from then on every step may only finish, and ends the run.
     past_limit: LimitReached | None = None
@@ -1013,7 +1126,6 @@ async def run_agent(agent: AgentRun) -> RunEnd:
         )
         registry: ToolRegistry = callable_tools if allowed is None else _only(callable_tools, allowed)
         hidden: dict[str, str] = hidden_tools(specs, on) if allowed is None else {}
-        allowed = None
         history, estimated, ledger = await _fit_context(
             agent, history, system, offered, ratio, ledger, scaffold.context_tokens
         )
@@ -1028,8 +1140,36 @@ async def run_agent(agent: AgentRun) -> RunEnd:
         )
         steps += 1
         asked_at: float = time.monotonic()
-        async with asyncio.timeout(config.model_call_timeout_s):
-            reply: ModelReply = await runtime.router.complete(ref, request, sink, step_origin)
+        try:
+            async with asyncio.timeout(config.model_call_timeout_s):
+                reply: ModelReply = await runtime.router.complete(ref, request, sink, step_origin)
+        except (ProviderError, MissingSecretError) as error:
+            standby: _Standby | None = await _to_standby(
+                agent, ref, error, left, bool(specs), estimate_tokens([system], specs), steps
+            )
+            if standby is None:
+                raise
+            history.append(
+                await _stored_note(
+                    standby.agent, _SWITCH_NOTE.format(to=standby.ref.label, old=ref.label, reason=standby.reason)
+                )
+            )
+            agent, run, ref, info, scaffold = (
+                standby.agent,
+                standby.agent.run,
+                standby.ref,
+                standby.info,
+                standby.scaffold,
+            )
+            left = left | {ref.label}
+            context = replace(context, output_chars=scaffold.tool_output_chars)
+            if not info.vision:
+                history = drop_old_images(history, 0)
+            # The step is asked again on the new model, whose tokens the estimate has not been fitted to.
+            steps -= 1
+            ratio = 1.0
+            continue
+        allowed = None
         step_seconds: float = time.monotonic() - asked_at
         if reply.usage.input_tokens > 0 and estimated > 0:
             ratio = min(3.0, max(0.4, reply.usage.input_tokens / (estimated / ratio)))

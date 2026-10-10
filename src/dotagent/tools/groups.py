@@ -1,7 +1,7 @@
 """Tool groups: the tools of a run come in groups, and a run whose tools are grouped starts with only some of them on.
 
 The core group holds what most runs need: the files, the shell, the web, searching and saving notes, delegation,
-skills and the meta tools (the plan, questions, finish). The other groups are named after what they reach: ``browser``
+skills, the helper models and the meta tools (the plan, questions, finish). The other groups are named after what they reach: ``browser``
 (Chrome), ``desktop`` (the Mac's applications and AppleScript), ``schedule`` (goals that run later), ``memory_admin``
 (correcting and forgetting notes) and one group per MCP server, ``mcp__<server>``. Which groups are on is up to the
 loop; everything here is pure.
