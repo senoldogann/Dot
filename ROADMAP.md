@@ -2043,7 +2043,7 @@ decision maker: the harness keeps the workflow, the judge supplies the semantic 
 
 **Decisions and limits.**
 - Off by default (`provider = "none"`): it is a paid external service, though a cheap one (input tokens only). The
-  thresholds were set on live answers of `jev-1.13.0` (open decision 9, done); the owner's `config.toml` turns it on.
+  thresholds were set on live answers of `jev-1.13.0` (open decision 9, done); the owner keeps it off.
 - The judge never decides a step and never grants anything: it adds flags that make the policy ask, or stops a claim
   the goal checker would have examined. Code owns the workflow, as TypeSafe's own guidance says.
 - One request per judged control adds its latency to that click, at most `timeout_s`; a claim the judge refuses saves
@@ -2344,9 +2344,10 @@ text, no console error; the Options panel with YOLO saved; every status ring. RE
    replies a day, 500 messages and 400 follows; its automation rules forbid automated likes and bulk or aggressive
    following, and scripting the website can get an account suspended.
 9. TypeSafe (item 16), done on 2026-10-10: the owner saved `TYPESAFE_API_KEY`; the thresholds were set on live answers
-   (0.45 for clicks, 0.15 for claims, model pinned to `jev-1.13.0`, PR #18), and the owner's `config.toml` sets
-   `[judge] provider = "typesafe"`. In `yolo` its flags ask nothing; it refuses a clearly false campaign claim before
-   the goal checker's call. Remove that table to turn it off.
+   (0.45 for clicks, 0.15 for claims, model pinned to `jev-1.13.0`, PR #18). The owner keeps it off: in `yolo` its
+   flags ask nothing, while every judged click waits for its request and a wrong flag can split a batch; its one gain
+   there is refusing a clearly false campaign claim before the goal checker's call. `[judge] provider = "typesafe"` in
+   `config.toml` turns it on.
 10. Skills (item 18), done on 2026-10-10 at the owner's word: the owner's `config.toml` lists the six skill folders of
     `~/.claude/skills` that stand alone (the two X skills, `find-skills`, `frontend-design`, `ui-ux-pro-max`,
     `rust-best-practices`), not the whole folder, which would also bring its `superpowers` bundle (process skills that
@@ -2737,3 +2738,6 @@ text, no console error; the Options panel with YOLO saved; every status ring. RE
   restarts and the data directory to the owner. Their `config.toml` sets `[judge] provider = "typesafe"`; the daemon
   was restarted to read it (no run active, the plist still names only `PATH`), and `dotx doctor` shows the judge on
   `typesafe:jev-1.13.0` with its key.
+- 2026-10-10: at the owner's word the judge is off again: `[judge]` left their `config.toml` (in `yolo` it delayed
+  clicks and gained only the campaign-claim check, decision 9); the daemon was restarted (no run active, the plist still
+  names only `PATH`), and `dotx doctor` shows the judge off.
