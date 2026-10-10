@@ -13,6 +13,7 @@ from dotagent.agent.campaign import (
     Brief,
     BriefQuestion,
     LastSession,
+    campaign_browser,
     next_session_at,
     render_brief,
     sessions_without_progress,
@@ -34,6 +35,7 @@ from dotagent.agent.resume import (
     resumes_on_start,
 )
 from dotagent.agent.review import reviewer_for
+from dotagent.browser.attach import read_debug_endpoint
 from dotagent.core.errors import (
     ConfigError,
     DotError,
@@ -43,6 +45,7 @@ from dotagent.core.errors import (
     RunConflict,
 )
 from dotagent.core.logs import get_logger
+from dotagent.core.paths import chrome_data_dir
 from dotagent.core.text import redact_secrets, truncate_tail
 from dotagent.llm.router import ModelRef, parse_model_ref
 from dotagent.llm.types import Effort, ModelInfo, user_message
@@ -63,6 +66,7 @@ from dotagent.store.endings import (
 from dotagent.store.models import (
     WORKING_STATUSES,
     ApprovalRecord,
+    BrowserMode,
     CampaignEntry,
     CampaignRecord,
     EventRecord,
@@ -189,10 +193,14 @@ class RunManager:
         approvals: ApprovalMode | None,
         goal_mode: bool | None,
         files: tuple[StoredAttachment, ...],
+        browser: BrowserMode | None,
     ) -> RunRecord:
         """Start a campaign on ``goal`` ("Keep going until done") with its opening session: a run of ``source`` on
         ``thread_id`` (a new thread when ``None``), which becomes the campaign's conversation. Every session keeps the
-        model, reasoning level and approval mode the opening one starts with (``None`` takes the configured one).
+        model, reasoning level and approval mode the opening one starts with (``None`` takes the configured one), and
+        works in the Chrome ``browser`` names (``None``: ``[agent] campaign_browser``); a campaign that asks for the
+        owner's Chrome is refused while that Chrome is closed or does not allow the connection, so that its sessions do
+        not fail one after the other.
 
         A campaign is a task, so a chat or a research run is refused. Goal mode is refused too: ``campaign_achieved``
         checks the campaign's outcome, and a session ends when its own work is done.
@@ -209,13 +217,16 @@ class RunManager:
             await self._check_effort(parse_model_ref(model_ref), effort)
         level: Effort = runtime.config.models.effort if effort is None else effort
         approval_mode: ApprovalMode = runtime.config.policy.approvals if approvals is None else approvals
+        chrome: BrowserMode = runtime.config.agent.campaign_browser if browser is None else browser
+        if chrome == "attach":
+            await asyncio.to_thread(read_debug_endpoint, chrome_data_dir())
         thread: ThreadRecord = (
             await runtime.store.create_thread(thread_title(goal), source)
             if thread_id is None
             else await runtime.store.get_thread(thread_id)
         )
         campaign: CampaignRecord = await runtime.store.create_campaign(
-            thread_title(goal), goal, thread.id, model_ref, level, approval_mode, [file.path for file in files]
+            thread_title(goal), goal, thread.id, model_ref, level, approval_mode, [file.path for file in files], chrome
         )
         try:
             run, _ = await self._launch(
@@ -578,6 +589,7 @@ class RunManager:
         last: RunRecord | None = sessions[-1] if sessions else None
         return Brief(
             goal=campaign.goal,
+            browser=campaign_browser(self._runtime.browser.config.mode, campaign),
             targets=campaign.targets,
             verification=campaign.verification,
             files=campaign.files,

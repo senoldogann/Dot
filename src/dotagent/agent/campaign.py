@@ -11,7 +11,7 @@ from collections.abc import Sequence
 
 from dotagent.core.text import truncate_tail
 from dotagent.core.types import FrozenModel
-from dotagent.store.models import ApprovalStatus, CampaignEntry, RunRecord, RunStatus
+from dotagent.store.models import ApprovalStatus, BrowserMode, CampaignEntry, CampaignRecord, RunRecord, RunStatus
 
 # How many entries of the ledger a brief shows, the newest last.
 BRIEF_ENTRIES: int = 12
@@ -49,9 +49,11 @@ class Brief(FrozenModel):
     the goal; ``instructions`` are the messages the owner sent in the campaign's conversation after its goal;
     ``strategy`` and ``progress`` are the newest entries of these kinds, which the brief shows also when they are
     older than ``entries``; ``without_progress`` is how many sessions in a row wrote no ``progress`` entry, and
-    ``patience`` how many of them the campaign accepts before it asks for a new strategy."""
+    ``patience`` how many of them the campaign accepts before it asks for a new strategy; ``browser`` is the Chrome
+    the session works in."""
 
     goal: str
+    browser: BrowserMode
     targets: str
     verification: str
     files: tuple[str, ...]
@@ -116,9 +118,18 @@ def _last_line(last: LastSession, now: float) -> str:
     return f"{ended}\nIts answer: {truncate_tail(said, _RESULT_CHARS)}" if said and not last.cut_off else ended
 
 
+BROWSER_LINES: dict[BrowserMode, str] = {
+    "attach": "Browser: the owner's own Chrome, signed in as they are (attach); their tabs are theirs to keep.",
+    "own": "Browser: Dot's own Chrome (own), signed in to nothing unless a session signed in.",
+}
+
+
 def render_brief(brief: Brief) -> str:
     """The opening message of session ``brief.session``."""
-    parts: list[str] = [f"This is session {brief.session} of a campaign. Its goal:\n{brief.goal}"]
+    parts: list[str] = [
+        f"This is session {brief.session} of a campaign. Its goal:\n{brief.goal}",
+        BROWSER_LINES[brief.browser],
+    ]
     if brief.targets:
         verified: str = f"\nVerified by: {brief.verification}" if brief.verification else ""
         parts.append(f"Targets: {brief.targets}{verified}")
@@ -159,6 +170,12 @@ def render_brief(brief: Brief) -> str:
             "new strategy entry with campaign_note (kind strategy) that tries another way, and follow it."
         )
     return "\n\n".join(parts)
+
+
+def campaign_browser(daemon_mode: BrowserMode, campaign: CampaignRecord) -> BrowserMode:
+    """The Chrome the campaign's sessions work in: its own choice, or the daemon's (``daemon_mode``) for a campaign
+    from before the choice."""
+    return daemon_mode if campaign.browser is None else campaign.browser
 
 
 def session_number(sessions: Sequence[RunRecord], run_id: str) -> int:

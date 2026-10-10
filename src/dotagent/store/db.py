@@ -33,6 +33,7 @@ from dotagent.store.models import (
     ApprovalRecord,
     ApprovalStatus,
     Behavior,
+    BrowserMode,
     CampaignEntry,
     CampaignEntryKind,
     CampaignRecord,
@@ -99,7 +100,7 @@ CREATE TABLE IF NOT EXISTS campaigns (
     id TEXT PRIMARY KEY, title TEXT NOT NULL, goal TEXT NOT NULL, targets TEXT NOT NULL, verification TEXT NOT NULL,
     status TEXT NOT NULL, thread_id TEXT NOT NULL, model TEXT NOT NULL, effort TEXT NOT NULL, approvals TEXT NOT NULL,
     files TEXT NOT NULL, cron TEXT, next_session_at REAL, created_at REAL NOT NULL, updated_at REAL NOT NULL,
-    evidence TEXT NOT NULL
+    evidence TEXT NOT NULL, browser TEXT
 );
 CREATE TABLE IF NOT EXISTS campaign_entries (
     id TEXT PRIMARY KEY, campaign_id TEXT NOT NULL, run_id TEXT, ts REAL NOT NULL, kind TEXT NOT NULL,
@@ -355,6 +356,7 @@ def _campaign(row: aiosqlite.Row) -> CampaignRecord:
             "created_at": row["created_at"],
             "updated_at": row["updated_at"],
             "evidence": row["evidence"],
+            "browser": row["browser"],
         }
     )
 
@@ -480,6 +482,10 @@ _ADDED_SCHEDULE_COLUMNS: tuple[tuple[str, str], ...] = (
 )
 
 
+# Columns of ``campaigns`` added later: NULL means the daemon's browser, which is where an older campaign's sessions ran.
+_ADDED_CAMPAIGN_COLUMNS: tuple[tuple[str, str], ...] = (("browser", "TEXT"),)
+
+
 async def _add_columns(connection: aiosqlite.Connection, table: str, added: Sequence[tuple[str, str]]) -> None:
     async with connection.execute(f"PRAGMA table_info({table})") as cursor:
         columns: set[str] = {str(row["name"]) for row in await cursor.fetchall()}
@@ -493,6 +499,7 @@ async def _add_missing_columns(connection: aiosqlite.Connection) -> None:
     await _add_columns(connection, "runs", _ADDED_RUN_COLUMNS)
     await _add_columns(connection, "memories", _ADDED_MEMORY_COLUMNS)
     await _add_columns(connection, "schedules", _ADDED_SCHEDULE_COLUMNS)
+    await _add_columns(connection, "campaigns", _ADDED_CAMPAIGN_COLUMNS)
     await connection.execute("CREATE INDEX IF NOT EXISTS runs_campaign ON runs(campaign_id, created_at)")
 
 
@@ -1427,8 +1434,9 @@ class Store:
         effort: Effort,
         approvals: ApprovalMode,
         files: Sequence[str],
+        browser: BrowserMode,
     ) -> CampaignRecord:
-        """Store a new campaign: active, without targets, with no session planned yet."""
+        """Store a new campaign: active, without targets, with no session planned yet, on the Chrome ``browser`` names."""
         now: float = time.time()
         record: CampaignRecord = CampaignRecord(
             id=new_id("cmp"),
@@ -1447,11 +1455,12 @@ class Store:
             created_at=now,
             updated_at=now,
             evidence="",
+            browser=browser,
         )
         await self._db.execute(
             "INSERT INTO campaigns(id, title, goal, targets, verification, status, thread_id, model, effort, approvals,"
-            " files, cron, next_session_at, created_at, updated_at, evidence)"
-            " VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            " files, cron, next_session_at, created_at, updated_at, evidence, browser)"
+            " VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (
                 record.id,
                 record.title,
@@ -1469,6 +1478,7 @@ class Store:
                 record.created_at,
                 record.updated_at,
                 record.evidence,
+                record.browser,
             ),
         )
         await self._db.commit()

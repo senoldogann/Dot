@@ -59,7 +59,13 @@ def eval_config(config: AppConfig) -> AppConfig:
         update={
             "models": config.models.model_copy(update={"helpers": [], "standby": []}),
             "agent": config.agent.model_copy(
-                update={"lessons": "off", "playbooks": False, "run_max_minutes": 0.0, "run_max_tokens": 0}
+                update={
+                    "lessons": "off",
+                    "playbooks": False,
+                    "run_max_minutes": 0.0,
+                    "run_max_tokens": 0,
+                    "campaign_browser": "own",
+                }
             ),
             "mcp": [],
             "skills": SkillsConfig(dirs=[]),

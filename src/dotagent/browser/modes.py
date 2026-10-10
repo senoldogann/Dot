@@ -9,9 +9,10 @@ from pathlib import Path
 
 from dotagent.browser.attach import read_debug_endpoint
 from dotagent.browser.session import BrowserSession
-from dotagent.config import BrowserConfig, BrowserMode
+from dotagent.config import BrowserConfig
 from dotagent.core.errors import BrowserError
 from dotagent.core.paths import browser_profile_dir, chrome_data_dir
+from dotagent.store.models import BrowserMode
 
 CHECK_THREAD: str = "attach-check"
 

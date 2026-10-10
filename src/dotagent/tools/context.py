@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Protocol
 
+from dotagent.browser.session import BrowserSession
 from dotagent.policy.types import ActionInfo, ApprovalMode, QuestionMode
 from dotagent.store.models import RunMode, RunRecord
 
@@ -49,6 +50,8 @@ class ToolContext:
     gives what the run's calls did so far, as the harness measured it, for a tool that has a claim checked."""
 
     runtime: "Runtime"
+    # The browser session this run works in: the daemon's, or the one of the mode its campaign asked for.
+    browser: BrowserSession
     run_id: str
     thread_id: str
     mode: RunMode

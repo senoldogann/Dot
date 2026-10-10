@@ -6,9 +6,9 @@ import tempfile
 import tomllib
 from pathlib import Path
 
-from dotagent.config import BrowserMode
 from dotagent.core.errors import ConfigError
 from dotagent.core.types import JsonObject
+from dotagent.store.models import BrowserMode
 
 _TABLE_HEADER: re.Pattern[str] = re.compile(r"^\s*\[")
 _BROWSER_HEADER: re.Pattern[str] = re.compile(r"^\s*\[\s*browser\s*\]\s*(#.*)?$")

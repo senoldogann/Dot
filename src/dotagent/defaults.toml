@@ -133,6 +133,11 @@ campaign_gap_minutes = 60
 campaign_wait_hours = 24
 campaign_patience_sessions = 3
 campaign_max_sessions = 0
+# The Chrome a campaign works in unless 'dotx run --standing --browser' or the API says otherwise: "attach" is the
+# Chrome you have open (your signed-in profile; it needs remote debugging, see 'dotx browser attach'), "own" is Dot's
+# own Chrome. A campaign that asks for your Chrome is refused at its start while that Chrome is closed or does not
+# allow the connection. Runs you start by hand keep [browser] mode.
+campaign_browser = "attach"
 # The most questions a run may ask the helper models ([models] helpers) with the consult tool; 0 offers no consult.
 consult_max_per_run = 5
 tool_output_chars = 12000

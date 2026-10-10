@@ -8,7 +8,7 @@ from zoneinfo import ZoneInfo
 
 from dotagent.agent.approvals import ApprovalBroker
 from dotagent.agent.judge import Judge, judge_for
-from dotagent.browser.modes import browser_data_dir
+from dotagent.browser.pool import BrowserPool
 from dotagent.browser.session import BrowserSession
 from dotagent.config import AppConfig
 from dotagent.core.logs import get_logger
@@ -73,7 +73,9 @@ class Runtime:
     approvals: ApprovalBroker
     router: ModelRouter
     judge: Judge
+    # The browser sessions: ``browser`` is the main one (the configured mode), ``browsers`` gives the one of a mode.
     browser: BrowserSession
+    browsers: BrowserPool
     desktop: DesktopSession
     terminals: Terminals
     web: WebClient
@@ -179,6 +181,7 @@ async def open_runtime(config: AppConfig, login_env: dict[str, str]) -> Runtime:
         cleanup.push_async_callback(close_memory_index, memory)
         registry: ToolRegistry = build_registry((*_tool_groups(config), build_mcp_tools(mcp)))
         bus: EventBus = EventBus(store)
+        browsers: BrowserPool = BrowserPool(config.browser, downloads_dir())
         runtime: Runtime = Runtime(
             config=config,
             store=store,
@@ -186,7 +189,8 @@ async def open_runtime(config: AppConfig, login_env: dict[str, str]) -> Runtime:
             approvals=ApprovalBroker(store, bus, config.policy.approval_timeout_s),
             router=ModelRouter(config, _call_recorder(store, bus)),
             judge=judge_for(config, bus),
-            browser=BrowserSession(config.browser, browser_data_dir(config.browser.mode), downloads_dir()),
+            browser=browsers.main,
+            browsers=browsers,
             desktop=DesktopSession(sized_for_agent(config), failsafe_path()),
             terminals=Terminals(config.shell.terminal_sessions, config.shell.terminal_idle_s, shell_env),
             web=WebClient(config.web, config.browser.allowed_hosts, config.browser.blocked_hosts),
@@ -209,7 +213,7 @@ async def open_runtime(config: AppConfig, login_env: dict[str, str]) -> Runtime:
 async def close_runtime(runtime: Runtime) -> None:
     await runtime.terminals.aclose()
     await runtime.desktop.close()
-    await runtime.browser.aclose()
+    await runtime.browsers.aclose()
     await runtime.mcp.close()
     await runtime.web.aclose()
     await runtime.router.aclose()

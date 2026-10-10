@@ -147,6 +147,7 @@ async def _context(runtime: Runtime, campaign_id: str | None) -> ToolContext:
     )
     return ToolContext(
         runtime=runtime,
+        browser=runtime.browser,
         run_id=run.id,
         thread_id=thread.id,
         mode="task",
@@ -247,7 +248,7 @@ async def test_a_campaign_claim_the_judge_finds_unlikely_is_refused_before_the_g
 ) -> None:
     thread: ThreadRecord = await runtime.store.create_thread("leads", "test")
     campaign: CampaignRecord = await runtime.store.create_campaign(
-        "Leads", GOAL, thread.id, "ollama:none", "medium", "ask", ()
+        "Leads", GOAL, thread.id, "ollama:none", "medium", "ask", (), "own"
     )
     await runtime.store.set_campaign_targets(campaign.id, "50 leads in leads.csv", "wc -l leads.csv counts 51 lines")
     ctx: ToolContext = await _context(runtime, campaign.id)

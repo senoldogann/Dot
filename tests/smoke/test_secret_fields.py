@@ -133,6 +133,7 @@ async def _context(runtime: Runtime, approvals: ApprovalMode) -> tuple[ToolConte
     )
     ctx: ToolContext = ToolContext(
         runtime=runtime,
+        browser=runtime.browser,
         run_id=run.id,
         thread_id=thread.id,
         mode="task",

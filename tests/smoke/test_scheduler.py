@@ -150,6 +150,7 @@ async def _until_over(runtime: Runtime, schedule_id: str) -> ScheduleRecord:
 async def _prepare(runtime: Runtime, name: str, arguments: JsonObject) -> tuple[PreparedCall, ToolContext]:
     ctx: ToolContext = ToolContext(
         runtime=runtime,
+        browser=runtime.browser,
         run_id="schedule-test",
         thread_id="schedule-test",
         mode="task",

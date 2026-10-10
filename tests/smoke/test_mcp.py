@@ -138,6 +138,7 @@ async def login_env(environment: None) -> dict[str, str]:
 async def _call(runtime: Runtime, name: str, arguments: JsonObject) -> tuple[ToolResult, ActionInfo]:
     ctx: ToolContext = ToolContext(
         runtime=runtime,
+        browser=runtime.browser,
         run_id="mcp-test",
         thread_id="mcp-test",
         mode="task",

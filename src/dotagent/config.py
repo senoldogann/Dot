@@ -12,6 +12,7 @@ from dotagent.core.paths import config_path
 from dotagent.core.types import FrozenModel, JsonObject
 from dotagent.llm.types import Effort
 from dotagent.policy.types import ApprovalMode, Preset, QuestionMode
+from dotagent.store.models import BrowserMode
 
 
 class ServerConfig(FrozenModel):
@@ -99,6 +100,8 @@ class AgentConfig(FrozenModel):
     campaign_wait_hours: float = Field(ge=0, allow_inf_nan=False)
     campaign_patience_sessions: int = Field(ge=1)
     campaign_max_sessions: int = Field(ge=0)
+    # The Chrome a campaign's sessions work in unless its start says otherwise.
+    campaign_browser: BrowserMode
     consult_max_per_run: int = Field(ge=0)
     tool_output_chars: int
     context_tokens: int
@@ -151,9 +154,6 @@ class PolicyConfig(FrozenModel):
     protected_paths: list[str]
     code_sources: list[Literal["mail", "messages"]]
     pace: PaceConfig
-
-
-type BrowserMode = Literal["own", "attach"]
 
 
 class BrowserConfig(FrozenModel):

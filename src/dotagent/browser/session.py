@@ -75,10 +75,11 @@ from dotagent.browser.types import (
     Viewport,
 )
 from dotagent.browser.upstream import ignore_repeated_frame_detach
-from dotagent.config import BrowserConfig, BrowserMode
+from dotagent.config import BrowserConfig
 from dotagent.core.errors import ApprovalRejected, BrowserError, HandedOff, PolicyDenied
 from dotagent.core.logs import get_logger
 from dotagent.core.text import truncate_middle
+from dotagent.store.models import BrowserMode
 
 _log = get_logger("dotagent.browser.session")
 

@@ -56,6 +56,7 @@ async def runtime(tmp_path_factory: pytest.TempPathFactory) -> AsyncIterator[Run
 async def _prepare(runtime: Runtime, arguments: JsonObject) -> tuple[PreparedCall, ToolContext]:
     ctx: ToolContext = ToolContext(
         runtime=runtime,
+        browser=runtime.browser,
         run_id="codes-test",
         thread_id="codes-test",
         mode="task",

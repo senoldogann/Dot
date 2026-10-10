@@ -84,6 +84,7 @@ def runs_router(ctx: ServerContext) -> APIRouter:
                 request.approvals,
                 request.goal_mode,
                 files,
+                request.browser,
             )
         return await ctx.manager.start(
             request.goal,

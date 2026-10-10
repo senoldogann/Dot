@@ -2371,8 +2371,8 @@ Paste this to the agent that takes the work:
 | 28  | Evidence on every plan step                                              | done    | 9a9fe5f |
 | 29  | Eval reports that compare runs, and the defaults that wait for them      | done    | 1513bd4 |
 | 30  | Typed best-of-two at critical decisions; injection fixtures in the evals | planned |         |
-| 31  | One-time codes from the owner's own Mail and Messages                    | in progress |     |
-| 32  | The owner's Chrome profile as the default of a campaign                  | planned |         |
+| 31  | One-time codes from the owner's own Mail and Messages                    | done    | 88abeed |
+| 32  | The owner's Chrome profile as the default of a campaign                  | in progress |     |
 | 33  | Pre-approved spending caps                                               | planned |         |
 | 34  | Research runs that keep notes, and hosted search by default              | done    | e68b22d |
 | 35  | A plan with dependencies and parallel branches                           | done    | d6b40c1 |
@@ -2684,10 +2684,27 @@ by hand keeps its current default. The campaign brief shows which profile it run
 **Why.** Cloud browsers are blocked or challenged by sites (dots' docs say so); the owner's signed-in profile is the
 advantage neither rival has. The attach path exists (README "Browser use").
 
-**Touchpoints.** `agent/campaign*.py`, `browser/attach.py`, `defaults.toml` (`[campaign] browser = "attach"`),
-README.
+**Design, as built.** The daemon had one browser session in one mode, so a campaign on the owner's Chrome while
+hand-started runs keep Dot's own needs a second session: `browser/pool.py` keeps the main session (the configured
+mode, which `dotx browser attach` still moves) and one session per other mode, made on first use and connected by the
+first call that needs it; `Runtime.browsers` holds the pool and `Runtime.browser` stays the main session. The run's
+session is chosen when it starts (`loop._browser_of`: the campaign's choice, a delegated run following its parent's
+campaign, else the daemon's) and travels in `ToolContext.browser`, which the browser tools and the crawler's renderer
+use instead of the runtime's. The campaign record gains `browser` (`own`/`attach`; `NULL` for a campaign from before,
+which keeps the daemon's), set at the start from `--browser`/the API's `browser` or `[agent] campaign_browser`
+(default `attach`; there is no `[campaign]` table in the configuration). A campaign that asks for the owner's Chrome
+is refused at its start while that Chrome is closed or has no debugging port (`read_debug_endpoint`), rather than
+failing session after session. The brief's second line names the Chrome; `dotx campaign show` and the campaign's page
+show it. Evals keep `campaign_browser = "own"`: a measurement never touches the owner's Chrome. The three-session X
+check is the owner's (decision 20); the offline tests cover the pool, the brief, the refusal and the stored choice.
 
-**Done when.** A campaign over three sessions keeps its X session; the brief names the profile; README.
+**Touchpoints.** `browser/pool.py` (new), `runtime.py`, `tools/context.py`, `tools/browser.py`, `tools/web.py`,
+`agent/loop.py`, `agent/resume.py`, `agent/campaign.py`, `agent/manager.py`, `store/models.py` (`BrowserMode` now
+lives here), `store/db.py`, `config.py`, `defaults.toml`, `evals/runner.py`, `cli.py`, `cli_campaign.py`,
+`server/views.py`, `server/routes_runs.py`, `server/static/js/views/campaigns.js`, README "Campaigns".
+
+**Done when.** The pool gives one session per mode without starting a Chrome; a campaign's brief names its Chrome; a
+campaign that asks for a closed Chrome is refused and one on Dot's own starts with the choice stored; README.
 
 ### 33. Pre-approved spending caps
 
@@ -3072,6 +3089,10 @@ item ends as a measured no, written in the log.
     program that runs Dot (`dotx doctor`, row `one-time codes`). The live test sends a mail to your own address and
     reads the code back: `DOT_MAIL_TESTS=1 uv run pytest tests/smoke/test_codes.py`. A `yolo` run that signs in to a
     site that mails you a code is yours to try (decision 12).
+20. Campaigns work in your own Chrome by default from item 32 on (`[agent] campaign_browser = "attach"`): a campaign
+    you start while your Chrome is closed or without remote debugging is refused with the reason, and `dotx run
+    --standing --browser own` keeps it on Dot's Chrome. The check that is yours: a campaign over three sessions on X
+    keeps your session (the brief of each session names the Chrome). Set `campaign_browser = "own"` to go back.
 
 ## Log
 
@@ -3460,3 +3481,5 @@ item ends as a measured no, written in the log.
 - 2026-10-10 (Fable 5.1): item 34 built on branch `item-34-research-notes` (MYP-172): `tools/notes.py` with `write_notes` (one Markdown file per run under `<workspace>/notes/`, in the undo journal, offered in task and research runs), the policy's mode gate allows `notes_write` and `memory_write` in research (`memory_save` in every mode), `[web] search_backend = "auto"` (the new default; decision 18) resolved once at runtime start, `dotx doctor` `web search` row, research prompt names `write_notes`/`memory_save`/`web_crawl`, web bullet on `web_crawl`/`web_extract`. The small-window scaffold smoke test moved from a 24 000 to a 26 000 token window: the three core tools of items 41 and 34 made the fixed prompt about 700 tokens larger, and what a compaction keeps grows a little each time, so the old window ended up compacting at every step. Gate: format, check, mypy clean; unit 597; `dotx eval check` ok; smoke (research notes, memory, web, doctor, approval modes, plan branches, undo, run limits, crawl, scaffold, tool groups) 64 passed.
 - 2026-10-10 (Fable 5.1): item 34 merged e68b22d (PR #31, MYP-172 Done). Next: item 31 (one-time codes from Mail and Messages).
 - 2026-10-10 (Fable 5.1): item 31 built on branch `item-31-one-time-codes` (MYP-173): `desktop/codes.py` (Mail through AppleScript, Messages through its database read-only, the code rule: a 4 to 8 digit number after a cue word, `G-` prefixed, opening the message, or the only six-digit number), `tools/codes.py` with `code_fetch` registered only when `[policy] code_sources` names an application (default empty; decision 19), a high-risk `app_control` action, result is the code with sender and age only; `dotx doctor` row `one-time codes`; the yolo sentence of the prompt names the tool. Design corrected: one connector module, Messages read from `chat.db` (no scripting for received messages), "ask asks once" is the owner's opt-in plus the presets. Gate: format, check, mypy clean; unit 610; `dotx eval check` ok; smoke (codes, doctor, tool groups, scaffold, research notes, approval modes) 24 passed, the live Mail test skipped (owner-run, `DOT_MAIL_TESTS=1`).
+- 2026-10-10 (Fable 5.1): item 31 merged 88abeed (PR #32, MYP-173 Done). Next: item 32 (the owner's Chrome profile as the default of a campaign).
+- 2026-10-10 (Fable 5.1): item 32 built on branch `item-32-campaign-browser` (MYP-174): `browser/pool.py` (the daemon's session plus one per other mode, made on first use), `ToolContext.browser` chosen when a run starts (its campaign's choice, a delegated run following its parent's campaign, else the daemon's), `CampaignRecord.browser` with `[agent] campaign_browser = "attach"` as the default (decision 20), `--browser`/API `browser`, a campaign on the owner's Chrome refused while that Chrome is closed or has no debugging port, the brief's second line names the Chrome, `dotx campaign show` and the campaign page show it; evals keep `own`. Design corrected: no `[campaign]` table, one pool instead of switching the shared session. Gate: format, check, mypy clean; unit 611; `dotx eval check` ok; smoke (campaigns, web, crawl, memory, codes, judge, pace, scheduler, terminal, skills, MCP, secret fields, server, resume, plan branches, scaffold) 137 passed, 1 skipped; the two live-model delegate tests (`gpt-oss:20b-cloud` through the owner's Ollama) fail on main too: the model passes `step=1` to `delegate` before any plan exists, item 35's check refuses that call, and the test helper expects one delegate result. Finding, not a regression (log of item 35 to be revisited: the live model wastes a turn on a step it has not planned).
