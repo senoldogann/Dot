@@ -3282,8 +3282,8 @@ third; 49 (the face as the state) and 50 (the visual system) next, form on top o
 | #   | Item                                                                     | Status  | Commits |
 | --- | ------------------------------------------------------------------------ | ------- | ------- |
 | 46  | Dot's computer: the live view and the handover                           | done    | f4d3754 |
-| 47  | Activity: everything in motion in one list                               | in progress |         |
-| 48  | Rules in four answers                                                    | planned |         |
+| 47  | Activity: everything in motion in one list                               | done    | 2282e57 |
+| 48  | Rules in four answers                                                    | in progress |         |
 | 49  | The face as the state                                                    | planned |         |
 | 50  | The visual system                                                        | planned |         |
 | 51  | The desktop shell                                                        | planned |         |
@@ -3371,22 +3371,36 @@ rows in the right sections, and the row of the approval opens it; wide and phone
 
 ### 48. Rules in four answers
 
-**What.** The Rules tab speaks the owner's language: a rule is "when Dot would {tool_glob}, matching {regex}: *do it*
-/ *do it when I said so in this chat* / *ask me first* / *hand it to me*". The first three are the existing
-decisions; *hand it to me* is new: the run asks a question that says what it needs done and, when the browser is
-involved, offers the takeover of item 46; on the owner's "done" it goes on.
+**What.** The Rules tab speaks the owner's language: a rule reads "When Dot would use {tool}, matching {pattern}:
+*do it* / *do it, whatever it has read* / *ask me first* / *hand it to me*". The four answers are the four behaviours
+the policy has had since the hand-off rules of Part 2 (`allow`, `preapproved`, `ask`, `handoff`); what the item adds
+is the wording, the sentence form, a segmented control in place of the select, and the takeover of item 46 offered on
+a hand-off question of a browser step.
 
 **Why.** dots' four rules read well and the reviewers said so; Dot's rules have the same shape (tool glob, regex,
-decision) and lack the fourth answer and the plain wording. The second answer, "when I said so", is what the
-`do_not_ask_again` note of a campaign already does for a session; the rule makes it standing.
+decision) and the same four outcomes, but named for the engine (`preapproved`) rather than for the owner.
 
-**Design.** `RuleRequest` gains the fourth decision; the policy's check returns it as a `handoff` outcome that the
-executor turns into a question event with a `takeover` hint; `rules.js` renders the four as a segmented control with
-the sentence above. Read `policy/` first: where the code's decisions differ from the three named here, the section is
-corrected before the fourth is added.
+**Design, corrected before building.** The plan said the fourth answer was new and that the second meant "do it when I
+said so in this chat". Neither held against `policy/engine.py`: `owner_handoff` and the `handoff` behaviour exist, the
+approval card already says "Dot needs you to take over this step" with "I did it" / "Skip this step", and on "I did it"
+the executor turns the `HandedOff` into a tool result ("The user handled this step themselves. Continue from there.") so
+the run goes on. The second behaviour, `preapproved`, means "skip the question untrusted content raises too"; a rule that
+would hold only "when I said so in this chat" has no decision behind it and would need a judgment the policy does not
+make, so the second answer is worded for what the engine does: *do it, whatever it has read*. The campaign's
+`do_not_ask_again` note stays the session-scoped form of that.
 
-**Touchpoints.** `policy/`, `server/views.py`, `server/routes_data.py`, `agent/executor.py`, `static/js/views/rules.js`,
-`settings.css`, README (Safety).
+**Design, as built.** `rules.js` keeps the four behaviour ids and renders them as answers: a `segmented` control (class
+`answers`, wrapping on a phone) with a hint per answer, a live sentence above the form ("When Dot would use `shell`,
+matching `^git push`: *ask me first*."), and each rule row as the same sentence with the answer as a badge. The policy
+is untouched. `approvals.js` adds, on a pending hand-off whose tool is `browser_*`, a "Take the browser over" button
+that posts `/runs/{id}/takeover` and turns into "Return control" (`/handback`); a hand-off of any other tool shows no
+offer. README (Safety) names the four answers with their engine words. Tests: `tests/unit/test_rule_answers.py` (each
+answer on a matching action, tainted and not; a non-matching pattern leaves the preset to decide; a hand-off is the
+user's in every approval mode) and `tests/smoke/test_rule_handoff.py` (a *hand it to me* rule on `write_file` stops
+the write, the run asks with severity `handoff`, the Rules tab shows the sentence and the four answers wide and on a
+phone in both looks, "I did it" is clicked in the run page, the run ends done and the file was never written).
+
+**Touchpoints.** `static/js/views/rules.js`, `static/js/approvals.js`, `settings.css`, README (Safety), tests.
 
 **Done when.** A unit test for each of the four answers; a smoke test where a *hand it to me* rule stops a write,
 asks, and the run ends after the owner answers; wide and phone, both looks.
@@ -4067,3 +4081,4 @@ tailnet for an approval and opens the run (owner's run, logged by hand in this f
 - 2026-10-11 (Fable 5.1): the DeepSeek arms of decision 29 ended (62/68 both; the router costs 2.2 steps, 18.2k tokens and 3.7 s a pass): off it stays. Item 46 started on `item-46-live-view` (MYP-186).
 - 2026-10-11 (Fable 5.1): item 46 merged f4d3754 (PR #48, MYP-186 Done; gate green). Next: item 47 (Activity).
 - 2026-10-11 (Fable 5.1): decisions 30 (Tauri 2), 31 (Tailscale, PWA first) and 32 (the state dot, no character) taken at the owner's word. Item 47 started on `item-47-activity`.
+- 2026-10-11 (Fable 5.1): item 47 merged 2282e57 (PR #49, MYP-187 Done; gate green). Next: item 48 (rules in four answers).

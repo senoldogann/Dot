@@ -58,6 +58,30 @@ function iconOf(severity) {
   return severity === "handoff" ? "hand" : "shield";
 }
 
+const TAKEOVER_IDLE = "Dot's window comes to the front and the run waits while you have it.";
+const TAKEOVER_HELD = "You have the browser. Do the step, return control, then say you did it.";
+
+/** On the hand-off of a browser step, the offer of the live view: take the browser over, do the step, give it back. */
+function takeoverOffer(runId) {
+  let held = false;
+  const button = el("button", { class: "btn sm", type: "button" }, icon("hand"), "Take the browser over");
+  const text = el("span", { class: "small muted" }, TAKEOVER_IDLE);
+  button.addEventListener("click", async () => {
+    button.disabled = true;
+    try {
+      await api.post(`/runs/${runId}/${held ? "handback" : "takeover"}`, {});
+      held = !held;
+      button.replaceChildren(icon("hand"), held ? "Return control" : "Take the browser over");
+      text.textContent = held ? TAKEOVER_HELD : TAKEOVER_IDLE;
+    } catch (error) {
+      toast("error", error.message);
+    } finally {
+      button.disabled = false;
+    }
+  });
+  return el("div", { class: "row takeover-offer" }, button, text);
+}
+
 /** The parts of a card that are there: `replaceChildren` would turn a part left out (null) into the text "null". */
 function present(...parts) {
   return parts.filter((part) => part !== null);
@@ -184,6 +208,7 @@ export function approvalCard({ approval, heading, onSettled, leftNote }) {
         el("div", { class: "approval-text" }, text),
         isLeft ? el("div", { class: "small muted" }, leftNote) : null,
         isQuestion ? options : technicalDetails(approval.args),
+        isHandoff && approval.status === "pending" && approval.tool.startsWith("browser_") ? takeoverOffer(approval.runId) : null,
         el(
           "div",
           { class: "approval-actions" },

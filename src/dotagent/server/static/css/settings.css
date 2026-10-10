@@ -229,3 +229,36 @@
     padding: 7px 12px;
   }
 }
+
+/* Rules read as sentences: "When Dot would use shell, matching ^git push: ask me first." The four answers sit in a
+   segmented control that wraps on a phone. */
+.rule-sentence {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 8px;
+  line-height: 1.5;
+}
+
+.rule-sentence-preview {
+  color: var(--text-2);
+}
+
+.rule-sentence-preview svg {
+  flex: none;
+  color: var(--accent);
+}
+
+.rule-preview code {
+  color: var(--text);
+}
+
+.segmented.answers {
+  flex-wrap: wrap;
+}
+
+@container (max-width: 640px) {
+  .segmented.answers button {
+    flex: 1 1 auto;
+  }
+}
