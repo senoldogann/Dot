@@ -133,5 +133,9 @@ def test_timings_are_described_in_local_time() -> None:
 
 def test_the_zone_is_looked_up_by_name() -> None:
     assert resolve_zone("Europe/Helsinki").key == "Europe/Helsinki"
+    with pytest.MonkeyPatch.context() as patch:
+        patch.setenv("TZ", "Asia/Tokyo")
+        assert resolve_zone("").key == "Asia/Tokyo"
+        assert resolve_zone("Europe/Helsinki").key == "Europe/Helsinki"
     with pytest.raises(ConfigError, match="unknown time zone"):
         resolve_zone("Mars/Olympus_Mons")

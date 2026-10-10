@@ -422,7 +422,8 @@ similar_threshold = 0.85
 max_chars = 600
 
 [scheduler]
-# IANA name ("Europe/Helsinki") of the zone that cron expressions and one-time moments are read in; "" = this Mac's zone.
+# IANA name ("Europe/Helsinki") of the zone that cron expressions and one-time moments are read in; "" = the zone the
+# TZ environment variable names when one is set, else this Mac's zone.
 timezone = ""
 # How often the daemon looks for schedules that are due.
 tick_s = 15.0

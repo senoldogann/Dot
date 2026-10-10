@@ -20,6 +20,8 @@ jobs:
       DOT_HOME: ${{ github.workspace }}/.ci/home
       DOT_LOG_DIR: ${{ github.workspace }}/.ci/logs
       DOT_CHROME_DIR: ${{ github.workspace }}/.ci/chrome
+      # The runner's /etc/localtime is not a link into the zone database, so the zone is named here.
+      TZ: UTC
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v6

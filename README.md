@@ -1019,7 +1019,7 @@ dotx schedule disable|enable|delete ID
 ```
 
 A schedule is a complete goal that Dot runs later, once (`--at`) or on a cron rhythm (`--cron`, five fields, read in
-`[scheduler] timezone`, which defaults to the zone of this Mac). Each firing starts a fresh run without any conversation,
+`[scheduler] timezone`, which defaults to the zone `TZ` names when it is set, else the zone of this Mac). Each firing starts a fresh run without any conversation,
 so the goal has to say everything. The agent can create schedules too (`schedule_create`).
 
 On Settings › Schedules a schedule is created and edited whole: its name, goal, repetition (cron or one moment), time
