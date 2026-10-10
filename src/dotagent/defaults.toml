@@ -97,7 +97,10 @@ max_concurrent = 4
 # The typed judge answers two questions where code has no answer of its own, each with the probability of yes. Does a
 # click on a browser control whose label no pattern of the policy knows publish, send, pay or delete? At or above
 # public_action_threshold the click gets that flag, so the policy treats it as a click on "Post" or "Delete". Does a
-# campaign's claim of its targets hold? Below target_threshold the claim is refused before the goal checker is asked.
+# campaign's claim of its targets hold, or a run's answer in goal mode reach its goal? Below target_threshold the claim
+# is refused before the goal checker is asked. And when a browser_act names what it expects to see (expect), the result
+# opens with the probability that the page shows it and that it is a login wall, a CAPTCHA or an error page. The click
+# questions are asked in ask and auto only: in yolo a flag asks nothing, so a click there sends nothing.
 # "none" leaves both to the patterns and the goal checker; "typesafe" asks TypeSafe's System One API, a paid service:
 # one request per judged click or claim, bounded by timeout_s. A missing key or a failed request leaves the decisions
 # to the patterns and the goal checker for [models] helper_cooldown_s, with a judge_unavailable event.

@@ -12,7 +12,7 @@ from typing import Literal
 
 from pydantic import Field
 
-from dotagent.agent.judge import ClickFacts, ClickJudgment
+from dotagent.agent.judge import ClickFacts, ClickJudgment, PageCheck, PageFacts, render_page_check
 from dotagent.browser.render import (
     describe_step,
     render_act_outcome,
@@ -74,6 +74,9 @@ _LABEL_CHARS: int = 50
 _DEFAULT_FIND_LIMIT: int = 10
 # How much of the page's text is read for the amount of a payment step.
 _AMOUNT_PAGE_CHARS: int = 20_000
+# How much of the page's text the typed judge reads after a batch that named what it expected.
+_CHECKED_PAGE_CHARS: int = 6000
+_EXPECT_CHARS: int = 300
 _DEFAULT_LINKS_LIMIT: int = 40
 _DEFAULT_WAIT_S: float = 10.0
 _VIEWPORT_SCROLL_RATIO: float = 0.8
@@ -274,6 +277,15 @@ class ActArgs(ToolArgs):
         default=False,
         description="Accept confirm() dialogs this batch triggers (purchase or payment confirmations are never accepted).",
     )
+    expect: str | None = Field(
+        default=None,
+        max_length=_EXPECT_CHARS,
+        description=(
+            "What the page should show after the steps, in a few words ('the reply shows under the post', 'the order "
+            "confirmation'). When the typed judge is on, the result opens with the probability that the page shows it "
+            "and that it is a login wall, a CAPTCHA or an error page, so you need not read the whole page to know."
+        ),
+    )
 
 
 def _element_at(ref: str | None, ctx: ToolContext) -> Element | None:
@@ -330,6 +342,14 @@ async def _payment_amount(ctx: ToolContext, elements: list[Element | None]) -> A
     return total_on_page(page.text)
 
 
+async def _page_check(expected: str, outcome: ActOutcome, ctx: ToolContext) -> PageCheck | None:
+    """The typed judge's numbers about the page after a batch, from its visible text; ``None`` when the judge is off or
+    unavailable."""
+    page: TextView = await ctx.browser.read_text(ctx.thread_id, None, 0, _CHECKED_PAGE_CHARS)
+    facts: PageFacts = PageFacts(url=outcome.view.url, title=outcome.view.title, text=page.text, expected=expected)
+    return await ctx.runtime.judge.judge_page(facts, ctx.run_id)
+
+
 def _act_tool() -> RegisteredTool:
     async def classify(args: ActArgs, ctx: ToolContext) -> ActionInfo:
         limit: int = ctx.runtime.config.browser.max_batch_steps
@@ -349,10 +369,17 @@ def _act_tool() -> RegisteredTool:
         summary: str = "; ".join(_step_label(step, element, target) for step, element, target in judged)
         target: str = ctx.browser.current_url(ctx.thread_id) or ""
         # The typed judge reads the clicks whose labels no pattern knows; it can only add reasons, never take one away.
-        judgments: list[ClickJudgment] = await asyncio.gather(
-            *(
-                ctx.runtime.judge.judge_click(ClickFacts(label=element.name, role=element.role, url=target), ctx.run_id)
-                for element in unexplained_clicks([(step, element) for step, element, _ in judged])
+        # In yolo a flag asks nothing, so nothing is asked.
+        judgments: list[ClickJudgment] = (
+            []
+            if ctx.approvals == "yolo"
+            else await asyncio.gather(
+                *(
+                    ctx.runtime.judge.judge_click(
+                        ClickFacts(label=element.name, role=element.role, url=target), ctx.run_id
+                    )
+                    for element in unexplained_clicks([(step, element) for step, element, _ in judged])
+                )
             )
         )
         found: list[StepAssessment] = [assessment_for(judgment.reasons) for judgment in judgments if judgment.reasons]
@@ -381,7 +408,11 @@ def _act_tool() -> RegisteredTool:
         outcome: ActOutcome = await ctx.browser.act(
             ctx.thread_id, args.steps, args.accept_dialogs, _secret_field_check(ctx, authorized)
         )
-        return ok(render_act_outcome(outcome, _nonce(), _body_budget(ctx)))
+        rendered: str = render_act_outcome(outcome, _nonce(), _body_budget(ctx))
+        if args.expect is None:
+            return ok(rendered)
+        check: PageCheck | None = await _page_check(args.expect, outcome, ctx)
+        return ok(rendered if check is None else f"{render_page_check(check)}\n{rendered}")
 
     return make_reviewed_tool(
         name="browser_act",

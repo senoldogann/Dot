@@ -4,11 +4,17 @@
 - whether a click on a browser control whose label no pattern of the policy knows publishes, sends, pays or deletes
   (:meth:`Judge.judge_click`): a probability at or above ``public_action_threshold`` gives the click the reason a
   pattern would have given it, so the policy treats it as a click on "Post" or "Delete";
-- whether a campaign's claim of its targets holds (:meth:`Judge.judge_claim`): below ``target_threshold`` the claim is
-  refused before the goal checker is asked.
+- whether a campaign's claim of its targets holds, and whether a run's answer in goal mode reaches its goal
+  (:meth:`Judge.judge_claim`): below ``target_threshold`` the claim is refused before the goal checker is asked;
+- what the page after a browser action shows (:meth:`Judge.judge_page`), when the action named what it expected to
+  see: whether it shows that, and whether it is a login wall, a CAPTCHA or an error page, so the next turn starts from
+  those numbers.
 
-The judge never decides a step and never grants anything: it adds flags that make the policy ask, or stops a claim the
-goal checker would have examined. What it sends has its secrets masked, and a page's address goes without its query and
+The click questions are asked in ``ask`` and ``auto`` only: in ``yolo`` a flag asks nothing, so a click there sends
+nothing to the judge.
+
+The judge never decides a step and never grants anything: it adds flags that make the policy ask, stops a claim the
+goal checker would have examined, or puts numbers above a page the model reads anyway. What it sends has its secrets masked, and a page's address goes without its query and
 fragment. It asks through the :class:`TypeSafeService` of the runtime, which the judge_items tool shares: a missing
 key or an outage makes the service unavailable for ``[models] helper_cooldown_s``, with a ``judge_unavailable`` event,
 and meanwhile the patterns and the goal checker decide alone; a request TypeSafe rejects is a ``judge_error`` of this
@@ -160,10 +166,96 @@ class ClaimJudgment(FrozenModel):
     second: float | None
 
 
+class PageFacts(FrozenModel):
+    """The page after a browser action, as the judge sees it: its address, its title, its visible text and what the
+    action expected to see."""
+
+    url: str
+    title: str
+    text: str
+    expected: str
+
+
+class PageCheck(FrozenModel):
+    """What the judge found on the page after an action: the probability that it shows what the action expected, and
+    that it is a login wall, a CAPTCHA or an error page."""
+
+    expected: float
+    login_wall: float
+    captcha: float
+    error_page: float
+
+
+# The questions about the page after an action, besides the one about what the action expected.
+PAGE_QUESTIONS: tuple[NoulQuestion, ...] = (
+    NoulQuestion(
+        id="login_wall",
+        instructions=(
+            "Is the page at `page` a sign-in or log-in wall: it asks for credentials or an account before it shows "
+            "what the address is for?"
+        ),
+    ),
+    NoulQuestion(
+        id="captcha",
+        instructions="Does the page at `page` ask to solve a CAPTCHA, a puzzle or a verification that one is human?",
+    ),
+    NoulQuestion(
+        id="error_page",
+        instructions=(
+            "Is the page at `page` an error page: a server error, a page not found, an access denied, a rate limit or "
+            "a message that something went wrong, in place of the content?"
+        ),
+    ),
+)
+EXPECTED_QUESTION: NoulQuestion = NoulQuestion(
+    id="expected",
+    instructions="Does the page at `page` show what `expected` describes, as the result of the action just taken?",
+)
+
+
+def page_state(facts: PageFacts) -> JsonObject:
+    return {
+        "page": {"url": _page(facts.url), "title": facts.title, "text": facts.text},
+        "expected": facts.expected,
+    }
+
+
+def page_check(probabilities: dict[str, float]) -> PageCheck:
+    return PageCheck(
+        expected=probabilities[EXPECTED_QUESTION.id],
+        login_wall=probabilities["login_wall"],
+        captcha=probabilities["captcha"],
+        error_page=probabilities["error_page"],
+    )
+
+
+def render_page_check(check: PageCheck) -> str:
+    """The judge's line above an action's result: the probabilities, as the next turn reads them."""
+    return (
+        f"Typed check of the page after the steps: what you expected shows {check.expected:.2f}; login wall "
+        f"{check.login_wall:.2f}, CAPTCHA {check.captcha:.2f}, error page {check.error_page:.2f}."
+    )
+
+
+def claim_state(goal: str, plan: str, targets: str, digest: str, facts: str, claim: str) -> JsonObject:
+    """What the typed judge reads of a claim that a goal or a campaign's targets are reached: what the goal checker
+    reads."""
+    return {
+        "goal": goal,
+        "plan": plan,
+        "targets": targets,
+        "ledger": digest,
+        "session_facts": facts,
+        "claim": claim,
+    }
+
+
 class Judge(Protocol):
     async def judge_click(self, facts: ClickFacts, run_id: str) -> ClickJudgment: ...
 
     async def judge_claim(self, claim: JsonObject, run_id: str) -> ClaimJudgment: ...
+
+    async def judge_page(self, facts: PageFacts, run_id: str) -> PageCheck | None: ...
 
     async def retire(self) -> None: ...
 
@@ -229,6 +321,9 @@ class NoJudge:
 
     async def judge_claim(self, claim: JsonObject, run_id: str) -> ClaimJudgment:
         return ClaimJudgment(probability=None, second=None)
+
+    async def judge_page(self, facts: PageFacts, run_id: str) -> PageCheck | None:
+        return None
 
     async def retire(self) -> None:
         return None
@@ -414,6 +509,12 @@ class TypeSafeJudge:
             return ClaimJudgment(probability=first, second=None)
         second: dict[str, float] | None = await self._ask(claim, (SECOND_CLAIM_QUESTION,), run_id)
         return ClaimJudgment(probability=first, second=None if second is None else second[SECOND_CLAIM_QUESTION.id])
+
+    async def judge_page(self, facts: PageFacts, run_id: str) -> PageCheck | None:
+        probabilities: dict[str, float] | None = await self._ask(
+            page_state(facts), (EXPECTED_QUESTION, *PAGE_QUESTIONS), run_id
+        )
+        return None if probabilities is None else page_check(probabilities)
 
     async def retire(self) -> None:
         await self._service.retire()

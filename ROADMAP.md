@@ -2383,8 +2383,8 @@ Paste this to the agent that takes the work:
 | 40  | Cold start of `dotx`                                                     | done    | 9ebe8e0 |
 | 41  | An own crawler: fetch, render, crawl, extract                            | done    | aedab8b |
 | 42  | TypeSafe as a tool of the agent: many items judged in one call           | done    | f0b1188 |
-| 43  | Typed judgments in X campaigns: what to answer, the best draft, a check  | in progress |         |
-| 44  | Typed checks before a model call: the page after an action, the goal     | planned |         |
+| 43  | Typed judgments in X campaigns: what to answer, the best draft, a check  | done    | aa1c77d |
+| 44  | Typed checks before a model call: the page after an action, the goal     | in progress |         |
 | 45  | A step's model chosen by a typed judgment                                | planned |         |
 
 **Order and dependencies.** 22 first: cheap, and every later item is judged with it. Then 24 and 23 (the two biggest
@@ -3162,6 +3162,26 @@ many). The pattern is verify and escalate (`https://docs.typesafe.ai/cookbooks/c
 22's numbers on the eval set show fewer turns or seconds per task with the checks; with `[judge] provider =
 "typesafe"`, a click in `yolo` sends nothing to TypeSafe.
 
+**Design, as built.** All three go through the `Judge` of the runtime, so `[judge] provider = "typesafe"` switches
+them on together and `"none"` leaves everything as it was. (1) `browser_act` took an optional `expect` (a few words
+on what the page should show after the steps). When it is given, the tool reads the page's visible text after the
+batch (6,000 characters at most) and asks `Judge.judge_page` four Nouls in one request over `{"page": {url without
+query and fragment, title, text}, "expected"}`: whether the page shows what was expected, whether it is a login wall,
+a CAPTCHA, an error page (`EXPECTED_QUESTION`, `PAGE_QUESTIONS` in `agent/judge.py`). The result opens with one
+Dot-written line above the fenced page ("Typed check of the page after the steps: what you expected shows 0.90; login
+wall 0.05, CAPTCHA 0.05, error page 0.05."), the numbers only: no threshold acts on them, the next turn reads them.
+Without `expect`, or with the judge off or paused, nothing is asked and the result is as before. (2) The goal check of
+a run in goal mode (`loop._ask_checker`) asks `Judge.judge_claim` first when the run claims success, on the same state
+the goal checker reads (`claim_state`, now shared with `campaign_achieved`); a claim below `target_threshold` comes
+back as a `continue` verdict whose reason carries the judge's number, so the run is sent back without the review
+model's call, and the `goal_check` event records it like any verdict; a clear yes and the middle go to the review model
+as before, and a run that ended failed is not judged. (3) The click judgments in `browser_act`'s classification run
+only when `ctx.approvals != "yolo"`. Measured on the stand-in in `tests/smoke/test_judge.py`: a posted reply, a
+login wall and an error page get the right numbers through the real tool and headless Chrome; in `yolo` a click on
+"Boost" makes no request; a goal-mode run of five finishes that claim success is sent back five times on the judge's
+0.10 and never reaches the review model. The eval-set numbers (fewer turns or seconds with the checks) need a live
+model and a key: decision 28.
+
 ### 45. A step's model chosen by a typed judgment
 
 **What.** Before a step, a Choice over the run's models (the fast model of item 24, the main model, a helper of item
@@ -3293,6 +3313,11 @@ item ends as a measured no, written in the log.
     twenty or thirty posts of your own X feed (would answer / would not) and run them through `rank_posts`' questions
     (the hosted test shows how); if a post you would answer falls under one you would not, change the weights with a
     `campaign_note` carrying `w_topic`, `w_person`, `w_reply`, and set the threshold where your rejected drafts fall.
+28. The checks before a model call (item 44) are on whenever `[judge] provider = "typesafe"`; the click questions
+    no longer run in `yolo`, which removes the cost decision 9 named, so the judge can stay on in `yolo` for the page
+    check and the goal check alone. Whether they save turns or seconds on the eval set is not measured here: run
+    `dotx eval run --model REF --repeat 2` with the judge on and off (`[judge] provider` in `config.toml`) and compare
+    the reports; the page check only acts when the model fills `expect`, so look at how often it did in the timelines.
 
 ## Log
 
@@ -3702,3 +3727,5 @@ item ends as a measured no, written in the log.
 - 2026-10-10 (Fable 5.1): item 42 built on branch `item-42-judge-items` (MYP-182): `TypeSafeService` shared by the judge and the new `judge_items` tool (one Noul or Score per item in one request, ranked), 422 and malformed answers as `judge_error` without a pause, `[judge] items_per_request = 100` from the measured requests, eval task `filter-headlines`, decision 26.
 - 2026-10-10 (Fable 5.1): item 42 merged f0b1188 (PR #41, MYP-182 Done; gate green). Next: item 43.
 - 2026-10-10 (Fable 5.1): item 43 built on branch `item-43-x-judgments` (MYP-183): `tools/posts.py` (rank_posts with ledger weights and a posts_ranked event, pick_draft on a Choice, check_draft with the draft threshold), Choice in `llm/typesafe.py`, campaign prompt bullet, README, decision 27. Hosted: precision@10 1.00 on the synthetic sample in 0.64 s.
+- 2026-10-10 (Fable 5.1): item 43 merged aa1c77d (PR #42, MYP-183 Done; gate green). Next: item 44.
+- 2026-10-10 (Fable 5.1): item 44 built on branch `item-44-typed-checks` (MYP-184): `expect` on browser_act with `Judge.judge_page` (expected, login wall, CAPTCHA, error page), the goal check judged first in goal mode (`claim_state` shared), no click judgments in `yolo`; stand-in smoke tests for the three pages, yolo and a goal-mode run; decision 28.
