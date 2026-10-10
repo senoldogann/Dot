@@ -74,9 +74,9 @@
   flex-wrap: wrap;
   gap: 2px 8px;
   padding: 5px 8px 5px 4px;
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   color: var(--text-2);
-  font-size: 13px;
+  font-size: var(--fs-sm);
   cursor: pointer;
   list-style: none;
   user-select: none;
@@ -116,7 +116,7 @@
   white-space: nowrap;
   color: var(--muted);
   font-family: var(--mono);
-  font-size: 12px;
+  font-size: var(--fs-xs);
 }
 
 /* An open group already shows every step, so the line about the latest one would only say it twice. */
@@ -163,7 +163,7 @@
   padding: 14px 14px 24px;
   border-left: 1px solid var(--border);
   background: var(--bg);
-  box-shadow: 0 0 40px rgb(0 0 0 / 28%);
+  box-shadow: var(--shadow-overlay);
 }
 
 .inspector[data-mode="drawer"] .inspector-head {
@@ -174,7 +174,7 @@
   position: fixed;
   inset: 0;
   z-index: 39;
-  background: rgb(0 0 0 / 42%);
+  background: var(--scrim);
 }
 
 .inspector-shot {
@@ -182,7 +182,7 @@
   width: 100%;
   padding: 0;
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   background: var(--surface-2);
   overflow: hidden;
   cursor: zoom-in;
@@ -205,12 +205,12 @@
   place-items: center;
   min-height: 96px;
   padding: 12px;
-  border-radius: 10px;
-  background: linear-gradient(160deg, color-mix(in srgb, var(--bubble) 55%, white), var(--bubble) 70%, color-mix(in srgb, var(--bubble) 80%, black));
+  border-radius: var(--radius-control);
+  background: var(--computer-backdrop);
 }
 
 .computer-screen .hint {
-  color: #1a1a1a;
+  color: var(--on-bubble);
   text-align: center;
 }
 
@@ -218,8 +218,8 @@
   display: block;
   width: 100%;
   height: auto;
-  border-radius: 6px;
-  box-shadow: 0 6px 18px rgb(0 0 0 / 24%);
+  border-radius: var(--radius-xs);
+  box-shadow: var(--shadow-float);
 }
 
 .computer-url {
@@ -235,9 +235,9 @@
   align-self: center;
   padding: 4px 4px 4px 12px;
   border: 1px solid var(--border);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--surface);
-  box-shadow: 0 2px 8px rgb(0 0 0 / 8%);
+  box-shadow: var(--shadow-raised);
 }
 
 .computer-pill[data-held="true"] {
@@ -257,7 +257,7 @@
   height: 38px;
   padding: 0;
   border: 2px solid transparent;
-  border-radius: 6px;
+  border-radius: var(--radius-xs);
   background: var(--surface-2);
   overflow: hidden;
   cursor: pointer;

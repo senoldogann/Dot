@@ -7,6 +7,13 @@ import { themeInUse } from "./theme.js";
 const FOLD_KEY = "dot.foldSteps";
 const INSPECTOR_KEY = "dot.inspector";
 const SIDEBAR_KEY = "dot.sidebar";
+const DENSITY_KEY = "dot.density";
+// How close the rows, cards and stacks sit (the paddings are tokens in app.css, switched by `data-density` on the page).
+export const DENSITIES = [
+  { id: "comfortable", label: "Comfortable", hint: "Room around every row and card." },
+  { id: "compact", label: "Compact", hint: "Rows, cards and lists sit closer, for more on one screen." },
+];
+const DEFAULT_DENSITY = "comfortable";
 
 function choice(key) {
   const stored = readPref(key);
@@ -46,6 +53,31 @@ export function hasOwnLayout() {
 export function followTheme() {
   writePref(FOLD_KEY, "theme");
   writePref(INSPECTOR_KEY, "theme");
+}
+
+function isDensity(id) {
+  return DENSITIES.some((density) => density.id === id);
+}
+
+/** The density on the page now. */
+export function currentDensity() {
+  const id = document.documentElement.dataset.density;
+  return isDensity(id) ? id : DEFAULT_DENSITY;
+}
+
+/** Put the saved density on the page; call it before anything is drawn. */
+export function applyStoredDensity() {
+  const stored = readPref(DENSITY_KEY);
+  document.documentElement.dataset.density = isDensity(stored) ? stored : DEFAULT_DENSITY;
+}
+
+/** Switch the density and remember the choice. */
+export function chooseDensity(id) {
+  if (!isDensity(id)) {
+    throw new Error(`unknown density: ${id}`);
+  }
+  document.documentElement.dataset.density = id;
+  writePref(DENSITY_KEY, id);
 }
 
 /** Whether the sidebar is open on a wide screen; open until the user hides it. */

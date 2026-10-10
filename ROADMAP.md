@@ -3284,8 +3284,8 @@ third; 49 (the face as the state) and 50 (the visual system) next, form on top o
 | 46  | Dot's computer: the live view and the handover                           | done    | f4d3754 |
 | 47  | Activity: everything in motion in one list                               | done    | 2282e57 |
 | 48  | Rules in four answers                                                    | done    | 0811f52 |
-| 49  | The face as the state                                                    | in progress |         |
-| 50  | The visual system                                                        | planned |         |
+| 49  | The face as the state                                                    | done    | 72f6168 |
+| 50  | The visual system                                                        | in progress |         |
 | 51  | The desktop shell                                                        | planned |         |
 | 52  | Dot on the phone                                                         | planned |         |
 
@@ -3456,9 +3456,29 @@ segmented controls and the pill buttons are redrawn on the tokens; density has t
 **Why.** The looks were built item by item; a system is what the desktop shell and the phone will inherit, and what
 makes Dot look finished next to dots' white-and-black-pill language.
 
-**Design.** `app.css` keeps the variables, `themes.css` the two looks on them; no web fonts and no images (the house
-rule in `app.css`'s first line stays). Before redrawing, a page of every control in both looks is rendered in the
-headless check and kept as the PR's screenshots.
+**Design, corrected before building.** Read against the sheets: the tokens existed (`--surface`, `--text`, `--accent`,
+`--ok`/`--warn`/`--bad` and their weak and border forms, `--bubble`, `--shadow`, three radii) but the neutral look's
+colours sat in `app.css` while `themes.css` carried only Paper; five literal colours (`#fff` on the switch knob, the
+plan marks and the error toast; `#1a1a1a` and `white`/`black` in the computer backdrop), the shadow and scrim colours,
+and every font size (nine distinct values, 11.5 to 22 px) and radius (4 to 20 px and the pill) were literals. The
+density setting did not exist. The 4 px type rhythm of the plan would have moved the body text; the scale is the six
+sizes in use, named.
+
+**Design, as built.** `themes.css` holds every colour: the neutral look first (`:root`, light and dark), then Paper
+on the same tokens, with the new tokens `--on-ok`, `--knob`, `--scrim`, `--scrim-strong`, the five shadows
+(`--shadow-seg`, `--shadow-knob`, `--shadow-raised`, `--shadow-float`, `--shadow-overlay`, `--shadow-modal`) and
+`--computer-backdrop` (the warm gradient of item 46 on `--bubble`). `app.css` holds the shape, type and spacing tokens:
+`--fs-xs` 12 to `--fs-2xl` 22 (11.5 and 12.5 px fold into 12 and 13), `--radius-xs` 6 to `--radius-lg` 20 and
+`--radius-pill`, `--space-1` 4 to `--space-6` 24, and the four paddings density changes (`--pad-card`, `--pad-row`,
+`--pad-side`, `--gap-stack`), with `:root[data-density="compact"]` tightening them. Every sheet but `themes.css` draws
+on tokens only; `tests/unit/test_css_tokens.py` keeps it so (no literal colour, font size or radius outside the token
+blocks; the colour tokens declared in `themes.css` and not in `app.css`). Density is a browser preference
+(`layout.js`: `DENSITIES`, `applyStoredDensity()` at start, `chooseDensity()`), chosen in Settings › Appearance under
+Look. `views/controls.js` at `#/controls` (not linked) draws every control: the colour swatches, the type scale, the
+five faces, the buttons, badges, chips and pills, the status dots and rings, the inputs, switches and segmented
+controls (with the YOLO form), the notes and the banner, the three approval cards, the two bubbles and the three
+panels. `tests/smoke/test_controls.py` renders it in neutral and paper, light and dark, wide and on a phone, and in
+compact after choosing it in Settings; its screenshots are the PR's record.
 
 **Touchpoints.** `app.css`, `themes.css`, `shell.css`, `run.css`, `settings.css`, README (Settings › Appearance).
 
@@ -4103,3 +4123,4 @@ tailnet for an approval and opens the run (owner's run, logged by hand in this f
 - 2026-10-11 (Fable 5.1): decisions 30 (Tauri 2), 31 (Tailscale, PWA first) and 32 (the state dot, no character) taken at the owner's word. Item 47 started on `item-47-activity`.
 - 2026-10-11 (Fable 5.1): item 47 merged 2282e57 (PR #49, MYP-187 Done; gate green). Next: item 48 (rules in four answers).
 - 2026-10-11 (Fable 5.1): item 48 merged 0811f52 (PR #50, MYP-188 Done; gate green). Next: item 49 (the face as the state).
+- 2026-10-11 (Fable 5.1): item 49 merged 72f6168 (PR #51, MYP-189 Done; gate green). Next: item 50 (the visual system).
