@@ -6,6 +6,7 @@ import { api } from "../api.js";
 import { createAttachments, readyToSend } from "../attachments.js";
 import { el, modelName } from "../dom.js";
 import { allModels, offersChoice, savedLevel } from "../efforts.js";
+import { dotName } from "../face.js";
 import { avatar, icon } from "../icons.js";
 import { segmented } from "../panels.js";
 import { providerLabel } from "../providers.js";
@@ -261,7 +262,7 @@ function buildApprovals() {
 export function mount(root, ctx) {
   const composer = buildComposer(ctx);
   const approvals = buildApprovals();
-  const who = el("div", { class: "home-who" }, avatar(), el("div", { class: "home-name" }, "Dot"), el("p", { class: "home-hint" }, "What should I work on?"));
+  const who = el("div", { class: "home-who" }, avatar("idle"), el("div", { class: "home-name" }, dotName()), el("p", { class: "home-hint" }, "What should I work on?"));
   root.append(el("div", { class: "home" }, el("h1", { class: "visually-hidden" }, "New chat"), approvals.element, el("div", { class: "home-start" }, who, composer.element)));
   approvals.sync(getSnapshot());
   const stopApprovals = onChange(approvals.sync);

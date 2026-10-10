@@ -2,6 +2,7 @@
 // desktop notifications (off until you switch them on) say when Dot needs an answer or a run has ended.
 
 import { api } from "./api.js";
+import { faceDataUrl, overallState } from "./face.js";
 import { readPref, writePref } from "./prefs.js";
 import { getSnapshot, onChange, onLifecycle } from "./state.js";
 
@@ -10,11 +11,19 @@ const BODY_CHARS = 140;
 const FINISHED_TITLE = { done: "A run is done", failed: "A run failed", cancelled: "A run was stopped" };
 const ASKING_TITLE = { question: "Dot has a question", handoff: "Dot needs your help" };
 
+const FINISHED_FACE = { done: "done", failed: "failed" };
+
 let pageTitle = "Dot";
 
+/** The tab's title counts the approvals that wait; its icon is the face in the state of the whole of Dot. */
 function paintTitle() {
-  const waiting = getSnapshot().approvals.length;
+  const snapshot = getSnapshot();
+  const waiting = snapshot.approvals.length;
   document.title = waiting === 0 ? pageTitle : `(${waiting}) ${pageTitle}`;
+  const link = document.querySelector('link[rel="icon"]');
+  if (link !== null) {
+    link.href = faceDataUrl(overallState(snapshot));
+  }
 }
 
 /** Set the title of the page; the number of approvals that wait comes in front of it. */
@@ -61,8 +70,8 @@ function worthATell() {
   return notificationsOn() && awayFromPage();
 }
 
-function tell({ title, body, tag, route }) {
-  const note = new Notification(title, { body, tag });
+function tell({ title, body, tag, route, state }) {
+  const note = new Notification(title, { body, tag, icon: faceDataUrl(state) });
   note.addEventListener("click", () => {
     window.focus();
     location.hash = route;
@@ -73,7 +82,7 @@ function tell({ title, body, tag, route }) {
 function tellAboutApproval(event) {
   const { approval_id: id, severity, summary, args } = event.data;
   const text = severity === "question" && typeof args.question === "string" ? args.question : summary;
-  tell({ title: ASKING_TITLE[severity] ?? "Dot asks for approval", body: shorten(text), tag: `approval-${id}`, route: `#/runs/${event.run_id}` });
+  tell({ title: ASKING_TITLE[severity] ?? "Dot asks for approval", body: shorten(text), tag: `approval-${id}`, route: `#/runs/${event.run_id}`, state: "waiting" });
 }
 
 async function tellAboutEnd(event) {
@@ -81,7 +90,13 @@ async function tellAboutEnd(event) {
   if (run.parent_run_id !== null || !worthATell()) {
     return;
   }
-  tell({ title: FINISHED_TITLE[event.data.status] ?? "A run has ended", body: shorten(run.goal), tag: `run-${run.id}`, route: `#/runs/${run.id}` });
+  tell({
+    title: FINISHED_TITLE[event.data.status] ?? "A run has ended",
+    body: shorten(run.goal),
+    tag: `run-${run.id}`,
+    route: `#/runs/${run.id}`,
+    state: FINISHED_FACE[event.data.status] ?? "idle",
+  });
 }
 
 /** What a failure to notify costs: nothing but a line in the console, so it never stops the page from updating. */

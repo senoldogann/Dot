@@ -3283,8 +3283,8 @@ third; 49 (the face as the state) and 50 (the visual system) next, form on top o
 | --- | ------------------------------------------------------------------------ | ------- | ------- |
 | 46  | Dot's computer: the live view and the handover                           | done    | f4d3754 |
 | 47  | Activity: everything in motion in one list                               | done    | 2282e57 |
-| 48  | Rules in four answers                                                    | in progress |         |
-| 49  | The face as the state                                                    | planned |         |
+| 48  | Rules in four answers                                                    | done    | 0811f52 |
+| 49  | The face as the state                                                    | in progress |         |
 | 50  | The visual system                                                        | planned |         |
 | 51  | The desktop shell                                                        | planned |         |
 | 52  | Dot on the phone                                                         | planned |         |
@@ -3416,9 +3416,29 @@ in the home greeting and the run head; no accessories, no eyes that follow the c
 **Why.** dots' character is what people remember and what critics distrust; a mark that only ever tells the truth
 about the state is the honest version of it, and the owner recognises Dot's yellow dot already.
 
-**Design.** One SVG face in `icons.js` with a `state` attribute and CSS animations in `app.css` (reduced motion
-honoured); `attention.js` already derives the states for the tab title; a favicon per state via a data URL swap. The
-name is `[ui] name` in the browser's local storage, not the config, since it is the look of this browser.
+**Design, corrected before building.** Read against the code: the face (`avatar()` in `icons.js`) had one look and a
+blink of its core while the run head's badge said running; the sidebar rows (`status-dot`) and the delegated chips
+(`status-ring`) already spoke the state in the same colours (accent pulse working, amber blink waiting, green done, red
+failed), so they keep their dot and ring and only the face gains states. `attention.js` counted the approvals in the
+title but the favicon was a fixed dark square with the blue dot of the first look, not the yellow face. The menu bar
+is item 51's.
+
+**Design, as built.** `face.js` holds the vocabulary and the mapping: `faceState(status)` (queued, running → working;
+blocked → waiting; failed → failed; done and cancelled → idle, since a run being looked at later rests),
+`faceStateAtEnd(status)` (done → the tick), `overallState(snapshot)` (an approval waits → waiting; an active run →
+working; else idle), `faceSvg(state)` / `faceDataUrl(state)` (the standalone face in the light look's colours, with
+`data-state` in its text) and the name (`dotName()`, `setDotName()`, preference `dot.name`, 24 characters, blank goes
+back to Dot). `avatar(state)` carries `data-state` and a tick path; `app.css` animates per state (breath = the core
+scales 1.4 over 2.8 s; waiting = amber ring blinking; done = ring green and tick shown for 80 % of 3 s then back to
+rest, `forwards`; failed = ring and core red) and, under `prefers-reduced-motion`, shows the tick in place of the
+core without motion. The run page sets the state from the status on every repaint except while the tick is showing,
+and sets `done` only on the `run_finished` transition. `attention.js` paints the favicon with every change of the
+snapshot and gives each notification the face in the state it tells of (waiting; done or failed at an end).
+`favicon.svg` is the idle face. Settings › General has a Name card; the home greeting and the run head use the name.
+README: New chat, the run head, the title paragraph. Test: `tests/smoke/test_face.py` reads the face's state and the
+favicon through a run's life (idle on the home page; waiting on a question; working after the answer; done at the end,
+idle when opened again; failed for a run whose model has no reply) and gives Dot a name, wide and on a phone in both
+looks.
 
 **Touchpoints.** `static/js/icons.js`, `attention.js`, `sidebar.js`, `views/run.js`, `app.css`, `favicon.svg`, README.
 
@@ -4082,3 +4102,4 @@ tailnet for an approval and opens the run (owner's run, logged by hand in this f
 - 2026-10-11 (Fable 5.1): item 46 merged f4d3754 (PR #48, MYP-186 Done; gate green). Next: item 47 (Activity).
 - 2026-10-11 (Fable 5.1): decisions 30 (Tauri 2), 31 (Tailscale, PWA first) and 32 (the state dot, no character) taken at the owner's word. Item 47 started on `item-47-activity`.
 - 2026-10-11 (Fable 5.1): item 47 merged 2282e57 (PR #49, MYP-187 Done; gate green). Next: item 48 (rules in four answers).
+- 2026-10-11 (Fable 5.1): item 48 merged 0811f52 (PR #50, MYP-188 Done; gate green). Next: item 49 (the face as the state).

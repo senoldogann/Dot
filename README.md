@@ -758,14 +758,17 @@ it last worked in (browser, files, shell, desktop, mail) and what it needs; a ro
 kind (runs, campaigns, schedules); it is `GET /api/activity`. Both follow the lifecycle stream, so a run moves between
 the sections the moment it starts, waits, is taken over or ends.
 
-**New chat** is Dot's face and one composer, centred in the window: the goal, then one line with the mode (Task, Chat
+**New chat** is Dot's face and name (the name is yours to give in Settings › General; Dot until then, and kept in this
+browser only) and one composer, centred in the window: the goal, then one line with the mode (Task, Chat
 or Research), the model and, for a model that offers a choice, its reasoning level (kept in the browser per model).
 **Options** at the end of that line opens the approval mode (Ask, Auto or YOLO; the mode in use always shows on the
 button), the Goal mode switch and Keep going (see
 [Autonomy](#autonomy-approvals-goal-mode-and-the-end-of-a-run)). Enter starts the run, Shift+Enter adds a line. A run
 that waits for your approval shows above the composer.
 
-A run opens as a conversation under Dot's face and name, with the state of the run and when it started; its chips (the
+A run opens as a conversation under Dot's face and name, with the state of the run and when it started. The face is the
+state: still when the run rests, a slow breath while it works, an amber ring while it waits for you, a green tick for
+a moment when the run ends done, red when it failed (with reduced motion the tick simply shows). Its chips (the
 model, the approval mode, goal mode) and buttons sit on the right. Your goal is the first message, in the yellow bubble
 of your messages. A delegated run is a chip with its goal and a status ring (turning while it works, amber while it
 waits for you, green with a check when it is done, red when it failed); open it for its steps. The tool calls of one
@@ -817,7 +820,9 @@ While you are elsewhere, the tab title counts the approvals that wait: `(2) New 
 Notifications adds
 desktop notifications (off until you switch them on; the browser asks for its permission on that click): while the page
 is in the background or its window is not the active one, Dot says when it asks for an approval, a question or your help,
-and when a run ends (done, failed or stopped; the sub-runs of a run stay quiet). Clicking one opens the run.
+and when a run ends (done, failed or stopped; the sub-runs of a run stay quiet). Clicking one opens the run. The tab's
+icon is the same face in the state of the whole of Dot (amber ring while something waits for you, working while a run
+is active, still otherwise), and a notification carries the face in the state it tells of.
 
 Ctrl-C stops the daemon: the runs that are going on are cancelled, and the browser and the other services are closed.
 
