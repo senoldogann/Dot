@@ -3,28 +3,13 @@
 import asyncio
 import sys
 from pathlib import Path
-from typing import Literal
 
 from dotagent.agent.playbooks import PlaybookEntry, drop_playbook, list_playbooks
-from dotagent.core.errors import NotFoundError
+from dotagent.cli_commands import Command, PlaybooksDropCommand, PlaybooksListCommand, PlaybooksShowCommand
+from dotagent.core.errors import InvalidValueError, NotFoundError
 from dotagent.core.paths import playbooks_dir
-from dotagent.core.types import FrozenModel
 
 _DESCRIPTION_CHARS: int = 90
-
-
-class PlaybooksListCommand(FrozenModel):
-    name: Literal["playbooks-list"]
-
-
-class PlaybooksShowCommand(FrozenModel):
-    name: Literal["playbooks-show"]
-    playbook: str
-
-
-class PlaybooksDropCommand(FrozenModel):
-    name: Literal["playbooks-drop"]
-    playbook: str
 
 
 def _clip(text: str, limit: int) -> str:
@@ -68,3 +53,16 @@ async def cmd_playbooks_drop(command: PlaybooksDropCommand) -> int:
         return 1
     sys.stdout.write(f"dropped {command.playbook} ({folder})\n")
     return 0
+
+
+async def dispatch(command: Command) -> int:
+    """Carry out one of this module's commands."""
+    match command:
+        case PlaybooksListCommand():
+            return await cmd_playbooks_list(command)
+        case PlaybooksShowCommand():
+            return await cmd_playbooks_show(command)
+        case PlaybooksDropCommand():
+            return await cmd_playbooks_drop(command)
+        case _:
+            raise InvalidValueError("not a command of this module", {"name": command.name})

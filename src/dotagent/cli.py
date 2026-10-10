@@ -1,145 +1,26 @@
-"""The ``dotx`` command line: run tasks, chat, inspect models and keys, and diagnose the setup."""
+"""The ``dotx`` command line: run tasks, chat, inspect models and keys, and diagnose the setup.
+
+This module builds the parser and validates a command (:mod:`dotagent.cli_commands`); what carries a command out lives
+in one module per family (``cli_run``, ``cli_daemon``, ...), loaded by name once the command is known, so that
+``dotx --help`` and the light commands start without the server, the desktop, the MCP client or the eval runner.
+"""
 
 import argparse
 import asyncio
-import contextlib
-import getpass
-import secrets
-import signal
+import importlib
 import sys
-from collections.abc import AsyncIterator, Awaitable, Callable
-from pathlib import Path
-from typing import Annotated, Literal, get_args
+from typing import Protocol, cast, get_args
 
-from pydantic import Field, TypeAdapter, ValidationError
+from pydantic import ValidationError
 
-from dotagent.agent.lessons import RunLessons, run_lessons
-from dotagent.agent.manager import RunManager
-from dotagent.browser.login import open_profile_for_login
-from dotagent.cli_browser import (
-    BrowserAttachCommand,
-    BrowserDetachCommand,
-    BrowserImportChromeCommand,
-    cmd_browser_attach,
-    cmd_browser_detach,
-    cmd_browser_import_chrome,
-)
-from dotagent.cli_campaign import (
-    CampaignAchievedCommand,
-    CampaignListCommand,
-    CampaignResumeCommand,
-    CampaignShowCommand,
-    CampaignStopCommand,
-    cmd_campaign_achieved,
-    cmd_campaign_list,
-    cmd_campaign_resume,
-    cmd_campaign_show,
-    cmd_campaign_stop,
-    render_first_session_end,
-)
-from dotagent.cli_daemon import (
-    DaemonCommand,
-    OpenCommand,
-    ServiceInstallCommand,
-    ServicePermissionsCommand,
-    ServiceStatusCommand,
-    ServiceUninstallCommand,
-    UrlCommand,
-    cmd_daemon,
-    cmd_open,
-    cmd_service_install,
-    cmd_service_permissions,
-    cmd_service_status,
-    cmd_service_uninstall,
-    cmd_url,
-)
-from dotagent.cli_eval import (
-    EvalCheckCommand,
-    EvalListCommand,
-    EvalReportCommand,
-    EvalRunCommand,
-    cmd_eval_check,
-    cmd_eval_list,
-    cmd_eval_report,
-    cmd_eval_run,
-)
-from dotagent.cli_mcp import McpListCommand, cmd_mcp_list
-from dotagent.cli_playbooks import (
-    PlaybooksDropCommand,
-    PlaybooksListCommand,
-    PlaybooksShowCommand,
-    cmd_playbooks_drop,
-    cmd_playbooks_list,
-    cmd_playbooks_show,
-)
-from dotagent.cli_profile import ModelsProfileCommand, cmd_models_profile
-from dotagent.cli_prune import PruneCommand, cmd_prune
-from dotagent.cli_schedule import (
-    ScheduleAddCommand,
-    ScheduleDeleteCommand,
-    ScheduleDisableCommand,
-    ScheduleEnableCommand,
-    ScheduleListCommand,
-    cmd_schedule_add,
-    cmd_schedule_delete,
-    cmd_schedule_disable,
-    cmd_schedule_enable,
-    cmd_schedule_list,
-)
-from dotagent.cli_skills import SkillsListCommand, cmd_skills_list
-from dotagent.cli_stats import StatsCommand, cmd_stats
-from dotagent.cli_ui import TerminalUi, UiOptions, read_line
-from dotagent.cli_undo import UndoCommand, cmd_undo
-from dotagent.config import AppConfig, load_user_config, providers_by_key
-from dotagent.core.errors import ConfigError, DotError
+from dotagent.cli_commands import COMMAND_ADAPTER, Command
+from dotagent.core.errors import DotError
 from dotagent.core.logs import configure_logging
-from dotagent.core.paths import (
-    browser_profile_dir,
-    db_path,
-    ensure_layout,
-    env_file_path,
-    failsafe_path,
-    log_dir,
-    screenshots_dir,
-)
-from dotagent.core.types import FrozenModel
-from dotagent.desktop.perms import (
-    Pane,
-    check_permissions,
-    missing_panes,
-    open_settings,
-    request_permissions,
-    settings_url,
-)
-from dotagent.desktop.render import render_apps, render_snapshot
-from dotagent.desktop.session import DesktopSession
-from dotagent.desktop.types import AppView, Permissions, ScreenshotView, SnapshotScope, SnapshotView
-from dotagent.desktop.views import ViewRequest
-from dotagent.doctor import CheckResult, run_checks
-from dotagent.events import Subscription
-from dotagent.llm.calls import log_model_call
-from dotagent.llm.router import KNOWN_PROVIDERS, ModelRef, ModelRouter
-from dotagent.llm.types import Effort, ModelInfo
-from dotagent.memory.render import render_note
-from dotagent.memory.service import (
-    MemoryHit,
-    MemoryIndex,
-    SavedMemory,
-    close_memory_index,
-    forget_memory,
-    open_memory_index,
-    recall,
-    reindex,
-    save_memory,
-)
+from dotagent.core.paths import ensure_layout, log_dir
+from dotagent.llm.types import KNOWN_PROVIDERS, Effort
 from dotagent.policy.types import ApprovalMode
-from dotagent.runtime import Runtime, build_runtime, close_runtime
-from dotagent.secrets import resolve_secret, write_env_value
-from dotagent.store.db import Store
-from dotagent.store.models import BrowserMode, MemoryRecord, RunMode, RunRecord
-from dotagent.tools.desktop import sized_for_agent
+from dotagent.store.models import BrowserMode
 
-_NONCE_BYTES: int = 8
 _EFFORT_HELP: str = "reasoning level; the levels a model offers are listed by 'dotx models'"
 _APPROVALS_HELP: str = (
     "who answers what the policy would ask: ask (you), auto (a review model) or yolo (nobody; the run also reads "
@@ -148,171 +29,64 @@ _APPROVALS_HELP: str = (
 _GOAL_MODE_HELP: str = (
     "a checker sends the run back to work until the goal is really reached (default: [agent] goal_mode)"
 )
-_CLI_THREAD: str = "cli"
+# The module that carries out each command, by the command's name; loaded only once that command runs.
+_FAMILIES: dict[str, str] = {
+    "run": "dotagent.cli_run",
+    "resume": "dotagent.cli_run",
+    "chat": "dotagent.cli_run",
+    "models": "dotagent.cli_models",
+    "auth-set": "dotagent.cli_models",
+    "auth-status": "dotagent.cli_models",
+    "models-profile": "dotagent.cli_profile",
+    "doctor": "dotagent.cli_doctor",
+    "browser-login": "dotagent.cli_browser",
+    "browser-import-chrome": "dotagent.cli_browser",
+    "browser-attach": "dotagent.cli_browser",
+    "browser-detach": "dotagent.cli_browser",
+    "desktop-check": "dotagent.cli_desktop",
+    "desktop-setup": "dotagent.cli_desktop",
+    "desktop-apps": "dotagent.cli_desktop",
+    "desktop-snapshot": "dotagent.cli_desktop",
+    "desktop-screenshot": "dotagent.cli_desktop",
+    "memory-list": "dotagent.cli_memory",
+    "memory-add": "dotagent.cli_memory",
+    "memory-search": "dotagent.cli_memory",
+    "memory-forget": "dotagent.cli_memory",
+    "memory-reindex": "dotagent.cli_memory",
+    "schedule-list": "dotagent.cli_schedule",
+    "schedule-add": "dotagent.cli_schedule",
+    "schedule-delete": "dotagent.cli_schedule",
+    "schedule-enable": "dotagent.cli_schedule",
+    "schedule-disable": "dotagent.cli_schedule",
+    "campaign-list": "dotagent.cli_campaign",
+    "campaign-show": "dotagent.cli_campaign",
+    "campaign-stop": "dotagent.cli_campaign",
+    "campaign-resume": "dotagent.cli_campaign",
+    "campaign-achieved": "dotagent.cli_campaign",
+    "mcp-list": "dotagent.cli_mcp",
+    "skills-list": "dotagent.cli_skills",
+    "playbooks-list": "dotagent.cli_playbooks",
+    "playbooks-show": "dotagent.cli_playbooks",
+    "playbooks-drop": "dotagent.cli_playbooks",
+    "prune": "dotagent.cli_prune",
+    "undo": "dotagent.cli_undo",
+    "eval-list": "dotagent.cli_eval",
+    "eval-check": "dotagent.cli_eval",
+    "eval-run": "dotagent.cli_eval",
+    "eval-report": "dotagent.cli_eval",
+    "stats": "dotagent.cli_stats",
+    "daemon": "dotagent.cli_daemon",
+    "open": "dotagent.cli_daemon",
+    "url": "dotagent.cli_daemon",
+    "service-install": "dotagent.cli_daemon",
+    "service-uninstall": "dotagent.cli_daemon",
+    "service-status": "dotagent.cli_daemon",
+    "service-permissions": "dotagent.cli_daemon",
+}
 
 
-class RunCommand(FrozenModel):
-    name: Literal["run"]
-    goal: list[str]
-    mode: Literal["task", "research"]
-    model: str | None
-    effort: Effort | None
-    approvals: ApprovalMode | None
-    goal_mode: bool | None
-    standing: bool
-    browser: BrowserMode | None
-    thread: str | None
-    no_input: bool
-    thinking: bool
-    verbose: bool
-
-
-class ResumeCommand(FrozenModel):
-    name: Literal["resume"]
-    run_id: str
-    no_input: bool
-    thinking: bool
-    verbose: bool
-
-
-class ChatCommand(FrozenModel):
-    name: Literal["chat"]
-    model: str | None
-    effort: Effort | None
-    approvals: ApprovalMode | None
-    thread: str | None
-    thinking: bool
-    verbose: bool
-
-
-class ModelsCommand(FrozenModel):
-    name: Literal["models"]
-    provider: str | None
-
-
-class AuthSetCommand(FrozenModel):
-    name: Literal["auth-set"]
-    key: str
-
-
-class AuthStatusCommand(FrozenModel):
-    name: Literal["auth-status"]
-
-
-class DoctorCommand(FrozenModel):
-    name: Literal["doctor"]
-
-
-class BrowserLoginCommand(FrozenModel):
-    name: Literal["browser-login"]
-    url: str | None
-
-
-class DesktopCheckCommand(FrozenModel):
-    name: Literal["desktop-check"]
-
-
-class DesktopSetupCommand(FrozenModel):
-    name: Literal["desktop-setup"]
-
-
-class DesktopAppsCommand(FrozenModel):
-    name: Literal["desktop-apps"]
-
-
-class DesktopSnapshotCommand(FrozenModel):
-    name: Literal["desktop-snapshot"]
-    app: str | None
-    scope: SnapshotScope
-    query: str | None
-
-
-class DesktopScreenshotCommand(FrozenModel):
-    name: Literal["desktop-screenshot"]
-    path: str
-
-
-class MemoryListCommand(FrozenModel):
-    name: Literal["memory-list"]
-    limit: int = Field(ge=1)
-
-
-class MemoryAddCommand(FrozenModel):
-    name: Literal["memory-add"]
-    text: list[str]
-    tags: list[str]
-
-
-class MemorySearchCommand(FrozenModel):
-    name: Literal["memory-search"]
-    query: list[str]
-    limit: int = Field(ge=1)
-
-
-class MemoryForgetCommand(FrozenModel):
-    name: Literal["memory-forget"]
-    memory_id: str
-
-
-class MemoryReindexCommand(FrozenModel):
-    name: Literal["memory-reindex"]
-
-
-type Command = Annotated[
-    RunCommand
-    | ResumeCommand
-    | ChatCommand
-    | ModelsCommand
-    | ModelsProfileCommand
-    | AuthSetCommand
-    | AuthStatusCommand
-    | DoctorCommand
-    | BrowserLoginCommand
-    | BrowserImportChromeCommand
-    | BrowserAttachCommand
-    | BrowserDetachCommand
-    | DesktopCheckCommand
-    | DesktopSetupCommand
-    | DesktopAppsCommand
-    | DesktopSnapshotCommand
-    | DesktopScreenshotCommand
-    | MemoryListCommand
-    | MemoryAddCommand
-    | MemorySearchCommand
-    | MemoryForgetCommand
-    | MemoryReindexCommand
-    | ScheduleListCommand
-    | ScheduleAddCommand
-    | ScheduleDeleteCommand
-    | ScheduleEnableCommand
-    | ScheduleDisableCommand
-    | CampaignListCommand
-    | CampaignShowCommand
-    | CampaignStopCommand
-    | CampaignResumeCommand
-    | CampaignAchievedCommand
-    | McpListCommand
-    | SkillsListCommand
-    | PlaybooksListCommand
-    | PlaybooksShowCommand
-    | PlaybooksDropCommand
-    | PruneCommand
-    | UndoCommand
-    | EvalListCommand
-    | EvalCheckCommand
-    | EvalRunCommand
-    | EvalReportCommand
-    | StatsCommand
-    | DaemonCommand
-    | OpenCommand
-    | UrlCommand
-    | ServiceInstallCommand
-    | ServiceUninstallCommand
-    | ServiceStatusCommand
-    | ServicePermissionsCommand,
-    Field(discriminator="name"),
-]
-_COMMAND_ADAPTER: TypeAdapter[Command] = TypeAdapter(Command)
+class _Family(Protocol):
+    async def dispatch(self, command: Command) -> int: ...
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -622,535 +396,15 @@ def parse_command(parser: argparse.ArgumentParser, arguments: list[str]) -> Comm
     if raw["name"] == "eval":
         raw["name"] = f"eval-{eval_action}"
     try:
-        return _COMMAND_ADAPTER.validate_python(raw)
+        return COMMAND_ADAPTER.validate_python(raw)
     except ValidationError as exc:
         parser.error(str(exc))
 
 
-async def _pump(subscription: Subscription, ui: TerminalUi) -> None:
-    while True:
-        await ui.handle(await subscription.queue.get())
-
-
-async def _drain(subscription: Subscription, ui: TerminalUi) -> None:
-    while not subscription.queue.empty():
-        await ui.handle(subscription.queue.get_nowait())
-
-
-async def execute_run(
-    runtime: Runtime,
-    manager: RunManager,
-    ui: TerminalUi,
-    goal: str,
-    mode: RunMode,
-    model: str | None,
-    effort: Effort | None,
-    approvals: ApprovalMode | None,
-    goal_mode: bool | None,
-    thread_id: str | None,
-) -> RunRecord:
-    """Start one run, show its events live and return the finished record. Ctrl-C stops the run."""
-    return await follow_run(
-        runtime,
-        manager,
-        ui,
-        lambda: manager.start(goal, mode, model, thread_id, "cli", None, effort, approvals, goal_mode, ()),
-    )
-
-
-async def follow_run(
-    runtime: Runtime, manager: RunManager, ui: TerminalUi, launch: Callable[[], Awaitable[RunRecord]]
-) -> RunRecord:
-    """Start a run with ``launch``, show its events live and return the finished record. Ctrl-C stops the run, and so
-    do a closed terminal (SIGHUP) and SIGTERM, so the run's end is recorded and the daemon does not take it for a run
-    that still works. The events are followed before the run starts, so none of them is missed."""
-    loop: asyncio.AbstractEventLoop = asyncio.get_running_loop()
-    main_task: asyncio.Task[object] | None = asyncio.current_task()
-    async with runtime.bus.subscribe(None) as subscription:
-        pump: asyncio.Task[None] = asyncio.create_task(_pump(subscription, ui))
-        run: RunRecord = await launch()
-        presses: list[int] = []
-
-        def on_interrupt() -> None:
-            presses.append(1)
-            if len(presses) == 1 and run.id in manager.active_run_ids():
-                sys.stderr.write("\nstopping the run (press Ctrl-C again to quit immediately)\n")
-                manager.cancel(run.id)
-            elif main_task is not None:
-                main_task.cancel()
-
-        def on_end() -> None:
-            # Nothing is written: after SIGHUP the terminal is gone.
-            if run.id in manager.active_run_ids():
-                manager.cancel(run.id)
-
-        loop.add_signal_handler(signal.SIGINT, on_interrupt)
-        loop.add_signal_handler(signal.SIGHUP, on_end)
-        loop.add_signal_handler(signal.SIGTERM, on_end)
-        try:
-            finished: RunRecord = await manager.wait(run.id)
-        finally:
-            loop.remove_signal_handler(signal.SIGINT)
-            loop.remove_signal_handler(signal.SIGHUP)
-            loop.remove_signal_handler(signal.SIGTERM)
-            pump.cancel()
-            with contextlib.suppress(asyncio.CancelledError):
-                await pump
-        await _drain(subscription, ui)
-    return finished
-
-
-async def _read_goal(parts: list[str]) -> str:
-    if parts == ["-"]:
-        text: str = await asyncio.to_thread(sys.stdin.read)
-        if not text.strip():
-            raise ConfigError("the goal read from standard input is empty", {})
-        return text.strip()
-    return " ".join(parts)
-
-
-def _print_result(run: RunRecord) -> None:
-    sys.stdout.write(f"{run.result}\n")
-    sys.stdout.flush()
-    sys.stderr.write(
-        f"[{run.status}] {run.steps} steps, {run.input_tokens} tokens in / {run.output_tokens} out, "
-        f"run {run.id}, thread {run.thread_id}\n"
-    )
-
-
-async def _show_lessons(runtime: Runtime, manager: RunManager, ui: TerminalUi, run_id: str) -> None:
-    """Wait until the lessons of a run that ended are drawn, then show what became of them. Ctrl-C drops the ones not
-    drawn or saved yet, and the command still ends with the run's status."""
-    if manager.learning(run_id):
-        sys.stderr.write("drawing the lessons of this run (Ctrl-C skips it)\n")
-        loop: asyncio.AbstractEventLoop = asyncio.get_running_loop()
-        # Cancelling the wait cancels the drawing (see RunManager.learned).
-        waiting: asyncio.Task[None] = asyncio.create_task(manager.learned(run_id))
-        loop.add_signal_handler(signal.SIGINT, waiting.cancel)
-        try:
-            await asyncio.wait({waiting})
-        finally:
-            loop.remove_signal_handler(signal.SIGINT)
-            waiting.cancel()
-    lessons: RunLessons | None = await run_lessons(runtime.store, run_id)
-    if lessons is not None:
-        ui.show_lessons(lessons)
-
-
-async def cmd_run(command: RunCommand) -> int:
-    goal: str = await _read_goal(command.goal)
-    runtime: Runtime = await build_runtime(load_user_config())
-    try:
-        options: UiOptions = UiOptions(
-            interactive=sys.stdin.isatty() and not command.no_input,
-            stream_text=False,
-            show_thinking=command.thinking,
-            verbose=command.verbose,
-        )
-        manager: RunManager = RunManager(runtime)
-        ui: TerminalUi = TerminalUi(runtime, options)
-        run: RunRecord = (
-            await follow_run(
-                runtime,
-                manager,
-                ui,
-                lambda: manager.start_campaign(
-                    goal,
-                    command.mode,
-                    command.model,
-                    command.thread,
-                    "cli",
-                    command.effort,
-                    command.approvals,
-                    command.goal_mode,
-                    (),
-                    command.browser,
-                ),
-            )
-            if command.standing
-            else await execute_run(
-                runtime,
-                manager,
-                ui,
-                goal,
-                command.mode,
-                command.model,
-                command.effort,
-                command.approvals,
-                command.goal_mode,
-                command.thread,
-            )
-        )
-        # The answer comes first: the lessons are drawn after the run's end.
-        _print_result(run)
-        ui.show_open_ends(ui.needs_from_user, await runtime.store.list_left_questions(run.id))
-        if run.campaign_id is not None:
-            sys.stderr.write(f"{render_first_session_end(await runtime.store.get_campaign(run.campaign_id))}\n")
-        await _show_lessons(runtime, manager, ui, run.id)
-    finally:
-        await close_runtime(runtime)
-    return 0 if run.status == "done" else 1
-
-
-async def cmd_resume(command: ResumeCommand) -> int:
-    """Resume a run that the daemon cut off in this process, like ``dotx run``: see ``RunManager.resume``."""
-    runtime: Runtime = await build_runtime(load_user_config())
-    try:
-        options: UiOptions = UiOptions(
-            interactive=sys.stdin.isatty() and not command.no_input,
-            stream_text=False,
-            show_thinking=command.thinking,
-            verbose=command.verbose,
-        )
-        manager: RunManager = RunManager(runtime)
-        ui: TerminalUi = TerminalUi(runtime, options)
-        run: RunRecord = await follow_run(runtime, manager, ui, lambda: manager.resume(command.run_id))
-        _print_result(run)
-        ui.show_open_ends(ui.needs_from_user, await runtime.store.list_left_questions(run.id))
-        await _show_lessons(runtime, manager, ui, run.id)
-    finally:
-        await close_runtime(runtime)
-    return 0 if run.status == "done" else 1
-
-
-async def cmd_chat(command: ChatCommand) -> int:
-    if not sys.stdin.isatty():
-        raise ConfigError("chat needs an interactive terminal; use 'dotx run' for scripts", {})
-    runtime: Runtime = await build_runtime(load_user_config())
-    try:
-        manager: RunManager = RunManager(runtime)
-        ui: TerminalUi = TerminalUi(
-            runtime,
-            UiOptions(interactive=True, stream_text=True, show_thinking=command.thinking, verbose=command.verbose),
-        )
-        thread_id: str | None = command.thread
-        sys.stderr.write("Dot chat. /new starts a fresh conversation, /exit leaves.\n")
-        while True:
-            line: str | None = await read_line("\nyou> ")
-            if line is None or line.strip() in ("/exit", "/quit"):
-                return 0
-            text: str = line.strip()
-            if text == "/new":
-                thread_id = None
-                continue
-            if not text:
-                continue
-            run: RunRecord = await execute_run(
-                runtime, manager, ui, text, "chat", command.model, command.effort, command.approvals, None, thread_id
-            )
-            thread_id = run.thread_id
-            if not ui.streamed(run.result):
-                sys.stderr.write(f"{run.result}\n")
-            if run.status != "done":
-                sys.stderr.write(f"[{run.status}]\n")
-    finally:
-        await close_runtime(runtime)
-
-
-async def cmd_models(command: ModelsCommand) -> int:
-    config: AppConfig = load_user_config()
-    router: ModelRouter = ModelRouter(config, log_model_call)
-    failures: int = 0
-    try:
-        for provider_name in [command.provider] if command.provider is not None else list(KNOWN_PROVIDERS):
-            try:
-                models: tuple[ModelInfo, ...] = await (await router.provider(provider_name)).list_models()
-            except DotError as exc:
-                failures += 1
-                sys.stdout.write(f"{provider_name}: unavailable - {exc.message}\n")
-                continue
-            sys.stdout.write(f"{provider_name}:\n")
-            for info in models:
-                ref: ModelRef = ModelRef(provider=provider_name, model=info.id)
-                traits: str = ", ".join(
-                    name
-                    for name, present in (("tools", info.tools), ("vision", info.vision), ("thinking", info.thinking))
-                    if present
-                )
-                levels: str = f"  reasoning: {' '.join(info.efforts)}" if len(info.efforts) > 1 else ""
-                sys.stdout.write(f"  {ref.label}  [{traits}]{levels}\n")
-    finally:
-        await router.aclose()
-    return 1 if failures and command.provider is not None else 0
-
-
-async def cmd_auth_set(command: AuthSetCommand) -> int:
-    known: dict[str, str] = providers_by_key(load_user_config())
-    if command.key not in known:
-        raise ConfigError("unknown key name", {"key": command.key, "known": list(sorted(known))})
-    if sys.stdin.isatty():
-        value: str = await asyncio.to_thread(getpass.getpass, f"{command.key}: ")
-    else:
-        value = (await asyncio.to_thread(sys.stdin.read)).strip()
-    if not value.strip():
-        raise ConfigError("no value was provided", {"key": command.key})
-    await asyncio.to_thread(write_env_value, env_file_path(), command.key, value.strip())
-    sys.stdout.write(f"{command.key} stored in {env_file_path()} (mode 0600)\n")
-    return 0
-
-
-async def cmd_auth_status(command: AuthStatusCommand) -> int:
-    for variable, provider_name in providers_by_key(load_user_config()).items():
-        state: str = "set" if await asyncio.to_thread(resolve_secret, variable) is not None else "missing"
-        sys.stdout.write(f"{provider_name:<12} {variable:<18} {state}\n")
-    return 0
-
-
-async def cmd_doctor(command: DoctorCommand) -> int:
-    results: list[CheckResult] = await run_checks(load_user_config())
-    for result in results:
-        mark: str = "ok  " if result.ok else ("FAIL" if result.required else "warn")
-        sys.stdout.write(f"{mark}  {result.name:<22} {result.detail}\n")
-    return 1 if any(not result.ok and result.required for result in results) else 0
-
-
-async def cmd_browser_login(command: BrowserLoginCommand) -> int:
-    sys.stdout.write(
-        "Chrome opens with Dot's own profile. Sign in to the sites Dot should be able to use, then quit Chrome "
-        "(Cmd+Q). Dot keeps the cookies; it never sees your passwords.\n"
-    )
-    code: int = await open_profile_for_login(browser_profile_dir(), command.url)
-    sys.stdout.write("Chrome closed; the sign-ins are saved in Dot's profile.\n")
-    return code
-
-
-@contextlib.asynccontextmanager
-async def _desktop_session() -> AsyncIterator[DesktopSession]:
-    """A desktop session sized the way the agent's is, closed again afterwards."""
-    session: DesktopSession = DesktopSession(sized_for_agent(load_user_config()), failsafe_path())
-    try:
-        yield session
-    finally:
-        await session.close()
-
-
-async def cmd_desktop_check(command: DesktopCheckCommand) -> int:
-    permissions: Permissions = check_permissions()
-    rows: tuple[tuple[str, bool], ...] = (
-        ("accessibility", permissions.accessibility),
-        ("input events", permissions.post_event),
-        ("screen recording", permissions.screen_recording),
-    )
-    for name, granted in rows:
-        sys.stdout.write(f"{'ok  ' if granted else 'FAIL'}  {name:<18} {'granted' if granted else 'not granted'}\n")
-    if missing_panes(permissions):
-        sys.stdout.write("Run `dotx desktop setup` to be asked for what is missing.\n")
-        return 1
-    return 0
-
-
-async def cmd_desktop_setup(command: DesktopSetupCommand) -> int:
-    missing: tuple[Pane, ...] = missing_panes(check_permissions())
-    if not missing:
-        sys.stdout.write("Accessibility, input events and screen recording are all granted.\n")
-        return 0
-    await asyncio.to_thread(request_permissions)
-    for pane in missing:
-        await asyncio.to_thread(open_settings, pane)
-        sys.stdout.write(f"opened {settings_url(pane)}\n")
-    sys.stdout.write(
-        "Switch on the app that runs Dot (Terminal, iTerm, Claude or the Dot service) in each pane, "
-        "then start Dot again.\n"
-    )
-    return 0
-
-
-async def cmd_desktop_apps(command: DesktopAppsCommand) -> int:
-    async with _desktop_session() as session:
-        views: tuple[AppView, ...] = await session.list_apps()
-    sys.stdout.write(render_apps(views, secrets.token_hex(_NONCE_BYTES)) + "\n")
-    return 0
-
-
-async def cmd_desktop_snapshot(command: DesktopSnapshotCommand) -> int:
-    request: ViewRequest = ViewRequest(scope=command.scope, ref=None, query=command.query, full=True)
-    async with _desktop_session() as session:
-        view: SnapshotView = await session.snapshot(_CLI_THREAD, command.app, request)
-    sys.stdout.write(render_snapshot(view, secrets.token_hex(_NONCE_BYTES)) + "\n")
-    return 0
-
-
-def _write_screenshot(path_text: str, image: bytes) -> Path:
-    target: Path = Path(path_text).expanduser()
-    target.write_bytes(image)
-    return target
-
-
-async def cmd_desktop_screenshot(command: DesktopScreenshotCommand) -> int:
-    async with _desktop_session() as session:
-        shot: ScreenshotView = await session.screenshot()
-    target: Path = await asyncio.to_thread(_write_screenshot, command.path, shot.image)
-    sys.stdout.write(f"{target} ({shot.width}x{shot.height} px, {len(shot.image)} bytes)\n")
-    return 0
-
-
-@contextlib.asynccontextmanager
-async def _memory_index(config: AppConfig) -> AsyncIterator[MemoryIndex]:
-    """The note memory alone (store and embedder), opened without the rest of the runtime and closed afterwards."""
-    store: Store = await Store.open(db_path(), screenshots_dir())
-    try:
-        index: MemoryIndex = await open_memory_index(store, config)
-        try:
-            yield index
-        finally:
-            await close_memory_index(index)
-    finally:
-        await store.close()
-
-
-async def cmd_memory_list(command: MemoryListCommand) -> int:
-    async with _memory_index(load_user_config()) as index:
-        records: list[MemoryRecord] = await index.store.list_memories(command.limit, 0)
-        total: int = await index.store.count_memories()
-    for record in records:
-        sys.stdout.write(f"{render_note(record)}\n")
-    sys.stderr.write(f"{len(records)} of {total} notes\n")
-    return 0
-
-
-async def cmd_memory_add(command: MemoryAddCommand) -> int:
-    async with _memory_index(load_user_config()) as index:
-        saved: SavedMemory = await save_memory(index, " ".join(command.text), command.tags, None)
-    sys.stdout.write(f"{'Saved' if saved.created else 'Already saved'}: {render_note(saved.record)}\n")
-    if saved.similar:
-        sys.stdout.write("These notes say nearly the same; remove an outdated one with 'dotx memory forget <id>':\n")
-        for hit in saved.similar:
-            sys.stdout.write(f"  {render_note(hit.record)}\n")
-    return 0
-
-
-async def cmd_memory_search(command: MemorySearchCommand) -> int:
-    async with _memory_index(load_user_config()) as index:
-        hits: list[MemoryHit] = await recall(index, " ".join(command.query), command.limit)
-    for hit in hits:
-        score: str = "    -" if hit.similarity is None else f"{hit.similarity:5.2f}"
-        sys.stdout.write(f"{score}  {render_note(hit.record)}\n")
-    if not hits:
-        sys.stderr.write("no saved notes match\n")
-    return 0
-
-
-async def cmd_memory_forget(command: MemoryForgetCommand) -> int:
-    async with _memory_index(load_user_config()) as index:
-        forgotten: MemoryRecord = await forget_memory(index, command.memory_id)
-    sys.stdout.write(f"Forgot: {render_note(forgotten)}\n")
-    return 0
-
-
-async def cmd_memory_reindex(command: MemoryReindexCommand) -> int:
-    config: AppConfig = load_user_config()
-    if not config.memory.embed_enabled:
-        raise ConfigError("embeddings are switched off ([memory] embed_enabled = false); nothing to embed", {})
-    async with _memory_index(config) as index:
-        count: int = await reindex(index)
-    sys.stdout.write(f"{count} notes embedded with {config.memory.embed_provider}:{config.memory.embed_model}\n")
-    return 0
-
-
 async def dispatch(command: Command) -> int:
-    match command:
-        case RunCommand():
-            return await cmd_run(command)
-        case ResumeCommand():
-            return await cmd_resume(command)
-        case ChatCommand():
-            return await cmd_chat(command)
-        case ModelsCommand():
-            return await cmd_models(command)
-        case ModelsProfileCommand():
-            return await cmd_models_profile(command)
-        case AuthSetCommand():
-            return await cmd_auth_set(command)
-        case AuthStatusCommand():
-            return await cmd_auth_status(command)
-        case DoctorCommand():
-            return await cmd_doctor(command)
-        case BrowserLoginCommand():
-            return await cmd_browser_login(command)
-        case BrowserImportChromeCommand():
-            return await cmd_browser_import_chrome(command)
-        case BrowserAttachCommand():
-            return await cmd_browser_attach(command)
-        case BrowserDetachCommand():
-            return await cmd_browser_detach(command)
-        case DesktopCheckCommand():
-            return await cmd_desktop_check(command)
-        case DesktopSetupCommand():
-            return await cmd_desktop_setup(command)
-        case DesktopAppsCommand():
-            return await cmd_desktop_apps(command)
-        case DesktopSnapshotCommand():
-            return await cmd_desktop_snapshot(command)
-        case DesktopScreenshotCommand():
-            return await cmd_desktop_screenshot(command)
-        case MemoryListCommand():
-            return await cmd_memory_list(command)
-        case MemoryAddCommand():
-            return await cmd_memory_add(command)
-        case MemorySearchCommand():
-            return await cmd_memory_search(command)
-        case MemoryForgetCommand():
-            return await cmd_memory_forget(command)
-        case MemoryReindexCommand():
-            return await cmd_memory_reindex(command)
-        case ScheduleListCommand():
-            return await cmd_schedule_list(command)
-        case ScheduleAddCommand():
-            return await cmd_schedule_add(command)
-        case ScheduleDeleteCommand():
-            return await cmd_schedule_delete(command)
-        case ScheduleEnableCommand():
-            return await cmd_schedule_enable(command)
-        case ScheduleDisableCommand():
-            return await cmd_schedule_disable(command)
-        case CampaignListCommand():
-            return await cmd_campaign_list(command)
-        case CampaignShowCommand():
-            return await cmd_campaign_show(command)
-        case CampaignStopCommand():
-            return await cmd_campaign_stop(command)
-        case CampaignResumeCommand():
-            return await cmd_campaign_resume(command)
-        case CampaignAchievedCommand():
-            return await cmd_campaign_achieved(command)
-        case McpListCommand():
-            return await cmd_mcp_list(command)
-        case SkillsListCommand():
-            return await cmd_skills_list(command)
-        case PlaybooksListCommand():
-            return await cmd_playbooks_list(command)
-        case PlaybooksShowCommand():
-            return await cmd_playbooks_show(command)
-        case PlaybooksDropCommand():
-            return await cmd_playbooks_drop(command)
-        case PruneCommand():
-            return await cmd_prune(command)
-        case UndoCommand():
-            return await cmd_undo(command)
-        case EvalListCommand():
-            return await cmd_eval_list(command)
-        case EvalCheckCommand():
-            return await cmd_eval_check(command)
-        case EvalRunCommand():
-            return await cmd_eval_run(command)
-        case EvalReportCommand():
-            return await cmd_eval_report(command)
-        case StatsCommand():
-            return await cmd_stats(command)
-        case DaemonCommand():
-            return await cmd_daemon(command)
-        case OpenCommand():
-            return await cmd_open(command)
-        case UrlCommand():
-            return await cmd_url(command)
-        case ServiceInstallCommand():
-            return await cmd_service_install(command)
-        case ServiceUninstallCommand():
-            return await cmd_service_uninstall(command)
-        case ServiceStatusCommand():
-            return await cmd_service_status(command)
-        case ServicePermissionsCommand():
-            return await cmd_service_permissions(command)
+    """Carry out ``command`` in the module of its family."""
+    family: _Family = cast(_Family, importlib.import_module(_FAMILIES[command.name]))
+    return await family.dispatch(command)
 
 
 def main() -> None:

@@ -18,7 +18,7 @@ from dotagent.llm.calls import CANCELLED, CallOrigin, CallRecorder, ModelCall
 from dotagent.llm.ollama import OllamaProvider
 from dotagent.llm.openai import OpenAIProvider
 from dotagent.llm.opencode_go import OpenCodeGoProvider
-from dotagent.llm.types import ChatProvider, ChatRequest, DeltaSink, ModelInfo, ModelReply
+from dotagent.llm.types import KNOWN_PROVIDERS, ChatProvider, ChatRequest, DeltaSink, ModelInfo, ModelReply
 from dotagent.secrets import require_secret, resolve_secret
 
 log = get_logger(__name__)
@@ -31,9 +31,6 @@ class ModelRef(FrozenModel):
     @property
     def label(self) -> str:
         return f"{self.provider}:{self.model}"
-
-
-KNOWN_PROVIDERS: tuple[str, ...] = ("ollama", "openai", "opencode_go", "anthropic")
 
 
 def parse_model_ref(text: str) -> ModelRef:

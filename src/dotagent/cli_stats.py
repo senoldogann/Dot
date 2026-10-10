@@ -7,10 +7,9 @@ import time
 from collections.abc import Sequence
 from typing import Literal
 
-from pydantic import Field
-
+from dotagent.cli_commands import Command, StatsCommand
+from dotagent.core.errors import InvalidValueError
 from dotagent.core.paths import db_path
-from dotagent.core.types import FrozenModel
 from dotagent.store.endings import ENDING_LABELS
 from dotagent.store.stats import (
     ActStats,
@@ -28,12 +27,6 @@ from dotagent.store.stats import (
 _DAY_S: float = 86400.0
 # The tools listed: the ones whose calls took the most seconds in all.
 _TOOLS_SHOWN: int = 15
-
-
-class StatsCommand(FrozenModel):
-    name: Literal["stats"]
-    days: int = Field(ge=1)
-    by: Literal["model", "site", "all"]
 
 
 def _count(count: int) -> str:
@@ -199,3 +192,12 @@ async def cmd_stats(command: StatsCommand) -> int:
     stats: RunStatistics = await asyncio.to_thread(collect_statistics, db_path(), since)
     sys.stdout.write("\n".join(render_stats(stats, command.days, command.by)) + "\n")
     return 0
+
+
+async def dispatch(command: Command) -> int:
+    """Carry out one of this module's commands."""
+    match command:
+        case StatsCommand():
+            return await cmd_stats(command)
+        case _:
+            raise InvalidValueError("not a command of this module", {"name": command.name})

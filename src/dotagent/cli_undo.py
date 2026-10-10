@@ -9,25 +9,17 @@ import asyncio
 import sys
 from collections.abc import Sequence
 from pathlib import Path
-from typing import Literal
 
-from dotagent.core.errors import RunConflict
+from dotagent.cli_commands import Command, UndoCommand
+from dotagent.core.errors import InvalidValueError, RunConflict
 from dotagent.core.logs import get_logger
 from dotagent.core.paths import db_path, screenshots_dir, undo_dir
-from dotagent.core.types import FrozenModel
 from dotagent.store.db import Store
 from dotagent.store.models import RunRecord
 from dotagent.undo.restore import UndoStep, apply_undo, due_steps, forced_steps, remove_empty_dirs
 from dotagent.undo.runs import UndoPlan, active_run_ids, plan_for, runs_with_children
 
 log = get_logger(__name__)
-
-
-class UndoCommand(FrozenModel):
-    name: Literal["undo"]
-    run_id: str
-    apply: bool
-    force: bool
 
 
 def _count(number: int, noun: str) -> str:
@@ -122,3 +114,12 @@ async def cmd_undo(command: UndoCommand) -> int:
         return await _show(runs[0], len(runs), plan, folders)
     steps: list[UndoStep] = forced_steps(plan) if command.force else due_steps(plan)
     return await _undo(runs[0], plan, steps, folders, root)
+
+
+async def dispatch(command: Command) -> int:
+    """Carry out one of this module's commands."""
+    match command:
+        case UndoCommand():
+            return await cmd_undo(command)
+        case _:
+            raise InvalidValueError("not a command of this module", {"name": command.name})

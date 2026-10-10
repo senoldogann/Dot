@@ -17,9 +17,9 @@ from dotagent.core.paths import dot_home, failsafe_path, screenshots_dir
 from dotagent.desktop.perms import missing_panes, program_of_this_process, request_permissions
 from dotagent.desktop.types import Permissions
 from dotagent.doctor import CheckResult, run_quick_checks
-from dotagent.llm.router import KNOWN_PROVIDERS, ModelRef, ModelRouter
+from dotagent.llm.router import ModelRef, ModelRouter
 from dotagent.llm.traits import effective_effort
-from dotagent.llm.types import Effort, ModelInfo
+from dotagent.llm.types import KNOWN_PROVIDERS, Effort, ModelInfo
 from dotagent.server.context import ServerContext
 from dotagent.server.views import (
     FailsafeView,

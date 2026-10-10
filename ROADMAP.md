@@ -2379,8 +2379,8 @@ Paste this to the agent that takes the work:
 | 36  | Playbooks learned from runs that reached their goal                      | done    | fb99354 |
 | 37  | A stuck campaign changes strategy, not just session                      | done    | 12c589f |
 | 38  | One view of what a run did and what can be undone                        | done    | 8c9cdbc |
-| 39  | CI and retention defaults                                                | in progress |         |
-| 40  | Cold start of `dotx`                                                     | planned |         |
+| 39  | CI and retention defaults                                                | done    | 80e8f19 |
+| 40  | Cold start of `dotx`                                                     | in progress |         |
 | 41  | An own crawler: fetch, render, crawl, extract                            | done    | aedab8b |
 | 42  | TypeSafe as a tool of the agent: many items judged in one call           | planned |         |
 | 43  | Typed judgments in X campaigns: what to answer, the best draft, a check  | planned |         |
@@ -2970,9 +2970,26 @@ split into one module per subcommand family, each with its imports at the top, a
 **Why.** Measured 1 170 ms, of which `mcp` 430 ms, `desktop.session` 245 ms, `fastapi` 139 ms ("Measurements"); the
 rule "imports at the top" stands, so the split is the way.
 
-**Touchpoints.** `cli.py`, `cli_*.py`, `__main__.py`.
+**Design, as built.** Three moves. The command models (one `FrozenModel` per subcommand, the `Command` union and
+its `TypeAdapter`) live in `cli_commands.py`, which imports pydantic and the type aliases only (`Effort`,
+`ApprovalMode`, `BrowserMode`, `SnapshotScope`); `KNOWN_PROVIDERS` moved to `llm/types.py` so the parser does not
+pull the router and the providers. The commands that lived in `cli.py` moved to family modules with their imports at
+the top: `cli_run.py` (run, resume, chat, with `follow_run`, which the CLI smoke fixture imports from there now),
+`cli_models.py` (models, auth), `cli_doctor.py`, `cli_desktop.py`, `cli_memory.py`, and `browser login` joined
+`cli_browser.py`. Every family module ends with `dispatch(command)`, a match over its own commands; `cli.py` keeps the
+parser, the validation and `main`, and its `dispatch` looks the family module up by the command's name
+(`_FAMILIES`) and imports it then, the one place the program loads a module by name. Measured on the owner's Mac,
+warm cache, five runs: `dotx --help` 80 ms (110 ms the first), from 600 to 760 ms before this item and 1 170 ms when
+the item was written; `import dotagent.cli` 67 ms, of which `cli_commands` 38 ms. A heavy command pays its own
+imports when it runs, as before.
 
-**Done when.** `dotx --help` under 400 ms p50; all CLI tests pass.
+**Touchpoints.** `cli.py`, `cli_commands.py` (new), `cli_run.py`, `cli_models.py`, `cli_doctor.py`,
+`cli_desktop.py`, `cli_memory.py` (new), the other `cli_*.py` (their models moved out, a `dispatch` added),
+`llm/types.py`, `llm/router.py`, `server/routes_system.py`, `tests/fixtures/dot_cli_run.py`, README "Development".
+
+**Done when.** `dotx --help` under 400 ms p50 (80 ms measured); the unit tests and the CLI smoke tests pass; every
+light command runs end to end on a throw-away home (`prune`, `eval list`, `skills list`, `campaign list`,
+`schedule list`, `playbooks list`, `auth status`, `memory list`, `undo`, `models`).
 
 ### 41. An own crawler: fetch, render, crawl, extract
 
@@ -3620,3 +3637,5 @@ item ends as a measured no, written in the log.
 - 2026-10-10 (Fable 5.1): item 38 merged 8c9cdbc (PR #38, MYP-179 Done). Next: item 39.
 - 2026-10-10 (Fable 5.1): item 39 built on branch `item-39-ci-retention` (MYP-180): `.github/workflows/gate.yml` (macOS; format, lint, mypy, unit, eval check, 19 offline smoke files), `[store] retention_days = 90` and `dotx prune` deleting the events of old runs on `--apply`; README. Unit 646. Decision 25.
 - 2026-10-10 (Fable 5.1): item 39's gate went green on PR #39 at its third run: the first lacked ripgrep on the runner, the second could not tell the runner's time zone (`TZ` is honoured now).
+- 2026-10-10 (Fable 5.1): item 39 merged 80e8f19 (PR #39, MYP-180 Done; gate green). Next: item 40.
+- 2026-10-10 (Fable 5.1): item 40 built on branch `item-40-cold-start` (MYP-181): `cli_commands.py` (light models and union), the commands of `cli.py` moved to `cli_run`, `cli_models`, `cli_doctor`, `cli_desktop`, `cli_memory` and `cli_browser`, a `dispatch` per family, `cli.py` loads the family by name. `dotx --help` 80 ms (was 600 to 760 ms). Unit 646, offline smoke 97, eval check ok.

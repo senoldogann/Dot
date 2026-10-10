@@ -10,14 +10,11 @@ import sys
 import time
 from collections.abc import Sequence
 from pathlib import Path
-from typing import Literal
 
-from pydantic import Field
-
+from dotagent.cli_commands import Command, EvalCheckCommand, EvalListCommand, EvalReportCommand, EvalRunCommand
 from dotagent.config import AppConfig, load_default_config, load_user_config
-from dotagent.core.errors import ConfigError
+from dotagent.core.errors import ConfigError, InvalidValueError
 from dotagent.core.paths import evals_dir
-from dotagent.core.types import FrozenModel
 from dotagent.evals.audit import catalog_problems, task_problems
 from dotagent.evals.catalog import all_tasks, select_tasks
 from dotagent.evals.reports import load_report, save_report
@@ -44,26 +41,6 @@ from dotagent.llm.router import parse_model_ref
 from dotagent.tools.shell import child_env, read_login_env
 
 _GOAL_PREVIEW_CHARS: int = 70
-
-
-class EvalListCommand(FrozenModel):
-    name: Literal["eval-list"]
-
-
-class EvalCheckCommand(FrozenModel):
-    name: Literal["eval-check"]
-
-
-class EvalRunCommand(FrozenModel):
-    name: Literal["eval-run"]
-    model: str | None
-    tasks: tuple[str, ...]
-    repeat: int = Field(ge=1)
-
-
-class EvalReportCommand(FrozenModel):
-    name: Literal["eval-report"]
-    files: tuple[str, ...]
 
 
 def _write(lines: Sequence[str]) -> None:
@@ -220,3 +197,18 @@ async def cmd_eval_report(command: EvalReportCommand) -> int:
         # Two reports: the second against the first, the way a change is judged (the same model before and after).
         _write(["", *render_difference(cards[0], cards[1])])
     return 0
+
+
+async def dispatch(command: Command) -> int:
+    """Carry out one of this module's commands."""
+    match command:
+        case EvalListCommand():
+            return await cmd_eval_list(command)
+        case EvalCheckCommand():
+            return await cmd_eval_check(command)
+        case EvalRunCommand():
+            return await cmd_eval_run(command)
+        case EvalReportCommand():
+            return await cmd_eval_report(command)
+        case _:
+            raise InvalidValueError("not a command of this module", {"name": command.name})

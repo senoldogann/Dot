@@ -2,21 +2,17 @@
 
 import asyncio
 import sys
-from typing import Literal
 
+from dotagent.cli_commands import Command, SkillsListCommand
 from dotagent.config import AppConfig, load_user_config
+from dotagent.core.errors import InvalidValueError
 from dotagent.core.paths import plugins_dir, skills_dir
-from dotagent.core.types import FrozenModel
 from dotagent.plugins.catalog import load_plugins
 from dotagent.plugins.types import Plugin, PluginCatalog, PluginProblem
 from dotagent.skills.catalog import load_skills, playbook_root
 from dotagent.skills.types import Skill, SkillCatalog, SkillProblem
 
 _DESCRIPTION_CHARS: int = 90
-
-
-class SkillsListCommand(FrozenModel):
-    name: Literal["skills-list"]
 
 
 def _clip(text: str, limit: int) -> str:
@@ -60,3 +56,12 @@ async def cmd_skills_list(command: SkillsListCommand) -> int:
     skills: SkillCatalog = await asyncio.to_thread(load_skills, config.skills, plugins.plugins, playbook_root(config))
     sys.stdout.write("\n".join(render_catalogs(plugins, skills)) + "\n")
     return 1 if plugins.problems or skills.problems else 0
+
+
+async def dispatch(command: Command) -> int:
+    """Carry out one of this module's commands."""
+    match command:
+        case SkillsListCommand():
+            return await cmd_skills_list(command)
+        case _:
+            raise InvalidValueError("not a command of this module", {"name": command.name})

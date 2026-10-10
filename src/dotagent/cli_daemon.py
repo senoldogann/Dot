@@ -5,15 +5,23 @@ import os
 import sys
 import time
 from pathlib import Path
-from typing import Literal
 
 import httpx
 from pydantic import ValidationError
 
+from dotagent.cli_commands import (
+    Command,
+    DaemonCommand,
+    OpenCommand,
+    ServiceInstallCommand,
+    ServicePermissionsCommand,
+    ServiceStatusCommand,
+    ServiceUninstallCommand,
+    UrlCommand,
+)
 from dotagent.config import AppConfig, load_user_config
-from dotagent.core.errors import ConfigError, ServiceError
+from dotagent.core.errors import ConfigError, InvalidValueError, ServiceError
 from dotagent.core.paths import dot_home, log_dir, token_path
-from dotagent.core.types import FrozenModel
 from dotagent.desktop.perms import Pane, open_settings, program_of_this_process, settings_url
 from dotagent.launchd import (
     LABEL,
@@ -44,34 +52,6 @@ _START_WAIT_S: float = 60.0
 _BODY_CHARS: int = 300
 
 _NO_DAEMON_FIX: str = "start it with 'dotx daemon' (in the foreground) or 'dotx service install' (at every login)"
-
-
-class DaemonCommand(FrozenModel):
-    name: Literal["daemon"]
-
-
-class OpenCommand(FrozenModel):
-    name: Literal["open"]
-
-
-class UrlCommand(FrozenModel):
-    name: Literal["url"]
-
-
-class ServiceInstallCommand(FrozenModel):
-    name: Literal["service-install"]
-
-
-class ServiceUninstallCommand(FrozenModel):
-    name: Literal["service-uninstall"]
-
-
-class ServiceStatusCommand(FrozenModel):
-    name: Literal["service-status"]
-
-
-class ServicePermissionsCommand(FrozenModel):
-    name: Literal["service-permissions"]
 
 
 def _clip(text: str, limit: int) -> str:
@@ -331,3 +311,24 @@ async def cmd_service_uninstall(command: ServiceUninstallCommand) -> int:
         f"file deleted: {'yes' if removal.file_removed else 'no file'}). The data in {dot_home()} is untouched.\n"
     )
     return 0
+
+
+async def dispatch(command: Command) -> int:
+    """Carry out one of this module's commands."""
+    match command:
+        case DaemonCommand():
+            return await cmd_daemon(command)
+        case OpenCommand():
+            return await cmd_open(command)
+        case UrlCommand():
+            return await cmd_url(command)
+        case ServiceInstallCommand():
+            return await cmd_service_install(command)
+        case ServiceUninstallCommand():
+            return await cmd_service_uninstall(command)
+        case ServiceStatusCommand():
+            return await cmd_service_status(command)
+        case ServicePermissionsCommand():
+            return await cmd_service_permissions(command)
+        case _:
+            raise InvalidValueError("not a command of this module", {"name": command.name})

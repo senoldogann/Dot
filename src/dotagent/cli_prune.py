@@ -10,9 +10,10 @@ import sys
 import time
 from collections.abc import Sequence
 from pathlib import Path
-from typing import Literal
 
+from dotagent.cli_commands import Command, PruneCommand
 from dotagent.config import AppConfig, load_user_config
+from dotagent.core.errors import InvalidValueError
 from dotagent.core.paths import db_path, screenshots_dir, undo_dir
 from dotagent.core.types import FrozenModel
 from dotagent.store.db import Store
@@ -22,11 +23,6 @@ from dotagent.undo.journal import JournalFolder, list_journals, remove_journals
 _YOUNG_IMAGE_S: float = 3600.0
 _DAY_S: float = 86400.0
 _MIB: int = 1024 * 1024
-
-
-class PruneCommand(FrozenModel):
-    name: Literal["prune"]
-    apply: bool
 
 
 class Retention(FrozenModel):
@@ -173,3 +169,12 @@ async def cmd_prune(command: PruneCommand) -> int:
         return await (_prune(store, retention) if command.apply else _report(store, retention))
     finally:
         await store.close()
+
+
+async def dispatch(command: Command) -> int:
+    """Carry out one of this module's commands."""
+    match command:
+        case PruneCommand():
+            return await cmd_prune(command)
+        case _:
+            raise InvalidValueError("not a command of this module", {"name": command.name})
