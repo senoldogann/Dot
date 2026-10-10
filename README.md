@@ -188,8 +188,13 @@ answer (a small model that is offered both writes the call out as text).
   check lists names, paths and links in the summary that the conversation never had. The `compacted` event names the
   model, how the summary came about and what the check found.
 - The plan has steps that are `pending`, `in_progress`, `done`, `failed` or `skipped`; `update_plan` writes it and
-  `mark_plan_step` changes one step, so the plan in the web UI moves as the work does. A run that calls `finish` with
-  steps still open is asked once to close them. A plan can also hold the run's targets (`targets` of `update_plan`, at
+  `mark_plan_step` changes one step, so the plan in the web UI moves as the work does. A step is marked `done` only
+  with evidence (`evidence`, at most 400 characters): what the run observed that shows it, such as the path and what it
+  read back, the count or the line of output, or what the page showed. A mark without it is refused with what counts
+  as evidence, and a rewritten plan that keeps a done step keeps its evidence; a failed or skipped step may carry what
+  happened. The evidence stands under the step in the web UI, in every note that carries the plan and in the goal
+  check. A run that calls `finish` with steps still open is asked once to close them. A plan can also hold the run's
+  targets (`targets` of `update_plan`, at
   most 600 characters): for a goal that names an outcome, what the run will reach and how its own tools measure it.
   They stay until new targets replace them (an `update_plan` without `targets`, or with an empty text, keeps them), are
   the first line of the plan in the web UI and are printed under "plan" by `dotx run`, go into every note that carries
@@ -441,9 +446,11 @@ question is not put to you in its place.
 
 **Goal mode** is for `task` and `research` runs; a `chat` has no goal to check against, and asking for one is refused.
 When the model calls `finish`, the review model checks the answer against the goal, from the evidence of what the run
-did and not from what the answer claims. When the run's plan has targets, it judges them too: they are the run's own
-measurable reading of the goal, not requirements it added, and they make the goal reached only when they fit its words.
-The evidence is a digest of the run's tool calls with the start of each result, and facts that Dot measured itself: the
+did and not from what the answer claims. When the run kept a plan, the checker reads it with the evidence of each closed
+step: a step marked done whose evidence nothing in the digest or the facts bears out is not done, its number goes into
+the verdict's `unproven_steps` (in the `goal_check` event), and when the goal needs that step the goal is not reached.
+When the plan has targets, it judges them too: they are the run's own measurable reading of the goal, not requirements
+it added, and they make the goal reached only when they fit its words. The evidence is a digest of the run's tool calls with the start of each result, and facts that Dot measured itself: the
 files its file tools wrote, its failed calls that no later success of the same call followed, the newest result of each
 command that tests, builds or lints, and the paths and addresses the answer names that the run never touched (paths
 that do not exist, addresses no call opened). Where the facts and the answer disagree, the checker goes by the facts.
@@ -612,7 +619,7 @@ round trips a model spends on work that cannot be done in one.
 | `dotx eval list`                                         | The tasks, with their kind, mode and number of checks.                                                                                                                                                             |
 | `dotx eval check`                                        | Needs no model and costs nothing. Replays the reference solution of every task through the real loop, tools and policy, and proves that a run that touches nothing and says "done" fails every task. Run it after changing a tool, the policy or the loop. |
 | `dotx eval run [--model REF] [--task ID]... [--repeat N]` | Plays the tasks against a model (the configured main model if none is given) and prints the score. It spends the tokens of that model: an attempt is cut after 300 s or 600000 tokens, and the notice before it starts states the ceiling. `--repeat` plays every task several times, which shows the tasks a model passes only now and then. |
-| `dotx eval report [FILE...]`                             | The score of saved runs, with a comparison table when there are several and, for exactly two files, a line with the second against the first (passed, steps, tokens and seconds per pass, the one-step act and cache shares in percentage points, tool errors, stalls, false claims); without a file, every run saved under `<home>/evals/`. |
+| `dotx eval report [FILE...]`                             | The score of saved runs, with a comparison table when there are several and, for exactly two files, a line with the second against the first (passed, steps, tokens and seconds per pass, the one-step act and cache shares in percentage points, tool errors, stalls, false claims, unproven steps); without a file, every run saved under `<home>/evals/`. |
 
 Every attempt runs unattended in a throw-away Dot home (its own database and workspace, removed afterwards), with the
 Mac desktop, your MCP servers, skills, plugins and the memory embeddings switched off, and with every question of the
@@ -621,7 +628,9 @@ screenshots are never touched; the API keys the model needs are looked up first 
 the pass rate, per kind of task, what a pass costs in steps, tokens and seconds (split into model calls and tool calls),
 the share of the act calls that carried one step and the share of the input tokens served from the prompt cache (both
 as `dotx stats` counts them, over every attempt), how often a tool call failed, stalls, runs that were cut, runs that
-said they were done and were not, and the tasks that passed only in some attempts. The token ceiling of an attempt
+said they were done and were not, plan steps marked done without evidence (zero since the plan tools require it) and
+done steps whose evidence the goal check could not bear out (counted from the `goal_check` events, so only in goal
+mode), and the tasks that passed only in some attempts. The token ceiling of an attempt
 counts every model call of the run and of the runs it delegated to, side calls included; a report saved before model
 calls were timed counted the steps' tokens only and has no seconds, and one saved before acts and cached tokens were
 counted shows `-` for their shares. `dotx eval run` saves its report after every attempt, so an interrupted run keeps
@@ -987,8 +996,8 @@ your conversation; the daemon runs the sessions after it, each a run in a thread
   daemon, your answer goes to it). After `campaign_patience_sessions` (3) sessions in a row without a progress entry,
   the brief asks for a new strategy first. All four live in `[agent]`.
 - **Only a verified outcome ends it.** `campaign_achieved` asks the goal checker (the review model) whether the targets
-  are reached, from the targets and how they are verified, the progress in the ledger, what the session's own calls
-  measured and the session's evidence. Refused, the call fails with the checker's reason and the session goes on (one
+  are reached, from the targets and how they are verified, the progress in the ledger, the session's plan with the
+  evidence of its steps, what the session's own calls measured and the session's evidence. Refused, the call fails with the checker's reason and the session goes on (one
   the checker finds out of reach asks you how to go on); accepted, the campaign is achieved and you get a
   notification.
 - **Only you stop it.** Campaigns, in the sidebar, lists them; a campaign's page shows its targets, the questions

@@ -27,6 +27,8 @@ from dotagent.agent.plan import (
     plan_from_event,
     plan_lines,
     render_plan,
+    rewritten_steps,
+    unevidenced_done,
     with_step_status,
 )
 from dotagent.core.errors import ToolInputError
@@ -160,15 +162,47 @@ def test_a_reminder_repeats_the_task_the_plan_and_only_the_newest_actions() -> N
 
 def test_plan_steps_change_one_at_a_time_and_report_what_is_open() -> None:
     plan = (PlanItem(text="a", status="pending"), PlanItem(text="b", status="pending"))
-    changed = with_step_status(plan, 1, "done")
+    changed = with_step_status(plan, 1, "done", "cat a.txt printed 3 lines")
     assert [step.status for step in changed] == ["done", "pending"]
     assert open_steps(changed) == (2,)
-    assert open_steps(with_step_status(changed, 2, "skipped")) == ()
-    assert render_plan(changed) == "1. [done] a\n2. [pending] b"
+    assert open_steps(with_step_status(changed, 2, "skipped", "")) == ()
+    assert render_plan(changed) == "1. [done] a\n   evidence: cat a.txt printed 3 lines\n2. [pending] b"
     with pytest.raises(ToolInputError):
-        with_step_status(plan, 3, "done")
+        with_step_status(plan, 3, "done", "x")
     with pytest.raises(ToolInputError):
-        with_step_status((), 1, "done")
+        with_step_status((), 1, "done", "x")
+
+
+def test_a_step_is_done_only_with_evidence_and_a_reopened_step_drops_it() -> None:
+    plan = (PlanItem(text="a", status="in_progress"), PlanItem(text="b", status="pending"))
+    with pytest.raises(ToolInputError) as caught:
+        with_step_status(plan, 1, "done", "")
+    assert "step 1 cannot be marked done without evidence" in str(caught.value)
+    assert "the tool result that shows it" in str(caught.value)
+    done = with_step_status(plan, 1, "done", "wc -l a.txt printed 3")
+    assert done[0].evidence == "wc -l a.txt printed 3"
+    assert unevidenced_done(done) == 0
+    # Failed and skipped steps may carry evidence or not; a step opened again holds nothing shown yet.
+    assert with_step_status(done, 1, "failed", "")[0].evidence == ""
+    assert with_step_status(done, 1, "in_progress", "")[0] == PlanItem(text="a", status="in_progress", evidence="")
+    # A plan stored before evidence existed counts its done steps as unevidenced.
+    assert unevidenced_done((PlanItem(text="a", status="done"), PlanItem(text="b", status="done", evidence="e"))) == 1
+
+
+def test_a_rewritten_plan_keeps_the_evidence_of_the_steps_it_keeps_and_refuses_done_without_any() -> None:
+    previous = (PlanItem(text="Read the data", status="done", evidence="read_file data.csv: 12 rows"),)
+    kept = rewritten_steps(
+        previous,
+        (
+            PlanItem(text="read the data ", status="done"),
+            PlanItem(text="Sum the rows", status="done", evidence="awk printed 420"),
+            PlanItem(text="Mail it", status="pending"),
+        ),
+    )
+    assert [step.evidence for step in kept] == ["read_file data.csv: 12 rows", "awk printed 420", ""]
+    with pytest.raises(ToolInputError) as caught:
+        rewritten_steps(previous, (PlanItem(text="Something new", status="done"),))
+    assert "step 1 cannot be marked done without evidence" in str(caught.value)
 
 
 def test_the_targets_of_a_plan_are_stored_with_it_and_read_under_its_steps() -> None:
@@ -180,6 +214,7 @@ def test_the_targets_of_a_plan_are_stored_with_it_and_read_under_its_steps() -> 
     # A plan stored before targets existed has none.
     older = stored.model_copy(update={"data": {"steps": [{"text": "a", "status": "done"}]}})
     assert plan_from_event(older) == PlanPayload(steps=plan.steps, targets="")
+    assert plan_from_event(older).steps[0].evidence == ""
 
 
 def test_the_plan_changes_of_one_reply_apply_one_after_another() -> None:

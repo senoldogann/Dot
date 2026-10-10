@@ -5,6 +5,7 @@ from collections.abc import Sequence
 from pydantic import JsonValue
 
 from dotagent.agent.approvals import QUESTION_LEFT_EVENT
+from dotagent.agent.plan import PLAN_EVENT, plan_from_event, unevidenced_done
 from dotagent.core.errors import EvalError
 from dotagent.evals.results import RunMetrics
 from dotagent.llm.calls import CALL_EVENT
@@ -54,6 +55,25 @@ def _cached_tokens(events: Sequence[EventRecord]) -> int:
     return total
 
 
+def _unevidenced_steps(events: Sequence[EventRecord]) -> int:
+    """The done steps without evidence in the run's last plan; 0 when it kept none."""
+    plans: list[EventRecord] = [event for event in events if event.kind == PLAN_EVENT]
+    return 0 if not plans else unevidenced_done(plan_from_event(plans[-1]).steps)
+
+
+def _unproven_steps(events: Sequence[EventRecord]) -> int:
+    """The done steps the goal checker could not bear out, over the run's goal checks."""
+    total: int = 0
+    for event in events:
+        if event.kind != "goal_check":
+            continue
+        steps: JsonValue = event.data.get("unproven_steps")
+        if not isinstance(steps, list):
+            raise EvalError("a goal check lacks the unproven steps the harness counts", {"event_id": event.id})
+        total += len(steps)
+    return total
+
+
 def run_metrics(run: RunRecord, events: Sequence[EventRecord]) -> RunMetrics:
     """The numbers of one run: its record gives steps and tokens, its events give the rest."""
     results: list[EventRecord] = [event for event in events if event.kind == "tool_result"]
@@ -73,4 +93,6 @@ def run_metrics(run: RunRecord, events: Sequence[EventRecord]) -> RunMetrics:
         acts=len(acts),
         single_acts=sum(1 for event in acts if _batch_steps(event) == 1),
         cached_tokens=_cached_tokens(events),
+        unevidenced_steps=_unevidenced_steps(events),
+        unproven_steps=_unproven_steps(events),
     )

@@ -22,9 +22,22 @@ type StepStatus = Literal["pending", "in_progress", "done", "failed", "skipped"]
 CLOSED_STATES: frozenset[StepStatus] = frozenset({"done", "failed", "skipped"})
 
 
+# What a step marked done must carry, named in the error a mark without it gets.
+EVIDENCE_HINT: str = (
+    "a step is done only with evidence: the tool result that shows it (the path and what was read back, the count or "
+    "the line of output, what the page or the window showed), not the intention"
+)
+EVIDENCE_MAX_CHARS: int = 400
+
+
 class PlanItem(FrozenModel):
+    """One step: its text, its state and, for a step that was closed, the evidence the run recorded (what it observed
+    that shows the step done, or why it failed or was skipped). Empty for an open step, and for the steps of the plans
+    stored before evidence existed."""
+
     text: str
     status: StepStatus
+    evidence: str = ""
 
 
 class PlanPayload(FrozenModel):
@@ -40,7 +53,10 @@ EMPTY_PLAN: PlanPayload = PlanPayload(steps=(), targets="")
 
 
 def plan_event_data(plan: PlanPayload) -> JsonObject:
-    return {"steps": [{"text": step.text, "status": step.status} for step in plan.steps], "targets": plan.targets}
+    return {
+        "steps": [{"text": step.text, "status": step.status, "evidence": step.evidence} for step in plan.steps],
+        "targets": plan.targets,
+    }
 
 
 def plan_from_event(event: EventRecord) -> PlanPayload:
@@ -54,16 +70,43 @@ def plan_from_event(event: EventRecord) -> PlanPayload:
         ) from exc
 
 
-def with_step_status(steps: Sequence[PlanItem], number: int, status: StepStatus) -> tuple[PlanItem, ...]:
-    """The plan with step ``number`` (1-based) set to ``status``."""
+def _checked_evidence(number: int, status: StepStatus, evidence: str) -> str:
+    """``evidence`` for a step set to ``status``: a step marked done without any is refused."""
+    if status == "done" and not evidence:
+        raise ToolInputError(f"step {number} cannot be marked done without evidence: {EVIDENCE_HINT}", {"step": number})
+    return evidence
+
+
+def with_step_status(steps: Sequence[PlanItem], number: int, status: StepStatus, evidence: str) -> tuple[PlanItem, ...]:
+    """The plan with step ``number`` (1-based) set to ``status`` and carrying ``evidence`` (empty clears what the step
+    held: a step opened again has nothing shown yet)."""
     if not steps:
         raise ToolInputError("there is no plan yet; record one with update_plan first", {"step": number})
     if number < 1 or number > len(steps):
         raise ToolInputError(
             f"the plan has steps 1 to {len(steps)}; there is no step {number}", {"step": number, "steps": len(steps)}
         )
+    checked: str = _checked_evidence(number, status, evidence)
     return tuple(
-        step.model_copy(update={"status": status}) if index == number - 1 else step for index, step in enumerate(steps)
+        step.model_copy(update={"status": status, "evidence": checked}) if index == number - 1 else step
+        for index, step in enumerate(steps)
+    )
+
+
+def rewritten_steps(previous: Sequence[PlanItem], steps: Sequence[PlanItem]) -> tuple[PlanItem, ...]:
+    """The steps of a rewritten plan. A step given as done keeps the evidence it carries; one given without takes the
+    evidence of the step of the previous plan with the same text (the rewrite kept a step already shown done); one with
+    neither is refused, so no plan ever holds a done step without evidence."""
+    kept: dict[str, str] = {step.text.strip().casefold(): step.evidence for step in previous if step.evidence}
+    return tuple(
+        step.model_copy(
+            update={
+                "evidence": _checked_evidence(
+                    number, step.status, step.evidence or kept.get(step.text.strip().casefold(), "")
+                )
+            }
+        )
+        for number, step in enumerate(steps, start=1)
     )
 
 
@@ -76,9 +119,20 @@ def count_done(steps: Sequence[PlanItem]) -> int:
     return sum(1 for step in steps if step.status == "done")
 
 
+def unevidenced_done(steps: Sequence[PlanItem]) -> int:
+    """The steps marked done that carry no evidence: zero for every plan written since evidence is required, and the
+    count a plan stored before that shows."""
+    return sum(1 for step in steps if step.status == "done" and not step.evidence)
+
+
+def _step_line(number: int, step: PlanItem) -> str:
+    line: str = f"{number}. [{step.status}] {step.text}"
+    return f"{line}\n   evidence: {step.evidence}" if step.evidence else line
+
+
 def render_plan(steps: Sequence[PlanItem]) -> str:
-    """``1. [done] text`` lines, as the model reads the plan back."""
-    return "\n".join(f"{index + 1}. [{step.status}] {step.text}" for index, step in enumerate(steps))
+    """``1. [done] text`` lines, as the model reads the plan back, each closed step followed by its evidence."""
+    return "\n".join(_step_line(index + 1, step) for index, step in enumerate(steps))
 
 
 def plan_lines(plan: PlanPayload) -> str:

@@ -195,6 +195,7 @@ def _facts(written: str) -> str:
 async def test_the_goal_checker_accepts_work_that_the_digest_shows(runtime: Runtime) -> None:
     request: GoalRequest = GoalRequest(
         goal="Create the file report.txt in the workspace and write the word done in it.",
+        plan="",
         targets="",
         digest=CREATED_REPORT,
         facts=_facts("report.txt"),
@@ -209,6 +210,7 @@ async def test_the_goal_checker_accepts_work_that_the_digest_shows(runtime: Runt
 async def test_the_goal_checker_sends_the_agent_back_for_what_the_digest_does_not_show(runtime: Runtime) -> None:
     request: GoalRequest = GoalRequest(
         goal="Create two files in the workspace: a.txt holding the word one and b.txt holding the word two.",
+        plan="",
         targets="",
         digest="1. write_file path=a.txt content=one -> ok: wrote 3 bytes to a.txt",
         facts=_facts("a.txt"),

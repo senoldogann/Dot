@@ -7,6 +7,7 @@ from pydantic import Field, StringConstraints
 from dotagent.agent.approvals import ApprovalOutcome
 from dotagent.agent.plan import (
     EMPTY_PLAN,
+    EVIDENCE_MAX_CHARS,
     PLAN_EVENT,
     PlanItem,
     PlanPayload,
@@ -15,6 +16,7 @@ from dotagent.agent.plan import (
     plan_event_data,
     plan_from_event,
     plan_lines,
+    rewritten_steps,
     with_step_status,
 )
 from dotagent.core.types import JsonObject
@@ -150,10 +152,26 @@ def _notify_tool() -> RegisteredTool:
     )
 
 
+# The evidence of a step. A provider sees an optional text; empty means none was given.
+type Evidence = Annotated[str, StringConstraints(strip_whitespace=True, max_length=EVIDENCE_MAX_CHARS)]
+_EVIDENCE_DESCRIPTION: str = (
+    "What you observed that shows the step done: the tool result, quoted or named (the path and what you read back, "
+    "the count or the line of output, what the page or the window showed). Required for done; for failed or skipped, "
+    "what happened or why it is no longer needed."
+)
+
+
 class PlanStep(ToolArgs):
     text: str = Field(description="One short step.")
     status: StepStatus = Field(
         description="pending, in_progress, done, failed (tried and did not work) or skipped (no longer needed)."
+    )
+    evidence: Evidence = Field(
+        default="",
+        description=(
+            f"{_EVIDENCE_DESCRIPTION} A step kept from the previous plan with the same text keeps its evidence when "
+            "none is given."
+        ),
     )
 
 
@@ -187,16 +205,20 @@ def _update_plan_tool() -> RegisteredTool:
         return _meta_action(UPDATE_PLAN_TOOL, "Update the plan")
 
     async def run(args: UpdatePlanArgs, ctx: ToolContext) -> ToolResult:
-        targets: str = args.targets or (await _latest_plan(ctx)).targets
-        steps: tuple[PlanItem, ...] = tuple(PlanItem(text=step.text, status=step.status) for step in args.steps)
-        return await _record_plan(ctx, PlanPayload(steps=steps, targets=targets))
+        previous: PlanPayload = await _latest_plan(ctx)
+        targets: str = args.targets or previous.targets
+        given: tuple[PlanItem, ...] = tuple(
+            PlanItem(text=step.text, status=step.status, evidence=step.evidence) for step in args.steps
+        )
+        return await _record_plan(ctx, PlanPayload(steps=rewritten_steps(previous.steps, given), targets=targets))
 
     return make_tool(
         name=UPDATE_PLAN_TOOL,
         description=(
             "Record or rewrite a short step-by-step plan for multi-step work, and the targets of a goal that names an "
             "outcome. The user sees it live. Skip it for trivial tasks. To mark progress on one step use "
-            "mark_plan_step instead."
+            "mark_plan_step instead. A step given as done needs its evidence, unless the previous plan already holds "
+            "that step done."
         ),
         args_model=UpdatePlanArgs,
         modes=ALL_MODES,
@@ -211,6 +233,7 @@ def _update_plan_tool() -> RegisteredTool:
 class MarkPlanStepArgs(ToolArgs):
     step: int = Field(ge=1, le=20, description="The number of the step in the plan, starting at 1.")
     status: StepStatus = Field(description="The new state of that step.")
+    evidence: Evidence = Field(default="", description=_EVIDENCE_DESCRIPTION)
 
 
 def _mark_plan_step_tool() -> RegisteredTool:
@@ -219,14 +242,15 @@ def _mark_plan_step_tool() -> RegisteredTool:
 
     async def run(args: MarkPlanStepArgs, ctx: ToolContext) -> ToolResult:
         current: PlanPayload = await _latest_plan(ctx)
-        steps: tuple[PlanItem, ...] = with_step_status(current.steps, args.step, args.status)
+        steps: tuple[PlanItem, ...] = with_step_status(current.steps, args.step, args.status, args.evidence)
         return await _record_plan(ctx, current.model_copy(update={"steps": steps}))
 
     return make_tool(
         name=MARK_PLAN_STEP_TOOL,
         description=(
             "Mark one step of your plan as in_progress, done, failed or skipped. Call it the moment a step changes, "
-            "in the same reply as your next action, so the plan the user watches matches the work."
+            "in the same reply as your next action, so the plan the user watches matches the work. Marking a step "
+            "done needs evidence: what you observed that shows it; a mark without it is refused."
         ),
         args_model=MarkPlanStepArgs,
         modes=ALL_MODES,

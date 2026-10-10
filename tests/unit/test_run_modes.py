@@ -46,7 +46,7 @@ def test_a_question_goes_where_the_mode_sends_it(
 
 
 def _verdict(decision: Literal["achieved", "continue", "blocked"], reason: str) -> GoalVerdict:
-    return GoalVerdict(decision=decision, reason=reason)
+    return GoalVerdict(decision=decision, reason=reason, unproven_steps=())
 
 
 def test_an_achieved_goal_ends_the_run_as_done_with_its_answer() -> None:

@@ -2365,10 +2365,10 @@ Paste this to the agent that takes the work:
 | 22  | Step efficiency: the numbers every later item is judged by               | done    | accd6a8 |
 | 23  | Multi-action turns as the rule                                           | done    | a70e354 |
 | 24  | The fast model does the side work                                        | done    | 9c16866 |
-| 25  | Early and speculative execution of read-only tools                       | planned |         |
-| 26  | Speed knobs decided by measurement; snapshots that send only the change  | in progress |         |
+| 25  | Early and speculative execution of read-only tools                       | parked  |         |
+| 26  | Speed knobs decided by measurement; snapshots that send only the change  | done    | 8566080 |
 | 27  | Cheapest channel first: API or CLI, then the browser, then the desktop   | planned |         |
-| 28  | Evidence on every plan step                                              | planned |         |
+| 28  | Evidence on every plan step                                              | in progress |     |
 | 29  | Eval reports that compare runs, and the defaults that wait for them      | done    | 1513bd4 |
 | 30  | Typed best-of-two at critical decisions; injection fixtures in the evals | planned |         |
 | 31  | One-time codes from the owner's own Mail and Messages                    | planned |         |
@@ -2506,14 +2506,23 @@ model asks for it; a stale cache is dropped on any act.
 tool execution reports 20 to 48 % latency cuts in 2026 papers (Speculative Actions, PASTE, SPORK); only side-effect
 free tools qualify, and the one-step observation cache is the safe subset.
 
-**Design.** `agent/executor.py` gains a `start_early` path fed from the stream parser; the cache is a
-`SpeculativeObservation` FrozenModel keyed by run, tool and page/window identity, invalidated in the act path.
+**Parked (2026-10-10), after reading the code.** Both halves rest on premises the code does not hold. (a) The stream
+carries text and thinking only (`llm/types.py:StreamDelta`, kinds `text`, `thinking`, `reset`); every codec
+accumulates the tool calls' arguments in partial slots and hands them over with the finished reply
+(`codec_chat.py:199-268` `PartialCall`, `codec_messages.py:247` `input_json_delta`, the Responses and Ollama codecs the
+same way). An early start needs a fourth delta kind in four codecs, plus care for `reset` (a retry re-emits the calls,
+so an early-started call would run twice), and it gains only the tail of the reply after the last argument: for the
+one-call steps that make up most of a run that is the finish tokens, a few hundred milliseconds at most. (b) An act
+already returns the observation the model needs next: `browser/session.py:act` ends with `_changes_view`, the desktop
+act with its changed view (item 13), and `browser_open` returns the page, so there is no next observation to take
+early in the common path. What would reopen the item is a number: the share of steps with two or more tool calls of
+which the first is `parallel_safe` (the `tool_call` events of a step carry the names), read from the owner's history
+once item 22's events have accrued; if it is well above a tenth, (a) is worth the codec work.
 
-**Touchpoints.** `agent/loop.py`, `agent/executor.py`, `llm/stream.py` (or where tool calls are parsed),
-`browser/session.py`, `desktop/session.py`, `tools/base.py`.
+**Touchpoints (if reopened).** `llm/types.py`, the four codecs, `agent/executor.py`, `agent/loop.py`.
 
-**Done when.** Seconds per step on the eval set fall 15 % or more against item 22's baseline; a unit test proves a
-side-effect tool never starts early and a stale observation is never served.
+**Done when (if reopened).** Seconds per step on the eval set fall 15 % or more against item 22's baseline; a unit
+test proves a side-effect tool never starts early and a retried reply never runs a call twice.
 
 ### 26. Speed knobs decided by measurement; snapshots that send only the change
 
@@ -2565,11 +2574,31 @@ run (item 5) and a campaign's outcome check (item 12) read the evidence instead 
 **Why.** Grok Bot's most reported failure is reporting incomplete work as finished; dots' docs say it "can make
 mistakes". Dot's plan is a flat list with a free `targets` text (`agent/plan.py:1-40`).
 
-**Touchpoints.** `agent/plan.py`, `tools/meta.py` (the plan tools), `agent/verify.py`, `agent/campaign*.py`,
-`server/static/js` (the plan view shows evidence), README "Autonomy".
+**Design, as built.** `PlanItem.evidence` (empty for the plans stored before it existed, which still validate).
+`mark_plan_step … done` without `evidence` is a `ToolInputError` that names what counts (the tool result that shows the
+step: the path and what was read back, the count or the line of output, what the page or the window showed); a failed or
+skipped step may carry what happened; a step opened again drops its evidence. `update_plan` takes an `evidence` per
+step too: a step given as done keeps its own, else the evidence of the previous plan's step with the same text, else it
+is refused, so no plan holds a done step without evidence. The plan with the evidence under each closed step goes
+wherever the plan went (compaction note, resumed run, consult, aside) and, new, to the goal check: `GoalRequest.plan`
+is a fenced PLAN section of the goal prompt for the end of a run and for `campaign_achieved` (the session's own plan),
+and the checker's rules say the evidence of a step is the agent's claim, to be borne out by the digest or the facts.
+`GoalVerdict.unproven_steps` lists the done steps the checker could not bear out; the `goal_check` event carries it.
+`agent/verify.py` is unchanged: the facts are the harness's, the evidence the agent's, and the checker reads both. The
+web UI shows the evidence under the step. Evals: `RunMetrics.unevidenced_steps` (the last plan's done steps without
+evidence, 0 by construction) and `RunMetrics.unproven_steps` (summed from the `goal_check` events), in the eval JSON,
+the scorecard, the comparison table and the difference line. The "judged by the review model" count therefore exists
+only where a goal checker ran (goal mode; the offline `dotx eval check` scripts the verdict), as the harness has no
+review model of its own.
 
-**Done when.** The eval harness counts "done without evidence" (zero by construction) and "evidence that does not
-match the observation" (judged by the review model) and both are in the eval JSON.
+**Touchpoints.** `agent/plan.py`, `tools/meta.py`, `agent/review.py`, `agent/loop.py`, `tools/campaign.py`,
+`agent/prompt.py`, `evals/results.py`, `evals/metrics.py`, `evals/scoring.py`, `evals/catalog.py`,
+`server/static/js/views/run.js`, `server/static/css/app.css`, README "How a run works", "Autonomy", "Campaigns" and
+"Measuring the agent".
+
+**Done when.** A mark to done without evidence is refused and a rewritten plan keeps evidence (unit tests, done); the
+goal prompt carries the plan with evidence and the verdict's `unproven_steps` reaches the `goal_check` event (smoke
+tests of the real loop, done); the eval JSON holds both counts and the scorecard prints them (unit test, done).
 
 ### 29. Eval reports that compare runs, and the defaults that wait for them
 
@@ -3315,3 +3344,5 @@ item ends as a measured no, written in the log.
 - 2026-10-10 (Fable 5.1): item 24 merged 9c16866 (PR #23, MYP-164 Done). Item 23 built on branch `item-23-multi-action`: prompt and tool descriptions make the one-step act the exception, with examples; `progress.py` single-action detector, streak and steer; the loop stores the note and emits `single_action_steer` after three such steps on one target; `[agent] steer_single_actions = true`. Gate: format, check, mypy clean; unit 563; `dotx eval check` ok; smoke scaffold, tool groups and run limits 14 passed. The eval set has no browser task, so the share is the owner's reading with `dotx stats --by site`.
 - 2026-10-10 (Fable 5.1): item 23 merged a70e354 (PR #24, MYP-165 Done). Item 29 built on branch `item-29-eval-compare`: `dotx eval report A B` ends with a difference line; five long tasks (ten or more tool turns) in the catalog, `LONG_TASK_IDS`; decision 1 lists the live commands. No `compare` command (report already compares); no fixture-server or campaign task (the harness has no browser and runs one run per attempt). Gate: format, check, mypy clean; unit 565; `dotx eval check` 31 ok.
 - 2026-10-10 (Fable 5.1): item 29 merged 1513bd4 (PR #25, MYP-166 Done). Item 26 built on branch `item-26-speed-knobs`: browser settle 60 ms, screenshot edge 1366, the unchanged-page delta says so in one line; decision 13 closed for the two knobs. Browser smoke (headless Chrome, temp dirs) 39 passed with the medians above.
+- 2026-10-10 (Fable 5.1): item 26 merged 8566080 (PR #26, MYP-167 Done). Item 25 parked: the stream carries no tool calls (the codecs hand them over with the finished reply) and an act already returns the next observation; the number that would reopen it is in the item.
+- 2026-10-10 (Fable 5.1): item 28 built on branch `item-28-plan-evidence` (MYP-168): `PlanItem.evidence`; a mark to done without evidence is refused with what counts, a rewritten plan keeps the evidence of the steps it keeps; the goal check (end of run, `campaign_achieved`) reads the plan with evidence and its verdict lists `unproven_steps`, carried by the `goal_check` event; the web UI shows the evidence under the step; evals count `unevidenced_steps` and `unproven_steps`. `agent/verify.py` unchanged (facts are the harness's, evidence the agent's). Gate: format, check, mypy clean; unit 570; `dotx eval check` 31 ok; offline smoke 208 passed, 10 skipped.

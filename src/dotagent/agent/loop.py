@@ -61,6 +61,7 @@ from dotagent.agent.plan import (
     plan_event_data,
     plan_from_event,
     plan_lines,
+    render_plan,
 )
 from dotagent.agent.progress import (
     SINGLE_ACTION_STEPS,
@@ -686,9 +687,11 @@ async def _ask_checker(
     """
     run: RunRecord = agent.run
     patience: int = agent.runtime.config.agent.goal_patience
+    plan: PlanPayload = await _current_plan(agent)
     request: GoalRequest = GoalRequest(
         goal=run.goal,
-        targets=(await _current_plan(agent)).targets,
+        plan=render_plan(plan.steps),
+        targets=plan.targets,
         digest=goal_digest(render_transcript(_since_goal(history, goal))),
         facts=await asyncio.to_thread(checked_facts, facts, ended.result, agent.runtime.workspace),
         answer=ended.result,
@@ -740,6 +743,7 @@ async def _check_goal(
         {
             "decision": asked.decision,
             "reason": shorten_reason(asked.reason),
+            "unproven_steps": list(asked.unproven_steps),
             "check": sent_back + 1,
             "patience": patience,
             "final": isinstance(settled, RunOutcome),
@@ -769,6 +773,7 @@ async def _check_goal_at_limit(
         {
             "decision": asked.decision,
             "reason": shorten_reason(asked.reason),
+            "unproven_steps": list(asked.unproven_steps),
             "check": sent_back + 1,
             "patience": agent.runtime.config.agent.goal_patience,
             "final": True,

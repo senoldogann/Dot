@@ -646,11 +646,19 @@ def _catalog() -> tuple[EvalTask, ...]:
                             "Ela Yıldız,ela@example.com",
                         ),
                     ),
-                    _call(MARK_PLAN_STEP_TOOL, step=1, status="done"),
-                    _call(MARK_PLAN_STEP_TOOL, step=2, status="done"),
+                    _call(
+                        MARK_PLAN_STEP_TOOL,
+                        step=1,
+                        status="done",
+                        evidence="grep -rn @ notes listed 6 addresses in 6 lines, Mert Kaya's twice",
+                    ),
+                    _call(
+                        MARK_PLAN_STEP_TOOL, step=2, status="done", evidence="write_file wrote contacts.csv, 6 lines"
+                    ),
                 ),
                 _turn(
-                    _call("shell", command="grep -c @ contacts.csv"), _call(MARK_PLAN_STEP_TOOL, step=3, status="done")
+                    _call("shell", command="grep -c @ contacts.csv"),
+                    _call(MARK_PLAN_STEP_TOOL, step=3, status="done", evidence="grep -c @ contacts.csv printed 5"),
                 ),
                 _finish(
                     "contacts.csv has the 5 people the notes give an e-mail address for (Mert Kaya once, although two "
