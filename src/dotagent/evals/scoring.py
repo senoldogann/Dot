@@ -26,8 +26,10 @@ class FailureNote(FrozenModel):
 class Scorecard(FrozenModel):
     """The numbers of one report. ``steps_per_pass``, ``tokens_per_pass`` and ``seconds_per_pass`` are what the attempts
     that passed cost on average (``None`` when none did); ``model_seconds_per_pass`` and ``tool_seconds_per_pass`` split
-    the time into model calls and tool calls, over the passes whose report measured them. An attempt is a false
-    success when the agent claimed to be done and was not."""
+    the time into model calls and tool calls, over the passes whose report measured them. ``single_act_share`` is the
+    share of the browser and desktop act calls that carried one step, ``cached_share`` the share of the input tokens
+    the provider served from its cache, both over every attempt whose report counted them (``None`` when none did).
+    An attempt is a false success when the agent claimed to be done and was not."""
 
     model: str
     settings: EvalSettings
@@ -38,6 +40,8 @@ class Scorecard(FrozenModel):
     seconds_per_pass: float | None
     model_seconds_per_pass: float | None
     tool_seconds_per_pass: float | None
+    single_act_share: float | None
+    cached_share: float | None
     tool_calls: int
     tool_errors: int
     invalid_arguments: int
@@ -96,6 +100,15 @@ def _measured_mean(values: Sequence[float | None]) -> float | None:
     return _mean(sum(measured), len(measured))
 
 
+def _share(parts: Sequence[int | None], wholes: Sequence[int | None]) -> float | None:
+    """``parts`` over ``wholes``, summed over the attempts that counted both; ``None`` when none did or the whole is 0."""
+    counted: list[tuple[int, int]] = [
+        (part, whole) for part, whole in zip(parts, wholes, strict=True) if part is not None and whole is not None
+    ]
+    whole_sum: int = sum(whole for _, whole in counted)
+    return None if whole_sum == 0 else sum(part for part, _ in counted) / whole_sum
+
+
 def score_report(report: EvalReport) -> Scorecard:
     outcomes: tuple[TaskOutcome, ...] = report.outcomes
     passes: list[TaskOutcome] = [outcome for outcome in outcomes if outcome.passed]
@@ -112,6 +125,13 @@ def score_report(report: EvalReport) -> Scorecard:
         seconds_per_pass=_mean(sum(outcome.seconds for outcome in passes), len(passes)),
         model_seconds_per_pass=_measured_mean([outcome.metrics.model_seconds for outcome in passes]),
         tool_seconds_per_pass=_measured_mean([outcome.metrics.tool_seconds for outcome in passes]),
+        single_act_share=_share(
+            [outcome.metrics.single_acts for outcome in outcomes], [outcome.metrics.acts for outcome in outcomes]
+        ),
+        cached_share=_share(
+            [outcome.metrics.cached_tokens for outcome in outcomes],
+            [None if outcome.metrics.cached_tokens is None else outcome.metrics.input_tokens for outcome in outcomes],
+        ),
         tool_calls=sum(outcome.metrics.tool_calls for outcome in outcomes),
         tool_errors=sum(outcome.metrics.tool_errors for outcome in outcomes),
         invalid_arguments=sum(outcome.metrics.invalid_arguments for outcome in outcomes),
@@ -154,6 +174,10 @@ def _time_split(card: Scorecard) -> str:
     return f" (model calls {_seconds(card.model_seconds_per_pass)}, tools {_seconds(card.tool_seconds_per_pass)})"
 
 
+def _share_text(value: float | None) -> str:
+    return "-" if value is None else f"{round(100 * value)} %"
+
+
 def render_scorecard(card: Scorecard) -> list[str]:
     """The lines that show one scorecard."""
     settings: EvalSettings = card.settings
@@ -168,6 +192,8 @@ def render_scorecard(card: Scorecard) -> list[str]:
         "  by kind: " + ", ".join(f"{score.category} {score.passed}/{score.attempts}" for score in card.categories),
         f"  a pass costs {_steps(card.steps_per_pass)} steps, {_tokens(card.tokens_per_pass)} tokens and "
         f"{_seconds(card.seconds_per_pass)}{_time_split(card)}",
+        f"  act calls with one step {_share_text(card.single_act_share)}, input tokens from the cache "
+        f"{_share_text(card.cached_share)}",
         f"  tools: {card.tool_calls} calls, {card.tool_errors} failed ({_percent(card.tool_errors, card.tool_calls)}), "
         f"{card.invalid_arguments} with arguments that were not valid JSON",
         f"  stalls {card.stalls}, cut short {card.cuts}, claimed to be done but were not {card.false_successes}, "
@@ -186,10 +212,14 @@ def render_scorecard(card: Scorecard) -> list[str]:
 def render_comparison(cards: Sequence[Scorecard]) -> list[str]:
     """One row per scorecard: the numbers to compare models, or one model before and after a change."""
     width: int = max(len(card.model) for card in cards)
-    header: str = f"{'model':<{width}}  {'passed':>9}  {'steps/pass':>10}  {'tokens/pass':>11}  {'seconds/pass':>12}  {'tool errors':>11}  {'stalls':>6}  {'false claims':>12}"
+    header: str = (
+        f"{'model':<{width}}  {'passed':>9}  {'steps/pass':>10}  {'tokens/pass':>11}  {'seconds/pass':>12}  "
+        f"{'one-step acts':>13}  {'cached':>6}  {'tool errors':>11}  {'stalls':>6}  {'false claims':>12}"
+    )
     rows: list[str] = [
         f"{card.model:<{width}}  {f'{card.passed}/{card.attempts}':>9}  {_steps(card.steps_per_pass):>10}  "
         f"{_tokens(card.tokens_per_pass):>11}  {_seconds(card.seconds_per_pass):>12}  "
+        f"{_share_text(card.single_act_share):>13}  {_share_text(card.cached_share):>6}  "
         f"{_percent(card.tool_errors, card.tool_calls):>11}  {card.stalls:>6}  {card.false_successes:>12}"
         for card in cards
     ]

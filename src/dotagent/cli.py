@@ -529,6 +529,12 @@ def build_parser() -> argparse.ArgumentParser:
         "stats", help="numbers about the runs that really happened: how they ended, tokens and tool errors per model"
     )
     stats.add_argument("--days", type=int, default=30, help="only the runs of the last N days")
+    stats.add_argument(
+        "--by",
+        choices=["model", "site", "all"],
+        default="all",
+        help="what to show: the numbers per model, the act calls per site (a page's host or an application), or both",
+    )
 
     commands.add_parser("daemon", help="run Dot in this terminal: the API, the web UI, the agent and the schedules")
     commands.add_parser("open", help="open the web UI of the running daemon in your default browser, signed in")

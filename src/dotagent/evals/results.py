@@ -23,7 +23,9 @@ class RunMetrics(FrozenModel):
     """What a run did, counted from its events and its record. ``unanswered_questions`` are the questions the policy
     or the agent raised that nobody could answer, because an eval run is unattended. ``model_seconds`` is the time its
     model calls took (the steps and the side calls), ``tool_seconds`` the time its tool calls took; a report saved
-    before they were measured has neither."""
+    before they were measured has neither. ``acts`` are the browser and desktop act calls, ``single_acts`` the ones
+    that carried one step, ``cached_tokens`` the input tokens the provider served from its prompt cache; a report
+    saved before they were counted has none of the three."""
 
     steps: int
     input_tokens: int
@@ -36,6 +38,9 @@ class RunMetrics(FrozenModel):
     unanswered_questions: int
     model_seconds: float | None = None
     tool_seconds: float | None = None
+    acts: int | None = None
+    single_acts: int | None = None
+    cached_tokens: int | None = None
 
 
 class TaskOutcome(FrozenModel):

@@ -4,6 +4,7 @@ import asyncio
 import time
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, replace
+from urllib.parse import urlsplit
 
 from dotagent.agent.gate import RunGate
 from dotagent.core.errors import (
@@ -42,6 +43,22 @@ class ToolOutcome:
 def _safe_json(value: JsonObject) -> JsonObject:
     sanitized = redact_json(strip_blobs(value))
     return sanitized if isinstance(sanitized, dict) else {}
+
+
+def _site(call: ToolCall, action: ActionInfo | None) -> str:
+    """Where a call acted, for the statistics: the host of the page for a browser action, the application for a
+    desktop one, and nothing for every other tool (a file path or a command is not a site)."""
+    if action is None:
+        return ""
+    if action.kind.startswith("browser_"):
+        return urlsplit(action.target).hostname or ""
+    return action.target if call.name.startswith("desktop_") else ""
+
+
+def _batch_steps(arguments: JsonObject) -> int:
+    """How many steps a batched call (``browser_act``, ``desktop_act``) carried; 0 for a call without a step list."""
+    steps: object = arguments.get("steps")
+    return len(steps) if isinstance(steps, list) else 0
 
 
 def _describe_failure(exc: Exception, tool: RegisteredTool) -> str | None:
@@ -194,6 +211,8 @@ async def _execute_one(
             "waited_s": round(waited_s, 2),
             "summary": action.summary if action is not None else "",
             "risk": action.risk if action is not None else "",
+            "site": _site(call, action),
+            "steps": _batch_steps(call.arguments),
         },
         True,
     )

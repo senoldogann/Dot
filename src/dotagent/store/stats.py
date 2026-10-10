@@ -26,14 +26,36 @@ _ENDING_ORDER: dict[Ending, int] = {ending: index for index, ending in enumerate
 # The share of the step calls whose seconds the second time figure does not exceed.
 _SLOW_SHARE: float = 0.9
 
+# The tools whose calls carry a list of steps: a call with one step is a single-action turn.
+ACT_TOOLS: frozenset[str] = frozenset({"browser_act", "desktop_act"})
+# The step bands of the slowdown curve: the first step of each; the last band is open.
+_BAND_STARTS: tuple[int, ...] = (1, 6, 11, 21, 41)
+
 _RUNS_SQL: str = "SELECT model, status, result, steps, input_tokens, output_tokens FROM runs WHERE created_at >= ?"
 # One row per model call of the runs: the model of its run, the run, what the call was for, its seconds, the tokens the
-# provider served from its cache and whether it got a reply (no error).
+# provider served from its cache, whether it got a reply (no error) and its input tokens.
 _CALLS_SQL: str = """
 SELECT r.model, r.id, json_extract(e.data, '$.purpose'), json_extract(e.data, '$.seconds'),
-       json_extract(e.data, '$.cached_tokens'), json_extract(e.data, '$.error') IS NULL
+       json_extract(e.data, '$.cached_tokens'), json_extract(e.data, '$.error') IS NULL,
+       json_extract(e.data, '$.input_tokens')
 FROM runs r JOIN events e ON e.run_id = r.id
 WHERE r.created_at >= ? AND e.kind = ?
+"""
+# One row per act call (browser_act, desktop_act) that came back: the model of its run, the site it acted on (the
+# page's host or the application), the steps it carried (NULL for a call recorded before they were counted), whether
+# it worked and its seconds.
+_ACTS_SQL: str = """
+SELECT r.model, json_extract(e.data, '$.site'), json_extract(e.data, '$.steps'), json_extract(e.data, '$.ok'),
+       json_extract(e.data, '$.seconds')
+FROM runs r JOIN events e ON e.run_id = r.id
+WHERE r.created_at >= ? AND e.kind = 'tool_result' AND json_extract(e.data, '$.tool') IN ('browser_act', 'desktop_act')
+"""
+# One row per step of the runs: the model of its run, the step's number in its run and the seconds its model call
+# took (NULL for a step recorded before that was measured).
+_STEPS_SQL: str = """
+SELECT r.model, json_extract(e.data, '$.step'), json_extract(e.data, '$.seconds')
+FROM runs r JOIN events e ON e.run_id = r.id
+WHERE r.created_at >= ? AND e.kind = 'assistant'
 """
 # One row per tool call of the runs that came back: the tool, whether it worked (``"ok": false`` is a failed call), its
 # seconds and the part of them it spent at the gate (NULL for a call recorded before that was measured).
@@ -92,6 +114,26 @@ class CallSample(FrozenModel):
     seconds: float
     cached_tokens: int
     answered: bool
+    input_tokens: int
+
+
+class ActSample(FrozenModel):
+    """One act call that came back: the model of its run, the site it acted on (the page's host for the browser, the
+    application for the desktop), the steps it carried, whether it worked and its seconds."""
+
+    model: str
+    site: str
+    steps: int
+    ok: bool
+    seconds: float
+
+
+class StepSample(FrozenModel):
+    """One step of a run: the model of its run, the step's number in its run and the seconds its model call took."""
+
+    model: str
+    step: int
+    seconds: float
 
 
 class ToolSample(FrozenModel):
@@ -118,6 +160,35 @@ class TimeStats(FrozenModel):
     compaction_seconds: float
     side_call_seconds: float
     cached_tokens: int
+    cached_share: float | None
+
+
+class ActStats(FrozenModel):
+    """What the act calls (``browser_act``, ``desktop_act``) of some runs did: how many there were, how many carried
+    one step (a single-action turn: the model paid a round trip for one click or one keystroke), how many failed and
+    the median call. Calls recorded before their steps were counted are left out."""
+
+    acts: int
+    single: int
+    failed: int
+    seconds_median: float | None
+
+
+class StepBand(FrozenModel):
+    """The model-call seconds of the steps whose number in their run falls in a band (``last`` 0: open-ended): the
+    slowdown curve of a run, one band at a time."""
+
+    first: int
+    last: int
+    steps: int
+    seconds_median: float
+
+
+class SiteStats(FrozenModel):
+    """What the act calls on one site (the page's host, or the application) did."""
+
+    site: str
+    acts: ActStats
 
 
 class ToolStats(FrozenModel):
@@ -147,13 +218,17 @@ class ModelStats(FrozenModel):
     stalls: int
     compactions: int
     time: TimeStats
+    acts: ActStats
+    bands: tuple[StepBand, ...]
 
 
 class RunStatistics(FrozenModel):
-    """The statistics of the runs in a window: per model, the busiest first, and per tool, the slowest in all first."""
+    """The statistics of the runs in a window: per model, the busiest first; per tool, the slowest in all first; and
+    per site, the one with the most act calls first."""
 
     models: tuple[ModelStats, ...]
     tools: tuple[ToolStats, ...]
+    sites: tuple[SiteStats, ...]
 
 
 class _EventCounts(FrozenModel):
@@ -212,10 +287,13 @@ class _Rows(FrozenModel):
     events: list[tuple[object, ...]]
     calls: list[tuple[object, ...]]
     tools: list[tuple[object, ...]]
+    acts: list[tuple[object, ...]]
+    steps: list[tuple[object, ...]]
 
 
 def _read_rows(database: Path, since: float) -> _Rows:
-    """The runs created since ``since``, the counts of their events, their model calls and their tool calls. Blocking."""
+    """The runs created since ``since``, the counts of their events, their model calls, their tool calls, their act
+    calls and their steps. Blocking."""
     try:
         with closing(sqlite3.connect(f"{database.as_uri()}?mode=ro", uri=True, timeout=_BUSY_TIMEOUT_S)) as connection:
             return _Rows(
@@ -223,6 +301,8 @@ def _read_rows(database: Path, since: float) -> _Rows:
                 events=connection.execute(_EVENTS_SQL, (INVALID_ARGUMENTS_KEY, since)).fetchall(),
                 calls=connection.execute(_CALLS_SQL, (since, CALL_EVENT)).fetchall(),
                 tools=connection.execute(_TOOLS_SQL, (since,)).fetchall(),
+                acts=connection.execute(_ACTS_SQL, (since,)).fetchall(),
+                steps=connection.execute(_STEPS_SQL, (since,)).fetchall(),
             )
     except sqlite3.Error as error:
         raise StoreError(
@@ -246,8 +326,33 @@ def _call_samples(rows: list[tuple[object, ...]]) -> list[CallSample]:
             seconds=_number(row[3], "seconds"),
             cached_tokens=int(_number(row[4], "cached_tokens")),
             answered=row[5] == 1,
+            input_tokens=int(_number(row[6], "input_tokens")),
         )
         for row in rows
+    ]
+
+
+def _act_samples(rows: list[tuple[object, ...]]) -> list[ActSample]:
+    """The act calls whose steps were counted; the ones recorded before that are left out."""
+    return [
+        ActSample(
+            model=str(row[0]),
+            site="" if row[1] is None else str(row[1]),
+            steps=int(_number(row[2], "steps")),
+            ok=row[3] != 0,
+            seconds=_number(row[4], "seconds"),
+        )
+        for row in rows
+        if row[2] is not None
+    ]
+
+
+def _step_samples(rows: list[tuple[object, ...]]) -> list[StepSample]:
+    """The steps whose model call was timed; the ones recorded before that are left out."""
+    return [
+        StepSample(model=str(row[0]), step=int(_number(row[1], "step")), seconds=_number(row[2], "seconds"))
+        for row in rows
+        if row[2] is not None
     ]
 
 
@@ -274,6 +379,8 @@ def nearest_rank(values: Sequence[float], share: float) -> float | None:
 def time_stats(calls: Sequence[CallSample]) -> TimeStats:
     """Where the time of one model's runs went, from the calls they recorded."""
     steps: list[float] = [call.seconds for call in calls if call.purpose == "step" and call.answered]
+    input_tokens: int = sum(call.input_tokens for call in calls if call.answered)
+    cached_tokens: int = sum(call.cached_tokens for call in calls)
     return TimeStats(
         timed_runs=len({call.run_id for call in calls}),
         model_seconds=sum(call.seconds for call in calls),
@@ -281,8 +388,42 @@ def time_stats(calls: Sequence[CallSample]) -> TimeStats:
         step_seconds_p90=nearest_rank(steps, _SLOW_SHARE),
         compaction_seconds=sum(call.seconds for call in calls if call.purpose == "compaction"),
         side_call_seconds=sum(call.seconds for call in calls if call.purpose != "step"),
-        cached_tokens=sum(call.cached_tokens for call in calls),
+        cached_tokens=cached_tokens,
+        cached_share=None if input_tokens == 0 else cached_tokens / input_tokens,
     )
+
+
+def act_stats(samples: Sequence[ActSample]) -> ActStats:
+    """What some act calls did: their count, the single-action ones, the failed ones and the median call."""
+    return ActStats(
+        acts=len(samples),
+        single=sum(1 for sample in samples if sample.steps == 1),
+        failed=sum(1 for sample in samples if not sample.ok),
+        seconds_median=statistics.median(sample.seconds for sample in samples) if samples else None,
+    )
+
+
+def step_bands(samples: Sequence[StepSample]) -> tuple[StepBand, ...]:
+    """The slowdown curve: the median model-call seconds of the steps in each band, the empty bands left out."""
+    bands: list[StepBand] = []
+    for index, first in enumerate(_BAND_STARTS):
+        last: int = 0 if index + 1 == len(_BAND_STARTS) else _BAND_STARTS[index + 1] - 1
+        mine: list[float] = [
+            sample.seconds for sample in samples if sample.step >= first and (last == 0 or sample.step <= last)
+        ]
+        if mine:
+            bands.append(StepBand(first=first, last=last, steps=len(mine), seconds_median=statistics.median(mine)))
+    return tuple(bands)
+
+
+def site_stats(samples: Sequence[ActSample]) -> tuple[SiteStats, ...]:
+    """What the act calls did per site, the site with the most calls first (by name when the counts are equal); calls
+    that named no site are left out."""
+    sites: list[str] = list(dict.fromkeys(sample.site for sample in samples if sample.site != ""))
+    found: list[SiteStats] = [
+        SiteStats(site=site, acts=act_stats([sample for sample in samples if sample.site == site])) for site in sites
+    ]
+    return tuple(sorted(found, key=lambda entry: (-entry.acts.acts, entry.site)))
 
 
 def tool_stats(samples: Sequence[ToolSample]) -> tuple[ToolStats, ...]:
@@ -324,6 +465,8 @@ def collect_statistics(database: Path, since: float) -> RunStatistics:
     runs: list[tuple[object, ...]] = rows.runs
     counts: dict[str, _EventCounts] = _counts_by_model(rows.events)
     calls: list[CallSample] = _call_samples(rows.calls)
+    acts: list[ActSample] = _act_samples(rows.acts)
+    steps: list[StepSample] = _step_samples(rows.steps)
     models: list[str] = list(dict.fromkeys(str(row[0]) for row in runs))
     stats: list[ModelStats] = []
     for model in models:
@@ -351,9 +494,12 @@ def collect_statistics(database: Path, since: float) -> RunStatistics:
                 stalls=found.stalls,
                 compactions=found.compactions,
                 time=time_stats([call for call in calls if call.model == model]),
+                acts=act_stats([sample for sample in acts if sample.model == model]),
+                bands=step_bands([sample for sample in steps if sample.model == model]),
             )
         )
     return RunStatistics(
         models=tuple(sorted(stats, key=lambda entry: entry.runs, reverse=True)),
         tools=tool_stats(_tool_samples(rows.tools)),
+        sites=site_stats(acts),
     )
