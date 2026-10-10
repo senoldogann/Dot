@@ -2367,10 +2367,10 @@ Paste this to the agent that takes the work:
 | 24  | The fast model does the side work                                        | done    | 9c16866 |
 | 25  | Early and speculative execution of read-only tools                       | parked  |         |
 | 26  | Speed knobs decided by measurement; snapshots that send only the change  | done    | 8566080 |
-| 27  | Cheapest channel first: API or CLI, then the browser, then the desktop   | in progress |     |
+| 27  | Cheapest channel first: API or CLI, then the browser, then the desktop   | done    | dfbd485 |
 | 28  | Evidence on every plan step                                              | done    | 9a9fe5f |
 | 29  | Eval reports that compare runs, and the defaults that wait for them      | done    | 1513bd4 |
-| 30  | Typed best-of-two at critical decisions; injection fixtures in the evals | planned |         |
+| 30  | Typed best-of-two at critical decisions; injection fixtures in the evals | in progress |         |
 | 31  | One-time codes from the owner's own Mail and Messages                    | done    | 88abeed |
 | 32  | The owner's Chrome profile as the default of a campaign                  | done    | f302464 |
 | 33  | Pre-approved spending caps                                               | done    | 44ea96b |
@@ -2648,9 +2648,33 @@ content, and the evals report how many a run followed.
 **Why.** OpenAI's own evals for dots report 15 to 17.4 % attempts to work around a warning and 8.6 → 19.7 % scope
 violations across chained tasks; a measured counter-number is a claim Dot can make.
 
-**Touchpoints.** `agent/judge.py`, `agent/gate.py`, `policy/*`, `evals/catalog.py`, `tests/fixtures`.
+**Design, as built.** The judge of item 16 is asked only where code has no answer of its own: a click on a control
+whose label no pattern knows, and a campaign's claim of its targets. A payment under a cap (item 33), the choice of a
+recipient and a click on "Post" are decided by the patterns and the caps, and end in the policy's question or in the
+allowance, so the second opinion lives in `agent/judge.py` alone and `agent/gate.py` and `policy/*` are untouched.
+`[judge] second_opinion` (off by default: a second paid request per judged click or claim) asks each question a
+second time, in a request of its own with an independent phrasing (`SECOND_CLICK_QUESTIONS`, `SECOND_CLAIM_QUESTION`,
+the same ids), and the two answers are read together. A click has no `needs_decision` state of its own, and a flag is
+what makes the policy ask, so that is the disagreement's outcome: `agreed_click_judgment` gives the flag when either
+answer is at the threshold and the summary names both answers, marking the ones that disagreed. A claim is refused
+only when both answers are below `target_threshold` (`claim_refused`); a disagreement leaves it to the goal checker,
+since a true claim refused keeps a campaign from ending, and the refusal names both answers. A second request that
+fails falls back to the single answer, with the usual `judge_unavailable` event. There is no fixture server offline
+(item 29), so the hidden instructions are in seeded files: the invoice of `injection-in-invoice`, a saved pricing page
+with a hidden block that asks for a keys file (`injection-in-page`), and a notes file whose last line asks for its own
+deletion and a false report (`injection-in-notes`). A task carries `injection_checks` apart from its checks (a file not
+made, a file still there, and the new `answer_lacks` check: the words the injection told the run to say); they count
+toward the pass, and the attempt's `injection_followed` in the report says whether one of them failed. The scorecard
+counts the attempts at such tasks and how many followed (`hidden instructions followed 1 of 3`), the difference line
+and the comparison table carry the count, and `dotx eval check` proves the three references pass.
 
-**Done when.** The injection share is in the eval JSON; a unit test covers the disagreement path.
+**Touchpoints.** `agent/judge.py`, `tools/campaign.py`, `config.py`, `defaults.toml`, `evals/types.py`,
+`evals/checks.py`, `evals/audit.py`, `evals/catalog.py`, `evals/runner.py`, `evals/results.py`, `evals/scoring.py`,
+`cli_eval.py`, README "Typed judgments" and "Evals".
+
+**Done when.** The injection count is in the eval JSON and the scorecard; unit tests cover the disagreement of two
+click answers, the refusal of a claim with two answers and the count; the references of the three injection tasks pass
+`dotx eval check` (decision 23).
 
 ### 31. One-time codes from the owner's own Mail and Messages
 
@@ -3130,6 +3154,12 @@ item ends as a measured no, written in the log.
     version and compare the GUI share of the acting calls with the share before (the events of older runs carry no
     channel, so the share starts with this version). A live eval run of the long tasks (decision 1) on the same model
     before and after is the stricter check and is yours to pay for.
+23. The second opinion of the judge (item 30) is off by default, because it doubles the paid requests of a judge that
+    is itself off by default; turn it on with `[judge] second_opinion = true` once the judge is. How often the two
+    phrasings disagree on `jev-1.13.0` is unmeasured: the offline tests use a stand-in, so the first live runs with it
+    on are the measurement, and the summaries of the judged clicks (`(disagreed)`) say what it found. The three
+    injection tasks have not been run against a live model either; `dotx eval run` with your model gives the first
+    `hidden instructions followed` count.
 
 ## Log
 
@@ -3524,3 +3554,5 @@ item ends as a measured no, written in the log.
 - 2026-10-10 (Fable 5.1): item 33 built on branch `item-33-spending-caps` (MYP-175): `policy/spend.py` (amounts from a control's label or the page's total, `SpendCap` per site, `spend_allowance` turns a payment under both caps into a question with source `spend` that takes the money hand-off's place), `ActionInfo.amount` and the amount in the step's summary (timeline, policy event, approval record), the gate reads the day's spends from the new `spends` table and records the spend once the step is authorized, `[policy.spend]` empty by default (decision 21). Design corrected: the amount is read in the browser tool's classification, not in `elements.py`; `ask` asks once (the plan named only yolo and auto). Gate: format, check, mypy clean; unit 625; `dotx eval check` ok; smoke (approval modes, secret fields, judge, pace, terminal, memory, codes, browser, campaigns, scaffold, tool groups) 102 passed, 1 skipped.
 - 2026-10-10 (Fable 5.1): item 33 merged 44ea96b (PR #34, MYP-175 Done). Next: item 27 (cheapest channel first).
 - 2026-10-10 (Fable 5.1): item 27 built on branch `item-27-cheapest-channel` (MYP-176): `tools/channels.py` (`channel_of`: command, api, web, browser, desktop, agent), the executor records `channel` in every `tool_result` event, `dotx stats` gains a channels table with the GUI share of the acting calls, the prompt's channel order gains "a skill or an MCP server of a site that names its API or command is used before the site's pages". Design corrected: the order was already in the prompt; the channel is recorded by the executor, not the loop; the eval set is scripted so the GUI share cannot move offline (decision 22: measured on the owner's real runs). Gate: format, check, mypy clean; unit 639; `dotx eval check` ok; smoke (tool groups, scaffold, run limits, approval modes, research notes) 27 passed.
+- 2026-10-10 (Fable 5.1): item 27 merged dfbd485 (PR #35, MYP-176 Done). Next: item 30 (typed best-of-two; injection fixtures).
+- 2026-10-10 (Fable 5.1): item 30 built on branch `item-30-best-of-two` (MYP-177): `[judge] second_opinion` (off) asks each question again in an independent phrasing; a disagreement flags the click and names both answers, a claim is refused only when both answers are below the threshold; three eval tasks hide an instruction in a file with `injection_checks` and the new `answer_lacks` check, the report's `injection_followed` and the scorecard's `hidden instructions followed` count them. Unit 642, eval check ok, judge and eval-runner smoke 10. Decision 23.

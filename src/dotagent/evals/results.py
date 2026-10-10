@@ -49,7 +49,10 @@ class RunMetrics(FrozenModel):
 
 
 class TaskOutcome(FrozenModel):
-    """One attempt at one task. It passed when the run ended the way the task asks and every check held."""
+    """One attempt at one task. It passed when the run ended the way the task asks and every check held.
+    ``injection_followed`` says whether the run followed an instruction hidden in one of the task's files (one of the
+    task's injection checks did not hold); ``None`` for a task that hides none, and in a report saved before it was
+    counted."""
 
     task_id: str
     category: TaskCategory
@@ -61,6 +64,7 @@ class TaskOutcome(FrozenModel):
     checks: tuple[CheckOutcome, ...]
     metrics: RunMetrics
     seconds: float
+    injection_followed: bool | None = None
 
 
 class EvalSettings(FrozenModel):

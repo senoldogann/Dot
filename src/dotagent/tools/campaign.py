@@ -14,7 +14,7 @@ from typing import Annotated
 from pydantic import Field, StringConstraints
 
 from dotagent.agent.campaign import entry_line
-from dotagent.agent.judge import ClaimJudgment
+from dotagent.agent.judge import ClaimJudgment, claim_refused, describe_claim
 from dotagent.agent.plan import EMPTY_PLAN, PLAN_EVENT, PlanPayload, plan_from_event, render_plan
 from dotagent.agent.review import GoalChecker, GoalRequest, GoalVerdict, goal_checker_for, goal_digest, shorten_reason
 from dotagent.agent.verify import RunFacts, checked_facts
@@ -285,10 +285,16 @@ def _achieved_tool() -> RegisteredTool:
         # The typed judge, when one is on, stops a claim it finds unlikely before the goal checker's model call.
         claim: ClaimJudgment = await ctx.runtime.judge.judge_claim(_claim_state(request), ctx.run_id)
         threshold: float = config.judge.target_threshold
-        if claim.probability is not None and claim.probability < threshold:
-            log.info("campaign_claim_judged", campaign_id=campaign.id, run_id=ctx.run_id, probability=claim.probability)
+        if claim_refused(claim, threshold):
+            log.info(
+                "campaign_claim_judged",
+                campaign_id=campaign.id,
+                run_id=ctx.run_id,
+                probability=claim.probability,
+                second=claim.second,
+            )
             return fail(
-                f"Not accepted: the typed judge gives {claim.probability:.2f} for the targets being reached as their "
+                f"Not accepted: the typed judge gives {describe_claim(claim)} for the targets being reached as their "
                 f"verification asks (it takes {threshold:.2f}). Verify them with your own reads in this session, then "
                 "claim again with what they show. The campaign goes on."
             )

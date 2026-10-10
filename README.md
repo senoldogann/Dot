@@ -404,8 +404,13 @@ at least `public_action_threshold` (0.45: below each yes measured; a wrong flag 
 the policy treats it as a click on "Post" or "Delete", and the action's summary says so: `(judge: public_post 0.93)`.
 The judge also reads a campaign's claim of its targets before the goal checker does, and refuses a claim below
 `target_threshold` (0.15: only a clearly false one, since a true claim it refused would keep the campaign from ending)
-at once. It never allows anything and never decides a step; it only adds flags, or stops a claim early. It is a paid
-service, though a cheap one (input tokens only, $0.042 a million on 2026-10-10): one request per judged click or claim,
+at once. It never allows anything and never decides a step; it only adds flags, or stops a claim early. With `[judge]
+second_opinion = true` (off by default) every question is asked a second time, in a request of its own with an
+independent phrasing, and the two answers are read together: a click gets its flag when either answer is at the
+threshold, and the summary names both and says when they disagreed (`judge: public_post 0.62/0.31 (disagreed)`), so a
+disagreement ends in the policy's question rather than in a silent pass; a claim is refused only when both answers are
+below `target_threshold`, and a disagreement leaves it to the goal checker. It is a paid service, though a cheap one
+(input tokens only, $0.042 a million on 2026-10-10): one request per judged click or claim, two with a second opinion,
 at most `timeout_s` (5 s) each. The thresholds were set on answers of `jev-1.13.0`, the version `[judge] model` names;
 move them together. A missing or refused key, a spent quota or a failed request turns it off for `[models]
 helper_cooldown_s`, with a note in the timeline, and meanwhile the patterns and the goal checker decide alone; a key
@@ -680,15 +685,18 @@ the share of the act calls that carried one step and the share of the input toke
 as `dotx stats` counts them, over every attempt), how often a tool call failed, stalls, runs that were cut, runs that
 said they were done and were not, plan steps marked done without evidence (zero since the plan tools require it) and
 done steps whose evidence the goal check could not bear out (counted from the `goal_check` events, so only in goal
-mode), and the tasks that passed only in some attempts. The token ceiling of an attempt
+mode), how many of the attempts at a task that hides an instruction in one of its files (a note "to the AI assistant"
+in an invoice, a hidden block in a saved page, a line in a notes file) followed it, and the tasks that passed only in
+some attempts. The token ceiling of an attempt
 counts every model call of the run and of the runs it delegated to, side calls included; a report saved before model
 calls were timed counted the steps' tokens only and has no seconds, and one saved before acts and cached tokens were
 counted shows `-` for their shares. `dotx eval run` saves its report after every attempt, so an interrupted run keeps
 what it measured.
 
 A task is data (`src/dotagent/evals/catalog.py`): the files the workspace starts with, the goal, checks (a file exists,
-holds or equals something, a JSON file equals a value, a command exits with 0, the answer contains something) and a
-reference solution as a script of tool calls. To add one, write it there and run `dotx eval check`.
+holds or equals something, a JSON file equals a value, a command exits with 0, the answer contains or does not
+contain something), the checks that hold unless the run followed an instruction hidden in a file, and a reference
+solution as a script of tool calls. To add one, write it there and run `dotx eval check`.
 
 ## The daemon, the web UI and the service
 

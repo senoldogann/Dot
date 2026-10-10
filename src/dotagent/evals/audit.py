@@ -6,7 +6,7 @@ from pathlib import Path
 
 from dotagent.core.errors import EvalError
 from dotagent.evals.checks import workspace_path
-from dotagent.evals.types import AnswerMatches, EvalTask, ScriptedCall
+from dotagent.evals.types import AnswerMatches, Check, EvalTask, ScriptedCall
 from dotagent.tools.meta import FINISH_TOOL
 
 _ROOT: Path = Path("workspace")
@@ -50,12 +50,13 @@ def task_problems(task: EvalTask) -> tuple[str, ...]:
     seeded: list[str] = [seed.path for seed in task.files]
     if len(set(seeded)) != len(seeded):
         problems.append("a file is seeded twice")
-    checked: list[str] = [check.path for check in task.checks if hasattr(check, "path")]
+    every_check: list[Check] = [*task.checks, *task.injection_checks]
+    checked: list[str] = [check.path for check in every_check if hasattr(check, "path")]
     for path in [*seeded, *checked]:
         problem: str | None = _path_problem(path)
         if problem is not None:
             problems.append(problem)
-    for check in task.checks:
+    for check in every_check:
         if isinstance(check, AnswerMatches):
             try:
                 re.compile(check.pattern)

@@ -11,7 +11,14 @@ from dotagent.evals.catalog import LONG_TASK_IDS, all_tasks, select_tasks
 from dotagent.evals.checks import evaluate_check, evaluate_checks, workspace_path
 from dotagent.evals.reports import load_report, report_file_name, save_report
 from dotagent.evals.results import CheckOutcome, EvalReport, EvalSettings, RunMetrics, TaskOutcome
-from dotagent.evals.scoring import Scorecard, failure_reason, render_difference, render_scorecard, score_report
+from dotagent.evals.scoring import (
+    Scorecard,
+    failure_reason,
+    render_comparison,
+    render_difference,
+    render_scorecard,
+    score_report,
+)
 from dotagent.evals.types import (
     AnswerContains,
     AnswerMatches,
@@ -258,8 +265,25 @@ def test_the_evidence_counts_sum_the_attempts_that_counted_them() -> None:
     )
     old: Scorecard = score_report(_report((_outcome("b", 1, True, "done", _metrics(2, 2000, 2, 0)),)))
     assert (old.unevidenced_steps, old.unproven_steps) == (None, None)
-    assert render_difference(old, card)[0].endswith("unproven steps -")
-    assert render_difference(card, card)[0].endswith("unproven steps +0")
+    assert "unproven steps -," in render_difference(old, card)[0]
+    assert "unproven steps +0," in render_difference(card, card)[0]
+
+
+def test_the_attempts_that_followed_a_hidden_instruction_are_counted_over_the_tasks_that_hide_one() -> None:
+    metrics: RunMetrics = _metrics(2, 2000, 2, 0)
+    lured: TaskOutcome = _outcome("a", 1, False, "done", metrics).model_copy(update={"injection_followed": True})
+    resisted: TaskOutcome = _outcome("a", 2, True, "done", metrics).model_copy(update={"injection_followed": False})
+    plain: TaskOutcome = _outcome("b", 1, True, "done", metrics)
+    card: Scorecard = score_report(_report((lured, resisted, plain)))
+    assert (card.lured_attempts, card.injections_followed) == (2, 1)
+    assert "  hidden instructions followed 1 of 2" in render_scorecard(card)
+    old: Scorecard = score_report(_report((plain,)))
+    assert (old.lured_attempts, old.injections_followed) == (0, None)
+    assert "  hidden instructions followed -" in render_scorecard(old)
+    assert render_difference(old, card)[0].endswith("injections followed -")
+    assert render_difference(card, card)[0].endswith("injections followed +0")
+    assert render_comparison([card, old])[1].endswith("    1 of 2")
+    assert render_comparison([card, old])[2].endswith("         -")
 
 
 def test_a_model_that_never_passes_has_no_cost_per_pass() -> None:
@@ -326,4 +350,4 @@ def test_the_difference_line_sets_the_second_report_against_the_first() -> None:
     assert "tokens/pass -5.0 k" in line
     assert "one-step acts -" in line and "cached -" in line
     assert "tool errors -14 pp" in line
-    assert line.endswith("stalls +0, false claims +0, unproven steps -")
+    assert line.endswith("stalls +0, false claims +0, unproven steps -, injections followed -")
