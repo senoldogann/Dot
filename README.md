@@ -336,16 +336,19 @@ the run clears the mark. A delegated run starts as untrusted as its parent.
 **Typed judgments (optional, off by default).** The policy reads what a click does from the control's label, with
 patterns in English and Turkish, and a few in Finnish ("Post", "Send", "Delete", "Pay now", "Paylaş", "Lähetä"…); a
 label they do not know (Mastodon's "Boost", the German "Teilen") passes as an ordinary click. With `[judge] provider =
-"typesafe"` and `TYPESAFE_API_KEY` saved (Settings › API keys, or `dotx auth set TYPESAFE_API_KEY`), TypeSafe's System
-One API is asked about such a click in four yes/no questions (does it publish, send, pay or delete?) over the label, the
-role and the page's address (without its query and fragment). A probability of at least `public_action_threshold` (0.7)
-gives the click that flag, so the policy treats it as a click on "Post" or "Delete", and the action's summary says so:
-`(judge: public_post 0.93)`. The judge also reads a campaign's claim of its targets before the goal checker does, and
-refuses a claim below `target_threshold` (0.9) at once. It never allows anything and never decides a step; it only adds
-flags, or stops a claim early. It is a paid service: one request per judged click or claim, at most `timeout_s` (5 s)
-each. A missing or refused key, a spent quota or a failed request turns it off for `[models] helper_cooldown_s`, with a
-note in the timeline, and meanwhile the patterns and the goal checker decide alone; a key saved in Settings turns it on
-again at once. `dotx doctor` shows whether it is on and has its key.
+"typesafe"` and `TYPESAFE_API_KEY` saved (made at console.typesafe.ai; Settings › API keys, or `dotx auth set
+TYPESAFE_API_KEY`), TypeSafe's System One API is asked about such a click in four yes/no questions (does it publish,
+send, pay or delete?) over the label, the role and the page's address (without its query and fragment). A probability of
+at least `public_action_threshold` (0.45: below each yes measured; a wrong flag only asks) gives the click that flag, so
+the policy treats it as a click on "Post" or "Delete", and the action's summary says so: `(judge: public_post 0.93)`.
+The judge also reads a campaign's claim of its targets before the goal checker does, and refuses a claim below
+`target_threshold` (0.15: only a clearly false one, since a true claim it refused would keep the campaign from ending)
+at once. It never allows anything and never decides a step; it only adds flags, or stops a claim early. It is a paid
+service, though a cheap one (input tokens only, $0.042 a million on 2026-10-10): one request per judged click or claim,
+at most `timeout_s` (5 s) each. The thresholds were set on answers of `jev-1.13.0`, the version `[judge] model` names;
+move them together. A missing or refused key, a spent quota or a failed request turns it off for `[models]
+helper_cooldown_s`, with a note in the timeline, and meanwhile the patterns and the goal checker decide alone; a key
+saved in Settings turns it on again at once. `dotx doctor` shows whether it is on and has its key.
 
 **Pace on social platforms.** A click whose label posts, replies, reposts, quotes or sends ("Post", "Reply", "Repost",
 "Quote", "Yeniden gönder", "Lähetä"…) is a public action; one that follows, likes or subscribes ("Follow", "Like",

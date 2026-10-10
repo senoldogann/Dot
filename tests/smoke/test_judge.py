@@ -39,7 +39,7 @@ KEY_ENV: str = "DOT_TEST_TYPESAFE_KEY"
 REFUSED_ENV: str = "DOT_TEST_TYPESAFE_REFUSED_KEY"
 # The probability of yes the stand-in gives, by the label of the control and the question; anything else gets 0.05.
 _YES: dict[str, dict[str, float]] = {"Boost": {"public_post": 0.95}}
-_CLAIM_PROBABILITY: float = 0.4
+_CLAIM_PROBABILITY: float = 0.1
 _PAGE: bytes = b"""<!doctype html><title>Timeline</title><h1>Timeline</h1><p>A post worth sharing.</p>
 <button type="button">Boost</button> <button type="button">Post</button> <a href="/next">Next page</a>"""
 
@@ -208,7 +208,7 @@ async def test_a_click_no_pattern_knows_gets_the_flag_the_judge_finds_and_a_know
     # The label a pattern knows is the patterns' alone: no third request.
     assert (post.flags, len(service.requests)) == (("public_post",), before + 2)
     path, authorization, body = asked[0]
-    assert (path, authorization, body["model"]) == ("/v1/systemone", f"Bearer {KEY}", "jev-latest")
+    assert (path, authorization, body["model"]) == ("/v1/systemone", f"Bearer {KEY}", runtime.config.judge.model)
     # The page's query and fragment stay home.
     assert body["state"] == {"control": {"label": "Boost", "role": "button"}, "page": f"{service.base}/"}
     questions: JsonValue = body["questions"]
@@ -257,7 +257,7 @@ async def test_a_campaign_claim_the_judge_finds_unlikely_is_refused_before_the_g
     stored: CampaignRecord = await runtime.store.get_campaign(campaign.id)
     _, _, body = service.requests[-1]
     assert result.is_error
-    assert result.text.startswith("Not accepted: the typed judge gives 0.40 for the targets being reached"), result.text
+    assert result.text.startswith("Not accepted: the typed judge gives 0.10 for the targets being reached"), result.text
     assert stored.status == "active"
     state: JsonValue = body["state"]
     assert isinstance(state, dict) and isinstance(body["questions"], dict)
