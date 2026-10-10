@@ -7,6 +7,8 @@ from dataclasses import dataclass, replace
 from datetime import datetime
 from typing import Literal
 
+from pydantic import JsonValue
+
 from dotagent.agent.attachments import (
     ATTACHMENTS_EVENT,
     StoredAttachment,
@@ -56,12 +58,14 @@ from dotagent.agent.limits import (
 from dotagent.agent.plan import (
     EMPTY_PLAN,
     PLAN_EVENT,
+    PlanItem,
     PlanPayload,
     open_steps,
     plan_event_data,
     plan_from_event,
     plan_lines,
     render_plan,
+    with_step_status,
 )
 from dotagent.agent.progress import (
     SINGLE_ACTION_STEPS,
@@ -124,7 +128,7 @@ from dotagent.agent.verify import (
 )
 from dotagent.agent.vision import text_for_blind_model
 from dotagent.config import AgentConfig
-from dotagent.core.errors import ConfigError, MissingSecretError, ProviderError, RunCancelled
+from dotagent.core.errors import ConfigError, MissingSecretError, ProviderError, RunCancelled, ToolInputError
 from dotagent.core.jsonutil import dumps_compact
 from dotagent.core.logs import get_logger
 from dotagent.core.text import redact_secrets, truncate_middle
@@ -158,7 +162,7 @@ from dotagent.store.stats import ACT_TOOLS
 from dotagent.tools.campaign import CAMPAIGN_TOOLS
 from dotagent.tools.consult import CONSULT_TOOL
 from dotagent.tools.context import Spawner, ToolContext
-from dotagent.tools.delegate import DELEGATE_TOOL
+from dotagent.tools.delegate import DELEGATE_TOOL, delegated_evidence
 from dotagent.tools.groups import CORE_GROUP, groups_event, groups_of, hidden_tools, offered_specs, used_groups
 from dotagent.tools.meta import ASK_USER_TOOL, FINISH_TOOL, USE_TOOLS_TOOL, FinishArgs, UseToolsArgs
 from dotagent.tools.registry import ToolRegistry, specs_for_mode
@@ -589,6 +593,47 @@ class SendBack(FrozenModel):
     """The goal check does not accept the end of the run yet: the run goes on after ``note``."""
 
     note: str
+
+
+def _delegated_closings(outcomes: Sequence[ToolOutcome]) -> list[tuple[int, ToolOutcome]]:
+    """The delegate calls of one step that named a plan step and ran, with that step."""
+    closings: list[tuple[int, ToolOutcome]] = []
+    for outcome in outcomes:
+        step: JsonValue = outcome.call.arguments.get("step")
+        if outcome.call.name == DELEGATE_TOOL and outcome.action is not None and isinstance(step, int):
+            closings.append((step, outcome))
+    return closings
+
+
+async def _close_delegated_steps(agent: AgentRun, outcomes: Sequence[ToolOutcome]) -> str | None:
+    """Close the plan steps the delegate calls of this step named: done with the report as evidence when the delegated
+    run ended done, failed otherwise. The loop does this, not the tool, because delegate calls run side by side and the
+    plan is rewritten whole. Returns the note for the model when a step of a run that ended done could not be closed
+    (the plan was rewritten under it), else ``None``; a call that was refused closes nothing and its result already
+    says why."""
+    closings: list[tuple[int, ToolOutcome]] = _delegated_closings(outcomes)
+    if not closings:
+        return None
+    plan: PlanPayload = await _current_plan(agent)
+    steps: tuple[PlanItem, ...] = plan.steps
+    problems: list[str] = []
+    for number, outcome in closings:
+        failed: bool = outcome.result.is_error
+        try:
+            steps = with_step_status(steps, number, "failed" if failed else "done", delegated_evidence(outcome.result))
+        except ToolInputError as error:
+            if not failed:
+                problems.append(f"step {number}: {error.message}")
+    if steps != plan.steps:
+        await agent.runtime.bus.emit(
+            agent.run.id, PLAN_EVENT, plan_event_data(plan.model_copy(update={"steps": steps})), True
+        )
+    if not problems:
+        return None
+    return (
+        "[system note] The delegated runs ended, but their plan steps could not be closed, so mark them yourself: "
+        + ("; ".join(problems))
+    )
 
 
 async def _stored_note(agent: AgentRun, text: str) -> Message:
@@ -1272,6 +1317,9 @@ async def run_agent(agent: AgentRun) -> RunEnd:
             single_last = single_now
             history.extend(results)
             await runtime.store.append_messages(run.thread_id, results)
+            delegated_note: str | None = await _close_delegated_steps(agent, outcomes)
+            if delegated_note is not None:
+                history.append(await _stored_note(agent, delegated_note))
             finished: ToolOutcome | None = next(
                 (outcome for outcome in outcomes if outcome.call.name == FINISH_TOOL and not outcome.result.is_error),
                 None,

@@ -12,10 +12,12 @@ from dotagent.agent.plan import (
     PlanItem,
     PlanPayload,
     StepStatus,
+    checked_dependencies,
     count_done,
     plan_event_data,
     plan_from_event,
     plan_lines,
+    readiness_lines,
     rewritten_steps,
     with_step_status,
 )
@@ -173,6 +175,15 @@ class PlanStep(ToolArgs):
             "none is given."
         ),
     )
+    # Empty means the step waits for nothing: a provider sees an optional list.
+    depends_on: list[int] = Field(
+        default_factory=list,
+        max_length=20,
+        description=(
+            "The numbers of the steps this one waits for, if any. Steps that wait for nothing open are independent: "
+            "the plan says which are ready, and delegate can run them in one turn."
+        ),
+    )
 
 
 class UpdatePlanArgs(ToolArgs):
@@ -197,7 +208,9 @@ async def _latest_plan(ctx: ToolContext) -> PlanPayload:
 
 async def _record_plan(ctx: ToolContext, plan: PlanPayload) -> ToolResult:
     await ctx.runtime.bus.emit(ctx.run_id, PLAN_EVENT, plan_event_data(plan), True)
-    return ok(f"Plan recorded ({count_done(plan.steps)}/{len(plan.steps)} done):\n{plan_lines(plan)}")
+    readiness: str = readiness_lines(plan.steps)
+    text: str = f"Plan recorded ({count_done(plan.steps)}/{len(plan.steps)} done):\n{plan_lines(plan)}"
+    return ok(f"{text}\n{readiness}" if readiness else text)
 
 
 def _update_plan_tool() -> RegisteredTool:
@@ -208,9 +221,11 @@ def _update_plan_tool() -> RegisteredTool:
         previous: PlanPayload = await _latest_plan(ctx)
         targets: str = args.targets or previous.targets
         given: tuple[PlanItem, ...] = tuple(
-            PlanItem(text=step.text, status=step.status, evidence=step.evidence) for step in args.steps
+            PlanItem(text=step.text, status=step.status, evidence=step.evidence, depends_on=tuple(step.depends_on))
+            for step in args.steps
         )
-        return await _record_plan(ctx, PlanPayload(steps=rewritten_steps(previous.steps, given), targets=targets))
+        steps: tuple[PlanItem, ...] = checked_dependencies(rewritten_steps(previous.steps, given))
+        return await _record_plan(ctx, PlanPayload(steps=steps, targets=targets))
 
     return make_tool(
         name=UPDATE_PLAN_TOOL,
@@ -218,7 +233,8 @@ def _update_plan_tool() -> RegisteredTool:
             "Record or rewrite a short step-by-step plan for multi-step work, and the targets of a goal that names an "
             "outcome. The user sees it live. Skip it for trivial tasks. To mark progress on one step use "
             "mark_plan_step instead. A step given as done needs its evidence, unless the previous plan already holds "
-            "that step done."
+            "that step done. A step that must wait for others names them in depends_on; the result says which steps "
+            "are ready now."
         ),
         args_model=UpdatePlanArgs,
         modes=ALL_MODES,

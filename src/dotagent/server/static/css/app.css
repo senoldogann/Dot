@@ -1298,6 +1298,23 @@ a.pill:hover {
   min-width: 0;
 }
 
+.plan-step .line {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* The steps this one waits for (depends_on). */
+.plan-step .after {
+  font-size: 0.75em;
+  color: var(--muted);
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  padding: 0 7px;
+  white-space: nowrap;
+}
+
 /* What the run observed that closed the step; the goal check reads the same text. */
 .plan-step .evidence {
   font-size: 0.85em;
