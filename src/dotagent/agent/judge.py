@@ -42,7 +42,14 @@ from dotagent.core.text import redact_json
 from dotagent.core.types import FrozenModel, JsonObject
 from dotagent.events import EventBus
 from dotagent.llm.router import unavailable_reason
-from dotagent.llm.typesafe import NoulQuestion, ScoreAnswer, ScoreQuestion, TypeSafeClient
+from dotagent.llm.typesafe import (
+    ChoiceAnswer,
+    ChoiceQuestion,
+    NoulQuestion,
+    ScoreAnswer,
+    ScoreQuestion,
+    TypeSafeClient,
+)
 from dotagent.secrets import require_secret
 
 log = get_logger(__name__)
@@ -286,6 +293,21 @@ class TypeSafeService:
             async with asyncio.timeout(self._config.timeout_s):
                 client: TypeSafeClient = await self._connect()
                 return await client.scores(redact_json(state), questions)
+        except (ProviderError, MissingSecretError, TimeoutError) as error:
+            await self._failed(error, run_id, state, len(questions))
+            return None
+
+    async def choices(
+        self, state: JsonValue, questions: tuple[ChoiceQuestion, ...], run_id: str
+    ) -> dict[str, ChoiceAnswer] | None:
+        """The choice answer to each question, or ``None`` while the service is paused or once this request paused it.
+        Raises :class:`ProviderError` for a request TypeSafe rejected or an answer it could not read."""
+        if self.unavailable():
+            return None
+        try:
+            async with asyncio.timeout(self._config.timeout_s):
+                client: TypeSafeClient = await self._connect()
+                return await client.choices(redact_json(state), questions)
         except (ProviderError, MissingSecretError, TimeoutError) as error:
             await self._failed(error, run_id, state, len(questions))
             return None

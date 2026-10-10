@@ -26,6 +26,7 @@ from dotagent.tools.groups import (
     offered_specs,
     used_groups,
 )
+from dotagent.tools.posts import POST_TOOLS
 from dotagent.tools.registry import ToolRegistry, build_registry, specs_for_mode
 
 _DEFAULT: AppConfig = load_default_config()
@@ -35,7 +36,7 @@ REGISTRY: ToolRegistry = build_registry(
 )
 # What a task run is offered when it is not a session of a campaign: the loop leaves the campaign tools out.
 TASK_SPECS: tuple[ToolSpec, ...] = tuple(
-    spec for spec in specs_for_mode(REGISTRY, "task") if spec.name not in CAMPAIGN_TOOLS
+    spec for spec in specs_for_mode(REGISTRY, "task") if spec.name not in CAMPAIGN_TOOLS | POST_TOOLS
 )
 TASK_TOOLS: list[str] = [spec.name for spec in TASK_SPECS]
 DEFAULTS: AgentConfig = _DEFAULT.agent

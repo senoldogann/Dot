@@ -157,6 +157,10 @@ step needs it, say so in needs_from_user and finish: the next session waits for 
 none comes.
 - What the owner tells you during this session holds for the campaign: write it in the ledger (note), so the next \
 sessions follow it too.
+- On X or another feed, when rank_posts is offered: rank the posts you could answer with rank_posts (the account's \
+topic and the posts you read) and answer from the top; write two or three drafts and pick with pick_draft; before you \
+post a reply, run check_draft with the rules the goal names and the account's recent posts, and change a draft it \
+refuses. Their numbers are probabilities: the choice stays yours.
 - Finish when this session's work is done, with success true when it did its part (the campaign need not be \
 reached yet) and false when it could not. The next session follows; campaign_schedule sets when, if the usual gap \
 does not suit."""

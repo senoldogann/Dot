@@ -1087,6 +1087,16 @@ your conversation; the daemon runs the sessions after it, each a run in a thread
   it ends. `dotx campaign` changes the campaign without the daemon, so a session working then goes on until it ends
   (Stop on its run page ends it). `campaign_max_sessions` (0: no limit) stops a campaign after that many sessions; Go on
   gives it one more.
+- **Posts, judged before they are answered.** With `TYPESAFE_API_KEY` saved, a session also has three tools on TypeSafe's
+  typed judgments for a campaign on X or another feed. `rank_posts` asks three yes/no questions about every post it
+  could answer, in one request (on the account's topic; written by a person, not a bot, a brand or spam; worth a reply
+  that adds something) and combines them with weights the ledger holds: the first ranking writes them as a note with
+  equal values, and a `campaign_note` entry with the numbers `w_topic`, `w_person` and `w_reply` changes them without
+  asking TypeSafe again; every ranking's scores are kept in the session's timeline (`posts_ranked`). `pick_draft` asks
+  one choice over two to ten drafts of a reply. `check_draft` asks whether a draft is off topic, repeats one of the
+  account's earlier posts or breaks a rule the goal names, and refuses it when one of those reaches `[judge]
+  draft_check_threshold` (0.5, provisional until it is set on a labeled sample of your own feed). None of them posts;
+  the model keeps the decision.
 
 **The browser of a campaign.** A campaign works in the Chrome you have open, signed in as you are (`attach`), unless you
 start it with `--browser own` (or `browser` in the API), and `[agent] campaign_browser` sets the default; runs you start

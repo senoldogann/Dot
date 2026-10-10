@@ -54,6 +54,7 @@ from dotagent.tools.mcp import build_mcp_tools
 from dotagent.tools.memory import build_memory_tools
 from dotagent.tools.meta import build_meta_tools
 from dotagent.tools.notes import build_notes_tools
+from dotagent.tools.posts import build_post_tools
 from dotagent.tools.registry import ToolRegistry, build_registry
 from dotagent.tools.schedule import build_schedule_tools
 from dotagent.tools.shell import build_shell_tool, child_env, read_login_env
@@ -98,8 +99,8 @@ class Runtime:
 
 def _tool_groups(config: AppConfig, judge_items: bool) -> tuple[tuple[RegisteredTool, ...], ...]:
     """The tools of this installation: the terminal tools only exist when a chat may open a terminal session, the
-    code_fetch tool only when [policy] code_sources names an application, judge_items only when TypeSafe's key is saved
-    (``judge_items``), the Mac desktop tools only when the desktop is enabled."""
+    code_fetch tool only when [policy] code_sources names an application, judge_items and the post tools of a campaign
+    only when TypeSafe's key is saved (``judge_items``), the Mac desktop tools only when the desktop is enabled."""
     core: tuple[tuple[RegisteredTool, ...], ...] = (
         build_file_tools(),
         (build_shell_tool(),),
@@ -115,7 +116,7 @@ def _tool_groups(config: AppConfig, judge_items: bool) -> tuple[tuple[Registered
         (build_skill_tool(),),
         *((build_terminal_tools(),) if config.shell.terminal_sessions > 0 else ()),
         *((build_code_tools(),) if config.policy.code_sources else ()),
-        *(((build_judge_items_tool(),),) if judge_items else ()),
+        *(((build_judge_items_tool(),), build_post_tools()) if judge_items else ()),
     )
     if not config.desktop.enabled:
         return core

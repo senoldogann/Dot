@@ -662,6 +662,14 @@ export function createTimeline({ rootRunId, startedAt, onGrow, onPlan, onStats, 
       note(scope, record.ts, "key", `TypeSafe rejected a request (the log has it): ${record.data.error}`, "warn");
     },
 
+    // A session of a campaign ranked the posts it could answer (`topic`, `weights`, `posts` with their scores, the
+    // highest first).
+    posts_ranked(scope, record) {
+      const data = record.data;
+      const top = data.posts.slice(0, 3).map((post) => `${post.id} ${post.score.toFixed(2)}`).join(", ");
+      note(scope, record.ts, "key", `Ranked ${data.posts.length} posts on “${data.topic}”; the top: ${top}`, "");
+    },
+
     // The progress watchdog saw that the run is not getting anywhere (`detail`) and answered with a rung of its ladder
     // (`action`); the consult rung brings the advice of the review model, or the `error` that ended the run. An event
     // without `action` comes from the older stall guard, which only counted its `warnings`.

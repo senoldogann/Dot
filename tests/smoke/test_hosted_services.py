@@ -38,6 +38,7 @@ from dotagent.llm.types import (
 from dotagent.llm.typesafe import NoulQuestion, TypeSafeClient
 from dotagent.secrets import resolve_secret
 from dotagent.tools.judge_items import Item, noul_questions, state_of
+from dotagent.tools.posts import Post, equal_weights, post_questions, posts_state, ranked_posts
 from dotagent.web.client import WebClient
 from dotagent.web.search import search_ollama
 from dotagent.web.types import SearchHit
@@ -271,3 +272,64 @@ async def test_typesafe_ranks_the_posts_on_a_topic_above_every_other_in_one_requ
     on_topic: list[float] = [answers[f"p{number}"] for number in range(1, len(_ON_TOPIC) + 1)]
     off_topic: list[float] = [answers[f"p{number}"] for number in range(len(_ON_TOPIC) + 1, len(items) + 1)]
     assert min(on_topic) > max(off_topic), (on_topic, off_topic)
+
+
+# A labeled sample of a feed for an account on Python packaging: ten posts worth answering (on topic, by a person, with
+# something to add to) and ten not (off topic, bots and brands, closed statements). The owner's own labeled feed is to
+# replace it (ROADMAP open decision 27).
+_ANSWERABLE: tuple[tuple[str, str], ...] = (
+    ("@mara", "Why does uv lock give me a different tree than pip freeze? Lost an afternoon to this."),
+    ("@tomas", "Our wheels build fine on Linux but the macOS arm64 one fails on a missing symbol. Anyone seen this?"),
+    ("@jules", "Is there any reason to keep setup.py around now that pyproject.toml covers everything?"),
+    ("@ines", "Moving a 40-package monorepo to uv workspaces. What broke for you?"),
+    (
+        "@dev_sam",
+        "Our CI pins with pip-compile but devs use uv locally; the two lockfiles drift. How do people handle it?",
+    ),
+    (
+        "@priya",
+        "First time publishing to PyPI with trusted publishing; the OIDC step keeps failing on the tag workflow.",
+    ),
+    ("@kofi", "Hot take: sdists should be optional for pure-Python packages. Change my mind."),
+    ("@lena", "Does anyone ship a private index with uv? Looking at devpi vs a plain static bucket."),
+    ("@omar", "Spent the morning on a hatchling vs setuptools decision for a new library and still unsure."),
+    ("@yuki", "Why is my wheel 80 MB? It only has pure Python in it."),
+)
+_NOT_ANSWERABLE: tuple[tuple[str, str], ...] = (
+    ("@dealsbot", "GIVEAWAY: retweet and follow to win a laptop! Winner announced Friday."),
+    ("@acme_cloud", "Acme Cloud is proud to announce our Q3 earnings call. Join us at 9am ET."),
+    ("@sofia", "Weekend hike photos from the Alps, finally some snow."),
+    ("@grumpyrust", "Rust's borrow checker finally clicked for me after three years."),
+    ("@coffeeguy", "Best espresso grinder under 300 euros? Asking for a friend."),
+    ("@newsfeed_ai", "Top 10 Python libraries you MUST know in 2026 (thread) 1/10"),
+    ("@pep8bot", "Reminder: PEP 8 says 79 characters. Daily reminder #1842."),
+    ("@karl", "Shipped dark mode to our React app, one afternoon with CSS variables."),
+    ("@python_quotes", '"Readability counts." - Tim Peters'),
+    ("@liam", "Our team moved to a four-day week; thread on what changed."),
+)
+
+
+@pytest.mark.hosted
+@requires_typesafe
+async def test_typesafe_ranks_the_answerable_posts_of_a_feed_at_the_top() -> None:
+    """The labeled sample above, ranked as rank_posts does it with equal weights: the precision of the top ten is
+    printed and has to be at least 0.8 (eight of the ten are posts worth answering)."""
+    assert TYPESAFE_KEY is not None
+    posts: tuple[Post, ...] = tuple(
+        Post(id=f"p{number}", author=author, text=text)
+        for number, (author, text) in enumerate([*_ANSWERABLE, *_NOT_ANSWERABLE], 1)
+    )
+    answerable: frozenset[str] = frozenset(f"p{number}" for number in range(1, len(_ANSWERABLE) + 1))
+    client: TypeSafeClient = TypeSafeClient(DEFAULTS.judge, TYPESAFE_KEY)
+    started: float = time.monotonic()
+    try:
+        answers: dict[str, float] = await client.nouls(posts_state("Python packaging", posts), post_questions(posts))
+    finally:
+        await client.aclose()
+    ranked = ranked_posts(answers, posts, equal_weights())
+    top: list[str] = [item.id for item in ranked[: len(_ANSWERABLE)]]
+    precision: float = len(set(top) & answerable) / len(top)
+    print(f"{time.monotonic() - started:.2f} s, precision@10 {precision:.2f}")
+    for item in ranked:
+        print(item.id, f"{item.score:.2f}", {name: round(value, 2) for name, value in item.answers.items()})
+    assert precision >= 0.8, top

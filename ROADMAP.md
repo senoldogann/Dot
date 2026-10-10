@@ -2382,8 +2382,8 @@ Paste this to the agent that takes the work:
 | 39  | CI and retention defaults                                                | done    | 80e8f19 |
 | 40  | Cold start of `dotx`                                                     | done    | 9ebe8e0 |
 | 41  | An own crawler: fetch, render, crawl, extract                            | done    | aedab8b |
-| 42  | TypeSafe as a tool of the agent: many items judged in one call           | in progress |         |
-| 43  | Typed judgments in X campaigns: what to answer, the best draft, a check  | planned |         |
+| 42  | TypeSafe as a tool of the agent: many items judged in one call           | done    | f0b1188 |
+| 43  | Typed judgments in X campaigns: what to answer, the best draft, a check  | in progress |         |
 | 44  | Typed checks before a model call: the page after an action, the goal     | planned |         |
 | 45  | A step's model chosen by a typed judgment                                | planned |         |
 
@@ -3118,6 +3118,29 @@ of the owner's own feed (posts they would and would not answer), not on a cookbo
 **Done when.** On the labeled sample, the precision of the top ten is measured and written in the log; a live
 campaign session records the scores of the posts it answered.
 
+**Design, as built.** Three tools in `tools/posts.py`, offered to the sessions of a campaign (the loop leaves them
+out of every other run, with the campaign tools) when TypeSafe's key resolves, on the `TypeSafeService` of item 42.
+`rank_posts(topic, posts[id, author, text])` asks three Nouls per post in one request, the posts by id in the state
+(`{"topic", "posts": {id: {author, text}}}`) and each question naming its post's path: on the topic, written by a
+person (not a bot, a brand's broadcast, spam, a giveaway or engagement bait), worth a reply that adds something. The
+composite is the weighted mean of the three probabilities with the weights of the campaign's ledger, the newest entry
+whose numbers hold `w_topic`, `w_person` and `w_reply`: the first ranking writes a note with equal weights, and a
+`campaign_note` with those numbers changes them without asking TypeSafe again (composite scoring, as the pattern says:
+code owns the weights). The scores of every ranking go in a `posts_ranked` event of the session, shown as a note in the
+timeline. `pick_draft(topic, post, drafts[2..10])` asks one Choice whose criteria are the drafts by id (the Choice
+answer, `{"choice", "confidence", "probabilities": {option: p}}`, joined `llm/typesafe.py` as `ChoiceQuestion` /
+`ChoiceAnswer` / `TypeSafeClient.choices`, and the service got `choices`). `check_draft(topic, post, draft,
+earlier_posts, rules)` asks in one request whether the draft is off topic or beside the point, whether it repeats one of
+the account's earlier posts (when any are given) and, one question per rule, whether it breaks a rule the goal names;
+a check at `[judge] draft_check_threshold` (0.5) refuses the draft with every probability listed. The campaign prompt
+block says when to call them; the owner's X skills of item 18 are theirs and were not changed. Measured against
+TypeSafe with jev-1.13.0 on a labeled sample of 20 posts for an account on Python packaging (10 worth answering, 10
+not: bots, brands, closed statements, other topics; in `tests/smoke/test_hosted_services.py`): one request of 60
+questions in 0.64 s, precision of the top ten 1.00, the lowest answerable post at 0.93 and the highest other at 0.53
+(an espresso question: a person, worth a reply, off topic). The sample is synthetic and the threshold provisional: the
+owner's own labeled feed is decision 27, and the scores a live session records are read from its `posts_ranked`
+events.
+
 ### 44. Typed checks before a model call: the page after an action, the goal
 
 **What.** (1) A browser action can name what it expects to see after it (`expect`: "the reply shows under the post");
@@ -3265,6 +3288,11 @@ item ends as a measured no, written in the log.
     `dotx eval run --model REF --task filter-headlines --repeat 3` once with the key saved and once with it removed (or
     with `[judge] api_key_env` pointing at an unset name) and compare seconds and tokens in the two reports; if the
     model does not reach for the tool, the prompt line under "# Web" in `agent/prompt.py` is where to push it.
+27. The post tools of a campaign (item 43) rank, pick and check with weights of 1/1/1 and `[judge]
+    draft_check_threshold = 0.5`, measured on a synthetic sample (precision@10 1.00, the top other post at 0.53). Label
+    twenty or thirty posts of your own X feed (would answer / would not) and run them through `rank_posts`' questions
+    (the hosted test shows how); if a post you would answer falls under one you would not, change the weights with a
+    `campaign_note` carrying `w_topic`, `w_person`, `w_reply`, and set the threshold where your rejected drafts fall.
 
 ## Log
 
@@ -3672,3 +3700,5 @@ item ends as a measured no, written in the log.
 - 2026-10-10 (Fable 5.1): item 40 built on branch `item-40-cold-start` (MYP-181): `cli_commands.py` (light models and union), the commands of `cli.py` moved to `cli_run`, `cli_models`, `cli_doctor`, `cli_desktop`, `cli_memory` and `cli_browser`, a `dispatch` per family, `cli.py` loads the family by name. `dotx --help` 80 ms (was 600 to 760 ms). Unit 646, offline smoke 97, eval check ok.
 - 2026-10-10 (Fable 5.1): item 40 merged 9ebe8e0 (PR #40, MYP-181 Done; gate green). Next: item 42.
 - 2026-10-10 (Fable 5.1): item 42 built on branch `item-42-judge-items` (MYP-182): `TypeSafeService` shared by the judge and the new `judge_items` tool (one Noul or Score per item in one request, ranked), 422 and malformed answers as `judge_error` without a pause, `[judge] items_per_request = 100` from the measured requests, eval task `filter-headlines`, decision 26.
+- 2026-10-10 (Fable 5.1): item 42 merged f0b1188 (PR #41, MYP-182 Done; gate green). Next: item 43.
+- 2026-10-10 (Fable 5.1): item 43 built on branch `item-43-x-judgments` (MYP-183): `tools/posts.py` (rank_posts with ledger weights and a posts_ranked event, pick_draft on a Choice, check_draft with the draft threshold), Choice in `llm/typesafe.py`, campaign prompt bullet, README, decision 27. Hosted: precision@10 1.00 on the synthetic sample in 0.64 s.

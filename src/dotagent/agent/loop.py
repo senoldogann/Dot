@@ -166,6 +166,7 @@ from dotagent.tools.context import Spawner, ToolContext
 from dotagent.tools.delegate import DELEGATE_TOOL, delegated_evidence
 from dotagent.tools.groups import CORE_GROUP, groups_event, groups_of, hidden_tools, offered_specs, used_groups
 from dotagent.tools.meta import ASK_USER_TOOL, FINISH_TOOL, USE_TOOLS_TOOL, FinishArgs, UseToolsArgs
+from dotagent.tools.posts import POST_TOOLS
 from dotagent.tools.registry import ToolRegistry, specs_for_mode
 from dotagent.tools.skill import SKILL_TOOL
 
@@ -1069,7 +1070,7 @@ async def run_agent(agent: AgentRun) -> RunEnd:
     if run.parent_run_id is not None:
         specs = tuple(spec for spec in specs if spec.name not in _NOT_FOR_DELEGATED_RUNS)
     if run.campaign_id is None:
-        specs = tuple(spec for spec in specs if spec.name not in CAMPAIGN_TOOLS)
+        specs = tuple(spec for spec in specs if spec.name not in CAMPAIGN_TOOLS | POST_TOOLS)
     skills: SkillCatalog = await asyncio.to_thread(
         load_skills, runtime.config.skills, runtime.plugins.plugins, playbook_root(runtime.config)
     )

@@ -353,7 +353,8 @@ class JudgeConfig(FrozenModel):
     named by ``api_key_env``. ``timeout_s`` bounds one judgment, retries included. With ``second_opinion`` each
     question is asked a second time in an independent phrasing, and the two answers have to agree before the judge
     acts on them. The judge_items tool (:mod:`dotagent.tools.judge_items`) uses the same key, address, model and
-    timeout whatever ``provider`` says, and asks about ``items_per_request`` items in one request."""
+    timeout whatever ``provider`` says, and asks about ``items_per_request`` items in one request; so do the post tools
+    of a campaign (:mod:`dotagent.tools.posts`), whose check of a draft fires at ``draft_check_threshold``."""
 
     provider: Literal["none", "typesafe"]
     api_key_env: str
@@ -364,6 +365,7 @@ class JudgeConfig(FrozenModel):
     target_threshold: float = Field(ge=0, le=1)
     second_opinion: bool
     items_per_request: int = Field(ge=1, le=500)
+    draft_check_threshold: float = Field(ge=0, le=1)
 
 
 class AppConfig(FrozenModel):
