@@ -3223,6 +3223,230 @@ steps against the stand-in, which routes by a marker the previous step echoed, s
 measured here: whether it saves time at the same success rate on a live model (decision 29); until then the item is
 neither a yes nor a measured no.
 
+## Part 4: the face of Dot: web, desktop, mobile (planned 2026-10-11)
+
+The owner's fourth ask, on 2026-10-10: find the design of OpenAI's "Dot" and make Dot's look like it and better, with
+desktop and mobile apps planned. The product is OpenAI's **dots** (DevDay, 29 September 2026): an always-on agent
+inside ChatGPT with a cloud computer, reached in ChatGPT, Slack, Teams or a call, with a mascot the owner names and
+dresses. What could be read on 2026-10-11 (the launch post on openai.com answers 403 to agents; the docs at
+learn.chatgpt.com/docs/dots and its subpages read in full; MacStories, TechCrunch, Fortune and Flavio Copes as
+reviews; the screenshots are under /tmp/dots-docs on the Mac that did the reading, not committed):
+
+- **Where it lives.** One entry under "New chat" in the ChatGPT sidebar, named after the dot. Its *profile* holds
+  **Activity** (every task with progress, files, results and the requests waiting), **Scheduled**, **Computers** and
+  **Add** (contact methods). No model picker, no effort level: the dot chooses.
+- **Its computer.** A window titled "Alfred's Computer" on a warm yellow gradient: the cloud browser's page, a dock of
+  three icons (browser, terminal, files) and a pill under it, "**Alfred** has control · **Take over**"; the pill
+  turns into "You have control · Return control". A separate private form for website sign-ins, with "Take over to
+  sign in" and "Not now".
+- **Permissions.** Automatic review before every action that touches an account; *custom rules* under Settings ›
+  Personalization › Permissions with four answers per action: "Take action without asking", "Take action when you
+  say so", "Ask before taking action", "Hand off to you".
+- **Across devices.** Set up on desktop or phone, the same dot and thread on both; mobile web not supported.
+- **Visual language.** White surfaces, black pill buttons, one warm accent per dot, a round character with eyes and
+  accessories (berets, bow ties, glasses). Reviewers praised the pacing of the first conversation (no tool access
+  until asked), the one synced thread and the absence of knobs; they faulted the single dot per account, a thread
+  search that does not work, memories that cannot be read or deleted one by one, and the mascot as "entirely
+  marketing" (Fortune, Ed Zitron) that makes the agent look safe before it has earned it.
+
+**Where Dot already stands against it.** Dot's web UI is the same shape (chats in a sidebar, one page, a composer in
+the middle, Settings on a page of its own, two looks, light and dark, a phone layout under 860 px) and already has
+what dots lacks: any number of threads and campaigns, a search over chats, a Memory tab where every note is read,
+corrected and forgotten one by one, Rules the owner writes, an Actions card with undo, a full event timeline, and the
+computer is the owner's own Mac with the owner's own Chrome profile, so no site "blocks the cloud browser" and no
+session has to be rebuilt. What dots has and Dot has not: a *live view* of the computer with a handover, one
+*Activity* list across everything in motion, the four-answer rule, a face that tells the state at a glance, and a
+shell on the desktop and the phone.
+
+**Principle for part 4.** Better means *more visible and more honest*, not cuter: every state the agent is in has one
+mark that is the same in the sidebar, the run head, the tab title, the notification and later the menu bar; what the
+agent is doing right now can be watched and taken over in one click; nothing is hidden behind a character. The
+mascot stays a dot (Dot's yellow face, no accessories), and a name is optional. Every item is checked in headless
+Chrome on a throw-away daemon in both looks, light and dark, wide and at phone width (item 41's check), and no item
+widens what a run may do.
+
+**Order and dependencies.** 46 (the live view) and 47 (Activity) first, both function; 48 (rules in four answers)
+third; 49 (the face as the state) and 50 (the visual system) next, form on top of function; 51 (desktop shell) and
+52 (phone) last, shells around a web UI that is already right. 51 and 52 each start with an owner decision (30, 31).
+
+### How to start part 4 (the handoff prompt)
+
+> Read `ROADMAP.md` from the top, then "Part 4" and its status table. Check the ground. Take the first item of the
+> part 4 table that is not `done`, in the order above. The protocol is part 3's: read the code, correct the design
+> where the code disagrees, `in progress`, build under the house rules, check wide and phone in both looks, update
+> README and defaults, branch `item-NN-short-name`, PR, squash-merge, hash and log line. Screenshots of a throw-away
+> daemon go into the PR, never the owner's data. The owner reads Turkish; everything written is English.
+
+### Status, part 4
+
+| #   | Item                                                                     | Status  | Commits |
+| --- | ------------------------------------------------------------------------ | ------- | ------- |
+| 46  | Dot's computer: the live view and the handover                           | planned |         |
+| 47  | Activity: everything in motion in one list                               | planned |         |
+| 48  | Rules in four answers                                                    | planned |         |
+| 49  | The face as the state                                                    | planned |         |
+| 50  | The visual system                                                        | planned |         |
+| 51  | The desktop shell                                                        | planned |         |
+| 52  | Dot on the phone                                                         | planned |         |
+
+### 46. Dot's computer: the live view and the handover
+
+**What.** A panel on the run page, "Dot's computer", that shows the page Dot's Chrome is on while a run works in it
+(a screencast, not a screenshot a step old), and a pill under it: "Dot has control · Take over". *Take over* pauses
+the run at its next tool call (the run waits as it waits for an answer, with the note "you have the browser"), brings
+the Chrome window to the front (it is a real window on the owner's Mac: `[browser] headless = false`), and the pill
+reads "You have control · Return control". *Return control* resumes the run with a fresh snapshot of the page, so the
+model sees what the owner did. In `attach` mode the tabs are in the owner's own Chrome already; the panel shows the
+tab Dot works in and the pill does the same. A desktop (item 13) run shows the window view the same way.
+
+**Why.** It is the one thing dots has on Dot that a reviewer sees first, and Dot can do it better: the computer is
+local, the handover is a window the owner already has, and a sign-in, a CAPTCHA or a payment is done in the owner's
+own session, not a cloud browser's (dots hands those off or fails: "Some websites block cloud browsers").
+
+**Design.** `browser/driver.py` has a CDP session for screenshots (`new_cdp_session`); the screencast is
+`Page.startScreencast` (JPEG, quality 50, at most 4 frames a second, `maxWidth` 1280) and `Page.screencastFrameAck`,
+started when the panel opens and stopped when it closes or the run ends, never otherwise, so an idle daemon sends no
+frames. Frames travel on the run's existing event stream (`GET /runs/{id}/stream`) as an unpersisted event
+`browser_frame` with the JPEG base64 and the page URL, or, if that bloats the stream, on `GET /runs/{id}/screencast`
+as a multipart stream. The handover is a run state: `POST /runs/{id}/takeover` sets a flag the executor checks before
+each tool call (`agent/executor.py`), the loop waits on it as on a question, and `POST /runs/{id}/resume` clears it
+and queues a snapshot. The panel lives in the Details panel's place when a run uses the browser and the owner opens
+it; the choice is kept in the browser.
+
+**Touchpoints.** `browser/driver.py`, `browser/session.py`, `agent/executor.py`, `agent/loop.py`, `server/stream.py`,
+`server/routes_runs.py`, `static/js/views/run.js`, `run.css`, `cli_ui.py` (a `takeover` line), README.
+
+**Done when.** A smoke test on the fixture server opens the panel, receives frames, takes over (the run waits, the
+next tool call does not run), returns control (the run goes on with a snapshot event) and finishes; a run without the
+panel open sends no frame (counted on the stream); wide and phone, both looks.
+
+### 47. Activity: everything in motion in one list
+
+**What.** Two sections at the top of the sidebar, above the chats: **Waiting for you** (approvals, questions, a
+campaign's questions, a takeover the owner holds) and **Working** (runs, their delegated runs, campaigns in a
+session, a schedule firing), each row with what it is, the channel it works in (browser, files, shell, desktop, mail),
+since when, and what it needs; and a page `#/activity` with the same rows plus the recent (ended today) and filters
+by kind and state. A row opens the run, the approval or the campaign.
+
+**Why.** dots' Activity is the one place its reviewers look; Dot has the data (`/runs`, `/approvals`, campaigns,
+schedules, the live dot in the sidebar) in four places. One list is also what the phone and the menu bar (51) show.
+
+**Design.** One read model, `server/views.py:ActivityView`, built in `server/routes_data.py` from the runs that are
+not ended, the pending approvals and questions, the campaigns with an active session and the schedules due within
+the hour; `GET /activity`; the sidebar reads it once and keeps it fresh from `GET /stream` (the global stream already
+carries run state changes). The sections fold, the choice kept in the browser; an empty section is not shown.
+
+**Touchpoints.** `server/views.py`, `server/routes_data.py`, `static/js/sidebar.js`, a new `views/activity.js`,
+`shell.css`, README (the sidebar paragraph).
+
+**Done when.** A smoke test with a run waiting for approval, a run working and a campaign in a session shows three
+rows in the right sections, and the row of the approval opens it; wide and phone, both looks.
+
+### 48. Rules in four answers
+
+**What.** The Rules tab speaks the owner's language: a rule is "when Dot would {tool_glob}, matching {regex}: *do it*
+/ *do it when I said so in this chat* / *ask me first* / *hand it to me*". The first three are the existing
+decisions; *hand it to me* is new: the run asks a question that says what it needs done and, when the browser is
+involved, offers the takeover of item 46; on the owner's "done" it goes on.
+
+**Why.** dots' four rules read well and the reviewers said so; Dot's rules have the same shape (tool glob, regex,
+decision) and lack the fourth answer and the plain wording. The second answer, "when I said so", is what the
+`do_not_ask_again` note of a campaign already does for a session; the rule makes it standing.
+
+**Design.** `RuleRequest` gains the fourth decision; the policy's check returns it as a `handoff` outcome that the
+executor turns into a question event with a `takeover` hint; `rules.js` renders the four as a segmented control with
+the sentence above. Read `policy/` first: where the code's decisions differ from the three named here, the section is
+corrected before the fourth is added.
+
+**Touchpoints.** `policy/`, `server/views.py`, `server/routes_data.py`, `agent/executor.py`, `static/js/views/rules.js`,
+`settings.css`, README (Safety).
+
+**Done when.** A unit test for each of the four answers; a smoke test where a *hand it to me* rule stops a write,
+asks, and the run ends after the owner answers; wide and phone, both looks.
+
+### 49. The face as the state
+
+**What.** Dot's yellow face is the state mark everywhere: still when idle, a slow breath while it works, an amber
+ring while it waits for the owner, a green tick for a moment when a run ends done, red when it fails. The same mark
+in the sidebar row, the run head, the delegated-run chip (which has the ring already), the tab title's count, the
+notification icon, the favicon, and in item 51 the menu bar. A name for Dot is a setting (Settings › General), used
+in the home greeting and the run head; no accessories, no eyes that follow the cursor.
+
+**Why.** dots' character is what people remember and what critics distrust; a mark that only ever tells the truth
+about the state is the honest version of it, and the owner recognises Dot's yellow dot already.
+
+**Design.** One SVG face in `icons.js` with a `state` attribute and CSS animations in `app.css` (reduced motion
+honoured); `attention.js` already derives the states for the tab title; a favicon per state via a data URL swap. The
+name is `[ui] name` in the browser's local storage, not the config, since it is the look of this browser.
+
+**Touchpoints.** `static/js/icons.js`, `attention.js`, `sidebar.js`, `views/run.js`, `app.css`, `favicon.svg`, README.
+
+**Done when.** A smoke test reads the face's state attribute through the run's life (idle, working, waiting, done,
+failed); the headless check in both looks shows the ring and the tick.
+
+### 50. The visual system
+
+**What.** The two looks become one system with named tokens: colour (surface 1 to 3, ink 1 to 3, the yellow accent
+and its weak and strong, the four state colours), type (one sans, sizes 12 to 28 on a 4 px rhythm, the serif voice of
+Paper), radius (8, 12, 20, pill), elevation (two shadows), spacing (4 px grid), and the computer panel of item 46 on
+the warm gradient backdrop dots uses for its computer, which is also Dot's yellow. The composer, the chips, the
+segmented controls and the pill buttons are redrawn on the tokens; density has two settings (comfortable, compact).
+
+**Why.** The looks were built item by item; a system is what the desktop shell and the phone will inherit, and what
+makes Dot look finished next to dots' white-and-black-pill language.
+
+**Design.** `app.css` keeps the variables, `themes.css` the two looks on them; no web fonts and no images (the house
+rule in `app.css`'s first line stays). Before redrawing, a page of every control in both looks is rendered in the
+headless check and kept as the PR's screenshots.
+
+**Touchpoints.** `app.css`, `themes.css`, `shell.css`, `run.css`, `settings.css`, README (Settings › Appearance).
+
+**Done when.** Every control on the control page uses tokens only (a grep for hex colours outside `themes.css` finds
+none); the headless check passes in both looks, wide and phone.
+
+### 51. The desktop shell
+
+**What.** A native window around the web UI: a menu bar item with the face of item 49 and the Waiting-for-you count,
+a global shortcut for New chat, native notifications, drag-and-drop of files into the composer, and the daemon owned
+by the launchd service as now (the shell connects, it does not run the agent). Decision 30 chooses the shell:
+Tauri 2 (Rust, a few MB, the web UI unchanged) or Electron (TypeScript, the owner's language, 150 MB).
+
+**Why.** The owner wants a desktop app; dots lives in the ChatGPT desktop app. The web UI is already the app, so the
+shell is thin, and a menu bar item is where an always-on agent belongs on a Mac.
+
+**Design.** A `desktop/` directory in the repo with the shell; it loads `http://127.0.0.1:{port}` with the token from
+`dotx url` (read from the keychain or the token file, never typed), falls back to a "start the service" page when the
+daemon is down, and exposes the menu bar item through the shell's tray API. Signed and notarised builds are an owner
+decision too (an Apple developer account).
+
+**Touchpoints.** `desktop/` (new), `server/routes_system.py` (a `GET /activity/count` for the tray), README (a new
+section).
+
+**Done when.** The shell opens the UI signed in, the tray shows the count and the face state within a second of a
+change, a notification click opens the run; built on the owner's Mac.
+
+### 52. Dot on the phone
+
+**What.** The web UI as a progressive web app first: a manifest, a service worker for the shell files, install to
+the home screen, and web push from the daemon for what the desktop notifications say today (an approval, a question,
+a run ended); then, if the owner wants a store app, a Capacitor wrapper of the same UI. The phone shows Activity
+(47) first, then the chats. Decision 31 chooses how the phone reaches the Mac: the daemon bound to a Tailscale
+address with the token, or nothing until then.
+
+**Why.** dots continues the same thread on the phone; Dot's daemon is on the Mac, so the phone is a window to it,
+which is exactly what a PWA is. The phone layout exists (the drawer under 860 px); what is missing is reach, install
+and push.
+
+**Design.** `static/manifest.webmanifest`, `static/sw.js` (shell files only, never API responses), `POST
+/push/subscribe` with VAPID keys made by `dotx` once and kept in the data dir, the daemon's notifier sends to every
+subscription what `attention.js` shows today; `[server] host` documents the Tailscale case.
+
+**Touchpoints.** `static/` (manifest, service worker), `server/routes_system.py`, `notify/` (push), `cli_*` (VAPID
+keys), README (a new section).
+
+**Done when.** Lighthouse's PWA check passes on the throw-away daemon; a push arrives on a phone on the owner's
+tailnet for an approval and opens the run (owner's run, logged by hand in this file).
+
 ## Open owner decisions
 
 1. Live evals: `dotx eval run --model REF` spends model quota. Run it for the models in use and keep the JSON; it is the
@@ -3370,6 +3594,16 @@ neither a yes nor a measured no.
     step and a half more a pass, 8.5k tokens more, 1.7 s more: the numbers do not favour it, so the router stays off
     and the default holds. Not kept: the per-step `step_routed` counts, since an eval attempt's home is thrown away
     with its database; the next measurement should read them from `dotx timeline` of a kept run. Resolved: off.
+
+30. The desktop shell (item 51): Tauri 2 (Rust, a few MB, nothing to change in the web UI) or Electron (TypeScript,
+    about 150 MB). The recommendation is Tauri 2: the shell is a window, a tray item and notifications, nothing that
+    needs Node in the app, and the owner never has to write Rust beyond the generated project. An Apple developer
+    account is needed for a signed build that other Macs open without a warning.
+31. Reaching the daemon from the phone (item 52): the daemon listens on `127.0.0.1` on purpose. The recommendation is
+    Tailscale: `[server] host` set to the Mac's tailnet address, the token stays the sign-in, nothing is opened to the
+    internet. Without it, the phone items are built and tested on the Mac's own network only.
+32. A name and a face for Dot (item 49): the recommendation is a yellow dot that tells the state and an optional
+    name, no eyes and no accessories; dots' critics (Fortune, 2026-10-02) said why. Say so if you want the character.
 
 ## Log
 
@@ -3786,3 +4020,4 @@ neither a yes nor a measured no.
 - 2026-10-10 (Fable 5.1): item 45 merged 1a080ca (PR #44, MYP-185 Done; gate green). Part 3 is built: every row 22 to 45 is done except 25 (parked). What waits for the owner is in "Open owner decisions" 26 to 29: the live measurements of judge_items (eval task filter-headlines), the post tools on the owner's own feed, the checks before a model call, and the step router, each a paid run on the owner's models.
 - 2026-10-10 (Fable 5.1): Part 3 bookkeeping merged 181709d (PR #45). The daemon was reinstalled at the owner's word (`dotx service install`, no run or campaign active), so items 22 to 45 are live.
 - 2026-10-10 (Fable 5.1): the live measurements behind decisions 26, 28 and 29 ran at the owner's word on `ollama:minimax-m2.7:cloud` with the TypeSafe key, each arm a throw-away home (reports under /tmp/dot-evals, not committed). Decision 26: `judge_items` never called on filter-headlines, no gain. Decision 28: the eval set exercises neither `expect` nor the goal check, the arms differ by variance only. Decision 29: the step router costs a step and a half, 8.5k tokens and 1.7 s a pass at the same success, so it stays off, resolved. Decision 27 needs the owner's own labeled feed and stays open. Branch `part-3-measurements` also sharpens the `step` description of `delegate`.
+- 2026-10-11 (Fable 5.1): Part 4 planned at the owner's word ("find OpenAI's Dot design, make ours like it and better; desktop and mobile apps are planned"): the product is OpenAI's dots (DevDay 2026-09-29), read from learn.chatgpt.com/docs/dots and reviews; items 46 to 52 (live view and takeover, Activity, four-answer rules, the face as the state, the visual system, the desktop shell, the phone) and decisions 30 to 32. The DeepSeek arms of decision 29 run in the background and are logged when they end.
