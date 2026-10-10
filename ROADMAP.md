@@ -2366,10 +2366,10 @@ Paste this to the agent that takes the work:
 | 23  | Multi-action turns as the rule                                           | done    | a70e354 |
 | 24  | The fast model does the side work                                        | done    | 9c16866 |
 | 25  | Early and speculative execution of read-only tools                       | planned |         |
-| 26  | Speed knobs decided by measurement; snapshots that send only the change  | planned |         |
+| 26  | Speed knobs decided by measurement; snapshots that send only the change  | in progress |         |
 | 27  | Cheapest channel first: API or CLI, then the browser, then the desktop   | planned |         |
 | 28  | Evidence on every plan step                                              | planned |         |
-| 29  | Eval reports that compare runs, and the defaults that wait for them      | in progress |         |
+| 29  | Eval reports that compare runs, and the defaults that wait for them      | done    | 1513bd4 |
 | 30  | Typed best-of-two at critical decisions; injection fixtures in the evals | planned |         |
 | 31  | One-time codes from the owner's own Mail and Messages                    | planned |         |
 | 32  | The owner's Chrome profile as the default of a campaign                  | planned |         |
@@ -2525,11 +2525,23 @@ than the whole.
 **Why.** Item 13 measured 220 → 149 ms per click at 60 ms; a 1 710 × 1 112 JPEG is about 2 500 tokens against 1 600
 at 1 366; a full aria snapshot is taken also when nothing changed (audit).
 
-**Touchpoints.** `browser/snapshot.py`, `browser/session.py`, `desktop/render.py`, `defaults.toml`, `config.py`,
-README "Browser use" and "Computer use".
+**Design, as built.** Two of the four knobs had numbers and were flipped: `[browser] settle_quiet_ms` 120 → 60 (item
+13 measured one click 149 against 220 ms with the same result; a page that keeps changing is still waited for up to
+`settle_max_ms`), `[desktop] screenshot_max_edge` 1920 → 1366 (about 1 600 tokens a screenshot against about 2 500).
+`keep_recent_tool_results` and `tool_output_chars` stay: no number says what they cost, and the eval set has no
+browser task to judge them by. The snapshot delta already existed (item 13: an act returns the changed lines when
+they are clearly smaller than the page, `browser/session.py:_changes_view`, `snapshot.py:prefer_diff`); what was
+missing was the unchanged case, which rendered "0 new/changed lines": `render_diff` now says "no change since the last
+observation (N lines unchanged); the refs still hold" in one line. The desktop view already returns only what changed
+(item 13). Decision 13 is closed by this item for the two knobs.
 
-**Done when.** Eval success unchanged, tokens per step and seconds per step (item 22) down; the smoke timing tests
-print the new medians.
+**Touchpoints.** `browser/snapshot.py`, `defaults.toml`, README "Browser use" and "Computer use".
+
+**Done when.** The browser smoke suite passes with the new default and its timing test prints the medians (done,
+headless Chrome, 39 passed: one click 0.167 s at 60 ms against 0.231 s at 120 ms, five clicks 0.497 against 0.566 s);
+the unchanged case has a unit test. The desktop timing test needs the owner away from the keyboard
+(`DOT_DESKTOP_TESTS=1`) and was not run here; the screenshot size change is a pure scale and is covered by the existing
+unit tests of `desktop/shots.py`.
 
 ### 27. Cheapest channel first: API or CLI, then the browser, then the desktop
 
@@ -2911,7 +2923,7 @@ item ends as a measured no, written in the log.
     whose main model hit a quota.
 12. Only you can check live: the X composer with item 14's `type` and `insert`, and a `yolo` run that reads a
     one-time code from your webmail and types it (item 10).
-13. Speed knobs that wait for item 9's numbers: `[browser] settle_quiet_ms` (120 or 60; item 13 has the timings of
+13. Speed knobs that wait for item 9's numbers (item 26 set `[browser] settle_quiet_ms` to 60 and `[desktop] screenshot_max_edge` to 1366 on 2026-10-10; the rest still waits): `[browser] settle_quiet_ms` (120 or 60; item 13 has the timings of
     both; a longer window also shows more of what a page fetches after a scroll), `[desktop] settle_quiet_ms` (120: a
     change later than it is not waited for), `[desktop] screenshot_max_edge` (1920 or 1366), `[desktop]
     paste_threshold_chars` (40: typing costs 8 ms a character, a paste about 0.25 s), `[agent] tool_output_chars` and
@@ -3302,3 +3314,4 @@ item ends as a measured no, written in the log.
 - 2026-10-10 (Fable 5.1): item 24 built on branch `item-24-fast-model`: the compaction summary is the fast model's side work, the run's own model writes it when the fast one fails and the `compacted` event names the problem (`fast_problem`); `dotx doctor` checks the fast model; defaults and README. Scope cut to what the audit measured (no wait_text or judge classification exists on a chat model; vision has its own role; no goal pre-check). Gate: format, check, mypy clean; unit 560; offline smoke 197 passed, 1 failed: `test_delegate.py::test_a_run_reads_a_file_through_a_delegated_run` (`@requires_model`, a real cloud model delegated three times instead of once; it passed on a rerun; unrelated to this item). The merge hash goes into the table with the next PR.
 - 2026-10-10 (Fable 5.1): item 24 merged 9c16866 (PR #23, MYP-164 Done). Item 23 built on branch `item-23-multi-action`: prompt and tool descriptions make the one-step act the exception, with examples; `progress.py` single-action detector, streak and steer; the loop stores the note and emits `single_action_steer` after three such steps on one target; `[agent] steer_single_actions = true`. Gate: format, check, mypy clean; unit 563; `dotx eval check` ok; smoke scaffold, tool groups and run limits 14 passed. The eval set has no browser task, so the share is the owner's reading with `dotx stats --by site`.
 - 2026-10-10 (Fable 5.1): item 23 merged a70e354 (PR #24, MYP-165 Done). Item 29 built on branch `item-29-eval-compare`: `dotx eval report A B` ends with a difference line; five long tasks (ten or more tool turns) in the catalog, `LONG_TASK_IDS`; decision 1 lists the live commands. No `compare` command (report already compares); no fixture-server or campaign task (the harness has no browser and runs one run per attempt). Gate: format, check, mypy clean; unit 565; `dotx eval check` 31 ok.
+- 2026-10-10 (Fable 5.1): item 29 merged 1513bd4 (PR #25, MYP-166 Done). Item 26 built on branch `item-26-speed-knobs`: browser settle 60 ms, screenshot edge 1366, the unchanged-page delta says so in one line; decision 13 closed for the two knobs. Browser smoke (headless Chrome, temp dirs) 39 passed with the medians above.
