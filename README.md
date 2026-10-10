@@ -602,14 +602,17 @@ these were counted (before item 22 of the roadmap) are left out of the acts line
 **`dotx eval`** plays a catalog of small tasks against a model and judges each by what is left in a workspace of its own:
 file edits, shell work, fixing code until its test passes, recovering from an error, multi-step work, a goal that asks
 for as much as the files give, read-only research, a task that cannot be done and has to end as an honest failure, an
-instruction hidden in a file that must not be followed, and a goal written in Turkish.
+instruction hidden in a file that must not be followed, and a goal written in Turkish. Five long tasks follow, each
+needing ten or more tool turns (a digest of twelve logs, a rename across ten modules, ten branch totals into JSON, a
+ten-item checklist, a nine-stage pipeline whose fifth stage fails once): on them the steps a pass costs say how many
+round trips a model spends on work that cannot be done in one.
 
 | Command                                                  | What it does                                                                                                                                                                                                       |
 | -------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `dotx eval list`                                         | The tasks, with their kind, mode and number of checks.                                                                                                                                                             |
 | `dotx eval check`                                        | Needs no model and costs nothing. Replays the reference solution of every task through the real loop, tools and policy, and proves that a run that touches nothing and says "done" fails every task. Run it after changing a tool, the policy or the loop. |
 | `dotx eval run [--model REF] [--task ID]... [--repeat N]` | Plays the tasks against a model (the configured main model if none is given) and prints the score. It spends the tokens of that model: an attempt is cut after 300 s or 600000 tokens, and the notice before it starts states the ceiling. `--repeat` plays every task several times, which shows the tasks a model passes only now and then. |
-| `dotx eval report [FILE...]`                             | The score of saved runs, with a comparison table when there are several; without a file, every run saved under `<home>/evals/`.                                                                                    |
+| `dotx eval report [FILE...]`                             | The score of saved runs, with a comparison table when there are several and, for exactly two files, a line with the second against the first (passed, steps, tokens and seconds per pass, the one-step act and cache shares in percentage points, tool errors, stalls, false claims); without a file, every run saved under `<home>/evals/`. |
 
 Every attempt runs unattended in a throw-away Dot home (its own database and workspace, removed afterwards), with the
 Mac desktop, your MCP servers, skills, plugins and the memory embeddings switched off, and with every question of the

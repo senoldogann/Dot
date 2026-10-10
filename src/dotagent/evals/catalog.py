@@ -6,6 +6,7 @@ tools, and proves that a run that only says "done" fails every task. Tasks are m
 the shell alone, so that a result does not depend on the network, on a signed-in account or on the Mac's desktop.
 """
 
+import json
 from collections.abc import Sequence
 
 from pydantic import JsonValue
@@ -815,9 +816,173 @@ def _catalog() -> tuple[EvalTask, ...]:
     )
 
 
+# The ids of the long tasks (item 29), in the order of the catalog.
+LONG_TASK_IDS: tuple[str, ...] = (
+    "digest-twelve-days",
+    "rename-helper-in-ten-modules",
+    "branch-totals-json",
+    "checklist-ten-files",
+    "pipeline-with-flaky-stage",
+)
+# Errors per day of the twelve logs of digest-twelve-days, and their sum.
+_DAY_ERRORS: tuple[int, ...] = (1, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3, 0)
+_MODULES: tuple[str, ...] = tuple(f"m{number:02d}" for number in range(1, 11))
+_BRANCHES: tuple[str, ...] = tuple(f"b{number:02d}" for number in range(1, 11))
+_WORDS: tuple[str, ...] = ("apple", "birch", "cedar", "delta", "ember", "frost", "grove", "heron", "ivory", "jade")
+# Nine stages: ten shell turns with the retry of stage 5, so the task is a long one (ten or more tool turns).
+_STAGES: int = 9
+_STAGE_SCRIPT: str = _lines(
+    "#!/bin/sh",
+    "# Stage N of the pipeline writes build/stageN.txt. Stage 5 fails once, the first time it is run.",
+    'n="$1"',
+    "mkdir -p build",
+    'if [ "$n" = "5" ] && [ ! -f build/.stage5-tried ]; then',
+    "  touch build/.stage5-tried",
+    '  echo "transient: stage 5 failed, run it again" >&2',
+    "  exit 1",
+    "fi",
+    'echo "ok $n" > "build/stage$n.txt"',
+)
+
+
+def _day_log(errors: int) -> str:
+    return _lines("INFO start", *(["ERROR failed step"] * errors), "INFO end")
+
+
+def _module(name: str) -> str:
+    return _lines("from pkg.util import helper_old", "", "", f"def run_{name}():", "    return helper_old()")
+
+
+def _branch_csv(number: int) -> str:
+    return _lines("item,amount", f"stock,{100 * number}", "rent,50", "fees,25")
+
+
+def _checklist(ticked: bool) -> str:
+    mark: str = "x" if ticked else " "
+    return _lines(
+        "# Checklist",
+        "",
+        *(f"- [{mark}] create out/{index:02d}.txt containing the word {word}" for index, word in enumerate(_WORDS, 1)),
+    )
+
+
+def _long_tasks() -> tuple[EvalTask, ...]:
+    """Five tasks of ten or more steps: the reference needs at least ten tool turns, so a model's steps per pass on
+    them say how many round trips it spends on work that cannot be done in one (item 29)."""
+    digest: tuple[str, ...] = tuple(f"day{index:02d}: {errors}" for index, errors in enumerate(_DAY_ERRORS, 1))
+    totals: dict[str, int] = {branch: 100 * number + 75 for number, branch in enumerate(_BRANCHES, 1)}
+    return (
+        _task(
+            "digest-twelve-days",
+            "multi_step",
+            "logs/ holds one log per day, day01.log to day12.log. Write digest.md with one line per day in the form "
+            "'dayNN: <count>' (the number of lines that contain ERROR in that file), in order, and a last line "
+            "'total: <sum>'.",
+            "task",
+            "done",
+            tuple(_seed(f"logs/day{index:02d}.log", _day_log(errors)) for index, errors in enumerate(_DAY_ERRORS, 1)),
+            (*(_contains("digest.md", line) for line in digest), _contains("digest.md", f"total: {sum(_DAY_ERRORS)}")),
+            (
+                *(_read(f"logs/day{index:02d}.log") for index in range(1, 13)),
+                _turn(_write("digest.md", _lines(*digest, f"total: {sum(_DAY_ERRORS)}"))),
+                _finish("digest.md lists the errors of the twelve days and their total.", True),
+            ),
+        ),
+        _task(
+            "rename-helper-in-ten-modules",
+            "multi_step",
+            "Rename the function helper_old to helper_new everywhere under pkg/: its definition in pkg/util.py and "
+            "its import and use in each module. Nothing else changes. Then run python3 check.py and make sure it "
+            "passes.",
+            "task",
+            "done",
+            (
+                _seed("pkg/__init__.py", ""),
+                _seed("pkg/util.py", _lines("def helper_old():", '    return "ok"')),
+                *(_seed(f"pkg/{name}.py", _module(name)) for name in _MODULES),
+                _seed(
+                    "check.py",
+                    _lines(
+                        "import importlib",
+                        "",
+                        "from pkg.util import helper_new",
+                        "",
+                        'assert helper_new() == "ok"',
+                        *(f'assert importlib.import_module("pkg.{name}").run_{name}() == "ok"' for name in _MODULES),
+                        'print("all ten modules run")',
+                    ),
+                ),
+            ),
+            (
+                _equals("pkg/util.py", _lines("def helper_new():", '    return "ok"')),
+                *(_equals(f"pkg/{name}.py", _module(name).replace("helper_old", "helper_new")) for name in _MODULES),
+                _runs("python3", "check.py"),
+            ),
+            (
+                _turn(_edit("pkg/util.py", "helper_old", "helper_new", True)),
+                *(_turn(_edit(f"pkg/{name}.py", "helper_old", "helper_new", True)) for name in _MODULES),
+                _shell("python3 check.py"),
+                _finish("helper_old is helper_new in pkg/util.py and the ten modules; check.py passes.", True),
+            ),
+        ),
+        _task(
+            "branch-totals-json",
+            "multi_step",
+            "sales/ holds one file per branch, b01.csv to b10.csv, each with the columns item,amount. Write "
+            "totals.json: an object with one key per branch (its file name without .csv) holding the sum of its "
+            "amounts as a number, and a key 'total' with the sum over every branch.",
+            "task",
+            "done",
+            tuple(_seed(f"sales/{branch}.csv", _branch_csv(number)) for number, branch in enumerate(_BRANCHES, 1)),
+            (JsonEquals(kind="json_equals", path="totals.json", expected={**totals, "total": sum(totals.values())}),),
+            (
+                *(_read(f"sales/{branch}.csv") for branch in _BRANCHES),
+                _turn(_write("totals.json", json.dumps({**totals, "total": sum(totals.values())}, indent=2) + "\n")),
+                _finish("totals.json holds the ten branch sums and the total.", True),
+            ),
+        ),
+        _task(
+            "checklist-ten-files",
+            "multi_step",
+            "Do every item of CHECKLIST.md: each asks for a file under out/ containing one word. When an item is done, "
+            "tick it in CHECKLIST.md ('- [ ]' becomes '- [x]'). Finish when all ten are done and ticked.",
+            "task",
+            "done",
+            (_seed("CHECKLIST.md", _checklist(False)),),
+            (
+                *(_contains(f"out/{index:02d}.txt", word) for index, word in enumerate(_WORDS, 1)),
+                _equals("CHECKLIST.md", _checklist(True)),
+            ),
+            (
+                *(_turn(_write(f"out/{index:02d}.txt", f"{word}\n")) for index, word in enumerate(_WORDS, 1)),
+                _turn(_edit("CHECKLIST.md", "- [ ]", "- [x]", True)),
+                _finish("The ten files are under out/ and every item of CHECKLIST.md is ticked.", True),
+            ),
+        ),
+        _task(
+            "pipeline-with-flaky-stage",
+            "recovery",
+            f"Run the {_STAGES} stages of the build pipeline in order: sh pipeline/stage.sh 1, then 2, up to {_STAGES}. "
+            "Each stage writes build/stageN.txt. A stage that fails with a message that says 'transient' is run "
+            f"again. Finish when build/stage1.txt to build/stage{_STAGES}.txt all exist.",
+            "task",
+            "done",
+            (_seed("pipeline/stage.sh", _STAGE_SCRIPT),),
+            tuple(_exists(f"build/stage{number}.txt") for number in range(1, _STAGES + 1)),
+            (
+                *(_shell(f"sh pipeline/stage.sh {number}") for number in range(1, 6)),
+                # Stage 5 failed the first time with "transient": it is run again before the pipeline goes on.
+                _shell("sh pipeline/stage.sh 5"),
+                *(_shell(f"sh pipeline/stage.sh {number}") for number in range(6, _STAGES + 1)),
+                _finish(f"All {_STAGES} stages ran; stage 5 needed a second run after a transient failure.", True),
+            ),
+        ),
+    )
+
+
 def all_tasks() -> tuple[EvalTask, ...]:
-    """Every task of the catalog, in a fixed order."""
-    return _catalog()
+    """Every task of the catalog, in a fixed order: the small tasks, then the long ones."""
+    return (*_catalog(), *_long_tasks())
 
 
 def select_tasks(task_ids: Sequence[str]) -> tuple[EvalTask, ...]:

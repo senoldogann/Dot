@@ -2363,13 +2363,13 @@ Paste this to the agent that takes the work:
 | #   | Item                                                                     | Status  | Commits |
 | --- | ------------------------------------------------------------------------ | ------- | ------- |
 | 22  | Step efficiency: the numbers every later item is judged by               | done    | accd6a8 |
-| 23  | Multi-action turns as the rule                                           | in progress |         |
+| 23  | Multi-action turns as the rule                                           | done    | a70e354 |
 | 24  | The fast model does the side work                                        | done    | 9c16866 |
 | 25  | Early and speculative execution of read-only tools                       | planned |         |
 | 26  | Speed knobs decided by measurement; snapshots that send only the change  | planned |         |
 | 27  | Cheapest channel first: API or CLI, then the browser, then the desktop   | planned |         |
 | 28  | Evidence on every plan step                                              | planned |         |
-| 29  | Eval reports that compare runs, and the defaults that wait for them      | planned |         |
+| 29  | Eval reports that compare runs, and the defaults that wait for them      | in progress |         |
 | 30  | Typed best-of-two at critical decisions; injection fixtures in the evals | planned |         |
 | 31  | One-time codes from the owner's own Mail and Messages                    | planned |         |
 | 32  | The owner's Chrome profile as the default of a campaign                  | planned |         |
@@ -2568,10 +2568,23 @@ are flipped from the comparison, one commit each.
 
 **Why.** Every later item claims a measured gain; without a comparison command each claim is a hand-made table.
 
-**Touchpoints.** `cli_eval.py`, `evals/catalog.py`, `evals/*`, `tests/fixtures`, README "Evaluation".
+**Design, as built.** The reading of the code corrected two things. `dotx eval report A.json B.json` already prints a
+comparison table, so no `compare` command was added: with exactly two files the report ends with a difference line,
+the second against the first (passed with percentage points, steps, tokens and seconds per pass, the one-step act and
+cache shares of item 22 in percentage points, tool errors, stalls, false claims; `-` where a side lacks the number).
+The eval harness runs without a browser or the desktop, so the "fixture server" and the campaign of the plan have no
+place in it: the five long tasks are file and shell work whose reference needs ten or more tool turns (a digest of
+twelve logs, a rename across ten modules with a check script, ten branch totals into JSON, a ten-item checklist that
+is ticked, a nine-stage pipeline whose fifth stage fails once with "transient" and is run again: category
+`recovery`); `LONG_TASK_IDS` names them, `dotx eval check` replays every reference. A campaign eval waits for a
+harness that can run sessions (none planned; item 37 tests campaigns in unit tests).
 
-**Done when.** `dotx eval compare` exists with a unit test; the long tasks run offline; "Open owner decisions" lists
-the exact command for the live runs.
+**Touchpoints.** `cli_eval.py`, `evals/catalog.py`, `evals/scoring.py`, README "Evaluation",
+`tests/unit/test_evals.py`.
+
+**Done when.** The difference line has a unit test (done); the long tasks pass `dotx eval check` (done, 5 of 5) and
+need ten or more tool turns (unit test); "Open owner decisions" lists the exact commands for the live runs (decision
+1, updated).
 
 ### 30. Typed best-of-two at critical decisions; injection fixtures in the evals
 
@@ -2854,7 +2867,11 @@ item ends as a measured no, written in the log.
 ## Open owner decisions
 
 1. Live evals: `dotx eval run --model REF` spends model quota. Run it for the models in use and keep the JSON; it is the
-   basis for flipping the defaults below.
+   basis for flipping the defaults below. Since item 29 the commands are, with temp dirs so the owner's data is not
+   touched: `DOT_HOME=$(mktemp -d) DOT_LOG_DIR=$(mktemp -d) .venv/bin/dotx eval run --model ollama:minimax-m2.7:cloud
+   --repeat 2` before a change and again after it (the report path is printed), then `.venv/bin/dotx eval report
+   BEFORE.json AFTER.json`, whose last line is the difference. Each full run plays 31 tasks (26 small, 5 long of ten
+   or more turns) against the model; `--task ID` plays one.
 2. Defaults that change how the agent behaves and wait for evidence: `[agent] tool_surface` (item 4),
    `verify_answer_paths` (item 5), `resume` (item 6), `lessons` (item 7), `stall_escalation` (item 2),
    `scaffold = "measured"` (item 3).
@@ -3284,3 +3301,4 @@ item ends as a measured no, written in the log.
 - 2026-10-10 (Fable 5.1): item 22 merged accd6a8 (PR #22, MYP-163 Done). Item 24 (branch `item-24-fast-model`) started; its first commit records accd6a8.
 - 2026-10-10 (Fable 5.1): item 24 built on branch `item-24-fast-model`: the compaction summary is the fast model's side work, the run's own model writes it when the fast one fails and the `compacted` event names the problem (`fast_problem`); `dotx doctor` checks the fast model; defaults and README. Scope cut to what the audit measured (no wait_text or judge classification exists on a chat model; vision has its own role; no goal pre-check). Gate: format, check, mypy clean; unit 560; offline smoke 197 passed, 1 failed: `test_delegate.py::test_a_run_reads_a_file_through_a_delegated_run` (`@requires_model`, a real cloud model delegated three times instead of once; it passed on a rerun; unrelated to this item). The merge hash goes into the table with the next PR.
 - 2026-10-10 (Fable 5.1): item 24 merged 9c16866 (PR #23, MYP-164 Done). Item 23 built on branch `item-23-multi-action`: prompt and tool descriptions make the one-step act the exception, with examples; `progress.py` single-action detector, streak and steer; the loop stores the note and emits `single_action_steer` after three such steps on one target; `[agent] steer_single_actions = true`. Gate: format, check, mypy clean; unit 563; `dotx eval check` ok; smoke scaffold, tool groups and run limits 14 passed. The eval set has no browser task, so the share is the owner's reading with `dotx stats --by site`.
+- 2026-10-10 (Fable 5.1): item 23 merged a70e354 (PR #24, MYP-165 Done). Item 29 built on branch `item-29-eval-compare`: `dotx eval report A B` ends with a difference line; five long tasks (ten or more tool turns) in the catalog, `LONG_TASK_IDS`; decision 1 lists the live commands. No `compare` command (report already compares); no fixture-server or campaign task (the harness has no browser and runs one run per attempt). Gate: format, check, mypy clean; unit 565; `dotx eval check` 31 ok.
