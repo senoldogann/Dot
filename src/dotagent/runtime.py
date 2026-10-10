@@ -44,6 +44,7 @@ from dotagent.tools.apple import build_apple_tool
 from dotagent.tools.base import RegisteredTool
 from dotagent.tools.browser import build_browser_tools
 from dotagent.tools.campaign import build_campaign_tools
+from dotagent.tools.codes import build_code_tools
 from dotagent.tools.consult import build_consult_tools
 from dotagent.tools.delegate import build_delegate_tools
 from dotagent.tools.desktop import build_desktop_tools, sized_for_agent
@@ -91,8 +92,9 @@ class Runtime:
 
 
 def _tool_groups(config: AppConfig) -> tuple[tuple[RegisteredTool, ...], ...]:
-    """The tools of this installation: the terminal tools only exist when a chat may open a terminal session, the Mac
-    desktop tools only when the desktop is enabled."""
+    """The tools of this installation: the terminal tools only exist when a chat may open a terminal session, the
+    code_fetch tool only when [policy] code_sources names an application, the Mac desktop tools only when the desktop
+    is enabled."""
     core: tuple[tuple[RegisteredTool, ...], ...] = (
         build_file_tools(),
         (build_shell_tool(),),
@@ -107,6 +109,7 @@ def _tool_groups(config: AppConfig) -> tuple[tuple[RegisteredTool, ...], ...]:
         build_meta_tools(),
         (build_skill_tool(),),
         *((build_terminal_tools(),) if config.shell.terminal_sessions > 0 else ()),
+        *((build_code_tools(),) if config.policy.code_sources else ()),
     )
     if not config.desktop.enabled:
         return core

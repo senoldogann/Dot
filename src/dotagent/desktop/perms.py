@@ -79,7 +79,7 @@ def missing_panes(permissions: Permissions) -> tuple[Pane, ...]:
     return tuple(panes)
 
 
-def _grant_hint(pane: Pane) -> str:
+def grant_hint(pane: Pane) -> str:
     return (
         f"Open System Settings > Privacy & Security > {_PANE_TITLES[pane]} and switch on the app that runs Dot "
         "(Terminal, iTerm, Claude, or the Dot service), then start it again. `dotx desktop setup` opens the pane; "
@@ -91,7 +91,7 @@ def require_accessibility(permissions: Permissions) -> None:
     if not (permissions.accessibility and permissions.post_event):
         raise DesktopPermissionError(
             "macOS has not granted Accessibility to the app that runs Dot, so it can neither read nor control "
-            "other applications. " + _grant_hint("accessibility"),
+            "other applications. " + grant_hint("accessibility"),
             {"accessibility": permissions.accessibility, "post_event": permissions.post_event},
         )
 
@@ -100,6 +100,6 @@ def require_screen_recording(permissions: Permissions) -> None:
     if not permissions.screen_recording:
         raise DesktopPermissionError(
             "macOS has not granted Screen Recording to the app that runs Dot, so it cannot take screenshots. "
-            + _grant_hint("screen_recording"),
+            + grant_hint("screen_recording"),
             {"screen_recording": permissions.screen_recording},
         )

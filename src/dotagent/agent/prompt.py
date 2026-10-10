@@ -251,8 +251,8 @@ _SECRETS_REFUSED: str = (
 )
 _SECRETS_ENTERED: str = (
     "Passwords, one-time codes and payment details: enter them when you can read them yourself (a code in a mailbox "
-    "you can open, a value the user gave you). Never guess one, never read a secret store the task does not need, and "
-    "say in the answer which ones you entered."
+    "you can open, one that code_fetch reads when the user offers that tool, a value the user gave you). Never guess "
+    "one, never read a secret store the task does not need, and say in the answer which ones you entered."
 )
 
 _CLOSING: str = """- Prefer reversible actions. Before deleting, overwriting or sending something, make sure the target is \

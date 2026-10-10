@@ -5,6 +5,7 @@ import asyncio
 import os
 import platform
 import shutil
+import sqlite3
 import time
 from collections.abc import Sequence
 from pathlib import Path
@@ -34,6 +35,7 @@ from dotagent.core.paths import (
 from dotagent.core.text import truncate_middle
 from dotagent.core.types import FrozenModel
 from dotagent.desktop.capture import rect_capture_supported
+from dotagent.desktop.codes import chat_db_path
 from dotagent.desktop.perms import check_permissions
 from dotagent.desktop.types import Permissions
 from dotagent.llm.calls import log_model_call
@@ -379,6 +381,22 @@ def _check_browser_mode(config: AppConfig) -> CheckResult:
     )
 
 
+def _codes_row(config: AppConfig) -> CheckResult:
+    """Where code_fetch may read one-time codes from, and whether the Messages database can be opened."""
+    sources: list[str] = list(config.policy.code_sources)
+    if not sources:
+        return _result("one-time codes", True, False, "off ([policy] code_sources is empty)")
+    detail: str = ", ".join(sources)
+    if "messages" in sources:
+        db: Path = chat_db_path()
+        try:
+            sqlite3.connect(f"file:{db}?mode=ro&immutable=1", uri=True).close()
+        except sqlite3.OperationalError:
+            return _result("one-time codes", False, False, f"{detail}; {db} cannot be opened (Full Disk Access)")
+        detail = f"{detail}; {db} opens"
+    return _result("one-time codes", True, False, detail)
+
+
 def _local_checks() -> list[CheckResult]:
     """Checks that only touch the local filesystem and PATH."""
     chrome_present: bool = CHROME_APP.exists()
@@ -540,6 +558,7 @@ async def _machine_checks(config: AppConfig) -> list[CheckResult]:
     return [
         *await asyncio.to_thread(_local_checks),
         *_check_desktop(config),
+        await asyncio.to_thread(_codes_row, config),
         await asyncio.to_thread(_check_browser_mode, config),
         await asyncio.to_thread(_check_browser_profile),
         _plugins_row(plugins),
