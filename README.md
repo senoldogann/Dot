@@ -193,7 +193,12 @@ answer (a small model that is offered both writes the call out as text).
   read back, the count or the line of output, or what the page showed. A mark without it is refused with what counts
   as evidence, and a rewritten plan that keeps a done step keeps its evidence; a failed or skipped step may carry what
   happened. The evidence stands under the step in the web UI, in every note that carries the plan and in the goal
-  check. A run that calls `finish` with steps still open is asked once to close them. A plan can also hold the run's
+  check. A step that must wait for others names them (`depends_on`, step numbers; a cycle or a number outside the plan
+  is refused), the plan reads `(after 1, 2)` and the web UI shows the same, and the result of every plan change says
+  which steps are ready now (open, waiting for nothing open or failed) and which are held by a failed step. Steps that
+  are ready together are independent, so the run can hand each to `delegate` in one turn, naming the step; the
+  delegated run's report then closes the step (done with the report's start as evidence, or failed) without a mark of
+  the run's own. A run that calls `finish` with steps still open is asked once to close them. A plan can also hold the run's
   targets (`targets` of `update_plan`, at
   most 600 characters): for a goal that names an outcome, what the run will reach and how its own tools measure it.
   They stay until new targets replace them (an `update_plan` without `targets`, or with an empty text, keeps them), are
@@ -1068,9 +1073,11 @@ every run.
 
 ## Delegation
 
-`delegate(goal, mode?, model?)` hands a sub-goal to a separate run with a conversation of its own and returns its
-result, so a long investigation does not fill the parent's context. The run works on the parent's model, or on the
-helper model that `model` names when that one can answer (see [Helpers and standby](#models-and-providers)). A
+`delegate(goal, mode?, model?, step?)` hands a sub-goal to a separate run with a conversation of its own and returns
+its result, so a long investigation does not fill the parent's context. The run works on the parent's model, or on the
+helper model that `model` names when that one can answer (see [Helpers and standby](#models-and-providers)). Several
+calls in one turn run side by side (up to `parallel_tools`), which is how a plan's independent steps run at the same
+time; `step` names the plan step the part is, and the report closes it (see the plan above). A
 delegated run cannot delegate again (the depth is one) or consult a helper, does not take one of the
 `max_concurrent_runs` slots, starts as untrusted as its parent, and ends when the parent is cancelled. The parent's
 result names the model the delegated run ended on. A research run can only delegate to research.

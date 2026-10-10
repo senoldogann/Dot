@@ -22,10 +22,14 @@ from dotagent.agent.plan import (
     EMPTY_PLAN,
     PlanItem,
     PlanPayload,
+    checked_dependencies,
+    held_steps,
     open_steps,
     plan_event_data,
     plan_from_event,
     plan_lines,
+    readiness_lines,
+    ready_steps,
     render_plan,
     rewritten_steps,
     unevidenced_done,
@@ -189,6 +193,47 @@ def test_a_step_is_done_only_with_evidence_and_a_reopened_step_drops_it() -> Non
     assert unevidenced_done((PlanItem(text="a", status="done"), PlanItem(text="b", status="done", evidence="e"))) == 1
 
 
+def test_steps_are_ready_when_what_they_wait_for_is_done_and_held_by_a_failed_step() -> None:
+    plan = (
+        PlanItem(text="Fetch prices", status="pending"),
+        PlanItem(text="Fetch reviews", status="pending"),
+        PlanItem(text="Write the report", status="pending", depends_on=(1, 2)),
+        PlanItem(text="Mail it", status="pending", depends_on=(3,)),
+    )
+    assert checked_dependencies(plan) == plan
+    assert ready_steps(plan) == (1, 2)
+    assert held_steps(plan) == ()
+    assert readiness_lines(plan) == "Ready now: steps 1, 2; they are independent, so delegate can run them in one turn."
+    fetched = with_step_status(with_step_status(plan, 1, "done", "prices.csv: 40 rows"), 2, "skipped", "")
+    assert ready_steps(fetched) == (3,)
+    assert readiness_lines(fetched) == "Ready now: step 3."
+    failed = with_step_status(plan, 1, "failed", "the site refused")
+    assert (ready_steps(failed), held_steps(failed)) == ((2,), (3,))
+    assert readiness_lines(failed) == "Ready now: step 2.\nHeld by a failed step: 3."
+    assert render_plan(plan[2:3]) == "1. [pending] Write the report (after 1, 2)"
+    closed = tuple(step.model_copy(update={"status": "skipped"}) for step in plan)
+    assert readiness_lines(closed) == ""
+
+
+@pytest.mark.parametrize(
+    ("depends_on", "message"),
+    [
+        (((5,), ()), "step 1 depends on step 5, and the plan has steps 1 to 2"),
+        (((1,), ()), "step 1 cannot depend on itself"),
+        (((2,), (1,)), "step 1 waits, through the steps it depends on, for itself"),
+    ],
+)
+def test_a_dependency_outside_the_plan_on_itself_or_in_a_cycle_is_refused(
+    depends_on: tuple[tuple[int, ...], tuple[int, ...]], message: str
+) -> None:
+    plan = tuple(
+        PlanItem(text=text, status="pending", depends_on=wanted) for text, wanted in zip("ab", depends_on, strict=True)
+    )
+    with pytest.raises(ToolInputError) as caught:
+        checked_dependencies(plan)
+    assert message in str(caught.value)
+
+
 def test_a_rewritten_plan_keeps_the_evidence_of_the_steps_it_keeps_and_refuses_done_without_any() -> None:
     previous = (PlanItem(text="Read the data", status="done", evidence="read_file data.csv: 12 rows"),)
     kept = rewritten_steps(
@@ -214,7 +259,7 @@ def test_the_targets_of_a_plan_are_stored_with_it_and_read_under_its_steps() -> 
     # A plan stored before targets existed has none.
     older = stored.model_copy(update={"data": {"steps": [{"text": "a", "status": "done"}]}})
     assert plan_from_event(older) == PlanPayload(steps=plan.steps, targets="")
-    assert plan_from_event(older).steps[0].evidence == ""
+    assert (plan_from_event(older).steps[0].evidence, plan_from_event(older).steps[0].depends_on) == ("", ())
 
 
 def test_the_plan_changes_of_one_reply_apply_one_after_another() -> None:

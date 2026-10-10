@@ -2368,14 +2368,14 @@ Paste this to the agent that takes the work:
 | 25  | Early and speculative execution of read-only tools                       | parked  |         |
 | 26  | Speed knobs decided by measurement; snapshots that send only the change  | done    | 8566080 |
 | 27  | Cheapest channel first: API or CLI, then the browser, then the desktop   | planned |         |
-| 28  | Evidence on every plan step                                              | in progress |     |
+| 28  | Evidence on every plan step                                              | done    | 9a9fe5f |
 | 29  | Eval reports that compare runs, and the defaults that wait for them      | done    | 1513bd4 |
 | 30  | Typed best-of-two at critical decisions; injection fixtures in the evals | planned |         |
 | 31  | One-time codes from the owner's own Mail and Messages                    | planned |         |
 | 32  | The owner's Chrome profile as the default of a campaign                  | planned |         |
 | 33  | Pre-approved spending caps                                               | planned |         |
 | 34  | Research runs that keep notes, and hosted search by default              | planned |         |
-| 35  | A plan with dependencies and parallel branches                           | planned |         |
+| 35  | A plan with dependencies and parallel branches                           | in progress |     |
 | 36  | Playbooks learned from runs that reached their goal                      | planned |         |
 | 37  | A stuck campaign changes strategy, not just session                      | planned |         |
 | 38  | One view of what a run did and what can be undone                        | planned |         |
@@ -2711,11 +2711,32 @@ back into the parent plan. The run page draws the graph.
 **Why.** dots runs background agents in parallel and Grok Bot coordinates several bots; Dot delegates one level deep,
 one child at a time by the model's choice, with a flat plan.
 
-**Touchpoints.** `agent/plan.py`, `agent/manager.py`, `agent/helpers.py`, `tools/delegate.py`, `tools/meta.py`,
-`server/static/js`, README.
+**Design, as built.** The reading of the code corrected the plan in three places. The parallel mechanism already
+existed: `delegate` is parallel-safe and the delegate calls of one turn run side by side (up to `parallel_tools`), so no
+new scheduler was built and the harness does not start runs on its own; the model does, told by the plan. What was
+missing was the plan knowing which steps are independent, and the parent having to mark each delegated step itself.
+`PlanItem.depends_on` (1-based step numbers; empty for the plans stored before); `update_plan` refuses a number outside
+the plan, a step that depends on itself and a cycle (`checked_dependencies`). `ready_steps` (open, waiting for no open
+or failed step) and `held_steps` (open, waiting for a failed one) are the readiness rule; the result of every plan
+change ends with "Ready now: steps 1, 2; they are independent, so delegate can run them in one turn" and "Held by a
+failed step: 3", and the plan reads `(after 1, 2)`. `delegate` takes `step`, checked against the plan before the run
+starts; when the delegated run ends, the loop (not the tool: the calls run side by side and the plan is rewritten
+whole) marks the step done with the report's start as evidence (item 28; a fenced third-party report stays in the tool
+result and the evidence says so) or failed, and the delegate result says so. No per-child step budget: the parent's
+`run_max_tokens` already counts the delegated runs, `run_max_minutes` bounds each, and the progress watchdog stops a
+child that gets nowhere. The model of a branch is the `model` of `delegate` (item 15). The web UI shows `after 1, 2` on
+the step; a graph drawing was not built. The eval harness's scripted model answers in call order, so two delegated runs
+on one script are not deterministic: the parallel measurement is a smoke test of the real loop with a helper provider
+per child (each child works 0.5 s; both start before either ends, so the parent waits for the longer one, not the sum),
+and no eval task was added.
 
-**Done when.** An eval task with three independent sub-goals runs them in parallel and its wall time falls against
-the serial baseline; a unit test checks the readiness rule.
+**Touchpoints.** `agent/plan.py`, `tools/meta.py`, `tools/delegate.py`, `agent/loop.py`, `agent/prompt.py`,
+`server/static/js/views/run.js`, `server/static/css/app.css`, README "How a run works" and "Delegation",
+`tests/unit/test_continuity.py`, `tests/smoke/test_plan_branches.py`.
+
+**Done when.** The readiness rule and the dependency checks have unit tests (done); in the real loop two delegated
+steps run side by side and their reports close the steps with evidence, and a delegation for a step the plan lacks
+starts no run (smoke tests, done).
 
 ### 36. Playbooks learned from runs that reached their goal
 
@@ -3346,3 +3367,5 @@ item ends as a measured no, written in the log.
 - 2026-10-10 (Fable 5.1): item 29 merged 1513bd4 (PR #25, MYP-166 Done). Item 26 built on branch `item-26-speed-knobs`: browser settle 60 ms, screenshot edge 1366, the unchanged-page delta says so in one line; decision 13 closed for the two knobs. Browser smoke (headless Chrome, temp dirs) 39 passed with the medians above.
 - 2026-10-10 (Fable 5.1): item 26 merged 8566080 (PR #26, MYP-167 Done). Item 25 parked: the stream carries no tool calls (the codecs hand them over with the finished reply) and an act already returns the next observation; the number that would reopen it is in the item.
 - 2026-10-10 (Fable 5.1): item 28 built on branch `item-28-plan-evidence` (MYP-168): `PlanItem.evidence`; a mark to done without evidence is refused with what counts, a rewritten plan keeps the evidence of the steps it keeps; the goal check (end of run, `campaign_achieved`) reads the plan with evidence and its verdict lists `unproven_steps`, carried by the `goal_check` event; the web UI shows the evidence under the step; evals count `unevidenced_steps` and `unproven_steps`. `agent/verify.py` unchanged (facts are the harness's, evidence the agent's). Gate: format, check, mypy clean; unit 570; `dotx eval check` 31 ok; offline smoke 208 passed, 10 skipped.
+- 2026-10-10 (Fable 5.1): item 28 merged 9a9fe5f (PR #27, MYP-168 Done). Next: item 35 (a plan with dependencies and parallel branches).
+- 2026-10-10 (Fable 5.1): item 35 built on branch `item-35-plan-branches` (MYP-169): `PlanItem.depends_on` with range, self and cycle checks; the plan result names the ready (independent) and held steps; `delegate` takes `step` and the loop closes that step from the report (done with evidence, or failed); web UI shows `after 1, 2`. No scheduler, no step budget, no graph drawing, no eval task (the scripted model answers in call order): the design section says why. Gate: format, check, mypy clean; unit 574; `dotx eval check` 31 ok; smoke (plan branches, helpers, run limits, resume, watchdog, campaigns, answer check, scaffold, tool groups, server) 76 passed; the two delegated steps overlap in the real loop.

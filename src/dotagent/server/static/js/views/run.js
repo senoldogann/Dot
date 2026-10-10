@@ -45,13 +45,19 @@ function planTargets(targets) {
   return el("div", { class: "plan-targets", title: "Targets" }, icon("target"), el("span", { class: "text" }, targets));
 }
 
-/** One step of the plan: its mark, its text and, under a closed step, the evidence the run recorded for it. Plans
- * stored before evidence existed have none. */
+/** One step of the plan: its mark, its text, the steps it waits for and, under a closed step, the evidence the run
+ * recorded for it. Plans stored before evidence existed have none. */
 function planStep(step) {
   const markIcon = STEP_MARKS[step.status];
   const mark = el("span", { class: "mark" }, markIcon === undefined ? null : icon(markIcon));
   const evidence = step.evidence ?? "";
-  const body = el("span", { class: "body" }, el("span", { class: "text" }, step.text));
+  // Plans stored before dependencies existed have none.
+  const dependsOn = step.depends_on ?? [];
+  const line = el("span", { class: "line" }, el("span", { class: "text" }, step.text));
+  if (dependsOn.length > 0) {
+    line.append(el("span", { class: "after", title: "Waits for these steps" }, `after ${dependsOn.join(", ")}`));
+  }
+  const body = el("span", { class: "body" }, line);
   if (evidence !== "") body.append(el("span", { class: "evidence", title: "Evidence" }, evidence));
   return el("div", { class: `plan-step ${step.status}`, title: STEP_LABELS[step.status] ?? step.status }, mark, body);
 }
