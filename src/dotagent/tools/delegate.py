@@ -52,7 +52,8 @@ class DelegateArgs(ToolArgs):
         ge=1,
         le=20,
         description=(
-            "The number of the plan step this part is: when the delegated run ends, that step is marked done with its "
+            "The number of the plan step this part is, only once update_plan recorded a plan with that step (a part for a "
+            "step the plan does not have is refused): when the delegated run ends, that step is marked done with its "
             "report as the evidence, or failed when the run did not end done, so you need not mark it yourself."
         ),
     )

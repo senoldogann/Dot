@@ -3330,6 +3330,12 @@ neither a yes nor a measured no.
     `dotx eval run --model REF --task filter-headlines --repeat 3` once with the key saved and once with it removed (or
     with `[judge] api_key_env` pointing at an unset name) and compare seconds and tokens in the two reports; if the
     model does not reach for the tool, the prompt line under "# Web" in `agent/prompt.py` is where to push it.
+    Measured on 2026-10-10 at the owner's word (`ollama:minimax-m2.7:cloud`, `filter-headlines` three times each
+    arm): key saved 3/3 in 4.3 steps, 50.8k tokens, 12.9 s an attempt; key removed 3/3 in 4.0 steps, 45.3k, 13.8 s.
+    The model never called `judge_items` (its tool calls were read_file, write_file, finish on every attempt): it
+    filtered 24 headlines itself in one write. So the tool costs the 5.5k tokens of its definition on a task of this
+    size and gains nothing; its case is a list the model cannot hold in a reply, which the eval set does not have.
+    Open: whether to push the prompt line, or to add a task of a few hundred lines where the tool is the only way.
 27. The post tools of a campaign (item 43) rank, pick and check with weights of 1/1/1 and `[judge]
     draft_check_threshold = 0.5`, measured on a synthetic sample (precision@10 1.00, the top other post at 0.53). Label
     twenty or thirty posts of your own X feed (would answer / would not) and run them through `rank_posts`' questions
@@ -3340,12 +3346,30 @@ neither a yes nor a measured no.
     check and the goal check alone. Whether they save turns or seconds on the eval set is not measured here: run
     `dotx eval run --model REF --repeat 2` with the judge on and off (`[judge] provider` in `config.toml`) and compare
     the reports; the page check only acts when the model fills `expect`, so look at how often it did in the timelines.
+    Measured on 2026-10-10 at the owner's word (`ollama:minimax-m2.7:cloud`, 34 attempts an arm, `--repeat 1`):
+    judge off 31/34, 4.6 steps and 16.2 s a pass, 53.6k tokens; judge on 30/34, 4.3 steps and 10.2 s a pass, 48.9k.
+    The difference is run-to-run variance, not the checks: the eval set has no browser task and runs with goal mode
+    off, so neither `expect` nor the goal check ever fired, and the seconds moved on single tasks (sort-into-folders
+    142 s against 17 s, pipeline-with-flaky-stage 24 steps against 10). The failures changed names, not count:
+    collect-contacts and report-failing-tests fell in both arms, filter-headlines only off, write-todo-note and
+    recover-wrong-extension only on. What would measure item 44 is a browser task with `expect` filled and a goal-mode
+    run; neither is in the eval set, so the decision stays with you: the checks cost nothing on this set and the
+    judge can stay on.
 29. The step router (item 45) is built and off. Its question is the item's own: does a run take less time at the same
     success rate when routine steps go to `[models] fast` and hard ones to a helper? Measure it on your models with the
     eval set, both arms with the key saved: `dotx eval run --model REF --repeat 2` with `[agent] step_router = false`,
     then with `true` (and a helper in `[models] helpers` if you want the hard steps routed too), and compare seconds
     and success in `dotx eval report`. On Anthropic or OpenAI as the main model, count the cache miss: a routed step
     sends the whole prefix again. Keep it off, or set `step_router_threshold` higher, when the numbers do not favour it.
+    Measured on 2026-10-10 at the owner's word (`ollama:minimax-m2.7:cloud` as main, `ollama:gpt-oss:20b-cloud` as
+    fast, no helper, threshold 0.6, 34 attempts an arm): router off 31/34, 4.6 steps and 16.2 s a pass, 53.6k tokens,
+    194 tool calls of which 5 failed; router on 32/34, 6.1 steps and 17.9 s a pass, 62.1k tokens, 209 tool calls of
+    which 13 failed. The routed steps cost turns: the fast model needed more of them on the same tasks (rename-function
+    15 steps, checklist-ten-files 14, rename-helper 13, collect-contacts 12) and made more tool errors (6% against 3%),
+    and the time of a judgment plus a retried step ate what the fast model's speed saved. Success within the noise, a
+    step and a half more a pass, 8.5k tokens more, 1.7 s more: the numbers do not favour it, so the router stays off
+    and the default holds. Not kept: the per-step `step_routed` counts, since an eval attempt's home is thrown away
+    with its database; the next measurement should read them from `dotx timeline` of a kept run. Resolved: off.
 
 ## Log
 
@@ -3760,3 +3784,5 @@ neither a yes nor a measured no.
 - 2026-10-10 (Fable 5.1): item 44 merged 1c72fa7 (PR #43, MYP-184 Done; gate green). Next: item 45.
 - 2026-10-10 (Fable 5.1): item 45 built on branch `item-45-step-model` (MYP-185): `agent/stepmodel.py` and the loop's `_routing`/`_route_step`, `[agent] step_router = false` and `step_router_threshold = 0.6`, `step_routed`/`step_route_failed` events, a scripted smoke run routed by the stand-in; the live measurement is decision 29.
 - 2026-10-10 (Fable 5.1): item 45 merged 1a080ca (PR #44, MYP-185 Done; gate green). Part 3 is built: every row 22 to 45 is done except 25 (parked). What waits for the owner is in "Open owner decisions" 26 to 29: the live measurements of judge_items (eval task filter-headlines), the post tools on the owner's own feed, the checks before a model call, and the step router, each a paid run on the owner's models.
+- 2026-10-10 (Fable 5.1): Part 3 bookkeeping merged 181709d (PR #45). The daemon was reinstalled at the owner's word (`dotx service install`, no run or campaign active), so items 22 to 45 are live.
+- 2026-10-10 (Fable 5.1): the live measurements behind decisions 26, 28 and 29 ran at the owner's word on `ollama:minimax-m2.7:cloud` with the TypeSafe key, each arm a throw-away home (reports under /tmp/dot-evals, not committed). Decision 26: `judge_items` never called on filter-headlines, no gain. Decision 28: the eval set exercises neither `expect` nor the goal check, the arms differ by variance only. Decision 29: the step router costs a step and a half, 8.5k tokens and 1.7 s a pass at the same success, so it stays off, resolved. Decision 27 needs the owner's own labeled feed and stays open. Branch `part-3-measurements` also sharpens the `step` description of `delegate`.
