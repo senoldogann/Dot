@@ -274,7 +274,7 @@ answer (a small model that is offered both writes the call out as text).
 | --------------- | ------------------------------------------------------------------------------------------------------------------ |
 | Shell and files | `shell`, `read_file`, `write_file`, `edit_file`, `list_dir`, `find_files`, `search_files`                          |
 | Terminal        | `terminal_open`, `terminal_send`, `terminal_read`, `terminal_close`                                                |
-| Web             | `web_search`, `web_fetch`                                                                                          |
+| Web             | `web_search`, `web_fetch`, `web_crawl`, `web_extract`                                                              |
 | Browser         | `browser_open`, `browser_snapshot`, `browser_find`, `browser_links`, `browser_read_text`, `browser_wait_text`, `browser_act`, `browser_scroll`, `browser_screenshot`, `browser_upload`, `browser_back`, `browser_new_tab`, `browser_switch_tab`, `browser_close_tab` |
 | Desktop         | `desktop_apps`, `desktop_open_app`, `desktop_snapshot`, `desktop_read`, `desktop_act`, `desktop_screenshot`, `desktop_clipboard_read`, `desktop_clipboard_write` |
 | macOS           | `apple_script`, `notify`                                                                                           |
@@ -287,6 +287,29 @@ The shell and the file tools work in `<home>/workspace` unless a path says other
 `PATH` of your login shell, in its own process group (cancelling a run ends the whole group) and under a timeout
 (`[shell] default_timeout_s`, at most `max_timeout_s`). `web_search` uses DuckDuckGo, which needs no key; `web_fetch`
 reads HTML and PDF and refuses localhost, LAN and cloud-metadata addresses unless `[web] allow_private_hosts` is set.
+
+**Crawling and extraction.** `web_crawl(url, scope, max_pages, max_depth)` reads many pages of one site in one call:
+breadth first from the start address, following the links within the scope (`prefix`, the pages under the start
+address's folder, or `host`, every page of its host), several fetches at once and the requests to one host spaced
+apart, within the limits of `[web.crawl]` (`max_pages` 50, `max_depth` 3, `concurrency` 4, `per_host_spacing_s` 0.5; a
+call may ask for less, never for more). Every page comes back as one clean text document (title, address, description,
+then the text as `web_fetch` renders it, at most `page_max_chars`), each in its own `<web_content>` fence, under an
+index that lists the pages with their depth, size and how they were read, the addresses left out and why, and how many
+more addresses were found within the scope but not read. A page that shows little text without JavaScript (fewer than
+400 characters and three or more script tags) is rendered once in Dot's own browser tab and read from the screen
+(`render = "auto"`; `"never"` fetches only, `"always"` renders every page); PDFs are read as `web_fetch` reads them.
+`robots.txt` is read once per host: with `robots = "report"` the addresses it disallows are named in the index but
+fetched, with `"obey"` they are left out. The crawl goes through the same client as `web_fetch`, so the address rules
+and the browser's host lists hold for every page. When the pages do not fit one result, each becomes a Markdown file
+under `<workspace>/crawl/<host>-<time>/` with an `index.md`, and the result says so: the run reads the ones it needs with
+`read_file` or hands them to `web_extract`.
+
+`web_extract(sources, fields)` pulls named fields out of pages or files as JSON without the pages entering the main
+model's context: for every source (an address, or a file in the workspace such as the Markdown files a crawl wrote) the
+fast model (`[models] fast`) is asked once for every field's value and the exact words of the source it comes from, and
+each quote is checked against the source, so the result says per field whether the value is `verified`; a value whose
+quote the source does not hold is kept and marked `verified: false`, a claim to treat as one. A source that cannot be
+read or extracted is listed under "Not extracted" with the reason. At most 20 sources and 20 fields per call.
 
 A terminal session is for a program that does not run to its end by itself: one that asks questions (an installer,
 `npm create`, `ssh`), a REPL (`python3 -i`, `psql`), or a server that must stay up while the run goes on.

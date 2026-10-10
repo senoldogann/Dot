@@ -228,6 +228,21 @@ class ShellConfig(FrozenModel):
     terminal_idle_s: float = Field(ge=60)
 
 
+class CrawlConfig(FrozenModel):
+    """The limits of ``web_crawl`` (``[web.crawl]``): the most pages and the deepest link a crawl may take (a call may
+    ask for less), how many fetches run at once, the spacing of requests to one host, when a page is rendered in the
+    browser (``auto``: when it shows little text without JavaScript), whether ``robots.txt`` is only reported or
+    obeyed, and the most characters of text kept per page."""
+
+    max_pages: int = Field(ge=1, le=500)
+    max_depth: int = Field(ge=0, le=10)
+    concurrency: int = Field(ge=1, le=16)
+    per_host_spacing_s: float = Field(ge=0.0)
+    render: Literal["auto", "never", "always"]
+    robots: Literal["report", "obey"]
+    page_max_chars: int = Field(ge=1000)
+
+
 class WebConfig(FrozenModel):
     search_backend: Literal["duckduckgo", "ollama"]
     search_spacing_s: float
@@ -237,6 +252,7 @@ class WebConfig(FrozenModel):
     pdf_max_bytes: int
     allow_private_hosts: bool
     user_agent: str
+    crawl: CrawlConfig
 
 
 class SchedulerConfig(FrozenModel):

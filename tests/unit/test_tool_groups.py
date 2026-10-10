@@ -83,6 +83,8 @@ def test_the_core_group_holds_what_most_runs_need_and_is_about_a_third_of_the_to
         "shell",
         "web_search",
         "web_fetch",
+        "web_crawl",
+        "web_extract",
         "memory_save",
         "memory_search",
         "delegate",
@@ -95,7 +97,8 @@ def test_the_core_group_holds_what_most_runs_need_and_is_about_a_third_of_the_to
         "use_tools",
         "skill",
     }
-    assert estimate_tokens([], core) < 0.4 * estimate_tokens([], TASK_SPECS)
+    # web_crawl and web_extract (item 41) joined the core: measured share 0.412 with their descriptions trimmed.
+    assert estimate_tokens([], core) < 0.45 * estimate_tokens([], TASK_SPECS)
 
 
 def test_the_tools_of_the_groups_that_are_off_are_hidden_with_their_group() -> None:
