@@ -902,7 +902,7 @@ that change the owner's agent are their call (see "Open owner decisions", 6 onwa
 | 17  | Pacing and public actions on social platforms                          | done        | d50a41e |
 | 18  | Skills written for Claude Code, and the X playbook                     | done        | 6464881 |
 | 19  | Prompt-cache hygiene for the hosted providers                          | done        | 0526a60 |
-| 20  | An interactive terminal for programs that prompt                       | done        |         |
+| 20  | An interactive terminal for programs that prompt                       | done        | cdf7ec7 |
 | 21  | A plain chat screen: Dot's face, task chips, one composer line         | done        | bb89714 |
 
 **Order and dependencies.** 9 first: it is cheap and every later item is judged with it. 10, 11 and 12 are the owner's
@@ -2206,8 +2206,8 @@ offline smoke suite and `dotx eval check` clean with the note after every goal. 
 
 ### 20. An interactive terminal for programs that prompt
 
-**Status: done.** **Goal.** The agent can run a program that asks questions, keep a REPL or a dev server alive while it
-works, and answer a prompt, as a person at a terminal would.
+**Status: done** (`cdf7ec7`, PR #14). **Goal.** The agent can run a program that asks questions, keep a REPL or a dev
+server alive while it works, and answer a prompt, as a person at a terminal would.
 
 **Why.** `shell` runs `zsh -c` with stdin closed and in its own process group (`tools/shell.py:128-137`); nothing in
 the code base opened a pseudo-terminal (search for `pty`, `openpty`, `pexpect`, `termios`: none). So `npm create`,
@@ -2704,3 +2704,5 @@ text, no console error; the Options panel with YOLO saved; every status ring. RE
   between calls. Each line typed is judged as a shell command; a password prompt takes a secret only in `yolo` (`ask`
   and `auto` refuse, since nobody else can type into the session). Three sessions per chat, closed after 30 idle
   minutes. Reviewed in the main session. Unit tests (558), the offline smoke suite (247, no cloud request).
+- 2026-10-10: item 20 merged as `cdf7ec7` (PR #14, squash). Every item of part 2 is done; what waits for the owner
+  is in "Open owner decisions".
