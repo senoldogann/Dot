@@ -111,6 +111,9 @@ max_concurrent = 4
 # claim, so twice the cost): a click gets its flag when either answer finds one, and the summary says when the two
 # disagreed; a claim is refused only when both answers are below target_threshold, and a disagreement leaves it to the
 # goal checker.
+# Whatever provider says, the judge_items tool is offered to the agent when the key named by api_key_env is saved: one
+# question about every item of a list in one request (items_per_request items at most per request; timeout_s each),
+# ranked for the agent to filter or order search hits, posts, links or files without reading each in its own words.
 provider = "none"
 api_key_env = "TYPESAFE_API_KEY"
 base_url = "https://api.typesafe.ai"
@@ -119,6 +122,7 @@ timeout_s = 5.0
 public_action_threshold = 0.45
 target_threshold = 0.15
 second_opinion = false
+items_per_request = 100
 
 [agent]
 # A run has no step limit: it ends by finishing, by the progress watchdog (below), at a limit below or by the stop button.

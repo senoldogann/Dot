@@ -227,18 +227,24 @@ async def _check_typesafe_key(config: JudgeConfig) -> CheckResult:
 
 
 def _judge_row(config: JudgeConfig, present: bool) -> CheckResult:
-    """The typed judge: off, or the service it asks and whether its key is set (nothing is asked here)."""
+    """The typed judge: off, or the service it asks and whether its key is set (nothing is asked here); and whether
+    the judge_items tool is offered, which only needs the key."""
+    items: str = (
+        f"judge_items is offered ({config.api_key_env} is set)"
+        if present
+        else f"judge_items is not offered until {config.api_key_env} is set"
+    )
     if config.provider == "none":
-        return _result("judge", True, False, 'off ([judge] provider = "none")')
+        return _result("judge", True, False, f'off ([judge] provider = "none"); {items}')
     if not present:
         return _result(
             "judge",
             False,
             True,
             f"{config.api_key_env} is missing (dotx auth set {config.api_key_env}); until it is set the policy's "
-            "patterns and the goal checker decide alone",
+            f"patterns and the goal checker decide alone, and {items}",
         )
-    return _result("judge", True, True, f"{config.provider}:{config.model}; {config.api_key_env} is set")
+    return _result("judge", True, True, f"{config.provider}:{config.model}; {items}")
 
 
 async def check_provider_key(config: AppConfig, provider: str) -> CheckResult:
@@ -603,7 +609,7 @@ async def _service_checks(config: AppConfig) -> list[CheckResult]:
         results.append(await _models_row("standby", "[models] standby", config.models.standby, config.providers))
     finally:
         await router.aclose()
-    judge_key: bool = config.judge.provider != "none" and await asyncio.to_thread(_has_secret, config.judge.api_key_env)
+    judge_key: bool = await asyncio.to_thread(_has_secret, config.judge.api_key_env)
     results.append(_judge_row(config.judge, judge_key))
     return results
 

@@ -276,7 +276,7 @@ answer (a small model that is offered both writes the call out as text).
 | --------------- | ------------------------------------------------------------------------------------------------------------------ |
 | Shell and files | `shell`, `read_file`, `write_file`, `edit_file`, `list_dir`, `find_files`, `search_files`, `write_notes`           |
 | Terminal        | `terminal_open`, `terminal_send`, `terminal_read`, `terminal_close`                                                |
-| Web             | `web_search`, `web_fetch`, `web_crawl`, `web_extract`                                                              |
+| Web             | `web_search`, `web_fetch`, `web_crawl`, `web_extract`, `judge_items`                                               |
 | Browser         | `browser_open`, `browser_snapshot`, `browser_find`, `browser_links`, `browser_read_text`, `browser_wait_text`, `browser_act`, `browser_scroll`, `browser_screenshot`, `browser_upload`, `browser_back`, `browser_new_tab`, `browser_switch_tab`, `browser_close_tab` |
 | Desktop         | `desktop_apps`, `desktop_open_app`, `desktop_snapshot`, `desktop_read`, `desktop_act`, `desktop_screenshot`, `desktop_clipboard_read`, `desktop_clipboard_write` |
 | macOS           | `apple_script`, `notify`, `code_fetch`                                                                             |
@@ -415,6 +415,17 @@ at most `timeout_s` (5 s) each. The thresholds were set on answers of `jev-1.13.
 move them together. A missing or refused key, a spent quota or a failed request turns it off for `[models]
 helper_cooldown_s`, with a note in the timeline, and meanwhile the patterns and the goal checker decide alone; a key
 saved in Settings turns it on again at once. `dotx doctor` shows whether it is on and has its key.
+
+Whatever `[judge] provider` says, saving `TYPESAFE_API_KEY` also gives the agent the `judge_items` tool (acting and
+research runs; the daemon reads the key when it starts): one question about every item of a list, answered in one
+request and handed back ranked, so the model reads a short ordered list instead of weighing each search hit, post, link
+or file in its own words. Without levels every item gets the probability of yes to a yes/no question ("Is this post
+about Python packaging?"); with two to ten ordered levels every item gets its expected level and the likeliest one.
+Each item's question is its own, so the ids stay in the code and the question carries the whole meaning; a list longer
+than `items_per_request` (100) goes in several requests, each bounded by `timeout_s`. The ranking is a probability, not
+a fact: the decision stays with the model. The tool and the judge share one connection and one pause: an outage pauses
+both for `helper_cooldown_s`; a request TypeSafe rejects (HTTP 422) or an answer outside its reference is an error of
+Dot's code or of the model, logged with the request and shown in the timeline as `judge_error`, and pauses nothing.
 
 **Pace on social platforms.** A click whose label posts, replies, reposts, quotes or sends ("Post", "Reply", "Repost",
 "Quote", "Yeniden gönder", "Lähetä"…) is a public action; one that follows, likes or subscribes ("Follow", "Like",

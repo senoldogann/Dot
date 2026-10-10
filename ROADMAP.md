@@ -2380,9 +2380,9 @@ Paste this to the agent that takes the work:
 | 37  | A stuck campaign changes strategy, not just session                      | done    | 12c589f |
 | 38  | One view of what a run did and what can be undone                        | done    | 8c9cdbc |
 | 39  | CI and retention defaults                                                | done    | 80e8f19 |
-| 40  | Cold start of `dotx`                                                     | in progress |         |
+| 40  | Cold start of `dotx`                                                     | done    | 9ebe8e0 |
 | 41  | An own crawler: fetch, render, crawl, extract                            | done    | aedab8b |
-| 42  | TypeSafe as a tool of the agent: many items judged in one call           | planned |         |
+| 42  | TypeSafe as a tool of the agent: many items judged in one call           | in progress |         |
 | 43  | Typed judgments in X campaigns: what to answer, the best draft, a check  | planned |         |
 | 44  | Typed checks before a model call: the page after an action, the goal     | planned |         |
 | 45  | A step's model chosen by a typed judgment                                | planned |         |
@@ -3072,6 +3072,32 @@ leaves the judge on, with an error event; the hosted test ranks a fixed list (po
 relevant one above every other; item 22's numbers on an eval task that filters a list show fewer seconds or tokens
 with the tool.
 
+**Design, as built.** The connection moved out of the judge: `agent/judge.py` has a `TypeSafeService` (one client,
+the key read at the first request and again after `retire`, the pause of an outage, `nouls` and `scores` that answer
+`None` while paused) which the runtime builds once (`Runtime.typesafe`) when `[judge] provider` is `typesafe` or the
+key named by `api_key_env` resolves; `TypeSafeJudge` is a thin wrapper over it and `judge_for(config, typesafe)` takes
+it. The failures are told apart in `TypeSafeService._failed`: `request_error` (HTTP 422, or an answer outside the
+reference, `ProviderProtocolError`) is logged as `judge_error` with the request and the answer, emitted as a
+`judge_error` event (CLI line and timeline note) and raised to the caller, with no pause; everything else (401, 429,
+529, a missing key, a timeout, a transport error) pauses the service as before. `llm/typesafe.py` gained
+`ScoreQuestion(id, instructions, levels)`, `ScoreAnswer(score, probabilities, confidence)` and `TypeSafeClient.scores`;
+a score answer is read as the reference documents it (the expected level from 0 to one less than the number of levels,
+one probability per level under its index). The tool, `tools/judge_items.py`, takes `question`, `items` (id of letters,
+digits, `-` and `_`, up to 64 characters, and text; 500 items at most, distinct ids) and optional `levels` (none, or 2
+to 10); without levels one Noul per item, with levels one Score per item whose criteria are the levels. The state of a
+request is `{"candidates": {id: text}}` and each item's question is "About the candidate at `candidates.<id>`:
+<question>", so the ids never reach the model and the question carries the whole meaning, as TypeSafe's reranking
+cookbook does it. The list goes in requests of `[judge] items_per_request` items; the answers come back ranked, the
+highest first (`ranked`), one line per item with its id, its value, the likeliest level when there are levels and the
+start of its text (`render`). It is in the core group, acting and research modes, kind `network`, risk low, with the
+service's host as the target; it is registered in `runtime._tool_groups(config, judge_items)` when the key resolved at
+start (so a key saved later needs a restart, which the README says), whatever `provider` is. `dotx doctor`'s judge row
+now says whether judge_items is offered. Measured against TypeSafe with jev-1.13.0: 12 posts, 5 on Python packaging,
+ranked in one request in 0.59 s with every on-topic post above every other (min 0.9 against max 0.06 on the synthetic
+lists); one request of 25, 50 and 100 short posts took 0.40, 0.27 and 0.28 s, so `items_per_request = 100`. An eval
+task `filter-headlines` (24 headlines, 6 about electric cars, write them to a file and say how many) is the list a live
+run can filter with or without the tool; its item-22 numbers need a live model and are an owner decision (26 below).
+
 ### 43. Typed judgments in X campaigns: what to answer, the best draft, a check
 
 **What.** In an X campaign (items 12 and 18), the agent ranks the posts it could answer with item 42's tool on three
@@ -3138,7 +3164,7 @@ item ends as a measured no, written in the log.
    basis for flipping the defaults below. Since item 29 the commands are, with temp dirs so the owner's data is not
    touched: `DOT_HOME=$(mktemp -d) DOT_LOG_DIR=$(mktemp -d) .venv/bin/dotx eval run --model ollama:minimax-m2.7:cloud
    --repeat 2` before a change and again after it (the report path is printed), then `.venv/bin/dotx eval report
-   BEFORE.json AFTER.json`, whose last line is the difference. Each full run plays 31 tasks (26 small, 5 long of ten
+   BEFORE.json AFTER.json`, whose last line is the difference. Each full run plays 32 tasks (27 small, 5 long of ten
    or more turns) against the model; `--task ID` plays one.
 2. Defaults that change how the agent behaves and wait for evidence: `[agent] tool_surface` (item 4),
    `verify_answer_paths` (item 5), `resume` (item 6), `lessons` (item 7), `stall_escalation` (item 2),
@@ -3234,6 +3260,11 @@ item ends as a measured no, written in the log.
     Set it in your `config.toml` if you keep timelines longer, and run `dotx prune` first to see what it would take.
     The gate workflow runs on GitHub's macOS runners, which are metered on a private repository; the smoke tests that
     need Chrome, Ollama, the desktop or a key stay on your Mac on purpose, so the run is short.
+26. `judge_items` (item 42) appears when `TYPESAFE_API_KEY` is saved, whatever `[judge] provider` says, and it costs
+    input tokens only (about 0.3 s a request of up to 100 items). Its gain on a live model is not measured here: run
+    `dotx eval run --model REF --task filter-headlines --repeat 3` once with the key saved and once with it removed (or
+    with `[judge] api_key_env` pointing at an unset name) and compare seconds and tokens in the two reports; if the
+    model does not reach for the tool, the prompt line under "# Web" in `agent/prompt.py` is where to push it.
 
 ## Log
 
@@ -3639,3 +3670,5 @@ item ends as a measured no, written in the log.
 - 2026-10-10 (Fable 5.1): item 39's gate went green on PR #39 at its third run: the first lacked ripgrep on the runner, the second could not tell the runner's time zone (`TZ` is honoured now).
 - 2026-10-10 (Fable 5.1): item 39 merged 80e8f19 (PR #39, MYP-180 Done; gate green). Next: item 40.
 - 2026-10-10 (Fable 5.1): item 40 built on branch `item-40-cold-start` (MYP-181): `cli_commands.py` (light models and union), the commands of `cli.py` moved to `cli_run`, `cli_models`, `cli_doctor`, `cli_desktop`, `cli_memory` and `cli_browser`, a `dispatch` per family, `cli.py` loads the family by name. `dotx --help` 80 ms (was 600 to 760 ms). Unit 646, offline smoke 97, eval check ok.
+- 2026-10-10 (Fable 5.1): item 40 merged 9ebe8e0 (PR #40, MYP-181 Done; gate green). Next: item 42.
+- 2026-10-10 (Fable 5.1): item 42 built on branch `item-42-judge-items` (MYP-182): `TypeSafeService` shared by the judge and the new `judge_items` tool (one Noul or Score per item in one request, ranked), 422 and malformed answers as `judge_error` without a pause, `[judge] items_per_request = 100` from the measured requests, eval task `filter-headlines`, decision 26.

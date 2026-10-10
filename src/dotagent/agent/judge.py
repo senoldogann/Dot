@@ -9,8 +9,10 @@
 
 The judge never decides a step and never grants anything: it adds flags that make the policy ask, or stops a claim the
 goal checker would have examined. What it sends has its secrets masked, and a page's address goes without its query and
-fragment. A missing key or a failed request makes it unavailable for ``[models] helper_cooldown_s``, with a
-``judge_unavailable`` event, and meanwhile the patterns and the goal checker decide alone.
+fragment. It asks through the :class:`TypeSafeService` of the runtime, which the judge_items tool shares: a missing
+key or an outage makes the service unavailable for ``[models] helper_cooldown_s``, with a ``judge_unavailable`` event,
+and meanwhile the patterns and the goal checker decide alone; a request TypeSafe rejects is a ``judge_error`` of this
+code, logged with the request, and does not pause the service.
 
 With ``[judge] second_opinion`` each question is asked a second time, in a separate request with an independent
 phrasing (:data:`SECOND_CLICK_QUESTIONS`, :data:`SECOND_CLAIM_QUESTION`), and the judge acts on the two answers
@@ -27,18 +29,28 @@ from urllib.parse import SplitResult, urlsplit, urlunsplit
 from pydantic import JsonValue
 
 from dotagent.config import AppConfig, JudgeConfig
-from dotagent.core.errors import DotError, MissingSecretError, ProviderError
+from dotagent.core.errors import (
+    ConfigError,
+    DotError,
+    MissingSecretError,
+    ProviderError,
+    ProviderHttpError,
+    ProviderProtocolError,
+)
 from dotagent.core.logs import get_logger
 from dotagent.core.text import redact_json
 from dotagent.core.types import FrozenModel, JsonObject
 from dotagent.events import EventBus
 from dotagent.llm.router import unavailable_reason
-from dotagent.llm.typesafe import NoulQuestion, TypeSafeClient
+from dotagent.llm.typesafe import NoulQuestion, ScoreAnswer, ScoreQuestion, TypeSafeClient
 from dotagent.secrets import require_secret
 
 log = get_logger(__name__)
 
 JUDGE_UNAVAILABLE_EVENT: str = "judge_unavailable"
+JUDGE_ERROR_EVENT: str = "judge_error"
+# TypeSafe answers a body it rejects with HTTP 422.
+_REJECTED_STATUS: int = 422
 # The questions about a click, each by the flag it stands for, with the reason of dotagent.policy.elements that gives
 # that flag.
 CLICK_QUESTIONS: tuple[tuple[NoulQuestion, str], ...] = (
@@ -218,9 +230,17 @@ class NoJudge:
         return None
 
 
-class TypeSafeJudge:
-    """``[judge] provider = "typesafe"``: TypeSafe's System One API answers. The key is read at the first judgment and
-    again after :meth:`retire` (a key saved or removed in Settings, which also ends a pause)."""
+class TypeSafeService:
+    """One connection to TypeSafe's System One API, shared by the typed judge and the judge_items tool, with the
+    pause an outage brings. The key is read at the first request and again after :meth:`retire` (a key saved or
+    removed in Settings, which also ends a pause).
+
+    Its failures are told apart. An outage (a refused or missing key, a spent quota, a rate limit, an overloaded
+    service, a timeout, a transport error) pauses the service for ``cooldown_s`` with a ``judge_unavailable`` event,
+    and meanwhile every request answers ``None``. A request TypeSafe rejects (HTTP 422) or an answer that is not what
+    its reference documents is an error of this code or of the model, logged with the request as ``judge_error`` and
+    raised to the caller; the service stays on.
+    """
 
     def __init__(self, config: JudgeConfig, cooldown_s: float, bus: EventBus) -> None:
         self._config: JudgeConfig = config
@@ -231,6 +251,122 @@ class TypeSafeJudge:
         self._retired: list[TypeSafeClient] = []
         self._unavailable_until: float = 0.0
         self._lock: asyncio.Lock = asyncio.Lock()
+
+    @property
+    def config(self) -> JudgeConfig:
+        return self._config
+
+    def unavailable(self) -> bool:
+        """Whether the service is paused after an outage."""
+        return time.time() < self._unavailable_until
+
+    async def nouls(
+        self, state: JsonValue, questions: tuple[NoulQuestion, ...], run_id: str
+    ) -> dict[str, float] | None:
+        """The probability of yes for each question, or ``None`` while the service is paused or once this request
+        paused it. Raises :class:`ProviderError` for a request TypeSafe rejected or an answer it could not read."""
+        if self.unavailable():
+            return None
+        try:
+            async with asyncio.timeout(self._config.timeout_s):
+                client: TypeSafeClient = await self._connect()
+                return await client.nouls(redact_json(state), questions)
+        except (ProviderError, MissingSecretError, TimeoutError) as error:
+            await self._failed(error, run_id, state, len(questions))
+            return None
+
+    async def scores(
+        self, state: JsonValue, questions: tuple[ScoreQuestion, ...], run_id: str
+    ) -> dict[str, ScoreAnswer] | None:
+        """The score answer to each question, or ``None`` while the service is paused or once this request paused it.
+        Raises :class:`ProviderError` for a request TypeSafe rejected or an answer it could not read."""
+        if self.unavailable():
+            return None
+        try:
+            async with asyncio.timeout(self._config.timeout_s):
+                client: TypeSafeClient = await self._connect()
+                return await client.scores(redact_json(state), questions)
+        except (ProviderError, MissingSecretError, TimeoutError) as error:
+            await self._failed(error, run_id, state, len(questions))
+            return None
+
+    async def retire(self) -> None:
+        async with self._lock:
+            if self._client is not None:
+                self._retired.append(self._client)
+                self._client = None
+            self._unavailable_until = 0.0
+
+    async def aclose(self) -> None:
+        async with self._lock:
+            clients: list[TypeSafeClient] = [*self._retired, *([] if self._client is None else [self._client])]
+            self._client = None
+            self._retired = []
+        for client in clients:
+            await client.aclose()
+
+    async def _connect(self) -> TypeSafeClient:
+        async with self._lock:
+            if self._client is None:
+                key: str = await asyncio.to_thread(require_secret, self._config.api_key_env, "the typed judge")
+                self._client = TypeSafeClient(self._config, key)
+            return self._client
+
+    async def _failed(self, error: Exception, run_id: str, state: JsonValue, questions: int) -> None:
+        """A request error is logged with its request and raised again; an outage pauses the service."""
+        if request_error(error):
+            message, context = _described(error)
+            log.error(
+                "judge_error",
+                run_id=run_id,
+                error_type=type(error).__name__,
+                error=message,
+                context=context,
+                questions=questions,
+                state=redact_json(state),
+            )
+            await self._bus.emit(run_id, JUDGE_ERROR_EVENT, {"error": message[:_ERROR_CHARS]}, True)
+            raise error
+        reason: str = unavailable_reason(error) or ("timed out" if isinstance(error, TimeoutError) else "failed")
+        until: float = time.time() + self._cooldown_s
+        self._unavailable_until = until
+        message, context = _described(error)
+        log.warning(
+            "judge_unavailable",
+            run_id=run_id,
+            reason=reason,
+            until=until,
+            error_type=type(error).__name__,
+            error=message,
+            context=context,
+        )
+        await self._bus.emit(
+            run_id, JUDGE_UNAVAILABLE_EVENT, {"reason": reason, "until": until, "error": message[:_ERROR_CHARS]}, True
+        )
+
+
+def request_error(error: Exception) -> bool:
+    """Whether ``error`` is TypeSafe rejecting the request (HTTP 422) or answering outside its reference: an error of
+    this code or of the model, not an outage of the service."""
+    if isinstance(error, ProviderHttpError):
+        return error.status == _REJECTED_STATUS
+    return isinstance(error, ProviderProtocolError)
+
+
+def _described(error: Exception) -> tuple[str, JsonObject]:
+    message: str = error.message if isinstance(error, DotError) else str(error) or type(error).__name__
+    context: JsonObject = error.context if isinstance(error, DotError) else {}
+    return message, context
+
+
+class TypeSafeJudge:
+    """``[judge] provider = "typesafe"``: TypeSafe's System One API answers, through the :class:`TypeSafeService` of
+    the runtime. A request the service rejected leaves the judgment to the patterns and the goal checker, like an
+    outage, after the service's ``judge_error`` event."""
+
+    def __init__(self, service: TypeSafeService, config: JudgeConfig) -> None:
+        self._service: TypeSafeService = service
+        self._config: JudgeConfig = config
 
     async def judge_click(self, facts: ClickFacts, run_id: str) -> ClickJudgment:
         state: JsonObject = {"control": {"label": facts.label, "role": facts.role}, "page": _page(facts.url)}
@@ -258,64 +394,25 @@ class TypeSafeJudge:
         return ClaimJudgment(probability=first, second=None if second is None else second[SECOND_CLAIM_QUESTION.id])
 
     async def retire(self) -> None:
-        async with self._lock:
-            if self._client is not None:
-                self._retired.append(self._client)
-                self._client = None
-            self._unavailable_until = 0.0
+        await self._service.retire()
 
     async def aclose(self) -> None:
-        async with self._lock:
-            clients: list[TypeSafeClient] = [*self._retired, *([] if self._client is None else [self._client])]
-            self._client = None
-            self._retired = []
-        for client in clients:
-            await client.aclose()
-
-    async def _connect(self) -> TypeSafeClient:
-        async with self._lock:
-            if self._client is None:
-                key: str = await asyncio.to_thread(require_secret, self._config.api_key_env, "the typed judge")
-                self._client = TypeSafeClient(self._config, key)
-            return self._client
+        await self._service.aclose()
 
     async def _ask(self, state: JsonValue, questions: tuple[NoulQuestion, ...], run_id: str) -> dict[str, float] | None:
-        """The probability of yes for each question, or ``None`` while the judge is unavailable or once this request
-        made it so."""
-        if time.time() < self._unavailable_until:
-            return None
         try:
-            async with asyncio.timeout(self._config.timeout_s):
-                client: TypeSafeClient = await self._connect()
-                return await client.nouls(redact_json(state), questions)
-        except (ProviderError, MissingSecretError, TimeoutError) as error:
-            await self._pause(error, run_id)
+            return await self._service.nouls(state, questions, run_id)
+        except ProviderError:
             return None
 
-    async def _pause(self, error: Exception, run_id: str) -> None:
-        reason: str = unavailable_reason(error) or ("timed out" if isinstance(error, TimeoutError) else "failed")
-        until: float = time.time() + self._cooldown_s
-        self._unavailable_until = until
-        message: str = error.message if isinstance(error, DotError) else str(error) or type(error).__name__
-        context: JsonObject = error.context if isinstance(error, DotError) else {}
-        log.warning(
-            "judge_unavailable",
-            run_id=run_id,
-            reason=reason,
-            until=until,
-            error_type=type(error).__name__,
-            error=message,
-            context=context,
-        )
-        await self._bus.emit(
-            run_id, JUDGE_UNAVAILABLE_EVENT, {"reason": reason, "until": until, "error": message[:_ERROR_CHARS]}, True
-        )
 
-
-def judge_for(config: AppConfig, bus: EventBus) -> Judge:
-    """The judge ``[judge] provider`` names."""
+def judge_for(config: AppConfig, typesafe: TypeSafeService | None) -> Judge:
+    """The judge ``[judge] provider`` names; ``typesafe`` is the runtime's service, present whenever the provider is
+    ``typesafe``."""
     match config.judge.provider:
         case "none":
             return NoJudge()
         case "typesafe":
-            return TypeSafeJudge(config.judge, config.models.helper_cooldown_s, bus)
+            if typesafe is None:
+                raise ConfigError("the typed judge needs the TypeSafe service", {"provider": "typesafe"})
+            return TypeSafeJudge(typesafe, config.judge)

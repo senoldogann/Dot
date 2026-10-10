@@ -138,6 +138,44 @@ def _task(
     )
 
 
+# Twenty-four headlines, six of them about electric cars (filter-headlines: a list to filter, where judge_items can
+# stand in for reading each line in the model's own words).
+_EV_HEADLINES: tuple[str, ...] = (
+    "Volkswagen cuts the price of its ID.3 electric hatchback by 3,000 euros",
+    "Charging network operators agree on one plug-and-charge standard for Europe",
+    "Hyundai's Ioniq 6 wins the electric car of the year award",
+    "Norway's new car sales were 94 percent electric in March",
+    "Tesla recalls 120,000 Model Y cars over a seat belt fault",
+    "Battery maker CATL promises a 1,000 km range from its next sodium cells",
+)
+_HEADLINES: tuple[str, ...] = (
+    "Central bank holds interest rates at 4 percent for a third month",
+    _EV_HEADLINES[0],
+    "City council approves a new tram line to the airport",
+    "Oil prices fall as OPEC lifts its output ceiling",
+    _EV_HEADLINES[1],
+    "Local bakery wins the national sourdough championship",
+    "Wind farm off the Dutch coast starts delivering power to 1.5 million homes",
+    _EV_HEADLINES[2],
+    "Parliament debates a four-day work week pilot",
+    "Airline orders 40 narrow-body jets with a hydrogen option",
+    _EV_HEADLINES[3],
+    "Museum reopens after a two-year renovation",
+    "Rail strike called off after a late-night pay deal",
+    _EV_HEADLINES[4],
+    "Diesel trucks face a new toll on motorways from January",
+    "Chip maker opens a second plant in Dresden",
+    "Heat pump sales double as subsidies kick in",
+    _EV_HEADLINES[5],
+    "Football club sacks its coach after five defeats",
+    "Study links city cycling lanes to fewer shop closures",
+    "Bicycle maker recalls 8,000 e-bikes over a brake fault",
+    "Ferry line adds a night crossing for the summer season",
+    "Petrol station chain to close 200 sites by 2028",
+    "Space agency delays its lunar lander to 2029",
+)
+
+
 def _app_log() -> str:
     """Thirty log lines, seven of them errors."""
     errors: frozenset[int] = frozenset({3, 8, 9, 14, 21, 22, 29})
@@ -902,6 +940,21 @@ def _catalog() -> tuple[EvalTask, ...]:
             (
                 _shell("sort notlar/gorevler.txt > notlar/sirali.txt"),
                 _finish("Satırlar alfabetik sıraya dizildi ve notlar/sirali.txt dosyasına yazıldı.", True),
+            ),
+        ),
+        _task(
+            "filter-headlines",
+            "files",
+            "headlines.txt has one news headline per line. Write the headlines about electric cars to ev.txt, one per "
+            "line and nothing else, and tell me how many there are.",
+            "task",
+            "done",
+            (_seed("headlines.txt", _lines(*_HEADLINES)),),
+            (*(_contains("ev.txt", headline) for headline in _EV_HEADLINES), _matches(r"(^|\D)6(\D|$)")),
+            (
+                _read("headlines.txt"),
+                _turn(_write("ev.txt", _lines(*_EV_HEADLINES))),
+                _finish("Wrote the 6 headlines about electric cars to ev.txt.", True),
             ),
         ),
     )

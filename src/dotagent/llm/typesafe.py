@@ -1,10 +1,14 @@
-"""TypeSafe's System One API, for the typed judge: yes/no questions ("Noul" in TypeSafe's words) about a state, each
-answered with the probability of yes.
+"""TypeSafe's System One API, for the typed judge and the judge_items tool: yes/no questions ("Noul" in TypeSafe's
+words) about a state, each answered with the probability of yes, and ratings on ordered levels ("Score"), each
+answered with the expected level and the probability of each.
 
 One request carries the state and every question about it: ``POST {base_url}/v1/systemone`` with the key as a bearer
-token and the body ``{"state", "model", "questions": {id: {"type": "noul", "instructions"}}}``; the answer is
-``{"model", "answers": {id: {"type": "noul", "noul": p}}, "usage"}`` with ``p`` from 0 (no) to 1 (yes). A refused key
-is HTTP 401, a body it rejects 422, a rate limit 429 and an overloaded service 529; the last two are retried.
+token and the body ``{"state", "model", "questions": {id: {"type", "instructions", "criteria"?}}}``; the answer is
+``{"model", "answers": {id: ...}, "usage"}``. A Noul answer is ``{"type": "noul", "noul": p}`` with ``p`` from 0 (no)
+to 1 (yes); a Score answer is ``{"type": "score", "score": s, "confidence": c, "legend": {"0": level, ...},
+"probabilities": {"0": p, ...}}`` with ``s`` the expected level, from 0 for the first level to one less than their
+number for the last. A refused key is HTTP 401, a body it rejects 422, a rate limit 429 and an overloaded service 529;
+the last two are retried.
 """
 
 import httpx
@@ -24,11 +28,40 @@ _PATH: str = "/v1/systemone"
 _POLICY: RetryPolicy = RetryPolicy(attempts=2, base_delay_s=0.5, max_delay_s=2.0)
 
 
+# A Score has at least two levels and at most ten, by TypeSafe's reference.
+MIN_LEVELS: int = 2
+MAX_LEVELS: int = 10
+
+
 class NoulQuestion(FrozenModel):
     """A yes/no question about the state. ``id`` names its answer; TypeSafe does not show it to the model."""
 
     id: str
     instructions: str
+
+
+class ScoreQuestion(FrozenModel):
+    """A rating of the state on the ordered ``levels``, the lowest first, each a situation of its own."""
+
+    id: str
+    instructions: str
+    levels: tuple[str, ...]
+
+
+class ScoreAnswer(FrozenModel):
+    """TypeSafe's answer to a :class:`ScoreQuestion`: the expected level (0 for the first level, one less than their
+    number for the last), the probability of each level in their order and how concentrated they are."""
+
+    score: float
+    probabilities: tuple[float, ...]
+    confidence: float
+
+
+def _number(value: JsonValue, low: float, high: float) -> float | None:
+    """``value`` as a number between ``low`` and ``high``, else ``None``."""
+    if isinstance(value, bool) or not isinstance(value, int | float) or not low <= value <= high:
+        return None
+    return float(value)
 
 
 def _probabilities(reply: JsonObject, questions: tuple[NoulQuestion, ...], url: str) -> dict[str, float]:
@@ -47,6 +80,30 @@ def _probabilities(reply: JsonObject, questions: tuple[NoulQuestion, ...], url: 
     return found
 
 
+def _scores(reply: JsonObject, questions: tuple[ScoreQuestion, ...], url: str) -> dict[str, ScoreAnswer]:
+    """The score answer to each question, by its id, read from TypeSafe's answer."""
+    answers: JsonObject = get_obj(reply, "answers")
+    found: dict[str, ScoreAnswer] = {}
+    for question in questions:
+        answer: JsonValue = answers.get(question.id)
+        top: int = len(question.levels) - 1
+        score: float | None = _number(answer.get("score"), 0, top) if isinstance(answer, dict) else None
+        confidence: float | None = _number(answer.get("confidence"), 0, 1) if isinstance(answer, dict) else None
+        given: JsonValue = answer.get("probabilities") if isinstance(answer, dict) else None
+        probabilities: list[float | None] = [
+            _number(given.get(str(level)), 0, 1) if isinstance(given, dict) else None for level in range(top + 1)
+        ]
+        if score is None or confidence is None or any(p is None for p in probabilities):
+            raise ProviderProtocolError(
+                "TypeSafe's answer has no score for a question",
+                {"url": url, "question": question.id, "answer": answer},
+            )
+        found[question.id] = ScoreAnswer(
+            score=score, probabilities=tuple(p for p in probabilities if p is not None), confidence=confidence
+        )
+    return found
+
+
 class TypeSafeClient:
     """A connection to TypeSafe's System One API with one key."""
 
@@ -58,17 +115,29 @@ class TypeSafeClient:
 
     async def nouls(self, state: JsonValue, questions: tuple[NoulQuestion, ...]) -> dict[str, float]:
         """Ask ``questions`` about ``state`` in one request; the probability of yes for each, by its id."""
-        payload: JsonObject = {
-            "state": state,
-            "model": self._model,
-            "questions": {
-                question.id: {"type": "noul", "instructions": question.instructions} for question in questions
-            },
-        }
-        reply: JsonObject = await post_json(
-            self._client, self._url, self._headers, payload, classify_generic, _POLICY, "typesafe"
+        reply: JsonObject = await self._post(
+            state, {question.id: {"type": "noul", "instructions": question.instructions} for question in questions}
         )
         return _probabilities(reply, questions, self._url)
+
+    async def scores(self, state: JsonValue, questions: tuple[ScoreQuestion, ...]) -> dict[str, ScoreAnswer]:
+        """Ask ``questions`` about ``state`` in one request; the score answer to each, by its id."""
+        reply: JsonObject = await self._post(
+            state,
+            {
+                question.id: {
+                    "type": "score",
+                    "instructions": question.instructions,
+                    "criteria": [*question.levels],
+                }
+                for question in questions
+            },
+        )
+        return _scores(reply, questions, self._url)
+
+    async def _post(self, state: JsonValue, questions: JsonObject) -> JsonObject:
+        payload: JsonObject = {"state": state, "model": self._model, "questions": questions}
+        return await post_json(self._client, self._url, self._headers, payload, classify_generic, _POLICY, "typesafe")
 
     async def aclose(self) -> None:
         await self._client.aclose()

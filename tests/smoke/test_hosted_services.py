@@ -6,6 +6,7 @@ sends a handful of tiny requests (cents at most) and is skipped when its key can
 ``.env`` file of the Dot home or the Keychain), so a machine without keys still runs the whole suite.
 """
 
+import time
 from pathlib import Path
 
 import pytest
@@ -36,6 +37,7 @@ from dotagent.llm.types import (
 )
 from dotagent.llm.typesafe import NoulQuestion, TypeSafeClient
 from dotagent.secrets import resolve_secret
+from dotagent.tools.judge_items import Item, noul_questions, state_of
 from dotagent.web.client import WebClient
 from dotagent.web.search import search_ollama
 from dotagent.web.types import SearchHit
@@ -228,3 +230,44 @@ async def test_typesafe_lets_a_true_campaign_claim_through_and_stops_one_resting
         await client.aclose()
     print("read", read, "hoped", hoped)
     assert read[CLAIM_QUESTION.id] >= DEFAULTS.judge.target_threshold > hoped[CLAIM_QUESTION.id]
+
+
+_ON_TOPIC: tuple[str, ...] = (
+    "uv 0.5 ships a lockfile format that replaces requirements.txt; here is how we migrated our monorepo",
+    "Why wheels beat sdists: a short history of Python packaging and what PEP 517 fixed",
+    "pip 25 drops the legacy resolver for good. Pin your builds before you upgrade",
+    "We cut our Docker image by 400 MB by building Python wheels in a separate stage",
+    "Poetry or uv in 2026? A comparison of lockfiles, workspaces and publish flows",
+)
+_OFF_TOPIC: tuple[str, ...] = (
+    "My cat learned to open the fridge and now nothing is safe",
+    "Weekend hike photos from the Alps, finally some snow",
+    "Rust's borrow checker finally clicked for me after three years",
+    "Our team moved to a four-day week; a thread on what changed",
+    "Best espresso grinder under 300 euros? Asking for a friend",
+    "The new Kubernetes release notes are out; the gateway API is stable",
+    "Just shipped dark mode to our React app, took one afternoon with CSS variables",
+)
+
+
+@pytest.mark.hosted
+@requires_typesafe
+async def test_typesafe_ranks_the_posts_on_a_topic_above_every_other_in_one_request() -> None:
+    """Twelve posts, five on Python packaging, as judge_items sends them: one request, one question per post. Every
+    on-topic post has to come out above every off-topic one; the probabilities and the time of the request are
+    printed, since they set ``[judge] items_per_request``."""
+    assert TYPESAFE_KEY is not None
+    items: tuple[Item, ...] = tuple(
+        Item(id=f"p{number}", text=text) for number, text in enumerate([*_ON_TOPIC, *_OFF_TOPIC], 1)
+    )
+    question: str = "Is this post about Python packaging (installing, building or publishing Python packages)?"
+    client: TypeSafeClient = TypeSafeClient(DEFAULTS.judge, TYPESAFE_KEY)
+    started: float = time.monotonic()
+    try:
+        answers: dict[str, float] = await client.nouls(state_of(items), noul_questions(question, items))
+    finally:
+        await client.aclose()
+    print(f"{time.monotonic() - started:.2f} s", answers)
+    on_topic: list[float] = [answers[f"p{number}"] for number in range(1, len(_ON_TOPIC) + 1)]
+    off_topic: list[float] = [answers[f"p{number}"] for number in range(len(_ON_TOPIC) + 1, len(items) + 1)]
+    assert min(on_topic) > max(off_topic), (on_topic, off_topic)
