@@ -339,7 +339,7 @@ label they do not know (Mastodon's "Boost", the German "Teilen") passes as an or
 "typesafe"` and `TYPESAFE_API_KEY` saved (made at console.typesafe.ai; Settings › API keys, or `dotx auth set
 TYPESAFE_API_KEY`), TypeSafe's System One API is asked about such a click in four yes/no questions (does it publish,
 send, pay or delete?) over the label, the role and the page's address (without its query and fragment). A probability of
-at least `public_action_threshold` (0.45: a click is flagged unless the judge leans to no) gives the click that flag, so
+at least `public_action_threshold` (0.45: below each yes measured; a wrong flag only asks) gives the click that flag, so
 the policy treats it as a click on "Post" or "Delete", and the action's summary says so: `(judge: public_post 0.93)`.
 The judge also reads a campaign's claim of its targets before the goal checker does, and refuses a claim below
 `target_threshold` (0.15: only a clearly false one, since a true claim it refused would keep the campaign from ending)

@@ -160,31 +160,31 @@ async def test_the_hosted_search_of_ollama_answers_with_titles_and_addresses() -
 
 @pytest.mark.hosted
 @requires_typesafe
-async def test_typesafe_judges_click_labels_the_patterns_do_not_know() -> None:
+async def test_typesafe_flags_click_labels_the_patterns_do_not_know() -> None:
     """Labels no pattern of the policy knows, on the pages they belong to, as the judge gets them (a repost, a share, a
-    payment and a deletion in other languages), with the probability of each flag the judge asks about, in its own
-    words: printed for the owner to set the thresholds by, and checked only for being probabilities."""
+    payment and a deletion in other languages): each one gets its flag at ``public_action_threshold``, since a missed
+    flag lets the click through without its question in ask and auto. The probabilities are printed."""
     assert TYPESAFE_KEY is not None
-    clicks: tuple[tuple[str, str], ...] = (
-        ("Boost", "https://mastodon.social/home"),
-        ("Teilen", "https://www.facebook.com/"),
-        ("Compartir", "https://www.linkedin.com/feed/"),
-        ("Jetzt bezahlen", "https://www.amazon.de/checkout"),
-        ("Konto löschen", "https://x.com/settings/deactivate"),
+    clicks: tuple[tuple[str, str, str], ...] = (
+        ("Boost", "https://mastodon.social/home", "public_post"),
+        ("Teilen", "https://www.facebook.com/", "public_post"),
+        ("Compartir", "https://www.linkedin.com/feed/", "public_post"),
+        ("Jetzt bezahlen", "https://www.amazon.de/checkout", "financial"),
+        ("Konto löschen", "https://x.com/settings/deactivate", "destructive"),
     )
     questions: tuple[NoulQuestion, ...] = tuple(question for question, _ in CLICK_QUESTIONS)
     client: TypeSafeClient = TypeSafeClient(DEFAULTS.judge, TYPESAFE_KEY)
     try:
         answers: list[dict[str, float]] = [
             await client.nouls({"control": {"label": label, "role": "button"}, "page": page}, questions)
-            for label, page in clicks
+            for label, page, _ in clicks
         ]
     finally:
         await client.aclose()
-    for (label, _), probabilities in zip(clicks, answers, strict=True):
+    for (label, _, _), probabilities in zip(clicks, answers, strict=True):
         print(label, probabilities)
-    assert all(set(found) == {question.id for question in questions} for found in answers)
-    assert all(0.0 <= value <= 1.0 for found in answers for value in found.values())
+    threshold: float = DEFAULTS.judge.public_action_threshold
+    assert all(found[flag] >= threshold for (_, _, flag), found in zip(clicks, answers, strict=True))
 
 
 def _claim(claim: str) -> JsonObject:
