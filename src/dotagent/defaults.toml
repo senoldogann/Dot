@@ -293,8 +293,10 @@ action_timeout_s = 8.0
 snapshot_max_chars = 9000
 # Elements this far outside the viewport still appear in an observation.
 viewport_margin_px = 300
-# A page counts as settled after settle_quiet_ms without DOM changes, at the latest after settle_max_ms.
-settle_quiet_ms = 120
+# A page counts as settled after settle_quiet_ms without DOM changes, at the latest after settle_max_ms. 60 ms was
+# measured (item 13): one click 149 ms against 220 ms at 120 ms, with the same result; a page that keeps changing is
+# still waited for up to settle_max_ms.
+settle_quiet_ms = 60
 settle_max_ms = 1500
 # Popups and dialogs are reported a few ms after a click returns; side-effect steps wait this long before checking.
 side_effect_grace_ms = 40
@@ -314,7 +316,9 @@ decline_cookie_banners = true
 
 [desktop]
 enabled = true
-screenshot_max_edge = 1920
+# The longest edge of a screenshot in pixels: a 1366 px JPEG of this display is about 1 600 tokens on the hosted
+# providers against about 2 500 at 1920 (item 13); the zoom of desktop_screenshot stays as sharp as the display.
+screenshot_max_edge = 1366
 jpeg_quality = 72
 # After steps that changed something, Dot reads the window once the application has announced no change of its
 # interface for settle_quiet_ms, at most after settle_ms; a step that opens a menu or a window waits a third of

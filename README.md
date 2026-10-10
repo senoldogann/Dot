@@ -820,7 +820,9 @@ Both modes share what follows.
   call is still found. A very long list is cut with the number of options left out and the current choice.
 - `browser_act` runs up to `max_batch_steps` steps in one call: `click`, `double_click`, `right_click`, `hover`, `fill`,
   `type`, `insert`, `select`, `press`, `check`, `uncheck`, `scroll_into_view`, `drag` and `click_at`. After a step Dot
-  waits until the page has settled and reports popups, dialogs and downloads that appeared.
+  waits until the page has settled (no DOM change for `settle_quiet_ms`, 60 ms, at most `settle_max_ms`) and reports
+  popups, dialogs and downloads that appeared. The result is the part of the page that changed, with the refs of the
+  last snapshot still valid; a page that did not change comes back as one line that says so.
 - `fill` replaces a form field's value, `type` presses a key per character (autocomplete sees them), `insert` puts the
   text in at once at the caret without key events (long text, post composers, code editors) and `drag` moves an
   element onto the element `to_ref` (HTML5 drag and drop or a library driven by the mouse). `insert` goes only into a
@@ -870,7 +872,8 @@ missing ones and opens their Settings panes.
   read, or the text looks like a key. After steps that changed something, the window is read once the application has
   announced no change for `settle_quiet_ms` (120 ms), at most after `settle_ms` (350 ms); a change it makes later
   without announcing anything in between shows in the next view.
-- `desktop_screenshot` captures the screen with ScreenCaptureKit as a JPEG of at most `screenshot_max_edge` pixels.
+- `desktop_screenshot` captures the screen with ScreenCaptureKit as a JPEG of at most `screenshot_max_edge` pixels
+  (1366 by default: about 1 600 tokens on the hosted providers, against about 2 500 at 1920).
 - `desktop.keep_awake` keeps the display awake while Dot works. Password managers are refused in every mode, and so
   are secure fields except in a `yolo` run (see [Safety](#safety)).
 - `dotx desktop apps`, `dotx desktop snapshot [app] [--scope …] [--query …]` and `dotx desktop screenshot PATH` show what

@@ -311,8 +311,12 @@ def _refs_in(line: str) -> list[str]:
 
 
 def render_diff(diff: ViewDiff) -> str:
+    """The delta as the model reads it: a header with the counts (one plain line when nothing changed, so an act on a
+    page that stayed the same costs the model one line, not the page again) and the new or changed lines."""
     header: str = (
-        f"# changed since the last observation: {len(diff.added)} new/changed lines, {diff.unchanged} unchanged"
+        f"# no change since the last observation ({diff.unchanged} lines unchanged); the refs still hold"
+        if not diff.added and not diff.removed_refs
+        else f"# changed since the last observation: {len(diff.added)} new/changed lines, {diff.unchanged} unchanged"
     )
     if diff.removed_refs:
         header += f"; removed refs: {', '.join(diff.removed_refs[:20])}"
