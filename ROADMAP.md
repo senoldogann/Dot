@@ -4,7 +4,7 @@ The owner asked for Dot's autonomy to be smarter, steadier and sturdier **whatev
 handoff for that work: what is planned, why, in which order, what is done and how it was checked. If you continue the
 work, read it first, and keep the status table, the item sections and the log at the bottom true. It is the only record
 of where the work stands. Part 1 (items 1 to 8, autonomy) is done; part 2 (items 9 to 20: standing goals, yolo without
-questions, faster steps, helper models) was planned on 2026-10-09 and has its own status table below.
+questions, faster steps, helper models) was planned on 2026-10-09 and has its own status table below. Part 3 (items 22 to 41: fewer steps, evidence, learned playbooks, the owner's own channels, an own crawler) was planned on 2026-10-10 from the competitive research in `reports/Dot ajanı rekabet yol haritası.md`; its status table and handoff prompt are under "Part 3".
 
 ## Principle
 
@@ -2316,6 +2316,500 @@ full width. The reference's pinned chats and projects have no counterpart in Dot
 **Done when.** Headless Chrome on a scripted daemon (wide light, wide dark, phone): no horizontal overflow, no "null"
 text, no console error; the Options panel with YOLO saved; every status ring. README.
 
+## Part 3: fewer steps, evidence, learned playbooks, the owner's own channels, an own crawler (planned 2026-10-10)
+
+The owner's third ask, after parts 1 and 2: be more autonomous, better planned, faster and more correct than OpenAI
+dots and SpaceXAI Grok Bot, and give Dot a web crawler of its own "that really works" (the owner named Firecrawl).
+The research behind this part is `reports/Dot ajanı rekabet yol haritası.md` (Turkish, sourced): both rivals run on a
+cloud computer, hand off at passwords, one-time codes, CAPTCHAs and payments, and publish no independent success or
+speed number; Grok Bot has no audit log and shares one computer between all bots of an account. Dot's structural
+advantage is the owner's real Mac and real Chrome profile, local data, undo and a full event log. This part turns that
+advantage into measured facts.
+
+**Principle for part 3.** The same as before: measure, notice, steer, recover. What is new: (1) *steps* are the
+currency of speed: OSWorld-Human (MLSys 2026) found the best agents take 2.7 to 4.3 times the human steps and that
+late steps run about 3 times slower than early ones, so every speed item is judged by steps per task and seconds per
+step, not by feel; (2) a plan step is done when it carries *evidence*, never on the model's word; (3) what worked once
+on a site is kept as a *playbook* and tried first next time (Agent Workflow Memory: +51 % relative success and fewer
+steps on WebArena; SkillWeaver: 40.2 to 56.2 on live sites); (4) where the rivals hand off, Dot uses the owner's own
+channels (Mail, Messages, Chrome profile) with the owner's standing consent (decision 7). Nothing here widens what a
+run may do beyond what `yolo` already waives.
+
+**TypeSafe in part 3 (items 42 to 45, added on 2026-10-10 at the owner's word).** Item 16 asked TypeSafe only where
+`ask` and `auto` ask, so in `yolo` it slowed clicks for no gain and the owner turned it off (decision 9). These items
+use it where `yolo` gains: fast, cheap typed decisions (about 0.3 s a request in the hosted test, input tokens only)
+that take small choices off the main model. Before building one, read TypeSafe's live docs and the cookbook the item
+names (the TypeSafe skill, plugin `typesafe@typesafe-ai`, leads to them), and set each threshold on the owner's own
+data, not on a cookbook's.
+
+### How to start part 3 (the handoff prompt)
+
+Paste this to the agent that takes the work:
+
+> Read `ROADMAP.md` from the top, then "Part 3" and its status table. Check the ground (`ruff format --check`,
+> `ruff check`, `mypy`, unit tests, all with temp `DOT_HOME`/`DOT_LOG_DIR`). Take the first item of the part 3 table
+> that is not `done`, in the order its "Order and dependencies" paragraph gives. For each item: read the code it
+> touches, correct the design in its section where the code disagrees, set `in progress`, implement under the house
+> rules (functional style, strict typing, no defaults, no fallbacks, real tests over mocks, minimum tests), measure
+> with the numbers of items 9 and 22, update README and defaults, then branch `item-NN-short-name`, commit with the
+> trailer, open a PR against `main`, review it with subagents (at most five; check each one's evidence), squash-merge,
+> write the hash into the table and a line into the log. Paid hosted tests with the owner's keys, restarts of their
+> daemon and edits of their `config.toml` are yours to do when an item needs them (house rules); `PLAN.md` stays
+> untracked. Items 42 to 45 use TypeSafe: read its live docs and the cookbook each item names first (the TypeSafe
+> skill leads to them). The owner reads Turkish; code, comments, README and this file are English.
+
+### Status, part 3
+
+| #   | Item                                                                     | Status  | Commits |
+| --- | ------------------------------------------------------------------------ | ------- | ------- |
+| 22  | Step efficiency: the numbers every later item is judged by               | planned |         |
+| 23  | Multi-action turns as the rule                                           | planned |         |
+| 24  | The fast model does the side work                                        | planned |         |
+| 25  | Early and speculative execution of read-only tools                       | planned |         |
+| 26  | Speed knobs decided by measurement; snapshots that send only the change  | planned |         |
+| 27  | Cheapest channel first: API or CLI, then the browser, then the desktop   | planned |         |
+| 28  | Evidence on every plan step                                              | planned |         |
+| 29  | Eval reports that compare runs, and the defaults that wait for them      | planned |         |
+| 30  | Typed best-of-two at critical decisions; injection fixtures in the evals | planned |         |
+| 31  | One-time codes from the owner's own Mail and Messages                    | planned |         |
+| 32  | The owner's Chrome profile as the default of a campaign                  | planned |         |
+| 33  | Pre-approved spending caps                                               | planned |         |
+| 34  | Research runs that keep notes, and hosted search by default              | planned |         |
+| 35  | A plan with dependencies and parallel branches                           | planned |         |
+| 36  | Playbooks learned from runs that reached their goal                      | planned |         |
+| 37  | A stuck campaign changes strategy, not just session                      | planned |         |
+| 38  | One view of what a run did and what can be undone                        | planned |         |
+| 39  | CI and retention defaults                                                | planned |         |
+| 40  | Cold start of `dotx`                                                     | planned |         |
+| 41  | An own crawler: fetch, render, crawl, extract                            | planned |         |
+| 42  | TypeSafe as a tool of the agent: many items judged in one call           | planned |         |
+| 43  | Typed judgments in X campaigns: what to answer, the best draft, a check  | planned |         |
+| 44  | Typed checks before a model call: the page after an action, the goal     | planned |         |
+| 45  | A step's model chosen by a typed judgment                                | planned |         |
+
+**Order and dependencies.** 22 first: cheap, and every later item is judged with it. Then 24 and 23 (the two biggest
+measured time sinks: side calls on the main model, one-action turns). 29 next, because the defaults of items 2 to 7
+and the knobs of 26 wait for eval numbers; 26 and 25 follow it. 28 before 35 and 36 (both build on evidence-bearing
+steps). 41 before 34 (research runs use the crawler). 31, 32, 33 are independent and are the owner's autonomy ask;
+do them after 28. 27, 30, 37, 38, 39, 40 are independent and can fill gaps. 42 to 45 (TypeSafe) come after 22, whose
+numbers judge them: 42 first, 43 after it, 44 after 28, and 45 last, after 24, kept only if item 22's numbers show a
+gain. The owner may reorder; write the new order here when they do.
+
+### 22. Step efficiency: the numbers every later item is judged by
+
+**What.** `dotx stats` (and the run page) report, per run and aggregated by site host and model: steps; the share of
+browser and desktop turns that performed a single action; model-call seconds per step and their curve over the step
+index; `cached_tokens / input_tokens`; tokens per step. `dotx eval` reports the same per task, next to success.
+
+**Why.** Item 9 records model-call seconds and `cached_tokens` is stored in the `assistant` event
+(`agent/loop.py:1195`, `store/stats.py:34`), but no ratio, no per-site split and no curve exists. OSWorld-Human's two
+findings (step inflation, late-step slowdown) cannot be seen in Dot's own data today.
+
+**Design.** Pure functions over the stored events in `store/stats.py`; one SQL per aggregate; a `StepEfficiency`
+FrozenModel; printed by `cli_stats.py`, served by the stats endpoint, painted on the run page. A browser or desktop
+turn counts as single-action when its `browser_act`/desktop act carried one step.
+
+**Touchpoints.** `store/stats.py`, `cli_stats.py`, `server/views.py`, `evals/*`, README "Statistics".
+
+**Done when.** `dotx stats --by host` and `--by model` print the five numbers; a unit test over a fixed event set
+checks them; the eval JSON carries them per task.
+
+### 23. Multi-action turns as the rule
+
+**What.** The prompt and the tool descriptions make a one-action browser or desktop turn the exception: steps that
+need no new observation between them (fill a form, walk a menu, select and type, scroll and click) go in one
+`browser_act` or desktop act call. The loop notices a run of three single-action turns on the same page and adds a
+one-line steer.
+
+**Why.** Measured: a 4-step form in one `act` 409 ms against 773 ms as four calls and three model round trips fewer
+(`PLAN.md` "Measurements"); item 13 batches exist (`browser/session.py`), the model does not use them by default.
+
+**Design.** Prompt lines in `agent/prompt.py` (browser and desktop sections) with one worked example each; a
+`single_action_streak` counter in the loop next to the progress watchdog (item 2) that emits a steer, off when
+`[agent] steer_single_actions = false`.
+
+**Touchpoints.** `agent/prompt.py`, `agent/loop.py`, `agent/progress.py`, `tools/browser.py`, `tools/desktop.py`,
+`defaults.toml`, `config.py`, README.
+
+**Done when.** On the eval set the single-action share (item 22) halves against the baseline run and success does
+not drop; the steer has a unit test.
+
+### 24. The fast model does the side work
+
+**What.** `[models] fast` is read and used for: compaction, the `browser_wait_text` and `judge` classifications where
+no typed provider is set, the vision descriptions when `vision` is unset, the pre-check of the goal (the full review
+model still decides). A side call on the fast model that fails falls to the main model with a warning in the event
+(an error, not a silent fallback: the event names it).
+
+**Why.** The audit: compaction took 12.7 % of run wall time, median 10.7 s, on the run's own model
+(`agent/loop.py:290-298`); `[models] fast` is documented and read nowhere (decision 4). gpt-oss:20b-cloud answers a
+tool step in 889 ms, the default main in 2 798 ms.
+
+**Design.** A `ModelRole.FAST` resolved in `runtime.py` like `review`; `agent/compact.py` and the side callers take
+the role, not the main model. `dotx doctor` checks the fast model like the others.
+
+**Touchpoints.** `runtime.py`, `agent/compact.py`, `agent/review.py`, `agent/vision.py`, `tools/browser.py`,
+`doctor.py`, `defaults.toml`, `config.py`, README "Models and providers".
+
+**Done when.** Item 9's numbers show compaction under 5 % of run time on the eval set; a smoke test runs one
+compaction on the fast model.
+
+### 25. Early and speculative execution of read-only tools
+
+**What.** (a) Early start: a `parallel_safe` tool call starts as soon as its arguments are parsed from the stream,
+not when the reply ends. (b) Speculation: after a browser or desktop act, the observation the model is most likely to
+ask for next (the snapshot of the page, the window view) is taken at once and served from a one-step cache when the
+model asks for it; a stale cache is dropped on any act.
+
+**Why.** Tools run after the whole reply (`agent/loop.py:1180-1208`); the stream parse already exists. Speculative
+tool execution reports 20 to 48 % latency cuts in 2026 papers (Speculative Actions, PASTE, SPORK); only side-effect
+free tools qualify, and the one-step observation cache is the safe subset.
+
+**Design.** `agent/executor.py` gains a `start_early` path fed from the stream parser; the cache is a
+`SpeculativeObservation` FrozenModel keyed by run, tool and page/window identity, invalidated in the act path.
+
+**Touchpoints.** `agent/loop.py`, `agent/executor.py`, `llm/stream.py` (or where tool calls are parsed),
+`browser/session.py`, `desktop/session.py`, `tools/base.py`.
+
+**Done when.** Seconds per step on the eval set fall 15 % or more against item 22's baseline; a unit test proves a
+side-effect tool never starts early and a stale observation is never served.
+
+### 26. Speed knobs decided by measurement; snapshots that send only the change
+
+**What.** Decision 13 is closed with numbers: `[browser] settle_quiet_ms` 60, `[desktop] screenshot_max_edge` 1366,
+`keep_recent_tool_results`, `tool_output_chars`. A snapshot after an act on an unchanged page returns "no change" and
+the ref table of the previous snapshot stays valid; a changed page returns the changed subtree when it is smaller
+than the whole.
+
+**Why.** Item 13 measured 220 → 149 ms per click at 60 ms; a 1 710 × 1 112 JPEG is about 2 500 tokens against 1 600
+at 1 366; a full aria snapshot is taken also when nothing changed (audit).
+
+**Touchpoints.** `browser/snapshot.py`, `browser/session.py`, `desktop/render.py`, `defaults.toml`, `config.py`,
+README "Browser use" and "Computer use".
+
+**Done when.** Eval success unchanged, tokens per step and seconds per step (item 22) down; the smoke timing tests
+print the new medians.
+
+### 27. Cheapest channel first: API or CLI, then the browser, then the desktop
+
+**What.** The prompt states the order for any job: a documented API or a CLI on this Mac first, the owner's Chrome
+profile second, the desktop GUI last; skills may name the API of their site. The loop records the channel of each
+step so item 22 can count GUI steps.
+
+**Why.** Claude Cowork does this with connectors and is the reference of the local-Mac category; GUI steps are the
+slowest and least reliable.
+
+**Touchpoints.** `agent/prompt.py`, `agent/loop.py` (channel in the step event), `store/stats.py`, README.
+
+**Done when.** GUI step share on the eval set falls; the prompt change has its eval run recorded.
+
+### 28. Evidence on every plan step
+
+**What.** `PlanItem` gets `evidence: str` (a tool result reference or a quoted observation). `mark_plan_step` to
+`done` without evidence is a `ToolInputError` that names what counts as evidence. The verification of the end of a
+run (item 5) and a campaign's outcome check (item 12) read the evidence instead of the model's summary.
+
+**Why.** Grok Bot's most reported failure is reporting incomplete work as finished; dots' docs say it "can make
+mistakes". Dot's plan is a flat list with a free `targets` text (`agent/plan.py:1-40`).
+
+**Touchpoints.** `agent/plan.py`, `tools/meta.py` (the plan tools), `agent/verify.py`, `agent/campaign*.py`,
+`server/static/js` (the plan view shows evidence), README "Autonomy".
+
+**Done when.** The eval harness counts "done without evidence" (zero by construction) and "evidence that does not
+match the observation" (judged by the review model) and both are in the eval JSON.
+
+### 29. Eval reports that compare runs, and the defaults that wait for them
+
+**What.** `dotx eval compare A.json B.json` prints success, steps, seconds per step, tokens, cache ratio side by
+side with the difference; the eval set gets five long tasks (10 or more steps) on the fixture server, one of them a
+campaign with a verifiable outcome. The owner runs the live evals (decision 1); the defaults of decisions 2 and 13
+are flipped from the comparison, one commit each.
+
+**Why.** Every later item claims a measured gain; without a comparison command each claim is a hand-made table.
+
+**Touchpoints.** `cli_eval.py`, `evals/catalog.py`, `evals/*`, `tests/fixtures`, README "Evaluation".
+
+**Done when.** `dotx eval compare` exists with a unit test; the long tasks run offline; "Open owner decisions" lists
+the exact command for the live runs.
+
+### 30. Typed best-of-two at critical decisions; injection fixtures in the evals
+
+**What.** At a decision the policy flags as critical (a payment under a cap, the choice of an account or recipient,
+a public post) the judge of item 16 is asked twice with independent phrasing and acts only on agreement, otherwise
+the step is marked `needs_decision` with both answers. The fixture server gets pages with instructions hidden in
+content, and the evals report how many a run followed.
+
+**Why.** OpenAI's own evals for dots report 15 to 17.4 % attempts to work around a warning and 8.6 → 19.7 % scope
+violations across chained tasks; a measured counter-number is a claim Dot can make.
+
+**Touchpoints.** `agent/judge.py`, `agent/gate.py`, `policy/*`, `evals/catalog.py`, `tests/fixtures`.
+
+**Done when.** The injection share is in the eval JSON; a unit test covers the disagreement path.
+
+### 31. One-time codes from the owner's own Mail and Messages
+
+**What.** A `code_fetch` tool (acting, `yolo` and `auto` only; `ask` asks once) reads the newest message in Mail.app
+or Messages.app from a sender or with a subject the model names, within the last N minutes, and returns the code
+only. The browser then types it as item 10 allows. Nothing else of the mailbox reaches the model.
+
+**Why.** Decision 7 lets `yolo` type one-time codes; decision 12 waits for a live run that reads one from webmail.
+dots sends the user a private form, Grok Bot hands over the screen: this is the line where Dot keeps going. Reading
+through AppleScript is faster and steadier than browsing a webmail.
+
+**Design.** `desktop/messages.py` and `desktop/mail.py` as connectors (AppleScript through the existing
+`apple_script` path), a regex set for 4 to 8 digit codes and common phrasings, `[policy] code_sources` listing the
+apps allowed (empty by default: the owner turns it on, decision for them).
+
+**Touchpoints.** `tools/codes.py`, `desktop/*.py`, `policy/*`, `defaults.toml`, `config.py`, README "Autonomy" and
+"Safety", `tests/smoke/test_codes.py` under a `DOT_MAIL_TESTS=1` guard with a message the test sends itself.
+
+**Done when.** The smoke test reads a code the test created; a live `yolo` run on a fixture login that mails a code
+to the owner's own address completes within 30 s of the mail arriving (owner-run, decision).
+
+### 32. The owner's Chrome profile as the default of a campaign
+
+**What.** A campaign (item 12) uses `attach` (the owner's Chrome profile) unless its brief says `own`; a run started
+by hand keeps its current default. The campaign brief shows which profile it runs on.
+
+**Why.** Cloud browsers are blocked or challenged by sites (dots' docs say so); the owner's signed-in profile is the
+advantage neither rival has. The attach path exists (README "Browser use").
+
+**Touchpoints.** `agent/campaign*.py`, `browser/attach.py`, `defaults.toml` (`[campaign] browser = "attach"`),
+README.
+
+**Done when.** A campaign over three sessions keeps its X session; the brief names the profile; README.
+
+### 33. Pre-approved spending caps
+
+**What.** `[policy.spend]` lists hosts with a cap per purchase and per day; a payment step on a listed host under its
+cap passes in `yolo` and `auto`, is recorded with the amount, and counts against the day; over the cap or on an
+unlisted host the money hard stop holds in every mode.
+
+**Why.** dots allows advance approval for a specific purchase; Dot has only the hard stop. The owner's "earn money"
+goals need small spends (a domain, a listing fee).
+
+**Touchpoints.** `policy/*`, `agent/gate.py`, `policy/elements.py` (amount reading from the page), `defaults.toml`,
+`config.py`, README "Safety".
+
+**Done when.** Unit tests for under, over and unlisted; the timeline shows the amount; README.
+
+### 34. Research runs that keep notes, and hosted search by default
+
+**What.** A `research` run may write one notes file under the run's folder and save memory notes; `web.search_backend`
+defaults to `ollama` when `OLLAMA_API_KEY` is present, DuckDuckGo otherwise; long research uses the crawler of item
+41 instead of page-by-page fetches.
+
+**Why.** Decision 14: a research run can save nothing (`tools/base.py:16-17`), DuckDuckGo's bot check throttles long
+runs (README "Status and known limits").
+
+**Touchpoints.** `tools/base.py`, `tools/files.py`, `tools/memory.py`, `web/search.py`, `defaults.toml`, README.
+
+**Done when.** A 30-minute offline research task on the fixture server ends with a notes file and no throttle; the
+backend choice is in `dotx doctor`.
+
+### 35. A plan with dependencies and parallel branches
+
+**What.** `PlanItem` gets `depends_on: tuple[int, ...]`; steps with no unmet dependency and marked `parallel` may be
+delegated at once (item 15's helpers choose the model), each with a step budget, and their evidence (item 28) flows
+back into the parent plan. The run page draws the graph.
+
+**Why.** dots runs background agents in parallel and Grok Bot coordinates several bots; Dot delegates one level deep,
+one child at a time by the model's choice, with a flat plan.
+
+**Touchpoints.** `agent/plan.py`, `agent/manager.py`, `agent/helpers.py`, `tools/delegate.py`, `tools/meta.py`,
+`server/static/js`, README.
+
+**Done when.** An eval task with three independent sub-goals runs them in parallel and its wall time falls against
+the serial baseline; a unit test checks the readiness rule.
+
+### 36. Playbooks learned from runs that reached their goal
+
+**What.** When a run or campaign session reaches a verified outcome on a site or application, the harness distills
+its acting steps into a playbook: a skill file (`SKILL.md` layout, natural-language steps with the parameters named)
+under `<DOT_HOME>/playbooks/<host or app>/`, with the evidence that it worked. The next run on that host sees the
+playbook's description in the prompt and reads it with the `skill` tool. A playbook that fails twice is marked and
+no longer offered.
+
+**Why.** Agent Workflow Memory: +51 % relative success and fewer steps on WebArena; SkillWeaver: live sites 40.2 →
+56.2; "Demystifying Agent Skills" (2026): the skill representation beats raw workflow memory by about 6 points. Dot's
+lessons (item 7) record what went wrong, nothing records how a goal was reached.
+
+**Design.** Distillation on the review model from the run's step events (pure function events → `Playbook`); the
+skills loader (item 18) reads the playbook folder like a skill dir; `dotx playbooks list|show|drop`.
+
+**Touchpoints.** `agent/lessons.py` (sibling module `agent/playbooks.py`), `skills/*`, `agent/prompt.py`,
+`cli_skills.py`, `defaults.toml` (`[agent] playbooks = true`), README.
+
+**Done when.** On a fixture site the second run of the same goal takes half the steps of the first (item 22); the
+distillation has a unit test over a fixed event set.
+
+### 37. A stuck campaign changes strategy, not just session
+
+**What.** When `sessions_without_progress` reaches the patience (item 12), the next session's brief carries an
+explicit instruction to take a different route (another channel, source or approach) and lists what was tried; the
+same route twice in a row is named in the brief as refused.
+
+**Why.** `agent/campaign.py:169` counts sessions without progress; what follows is another session of the same kind.
+
+**Touchpoints.** `agent/campaign.py`, `agent/campaign_control.py`, README "Campaigns".
+
+**Done when.** A unit test over a fixed campaign history shows the strategy line; an eval campaign that is blocked
+on one route reaches its outcome by another.
+
+### 38. One view of what a run did and what can be undone
+
+**What.** The run page gets an "Actions" panel: every acting step with its channel, target and evidence, every
+approval decision, every file edit with its undo state (item 8), and one button per undoable edit.
+
+**Why.** Grok Bot has no audit log; dots' stop does not undo. Dot records all of it and shows it in pieces.
+
+**Touchpoints.** `server/views.py`, `server/static/js/views`, `undo/*`, README "Web UI".
+
+**Done when.** The headless UI test walks the panel; README.
+
+### 39. CI and retention defaults
+
+**What.** A GitHub Actions workflow runs the gate (ruff format, ruff check, mypy, unit tests, offline smoke) on every
+PR; `[store] retention_days` for events and screenshots gets a documented default and `dotx prune` honours it only
+when told (nothing deletes by default, house rule).
+
+**Why.** Audit leftover F and decision 4.
+
+**Touchpoints.** `.github/workflows/gate.yml`, `store/*`, `cli_prune.py`, README.
+
+**Done when.** The workflow is green on a PR; retention is in README.
+
+### 40. Cold start of `dotx`
+
+**What.** `dotx --help` and the light subcommands start without importing `mcp`, AppKit and FastAPI: the CLI is
+split into one module per subcommand family, each with its imports at the top, and `cli.py` dispatches by name.
+
+**Why.** Measured 1 170 ms, of which `mcp` 430 ms, `desktop.session` 245 ms, `fastapi` 139 ms ("Measurements"); the
+rule "imports at the top" stands, so the split is the way.
+
+**Touchpoints.** `cli.py`, `cli_*.py`, `__main__.py`.
+
+**Done when.** `dotx --help` under 400 ms p50; all CLI tests pass.
+
+### 41. An own crawler: fetch, render, crawl, extract
+
+**What.** A `web/crawl.py` layer and two tools. `web_crawl(url, scope, max_pages, depth)` follows links within the
+scope (same host or a path prefix), with concurrency, per-host pacing (`web/gate.py`), robots.txt read and reported
+(the owner decides whether it binds, a config key), a per-run cache, and returns one clean markdown document per page
+(the `web/text.py` reader) with the link graph. `web_extract(url_or_pages, schema)` returns typed data: the model
+names fields, the extraction runs on the fast model (item 24) over the markdown, validated into the schema, with the
+source quote per field. Pages whose plain fetch yields little text (a JavaScript shell) are rendered once in Dot's own
+headless Chrome through the existing browser session and read from the DOM; PDF goes through `web/pdf.py` as today.
+
+**Why.** The owner asked for "our own Firecrawl that really works". Today `web_fetch` reads one page at a time with
+plain HTTP, `web_search` is DuckDuckGo or the hosted Ollama search, and long research runs are throttled (decision
+14). A crawler that renders when needed, respects pacing and returns markdown plus typed extraction removes the
+page-by-page round trips from research runs and gives campaigns a steady source.
+
+**Design.** Pure functions: `plan_frontier(graph, scope, seen)`, `should_render(fetched)` (text density under a
+threshold or a known shell marker), `to_markdown(document)`; the connector is the existing `WebClient` plus one
+browser page borrowed from `browser/session.py`. Limits in `[web.crawl]`: `max_pages = 50`, `max_depth = 3`,
+`concurrency = 4`, `per_host_spacing_s`, `render = "auto"|"never"|"always"`, `robots = "report"|"obey"`. Results
+over `tool_output_chars` go to the run's folder as files and the tool returns the index. No external service, no
+key. The addresses rule (`web/addresses.py`) holds for every fetched and rendered page.
+
+**Touchpoints.** `web/crawl.py`, `web/text.py`, `web/client.py`, `web/gate.py`, `tools/web.py`, `browser/session.py`,
+`defaults.toml`, `config.py`, `doctor.py`, README "Tools" and "Research", `tests/smoke/test_crawl.py` on the fixture
+server (a 30-page site with a JavaScript-only page and a PDF).
+
+**Done when.** The smoke test crawls the fixture site within the limits, renders the JavaScript page, extracts a
+typed table from three pages with source quotes, and a 30-minute research eval uses `web_crawl` instead of repeated
+`web_fetch` with fewer steps (item 22). README documents the tools and the limits.
+
+### 42. TypeSafe as a tool of the agent: many items judged in one call
+
+**What.** A tool `judge_items` (acting and research runs) that takes one question and a list of candidates (posts,
+search hits, links, playbooks, each with an id) and returns TypeSafe's answer for each in one request, ranked: a Noul
+probability or a Score level. The main model reads a short ordered list instead of weighing every item in its own
+context, and keeps the decision. The judge's failures are told apart, as TypeSafe's guidance asks: a 422 or a
+malformed answer is a code or model error, logged with the request, and does not pause the judge the way an outage
+(401, 429, 529, a timeout) does.
+
+**Why.** Sorting and filtering many items is where the main model spends seconds and tokens on a judgment a typed
+model gives in about 0.3 s, for input tokens only. In `yolo` this is the gain item 16 never had. Its first users: the
+posts of item 43, the search hits of item 34, the links item 41's crawler may follow, the playbook of item 36 that
+fits a task.
+
+**Design.** Read first: the re-ranking cookbook (`https://docs.typesafe.ai/cookbooks/rerank_typesafe.md`), the Score
+page (`https://docs.typesafe.ai/primitives/score.md`) and State (`https://docs.typesafe.ai/concepts/state.md`). One
+question per candidate in one request (the ids stay in code; the question carries the whole meaning); the batch size
+is set by measured request size and latency. The tool uses `[judge]`'s key, address and model but not its `provider`
+switch, which stays the click and claim judge of item 16: it is offered when `TYPESAFE_API_KEY` resolves.
+
+**Touchpoints.** `llm/typesafe.py`, `agent/judge.py`, a new tool under `tools/` and its registration,
+`agent/prompt.py` (when to use it), `llm/router.py` (`unavailable_reason`), `defaults.toml`, `config.py`, README
+"Typed judgments".
+
+**Done when.** A smoke test on the stand-in service ranks a list and checks the request; a 422 from the stand-in
+leaves the judge on, with an error event; the hosted test ranks a fixed list (posts on and off a topic) with every
+relevant one above every other; item 22's numbers on an eval task that filters a list show fewer seconds or tokens
+with the tool.
+
+### 43. Typed judgments in X campaigns: what to answer, the best draft, a check
+
+**What.** In an X campaign (items 12 and 18), the agent ranks the posts it could answer with item 42's tool on three
+questions (on the account's topic; written by a person, not a bot or spam; worth a reply that adds something), picks
+the best of its drafts with a Choice, and checks a draft before posting it (off topic, repeats an earlier post of the
+account, against a rule the campaign's goal names).
+
+**Why.** Growth on X comes from answering the right posts well; today the main model picks from what the screen
+shows, one judgment at a time. Several scores over many candidates, weighted in code, is TypeSafe's composite-scoring
+pattern (`https://docs.typesafe.ai/patterns/composite-scoring.md`).
+
+**Design.** The X playbook of item 18 says when to call the tool. The weights of the three scores live in the
+campaign's ledger, so the owner can change them without asking TypeSafe again. Thresholds are set on a labeled sample
+of the owner's own feed (posts they would and would not answer), not on a cookbook's numbers.
+
+**Touchpoints.** The X skills of item 18, `tools/campaign.py`, item 42's tool, README "Campaigns".
+
+**Done when.** On the labeled sample, the precision of the top ten is measured and written in the log; a live
+campaign session records the scores of the posts it answered.
+
+### 44. Typed checks before a model call: the page after an action, the goal
+
+**What.** (1) A browser action can name what it expects to see after it (`expect`: "the reply shows under the post");
+its result carries TypeSafe's probability that the page's text shows it, and whether the page is a login wall, a
+CAPTCHA or an error page, so the next turn starts from that answer instead of reading the whole page. (2) The goal
+check of a run asks TypeSafe first, as item 16 does for a campaign's claim: a clear no is refused at once, a clear yes
+and the uncertain middle go to the review model. (3) The judge's click questions apply in `ask` and `auto` only: in
+`yolo` they changed no decision and cost a request per click (decision 9), so the owner can keep the judge on for (1)
+and (2) without them.
+
+**Why.** A typed check takes about 0.3 s; a model turn or a review call takes seconds (item 9's numbers say how
+many). The pattern is verify and escalate (`https://docs.typesafe.ai/cookbooks/citation_check.md`,
+`https://docs.typesafe.ai/cookbooks/sde_cascade.md`).
+
+**Touchpoints.** `tools/browser.py`, `browser/safety.py`, `agent/judge.py`, `agent/review.py`, `tools/campaign.py`,
+`defaults.toml`, README "Typed judgments".
+
+**Done when.** Fixture pages (a login wall, an error page, a posted reply) are judged right in a smoke test; item
+22's numbers on the eval set show fewer turns or seconds per task with the checks; with `[judge] provider =
+"typesafe"`, a click in `yolo` sends nothing to TypeSafe.
+
+### 45. A step's model chosen by a typed judgment
+
+**What.** Before a step, a Choice over the run's models (the fast model of item 24, the main model, a helper of item
+15) from the step's state (the task, the last result, the failures so far): routine steps go to the fast model, hard
+ones to the helper.
+
+**Why.** The fast model answers a tool step in 889 ms, the default main model in 2 798 ms (item 24), and most steps of
+a long run are routine. The routing shape is in the function-calling cookbook
+(`https://docs.typesafe.ai/cookbooks/function_calling.md`) and speculative fan-out
+(`https://docs.typesafe.ai/patterns/fan-out.md`).
+
+**Risk.** A change of model loses the prompt cache that item 19 keeps warm, and a weaker model can add steps: the net
+is measured, not assumed.
+
+**Touchpoints.** `agent/loop.py`, `runtime.py`, `llm/router.py`, item 42's client, `defaults.toml`, `config.py`.
+
+**Done when.** Item 22's numbers on the eval set show less time per task at the same success rate; otherwise the
+item ends as a measured no, written in the log.
+
 ## Open owner decisions
 
 1. Live evals: `dotx eval run --model REF` spends model quota. Run it for the models in use and keep the JSON; it is the
@@ -2741,3 +3235,7 @@ text, no console error; the Options panel with YOLO saved; every status ring. RE
 - 2026-10-10: at the owner's word the judge is off again: `[judge]` left their `config.toml` (in `yolo` it delayed
   clicks and gained only the campaign-claim check, decision 9); the daemon was restarted (no run active, the plist still
   names only `PATH`), and `dotx doctor` shows the judge off.
+- 2026-10-10 (Fable 5.1, research session): part 3 planned, items 22 to 41, from `reports/Dot ajanı rekabet yol haritası.md`; no code changed. Start with the handoff prompt under "How to start part 3".
+- 2026-10-10: at the owner's word, items 42 to 45 join part 3: TypeSafe where `yolo` gains (a tool that judges many
+  items in one call, X campaigns, typed checks before a model call, a step's model), with the docs and cookbooks each
+  item starts from; part 3 is committed with them.
