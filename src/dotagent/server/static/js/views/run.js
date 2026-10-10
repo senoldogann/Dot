@@ -45,15 +45,15 @@ function planTargets(targets) {
   return el("div", { class: "plan-targets", title: "Targets" }, icon("target"), el("span", { class: "text" }, targets));
 }
 
+/** One step of the plan: its mark, its text and, under a closed step, the evidence the run recorded for it. Plans
+ * stored before evidence existed have none. */
 function planStep(step) {
   const markIcon = STEP_MARKS[step.status];
   const mark = el("span", { class: "mark" }, markIcon === undefined ? null : icon(markIcon));
-  return el(
-    "div",
-    { class: `plan-step ${step.status}`, title: STEP_LABELS[step.status] ?? step.status },
-    mark,
-    el("span", { class: "text" }, step.text),
-  );
+  const evidence = step.evidence ?? "";
+  const body = el("span", { class: "body" }, el("span", { class: "text" }, step.text));
+  if (evidence !== "") body.append(el("span", { class: "evidence", title: "Evidence" }, evidence));
+  return el("div", { class: `plan-step ${step.status}`, title: STEP_LABELS[step.status] ?? step.status }, mark, body);
 }
 
 /**

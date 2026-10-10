@@ -25,7 +25,10 @@ class RunMetrics(FrozenModel):
     model calls took (the steps and the side calls), ``tool_seconds`` the time its tool calls took; a report saved
     before they were measured has neither. ``acts`` are the browser and desktop act calls, ``single_acts`` the ones
     that carried one step, ``cached_tokens`` the input tokens the provider served from its prompt cache; a report
-    saved before they were counted has none of the three."""
+    saved before they were counted has none of the three. ``unevidenced_steps`` are the steps the run's last plan marks
+    done without evidence (zero since the plan tools require it; a report saved before has none), ``unproven_steps``
+    the done steps whose evidence the goal checker found nothing in the digest or the facts to bear out, summed over
+    its checks (none in a report saved before the checker judged them, or in a run without goal mode)."""
 
     steps: int
     input_tokens: int
@@ -41,6 +44,8 @@ class RunMetrics(FrozenModel):
     acts: int | None = None
     single_acts: int | None = None
     cached_tokens: int | None = None
+    unevidenced_steps: int | None = None
+    unproven_steps: int | None = None
 
 
 class TaskOutcome(FrozenModel):

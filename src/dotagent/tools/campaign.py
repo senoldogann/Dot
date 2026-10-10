@@ -15,6 +15,7 @@ from pydantic import Field, StringConstraints
 
 from dotagent.agent.campaign import entry_line
 from dotagent.agent.judge import ClaimJudgment
+from dotagent.agent.plan import EMPTY_PLAN, PLAN_EVENT, PlanPayload, plan_from_event, render_plan
 from dotagent.agent.review import GoalChecker, GoalRequest, GoalVerdict, goal_checker_for, goal_digest, shorten_reason
 from dotagent.agent.verify import RunFacts, checked_facts
 from dotagent.config import AppConfig
@@ -23,7 +24,7 @@ from dotagent.core.logs import get_logger
 from dotagent.core.types import FrozenModel, JsonObject
 from dotagent.policy.types import ActionInfo, Flag
 from dotagent.scheduler.timing import Timing, describe_timing
-from dotagent.store.models import CampaignEntry, CampaignEntryKind, CampaignRecord, RunRecord
+from dotagent.store.models import CampaignEntry, CampaignEntryKind, CampaignRecord, EventRecord, RunRecord
 from dotagent.tools.base import ALL_MODES, RegisteredTool, ToolArgs, ToolResult, fail, make_tool, ok
 from dotagent.tools.context import ToolContext
 from dotagent.tools.schedule import tool_timing
@@ -225,15 +226,21 @@ class AchievedArgs(ToolArgs):
     )
 
 
+async def _session_plan(ctx: ToolContext) -> PlanPayload:
+    latest: EventRecord | None = await ctx.runtime.store.last_event(ctx.run_id, PLAN_EVENT)
+    return EMPTY_PLAN if latest is None else plan_from_event(latest)
+
+
 async def _checked_request(campaign: CampaignRecord, evidence: str, ctx: ToolContext) -> GoalRequest:
-    """The goal check's question: the campaign's goal and targets, the progress its ledger records, what this
-    session's calls did and the claim."""
+    """The goal check's question: the campaign's goal and targets, the progress its ledger records, this session's
+    plan with the evidence of its steps, what the session's calls did and the claim."""
     now: float = time.time()
     entries: list[CampaignEntry] = await ctx.runtime.store.campaign_entries(campaign.id, _CHECKED_ENTRIES)
     progress: list[str] = [entry_line(entry, now) for entry in entries if entry.kind == "progress"]
     facts: RunFacts = ctx.facts()
     return GoalRequest(
         goal=campaign.goal,
+        plan=render_plan((await _session_plan(ctx)).steps),
         targets=f"{campaign.targets}\nHow they are verified: {campaign.verification}",
         digest=goal_digest(
             "Progress recorded in the campaign's ledger:\n" + ("\n".join(progress) if progress else "none")
@@ -248,6 +255,7 @@ def _claim_state(request: GoalRequest) -> JsonObject:
     """What the typed judge reads of a claim: what the goal checker reads."""
     return {
         "goal": request.goal,
+        "plan": request.plan,
         "targets": request.targets,
         "ledger": request.digest,
         "session_facts": request.facts,

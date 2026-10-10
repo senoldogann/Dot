@@ -1291,6 +1291,21 @@ a.pill:hover {
   text-decoration: line-through;
 }
 
+.plan-step .body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+/* What the run observed that closed the step; the goal check reads the same text. */
+.plan-step .evidence {
+  font-size: 0.85em;
+  color: var(--muted);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
 .plan-step.failed .mark {
   background: var(--bad);
   border-color: var(--bad);

@@ -167,7 +167,7 @@ def _progress(text: str, leads: int) -> ScriptedCall:
 
 
 def _verdict(decision: str, reason: str) -> ScriptedTurn:
-    return _turn(_call(GOAL_TOOL, {"decision": decision, "reason": reason}))
+    return _turn(_call(GOAL_TOOL, {"decision": decision, "reason": reason, "unproven_steps": []}))
 
 
 def _offered(request: ChatRequest) -> frozenset[str]:

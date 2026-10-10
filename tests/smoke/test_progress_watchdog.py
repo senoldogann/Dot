@@ -154,7 +154,10 @@ async def test_a_run_that_gets_nowhere_climbs_the_ladder_and_is_stopped_with_wha
     plan: ScriptedCall = ScriptedCall(
         tool=UPDATE_PLAN_TOOL,
         arguments={
-            "steps": [{"text": "Read notes.txt", "status": "done"}, {"text": "Write summary.md", "status": "pending"}]
+            "steps": [
+                {"text": "Read notes.txt", "status": "done", "evidence": "read_file notes.txt: 2 lines"},
+                {"text": "Write summary.md", "status": "pending"},
+            ]
         },
     )
     advice: ScriptedTurn = _turn(

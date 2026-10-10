@@ -245,6 +245,23 @@ def test_the_shares_of_one_step_acts_and_cached_tokens_skip_the_attempts_that_di
     assert "  act calls with one step -, input tokens from the cache -" in render_scorecard(old)
 
 
+def test_the_evidence_counts_sum_the_attempts_that_counted_them() -> None:
+    counted: RunMetrics = _metrics(4, 4000, 4, 0).model_copy(update={"unevidenced_steps": 0, "unproven_steps": 2})
+    also: RunMetrics = _metrics(2, 2000, 2, 0).model_copy(update={"unevidenced_steps": 1, "unproven_steps": 0})
+    card: Scorecard = score_report(
+        _report((_outcome("a", 1, True, "done", counted), _outcome("b", 1, True, "done", also)))
+    )
+    assert (card.unevidenced_steps, card.unproven_steps) == (1, 2)
+    assert (
+        "  plan steps done without evidence 1, with evidence the goal check could not bear out 2"
+        in render_scorecard(card)
+    )
+    old: Scorecard = score_report(_report((_outcome("b", 1, True, "done", _metrics(2, 2000, 2, 0)),)))
+    assert (old.unevidenced_steps, old.unproven_steps) == (None, None)
+    assert render_difference(old, card)[0].endswith("unproven steps -")
+    assert render_difference(card, card)[0].endswith("unproven steps +0")
+
+
 def test_a_model_that_never_passes_has_no_cost_per_pass() -> None:
     card: Scorecard = score_report(_report((_outcome("a", 1, False, "failed", _metrics(3, 3000, 3, 0)),)))
     assert card.steps_per_pass is None
@@ -309,4 +326,4 @@ def test_the_difference_line_sets_the_second_report_against_the_first() -> None:
     assert "tokens/pass -5.0 k" in line
     assert "one-step acts -" in line and "cached -" in line
     assert "tool errors -14 pp" in line
-    assert line.endswith("stalls +0, false claims +0")
+    assert line.endswith("stalls +0, false claims +0, unproven steps -")

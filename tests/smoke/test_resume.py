@@ -115,7 +115,7 @@ async def test_a_run_a_shutdown_cut_off_while_it_asked_goes_on_by_itself_with_it
         tool=UPDATE_PLAN_TOOL,
         arguments={
             "steps": [
-                {"text": "Read data.csv", "status": "done"},
+                {"text": "Read data.csv", "status": "done", "evidence": "read_file data.csv: 3 rows"},
                 {"text": "Write report.md", "status": "in_progress"},
             ],
             "targets": "report.md sums every row of data.csv",
@@ -124,7 +124,9 @@ async def test_a_run_a_shutdown_cut_off_while_it_asked_goes_on_by_itself_with_it
     ask: ScriptedCall = ScriptedCall(
         tool=ASK_USER_TOOL, arguments={"question": "Which title should the report have?", "options": ["Report", "Data"]}
     )
-    close_step: ScriptedCall = ScriptedCall(tool=MARK_PLAN_STEP_TOOL, arguments={"step": 2, "status": "done"})
+    close_step: ScriptedCall = ScriptedCall(
+        tool=MARK_PLAN_STEP_TOOL, arguments={"step": 2, "status": "done", "evidence": "write_file wrote report.md"}
+    )
     # An owner whose yolo runs wait for their questions (``[agent] questions``), so the run is cut off while it waits.
     config: AppConfig = _config()
     waiting: AppConfig = config.model_copy(update={"agent": config.agent.model_copy(update={"questions": "wait"})})
@@ -195,7 +197,8 @@ async def test_a_run_a_shutdown_cut_off_while_it_asked_goes_on_by_itself_with_it
         "run again.\n"
     ) in note
     assert (
-        "Its plan, which is your plan now:\n1. [done] Read data.csv\n2. [in_progress] Write report.md\n"
+        "Its plan, which is your plan now:\n1. [done] Read data.csv\n   evidence: read_file data.csv: 3 rows\n"
+        "2. [in_progress] Write report.md\n"
         "Targets: report.md sums every row of data.csv\n"
     ) in note
 

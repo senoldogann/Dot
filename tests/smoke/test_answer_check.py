@@ -172,7 +172,9 @@ async def test_the_paths_of_an_answer_are_not_checked_when_the_check_is_off_or_t
 
 async def test_the_goal_check_reads_the_facts_the_harness_measured(login_env: dict[str, str]) -> None:
     command: str = f"{sys.executable} -m unittest"
-    verdict: ScriptedCall = ScriptedCall(tool=GOAL_TOOL, arguments={"decision": "achieved", "reason": "It is there."})
+    verdict: ScriptedCall = ScriptedCall(
+        tool=GOAL_TOOL, arguments={"decision": "achieved", "reason": "It is there.", "unproven_steps": []}
+    )
 
     def script(workspace: Path) -> list[ScriptedTurn]:
         return [
