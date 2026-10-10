@@ -27,6 +27,9 @@ jobs:
           enable-cache: true
       - name: Install
         run: uv sync --frozen
+      # The search tool runs ripgrep; the runner image has Homebrew but not rg.
+      - name: Ripgrep
+        run: brew install ripgrep
       - name: Throw-away home
         run: mkdir -p "$DOT_HOME" "$DOT_LOG_DIR" "$DOT_CHROME_DIR"
       - name: Format
