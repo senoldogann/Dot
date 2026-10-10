@@ -1,5 +1,5 @@
 """A ``dotx run`` of the scripted model, for the smoke test of how it ends when it is told to: the run goes through
-:func:`dotagent.cli.follow_run`, as the command's runs do.
+:func:`dotagent.cli_run.follow_run`, as the command's runs do.
 
 Usage: ``python dot_cli_run.py <goal> <turn>``, with ``DOT_HOME`` set to a throw-away home and ``<turn>`` a
 ``ScriptedTurn`` as JSON. On the eval configuration, it starts a yolo run of ``dotx run`` whose model plays that one
@@ -12,7 +12,7 @@ import os
 import sys
 
 from dotagent.agent.manager import RunManager
-from dotagent.cli import follow_run
+from dotagent.cli_run import follow_run
 from dotagent.cli_ui import TerminalUi, UiOptions
 from dotagent.config import load_default_config
 from dotagent.evals.runner import SCRIPTED_MODEL, eval_config

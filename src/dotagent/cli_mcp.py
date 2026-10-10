@@ -1,14 +1,14 @@
 """``dotx mcp``: start the configured MCP servers once and show the tools each offers, or why one does not start."""
 
 import sys
-from typing import Literal
 
 from pydantic import JsonValue
 
+from dotagent.cli_commands import Command, McpListCommand
 from dotagent.config import AppConfig, load_user_config
+from dotagent.core.errors import InvalidValueError
 from dotagent.core.jsonutil import dumps_compact
 from dotagent.core.paths import config_path
-from dotagent.core.types import FrozenModel
 from dotagent.mcp.hub import ServerReport, inspect_servers
 from dotagent.mcp.types import McpTool
 from dotagent.policy.types import ActionInfo
@@ -18,10 +18,6 @@ from dotagent.tools.shell import read_login_env
 _DESCRIPTION_CHARS: int = 70
 _VALUE_CHARS: int = 400
 _HIDDEN_DETAIL: frozenset[str] = frozenset({"server", "stderr_tail"})
-
-
-class McpListCommand(FrozenModel):
-    name: Literal["mcp-list"]
 
 
 def _clip(text: str, limit: int) -> str:
@@ -77,3 +73,12 @@ async def cmd_mcp_list(command: McpListCommand) -> int:
     for report in reports:
         sys.stdout.write(f"{render_report(report)}\n")
     return 1 if any(report.error is not None for report in reports) else 0
+
+
+async def dispatch(command: Command) -> int:
+    """Carry out one of this module's commands."""
+    match command:
+        case McpListCommand():
+            return await cmd_mcp_list(command)
+        case _:
+            raise InvalidValueError("not a command of this module", {"name": command.name})

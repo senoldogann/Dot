@@ -3,21 +3,16 @@ from that and from its window. The database is only read; the window is asked fr
 
 import asyncio
 import sys
-from typing import Literal
 
 from dotagent.agent.scaffold import PROFILE_RUNS, Scaffold, scaffold_for
+from dotagent.cli_commands import Command, ModelsProfileCommand
 from dotagent.config import AppConfig, load_user_config
+from dotagent.core.errors import InvalidValueError
 from dotagent.core.paths import db_path
-from dotagent.core.types import FrozenModel
 from dotagent.llm.calls import log_model_call
 from dotagent.llm.router import ModelRef, ModelRouter, parse_model_ref
 from dotagent.llm.types import ModelInfo
 from dotagent.store.stats import ModelProfile, read_model_profile
-
-
-class ModelsProfileCommand(FrozenModel):
-    name: Literal["models-profile"]
-    model: str | None
 
 
 def _percent(part: int, whole: int) -> str:
@@ -66,3 +61,12 @@ async def cmd_models_profile(command: ModelsProfileCommand) -> int:
     profile: ModelProfile = await asyncio.to_thread(read_model_profile, db_path(), ref.label, PROFILE_RUNS)
     sys.stdout.write("\n".join(render_profile(profile, scaffold_for(config.agent, info, profile))) + "\n")
     return 0
+
+
+async def dispatch(command: Command) -> int:
+    """Carry out one of this module's commands."""
+    match command:
+        case ModelsProfileCommand():
+            return await cmd_models_profile(command)
+        case _:
+            raise InvalidValueError("not a command of this module", {"name": command.name})

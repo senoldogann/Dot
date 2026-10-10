@@ -15,6 +15,9 @@ Effort = Literal["off", "on", "minimal", "low", "medium", "high", "xhigh", "max"
 
 INVALID_ARGUMENTS_KEY: str = "__invalid_arguments__"
 
+# The providers a model reference ("<provider>:<model>") can name.
+KNOWN_PROVIDERS: tuple[str, ...] = ("ollama", "openai", "opencode_go", "anthropic")
+
 
 class ImageData(FrozenModel):
     media_type: str

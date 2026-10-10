@@ -4,34 +4,26 @@ own browser profile."""
 import asyncio
 import sys
 from pathlib import Path
-from typing import Literal
 
 from dotagent.browser.attach import DebugEndpoint, read_debug_endpoint
 from dotagent.browser.chrome_import import ImportReport, has_stored_cookies, import_chrome_profile
+from dotagent.browser.login import open_profile_for_login
 from dotagent.browser.session import BrowserSession
 from dotagent.browser.types import Attachment
+from dotagent.cli_commands import (
+    BrowserAttachCommand,
+    BrowserDetachCommand,
+    BrowserImportChromeCommand,
+    BrowserLoginCommand,
+    Command,
+)
 from dotagent.config import BrowserConfig, load_user_config
 from dotagent.config_edit import set_browser_mode
-from dotagent.core.errors import BrowserError
+from dotagent.core.errors import BrowserError, InvalidValueError
 from dotagent.core.paths import browser_profile_dir, chrome_data_dir, config_path, downloads_dir
-from dotagent.core.types import FrozenModel
 
 _MEGABYTE: int = 1_000_000
 _CHECK_THREAD: str = "attach-check"
-
-
-class BrowserImportChromeCommand(FrozenModel):
-    name: Literal["browser-import-chrome"]
-    profile: str
-    replace: bool
-
-
-class BrowserAttachCommand(FrozenModel):
-    name: Literal["browser-attach"]
-
-
-class BrowserDetachCommand(FrozenModel):
-    name: Literal["browser-detach"]
 
 
 async def _readable_cookies(config: BrowserConfig, profile: Path) -> int:
@@ -113,3 +105,28 @@ async def cmd_browser_detach(command: BrowserDetachCommand) -> int:
         "Restart the Dot service so it uses Dot's own Chrome again: dotx service install\n"
     )
     return 0
+
+
+async def cmd_browser_login(command: BrowserLoginCommand) -> int:
+    sys.stdout.write(
+        "Chrome opens with Dot's own profile. Sign in to the sites Dot should be able to use, then quit Chrome "
+        "(Cmd+Q). Dot keeps the cookies; it never sees your passwords.\n"
+    )
+    code: int = await open_profile_for_login(browser_profile_dir(), command.url)
+    sys.stdout.write("Chrome closed; the sign-ins are saved in Dot's profile.\n")
+    return code
+
+
+async def dispatch(command: Command) -> int:
+    """Carry out one of this module's commands."""
+    match command:
+        case BrowserLoginCommand():
+            return await cmd_browser_login(command)
+        case BrowserImportChromeCommand():
+            return await cmd_browser_import_chrome(command)
+        case BrowserAttachCommand():
+            return await cmd_browser_attach(command)
+        case BrowserDetachCommand():
+            return await cmd_browser_detach(command)
+        case _:
+            raise InvalidValueError("not a command of this module", {"name": command.name})

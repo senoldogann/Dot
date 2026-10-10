@@ -5,14 +5,19 @@ import contextlib
 import sys
 import time
 from collections.abc import AsyncIterator
-from typing import Literal
 from zoneinfo import ZoneInfo
 
-from pydantic import Field
-
+from dotagent.cli_commands import (
+    Command,
+    ScheduleAddCommand,
+    ScheduleDeleteCommand,
+    ScheduleDisableCommand,
+    ScheduleEnableCommand,
+    ScheduleListCommand,
+)
 from dotagent.config import AppConfig, load_user_config
+from dotagent.core.errors import InvalidValueError
 from dotagent.core.paths import db_path, screenshots_dir
-from dotagent.core.types import FrozenModel
 from dotagent.scheduler import DAEMON_NOTE
 from dotagent.scheduler.plans import (
     UNSET_OPTIONS,
@@ -30,34 +35,6 @@ from dotagent.scheduler.plans import (
 from dotagent.scheduler.timing import resolve_zone
 from dotagent.store.db import Store
 from dotagent.store.models import ScheduleRecord
-
-
-class ScheduleListCommand(FrozenModel):
-    name: Literal["schedule-list"]
-
-
-class ScheduleAddCommand(FrozenModel):
-    name: Literal["schedule-add"]
-    title: str = Field(min_length=1, max_length=80, pattern=r"\S")
-    cron: str | None
-    at: str | None
-    mode: Literal["task", "research"]
-    goal: list[str] = Field(min_length=1)
-
-
-class ScheduleDeleteCommand(FrozenModel):
-    name: Literal["schedule-delete"]
-    schedule_id: str
-
-
-class ScheduleEnableCommand(FrozenModel):
-    name: Literal["schedule-enable"]
-    schedule_id: str
-
-
-class ScheduleDisableCommand(FrozenModel):
-    name: Literal["schedule-disable"]
-    schedule_id: str
 
 
 @contextlib.asynccontextmanager
@@ -126,3 +103,20 @@ async def cmd_schedule_disable(command: ScheduleDisableCommand) -> int:
         record: ScheduleRecord = await disable_schedule(store, command.schedule_id)
     sys.stdout.write(f"Switched off: {render_schedule(record, await schedule_zone(record.options, zone))}\n")
     return 0
+
+
+async def dispatch(command: Command) -> int:
+    """Carry out one of this module's commands."""
+    match command:
+        case ScheduleListCommand():
+            return await cmd_schedule_list(command)
+        case ScheduleAddCommand():
+            return await cmd_schedule_add(command)
+        case ScheduleDeleteCommand():
+            return await cmd_schedule_delete(command)
+        case ScheduleEnableCommand():
+            return await cmd_schedule_enable(command)
+        case ScheduleDisableCommand():
+            return await cmd_schedule_disable(command)
+        case _:
+            raise InvalidValueError("not a command of this module", {"name": command.name})

@@ -5,14 +5,21 @@ These read and change the store alone, so the daemon need not run; it is the dae
 
 import sys
 import time
-from typing import Literal
 from zoneinfo import ZoneInfo
 
 from dotagent.agent.campaign import entry_line
 from dotagent.agent.campaign_control import mark_achieved, resume_campaign, stop_campaign
+from dotagent.cli_commands import (
+    CampaignAchievedCommand,
+    CampaignListCommand,
+    CampaignResumeCommand,
+    CampaignShowCommand,
+    CampaignStopCommand,
+    Command,
+)
 from dotagent.cli_schedule import local_zone, store_alone
 from dotagent.config import load_user_config
-from dotagent.core.types import FrozenModel
+from dotagent.core.errors import InvalidValueError
 from dotagent.scheduler.timing import format_local
 from dotagent.store.models import WORKING_STATUSES, CampaignEntry, CampaignRecord, RunRecord
 
@@ -20,30 +27,6 @@ CAMPAIGN_DAEMON_NOTE: str = "The Dot daemon runs the sessions of a campaign, onl
 # How many of the newest entries of its ledger 'dotx campaign show' prints.
 _SHOWN_ENTRIES: int = 20
 _WORKING_NOTE: str = "Its session that is working goes on until it ends; Stop on the session's page stops it."
-
-
-class CampaignListCommand(FrozenModel):
-    name: Literal["campaign-list"]
-
-
-class CampaignShowCommand(FrozenModel):
-    name: Literal["campaign-show"]
-    campaign_id: str
-
-
-class CampaignStopCommand(FrozenModel):
-    name: Literal["campaign-stop"]
-    campaign_id: str
-
-
-class CampaignResumeCommand(FrozenModel):
-    name: Literal["campaign-resume"]
-    campaign_id: str
-
-
-class CampaignAchievedCommand(FrozenModel):
-    name: Literal["campaign-achieved"]
-    campaign_id: str
 
 
 def render_campaign(campaign: CampaignRecord, sessions: list[RunRecord], zone: ZoneInfo) -> str:
@@ -151,3 +134,20 @@ async def cmd_campaign_achieved(command: CampaignAchievedCommand) -> int:
     if any(session.status in WORKING_STATUSES for session in sessions):
         sys.stderr.write(f"{_WORKING_NOTE}\n")
     return 0
+
+
+async def dispatch(command: Command) -> int:
+    """Carry out one of this module's commands."""
+    match command:
+        case CampaignListCommand():
+            return await cmd_campaign_list(command)
+        case CampaignShowCommand():
+            return await cmd_campaign_show(command)
+        case CampaignStopCommand():
+            return await cmd_campaign_stop(command)
+        case CampaignResumeCommand():
+            return await cmd_campaign_resume(command)
+        case CampaignAchievedCommand():
+            return await cmd_campaign_achieved(command)
+        case _:
+            raise InvalidValueError("not a command of this module", {"name": command.name})
