@@ -343,7 +343,9 @@ class PluginsConfig(FrozenModel):
 class JudgeConfig(FrozenModel):
     """The typed judge (``[judge]``, :mod:`dotagent.agent.judge`): ``provider = "none"`` leaves its two questions to the
     policy's patterns and the goal checker; ``"typesafe"`` asks TypeSafe's System One API at ``base_url`` with the key
-    named by ``api_key_env``. ``timeout_s`` bounds one judgment, retries included."""
+    named by ``api_key_env``. ``timeout_s`` bounds one judgment, retries included. With ``second_opinion`` each
+    question is asked a second time in an independent phrasing, and the two answers have to agree before the judge
+    acts on them."""
 
     provider: Literal["none", "typesafe"]
     api_key_env: str
@@ -352,6 +354,7 @@ class JudgeConfig(FrozenModel):
     timeout_s: float = Field(gt=0, le=60)
     public_action_threshold: float = Field(ge=0, le=1)
     target_threshold: float = Field(ge=0, le=1)
+    second_opinion: bool
 
 
 class AppConfig(FrozenModel):

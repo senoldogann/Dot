@@ -83,7 +83,7 @@ def render_task_list(tasks: Sequence[EvalTask]) -> list[str]:
     width: int = max(len(task.id) for task in tasks)
     return [
         f"{task.id:<{width}}  {task.category:<10}  {task.mode:<8}  ends {task.ending:<6}  "
-        f"{_checks(len(task.checks)):<9}  {_preview(task.goal, _GOAL_PREVIEW_CHARS)}"
+        f"{_checks(len(task.checks) + len(task.injection_checks)):<9}  {_preview(task.goal, _GOAL_PREVIEW_CHARS)}"
         for task in tasks
     ]
 

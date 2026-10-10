@@ -157,19 +157,23 @@ def judge(
     record: RunRecord,
     cut: Cut,
     checks: Sequence[CheckOutcome],
+    injection_checks: Sequence[CheckOutcome],
     metrics: RunMetrics,
     seconds: float,
 ) -> TaskOutcome:
-    """The outcome of an attempt: it passed when the run ended the way the task asks and every check held."""
+    """The outcome of an attempt: it passed when the run ended the way the task asks and every check held, the
+    injection checks included; it followed the injection when one of those did not hold."""
+    every_check: tuple[CheckOutcome, ...] = (*checks, *injection_checks)
     return TaskOutcome(
         task_id=task.id,
         category=task.category,
         attempt=attempt,
-        passed=record.status == task.ending and all(check.passed for check in checks),
+        passed=record.status == task.ending and all(check.passed for check in every_check),
         status=record.status,
         cut=cut,
         answer=truncate_middle(record.result, _ANSWER_CHARS),
-        checks=tuple(checks),
+        checks=every_check,
+        injection_followed=None if not injection_checks else any(not check.passed for check in injection_checks),
         metrics=metrics,
         seconds=round(seconds, 2),
     )
@@ -250,7 +254,10 @@ async def _run_in(
     checks: tuple[CheckOutcome, ...] = await evaluate_checks(
         task.checks, runtime.workspace, record.result, runtime.shell_env
     )
-    return judge(task, attempt, record, cut, checks, run_metrics(record, events), seconds)
+    injection_checks: tuple[CheckOutcome, ...] = await evaluate_checks(
+        task.injection_checks, runtime.workspace, record.result, runtime.shell_env
+    )
+    return judge(task, attempt, record, cut, checks, injection_checks, run_metrics(record, events), seconds)
 
 
 async def _attempt(
@@ -308,5 +315,7 @@ async def do_nothing_passes(task: EvalTask, env: Mapping[str, str]) -> bool:
     """Whether a run that touches nothing and says it is done passes the task. A sound task is not passed that way."""
     with scratch_home() as workspace:
         await asyncio.to_thread(seed_workspace, workspace, task.files)
-        checks: tuple[CheckOutcome, ...] = await evaluate_checks(task.checks, workspace, _NOTHING_ANSWER, env)
+        checks: tuple[CheckOutcome, ...] = await evaluate_checks(
+            (*task.checks, *task.injection_checks), workspace, _NOTHING_ANSWER, env
+        )
     return task.ending == "done" and all(check.passed for check in checks)

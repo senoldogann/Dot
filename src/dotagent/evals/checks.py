@@ -13,6 +13,7 @@ from dotagent.core.text import fold_search, truncate_middle
 from dotagent.evals.results import CheckOutcome
 from dotagent.evals.types import (
     AnswerContains,
+    AnswerLacks,
     AnswerMatches,
     Check,
     CommandSucceeds,
@@ -55,6 +56,8 @@ def describe_check(check: Check) -> str:
             return f"the answer contains {check.text!r}"
         case AnswerMatches():
             return f"the answer matches /{check.pattern}/"
+        case AnswerLacks():
+            return f"the answer does not contain {check.text!r}"
 
 
 def _dump(value: JsonValue) -> str:
@@ -103,10 +106,14 @@ def _judge_file(
             return _outcome(check, parsed == check.expected, f"the file holds: {_shown(_dump(parsed))}")
 
 
-def _judge_answer(check: AnswerContains | AnswerMatches, answer: str) -> CheckOutcome:
+def _judge_answer(check: AnswerContains | AnswerMatches | AnswerLacks, answer: str) -> CheckOutcome:
     match check:
         case AnswerContains():
             return _outcome(check, fold_search(check.text) in fold_search(answer), f"the answer is: {_shown(answer)!r}")
+        case AnswerLacks():
+            return _outcome(
+                check, fold_search(check.text) not in fold_search(answer), f"the answer is: {_shown(answer)!r}"
+            )
         case AnswerMatches():
             try:
                 found: bool = re.search(check.pattern, answer, re.IGNORECASE) is not None
@@ -147,7 +154,7 @@ async def evaluate_check(check: Check, workspace: Path, answer: str, env: Mappin
     match check:
         case CommandSucceeds():
             return await _judge_command(check, workspace, env)
-        case AnswerContains() | AnswerMatches():
+        case AnswerContains() | AnswerMatches() | AnswerLacks():
             return _judge_answer(check, answer)
         case FileExists() | FileAbsent() | FileContains() | FileEquals() | JsonEquals():
             return await asyncio.to_thread(_judge_file, check, workspace)

@@ -11,6 +11,12 @@ The judge never decides a step and never grants anything: it adds flags that mak
 goal checker would have examined. What it sends has its secrets masked, and a page's address goes without its query and
 fragment. A missing key or a failed request makes it unavailable for ``[models] helper_cooldown_s``, with a
 ``judge_unavailable`` event, and meanwhile the patterns and the goal checker decide alone.
+
+With ``[judge] second_opinion`` each question is asked a second time, in a separate request with an independent
+phrasing (:data:`SECOND_CLICK_QUESTIONS`, :data:`SECOND_CLAIM_QUESTION`), and the judge acts on the two answers
+together: a click gets its flag when either answer is at the threshold, so a disagreement ends in the policy's
+question, and the summary names both answers; a claim is refused only when both answers are below the threshold, so a
+disagreement leaves it to the goal checker (:func:`claim_refused`).
 """
 
 import asyncio
@@ -74,6 +80,39 @@ CLAIM_QUESTION: NoulQuestion = NoulQuestion(
         "verification asks?"
     ),
 )
+# The second phrasing of each question, asked in a request of its own when [judge] second_opinion is on; the ids are
+# the same, so the answers line up with the first ones.
+SECOND_CLICK_QUESTIONS: tuple[NoulQuestion, ...] = (
+    NoulQuestion(
+        id="public_post",
+        instructions=(
+            "After this control is clicked, will other users of the site be able to see something new from this "
+            "account, such as a post, a share, a public reply or a comment?"
+        ),
+    ),
+    NoulQuestion(
+        id="external_send",
+        instructions=(
+            "After this control is clicked, will another person receive a message, an e-mail, an invitation or a "
+            "file from this account?"
+        ),
+    ),
+    NoulQuestion(
+        id="financial",
+        instructions="After this control is clicked, will money be charged, paid, ordered, subscribed or donated?",
+    ),
+    NoulQuestion(
+        id="destructive",
+        instructions="After this control is clicked, will something be gone for good: deleted, removed or destroyed?",
+    ),
+)
+SECOND_CLAIM_QUESTION: NoulQuestion = NoulQuestion(
+    id="targets_reached",
+    instructions=(
+        "Is every target met according to its own verification, going only by the facts this session read and "
+        "measured, not by what the claim asserts?"
+    ),
+)
 _ERROR_CHARS: int = 300
 
 
@@ -95,9 +134,11 @@ class ClickJudgment(FrozenModel):
 
 
 class ClaimJudgment(FrozenModel):
-    """The probability that a campaign's claim holds; ``None`` when the judge is switched off or unavailable."""
+    """The probability that a campaign's claim holds, ``None`` when the judge is switched off or unavailable, and the
+    second answer when ``[judge] second_opinion`` asked for one."""
 
     probability: float | None
+    second: float | None
 
 
 class Judge(Protocol):
@@ -128,6 +169,39 @@ def click_judgment(probabilities: dict[str, float], threshold: float) -> ClickJu
     return ClickJudgment(reasons=tuple(reason for _, reason in found), note=f"judge: {named}")
 
 
+def agreed_click_judgment(first: dict[str, float], second: dict[str, float], threshold: float) -> ClickJudgment:
+    """The click judgment of two answers to each question: a reason is given when either answer is at ``threshold``,
+    and the note names both answers, marking the questions the two disagreed on."""
+    found: list[tuple[NoulQuestion, str]] = [
+        (question, reason)
+        for question, reason in CLICK_QUESTIONS
+        if first[question.id] >= threshold or second[question.id] >= threshold
+    ]
+    if not found:
+        return ClickJudgment(reasons=(), note="")
+    named: list[str] = []
+    for question, _ in found:
+        agreed: bool = (first[question.id] >= threshold) == (second[question.id] >= threshold)
+        named.append(
+            f"{question.id} {first[question.id]:.2f}/{second[question.id]:.2f}{'' if agreed else ' (disagreed)'}"
+        )
+    return ClickJudgment(reasons=tuple(reason for _, reason in found), note=f"judge: {', '.join(named)}")
+
+
+def claim_refused(judgment: ClaimJudgment, threshold: float) -> bool:
+    """Whether the judge refuses a claim: its answer is below ``threshold`` and, when a second one was asked, so is
+    that one; a disagreement leaves the claim to the goal checker."""
+    if judgment.probability is None or judgment.probability >= threshold:
+        return False
+    return judgment.second is None or judgment.second < threshold
+
+
+def describe_claim(judgment: ClaimJudgment) -> str:
+    """The answers of the judge to a claim, for its refusal: ``0.08``, or ``0.08 and 0.11 on a second phrasing``."""
+    first: str = "-" if judgment.probability is None else f"{judgment.probability:.2f}"
+    return first if judgment.second is None else f"{first} and {judgment.second:.2f} on a second phrasing"
+
+
 class NoJudge:
     """``[judge] provider = "none"``: nothing is asked and nothing is added."""
 
@@ -135,7 +209,7 @@ class NoJudge:
         return ClickJudgment(reasons=(), note="")
 
     async def judge_claim(self, claim: JsonObject, run_id: str) -> ClaimJudgment:
-        return ClaimJudgment(probability=None)
+        return ClaimJudgment(probability=None, second=None)
 
     async def retire(self) -> None:
         return None
@@ -165,11 +239,23 @@ class TypeSafeJudge:
         )
         if probabilities is None:
             return ClickJudgment(reasons=(), note="judge off")
-        return click_judgment(probabilities, self._config.public_action_threshold)
+        threshold: float = self._config.public_action_threshold
+        if not self._config.second_opinion:
+            return click_judgment(probabilities, threshold)
+        second: dict[str, float] | None = await self._ask(state, SECOND_CLICK_QUESTIONS, run_id)
+        if second is None:
+            return click_judgment(probabilities, threshold)
+        return agreed_click_judgment(probabilities, second, threshold)
 
     async def judge_claim(self, claim: JsonObject, run_id: str) -> ClaimJudgment:
         probabilities: dict[str, float] | None = await self._ask(claim, (CLAIM_QUESTION,), run_id)
-        return ClaimJudgment(probability=None if probabilities is None else probabilities[CLAIM_QUESTION.id])
+        if probabilities is None:
+            return ClaimJudgment(probability=None, second=None)
+        first: float = probabilities[CLAIM_QUESTION.id]
+        if not self._config.second_opinion:
+            return ClaimJudgment(probability=first, second=None)
+        second: dict[str, float] | None = await self._ask(claim, (SECOND_CLAIM_QUESTION,), run_id)
+        return ClaimJudgment(probability=first, second=None if second is None else second[SECOND_CLAIM_QUESTION.id])
 
     async def retire(self) -> None:
         async with self._lock:
