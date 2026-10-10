@@ -327,8 +327,9 @@ the same way, except in a run nobody can answer during it (see
 
 **Emergency stop.** Any of these stops Dot from controlling the desktop:
 
-- the **Emergency stop** button of the web UI (or `POST /api/failsafe`) creates the `STOP` file in the home directory
-  and cancels every run; the page shows a banner with a button that releases it
+- the **Emergency stop** button of the web UI (the red square at the top right of every page, or `POST
+  /api/failsafe`) creates the `STOP` file in the home directory and cancels every run; the page shows a banner with a
+  button that releases it
 - `touch ~/Library/Application\ Support/Dot/STOP` blocks desktop control the same way; delete the file to allow it again
 - with `[desktop] failsafe_corner = true` (the default), moving the pointer into the top-left corner of the screen
   aborts the desktop step in progress, and Dot never clicks that corner
@@ -579,20 +580,27 @@ and a search over the titles (⌘K or `/`); below it, **Settings**. **Select** t
 with a run under way is refused: wait for the run to end, or cancel it. Escape leaves the selection. Under 860 px the
 sidebar becomes a drawer.
 
-**New chat** is the composer and nothing else, centred in the window: the goal, the mode (Task, Chat or Research),
-the model and, for a model that offers a choice, its reasoning level (kept in the browser per model), the approval mode
-(Ask, Auto or YOLO) and the Goal mode switch (see [Autonomy](#autonomy-approvals-goal-mode-and-the-end-of-a-run)). Enter
-starts the run, Shift+Enter adds a line. A run that waits for your approval shows above the composer.
+**New chat** is Dot's face and one composer, centred in the window: the goal, then one line with the mode (Task, Chat
+or Research), the model and, for a model that offers a choice, its reasoning level (kept in the browser per model).
+**Options** at the end of that line opens the approval mode (Ask, Auto or YOLO; the mode in use always shows on the
+button), the Goal mode switch and Keep going (see
+[Autonomy](#autonomy-approvals-goal-mode-and-the-end-of-a-run)). Enter starts the run, Shift+Enter adds a line. A run
+that waits for your approval shows above the composer.
 
-A run opens as a conversation. Your goal is the first message. The tool calls of one stretch of work fold into a single
+A run opens as a conversation under Dot's face and name, with the state of the run and when it started; its chips (the
+model, the approval mode, goal mode) and buttons sit on the right. Your goal is the first message, in the yellow bubble
+of your messages. A delegated run is a chip with its goal and a status ring (turning while it works, amber while it
+waits for you, green with a check when it is done, red when it failed); open it for its steps. The tool calls of one
+stretch of work fold into a single
 "Worked for 12 s (model 8 s) · 5 tool calls" line, where the part in brackets is how much of that time the model's turns
 took (open it for every call, result and screenshot), while approvals, questions and policy notes stay in the open. The
 answer of the run is the last message, with a Copy button and when it finished and how long the run took. A strip under
-the title links the other runs of the same thread, and the box at the bottom steers a run that is going on or follows up
+the head links the other runs of the same thread, and the box at the bottom steers a run that is going on or follows up
 on a finished one. A Details panel shows the status, the model and its reasoning level, the approval mode and goal mode,
 the model turns, the tool calls (with the failed ones), the tokens (of every model call of the run: its steps and its
 side calls, such as compactions, reviews and the goal check), the duration and the run id, then the plan and the latest
-screenshots; it sits beside the conversation from 960 px and opens as a drawer below that.
+screenshots. It stays closed until the panel button in the head of the run opens it (the choice is kept in the
+browser); open, it sits beside the conversation from 960 px and is a drawer below that.
 
 **Settings** (`#/settings`) is one page with tabs: **General** (the look of this browser, the two switches below, desktop
 notifications and the token this browser is signed in with), **Models** (one fold per provider, with the reasoning levels
@@ -606,7 +614,7 @@ addresses of the memory, schedules, rules and system pages lead to their tabs.
 
 Settings › General › Appearance switches between two looks on the same layout: **Neutral** (cool, round and quiet; the
 default) and **Paper** (warm paper tones with a serif heading). Two switches follow the look until you set them
-yourself: fold the tool steps (on in Neutral) and the Details panel (on in both). Light and dark follow the system. The
+yourself: fold the tool steps (on in Neutral) and the Details panel (off in both). Light and dark follow the system. The
 choices are kept in the browser only.
 
 While you are elsewhere, the tab title counts the approvals that wait: `(2) New chat · Dot`. Settings › General ›

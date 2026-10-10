@@ -29,6 +29,8 @@
   --bad-weak: #fbe9e6;
   --bad-border: #eeb4ad;
   --on-bad: #ffffff;
+  --bubble: var(--accent-weak);
+  --on-bubble: var(--text);
   --shadow: 0 1px 2px rgb(20 20 19 / 5%), 0 6px 20px rgb(20 20 19 / 5%);
   --radius: 12px;
   --radius-control: 8px;
@@ -68,7 +70,7 @@
 }
 
 :root[data-theme="paper"] .page-title,
-:root[data-theme="paper"] .run-title {
+:root[data-theme="paper"] .home-name {
   font-family: var(--voice);
   font-weight: 500;
   letter-spacing: -0.01em;

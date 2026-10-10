@@ -31,10 +31,17 @@ function buildIndicators() {
   );
   const dot = el("span", { class: "live-dot connecting" });
   const connectionLabel = el("span", { class: "label" }, STREAM_LABEL.connecting);
-  const connection = el("span", { class: "pill", title: "Connection to the daemon" }, dot, connectionLabel);
+  const connection = el("span", { class: "pill" }, dot, connectionLabel);
+  // The emergency stop is a red square at the top right of every page; its words are in its tooltip.
   const stop = el(
     "button",
-    { class: "btn danger sm", type: "button", title: "Cancel every run and block desktop control", onclick: () => attempt(engageFailsafe) },
+    {
+      class: "btn danger sm failsafe",
+      type: "button",
+      title: "Emergency stop: cancel every run and block desktop control",
+      "aria-label": "Emergency stop",
+      onclick: () => attempt(engageFailsafe),
+    },
     icon("stop"),
     el("span", { class: "label" }, "Emergency stop"),
   );
@@ -56,6 +63,9 @@ function buildIndicators() {
       waiting.hidden = snapshot.approvals.length === 0;
       dot.className = `live-dot ${snapshot.stream}`;
       connectionLabel.textContent = STREAM_LABEL[snapshot.stream];
+      // A live connection is a green dot; the word only shows while the connection is being made or lost.
+      connection.classList.toggle("quiet", snapshot.stream === "live");
+      connection.title = `Connection to the daemon: ${STREAM_LABEL[snapshot.stream]}`;
       banner.hidden = snapshot.status === null || !snapshot.status.failsafe_engaged;
     },
   };

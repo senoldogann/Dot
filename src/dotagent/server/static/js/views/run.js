@@ -4,10 +4,10 @@ import { api, follow } from "../api.js";
 import { approvalCard, fromRecord, LEFT_IN_CAMPAIGN, LEFT_IN_RUN } from "../approvals.js";
 import { createAttachments, readyToSend } from "../attachments.js";
 import { createDetails } from "../details.js";
-import { clip, dateTimeFull, debounce, el, modelName } from "../dom.js";
+import { clip, dateTime, dateTimeFull, debounce, el, modelName } from "../dom.js";
 import { levelLabel } from "../efforts.js";
 import { continuedIn, earlierTurns, loadHistory, RESUME_SOURCE } from "../history.js";
-import { icon } from "../icons.js";
+import { avatar, icon } from "../icons.js";
 import { createInspector } from "../inspector.js";
 import { userMessage } from "../messages.js";
 import { emptyPanel, errorPanel, foldCard, loadingPanel, statusBadge } from "../panels.js";
@@ -577,25 +577,25 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
     historyProblem === null
       ? null
       : el("div", { class: "note warn" }, icon("alert"), el("span", null, `The earlier part of this conversation could not be loaded: ${historyProblem.message}`));
+  // Dot's face and name head the conversation, with the run's state and when it started; the goal is the first message.
   const chatHead = el(
     "header",
     { class: "chat-head" },
-    statusSlot,
-    el("h1", { class: "run-title", title: run.goal }, run.goal),
-    modelChip,
-    modeChips,
-    parentChip,
-    campaignChip,
-    inspector.toggle,
-    resumeButton,
-    cancelButton,
+    el("h1", { class: "visually-hidden" }, run.goal),
+    el(
+      "div",
+      { class: "chat-who" },
+      avatar(),
+      el("div", { class: "chat-who-name" }, "Dot"),
+      el("div", { class: "chat-who-sub" }, statusSlot, el("span", null, dateTime(run.created_at))),
+    ),
+    el("div", { class: "chat-tools" }, modelChip, modeChips, parentChip, campaignChip, inspector.toggle, resumeButton, cancelButton),
   );
 
   layout.append(
     el(
       "div",
       { class: "run-main" },
-      backLink(),
       chatHead,
       connectionNote,
       problem,

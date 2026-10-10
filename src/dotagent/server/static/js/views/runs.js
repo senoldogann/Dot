@@ -1,16 +1,16 @@
-// The home page: one composer in the middle of the window. The recent runs live in the sidebar; a run that waits for an
-// answer is the only other thing this page ever shows, above the composer.
+// The home page: Dot's face and one composer in the middle of the window. The recent runs live in the sidebar; a run that
+// waits for an answer is the only other thing this page ever shows, above them.
 
 import { approvalCard, fromRecord, LEFT_IN_RUN } from "../approvals.js";
 import { api } from "../api.js";
 import { createAttachments, readyToSend } from "../attachments.js";
 import { el, modelName } from "../dom.js";
 import { allModels, offersChoice, savedLevel } from "../efforts.js";
-import { icon } from "../icons.js";
+import { avatar, icon } from "../icons.js";
 import { segmented } from "../panels.js";
 import { providerLabel } from "../providers.js";
 import { reasoningSelect } from "../reasoning.js";
-import { approvalsPicker, goalModePicker, standingPicker } from "../runmodes.js";
+import { approvalLabel, approvalsPicker, goalModePicker, standingPicker } from "../runmodes.js";
 import { onCompose } from "../shortcuts.js";
 import { getSnapshot, loadModels, onChange, refresh } from "../state.js";
 import { attempt } from "../ui.js";
@@ -44,8 +44,14 @@ function pick(caption, control) {
 }
 
 function buildComposer(ctx) {
-  const goal = el("textarea", { class: "textarea", rows: "3", placeholder: "What should Dot do?", "aria-label": "Goal" });
-  const approvals = approvalsPicker();
+  const goal = el("textarea", { class: "textarea", rows: "3", placeholder: "Message Dot", "aria-label": "Goal" });
+  // The approval mode stays in sight on the Options button, since it decides whether the run asks before it acts.
+  const approvalTag = el("span", { class: "chip", hidden: true });
+  const approvals = approvalsPicker((shown) => {
+    approvalTag.hidden = shown === null;
+    approvalTag.className = `chip approvals-${shown}`;
+    approvalTag.textContent = shown === null ? "" : approvalLabel(shown);
+  });
   const goalMode = goalModePicker();
   // A campaign checks its outcome itself, so goal mode does not apply to one; the switch only shows for a task.
   const standing = standingPicker((on) => goalMode.setAvailable(!on));
@@ -59,6 +65,19 @@ function buildComposer(ctx) {
   const model = el("select", { class: "select sm", "aria-label": "Model" }, defaultOption);
   const reasoning = el("span", { class: "composer-reasoning", hidden: true });
   const attachments = createAttachments({ dropTarget: goal, input: goal });
+  // Approvals and goal mode are kept per browser and keep going is for the odd goal, so the three wait behind one button.
+  const more = el("div", { class: "composer-more", hidden: true }, approvals.element, goalMode.element, standing.element, approvals.warning);
+  const moreButton = el(
+    "button",
+    { class: "btn ghost sm", type: "button", "aria-expanded": "false", title: "Approvals, goal mode and keep going" },
+    icon("sliders"),
+    el("span", null, "Options"),
+    approvalTag,
+  );
+  moreButton.addEventListener("click", () => {
+    more.hidden = !more.hidden;
+    moreButton.setAttribute("aria-expanded", String(!more.hidden));
+  });
   const start = el(
     "button",
     { class: "btn primary send", type: "button", title: "Start (Enter)", "aria-label": "Start" },
@@ -197,10 +216,10 @@ function buildComposer(ctx) {
     el(
       "div",
       { class: "composer-bar" },
-      el("div", { class: "composer-options" }, attachments.button, mode.element, pick("Model", model), reasoning, approvals.element, goalMode.element, standing.element),
+      el("div", { class: "composer-options" }, attachments.button, mode.element, pick("Model", model), reasoning, moreButton),
       start,
     ),
-    approvals.warning,
+    more,
     standing.note,
   );
   return { element, focus: () => goal.focus(), dispose: onChange(syncStatus) };
@@ -242,7 +261,8 @@ function buildApprovals() {
 export function mount(root, ctx) {
   const composer = buildComposer(ctx);
   const approvals = buildApprovals();
-  root.append(el("div", { class: "home" }, el("h1", { class: "visually-hidden" }, "New chat"), approvals.element, composer.element));
+  const who = el("div", { class: "home-who" }, avatar(), el("div", { class: "home-name" }, "Dot"), el("p", { class: "home-hint" }, "What should I work on?"));
+  root.append(el("div", { class: "home" }, el("h1", { class: "visually-hidden" }, "New chat"), approvals.element, el("div", { class: "home-start" }, who, composer.element)));
   approvals.sync(getSnapshot());
   const stopApprovals = onChange(approvals.sync);
   const stopCompose = onCompose(composer.focus);
