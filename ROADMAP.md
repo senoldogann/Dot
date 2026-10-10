@@ -74,10 +74,11 @@ order its "Order and dependencies" paragraph gives. All of part 2 is done as wel
   `DOT_LOG_DIR` for a daemon and for every other `dotx` command, `dotx eval check` included: each one logs to
   `<log dir>/dotx.log`, which otherwise is the owner's `~/Library/Logs/Dot`) and never the owner's data directory
   (`~/Library/Application Support/Dot`): not even to read message text. Counting rows is the most that was ever done
-  there.
-- Safety: never start, stop or restart the owner's launchd daemon. Nothing that deletes the owner's data may run by
-  default: retention and cleanup are explicit commands. `PLAN.md` (the owner's working notes, untracked on purpose,
-  excluded in `.git/info/exclude`) is not committed.
+  there, besides the owner's `config.toml`, edited for decision 10 at the owner's word.
+- Safety: start, stop or restart the owner's launchd daemon only at the owner's word (on 2026-10-10 they let the agent
+  restart it with `dotx service install`). Nothing that deletes the owner's data may run by default: retention and
+  cleanup are explicit commands. `PLAN.md` (the owner's working notes, untracked on purpose, excluded in
+  `.git/info/exclude`) is not committed.
 - Git, since 2026-10-09: the repository is `https://github.com/senoldogann/Dot` (`origin`, branch `main`). One branch
   per item (`item-09-time-accounting`), commits with the agent's `Co-Authored-By` trailer, pushed to `origin`; one pull
   request per item against `main`, its description ending with the attribution line the harness gives, carrying the
@@ -2059,8 +2060,9 @@ when they run it.
 
 ### 17. Pacing and public actions on social platforms
 
-**Status: done** (`d50a41e`, PR #11). **Goal.** Reposts, quotes, follows and likes are seen as what they are, and a run
-keeps to a pace that a platform tolerates, so an account that Dot grows is not the account Dot gets suspended.
+**Status: done** (`d50a41e`, PR #11); no limit is set by default since decision 8 (2026-10-10). **Goal.** Reposts,
+quotes, follows and likes are seen as what they are, and a run keeps to a pace that a platform tolerates, so an account
+that Dot grows is not the account Dot gets suspended.
 
 **Why.** `_POST_ACTION` and `_SEND_ACTION` (`policy/elements.py:28-29`) catch Post, Tweet, Retweet, Publish, Share,
 Comment, Send and Reply; "Repost" and "Quote" (X's labels since 2023) match nothing, and Follow and Like carry no flag
@@ -2076,11 +2078,12 @@ suspend for exactly that.
   `tykkää` in the same place ("Follow @dot", "12 Likes. Like"; "Posts you might like" and "Following @dot" are no
   action). It gives the reason `social`: the new flag `social`, of risk `low` when it is the only one, in
   `TAINT_ESCALATION_FLAGS` (outward-facing).
-- **The pace** (new `policy/pace.py`, pure). `[policy.pace] public_per_hour = 10`, `public_per_day = 50`,
-  `social_per_hour = 20`, `social_per_day = 100`, `public_spacing_s = 20`; 0 removes a limit. A `browser_click` or
-  `browser_input` action with `public_post` or `external_send` is public, one with `social` is social. It counts on its
-  site, the host of the action's target (the page's address) without `www.`, across runs and threads, in a sliding
-  hour and day (`paced_actions(host, pace, ts, run_id)` in the store).
+- **The pace** (new `policy/pace.py`, pure). `[policy.pace]` `public_per_hour`, `public_per_day`, `social_per_hour`,
+  `social_per_day`, `public_spacing_s`; 0 removes a limit, and every default is 0 since decision 8 (the first defaults
+  were 10, 50, 20, 100 and 20 s). A `browser_click` or `browser_input` action with `public_post` or `external_send` is
+  public, one with `social` is social. It counts on its site, the host of the action's target (the page's address)
+  without `www.`, across runs and threads, in a sliding hour and day (`paced_actions(host, pace, ts, run_id)` in the
+  store).
 - **In the gate** (`agent/gate.py`). Before the policy decides, an action past a limit is refused (`PolicyDenied` and a
   `policy` event with source `pace`): "Pace for x.com: 10 of 10 public actions in the last hour; the next is allowed at
   14:35. Do other work meanwhile, or leave the rest to a later session." No approval mode waives it. Once the action is
@@ -2089,8 +2092,9 @@ suspend for exactly that.
 - **One per batch** (`tools/browser.py`). A `browser_act` call with more than one public or social click (by the
   patterns or the typed judge) is sent back ("A batch takes one public or social action at most…"), so that each one
   counts.
-- **Prompt.** A bullet under Browser: keep to a platform's rules (no bulk follows or likes, no duplicate posts, nothing
-  its automation rules forbid), one public or social action per `browser_act`, and what a refusal of the pace means.
+- **Prompt.** A bullet under Browser: one public or social action per `browser_act`. Until decision 8 it also told the
+  agent to keep to a platform's rules (no bulk follows or likes, no duplicate posts, nothing its automation rules
+  forbid) and what a refusal of the pace means, which a refusal says itself.
 - **Where it is seen.** The refusal is a `policy` event, which the timeline and `dotx run` show with its reason. README
   "Safety" ("Pace on social platforms").
 
@@ -2114,9 +2118,9 @@ that the policy does not import the agent), `config.py`, `defaults.toml`, README
 - The typed judge's tests use "Boost" and other labels the new patterns do not know.
 
 **Decisions and limits.**
-- The defaults are guesses below X's published limits (decision 8). X's automation rules forbid automated likes and
-  bulk or aggressive following, and warn that scripting the website can get an account suspended: the pace makes Dot
-  slow, not allowed.
+- No limit is set by default (decision 8: the owner wants the agent free); the first defaults were guesses below X's
+  published limits. X's automation rules forbid automated likes and bulk or aggressive following, and warn that
+  scripting the website can get an account suspended.
 - Only the clicks the policy recognises are counted: a post sent with a keyboard shortcut or through an API from the
   shell is not, and an action that was let through counts even when its click then fails.
 - Two runs acting on one site at the same moment can both pass a limit before either is recorded.
@@ -2323,25 +2327,27 @@ text, no console error; the Options panel with YOLO saved; every status ring. RE
    run the hosted test once (`.venv/bin/python -m pytest tests/smoke/test_hosted_services.py -m hosted -k anthropic`:
    a few tiny requests of `claude-haiku-5-5`). A Claude model is then a candidate for `[models] review` while `main` is
    of another family (decision 3).
-6. Standing goals (item 12): the composer switch "Keep going until done" is off by default and a campaign stops only
-   when the owner stops it; the defaults `campaign_gap_minutes = 60`, `campaign_wait_hours = 24`,
-   `campaign_patience_sessions = 3`, `campaign_max_sessions = 0`, and item 11's `run_max_minutes = 0`,
-   `run_max_tokens = 0` are proposals: say the numbers you want, or that none should bound a campaign.
-7. `yolo` and password managers (item 10): secure fields and one-time codes are typed in `yolo` by design of this
-   part; password-manager apps stay refused in every mode unless you say otherwise.
-8. Pace limits (item 17): the defaults (`[policy.pace]`: 10 public actions an hour and 50 a day, 20 social ones an hour
-   and 100 a day, 20 s between public actions) sit below X's published limits as search results quoted the Help Center
-   on 2026-10-10 (help.x.com answered HTTP 403 to a direct read, so its pages were not read themselves): an unverified
-   account may send 50 posts and 200 replies a day (cut from 2 400 in May 2026, by news reports), 500 messages and 400
-   follows. The same sources say X's automation rules forbid automated likes outright and bulk or aggressive following,
-   and that scripting the website can get an account suspended. Decide whether Dot may like and follow on X at all, and
-   set your numbers, or 0.
+6. Standing goals (item 12), decided by the owner on 2026-10-09: the composer switch "Keep going until done" is off by
+   default, a campaign stops only when the owner stops it, and the proposed numbers stay (`campaign_gap_minutes = 60`,
+   `campaign_wait_hours = 24`, `campaign_patience_sessions = 3`, `campaign_max_sessions = 0`, and item 11's
+   `run_max_minutes = 0`, `run_max_tokens = 0`).
+7. `yolo` and password managers (item 10), decided by the owner on 2026-10-09: `yolo` types secure fields and one-time
+   codes; password-manager apps stay refused in every mode.
+8. Pace limits (item 17), decided by the owner on 2026-10-10: no limit, the agent is free to post, follow and like as
+   its task needs. Every `[policy.pace]` default is 0 and the prompt no longer tells the agent to keep to a platform's
+   rules; a limit set in `config.toml` still holds in every mode. What X publishes, as search results quoted its Help
+   Center on 2026-10-10 (help.x.com answered HTTP 403 to a direct read): an unverified account may send 50 posts and 200
+   replies a day, 500 messages and 400 follows; its automation rules forbid automated likes and bulk or aggressive
+   following, and scripting the website can get an account suspended.
 9. TypeSafe (item 16): save `TYPESAFE_API_KEY` (Settings › API keys, or `dotx auth set TYPESAFE_API_KEY`), run the
    hosted test (a few paid requests: `.venv/bin/python -m pytest tests/smoke/test_hosted_services.py -m hosted -k
    typesafe`), set the thresholds by what it prints, and run the read-only count on your history (how many allowed
    clicks on social hosts had labels no pattern matched) before `[judge] provider = "typesafe"` becomes your default.
-10. Skills (item 18): put `dirs = ["~/.claude/skills"]` under `[skills]` in your `config.toml` once the loader accepts
-    your two X skills; Dot reads nothing there until you do.
+10. Skills (item 18), done on 2026-10-10 at the owner's word: the owner's `config.toml` lists the six skill folders of
+    `~/.claude/skills` that stand alone (the two X skills, `find-skills`, `frontend-design`, `ui-ux-pro-max`,
+    `rust-best-practices`), not the whole folder, which would also bring its `superpowers` bundle (process skills that
+    tell the model to brainstorm, plan and ask before it acts) and its `synced` skills (claude.ai's, for tools Dot does
+    not have). Add `"~/.claude/skills"` itself to take them all.
 11. Helpers (item 15): fill `[models] helpers` and `[models] standby` in your `config.toml`. The natural first entry is
     a Claude model once `ANTHROPIC_API_KEY` is saved (decision 5).
 12. Only you can check live: the X composer with item 14's `type` and `insert`, and a `yolo` run that reads a
@@ -2352,10 +2358,10 @@ text, no console error; the Options panel with YOLO saved; every status ring. RE
     paste_threshold_chars` (40: typing costs 8 ms a character, a paste about 0.25 s), `[agent] tool_output_chars` and
     `keep_recent_tool_results`, besides `tool_surface = "grouped"` (decision 2) and the compaction model (decision 4,
     and `agent/loop.py:290-298` records the decision that a run compacts with its own model).
-14. Research (not an item of part 2): a `research` run can save nothing, not even a note (`write_file` and
-    `memory_save` are acting-only, `tools/base.py:16-17`), and DuckDuckGo's bot check throttles long research runs
-    (README "Status and known limits"). Say whether a research run may save notes and files under the workspace,
-    and whether the hosted Ollama search (`OLLAMA_API_KEY`) should be the default backend; either is a small item.
+14. Research (not an item of part 2): a `research` run can save nothing, not even a note (`write_file` and `memory_save`
+    are acting-only, `tools/base.py:16-17`), and DuckDuckGo's bot check throttles long research runs (README "Status and
+    known limits"). Decided by the owner on 2026-10-09: no change for now; note saving and the hosted Ollama search
+    (`OLLAMA_API_KEY`) as the default backend come later.
 15. The Claude GitHub app reviews nothing: on PR #1, PR #2 and PR #4 to PR #10 it answered "Code review skipped" (on PR
     #3 it posted nothing) because your organization has no extra usage to pay for it, and on PR #11 it answered nothing.
     On 2026-10-10 you said its limit is spent: PRs no longer wait for it and are merged on the agent's own review. Extra
@@ -2706,3 +2712,8 @@ text, no console error; the Options panel with YOLO saved; every status ring. RE
   minutes. Reviewed in the main session. Unit tests (558), the offline smoke suite (247, no cloud request).
 - 2026-10-10: item 20 merged as `cdf7ec7` (PR #14, squash). Every item of part 2 is done; what waits for the owner
   is in "Open owner decisions".
+- 2026-10-10: decision 8 answered by the owner: no pace limit, the agent is free. Every `[policy.pace]` default is 0,
+  and the Browser bullet of the prompt no longer tells the agent to keep to a platform's rules; a limit set in
+  `config.toml` still holds in every mode, and a `browser_act` still takes one public or social click. Decisions 6, 7
+  and 14, which the owner answered on 2026-10-09, are marked so; decision 10 is done (six skill folders of
+  `~/.claude/skills` in the owner's `config.toml`). Branch `decision-08-no-pace-limits`.
