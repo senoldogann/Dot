@@ -6,7 +6,7 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, replace
 from urllib.parse import urlsplit
 
-from dotagent.agent.gate import RunGate
+from dotagent.agent.gate import RunGate, hold_note
 from dotagent.core.errors import (
     ApprovalRejected,
     DotError,
@@ -139,6 +139,8 @@ async def _run_checked(call: ToolCall, tool: RegisteredTool, ctx: ToolContext, g
         asked_at: float = time.monotonic()
         try:
             note: str = await gate.authorize(action)
+            # The user may hold the run (a takeover of the browser): the call waits here, not on its own clock.
+            held_s: float = await gate.wait_free()
         finally:
             at_gate.seconds += time.monotonic() - asked_at
         async with asyncio.timeout(tool.timeout_s) as scope:
@@ -155,7 +157,10 @@ async def _run_checked(call: ToolCall, tool: RegisteredTool, ctx: ToolContext, g
         gate.observe(action)
     if result.untrusted:
         gate.taint()
-    return _Checked(result=_with_approval_note(result, note), action=action, waited_s=at_gate.seconds)
+    noted: ToolResult = _with_approval_note(result, note)
+    if held_s > 0.0:
+        noted = noted.model_copy(update={"text": f"{noted.text}\n\n{hold_note(held_s)}"})
+    return _Checked(result=noted, action=action, waited_s=at_gate.seconds)
 
 
 def _turn_on_action(tool: str, group: str) -> ActionInfo:

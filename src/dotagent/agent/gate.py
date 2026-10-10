@@ -8,7 +8,7 @@ from collections.abc import Mapping
 from dotagent.agent.approvals import ApprovalBroker, ApprovalOutcome
 from dotagent.agent.review import Reviewer, ReviewRequest, ReviewVerdict, shorten_reason
 from dotagent.config import PaceConfig, SpendCap
-from dotagent.core.errors import ApprovalRejected, HandedOff, PolicyDenied
+from dotagent.core.errors import ApprovalRejected, HandedOff, PolicyDenied, RunConflict
 from dotagent.core.logs import get_logger
 from dotagent.core.types import JsonObject
 from dotagent.events import EventBus
@@ -24,6 +24,19 @@ log = get_logger(__name__)
 # Who decided, as the approval records and the ``approval_auto`` event state it.
 YOLO_DECIDER: str = "yolo"
 REVIEWER_DECIDER: str = "reviewer"
+
+# The user took the browser (and with it the run) over, and gave it back: the run waits at its next tool call in
+# between (see ``RunGate.hold``). ``held_s`` of the handback is how long.
+TAKEOVER_EVENT: str = "takeover"
+HANDBACK_EVENT: str = "handback"
+
+
+def hold_note(seconds: float) -> str:
+    """What a tool result says when the user held the run while it waited to run that tool."""
+    return (
+        f"[The user took over the browser and used it themselves for {seconds:.0f} s before this ran. The page may "
+        "have changed: take a snapshot before you act on it.]"
+    )
 
 
 def _describe(info: ActionInfo) -> JsonObject:
@@ -84,10 +97,43 @@ class RunGate:
         self.tainted: bool = False
         # Whether the run read such content at any point: a fresh instruction clears ``tainted``, never this.
         self.ever_tainted: bool = False
+        # Set while the run may go on; cleared while the user holds it (``hold``), with when the hold began.
+        self._free: asyncio.Event = asyncio.Event()
+        self._free.set()
+        self._held_since: float | None = None
 
     @property
     def instructions(self) -> tuple[str, ...]:
         return self._instructions
+
+    @property
+    def held(self) -> bool:
+        return not self._free.is_set()
+
+    def hold(self) -> None:
+        """Keep the run from running its next tool call until ``release``; a run already held is refused."""
+        if self.held:
+            raise RunConflict("the run is already taken over", {"run_id": self._run_id})
+        self._held_since = time.monotonic()
+        self._free.clear()
+
+    def release(self) -> float:
+        """Let the run go on; returns how long it was held. A run that is not held is refused."""
+        if not self.held or self._held_since is None:
+            raise RunConflict("the run is not taken over", {"run_id": self._run_id})
+        seconds: float = time.monotonic() - self._held_since
+        self._held_since = None
+        self._free.set()
+        return seconds
+
+    async def wait_free(self) -> float:
+        """Wait while the user holds the run (the executor calls it before each tool runs); returns the seconds
+        waited, 0 when the run was not held."""
+        if not self.held:
+            return 0.0
+        waited_from: float = time.monotonic()
+        await self._free.wait()
+        return time.monotonic() - waited_from
 
     def add_instruction(self, text: str) -> None:
         """Count a message of the user (a steer, the answer to a question) among the instructions the reviewer reads."""

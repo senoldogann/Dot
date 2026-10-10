@@ -185,6 +185,18 @@ class JudgeErrorPayload(Payload):
     error: str
 
 
+class TakeoverPayload(Payload):
+    """The user took the browser over (the run waits at its next tool call); ``url`` is the tab they got."""
+
+    source: str
+    url: str | None
+
+
+class HandbackPayload(Payload):
+    source: str
+    held_s: float
+
+
 class ResumedCallPayload(Payload):
     tool: str
     end: CallEnd
@@ -401,6 +413,15 @@ class TerminalUi:
             case "judge_error":
                 rejected = JudgeErrorPayload.model_validate(data)
                 self._line(self._paint(f"  ⚠ TypeSafe rejected a request: {rejected.error}", "33"))
+            case "takeover":
+                taken = TakeoverPayload.model_validate(data)
+                where: str = "" if taken.url is None else f" at {taken.url}"
+                self._line(self._paint(f"  ✋ you took the browser over{where}; the run waits", "33"))
+            case "handback":
+                back = HandbackPayload.model_validate(data)
+                self._line(
+                    self._paint(f"  ✋ you gave the browser back after {back.held_s:.0f} s; the run goes on", "33")
+                )
             case "judge_unavailable":
                 judge = JudgeUnavailablePayload.model_validate(data)
                 minutes: int = max(1, round((judge.until - time.time()) / 60))

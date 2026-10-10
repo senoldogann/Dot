@@ -3281,7 +3281,7 @@ third; 49 (the face as the state) and 50 (the visual system) next, form on top o
 
 | #   | Item                                                                     | Status  | Commits |
 | --- | ------------------------------------------------------------------------ | ------- | ------- |
-| 46  | Dot's computer: the live view and the handover                           | planned |         |
+| 46  | Dot's computer: the live view and the handover                           | in progress |         |
 | 47  | Activity: everything in motion in one list                               | planned |         |
 | 48  | Rules in four answers                                                    | planned |         |
 | 49  | The face as the state                                                    | planned |         |
@@ -3313,8 +3313,23 @@ each tool call (`agent/executor.py`), the loop waits on it as on a question, and
 and queues a snapshot. The panel lives in the Details panel's place when a run uses the browser and the owner opens
 it; the choice is kept in the browser.
 
-**Touchpoints.** `browser/driver.py`, `browser/session.py`, `agent/executor.py`, `agent/loop.py`, `server/stream.py`,
-`server/routes_runs.py`, `static/js/views/run.js`, `run.css`, `cli_ui.py` (a `takeover` line), README.
+**Design, as built (2026-10-11).** `BrowserSession.screencast(thread_id)` is an async generator over Chrome's
+`Page.startScreencast` (JPEG 50, longest edge 1280) on the thread's current tab, read without the thread's lock so it
+never waits behind an action and never starts a Chrome; it yields `None` once a second while nothing paints, follows
+the tab the model switches to, and stops the cast when the reader stops. `GET /runs/{id}/screencast` is a
+server-sent stream of `frame` events (the address and the JPEG, base64), keepalives in between, ending with the run;
+the web client reads it with the same fetch-based SSE reader as the run stream, so the token stays in a header. The
+hold lives in `RunGate` (`hold`, `release`, `wait_free`, `held`): the executor waits in `wait_free` after
+`authorize`, so the wait counts as time at the gate, not the tool's, and the result of the call that waited ends with
+the hold note (how long, take a snapshot first). `RunManager.take_over` refuses a headless browser and a run already
+held, focuses the tab (`BrowserSession.focus`) and emits `takeover`; `hand_back` emits `handback` with `held_s`;
+`RunDetail.held` says the state on a reload. The card `static/js/computer.js` sits first in the details panel with
+Watch / Close the view and the pill; `timeline.js` notes both events and tells the card; `dotx run` prints them. The
+loop was not touched: the executor is the one place every tool call passes.
+
+**Touchpoints.** `browser/types.py`, `browser/session.py`, `agent/gate.py`, `agent/executor.py`, `agent/manager.py`,
+`server/views.py`, `server/stream.py`, `server/routes_runs.py`, `static/js/computer.js`, `views/run.js`,
+`timeline.js`, `run.css`, `cli_ui.py`, README, `tests/smoke/test_takeover.py`.
 
 **Done when.** A smoke test on the fixture server opens the panel, receives frames, takes over (the run waits, the
 next tool call does not run), returns control (the run goes on with a snapshot event) and finishes; a run without the
@@ -3594,6 +3609,14 @@ tailnet for an approval and opens the run (owner's run, logged by hand in this f
     step and a half more a pass, 8.5k tokens more, 1.7 s more: the numbers do not favour it, so the router stays off
     and the default holds. Not kept: the per-step `step_routed` counts, since an eval attempt's home is thrown away
     with its database; the next measurement should read them from `dotx timeline` of a kept run. Resolved: off.
+    The same two arms on `ollama:deepseek-v4.1-flash:cloud` (the model of most of the owner's real runs), `--repeat 2`,
+    68 attempts an arm, on 2026-10-11: router off 62/68, 4.3 steps and 9.8 s a pass, 50.2k tokens, 11 of 301 tool
+    calls failed; router on 62/68, 6.5 steps and 13.5 s a pass, 68.4k tokens, 12 of 398 failed, and four tasks passed
+    in one attempt only (rename-function, collect-contacts, turkish-sort, filter-headlines). The same verdict, by a
+    wider margin: the routed steps cost 2.2 steps, 18.2k tokens and 3.7 s a pass at the same success. Off it stays. A
+    side finding for the safety set: DeepSeek followed the hidden instruction in 4 of 6 injection attempts off and 2
+    of 6 on (the two arms differ by variance there too; the two injection tasks are where it fails), which is a
+    number for the preset decision (2), not for this one.
 
 30. The desktop shell (item 51): Tauri 2 (Rust, a few MB, nothing to change in the web UI) or Electron (TypeScript,
     about 150 MB). The recommendation is Tauri 2: the shell is a window, a tray item and notifications, nothing that
@@ -4021,3 +4044,4 @@ tailnet for an approval and opens the run (owner's run, logged by hand in this f
 - 2026-10-10 (Fable 5.1): Part 3 bookkeeping merged 181709d (PR #45). The daemon was reinstalled at the owner's word (`dotx service install`, no run or campaign active), so items 22 to 45 are live.
 - 2026-10-10 (Fable 5.1): the live measurements behind decisions 26, 28 and 29 ran at the owner's word on `ollama:minimax-m2.7:cloud` with the TypeSafe key, each arm a throw-away home (reports under /tmp/dot-evals, not committed). Decision 26: `judge_items` never called on filter-headlines, no gain. Decision 28: the eval set exercises neither `expect` nor the goal check, the arms differ by variance only. Decision 29: the step router costs a step and a half, 8.5k tokens and 1.7 s a pass at the same success, so it stays off, resolved. Decision 27 needs the owner's own labeled feed and stays open. Branch `part-3-measurements` also sharpens the `step` description of `delegate`.
 - 2026-10-11 (Fable 5.1): Part 4 planned at the owner's word ("find OpenAI's Dot design, make ours like it and better; desktop and mobile apps are planned"): the product is OpenAI's dots (DevDay 2026-09-29), read from learn.chatgpt.com/docs/dots and reviews; items 46 to 52 (live view and takeover, Activity, four-answer rules, the face as the state, the visual system, the desktop shell, the phone) and decisions 30 to 32. The DeepSeek arms of decision 29 run in the background and are logged when they end.
+- 2026-10-11 (Fable 5.1): the DeepSeek arms of decision 29 ended (62/68 both; the router costs 2.2 steps, 18.2k tokens and 3.7 s a pass): off it stays. Item 46 started on `item-46-live-view` (MYP-186).

@@ -109,7 +109,7 @@ function paintGroup(group) {
  * `onRunStatus({ status, model, endedAt })` (`endedAt` is null until the run is over), `onAnswer(node)` when the answer is
  * on the page and `onImage(name)` for every screenshot a tool returned.
  */
-export function createTimeline({ rootRunId, startedAt, onGrow, onPlan, onStats, onCalls, onRunStatus, onAnswer, onImage, onQuestionLeft }) {
+export function createTimeline({ rootRunId, startedAt, onGrow, onPlan, onStats, onCalls, onRunStatus, onAnswer, onImage, onQuestionLeft, onHeld }) {
   const element = el("div", { class: "timeline" });
   const scopes = new Map();
   const cards = new Map();
@@ -660,6 +660,18 @@ export function createTimeline({ rootRunId, startedAt, onGrow, onPlan, onStats, 
     // error of the code or the model, logged with the request; nothing is paused.
     judge_error(scope, record) {
       note(scope, record.ts, "key", `TypeSafe rejected a request (the log has it): ${record.data.error}`, "warn");
+    },
+
+    // The user took the browser over (`url`: the tab they got) and the run waits at its next tool call; and gave it
+    // back after `held_s` seconds, with a note to the model that the page may have changed.
+    takeover(scope, record) {
+      const where = record.data.url ? ` at ${record.data.url}` : "";
+      note(scope, record.ts, "hand", `You took the browser over${where}; the run waits until you return control.`, "");
+      onHeld(true);
+    },
+    handback(scope, record) {
+      note(scope, record.ts, "hand", `You returned control after ${Math.round(record.data.held_s)} s; the run goes on.`, "");
+      onHeld(false);
     },
 
     // A typed judgment sent a step to another model of the run (`model`, `option`, `probabilities`); or that model
