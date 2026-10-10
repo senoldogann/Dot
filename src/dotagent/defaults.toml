@@ -24,6 +24,12 @@ mcp = []
 host = "127.0.0.1"
 port = 8765
 
+[store]
+# Nothing in the database is deleted by itself. `dotx prune` reports, and `dotx prune --apply` deletes, the events (the
+# steps, tool calls and results of the timeline) of the runs that ended more than retention_days days ago, and with
+# them the screenshots only those events name; the runs themselves, their answers, numbers and conversations stay.
+retention_days = 90
+
 [models]
 # "<provider>:<model>"; providers are ollama, openai, opencode_go and anthropic.
 # A run uses the model it was started with (main unless one is chosen) for every step, until it moves to a standby
@@ -416,7 +422,8 @@ similar_threshold = 0.85
 max_chars = 600
 
 [scheduler]
-# IANA name ("Europe/Helsinki") of the zone that cron expressions and one-time moments are read in; "" = this Mac's zone.
+# IANA name ("Europe/Helsinki") of the zone that cron expressions and one-time moments are read in; "" = the zone the
+# TZ environment variable names when one is set, else this Mac's zone.
 timezone = ""
 # How often the daemon looks for schedules that are due.
 tick_s = 15.0

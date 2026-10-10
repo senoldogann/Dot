@@ -15,6 +15,7 @@ _CRON_FIELDS: int = 5
 # schedule far enough to see all the times of one matching day.
 _GAP_SAMPLE: int = 600
 _LOCALTIME: str = "/etc/localtime"
+_TZ: str = "TZ"
 _ZONEINFO_MARK: str = "zoneinfo/"
 _STAMP_FORMAT: str = "%a %Y-%m-%d %H:%M"
 
@@ -29,10 +30,17 @@ class Timing(FrozenModel):
 
 
 def _system_zone_name() -> str:
+    """The zone the environment names in ``TZ`` (the POSIX way, which a shell or a runner sets on purpose), else the
+    one this Mac is set to, read from the link ``/etc/localtime``."""
+    named: str = os.environ.get(_TZ, "")
+    if named != "":
+        return named
     target: str = os.path.realpath(_LOCALTIME)
     _, mark, name = target.partition(_ZONEINFO_MARK)
     if mark == "" or name == "":
-        raise ConfigError("cannot tell the time zone of this Mac; set [scheduler] timezone", {"localtime": target})
+        raise ConfigError(
+            "cannot tell the time zone of this Mac; set [scheduler] timezone or TZ", {"localtime": target}
+        )
     return name
 
 
@@ -48,7 +56,8 @@ def named_zone(name: str) -> ZoneInfo:
 
 
 def resolve_zone(name: str) -> ZoneInfo:
-    """The zone that schedules are read in: ``name``, or the zone this Mac is set to when ``name`` is empty.
+    """The zone that schedules are read in: ``name``, or when ``name`` is empty the zone ``TZ`` names, else the zone
+    this Mac is set to.
 
     Reads the zone database from disk, so call it off the event loop.
     """

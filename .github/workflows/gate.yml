@@ -1,0 +1,68 @@
+# The gate every change passes before it is merged: the same commands as README "Development", on macOS because the
+# package depends on PyObjC. The smoke tests here are the ones that need no service: a scripted model plays the real
+# loop, tools, policy and store. The tests marked live, browser, internet, desktop or hosted stay on the developer's Mac.
+name: gate
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: gate-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  gate:
+    runs-on: macos-latest
+    timeout-minutes: 30
+    env:
+      DOT_HOME: ${{ github.workspace }}/.ci/home
+      DOT_LOG_DIR: ${{ github.workspace }}/.ci/logs
+      DOT_CHROME_DIR: ${{ github.workspace }}/.ci/chrome
+      # The runner's /etc/localtime is not a link into the zone database, so the zone is named here.
+      TZ: UTC
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+      - name: Install
+        run: uv sync --frozen
+      # The search tool runs ripgrep; the runner image has Homebrew but not rg.
+      - name: Ripgrep
+        run: brew install ripgrep
+      - name: Throw-away home
+        run: mkdir -p "$DOT_HOME" "$DOT_LOG_DIR" "$DOT_CHROME_DIR"
+      - name: Format
+        run: uv run ruff format --check src tests
+      - name: Lint
+        run: uv run ruff check src tests
+      - name: Types
+        run: uv run mypy src
+      - name: Unit tests
+        run: uv run pytest tests/unit -q -p no:cacheprovider
+      - name: Eval references
+        run: uv run dotx eval check
+      - name: Offline smoke tests
+        run: >
+          uv run pytest -q -p no:cacheprovider
+          tests/smoke/test_answer_check.py
+          tests/smoke/test_approval_modes.py
+          tests/smoke/test_campaigns.py
+          tests/smoke/test_cli_auth.py
+          tests/smoke/test_cli_run_end.py
+          tests/smoke/test_doctor.py
+          tests/smoke/test_evals_runner.py
+          tests/smoke/test_helpers.py
+          tests/smoke/test_left_questions.py
+          tests/smoke/test_lessons.py
+          tests/smoke/test_mcp_http.py
+          tests/smoke/test_plan_branches.py
+          tests/smoke/test_progress_watchdog.py
+          tests/smoke/test_research_notes.py
+          tests/smoke/test_resume.py
+          tests/smoke/test_run_limits.py
+          tests/smoke/test_scaffold.py
+          tests/smoke/test_tool_groups.py
+          tests/smoke/test_undo.py

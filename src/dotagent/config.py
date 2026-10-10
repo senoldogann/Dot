@@ -20,6 +20,13 @@ class ServerConfig(FrozenModel):
     port: int
 
 
+class StoreConfig(FrozenModel):
+    """What ``dotx prune --apply`` deletes of the database (``[store]``): the events of the runs that ended more than
+    ``retention_days`` days ago, and with them the screenshots only those events name. Nothing is deleted by itself."""
+
+    retention_days: int = Field(ge=1)
+
+
 class OllamaConfig(FrozenModel):
     base_url: str
     api_key_env: str
@@ -360,6 +367,7 @@ class JudgeConfig(FrozenModel):
 class AppConfig(FrozenModel):
     mcp: list[McpServerConfig]
     server: ServerConfig
+    store: StoreConfig
     models: ModelsConfig
     providers: ProvidersConfig
     judge: JudgeConfig

@@ -703,6 +703,25 @@ class Store:
         )
         return await asyncio.to_thread(image_names_in, [str(row["text"]) for row in rows])
 
+    async def events_of_runs_ended_before(self, before: float) -> tuple[int, int]:
+        """How many runs that ended before ``before`` still have events, and how many events they have."""
+        row = await self._one(
+            "SELECT COUNT(DISTINCT run_id) AS runs, COUNT(*) AS events FROM events WHERE run_id IN"
+            " (SELECT id FROM runs WHERE finished_at IS NOT NULL AND finished_at < ?)",
+            (before,),
+        )
+        return (0, 0) if row is None else (int(row["runs"]), int(row["events"]))
+
+    async def delete_events_of_runs_ended_before(self, before: float) -> int:
+        """Delete the events of the runs that ended before ``before``; the runs stay. Returns how many events went.
+        The screenshots those events named become orphans for :meth:`orphan_images`."""
+        cursor = await self._db.execute(
+            "DELETE FROM events WHERE run_id IN (SELECT id FROM runs WHERE finished_at IS NOT NULL AND finished_at < ?)",
+            (before,),
+        )
+        await self._db.commit()
+        return cursor.rowcount
+
     async def orphan_images(self, now: float, grace_s: float) -> list[Path]:
         """The screenshot files that nothing names: what chats deleted before their files went with them left behind.
         Files younger than ``grace_s`` seconds are left out."""
