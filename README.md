@@ -1192,12 +1192,14 @@ things: `DOT_HOME` (the home directory) and `DOT_LOG_DIR` (the logs).
 | `STOP`                                           | exists while the emergency stop is engaged                           |
 
 Deleting a chat deletes the screenshot files that only it named. Nothing else is removed by itself: old runs and their
-events stay until their chats are deleted, and the journals of file changes until `dotx prune --apply` finds them old.
-`dotx prune` lists the screenshot files that no chat names any more (what chats deleted earlier left behind), the free
+events stay until their chats are deleted or `dotx prune --apply` finds them old, and the journals of file changes
+until it finds them old. `dotx prune` lists the events of the runs that ended more than `[store] retention_days`
+(90) days ago (the steps, tool calls and results of their timelines; the runs keep their answers, numbers and
+conversations), the screenshot files that no chat names any more (what chats deleted earlier left behind), the free
 space inside the database file and the journals of file changes (`dotx undo`) whose last change is older than
-`[agent] undo_keep_days`; `dotx prune --apply` deletes those files and journals and gives the space back to the disk,
-after which a delete returns its space by itself. The database is locked for a moment while it compacts, so run it when
-no run is active.
+`[agent] undo_keep_days`; `dotx prune --apply` deletes those events, and with them the screenshots only they named,
+those files and journals, and gives the space back to the disk, after which a delete returns its space by itself. The
+database is locked for a moment while it compacts, so run it when no run is active.
 
 Logs are structured and go to `~/Library/Logs/Dot/dotx.log`. The output of the launchd job goes to `daemon.out.log`
 and `daemon.err.log` in the same directory, and the stderr of each MCP server to `mcp-<name>.log`.
@@ -1227,6 +1229,10 @@ use your keys.
 
 The smoke tests of the eval runner (`tests/smoke/test_evals_runner.py`) need no service at all: a scripted model
 plays the real loop, tools, policy and store.
+
+The gate runs on every pull request and every push to `main` (`.github/workflows/gate.yml`, on macOS because the
+package depends on PyObjC): the format check, the lint, mypy, the unit tests, `dotx eval check` and the smoke tests
+that need no service, which the workflow lists by file. The tests marked above stay on your Mac.
 
 The work on the agent's autonomy (measuring it, noticing a stuck run, adapting to the model, resuming, learning) is
 planned and tracked in [ROADMAP.md](ROADMAP.md); read it before continuing that work.

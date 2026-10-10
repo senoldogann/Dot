@@ -2378,8 +2378,8 @@ Paste this to the agent that takes the work:
 | 35  | A plan with dependencies and parallel branches                           | done    | d6b40c1 |
 | 36  | Playbooks learned from runs that reached their goal                      | done    | fb99354 |
 | 37  | A stuck campaign changes strategy, not just session                      | done    | 12c589f |
-| 38  | One view of what a run did and what can be undone                        | in progress |         |
-| 39  | CI and retention defaults                                                | planned |         |
+| 38  | One view of what a run did and what can be undone                        | done    | 8c9cdbc |
+| 39  | CI and retention defaults                                                | in progress |         |
 | 40  | Cold start of `dotx`                                                     | planned |         |
 | 41  | An own crawler: fetch, render, crawl, extract                            | done    | aedab8b |
 | 42  | TypeSafe as a tool of the agent: many items judged in one call           | planned |         |
@@ -2940,9 +2940,24 @@ when told (nothing deletes by default, house rule).
 
 **Why.** Audit leftover F and decision 4.
 
-**Touchpoints.** `.github/workflows/gate.yml`, `store/*`, `cli_prune.py`, README.
+**Design, as built.** One workflow, `.github/workflows/gate.yml`, on `macos-latest` (the package depends on
+PyObjC, so Linux cannot install it), on every pull request and push to `main`, one run per ref at a time: `uv sync
+--frozen`, the format check, the lint, mypy, the unit tests, `dotx eval check` and the smoke tests that need no
+service, listed by file in the workflow (the 19 files that use the scripted model, the real store and the real loop
+without Chrome, Ollama, the desktop or a key; about 16 s on a Mac). Each run gets a throw-away home through `DOT_HOME`,
+`DOT_LOG_DIR` and `DOT_CHROME_DIR`. Retention: a `[store]` section with `retention_days` (90) names how long the
+events of an ended run are kept; `dotx prune` reports the runs that ended before that and still have events, and
+`dotx prune --apply` deletes those events first (the runs, their answers, numbers, approvals and conversations stay),
+so that the screenshots only they named are among the orphans it deletes next; a run without events shows an empty
+timeline and an empty Actions card. Nothing deletes by itself, as before: the daemon never prunes. The journals keep
+`[agent] undo_keep_days`.
 
-**Done when.** The workflow is green on a PR; retention is in README.
+**Touchpoints.** `.github/workflows/gate.yml` (new), `config.py` (`StoreConfig`), `defaults.toml`, `store/db.py`
+(`events_of_runs_ended_before`, `delete_events_of_runs_ended_before`), `cli_prune.py`, README "Development" and the
+home directory paragraph of "Configuration".
+
+**Done when.** The workflow is green on this item's pull request; a unit test covers the retention queries; README
+names the default (decision 25).
 
 ### 40. Cold start of `dotx`
 
@@ -3195,6 +3210,10 @@ item ends as a measured no, written in the log.
 24. The change of route (item 37) is proven offline with a scripted model; whether a live model takes the brief's
     call and finds another channel is unmeasured. A campaign of yours that reaches the patience is the measurement:
     its brief and the `campaign_route_refused` log lines say what it refused and what the session wrote instead.
+25. `[store] retention_days` (item 39) is 90 days and only `dotx prune --apply` acts on it; the daemon never deletes.
+    Set it in your `config.toml` if you keep timelines longer, and run `dotx prune` first to see what it would take.
+    The gate workflow runs on GitHub's macOS runners, which are metered on a private repository; the smoke tests that
+    need Chrome, Ollama, the desktop or a key stay on your Mac on purpose, so the run is short.
 
 ## Log
 
@@ -3595,3 +3614,5 @@ item ends as a measured no, written in the log.
 - 2026-10-10 (Fable 5.1): item 37 built on branch `item-37-change-strategy` (MYP-178): the brief of a stuck campaign lists the strategies since the newest progress as refused routes and asks for another channel, source or approach; `campaign_note` refuses a repeated route while the campaign is stuck; README "Campaigns". Unit 643, campaigns smoke 8, eval check ok. Decision 24.
 - 2026-10-10 (Fable 5.1): item 37 merged 12c589f (PR #37, MYP-178 Done). Next: item 38.
 - 2026-10-10 (Fable 5.1): item 38 built on branch `item-38-actions-panel` (MYP-179): Actions card on the run page from `GET /api/runs/{id}/actions` (acting steps with channel, target and evidence; approvals; file edits with undo state) and `POST /api/runs/{id}/undo` per file; `undo/runs.py` shared by the CLI and the server; README. Unit 645, actions-panel smoke 2, undo smoke 1.
+- 2026-10-10 (Fable 5.1): item 38 merged 8c9cdbc (PR #38, MYP-179 Done). Next: item 39.
+- 2026-10-10 (Fable 5.1): item 39 built on branch `item-39-ci-retention` (MYP-180): `.github/workflows/gate.yml` (macOS; format, lint, mypy, unit, eval check, 19 offline smoke files), `[store] retention_days = 90` and `dotx prune` deleting the events of old runs on `--apply`; README. Unit 646. Decision 25.
