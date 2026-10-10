@@ -239,6 +239,10 @@ protected_paths = [
   "~/.config/gcloud",
   "~/Library/Application Support/Google/Chrome",
 ]
+# The applications code_fetch may read a one-time code from: "mail" (Mail.app, through AppleScript) and "messages"
+# (Messages.app, its database read-only; needs Full Disk Access for the program that runs Dot). Only the code of the
+# newest matching message reaches the model. Empty: no such tool.
+code_sources = []
 
 [policy.pace]
 # How many public browser actions (posts, replies, reposts, quotes, messages: the public_post and external_send flags)

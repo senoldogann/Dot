@@ -277,7 +277,7 @@ answer (a small model that is offered both writes the call out as text).
 | Web             | `web_search`, `web_fetch`, `web_crawl`, `web_extract`                                                              |
 | Browser         | `browser_open`, `browser_snapshot`, `browser_find`, `browser_links`, `browser_read_text`, `browser_wait_text`, `browser_act`, `browser_scroll`, `browser_screenshot`, `browser_upload`, `browser_back`, `browser_new_tab`, `browser_switch_tab`, `browser_close_tab` |
 | Desktop         | `desktop_apps`, `desktop_open_app`, `desktop_snapshot`, `desktop_read`, `desktop_act`, `desktop_screenshot`, `desktop_clipboard_read`, `desktop_clipboard_write` |
-| macOS           | `apple_script`, `notify`                                                                                           |
+| macOS           | `apple_script`, `notify`, `code_fetch`                                                                             |
 | Memory, time    | `memory_save`, `memory_search`, `memory_forget`, `schedule_create`, `schedule_list`, `schedule_delete`             |
 | Orchestration   | `delegate`, `consult`, `update_plan`, `ask_user`, `finish`, `use_tools`                                            |
 | Skills          | `skill`                                                                                                            |
@@ -332,6 +332,14 @@ allow, ask, hand off to you, or deny.
 **Run modes.** `task` (the default) and `chat` can do whatever the policy allows. `research` is read-only: it can read,
 search, browse and look at the screen, and a research run can only delegate to research runs. The one file it may write
 is its notes file (`write_notes`, below), and it may save memory notes.
+
+**One-time codes from your own Mail and Messages.** With `[policy] code_sources = ["mail", "messages"]` (empty by
+default), the agent has `code_fetch(app, sender, subject, within_minutes)`: it reads the newest message of Mail (through
+AppleScript) or of Messages (its database, read-only; the program that runs Dot needs Full Disk Access, and `dotx
+doctor` says whether the database opens) from a sender or with a subject within the last minutes, and returns the code
+alone, with who sent it and how old the message is; the message never reaches the model. It is a high-risk action of
+the Mac: the aggressive preset allows it, balanced and cautious ask, a research run has no such tool. Typing the code
+into the field is still what the approval mode allows (only `yolo` types one-time codes).
 
 **Decision order**, strictest first:
 
@@ -456,8 +464,8 @@ run page carries a chip for it.
 - `yolo`: nobody does. The action is allowed and recorded. The question that untrusted content raises (see
   [Safety](#safety)) is waived as well, and so are the refusals and hand-offs below: a yolo run reads secrets, uploads
   or sends files from anywhere, and does money and credential steps itself. It types passwords, one-time codes and card
-  numbers into the fields that take them when it can read them itself (a code in a mailbox it can open, a value you gave
-  it), and a password into a terminal program that asks for one; every such field is a `credential` record in its
+  numbers into the fields that take them when it can read them itself (a code in a mailbox it can open, one that
+  `code_fetch` reads, a value you gave it), and a password into a terminal program that asks for one; every such field is a `credential` record in its
   timeline (`financial` for a card field). That is the price of the mode: a run that has read a hostile page can send
   your files out, pay or sign in without asking you. Only the desktop tools stay away from password managers and
   Keychain Access in every mode; through the shell and the file tools a yolo run reads the keychain like any other
@@ -1209,6 +1217,9 @@ src/dotagent/
 
 ## Status and known limits
 
+- `code_fetch` reads Messages through its database, so it needs Full Disk Access for the program that runs Dot; Mail is
+  read through AppleScript and the first use may show an Automation prompt. A code Dot does not recognise (no cue word,
+  more than one six-digit number) is reported as such, not guessed.
 - **Verified live, through the whole stack:** Ollama with cloud models through the local server; OpenAI on both wires
   (Responses and Chat Completions), with screenshots and with the embeddings; OpenCode Go on its three routes (chat,
   responses, messages), with screenshots that a tool returns; the hosted Ollama web search. The smoke tests of the wire

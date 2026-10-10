@@ -142,10 +142,14 @@ class PaceConfig(FrozenModel):
 
 
 class PolicyConfig(FrozenModel):
+    """``code_sources`` lists the applications ``code_fetch`` may read one-time codes from (``mail``, ``messages``);
+    empty, the tool does not exist."""
+
     preset: Preset
     approvals: ApprovalMode
     approval_timeout_s: float
     protected_paths: list[str]
+    code_sources: list[Literal["mail", "messages"]]
     pace: PaceConfig
 
 

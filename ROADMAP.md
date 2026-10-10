@@ -2371,10 +2371,10 @@ Paste this to the agent that takes the work:
 | 28  | Evidence on every plan step                                              | done    | 9a9fe5f |
 | 29  | Eval reports that compare runs, and the defaults that wait for them      | done    | 1513bd4 |
 | 30  | Typed best-of-two at critical decisions; injection fixtures in the evals | planned |         |
-| 31  | One-time codes from the owner's own Mail and Messages                    | planned |         |
+| 31  | One-time codes from the owner's own Mail and Messages                    | in progress |     |
 | 32  | The owner's Chrome profile as the default of a campaign                  | planned |         |
 | 33  | Pre-approved spending caps                                               | planned |         |
-| 34  | Research runs that keep notes, and hosted search by default              | in progress |     |
+| 34  | Research runs that keep notes, and hosted search by default              | done    | e68b22d |
 | 35  | A plan with dependencies and parallel branches                           | done    | d6b40c1 |
 | 36  | Playbooks learned from runs that reached their goal                      | done    | fb99354 |
 | 37  | A stuck campaign changes strategy, not just session                      | planned |         |
@@ -2651,15 +2651,30 @@ only. The browser then types it as item 10 allows. Nothing else of the mailbox r
 dots sends the user a private form, Grok Bot hands over the screen: this is the line where Dot keeps going. Reading
 through AppleScript is faster and steadier than browsing a webmail.
 
-**Design.** `desktop/messages.py` and `desktop/mail.py` as connectors (AppleScript through the existing
-`apple_script` path), a regex set for 4 to 8 digit codes and common phrasings, `[policy] code_sources` listing the
-apps allowed (empty by default: the owner turns it on, decision for them).
+**Design, as built.** One connector module, `desktop/codes.py`. Mail is read through its AppleScript dictionary
+(`osascript`, the existing runner): the newest message of the inbox within the window from a sender or with a subject,
+returned as age, sender, subject and content, read in Dot and never shown to the model. Messages has no scripting for
+received messages, so its database `~/Library/Messages/chat.db` is read directly, read-only and immutable (needs Full
+Disk Access for the program that runs Dot; the error says so, and `dotx doctor` has a `one-time codes` row that says
+whether the database opens); the text column or the attributed body, decoded loosely, gives the text. The code is the
+4 to 8 digit number after a cue word (code, pin, otp, verification, kod, şifre, …), a `G-` prefixed one, the number a
+message opens with, or the only six-digit number of the text; anything else is "no code recognised", never a guess.
+`tools/codes.py` builds `code_fetch(app, sender, subject, within_minutes)`, registered only when
+`[policy] code_sources` names an application (so the default installation's prompt does not carry it), and refuses an
+application the list lacks. The action is `app_control` of `high` risk with no hard-stop flag: "ask asks once" of the
+plan has no equivalent in the engine without a new flag, so the owner's opt-in is the standing answer, the aggressive
+preset allows a read, balanced and cautious ask, a yolo or auto run goes on, and research has no such tool. The result
+is not marked untrusted: a few digits carry no instruction, and the message itself stayed in Dot. Typing the code is
+item 10's rule (yolo only). The live test (a mail the test sends to the owner's own address, read back within two
+minutes) runs only with `DOT_MAIL_TESTS=1`; the offline smoke test covers the registry, the refusal and the policy.
 
-**Touchpoints.** `tools/codes.py`, `desktop/*.py`, `policy/*`, `defaults.toml`, `config.py`, README "Autonomy" and
-"Safety", `tests/smoke/test_codes.py` under a `DOT_MAIL_TESTS=1` guard with a message the test sends itself.
+**Touchpoints.** `desktop/codes.py` (new), `tools/codes.py` (new), `desktop/perms.py` (`grant_hint` made public),
+`config.py`, `defaults.toml`, `runtime.py`, `doctor.py`, `agent/prompt.py`, README "Tools", "Safety", "Autonomy",
+"Status and known limits".
 
-**Done when.** The smoke test reads a code the test created; a live `yolo` run on a fixture login that mails a code
-to the owner's own address completes within 30 s of the mail arriving (owner-run, decision).
+**Done when.** Unit tests for the code rule, the Mail script and the Messages read on a copy of the schema; the smoke
+test shows the tool exists only for the listed applications and the policy's verdicts; the live Mail test passes for
+the owner (decision 19).
 
 ### 32. The owner's Chrome profile as the default of a campaign
 
@@ -3052,6 +3067,11 @@ item ends as a measured no, written in the log.
     hosted search as soon as `OLLAMA_API_KEY` is set on the Mac (each search counts against the key's allowance) and to
     DuckDuckGo otherwise. If you prefer DuckDuckGo with the key present, set `search_backend = "duckduckgo"` in your
     config; `dotx doctor` shows the choice. Nothing needs restarting beyond the usual daemon restart for a new version.
+19. One-time codes (item 31) are off by default: `[policy] code_sources = []`. To turn them on, set
+    `code_sources = ["mail"]` or `["mail", "messages"]` in your `config.toml`; Messages needs Full Disk Access for the
+    program that runs Dot (`dotx doctor`, row `one-time codes`). The live test sends a mail to your own address and
+    reads the code back: `DOT_MAIL_TESTS=1 uv run pytest tests/smoke/test_codes.py`. A `yolo` run that signs in to a
+    site that mails you a code is yours to try (decision 12).
 
 ## Log
 
@@ -3438,3 +3458,5 @@ item ends as a measured no, written in the log.
 - 2026-10-10 (Fable 5.1): item 41 built on branch `item-41-own-crawler` (MYP-171): `web/crawl.py` (breadth-first crawl within a prefix or host scope, per-host pacing, robots.txt read and reported, a shell page rendered in Dot's own Chrome, PDFs read, one clean text per page), `web/extract.py` (typed fields with a quote each, checked against the source, on the fast model), tools `web_crawl` and `web_extract` (a crawl that does not fit one result becomes Markdown files in the workspace), `[web.crawl]` caps. Tool descriptions trimmed so the small-window scaffold test still compacts at a steady pace (core share 0.412; `test_tool_groups` bound 0.45). Gate: format, check, mypy clean; unit 587; `dotx eval check` ok; smoke (crawl against a local fixture site with headless Chrome, web, tool groups, scaffold, plan branches, helpers, doctor, server) 72 passed.
 - 2026-10-10 (Fable 5.1): item 41 merged aedab8b (PR #30, MYP-171 Done). Next: item 34.
 - 2026-10-10 (Fable 5.1): item 34 built on branch `item-34-research-notes` (MYP-172): `tools/notes.py` with `write_notes` (one Markdown file per run under `<workspace>/notes/`, in the undo journal, offered in task and research runs), the policy's mode gate allows `notes_write` and `memory_write` in research (`memory_save` in every mode), `[web] search_backend = "auto"` (the new default; decision 18) resolved once at runtime start, `dotx doctor` `web search` row, research prompt names `write_notes`/`memory_save`/`web_crawl`, web bullet on `web_crawl`/`web_extract`. The small-window scaffold smoke test moved from a 24 000 to a 26 000 token window: the three core tools of items 41 and 34 made the fixed prompt about 700 tokens larger, and what a compaction keeps grows a little each time, so the old window ended up compacting at every step. Gate: format, check, mypy clean; unit 597; `dotx eval check` ok; smoke (research notes, memory, web, doctor, approval modes, plan branches, undo, run limits, crawl, scaffold, tool groups) 64 passed.
+- 2026-10-10 (Fable 5.1): item 34 merged e68b22d (PR #31, MYP-172 Done). Next: item 31 (one-time codes from Mail and Messages).
+- 2026-10-10 (Fable 5.1): item 31 built on branch `item-31-one-time-codes` (MYP-173): `desktop/codes.py` (Mail through AppleScript, Messages through its database read-only, the code rule: a 4 to 8 digit number after a cue word, `G-` prefixed, opening the message, or the only six-digit number), `tools/codes.py` with `code_fetch` registered only when `[policy] code_sources` names an application (default empty; decision 19), a high-risk `app_control` action, result is the code with sender and age only; `dotx doctor` row `one-time codes`; the yolo sentence of the prompt names the tool. Design corrected: one connector module, Messages read from `chat.db` (no scripting for received messages), "ask asks once" is the owner's opt-in plus the presets. Gate: format, check, mypy clean; unit 610; `dotx eval check` ok; smoke (codes, doctor, tool groups, scaffold, research notes, approval modes) 24 passed, the live Mail test skipped (owner-run, `DOT_MAIL_TESTS=1`).
