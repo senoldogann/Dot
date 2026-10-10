@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="color-scheme" content="light dark">
+  <title>Dot</title>
+  <link rel="stylesheet" href="down.css">
+</head>
+<body>
+  <main>
+    <svg viewBox="0 0 32 32" width="56" height="56" aria-hidden="true">
+      <circle cx="16" cy="16" r="16" fill="#ffcd3c"/>
+      <circle cx="16" cy="16" r="9" fill="none" stroke="#1a1a1a" stroke-opacity="0.35" stroke-width="2"/>
+      <circle cx="16" cy="16" r="4.5" fill="#1a1a1a"/>
+    </svg>
+    <h1>Dot is not running</h1>
+    <p>The daemon that does the work is off. Start it once and it stays on, at every login and after a crash:</p>
+    <pre>uv run dotx service install</pre>
+    <p class="muted">This window opens the web UI by itself as soon as the daemon answers.</p>
+  </main>
+</body>
+</html>

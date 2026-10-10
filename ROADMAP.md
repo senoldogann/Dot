@@ -3285,8 +3285,8 @@ third; 49 (the face as the state) and 50 (the visual system) next, form on top o
 | 47  | Activity: everything in motion in one list                               | done    | 2282e57 |
 | 48  | Rules in four answers                                                    | done    | 0811f52 |
 | 49  | The face as the state                                                    | done    | 72f6168 |
-| 50  | The visual system                                                        | in progress |         |
-| 51  | The desktop shell                                                        | planned |         |
+| 50  | The visual system                                                        | done    | fbf5b34 |
+| 51  | The desktop shell                                                        | in progress |         |
 | 52  | Dot on the phone                                                         | planned |         |
 
 ### 46. Dot's computer: the live view and the handover
@@ -3495,16 +3495,35 @@ Tauri 2 (Rust, a few MB, the web UI unchanged) or Electron (TypeScript, the owne
 **Why.** The owner wants a desktop app; dots lives in the ChatGPT desktop app. The web UI is already the app, so the
 shell is thin, and a menu bar item is where an always-on agent belongs on a Mac.
 
-**Design.** A `desktop/` directory in the repo with the shell; it loads `http://127.0.0.1:{port}` with the token from
-`dotx url` (read from the keychain or the token file, never typed), falls back to a "start the service" page when the
-daemon is down, and exposes the menu bar item through the shell's tray API. Signed and notarised builds are an owner
-decision too (an Apple developer account).
+**Design, corrected before building.** The token lives in a plain file under the home directory (`api-token`,
+`dotagent.core.paths.token_path`), not in the keychain: the shell reads that file, and `dotx url` is not needed. The
+notification plugin of Tauri 2 has no click event on desktop (its Actions API is mobile only), so a click on a
+notification brings Dot to the front and the sidebar's Waiting for you leads to the run; "a notification click opens
+the run" is not something the shell can promise. The web UI's `Notification` API does not exist in WKWebView, so the
+UI sends through the shell's bridge when it runs inside it, and the daemon's CSP lets the page reach the bridge
+(`connect-src ipc: http://ipc.localhost`, which a browser never uses).
+
+**Design, as built.** `desktop/` holds a Tauri 2 project: `package.json` with the Tauri CLI (`npm run dev`, `npm run
+build`, `npm run icons`), `src-tauri/` with the Rust shell (`src/lib.rs`, about two hundred lines) and
+`tauri.conf.json` (no window in the config: the window is made at start, on the UI when the daemon answers and on
+`ui/down.html` otherwise, with the shell's drag-and-drop handler off so the composer's HTML drop works), a capability
+that lets the UI at `http://127.0.0.1:*` use the notification plugin, and `ui/` with the down page. The shell reads
+`DOT_HOME` or `~/Library/Application Support/Dot`, `[server]` of `config.toml` (defaults 127.0.0.1:8765) and
+`api-token`. A thread asks `GET /api/activity/count` (new, `ActivityCount(waiting, working, state)`, the state as the
+face's `overallState`) every second with a 0.8 s timeout, sets the tray icon per state (three PNGs rendered from the
+face by `desktop/icons/render.py`, which draws the same shapes as `faceSvg`), the count as the tray title when
+something waits, a tooltip, and navigates the window between the UI and the down page when the daemon comes or goes.
+The tray menu has Open Dot, New chat (⌘⇧Space, also the global shortcut) and Quit; a left click opens the window;
+closing the window hides it; the dock icon's reopen shows it. `attention.js` uses `window.__TAURI__.notification`
+when it is there (permission, send) and the browser's `Notification` otherwise. README has a section; the gate gets a
+`desktop` job (`cargo fmt --check`, `cargo clippy -D warnings`) with a Rust cache; the build is ad hoc signed and made
+on the owner's Mac (`npm run build`).
 
 **Touchpoints.** `desktop/` (new), `server/routes_system.py` (a `GET /activity/count` for the tray), README (a new
 section).
 
 **Done when.** The shell opens the UI signed in, the tray shows the count and the face state within a second of a
-change, a notification click opens the run; built on the owner's Mac.
+change, a notification click brings Dot to the front; built on the owner's Mac.
 
 ### 52. Dot on the phone
 
@@ -4124,3 +4143,4 @@ tailnet for an approval and opens the run (owner's run, logged by hand in this f
 - 2026-10-11 (Fable 5.1): item 47 merged 2282e57 (PR #49, MYP-187 Done; gate green). Next: item 48 (rules in four answers).
 - 2026-10-11 (Fable 5.1): item 48 merged 0811f52 (PR #50, MYP-188 Done; gate green). Next: item 49 (the face as the state).
 - 2026-10-11 (Fable 5.1): item 49 merged 72f6168 (PR #51, MYP-189 Done; gate green). Next: item 50 (the visual system).
+- 2026-10-11 (Fable 5.1): item 50 merged fbf5b34 (PR #52, MYP-190 Done; gate green). Next: item 51 (the desktop shell, Tauri 2).

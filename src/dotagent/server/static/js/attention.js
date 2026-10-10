@@ -32,26 +32,32 @@ export function setPageTitle(text) {
   paintTitle();
 }
 
+/** The desktop shell's notification bridge (Tauri), when the page runs inside the shell; null in a browser. */
+function shell() {
+  return typeof window.__TAURI__ === "object" && window.__TAURI__ !== null && "notification" in window.__TAURI__ ? window.__TAURI__.notification : null;
+}
+
 export function notificationsAvailable() {
-  return typeof Notification === "function";
+  return shell() !== null || typeof Notification === "function";
 }
 
 export function notificationsBlocked() {
-  return notificationsAvailable() && Notification.permission === "denied";
+  return shell() === null && notificationsAvailable() && Notification.permission === "denied";
 }
 
-/** Whether notifications are switched on here and the browser lets the page show them. */
+/** Whether notifications are switched on here and the browser (or the shell) lets the page show them. */
 export function notificationsOn() {
-  return notificationsAvailable() && Notification.permission === "granted" && readPref(NOTIFY_KEY) === "on";
+  return notificationsAvailable() && (shell() !== null || Notification.permission === "granted") && readPref(NOTIFY_KEY) === "on";
 }
 
-/** Switch notifications on (the browser asks for its permission the first time) or off; resolves to whether they are on. */
+/** Switch notifications on (the browser or the shell asks for its permission the first time) or off; resolves to whether they are on. */
 export async function setNotifications(on) {
   if (!on) {
     writePref(NOTIFY_KEY, "off");
     return false;
   }
-  const permission = await Notification.requestPermission();
+  const bridge = shell();
+  const permission = bridge === null ? await Notification.requestPermission() : (await bridge.isPermissionGranted()) ? "granted" : await bridge.requestPermission();
   writePref(NOTIFY_KEY, permission === "granted" ? "on" : "off");
   return permission === "granted";
 }
@@ -70,7 +76,13 @@ function worthATell() {
   return notificationsOn() && awayFromPage();
 }
 
+/** In the desktop shell the notification is the system's; a click brings Dot to the front, where Waiting for you leads on. */
 function tell({ title, body, tag, route, state }) {
+  const bridge = shell();
+  if (bridge !== null) {
+    bridge.sendNotification({ title, body });
+    return;
+  }
   const note = new Notification(title, { body, tag, icon: faceDataUrl(state) });
   note.addEventListener("click", () => {
     window.focus();
