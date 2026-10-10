@@ -1071,6 +1071,24 @@ every run.
 
 `dotx skills list` shows every plugin and skill found, and anything left out and why; `dotx doctor` has a row for each.
 
+**Playbooks.** With `playbooks = true` in `[agent]`, a task run of its own that ran in goal mode, ended done (its goal
+check found the outcome achieved) and acted on a web site or an application is followed, once it has ended, by one call
+of the review model that distils how it got there: from the acting steps on the site it used most (each tool call with
+its arguments and the start of its result; failed calls marked), the model writes the steps that worked, one sentence
+each, with the values that change from goal to goal as parameters in angle brackets, and a one-sentence description.
+The playbook is a skill folder `playbook-<host>/SKILL.md` under `<home>/playbooks` with "When", "Steps", "Parameters"
+and "Evidence" (the goal, the run, the date and how many acting steps it took), plus a `playbook.json` that counts its
+use. Later runs see it under Skills like any skill (its source is `playbook`) with a note that it is Dot's own record,
+to follow with their own parameters, and read it with the `skill` tool. One playbook per host: a host that has one is
+not distilled again. Every run that ended done or failed counts the playbooks it read; one read by two runs that then
+failed is retired, moved under `<home>/playbooks/.retired`, and no longer offered. A review model that fails, or a
+folder that cannot be written, leaves a `playbook_failed` event on the run; a written one a `playbook_written` event
+and a retired one a `playbook_retired` event. The distillation reads pages third parties wrote, so the playbook never
+takes an instruction from them as a step, and never holds a secret, a one-time code, an e-mail address or a home path.
+`dotx playbooks list` shows every playbook with its use, `dotx playbooks show NAME` prints one and `dotx playbooks drop
+NAME` removes one, active or retired. Delegated runs, chats and evals (which always run without playbooks) write none.
+`playbooks` is `false` by default until a live comparison shows that the second run on a site takes fewer steps.
+
 ## Delegation
 
 `delegate(goal, mode?, model?, step?)` hands a sub-goal to a separate run with a conversation of its own and returns

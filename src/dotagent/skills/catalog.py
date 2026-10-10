@@ -3,10 +3,10 @@
 from collections.abc import Sequence
 from pathlib import Path
 
-from dotagent.config import SkillsConfig
+from dotagent.config import AppConfig, SkillsConfig
 from dotagent.core.errors import SkillError
 from dotagent.core.jsonutil import dumps_compact
-from dotagent.core.paths import skills_dir
+from dotagent.core.paths import playbooks_dir, skills_dir
 from dotagent.core.types import FrozenModel, JsonObject
 from dotagent.plugins.types import Plugin
 from dotagent.skills.discover import find_skill_files
@@ -21,12 +21,20 @@ class SkillRoot(FrozenModel):
     source: str
 
 
-def skill_roots(config: SkillsConfig, plugins: Sequence[Plugin]) -> tuple[SkillRoot, ...]:
-    """``<home>/skills``, then the ``[skills] dirs`` entries, then the skill folders of each plugin."""
+# Where a skill that Dot distilled itself was found (:mod:`dotagent.agent.playbooks`).
+PLAYBOOK_SOURCE: str = "playbook"
+
+
+def skill_roots(config: SkillsConfig, plugins: Sequence[Plugin], playbooks: Path | None) -> tuple[SkillRoot, ...]:
+    """``<home>/skills``, then the ``[skills] dirs`` entries, then the skill folders of each plugin, then the playbook
+    folder when playbooks are on (``None`` when they are off: a playbook that exists is not offered then). A playbook
+    folder that does not exist yet is no problem: none was written."""
     roots: list[SkillRoot] = [SkillRoot(path=skills_dir(), source="home")]
     roots.extend(SkillRoot(path=Path(entry).expanduser(), source="config") for entry in config.dirs)
     for plugin in plugins:
         roots.extend(SkillRoot(path=folder, source=f"plugin {plugin.name}") for folder in plugin.skill_dirs)
+    if playbooks is not None and playbooks.is_dir():
+        roots.append(SkillRoot(path=playbooks, source=PLAYBOOK_SOURCE))
     return tuple(roots)
 
 
@@ -78,6 +86,11 @@ def load_catalog(roots: Sequence[SkillRoot]) -> SkillCatalog:
     return SkillCatalog(skills=tuple(skills.values()), problems=tuple(problems))
 
 
-def load_skills(config: SkillsConfig, plugins: Sequence[Plugin]) -> SkillCatalog:
-    """The skills of this installation, read fresh from disk."""
-    return load_catalog(skill_roots(config, plugins))
+def load_skills(config: SkillsConfig, plugins: Sequence[Plugin], playbooks: Path | None) -> SkillCatalog:
+    """The skills of this installation, read fresh from disk, with the playbooks under ``playbooks`` when given."""
+    return load_catalog(skill_roots(config, plugins, playbooks))
+
+
+def playbook_root(config: AppConfig) -> Path | None:
+    """The playbook folder the skills catalog reads: ``<home>/playbooks`` when ``[agent] playbooks`` is on."""
+    return playbooks_dir() if config.agent.playbooks else None

@@ -64,6 +64,14 @@ from dotagent.cli_eval import (
     cmd_eval_run,
 )
 from dotagent.cli_mcp import McpListCommand, cmd_mcp_list
+from dotagent.cli_playbooks import (
+    PlaybooksDropCommand,
+    PlaybooksListCommand,
+    PlaybooksShowCommand,
+    cmd_playbooks_drop,
+    cmd_playbooks_list,
+    cmd_playbooks_show,
+)
 from dotagent.cli_profile import ModelsProfileCommand, cmd_models_profile
 from dotagent.cli_prune import PruneCommand, cmd_prune
 from dotagent.cli_schedule import (
@@ -284,6 +292,9 @@ type Command = Annotated[
     | CampaignAchievedCommand
     | McpListCommand
     | SkillsListCommand
+    | PlaybooksListCommand
+    | PlaybooksShowCommand
+    | PlaybooksDropCommand
     | PruneCommand
     | UndoCommand
     | EvalListCommand
@@ -474,6 +485,14 @@ def build_parser() -> argparse.ArgumentParser:
     skills_commands = skills.add_subparsers(dest="skills_action", required=True)
     skills_commands.add_parser("list", help="show every skill and plugin found, and the folders left out and why")
 
+    playbooks = commands.add_parser("playbooks", help="the playbooks Dot distilled from runs that reached their goal")
+    playbooks_commands = playbooks.add_subparsers(dest="playbooks_action", required=True)
+    playbooks_commands.add_parser("list", help="show every playbook, how often it was used and whether it is retired")
+    playbooks_show = playbooks_commands.add_parser("show", help="print a playbook's instructions")
+    playbooks_show.add_argument("playbook", help="the name shown by 'dotx playbooks list'")
+    playbooks_drop = playbooks_commands.add_parser("drop", help="remove a playbook, active or retired")
+    playbooks_drop.add_argument("playbook", help="the name shown by 'dotx playbooks list'")
+
     prune = commands.add_parser(
         "prune", help="find the screenshot files that no chat names any more and the free space in the database file"
     )
@@ -562,6 +581,7 @@ def parse_command(parser: argparse.ArgumentParser, arguments: list[str]) -> Comm
     campaign_action: object = raw.pop("campaign_action", None)
     mcp_action: object = raw.pop("mcp_action", None)
     skills_action: object = raw.pop("skills_action", None)
+    playbooks_action: object = raw.pop("playbooks_action", None)
     service_action: object = raw.pop("service_action", None)
     eval_action: object = raw.pop("eval_action", None)
     models_action: object = raw.pop("models_action", None)
@@ -585,6 +605,8 @@ def parse_command(parser: argparse.ArgumentParser, arguments: list[str]) -> Comm
         raw["name"] = f"mcp-{mcp_action}"
     if raw["name"] == "skills":
         raw["name"] = f"skills-{skills_action}"
+    if raw["name"] == "playbooks":
+        raw["name"] = f"playbooks-{playbooks_action}"
     if raw["name"] == "service":
         raw["name"] = f"service-{service_action}"
     if raw["name"] == "eval":
@@ -1084,6 +1106,12 @@ async def dispatch(command: Command) -> int:
             return await cmd_mcp_list(command)
         case SkillsListCommand():
             return await cmd_skills_list(command)
+        case PlaybooksListCommand():
+            return await cmd_playbooks_list(command)
+        case PlaybooksShowCommand():
+            return await cmd_playbooks_show(command)
+        case PlaybooksDropCommand():
+            return await cmd_playbooks_drop(command)
         case PruneCommand():
             return await cmd_prune(command)
         case UndoCommand():

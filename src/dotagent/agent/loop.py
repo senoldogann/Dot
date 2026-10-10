@@ -154,7 +154,7 @@ from dotagent.memory.render import render_note
 from dotagent.memory.service import prompt_memories
 from dotagent.policy.types import QuestionMode
 from dotagent.runtime import Runtime
-from dotagent.skills.catalog import load_skills
+from dotagent.skills.catalog import load_skills, playbook_root
 from dotagent.skills.types import SkillCatalog
 from dotagent.store.endings import GOAL_CHECK_MARK, RESULT_EMPTY_REPLIES
 from dotagent.store.models import EventRecord, MemoryRecord, RunMode, RunRecord
@@ -1057,7 +1057,9 @@ async def run_agent(agent: AgentRun) -> RunEnd:
         specs = tuple(spec for spec in specs if spec.name not in _NOT_FOR_DELEGATED_RUNS)
     if run.campaign_id is None:
         specs = tuple(spec for spec in specs if spec.name not in CAMPAIGN_TOOLS)
-    skills: SkillCatalog = await asyncio.to_thread(load_skills, runtime.config.skills, runtime.plugins.plugins)
+    skills: SkillCatalog = await asyncio.to_thread(
+        load_skills, runtime.config.skills, runtime.plugins.plugins, playbook_root(runtime.config)
+    )
     for problem in skills.problems:
         log.warning("skill_skipped", run_id=run.id, path=str(problem.path), reason=problem.reason)
     if not skills.skills:

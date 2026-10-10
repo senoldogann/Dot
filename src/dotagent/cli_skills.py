@@ -9,7 +9,7 @@ from dotagent.core.paths import plugins_dir, skills_dir
 from dotagent.core.types import FrozenModel
 from dotagent.plugins.catalog import load_plugins
 from dotagent.plugins.types import Plugin, PluginCatalog, PluginProblem
-from dotagent.skills.catalog import load_skills
+from dotagent.skills.catalog import load_skills, playbook_root
 from dotagent.skills.types import Skill, SkillCatalog, SkillProblem
 
 _DESCRIPTION_CHARS: int = 90
@@ -57,6 +57,6 @@ def render_catalogs(plugins: PluginCatalog, skills: SkillCatalog) -> list[str]:
 async def cmd_skills_list(command: SkillsListCommand) -> int:
     config: AppConfig = load_user_config()
     plugins: PluginCatalog = await asyncio.to_thread(load_plugins, config.plugins, config.mcp)
-    skills: SkillCatalog = await asyncio.to_thread(load_skills, config.skills, plugins.plugins)
+    skills: SkillCatalog = await asyncio.to_thread(load_skills, config.skills, plugins.plugins, playbook_root(config))
     sys.stdout.write("\n".join(render_catalogs(plugins, skills)) + "\n")
     return 1 if plugins.problems or skills.problems else 0
