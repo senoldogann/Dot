@@ -764,6 +764,7 @@ class RunManager:
             run.id,
             run.mode,
             runtime.config.policy.preset,
+            runtime.config.policy.pace,
             approval_mode,
             reviewer_for(
                 runtime.router,

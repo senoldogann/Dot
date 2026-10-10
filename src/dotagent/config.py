@@ -128,11 +128,23 @@ class AgentConfig(FrozenModel):
     undo_keep_days: int
 
 
+class PaceConfig(FrozenModel):
+    """How many public and social browser actions a site gets in an hour and in a day, and how far apart public ones
+    are (:mod:`dotagent.policy.pace`); 0 removes a limit."""
+
+    public_per_hour: int = Field(ge=0)
+    public_per_day: int = Field(ge=0)
+    social_per_hour: int = Field(ge=0)
+    social_per_day: int = Field(ge=0)
+    public_spacing_s: float = Field(ge=0, le=3600)
+
+
 class PolicyConfig(FrozenModel):
     preset: Preset
     approvals: ApprovalMode
     approval_timeout_s: float
     protected_paths: list[str]
+    pace: PaceConfig
 
 
 type BrowserMode = Literal["own", "attach"]

@@ -8,10 +8,10 @@ paused the model after an error that says it cannot answer for a while (:func:`d
 import asyncio
 import time
 from collections.abc import Collection, Mapping, Sequence
-from datetime import datetime
 
 from dotagent.config import ProvidersConfig
 from dotagent.core.errors import ConfigError
+from dotagent.core.text import until_text
 from dotagent.core.types import FrozenModel, JsonObject
 from dotagent.llm.router import ModelRouter, Pause, parse_model_ref, unavailable_reason
 from dotagent.secrets import secret_state
@@ -103,13 +103,6 @@ def unavailable_after(router: ModelRouter, model: str, error: Exception) -> Unav
         return None
     pause: Pause | None = router.paused(time.time()).get(model)
     return Unavailable(model=model, reason=reason, until=None if pause is None else pause.until)
-
-
-def until_text(until: float, now: float) -> str:
-    """The end of a pause in local time: the time of day when it is today, else with its date."""
-    end: datetime = datetime.fromtimestamp(until).astimezone()
-    today: bool = end.date() == datetime.fromtimestamp(now).astimezone().date()
-    return end.strftime("%H:%M" if today else "%Y-%m-%d %H:%M")
 
 
 def unavailable_text(entry: Unavailable, now: float) -> str:

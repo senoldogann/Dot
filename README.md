@@ -299,9 +299,9 @@ Who answers what the policy asks depends on the approval mode of the run: you, a
 **Untrusted content.** Web pages, screens and MCP results can be written by third parties. Dot wraps them in a fence
 with a random marker per call (`<web_content …>`, `<screen_content …>`) and tells the model that what is inside is data,
 never instructions. A run that has seen such content is marked untrusted, and from then on outward-facing or lasting
-actions (messages, posts, privilege, system settings, saving a schedule or a note) ask even when the preset or an
-`allow` rule would let them through; only a `preapproved` rule skips the question. A message you send to the run
-clears the mark. A delegated run starts as untrusted as its parent.
+actions (messages, posts, follows and likes, privilege, system settings, saving a schedule or a note) ask even when the
+preset or an `allow` rule would let them through; only a `preapproved` rule skips the question. A message you send to
+the run clears the mark. A delegated run starts as untrusted as its parent.
 
 **Secrets.**
 
@@ -319,18 +319,31 @@ clears the mark. A delegated run starts as untrusted as its parent.
   servers, the database the rules, the journals what `dotx undo` writes back.
 
 **Typed judgments (optional, off by default).** The policy reads what a click does from the control's label, with
-patterns in English and Turkish ("Post", "Send", "Delete", "Pay now", "Paylaş"…); a label they do not know ("Repost",
-the Finnish "Lähetä") passes as an ordinary click. With `[judge] provider = "typesafe"` and `TYPESAFE_API_KEY` saved
-(Settings › API keys, or `dotx auth set TYPESAFE_API_KEY`), TypeSafe's System One API is asked about such a click in
-four yes/no questions (does it publish, send, pay or delete?) over the label, the role and the page's address (without
-its query and fragment). A probability of at least `public_action_threshold` (0.7) gives the click that flag, so the
-policy treats it as a click on "Post" or "Delete", and the action's summary says so: `(judge: public_post 0.93)`. The
-judge also reads a campaign's claim of its targets before the goal checker does, and refuses a claim below
-`target_threshold` (0.9) at once. It never allows anything and never decides a step; it only adds flags, or stops a
-claim early. It is a paid service: one request per judged click or claim, at most `timeout_s` (5 s) each. A missing or
-refused key, a spent quota or a failed request turns it off for `[models] helper_cooldown_s`, with a note in the
-timeline, and meanwhile the patterns and the goal checker decide alone; a key saved in Settings turns it on again at
-once. `dotx doctor` shows whether it is on and has its key.
+patterns in English and Turkish, and a few in Finnish ("Post", "Send", "Delete", "Pay now", "Paylaş", "Lähetä"…); a
+label they do not know (Mastodon's "Boost", the German "Teilen") passes as an ordinary click. With `[judge] provider =
+"typesafe"` and `TYPESAFE_API_KEY` saved (Settings › API keys, or `dotx auth set TYPESAFE_API_KEY`), TypeSafe's System
+One API is asked about such a click in four yes/no questions (does it publish, send, pay or delete?) over the label, the
+role and the page's address (without its query and fragment). A probability of at least `public_action_threshold` (0.7)
+gives the click that flag, so the policy treats it as a click on "Post" or "Delete", and the action's summary says so:
+`(judge: public_post 0.93)`. The judge also reads a campaign's claim of its targets before the goal checker does, and
+refuses a claim below `target_threshold` (0.9) at once. It never allows anything and never decides a step; it only adds
+flags, or stops a claim early. It is a paid service: one request per judged click or claim, at most `timeout_s` (5 s)
+each. A missing or refused key, a spent quota or a failed request turns it off for `[models] helper_cooldown_s`, with a
+note in the timeline, and meanwhile the patterns and the goal checker decide alone; a key saved in Settings turns it on
+again at once. `dotx doctor` shows whether it is on and has its key.
+
+**Pace on social platforms.** A click whose label posts, replies, reposts, quotes or sends ("Post", "Reply", "Repost",
+"Quote", "Yeniden gönder", "Lähetä"…) is a public action; one that follows, likes or subscribes ("Follow", "Like",
+"Takip et", "Beğen", "Seuraa", "Tykkää"…) is a social action, of low risk, which asks once the run has read untrusted
+content. Both are counted on their site (the page's host, without `www.`), across runs and threads, in a sliding hour
+and day (`[policy.pace]`: 10 public actions an hour and 50 a day, 20 social ones an hour and 100 a day, public ones at
+least 20 s apart; 0 removes a limit). The browser waits out the spacing. An action past a limit is refused in every
+approval mode, `yolo` too, with the time the next one is allowed, and the timeline shows the refusal. A `browser_act`
+call takes one public or social click at most, so that each one counts. Only the clicks the policy recognises are
+counted: a post sent with a keyboard shortcut or through an API from the shell is not. X publishes higher limits (an
+unverified account: 50 posts and 200 replies a day, 400 follows, 500 messages), and its automation rules forbid
+automated likes and bulk or aggressive following, and warn that scripting its website can get an account suspended. The
+pace keeps Dot slow; it does not make automation allowed.
 
 **Approvals.** An action that needs a yes becomes an approval: `allow? [y/N]` in the terminal, a card in the web UI. The
 run waits (its status is `blocked`) for up to `[policy] approval_timeout_s`; an approval nobody answers expires and

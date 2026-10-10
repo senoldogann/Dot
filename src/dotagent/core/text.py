@@ -1,7 +1,8 @@
-"""Text helpers: truncation, secret redaction and blob stripping for logs and errors."""
+"""Text helpers: truncation, secret redaction and blob stripping for logs and errors, and times of day."""
 
 import re
 import unicodedata
+from datetime import datetime
 
 from pydantic import JsonValue
 
@@ -50,6 +51,13 @@ def _mask_match(match: re.Match[str]) -> str:
     if len(groups) >= 2 and groups[0] is not None and groups[1] is not None:
         return f"{groups[0]}{groups[1]}***"
     return "***"
+
+
+def until_text(until: float, now: float) -> str:
+    """A moment in local time: the time of day when it is today (``now``), else with its date."""
+    end: datetime = datetime.fromtimestamp(until).astimezone()
+    today: bool = end.date() == datetime.fromtimestamp(now).astimezone().date()
+    return end.strftime("%H:%M" if today else "%Y-%m-%d %H:%M")
 
 
 def strip_blobs(value: JsonValue) -> JsonValue:

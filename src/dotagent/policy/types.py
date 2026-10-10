@@ -36,6 +36,7 @@ Flag = Literal[
     "privilege",
     "external_send",
     "public_post",
+    "social",
     "install",
     "secret_access",
     "exfiltration",
@@ -44,8 +45,10 @@ Flag = Literal[
 ]
 
 Preset = Literal["aggressive", "balanced", "cautious"]
+# What the pace of a site counts an action as (:mod:`dotagent.policy.pace`).
+PaceClass = Literal["public", "social"]
 Verdict = Literal["allow", "ask", "handoff", "deny"]
-DecisionSource = Literal["auto_review", "mode", "hard_stop", "rule", "taint", "preset"]
+DecisionSource = Literal["auto_review", "mode", "hard_stop", "rule", "taint", "preset", "pace"]
 
 # Who answers a question the policy raised: ``ask`` the user, ``auto`` a reviewer model (which can hand the question on
 # to the user), ``yolo`` nobody (the action is allowed and only recorded).
@@ -83,6 +86,7 @@ TAINT_ESCALATION_FLAGS: frozenset[Flag] = frozenset(
     {
         "external_send",
         "public_post",
+        "social",
         "exfiltration",
         "financial",
         "credential",

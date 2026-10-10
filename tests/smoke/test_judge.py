@@ -38,10 +38,10 @@ KEY: str = "stand-in-key"
 KEY_ENV: str = "DOT_TEST_TYPESAFE_KEY"
 REFUSED_ENV: str = "DOT_TEST_TYPESAFE_REFUSED_KEY"
 # The probability of yes the stand-in gives, by the label of the control and the question; anything else gets 0.05.
-_YES: dict[str, dict[str, float]] = {"Repost": {"public_post": 0.95}}
+_YES: dict[str, dict[str, float]] = {"Boost": {"public_post": 0.95}}
 _CLAIM_PROBABILITY: float = 0.4
 _PAGE: bytes = b"""<!doctype html><title>Timeline</title><h1>Timeline</h1><p>A post worth sharing.</p>
-<button type="button">Repost</button> <button type="button">Post</button> <a href="/next">Next page</a>"""
+<button type="button">Boost</button> <button type="button">Post</button> <a href="/next">Next page</a>"""
 
 
 class _Service(ThreadingHTTPServer):
@@ -154,7 +154,16 @@ async def _context(runtime: Runtime, campaign_id: str | None) -> ToolContext:
         questions="wait",
         workspace=workspace_dir(),
         gate=RunGate(
-            runtime.store, runtime.bus, runtime.approvals, run.id, "task", "aggressive", "ask", _nobody, (GOAL,)
+            runtime.store,
+            runtime.bus,
+            runtime.approvals,
+            run.id,
+            "task",
+            "aggressive",
+            runtime.config.policy.pace,
+            "ask",
+            _nobody,
+            (GOAL,),
         ),
         cancel=asyncio.Event(),
         output_chars=runtime.config.agent.tool_output_chars,
@@ -183,17 +192,17 @@ async def test_a_click_no_pattern_knows_gets_the_flag_the_judge_finds_and_a_know
     page: ToolResult = await opened.run(ctx)
     refs: dict[str, str] = {
         name: _ref(page.text, role, name)
-        for role, name in (("button", "Repost"), ("button", "Post"), ("link", "Next page"))
+        for role, name in (("button", "Boost"), ("button", "Post"), ("link", "Next page"))
     }
     before: int = len(service.requests)
-    repost: ActionInfo = await _classified(ctx, "browser_act", {"steps": [{"action": "click", "ref": refs["Repost"]}]})
+    boost: ActionInfo = await _classified(ctx, "browser_act", {"steps": [{"action": "click", "ref": refs["Boost"]}]})
     following: ActionInfo = await _classified(
         ctx, "browser_act", {"steps": [{"action": "click", "ref": refs["Next page"]}]}
     )
     asked: list[tuple[str, str, JsonObject]] = service.requests[before:]
     post: ActionInfo = await _classified(ctx, "browser_act", {"steps": [{"action": "click", "ref": refs["Post"]}]})
-    assert (repost.risk, repost.flags) == ("medium", ("public_post",))
-    assert repost.summary.endswith("(judge: public_post 0.95)"), repost.summary
+    assert (boost.risk, boost.flags) == ("medium", ("public_post",))
+    assert boost.summary.endswith("(judge: public_post 0.95)"), boost.summary
     assert (following.risk, following.flags) == ("low", ())
     assert "judge" not in following.summary
     # The label a pattern knows is the patterns' alone: no third request.
@@ -201,7 +210,7 @@ async def test_a_click_no_pattern_knows_gets_the_flag_the_judge_finds_and_a_know
     path, authorization, body = asked[0]
     assert (path, authorization, body["model"]) == ("/v1/systemone", f"Bearer {KEY}", "jev-latest")
     # The page's query and fragment stay home.
-    assert body["state"] == {"control": {"label": "Repost", "role": "button"}, "page": f"{service.base}/"}
+    assert body["state"] == {"control": {"label": "Boost", "role": "button"}, "page": f"{service.base}/"}
     questions: JsonValue = body["questions"]
     assert isinstance(questions, dict)
     assert set(questions) == {"public_post", "external_send", "financial", "destructive"}
@@ -214,7 +223,7 @@ async def test_a_refused_key_makes_the_judge_unavailable_for_the_cooldown_until_
     ctx: ToolContext = await _context(runtime, None)
     config: JudgeConfig = runtime.config.judge.model_copy(update={"api_key_env": REFUSED_ENV})
     judge: TypeSafeJudge = TypeSafeJudge(config, 600.0, runtime.bus)
-    facts: ClickFacts = ClickFacts(label="Repost", role="button", url=f"{service.base}/")
+    facts: ClickFacts = ClickFacts(label="Boost", role="button", url=f"{service.base}/")
     before: int = len(service.requests)
     try:
         first: ClickJudgment = await judge.judge_click(facts, ctx.run_id)
