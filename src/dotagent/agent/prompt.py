@@ -30,7 +30,9 @@ class PromptInputs(FrozenModel):
     home: str
     user: str
     os_version: str
-    now_text: str
+    # The date and the time zone, never the time of day: the prompt stays the same all day, so a provider's prompt
+    # cache can serve the next run of a thread (the time of day is in the note after the goal, :func:`clock_note`).
+    today_text: str
     memories: tuple[str, ...]
     tool_names: tuple[str, ...]
     skills: tuple[Skill, ...]
@@ -320,7 +322,7 @@ def _environment(inputs: PromptInputs) -> str:
     lines: list[str] = [
         "# Environment",
         f"- macOS {inputs.os_version}, user {inputs.user}, home {inputs.home}.",
-        f"- Local time: {inputs.now_text}.",
+        f"- Today: {inputs.today_text}; the time of day is in the note after the goal.",
         f"- Working directory: {inputs.workspace}. Relative paths resolve there; keep scratch files and downloads "
         "there unless the user names another place.",
         f"- Mode: {_MODE_TEXT[inputs.mode]}",
@@ -399,6 +401,11 @@ def _ending(mode: RunMode, campaign_session: int | None) -> str:
     return f"{_ENDING_TOOL}\n\n{_OPEN_GOALS}"
 
 
+def clock_note(now: datetime) -> str:
+    """The note after a run's goal that gives the time of day, which the system prompt leaves out."""
+    return f"[system note] It is now {now:%H:%M} {now:%Z}."
+
+
 def build_system_prompt(inputs: PromptInputs) -> str:
     sections: list[str] = [
         f"{_WORK}\n{_ending(inputs.mode, inputs.campaign_session)}",
@@ -440,7 +447,7 @@ def collect_prompt_inputs(
         home=str(Path.home()),
         user=getpass.getuser(),
         os_version=platform.mac_ver()[0],
-        now_text=datetime.now().astimezone().strftime("%A %Y-%m-%d %H:%M %Z"),
+        today_text=datetime.now().astimezone().strftime("%A %Y-%m-%d, time zone %Z (UTC%z)"),
         memories=tuple(memories),
         tool_names=tuple(tool_names),
         skills=tuple(skills),
