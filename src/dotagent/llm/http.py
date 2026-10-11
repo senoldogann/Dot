@@ -1,6 +1,7 @@
 """HTTP plumbing shared by all providers: client factory, error mapping, NDJSON and SSE readers."""
 
 import json
+import ssl
 from collections.abc import AsyncGenerator, AsyncIterator
 
 import httpx
@@ -30,6 +31,9 @@ _TRANSPORT_ERRORS: tuple[type[Exception], ...] = (
     httpx.RemoteProtocolError,
     httpx.ReadError,
     httpx.WriteError,
+    # A TLS read that fails on the wire ("bad record mac") reaches the caller as the raw ssl error, not as a ReadError
+    # (item 107): the network path corrupted a record, the call is as retryable as any other transport failure.
+    ssl.SSLError,
 )
 
 

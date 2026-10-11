@@ -601,6 +601,7 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
     el(
       "div",
       { class: "side-body" },
+      el("label", { class: "side-search" }, icon("search"), search, el("kbd", { "aria-hidden": "true" }, "⌘K")),
       el(
         "a",
         {
@@ -615,7 +616,6 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
         el("span", { class: "grow" }, "New chat"),
         el("kbd", { "aria-hidden": "true" }, "⇧⌘O"),
       ),
-      el("label", { class: "side-search" }, icon("search"), search, el("kbd", { "aria-hidden": "true" }, "⌘K")),
       el("nav", { class: "side-links", "aria-label": "Pages" }, agentsLink, activityLink, campaignsLink),
       activityNav,
       el("nav", { class: "side-recent", "aria-label": "Chats" }, head, bar, list),

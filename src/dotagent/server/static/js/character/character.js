@@ -6,7 +6,7 @@
 // `data-animation`, `data-shape`, `data-expression`, `data-colour` and `data-still`. `tight: true` crops the viewBox
 // to the body (no room for the rings), for a face drawn small.
 import { svg } from "../dom.js";
-import { CharacterEngine } from "./engine.js";
+import { CharacterEngine, SHAPE_MORPH } from "./engine.js";
 import { DEFAULT_EXPRESSION, EXPRESSION_BY_ID } from "./expressions.js";
 import { HALF_VIEWBOX, RADIUS } from "./repere.js";
 import { COLOUR_BY_ID, DEFAULT_COLOUR, DEFAULT_SHAPE, SHAPE_BY_ID } from "./skins.js";
@@ -149,6 +149,13 @@ export function mountCharacter(parent, options) {
     sync(frame.dotsBehind ? dotsFront : dotsBehind, [], () => "", dotNode, paintDot);
   }
 
+  // When a shape or an expression is set: the live clock while moving, so the change is a morph; a time already
+  // past while still (item 107), since the still frame is sampled at the pose's own time, before any morph begun at
+  // the clock, and would keep the old look.
+  function morphAt() {
+    return subscribed ? clock : -SHAPE_MORPH;
+  }
+
   // The frame at `clock`, or the state's best-read frame when still.
   function still() {
     engine.reset(state, 0);
@@ -213,13 +220,13 @@ export function mountCharacter(parent, options) {
     setExpression(id) {
       expression = known(EXPRESSION_BY_ID, id, "expression");
       element.dataset.expression = id;
-      engine.setExpression(expression, clock);
+      engine.setExpression(expression, morphAt());
       if (!subscribed) still();
     },
     setShape(id) {
       shape = known(SHAPE_BY_ID, id, "shape");
       element.dataset.shape = id;
-      engine.setShape(shape.radii, clock);
+      engine.setShape(shape.radii, morphAt());
       if (!subscribed) still();
     },
     setColour(id) {

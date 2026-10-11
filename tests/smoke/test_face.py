@@ -151,6 +151,17 @@ async def _favicon_state(page: Page) -> str:
     raise AssertionError(f"the favicon names no state: {href[:80]}")
 
 
+# The tab's icon is a data: URL (item 107: the page's Content-Security-Policy allows it); drawn as an image it has a size.
+_ICON_LOADS: str = """
+new Promise((done) => {
+  const image = new Image();
+  image.onload = () => done(image.naturalWidth);
+  image.onerror = () => done(0);
+  image.src = document.querySelector('link[rel="icon"]').href;
+})
+"""
+
+
 async def _favicon_becomes(page: Page, state: str) -> None:
     deadline: float = time.monotonic() + _STEP_WAIT_S
     seen: str = await _favicon_state(page)
@@ -204,6 +215,7 @@ async def test_the_face_tells_the_state_through_a_runs_life_and_wears_the_name(
                 await expect(page.locator(".stage-name")).to_have_text(_NAME)
                 await expect(face).to_have_attribute("data-state", "waiting")
                 assert await _favicon_state(page) == "waiting"
+                assert await page.evaluate(_ICON_LOADS) > 0, "the tab's icon does not load under the page's policy"
                 await manager.decide(question.id, True, "test", "blue")
                 await expect(face).to_have_attribute("data-state", "working")
                 await _favicon_becomes(page, "working")

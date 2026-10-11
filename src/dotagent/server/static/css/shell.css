@@ -240,7 +240,7 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  margin: 4px 0 8px;
+  margin: 0 0 4px;
   padding: 0 8px;
   border: 1px solid var(--border-strong);
   border-radius: var(--radius-control);
@@ -495,10 +495,13 @@
 }
 
 /* Inside the desktop shell (item 88) the system draws the traffic lights over the top left of the page: the sidebar's
-   head keeps room for them, and so does the top bar when the sidebar is away (closed, or a drawer). */
+   head keeps room for them, and so does the top bar when the sidebar is away (closed, or a drawer). The lights' centre
+   is 15 px under the top edge, and the head's row is centred on that line (item 107): 30 px of row, no padding above. */
 :root[data-shell="desktop"] .side-head {
-  padding-left: 84px;
-  min-height: 52px;
+  box-sizing: border-box;
+  height: 38px;
+  min-height: 0;
+  padding: 0 8px 8px 84px;
 }
 
 :root[data-shell="desktop"] .shell:not([data-nav="docked"][data-sidebar="open"]) .stagebar-row {
