@@ -26,9 +26,9 @@
 .settings-title {
   margin: 0;
   padding: var(--space-half) 8px 16px;
-  font-size: var(--fs-2xl);
-  font-weight: 650;
-  letter-spacing: -0.015em;
+  font-size: var(--text-2xl);
+  font-weight: var(--weight-title);
+  letter-spacing: var(--tracking-title);
 }
 
 .settings-nav {
@@ -55,7 +55,7 @@
 .settings-tab[aria-current="page"] {
   background: color-mix(in srgb, var(--text) 7%, transparent);
   color: var(--text);
-  font-weight: 550;
+  font-weight: var(--weight-label);
 }
 
 .settings-pane {
@@ -73,7 +73,7 @@
 }
 
 .settings-pane .page-title {
-  font-size: var(--fs-xl);
+  font-size: var(--text-xl);
 }
 
 /* ---------- browser tab ---------- */
@@ -136,7 +136,7 @@
 
 .key-secret {
   font-family: var(--mono);
-  letter-spacing: 0.06em;
+  letter-spacing: var(--tracking-caps);
   color: var(--text-2);
 }
 
@@ -184,7 +184,7 @@
   align-items: center;
   gap: 4px;
   margin-top: 8px;
-  font-size: var(--fs-sm);
+  font-size: var(--text-sm);
 }
 
 .key-row .row-actions {
@@ -237,7 +237,7 @@
   flex-wrap: wrap;
   align-items: center;
   gap: 8px 8px;
-  line-height: 1.5;
+  line-height: var(--leading-md);
 }
 
 .rule-sentence-preview {
@@ -374,26 +374,42 @@
   background: var(--bad-weak);
 }
 
-.type-sample.fs-xs {
-  font-size: var(--fs-xs);
+.type-sample.text-xs {
+  font-size: var(--text-xs);
+  line-height: var(--leading-xs);
 }
 
-.type-sample.fs-sm {
-  font-size: var(--fs-sm);
+.type-sample.text-sm {
+  font-size: var(--text-sm);
+  line-height: var(--leading-sm);
 }
 
-.type-sample.fs-md {
-  font-size: var(--fs-md);
+.type-sample.text-ui {
+  font-size: var(--text-ui);
+  line-height: var(--leading-ui);
 }
 
-.type-sample.fs-lg {
-  font-size: var(--fs-lg);
+.type-sample.text-md {
+  font-size: var(--text-md);
+  line-height: var(--leading-md);
 }
 
-.type-sample.fs-xl {
-  font-size: var(--fs-xl);
+.type-sample.text-lg {
+  font-size: var(--text-lg);
+  line-height: var(--leading-lg);
+  font-weight: var(--weight-title);
 }
 
-.type-sample.fs-2xl {
-  font-size: var(--fs-2xl);
+.type-sample.text-xl {
+  font-size: var(--text-xl);
+  line-height: var(--leading-xl);
+  font-weight: var(--weight-title);
+  letter-spacing: var(--tracking-title);
+}
+
+.type-sample.text-2xl {
+  font-size: var(--text-2xl);
+  line-height: var(--leading-2xl);
+  font-weight: var(--weight-title);
+  letter-spacing: var(--tracking-title);
 }

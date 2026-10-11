@@ -4940,6 +4940,135 @@ written, merged and retired (item 70), notes resting and the share of recalled n
 sent against runs ended (item 75); read with `dotx stats`, the Activity page and the store, read-only, and written
 here.
 
+## Part 9: every corner clean: one type system, one bar, flat surfaces (planned 2026-10-11)
+
+The owner's ninth word, on 2026-10-11, after part 8: "redesign the whole thing, researched on the web, newer and
+proper: some places are great, some feel cheap; every inch matters and must have the right, clean design; ChatGPT,
+Claude and Grok are tidier and each has a text family and size hierarchy; pay attention down to the smallest point,
+research and fix". Planned from a screenshot tour of every page in both schemes and at 1280 and 390 (36 shots, read),
+an inventory of the stylesheets, and a web research round on the three products.
+
+**What the research gave.** The live stylesheets of chatgpt.com, claude.ai and grok.com could not be read (403, text
+only); the numbers come from third-party extractions and are low to medium trust. What they agree on: four to seven
+type sizes in use (ChatGPT about 13, 14, 15, 16, 20, 24, 32), three weights at most (400, 500, 600; no 700 in the
+interface), emphasis by colour and size rather than weight, hairline borders and flat cards over shadows, a 4 px
+spacing base, radii 6/8/12/16 with a rounder composer, and a message column of about 768 px. The faces are
+proprietary (OpenAI Sans, Anthropic's; Grok's unknown); the open equivalents with a verified SIL OFL licence are Inter
+(github.com/rsms/inter) and Geist Sans and Mono (github.com/vercel/geist-font).
+
+**What the tour showed.** Six type tokens but five weights in use (400, 500, 550, 600, 650) and nine sizes outside
+the tokens (`em` headings in prose, `.plan-step`); the run's sticky head is translucent and blurred, so a user bubble
+scrolled under it shows as a yellow haze and the first lines read half under it; the daemon's dot and the stop button
+float in the top right of a bar that has no other content; Settings has two title rows (the page and the tab);
+section labels are uppercase on some pages and sentence case on others; meta lines are strings joined with middle
+dots; the campaign's numbers are monospace chips; the Activity page's empty states are tall cards with an icon; every
+list is a card with a shadow; the dark scheme's first paint after sign-in may be light (one shot, to be verified).
+
+**The system (the decisions of this part).**
+
+- Type: Inter (variable, self-hosted, `font-optical-sizing: auto`) for the interface and the prose, Geist Mono for
+  code and identifiers; `system-ui` and `ui-monospace` as fallbacks. Seven sizes with their line-heights, each a
+  token with both: 12/16 (badges only), 13/18 (meta, hints), 14/20 (the interface: sidebar, buttons, labels, inputs),
+  15/24 (prose and the composer), 17/24 (section titles, prose h1), 20/28 (page titles), 24/32 (the home's greeting).
+  Three weights: 400 text, 500 interface labels and names, 600 titles. Letter-spacing 0 under 20 px, -0.01em at 20
+  and above. Tabular numerals on every number that sits in a column or a row of meta.
+- Bars: one top bar on every page, solid, with a hairline under it; it carries the sidebar opener, the page's name,
+  on the run page the run's face, state and start, and on the right the daemon's dot, the pills and the stop. The run
+  page's head is that bar; nothing scrolls under a blur. Settings has one title row.
+- Surfaces: the page, the sidebar and one raised surface; cards flat with a hairline, radius 12; no shadow but under
+  menus and dialogs; the composer a 1 px border at radius 24; the user's bubble a surface, not a colour.
+- Words: section labels in sentence case, no uppercase; a meta line is separate spans, not a dotted string; a number
+  with its noun ("2 posts deleted"); empty states one line of text with the action, no card and no icon.
+
+### How to start part 9 (the handoff prompt)
+
+> Read ROADMAP.md part 9 and the status table below. One item at a time, in order; the protocol of part 5 (branch,
+> gate, PR, Linear MYP issue, squash merge, hash in the table, log line) is unchanged. Every item ends with the
+> screenshot tour (`tests/smoke/test_tour.py` from item 77 on) read by eye in both schemes at 1280 and 390. Never
+> touch the owner's data directory except to read it and to restart the daemon when `/api/status` shows no active
+> run; the owner's goals stay out of this file; PLAN.md stays untracked. The owner reads Turkish; everything written
+> is English.
+
+### Status, part 9
+
+| #   | Item                                                                     | Status      | Commits |
+| --- | ------------------------------------------------------------------------ | ----------- | ------- |
+| 77  | The type system: Inter and Geist Mono, seven sizes, three weights        | planned     |         |
+| 78  | One bar: the top bar carries the page, the run's head and the daemon     | planned     |         |
+| 79  | Flat surfaces and plain words: cards, labels, meta, chips, empty states  | planned     |         |
+| 80  | Forms and controls: one grammar for inputs, selects, switches, tables    | planned     |         |
+| 81  | Dark, first paint and the tour: every page read in both schemes          | planned     |         |
+
+### 77. The type system: Inter and Geist Mono, seven sizes, three weights
+
+**Status: in progress.** Built on `item-77-type-system` (MYP-217).
+
+**Design, as built (2026-10-11).** `static/fonts` holds `InterVariable.woff2`, `InterVariable-Italic.woff2` (Inter
+4.1) and `GeistMono-Variable.woff2` with their OFL licence files; `app.css` declares the three `@font-face` blocks
+(weight 100 to 900, `font-display: swap`) and the CSP gained `font-src 'self'` (`guard.py`). The tokens: `--font`
+(Inter, then `system-ui`), `--mono` (Geist Mono, then `ui-monospace`), `--voice` (the Paper look's serif for its
+titles), `--text-{xs,sm,ui,md,lg,xl,2xl}` 12/13/14/15/17/20/24 with `--leading-*` 16/18/20/24/24/28/32,
+`--weight-{text,label,title}` 400/500/600, `--tracking-title` -0.01em and `--tracking-caps` 0.04em (the uppercase
+labels keep it until item 79 removes them). The body is 14/20 with `font-optical-sizing: auto` and tabular numerals
+everywhere. Every `font-size`, `font-weight`, `line-height`, `letter-spacing`, `font-family` and `font` shorthand in
+the five sheets names a token: the 650 and 550 weights are gone (titles 600, labels and names 500), the prose's
+headings are 17/24 (h1) and 15/24 (h2 in the title weight, h3 and h4 in the label weight) instead of `em` factors,
+code and the mono blocks are 13/18, the Paper look no longer sets its own prose size. The Controls page's Type card
+shows the seven steps with their names. `tests/unit/test_css_tokens.py` refuses a size in px or em, a weight, a
+line-height, a letter-spacing or a family that is not a token (the `@font-face` blocks excepted), checks the three
+files and the two licences are there and that the CSP names `font-src`. `tests/smoke/test_tour.py` plays one
+scripted run with a shell step and a Markdown answer, saves a note, and screenshots fourteen pages (the sign-in's
+first paint included) in light and dark at 1280 and 390 into its temp directory, 56 shots, asserting each page's
+title and that the body's face is Inter.
+
+**What.** The two faces self-hosted under `static/fonts` (woff2, OFL licence files beside them), `@font-face` with
+`font-display: swap`; the tokens `--text-{xs,sm,ui,md,lg,xl,2xl}` each a size and `--leading-*` its line-height,
+`--weight-{text,label,title}`; every `font-size`, `font-weight`, `line-height` and `letter-spacing` declaration in
+the five stylesheets on the tokens (the prose headings included, in px not em); `font-variant-numeric: tabular-nums`
+on meta and columns; the Controls page's Type card shows the seven steps. A unit test reads the stylesheets and
+refuses any size, weight or line-height off the scale. `tests/smoke/test_tour.py`: the screenshot tour of every page
+(light and dark, 1280 and 390) written to the test's temp dir for reading.
+
+### 78. One bar: the top bar carries the page, the run's head and the daemon
+
+**Status: planned.**
+
+**What.** The stage bar becomes the top bar of every page: solid background, hairline under it, 48 px; left the
+sidebar opener and the page's name (on the run page the face, the name, the state and the start), right the pills,
+the daemon's dot and the stop. The run page's sticky head is removed; the chips it carried (model, effort, approvals,
+campaign) go to the bar's right on wide windows and to the side panel on narrow ones. Settings shows "Settings" in
+the bar and the tabs as its first row; the page title row under the tabs goes, the description stays as one line.
+The phone header is the same bar. Nothing has a translucent backdrop any more.
+
+### 79. Flat surfaces and plain words: cards, labels, meta, chips, empty states
+
+**Status: planned.**
+
+**What.** Cards flat: hairline, radius 12, no shadow (shadows stay on menus, dialogs, the composer's focus); list
+rows inside a card without a second border; section labels sentence case at 14/20 weight 500 (the uppercase class
+goes); meta lines as spans with a 12 px gap and no middle dots; chips in Inter at 12/16 with a surface, numbers with
+nouns on the campaign cards; empty states one sentence and the action in a row, no card and no icon; the user's
+bubble on the raised surface; the home's "Ended today" list as rows on the page.
+
+### 80. Forms and controls: one grammar for inputs, selects, switches, tables
+
+**Status: planned.**
+
+**What.** Inputs and selects 36 px tall, radius 8, hairline, the same focus ring (2 px accent outline, offset 1);
+selects with a drawn chevron, the native one hidden; textareas with the same frame; segmented controls and switches
+on the 14/20 label; buttons 32 (small) and 36 (default) with 500 labels; the models table with 40 px rows, the model
+name in Geist Mono at 13, the capability chips as in item 79, the reasoning select as the others; field labels at
+14/20 500 and hints at 13/18 muted; the rule form and the schedule form on the same grid.
+
+### 81. Dark, first paint and the tour: every page read in both schemes
+
+**Status: planned.**
+
+**What.** The dark tiers of the Neutral look re-set on three surfaces (page, sunken sidebar, raised cards) with the
+secondary text at or above 4.5:1 on each; the Paper look the same way; the theme applied before the first paint after
+the sign-in redirect (verified by the tour: the first dark shot is dark); every one of the 36 shots of the tour read
+and what the earlier items missed fixed here; README's visual-system section rewritten as the current state.
+
 ## Log
 
 - 2026-10-08: roadmap written from the owner's go-ahead for all eight items, in this order. Nothing implemented yet.

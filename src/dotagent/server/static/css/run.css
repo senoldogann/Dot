@@ -76,7 +76,7 @@
   padding: 4px 8px 4px 4px;
   border-radius: var(--radius-sm);
   color: var(--text-2);
-  font-size: var(--fs-sm);
+  font-size: var(--text-sm);
   cursor: pointer;
   list-style: none;
   user-select: none;
@@ -99,7 +99,7 @@
 }
 
 .steps-title {
-  font-weight: 600;
+  font-weight: var(--weight-title);
   white-space: nowrap;
 }
 
@@ -116,7 +116,7 @@
   white-space: nowrap;
   color: var(--muted);
   font-family: var(--mono);
-  font-size: var(--fs-xs);
+  font-size: var(--text-xs);
 }
 
 /* An open group already shows every step, so the line about the latest one would only say it twice. */
