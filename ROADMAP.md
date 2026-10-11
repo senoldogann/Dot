@@ -5021,7 +5021,7 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 98  | The web that is refused: 999, 403 and their kind meet the browser, not the end     | done        | 65433d0 |
 | 99  | The team that grows: a run makes a lasting teammate and knows of it                | done        | 724768e |
 | 100 | The review: every feature of parts 1 to 12 read once more on the live pages        | done        | 62585c2 |
-| 101 | The character engine: bloub's one shape with two eyes, as plain modules of Dot's UI | planned     |         |
+| 101 | The character engine: bloub's one shape with two eyes, as plain modules of Dot's UI | in progress |         |
 | 102 | The look of every agent: shape, expression and colour, chosen in the editor and worn in every row | planned     |         |
 | 103 | Alive beside the chat: the character works, waits, finishes and sleeps with the run | planned     |         |
 | 104 | The composer remade: one frame, quiet menus, drafts that keep, a face that listens  | planned     |         |
@@ -5893,7 +5893,33 @@ polish of part 12's review is paid, and the whole is read once more.
 
 ### 101. The character engine: bloub's one shape with two eyes, as plain modules of Dot's UI
 
-**Status: planned.**
+**Status: in progress.**
+
+**Design, as built (2026-10-11).** `static/js/character/`: bloub's `src/bot` module by module (`math`, `repere`,
+`profiles`, `shape`, `skins`, `face`, `expressions`, `decor`, `states`, `eyefit`, `engine`), the types dropped, the
+French identifiers and comments English, the numbers bloub's; the shape, colour and expression ids are English too
+(`pebble`, `ink`, `unimpressed`). `eyefit.js` builds a shape's table of eye offsets on that shape's first use rather
+than every shape's at import (`eyeOffset`, keyed by the radii array's reference as in bloub). `character.js`:
+`mountCharacter(parent, {shape, expression, colour, size, moving, state, phase, label})` builds the SVG with `svg()`
+of dom.js (the mask with the body and the eyes as holes, the gradients of the arcs, the arcs' back halves, the dots,
+the paper under the body, the inked rect through the mask, the pastille, the arcs' front halves; a `sync` keeps each
+group's children in step with the frame's list) and returns `{element, state, setState, setExpression, setShape,
+setColour, setLook, freeze, resume, destroy}`; each character keeps its own clock, started at a different second so
+two faces do not blink as one; a still character (`moving: false`, `freeze()`, or reduced motion, followed through
+the media query's `change`) renders the one frame of `POSES[state]` after a `reset`, and carries `data-still`,
+`data-state` and `data-colour`. `ticker.js`: one requestAnimationFrame loop for the page, the frame time clamped at
+64 ms, started when the first character subscribes, stopped when the last leaves or the tab hides
+(`visibilitychange`), resumed when it shows. The body fills with `currentColor` and the wrapper's `data-colour`
+picks `--character-<id>` (themes.css: bloub's twelve, ink and cream per scheme so a body never matches the ground,
+`--character-notify` the pastille's blue); the eyes show `--bg`; a particle's depth is its opacity. `#/controls`
+gets a Characters card: the eight shapes, the sixteen expressions and the twelve colours still, the fourteen
+animations moving (`controls.js characters()`, destroyed on unmount). `static/js/character/LICENSE` carries bloub's
+MIT notice with its non-affiliation note; the README's design system credits bloub. Tests:
+`tests/smoke/test_character.py` (the gallery's counts, the eyes as two mask paths at rest and none in the thinking
+dots, a gradient per ring, a moving path against a still one, the ticker's state, a mounted character through
+`setState` to thinking (the eyes fade) and notify (the pastille), `freeze`, `destroy`; reduced motion leaves every
+character still and the loop off; a hidden tab stops the loop and a shown one resumes it); the gallery shot in both
+schemes read by eye.
 
 **What.** `static/js/character/`: bloub's `src/bot` translated module by module to plain ES modules (math, repere,
 profiles, shape, skins, face, decor, expressions, states, eyefit, engine), the eye-fit table built once on first use

@@ -947,6 +947,13 @@ string; an empty list is one line that says so and what to do; your messages sit
 buttons, inputs and selects 36 px tall on an 8 px corner with a hairline (32 for the small ones), the same 2 px focus
 ring on each, a select with its own drawn chevron, field labels on the interface line and hints on the small one,
 table rows 40 px with their content on the middle; `#/controls` shows every control on one page for checking a look.
+Characters: the animated faces (`static/js/character/`) are a port of bloub (github.com/jeremy-prt/bloub, MIT, Jérémy
+Perret) to plain ES modules, one filled shape with two eyes that are holes in it, in eight shapes, sixteen
+expressions, twelve colours (the theme's `--character-*` tokens) and fourteen animations; bloub recreates the
+behaviour of x.ai's bot avatar as an exercise and is affiliated with nobody, and neither is Dot: the licence covers
+the code, not the design it imitates (`static/js/character/LICENSE`). One loop drives every moving character on the
+page and stops while the tab is hidden; under reduced motion each shows one still frame. `#/controls` shows every
+shape, expression, colour and animation.
 Space: every gap, padding and margin sits on one rhythm of 8 px (4 for the smallest, a 2 px hairline token for what
 sits a breath apart; a unit test checks it); the sidebar has no dividers between its groups, its labels are the
 lightest ink that reads and its open row is a surface step rather than a tint; the top bar's pills show a border only
