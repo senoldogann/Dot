@@ -148,6 +148,18 @@ export function ago(ts) {
 }
 
 /** "850 ms", "12.4 s", "3m 05s", "2h 10m" */
+/** The milliseconds of a motion token of the stylesheet ("--motion-base"), for a script that waits for a slide to end. */
+export function motionMs(token) {
+  const raw = getComputedStyle(document.documentElement).getPropertyValue(token).trim();
+  if (raw.endsWith("ms")) {
+    return Number.parseFloat(raw);
+  }
+  if (raw.endsWith("s")) {
+    return Number.parseFloat(raw) * 1000;
+  }
+  throw new Error(`the motion token ${token} is not a duration: "${raw}"`);
+}
+
 export function duration(seconds) {
   if (seconds < 1) {
     return `${Math.round(seconds * 1000)} ms`;

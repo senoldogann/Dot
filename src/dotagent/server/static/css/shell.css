@@ -11,8 +11,24 @@
   min-height: 100vh;
 }
 
+/* The docked sidebar slides (item 85): its column goes from nothing to its width on the base duration and the page
+   follows; the sidebar keeps its own width inside the column and is clipped by it on the way. */
+.shell[data-nav="docked"] {
+  grid-template-columns: 0px minmax(0, 1fr);
+  transition: grid-template-columns var(--motion-base) var(--ease);
+}
+
 .shell[data-nav="docked"][data-sidebar="open"] {
   grid-template-columns: var(--sidebar-w) minmax(0, 1fr);
+}
+
+.shell[data-nav="docked"] .sidebar {
+  min-width: 0;
+  overflow: hidden;
+}
+
+.shell[data-nav="docked"] .sidebar > * {
+  min-width: var(--sidebar-w);
 }
 
 /* ---------- stage ---------- */
@@ -78,8 +94,11 @@
   border-right: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
 }
 
+/* Closed, the sidebar is out of reach (shell.js makes it inert) and out of sight once the slide has ended. */
 .shell[data-nav="docked"][data-sidebar="closed"] .sidebar {
-  display: none;
+  visibility: hidden;
+  border-right-color: transparent;
+  transition: visibility 0s linear var(--motion-base);
 }
 
 .shell[data-nav="drawer"] .sidebar {
@@ -103,6 +122,8 @@
 
 /* Reduced motion: the drawer appears in place rather than sliding in. */
 @media (prefers-reduced-motion: reduce) {
+  .shell[data-nav="docked"],
+  .shell[data-nav="docked"][data-sidebar="closed"] .sidebar,
   .shell[data-nav="drawer"] .sidebar,
   .shell[data-nav="drawer"][data-sidebar="open"] .sidebar {
     transition: none;

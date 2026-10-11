@@ -155,7 +155,8 @@
   gap: 8px;
 }
 
-/* On a narrow page the panel slides in over the conversation. */
+/* On a narrow page the panel slides in over the conversation (item 85): inspector.js shows it, then opens it on the
+   next frame; closing, it waits for the slide before it hides. The scrim fades with it. */
 .inspector[data-mode="drawer"] {
   position: fixed;
   inset: 0 0 0 auto;
@@ -166,6 +167,28 @@
   border-left: 1px solid var(--border);
   background: var(--bg);
   box-shadow: var(--shadow-overlay);
+  transform: translateX(100%);
+  transition: transform var(--motion-base) var(--ease);
+}
+
+.inspector[data-mode="drawer"][data-open="true"] {
+  transform: none;
+}
+
+.inspector-scrim {
+  opacity: 0;
+  transition: opacity var(--motion-base) var(--ease);
+}
+
+.inspector-scrim[data-open="true"] {
+  opacity: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .inspector[data-mode="drawer"],
+  .inspector-scrim {
+    transition: none;
+  }
 }
 
 .inspector[data-mode="drawer"] .inspector-head {

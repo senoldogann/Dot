@@ -454,10 +454,12 @@ a.pill:hover {
   animation: blink var(--motion-blink) ease-in-out infinite;
 }
 
+/* A page comes in with a fade and a rise of 4 px (item 85); the router replaces the old one at once. */
 .page {
   max-width: 1040px;
   margin: 0 auto;
   padding: 24px 20px 80px;
+  animation: page-in var(--motion-base) var(--ease);
 }
 
 .page > * + * {
@@ -2635,6 +2637,31 @@ dialog.lightbox img {
   }
 }
 
+@keyframes page-in {
+  from {
+    opacity: 0;
+    translate: 0 4px;
+  }
+}
+
+/* A body that unfolds (a card, a group of steps, a delegated run's steps) fades in and rises 4 px (item 85). */
+.fold-body,
+.steps-body,
+.child > .timeline {
+  transition:
+    opacity var(--motion-quick) var(--ease),
+    translate var(--motion-quick) var(--ease);
+}
+
+@starting-style {
+  .fold-body,
+  .steps-body,
+  .child > .timeline {
+    opacity: 0;
+    translate: 0 -4px;
+  }
+}
+
 /* Reduced motion (item 73): every transform goes (the breath and the pulse of the face, the spinners, the switch's
    knob and the chevron on the move) and the fades stay, so a state change is still seen. */
 @media (prefers-reduced-motion: reduce) {
@@ -2646,8 +2673,15 @@ dialog.lightbox img {
   }
 
   .switch::after,
-  .chev {
+  .chev,
+  .fold-body,
+  .steps-body,
+  .child > .timeline {
     transition: none;
+  }
+
+  .page {
+    animation-name: fade-in;
   }
 }
 

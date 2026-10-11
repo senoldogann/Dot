@@ -5005,7 +5005,7 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 82  | Delegated runs as rows: face, state, last line, time; the child's bar    | done        | 6454345 |
 | 83  | Faces for the actors: a hue each, alive in the rows and the bar          | done        | d760ea3 |
 | 84  | The side panel: inset bodies, facts as spans, one card grammar           | in progress |         |
-| 85  | Motion: the sidebar slides, the panel slides, folds fade, pages cross-fade | planned     |         |
+| 85  | Motion: the sidebar slides, the panel slides, folds fade, pages cross-fade | in progress |         |
 | 86  | Agents: profiles with a face, a role, a model and their own chats         | planned     |         |
 | 87  | Agents together: messages between agents, the team's thread, the harness  | planned     |         |
 | 88  | Desktop and web, one interface: the Tauri shell on the same pages         | planned     |         |
@@ -5239,7 +5239,21 @@ panel's scroll inside its own height.
 
 ### 85. Motion: the sidebar slides, the panel slides, folds fade, pages cross-fade
 
-**Status: planned.**
+**Status: in progress.** Built on `item-85-motion` (MYP-225).
+
+**Design, as built (2026-10-11).** The docked sidebar (`shell.css`): the shell's first column goes from `0px` to
+`--sidebar-w` with `transition: grid-template-columns` on the base duration, the page following; the sidebar keeps
+its own width inside the column (`min-width` on its children) and the column clips it on the way; closed, it is
+`visibility: hidden` once the slide has ended (a 0 s transition delayed by the base duration) and inert as before,
+its right hairline transparent. The side panel's drawer (`run.css`, `inspector.js`): the panel starts at
+`translateX(100%)` and `data-open="true"` brings it in on the base duration; `showDrawer` unhides it, lays out its
+first frame, then opens it; closing, it sets `data-open="false"` and hides it when the base duration has passed
+(`motionMs("--motion-base")` in `dom.js` reads the token, so the script and the sheet keep one number); the scrim
+fades the same way. A body that unfolds (`.fold-body`, `.steps-body`, a delegated run's `.timeline`) comes in from
+`opacity: 0; translate: 0 -4px` through `@starting-style` on the quick duration. A page comes in with `page-in`
+(a fade and a 4 px rise on the base duration) when the router mounts it; the old page leaves at once. Under reduced
+motion the slides and the rises go (`transition: none`, `animation-name: fade-in`) and the fades stay. Every
+duration is a motion token, which the existing unit test holds; the tour's shots are taken after the motion settles.
 
 **What.** The docked sidebar opens and closes by sliding (the column's width and the sidebar's transform on the base
 duration, the page following) instead of appearing; the side panel's drawer slides in and out; a fold's body fades

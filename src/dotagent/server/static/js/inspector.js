@@ -3,7 +3,7 @@
 // the header slides in over the conversation.
 
 import { imageUrl } from "./api.js";
-import { el } from "./dom.js";
+import { el, motionMs } from "./dom.js";
 import { icon } from "./icons.js";
 import { foldCard } from "./panels.js";
 import { setShowInspector, showInspector } from "./layout.js";
@@ -151,11 +151,44 @@ export function createInspector({ layout, content }) {
     const wanted = showInspector();
     layout.dataset.inspector = room && wanted ? "on" : "off";
     element.dataset.mode = room ? "docked" : "drawer";
-    element.hidden = room ? !wanted : !drawerOpen;
-    scrim.hidden = room || !drawerOpen;
-    const shown = !element.hidden;
+    if (room) {
+      clearTimeout(hideTimer);
+      hideTimer = null;
+      element.hidden = !wanted;
+      scrim.hidden = true;
+      delete element.dataset.open;
+      delete scrim.dataset.open;
+    } else {
+      showDrawer(drawerOpen);
+    }
+    const shown = room ? wanted : drawerOpen;
     toggle.setAttribute("aria-pressed", String(shown));
     toggle.title = shown ? "Hide the details" : "Show the details";
+  }
+
+  // The drawer slides (item 85): shown first, then opened once its first frame is laid out so the slide plays; closing,
+  // it hides when the slide has had its time (the base duration), under reduced motion too.
+  let hideTimer = null;
+  function showDrawer(open) {
+    clearTimeout(hideTimer);
+    hideTimer = null;
+    if (open) {
+      element.hidden = false;
+      scrim.hidden = false;
+      element.getBoundingClientRect();
+      element.dataset.open = "true";
+      scrim.dataset.open = "true";
+      return;
+    }
+    element.dataset.open = "false";
+    scrim.dataset.open = "false";
+    if (!element.hidden) {
+      hideTimer = setTimeout(() => {
+        element.hidden = true;
+        scrim.hidden = true;
+        hideTimer = null;
+      }, motionMs("--motion-base"));
+    }
   }
 
   function setDrawer(open) {
