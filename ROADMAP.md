@@ -3572,6 +3572,216 @@ keys), README (a new section).
 daemon; a push for a question and for an end reaches a push service encrypted and signed; a push arrives on a phone
 on the owner's tailnet for an approval and opens the run (owner's run, logged by hand in this file).
 
+## Part 5: the long run: context, the open web, the bill (planned 2026-10-11)
+
+The owner's fifth word, on 2026-10-11, after part 4: "continue with the next tasks", with the standing trust of
+2026-10-11 ("I believe you will take the right decisions; think it through for the future, performance and quality").
+Parts 1 to 4 are done, so this part is planned from the only evidence that is new: the owner's own seven runs on the
+daemon (2026-10-09 to 2026-10-10, read through the API and `dotx stats` on 2026-10-11; the goals stay out of this
+file), the daemon's logs, and what the code does at the points they name. Every item here is judged by numbers that
+`dotx stats` reads from those runs before and after, and by the eval set where a number can be had offline.
+
+**What the owner's runs show.** Seven runs, all `yolo`, all at effort `max`, six on `ollama:deepseek-v4.1-flash:cloud`
+(a model whose window Ollama reports as 1,048,576 tokens), one on `glm-5.3-flash:cloud`; three task runs from the UI
+of 160, 217 and 260 steps (17, 18 and 51 minutes), four research runs delegated by them of 24 to 53 steps.
+
+- *Context.* 96 steps a run, 40.1 k input tokens a step, 23.0 M input tokens over the six DeepSeek runs, 61 % of them
+  cached. The 260-step run compacted 63 times, once every four steps; the summaries took 1,004 of the 3,323 model
+  seconds of those runs, 30 % of the model time, written by the fast model (`gpt-oss:20b-cloud`) from up to 120,000
+  characters of transcript each time. The cause is the budget, not the ledger: `[agent] context_tokens = 48000` and
+  `[providers.ollama] num_ctx = 65536` give the run about 48 k tokens, the fixed part and six kept tool results of up to
+  12,000 characters fill it in a few browser steps, and the pinned ledger is bounded (40 actions, 60 addresses). 64
+  `compaction_check_failed` warnings and 7 `summary_too_long` say the fast model's summaries often miss a section or
+  run long, so the note leans on the pinned facts.
+- *The open web.* 561 `web_fetch` calls, 75 failed: about twenty HTTP 404 on career pages whose address the model
+  guessed (`/careers/`, `/ura/`, `/yhteystiedot/`), two DNS failures and two transit failures of the same kind, two
+  HTTP 429 from LinkedIn, two HTTP 403 from search engines the model fetched as pages (Mojeek, Ecosia) when
+  `web_search` was throttled. 32 `web_search` calls, 18 failed: 10 by DuckDuckGo's bot check, 3 by a result page with
+  no results, 5 by `max_results` above 10 (a turn lost to a validation message each). Those runs predate the restart
+  that made the hosted Ollama search live for the daemon (item 34, decision 18): the throttling is unmeasured since.
+  Two `browser_act` batches were refused for more than five steps and two for an action name outside the list.
+- *The browser.* The daemon's error log holds two tracebacks of `BrowserSession._adopt_popup`
+  (`list.remove(x): x not in list`: a popup closed while it was being adopted) and two `BrowserError: keeping the page
+  focused failed` after an OAuth callback page (`.../auth/linkedin_apply/callback`) closed under `keep_focused`
+  (`browser/driver.py:644`, a `TargetClosedError`). The log counts 13 `browser_context_closed`, 10 `launch_retry`,
+  4 `browser_navigation_failed`, 2 `browser_disconnected`.
+- *Delegation.* The three `delegate` calls of the 260-step run took 1,781 seconds (median 687): the tool is already
+  parallel-safe and the children ran at once, so the time is the children's own (research runs of 5 to 14 minutes,
+  0.8 to 2.1 M input tokens each), spent largely on the guessed addresses above.
+- *What the owner can read.* The run page shows tokens; the time of a run, where it went (model, summaries, tools,
+  waiting) and how often it compacted are in `dotx stats` only (item 22 left "numbers on the run page" for later).
+- *The eval set.* Decision 28 found it has no browser task and no goal-mode run, so items 44 and 54 cannot be measured
+  offline; its five long tasks are shell and file work.
+
+**Principle for part 5.** The same currency as part 3 (steps and seconds, never feel), with two additions: (1) the
+owner's own runs are the benchmark, read before and after each item with `dotx stats` (and, for the items that admit
+it, the eval set's long tasks); (2) a failure stays a failure and says more: a tool that meets a dead address or a
+closed page reports it with what it found, never guesses and never hides it behind a retry. Nothing here widens what a
+run may do.
+
+**Order and dependencies.** 53 (the numbers) first, since every other item is judged by them; 54 (long browser tasks
+in the eval set) second, the offline instrument; 55 (context) and 56 (the web) next, the two costs; 57 (the browser's
+closed pages) then; 58 (the bill on the run page) last, since it shows 53's numbers to the owner.
+
+### How to start part 5 (the handoff prompt)
+
+> Read `ROADMAP.md` from the top, then "Part 5" and its status table. Check the ground. Take the first item of the
+> part 5 table that is not `done`, in the order above. The protocol is part 4's: read the code, correct the design
+> where the code disagrees, `in progress`, build under the house rules, check wide and phone in both looks where a page
+> changes, update README and defaults, branch `item-NN-short-name`, PR, squash-merge, hash and log line. Read the
+> owner's daemon through its API and `dotx stats` only, never its files; the goals of their runs stay out of this
+> file. The owner reads Turkish; everything written is English.
+
+### Status, part 5
+
+| #   | Item                                                                     | Status  | Commits |
+| --- | ------------------------------------------------------------------------ | ------- | ------- |
+| 53  | The numbers of a long run                                                | planned |         |
+| 54  | Long browser tasks in the eval set                                       | planned |         |
+| 55  | Context that stays: a compaction every forty steps, not four             | planned |         |
+| 56  | The web without guessing                                                 | planned |         |
+| 57  | The browser's closed pages                                               | planned |         |
+| 58  | The bill of a run, on its page                                           | planned |         |
+
+### 53. The numbers of a long run
+
+**What.** `dotx stats` (per model and per run), the eval report and a new `GET /runs/{run_id}/stats` report what
+part 5 is judged by: compactions per 100 steps and the share of model seconds they took; input tokens a step as a curve
+over the step index (the bands of item 22); the failures of `web_fetch` and `web_search` by cause (not found: HTTP 404
+and an unresolved host; throttled: HTTP 429 and DuckDuckGo's check; blocked: HTTP 403; transit; invalid arguments);
+the turns lost to argument validation over every tool; the seconds a run waited for its delegated children.
+
+**Why.** The numbers above were assembled by hand from the events; nothing reads them back, so no item of this part
+could be checked. Item 22 built the acts, the bands, the sites and the cache share; this item adds the costs of the
+long run next to them.
+
+**Design (from the audit; correct it when the code disagrees).** `store/stats.py` gains the aggregates from the events
+that already exist: `compacted` (count, and the `model_call` rows whose purpose is the summary, which item 9 tags),
+`tool_result` of the web tools (the cause from the text's first line, classified by a pure function with its own unit
+test), the `Invalid arguments` results of every tool, and the `delegate` results' seconds. New frozen models
+`CompactionStats`, `WebFailureStats`, `DelegationStats` on `ModelStats`; a per-run `RunCosts` read by the new route
+and by `dotx stats --run ID`. The eval `RunMetrics` and the scorecard carry compactions and their seconds. The baseline
+of the owner's seven runs (the figures in the part's head) is written into this item once the code reads them, so the
+difference after 55 and 56 is a number, not a memory.
+
+**Touchpoints.** `store/stats.py`, `cli_stats.py`, `server/routes_runs.py`, `server/views.py`, `evals/metrics.py`,
+`evals/results.py`, `evals/scoring.py`, README "Statistics", `tests/unit/test_run_statistics.py`.
+
+**Done when.** `dotx stats` prints the five numbers per model, `dotx stats --run ID` and the route per run, the eval
+report per task; the unit tests over a fixed event set check each; the baseline of the owner's runs is in this item.
+
+### 54. Long browser tasks in the eval set
+
+**What.** Two long tasks against the test fixture site (the local server of the browser smoke tests): a *research*
+task that reads ten or more pages, one of them linked to a dead address and one behind a redirect, and reports a
+table; and a *goal-mode* task on a form whose outcome must be verified on the page (so `expect` and the goal check
+fire). Both play with the scripted model offline and with a live model under `--model`.
+
+**Why.** Decision 28: the eval set exercises neither the browser nor goal mode, so item 44 was unmeasurable and item
+55 would be measured on shell tasks whose context never fills. Long browser tasks are where the owner's runs spend.
+
+**Design (from the audit).** `evals/catalog.py` gains the two tasks under the long ids; the fixture pages come from the
+smoke tests' site (extend it rather than add a second one); the scripted turns show the intended path (search the
+site, follow links, meet the 404, report it); the checks read the report's table and the form's state. The runner
+starts the fixture server for a browser task and the browser in headless mode in the attempt's home.
+
+**Touchpoints.** `evals/catalog.py`, `evals/runner.py`, the fixture site under `tests/`, README "Evaluation".
+
+**Done when.** `dotx eval check` plays both offline; `dotx eval run --task ID --model REF` plays them live; the
+report shows compactions and fetch failures (item 53) for them.
+
+### 55. Context that stays: a compaction every forty steps, not four
+
+**What.** A long run on a model with a large window compacts rarely, and a compaction costs a tenth of what it does
+now. Targets, read with item 53 on the long tasks and on the owner's next runs: compactions per 100 steps under 5
+(from 24 on the owner's longest run), the summaries' share of model seconds under 10 % (from 30 %), input tokens a
+step not above today's 40 k on the same budget.
+
+**Why.** The numbers in the part's head: the budget is 48 k tokens on a model that holds a million, and every fourth
+step pays a 16-second summary of 120,000 characters to the fast model, which then misses sections.
+
+**Design (from the audit; the measured choice is decision 33).** Three moves, each measured alone before it stays:
+(1) the budget follows the model: `context_budget` already takes three quarters of the window, so what cuts it is
+`[agent] context_tokens = 48000` and `num_ctx = 65536`; a model-aware default (the window `/api/show` reports, capped
+by a ceiling that keeps the tokens a step within reason on a metered key) is measured against today's on the long tasks,
+compactions and tokens a step side by side, since a wider window costs more tokens a step at the same cache share;
+(2) the summary reads less: the head sent to the writer keeps tool results as their summary lines only (`summary_part`
+does part of this) and the earlier continuity note is carried as it is, not re-summarised; (3) the kept tool results
+shrink earlier: `shrink_old_tool_results` at the soft limit keeps `keep_recent_tool_results = 6` full results of up to
+12,000 characters; the number and the size scale with the budget as `tool_output_chars` already does. The check of a
+summary (`check_continuity`) stays; its failures are counted by 53.
+
+**Touchpoints.** `agent/loop.py` (`_compact`, the budget shares), `agent/scaffold.py`, `agent/continuity.py`,
+`defaults.toml`, `config.py`, README "How a run works" (compaction), `tests/unit/test_compaction*.py`.
+
+**Done when.** The three numbers on the long tasks before and after each move are in this item and decision 33; the
+defaults that win are set; the owner's next long run is read with `dotx stats --run` and logged.
+
+### 56. The web without guessing
+
+**What.** A research run finds pages instead of guessing their address, and a wrong guess costs one turn that says
+what is there. Targets (item 53): not-found fetches per research run near zero (from about ten), turns lost to
+argument validation zero.
+
+**Why.** The owner's two research runs on the same goal lost about twenty turns to guessed career-page addresses, two
+to search engines fetched as pages, and five to `max_results` above 10.
+
+**Design (from the audit).** (1) `web_fetch` on HTTP 404 or an unresolved host reports the failure and, when the host
+answers at its root, the links of that front page whose text or path shares a word with the asked path (a dozen at
+most, with the words they matched), so the next turn opens the right page; the result's first line stays the failure.
+(2) The prompt's "# Web" says: find a page with `web_search` (`site:host words`) or `web_crawl`, never guess a path;
+a search engine is never fetched as a page. (3) Every tool argument with a maximum says it in words in its description
+(`max_results` "1 to 10", a batch "at most 5 steps"), and a number above the maximum is lowered to it with the result
+saying so, rather than refused (the rule that a batch is looked at before the rest stands: the first five run). (4) The
+DuckDuckGo throttling is read again with item 53 on the owner's runs since the hosted search is live; if it is gone,
+the README's known limit is rewritten.
+
+**Touchpoints.** `tools/web.py`, `web/fetch.py`, `agent/prompt.py`, `tools/browser.py` (the batch), README "Tools"
+and "Status and known limits", `tests/unit/test_web_tools.py`, a smoke test against the fixture site's dead link.
+
+**Done when.** The fixture's dead link returns the front page's matching links in the smoke test; a `max_results` of
+20 returns ten results and says so; the prompt line is in; the owner's next research run shows the numbers.
+
+### 57. The browser's closed pages
+
+**What.** A page that closes under Dot (a popup that closes itself, an OAuth callback that redirects and closes, a
+tab the user closes) is reported as that, in the tool result, with the tab that is now current; no traceback in the
+daemon's log, no failed act for a page that did its job.
+
+**Why.** The two tracebacks and the two failed acts in the owner's log (the part's head); 13 `browser_context_closed`
+and 10 `launch_retry` warnings whose causes are read in the item.
+
+**Design (from the audit).** `_adopt_popup` registers a tab only if the page is still open after `opener()` and
+removes it once (`_close_tab_object` tolerates a tab already gone); `keep_focused` and the act that calls it treat
+`TargetClosedError` as "the page closed" and return the observation of the thread's current tab with a line that says
+which page closed and why (navigation, closed by script, closed by the user); the smoke test opens a popup that
+closes itself and a page that navigates away and closes during an act. The two warning counts are read from the log
+with their causes before the design is final.
+
+**Touchpoints.** `browser/session.py`, `browser/driver.py`, `tools/browser.py`, `tests/smoke/test_browser_*.py`.
+
+**Done when.** The two regressions are tests that fail on `main` before and pass after; the owner's daemon log shows
+no `_adopt_popup` traceback after a week on the version.
+
+### 58. The bill of a run, on its page
+
+**What.** The run page shows, under the face, what a run cost and where: minutes (model, summaries, tools, waiting
+for the owner), steps, input and output tokens with the cached share, compactions, delegated runs with their cost;
+the Activity rows that ended today show minutes and tokens. Wide and phone, both looks, both densities.
+
+**Why.** The owner's runs cost 23 M tokens in two days and the page said only the tokens; item 22 left the numbers off
+the page until the owner wanted them, and a 51-minute run with 63 compactions is what wants them.
+
+**Design (from the audit).** `GET /runs/{run_id}/stats` (item 53) feeds a `cost-card` in `views/run.js`, painted
+with `paintStats` while the run works and once at the end; `ActivityRow` gains `minutes` and `tokens`; the controls
+page (item 50) shows the card.
+
+**Touchpoints.** `static/js/views/run.js`, `views/activity.js`, `server/activity.py`, `server/views.py`,
+`static/css/app.css`, `tests/smoke/test_run_page.py`, README "The daemon, the web UI and the service".
+
+**Done when.** The card shows the numbers of a scripted run in the smoke test at both widths and looks; the Activity
+rows carry minutes and tokens.
+
 ## Open owner decisions
 
 1. Live evals: `dotx eval run --model REF` spends model quota. Run it for the models in use and keep the JSON; it is the
@@ -3747,6 +3957,11 @@ on the owner's tailnet for an approval and opens the run (owner's run, logged by
 32. A name and a face for Dot (item 49): the recommendation is a yellow dot that tells the state and an optional
     name, no eyes and no accessories; dots' critics (Fortune, 2026-10-02) said why. Say so if you want the character.
     Decided on 2026-10-11 at the owner's word: the yellow dot that tells the state, an optional name, no character.
+33. The context budget of a long run (item 55): today `[agent] context_tokens = 48000` and `[providers.ollama]
+    num_ctx = 65536` hold every run to about 48 k tokens, on models whose windows Ollama reports as 196,608
+    (minimax-m2.7), 131,072 (gpt-oss:20b) and 1,048,576 (deepseek-v4.1-flash, glm-5.3-flash). A wider budget means
+    fewer summaries and more tokens a step; the right number is measured in item 55 on the long tasks and on the
+    owner's own runs, and the owner's `config.toml` is set to the winner at their standing word. Open until item 55.
 
 ## Log
 
@@ -4177,3 +4392,7 @@ on the owner's tailnet for an approval and opens the run (owner's run, logged by
   (Tailscale on, `tailscale serve --bg 8765`, the name in `[server] reach`, Notifications on in the phone's browser,
   a push for a question that opens the run), to be logged here by hand; decision 27 (the labelled feed); decision 26's
   follow-up (a prompt push or a longer task for judge_items); a signed desktop build (an Apple developer account).
+- 2026-10-11 (Fable 5.1): Part 5 planned at the owner's word ("continue with the next tasks") from the owner's seven
+  runs read through the API and `dotx stats` (never their files) and the daemon's logs: items 53 to 58 (the numbers of
+  a long run, long browser tasks in the eval set, context that stays, the web without guessing, the browser's closed
+  pages, the bill on the run page) and decision 33 (the context budget, measured in 55). Next: item 53.
