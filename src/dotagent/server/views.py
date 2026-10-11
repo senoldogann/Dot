@@ -423,7 +423,9 @@ class ActivityRow(FrozenModel):
     """One thing in motion, or ended today: ``detail`` says what it needs or where it stands, ``channel`` is where the
     run last worked (browser, files, shell, desktop, mail; empty before its first tool result), ``since`` is when it
     started waiting, working or ended, ``href`` opens it in the web UI. A run that ended carries its ``minutes`` of
-    wall time and its ``tokens`` (input and output together); every other row has ``None`` for both."""
+    wall time and its ``tokens`` (input and output together); every other row has ``None`` for both. A row for a run
+    carries its ``steps`` and, for a delegated run, the ``parent_run_id`` of the run that delegated it, so the lists
+    can nest it under its parent; the other rows have ``None`` for both."""
 
     id: str
     section: ActivitySection
@@ -437,6 +439,8 @@ class ActivityRow(FrozenModel):
     status: str
     minutes: float | None
     tokens: int | None
+    steps: int | None
+    parent_run_id: str | None
 
 
 class ActivityView(FrozenModel):

@@ -383,3 +383,14 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+/* Delegated runs under the run that delegated them (item 68). */
+.side-children {
+  margin-left: 18px;
+  padding-left: 8px;
+  border-left: 1px solid var(--border);
+}
+
+.side-child .side-run-goal {
+  font-size: var(--fs-sm);
+}

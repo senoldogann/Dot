@@ -2495,3 +2495,29 @@ dialog.lightbox img {
     display: none;
   }
 }
+
+/* ---------- delegated runs (item 68) ---------- */
+
+.activity-children {
+  margin-left: 28px;
+  padding-left: 10px;
+  border-left: 1px solid var(--border);
+}
+
+.child > summary .child-progress {
+  flex: none;
+  font-variant-numeric: tabular-nums;
+}
+
+.child > summary .child-open {
+  flex: none;
+  display: inline-flex;
+  padding: 2px;
+  border-radius: var(--radius-sm);
+  color: var(--muted);
+}
+
+.child > summary .child-open:hover {
+  color: var(--text);
+  background: var(--surface-2);
+}

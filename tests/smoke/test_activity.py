@@ -140,6 +140,17 @@ async def _first_tool_call(runtime: Runtime, run_id: str) -> None:
     raise AssertionError(f"run {run_id} made no tool call in {_STEP_WAIT_S} s")
 
 
+async def _child_of(runtime: Runtime, parent_id: str) -> RunRecord:
+    """The run delegated by ``parent_id``, once the manager has stored it."""
+    deadline: float = time.monotonic() + _STEP_WAIT_S
+    while time.monotonic() < deadline:
+        for run in await runtime.store.list_runs(100, None):
+            if run.parent_run_id == parent_id:
+                return run
+        await asyncio.sleep(0.1)
+    raise AssertionError(f"run {parent_id} delegated nothing in {_STEP_WAIT_S} s")
+
+
 async def _pending_question(runtime: Runtime, run_id: str) -> ApprovalRecord:
     deadline: float = time.monotonic() + _STEP_WAIT_S
     while time.monotonic() < deadline:
@@ -163,6 +174,7 @@ async def test_the_sections_show_what_waits_what_works_and_a_campaign_session_wi
             _turn(ASK_USER_TOOL, {"question": "Which colour?"}),
             _turn("shell", {"command": f"sleep {_WORK_S}"}),
             _turn("shell", {"command": f"sleep {_WORK_S}"}),
+            _turn("shell", {"command": f"sleep {_WORK_S}"}),
         ],
     )
     asking: RunRecord = await manager.start(
@@ -173,6 +185,10 @@ async def test_the_sections_show_what_waits_what_works_and_a_campaign_session_wi
         "Count to twelve", "task", SCRIPTED_MODEL, None, "test", None, None, "yolo", False, ()
     )
     await _first_tool_call(runtime, working.id)
+    # A run the working run delegated (item 68): it works at the same time and hangs under its parent in the lists.
+    delegation = asyncio.create_task(manager.delegate(working.id, "Scan the catalogue", "task", None))
+    delegated: RunRecord = await _child_of(runtime, working.id)
+    await _first_tool_call(runtime, delegated.id)
     session: RunRecord = await manager.start_session(campaign.id)
     await _first_tool_call(runtime, session.id)
 
@@ -183,13 +199,16 @@ async def test_the_sections_show_what_waits_what_works_and_a_campaign_session_wi
         ("question", asking.id, "Which colour?")
     ]
     assert sorted((row["kind"], row["run_id"]) for row in activity["working"]) == sorted(
-        [("run", working.id), ("campaign", session.id)]
+        [("run", working.id), ("delegated", delegated.id), ("campaign", session.id)]
     )
     assert next(row for row in activity["working"] if row["kind"] == "campaign")["title"] == "Find leads"
+    child = next(row for row in activity["working"] if row["kind"] == "delegated")
+    assert child["parent_run_id"] == working.id and child["steps"] >= 1
+    assert all(row["parent_run_id"] is None for row in activity["working"] if row["kind"] != "delegated")
     assert activity["recent"] == []
     count: httpx.Response = await client.get("/api/activity/count")
     assert count.status_code == 200, count.text
-    assert count.json() == {"waiting": 1, "working": 2, "state": "waiting"}
+    assert count.json() == {"waiting": 1, "working": 3, "state": "waiting"}
 
     host: str = client.base_url.host
     port: int | None = client.base_url.port
@@ -213,29 +232,46 @@ async def test_the_sections_show_what_waits_what_works_and_a_campaign_session_wi
                     await expect(sidebar.locator("[data-section=waiting] .side-label")).to_have_text(
                         "Waiting for you · 1"
                     )
-                    await expect(sidebar.locator("[data-section=working] .side-label")).to_have_text("Working · 2")
-                    await expect(sidebar.locator("[data-section=working] a.side-activity")).to_have_count(2)
+                    await expect(sidebar.locator("[data-section=working] .side-label")).to_have_text("Working · 3")
+                    await expect(sidebar.locator("[data-section=working] a.side-activity")).to_have_count(3)
+                    # The delegated run hangs under its parent, with its steps; the parent says it delegated one.
+                    nested = sidebar.locator("[data-section=working] .side-children a.side-child")
+                    await expect(nested).to_have_count(1)
+                    await expect(nested).to_contain_text("Scan the catalogue")
+                    await expect(nested).to_contain_text("step")
+                    await expect(sidebar.locator("[data-section=working]")).to_contain_text("1 delegated run")
                     await page.screenshot(path=str(tmp_path / f"sidebar-{width}-{scheme}.png"))
                     await sidebar.locator("[data-section=waiting] a.side-activity").click()
                     await expect(page).to_have_url(f"http://{host}:{port}/#/runs/{asking.id}")
                     await page.goto(f"http://{host}:{port}/#/activity")
                     await expect(page.locator(".activity-section[data-section=waiting] .activity-row")).to_have_count(1)
-                    await expect(page.locator(".activity-section[data-section=working] .activity-row")).to_have_count(2)
+                    await expect(page.locator(".activity-section[data-section=working] .activity-row")).to_have_count(3)
                     await expect(page.locator(".activity-section[data-section=working]")).to_contain_text("Find leads")
+                    await expect(
+                        page.locator(".activity-section[data-section=working] .activity-children .activity-child")
+                    ).to_have_count(1)
                     await page.screenshot(path=str(tmp_path / f"activity-{width}-{scheme}.png"))
+                    # In the parent's chat, the delegated run's card shows its progress and opens its own page.
+                    await page.goto(f"http://{host}:{port}/#/runs/{working.id}")
+                    child_card = page.locator("details.child")
+                    await expect(child_card).to_have_count(1)
+                    await expect(child_card.locator(".child-progress")).to_contain_text("step")
+                    await expect(child_card.locator("a.child-open")).to_have_attribute("href", f"#/runs/{delegated.id}")
+                    await page.screenshot(path=str(tmp_path / f"delegated-{width}-{scheme}.png"))
                     await page.close()
             finally:
                 await browser.close()
     finally:
-        MODEL.script = ScriptedProvider(_PROVIDER, [_FINISH] * 6)
+        MODEL.script = ScriptedProvider(_PROVIDER, [_FINISH] * 8)
         await manager.decide(question.id, True, "test", "blue")
         async with asyncio.timeout(_RUN_WAIT_S):
-            for run_id in (asking.id, working.id, session.id):
+            for run_id in (asking.id, working.id, delegated.id, session.id):
                 ended: RunRecord = await manager.wait(run_id)
                 assert ended.status == "done", ended
+            assert (await delegation).run.status == "done"
     after = (await client.get("/api/activity")).json()
     assert after["waiting"] == [] and after["working"] == []
-    assert sorted(row["run_id"] for row in after["recent"]) == sorted([asking.id, working.id, session.id])
+    assert sorted(row["run_id"] for row in after["recent"]) == sorted([asking.id, working.id, delegated.id, session.id])
     # A run that ended carries its minutes and its tokens (item 58); the live rows above carried neither.
     assert all(row["minutes"] > 0 and row["tokens"] >= 0 for row in after["recent"])
     assert all(row["minutes"] is None and row["tokens"] is None for row in activity["waiting"] + activity["working"])
@@ -259,7 +295,7 @@ async def test_the_sections_show_what_waits_what_works_and_a_campaign_session_wi
                 await page.screenshot(path=str(tmp_path / f"run-cost-{width}-{scheme}.png"))
                 await page.goto(f"http://{host}:{port}/#/activity")
                 recent = page.locator(".activity-section[data-section=recent] .activity-row")
-                await expect(recent).to_have_count(3)
+                await expect(recent).to_have_count(4)
                 await expect(recent.first).to_contain_text("tokens")
                 await page.close()
         finally:
