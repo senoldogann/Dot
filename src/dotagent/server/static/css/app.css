@@ -1424,7 +1424,7 @@ a.pill:hover {
 /* The name gives way with an ellipsis when the bar is short; a breadcrumb's parent gives way first. */
 .stage-name {
   flex: 0 1 auto;
-  min-width: 0;
+  min-width: 72px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -2592,7 +2592,8 @@ dialog.lightbox img {
 
   /* The breadcrumb's parent waits in the pill under the conversation; the bar keeps the run's own name. */
   .stage-crumb,
-  .stage-sep {
+  .stage-sep,
+  .stagebar-row:has(.stage-crumb) .stage-sub {
     display: none;
   }
 

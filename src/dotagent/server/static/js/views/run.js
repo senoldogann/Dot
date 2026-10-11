@@ -200,6 +200,7 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
             "div",
             { class: "child-foot meta-facts" },
             el("span", null, run.effort === null ? modelName(run.model) : `${modelName(run.model)} ${levelLabel(run.effort)}`),
+            APPROVAL_CHIPS[run.approvals] === undefined ? null : el("span", null, APPROVAL_CHIPS[run.approvals].text),
             footTime,
             footParent,
             el("a", { href: `#/runs/${parentId}` }, "Open parent"),
@@ -827,7 +828,8 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
   // buttons are the bar's tools, the chips waiting in the side panel's Details card on a phone. The goal, the first
   // message, is the page's heading for a reader of the structure.
   setStageTitle(face, crumb, crumbSep, stageName, el("span", { class: "stage-sub" }, statusSlot, el("span", { class: "stage-time" }, dateTime(run.created_at))));
-  setStageTools(modelChip, ...modeChips, campaignChip, inspector.toggle, resumeButton, cancelButton);
+  // A delegated run's chips are in its pill and in the Details card; its bar keeps the room for the breadcrumb.
+  setStageTools(...(parentId === null ? [modelChip, ...modeChips, campaignChip] : []), inspector.toggle, resumeButton, cancelButton);
 
   layout.append(
     el(
