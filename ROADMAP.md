@@ -5026,7 +5026,7 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 103 | Alive beside the chat: the character works, waits, finishes and sleeps with the run | done        | 0a0fdaa |
 | 104 | The composer remade: one frame, quiet menus, drafts that keep, a face that listens  | done        | 9261fa9 |
 | 105 | The small polish part 12's review left: a scroll cue, empty sections that point, the Browser grid, the tour's content, Watch on an ended run | done        | c14b670 |
-| 106 | The review: every feature of parts 1 to 13 read once more, the characters' cost measured | planned     |         |
+| 106 | The review: every feature of parts 1 to 13 read once more, the characters' cost measured | done        | 8e3818d |
 
 ### 77. The type system: Inter and Geist Mono, seven sizes, three weights
 
@@ -5853,6 +5853,15 @@ menu) and one of the home composer: add animated cartoon characters for the agen
 at the right of the chat while the agent works, and in the chat; let the owner customise them; build such a system
 in Dot from that site, which is free; and design the composer again, more useful and more luxurious.
 
+**Status (2026-10-11): built.** Items 101 to 106 merged the same day (`8c3a590`, `f6afe5d`, `0a0fdaa`, `9261fa9`,
+`c14b670`, `8e3818d`), each behind the gate, its smoke tests and its screenshot tour read. bloub lives in Dot as
+plain modules with its notice; every agent has a look chosen in its editor and worn in every row, Dot its own in
+Settings; the run page's character works, waits, laughs, sulks and sleeps with the run, the home's face moves and
+listens to the composer; the three composers are one frame with pills, panels and drafts that keep; the five polish
+items of part 12 are done; the review found the tour and the pages sound, fixed two stale tests, and measured one
+moving face at about a millisecond of main-thread time a frame. What waits: the daemon restarted on `8e3818d` once
+no run is active, and the owner's eye on the faces and the composer in daily use.
+
 **Status (2026-10-11): planned.** What is built today: an agent's face is a 40 × 40 SVG glyph (`icons.js avatar`:
 a ring, a core and a tick) in one of eight hues its id gives it (`actors.js`, FNV-1a), drawn at 20 to 40 px in the
 sidebar, the activity rows, the timeline, the home greeting, the Agents and Team pages and the stage bar, with five
@@ -6105,7 +6114,7 @@ enough for the jump arrow. README where a line changes. Tests: `tests/smoke/test
 
 ### 106. The review: every feature of parts 1 to 13 read once more, the characters' cost measured
 
-**Status: in progress.**
+**Status: done.** Merged as `8e3818d` (PR #124, MYP-246 Done).
 
 **Findings, as built (2026-10-11).** Three readings and one measurement. (1) The tour as item 105 left it (23 pages,
 two schemes, two widths, 108 shots) read by eye against the README: the home with its moving face and the composer's
@@ -6664,3 +6673,4 @@ items. The findings go in this section as built.
 - 2026-10-11 (Fable 5.1): item 103 merged as `0a0fdaa` (PR #121, MYP-243 Done): the run page's character card with its moods (`mood.js`, `charactercard.js`), the turns and the answer with the actor's still face, the home's face moving.
 - 2026-10-11 (Fable 5.1): item 104 merged as `9261fa9` (PR #122, MYP-244 Done): one `composerFrame` for the three composers, the bar as pills with panels (`popover.js`), drafts kept per composer, the home's face listening.
 - 2026-10-11 (Fable 5.1): item 105 merged as `c14b670` (PR #123, MYP-245 Done): the scroll cue on the Models tables, the Activity page's empty sections that point, the Browser tab's facts two and two, Watch gone on an ended run, the tour seeded with a taller run, a scored lesson and a learned skill.
+- 2026-10-11 (Fable 5.1): item 106 merged as `8e3818d` (PR #124, MYP-246 Done): the tour read by eye, the offline smoke suite in full (two stale tests fixed), the owner's daemon through the API, one moving face measured at about a millisecond a frame (`test_character_cost.py`). Part 13 built: items 101 to 106. The daemon waits for a restart on `8e3818d`.
