@@ -5027,6 +5027,11 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 104 | The composer remade: one frame, quiet menus, drafts that keep, a face that listens  | done        | 9261fa9 |
 | 105 | The small polish part 12's review left: a scroll cue, empty sections that point, the Browser grid, the tour's content, Watch on an ended run | done        | c14b670 |
 | 106 | The review: every feature of parts 1 to 13 read once more, the characters' cost measured | done        | 8e3818d |
+| 107 | The fixes of the second look: the still face follows, the favicon freed, TLS reads retried, the sidebar's head and order | planned     |         |
+| 108 | The composer with marks: a mark per provider, an icon on every pill, the reasoning as its own pill | planned     |         |
+| 109 | Dot's computer as a stage: a frame with a size, the control under it, the character at the head of the chat | planned     |         |
+| 110 | Rules in plain words: the model writes the rule, an approval card offers one        | planned     |         |
+| 111 | The review: part 14 read once more                                                  | planned     |         |
 
 ### 77. The type system: Inter and Geist Mono, seven sizes, three weights
 
@@ -6143,6 +6148,123 @@ Chrome's performance trace, written here with the number, and a cap set if it co
 What is broken, stale or contradicts the README is fixed in this item's PR or written as the next part's first
 items. The findings go in this section as built.
 
+## Part 14: the second look: the still face that follows, marks on the composer, the computer as a stage, rules in plain words (planned 2026-10-11)
+
+The owner's fourteenth word, on 2026-10-11, after part 13, with five screenshots (the sidebar's head in the desktop
+shell, Dot's look in Settings, a composer of another product with a mark per provider, and two of another agent's
+"computer": the page large in a warm frame, the character with its state word at the head of the chat, "has
+control · Take over" under the view): an "Internal error: SSLError … bad record mac" seen twice, was it Dot's doing
+or the system's; Dot's computer could be nicer, with a size to choose; Dot's look does not work, the movements and
+the preview of what is picked; a composer like the third screenshot, each provider with its own SVG mark, tidy,
+always soft and premium; New chat under the search, the search at the top; the Rules tab is hard to use, an easy
+way to make a rule with the agent's help; the fourth screenshot's design too; and the alignment unevenness of the
+first screenshot fixed.
+
+**Status (2026-10-11): planned.** What is built today, and what the readings found: the SSL error is a TLS read
+from OpenCode Go (`llm/opencode_go.py` through `core/retry.py`) that failed with `bad record mac`, five times over
+two days (twice on 2026-10-10, before part 13), a corruption on the network path rather than Dot's code; it crashed
+the run as "Internal error" because `ssl.SSLError` is not among the transport errors the model call retries
+(`llm/http.py _TRANSPORT_ERRORS`). Dot's look card works in Chrome and in WebKit against the owner's own daemon
+(the preview follows the shape, the expression and the colour and moves), but a character that holds still (the
+system's Reduce motion, or "Faces that move" off) keeps its old shape and expression after a pick: `setShape` and
+`setExpression` start a morph at the live clock and the still frame is sampled at the pose's own time, before the
+morph; the owner's Mac most likely reduces motion, which also stills every face ("the movements do not work"), and
+nothing on the page says so. The favicon is a `data:` URL that the page's Content-Security-Policy (`img-src 'self'
+blob:`) refuses, so the tab shows no face. The sidebar's head in the desktop shell keeps 84 px for the traffic
+lights but its row sits 12 px of padding lower than them. The sidebar lists New chat, then the search. The
+composer's pills are words alone: "Model scripted", "Options Ask"; the models list by provider name with no mark.
+Dot's computer is a fold card of the side panel with the page at the card's width and the control pill under it;
+no size to choose. A rule is made from three fields (tool glob, regex, why) and a four-way answer, with a sentence
+preview; nothing writes it for the owner, and an approval card offers no way to make a rule of what it asks.
+
+**The shape of this part (the decisions).** First the fixes the owner saw, as one item, each with a test that would
+have caught it. The composer keeps part 13's frame and pills and gains marks: a mark per provider on the Model pill
+and in its menu, an icon on every pill, hairlines between them, the reasoning as a pill of its own, in the manner of
+the third screenshot; the marks are SVGs served from Dot's own origin under their licences. Dot's computer becomes
+a stage: the view in a warm frame with a size the owner chooses and drags, remembered per browser, the control
+under it, and the actor's character with its state word at the head of the chat, after the fourth screenshot. Rules
+are made in plain words: the owner says what should happen and the model writes the rule (tool, pattern, answer,
+why) for the owner to read and keep; an approval card offers to make a rule of what it asks. The whole is read once
+more at the end.
+
+### How to start part 14 (the handoff prompt)
+
+> Read ROADMAP.md part 14 and the status table of part 9 (rows 107 to 111). One item at a time, in order; the
+> protocol of part 5 (branch, gate, PR, Linear MYP issue, squash merge, hash in the table, log line) is unchanged.
+> Never touch the owner's data directory except to read it and to restart the daemon when `/api/status` shows no
+> active run; the owner's goals stay out of this file; PLAN.md stays untracked. The owner reads Turkish; everything
+> written is English. Every UI item ends with the screenshot tour read by eye.
+
+### 107. The fixes of the second look: the still face follows, the favicon freed, TLS reads retried, the sidebar's head and order
+
+**Status: planned.**
+
+**What.** A still character follows its look: `character.js` applies a shape or an expression set while the
+character is not subscribed as already morphed (the engine told a time earlier than the pose's by the morph's
+length), so the still frame shows the pick; `#/controls` and the look picker's smoke test pick a shape and an
+expression under reduced motion and read the path. Under "Faces that move" a note says, while the system reduces
+motion, that every face holds still for that reason and where the switch of macOS is. The favicon: the policy's
+`img-src` gains `data:`, and the smoke test of the face reads the tab's icon as loaded (`link[rel=icon]` with a
+natural size). TLS: `ssl.SSLError` joins `_TRANSPORT_ERRORS`, so a read that fails with `bad record mac` is
+retried with a warning per attempt and raised after the last like the other transport failures; a unit test raises
+it from a fake stream and counts the attempts. The sidebar: the search above New chat; in the desktop shell the
+head's row sits level with the traffic lights (the head 32 px high under the shell, the brand centred on the
+lights' line), checked by the tour's desktop shot. README where a line changes.
+
+### 108. The composer with marks: a mark per provider, an icon on every pill, the reasoning as its own pill
+
+**Status: planned.**
+
+**What.** `static/icons/providers/<provider>.svg`: a mark for each provider Dot knows (Anthropic, OpenAI, Ollama,
+OpenCode Go, and the generic one for the rest), simple single-colour SVGs that take `currentColor`, with their
+source and licence in `static/icons/providers/LICENSE`. `composerPill` takes an icon node: the Model pill wears the
+mark of the chosen model's provider and its name; the Reasoning pill (a brain, `icons.js`) shows the level of a
+model that offers a choice and opens the levels as a listbox, so the Model menu lists models alone, each row with
+its mark; the Options pill wears a lock open (YOLO), closed (Ask) or half (Auto); the Agent pill its agent's still
+face; hairline dividers stand between the pills (`.composer-divider`); the attach button and the send keep the
+right end. The look of the third screenshot: a soft, quiet bar, the icons at 16 px in the muted colour, the values
+in the label weight. README: New chat, the design system's controls. Tests: `test_composer.py` reads the mark's
+`src` on the Model pill and the Reasoning pill's menu; `test_css_tokens.py` unchanged.
+
+### 109. Dot's computer as a stage: a frame with a size, the control under it, the character at the head of the chat
+
+**Status: planned.**
+
+**What.** The computer's view leaves the fold card for a stage: `computer.js` draws the page in a warm frame
+(`--computer-backdrop`) with a size chooser of three (compact, the panel's width as today; wide, the panel widened
+to half the window; full, the conversation folded away and the stage across the window) and a drag handle on the
+stage's edge that sets any width between, kept per browser (`dot.computer.size`); the control pill ("Dot has
+control · Take over", "You have control · Return control") sits under the stage as in the fourth screenshot;
+Watch and Close the view stay. The run page's head of the chat carries the actor's character at 64 px with its
+name and its state word under it ("Thinking…", "Waiting for you", "Done"), the character card of item 103 moving
+there when the stage is wide or full. The inspector's width follows the size. README: the run page, Dot's computer.
+Tests: `test_takeover.py` picks each size and reads the stage's width; `test_run_chrome.py` keeps its selectors;
+the tour shoots the run page at the wide size.
+
+### 110. Rules in plain words: the model writes the rule, an approval card offers one
+
+**Status: planned.**
+
+**What.** `POST /api/rules/draft` takes a sentence ("let Dot run git status and git diff without asking", "always
+ask me before it posts on X") and returns a `RuleRequest` drafted by the fast model with a typed reply (tool glob,
+regex, answer, why, and one line that reads the rule back), checked against the tools the daemon has and the four
+answers before it is returned; the Rules page opens with one box, "Say the rule in your words", a Draft button,
+the drafted rule shown as the sentence with its fields open for a change, and Keep; the three fields stay for the
+owner who knows them. An approval card (the home, the run page, Activity) gains "Make a rule of this": it opens
+the Rules page with the fields prefilled from the approval's tool and arguments (the regex escaped from the
+command's first word) and the answer chosen. The page's head says in one line what rules are and in what order they
+are read. README: Rules. Tests: a unit test of the draft's checks with a scripted reply; `test_rules.py` (smoke)
+drafts a rule from a sentence against the scripted model and keeps it; the approval card's offer.
+
+### 111. The review: part 14 read once more
+
+**Status: planned.**
+
+**What.** As item 106: the tour of every page in both schemes and both widths read by eye against the README, the
+offline smoke suite in full, the owner's daemon read through the API only. What is broken, stale or contradicts the
+README is fixed in this item's PR or written as the next part's first items. The findings go in this section as
+built.
+
 ## Log
 
 - 2026-10-08: roadmap written from the owner's go-ahead for all eight items, in this order. Nothing implemented yet.
@@ -6674,3 +6796,4 @@ items. The findings go in this section as built.
 - 2026-10-11 (Fable 5.1): item 104 merged as `9261fa9` (PR #122, MYP-244 Done): one `composerFrame` for the three composers, the bar as pills with panels (`popover.js`), drafts kept per composer, the home's face listening.
 - 2026-10-11 (Fable 5.1): item 105 merged as `c14b670` (PR #123, MYP-245 Done): the scroll cue on the Models tables, the Activity page's empty sections that point, the Browser tab's facts two and two, Watch gone on an ended run, the tour seeded with a taller run, a scored lesson and a learned skill.
 - 2026-10-11 (Fable 5.1): item 106 merged as `8e3818d` (PR #124, MYP-246 Done): the tour read by eye, the offline smoke suite in full (two stale tests fixed), the owner's daemon through the API, one moving face measured at about a millisecond a frame (`test_character_cost.py`). Part 13 built: items 101 to 106. The daemon waits for a restart on `8e3818d`.
+- 2026-10-11 (Fable 5.1): part 14 planned, items 107 to 111, from the owner's five screenshots and the readings of the daemon's log and the look card; no code changed. Start with the handoff prompt under "How to start part 14".
