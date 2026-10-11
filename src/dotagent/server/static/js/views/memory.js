@@ -44,9 +44,12 @@ function noteText(text) {
 
 /** Who wrote a note and how often runs used it. */
 function provenance(record) {
-  const author = record.source_run
-    ? el("a", { href: `#/runs/${record.source_run}` }, "Saved by a run")
-    : el("span", { class: "chip" }, "You wrote it");
+  const author =
+    record.source_run === "reflection"
+      ? el("span", { class: "chip" }, "Written by the nightly reflection")
+      : record.source_run
+        ? el("a", { href: `#/runs/${record.source_run}` }, "Saved by a run")
+        : el("span", { class: "chip" }, "You wrote it");
   const used =
     record.used_count > 0
       ? el("span", { title: dateTimeFull(record.last_used_at) }, `Used ${plural(record.used_count, "time", "times")}, last ${ago(record.last_used_at)}`)

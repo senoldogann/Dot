@@ -25,6 +25,12 @@ from dotagent.store.db import Store
 from dotagent.store.models import MemoryRecord
 
 CORE_TAG: str = "core"
+# The tags the nightly reflection (:mod:`dotagent.agent.reflection`) writes: the day's journal note, and a lesson
+# that rests, which a search no longer finds while the Memory page still lists it.
+JOURNAL_TAG: str = "journal"
+REST_TAG: str = "rest"
+# The source of a note the reflection wrote, in place of a run's id.
+REFLECTION_SOURCE: str = "reflection"
 _MODEL_KEY: str = "memory.embed_model"
 _BACKFILL_BATCH: int = 32
 _QUERY_CHARS: int = 1500
@@ -176,7 +182,7 @@ async def _distinctive_terms(store: Store, terms: tuple[str, ...], total: int) -
 
 
 async def recall(index: MemoryIndex, query: str, limit: int) -> list[MemoryHit]:
-    """The ``limit`` notes that best fit ``query``, best first."""
+    """The ``limit`` notes that best fit ``query``, best first; a note that rests (tagged ``rest``) is never one."""
     text: str = normalize_text(query)[:_QUERY_CHARS]
     total: int = await index.store.count_memories()
     if not text or limit <= 0 or total == 0:
@@ -194,7 +200,11 @@ async def recall(index: MemoryIndex, query: str, limit: int) -> list[MemoryHit]:
         rankings.append([item.id for item in close])
         similarities = {item.id: item.similarity for item in close}
     records: list[MemoryRecord] = await index.store.get_memories(reciprocal_rank_fusion(rankings, limit))
-    return [MemoryHit(record=record, similarity=similarities.get(record.id)) for record in records]
+    return [
+        MemoryHit(record=record, similarity=similarities.get(record.id))
+        for record in records
+        if REST_TAG not in record.tags
+    ]
 
 
 def _closest_first(notes: Sequence[MemoryRecord], similarities: dict[str, float], limit: int) -> list[MemoryRecord]:

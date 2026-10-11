@@ -439,8 +439,9 @@ class StatusView(FrozenModel):
 
 ActivitySection = Literal["waiting", "working", "recent"]
 # What a row of the Activity list is: a run of its own, a run delegated by another, a session of a campaign, an
-# approval or a question a run waits for, a run the user holds (``takeover``), a schedule due within the hour.
-ActivityKind = Literal["run", "delegated", "campaign", "approval", "question", "takeover", "schedule"]
+# approval or a question a run waits for, a run the user holds (``takeover``), a schedule due within the hour, the
+# reflection that ran today.
+ActivityKind = Literal["run", "delegated", "campaign", "approval", "question", "takeover", "schedule", "reflection"]
 
 
 class ActivityRow(FrozenModel):

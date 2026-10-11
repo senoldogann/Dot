@@ -1,5 +1,6 @@
 """Typed configuration: the packaged ``defaults.toml`` deep-merged with the user's ``config.toml``."""
 
+import re
 import tomllib
 from importlib import resources
 from pathlib import Path
@@ -104,6 +105,8 @@ type ScaffoldMode = Literal["fixed", "measured"]
 type ToolSurface = Literal["full", "grouped", "auto"]
 type ResumeMode = Literal["off", "safe"]
 type LessonsMode = Literal["off", "propose", "auto"]
+# A time of day as [agent] reflection_time takes it: 24-hour, two digits each.
+_TIME_OF_DAY: re.Pattern[str] = re.compile(r"(?:[01]\d|2[0-3]):[0-5]\d")
 
 
 class AgentConfig(FrozenModel):
@@ -142,12 +145,23 @@ class AgentConfig(FrozenModel):
     resume: ResumeMode
     resume_within_s: int
     lessons: LessonsMode
+    # When the nightly reflection runs (HH:MM in [scheduler] timezone, or "off"), and after how many days without a
+    # run being handed it a lesson rests.
+    reflection_time: str
+    lesson_rest_days: int = Field(ge=1)
     playbooks: bool
     undo_max_file_bytes: int
     undo_max_run_bytes: int
     undo_keep_days: int
     step_router: bool
     step_router_threshold: float = Field(ge=0, le=1)
+
+    @field_validator("reflection_time")
+    @classmethod
+    def _time_of_day_or_off(cls, value: str) -> str:
+        if value != "off" and _TIME_OF_DAY.fullmatch(value) is None:
+            raise ValueError('reflection_time is a time of day as "03:30" (24-hour) or "off"')
+        return value
 
 
 class PaceConfig(FrozenModel):

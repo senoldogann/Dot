@@ -39,6 +39,7 @@ _FAMILIES: dict[str, str] = {
     "auth-status": "dotagent.cli_models",
     "models-profile": "dotagent.cli_profile",
     "doctor": "dotagent.cli_doctor",
+    "reflect": "dotagent.cli_reflect",
     "browser-login": "dotagent.cli_browser",
     "browser-import-chrome": "dotagent.cli_browser",
     "browser-attach": "dotagent.cli_browser",
@@ -165,6 +166,11 @@ def build_parser() -> argparse.ArgumentParser:
     auth_commands.add_parser("status", help="show which API keys are present")
 
     commands.add_parser("doctor", help="check the setup")
+    commands.add_parser(
+        "reflect",
+        help="reflect now on the runs that ended since the last reflection: lessons, merged and rested lesson notes, "
+        "the day's journal note (the daemon does it at [agent] reflection_time)",
+    )
 
     browser = commands.add_parser("browser", help="manage the browser Dot uses")
     browser_commands = browser.add_subparsers(dest="browser_action", required=True)

@@ -672,8 +672,20 @@ and `dotx resume` show the lessons after the answer; Ctrl-C skips the wait, and 
 `auto` they are saved at once, except after a run that read content others can write (web pages, mail, downloads),
 which could plant a lesson: those are only proposed, and the page says why. A saved lesson is a note of the agent like
 the others: a later run gets it when it fits its goal, and the Memory page edits or forgets it. Delegated runs, chats,
-runs that failed or were stopped, and evals (which always run without lessons) are not asked. `lessons` is `"off"` by
-default until evals show that it helps.
+runs that failed or were stopped, and evals (which always run without lessons) are not asked at their end; the nightly
+reflection asks about the failed and the stopped ones. `lessons` is `"off"` by default until evals show that it helps.
+
+**Reflection.** Once a day at `[agent] reflection_time` (`"03:30"` in `[scheduler] timezone`; `"off"` never), the
+daemon reflects on the runs that ended since the last reflection (the last day, the first time): it asks the review
+model for the lessons of the task and research runs the loop did not ask at their end, the failed and the stopped ones
+included, with how the run ended as one more signal, under the `lessons` setting above (`propose` leaves them on the
+run's page, `auto` saves them, `off` draws none); it folds the lesson notes that say the same into the newer one (by
+the embeddings when both have one, by the words otherwise); it rests a lesson that no run was handed for
+`lesson_rest_days` (60) by tagging it `rest`, after which searches skip it while `dotx memory list` and the Memory page
+still show it; and when anything happened it writes the day's journal note, tagged `journal` ("On 2026-10-11 I worked
+on 4 runs (2 done, 1 failed, 1 cancelled). Learned: … Tidied the lessons: 1 merged, 1 retired."). The reflection
+touches only the notes Dot wrote, never yours. A night the daemon slept through is caught up once at its start.
+Activity lists the reflection among what ended today; `dotx reflect` runs one now.
 
 **Taking back the file changes of a run.** Before `write_file` or `edit_file` changes a file, the run notes the change
 in its journal (`undo/` in the home directory), and its first change to a file keeps a copy of the file as it was. When
@@ -1159,6 +1171,8 @@ dotx memory reindex      # embed every note again, for example after changing [m
   most `user_limit`), together with up to `inject_top_k` other notes that are close enough to the goal and the earlier
   goals of the conversation (`inject_min_similarity`).
 - A note saved or changed while a run works reaches that run at its next step.
+- Two tags are the nightly reflection's: `journal` on the day's note, `rest` on a lesson no run was handed for sixty
+  days, which searches skip (the list and the page still show it; take the tag off to wake it).
 - `memory_update` lets the agent correct a note in place; you edit one on the Memory page or with
   `PATCH /api/memories/{id}`. The page also shows who wrote each note and how often runs used it.
 - Search combines SQLite full-text search (BM25) with cosine similarity of embeddings and fuses both rankings.
@@ -1207,7 +1221,9 @@ dotx schedule disable|enable|delete ID
 
 A schedule is a complete goal that Dot runs later, once (`--at`) or on a cron rhythm (`--cron`, five fields, read in
 `[scheduler] timezone`, which defaults to the zone `TZ` names when it is set, else the zone of this Mac). Each firing starts a fresh run without any conversation,
-so the goal has to say everything. The agent can create schedules too (`schedule_create`).
+so the goal has to say everything. The agent can create schedules too (`schedule_create`). The scheduler also fires the
+nightly reflection at `[agent] reflection_time` (see Reflection above); it is not a schedule and does not count against
+`max_schedules`.
 
 On Settings › Schedules a schedule is created and edited whole: its name, goal, repetition (cron or one moment), time
 zone, kind of run (task, chat, research), model, reasoning level, approval mode, goal mode and whether it is on. Options

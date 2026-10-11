@@ -6,6 +6,7 @@ import time
 from datetime import datetime
 
 from dotagent.agent.manager import RunManager
+from dotagent.agent.reflection import Reflection, last_reflection, summary_line
 from dotagent.server.views import ActivityRow, ActivityView
 from dotagent.store.db import Store
 from dotagent.store.models import ApprovalRecord, CampaignRecord, EventRecord, RunRecord, ScheduleRecord
@@ -108,11 +109,31 @@ def _schedule_row(schedule: ScheduleRecord, now: float) -> ActivityRow:
     )
 
 
+def _reflection_row(reflection: Reflection) -> ActivityRow:
+    """The reflection that ran today, among what ended: it opens the Memory page, where its journal and lessons are."""
+    return ActivityRow(
+        id="reflection",
+        section="recent",
+        kind="reflection",
+        title=summary_line(reflection),
+        detail="the nightly review of the day's runs",
+        channel="",
+        since=reflection.at,
+        href="#/memory",
+        run_id=None,
+        status="done",
+        minutes=None,
+        tokens=None,
+        steps=None,
+        parent_run_id=None,
+    )
+
+
 async def activity_view(store: Store, manager: RunManager, now: float) -> ActivityView:
     """The three sections at ``now``: waiting (the approvals and questions runs wait for, the questions runs left for
     the user, the runs the user holds),
     working (the live runs that wait for nothing, the schedules due within the hour), recent (the runs that ended
-    today, newest first)."""
+    today and the reflection that ran today, newest first)."""
     waiting: list[ActivityRow] = []
     working: list[ActivityRow] = []
     live: dict[str, RunRecord] = {}
@@ -144,6 +165,9 @@ async def activity_view(store: Store, manager: RunManager, now: float) -> Activi
     for run in await store.list_runs(_RECENT_RUNS, None):
         if run.status in _ENDED and run.finished_at is not None and run.finished_at >= today:
             recent.append(await _run_row(store, run, "recent", "run", "", _title(run.goal)))
+    reflection: Reflection | None = await last_reflection(store)
+    if reflection is not None and reflection.at >= today:
+        recent.append(_reflection_row(reflection))
     waiting.sort(key=lambda row: row.since)
     working.sort(key=lambda row: row.since)
     recent.sort(key=lambda row: row.since, reverse=True)

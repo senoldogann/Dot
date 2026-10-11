@@ -30,6 +30,7 @@ const KIND_ICON = {
   question: "help",
   takeover: "hand",
   schedule: "calendar",
+  reflection: "sparkle",
 };
 const KIND_WORD = {
   run: "run",
@@ -39,6 +40,7 @@ const KIND_WORD = {
   question: "question",
   takeover: "taken over",
   schedule: "schedule",
+  reflection: "reflection",
 };
 
 function row(item, child) {

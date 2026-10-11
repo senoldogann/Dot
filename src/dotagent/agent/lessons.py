@@ -14,8 +14,10 @@ With ``propose`` the lessons stay on the run (a ``lessons_proposed`` event), and
 dismisses it. With ``auto`` they are saved as notes tagged ``lesson`` whose source is the run, so later runs find them
 by relevance like the agent's other notes; after a run that read content third parties can author, which can plant a
 lesson, they are only proposed. A lesson is decided once: every save or dismissal, by the owner or by ``auto``, holds
-the run manager's lock while it looks at the lesson and acts. Every function here is pure except :func:`learn`,
-:func:`run_lessons`, :func:`save_lesson` and :func:`dismiss_lesson`, which read or write the store and the memory.
+the run manager's lock while it looks at the lesson and acts. Every function here is pure except :func:`learn`, :func:`learn_from`,
+:func:`draw_lessons`, :func:`stored_signals`, :func:`run_lessons`, :func:`save_lesson` and :func:`dismiss_lesson`, which
+read or write the store and the memory. The nightly reflection (:mod:`dotagent.agent.reflection`) asks through
+:func:`learn_from` about the runs that ended failed or cancelled, and about done runs the loop did not ask.
 """
 
 import asyncio
@@ -239,7 +241,7 @@ def _says_it(lesson: str, hit: MemoryHit, threshold: float) -> bool:
     return (hit.similarity is not None and hit.similarity >= threshold) or repeats(lesson, hit.record.content)
 
 
-async def _drawn(runtime: Runtime, case: LessonCase, signals: tuple[str, ...]) -> tuple[str, ...]:
+async def draw_lessons(runtime: Runtime, case: LessonCase, signals: tuple[str, ...]) -> tuple[str, ...]:
     """The lessons the review model draws from a run, without the ones that are not lessons or that a saved note
     already says. A review model or an embedding service that fails raises its error."""
     known: tuple[str, ...] = tuple(
@@ -297,26 +299,39 @@ async def learn(runtime: Runtime, deciding: asyncio.Lock, case: LessonCase) -> N
     ``deciding``, the lock of the owner's decisions. A run along which nothing went wrong is not asked about. An error
     on the way (a review model or an embedding service that fails, the review model's missing API key) ends it with a
     ``lessons_failed`` event; the run keeps its end either way."""
-    store: Store = runtime.store
-    signals: tuple[str, ...] = run_signals(
+    signals: tuple[str, ...] = await stored_signals(runtime.store, case)
+    if not signals:
+        log.info("lessons_skipped", run_id=case.run_id, reason="nothing went wrong on the way")
+        return
+    await learn_from(runtime, deciding, case, signals)
+
+
+async def stored_signals(store: Store, case: LessonCase) -> tuple[str, ...]:
+    """:func:`run_signals` of a run from the events the store holds of it."""
+    return run_signals(
         case,
         await store.events_of_kind(case.run_id, "stall", _EVENTS_READ),
         await store.events_of_kind(case.run_id, "goal_check", _EVENTS_READ),
         await store.events_of_kind(case.run_id, "answer_paths", _EVENTS_READ),
     )
-    if not signals:
-        log.info("lessons_skipped", run_id=case.run_id, reason="nothing went wrong on the way")
-        return
+
+
+async def learn_from(
+    runtime: Runtime, deciding: asyncio.Lock, case: LessonCase, signals: tuple[str, ...]
+) -> tuple[str, ...]:
+    """Draw the lessons of a run from ``signals`` and do with them what ``[agent] lessons`` says (see :func:`learn`);
+    the lessons proposed, none when drawing them failed."""
     try:
-        lessons: tuple[str, ...] = await _drawn(runtime, case, signals)
+        lessons: tuple[str, ...] = await draw_lessons(runtime, case, signals)
     except DotError as error:
         await _failed(runtime, case.run_id, error, "The lessons of this run could not be drawn")
-        return
+        return ()
     if not lessons:
-        return
+        return ()
     await runtime.bus.emit(case.run_id, LESSONS_PROPOSED, {"lessons": list(lessons), "tainted": case.tainted}, True)
     if runtime.config.agent.lessons == "auto" and not case.tainted:
         await _save_all(runtime, deciding, case.run_id, lessons)
+    return lessons
 
 
 def lessons_of(
