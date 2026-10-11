@@ -19,7 +19,7 @@ def _checked(request: AgentRequest, known: frozenset[str]) -> AgentRequest:
         parse_model_ref(request.model)
     unknown: list[str] = sorted(set(request.tools) - known)
     if unknown:
-        raise InvalidValueError("an agent names tools that do not exist", {"tools": unknown})
+        raise InvalidValueError("an agent names tools that do not exist", {"tools": ", ".join(unknown)})
     return request
 
 
@@ -27,6 +27,11 @@ def agents_router(ctx: ServerContext) -> APIRouter:
     router: APIRouter = APIRouter(prefix="/api")
     store: Store = ctx.runtime.store
     known: frozenset[str] = frozenset(ctx.runtime.registry.tools)
+
+    @router.get("/tools")
+    async def list_tools() -> list[str]:
+        """The names of the tools an agent may be given, in alphabetical order."""
+        return sorted(known)
 
     @router.get("/agents")
     async def list_agents() -> list[AgentSummary]:

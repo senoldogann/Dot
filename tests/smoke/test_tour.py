@@ -39,6 +39,7 @@ _PAGES: tuple[tuple[str, str], ...] = (
     ("home", "#/runs"),
     ("activity", "#/activity"),
     ("campaigns", "#/campaigns"),
+    ("agents", "#/agents"),
     ("controls", "#/controls"),
     ("settings-general", "#/settings/general"),
     ("settings-models", "#/settings/models"),
@@ -180,7 +181,25 @@ async def test_every_page_in_both_schemes_at_both_widths(
         await manager.wait(run.id)
     note = await client.post("/api/memories", json={"content": "The owner prefers short answers.", "tags": ["core"]})
     assert note.status_code == 201, note.text
-    pages: tuple[tuple[str, str], ...] = (*_PAGES, ("run", f"#/runs/{run.id}"))
+    # An agent (item 86) gives the Agents page a row of its own and an agent page to shoot.
+    made = await client.post(
+        "/api/agents",
+        json={
+            "name": "Scout",
+            "role": "Finds and checks sources",
+            "instructions": "Prefer primary sources. Say what you could not confirm.",
+            "model": "",
+            "effort": None,
+            "approvals": None,
+            "tools": [],
+        },
+    )
+    assert made.status_code == 201, made.text
+    pages: tuple[tuple[str, str], ...] = (
+        *_PAGES,
+        ("agent", f"#/agents/{made.json()['id']}"),
+        ("run", f"#/runs/{run.id}"),
+    )
     out: Path = tmp_path / "tour"
     await asyncio.to_thread(out.mkdir)
     async with async_playwright() as playwright:

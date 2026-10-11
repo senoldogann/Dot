@@ -133,8 +133,11 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
   const runId = detail.run.id;
   let run = detail.run;
   let status = run.status;
-  // Dot's face on Dot's own run; a delegated run wears the face of its own hue (item 83).
-  const face = run.parent_run_id === null ? avatar(faceState(status)) : actorFace(run.id, faceState(status));
+  // Dot's face on Dot's own run; a delegated run wears the face of its own hue (item 83); a run of an agent wears the
+  // agent's (item 86).
+  const agent = detail.agent;
+  const face =
+    agent !== null ? actorFace(agent.id, faceState(status)) : run.parent_run_id === null ? avatar(faceState(status)) : actorFace(run.id, faceState(status));
   let model = run.model;
   let active = detail.active;
   // The daemon cut the run off and a new run can go on from where it stopped.
@@ -189,7 +192,7 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
   const parentId = run.parent_run_id;
   const crumb = parentId === null ? null : el("a", { class: "stage-crumb", href: `#/runs/${parentId}` }, "Parent run");
   const crumbSep = parentId === null ? null : el("span", { class: "stage-sep", "aria-hidden": "true" }, "/");
-  const stageName = el("span", { class: "stage-name" }, parentId === null ? dotName() : clip(run.goal, CRUMB_CHARS));
+  const stageName = el("span", { class: "stage-name" }, parentId !== null ? clip(run.goal, CRUMB_CHARS) : agent !== null ? agent.name : dotName());
   const footTime = el("span", null);
   const footParent = el("span", null, "Part of another run");
   const foot =
@@ -241,6 +244,8 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
           icon("target"),
           `Campaign · session ${campaign.session}`,
         );
+  const agentChip =
+    agent === null ? null : el("a", { class: "chip", href: `#/agents/${agent.id}`, title: `A chat with ${agent.name}: ${agent.role}` }, icon("user"), agent.name);
   const approvalChip = APPROVAL_CHIPS[run.approvals];
   const modeChips = [
     approvalChip === undefined
@@ -831,7 +836,7 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
   // message, is the page's heading for a reader of the structure.
   setStageTitle(face, crumb, crumbSep, stageName, el("span", { class: "stage-sub" }, statusSlot, el("span", { class: "stage-time" }, dateTime(run.created_at))));
   // A delegated run's chips are in its pill and in the Details card; its bar keeps the room for the breadcrumb.
-  setStageTools(...(parentId === null ? [modelChip, ...modeChips, campaignChip] : []), inspector.toggle, resumeButton, cancelButton);
+  setStageTools(...(parentId === null ? [agentChip, modelChip, ...modeChips, campaignChip] : []), inspector.toggle, resumeButton, cancelButton);
 
   layout.append(
     el(

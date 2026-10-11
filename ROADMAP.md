@@ -5005,8 +5005,8 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 82  | Delegated runs as rows: face, state, last line, time; the child's bar    | done        | 6454345 |
 | 83  | Faces for the actors: a hue each, alive in the rows and the bar          | done        | d760ea3 |
 | 84  | The side panel: inset bodies, facts as spans, one card grammar           | done        | 82c06b8 |
-| 85  | Motion: the sidebar slides, the panel slides, folds fade, pages cross-fade | in progress |         |
-| 86  | Agents: profiles with a face, a role, a model and their own chats         | planned     |         |
+| 85  | Motion: the sidebar slides, the panel slides, folds fade, pages cross-fade | done        | 7f02492 |
+| 86  | Agents: profiles with a face, a role, a model and their own chats         | in progress |         |
 | 87  | Agents together: messages between agents, the team's thread, the harness  | planned     |         |
 | 88  | Desktop and web, one interface: the Tauri shell on the same pages         | planned     |         |
 
@@ -5239,7 +5239,7 @@ panel's scroll inside its own height.
 
 ### 85. Motion: the sidebar slides, the panel slides, folds fade, pages cross-fade
 
-**Status: in progress.** Built on `item-85-motion` (MYP-225).
+**Status: done.** Merged as `7f02492` (PR #95, MYP-225).
 
 **Design, as built (2026-10-11).** The docked sidebar (`shell.css`): the shell's first column goes from `0px` to
 `--sidebar-w` with `transition: grid-template-columns` on the base duration, the page following; the sidebar keeps
@@ -5264,7 +5264,35 @@ after the motion settles).
 
 ### 86. Agents: profiles with a face, a role, a model and their own chats
 
-**Status: planned.**
+**Status: in progress.** Built on `item-86-agents` (MYP-226).
+
+**Design, as built (2026-10-11).** An agent is an `AgentRecord` (`store/models.py`): `name`, `role` (one line),
+`instructions`, `model` (empty for the configured one), `effort` and `approvals` (`None` for the configured ones),
+`tools` (the names it may use; empty for every tool); the `agents` table keeps them and `RunRecord.agent_id` names
+the agent a run belongs to (`None` for Dot). Dot itself is `DOT_AGENT`, a synthetic record (`id` `dot`) that is
+listed first and neither stored nor editable. The API (`routes_agents.py`): `GET /api/agents` (Dot first, then the
+agents oldest first, each with its newest run), `POST /api/agents`, `GET`/`PUT`/`DELETE /api/agents/{id}` (a request
+naming an unknown tool or a model that does not parse is refused with 422; so is a change or deletion of Dot), and
+`GET /api/tools`, the names an agent may be given. Deleting an agent clears `agent_id` on its runs, which stay as
+Dot's. `POST /api/runs` takes `agent_id` and goes through `RunManager.start_for_agent`: what the request leaves
+out, the agent's bounds fill in (its model, effort and approvals), and what the agent leaves out, the configured
+ones. In the loop, a run of an agent builds its prompt with an `AgentBrief` whose section opens the prompt ("You are
+Scout, an agent the owner made: ... The owner's instructions to you, which you follow within the rules below: ...")
+before Dot's own sections, and keeps its tool specs to the agent's list plus the core three (`finish`, `ask_user`,
+`use_tools`; `AGENT_CORE_TOOLS`). The Activity rows and the sidebar wear the agent's face (`actor_id` is the agent's
+id first, then the campaign's, then a delegated run's own). The interface: `views/agents.js` at `#/agents` (the
+sidebar's foot, above Activity) lists Dot and the agents as one link row each (the face in the agent's hue, working
+while its newest run works; the name; the newest chat's goal, else the role; when that chat started) with "New agent"
+opening the editor card (name, role, instructions, model with its reasoning level when the model offers one,
+approvals, the tools as checkbox chips, none picked meaning every tool); `#/agents/<id>` greets with the face, name
+and role over a composer ("Message <name>", Enter sends, the run is a task with the agent's bounds) and lists the
+agent's chats, with Edit and Delete in the bar. The home composer offers an Agent menu once an agent exists (Dot by
+default; the placeholder follows the pick; Keep going hides while an agent is picked, a campaign being Dot's own
+work) and posts `agent_id`. A run of an agent wears the agent's face and name in its bar, with a chip to its page.
+Tests: `tests/unit/test_agents.py` (the prompt's opening, the core tools, the store's agents and their runs);
+`tests/smoke/test_agents.py` (an agent made through the API, a run for it on the scripted model whose prompt opens in
+its voice and whose tools are bound, the composer's menu, the Agents page, the agent's page and the run's bar read in
+Chrome, the agent deleted and its chat left to Dot); the tour shoots `#/agents` and an agent's page.
 
 **What.** A store table and API for agents (`id`, `name`, `role`, `instructions`, `model`, `effort`, `approvals`,
 `tools`, `created_at`); Dot as the built-in first agent; `RunRecord.agent_id`; the agent's instructions in the system
@@ -5798,3 +5826,4 @@ reviewed in the tour; the dependabot alert on `glib` in `desktop/src-tauri/Cargo
 - 2026-10-11 (Fable 5.1): item 82 merged as `6454345` (PR #91, MYP-222 Done). Item 83 built on branch `item-83-faces` (MYP-223): `actors.js`, eight hue tokens, the faces in the rows, the pages and the bar, `ActivityRow.actor_id`.
 - 2026-10-11 (Fable 5.1): item 83 merged as `d760ea3` (PR #92, MYP-223 Done). Part 9 is built: items 77 to 83 merged (`ffa00cb`, `7a7e43f`, `ab5f33a`, `132ce0d`, `04693d7`, `6454345`, `d760ea3`); the screenshot tour read after each. Item 76's reading (part 8) is still due on or after 2026-10-18. The daemon restarted on `d760ea3`.
 - 2026-10-11 (Fable 5.1): Part 10 planned (items 84-88) from the owner's word and arXiv 2609.20804. Item 84 merged as `82c06b8` (PR #94, MYP-224 Done). Item 85 built on branch `item-85-motion` (MYP-225): the sidebar's slide, the drawer's slide, unfolding bodies, pages coming in.
+- 2026-10-11 (Fable 5.1): item 85 merged as `7f02492` (PR #95, MYP-225 Done). Item 86 built on branch `item-86-agents` (MYP-226): `AgentRecord` and the `agents` table, `RunRecord.agent_id`, `start_for_agent`, the agent's section first in the prompt, its tools as the run's bound, `/api/agents`, the Agents page, the agent's page with its composer, the home composer's Agent menu, the agent's face in the rows and the bar.

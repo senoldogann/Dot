@@ -869,7 +869,7 @@ is the top bar itself: Dot's face, name, state and start on the left, the model 
 Continue and Cancel on the right before the daemon's pills; the bar is solid with a hairline under it, so nothing
 scrolls under a blur, the panel stays in place under it, and the box stays at the bottom. On a phone the bar keeps the
 face, the name and the buttons; the chips wait in the Details card. Every other page names itself in the same bar
-(Activity, Campaigns, Settings) and opens with one line of description.
+(Agents, Activity, Campaigns, Settings) and opens with one line of description.
 
 The panel's cards (Dot's computer, Details, Plan, Actions, Screen) arrive folded, each with a one-line summary, and
 open at a click; the choice is kept per card. **Dot's computer**, at the top of that panel while a run is going on,
@@ -910,7 +910,7 @@ lists sit (comfortable or compact). Two switches follow the look until you set t
 visual system. Colour: every colour is a token of `themes.css` naming its light and its dark value in one place;
 surfaces step up by lightness (page, sunken sidebar, raised cards) rather than by shadow in dark; borders are the text
 colour at a small alpha so they sit on every surface; the text tiers are measured against every surface by a unit
-test (4.5:1 for text and its second tier, 3:1 for the muted and faint ones); the yellow is Dot's face alone, and every other actor (a delegated run, a campaign, a schedule) wears the same
+test (4.5:1 for text and its second tier, 3:1 for the muted and faint ones); the yellow is Dot's face alone, and every other actor (an agent, a delegated run, a campaign, a schedule) wears the same
 mark in a hue of its own, one of eight chosen by a hash of its id, so it keeps its face in the sidebar, the lists,
 the rows of a chat and the bar of its own page. Type:
 Inter for the interface and the answers, Geist Mono for code and identifiers, both served from Dot's own origin
@@ -1280,6 +1280,21 @@ defaults: a run cannot schedule itself into another approval mode.
 - A firing is at most once. One that is overdue by more than `misfire_grace_s` (the daemon was off) is skipped and waits
   for the next.
 - A cron expression may not fire more often than every `min_interval_s`; at most `max_schedules` schedules can be on.
+
+## Agents
+
+An agent is a profile you make for a kind of work: a name, a role in one line, instructions, and bounds for its runs
+(a model, a reasoning level, approvals, the tools it may use; each left out takes the configured one, no tool picked
+means every tool). It wears the mark in a hue of its own wherever it shows. **Agents** in the sidebar lists Dot first
+and then your agents, each with its newest chat; **New agent** opens the editor; an agent's page greets with its
+face and role, takes a message for it ("Message Scout") and lists its chats, with Edit and Delete in the bar. The
+home composer offers an Agent menu once an agent exists, Dot by default. A run of an agent opens its system prompt
+with the agent's own section ("You are Scout, an agent the owner made: ..." and your instructions), ahead of Dot's
+rules, which still hold; its tools are the ones the agent names plus finishing, asking you and turning tool groups on.
+The run's page wears the agent's face and name in the bar with a chip to its page; its rows on the Activity page and
+in the sidebar wear the face too. Deleting an agent leaves its chats to Dot. The API: `GET /api/agents` (Dot first,
+each agent with its newest run), `POST /api/agents`, `GET`/`PUT`/`DELETE /api/agents/{id}` (Dot is neither changed
+nor deleted), `GET /api/tools` (the names an agent may be given), and `POST /api/runs` with `agent_id`.
 
 ## Campaigns
 

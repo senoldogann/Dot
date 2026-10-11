@@ -11,6 +11,7 @@ import { applyStoredDensity } from "./layout.js";
 import { applyStoredScheme, applyStoredTheme } from "./theme.js";
 import { attempt, toast } from "./ui.js";
 import * as activity from "./views/activity.js";
+import * as agents from "./views/agents.js";
 import * as campaigns from "./views/campaigns.js";
 import * as controls from "./views/controls.js";
 import * as run from "./views/run.js";
@@ -31,6 +32,7 @@ const ROUTES = [
   { tab: "runs", layout: "run", title: "Run", pattern: /^\/runs\/([A-Za-z0-9_-]+)$/, view: run },
   { tab: "activity", layout: "page", title: "Activity", pattern: /^\/activity$/, view: activity },
   { tab: "campaigns", layout: "page", title: "Campaigns", pattern: /^\/campaigns(?:\/([A-Za-z0-9_-]+))?$/, view: campaigns },
+  { tab: "agents", layout: "page", title: "Agents", pattern: /^\/agents(?:\/([A-Za-z0-9_-]+))?$/, view: agents },
   { tab: "settings", layout: "page", title: "Settings", pattern: /^\/settings(?:\/([a-z]+))?$/, view: settings },
   // Every control of the interface on one page, for checking a look; not linked from the sidebar.
   { tab: "settings", layout: "page", title: "Controls", pattern: /^\/controls$/, view: controls },
