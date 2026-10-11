@@ -1,21 +1,23 @@
-"""Playbooks: how a run that reached its goal on a web site or an application got there, kept as a skill for the runs
-after it.
+"""Learned skills: how a run of the agent's own did work that went well, kept as a skill for the runs after it
+(ROADMAP item 92; the module keeps its first name, playbooks).
 
 A run is distilled when ``[agent] playbooks`` is on, it is a task run of its own (a delegated run's work is its
-parent's; an eval run is not asked), it ran in goal mode and ended done (the goal check found the outcome achieved), it
-acted on a site or an application (the ``site`` of its ``tool_result`` events, :func:`main_site`) and no playbook for
-that site exists yet. Once the run has ended, the review model reads a digest of the acting steps on that site
-(:func:`acting_digest`) and writes the playbook (:func:`dotagent.agent.review.playbook_writer_for`): the steps that
-worked, the parameters a later run fills in, and a one-sentence description. It is written as a skill folder
-``playbook-<host>/SKILL.md`` under ``<home>/playbooks`` (:func:`render_playbook`), with the evidence (the run, the goal,
-the date, how many acting steps it took) and a ``playbook.json`` that counts its use; the skills catalog reads the
-folder like any skills directory, so later runs see the description under Skills and read the rest with the ``skill``
-tool.
+parent's; an eval run is not asked), it ended done (its answer was checked, or its goal check found the outcome
+achieved) and it took at least ``[agent] skill_min_steps`` acting steps (every tool call but the ones that plan, ask,
+remember, consult or finish: :func:`acting_steps`). Once the run has ended, the review model reads a digest of those
+steps (:func:`acting_digest`) and writes the skill (:func:`dotagent.agent.review.playbook_writer_for`): the kind of
+work in a few words, the steps that worked, the parameters a later run fills in, and a one-sentence description. The
+kind names the folder, ``learned-<kind>/SKILL.md`` under ``<home>/playbooks`` (:func:`render_playbook`), with the
+evidence (the runs, the goal, the date, the acting steps) and a ``playbook.json`` that keeps the kind and counts the
+use; a kind that matches an existing skill by meaning (or, without embeddings, by name) updates that skill instead of
+writing another, its runs appended to the evidence. The skills catalog reads the folder like any skills directory, so
+later runs see the description under Skills, told it is advice from Dot's own work, and read the rest with the
+``skill`` tool.
 
-Every run that ended done or failed records its use of playbooks (the ``skill`` calls that named one): a playbook read
-by :data:`MAX_FAILURES` runs that then failed is retired, moved under ``.retired`` where the catalog does not look, and
-no longer offered. Every function here is pure except :func:`learn_playbook`, which reads the store and the review
-model and writes the folder, and the small file helpers it calls.
+Every run that ended done or failed records its use of learned skills (the ``skill`` calls that named one): a skill
+read by :data:`MAX_FAILURES` runs that then failed is retired, moved under ``.retired`` where the catalog does not
+look, and no longer offered. Every function here is pure except :func:`learn_playbook`, which reads the store, the
+embedder and the review model and writes the folder, and the small file helpers it calls.
 """
 
 import asyncio
@@ -31,14 +33,16 @@ from pydantic import JsonValue, ValidationError
 
 from dotagent.agent.review import PlaybookDraft, PlaybookRequest, PlaybookWriter, playbook_writer_for, shorten_reason
 from dotagent.config import AppConfig
-from dotagent.core.errors import DotError, NotFoundError
+from dotagent.core.errors import DotError, InvalidValueError, NotFoundError
 from dotagent.core.jsonutil import dumps_compact
 from dotagent.core.logs import get_logger
 from dotagent.core.paths import playbooks_dir
 from dotagent.core.text import redact_secrets, truncate_tail
 from dotagent.core.types import FrozenModel, JsonObject
 from dotagent.evals import EVAL_SOURCE
+from dotagent.memory.ranking import Similar, Vector, most_similar
 from dotagent.runtime import Runtime
+from dotagent.skills.catalog import PLAYBOOK_SOURCE
 from dotagent.skills.parse import parse_skill
 from dotagent.skills.types import SKILL_FILE, Skill
 from dotagent.store.models import EventRecord, RunRecord, RunStatus
@@ -46,7 +50,9 @@ from dotagent.tools.skill import SKILL_TOOL
 
 log = get_logger(__name__)
 
-PLAYBOOK_PREFIX: str = "playbook-"
+PLAYBOOK_PREFIX: str = "learned-"
+# The prefix of the folders written before item 92, which a run may still read.
+_OLD_PREFIX: str = "playbook-"
 META_FILE: str = "playbook.json"
 RETIRED_DIR: str = ".retired"
 PLAYBOOK_WRITTEN: str = "playbook_written"
@@ -58,13 +64,37 @@ _EVENTS_READ: int = 2000
 _DIGEST_STEPS: int = 80
 _ARGS_CHARS: int = 200
 _RESULT_CHARS: int = 160
-# The site of a result is a host name or an application name; the folder name takes its letters and digits.
+# The kind of work names the folder: its letters and digits with single hyphens between.
 _UNSAFE: re.Pattern[str] = re.compile(r"[^a-z0-9]+")
 _SLUG_CHARS: int = 50
+# The tool calls that are not acting: they plan, ask, remember, consult, read a skill or end the run.
+_NOT_ACTING: frozenset[str] = frozenset(
+    {
+        "finish",
+        "ask_user",
+        "use_tools",
+        "skill",
+        "consult",
+        "delegate",
+        "message_agent",
+        "update_plan",
+        "mark_plan_step",
+        "write_notes",
+        "memory_search",
+        "memory_save",
+        "memory_update",
+        "memory_forget",
+        "judge_items",
+    }
+)
+# Two kinds this close in meaning are one kind: the new run updates the skill instead of writing another.
+_SAME_KIND: float = 0.85
+# The name a skill is written under when the run acted on no web site or application.
+NO_SITE: str = "this Mac"
 
 
 class ActingStep(FrozenModel):
-    """One tool call of a run on its main site, as the digest shows it."""
+    """One acting tool call of a run, as the digest shows it."""
 
     tool: str
     arguments: str
@@ -73,10 +103,11 @@ class ActingStep(FrozenModel):
 
 
 class Playbook(FrozenModel):
-    """A playbook as it is written: its skill name, the host or application, what the review model wrote and the
-    evidence of the run it comes from."""
+    """A learned skill as one run writes it: its skill name, the kind of work, the host or application it acted on
+    most (:data:`NO_SITE` for none), what the review model wrote and the evidence of the run it comes from."""
 
     name: str
+    kind: str
     host: str
     draft: PlaybookDraft
     run_id: str
@@ -86,13 +117,17 @@ class Playbook(FrozenModel):
 
 
 class PlaybookMeta(FrozenModel):
-    """``playbook.json``: where the playbook comes from and how it fared since. ``uses`` counts the runs that read it
-    and ended done, ``failures`` the runs that read it and failed."""
+    """``playbook.json``: the kind the skill is matched by, where it comes from (``runs``, the first one first, with
+    the acting steps each took) and how it fared since. ``uses`` counts the runs that read it and ended done,
+    ``failures`` the runs that read it and failed."""
 
     name: str
+    kind: str
     host: str
-    run_id: str
+    runs: tuple[str, ...]
+    acting_steps: tuple[int, ...]
     written_at: float
+    updated_at: float
     uses: int
     failures: int
 
@@ -105,14 +140,14 @@ class PlaybookEntry(FrozenModel):
     retired: bool
 
 
-def slug(host: str) -> str:
-    """The folder part of a playbook's name for ``host``: lower-case letters and digits with single hyphens between,
-    at most :data:`_SLUG_CHARS` long, empty when the host has none."""
-    return _UNSAFE.sub("-", host.lower()).strip("-")[:_SLUG_CHARS].strip("-")
+def slug(text: str) -> str:
+    """The folder part of a skill's name for ``text`` (the kind of work): lower-case letters and digits with single
+    hyphens between, at most :data:`_SLUG_CHARS` long, empty when the text has none."""
+    return _UNSAFE.sub("-", text.lower()).strip("-")[:_SLUG_CHARS].strip("-")
 
 
-def playbook_name(host: str) -> str:
-    return f"{PLAYBOOK_PREFIX}{slug(host)}"
+def playbook_name(kind: str) -> str:
+    return f"{PLAYBOOK_PREFIX}{slug(kind)}"
 
 
 def playbook_case(config: AppConfig, run: RunRecord, status: RunStatus) -> RunRecord | None:
@@ -123,10 +158,10 @@ def playbook_case(config: AppConfig, run: RunRecord, status: RunStatus) -> RunRe
     return run if status in ("done", "failed") else None
 
 
-def distils(run: RunRecord, status: RunStatus) -> bool:
-    """Whether a run that calls for playbook work may be distilled: it ran in goal mode, so a done end is one the goal
-    check found achieved."""
-    return status == "done" and run.goal_mode
+def distils(status: RunStatus, steps: int, min_steps: int) -> bool:
+    """Whether a run that calls for playbook work may be distilled: it ended done (its answer checked, or its goal
+    found achieved) after at least ``min_steps`` acting steps; a run that did less has nothing worth a skill."""
+    return status == "done" and steps >= min_steps
 
 
 def main_site(events: Sequence[EventRecord]) -> str:
@@ -139,8 +174,9 @@ def main_site(events: Sequence[EventRecord]) -> str:
     return "" if not counts else max(counts, key=lambda site: counts[site])
 
 
-def acting_steps(events: Sequence[EventRecord], site: str) -> tuple[ActingStep, ...]:
-    """The tool calls whose result names ``site``, in order, each with its arguments and the start of its result."""
+def acting_steps(events: Sequence[EventRecord]) -> tuple[ActingStep, ...]:
+    """The acting tool calls of the run (every call but :data:`_NOT_ACTING`), in order, each with its arguments and
+    the start of its result."""
     calls: dict[str, JsonObject] = {}
     steps: list[ActingStep] = []
     for event in events:
@@ -150,7 +186,7 @@ def acting_steps(events: Sequence[EventRecord], site: str) -> tuple[ActingStep, 
         if event.kind == "tool_call":
             arguments: JsonValue = event.data.get("args")
             calls[call_id] = arguments if isinstance(arguments, dict) else {}
-        elif event.kind == "tool_result" and event.data.get("site") == site:
+        elif event.kind == "tool_result" and str(event.data.get("tool", "")) not in _NOT_ACTING:
             steps.append(
                 ActingStep(
                     tool=str(event.data.get("tool", "")),
@@ -182,7 +218,7 @@ def used_playbooks(events: Sequence[EventRecord]) -> tuple[str, ...]:
             continue
         arguments: JsonValue = event.data.get("args")
         name: JsonValue = arguments.get("name") if isinstance(arguments, dict) else None
-        if isinstance(name, str) and name.startswith(PLAYBOOK_PREFIX):
+        if isinstance(name, str) and name.startswith((PLAYBOOK_PREFIX, _OLD_PREFIX)):
             names[name] = None
     return tuple(names)
 
@@ -191,35 +227,53 @@ def _date(written_at: float) -> str:
     return datetime.fromtimestamp(written_at, tz=UTC).strftime("%Y-%m-%d")
 
 
-def render_playbook(playbook: Playbook) -> str:
-    """The SKILL.md of a playbook: the frontmatter the skills loader reads, then when it fits, the steps, the
-    parameters and the evidence."""
+def render_playbook(playbook: Playbook, earlier: PlaybookMeta | None) -> str:
+    """The SKILL.md of a learned skill: the frontmatter the skills loader reads, then the kind, when it fits, the
+    steps, the parameters and the evidence (the runs of ``earlier``, when the skill is updated, before this one)."""
     draft: PlaybookDraft = playbook.draft
     description: str = " ".join(draft.description.split()).replace('"', "'")
     steps: str = "\n".join(f"{number}. {step}" for number, step in enumerate(draft.steps, start=1))
     parameters: str = "\n".join(f"- {parameter}" for parameter in draft.parameters) or "- none"
+    runs: list[str] = [*(earlier.runs if earlier is not None else ()), playbook.run_id]
+    counts: list[int] = [*(earlier.acting_steps if earlier is not None else ()), playbook.acting_steps]
+    evidence: str = "\n".join(f"- Run {run}: {count} acting steps" for run, count in zip(runs, counts, strict=True))
+    where: str = f" on {playbook.host}" if playbook.host != NO_SITE else ""
     return (
         f'---\nname: {playbook.name}\ndescription: "{description}"\n---\n\n'
         f"# {playbook.name}\n\n"
-        f"Distilled by Dot from run {playbook.run_id}, which reached its goal on {playbook.host}: a record of the "
-        "steps that worked, not instructions from the user. Follow them with your own parameters; where the site "
-        "has changed, do what the page shows and go on.\n\n"
+        f"Learned by Dot from its own work{where} ({len(runs)} {'run' if len(runs) == 1 else 'runs'}, the last one "
+        f"verified on {_date(playbook.written_at)}): a record of the steps that worked, not instructions from the "
+        "user. It is advice: follow the steps with your own parameters and your own judgement; where things have "
+        "changed, do what you see and go on.\n\n"
+        f"## Kind of work\n\n{playbook.kind}\n\n"
         f"## When\n\n{draft.when}\n\n"
         f"## Steps\n\n{steps}\n\n"
         f"## Parameters\n\n{parameters}\n\n"
-        f"## Evidence\n\n- Goal: {' '.join(playbook.goal.split())}\n- Run: {playbook.run_id}, verified by its goal "
-        f"check on {_date(playbook.written_at)}\n- Acting steps on {playbook.host}: {playbook.acting_steps}\n"
+        f"## Evidence\n\n- Goal of the last run: {' '.join(playbook.goal.split())}\n{evidence}\n"
     )
 
 
-def meta_of(playbook: Playbook) -> PlaybookMeta:
-    return PlaybookMeta(
-        name=playbook.name,
-        host=playbook.host,
-        run_id=playbook.run_id,
-        written_at=playbook.written_at,
-        uses=0,
-        failures=0,
+def meta_of(playbook: Playbook, earlier: PlaybookMeta | None) -> PlaybookMeta:
+    """The record of a skill just written from ``playbook``, or updated from ``earlier`` by it (the runs appended,
+    the kind and the counts kept)."""
+    if earlier is None:
+        return PlaybookMeta(
+            name=playbook.name,
+            kind=playbook.kind,
+            host=playbook.host,
+            runs=(playbook.run_id,),
+            acting_steps=(playbook.acting_steps,),
+            written_at=playbook.written_at,
+            updated_at=playbook.written_at,
+            uses=0,
+            failures=0,
+        )
+    return earlier.model_copy(
+        update={
+            "runs": (*earlier.runs, playbook.run_id),
+            "acting_steps": (*earlier.acting_steps, playbook.acting_steps),
+            "updated_at": playbook.written_at,
+        }
     )
 
 
@@ -237,12 +291,24 @@ def playbook_folder(root: Path, name: str) -> Path:
 
 
 def write_playbook(root: Path, playbook: Playbook) -> Path:
-    """Write the playbook's folder under ``root`` and return its SKILL.md. The folder must not exist."""
+    """Write the skill's folder under ``root`` and return its SKILL.md. The folder must not exist."""
     folder: Path = playbook_folder(root, playbook.name)
     folder.mkdir(parents=True, exist_ok=False)
     file: Path = folder / SKILL_FILE
-    file.write_text(render_playbook(playbook), encoding="utf-8")
-    (folder / META_FILE).write_text(meta_of(playbook).model_dump_json(indent=2) + "\n", encoding="utf-8")
+    file.write_text(render_playbook(playbook, None), encoding="utf-8")
+    (folder / META_FILE).write_text(meta_of(playbook, None).model_dump_json(indent=2) + "\n", encoding="utf-8")
+    return file
+
+
+def update_playbook(root: Path, name: str, playbook: Playbook) -> Path:
+    """Rewrite the active skill ``name`` from ``playbook`` (a later run of the same kind): the steps are the new
+    run's, the evidence keeps every run. Returns its SKILL.md."""
+    folder: Path = playbook_folder(root, name)
+    earlier: PlaybookMeta = read_meta(folder)
+    renamed: Playbook = playbook.model_copy(update={"name": name})
+    file: Path = folder / SKILL_FILE
+    file.write_text(render_playbook(renamed, earlier), encoding="utf-8")
+    (folder / META_FILE).write_text(meta_of(renamed, earlier).model_dump_json(indent=2) + "\n", encoding="utf-8")
     return file
 
 
@@ -276,7 +342,7 @@ def drop_playbook(root: Path, name: str) -> Path:
         if folder.is_dir():
             shutil.rmtree(folder)
             return folder
-    raise NotFoundError("there is no such playbook", {"name": name})
+    raise NotFoundError("there is no such learned skill", {"name": name})
 
 
 def _entries(folder: Path, retired: bool) -> list[PlaybookEntry]:
@@ -285,9 +351,9 @@ def _entries(folder: Path, retired: bool) -> list[PlaybookEntry]:
         return entries
     for child in sorted(folder.iterdir()):
         file: Path = child / SKILL_FILE
-        if not child.name.startswith(PLAYBOOK_PREFIX) or not file.is_file():
+        if not child.name.startswith((PLAYBOOK_PREFIX, _OLD_PREFIX)) or not file.is_file():
             continue
-        skill: Skill = parse_skill(file, file.read_text(encoding="utf-8"), "playbook")
+        skill: Skill = parse_skill(file, file.read_text(encoding="utf-8"), PLAYBOOK_SOURCE)
         entries.append(PlaybookEntry(skill=skill, meta=read_meta(child), retired=retired))
     return entries
 
@@ -308,8 +374,33 @@ async def _record_uses(runtime: Runtime, run: RunRecord, status: RunStatus, even
             await runtime.bus.emit(run.id, PLAYBOOK_RETIRED, {"name": name, "failures": meta.failures}, True)
 
 
-async def _write_from(runtime: Runtime, run: RunRecord, events: Sequence[EventRecord], host: str) -> Path:
-    steps: tuple[ActingStep, ...] = acting_steps(events, host)
+def same_kind(kind: str, entries: Sequence[PlaybookEntry], vectors: Sequence[Vector] | None) -> PlaybookEntry | None:
+    """The active skill whose kind is ``kind``: by meaning when ``vectors`` holds the embeddings of ``kind`` and then
+    of each entry's kind in order (cosine at least :data:`_SAME_KIND`, the closest), else by name."""
+    active: list[PlaybookEntry] = [entry for entry in entries if not entry.retired]
+    if vectors is None:
+        wanted: str = slug(kind)
+        return next((entry for entry in active if slug(entry.meta.kind) == wanted), None)
+    stored: list[tuple[str, Vector]] = [
+        (entry.meta.name, vector) for entry, vector in zip(active, vectors[1:], strict=True)
+    ]
+    close: list[Similar] = most_similar(vectors[0], stored, _SAME_KIND, 1)
+    return next((entry for entry in active if close and entry.meta.name == close[0].id), None)
+
+
+async def _matching(runtime: Runtime, kind: str, entries: Sequence[PlaybookEntry]) -> PlaybookEntry | None:
+    active: list[PlaybookEntry] = [entry for entry in entries if not entry.retired]
+    if runtime.memory.embedder is None or not active:
+        return same_kind(kind, entries, None)
+    vectors: list[Vector] = await runtime.memory.embedder.embed([kind, *(entry.meta.kind for entry in active)])
+    return same_kind(kind, entries, vectors)
+
+
+async def _write_from(
+    runtime: Runtime, run: RunRecord, steps: Sequence[ActingStep], host: str
+) -> tuple[Path, str, bool]:
+    """Ask the review model for the skill of ``run`` and write it: a new folder, or the folder of the skill of the
+    same kind. Returns the SKILL.md, the skill's name and whether it was updated rather than written."""
     writer: PlaybookWriter = playbook_writer_for(
         runtime.router,
         runtime.config.models.review,
@@ -321,7 +412,8 @@ async def _write_from(runtime: Runtime, run: RunRecord, events: Sequence[EventRe
         PlaybookRequest(goal=run.goal, host=host, digest=acting_digest(steps), answer=run.result)
     )
     playbook: Playbook = Playbook(
-        name=playbook_name(host),
+        name=playbook_name(draft.kind),
+        kind=draft.kind,
         host=host,
         draft=draft,
         run_id=run.id,
@@ -329,37 +421,44 @@ async def _write_from(runtime: Runtime, run: RunRecord, events: Sequence[EventRe
         written_at=time.time(),
         acting_steps=len(steps),
     )
-    return await asyncio.to_thread(write_playbook, playbooks_dir(), playbook)
+    root: Path = playbooks_dir()
+    match: PlaybookEntry | None = await _matching(runtime, draft.kind, await asyncio.to_thread(list_playbooks, root))
+    if match is not None:
+        return await asyncio.to_thread(update_playbook, root, match.meta.name, playbook), match.meta.name, True
+    if not slug(draft.kind):
+        raise InvalidValueError("the kind of work has no letters or digits to name a skill by", {"kind": draft.kind})
+    if playbook_folder(root, playbook.name).is_dir():
+        return await asyncio.to_thread(update_playbook, root, playbook.name, playbook), playbook.name, True
+    return await asyncio.to_thread(write_playbook, root, playbook), playbook.name, False
 
 
 async def learn_playbook(runtime: Runtime, run: RunRecord, status: RunStatus) -> None:
-    """The playbook work of a run that ended: record its use of playbooks, then, when it may be distilled and acted
-    on a site that has no playbook yet, write one. A review model that fails, or a folder that cannot be written,
-    ends it with a ``playbook_failed`` event; the run keeps its end either way."""
+    """The skill work of a run that ended: record its use of learned skills, then, when it may be distilled, write
+    the skill of its kind or update the one that exists. A review model that fails, or a folder that cannot be
+    written, ends it with a ``playbook_failed`` event; the run keeps its end either way."""
     events: list[EventRecord] = await runtime.store.list_events(run.id, 0, _EVENTS_READ)
     await _record_uses(runtime, run, status, events)
-    if not distils(run, status):
+    steps: tuple[ActingStep, ...] = acting_steps(events)
+    if not distils(status, len(steps), runtime.config.agent.skill_min_steps):
+        if status == "done":
+            log.info(
+                "playbook_skipped", run_id=run.id, reason="fewer acting steps than skill_min_steps", steps=len(steps)
+            )
         return
-    host: str = main_site(events)
-    if not host or not slug(host):
-        log.info("playbook_skipped", run_id=run.id, reason="the run acted on no site or application")
-        return
-    if playbook_folder(playbooks_dir(), playbook_name(host)).is_dir():
-        log.info("playbook_skipped", run_id=run.id, reason="the site has a playbook", host=host)
-        return
+    host: str = main_site(events) or NO_SITE
     try:
-        file: Path = await _write_from(runtime, run, events, host)
+        file, name, updated = await _write_from(runtime, run, steps, host)
     except (DotError, OSError) as error:
         message: str = error.message if isinstance(error, DotError) else str(error)
         log.warning("playbook_failed", run_id=run.id, host=host, error=message)
         await runtime.bus.emit(
             run.id,
             PLAYBOOK_FAILED,
-            {"host": host, "error": f"The playbook could not be written: {shorten_reason(message)}"},
+            {"host": host, "error": f"The skill could not be written: {shorten_reason(message)}"},
             True,
         )
         return
-    log.info("playbook_written", run_id=run.id, host=host, path=str(file))
+    log.info("playbook_written", run_id=run.id, name=name, host=host, path=str(file), updated=updated)
     await runtime.bus.emit(
-        run.id, PLAYBOOK_WRITTEN, {"name": playbook_name(host), "host": host, "path": str(file)}, True
+        run.id, PLAYBOOK_WRITTEN, {"name": name, "host": host, "path": str(file), "updated": updated}, True
     )

@@ -402,6 +402,27 @@ class ProviderModels(FrozenModel):
     problem: ProviderProblem | None
 
 
+class LearnedSkillView(FrozenModel):
+    """A skill Dot learned from its own work (:mod:`dotagent.agent.playbooks`): its name and description, the kind of
+    work, where it acted, the runs it comes from, how it fared (``uses`` done after reading it, ``failures``) and
+    whether it is retired."""
+
+    name: str
+    description: str
+    kind: str
+    host: str
+    runs: tuple[str, ...]
+    uses: int
+    failures: int
+    retired: bool
+    written_at: float
+    updated_at: float
+
+
+class LearnedSkillsView(FrozenModel):
+    items: tuple[LearnedSkillView, ...]
+
+
 class PaletteSkill(FrozenModel):
     name: str
     description: str

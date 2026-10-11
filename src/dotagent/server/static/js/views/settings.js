@@ -7,6 +7,7 @@ import * as keys from "./keys.js";
 import * as memory from "./memory.js";
 import * as rules from "./rules.js";
 import * as schedules from "./schedules.js";
+import * as skills from "./skills.js";
 import { mountBrowser, mountGeneral, mountModels, mountSystem } from "./system.js";
 
 const DEFAULT_TAB = "general";
@@ -17,6 +18,7 @@ const TABS = [
   { id: "browser", label: "Browser", icon: "globe", mount: mountBrowser },
   { id: "rules", label: "Rules", icon: "shield", mount: rules.mount },
   { id: "memory", label: "Memory", icon: "database", mount: memory.mount },
+  { id: "skills", label: "Skills", icon: "sparkle", mount: skills.mount },
   { id: "schedules", label: "Schedules", icon: "calendar", mount: schedules.mount },
   { id: "system", label: "System", icon: "monitor", mount: mountSystem },
 ];

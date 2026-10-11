@@ -110,12 +110,12 @@ FROM runs r JOIN events e ON e.run_id = r.id
 WHERE {scope} AND e.kind = 'tool_result' AND json_extract(e.data, '$.tool') IN ('browser_act', 'desktop_act')
 GROUP BY r.id, json_extract(e.data, '$.site')
 """
-# One row per run that read a playbook with the skill tool.
+# One row per run that read a learned skill (or a playbook of before item 92) with the skill tool.
 _PLAYBOOK_READS_SQL: str = """
 SELECT DISTINCT r.id
 FROM runs r JOIN events e ON e.run_id = r.id
 WHERE {scope} AND e.kind = 'tool_call' AND json_extract(e.data, '$.tool') = 'skill'
-  AND json_extract(e.data, '$.args.name') LIKE 'playbook-%'
+  AND (json_extract(e.data, '$.args.name') LIKE 'learned-%' OR json_extract(e.data, '$.args.name') LIKE 'playbook-%')
 """
 # One row per model: the events of its runs, counted. A tool result with ``"ok": false`` is a failed call.
 _EVENTS_SQL: str = """

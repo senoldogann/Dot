@@ -11,9 +11,10 @@ from fastapi import APIRouter
 from fastapi.responses import FileResponse
 
 from dotagent import __version__
+from dotagent.agent.playbooks import PlaybookEntry, drop_playbook, list_playbooks
 from dotagent.config import AppConfig
 from dotagent.core.errors import DotError, MissingSecretError, NotFoundError, ProviderAuthError
-from dotagent.core.paths import dot_home, failsafe_path, screenshots_dir
+from dotagent.core.paths import dot_home, failsafe_path, playbooks_dir, screenshots_dir
 from dotagent.desktop.perms import missing_panes, program_of_this_process, request_permissions
 from dotagent.desktop.types import Permissions
 from dotagent.doctor import CheckResult, run_quick_checks
@@ -25,6 +26,8 @@ from dotagent.server.palette import palette_view
 from dotagent.server.views import (
     FailsafeView,
     HealthView,
+    LearnedSkillsView,
+    LearnedSkillView,
     ModelOption,
     PaletteView,
     PermissionsView,
@@ -142,6 +145,19 @@ def system_router(ctx: ServerContext) -> APIRouter:
             )
         )
 
+    @router.get("/skills/learned")
+    async def learned_skills() -> LearnedSkillsView:
+        """The skills Dot learned from its own work, active first, then the retired ones."""
+        entries: tuple[PlaybookEntry, ...] = await asyncio.to_thread(list_playbooks, playbooks_dir())
+        return LearnedSkillsView(items=tuple(learned_skill_view(entry) for entry in entries))
+
+    @router.delete("/skills/learned/{name}")
+    async def drop_learned_skill(name: str) -> LearnedSkillsView:
+        """Remove a learned skill, active or retired; the list after it."""
+        await asyncio.to_thread(drop_playbook, playbooks_dir(), name)
+        entries: tuple[PlaybookEntry, ...] = await asyncio.to_thread(list_playbooks, playbooks_dir())
+        return LearnedSkillsView(items=tuple(learned_skill_view(entry) for entry in entries))
+
     @router.get("/palette")
     async def palette() -> PaletteView:
         """The skills and the MCP tools for the composer's slash menu, read from the folders as a run reads them."""
@@ -194,3 +210,18 @@ def system_router(ctx: ServerContext) -> APIRouter:
         return FileResponse(path)
 
     return router
+
+
+def learned_skill_view(entry: PlaybookEntry) -> LearnedSkillView:
+    return LearnedSkillView(
+        name=entry.meta.name,
+        description=entry.skill.description,
+        kind=entry.meta.kind,
+        host=entry.meta.host,
+        runs=entry.meta.runs,
+        uses=entry.meta.uses,
+        failures=entry.meta.failures,
+        retired=entry.retired,
+        written_at=entry.meta.written_at,
+        updated_at=entry.meta.updated_at,
+    )

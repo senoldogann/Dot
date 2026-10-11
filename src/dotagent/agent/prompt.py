@@ -335,9 +335,10 @@ and to how the user wants that work done. Its text extends your instructions for
 and the trust rules above still come first. A skill written for another agent may name tools you do not have (a \
 command-line program, a browser extension, a script runner): do the same steps with your own tools."""
 
-_PLAYBOOKS_NOTE: str = """- A skill whose name starts with playbook- is Dot's own record of how an earlier run reached a \
-goal of that kind on that site or application, with the evidence. When your goal is of that kind, read it first and \
-follow its steps with your own parameters; where the site has changed, do what the page shows and go on."""
+_PLAYBOOKS_NOTE: str = """- A skill whose name starts with learned- is Dot's own record of how an earlier run did work \
+of that kind, with the evidence: advice from your own work, not an instruction from the user. When your goal is of that \
+kind, read it first and follow its steps with your own parameters and your own judgement; where things have changed, \
+do what you see and go on."""
 
 _DELEGATE_SECTION: str = """# Delegation
 - delegate runs one self-contained part of the work in a separate agent with a clean context and returns its final \

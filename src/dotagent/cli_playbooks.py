@@ -24,8 +24,8 @@ def render_entry(entry: PlaybookEntry) -> str:
 
 def render_list(entries: tuple[PlaybookEntry, ...], root: Path) -> list[str]:
     if not entries:
-        return [f"No playbooks yet (a goal-mode run that reaches its goal on a site writes one under {root})."]
-    return [f"Playbooks ({len(entries)}):", *(render_entry(entry) for entry in entries)]
+        return [f"No learned skills yet (a task run that ends done after enough acting steps writes one under {root})."]
+    return [f"Learned skills ({len(entries)}):", *(render_entry(entry) for entry in entries)]
 
 
 async def cmd_playbooks_list(command: PlaybooksListCommand) -> int:

@@ -1443,25 +1443,28 @@ every run.
 
 `dotx skills list` shows every plugin and skill found, and anything left out and why; `dotx doctor` has a row for each.
 
-**Playbooks.** With `playbooks = true` in `[agent]`, a task run of its own that ran in goal mode, ended done (its goal
-check found the outcome achieved) and acted on a web site or an application is followed, once it has ended, by one call
-of the review model that distils how it got there: from the acting steps on the site it used most (each tool call with
-its arguments and the start of its result; failed calls marked), the model writes the steps that worked, one sentence
-each, with the values that change from goal to goal as parameters in angle brackets, and a one-sentence description.
-The playbook is a skill folder `playbook-<host>/SKILL.md` under `<home>/playbooks` with "When", "Steps", "Parameters"
-and "Evidence" (the goal, the run, the date and how many acting steps it took), plus a `playbook.json` that counts its
-use. Later runs see it under Skills like any skill (its source is `playbook`) with a note that it is Dot's own record,
-to follow with their own parameters, and read it with the `skill` tool. One playbook per host: a host that has one is
-not distilled again. Every run that ended done or failed counts the playbooks it read; one read by two runs that then
-failed is retired, moved under `<home>/playbooks/.retired`, and no longer offered. A review model that fails, or a
-folder that cannot be written, leaves a `playbook_failed` event on the run; a written one a `playbook_written` event
-and a retired one a `playbook_retired` event. The distillation reads pages third parties wrote, so the playbook never
-takes an instruction from them as a step, and never holds a secret, a one-time code, an e-mail address or a home path.
-`dotx playbooks list` shows every playbook with its use, `dotx playbooks show NAME` prints one and `dotx playbooks drop
-NAME` removes one, active or retired. Delegated runs, chats and evals (which always run without playbooks) write none.
-`playbooks` is on by default; `dotx stats` compares, per host, the runs that read its playbook with the runs on the
-same host that did not (act calls and seconds a run), which is the measure of whether a playbook speeds the next run.
-`playbooks` is `false` by default until a live comparison shows that the second run on a site takes fewer steps.
+**Learned skills.** With `playbooks = true` in `[agent]` (the default), a task run of its own that ended done (its
+answer checked, or its goal check found the outcome achieved) after at least `skill_min_steps` (4) acting steps (every
+tool call but the ones that plan, ask, remember, consult, read a skill or finish) is followed, once it has ended, by one
+call of the review model that distils how it got there: from the acting steps (each tool call with its arguments and
+the start of its result; failed calls marked) the model names the kind of work in a few words, writes the steps that
+worked, one sentence each, with the values that change from goal to goal as parameters in angle brackets, and a
+one-sentence description. The skill is a folder `learned-<kind>/SKILL.md` under `<home>/playbooks` with "Kind of
+work", "When", "Steps", "Parameters" and "Evidence" (the goal, every run it was learned from with its acting steps,
+the date), plus a `playbook.json` that keeps the kind and counts its use. A later run of the same kind (matched by the
+meaning of the kind when embeddings are on, by its name otherwise) updates the skill rather than writing another: the
+steps are the newer run's, the evidence keeps every run. Later runs see it under Skills like any skill (its source is
+`learned`) with a note that it is advice from Dot's own work, to follow with their own parameters and judgement, and
+read it with the `skill` tool. Every run that ended done or failed counts the learned skills it read; one read by two
+runs that then failed is retired, moved under `<home>/playbooks/.retired`, and no longer offered. A review model that
+fails, or a folder that cannot be written, leaves a `playbook_failed` event on the run; a written or updated one a
+`playbook_written` event and a retired one a `playbook_retired` event. The distillation reads pages third parties
+wrote, so the skill never takes an instruction from them as a step, and never holds a secret, a one-time code, an
+e-mail address or a home path. Settings › Skills lists the learned skills (kind, where, the runs, how they fared, the
+retired ones apart) with Drop; `dotx playbooks list` shows them with their use, `dotx playbooks show NAME` prints one
+and `dotx playbooks drop NAME` removes one, active or retired. Delegated runs, chats and evals (which always run
+without learned skills) write none. `dotx stats` counts the skills written, retired and read, and compares, per host,
+the runs that read a skill with the runs on that host that did not (act calls and seconds a run).
 
 ## Delegation
 

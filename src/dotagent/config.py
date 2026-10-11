@@ -156,6 +156,8 @@ class AgentConfig(FrozenModel):
     reflection_time: str
     lesson_rest_days: int = Field(ge=1)
     playbooks: bool
+    # The acting steps a done task run must have taken before it is distilled into a learned skill.
+    skill_min_steps: int = Field(ge=1)
     undo_max_file_bytes: int
     undo_max_run_bytes: int
     undo_keep_days: int
