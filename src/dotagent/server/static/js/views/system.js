@@ -1,7 +1,14 @@
 // The system page: how the daemon is doing, the emergency stop, the health checks and the models each provider offers.
 
 import { api, clearToken } from "../api.js";
-import { notificationsAvailable, notificationsBlocked, notificationsOn, setNotifications } from "../attention.js";
+import {
+  notificationsAvailable,
+  notificationsBlocked,
+  notificationsOn,
+  setNotifications,
+  setTellEvenWhenLooking,
+  tellEvenWhenLooking,
+} from "../attention.js";
 import { compact, copyText, dateTimeFull, duration, el, plural } from "../dom.js";
 import { offersChoice } from "../efforts.js";
 import { engageFailsafe, releaseFailsafe } from "../failsafe.js";
@@ -201,23 +208,34 @@ function buildNotifications() {
     onToggled: paint,
   });
 
+  // Item 75: a run on the page you are looking at stays quiet unless you ask otherwise.
+  const always = switchSetting({
+    label: "Tell me even when I am looking",
+    hint: "Otherwise a run that ends or asks on the page you are looking at stays quiet (the tab visible, the window active, the run's page open); the tab title counts either way.",
+    read: tellEvenWhenLooking,
+    write: async (on) => setTellEvenWhenLooking(on),
+    onToggled: paint,
+  });
+
   function paint() {
     setting.paint();
+    always.paint();
     const available = notificationsAvailable();
     const blocked = notificationsBlocked();
     setting.toggle.disabled = !available || blocked;
+    always.toggle.disabled = !notificationsOn();
     if (!available) {
       setting.note.textContent = "This browser cannot show desktop notifications.";
     } else if (blocked) {
       setting.note.textContent = "The browser blocks notifications for this address. Allow them in its site settings, then reload this page.";
     } else {
       setting.note.textContent =
-        "Tell me when Dot needs an answer or a run ends while this page is in the background. The tab title always counts the approvals that wait.";
+        "Tell me when Dot needs an answer or a run ends and I am not looking at that run: the tab hidden, the window inactive or another page open. The tab title always counts the approvals that wait.";
     }
   }
 
   paint();
-  return section("Notifications", null, el("div", { class: "card-pad stack" }, setting.element));
+  return section("Notifications", null, el("div", { class: "card-pad stack" }, setting.element, always.element));
 }
 
 function buildDaemon() {

@@ -4629,8 +4629,8 @@ says so), $10 per 1,000 searches plus tokens (the docs; a failed search is not b
 | 71  | Memory that rests: use decides what is recalled                          | done        | 6896e53 |
 | 72  | The home that says "I am here"                                           | done        | 9020ee0 |
 | 73  | Motion with meaning                                                      | done        | 1efede9 |
-| 74  | Quiet chrome: the surfaces recede, the work leads                        | in progress |         |
-| 75  | Told only when not looking                                               | planned     |         |
+| 74  | Quiet chrome: the surfaces recede, the work leads                        | done        | f809abd |
+| 75  | Told only when not looking                                               | in progress |         |
 | 76  | The live numbers of part 8                                               | planned     |         |
 
 ### 69. The Anthropic rung: Haiku 5.5 searches through the API's own web search
@@ -4857,7 +4857,7 @@ appear once, keep theirs.
 
 ### 74. Quiet chrome: the surfaces recede, the work leads
 
-**Status: in progress.** Built on `item-74-quiet-chrome` (MYP-214).
+**Status: done.** Merged as `f809abd` (PR #82, squash; MYP-214 Done).
 
 **What.** The parts that orient recede so the conversation leads (Linear's rule): the sidebar without dividers
 between its groups, its labels lighter and its active row a surface step, the stage bar's pills quieter until they
@@ -4891,7 +4891,7 @@ and the sidebar, the Activity page and a run's page at 1280 and 390 in both sche
 
 ### 75. Told only when not looking
 
-**Status: planned.**
+**Status: in progress.** Built on `item-75-not-looking` (MYP-215).
 
 **What.** A desktop notification or a push for a run that ended or asks fires only when the owner is not looking at
 that run: the tab hidden, or another page open (Claude Code desktop's rule); the tab title keeps counting; a setting
@@ -4905,6 +4905,17 @@ not). Smoke test with a stubbed Notification: a run that ends on the open page n
 does.
 
 **Touchpoints.** `static/js/attention.js`, `views/system.js`, `tests/smoke/test_attention.py`, README (the web UI).
+
+**Design, as built (2026-10-11).** As planned. `attention.js` had "away from the page" (the tab hidden or the window
+inactive, any page); it is now `isLooking(runId, { hash, visibility, focused })`, pure: the run's own page open
+(`#/runs/<id>`), the tab visible and the window active, and `worthATell(runId)` tells unless that holds, so a run
+that ends or asks while another page is open (the home, Activity, the settings) is told about, which it was not
+before. The setting is the preference `dot.notify.always` ("Tell me even when I am looking", a second switch under
+Settings › General › Notifications, enabled only while notifications are on). The push subscription is untouched: a
+browser the daemon pushes to stays quiet on the page as before. Smoke test (`tests/smoke/test_attention.py`): the
+page's `Notification` is a stub that records what it was shown and `document.hasFocus` says yes; a run that ends on
+its own open page notifies nothing, one that ends while the home is open notifies, one that ends while the tab is
+hidden notifies, and with the setting on a run that ends on its open page notifies too.
 
 ### 76. The live numbers of part 8
 
@@ -5410,3 +5421,4 @@ here.
 - 2026-10-11 (Fable 5.1): item 72 merged 9020ee0 (PR #80, MYP-212 Done).
 - 2026-10-11 (Fable 5.1): item 73 built on branch `item-73-motion` (MYP-213, PR #81). Item 74 built on branch `item-74-quiet-chrome` (MYP-214): the 4 px grid for every gap, padding and margin (`--space-half`), the sidebar without dividers, quiet pills, lighter card heads, step durations on hover; the spacing unit test.
 - 2026-10-11 (Fable 5.1): item 73 merged 1efede9 (PR #81, MYP-213 Done). The controls page's cost sample lacked the searches of item 69 (the page threw and drew nothing; the controls smoke test had not run since): fixed in item 74.
+- 2026-10-11 (Fable 5.1): item 74 built on branch `item-74-quiet-chrome` (MYP-214, PR #82). Item 75 built on branch `item-75-not-looking` (MYP-215): `attention.js` `isLooking`/`worthATell(runId)`, the "Tell me even when I am looking" switch, the attention smoke test with a stubbed Notification.

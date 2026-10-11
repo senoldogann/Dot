@@ -918,9 +918,11 @@ lighter than its body, and a folded step of the timeline is one line whose durat
 
 While you are elsewhere, the tab title counts the approvals that wait: `(2) New chat · Dot`. Settings › General ›
 Notifications adds
-desktop notifications (off until you switch them on; the browser asks for its permission on that click): while the page
-is in the background or its window is not the active one, Dot says when it asks for an approval, a question or your help,
-and when a run ends (done, failed or stopped; the sub-runs of a run stay quiet). Clicking one opens the run. The tab's
+desktop notifications (off until you switch them on; the browser asks for its permission on that click): Dot says
+when it asks for an approval, a question or your help, and when a run ends (done, failed or stopped; the sub-runs of a
+run stay quiet), unless you are looking at that run: its page open, the tab visible and the window active. On another
+page, in a background tab or in an inactive window you are told; "Tell me even when I am looking" under the same
+setting turns the rule off. Clicking a notification opens the run. The tab's
 icon is the same face in the state of the whole of Dot (amber ring while something waits for you, working while a run
 is active, still otherwise), and a notification carries the face in the state it tells of.
 
