@@ -2389,6 +2389,13 @@ details[open] > summary .chev {
   background: linear-gradient(to top, var(--bg) 72%, transparent);
 }
 
+/* A dock with nothing to type in (a delegated run): room for the arrow, nothing else. */
+.dock.dock-bare {
+  margin-top: 0;
+  padding: 0 0 44px;
+  background: transparent;
+}
+
 .dock-inner {
   display: flex;
   align-items: flex-end;
@@ -2432,12 +2439,24 @@ details[open] > summary .chev {
   overflow: hidden;
 }
 
+/* The way down: a round arrow centred just above the dock's frame (item 96); the dock positions it. */
 .jump {
-  position: fixed;
-  right: 24px;
-  bottom: 96px;
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% - 8px);
   z-index: 15;
-  box-shadow: var(--shadow);
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  box-shadow: var(--shadow-raised);
+  transform: translateX(-50%);
+}
+
+.jump:hover {
+  background: var(--surface);
+  color: var(--text);
 }
 
 /* ---------- overlays ---------- */
@@ -2776,9 +2795,6 @@ dialog.lightbox img {
     white-space: normal;
   }
 
-  .jump {
-    right: 12px;
-  }
 }
 
 /* Side questions (/btw): set apart from the run's own conversation, which never sees them. */

@@ -863,8 +863,10 @@ its parent still works ("Runs on its own" once not) and "Open parent". The tool 
 stretch of work fold into a single
 "Worked for 12 s (model 8 s) · 5 tool calls" line, where the part in brackets is how much of that time the model's turns
 took (open it for every call, result and screenshot), while approvals, questions and policy notes stay in the open. The
-answer of the run is the last message, with a Copy button and when it finished and how long the run took. Under the
-head a folded **Cost** card carries the bill of the run in one line (its minutes, steps and tokens); open, it says where
+answer of the run is the last message, with a Copy button and when it finished and how long the run took. While the
+end of the conversation, or its answer, is below the window, a round arrow just above the composer leads there. In the
+side panel (Run details), after Details, a folded **Cost** card carries the bill of the run in one line (its minutes,
+steps and tokens); open, it says where
 the minutes went (the model, the summaries, the tools, the time spent waiting for you), the input tokens with the share
 the provider served from its cache, the output tokens, the compactions (with their rate per 100 steps) and the runs it
 delegated. It is `GET /api/runs/{id}/stats` (the same numbers as `dotx stats --run ID`), read again every ten seconds

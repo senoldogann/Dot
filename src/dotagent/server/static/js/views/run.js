@@ -557,7 +557,11 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
   function syncControls() {
     cancelButton.hidden = !active;
     resumeButton.hidden = active || !resumable;
-    dock.hidden = run.parent_run_id !== null;
+    // A delegated run is not steered: its dock keeps only the arrow down (item 96).
+    const delegated = run.parent_run_id !== null;
+    dockInner.hidden = delegated;
+    attachments.list.hidden = delegated || attachments.list.hidden;
+    dock.classList.toggle("dock-bare", delegated);
     input.placeholder = active
       ? "Steer this run (Dot reads it before its next step), or ask on the side with /btw…"
       : "Follow up in the same conversation, or ask about this run with /btw…";
@@ -577,13 +581,15 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
   }
 
   // ------------------------------------------------------------------------------------------------ scroll
-  const jumpLabel = el("span", null, "Jump to latest");
+  // The way down (item 96): a round arrow just above the composer while the end, or the answer, is below the window.
   const jump = el(
     "button",
     {
-      class: "btn primary sm jump",
+      class: "btn icon-only jump",
       type: "button",
       hidden: true,
+      title: "Jump to latest",
+      "aria-label": "Jump to latest",
       onclick: () => {
         jump.hidden = true;
         if (answerNode !== null) {
@@ -595,8 +601,8 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
       },
     },
     icon("arrowDown"),
-    jumpLabel,
   );
+  dock.prepend(jump);
 
   function nearBottom() {
     return window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - NEAR_BOTTOM_PX;
@@ -606,7 +612,9 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
   function paintJump() {
     const unseen = answerNode !== null ? answerNode.getBoundingClientRect().top > window.innerHeight : active && !following;
     jump.hidden = !unseen;
-    jumpLabel.textContent = answerNode !== null ? "Jump to the answer" : "Jump to latest";
+    const words = answerNode !== null ? "Jump to the answer" : "Jump to latest";
+    jump.title = words;
+    jump.setAttribute("aria-label", words);
   }
 
   function onScroll() {
@@ -803,7 +811,11 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
   }
 
   const computer = createComputer({ runId, active: detail.active, held: detail.held });
-  const inspector = createInspector({ layout, content: [computer.element, details.element, plan.element, actionsCard.element] });
+  // The side panel (item 84): the computer, the details, the cost (item 96), the plan and the actions.
+  const inspector = createInspector({
+    layout,
+    content: [computer.element, details.element, cost.element, plan.element, actionsCard.element],
+  });
   const timeline = createTimeline({
     rootRunId: runId,
     startedAt: run.created_at,
@@ -845,7 +857,6 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
       el("h1", { class: "visually-hidden" }, run.goal),
       connectionNote,
       problem,
-      cost.element,
       earlierTurns(history.earlier),
       // A resumed run's goal is the one of the run above it; its timeline opens with how it resumed that run.
       run.source === RESUME_SOURCE ? null : userMessage(run.goal, dateTimeFull(run.created_at)),
@@ -860,7 +871,7 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
     inspector.element,
     inspector.scrim,
   );
-  root.replaceChildren(layout, jump);
+  root.replaceChildren(layout);
   inspector.arrange();
   paintStats();
   paintCost();
