@@ -178,6 +178,56 @@ async def test_reduced_motion_leaves_every_character_still(browser: Browser, cli
     await page.close()
 
 
+_PAPER: str = "window.__character.element.querySelector('.character-paper').getAttribute('d')"
+_EYES: str = "[...window.__character.element.querySelectorAll('mask path')].map((p) => p.getAttribute('d')).join('|')"
+
+
+async def test_a_still_character_follows_a_shape_and_an_expression_set(
+    browser: Browser, client: httpx.AsyncClient
+) -> None:
+    # Item 107: under reduced motion the still frame is sampled at the pose's time; a morph begun at the live clock
+    # had left the old shape and expression drawn.
+    page: Page = await _open(browser, client, True, "light")
+    assert await page.evaluate(_MOUNT) == "idle"
+    assert await page.evaluate("window.__character.element.dataset.still") == "true"
+    body_before: str = await page.evaluate(_PAPER)
+    eyes_before: str = await page.evaluate(_EYES)
+    await page.evaluate("window.__character.setShape('hexagon')")
+    assert await page.evaluate("window.__character.element.dataset.shape") == "hexagon"
+    assert await page.evaluate(_PAPER) != body_before, "the still body keeps the old shape"
+    await page.evaluate("window.__character.setExpression('happy')")
+    assert await page.evaluate(_EYES) != eyes_before, "the still eyes keep the old expression"
+    await page.close()
+
+
+async def test_dots_look_card_previews_the_pick_under_reduced_motion(
+    browser: Browser, client: httpx.AsyncClient
+) -> None:
+    page: Page = await browser.new_page(viewport={"width": 1280, "height": 900}, color_scheme="light")
+    await page.emulate_media(reduced_motion="reduce")
+    host: str = client.base_url.host
+    port: int | None = client.base_url.port
+    assert port is not None
+    await page.goto(ui_url(host, port, TOKEN))
+    await page.goto(f"http://{host}:{port}/#/settings/general")
+    # The note under "Faces that move" says the system reduces motion (item 107).
+    await expect(page.locator("[data-reduced-motion]")).to_be_visible()
+    card = page.locator('section[aria-label="Dot\'s look"]')
+    paper = card.locator(".look-preview .character-paper")
+    await expect(paper).to_have_count(1)
+    before: str = await paper.get_attribute("d") or ""
+    await card.locator(".look-picker input[value='hexagon']").check(force=True)
+    await expect(card.locator(".look-preview .character")).to_have_attribute("data-shape", "hexagon")
+    assert (await paper.get_attribute("d") or "") != before, "the preview keeps the old shape under reduced motion"
+    eyes = card.locator(".look-preview mask path")
+    eyes_before: list[str] = [await eye.get_attribute("d") or "" for eye in await eyes.all()]
+    await card.locator(".look-picker input[value='happy']").check(force=True)
+    await expect(card.locator(".look-preview .character")).to_have_attribute("data-expression", "happy")
+    eyes_after: list[str] = [await eye.get_attribute("d") or "" for eye in await eyes.all()]
+    assert eyes_after != eyes_before, "the preview keeps the old expression under reduced motion"
+    await page.close()
+
+
 async def test_a_hidden_tab_stops_the_loop_and_a_shown_one_resumes_it(
     browser: Browser, client: httpx.AsyncClient
 ) -> None:

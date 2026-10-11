@@ -27,6 +27,8 @@ import { forgetModels, getSnapshot, loadModels, onChange, refresh } from "../sta
 import { SCHEMES, THEMES, chooseScheme, chooseTheme, currentScheme, currentTheme, onThemeChange, themeInUse } from "../theme.js";
 import { attempt, confirmDialog, toast } from "../ui.js";
 
+const REDUCED_MOTION = window.matchMedia("(prefers-reduced-motion: reduce)");
+
 const NOT_SET = "—";
 // The roles a model is configured for, and the tab where a missing or refused key is put right.
 const MODEL_ROLES = ["main", "vision", "review"];
@@ -139,6 +141,19 @@ function buildAppearance() {
     write: setFacesMove,
     onToggled: () => faces.paint(),
   });
+  // While the system asks for less motion every face holds still whatever the switch says (item 107); the note says
+  // so, and where the system's own switch is.
+  const motionNote = el(
+    "div",
+    { class: "hint", "data-reduced-motion": "" },
+    "Your system reduces motion, so every face holds still whatever this says. On a Mac: System Settings › Accessibility › Display › Reduce motion.",
+  );
+  faces.element.append(motionNote);
+  const paintMotion = () => {
+    motionNote.hidden = !REDUCED_MOTION.matches;
+  };
+  REDUCED_MOTION.addEventListener("change", paintMotion);
+  paintMotion();
   const reset = el(
     "button",
     {
@@ -208,7 +223,13 @@ function buildAppearance() {
       faces.element,
     ),
   );
-  return { element, dispose: stopListening };
+  return {
+    element,
+    dispose: () => {
+      stopListening();
+      REDUCED_MOTION.removeEventListener("change", paintMotion);
+    },
+  };
 }
 
 /** Desktop notifications: the one setting that also depends on what the browser allows. */

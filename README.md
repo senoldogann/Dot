@@ -817,8 +817,8 @@ The web UI is laid out like a chat app: the chats in a sidebar on the left, one 
 page of their own.
 
 The sidebar lists your chats (the conversation threads) grouped by day, newest activity first; a live dot marks those
-with a run going on, waiting for you or failed, and a chat opens at its latest run. Above the list: **New chat** (⇧⌘O),
-a search over the titles (⌘K or `/`) and the ways to **Agents**, **Activity** and **Campaigns**; in the foot,
+with a run going on, waiting for you or failed, and a chat opens at its latest run. Above the list: a search over the titles
+(⌘K or `/`), **New chat** (⇧⌘O) and the ways to **Agents**, **Activity** and **Campaigns**; in the foot,
 **Settings**. The sections (Waiting for you, Working, Chats) fold on a click of their label, and the folds are kept
 between visits. **Select** turns the list into checkboxes: tick chats
 (or Select all) and **Delete** asks once, then removes them with every run, step, event and approval of theirs. A chat
@@ -966,7 +966,8 @@ expressions, twelve colours (the theme's `--character-*` tokens) and fourteen an
 behaviour of x.ai's bot avatar as an exercise and is affiliated with nobody, and neither is Dot: the licence covers
 the code, not the design it imitates (`static/js/character/LICENSE`). One loop drives every moving character on the
 page and stops while the tab is hidden; under reduced motion, or with "Faces that move" off in Settings › General, each
-shows one still frame. Three characters move: the home's face, the run page's panel character (its moods from the run's
+shows one still frame (while the system reduces motion the switch says so, and where that is turned off). A still
+character follows a change of its shape or expression at once. Three characters move: the home's face, the run page's panel character (its moods from the run's
 status, `static/js/mood.js`) and the look editor's preview; every other face is a still frame. One moving face costs
 about a millisecond of main-thread time a frame (`tests/smoke/test_character_cost.py` reads it from Chrome's
 performance metrics and caps it). `#/controls` shows every

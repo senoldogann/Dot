@@ -5027,7 +5027,7 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 104 | The composer remade: one frame, quiet menus, drafts that keep, a face that listens  | done        | 9261fa9 |
 | 105 | The small polish part 12's review left: a scroll cue, empty sections that point, the Browser grid, the tour's content, Watch on an ended run | done        | c14b670 |
 | 106 | The review: every feature of parts 1 to 13 read once more, the characters' cost measured | done        | 8e3818d |
-| 107 | The fixes of the second look: the still face follows, the favicon freed, TLS reads retried, the sidebar's head and order | planned     |         |
+| 107 | The fixes of the second look: the still face follows, the favicon freed, TLS reads retried, the sidebar's head and order | in progress |         |
 | 108 | The composer with marks: a mark per provider, an icon on every pill, the reasoning as its own pill | planned     |         |
 | 109 | Dot's computer as a stage: a frame with a size, the control under it, the character at the head of the chat | planned     |         |
 | 110 | Rules in plain words: the model writes the rule, an approval card offers one        | planned     |         |
@@ -6197,7 +6197,22 @@ more at the end.
 
 ### 107. The fixes of the second look: the still face follows, the favicon freed, TLS reads retried, the sidebar's head and order
 
-**Status: planned.**
+**Status: in progress.**
+
+**Design, as built (2026-10-12).** The still face: `character.js` tells the engine a time already past
+(`-SHAPE_MORPH`) when a shape or an expression is set while the character is not subscribed to the ticker, so the
+still frame, sampled at the pose's own time, shows the pick; moving, the live clock as before. `test_character.py`
+mounts a character under reduced motion and reads the body's path and the eyes' paths before and after a pick, and
+opens Dot's look card in Settings under reduced motion to check the preview the same way. Settings › General ›
+Faces that move gains a line, shown while `prefers-reduced-motion` matches (`[data-reduced-motion]`): the system
+reduces motion so every face holds still whatever the switch says, and where the Mac's own switch is. The favicon:
+`img-src` of the Content-Security-Policy gains `data:`; `test_face.py` draws the tab's icon as an image and reads
+its width. TLS: `ssl.SSLError` joins `_TRANSPORT_ERRORS` with the reason; `tests/unit/test_transport_retry.py`
+streams through an `httpx.MockTransport` that raises the owner's exact error, counts three attempts under a policy
+of three, two resets of the sink, and reads the wrapped error as retryable. The sidebar: the search is the first row
+of the body, New chat under it (the search's margin 0 above, 4 px below). The desktop head: 38 px high with no
+padding above and 8 px below, so the brand's centre sits 15 px under the top edge, where macOS centres the traffic
+lights of an overlay title bar; the tour reads the brand's box in the desktop shot and asserts it within 2 px.
 
 **What.** A still character follows its look: `character.js` applies a shape or an expression set while the
 character is not subscribed as already morphed (the engine told a time earlier than the pose's by the morph's
