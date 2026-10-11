@@ -5032,7 +5032,7 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 109 | Dot's computer as a stage: a frame with a size, the control under it, the character at the head of the chat | done        | b5d42c0 |
 | 110 | Rules in plain words: the model writes the rule, an approval card offers one        | done        | 6da73c4 |
 | 111 | The review: part 14 read once more                                                  | done        | 5d96935 |
-| 112 | Both eyes move: one key per eye in the character's drawing                          | in progress |         |
+| 112 | Both eyes move: one key per eye in the character's drawing                          | done        | 392132c |
 
 ### 77. The type system: Inter and Geist Mono, seven sizes, three weights
 
@@ -6161,6 +6161,19 @@ always soft and premium; New chat under the search, the search at the top; the R
 way to make a rule with the agent's help; the fourth screenshot's design too; and the alignment unevenness of the
 first screenshot fixed.
 
+**Status (2026-10-12): built.** Items 107 to 112 merged in a day (`6c79636`, `108c91d`, `b5d42c0`, `6da73c4`, `5d96935`,
+`392132c`), each behind the gate, its smoke tests and its screenshot tour read. The SSL error the owner saw was the
+network path's, not Dot's: a TLS read that failed with a bad record mac, retried now as the model call's other transport
+errors are. A still face follows the look picked and the page says when the system stills every face; the tab wears
+Dot's face; the sidebar's search comes first and its head sits on the traffic lights' line. The composer carries a mark
+per provider and an icon on every pill, the reasoning a pill of its own; Dot's computer is a stage in three sizes with a
+drag handle, the control under it and the character with its state at the head of the chat; a rule is said in plain
+words, drafted by the review model, written and read back by Dot, and an approval card offers to make one. The review
+read the part once more and fixed what it found; item 112, from the owner's word during the review, made both eyes of
+every face move again. What waits: the daemon restarted on `392132c` once no run is active, which brings item 107's TLS
+retries and item 110's drafting to the owner's daemon; the desktop shell's top line and the links opened on the Mac,
+written under item 111 for the next part.
+
 **Status (2026-10-11): planned.** What is built today, and what the readings found: the SSL error is a TLS read
 from OpenCode Go (`llm/opencode_go.py` through `core/retry.py`) that failed with `bad record mac`, five times over
 two days (twice on 2026-10-10, before part 13), a corruption on the network path rather than Dot's code; it crashed
@@ -6396,7 +6409,7 @@ built.
 
 ### 112. Both eyes move: one key per eye in the character's drawing
 
-**Status: in progress.**
+**Status: done.** Merged as `392132c` (PR #132, MYP-252 Done).
 
 The owner's word on 2026-10-12, during item 111, with a screenshot of Dot's look in Settings (the circle, attentive, the
 preview's eyes one above the other like an exclamation mark): one of Dot's eyes always moves and the other does not,
@@ -6952,3 +6965,4 @@ whenever the page opened faster than that; it now waits for the first.
 - 2026-10-12 (Opus 5.5): item 109 merged as `b5d42c0` (PR #129, MYP-249 Done): the computer's panel in three sizes and a drag handle kept per browser (`stagesize.js`), the control pill under the view naming the actor, the character with its name and the word of its state at the head of the chat while the panel is wide or full.
 - 2026-10-12 (Opus 5.5): item 110 merged as `6da73c4` (PR #130, MYP-250 Done): a rule said in words, drafted by the review model into its parts (`draft_rule`), the pattern written by Dot so that a rule that lets Dot act fits a command alone and one that stops it fits a word anywhere, read back in a sentence that is the rule's description; the Rules tab's "Say the rule in your words" card, and "Make a rule of this" on an approval card.
 - 2026-10-12 (Opus 5.5): item 111 merged as `5d96935` (PR #131, MYP-251 Done): the tour read by eye by two readers and checked wherever they doubted, the offline smoke suite in full (324 passed, two failures that pass alone), the owner's daemon through the API and its two SSL crashes identified; the panel's fold facts wrap under the title at its compact width, an ended run's computer card says why it is empty, the run composer's placeholder follows the run's state.
+- 2026-10-12 (Opus 5.5): item 112 merged as `392132c` (PR #132, MYP-252 Done): both eyes of every face move again (`sync` hands the key its index, a repeated key is an error), a test that reads each eye on its own, the gallery test waiting for the orbit's first ring. Part 14 built: items 107 to 112. The daemon waits for a restart on `392132c`.
