@@ -18,8 +18,8 @@ export function nestRows(rows) {
   return top;
 }
 
-/** What a row says about its progress: its steps, then its channel and detail, joined with dots. */
-export function progressWords(row) {
+/** The facts of a row's progress: its steps, then its channel and its detail. */
+export function progressFacts(row) {
   const parts = [];
   if (row.steps !== null && row.steps > 0) {
     parts.push(row.steps === 1 ? "1 step" : `${row.steps} steps`);
@@ -30,5 +30,5 @@ export function progressWords(row) {
   if (row.detail !== "") {
     parts.push(row.detail);
   }
-  return parts.join(" · ");
+  return parts;
 }

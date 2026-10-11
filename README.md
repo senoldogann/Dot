@@ -844,8 +844,12 @@ A run opens as a conversation under Dot's face and name, with the state of the r
 state: still when the run rests, a slow breath while it works, an amber ring while it waits for you, a green tick for
 a moment when the run ends done, red when it failed (with reduced motion the tick simply shows). Its chips (the
 model, the approval mode, goal mode) and buttons sit on the right. Your goal is the first message, in the bubble
-of your messages on the raised surface. A delegated run is a chip with its goal and a status ring (turning while it works, amber while it
-waits for you, green with a check when it is done, red when it failed); open it for its steps. The tool calls of one
+of your messages on the raised surface. A delegated run is a row: the face with its state at the corner (turning while it works, amber while it
+waits for you, green with a check when it is done, red when it failed), its goal over the last thing it did, the
+time it has taken, the way to its own page and a chevron that opens its steps; rows that follow each other share one
+card. Its own page names the parent in the top bar as a breadcrumb (the parent's goal, a link, then its own) and
+closes the conversation with a pill: the model, how long it took ("Completed in 1m 46s", "Working for 2m"), whether
+its parent still works ("Runs on its own" once not) and "Open parent". The tool calls of one
 stretch of work fold into a single
 "Worked for 12 s (model 8 s) · 5 tool calls" line, where the part in brackets is how much of that time the model's turns
 took (open it for every call, result and screenshot), while approvals, questions and policy notes stay in the open. The

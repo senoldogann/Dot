@@ -4,7 +4,7 @@
 import { ApiError, api, request } from "./api.js";
 import { clip, debounce, el, foldSearch, plural } from "./dom.js";
 import { brandMark, icon } from "./icons.js";
-import { nestRows, progressWords } from "./nesting.js";
+import { nestRows, progressFacts } from "./nesting.js";
 import { requestCompose } from "./shortcuts.js";
 import { onLifecycle } from "./state.js";
 import { attempt, confirmDialog, toast } from "./ui.js";
@@ -79,9 +79,10 @@ function chatLink(chat, onNavigate) {
 /** One row of the activity sections: the state dot, the title and what it needs or where it works. A run that
  * delegated runs says how many; a delegated run (`child`) sits under its parent with its steps. */
 function activityRow(row, onNavigate, children, child) {
-  const detail = child ? progressWords(row) : [row.channel, row.detail].filter((part) => part !== "").join(" · ");
-  const delegated = children === 0 ? "" : children === 1 ? "1 delegated run" : `${children} delegated runs`;
-  const words = [detail, delegated].filter((part) => part !== "").join(" · ");
+  const detail = child ? progressFacts(row) : [row.channel, row.detail].filter((part) => part !== "");
+  const delegated = children === 0 ? [] : [children === 1 ? "1 delegated run" : `${children} delegated runs`];
+  const facts = [...detail, ...delegated];
+  const words = facts.join(", ");
   return el(
     "a",
     {
@@ -92,7 +93,12 @@ function activityRow(row, onNavigate, children, child) {
       onclick: onNavigate,
     },
     el("span", { class: `status-dot s-${row.section === "waiting" ? "blocked" : "running"}` }),
-    el("span", { class: "side-run-goal" }, clip(row.title, 120), words === "" ? null : el("small", { class: "side-activity-detail" }, words)),
+    el(
+      "span",
+      { class: "side-run-goal" },
+      clip(row.title, 120),
+      facts.length === 0 ? null : el("small", { class: "side-activity-detail meta-facts" }, ...facts.map((fact) => el("span", null, fact))),
+    ),
   );
 }
 

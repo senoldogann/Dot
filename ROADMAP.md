@@ -4998,7 +4998,7 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 79  | Flat surfaces and plain words: cards, labels, meta, chips, empty states  | done        | ab5f33a |
 | 80  | Forms and controls: one grammar for inputs, selects, switches, tables    | done        | 132ce0d |
 | 81  | Dark, first paint and the tour: every page read in both schemes          | in progress |         |
-| 82  | Delegated runs as rows: face, state, last line, time; the child's bar    | planned     |         |
+| 82  | Delegated runs as rows: face, state, last line, time; the child's bar    | in progress |         |
 | 83  | Faces for the actors: a hue each, alive in the rows and the bar          | planned     |         |
 
 ### 77. The type system: Inter and Geist Mono, seven sizes, three weights
@@ -5128,7 +5128,26 @@ and what the earlier items missed fixed here; README's visual-system section rew
 
 ### 82. Delegated runs as rows: face, state, last line, time; the child's bar
 
-**Status: planned.** The owner's reference (2026-10-11): Claude Code's subagent list and page.
+**Status: in progress.** Built on `item-82-delegated` (MYP-222). The owner's reference (2026-10-11): Claude Code's
+subagent list and page.
+
+**Design, as built (2026-10-11).** `timeline.js` `childScope` draws a delegated run as `details.child` whose summary
+is the row: `.child-face` (the 24 px face, `avatar("working")`, with the status ring at its corner, 12 px, the same
+ring as before: turning, amber, green with a check, red, dashed), `.child-main` with `.child-title` (the goal, one
+line) over `.child-last` (the `.meta-facts` spans, class `child-progress`: "starting", then "step 3" and the tool,
+then the end state and the steps), `.child-time` (the time since the run was queued, repainted on every step and at
+the end by `paintChild`), the `a.child-open` link to its page and the chevron; the mode and model stay in a hidden
+span for a screen reader. The face rests or turns red at the end (`faceState`). The card: a hairline, the 12 px
+radius, the surface; a `.child` that follows a `.child` loses the 8 px gap and its top corners and draws one
+hairline between them (`:has(+ .child)`), so rows share one card. The sidebar's rows take `progressFacts(row)`
+(`nesting.js`, the array that `progressWords` used to join with dots) as spans in `.meta-facts`. The run page
+(`run.js`) of a delegated run puts `a.stage-crumb` (the parent's goal, loaded from `/runs/{parent}`, clipped to 56)
+and a `.stage-sep` before its own goal in `.stage-name`; the name gives way with an ellipsis, the crumb first, and
+on a phone the crumb hides. Under the conversation, where the dock would be, `.child-foot` is a pill of facts: the
+model and effort, `Completed in 1m 46s` / `Failed after` / `Stopped after` / `Working for` (repainted with the
+stats each second while the run works), "Part of a working run" or "Runs on its own" from the parent's `active`,
+and "Open parent"; the "Delegated by another run" chip is gone from the tools. `test_activity` opens the delegated
+run's page and holds the crumb's link and the pill's words, and photographs it.
 
 **What.** A delegated run in the parent's chat and in the sidebar is one row: the actor's face with a state dot at
 its corner (green ended, blue working, red failed), the goal as the title, the last line it said or did as a muted
