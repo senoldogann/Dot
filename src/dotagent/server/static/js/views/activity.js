@@ -5,6 +5,7 @@
 import { api } from "../api.js";
 import { ago, compact, duration, el } from "../dom.js";
 import { icon } from "../icons.js";
+import { nestRows } from "../nesting.js";
 import { emptyPanel, errorPanel, loadingPanel, pageHead, segmented, statusBadge } from "../panels.js";
 import { onChange, onLifecycle } from "../state.js";
 
@@ -40,15 +41,18 @@ const KIND_WORD = {
   schedule: "schedule",
 };
 
-function row(item) {
+function row(item, child) {
   const facts = [KIND_WORD[item.kind] ?? item.kind, item.channel, item.detail].filter((part) => part !== "");
+  if (item.steps !== null && item.steps > 0 && item.minutes === null) {
+    facts.push(item.steps === 1 ? "1 step" : `${item.steps} steps`);
+  }
   if (item.minutes !== null) {
     // A run that ended: how long it took and what it cost in tokens.
     facts.push(`${duration(item.minutes * 60)} · ${compact(item.tokens)} tokens`);
   }
   return el(
     "a",
-    { class: "activity-row", href: item.href, "aria-label": `${item.title} (${facts.join(", ")})` },
+    { class: child ? "activity-row activity-child" : "activity-row", href: item.href, "aria-label": `${item.title} (${facts.join(", ")})` },
     el("span", { class: "activity-icon" }, icon(KIND_ICON[item.kind] ?? "bolt")),
     el(
       "span",
@@ -97,7 +101,16 @@ export function mount(root, ctx) {
           "section",
           { class: "card activity-section", "data-section": key },
           el("div", { class: "card-head" }, el("span", null, title), el("span", { class: "small muted" }, String(items.length))),
-          items.length === 0 ? emptyPanel("clock", empty, "") : el("div", { class: "activity-list" }, ...items.map(row)),
+          items.length === 0
+            ? emptyPanel("clock", empty, "")
+            : el(
+                "div",
+                { class: "activity-list" },
+                ...nestRows(items).map(({ row: item, children }) => [
+                  row(item, false),
+                  children.length === 0 ? null : el("div", { class: "activity-children" }, children.map((kid) => row(kid, true))),
+                ]),
+              ),
         );
       }),
     );

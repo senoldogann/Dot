@@ -4,6 +4,7 @@
 import { ApiError, api, request } from "./api.js";
 import { clip, debounce, el, foldSearch, plural } from "./dom.js";
 import { brandMark, icon } from "./icons.js";
+import { nestRows, progressWords } from "./nesting.js";
 import { requestCompose } from "./shortcuts.js";
 import { onLifecycle } from "./state.js";
 import { attempt, confirmDialog, toast } from "./ui.js";
@@ -75,21 +76,32 @@ function chatLink(chat, onNavigate) {
   );
 }
 
-/** One row of the activity sections: the state dot, the title and what it needs or where it works. */
-function activityRow(row, onNavigate) {
-  const detail = [row.channel, row.detail].filter((part) => part !== "").join(" · ");
+/** One row of the activity sections: the state dot, the title and what it needs or where it works. A run that
+ * delegated runs says how many; a delegated run (`child`) sits under its parent with its steps. */
+function activityRow(row, onNavigate, children, child) {
+  const detail = child ? progressWords(row) : [row.channel, row.detail].filter((part) => part !== "").join(" · ");
+  const delegated = children === 0 ? "" : children === 1 ? "1 delegated run" : `${children} delegated runs`;
+  const words = [detail, delegated].filter((part) => part !== "").join(" · ");
   return el(
     "a",
     {
-      class: "side-run side-activity",
+      class: child ? "side-run side-activity side-child" : "side-run side-activity",
       href: row.href,
       title: clip(row.title, 240),
-      "aria-label": detail === "" ? row.title : `${row.title} (${detail})`,
+      "aria-label": words === "" ? row.title : `${row.title} (${words})`,
       onclick: onNavigate,
     },
     el("span", { class: `status-dot s-${row.section === "waiting" ? "blocked" : "running"}` }),
-    el("span", { class: "side-run-goal" }, clip(row.title, 120), detail === "" ? null : el("small", { class: "side-activity-detail" }, detail)),
+    el("span", { class: "side-run-goal" }, clip(row.title, 120), words === "" ? null : el("small", { class: "side-activity-detail" }, words)),
   );
+}
+
+/** The rows of a section: each parent, then its delegated runs under it. */
+function activityRows(rows, onNavigate) {
+  return nestRows(rows).map(({ row, children }) => [
+    activityRow(row, onNavigate, children.length, false),
+    children.length === 0 ? null : el("div", { class: "side-children" }, children.map((kid) => activityRow(kid, onNavigate, 0, true))),
+  ]);
 }
 
 /** A chat as a row to tick while chats are being chosen for deletion. */
@@ -404,7 +416,7 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
           "section",
           { class: "side-group", "data-section": key },
           el("h3", { class: "side-label" }, `${label} · ${activity[key].length}`),
-          activity[key].map((row) => activityRow(row, onNavigate)),
+          activityRows(activity[key], onNavigate),
         ),
       ),
     );

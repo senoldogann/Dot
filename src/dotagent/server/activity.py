@@ -52,6 +52,8 @@ def _approval_row(approval: ApprovalRecord, run: RunRecord, kind: str, detail: s
         status=run.status,
         minutes=None,
         tokens=None,
+        steps=None,
+        parent_run_id=None,
     )
 
 
@@ -70,6 +72,8 @@ async def _run_row(store: Store, run: RunRecord, section: str, kind: str, detail
         status=run.status,
         minutes=None if run.finished_at is None else (run.finished_at - run.created_at) / 60,
         tokens=None if run.finished_at is None else run.input_tokens + run.output_tokens,
+        steps=run.steps,
+        parent_run_id=run.parent_run_id,
     )
 
 
@@ -99,6 +103,8 @@ def _schedule_row(schedule: ScheduleRecord, now: float) -> ActivityRow:
         status="scheduled",
         minutes=None,
         tokens=None,
+        steps=None,
+        parent_run_id=None,
     )
 
 

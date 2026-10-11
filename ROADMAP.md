@@ -4253,8 +4253,8 @@ parked: its premises (tool-call deltas in the stream) are still not in the code.
 | 64  | The composer: a slash menu of commands, skills and MCP tools             | planned     |         |
 | 65  | The chrome that stays: the run's head and side panel while it scrolls    | planned     |         |
 | 66  | One door for the store's writes                                          | done        | 5c7eada |
-| 67  | The inspector's cards: folded, no stray null, a view that follows the run | in progress |         |
-| 68  | Delegated runs in sight: the sidebar and the chat                        | planned     |         |
+| 67  | The inspector's cards: folded, no stray null, a view that follows the run | done        | 8255af7 |
+| 68  | Delegated runs in sight: the sidebar and the chat                        | in progress |         |
 
 ### 66. One door for the store's writes
 
@@ -4291,8 +4291,8 @@ that holds `BEGIN IMMEDIATE` on a connection of its own for 0.6 s delays a token
 
 ### 67. The inspector's cards: folded, no stray null, a view that follows the run
 
-**Status: in progress.** Built on `item-67-inspector-cards` (MYP-201). From the owner's screenshots of 2026-10-11: the
-Actions card shows the word "null" under its last group, the cards of the side panel open by themselves, and "Dot's
+**Status: done.** Built on `item-67-inspector-cards` (MYP-201), merged 8255af7 (PR #68). From the owner's screenshots of
+2026-10-11: the Actions card shows the word "null" under its last group, the cards of the side panel open by themselves, and "Dot's
 computer" did not show the page while the run worked.
 
 **What.** The side panel's cards (Dot's computer, Details, Plan, Actions) arrive folded with a one-line summary each
@@ -4320,8 +4320,8 @@ and 390 px in both schemes.
 
 ### 68. Delegated runs in sight: the sidebar and the chat
 
-**Status: planned.** From the owner's word of 2026-10-11: "show the subagents' work better, in the left menu and in
-the chat".
+**Status: in progress.** Built on `item-68-delegated-runs` (MYP-202). From the owner's word of 2026-10-11: "show the
+subagents' work better, in the left menu and in the chat".
 
 **What.** A delegated run is visible where its parent is: in the sidebar the parent's row carries a count of its
 running delegated runs with their status rings and opens to list them; in the chat the delegate call is a live card
@@ -4333,6 +4333,19 @@ carries the child's events (`childScope` in `timeline.js`): the card under the d
 tool from them and the status ring from `run_finished`; `sidebar.js` lists the children under the parent row from the
 `/api/activity` payload (item 47), which gains `parent_run_id`. The Activity page groups a parent with its children.
 A smoke test plays a scripted parent that delegates and checks the card, the sidebar count and the child link.
+
+**Design, as built (2026-10-11).** No new field on `GET /runs/{id}`: the parent's stream already carries the child's
+events, and the lists have what they need from `/api/activity`, whose rows gained `steps` and `parent_run_id` (both
+`None` on approvals and schedules). `static/js/nesting.js`: `nestRows(rows)` puts a row whose `parent_run_id` names
+another row of the same section under that row and leaves every other row where it is; `progressWords(row)` reads
+"3 steps · browser · delegated by another run". The sidebar's sections and the Activity page render each parent and
+then its children in a bordered, indented block (`.side-children`, `.activity-children`); the parent's row says
+"1 delegated run". In the chat, `childScope` gives the delegated run's card a progress chip that reads "step 3 ·
+web_fetch" from the child's `assistant` and `tool_call` events and "done · 12 steps" at its `run_finished`, and an
+"open" link to the child's own page that does not fold the card. The smoke test delegates a scripted run through
+`manager.delegate` (a delegated run takes no slot of `max_concurrent_runs`, so `manager.start` with a parent would
+have queued it behind the three working runs) and checks the API fields, the nested sidebar row and its words, the
+Activity page's nested row, the chat card's chip and link, at 1280 and 390 px in both schemes, and the four ended rows.
 
 ### 60. The live numbers of parts 5 and 6
 
