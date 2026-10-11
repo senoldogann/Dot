@@ -4252,6 +4252,73 @@ parked: its premises (tool-call deltas in the stream) are still not in the code.
 | 63  | The soft look: light and dark, every surface                             | planned     |         |
 | 64  | The composer: a slash menu of commands, skills and MCP tools             | planned     |         |
 | 65  | The chrome that stays: the run's head and side panel while it scrolls    | planned     |         |
+| 66  | One door for the store's writes                                          | in progress |         |
+| 67  | The inspector's cards: folded, no stray null, a view that follows the run | planned     |         |
+| 68  | Delegated runs in sight: the sidebar and the chat                        | planned     |         |
+
+### 66. One door for the store's writes
+
+**Status: in progress.** Built on `item-66-one-writer` (MYP-200). Put first in the part: on 2026-10-11 at 06:30 the
+long run of item 60, its four delegated runs and nothing else died in the same 150 ms with
+`sqlite3.OperationalError: database is locked` raised from `add_run_tokens`, the write that follows every model call.
+
+**What.** The daemon's writes to `dot.sqlite3` go through one door: one connection, one writer at a time, a unit of
+several statements committed whole; a lock held by another process is waited out with retries, logged each time, and
+only then an error; and a run does not die because its token totals could not be written once.
+
+**Why.** The store had two kinds of writer: the daemon's `aiosqlite` connection (every event, run and token write)
+and, for the message units of a thread (append, replace at a compaction), a connection of their own opened in a thread
+with `BEGIN IMMEDIATE`, so that the unit was all or nothing. Two writers on one database wait on each other up to a
+busy timeout of 10 s and then fail; the `aiosqlite` connection serves every run in turn, so when one of its writes
+waited the full 10 s and failed, the writes queued behind it by the other runs failed in the same instant: five runs,
+one lock. What held the lock those 10 s is not in the log (the store logged nothing before the crash); the structure
+that let one holder take five runs down is what this item removes.
+
+**Design.** `store/db.py`: `_writing`, a decorator on every method that commits (42 of them), takes the store's
+`asyncio.Lock`, so the daemon's writers run one at a time on the one connection and no writer's statement or commit
+lands inside another's unit; a `sqlite3.OperationalError` that says locked or busy (another process: `dotx prune`, a
+tool of the owner's on the file) is rolled back and the method tried again after 0.2, 0.5, 1 and 2 s, each try a
+`store_locked_retry` warning, then raised as a `StoreError` that names the method and the tries. `append_messages` and
+`replace_messages` encode their bodies in a thread and then run as a `_unit` on the connection (`BEGIN IMMEDIATE`, the
+statements, `COMMIT`, a rollback on any error); the sync connection and `_write_transaction` are gone. `runtime.py`:
+the recorder of a model call catches a `StoreError` from `add_run_tokens`, logs `model_call_not_recorded` with the
+run and the tokens (the run's totals are then known to be short by that call) and still emits the `model_call` event,
+so a run goes on. The read-only connections of `dotx stats` and the stats route are untouched: in WAL mode a reader
+never blocks a writer. Unit tests: thirty concurrent appends to one thread and thirty token counts all land; a thread
+that holds `BEGIN IMMEDIATE` on a connection of its own for 0.6 s delays a token write and does not fail it.
+
+**Touchpoints.** `store/db.py`, `runtime.py`, `tests/unit/test_store_writes.py`, README (the store paragraph).
+
+### 67. The inspector's cards: folded, no stray null, a view that follows the run
+
+**Status: planned.** From the owner's screenshots of 2026-10-11: the Actions card shows the word "null" under its last
+group, the cards of the side panel open by themselves, and "Dot's computer" did not show the page while the run worked.
+
+**What.** The side panel's cards (Dot's computer, Details, Plan, Actions) arrive folded with a one-line summary each
+and open at a click, the owner's choice kept per card; no card renders a null; the live view starts by itself while a
+run works in the browser and stops when the run ends.
+
+**Design.** `panels.js`: `foldCard` renders `actions` only when it is a node (a `null` reached `el()` as a child,
+which the Actions and Plan cards pass); `run.js`: the four cards fold by default (`openByDefault: false`), Dot's
+computer becomes a `foldCard` whose summary is the page's address; `computer.js`: `start()` runs when the run is active
+and the browser has a page (the first `browser_*` tool call), stops at the end; the run page's smoke test checks the
+folded state, the summaries and that no card's text contains "null".
+
+### 68. Delegated runs in sight: the sidebar and the chat
+
+**Status: planned.** From the owner's word of 2026-10-11: "show the subagents' work better, in the left menu and in
+the chat".
+
+**What.** A delegated run is visible where its parent is: in the sidebar the parent's row carries a count of its
+running delegated runs with their status rings and opens to list them; in the chat the delegate call is a live card
+with the child's goal, its step count, its last tool and its status, updated from the parent's stream, with a link to
+the child's own page.
+
+**Design.** `GET /runs/{id}` gains `children` (id, goal, status, steps, last tool); the stream of a parent already
+carries the child's events (`childScope` in `timeline.js`): the card under the delegate call paints steps and the last
+tool from them and the status ring from `run_finished`; `sidebar.js` lists the children under the parent row from the
+`/api/activity` payload (item 47), which gains `parent_run_id`. The Activity page groups a parent with its children.
+A smoke test plays a scripted parent that delegates and checks the card, the sidebar count and the child link.
 
 ### 60. The live numbers of parts 5 and 6
 
