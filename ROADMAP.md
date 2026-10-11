@@ -5020,7 +5020,7 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 97  | Chrome in the background: the live view shows the page, the window stays put       | done        | 558621b |
 | 98  | The web that is refused: 999, 403 and their kind meet the browser, not the end     | done        | 65433d0 |
 | 99  | The team that grows: a run makes a lasting teammate and knows of it                | done        | 724768e |
-| 100 | The review: every feature of parts 1 to 12 read once more on the live pages        | in progress |         |
+| 100 | The review: every feature of parts 1 to 12 read once more on the live pages        | done        | 62585c2 |
 
 ### 77. The type system: Inter and Geist Mono, seven sizes, three weights
 
@@ -5612,15 +5612,23 @@ everything together with them; review every feature built so far together with t
 the 999 and 403 errors; and make the dark borders that appear on focus either go or take a light colour of the
 theme.
 
-**Status (2026-10-11): planned.** What is built today: one sidebar function (`sidebar.js`) with "New chat", the
-search, the Waiting and Working sections (a working run with its delegated runs nested, titles cut at 120
-characters but wrapped), the chats by day, and a foot with Agents, Activity, Campaigns and Settings; no section
-folds. The run page's "Jump to latest" is a fixed button at the bottom right; the cost card (item 58) stands in
-the conversation column; the side panel (item 84) holds Dot's computer, Details, Plan, Actions and Screen. Chrome
-is raised by `switch_tab` and by Take over, and by its own launch. `web_fetch` retries 401, 403, 429 and 503 in
-Dot's own Chrome and nothing in the owner's attached Chrome; 999 (LinkedIn's refusal) is a plain failure; crawl
-skips every refused page. The team is read once at a run's start, and only the owner makes agents. Focus is a
-two-pixel accent outline on every control, and the composer's inner textarea shows it as a dark frame.
+**Status (2026-10-11): built.** Items 95 to 100 merged the same day (`f3dce6e`, `3a8a20b`, `558621b`, `65433d0`,
+`724768e`, `62585c2`), each behind the gate, its smoke tests and its screenshot tour read. The sidebar is short
+and folds; the run page's arrow sits above the composer and the cost in the panel; Dot's Chrome stays in the
+background unless the owner switches it to the front; a refused page meets the browser in both modes, a refusing
+host is remembered for the run, and the plain request looks like a browser's; a run makes a lasting teammate and
+hears of the ones that join; the review fixed the composer's dark focus frame, the dark scheme's invisible switch
+knob and three stale lines, and left five small polish items for the next part. What waits: the daemon restarted
+on `62585c2` once no run is active, and the owner's eye on the sidebar and the quiet Chrome in daily use. Before
+this part: one sidebar function (`sidebar.js`) with "New chat", the search, the Waiting and Working sections (a
+working run with its delegated runs nested, titles cut at 120 characters but wrapped), the chats by day, and a foot
+with Agents, Activity, Campaigns and Settings; no section folds. The run page's "Jump to latest" was a fixed button
+at the bottom right; the cost card (item 58) stood in the conversation column; the side panel (item 84) held Dot's
+computer, Details, Plan, Actions and Screen. Chrome was raised by `switch_tab` and by Take over, and by its own
+launch. `web_fetch` retried 401, 403, 429 and 503 in Dot's own Chrome and nothing in the owner's attached Chrome;
+999 (LinkedIn's refusal) was a plain failure; crawl skipped every refused page. The team was read once at a run's
+start, and only the owner made agents. Focus was a two-pixel accent outline on every control, and the composer's
+inner textarea showed it as a dark frame.
 
 **The shape of this part (the decisions).** The frame gets out of the way: the sidebar is a list of short names,
 folded by the owner's choice and remembered; focus is visible to the keyboard and quiet to the mouse. Chrome
@@ -5793,7 +5801,7 @@ no agents. The record keeps `made_by` (the run that made the agent, `None` for t
 
 ### 100. The review: every feature of parts 1 to 12 read once more on the live pages
 
-**Status: in progress (2026-10-11).**
+**Status: done.** Merged as `62585c2` (PR #116, MYP-240 Done).
 
 **Findings, as built (2026-10-11).** Three readings. (1) The tour: 84 shots (21 pages, two schemes, two widths) read
 by four readers against the README and the as-built sections of items 92 to 99, their findings checked by eye and,
@@ -6354,3 +6362,4 @@ written as the next part's first items. The findings go in this section as built
 - 2026-10-11 (Fable 5.1): item 97 merged as `558621b` (PR #113, MYP-237 Done): `[browser] raise_window` off by default, the focus given back after the launch, the Settings › Browser switch, `POST /api/browser/raise`.
 - 2026-10-11 (Fable 5.1): item 98 merged as `65433d0` (PR #114, MYP-238 Done): 999 among the refused statuses, the host memory per run, a browser's navigation headers, quiet reads behind the user's tab, refused pages in a crawl, the next rung in one line.
 - 2026-10-11 (Fable 5.1): item 99 merged as `724768e` (PR #115, MYP-239 Done): `create_agent` in the `team` tool group, `AgentRecord.made_by`, the Team section that offers to make a teammate, the note of the agents that joined, "Made by Dot" on the Agents page.
+- 2026-10-11 (Fable 5.1): item 100 merged as `62585c2` (PR #116, MYP-240 Done): the tour read by four readers and by eye, the offline smoke suite in full, the owner's daemon through the API; the composer's focus frame, the dark switch knob, three stale lines and the tour's sidebar fixed; five polish items left for the next part. Part 12 built: items 95 to 100. The daemon waits for a restart on `62585c2`.
