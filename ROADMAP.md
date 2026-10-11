@@ -5950,7 +5950,8 @@ store under `look:dot` (`dot_look`, `set_dot_look`). `AgentRequest.look` (`None`
 /api/agents` and `/api/agents/dot` serve `DOT_AGENT` wearing the kv look (`dot_record`). `actors.js`: the registry of
 looks (`rememberLook`, `loadLooks` from `GET /api/agents`, called by `main.js` once the daemon answers; the Agents
 page and the editor keep it current), `fallbackLook(id)` (Dot: the circle in amber, the colour of its old badge;
-any other actor: the shape and the colour of its hue, among the character's twelve), `FACE_OF_STATE` (idle: the
+any other actor: `hueLook(hueOf(id))` of `hues.js`, the hash and the ring of eight moved there, pure, with the
+shape and the colour of each hue among the character's twelve; the `--hue-*` tokens are gone), `FACE_OF_STATE` (idle: the
 look's own expression; working: attentive; waiting: the notify animation with its pastille; done: happy; failed:
 sad), `actorFace(id, state, look)` (a still character of 40 px, `tight`, with the class `avatar`, `data-state` on it
 and `data-hue` when it wears the fallback; the handle kept in a WeakMap), `dotFace(state)`, `setActorState(face,

@@ -1,5 +1,6 @@
-"""The faces of the actors (item 83): the hash that picks an actor's hue and the ring of eight it picks from. The hash
-is run in node from the module itself, so the Python mirror here proves the one the browser uses."""
+"""The faces of the actors (items 83 and 102): the hash that picks an actor's hue, the ring of eight it picks from, and
+the look each hue gives. The hash is run in node from the module itself, so the Python mirror here proves the one the
+browser uses."""
 
 import json
 import shutil
@@ -27,7 +28,7 @@ def test_the_hue_of_an_id_is_its_hash_on_the_ring_of_eight() -> None:
     if node is None:
         pytest.skip("node is not installed: the browser's hash cannot be run here")
     script: str = (
-        f"import {{ hueOf, hashId, HUES }} from '{(STATIC_DIR / 'js' / 'actors.js').as_uri()}';"
+        f"import {{ hueOf, hashId, HUES }} from '{(STATIC_DIR / 'js' / 'hues.js').as_uri()}';"
         f"console.log(JSON.stringify({{ hues: {json.dumps(_IDS)}.map(hueOf), hashes: {json.dumps(_IDS)}.map(hashId), ring: HUES }}));"
     )
     result = subprocess.run([node, "--input-type=module", "-e", script], capture_output=True, text=True, check=True)
@@ -37,9 +38,20 @@ def test_the_hue_of_an_id_is_its_hash_on_the_ring_of_eight() -> None:
     assert seen["hues"] == [_fnv1a(text) % 8 for text in _IDS]
 
 
-def test_every_hue_of_the_ring_has_a_token_and_a_rule() -> None:
-    themes: str = (STATIC_DIR / "css" / "themes.css").read_text(encoding="utf-8")
-    app: str = (STATIC_DIR / "css" / "app.css").read_text(encoding="utf-8")
-    for hue in range(8):
-        assert f"--hue-{hue}: light-dark(" in themes, hue
-        assert f'.avatar[data-hue="{hue}"] .face' in app, hue
+def test_every_hue_of_the_ring_gives_a_look_of_its_own_from_the_catalogue() -> None:
+    node: str | None = shutil.which("node")
+    if node is None:
+        pytest.skip("node is not installed: the looks cannot be read here")
+    script: str = (
+        f"import {{ hueLook, HUES }} from '{(STATIC_DIR / 'js' / 'hues.js').as_uri()}';"
+        f"import {{ SHAPE_IDS, COLOUR_IDS }} from '{(STATIC_DIR / 'js' / 'character' / 'skins.js').as_uri()}';"
+        "console.log(JSON.stringify({ looks: Array.from({ length: HUES }, (_, hue) => hueLook(hue)), shapes: SHAPE_IDS,"
+        " colours: COLOUR_IDS }));"
+    )
+    result = subprocess.run([node, "--input-type=module", "-e", script], capture_output=True, text=True, check=True)
+    seen: dict[str, list[dict[str, str]] | list[str]] = json.loads(result.stdout)
+    looks = seen["looks"]
+    assert len(looks) == 8
+    assert len({(look["shape"], look["colour"]) for look in looks}) == 8
+    for look in looks:
+        assert look["shape"] in seen["shapes"] and look["colour"] in seen["colours"] and look["expression"] == "neutral"

@@ -1,16 +1,13 @@
 // The faces of the actors (items 83 and 102). Every actor (Dot, an agent, a delegated run, a campaign, a schedule) is a
 // character (character/): an agent wears the look the owner chose for it, Dot its own, and an actor without a look the
-// shape and colour its id's hue gives it, one of a ring of eight, so it keeps its face wherever it shows: the rows of a
-// chat, the sidebar, the Campaigns and Schedules pages, the bar of its own page. A face is a still frame; its state
-// (face.js) picks the animation posed and the expression worn.
+// shape and colour its id's hue gives it (hues.js), so it keeps its face wherever it shows: the rows of a chat, the
+// sidebar, the Campaigns and Schedules pages, the bar of its own page. A face is a still frame; its state (face.js)
+// picks the animation posed and the expression worn.
 import { api } from "./api.js";
 import { mountCharacter } from "./character/character.js";
-import { SHAPE_IDS } from "./character/skins.js";
+import { hueLook, hueOf } from "./hues.js";
 
-export const HUES = 8;
 export const DOT_ID = "dot";
-// The colour of each hue, among the character's twelve; the shape of a hue is the shape of the same index.
-const FALLBACK_COLOURS = ["red", "orange", "green", "teal", "blue", "violet", "pink", "brown"];
 // Dot before the owner chooses: the round face in the amber of its old badge.
 const DOT_LOOK = { shape: "circle", expression: "neutral", colour: "amber" };
 // How a face's state shows: the animation posed and, at rest, the expression that replaces the look's own.
@@ -26,28 +23,12 @@ const looks = new Map();
 // The character behind each face on the page, for a change of state.
 const handles = new WeakMap();
 
-/** FNV-1a over the UTF-16 code units of `id`: a 32-bit unsigned number, the same for the same id everywhere. */
-export function hashId(id) {
-  let hash = 0x811c9dc5;
-  for (let index = 0; index < id.length; index += 1) {
-    hash ^= id.charCodeAt(index);
-    hash = Math.imul(hash, 0x01000193) >>> 0;
-  }
-  return hash >>> 0;
-}
-
-/** The hue of an actor, 0 to 7, from its id. */
-export function hueOf(id) {
-  return hashId(id) % HUES;
-}
-
 /** The look an actor without one wears: Dot its own, any other the shape and colour of its hue. */
 export function fallbackLook(id) {
   if (id === DOT_ID) {
     return DOT_LOOK;
   }
-  const hue = hueOf(id);
-  return { shape: SHAPE_IDS[hue], expression: "neutral", colour: FALLBACK_COLOURS[hue] };
+  return hueLook(hueOf(id));
 }
 
 /** Keep an actor's look for the faces drawn later; `null` forgets it. */
