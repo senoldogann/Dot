@@ -3644,7 +3644,7 @@ closed pages) then; 58 (the bill on the run page) last, since it shows 53's numb
 | 55  | Context that stays: a compaction every forty steps, not seven            | done    | 57a000e |
 | 56  | The web without guessing                                                 | done        | 227e264 |
 | 57  | The browser's closed pages                                               | done        | 8d137c7 |
-| 58  | The bill of a run, on its page                                           | in progress |         |
+| 58  | The bill of a run, on its page                                           | done        | 0014d77 |
 
 ### 53. The numbers of a long run
 
@@ -4568,3 +4568,11 @@ rows carry minutes and tokens.
   stands (25 of 93 web failures throttled in the owner's last 30 days). Next: item 57 (the browser's closed pages).
 - 2026-10-11 (Fable 5.1): item 57 merged 8d137c7 (PR #61, MYP-197 Done; gate + desktop jobs green). The log's warnings have
   their causes in the item; Playwright's own frame traceback is not Dot's. Next: item 58 (the bill of a run, on its page).
+- 2026-10-11 (Fable 5.1): item 58 merged 0014d77 (PR #62, MYP-198 Done; gate + desktop jobs green). Part 5 complete:
+  items 53 to 58 merged, decision 33 settled by the instrument and built. The daemon restarted on 0014d77 with no run
+  active. The live numbers of the part are the owner's next long runs, read with `dotx stats --run ID` against the
+  baseline of item 53 (13.8 compactions per 100 steps, 53% of the model seconds in compactions, about ten not-found
+  fetches a research run): under 5 per 100 steps and a tenth of the model seconds (item 55), near zero not-found
+  fetches and no turn lost to argument validation (item 56), no `_adopt_popup` traceback after a week (item 57).
+  Still open for the owner, unchanged from part 4: the phone's own check of item 52, decision 27, decision 26's
+  follow-up, a signed desktop build.
