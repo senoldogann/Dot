@@ -33,6 +33,7 @@ from dotagent.agent.continuity import (
     continuity_note,
     history_text,
     mechanical_summary,
+    missing_sections,
     new_ledger,
     reminder_note,
     summary_part,
@@ -217,6 +218,15 @@ _SUMMARY_PROMPT: str = (
     "The history may begin with the summary of an earlier compaction: carry forward what is still needed, but shorten "
     "finished work to one line per step, so the summary does not grow from one compaction to the next."
 )
+_SUMMARY_SECTIONS_PROMPT: str = (
+    "Your summary lacked the sections {sections}. Write it again, complete, with every section, starting from the "
+    "draft that follows the history. "
+)
+_SUMMARY_SHORTER_PROMPT: str = (
+    "Your summary had {words} words; the limit is {max_words}. Write it again under {max_words} words: shorten "
+    "finished work to one line per step and keep every identifier. "
+)
+_SUMMARY_DRAFT_HEADING: str = "\n\n## Your earlier summary, which lacked the sections {sections}\n"
 _NO_TOOL_NOTE: str = (
     "[system note] You replied without calling a tool. If the goal is achieved or impossible, call finish with your "
     "complete final answer. Otherwise continue by calling the tools you need."
@@ -328,16 +338,23 @@ async def _model_summary(
     attempts made, last problem)``.
 
     An empty reply is asked again (the first try without reasoning, later ones with a little, since some models spend
-    their whole answer on thinking); a summary far over its word limit is asked again too. A provider error or a
-    timeout ends the attempts at once, as the provider already retried what can be retried.
+    their whole answer on thinking). A summary far over its word limit is asked again with the limit and the overrun
+    in front of the prompt; one that lacks a section is asked again once, with the missing sections named and the
+    first reply carried along as a draft. The attempts stay within ``_SUMMARY_ATTEMPTS``; a second reply that still
+    lacks a section is returned as it is, for the check to say so. A provider error or a timeout ends the attempts at
+    once, as the provider already retried what can be retried.
     """
     max_words: int = min(_SUMMARY_MAX_WORDS, round(context_tokens * _SUMMARY_SHARE * _WORDS_PER_TOKEN))
-    prompt: str = _SUMMARY_PROMPT.format(max_words=max_words)
+    base: str = _SUMMARY_PROMPT.format(max_words=max_words)
+    prompt: str = base
+    history: str = transcript
     problem: str | None = None
+    asked_shorter: bool = False
+    asked_sections: bool = False
     for attempt in range(1, _SUMMARY_ATTEMPTS + 1):
         request: ChatRequest = ChatRequest(
             model=ref.model,
-            messages=(system_message(prompt), user_message(transcript, ())),
+            messages=(system_message(prompt), user_message(history, ())),
             tools=(),
             temperature=0.2,
             max_output_tokens=None,
@@ -353,22 +370,38 @@ async def _model_summary(
             problem = error.message if isinstance(error, ProviderError) else "the summary request timed out"
             log.warning("summary_failed", run_id=agent.run.id, model=ref.label, attempt=attempt, error=problem)
             return None, attempt, problem
-        words: int = len(reply.text.split())
+        text: str = reply.text.strip()
+        words: int = len(text.split())
         if words > max_words * _SUMMARY_SLACK:
             problem = f"the summary had {words} words, over the limit of {max_words}"
             log.warning("summary_too_long", run_id=agent.run.id, model=ref.label, attempt=attempt, words=words)
+            if not asked_shorter:
+                asked_shorter = True
+                prompt = _SUMMARY_SHORTER_PROMPT.format(words=words, max_words=max_words) + base
             continue
-        if reply.text.strip():
-            return reply.text.strip(), attempt, problem
-        problem = f"the summary model returned no text (finish: {reply.raw_finish})"
-        log.warning(
-            "summary_empty",
-            run_id=agent.run.id,
-            model=ref.label,
-            attempt=attempt,
-            finish=reply.raw_finish,
-            thinking_chars=len(reply.thinking),
-        )
+        if not text:
+            problem = f"the summary model returned no text (finish: {reply.raw_finish})"
+            log.warning(
+                "summary_empty",
+                run_id=agent.run.id,
+                model=ref.label,
+                attempt=attempt,
+                finish=reply.raw_finish,
+                thinking_chars=len(reply.thinking),
+            )
+            continue
+        missing: tuple[str, ...] = missing_sections(text)
+        if missing and not asked_sections:
+            asked_sections = True
+            sections: str = ", ".join(missing)
+            problem = f"the summary lacked the sections {sections}"
+            log.warning(
+                "summary_sections_missing", run_id=agent.run.id, model=ref.label, attempt=attempt, sections=missing
+            )
+            prompt = _SUMMARY_SECTIONS_PROMPT.format(sections=sections) + base
+            history = transcript + _SUMMARY_DRAFT_HEADING.format(sections=sections) + text
+            continue
+        return text, attempt, problem
     return None, _SUMMARY_ATTEMPTS, problem
 
 

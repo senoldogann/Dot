@@ -182,14 +182,17 @@ answer (a small model that is offered both writes the call out as text).
   summary may use a tenth of the budget and never more than 1 500 words, so a long run's summary does not grow with
   each compaction until every step compacts, and does not cost the fast model minutes of writing. A compaction keeps the
   newest messages that fit next to the system prompt, the tool definitions and its note in 85 % of the budget, and
-  never less than the model's last reply with its results, so the steps after it have room. It is tried three times;
-  when the fast model gives no text, a summary far over that limit, an error or a timeout, the run's own model writes
-  it and the `compacted` event names the fast model's problem; when neither writes one, a mechanical summary takes its
-  place and the timeline says so with the reason. Next to the summary a continuity note keeps the
+  never less than the model's last reply with its results, so the steps after it have room. It is tried three times:
+  a summary far over the limit is asked again with the limit and the overrun in front, and one that lacks a section is
+  asked again once with the missing sections named and the first draft carried along; when the fast model gives no
+  text, a summary far too long, an error or a timeout, the run's own model writes it and the `compacted` event names
+  the fast model's problem; when neither writes one, a mechanical summary takes its place and the timeline says so
+  with the reason. Next to the summary a continuity note keeps the
   goal, the plan with the state of each step and its targets, and your messages, and of the work already done and the
   paths touched the newest that fit in another tenth of the budget (it says how many earlier ones it leaves out), and a
-  check lists names, paths and links in the summary that the conversation never had. The `compacted` event names the
-  model, how the summary came about and what the check found.
+  check lists names, paths and links in the summary that the conversation never had (an address cut short, with the
+  ellipsis of a cut value, or one lengthened by a fragment counts as known). The `compacted` event names the model,
+  how the summary came about, the attempts it took and what the check found.
 - The plan has steps that are `pending`, `in_progress`, `done`, `failed` or `skipped`; `update_plan` writes it and
   `mark_plan_step` changes one step, so the plan in the web UI moves as the work does. A step is marked `done` only
   with evidence (`evidence`, at most 400 characters): what the run observed that shows it, such as the path and what it

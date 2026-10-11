@@ -4247,14 +4247,14 @@ parked: its premises (tool-call deltas in the stream) are still not in the code.
 | #   | Item                                                                     | Status      | Commits |
 | --- | ------------------------------------------------------------------------ | ----------- | ------- |
 | 60  | The live numbers of parts 5 and 6                                        | planned     |         |
-| 61  | Summaries that pass their own check                                      | planned     |         |
+| 61  | Summaries that pass their own check                                      | in progress |         |
 | 62  | A delegate before the plan is a step, not a lost turn                   | planned     |         |
 | 63  | The soft look: light and dark, every surface                             | planned     |         |
 | 64  | The composer: a slash menu of commands, skills and MCP tools             | planned     |         |
 | 65  | The chrome that stays: the run's head and side panel while it scrolls    | planned     |         |
 | 66  | One door for the store's writes                                          | done        | 5c7eada |
 | 67  | The inspector's cards: folded, no stray null, a view that follows the run | done        | 8255af7 |
-| 68  | Delegated runs in sight: the sidebar and the chat                        | in progress |         |
+| 68  | Delegated runs in sight: the sidebar and the chat                        | done        | 278f256 |
 
 ### 66. One door for the store's writes
 
@@ -4320,7 +4320,7 @@ and 390 px in both schemes.
 
 ### 68. Delegated runs in sight: the sidebar and the chat
 
-**Status: in progress.** Built on `item-68-delegated-runs` (MYP-202). From the owner's word of 2026-10-11: "show the
+**Status: done.** Built on `item-68-delegated-runs` (MYP-202), merged 278f256 (PR #69). From the owner's word of 2026-10-11: "show the
 subagents' work better, in the left menu and in the chat".
 
 **What.** A delegated run is visible where its parent is: in the sidebar the parent's row carries a count of its
@@ -4363,7 +4363,7 @@ item.
 
 ### 61. Summaries that pass their own check
 
-**Status: planned.**
+**Status: in progress.** Built on `item-61-summary-check` (MYP-203).
 
 **What.** A compaction summary that names an address the history holds is not "unverified" because the model cut the
 address short; a summary that lacks a section is asked for again once, with the missing sections named, before the
@@ -4382,6 +4382,24 @@ first reply, on the same model; a reply over the word limit is followed by one m
 and the overrun first; the attempts stay within `_SUMMARY_ATTEMPTS`. The `compacted` event records the attempts and
 the check as before, so the log and `dotx stats` show whether the second ask helped. A unit test on the check with cut
 addresses; a scaffold smoke test that the second ask repairs a summary a scripted fast model writes without PROBLEMS.
+
+**Design, as built (2026-10-11).** The log's unverified identifiers were read one by one before the code changed: 11 of
+75 end in an ellipsis, the mark Dot's own renderings leave on a value they cut (the pinned actions at 160 characters, a
+page's text), which the summary copied as it was; the check took the ellipsis for part of the address. The exact check
+was already a substring match, so an address cut short without the ellipsis passed before; the 24-character prefix rule
+of the plan for a cut address added nothing and was not built. As built: `identifiers` strips a trailing ellipsis with
+the punctuation; `check_continuity` takes an identifier as known when the history holds it, whole or as a part, or when
+it starts with a known identifier of at least 24 characters (`_LONG_IDENTIFIER_CHARS`: a fragment or a query the
+history did not have), and `missing_sections(summary)` is its own function so the summary ask can use it.
+`loop._model_summary` keeps `_SUMMARY_ATTEMPTS` (3) and changes what it asks: a reply over the limit turns the next
+prompt into `_SUMMARY_SHORTER_PROMPT` (the words and the limit first, then the usual prompt); a reply that lacks a
+section is asked again once with `_SUMMARY_SECTIONS_PROMPT` (the sections named) and the history followed by the draft
+under "Your earlier summary, which lacked the sections …"; a second reply that still lacks a section is returned for
+the check to say so. The `compacted` event's `attempts` and `problem` show the repair ("the summary lacked the sections
+PROBLEMS", attempts 2). Unit test: a cut address with the ellipsis and a lengthened one pass, another page under the
+same prefix and a lengthened short path do not. Scaffold smoke test: a fast model that leaves PROBLEMS out until asked
+by name gives, at every compaction, a second summary that passes, with two requests per compaction and the draft in the
+second.
 
 **Touchpoints.** `agent/continuity.py`, `agent/loop.py`, `tests/unit/test_continuity.py`, `tests/smoke/test_scaffold.py`,
 README (compaction paragraph).
@@ -4948,3 +4966,9 @@ and asserts the head's and the inspector's bounding boxes stay in the viewport; 
   while scrolling"): items 60 to 65. The long run of item 60 started on the daemon (`run_mv39kmag_ec5bb3`); the owner's
   own task run was active at the time, so no daemon restart until both end. Evidence for item 61 from the daemon's log:
   47 of 64 check failures are addresses the summary cut short.
+- 2026-10-11 (Fable 5.1): the owner's "Connection lost" was every run crashing on `database is locked`: item 66 (one
+  writer, retries) merged 5c7eada (PR #67, MYP-200 Done); daemon restarted on it with no run active, the long run of
+  item 60 started again as `run_mv3aaeat_5e1c03`. Item 67 (folded cards, no "null", the view at the first browser step)
+  merged 8255af7 (PR #68, MYP-201 Done). Item 68 (delegated runs nested in the sidebar and the Activity page, a progress
+  chip and a link on the chat's card) merged 278f256 (PR #69, MYP-202 Done). The long run was active at both merges, so
+  the daemon stayed on 5c7eada.
