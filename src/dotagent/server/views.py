@@ -422,7 +422,8 @@ ActivityKind = Literal["run", "delegated", "campaign", "approval", "question", "
 class ActivityRow(FrozenModel):
     """One thing in motion, or ended today: ``detail`` says what it needs or where it stands, ``channel`` is where the
     run last worked (browser, files, shell, desktop, mail; empty before its first tool result), ``since`` is when it
-    started waiting, working or ended, ``href`` opens it in the web UI."""
+    started waiting, working or ended, ``href`` opens it in the web UI. A run that ended carries its ``minutes`` of
+    wall time and its ``tokens`` (input and output together); every other row has ``None`` for both."""
 
     id: str
     section: ActivitySection
@@ -434,6 +435,8 @@ class ActivityRow(FrozenModel):
     href: str
     run_id: str | None
     status: str
+    minutes: float | None
+    tokens: int | None
 
 
 class ActivityView(FrozenModel):

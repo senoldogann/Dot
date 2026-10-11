@@ -780,8 +780,9 @@ for, and a run whose browser you took over) and **Working** (the runs going on, 
 delegated by another, and a schedule that fires within the hour), each row with its state dot, what it is, the channel
 it last worked in (browser, files, shell, desktop, mail) and what it needs; a row opens the run. **Activity**
 (`#/activity`, below the list next to Campaigns) is the same in full, with the runs that ended today and a filter by
-kind (runs, campaigns, schedules); it is `GET /api/activity`. Both follow the lifecycle stream, so a run moves between
-the sections the moment it starts, waits, is taken over or ends.
+kind (runs, campaigns, schedules); it is `GET /api/activity`. A run that ended shows how long it took and what it cost
+in tokens. Both follow the lifecycle stream, so a run moves between the sections the moment it starts, waits, is taken
+over or ends.
 
 **New chat** is Dot's face and name (the name is yours to give in Settings › General; Dot until then, and kept in this
 browser only) and one composer, centred in the window: the goal, then one line with the mode (Task, Chat
@@ -800,7 +801,12 @@ waits for you, green with a check when it is done, red when it failed); open it 
 stretch of work fold into a single
 "Worked for 12 s (model 8 s) · 5 tool calls" line, where the part in brackets is how much of that time the model's turns
 took (open it for every call, result and screenshot), while approvals, questions and policy notes stay in the open. The
-answer of the run is the last message, with a Copy button and when it finished and how long the run took. A strip under
+answer of the run is the last message, with a Copy button and when it finished and how long the run took. Under the
+head a folded **Cost** card carries the bill of the run in one line (its minutes, steps and tokens); open, it says where
+the minutes went (the model, the summaries, the tools, the time spent waiting for you), the input tokens with the share
+the provider served from its cache, the output tokens, the compactions (with their rate per 100 steps) and the runs it
+delegated. It is `GET /api/runs/{id}/stats` (the same numbers as `dotx stats --run ID`), read again every ten seconds
+while the run works and once at its end. A strip under
 the head links the other runs of the same thread, and the box at the bottom steers a run that is going on or follows up
 on a finished one. A Details panel shows the status, the model and its reasoning level, the approval mode and goal mode,
 the model turns, the tool calls (with the failed ones), the tokens (of every model call of the run: its steps and its

@@ -3643,8 +3643,8 @@ closed pages) then; 58 (the bill on the run page) last, since it shows 53's numb
 | 54  | Long browser tasks in the eval set                                       | done    | 7df5799 |
 | 55  | Context that stays: a compaction every forty steps, not seven            | done    | 57a000e |
 | 56  | The web without guessing                                                 | done        | 227e264 |
-| 57  | The browser's closed pages                                               | in progress |         |
-| 58  | The bill of a run, on its page                                           | planned |         |
+| 57  | The browser's closed pages                                               | done        | 8d137c7 |
+| 58  | The bill of a run, on its page                                           | in progress |         |
 
 ### 53. The numbers of a long run
 
@@ -3904,6 +3904,8 @@ no `_adopt_popup` traceback after a week on the version.
 
 ### 58. The bill of a run, on its page
 
+**Status: done.** Built on `item-58-run-bill` (MYP-198).
+
 **What.** The run page shows, under the face, what a run cost and where: minutes (model, summaries, tools, waiting
 for the owner), steps, input and output tokens with the cached share, compactions, delegated runs with their cost;
 the Activity rows that ended today show minutes and tokens. Wide and phone, both looks, both densities.
@@ -3917,6 +3919,22 @@ page (item 50) shows the card.
 
 **Touchpoints.** `static/js/views/run.js`, `views/activity.js`, `server/activity.py`, `server/views.py`,
 `static/css/app.css`, `tests/smoke/test_run_page.py`, README "The daemon, the web UI and the service".
+
+**Design, as built (2026-10-11).** `static/js/cost.js`: `createCostCard()` is a folded card (`foldCard`, id
+`run-cost`, closed by default) whose head line is `costLine(costs)` ("12m 03s · 48 steps · 1.2M in · 8.1k out") and
+whose body is a `kv` grid of nine cells: Model, Summaries, Tools and Waiting for you as seconds with their share of
+the run's wall time ("None" at zero), Steps, Input tokens with the cached share, Output tokens, Compactions with the
+rate per 100 steps, Delegated runs with the seconds waited; every cell carries a hint. `run.js` places it under the
+head (after the connection note) and reads `GET /runs/{id}/stats` on arrival, every 10 s while the run works
+(`COST_REFRESH_MS`, a slower tick than the 1 s of the face since the route queries the run's events) and once at the
+end (from `reconcile`). `ActivityRow` gained `minutes` and `tokens` (`None` on the rows that have not ended;
+`_run_row` fills them from `finished_at - created_at` and the run's input and output tokens) and `activity.js` adds
+"12 s · 2.1k tokens" to the facts of a row that ended. The controls page shows the card on a 51-minute sample
+(`FAKE_COSTS`). `.cost-grid` narrows the cells to 150 px so they go three abreast wide and two on a phone. No
+`test_run_page.py`: the Activity smoke test already plays scripted runs to their end, so it opens the run page at
+1280 and 390 px in light and dark, checks the head line, opens the card, checks the grid and the Ended today rows,
+and keeps the screenshots. The scripted provider reports no model seconds, so the sample page shows "Model: None";
+the owner's runs fill it.
 
 **Done when.** The card shows the numbers of a scripted run in the smoke test at both widths and looks; the Activity
 rows carry minutes and tokens.
@@ -4548,3 +4566,5 @@ rows carry minutes and tokens.
   instrument: budget 96 k, `num_ctx_cloud` 262144, summaries capped at 1,500 words. Next: item 56 (the web without guessing).
 - 2026-10-11 (Fable 5.1): item 56 merged 227e264 (PR #60, MYP-196 Done; gate + desktop jobs green). The DuckDuckGo limit
   stands (25 of 93 web failures throttled in the owner's last 30 days). Next: item 57 (the browser's closed pages).
+- 2026-10-11 (Fable 5.1): item 57 merged 8d137c7 (PR #61, MYP-197 Done; gate + desktop jobs green). The log's warnings have
+  their causes in the item; Playwright's own frame traceback is not Dot's. Next: item 58 (the bill of a run, on its page).

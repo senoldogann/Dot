@@ -50,10 +50,13 @@ def _approval_row(approval: ApprovalRecord, run: RunRecord, kind: str, detail: s
         href=f"#/runs/{run.id}",
         run_id=run.id,
         status=run.status,
+        minutes=None,
+        tokens=None,
     )
 
 
 async def _run_row(store: Store, run: RunRecord, section: str, kind: str, detail: str, title: str) -> ActivityRow:
+    """A row for a run; one that ended carries its minutes and its tokens."""
     return ActivityRow(
         id=run.id,
         section=section,
@@ -65,6 +68,8 @@ async def _run_row(store: Store, run: RunRecord, section: str, kind: str, detail
         href=f"#/runs/{run.id}",
         run_id=run.id,
         status=run.status,
+        minutes=None if run.finished_at is None else (run.finished_at - run.created_at) / 60,
+        tokens=None if run.finished_at is None else run.input_tokens + run.output_tokens,
     )
 
 
@@ -92,6 +97,8 @@ def _schedule_row(schedule: ScheduleRecord, now: float) -> ActivityRow:
         href="#/settings/schedules",
         run_id=None,
         status="scheduled",
+        minutes=None,
+        tokens=None,
     )
 
 

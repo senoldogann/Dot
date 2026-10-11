@@ -3,6 +3,7 @@
 // approval cards post nowhere, the buttons do nothing.
 
 import { approvalCard } from "../approvals.js";
+import { createCostCard } from "../cost.js";
 import { el } from "../dom.js";
 import { avatar, icon } from "../icons.js";
 import { emptyPanel, errorPanel, field, loadingPanel, pageHead, segmented, statusBadge } from "../panels.js";
@@ -22,6 +23,25 @@ function section(title, ...body) {
 function row(...children) {
   return el("div", { class: "row wrap" }, ...children);
 }
+
+// The bill of a run of 51 minutes, as `GET /runs/{id}/stats` answers it.
+const FAKE_COSTS = {
+  run_id: "demo",
+  status: "done",
+  minutes: 51.2,
+  stats: {
+    model: "ollama:demo",
+    steps: 260,
+    input_tokens: 9_400_000,
+    output_tokens: 61_000,
+    compaction: { compactions: 36, per_100_steps: 13.8, seconds: 420.5, share: 0.26 },
+    delegation: { runs: 2, seconds: 310.0 },
+    time: { model_seconds: 1630.0, compaction_seconds: 420.5, cached_tokens: 7_100_000, cached_share: 0.76 },
+  },
+  tool_seconds: 980.0,
+  waited_s: 140.0,
+  tools: [],
+};
 
 function fakeApproval(severity, tool, summary) {
   return { id: `demo-${severity}`, runId: "demo", tool, summary, severity, args: { kind: "write", target: "~/notes.txt", question: summary, options: ["Blue", "Green"] }, status: "pending", note: "" };
@@ -86,6 +106,8 @@ export function mount(root, ctx) {
     el("div", { class: "bubble user" }, "Your message, in the yellow bubble."),
     el("div", { class: "bubble", role: "article" }, el("div", { class: "prose" }, el("p", null, "Dot's answer, in the voice of the look. "), el("code", { class: "mono" }, "code"))),
   );
+  const costSample = createCostCard();
+  costSample.paint(FAKE_COSTS);
   const panels = el("div", { class: "stack" }, loadingPanel(), emptyPanel("clock", "Nothing here yet", "An empty panel with its hint."), errorPanel(new Error("Something went wrong"), () => {}));
   const type = el(
     "div",
@@ -108,6 +130,7 @@ export function mount(root, ctx) {
       section("Inputs", inputs),
       section("Notes", notes),
       section("Cards", cards),
+      section("Cost", costSample.element),
       section("Bubbles", bubbles),
       section("Panels", panels),
     ),

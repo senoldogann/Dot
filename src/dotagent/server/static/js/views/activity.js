@@ -3,7 +3,7 @@
 // status refresh while something works.
 
 import { api } from "../api.js";
-import { ago, el } from "../dom.js";
+import { ago, compact, duration, el } from "../dom.js";
 import { icon } from "../icons.js";
 import { emptyPanel, errorPanel, loadingPanel, pageHead, segmented, statusBadge } from "../panels.js";
 import { onChange, onLifecycle } from "../state.js";
@@ -42,6 +42,10 @@ const KIND_WORD = {
 
 function row(item) {
   const facts = [KIND_WORD[item.kind] ?? item.kind, item.channel, item.detail].filter((part) => part !== "");
+  if (item.minutes !== null) {
+    // A run that ended: how long it took and what it cost in tokens.
+    facts.push(`${duration(item.minutes * 60)} · ${compact(item.tokens)} tokens`);
+  }
   return el(
     "a",
     { class: "activity-row", href: item.href, "aria-label": `${item.title} (${facts.join(", ")})` },

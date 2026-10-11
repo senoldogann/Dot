@@ -236,7 +236,31 @@ async def test_the_sections_show_what_waits_what_works_and_a_campaign_session_wi
     after = (await client.get("/api/activity")).json()
     assert after["waiting"] == [] and after["working"] == []
     assert sorted(row["run_id"] for row in after["recent"]) == sorted([asking.id, working.id, session.id])
+    # A run that ended carries its minutes and its tokens (item 58); the live rows above carried neither.
+    assert all(row["minutes"] > 0 and row["tokens"] >= 0 for row in after["recent"])
+    assert all(row["minutes"] is None and row["tokens"] is None for row in activity["waiting"] + activity["working"])
     costs: httpx.Response = await client.get(f"/api/runs/{working.id}/stats")
     assert costs.status_code == 200, costs.text
     assert costs.json()["status"] == "done" and costs.json()["stats"]["steps"] >= 2 and costs.json()["minutes"] > 0
     assert (await client.get("/api/runs/run_none/stats")).status_code == 404
+    # The bill of the run on its page: the head line of the Cost card, the grid once opened, and the Ended today rows.
+    async with async_playwright() as playwright:
+        browser = await playwright.chromium.launch(channel=runtime.config.browser.channel, headless=True)
+        try:
+            for width, scheme in schemes:
+                page = await browser.new_page(viewport={"width": width, "height": 900}, color_scheme=scheme)
+                await page.goto(ui_url(host, port, TOKEN))
+                await page.goto(f"http://{host}:{port}/#/runs/{working.id}")
+                card = page.locator(".cost-card")
+                await expect(card.locator(".fold-summary")).to_contain_text("steps")
+                await card.locator(".fold-toggle").click()
+                await expect(card).to_contain_text("Input tokens")
+                await expect(card).to_contain_text("Compactions")
+                await page.screenshot(path=str(tmp_path / f"run-cost-{width}-{scheme}.png"))
+                await page.goto(f"http://{host}:{port}/#/activity")
+                recent = page.locator(".activity-section[data-section=recent] .activity-row")
+                await expect(recent).to_have_count(3)
+                await expect(recent.first).to_contain_text("tokens")
+                await page.close()
+        finally:
+            await browser.close()
