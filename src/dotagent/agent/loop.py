@@ -16,7 +16,6 @@ from dotagent.agent.attachments import (
 )
 from dotagent.agent.campaign import session_number
 from dotagent.agent.compact import (
-    CHARS_PER_TOKEN,
     drop_old_images,
     estimate_tokens,
     render_transcript,
@@ -143,7 +142,7 @@ from dotagent.config import AgentConfig
 from dotagent.core.errors import ConfigError, MissingSecretError, ProviderError, RunCancelled, ToolInputError
 from dotagent.core.jsonutil import dumps_compact
 from dotagent.core.logs import get_logger
-from dotagent.core.text import redact_secrets, truncate_middle
+from dotagent.core.text import CHARS_PER_TOKEN, redact_secrets, truncate_middle
 from dotagent.core.types import FrozenModel, JsonObject
 from dotagent.llm.calls import CallOrigin
 from dotagent.llm.router import ModelRef, parse_model_ref, unavailable_reason
@@ -164,7 +163,7 @@ from dotagent.llm.types import (
 )
 from dotagent.llm.typesafe import ChoiceAnswer
 from dotagent.memory.render import render_note
-from dotagent.memory.service import prompt_memories
+from dotagent.memory.service import Remembered, memory_budget, prompt_memories
 from dotagent.policy.types import QuestionMode
 from dotagent.runtime import Runtime
 from dotagent.skills.catalog import load_skills, playbook_root
@@ -1275,10 +1274,17 @@ async def run_agent(agent: AgentRun) -> RunEnd:
         specs = tuple(spec for spec in specs if spec.name != USE_TOOLS_TOOL)
     callable_tools: ToolRegistry = _run_tools(runtime.registry, run.mode, specs)
     memory_seen_at: float = time.time()
-    remembered: list[MemoryRecord] = await prompt_memories(runtime.memory, await _memory_query(runtime, run))
+    recalled: Remembered = await prompt_memories(
+        runtime.memory,
+        await _memory_query(runtime, run),
+        memory_budget(runtime.config.memory, info.context_length),
+    )
+    remembered: tuple[MemoryRecord, ...] = recalled.records
     if remembered:
         await runtime.store.mark_memories_used(run.id, [record.id for record in remembered], memory_seen_at, "start")
-        await runtime.bus.emit(run.id, "memories", {"ids": [record.id for record in remembered]}, True)
+        await runtime.bus.emit(
+            run.id, "memories", {"ids": [record.id for record in remembered], "tokens": recalled.tokens}, True
+        )
     can_ask: bool = can_ask_user(run.source, run.parent_run_id, run.approvals)
     questions: QuestionMode = question_mode(config.questions, can_ask)
     system: Message = system_message(

@@ -258,9 +258,9 @@ class MemoryConfig(FrozenModel):
     embed_provider: EmbedProvider
     embed_model: str
     embed_enabled: bool
-    inject_top_k: int
-    core_limit: int
-    user_limit: int
+    # The tokens a run's starting notes may take: inject_share of the model's context window, at most inject_tokens.
+    inject_tokens: int = Field(ge=0)
+    inject_share: float = Field(gt=0, le=1)
     candidate_pool: int
     min_similarity: float
     inject_min_similarity: float

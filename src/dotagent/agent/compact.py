@@ -3,11 +3,10 @@
 from collections.abc import Sequence
 
 from dotagent.core.jsonutil import dumps_compact
-from dotagent.core.text import truncate_middle
+from dotagent.core.text import CHARS_PER_TOKEN, truncate_middle
 from dotagent.llm.types import Message, ToolCall, ToolSpec
 
 # Characters per token in the estimate; the loop calibrates the estimate against the provider's own counts.
-CHARS_PER_TOKEN: float = 3.2
 _TOKENS_PER_IMAGE: int = 1400
 _OLD_RESULT_CHARS: int = 700
 _OMITTED_IMAGE_NOTE: str = "\n[screenshot omitted: it is out of date]"

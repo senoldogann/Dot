@@ -28,8 +28,10 @@ from dotagent.memory.embedder import OpenAIEmbedder, build_embedder, build_ollam
 from dotagent.memory.service import (
     MemoryHit,
     MemoryIndex,
+    Remembered,
     SavedMemory,
     close_memory_index,
+    note_tokens,
     open_memory_index,
     prompt_memories,
     recall,
@@ -42,6 +44,7 @@ from dotagent.policy.engine import decide
 from dotagent.policy.types import ActionInfo
 from dotagent.runtime import Runtime, build_runtime, close_runtime
 from dotagent.store.db import Store
+from dotagent.store.models import MemoryRecord
 from dotagent.tools.base import PreparedCall, ToolResult
 from dotagent.tools.context import ToolContext
 from dotagent.tools.registry import tools_for_mode
@@ -135,6 +138,8 @@ async def words_only(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> AsyncIt
 
 
 AGENT_RUN: str = "run_earlier_0000"
+# The tokens a run's starting notes may take in these tests: room for every note of a test.
+BUDGET: int = 2000
 
 
 async def _save_all(index: MemoryIndex, notes: list[str]) -> None:
@@ -215,18 +220,31 @@ async def test_a_run_starts_with_the_standing_notes_and_the_ones_that_fit_its_go
     # Notes an earlier run saved: only the ones that fit the goal come along.
     for note in [DOG, LAPTOP, DARK_MODE]:
         await save_memory(memory, note, [], AGENT_RUN)
-    related: list[str] = [r.content for r in await prompt_memories(memory, "Take Biscuit the dog to the vet.")]
+    related_records: tuple[MemoryRecord, ...] = (
+        await prompt_memories(memory, "Take Biscuit the dog to the vet.", BUDGET)
+    ).records
+    related: list[str] = [r.content for r in related_records]
     assert related[0] == standing
     assert DOG in related
     assert len(related) == len(set(related))
-    assert [r.content for r in await prompt_memories(memory, "Find a recipe for sourdough bread.")] == [standing]
+    assert [
+        r.content for r in (await prompt_memories(memory, "Find a recipe for sourdough bread.", BUDGET)).records
+    ] == [standing]
+    # A budget with room for the standing note alone leaves the dog's note to memory_search, and says what it spent.
+    tight: Remembered = await prompt_memories(
+        memory, "Take Biscuit the dog to the vet.", note_tokens(related_records[0])
+    )
+    assert [r.content for r in tight.records] == [standing]
+    assert tight.tokens == note_tokens(related_records[0])
 
 
 @requires_embedder
 async def test_a_note_the_user_wrote_reaches_every_run_even_when_its_goal_is_unrelated(memory: MemoryIndex) -> None:
     await save_memory(memory, DOG, [], AGENT_RUN)
     await save_memory(memory, CITY, ["aboutme"], None)
-    given: list[str] = [r.content for r in await prompt_memories(memory, "Find a recipe for sourdough bread.")]
+    given: list[str] = [
+        r.content for r in (await prompt_memories(memory, "Find a recipe for sourdough bread.", BUDGET)).records
+    ]
     assert given == [CITY]
 
 
@@ -368,7 +386,8 @@ async def test_an_agent_note_no_run_was_handed_for_long_rests_while_the_users_no
     _backdate(tmp_path / "dot.db", old_agent.record.id, long_ago)
     _backdate(tmp_path / "dot.db", old_user.record.id, long_ago)
     given: list[str] = [
-        record.content for record in await prompt_memories(words_only, "Take Biscuit the dog to the vet.")
+        record.content
+        for record in (await prompt_memories(words_only, "Take Biscuit the dog to the vet.", BUDGET)).records
     ]
     assert given == [CITY]
     # A search still finds the resting note, and it is listed as resting.

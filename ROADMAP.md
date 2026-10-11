@@ -5010,8 +5010,8 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 87  | Agents together: messages between agents, the team's thread, the harness  | done        | 23c6b5c |
 | 88  | Desktop and web, one interface: the Tauri shell on the same pages         | done        | c4d9b88 |
 | 89  | Learning on, and measured: every note handed to a run is scored by how it ended | done        | a779b72 |
-| 90  | Memory that keeps what helps: the score decides what is recalled, rests, retires | in progress |         |
-| 91  | Recall by budget: the notes a run starts with fit a token budget, best first     | planned     |         |
+| 90  | Memory that keeps what helps: the score decides what is recalled, rests, retires | done        | fa775a0 |
+| 91  | Recall by budget: the notes a run starts with fit a token budget, best first     | in progress |         |
 | 92  | Skills from its own work: a task that went well becomes a skill for its kind     | planned     |         |
 | 93  | The owner, in one section: what the reflection knows about how you work         | planned     |         |
 | 94  | An agent learns for itself: lessons, skills and a score per agent                | planned     |         |
@@ -5439,7 +5439,7 @@ and ends, the use recorded with its status.
 
 ### 90. Memory that keeps what helps: the score decides what is recalled, rests and is retired
 
-**Status: in progress (2026-10-11).**
+**Status: done.** Merged as `fa775a0` (PR #104, MYP-230 Done).
 
 **Design, as built (2026-10-11).** `[memory] score_days` (30) and `score_min_uses` (3) in `MemoryConfig`.
 `Store.memory_scores(ids, since)` takes the window (`0.0` for all time; the Memory page shows all time) and
@@ -5466,7 +5466,21 @@ the resting and the retirement; the reflection smoke extended.
 
 ### 91. Recall by budget: the notes a run starts with fit a token budget, best first
 
-**Status: planned.**
+**Status: in progress (2026-10-11).**
+
+**Design, as built (2026-10-11).** `[memory] inject_tokens` (1500) and `inject_share` (0.02) replace `inject_top_k`,
+`core_limit` and `user_limit`. `memory_budget(config, context_length)` in `memory/service.py` is the share of the
+model's window capped at `inject_tokens`, the cap alone when `ModelInfo.context_length` is `None`; the loop
+computes it from the run's model before it recalls. `note_tokens(record)` estimates a note's line (its text and
+tags over `CHARS_PER_TOKEN`, which moved to `core/text.py` with `estimate_text_tokens`, plus twelve tokens for who
+wrote it and when); `fit_notes(notes, budget, spent)` takes the notes in order while they fit, passing over one that
+does not so that a shorter one after it may; `prompt_memories(index, query, budget)` reads up to 200 standing and
+user notes and the recall candidates, orders them as before (standing newest first; the user's closest first; the
+agent's by fit and score, resting ones out) and packs the three groups in that order, returning `Remembered`
+(the records and the tokens spent). The `memories` event carries `tokens` and the timeline says "Recalled 3
+memories, 420 tokens". Tests: `tests/unit/test_memory_ranking.py` (the budget from the window and the cap, the
+packing and the pass-over); `tests/smoke/test_memory.py` (a budget with room for the standing note alone leaves the
+rest to `memory_search` and reports what it spent).
 
 **What.** `[memory] inject_tokens` replaces `inject_top_k`, `core_limit` and `user_limit` as the measure: the
 standing notes first, then the owner's, then the agent's, each ranked by fit and score, taken until the budget
@@ -6023,3 +6037,5 @@ skills, the score), with the same Drop. Tests: unit for the scoping; the agents 
 - 2026-10-11 (Fable 5.1): the desktop shell rebuilt on the owner's Mac after part 10; its first drag raised an ACL error, fixed as `06cb620` (PR #100, under item 88): the start-dragging capability and the sidebar head owning its space. Verified by dragging both bars of the rebuilt `Dot.app`.
 - 2026-10-11 (Fable 5.1): part 11 planned (items 89 to 94): learning on and measured, memory scored by outcome, recall by token budget, skills from the agent's own work, the owner's section, learning per agent.
 - 2026-10-11 (Fable 5.1): item 89 merged as `a779b72` (PR #103, MYP-229 Done): learning on (`propose`, playbooks on) and measured (`memory_uses`, the Learning section of `dotx stats`, the score on the Memory page). The daemon restarted on `a779b72`.
+- 2026-10-11 (Fable 5.1): item 90 merged as `fa775a0` (PR #104, MYP-230 Done): the score lifts, rests and retires the agent's notes. The daemon restarted on `fa775a0`.
+- 2026-10-11 (Fable 5.1): `tests/smoke/test_continuity_live.py` (live, not in CI) had failed since the prompt outgrew its 14k window (the system prompt and the tools are about 18k tokens now); its window is 24k, the three tests pass against the cloud model (fixed with item 91).

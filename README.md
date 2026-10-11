@@ -1216,9 +1216,12 @@ dotx memory forget NOTE_ID
 dotx memory reindex      # embed every note again, for example after changing [memory] embed_model
 ```
 
-- A note tagged `core` goes into every run (at most `core_limit` of them), and so does a note you wrote yourself (at
-  most `user_limit`), together with up to `inject_top_k` other notes that are close enough to the goal and the earlier
-  goals of the conversation (`inject_min_similarity`).
+- A run starts with the notes tagged `core` (newest first), then the notes you wrote yourself (the ones closest to the
+  goal first), then the agent's notes close enough to the goal and the earlier goals of the conversation
+  (`inject_min_similarity`; by fit and score), as many as fit a budget of tokens: `inject_share` (2%) of the model's
+  context window, at most `inject_tokens` (1500; the cap alone when the provider does not say the window). A note that
+  does not fit is passed over, a shorter one after it may still fit, and `memory_search` finds the rest. The run's
+  timeline says how many notes it recalled and the tokens they took.
 - Use decides what is recalled: a note handed to a run counts as used, and a search lifts the agent's notes a run was
   handed lately (a use a moment ago is worth a second place in one ranking; the lift halves every `use_half_life_days`,
   30), so the notes that help overtake the ones first written. An agent's note that no run was handed for `rest_days`

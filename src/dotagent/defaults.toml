@@ -461,12 +461,12 @@ osascript_timeout_s = 30.0
 embed_provider = "ollama"
 embed_model = "bge-m3"
 embed_enabled = true
-# Every run starts with the notes tagged "core" (at most core_limit, newest first), the notes you wrote yourself in
-# Settings › Memory or with `dotx memory` (at most user_limit; past that, the ones that fit the goal best), and up to
-# inject_top_k notes the agent saved that fit the goal.
-inject_top_k = 6
-core_limit = 8
-user_limit = 12
+# Every run starts with the notes tagged "core" (newest first), the notes you wrote yourself in Settings › Memory or
+# with `dotx memory` (the ones that fit the goal first) and the agent's notes that fit the goal (by fit and score),
+# in that order, as many as fit a budget of tokens: inject_share of the model's context window, at most inject_tokens
+# (the budget alone when the provider does not say the window). A note that does not fit is left to memory_search.
+inject_tokens = 1500
+inject_share = 0.02
 # Candidates each search (words, meaning) hands to the fusion, and the weakest cosine similarity that counts as a match.
 # A run's starting notes are chosen more strictly (inject_min_similarity): a wrong note there costs tokens every run.
 # The similarities are those of bge-m3 (related 0.55-0.75, unrelated mostly below 0.5); recalibrate for another model.
