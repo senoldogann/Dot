@@ -5014,7 +5014,7 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 91  | Recall by budget: the notes a run starts with fit a token budget, best first     | done        | 9222a5d |
 | 92  | Skills from its own work: a task that went well becomes a skill for its kind     | done        | 3074107 |
 | 93  | The owner, in one section: what the reflection knows about how you work         | done        | 6d64e43 |
-| 94  | An agent learns for itself: lessons, skills and a score per agent                | in progress |         |
+| 94  | An agent learns for itself: lessons, skills and a score per agent                | done        | 937cca4 |
 
 ### 77. The type system: Inter and Geist Mono, seven sizes, three weights
 
@@ -5380,12 +5380,16 @@ The owner's eleventh word, on 2026-10-11, after part 10: "does it have its own c
 that drops what is not needed? If it learns and keeps skills it gets faster and better; it would not rely on them
 alone, but it would be fast. It must be excellent, different from and freer than Grok's and OpenAI's agents."
 
-**Status (2026-10-11): planned.** What is built today (items 7, 36, 70, 71): one note store with the owner's, the
-agent's and the reflection's notes; recall by words and meaning with a lift by recent use; lessons drawn after a
-run (`[agent] lessons`, off); playbooks per web host after a goal-mode run (`[agent] playbooks`, off); a nightly
-reflection that merges, retires and journals; a note that rests after 90 days unused. Nothing learned is measured
-against the runs it was handed to, so the two switches stayed off for want of evidence, and the agent never
-distils a skill from work that was not a web site in goal mode.
+**Status (2026-10-11): built.** Items 89 to 94 merged the same day (`a779b72`, `fa775a0`, `9222a5d`, `3074107`,
+`6d64e43`, `937cca4`), each behind the gate, its smoke tests and its screenshot tour read. Learning is on by
+default: lessons proposed after a run that stumbled, a skill distilled from a task that went well, every note scored
+by how the runs handed it ended, recall within a token budget, the owner section the reflection keeps, and an
+agent's lessons and skills its own. What waits: the evidence of real use (`dotx stats` Learning after a few weeks
+of runs, the scores on the Memory page), and the daemon restarted on `937cca4` once no run is active. Before this
+part: one note store with the owner's, the agent's and the reflection's notes; recall by words and meaning with a
+lift by recent use; lessons (`[agent] lessons`, off) and playbooks per web host after a goal-mode run
+(`[agent] playbooks`, off); a nightly reflection that merges, retires and journals; a note that rests after 90 days
+unused; nothing learned measured against the runs it was handed to.
 
 **The shape of the learning (the decisions of this part).** Learning is on, in the open: every lesson and every
 skill is a note or a folder the owner can read, edit and drop; nothing changes the agent's rules. What is learned
@@ -5560,7 +5564,7 @@ reflection smoke extended.
 
 ### 94. An agent learns for itself: lessons, skills and a score per agent
 
-**Status: in progress (2026-10-11).**
+**Status: done.** Merged as `937cca4` (PR #108, MYP-234 Done).
 
 **Design, as built (2026-10-11).** A note carries `agent_id` (a column added to `memories`, `None` for Dot's; the
 notes of an older database are Dot's): a lesson saved from a run, by `auto` or by the owner, is the run's agent's;
@@ -6106,3 +6110,4 @@ skills, the score), with the same Drop. Tests: unit for the scoping; the agents 
 - 2026-10-11 (Fable 5.1): item 91 merged as `9222a5d` (PR #105, MYP-231 Done): the run's starting notes fit a token budget. The daemon restarted on `9222a5d`.
 - 2026-10-11 (Fable 5.1): item 92 merged as `3074107` (PR #106, MYP-232 Done): learned skills of any kind of work, the Skills tab. The daemon restarted on `3074107`.
 - 2026-10-11 (Fable 5.1): item 93 merged as `6d64e43` (PR #107, MYP-233 Done): the owner section the reflection keeps, the owner's own lines beside it, the Memory page card. The daemon restarted on `6d64e43`.
+- 2026-10-11 (Fable 5.1): item 94 merged as `937cca4` (PR #108, MYP-234 Done): an agent's lessons, skills and scores its own, the agent's page "What it learned". Part 11 built: items 89 to 94. The daemon waits for a restart on `937cca4` (two of the owner's runs were active).
