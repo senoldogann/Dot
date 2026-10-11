@@ -4248,8 +4248,8 @@ parked: its premises (tool-call deltas in the stream) are still not in the code.
 | --- | ------------------------------------------------------------------------ | ----------- | ------- |
 | 60  | The live numbers of parts 5 and 6                                        | planned     |         |
 | 61  | Summaries that pass their own check                                      | done        | a8c602f |
-| 62  | A delegate before the plan is a step, not a lost turn                   | in progress |         |
-| 63  | The soft look: light and dark, every surface                             | planned     |         |
+| 62  | A delegate before the plan is a step, not a lost turn                   | done        | 056b153 |
+| 63  | The soft look: light and dark, every surface                             | in progress |         |
 | 64  | The composer: a slash menu of commands, skills and MCP tools             | planned     |         |
 | 65  | The chrome that stays: the run's head and side panel while it scrolls    | planned     |         |
 | 66  | One door for the store's writes                                          | done        | 5c7eada |
@@ -4406,7 +4406,7 @@ README (compaction paragraph).
 
 ### 62. A delegate before the plan is a step, not a lost turn
 
-**Status: in progress.** Built on `item-62-delegate-step` (MYP-204).
+**Status: done.** Built on `item-62-delegate-step` (MYP-204), merged 056b153 (PR #71).
 
 **What.** `delegate` with a `step` the plan does not have runs the delegation and says in its result that the step was
 not in the plan, instead of refusing the call and losing the turn.
@@ -4436,7 +4436,7 @@ live delegate smoke tests pass again (2 passed in 24 s on `gpt-oss:20b-cloud`).
 
 ### 63. The soft look: light and dark, every surface
 
-**Status: planned.**
+**Status: in progress.** Built on `item-63-soft-look` (MYP-205).
 
 **What.** One soft look in light and dark: low-saturation warm neutrals, surfaces that step up by lightness rather than
 by shadow in dark, hairline borders at a small alpha, text in three tiers that meet WCAG AA on every surface, one warm
@@ -4461,7 +4461,27 @@ surface (a contrast function in the test). Screenshots of the controls page, the
 settings at 1280 and 390 px in both schemes, looked at. What the research of 2026-10-11 into Radix Colors, Apple's
 dark mode guidance, Material 3 surfaces and the looks of Linear and Claude says is recorded as built.
 
-**Touchpoints.** `static/css/themes.css`, `app.css`, `shell.css`, `run.css`, `settings.css`, `static/js/theme.js`,
+**Design, as built (2026-10-11).** Item 50 had already moved every colour into `themes.css` (the unit test counts zero
+literal colours in the other sheets), so the other sheets did not change. `themes.css` names each token's light and
+dark value in one place with `light-dark()` (Baseline 2024) under `color-scheme: light dark` on the root, so there is
+no second block per scheme to keep in step; `:root[data-scheme="light"|"dark"]` sets `color-scheme` to one and holds
+it, which `light-dark()` follows, as do form controls and scrollbars. The neutral scale is a warm grey (Radix's
+12-step greys as the measure): light `#f8f7f4` page, `#fdfcfa` / `#f3f2ee` / `#e9e8e3` surfaces, ink `#1c1b19`; dark
+`#1b1a18` page, `#22211f` / `#2a2927` / `#343230` surfaces stepping up by lightness, text `#ecebe6`; borders are the
+ink at 8 % and 16 % alpha (9 % and 18 % in dark); shadows are built from three ink tokens (`--shadow-ink`,
+`-soft`, `-deep`) that are transparent in dark but under what floats over a scrim. The accent stayed an ink, not the
+amber of the plan: the accent paints text and focus rings, and an amber reads at under 2:1 on a light surface; the
+warmth is the bubble and the greys. Paper got the same treatment with its own values. `theme.js`: `SCHEMES`
+(system, light, dark), `applyStoredScheme` at start, `chooseScheme` kept as `dot.scheme`; Settings › General ›
+Appearance gained a "Colour scheme" segmented control. Tests: `test_css_tokens.py` reads each look's block, computes
+WCAG contrast and asserts text and text-2 at 4.5:1 and muted and faint at 3:1 on every surface in both schemes, the
+inks on their grounds (on-accent, on-bubble, ok/warn/bad on their weak tints) at 4.5:1, and the surfaces stepping
+down in light and up in dark; `test_controls.py` holds Dark on a light page and measures the page's luminance before,
+after and after a reload (its section count was 11 since item 58 added Cost: 12 now, the test had not been run).
+Screenshots of the controls page (both looks, both schemes, 1280 and 390), the Activity page, a run page and the
+settings in held dark were looked at.
+
+**Touchpoints.** `static/css/themes.css`, `static/js/theme.js`, `main.js`, `views/system.js`,
 `tests/unit/test_css_tokens.py`, `tests/smoke/test_controls.py`, README (visual system paragraph).
 
 ### 64. The composer: a slash menu of commands, skills and MCP tools

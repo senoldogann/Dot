@@ -1,5 +1,6 @@
 // The look of the interface: two skins on the same markup, picked with `data-theme` on the page element and remembered in
-// this browser. Light and dark always follow the system. Each skin also says how the layout starts out (see layout.js).
+// this browser, and the colour scheme: the system's, or light or dark held with `data-scheme` on the page element
+// (themes.css reads it through color-scheme). Each skin also says how the layout starts out (see layout.js).
 
 import { readPref, writePref } from "./prefs.js";
 
@@ -7,7 +8,7 @@ export const THEMES = [
   {
     id: "neutral",
     label: "Neutral",
-    hint: "White and graphite with a black accent, plain like a chat app.",
+    hint: "Warm grey and ink, plain like a chat app.",
     foldSteps: true,
     inspector: false,
   },
@@ -20,8 +21,16 @@ export const THEMES = [
   },
 ];
 
+export const SCHEMES = [
+  { id: "system", label: "System", hint: "Light or dark as your system is." },
+  { id: "light", label: "Light", hint: "Light, whatever the system says." },
+  { id: "dark", label: "Dark", hint: "Dark, whatever the system says." },
+];
+
 const THEME_KEY = "dot.theme";
+const SCHEME_KEY = "dot.scheme";
 const DEFAULT_THEME = "neutral";
+const DEFAULT_SCHEME = "system";
 
 const changeListeners = new Set();
 
@@ -62,4 +71,37 @@ export function chooseTheme(id) {
   for (const listener of changeListeners) {
     listener(id);
   }
+}
+
+function isScheme(id) {
+  return SCHEMES.some((scheme) => scheme.id === id);
+}
+
+/** The colour scheme chosen on the page now: "system" when it follows the system. */
+export function currentScheme() {
+  const id = document.documentElement.dataset.scheme;
+  return isScheme(id) ? id : DEFAULT_SCHEME;
+}
+
+function setScheme(id) {
+  if (id === DEFAULT_SCHEME) {
+    delete document.documentElement.dataset.scheme;
+  } else {
+    document.documentElement.dataset.scheme = id;
+  }
+}
+
+/** Put the saved colour scheme on the page. Call it before anything is drawn; a missing or unknown saved value means the system's. */
+export function applyStoredScheme() {
+  const stored = readPref(SCHEME_KEY);
+  setScheme(isScheme(stored) ? stored : DEFAULT_SCHEME);
+}
+
+/** Hold a colour scheme (or follow the system again) and remember the choice. */
+export function chooseScheme(id) {
+  if (!isScheme(id)) {
+    throw new Error(`unknown colour scheme: ${id}`);
+  }
+  setScheme(id);
+  writePref(SCHEME_KEY, id);
 }
