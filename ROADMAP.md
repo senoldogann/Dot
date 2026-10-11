@@ -4249,8 +4249,8 @@ parked: its premises (tool-call deltas in the stream) are still not in the code.
 | 60  | The live numbers of parts 5 and 6                                        | planned     |         |
 | 61  | Summaries that pass their own check                                      | done        | a8c602f |
 | 62  | A delegate before the plan is a step, not a lost turn                   | done        | 056b153 |
-| 63  | The soft look: light and dark, every surface                             | in progress |         |
-| 64  | The composer: a slash menu of commands, skills and MCP tools             | planned     |         |
+| 63  | The soft look: light and dark, every surface                             | done        | 9e86fda |
+| 64  | The composer: a slash menu of commands, skills and MCP tools             | in progress |         |
 | 65  | The chrome that stays: the run's head and side panel while it scrolls    | planned     |         |
 | 66  | One door for the store's writes                                          | done        | 5c7eada |
 | 67  | The inspector's cards: folded, no stray null, a view that follows the run | done        | 8255af7 |
@@ -4436,7 +4436,7 @@ live delegate smoke tests pass again (2 passed in 24 s on `gpt-oss:20b-cloud`).
 
 ### 63. The soft look: light and dark, every surface
 
-**Status: in progress.** Built on `item-63-soft-look` (MYP-205).
+**Status: done.** Built on `item-63-soft-look` (MYP-205), merged 9e86fda (PR #72).
 
 **What.** One soft look in light and dark: low-saturation warm neutrals, surfaces that step up by lightness rather than
 by shadow in dark, hairline borders at a small alpha, text in three tiers that meet WCAG AA on every surface, one warm
@@ -4486,7 +4486,7 @@ settings in held dark were looked at.
 
 ### 64. The composer: a slash menu of commands, skills and MCP tools
 
-**Status: planned.**
+**Status: in progress.** Built on `item-64-slash-composer` (MYP-206).
 
 **What.** Typing `/` at the start of a word in the composer (the new-run page and the run's dock) opens a menu over the
 caret: the commands (`/btw`, the run modes, approvals, model), the skills by name with their one-line description, and
@@ -4506,9 +4506,30 @@ textarea, autosize, Enter/Shift+Enter, attachments, slash menu); the dock of a r
 prompt is unchanged: a skill named in the goal is already read by the run. Unit test on the filter and grouping; a
 smoke test that types `/` and picks a skill from a fixture skills root, at 1280 and 390 px.
 
-**Touchpoints.** `server/routes_system.py`, `server/views.py`, `static/js/composer.js` (new), `static/js/slash.js`
-(new), `static/js/views/runs.js`, `static/js/views/run.js`, `app.css`, `tests/unit/test_slash.py`,
-`tests/smoke/test_composer.py`, README.
+**Design, as built (2026-10-11).** `GET /api/palette` (`server/palette.py`, `palette_view(skills, tools)`) returns
+the skills by name (name, description, source) and the MCP servers by name, each with its tools by the name the model
+calls them by and the first line of their description; the skills are read from the folders as a run reads them
+(`load_skills` with the plugins and the playbook root). The commands are the web UI's own, since they act on the
+composer and not on the daemon: `/task`, `/chat`, `/research` on the new chat page pick the kind of run (through the
+same effects as a click on the segmented control), `/btw` in the box of a run inserts itself. `static/js/slash.js`
+holds the words without the page: `slashWord(text, caret)` (a slash at the start of the text or after white space,
+so a slash in a path or an address opens nothing), `paletteGroups(commands, palette)`, `filterGroups(groups, word)`
+and `replaceSlashWord`. `static/js/composer.js` `wireComposer(textarea, { maxPx, send, commands })` is what the two
+composers share: autosize, Enter sends and Shift+Enter breaks a line, and the menu (`role="listbox"`, options with
+`aria-selected`, `aria-expanded`, `aria-controls` and `aria-activedescendant` on the box; ArrowUp/Down move, Enter
+and Tab pick, Escape closes, a blur closes); the palette is asked for once per page on the first slash and a failure
+is shown in the menu as a note, not hidden. The two frames stayed their own (the new chat's card with its options bar,
+the dock with its send button): the plan's one composer module is the wiring, not the frame. A skill picked reads
+"use the skill NAME: ", a tool its name and a space. No `tests/unit/test_slash.py`: the project has no JavaScript
+test runner, so the unit test is `tests/unit/test_palette.py` on `palette_view` and the slash words are covered by the
+smoke test `tests/smoke/test_composer.py`: a scratch home with one skill, the API's answer, and in the page at 1280
+and 390 px: `/` opens the menu with Commands and Skills, the first option is active, `sc` filters to the skill, Enter
+picks without sending, a slash inside a word opens nothing, Escape closes, `/res` and Tab pick the research mode and
+leave no text, Shift+Enter breaks a line. The dock of a run is wired by the same module and not driven by the test.
+
+**Touchpoints.** `server/routes_system.py`, `server/views.py`, `server/palette.py` (new), `static/js/composer.js`
+(new), `static/js/slash.js` (new), `static/js/views/runs.js`, `static/js/views/run.js`, `app.css`,
+`tests/unit/test_palette.py`, `tests/smoke/test_composer.py`, README.
 
 ### 65. The chrome that stays: the run's head and side panel while it scrolls
 
