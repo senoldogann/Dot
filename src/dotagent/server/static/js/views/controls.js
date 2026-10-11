@@ -3,6 +3,10 @@
 // approval cards post nowhere, the buttons do nothing.
 
 import { approvalCard } from "../approvals.js";
+import { mountCharacter } from "../character/character.js";
+import { EXPRESSION_IDS } from "../character/expressions.js";
+import { COLOUR_IDS, SHAPE_IDS } from "../character/skins.js";
+import { SEQUENCE } from "../character/states.js";
 import { createCostCard } from "../cost.js";
 import { el } from "../dom.js";
 import { avatar, icon } from "../icons.js";
@@ -51,7 +55,41 @@ function fakeApproval(severity, tool, summary) {
   return { id: `demo-${severity}`, runId: "demo", tool, summary, severity, args: { kind: "write", target: "~/notes.txt", question: summary, options: ["Blue", "Green"] }, status: "pending", note: "" };
 }
 
+// The characters (item 101): every shape, expression and colour as a still frame, and every animation moving.
+function characterRow(ids, size, make) {
+  const handles = [];
+  const cells = ids.map((id) => {
+    const cell = el("div", { class: "stack tight center" });
+    handles.push(make(cell, id));
+    cell.append(el("span", { class: "small muted" }, id));
+    return cell;
+  });
+  return { element: row(...cells), handles };
+}
+
+function characters() {
+  const shapes = characterRow(SHAPE_IDS, 64, (cell, id) => mountCharacter(cell, { shape: id, size: 64, moving: false }));
+  const expressions = characterRow(EXPRESSION_IDS, 64, (cell, id) => mountCharacter(cell, { expression: id, size: 64, moving: false }));
+  const colours = characterRow(COLOUR_IDS, 48, (cell, id) => mountCharacter(cell, { colour: id, size: 48, moving: false }));
+  const states = characterRow(SEQUENCE, 80, (cell, id) => mountCharacter(cell, { state: id, size: 80, phase: 0 }));
+  const element = el(
+    "div",
+    { class: "stack" },
+    el("span", { class: "small muted" }, "Shapes"),
+    shapes.element,
+    el("span", { class: "small muted" }, "Expressions"),
+    expressions.element,
+    el("span", { class: "small muted" }, "Colours"),
+    colours.element,
+    el("span", { class: "small muted" }, "Animations, moving"),
+    states.element,
+  );
+  const handles = [...shapes.handles, ...expressions.handles, ...colours.handles, ...states.handles];
+  return { element, dispose: () => handles.forEach((handle) => handle.destroy()) };
+}
+
 export function mount(root, ctx) {
+  const cast = characters();
   const swatches = el(
     "div",
     { class: "swatches" },
@@ -130,6 +168,7 @@ export function mount(root, ctx) {
       section("Colour", swatches),
       section("Type", type),
       section("Faces", faces),
+      section("Characters", cast.element),
       section("Buttons", buttons),
       section("Badges", badges),
       section("Marks", marks),
@@ -141,5 +180,5 @@ export function mount(root, ctx) {
       section("Panels", panels),
     ),
   );
-  return () => {};
+  return cast.dispose;
 }

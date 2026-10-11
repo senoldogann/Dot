@@ -260,6 +260,75 @@ textarea {
   fill: var(--accent);
 }
 
+/* A character (character/character.js, item 101): one filled shape in a colour of the theme's character palette, with
+   the eyes as holes that show the ground, and the notification pastille in its blue. */
+.character {
+  display: block;
+  flex: none;
+}
+
+.character[data-colour="ink"] {
+  color: var(--character-ink);
+}
+
+.character[data-colour="brown"] {
+  color: var(--character-brown);
+}
+
+.character[data-colour="red"] {
+  color: var(--character-red);
+}
+
+.character[data-colour="orange"] {
+  color: var(--character-orange);
+}
+
+.character[data-colour="amber"] {
+  color: var(--character-amber);
+}
+
+.character[data-colour="green"] {
+  color: var(--character-green);
+}
+
+.character[data-colour="teal"] {
+  color: var(--character-teal);
+}
+
+.character[data-colour="blue"] {
+  color: var(--character-blue);
+}
+
+.character[data-colour="violet"] {
+  color: var(--character-violet);
+}
+
+.character[data-colour="pink"] {
+  color: var(--character-pink);
+}
+
+.character[data-colour="grey"] {
+  color: var(--character-grey);
+}
+
+.character[data-colour="cream"] {
+  color: var(--character-cream);
+}
+
+.character-ink,
+.character-dots circle,
+.character-dots path {
+  fill: currentColor;
+}
+
+.character-paper {
+  fill: var(--bg);
+}
+
+.character-notif {
+  fill: var(--character-notify);
+}
+
 /* Dot's face (icons.js): a badge in the colour of the owner's bubbles with the mark in the ink of their text. */
 .avatar {
   width: 40px;

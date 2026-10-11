@@ -64,6 +64,21 @@
   --hue-5: light-dark(#c3b4f3, #a08fd6);
   --hue-6: light-dark(#f2aad0, #cf86ae);
   --hue-7: light-dark(#e1cf98, #bfab6f);
+  /* The twelve colours of a character's body (character/skins.js, item 101), bloub's palette; ink and cream follow the
+     scheme so a body is never the colour of the ground, and the pastille is bloub's notification blue. */
+  --character-ink: light-dark(#0a0a0c, #ecebe6);
+  --character-brown: light-dark(#8b5e3c, #a8744c);
+  --character-red: #e8483f;
+  --character-orange: #f08a24;
+  --character-amber: #f0b429;
+  --character-green: #3ecf8e;
+  --character-teal: #2fbfa0;
+  --character-blue: #3b93f0;
+  --character-violet: #8b5cf6;
+  --character-pink: #e152b0;
+  --character-grey: #a3a3a3;
+  --character-cream: light-dark(#d9d4c6, #f1efe9);
+  --character-notify: #2496e8;
   --knob: light-dark(#ffffff, #f5f4f0);
   --scrim: light-dark(rgb(28 27 25 / 40%), rgb(0 0 0 / 55%));
   --scrim-strong: light-dark(rgb(28 27 25 / 78%), rgb(0 0 0 / 80%));
