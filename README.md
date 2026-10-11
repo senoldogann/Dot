@@ -905,7 +905,12 @@ visual system, soft in both schemes: every colour is a token of `themes.css` tha
 in one place; surfaces step up by lightness rather than by shadow in dark, borders are the text colour at a small
 alpha so they sit on every surface, and the text tiers are measured against every surface (4.5:1 for text, 3:1 for
 labels) by a unit test. The type sizes, radii and spacing are tokens of `app.css` that every control is drawn on;
-`#/controls` shows every control on one page for checking a look.
+`#/controls` shows every control on one page for checking a look. Motion is tokens too: three durations (120, 200 and
+320 ms) and two easings for what changes, and the rhythms of what repeats (the face's breath and pulse, a blink, a
+spin); a unit test holds every transition and animation to them. The face breathes slowly at rest and pulses while a
+run works; cards, rows, the slash menu and the toasts fade in; a state badge cross-fades. Under the system's
+reduced-motion setting every transform goes (the breath, the pulse, the spinners, the drawer's slide) and the fades
+stay, so a state change is still seen.
 
 While you are elsewhere, the tab title counts the approvals that wait: `(2) New chat · Dot`. Settings › General ›
 Notifications adds

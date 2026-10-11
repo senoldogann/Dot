@@ -88,15 +88,23 @@
   visibility: hidden;
   transform: translateX(-100%);
   transition:
-    transform 0.2s ease,
-    visibility 0s linear 0.2s;
+    transform var(--motion-base) var(--ease),
+    visibility 0s linear var(--motion-base);
 }
 
 .shell[data-nav="drawer"][data-sidebar="open"] .sidebar {
   visibility: visible;
   transform: none;
   box-shadow: var(--shadow-overlay);
-  transition: transform 0.2s ease;
+  transition: transform var(--motion-base) var(--ease);
+}
+
+/* Reduced motion: the drawer appears in place rather than sliding in. */
+@media (prefers-reduced-motion: reduce) {
+  .shell[data-nav="drawer"] .sidebar,
+  .shell[data-nav="drawer"][data-sidebar="open"] .sidebar {
+    transition: none;
+  }
 }
 
 .scrim {
