@@ -2,6 +2,7 @@
 // and in dark, wide and on a phone. Reached at #/controls; nothing links to it. The cards here act on nothing: the
 // approval cards post nowhere, the buttons do nothing.
 
+import { dotFace } from "../actors.js";
 import { approvalCard } from "../approvals.js";
 import { mountCharacter } from "../character/character.js";
 import { EXPRESSION_IDS } from "../character/expressions.js";
@@ -9,7 +10,7 @@ import { COLOUR_IDS, SHAPE_IDS } from "../character/skins.js";
 import { SEQUENCE } from "../character/states.js";
 import { createCostCard } from "../cost.js";
 import { el } from "../dom.js";
-import { avatar, icon } from "../icons.js";
+import { icon } from "../icons.js";
 import { emptyPanel, errorPanel, field, loadingPanel, pageHead, segmented, statusBadge } from "../panels.js";
 
 const FACE_STATES = ["idle", "working", "waiting", "done", "failed"];
@@ -95,7 +96,7 @@ export function mount(root, ctx) {
     { class: "swatches" },
     ...COLOUR_TOKENS.map((token) => el("div", { class: "swatch" }, el("span", { class: "swatch-colour", "data-token": token }), el("code", { class: "mono small" }, `--${token}`))),
   );
-  const faces = row(...FACE_STATES.map((state) => el("div", { class: "stack tight center" }, avatar(state), el("span", { class: "small muted" }, state))));
+  const faces = row(...FACE_STATES.map((state) => el("div", { class: "stack tight center" }, dotFace(state), el("span", { class: "small muted" }, state))));
   const buttons = row(
     el("button", { class: "btn primary", type: "button" }, icon("plus"), "Primary"),
     el("button", { class: "btn", type: "button" }, "Default"),

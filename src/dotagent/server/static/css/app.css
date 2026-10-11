@@ -329,114 +329,88 @@ textarea {
   fill: var(--character-notify);
 }
 
-/* Dot's face (icons.js): a badge in the colour of the owner's bubbles with the mark in the ink of their text. */
+/* The look picker (lookpicker.js, item 102): the preview, then the shapes, the expressions and the colours as rows of
+   faces; the picked one wears the strong border. */
+.look-picker {
+  display: flex;
+  gap: var(--space-3);
+  align-items: flex-start;
+}
+
+.look-preview {
+  flex: none;
+}
+
+.look-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+}
+
+.look-option {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 4px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-control);
+  cursor: pointer;
+}
+
+.look-option:hover {
+  background: var(--surface-2);
+}
+
+.look-option:has(.look-radio:checked) {
+  border-color: var(--border-strong);
+  background: var(--surface-2);
+}
+
+.look-option:has(.look-radio:focus-visible) {
+  outline: 2px solid var(--ring);
+  outline-offset: 1px;
+}
+
+.look-face {
+  display: block;
+}
+
+.look-name {
+  font-size: var(--text-xs);
+  line-height: var(--leading-xs);
+  color: var(--muted);
+}
+
+@media (max-width: 720px) {
+  .look-picker {
+    flex-direction: column;
+  }
+}
+
+/* A face (actors.js): a still character 40 px wide, cropped to its body; its state (face.js) is on the wrapper. A
+   slight breath at rest, a pulse while it works; the waiting pastille, the done smile and the failed look are in the
+   frame itself. */
 .avatar {
   width: 40px;
   height: 40px;
   flex: none;
-}
-
-.avatar .face {
-  fill: var(--bubble);
-}
-
-.avatar .ring {
-  fill: none;
-  stroke: var(--on-bubble);
-  stroke-opacity: 0.35;
-  stroke-width: 2.2;
-}
-
-.avatar .core {
-  fill: var(--on-bubble);
-  transform-box: fill-box;
   transform-origin: center;
 }
 
-/* The face as the state (face.js): a slow breath while idle (here, at rest), a pulse while it works, an amber ring
-   while it waits for you, a green tick for a moment when a run ends done, red when it failed. */
-.avatar .tick {
-  fill: none;
-  stroke: var(--ok);
-  stroke-width: 3;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-  opacity: 0;
+.avatar[data-state="idle"] {
+  animation: breathe-face var(--motion-breath) ease-in-out infinite;
 }
 
-.avatar[data-state="idle"] .core {
-  animation: breathe var(--motion-breath) ease-in-out infinite;
+.avatar[data-state="working"] {
+  animation: pulse-face var(--motion-pulse) ease-in-out infinite;
 }
 
-.avatar[data-state="working"] .core {
-  animation: pulse-core var(--motion-pulse) ease-in-out infinite;
-}
-
-.avatar[data-state="waiting"] .ring {
-  stroke: var(--warn);
-  stroke-opacity: 1;
-  animation: blink var(--motion-blink) ease-in-out infinite;
-}
-
-.avatar[data-state="done"] .ring {
-  animation: ring-ok var(--motion-moment) var(--ease) forwards;
-}
-
-.avatar[data-state="done"] .core {
-  animation: core-away var(--motion-moment) var(--ease) forwards;
-}
-
-.avatar[data-state="done"] .tick {
-  animation: tick-moment var(--motion-moment) var(--ease) forwards;
-}
-
-.avatar[data-state="failed"] .ring {
-  stroke: var(--bad);
-  stroke-opacity: 1;
-}
-
-.avatar[data-state="failed"] .core {
-  fill: var(--bad);
-}
-
-/* The other actors (actors.js, item 83): the same mark in the hue the actor's id chose. */
-.avatar[data-hue="0"] .face {
-  fill: var(--hue-0);
-}
-
-.avatar[data-hue="1"] .face {
-  fill: var(--hue-1);
-}
-
-.avatar[data-hue="2"] .face {
-  fill: var(--hue-2);
-}
-
-.avatar[data-hue="3"] .face {
-  fill: var(--hue-3);
-}
-
-.avatar[data-hue="4"] .face {
-  fill: var(--hue-4);
-}
-
-.avatar[data-hue="5"] .face {
-  fill: var(--hue-5);
-}
-
-.avatar[data-hue="6"] .face {
-  fill: var(--hue-6);
-}
-
-.avatar[data-hue="7"] .face {
-  fill: var(--hue-7);
-}
-
-/* A face whose run just ended blinks its core once, then rests. */
-.avatar.ended .core {
+/* A face whose run just ended blinks once, then rests. */
+.avatar.ended {
   animation:
     blink var(--motion-blink) ease-in-out 1,
-    breathe var(--motion-breath) ease-in-out var(--motion-blink) infinite;
+    breathe-face var(--motion-breath) ease-in-out var(--motion-blink) infinite;
 }
 
 /* The faces in the rows and the sidebar: 24 px; in a list's row 28. */
@@ -2675,6 +2649,19 @@ dialog.lightbox img {
   }
 }
 
+/* A whole face breathes and pulses less than the old core did. */
+@keyframes breathe-face {
+  50% {
+    transform: scale(1.04);
+  }
+}
+
+@keyframes pulse-face {
+  50% {
+    transform: scale(1.1);
+  }
+}
+
 @keyframes tick-moment {
   0%,
   80% {
@@ -2760,8 +2747,9 @@ dialog.lightbox img {
 /* Reduced motion (item 73): every transform goes (the breath and the pulse of the face, the spinners, the switch's
    knob and the chevron on the move) and the fades stay, so a state change is still seen. */
 @media (prefers-reduced-motion: reduce) {
-  .avatar[data-state="idle"] .core,
-  .avatar[data-state="working"] .core,
+  .avatar[data-state="idle"],
+  .avatar[data-state="working"],
+  .avatar.ended,
   .spinner,
   .status-ring.s-queued {
     animation: none;

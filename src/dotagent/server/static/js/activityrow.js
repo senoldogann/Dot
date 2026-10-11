@@ -57,7 +57,7 @@ export function activityRow(item, child) {
   return el(
     "a",
     { class: child ? "activity-row activity-child" : "activity-row", href: item.href, "aria-label": `${item.title} (${facts.join(", ")})` },
-    item.actor_id === null ? el("span", { class: "activity-icon" }, icon(KIND_ICON[item.kind] ?? "bolt")) : actorFace(item.actor_id, faceState(item.status)),
+    item.actor_id === null ? el("span", { class: "activity-icon" }, icon(KIND_ICON[item.kind] ?? "bolt")) : actorFace(item.actor_id, faceState(item.status), null),
     el("span", { class: "activity-main" }, el("span", { class: "activity-title" }, item.title), el("span", { class: "small muted meta-facts" }, ...facts.map((fact) => el("span", null, fact)))),
     el("span", { class: "activity-side" }, badge, el("span", { class: "small muted" }, ago(item.since))),
   );

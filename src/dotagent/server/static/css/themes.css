@@ -55,15 +55,6 @@
   /* The owner's messages and Dot's face: one warm accent, with dark ink on it in light and dark alike. */
   --bubble: light-dark(#ffcd3c, #e9b93a);
   --on-bubble: #1c1b19;
-  /* The ring of eight hues the other actors wear (actors.js, item 83): light enough for the ink mark in both schemes. */
-  --hue-0: light-dark(#f3a39a, #d4847b);
-  --hue-1: light-dark(#f5be7a, #d69a57);
-  --hue-2: light-dark(#b5d58a, #8fb466);
-  --hue-3: light-dark(#8fd6c2, #67b39d);
-  --hue-4: light-dark(#9ec5f5, #76a3d6);
-  --hue-5: light-dark(#c3b4f3, #a08fd6);
-  --hue-6: light-dark(#f2aad0, #cf86ae);
-  --hue-7: light-dark(#e1cf98, #bfab6f);
   /* The twelve colours of a character's body (character/skins.js, item 101), bloub's palette; ink and cream follow the
      scheme so a body is never the colour of the ground, and the pastille is bloub's notification blue. */
   --character-ink: light-dark(#0a0a0c, #ecebe6);

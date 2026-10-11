@@ -84,7 +84,7 @@ function campaignRow(summary) {
   return el(
     "div",
     { class: "list-row", dataset: { campaign: record.id } },
-    actorFace(record.id, CAMPAIGN_FACE[record.status] ?? "idle"),
+    actorFace(record.id, CAMPAIGN_FACE[record.status] ?? "idle", null),
     el(
       "div",
       { class: "row-main" },

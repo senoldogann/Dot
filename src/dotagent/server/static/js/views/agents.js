@@ -3,12 +3,13 @@
 // The list (#/agents) shows Dot first and then the agents, each with its newest chat; an agent's page (#/agents/<id>)
 // greets with its face and role, takes a message for it and lists its chats; the editor makes or changes an agent.
 
-import { actorFace } from "../actors.js";
+import { actorFace, dotFace, fallbackLook, rememberLook } from "../actors.js";
 import { api } from "../api.js";
 import { wireComposer } from "../composer.js";
 import { ago, clip, el, modelName } from "../dom.js";
 import { allModels, levelLabel } from "../efforts.js";
-import { avatar, icon } from "../icons.js";
+import { icon } from "../icons.js";
+import { lookPicker } from "../lookpicker.js";
 import { emptyPanel, errorPanel, field, loadingPanel, pageHead, statusBadge } from "../panels.js";
 import { APPROVAL_OPTIONS } from "../runmodes.js";
 import { setStageTitle, setStageTools } from "../stage.js";
@@ -26,9 +27,9 @@ const WORKING = new Set(["queued", "running", "blocked"]);
 
 function faceOf(record, latest) {
   if (record.id === DOT_ID) {
-    return avatar("idle");
+    return dotFace("idle");
   }
-  return actorFace(record.id, latest !== null && WORKING.has(latest.status) ? "working" : "idle");
+  return actorFace(record.id, latest !== null && WORKING.has(latest.status) ? "working" : "idle", record.look);
 }
 
 function hrefOf(record) {
@@ -112,6 +113,10 @@ function agentForm({ record, onSaved, onCancel }) {
     [{ id: "", label: "Default" }, ...APPROVAL_OPTIONS.map((option) => ({ id: option.id, label: `${option.label}: ${option.hint}` }))],
     record === null || record.approvals === null ? "" : record.approvals,
   );
+  // The look (item 102): the agent's own, or for a new one the fallback of a face not yet named.
+  const look = lookPicker({ look: record === null || record.look === null ? fallbackLook(record === null ? "new" : record.id) : record.look, uid: record === null ? "new" : record.id });
+  const lookField = field("Look", look.element, "The face this agent wears everywhere; it moves on its own page and beside its chats.");
+  lookField.classList.add("wide");
   const tools = el("div", null, el("span", { class: "muted" }, "Loading the tools"));
   const toolsField = field("Tools", tools, "None picked: every tool. Finishing, asking you and turning tool groups on stay in any case.");
   toolsField.classList.add("wide");
@@ -181,10 +186,12 @@ function agentForm({ record, onSaved, onCancel }) {
       effort: effort.value === "" ? null : effort.value,
       approvals: approvals.value === "" ? null : approvals.value,
       tools: [...tools.querySelectorAll("input:checked")].map((input) => input.value),
+      look: look.value(),
     };
     save.disabled = true;
     try {
       const saved = record === null ? await api.post("/agents", body) : await api.put(`/agents/${record.id}`, body);
+      rememberLook(saved.id, saved.look);
       toast("ok", record === null ? `${saved.name} is ready.` : "Agent saved.");
       onSaved(saved);
     } finally {
@@ -206,6 +213,7 @@ function agentForm({ record, onSaved, onCancel }) {
         field("Name", name, ""),
         field("Role", role, "One line, as it shows under the name."),
         Object.assign(field("Instructions", instructions, ""), { className: "field wide" }),
+        lookField,
         field("Model", model, ""),
         effortField,
         field("Approvals", approvals, ""),
@@ -214,7 +222,7 @@ function agentForm({ record, onSaved, onCancel }) {
       el("div", { class: "cluster end" }, cancel, save),
     ),
   );
-  return { element, focus: () => name.focus() };
+  return { element, focus: () => name.focus(), dispose: look.dispose };
 }
 
 // ------------------------------------------------------------------------------------------------- the list
@@ -232,6 +240,9 @@ function mountList(root, ctx) {
       if (disposed || mine !== ticket) {
         return;
       }
+      for (const { record } of summaries) {
+        rememberLook(record.id, record.look);
+      }
       holder.replaceChildren(el("div", { class: "card" }, summaries.map(agentRow)));
     } catch (error) {
       if (!disposed && mine === ticket) {
@@ -240,14 +251,25 @@ function mountList(root, ctx) {
     }
   }
 
+  let editor = null;
+
+  function closeEditor() {
+    if (editor !== null) {
+      editor.dispose();
+      editor = null;
+    }
+    editorSlot.replaceChildren();
+  }
+
   function openEditor() {
-    const form = agentForm({
+    closeEditor();
+    editor = agentForm({
       record: null,
       onSaved: (saved) => ctx.navigate(`/agents/${saved.id}`),
-      onCancel: () => editorSlot.replaceChildren(),
+      onCancel: closeEditor,
     });
-    editorSlot.replaceChildren(form.element);
-    form.focus();
+    editorSlot.replaceChildren(editor.element);
+    editor.focus();
   }
 
   const newButton = el("button", { class: "btn primary", type: "button", onclick: openEditor }, icon("plus"), el("span", { class: "label" }, "New agent"));
@@ -266,6 +288,7 @@ function mountList(root, ctx) {
   return () => {
     disposed = true;
     stopLifecycle();
+    closeEditor();
   };
 }
 
@@ -342,7 +365,7 @@ function who(record) {
   return el(
     "div",
     { class: "home-who agent-who" },
-    actorFace(record.id, "idle"),
+    actorFace(record.id, "idle", record.look),
     el("div", { class: "home-name" }, record.name),
     record.role === "" ? null : el("p", { class: "home-greeting" }, record.role),
     record.made_by === null ? null : el("p", { class: "home-greeting agent-made" }, "Made by Dot in one of its runs"),
@@ -400,6 +423,7 @@ function mountPage(root, ctx, agentId) {
   let disposed = false;
   let ticket = 0;
   let composer = null;
+  let form = null;
   const top = el("div", { class: "stack agent-top" });
   const runs = el("div", { class: "stack" });
   const messages = el("div", { class: "stack" });
@@ -407,24 +431,33 @@ function mountPage(root, ctx, agentId) {
   const page = el("div", { class: "stack" }, loadingPanel());
 
   function stageOf(record) {
-    setStageTitle(actorFace(record.id, "idle"), el("span", { class: "stage-name" }, record.name));
+    setStageTitle(actorFace(record.id, "idle", record.look), el("span", { class: "stage-name" }, record.name));
     setStageTools(
       el("button", { class: "btn ghost sm", type: "button", title: "Edit the agent", onclick: () => edit(record) }, icon("pencil"), el("span", { class: "label" }, "Edit")),
       el("button", { class: "btn ghost sm", type: "button", title: "Delete the agent", onclick: () => attempt(() => remove(record)) }, icon("trash"), el("span", { class: "label" }, "Delete")),
     );
   }
 
+  function closeForm() {
+    if (form !== null) {
+      form.dispose();
+      form = null;
+    }
+  }
+
   function greet(record) {
     if (composer !== null) {
       composer.dispose();
     }
+    closeForm();
     composer = agentComposer(record, ctx);
     top.replaceChildren(who(record), composer.element);
     stageOf(record);
   }
 
   function edit(record) {
-    const form = agentForm({
+    closeForm();
+    form = agentForm({
       record,
       onSaved: () => attempt(reload),
       onCancel: () => greet(record),
@@ -514,6 +547,7 @@ function mountPage(root, ctx, agentId) {
     if (composer !== null) {
       composer.dispose();
     }
+    closeForm();
   };
 }
 

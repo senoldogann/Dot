@@ -77,12 +77,46 @@ class RunRecord(FrozenModel):
     agent_id: str | None
 
 
+CharacterShape = Literal["circle", "pebble", "squircle", "capsule", "triangle", "hexagon", "cloud", "droplet"]
+CharacterExpression = Literal[
+    "neutral",
+    "attentive",
+    "surprised",
+    "excited",
+    "happy",
+    "laughing",
+    "angry",
+    "sad",
+    "scared",
+    "suspicious",
+    "confused",
+    "curious",
+    "proud",
+    "shy",
+    "unimpressed",
+    "sleepy",
+]
+CharacterColour = Literal[
+    "ink", "brown", "red", "orange", "amber", "green", "teal", "blue", "violet", "pink", "grey", "cream"
+]
+
+
+class AgentLook(FrozenModel):
+    """How an agent's character looks (item 102): one of the shapes, rest expressions and colours of the character
+    engine (``static/js/character/skins.js`` and ``expressions.js``)."""
+
+    shape: CharacterShape
+    expression: CharacterExpression
+    colour: CharacterColour
+
+
 class AgentRecord(FrozenModel):
     """An agent the owner made (item 86): a name, a role in one line, the instructions that join the system prompt of
     its runs, and the bounds of its runs: ``model`` (empty for the configured one), ``effort`` and ``approvals``
     (``None`` for the configured ones) and ``tools``, the names of the tools it may use (empty for every tool). Its
-    face is the mark in the hue its id gives it (actors.js). ``made_by`` is the run that made it with ``create_agent``
-    (item 99), ``None`` for one the owner made. Dot itself is ``DOT_AGENT``, never stored."""
+    face is its ``look`` (item 102), or with ``None`` the shape and colour its id's hue gives it (actors.js).
+    ``made_by`` is the run that made it with ``create_agent`` (item 99), ``None`` for one the owner made. Dot itself
+    is ``DOT_AGENT``, never stored; its look lives in the kv store under ``look:dot``."""
 
     id: str
     name: str
@@ -95,6 +129,7 @@ class AgentRecord(FrozenModel):
     created_at: float
     updated_at: float
     made_by: str | None
+    look: AgentLook | None
 
 
 DOT_AGENT_ID: str = "dot"
@@ -110,6 +145,7 @@ DOT_AGENT: AgentRecord = AgentRecord(
     created_at=0.0,
     updated_at=0.0,
     made_by=None,
+    look=None,
 )
 
 

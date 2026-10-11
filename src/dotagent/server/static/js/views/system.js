@@ -1,5 +1,6 @@
 // The system page: how the daemon is doing, the emergency stop, the health checks and the models each provider offers.
 
+import { DOT_ID, lookOf, rememberLook } from "../actors.js";
 import { api, clearToken } from "../api.js";
 import {
   notificationsAvailable,
@@ -15,6 +16,7 @@ import { engageFailsafe, releaseFailsafe } from "../failsafe.js";
 import { dotName, NAME_CHARS, setDotName } from "../face.js";
 import { OWNER_CHARS, ownerName, setOwnerName } from "../presence.js";
 import { icon } from "../icons.js";
+import { lookPicker } from "../lookpicker.js";
 import { chooseDensity, currentDensity, DENSITIES, followTheme, foldSteps, hasOwnLayout, setFoldSteps, setShowInspector, showInspector } from "../layout.js";
 import { foldCard, foldGroup, inlineError, inlineLoading, paneHead, segmented } from "../panels.js";
 import { providerLabel, providerOf } from "../providers.js";
@@ -772,16 +774,46 @@ function buildNameCard() {
   );
 }
 
+/** Dot's own face (item 102): the picker and Save, kept by the daemon for every browser. */
+function buildDotLookCard() {
+  const picker = lookPicker({ look: lookOf(DOT_ID, null), uid: "dot" });
+  const save = el("button", { class: "btn primary", type: "button" }, icon("check"), "Save the look");
+  save.addEventListener("click", () =>
+    attempt(async () => {
+      save.disabled = true;
+      try {
+        const record = await api.put(`/agents/${DOT_ID}/look`, picker.value());
+        rememberLook(DOT_ID, record.look);
+        toast("ok", "Dot's look saved.");
+      } finally {
+        save.disabled = false;
+      }
+    }),
+  );
+  const element = el(
+    "section",
+    { class: "card", "aria-label": "Dot's look" },
+    el("div", { class: "card-head" }, el("span", null, "Dot's look")),
+    el("div", { class: "card-pad stack" }, picker.element, el("div", { class: "cluster end" }, save)),
+  );
+  return { element, dispose: picker.dispose };
+}
+
 export function mountGeneral(root, ctx) {
   const appearance = buildAppearance();
+  const look = buildDotLookCard();
   root.append(
-    paneHead("The look of this browser, how it draws your attention, and the token it is signed in with.", null),
+    paneHead("The look of this browser, Dot's own face, how it draws your attention, and the token it is signed in with.", null),
     appearance.element,
     buildNameCard(),
+    look.element,
     buildNotifications(),
     buildTokenCard(),
   );
-  return () => appearance.dispose();
+  return () => {
+    appearance.dispose();
+    look.dispose();
+  };
 }
 
 /** The providers Dot can reach and the models each of them offers. */

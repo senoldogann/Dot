@@ -1,6 +1,6 @@
 // One run as a conversation: the question, what Dot did about it, its answer, and the box to steer the run or to follow up on it.
 
-import { actorFace } from "../actors.js";
+import { actorFace, dotFace, setActorState } from "../actors.js";
 import { api, follow } from "../api.js";
 import { approvalCard, fromRecord, LEFT_IN_CAMPAIGN, LEFT_IN_RUN } from "../approvals.js";
 import { createAttachments, readyToSend } from "../attachments.js";
@@ -11,8 +11,8 @@ import { wireComposer } from "../composer.js";
 import { clip, dateTime, dateTimeFull, debounce, duration, el, modelName } from "../dom.js";
 import { levelLabel } from "../efforts.js";
 import { continuedIn, earlierTurns, loadHistory, RESUME_SOURCE } from "../history.js";
-import { dotName, faceState, faceStateAtEnd, setFaceState } from "../face.js";
-import { avatar, icon } from "../icons.js";
+import { dotName, faceState, faceStateAtEnd } from "../face.js";
+import { icon } from "../icons.js";
 import { createInspector } from "../inspector.js";
 import { userMessage } from "../messages.js";
 import { emptyPanel, errorPanel, foldCard, loadingPanel, statusBadge } from "../panels.js";
@@ -137,7 +137,7 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
   // agent's (item 86).
   const agent = detail.agent;
   const face =
-    agent !== null ? actorFace(agent.id, faceState(status)) : run.parent_run_id === null ? avatar(faceState(status)) : actorFace(run.id, faceState(status));
+    agent !== null ? actorFace(agent.id, faceState(status), agent.look) : run.parent_run_id === null ? dotFace(faceState(status)) : actorFace(run.id, faceState(status), null);
   let model = run.model;
   let active = detail.active;
   // The daemon cut the run off and a new run can go on from where it stopped.
@@ -274,7 +274,7 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
     statusSlot.replaceChildren(statusBadge(status));
     // The tick of a run that just ended stays for its moment; every other state follows the status.
     if (face.getAttribute("data-state") !== "done") {
-      setFaceState(face, faceState(status));
+      setActorState(face, faceState(status));
     }
     modelChip.hidden = model === "";
     modelChip.textContent = run.effort === null ? modelName(model) : `${modelName(model)} · ${levelLabel(run.effort)}`;
@@ -690,7 +690,7 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
     if (terminal) {
       // The tick is for an end that happens under the reader's eyes; a replayed end of a run opened later rests.
       if (active) {
-        setFaceState(face, faceStateAtEnd(update.status));
+        setActorState(face, faceStateAtEnd(update.status));
       }
       active = false;
       computer.setActive(false);

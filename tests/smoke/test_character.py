@@ -29,7 +29,9 @@ SHAPES: int = 8
 EXPRESSIONS: int = 16
 COLOURS: int = 12
 ANIMATIONS: int = 14
-_ORBIT: str = ".character[data-state='orbit'] .character-paper"
+# The Faces card draws Dot's face in its five states, as still characters too.
+FACES: int = 5
+_ORBIT: str = ".character[data-animation='orbit'] .character-paper"
 _STILL_CIRCLE: str = ".character[data-colour='blue'][data-still='true'] .character-paper"
 _SHOTS: Path = Path("/tmp/dot-101")
 # The ticker module of the page, read through the same URL the page loads it from, so it is the same instance.
@@ -37,7 +39,7 @@ _TICKER: str = "import(new URL('js/character/ticker.js', location.href)).then((m
 _MOUNT: str = """
 import(new URL('js/character/character.js', location.href)).then((m) => {
   window.__character = m.mountCharacter(document.body, { shape: 'droplet', colour: 'violet', size: 120, phase: 0 });
-  return window.__character.element.dataset.state;
+  return window.__character.element.dataset.animation;
 })
 """
 
@@ -113,7 +115,7 @@ async def _open(browser: Browser, client: httpx.AsyncClient, reduced: bool, sche
     await page.goto(ui_url(host, port, TOKEN))
     await page.goto(f"http://{host}:{port}/#/controls")
     await page.evaluate("(scheme) => { document.documentElement.dataset.scheme = scheme; }", scheme)
-    await expect(page.locator(".character")).to_have_count(SHAPES + EXPRESSIONS + COLOURS + ANIMATIONS)
+    await expect(page.locator(".character")).to_have_count(SHAPES + EXPRESSIONS + COLOURS + ANIMATIONS + FACES)
     return page
 
 
@@ -131,14 +133,14 @@ async def test_the_gallery_shows_still_frames_and_moving_animations(
     await asyncio.to_thread(_SHOTS.mkdir, exist_ok=True)
     for scheme in ("light", "dark"):
         page: Page = await _open(browser, client, False, scheme)
-        assert await page.locator(".character[data-still='true']").count() == SHAPES + EXPRESSIONS + COLOURS
+        assert await page.locator(".character[data-still='true']").count() == SHAPES + EXPRESSIONS + COLOURS + FACES
         assert await page.locator(".character[data-still='false']").count() == ANIMATIONS
         # The eyes are holes: two paths in the mask of a face at rest, none in the thinking dots.
         moving = ".character[data-still='false']"
-        await expect(page.locator(f"{moving}[data-state='idle'] mask g path")).to_have_count(2)
-        await expect(page.locator(f"{moving}[data-state='thinking'] mask g path")).to_have_count(0)
+        await expect(page.locator(f"{moving}[data-animation='idle'] mask g path")).to_have_count(2)
+        await expect(page.locator(f"{moving}[data-animation='thinking'] mask g path")).to_have_count(0)
         # The rings of the orbit carry a gradient each, and their back half is drawn before the body.
-        assert await page.locator(".character[data-state='orbit'] linearGradient").count() >= 1
+        assert await page.locator(".character[data-animation='orbit'] linearGradient").count() >= 1
         assert await _path_moves(page, _ORBIT)
         assert not await _path_moves(page, _STILL_CIRCLE)
         assert await page.evaluate(_TICKER) is True
@@ -155,7 +157,7 @@ async def test_a_state_change_reaches_the_engine_and_the_mask(browser: Browser, 
     await expect(mounted).to_have_attribute("data-colour", "violet")
     await expect(mounted.locator("mask g path")).to_have_count(2)
     await page.evaluate("window.__character.setState('thinking')")
-    await expect(mounted).to_have_attribute("data-state", "thinking")
+    await expect(mounted).to_have_attribute("data-animation", "thinking")
     # The morph into the dots takes 0.4 s; the eyes fade out with it.
     await expect(mounted.locator("mask g path")).to_have_count(0)
     await page.evaluate("window.__character.setState('notify')")

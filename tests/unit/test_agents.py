@@ -3,10 +3,14 @@ tools to the ones they name."""
 
 from pathlib import Path
 
+import pytest
+from pydantic import ValidationError
+
 from dotagent.agent.loop import AGENT_CORE_TOOLS
 from dotagent.agent.prompt import AgentBrief, build_system_prompt, collect_prompt_inputs
+from dotagent.server.views import AgentRequest
 from dotagent.store.db import Store
-from dotagent.store.models import AgentRecord, RunRecord, ThreadRecord
+from dotagent.store.models import AgentLook, AgentRecord, RunRecord, ThreadRecord
 from dotagent.tools.meta import ASK_USER_TOOL, FINISH_TOOL, USE_TOOLS_TOOL
 
 
@@ -36,8 +40,9 @@ async def test_the_store_keeps_agents_and_their_runs_and_a_deleted_agents_runs_b
     store: Store = await Store.open(tmp_path / "dot.sqlite3", tmp_path / "screenshots")
     try:
         agent: AgentRecord = await store.create_agent(
-            "Scout", "Finds sources", "Be brief.", "", None, None, ["shell"], None
+            "Scout", "Finds sources", "Be brief.", "", None, None, ["shell"], None, None
         )
+        assert agent.look is None
         assert await store.list_agents() == [agent]
         assert await store.latest_agent_runs() == {}
         thread: ThreadRecord = await store.create_thread("t", "ui")
@@ -54,9 +59,11 @@ async def test_the_store_keeps_agents_and_their_runs_and_a_deleted_agents_runs_b
         assert [run.id for run in await store.agent_runs(agent.id, 10)] == [second.id, first.id]
         assert [run.id for run in await store.agent_runs(agent.id, 1)] == [second.id]
         assert {key: run.id for key, run in (await store.latest_agent_runs()).items()} == {agent.id: second.id}
+        look: AgentLook = AgentLook(shape="droplet", expression="curious", colour="violet")
         changed: AgentRecord = await store.update_agent(
-            agent.id, "Scout", "Checks sources", "Be brief.", "ollama:m", "high", "yolo", ["shell", "fetch"]
+            agent.id, "Scout", "Checks sources", "Be brief.", "ollama:m", "high", "yolo", ["shell", "fetch"], look
         )
+        assert changed.look == look
         assert changed.id == agent.id
         assert (changed.role, changed.model, changed.effort, changed.approvals) == (
             "Checks sources",
@@ -67,9 +74,36 @@ async def test_the_store_keeps_agents_and_their_runs_and_a_deleted_agents_runs_b
         assert changed.tools == ("shell", "fetch")
         assert changed.updated_at >= agent.updated_at
         assert await store.get_agent(agent.id) == changed
+        # The look alone (item 102): an agent's in its columns, Dot's in the kv store.
+        other: AgentLook = AgentLook(shape="cloud", expression="sleepy", colour="teal")
+        assert (await store.set_agent_look(agent.id, other)).look == other
+        assert await store.dot_look() is None
+        await store.set_dot_look(look)
+        assert await store.dot_look() == look
         await store.delete_agent(agent.id)
         assert await store.list_agents() == []
         assert (await store.get_run(first.id)).agent_id is None
         assert (await store.get_run(second.id)).agent_id is None
     finally:
         await store.close()
+
+
+def test_a_request_with_a_look_outside_the_catalogue_is_refused() -> None:
+    body: dict[str, object] = {
+        "name": "Scout",
+        "role": "",
+        "instructions": "",
+        "model": "",
+        "effort": None,
+        "approvals": None,
+        "tools": [],
+    }
+    assert AgentRequest.model_validate({**body, "look": None}).look is None
+    chosen: AgentRequest = AgentRequest.model_validate(
+        {**body, "look": {"shape": "pebble", "expression": "proud", "colour": "pink"}}
+    )
+    assert chosen.look == AgentLook(shape="pebble", expression="proud", colour="pink")
+    with pytest.raises(ValidationError):
+        AgentRequest.model_validate({**body, "look": {"shape": "blob", "expression": "proud", "colour": "pink"}})
+    with pytest.raises(ValidationError):
+        AgentRequest.model_validate({**body, "look": {"shape": "pebble", "expression": "proud"}})

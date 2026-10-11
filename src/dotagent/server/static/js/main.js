@@ -1,5 +1,6 @@
 // The entry point: sign-in, the frame with its sidebar and live indicators, and routing between the pages.
 
+import { loadLooks } from "./actors.js";
 import { ApiError, clearToken, hasToken, loadToken, onAuthLost, setToken } from "./api.js";
 import { setPageTitle, watchAttention } from "./attention.js";
 import { el } from "./dom.js";
@@ -231,6 +232,7 @@ async function connect() {
   renderConnecting();
   try {
     await refresh();
+    await loadLooks();
   } catch (error) {
     if (error instanceof ApiError && error.status === 401) {
       clearToken();

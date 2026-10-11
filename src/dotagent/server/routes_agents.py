@@ -15,7 +15,7 @@ from dotagent.server.context import ServerContext
 from dotagent.server.routes_system import learned_skill_view
 from dotagent.server.views import AgentDetail, AgentLearning, AgentRequest, AgentSummary, TeamMessage, TeamView
 from dotagent.store.db import Store
-from dotagent.store.models import DOT_AGENT, DOT_AGENT_ID, AgentRecord, MemoryRecord, RunRecord
+from dotagent.store.models import DOT_AGENT, DOT_AGENT_ID, AgentLook, AgentRecord, MemoryRecord, RunRecord
 
 # How many of its newest runs an agent's page shows.
 _PAGE_RUNS: int = 50
@@ -35,6 +35,11 @@ def _checked(request: AgentRequest, known: frozenset[str]) -> AgentRequest:
     if unknown:
         raise InvalidValueError("an agent names tools that do not exist", {"tools": ", ".join(unknown)})
     return request
+
+
+async def dot_record(store: Store) -> AgentRecord:
+    """Dot as an agent record: ``DOT_AGENT`` wearing the look the owner chose (item 102), if any."""
+    return DOT_AGENT.model_copy(update={"look": await store.dot_look()})
 
 
 async def team_messages(store: Store, runs: list[RunRecord]) -> list[TeamMessage]:
@@ -85,7 +90,7 @@ def agents_router(ctx: ServerContext) -> APIRouter:
     async def list_agents() -> list[AgentSummary]:
         """Dot first, then the agents the owner made, oldest first, each with its newest run."""
         latest: dict[str, RunRecord] = await store.latest_agent_runs()
-        dot: AgentSummary = AgentSummary(record=DOT_AGENT, latest=None)
+        dot: AgentSummary = AgentSummary(record=await dot_record(store), latest=None)
         return [dot] + [AgentSummary(record=agent, latest=latest.get(agent.id)) for agent in await store.list_agents()]
 
     @router.post("/agents", status_code=201)
@@ -100,12 +105,13 @@ def agents_router(ctx: ServerContext) -> APIRouter:
             checked.approvals,
             checked.tools,
             None,
+            checked.look,
         )
 
     @router.get("/agents/{agent_id}")
     async def get_agent(agent_id: str) -> AgentDetail:
         if agent_id == DOT_AGENT_ID:
-            return AgentDetail(record=DOT_AGENT, runs=[], messages=[], learned=_NOTHING_LEARNED)
+            return AgentDetail(record=await dot_record(store), runs=[], messages=[], learned=_NOTHING_LEARNED)
         return AgentDetail(
             record=await store.get_agent(agent_id),
             runs=await store.agent_runs(agent_id, _PAGE_RUNS),
@@ -127,7 +133,16 @@ def agents_router(ctx: ServerContext) -> APIRouter:
             checked.effort,
             checked.approvals,
             checked.tools,
+            checked.look,
         )
+
+    @router.put("/agents/{agent_id}/look")
+    async def set_look(agent_id: str, look: AgentLook) -> AgentRecord:
+        """Give an agent, or Dot, a look (item 102); the record as it is now."""
+        if agent_id == DOT_AGENT_ID:
+            await store.set_dot_look(look)
+            return await dot_record(store)
+        return await store.set_agent_look(agent_id, look)
 
     @router.delete("/agents/{agent_id}", status_code=204)
     async def delete_agent(agent_id: str) -> None:

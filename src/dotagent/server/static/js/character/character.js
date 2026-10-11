@@ -2,7 +2,9 @@
 // `mountCharacter(parent, options)` appends the SVG and returns a handle whose setters change the state (the
 // animation), the rest expression, the shape and the colour, point the gaze, freeze and resume the motion, and
 // remove it. A character that is not moving (`moving: false`, `freeze()`, or `prefers-reduced-motion`) shows one
-// still frame of its state at the date where the state reads best, and never joins the loop.
+// still frame of its state at the date where the state reads best, and never joins the loop. The SVG carries
+// `data-animation`, `data-shape`, `data-expression`, `data-colour` and `data-still`. `tight: true` crops the viewBox
+// to the body (no room for the rings), for a face drawn small.
 import { svg } from "../dom.js";
 import { CharacterEngine } from "./engine.js";
 import { DEFAULT_EXPRESSION, EXPRESSION_BY_ID } from "./expressions.js";
@@ -72,7 +74,7 @@ function gradientNode(uid, arc) {
 export function mountCharacter(parent, options) {
   const uid = `character-${nextId++}`;
   const size = options.size ?? 96;
-  const vb = HALF_VIEWBOX;
+  const vb = options.tight ? RADIUS * 1.2 : HALF_VIEWBOX;
   const box = { x: -vb, y: -vb, width: vb * 2, height: vb * 2 };
 
   const maskBody = svg("path", { fill: "#fff" });
@@ -178,12 +180,21 @@ export function mountCharacter(parent, options) {
     }
   }
 
+  // The media query is watched only while the character wants to move: a still face in a row has no need of it.
   const onReduced = () => apply();
-  REDUCED.addEventListener("change", onReduced);
+  let watching = false;
+  function watch() {
+    if (wanted && !watching) REDUCED.addEventListener("change", onReduced);
+    if (!wanted && watching) REDUCED.removeEventListener("change", onReduced);
+    watching = wanted;
+  }
 
-  element.dataset.state = state;
+  element.dataset.animation = state;
+  element.dataset.shape = shape.id;
+  element.dataset.expression = expression.id;
   element.dataset.colour = known(COLOUR_BY_ID, options.colour ?? DEFAULT_COLOUR, "colour").id;
   parent.append(element);
+  watch();
   apply();
 
   return {
@@ -195,17 +206,19 @@ export function mountCharacter(parent, options) {
       known(STATE_BY_ID, id, "state");
       if (id === state) return;
       state = id;
-      element.dataset.state = id;
+      element.dataset.animation = id;
       if (subscribed) engine.setState(id, clock);
       else still();
     },
     setExpression(id) {
       expression = known(EXPRESSION_BY_ID, id, "expression");
+      element.dataset.expression = id;
       engine.setExpression(expression, clock);
       if (!subscribed) still();
     },
     setShape(id) {
       shape = known(SHAPE_BY_ID, id, "shape");
+      element.dataset.shape = id;
       engine.setShape(shape.radii, clock);
       if (!subscribed) still();
     },
@@ -218,14 +231,17 @@ export function mountCharacter(parent, options) {
     },
     freeze() {
       wanted = false;
+      watch();
       apply();
     },
     resume() {
       wanted = true;
+      watch();
       apply();
     },
     destroy() {
-      REDUCED.removeEventListener("change", onReduced);
+      wanted = false;
+      watch();
       if (subscribed) ticker.remove(tick);
       subscribed = false;
       element.remove();
