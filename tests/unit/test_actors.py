@@ -49,9 +49,11 @@ def test_every_hue_of_the_ring_gives_a_look_of_its_own_from_the_catalogue() -> N
         " colours: COLOUR_IDS }));"
     )
     result = subprocess.run([node, "--input-type=module", "-e", script], capture_output=True, text=True, check=True)
-    seen: dict[str, list[dict[str, str]] | list[str]] = json.loads(result.stdout)
-    looks = seen["looks"]
+    payload = json.loads(result.stdout)
+    looks: list[dict[str, str]] = payload["looks"]
+    shapes: list[str] = payload["shapes"]
+    colours: list[str] = payload["colours"]
     assert len(looks) == 8
     assert len({(look["shape"], look["colour"]) for look in looks}) == 8
     for look in looks:
-        assert look["shape"] in seen["shapes"] and look["colour"] in seen["colours"] and look["expression"] == "neutral"
+        assert look["shape"] in shapes and look["colour"] in colours and look["expression"] == "neutral"
