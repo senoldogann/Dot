@@ -1,5 +1,6 @@
-// The home page: Dot's face and one composer in the middle of the window. The recent runs live in the sidebar; a run that
-// waits for an answer is the only other thing this page ever shows, above them.
+// The home page: Dot's presence (presence.js: the face in its state, a greeting, one line of now) and one composer in
+// the middle of the window, the Today strip under them. The recent runs live in the sidebar; a run that waits for an
+// answer shows above, as a card.
 
 import { approvalCard, fromRecord, LEFT_IN_RUN } from "../approvals.js";
 import { api } from "../api.js";
@@ -7,12 +8,12 @@ import { createAttachments, readyToSend } from "../attachments.js";
 import { wireComposer } from "../composer.js";
 import { el, modelName } from "../dom.js";
 import { allModels, offersChoice, savedLevel } from "../efforts.js";
-import { dotName } from "../face.js";
-import { avatar, icon } from "../icons.js";
+import { icon } from "../icons.js";
 import { segmented } from "../panels.js";
 import { providerLabel } from "../providers.js";
 import { reasoningSelect } from "../reasoning.js";
 import { approvalLabel, approvalsPicker, goalModePicker, standingPicker } from "../runmodes.js";
+import { buildPresence } from "../presence.js";
 import { onCompose } from "../shortcuts.js";
 import { getSnapshot, loadModels, onChange, refresh } from "../state.js";
 import { attempt } from "../ui.js";
@@ -275,8 +276,17 @@ function buildApprovals() {
 export function mount(root, ctx) {
   const composer = buildComposer(ctx);
   const approvals = buildApprovals();
-  const who = el("div", { class: "home-who" }, avatar("idle"), el("div", { class: "home-name" }, dotName()), el("p", { class: "home-hint" }, "What should I work on?"));
-  root.append(el("div", { class: "home" }, el("h1", { class: "visually-hidden" }, "New chat"), approvals.element, el("div", { class: "home-start" }, who, composer.element)));
+  const presence = buildPresence();
+  root.append(
+    el(
+      "div",
+      { class: "home" },
+      el("h1", { class: "visually-hidden" }, "New chat"),
+      approvals.element,
+      el("div", { class: "home-start" }, presence.element, composer.element),
+      presence.strip,
+    ),
+  );
   approvals.sync(getSnapshot());
   const stopApprovals = onChange(approvals.sync);
   const stopCompose = onCompose(composer.focus);
@@ -285,5 +295,6 @@ export function mount(root, ctx) {
     stopApprovals();
     stopCompose();
     composer.dispose();
+    presence.dispose();
   };
 }

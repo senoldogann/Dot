@@ -819,8 +819,17 @@ page, with its steps so far and its channel; the parent's row says how many runs
 delegated run's card carries a chip with its progress ("step 3 · web_fetch", then "done · 12 steps") and an **open**
 link to the run's own page.
 
-**New chat** is Dot's face and name (the name is yours to give in Settings › General; Dot until then, and kept in this
-browser only) and one composer, centred in the window: the goal, then one line with the mode (Task, Chat
+**New chat** is Dot's presence and one composer, centred in the window. The face shows the state of the whole of Dot
+(waiting when something waits for you, working while a run is active, else idle) under Dot's name (yours to give in
+Settings › General; Dot until then, and kept in this browser only); a greeting by the hour says your name when you gave
+one there ("Good morning, Ada. What should I work on?"; "Something waits for you." when it does) and one line says what
+is going on ("Working on 2 runs · 1 waits for you · 3 ended today · 1 lesson · 2 things due today"; a quiet day says
+so). Under the composer, the **Today** strip lists it: what waits for you, what works, what is due later today (the
+schedules that fire and the campaigns whose next session starts), what was learned today (the lessons and the day's
+journal) and what ended, each row as on the Activity page and each opening what it is about; five rows a section,
+then "and N more in Activity". The line and the strip follow the lifecycle stream, so an answer or a run's end moves
+them at once; `GET /api/activity` carries the two new lists as `learned_today` and `due`. The composer is the goal,
+then one line with the mode (Task, Chat
 or Research), the model and, for a model that offers a choice, its reasoning level (kept in the browser per model).
 **Options** at the end of that line opens the approval mode (Ask, Auto or YOLO; the mode in use always shows on the
 button), the Goal mode switch and Keep going (see
