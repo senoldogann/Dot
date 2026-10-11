@@ -906,7 +906,7 @@ open at a click; the choice is kept per card. **Dot's computer**, at the top of 
 shows the page of the run's browser as Chrome paints it (`GET /api/runs/{id}/screencast`, Chrome's own screencast,
 sent only while the view is open; a tab that does not change sends nothing). The view starts by itself at the run's
 first browser step and says, until then, that the run has not opened a page; **Watch** and **Close the view** open
-and close it by hand. A pill under it says who has the browser. Since that view shows the page, Dot's own Chrome stays
+and close it by hand; once the run has ended the card keeps the last screen and Watch goes. A pill under it says who has the browser. Since that view shows the page, Dot's own Chrome stays
 in the background while a run works (`[browser] raise_window`, off by default, item 97): the app you were in gets the
 focus back right after Chrome starts, and switching tabs does not raise the window; Settings › Browser has the switch
 "Bring Chrome to the front while working" for the other way round. **Take over**

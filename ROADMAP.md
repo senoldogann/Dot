@@ -5024,7 +5024,7 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 101 | The character engine: bloub's one shape with two eyes, as plain modules of Dot's UI | done        | 8c3a590 |
 | 102 | The look of every agent: shape, expression and colour, chosen in the editor and worn in every row | done        | f6afe5d |
 | 103 | Alive beside the chat: the character works, waits, finishes and sleeps with the run | done        | 0a0fdaa |
-| 104 | The composer remade: one frame, quiet menus, drafts that keep, a face that listens  | planned     |         |
+| 104 | The composer remade: one frame, quiet menus, drafts that keep, a face that listens  | done        | 9261fa9 |
 | 105 | The small polish part 12's review left: a scroll cue, empty sections that point, the Browser grid, the tour's content, Watch on an ended run | planned     |         |
 | 106 | The review: every feature of parts 1 to 13 read once more, the characters' cost measured | planned     |         |
 
@@ -6026,7 +6026,7 @@ and the still frame with the switch off; `test_run_chrome.py` and `test_activity
 
 ### 104. The composer remade: one frame, quiet menus, drafts that keep, a face that listens
 
-**Status: in progress.**
+**Status: done.** Merged as `9261fa9` (PR #122, MYP-244 Done).
 
 Design, as built (2026-10-11). `composer.js` grows the frame itself: `composerFrame({label, boxLabel, placeholder,
 rows, maxPx, commands, send, sendLabel, draftKey, listener})` returns the card with the slash menu over it, the box,
@@ -6077,7 +6077,22 @@ gains the Model popover, the Options popover and a draft that survives a navigat
 
 ### 105. The small polish part 12's review left: a scroll cue, empty sections that point, the Browser grid, the tour's content, Watch on an ended run
 
-**Status: planned.**
+**Status: in progress.**
+
+Design, as built (2026-10-11). The scroll cue: `scrollcue.js scrollCue(box)` sets `data-scroll` on a box that scrolls
+sideways ("more" while more lies to the right, else "end"), read on scroll and on resize; the Models tab cues each
+of its tables after every paint and drops the cues with the tab, and the sheet fades the right edge of a
+`.table-scroll[data-scroll="more"]` (a mask, 40 px). The Activity page's empty sections say what would show there
+("Nothing waits for you. A run that asks a question or an approval shows here."; the same for Working and Ended
+today). The Browser tab's four facts wear `kv-pairs` (cells of 150 px, as the bill of a run), so a phone sees two and
+two, never three and a stray one. Dot's computer on an ended run hides Watch (`watchButton.hidden`, it was disabled)
+and keeps the last screen as before. The tour seeds what its pages show: a run of six text steps with a shell call
+each, so the conversation is taller than a window and a `run-top` shot shows the way down to the answer (the jump
+arrow, asserted visible); the lesson it posts is marked as handed to the run and the run's end closes the use, so the
+Memory page shows a score; a learned skill (`learned-count-files`, its `SKILL.md` and `playbook.json` under the
+home's `playbooks`, `[agent] playbooks = true`) so the Skills tab has a row; the Activity page's empty line is
+asserted to point. README: Dot's computer. Tests: `tests/smoke/test_tour.py` as above (the empty words are read
+there, on the tour's page, rather than in `test_activity.py`, whose sections are never empty), the tour read by eye.
 
 **What.** Four of the five from item 100 (the fifth, the dock's placeholder cut on a phone, is item 104's): the
 Models tab's table on a phone shows a fade at its right edge while it can scroll and the Reasoning and Context
@@ -6627,3 +6642,4 @@ items. The findings go in this section as built.
 - 2026-10-11 (Fable 5.1): item 101 merged as `8c3a590` (PR #119, MYP-241 Done): bloub ported to `static/js/character/` (MIT notice kept), `mountCharacter`, one ticker per page, the `--character-*` tokens, the Characters card of `#/controls`.
 - 2026-10-11 (Fable 5.1): item 102 merged as `f6afe5d` (PR #120, MYP-242 Done): `AgentLook` on the record and in the editor, Dot's look in Settings › General, every face a still character (`actors.js`), the favicon from `character/still.js`, `hues.js` pure.
 - 2026-10-11 (Fable 5.1): item 103 merged as `0a0fdaa` (PR #121, MYP-243 Done): the run page's character card with its moods (`mood.js`, `charactercard.js`), the turns and the answer with the actor's still face, the home's face moving.
+- 2026-10-11 (Fable 5.1): item 104 merged as `9261fa9` (PR #122, MYP-244 Done): one `composerFrame` for the three composers, the bar as pills with panels (`popover.js`), drafts kept per composer, the home's face listening.

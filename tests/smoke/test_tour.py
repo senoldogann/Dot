@@ -8,14 +8,17 @@ import asyncio
 import time
 from collections.abc import AsyncIterator
 from pathlib import Path
+from typing import Literal
 
 import httpx
 import pytest
 import pytest_asyncio
-from playwright.async_api import Browser, BrowserContext, Page, async_playwright
+from playwright.async_api import Browser, BrowserContext, Page, async_playwright, expect
 
 from dotagent.agent.manager import RunManager
+from dotagent.agent.playbooks import META_FILE, PlaybookMeta
 from dotagent.config import load_config
+from dotagent.core.paths import playbooks_dir
 from dotagent.evals.runner import SCRIPTED_MODEL
 from dotagent.evals.scripted import ScriptedProvider
 from dotagent.evals.types import ScriptedCall, ScriptedTurn
@@ -25,6 +28,7 @@ from dotagent.server.app import create_app
 from dotagent.server.context import ServerContext
 from dotagent.server.daemon import DotServer, bind_listener, serving_config
 from dotagent.server.links import ui_url
+from dotagent.skills.types import SKILL_FILE
 from dotagent.store.models import RunRecord
 from dotagent.tools.meta import FINISH_TOOL
 
@@ -53,7 +57,59 @@ _PAGES: tuple[tuple[str, str], ...] = (
     ("settings-system", "#/settings/system"),
 )
 _SIZES: tuple[tuple[str, int, int], ...] = (("desk", 1280, 860), ("phone", 390, 844))
-_SCHEMES: tuple[str, ...] = ("light", "dark")
+_SCHEMES: tuple[Literal["light", "dark"], ...] = ("light", "dark")
+# The steps before the answer, each a line of text and a shell call (the commands vary, so no step repeats enough to
+# be called a loop), so the conversation is taller than a window and the way down (the jump arrow) has something to
+# point at. Lessons are off: the scripted model has no reply left for drawing them.
+_STEPS: tuple[tuple[str, str], ...] = (
+    (
+        "Listing the workspace first, to see what is there before counting anything; the names and the sizes come with it.",
+        "ls -la",
+    ),
+    (
+        "Reading the dates of each file, newest first, so the latest change stands out before any of them is named.",
+        "ls -lt",
+    ),
+    (
+        "Checking the hidden entries too, since a dotfile counts as a file of the folder and the count must include it.",
+        "ls -A",
+    ),
+    (
+        "Checking where the folder is, so the count is of the workspace and not of a folder further up the tree.",
+        "pwd",
+    ),
+    (
+        "Measuring the folder, to say how much the three files weigh together and whether any of them is unexpectedly large.",
+        "du -sh .",
+    ),
+    (
+        "Reading the listing once more with the sizes, to be sure of the count before the answer is written down.",
+        "ls -la",
+    ),
+    (
+        "Sorting by date again, so the newest file is named with confidence and not from the first listing alone.",
+        "ls -lt",
+    ),
+    (
+        "Looking at the hidden entries a last time; nothing new appeared there, so the count stands as read before.",
+        "ls -A",
+    ),
+    (
+        "Checking the folder once more, since a change of directory in between would make the count another folder's.",
+        "pwd",
+    ),
+    (
+        "Measuring the folder a second time, so the size in the answer is the one of the moment it is written.",
+        "du -sh .",
+    ),
+    ("Reading the listing a last time, with every name in view, so nothing is left out of the count.", "ls -la"),
+    ("Writing the answer up with the count, the newest file and what was read on the way to it.", "ls -lt"),
+)
+_PLAYBOOK: str = (
+    '---\nname: learned-count-files\ndescription: "Count the files of a folder and name the newest."\n---\n\n'
+    "# learned-count-files\n\nLearned by Dot from its own work (1 run).\n\n## Kind of work\n\ncount files\n\n"
+    "## Steps\n\n1. List the folder.\n2. Read the dates.\n3. Name the newest.\n"
+)
 _ANSWER: str = (
     "# Counted\n\nThe directory holds **three** files; `notes.md` is the newest.\n\n"
     "## What I read\n\n- the listing\n- the dates\n\n```sh\nls -la\n```\n"
@@ -88,7 +144,8 @@ MODEL: _Recorder = _Recorder()
 async def runtime(tmp_path_factory: pytest.TempPathFactory) -> AsyncIterator[Runtime]:
     home: Path = tmp_path_factory.mktemp("home")
     (home / "config.toml").write_text(
-        f'[browser]\nheadless = true\n\n[models]\nmain = "{SCRIPTED_MODEL}"\n', encoding="utf-8"
+        f'[browser]\nheadless = true\n\n[agent]\nplaybooks = true\nlessons = "off"\n\n[models]\nmain = "{SCRIPTED_MODEL}"\n',
+        encoding="utf-8",
     )
     patch: pytest.MonkeyPatch = pytest.MonkeyPatch()
     patch.setenv("DOT_HOME", str(home))
@@ -175,7 +232,17 @@ async def _shoot(context: BrowserContext, base: str, pages: tuple[tuple[str, str
                 await page.get_by_role("button", name="Show sidebar").click()
                 await page.wait_for_timeout(_SETTLE_MS)
             await page.evaluate("delete document.documentElement.dataset.shell")
+        if name == "activity":
+            # An empty section says what would show there (item 105).
+            await expect(page.locator(".activity-section[data-section=waiting] .empty-line")).to_contain_text(
+                "shows here"
+            )
         if name == "run":
+            # From the top of a conversation taller than the window, the way down to the answer (item 96).
+            await page.evaluate("window.scrollTo(0, 0)")
+            await page.wait_for_timeout(_SETTLE_MS)
+            await expect(page.get_by_role("button", name="Jump to the answer")).to_be_visible()
+            await page.screenshot(path=str(out / f"{tag}-run-top.png"), full_page=False)
             # The side panel with its Details card open (item 84): on a wide window beside the chat, on a phone a drawer.
             await page.get_by_role("button", name="Run details").click()
             await page.locator(".inspector .fold-toggle", has_text="Details").click()
@@ -192,15 +259,45 @@ async def test_every_page_in_both_schemes_at_both_widths(
     assert port is not None
     base: str = f"http://{host}:{port}"
     MODEL.script = ScriptedProvider(
-        _PROVIDER, [_turn("shell", {"command": "ls -la"}), _turn(FINISH_TOOL, {"answer": _ANSWER, "success": True})]
+        _PROVIDER,
+        [
+            *(
+                ScriptedTurn(text=text, calls=(ScriptedCall(tool="shell", arguments={"command": command}),))
+                for text, command in _STEPS
+            ),
+            _turn(FINISH_TOOL, {"answer": _ANSWER, "success": True}),
+        ],
     )
     run: RunRecord = await manager.start(
         "Count the files in the workspace", "task", SCRIPTED_MODEL, None, "test", None, None, "yolo", False, ()
     )
     async with asyncio.timeout(_RUN_WAIT_S):
         await manager.wait(run.id)
+    # A lesson the run was handed, so the Memory page shows a score (item 105).
     note = await client.post("/api/memories", json={"content": "The owner prefers short answers.", "tags": ["core"]})
     assert note.status_code == 201, note.text
+    await runtime.store.mark_memories_used(run.id, [note.json()["record"]["id"]], time.time(), "start")
+    await runtime.store.close_memory_uses(run.id, "done")
+    # A skill Dot learned, so the Skills tab has a row.
+    folder: Path = playbooks_dir() / "learned-count-files"
+    meta: PlaybookMeta = PlaybookMeta(
+        name="learned-count-files",
+        kind="count files",
+        host="the Mac",
+        runs=(run.id,),
+        acting_steps=(12,),
+        written_at=time.time(),
+        updated_at=time.time(),
+        uses=1,
+        failures=0,
+    )
+
+    def write_playbook() -> None:
+        folder.mkdir(parents=True)
+        (folder / SKILL_FILE).write_text(_PLAYBOOK, encoding="utf-8")
+        (folder / META_FILE).write_text(meta.model_dump_json(indent=2) + "\n", encoding="utf-8")
+
+    await asyncio.to_thread(write_playbook)
     # An agent (item 86) gives the Agents page a row of its own and an agent page to shoot.
     made = await client.post(
         "/api/agents",
@@ -240,7 +337,7 @@ async def test_every_page_in_both_schemes_at_both_widths(
         finally:
             await browser.close()
     shots: list[Path] = await asyncio.to_thread(lambda: sorted(out.glob("*.png")))
-    assert len(shots) == len(_SCHEMES) * len(_SIZES) * (len(pages) + 4)
+    assert len(shots) == len(_SCHEMES) * len(_SIZES) * (len(pages) + 5)
     print(f"\ntour: {out}")
 
 
