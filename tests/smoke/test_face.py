@@ -188,7 +188,7 @@ async def test_the_face_tells_the_state_through_a_runs_life_and_wears_the_name(
                     page: Page = await browser.new_page(viewport={"width": width, "height": 900}, color_scheme=scheme)
                     await page.goto(ui_url(host, port, TOKEN))
                     await page.goto(f"{base}/#/runs/{run.id}")
-                    face = page.locator(".chat-head .avatar")
+                    face = page.locator(".stage-title .avatar")
                     await expect(face).to_have_attribute("data-state", "waiting")
                     await page.screenshot(path=str(tmp_path / f"waiting-{width}-{scheme}.png"))
                     await page.close()
@@ -200,8 +200,8 @@ async def test_the_face_tells_the_state_through_a_runs_life_and_wears_the_name(
                 await name.fill(_NAME)
                 await name.press("Enter")
                 await page.goto(f"{base}/#/runs/{run.id}")
-                face = page.locator(".chat-head .avatar")
-                await expect(page.locator(".chat-who-name")).to_have_text(_NAME)
+                face = page.locator(".stage-title .avatar")
+                await expect(page.locator(".stage-name")).to_have_text(_NAME)
                 await expect(face).to_have_attribute("data-state", "waiting")
                 assert await _favicon_state(page) == "waiting"
                 await manager.decide(question.id, True, "test", "blue")
@@ -215,7 +215,7 @@ async def test_the_face_tells_the_state_through_a_runs_life_and_wears_the_name(
                 await expect(page.locator(".home-who .avatar")).to_have_attribute("data-state", "idle")
                 await expect(page.locator(".home-name")).to_have_text(_NAME)
                 await page.goto(f"{base}/#/runs/{run.id}")
-                await expect(page.locator(".chat-head .avatar")).to_have_attribute("data-state", "idle")
+                await expect(page.locator(".stage-title .avatar")).to_have_attribute("data-state", "idle")
 
                 MODEL.script = ScriptedProvider(_PROVIDER, [])
                 failing: RunRecord = await manager.start(
@@ -225,7 +225,7 @@ async def test_the_face_tells_the_state_through_a_runs_life_and_wears_the_name(
                     failed: RunRecord = await manager.wait(failing.id)
                 assert failed.status == "failed", failed
                 await page.goto(f"{base}/#/runs/{failing.id}")
-                await expect(page.locator(".chat-head .avatar")).to_have_attribute("data-state", "failed")
+                await expect(page.locator(".stage-title .avatar")).to_have_attribute("data-state", "failed")
                 await page.screenshot(path=str(tmp_path / "failed-1280-light.png"))
                 await page.close()
             finally:

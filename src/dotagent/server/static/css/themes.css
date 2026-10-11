@@ -113,7 +113,6 @@
   --voice: ui-serif, "New York", Georgia, "Times New Roman", serif;
 }
 
-:root[data-theme="paper"] .page-title,
 :root[data-theme="paper"] .home-name {
   font-family: var(--voice);
   font-weight: var(--weight-label);

@@ -15,6 +15,7 @@ import { avatar, icon } from "../icons.js";
 import { createInspector } from "../inspector.js";
 import { userMessage } from "../messages.js";
 import { emptyPanel, errorPanel, foldCard, loadingPanel, statusBadge } from "../panels.js";
+import { setStageTitle, setStageTools } from "../stage.js";
 import { onLifecycle } from "../state.js";
 import { createTimeline } from "../timeline.js";
 import { attempt, confirmDialog, toast } from "../ui.js";
@@ -774,26 +775,17 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
     historyProblem === null
       ? null
       : el("div", { class: "note warn" }, icon("alert"), el("span", null, `The earlier part of this conversation could not be loaded: ${historyProblem.message}`));
-  // Dot's face and name head the conversation, with the run's state and when it started; the goal is the first message.
-  const chatHead = el(
-    "header",
-    { class: "chat-head" },
-    el("h1", { class: "visually-hidden" }, run.goal),
-    el(
-      "div",
-      { class: "chat-who" },
-      face,
-      el("div", { class: "chat-who-name" }, dotName()),
-      el("div", { class: "chat-who-sub" }, statusSlot, el("span", null, dateTime(run.created_at))),
-    ),
-    el("div", { class: "chat-tools" }, modelChip, modeChips, parentChip, campaignChip, inspector.toggle, resumeButton, cancelButton),
-  );
+  // Dot's face, name, the run's state and its start name the page in the top bar (item 78); the run's chips and
+  // buttons are the bar's tools, the chips waiting in the side panel's Details card on a phone. The goal, the first
+  // message, is the page's heading for a reader of the structure.
+  setStageTitle(face, el("span", { class: "stage-name" }, dotName()), el("span", { class: "stage-sub" }, statusSlot, el("span", { class: "stage-time" }, dateTime(run.created_at))));
+  setStageTools(modelChip, ...modeChips, parentChip, campaignChip, inspector.toggle, resumeButton, cancelButton);
 
   layout.append(
     el(
       "div",
       { class: "run-main" },
-      chatHead,
+      el("h1", { class: "visually-hidden" }, run.goal),
       connectionNote,
       problem,
       cost.element,

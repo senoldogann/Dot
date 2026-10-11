@@ -3,7 +3,7 @@
 import { api, query } from "../api.js";
 import { ago, clip, dateTimeFull, debounce, el, plural } from "../dom.js";
 import { icon } from "../icons.js";
-import { emptyPanel, errorPanel, field, loadingPanel, pageHead } from "../panels.js";
+import { emptyPanel, errorPanel, field, loadingPanel, paneHead } from "../panels.js";
 import { attempt, confirmDialog, toast } from "../ui.js";
 
 const PAGE_SIZE = 30;
@@ -350,7 +350,7 @@ export function mount(root, ctx) {
   });
 
   root.append(
-    pageHead("Memory", "Notes that Dot keeps between runs. It recalls the ones that fit the task at hand.", null),
+    paneHead("Notes that Dot keeps between runs. It recalls the ones that fit the task at hand.", null),
     el(
       "section",
       { class: "card card-pad stack" },

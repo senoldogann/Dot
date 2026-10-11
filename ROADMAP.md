@@ -4993,15 +4993,17 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 
 | #   | Item                                                                     | Status      | Commits |
 | --- | ------------------------------------------------------------------------ | ----------- | ------- |
-| 77  | The type system: Inter and Geist Mono, seven sizes, three weights        | planned     |         |
-| 78  | One bar: the top bar carries the page, the run's head and the daemon     | planned     |         |
+| 77  | The type system: Inter and Geist Mono, seven sizes, three weights        | done        | ffa00cb |
+| 78  | One bar: the top bar carries the page, the run's head and the daemon     | in progress |         |
 | 79  | Flat surfaces and plain words: cards, labels, meta, chips, empty states  | planned     |         |
 | 80  | Forms and controls: one grammar for inputs, selects, switches, tables    | planned     |         |
 | 81  | Dark, first paint and the tour: every page read in both schemes          | planned     |         |
+| 82  | Delegated runs as rows: face, state, last line, time; the child's bar    | planned     |         |
+| 83  | Faces for the actors: a hue each, alive in the rows and the bar          | planned     |         |
 
 ### 77. The type system: Inter and Geist Mono, seven sizes, three weights
 
-**Status: in progress.** Built on `item-77-type-system` (MYP-217).
+**Status: done.** Merged as `ffa00cb` (PR #86, squash; MYP-217 Done).
 
 **Design, as built (2026-10-11).** `static/fonts` holds `InterVariable.woff2`, `InterVariable-Italic.woff2` (Inter
 4.1) and `GeistMono-Variable.woff2` with their OFL licence files; `app.css` declares the three `@font-face` blocks
@@ -5031,7 +5033,20 @@ refuses any size, weight or line-height off the scale. `tests/smoke/test_tour.py
 
 ### 78. One bar: the top bar carries the page, the run's head and the daemon
 
-**Status: planned.**
+**Status: in progress.** Built on `item-78-one-bar` (MYP-218).
+
+**Design, as built (2026-10-11).** `static/js/stage.js` owns two slots the shell places in the bar once, between the
+sidebar opener and the daemon's pills: the page's name (`setStageTitle`) and the page's tools (`setStageTools`);
+`main.js` clears both before a page mounts, and a null among the nodes is dropped. `panels.pageHead(title, subtitle,
+actions)` names the page in the bar and returns the description line with the actions (`paneHead(subtitle, actions)`
+is the same line for a settings pane, which the bar already names "Settings"; the five settings panes use it). The
+run page names itself with the face (28 px), Dot's name, the state badge and the start, and puts its chips, the panel
+toggle, Continue and Cancel in the tools; the sticky translucent `.chat-head` and its styles are gone, the goal stays
+as the page's hidden heading. The bar (`shell.css`) is solid `--bg` with a hairline under it, 48 px, `padding: 4px
+16px`; on a phone the chips and the start hide (the Details card keeps them), the state badge stays and the brand hides when a page is named,
+the opener's button alone leading to the sidebar. `settings.js` draws the nav without its own title and names the bar
+"Settings" after the pane mounts; `.page-title` remains only for the sign-in card. The smoke tests follow the move
+(`.stage-title .avatar`, `.stage-name`, `.stage-tools .chip`): `test_run_chrome` now asserts the head is inside the bar.
 
 **What.** The stage bar becomes the top bar of every page: solid background, hairline under it, 48 px; left the
 sidebar opener and the page's name (on the run page the face, the name, the state and the start), right the pills,
@@ -5068,6 +5083,28 @@ name in Geist Mono at 13, the capability chips as in item 79, the reasoning sele
 secondary text at or above 4.5:1 on each; the Paper look the same way; the theme applied before the first paint after
 the sign-in redirect (verified by the tour: the first dark shot is dark); every one of the 36 shots of the tour read
 and what the earlier items missed fixed here; README's visual-system section rewritten as the current state.
+
+### 82. Delegated runs as rows: face, state, last line, time; the child's bar
+
+**Status: planned.** The owner's reference (2026-10-11): Claude Code's subagent list and page.
+
+**What.** A delegated run in the parent's chat and in the sidebar is one row: the actor's face with a state dot at
+its corner (green ended, blue working, red failed), the goal as the title, the last line it said or did as a muted
+second line, the elapsed time at the right, a chevron; the rows in one card with hairlines between them, no chips.
+The child's page shows a breadcrumb in the top bar ("Parent's goal / Child's goal", the parent a link) and, under the
+conversation, a pill with the model and effort, "Completed in 1m 46s" or "Working for 2m", "Runs on its own" when it
+has no parent in flight, and "Open parent". The timeline's delegated card and the sidebar's delegated section use the
+same row.
+
+### 83. Faces for the actors: a hue each, alive in the rows and the bar
+
+**Status: planned.** The owner's reference (2026-10-11): the character marks of OpenAI's dots and Grok's companions.
+
+**What.** Dot's face stays the yellow dot. Every other actor gets the same mark in its own hue, chosen from a ring of
+eight by a hash of its id: a delegated run, a campaign, a schedule. The face lives (item 73's motion): it breathes at
+rest, pulses while it works, blinks its core once when it ends, shows the tick or the cross as Dot's does; the rows of
+item 82, the sidebar's sections, the Campaigns and Schedules pages and the bar of a child's page all draw it at 24 or
+28 px. One SVG, one hue token per actor, no raster; a unit test for the hash and the ring.
 
 ## Log
 

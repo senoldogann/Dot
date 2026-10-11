@@ -33,20 +33,22 @@
   outline: none;
 }
 
+/* The top bar (item 78): one solid bar on every page with a hairline under it; nothing scrolls under a blur. It
+   carries the sidebar opener, the page's name (stage.js), the page's tools and the daemon's pills. */
 .stagebar {
   position: sticky;
   top: 0;
   z-index: 20;
-  background: color-mix(in srgb, var(--bg) 86%, transparent);
-  backdrop-filter: saturate(1.4) blur(10px);
+  background: var(--bg);
+  border-bottom: 1px solid var(--border);
 }
 
 .stagebar-row {
   display: flex;
   align-items: center;
   gap: 12px;
-  min-height: 52px;
-  padding: 8px 16px;
+  min-height: 48px;
+  padding: 4px 16px;
 }
 
 .stagebar-left {
@@ -367,9 +369,13 @@
 
 @media (max-width: 720px) {
   .stagebar-row {
-    min-height: 48px;
     gap: 8px;
-    padding: 8px 8px;
+    padding: 4px 8px;
+  }
+
+  /* A named page needs no brand beside its name; the sidebar's opener stays, and the sidebar leads home. */
+  .stagebar-row:has(.stage-title:not(:empty)) .brand {
+    display: none;
   }
 }
 

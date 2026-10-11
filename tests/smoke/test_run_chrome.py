@@ -128,7 +128,7 @@ async def test_the_head_and_the_panel_stay_in_sight_while_a_long_run_scrolls(
                 )
                 await page.goto(f"{address}/#/runs/{run.id}")
                 await page.reload()
-                await expect(page.locator(".chat-head")).to_be_visible()
+                await expect(page.locator(".stage-title")).to_be_visible()
                 await expect(page.locator("details.steps").first).to_be_visible()
                 await expect(page.locator("details.steps .steps-body").first).to_be_visible()
                 assert await page.evaluate("document.documentElement.scrollHeight") > 2 * 800
@@ -140,18 +140,17 @@ async def test_the_head_and_the_panel_stay_in_sight_while_a_long_run_scrolls(
                 assert measured.strip() == f"{round(bar_bottom)}px", (measured, bar_bottom)
                 await page.evaluate("window.scrollTo(0, document.documentElement.scrollHeight / 2)")
                 await page.wait_for_timeout(150)
-                head_top, head_bottom = await page.evaluate(_BOX, ".chat-head")
-                # The head sits right under the stage bar, not scrolled away; Cancel's place and the model stay in reach.
-                assert abs(head_top - bar_bottom) <= 1.5, (head_top, bar_bottom)
-                assert head_bottom < 800
-                await expect(page.locator(".chat-head .avatar")).to_be_visible()
+                head_top, head_bottom = await page.evaluate(_BOX, ".stage-title")
+                # The run's head is the bar itself (item 78), so it never scrolls away; Cancel's place stays in reach.
+                assert head_top >= 0 and head_bottom <= bar_bottom + 1, (head_top, head_bottom, bar_bottom)
+                await expect(page.locator(".stage-title .avatar")).to_be_visible()
                 if width >= 960:
                     panel_top, panel_bottom = await page.evaluate(_BOX, ".inspector")
                     assert bar_bottom < panel_top < bar_bottom + 40, (panel_top, bar_bottom)
                     assert panel_bottom <= 800
                     await expect(page.locator(".inspector")).to_be_visible()
                 else:
-                    assert await page.locator(".chat-head .chip:visible").count() == 0
+                    assert await page.locator(".stage-tools .chip:visible").count() == 0
                 dock_top, dock_bottom = await page.evaluate(_BOX, ".dock")
                 assert dock_top > head_bottom and dock_bottom <= 800 + 1
                 await page.screenshot(path=str(tmp_path / f"chrome-{width}-{scheme}.png"))

@@ -16,7 +16,7 @@ import { dotName, NAME_CHARS, setDotName } from "../face.js";
 import { OWNER_CHARS, ownerName, setOwnerName } from "../presence.js";
 import { icon } from "../icons.js";
 import { chooseDensity, currentDensity, DENSITIES, followTheme, foldSteps, hasOwnLayout, setFoldSteps, setShowInspector, showInspector } from "../layout.js";
-import { foldCard, foldGroup, inlineError, inlineLoading, pageHead, segmented } from "../panels.js";
+import { foldCard, foldGroup, inlineError, inlineLoading, paneHead, segmented } from "../panels.js";
 import { providerLabel, providerOf } from "../providers.js";
 import { reasoningSelect } from "../reasoning.js";
 import { approvalLabel } from "../runmodes.js";
@@ -757,7 +757,7 @@ function buildNameCard() {
 export function mountGeneral(root, ctx) {
   const appearance = buildAppearance();
   root.append(
-    pageHead("General", "The look of this browser, how it draws your attention, and the token it is signed in with.", null),
+    paneHead("The look of this browser, how it draws your attention, and the token it is signed in with.", null),
     appearance.element,
     buildNameCard(),
     buildNotifications(),
@@ -770,7 +770,7 @@ export function mountGeneral(root, ctx) {
 export function mountModels(root, ctx) {
   let disposed = false;
   const models = buildModels(() => disposed);
-  root.append(pageHead("Models", "The providers Dot can reach, the models each of them offers and the reasoning effort of each.", null), models.element);
+  root.append(paneHead("The providers Dot can reach, the models each of them offers and the reasoning effort of each.", null), models.element);
   const stop = onChange(() => models.paint());
   models.paint();
   attempt(refresh);
@@ -785,7 +785,7 @@ export function mountModels(root, ctx) {
 export function mountBrowser(root, ctx) {
   let disposed = false;
   const browser = buildBrowser(() => disposed);
-  root.append(pageHead("Browser", "Which Chrome the agent browses with, and what Chrome has to allow first.", null), browser.element);
+  root.append(paneHead("Which Chrome the agent browses with, and what Chrome has to allow first.", null), browser.element);
   attempt(browser.load);
   return () => {
     disposed = true;
@@ -804,7 +804,7 @@ export function mountSystem(root, ctx) {
     failsafe.paint(snapshot);
   }
 
-  root.append(pageHead("System", "The daemon, its safety switch and its health checks.", null), daemon.element, failsafe.element, doctor.element);
+  root.append(paneHead("The daemon, its safety switch and its health checks.", null), daemon.element, failsafe.element, doctor.element);
   const stop = onChange(paint);
   paint(getSnapshot());
   attempt(refresh);

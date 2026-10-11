@@ -5,6 +5,7 @@ import { setPageTitle, watchAttention } from "./attention.js";
 import { el } from "./dom.js";
 import { brandMark, icon } from "./icons.js";
 import { buildShell } from "./shell.js";
+import { clearStage } from "./stage.js";
 import { getSnapshot, onChange, refresh, runLifecycle } from "./state.js";
 import { applyStoredDensity } from "./layout.js";
 import { applyStoredScheme, applyStoredTheme } from "./theme.js";
@@ -153,6 +154,7 @@ function beginSession() {
     disposeView();
     disposeView = () => undefined;
     shell.main.replaceChildren();
+    clearStage();
     const path = currentPath();
     const moved = MOVED.get(path);
     if (moved !== undefined) {

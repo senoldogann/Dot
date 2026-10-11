@@ -7,6 +7,7 @@ import { brandMark, icon } from "./icons.js";
 import { setSidebarOpen, sidebarOpen, trackStagebar } from "./layout.js";
 import { installShortcuts, requestCompose } from "./shortcuts.js";
 import { buildSidebar } from "./sidebar.js";
+import { stageTitleSlot, stageToolsSlot } from "./stage.js";
 import { attempt } from "./ui.js";
 
 const NARROW = "(max-width: 859.98px)";
@@ -111,7 +112,12 @@ export function buildShell({ homeRoute }) {
     el("a", { class: "brand", href: homeHref, "aria-label": "Dot" }, brandMark(), el("span", { class: "brand-name" }, "Dot")),
   );
   const main = el("main", { class: "page", tabindex: "-1" });
-  const stagebar = el("header", { class: "stagebar" }, el("div", { class: "stagebar-row" }, opener, el("div", { class: "stagebar-right" }, indicators.pills)), indicators.banner);
+  const stagebar = el(
+    "header",
+    { class: "stagebar" },
+    el("div", { class: "stagebar-row" }, opener, stageTitleSlot(), stageToolsSlot(), el("div", { class: "stagebar-right" }, indicators.pills)),
+    indicators.banner,
+  );
   const stage = el("div", { class: "stage" }, stagebar, main);
   trackStagebar(stagebar);
   const scrim = el("div", { class: "scrim", onclick: closeToOpener });
