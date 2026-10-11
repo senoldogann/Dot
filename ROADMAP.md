@@ -4590,6 +4590,217 @@ and 390 px in both schemes were looked at.
 **Touchpoints.** `static/css/run.css`, `app.css`, `static/js/layout.js`, `static/js/shell.js`,
 `tests/smoke/test_run_chrome.py`, README.
 
+## Part 8: a system that works on its own, learns and shows it is here (planned 2026-10-11)
+
+The owner's eighth word, on 2026-10-11, after part 7: "continue with the next steps; do whatever it takes to bring
+the project to the best level: a freely working, fully autonomous, continuously self-improving system with memory;
+change the design completely, so that the UI says 'I am here' and the people who work in it all day are happy;
+research the web where needed; and should we use Claude Haiku 5.5 for web searches directly, since the API carries
+its own search?" Planned from a read-only map of what exists (memory, lessons, playbooks, scheduler, campaigns, the
+home page), the Anthropic docs and the Models API, and what Claude Code desktop, Cursor, Linear and Raycast do for
+presence and calm.
+
+**What exists, and what does not.** Memory: notes saved and recalled by meaning (`memory/service.py`), injected at
+each run's start (core, the owner's, then the top agent notes), forgotten only by hand. Learning: at most three
+lessons after a run that ended done with a signal of trouble (`agent/lessons.py`, `[agent] lessons = "off"` by
+default) and a playbook after a goal-mode run on a new site (`agent/playbooks.py`); nothing looks at a failed run, at
+the day as a whole, or at lessons that aged. Autonomy: schedules and campaigns run unattended; approvals, questions
+and the lesson's "propose" still wait for the owner. Presence: the home is a greeting and a composer; what Dot is
+doing now lives in the sidebar's sections and on the Activity page; notifications are off until switched on and fire
+whether or not the owner is looking. The Anthropic web search tool: supported by `claude-haiku-5-5` (the Models API
+says so), $10 per 1,000 searches plus tokens (the docs; a failed search is not billed), citations always on,
+`max_uses`, domain lists, errors as `web_search_tool_result_error` (`too_many_requests`, `max_uses_exceeded`,
+`query_too_long`, `request_too_large`, `unavailable`). It is not free: one cent a search next to Haiku's tokens; the
+`ollama` rung, which answered all 104 searches of item 60's run, stays first.
+
+### How to start part 8 (the handoff prompt)
+
+> Read ROADMAP.md part 8 and the status table below. One item at a time, in order; the protocol of part 5 (branch,
+> gate, PR, Linear MYP issue, squash merge, hash in the table, log line) is unchanged. Never touch the owner's data
+> directory except to read it and to restart the daemon when `/api/status` shows no active run; the owner's goals
+> stay out of this file; PLAN.md stays untracked. The owner reads Turkish; everything written is English.
+
+### Status, part 8
+
+| #   | Item                                                                     | Status      | Commits |
+| --- | ------------------------------------------------------------------------ | ----------- | ------- |
+| 69  | The Anthropic rung: Haiku 5.5 searches through the API's own web search | planned     |         |
+| 70  | Reflection: Dot's day in review, every night                             | planned     |         |
+| 71  | Memory that rests: use decides what is recalled                          | planned     |         |
+| 72  | The home that says "I am here"                                           | planned     |         |
+| 73  | Motion with meaning                                                      | planned     |         |
+| 74  | Quiet chrome: the surfaces recede, the work leads                        | planned     |         |
+| 75  | Told only when not looking                                               | planned     |         |
+| 76  | The live numbers of part 8                                               | planned     |         |
+
+### 69. The Anthropic rung: Haiku 5.5 searches through the API's own web search
+
+**Status: planned.**
+
+**What.** A search rung that asks `claude-haiku-5-5` with the Messages API's `web_search` server tool and reads its
+results as hits (title, address, the cited text, the page's age), second on the ladder after `ollama` when the
+Anthropic key is present and `[web] anthropic_search` is not `"off"`; each search is counted in the run's spends at
+the documented price and in `dotx stats`.
+
+**Why.** The owner asks whether the API's own search should carry Dot's searches. It is reliable and already paid
+through the key, but not free: one cent a search plus Haiku's tokens. As a second rung it answers when `ollama` is
+benched and before the HTML engines, which throttle; as the first rung it would cost about a dollar per hundred
+searches, so the owner chooses that with `[web] anthropic_search = "first"`.
+
+**Design.** `web/ladder.py`: `SearchEngine` gains `"anthropic"`, `BENCH_S["anthropic"] = 120`. `web/search.py`:
+`search_ladder` places it (`auto`: after `ollama`; `"first"`: before; `"off"`: absent) and `search_anthropic(client,
+model, query, max_results)` posts one Messages request with `tools=[{"type": "web_search_20250305", "name":
+"web_search", "max_uses": 1}]`, `max_tokens` small, a system line that asks for no prose, and parses the
+`web_search_tool_result` block into `SearchHit`s (`encrypted_content` is not kept); `web_search_tool_result_error`
+maps `too_many_requests`/`unavailable` to a bench and the rest to a `WebError` with the code. `llm/anthropic.py` is
+not changed: the search is its own request through the provider's client. `[models] search` names the model
+(`anthropic:claude-haiku-5-5`); `[web] anthropic_search_price_usd` holds the documented 0.01 so a price change is a
+config line. The spend is recorded in `spends` with kind `web_search`; `dotx stats` and the cost card show searches
+by engine and the dollars. Doctor's search row names the rung. Unit test on the parsing and the errors (recorded
+bodies); a live smoke test with the key (skipped without) runs one search and asserts a hit and a spend.
+
+**Touchpoints.** `web/ladder.py`, `web/search.py`, `web/client.py`, `config.py`, `defaults.toml`, `store` (spends),
+`store/stats.py`, `cli_stats`, `doctor.py`, `server/static/js/cost.js`, `tests/unit/test_search_anthropic.py`,
+`tests/smoke/test_search_anthropic.py`, README (web tools and ladder).
+
+### 70. Reflection: Dot's day in review, every night
+
+**Status: planned.**
+
+**What.** Once a day, unattended, Dot reads the runs that ended since the last reflection and writes what it learned:
+lessons from failed and cancelled runs too (today only runs that ended done teach), one short journal note for the
+day ("what I did and learned on 2026-10-11", shown on the home of item 72), merged duplicates among its lesson notes,
+and retired lessons that no run recalled in sixty days. It touches only its own notes, never the owner's.
+
+**Why.** The owner asks for a system that improves itself. Learning today happens only at the end of a run that went
+well; a failed run leaves nothing, lessons pile up without a merge, and nothing tells the owner what the day taught.
+
+**Design.** `agent/reflection.py`: `reflect(runtime, since) -> Reflection(runs_read, lessons_written, merged,
+retired, journal)`; the runs come from the store (ended, not delegated, since the last `reflection` event); the
+lesson writer of `agent/review.py` is asked per run with the run's signals and result, failed runs included, with the
+same cap of three; near-duplicates among `lesson` notes are found by the memory ranking (cosine above 0.92) and the
+older one folded into the newer, with provenance kept; lessons whose `last_used_at` is older than
+`[agent] lesson_rest_days` (60) are retired to a `rest` tag (recalled no more, still on the Memory page); the journal
+is a note tagged `journal` with the date. The scheduler gets a built-in schedule `reflection` at `[agent]
+reflection_time` (03:30 local, `"off"` to stop), fired like a schedule but running `reflect` instead of a run, with a
+`reflection` event and a row in Activity ("Reflected on 7 runs: 2 lessons, 1 merged"). `dotx reflect` runs it by
+hand. Lessons under `propose` stay proposals. Smoke test: three scripted runs (done, failed, cancelled) and a
+reflection on a scripted review model; asserts the lessons, the merge, the journal and the Activity row.
+
+**Touchpoints.** `agent/reflection.py` (new), `agent/lessons.py`, `agent/review.py`, `memory/service.py`,
+`scheduler/runner.py`, `config.py`, `defaults.toml`, `cli_reflect.py` (new), `server/activity.py`,
+`tests/smoke/test_reflection.py`, README (Memory, Schedules).
+
+### 71. Memory that rests: use decides what is recalled
+
+**Status: planned.**
+
+**What.** A note that a run recalled and built on is marked as used (the store has `mark_memories_used`); the ranking
+of auto-recalled agent notes favours notes used lately and lets notes never used rest after `[memory] rest_days`
+(90): still on the Memory page under "Resting", recalled by a search, not injected on their own. The owner's notes
+and core notes never rest.
+
+**Why.** Auto-injection has a fixed budget (6 agent notes); without use in the ranking the first notes written keep
+their place over the notes that help. A memory that only grows stops being one.
+
+**Design.** `memory/ranking.py`: `rank(hits, now)` adds a recency-of-use term (half-life `[memory] use_half_life_days`,
+30) to the RRF score of agent notes; `memory/service.py` `prompt_memories` skips resting notes; `store`:
+`last_used_at`, `use_count` on `memories` (migration), `rest` derived, not stored; the Memory page groups "Resting"
+and shows uses; `GET /memories` carries both. Unit test on the ranking with dates; the memory smoke test extended.
+
+**Touchpoints.** `memory/ranking.py`, `memory/service.py`, `store/db.py`, `server/routes_data.py`, `views.py`,
+`static/js/views/memory.js`, `defaults.toml`, `tests/unit/test_memory_ranking.py`, `tests/smoke/test_memory.py`,
+README (Memory).
+
+### 72. The home that says "I am here"
+
+**Status: planned.**
+
+**What.** The home is Dot's presence: the face in its state, a greeting by the time of day with the owner's name
+(Settings › General), one line of now ("Working on 2 runs · 1 waits for you · 3 ended today · 1 lesson"), a Today
+strip (what waits, what works, what ended, what was learned, what is due) that follows the lifecycle stream, and the
+composer; an empty day says so in one line. Nothing moves to the sidebar that is not already there.
+
+**Why.** The owner wants a UI that says "I am here". Today the home is a greeting and a box; what Dot is doing lives
+in the sidebar's small print and on another page.
+
+**Design.** `views/runs.js` gains `presence.js`: `nowLine(activity, journal)` (pure words from `/api/activity` and
+the day's journal note of item 70, with sensible words before item 70 lands), `todayStrip(activity)` (rows with one
+action each, Enter opens; the same `nestRows` as item 68), a greeting from the hour and the name; `/api/activity`
+gains `learned_today` (the journal and the lessons written today) and `due` (schedules firing within the day,
+campaigns' next session); the strip updates on the lifecycle stream like the sidebar. The face states of item 49
+drive the greeting's verb. Screenshots at 1280 and 390 in both schemes; a smoke test plays a waiting, a working and an
+ended run and reads the now line and the strip.
+
+**Touchpoints.** `static/js/presence.js` (new), `views/runs.js`, `server/activity.py`, `views.py`, `app.css`,
+`tests/smoke/test_home.py`, README (the web UI).
+
+### 73. Motion with meaning
+
+**Status: planned.**
+
+**What.** Motion tokens (`--motion-quick` 120 ms, `--motion-base` 200 ms, `--motion-slow` 320 ms, one standard
+easing and one emphasised), the face breathes while idle and pulses while working, cards and rows enter with a short
+fade, state badges cross-fade, the menu of item 64 and the toasts fade rather than slide, and under
+`prefers-reduced-motion` every transform goes and the fades stay (a status change must still be seen).
+
+**Why.** Presence is also motion: a face that breathes says "here" more than a label; and the people who use the UI
+all day need motion that is short, consistent and switchable.
+
+**Design.** `app.css`: the tokens next to the type tokens; `@keyframes breathe`, `pulse`, `fade-in`; the face's
+`data-state` picks the animation; `.card`, `.activity-row`, `.slash-menu`, `.toast` use the fades; a
+`@media (prefers-reduced-motion: reduce)` block strips transforms and keeps opacity. Unit test: every `transition` and
+`animation` in the drawn sheets uses a motion token (as the colour test does). Smoke test: the face's computed
+`animation-name` by state, and with `reduce_motion` emulated no transform animates.
+
+**Touchpoints.** `app.css`, `shell.css`, `run.css`, `static/js/face.js`, `tests/unit/test_css_tokens.py`,
+`tests/smoke/test_face.py`, README (the visual system).
+
+### 74. Quiet chrome: the surfaces recede, the work leads
+
+**Status: planned.**
+
+**What.** The parts that orient recede so the conversation leads (Linear's rule): the sidebar without dividers
+between its groups, its labels lighter and its active row a surface step, the stage bar's pills quieter until they
+have something to say, the timeline's step rows one line each with the duration shown on hover, the cards' heads
+lighter, one rhythm of 8 px for every gap and pad (checked), and one primary action per list row (Enter opens).
+
+**Why.** The owner wants the people who work in the UI all day to be happy: fewer lines, fewer weights, one rhythm.
+
+**Design.** `shell.css`, `app.css`, `run.css`: the rules above, on the existing tokens, with new spacing tokens where
+a value is not a multiple of 8 (4 allowed for the smallest); `tests/unit/test_css_tokens.py` asserts every `gap`,
+`padding` and `margin` is a token or a multiple of 4; screenshots of the sidebar, a run, the Activity page and the
+settings at 1280 and 390 in both schemes, looked at; the controls page updated.
+
+**Touchpoints.** `shell.css`, `app.css`, `run.css`, `views/controls.js`, `tests/unit/test_css_tokens.py`,
+`tests/smoke/test_controls.py`, README (the visual system).
+
+### 75. Told only when not looking
+
+**Status: planned.**
+
+**What.** A desktop notification or a push for a run that ended or asks fires only when the owner is not looking at
+that run: the tab hidden, or another page open (Claude Code desktop's rule); the tab title keeps counting; a setting
+"Tell me even when I am looking" turns it off.
+
+**Why.** A notification for what is on screen is noise, and the owner who works in the UI all day gets many.
+
+**Design.** `attention.js`: `isLooking(runId)` from `document.visibilityState` and the current route; `tellAboutEnd`
+and `tellAboutApproval` check it; the push subscription carries nothing new (the daemon pushes; the page shows or
+not). Smoke test with a stubbed Notification: a run that ends on the open page notifies nothing; on a hidden page it
+does.
+
+**Touchpoints.** `static/js/attention.js`, `views/system.js`, `tests/smoke/test_attention.py`, README (the web UI).
+
+### 76. The live numbers of part 8
+
+**Status: planned.** A measurement, not code.
+
+**What.** After a week on the daemon: searches by rung and their dollars (item 69), reflections run and lessons
+written, merged and retired (item 70), notes resting and the share of recalled notes used (item 71), notifications
+sent against runs ended (item 75); read with `dotx stats`, the Activity page and the store, read-only, and written
+here.
+
 ## Log
 
 - 2026-10-08: roadmap written from the owner's go-ahead for all eight items, in this order. Nothing implemented yet.
@@ -5074,3 +5285,7 @@ and 390 px in both schemes were looked at.
   summaries 3 to 6 % of the model time (53 %), 0 throttled searches of 104 (every one from the `ollama` rung), 0
   `_adopt_popup`, 0 store retries; 6 of 13 compaction checks failed for a missing STATE section (item 61 was not on the
   daemon yet). Part 7 complete.
+- 2026-10-11 (Fable 5.1): Part 8 planned at the owner's word ("a freely working, fully autonomous, self-improving
+  system with memory; a design that says I am here; Haiku 5.5 for web search?"): items 69 to 76. The Models API
+  confirmed `claude-haiku-5-5` supports the `web_search` server tool; the docs price it at $10 per 1,000 searches plus
+  tokens, so it is a second rung, not a free first one. Daemon restarted on e475368 (pid 66449) with no run active.
