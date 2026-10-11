@@ -688,7 +688,10 @@ the embeddings when both have one, by the words otherwise); it rests a lesson th
 it `rest`, after which searches skip it while `dotx memory list` and the Memory page still show it, and the log line
 `lesson_retired` says which reason with the numbers; and when anything happened it writes the day's journal note, tagged `journal` ("On 2026-10-11 I worked
 on 4 runs (2 done, 1 failed, 1 cancelled). Learned: … Tidied the lessons: 1 merged, 1 retired."). The reflection
-touches only the notes Dot wrote, never yours. A night the daemon slept through is caught up once at its start.
+touches only the notes Dot wrote, never yours. It also keeps what Dot knows about you (see Memory): after a day with
+runs, one call of the review model rewrites Dot's lines of that section from the section as it stands, your own lines,
+your notes and the day's goals, at most `[memory] owner_chars` (1500) characters. A night the daemon slept through is
+caught up once at its start.
 Activity lists the reflection among what ended today; `dotx reflect` runs one now.
 
 **Taking back the file changes of a run.** Before `write_file` or `edit_file` changes a file, the run notes the change
@@ -1228,6 +1231,11 @@ dotx memory reindex      # embed every note again, for example after changing [m
   (90) rests: the Memory page lists it under "Resting", a search still finds it, but runs no longer start with it on
   its own. Your notes and the `core` ones never rest. Under each note the page says how the runs it was handed to
   ended ("Handed to 5 runs, 4 done"); every use is recorded with the run's end, which `dotx stats` reads.
+- What Dot knows about you opens the memory part of every prompt: a short section the nightly reflection keeps (your
+  language, hours, tools and sites, the ways you ask, the limits you set), rewritten each night from its previous
+  version, your notes and the day's runs. The Memory page shows it first; the lines you write under it are yours, kept
+  as they are, marked "(you said)" in the prompt, never rewritten, and the reflection never contradicts them
+  (`GET`/`PUT /api/memories/owner`).
 - The score decides too: over the last `score_days` (30), a note's balance is the runs handed it that ended done less
   the ones that failed. Once `score_min_uses` (3) runs were handed it, the balance lifts or lowers the note in a search
   as much as a fresh use would, and a negative balance rests it at once, before the nightly reflection retires it.

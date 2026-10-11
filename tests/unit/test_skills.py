@@ -327,6 +327,7 @@ def _prompt(tool_names: list[str], skills: list[Skill]) -> str:
             [],
             None,
             (),
+            (),
         )
     )
 

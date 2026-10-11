@@ -3089,3 +3089,19 @@ dialog.lightbox img {
   padding-left: 12px;
   border-left: 2px solid var(--border-strong);
 }
+
+/* What Dot knows about you (Memory page, item 93): the reflection's lines as a plain list on the body size. */
+.owner-lines {
+  margin: 0;
+  padding-left: 20px;
+  font-size: var(--text-md);
+  line-height: var(--leading-md);
+  color: var(--text);
+}
+
+.owner-lines .muted {
+  color: var(--muted);
+  font-size: var(--text-ui);
+  list-style: none;
+  margin-left: -20px;
+}

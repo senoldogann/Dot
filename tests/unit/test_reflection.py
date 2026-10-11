@@ -25,6 +25,7 @@ from dotagent.agent.reflection import (
 )
 from dotagent.agent.verify import CallFact
 from dotagent.config import AppConfig, load_default_config
+from dotagent.memory.service import OwnerSection, owner_lines_within, owner_prompt_lines
 from dotagent.store.models import MemoryRecord, MemoryScore, RunRecord, RunStatus
 
 ZONE: ZoneInfo = ZoneInfo("Europe/Helsinki")
@@ -165,7 +166,7 @@ def test_a_lesson_rests_after_sixty_days_without_a_run_being_handed_it() -> None
 
 def test_the_summary_and_the_journal_say_what_happened() -> None:
     reflection: Reflection = Reflection(
-        at=2.0, since=1.0, runs_read=3, lessons_written=1, merged=1, retired=2, journal=None
+        at=2.0, since=1.0, runs_read=3, lessons_written=1, merged=1, retired=2, journal=None, owner_updated=False
     )
     assert summary_line(reflection) == "Reflected on 3 runs: 1 lesson, 1 merged, 2 retired."
     runs: list[RunRecord] = [
@@ -209,3 +210,12 @@ def test_a_lesson_whose_score_is_negative_over_enough_runs_rests_unless_the_owne
         "resting": MemoryScore(handed=5, done=0, failed=5),
     }
     assert to_retire_by_score([hurt, helped, few, kept, resting], scores, 3, {"kept"}) == [(hurt, scores["hurt"])]
+
+
+def test_the_owner_lines_are_flattened_capped_in_count_and_cut_at_the_budget() -> None:
+    lines: list[str] = ["  Reads  Turkish. ", "", "Works late.", "x" * 40]
+    assert owner_lines_within(lines, 1500) == ("Reads Turkish.", "Works late.", "x" * 40)
+    assert owner_lines_within(lines, 30) == ("Reads Turkish.", "Works late.")
+    assert len(owner_lines_within([f"line {n}" for n in range(20)], 1500)) == 12
+    section: OwnerSection = OwnerSection(dot_lines=("Works late.",), owner_lines=("I read Turkish.",), updated_at=1.0)
+    assert owner_prompt_lines(section) == ("(you said) I read Turkish.", "Works late.")

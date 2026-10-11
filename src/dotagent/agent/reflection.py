@@ -31,7 +31,7 @@ from dotagent.agent.lessons import (
     repeats,
     stored_signals,
 )
-from dotagent.agent.review import goal_digest
+from dotagent.agent.review import OwnerDraft, OwnerRequest, OwnerWriter, goal_digest, owner_writer_for
 from dotagent.agent.verify import CallFact
 from dotagent.core.errors import StoreError
 from dotagent.core.logs import get_logger
@@ -43,10 +43,14 @@ from dotagent.memory.service import (
     JOURNAL_TAG,
     REFLECTION_SOURCE,
     REST_TAG,
+    OwnerSection,
     SavedMemory,
     normalize_tags,
+    owner_lines_within,
+    owner_section,
     recent_scores,
     save_memory,
+    set_owner_section,
 )
 from dotagent.policy.types import TAINTING_KINDS
 from dotagent.runtime import Runtime
@@ -68,6 +72,9 @@ _ENDING_CHARS: int = 300
 _LESSON_NOTES: int = 500
 # Two lesson notes whose embeddings are at least this close say the same.
 _MERGE_SIMILARITY: float = 0.92
+# How many of the owner's notes and of the day's goals the owner writer is shown.
+_OWNER_NOTES: int = 50
+_OWNER_GOALS: int = 30
 # How many lessons the journal names.
 _JOURNAL_LESSONS: int = 3
 _ENDED: frozenset[RunStatus] = frozenset({"done", "failed", "cancelled"})
@@ -88,6 +95,8 @@ class Reflection(FrozenModel):
     merged: int
     retired: int
     journal: str | None
+    # Whether the owner section (what Dot knows about the owner, item 93) was rewritten.
+    owner_updated: bool
 
 
 class _Result(BaseModel):
@@ -376,6 +385,37 @@ async def _retire(runtime: Runtime, notes: Sequence[MemoryRecord], now: float) -
     return retired
 
 
+async def _describe_owner(runtime: Runtime, runs: Sequence[RunRecord], now: float) -> bool:
+    """Rewrite Dot's lines of the owner section from the section as it stands, the owner's own lines, the owner's
+    notes and the goals of ``runs``; the owner's lines are kept as they are. Returns whether the lines changed."""
+    before: OwnerSection = await owner_section(runtime.store)
+    notes: list[MemoryRecord] = await runtime.store.user_memories(_OWNER_NOTES)
+    writer: OwnerWriter = owner_writer_for(
+        runtime.router,
+        runtime.config.models.review,
+        runtime.config.agent.model_call_timeout_s,
+        f"reflection:{int(now)}:owner",
+    )
+    draft: OwnerDraft = await writer(
+        OwnerRequest(
+            previous=before.dot_lines,
+            owner_lines=before.owner_lines,
+            notes=tuple(note.content for note in notes),
+            goals=tuple(redact_secrets(" ".join(run.goal.split())) for run in runs[:_OWNER_GOALS]),
+        )
+    )
+    lines: tuple[str, ...] = owner_lines_within(
+        [redact_secrets(line) for line in draft.lines], runtime.config.memory.owner_chars
+    )
+    if lines == before.dot_lines:
+        return False
+    await set_owner_section(
+        runtime.store, OwnerSection(dot_lines=lines, owner_lines=before.owner_lines, updated_at=now)
+    )
+    log.info("owner_section_written", lines=len(lines), owner_lines=len(before.owner_lines))
+    return True
+
+
 async def reflect(runtime: Runtime, deciding: asyncio.Lock, now: float) -> Reflection:
     """One reflection at ``now`` (see the module). ``deciding`` is the run manager's lock of the owner's decisions on
     lessons. The reflection is recorded before it returns; an error on the way (the store, the embedder) raises and
@@ -393,6 +433,7 @@ async def reflect(runtime: Runtime, deciding: asyncio.Lock, now: float) -> Refle
     merged: int = await _merge(runtime, own)
     kept: list[MemoryRecord] = _own(await store.memories_with_tag(LESSON_TAG, _LESSON_NOTES)) if merged else own
     retired: int = await _retire(runtime, kept, now)
+    owner_updated: bool = await _describe_owner(runtime, runs, now) if runs else False
     journal: str | None = None
     if runs or merged or retired:
         day: str = datetime.fromtimestamp(now, tz=runtime.schedule_zone).strftime("%Y-%m-%d")
@@ -407,6 +448,7 @@ async def reflect(runtime: Runtime, deciding: asyncio.Lock, now: float) -> Refle
         merged=merged,
         retired=retired,
         journal=journal,
+        owner_updated=owner_updated,
     )
     await store.kv_set(REFLECTION_KEY, reflection.model_dump_json())
     log.info(
@@ -416,5 +458,6 @@ async def reflect(runtime: Runtime, deciding: asyncio.Lock, now: float) -> Refle
         merged=merged,
         retired=retired,
         journal=journal,
+        owner_updated=owner_updated,
     )
     return reflection

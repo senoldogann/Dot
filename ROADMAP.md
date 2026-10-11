@@ -5012,8 +5012,8 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 89  | Learning on, and measured: every note handed to a run is scored by how it ended | done        | a779b72 |
 | 90  | Memory that keeps what helps: the score decides what is recalled, rests, retires | done        | fa775a0 |
 | 91  | Recall by budget: the notes a run starts with fit a token budget, best first     | done        | 9222a5d |
-| 92  | Skills from its own work: a task that went well becomes a skill for its kind     | in progress |         |
-| 93  | The owner, in one section: what the reflection knows about how you work         | planned     |         |
+| 92  | Skills from its own work: a task that went well becomes a skill for its kind     | done        | 3074107 |
+| 93  | The owner, in one section: what the reflection knows about how you work         | in progress |         |
 | 94  | An agent learns for itself: lessons, skills and a score per agent                | planned     |         |
 
 ### 77. The type system: Inter and Geist Mono, seven sizes, three weights
@@ -5490,7 +5490,7 @@ carries the tokens spent. Tests: unit for the packing; the prompt-size assertion
 
 ### 92. Skills from its own work: a task that went well becomes a skill for the next of its kind
 
-**Status: in progress (2026-10-11).**
+**Status: done.** Merged as `3074107` (PR #106, MYP-232 Done).
 
 **Design, as built (2026-10-11).** The playbook module (`agent/playbooks.py`, its name kept) writes learned skills
 of any kind of work. The gate: `playbook_case` as before (playbooks on, a task run of its own, not an eval, ended
@@ -5530,7 +5530,25 @@ scripted run that is distilled, a second run of the kind offered the skill, and 
 
 ### 93. The owner, in one section: what the reflection knows about how you work
 
-**Status: planned.**
+**Status: in progress (2026-10-11).**
+
+**Design, as built (2026-10-11).** The section is not a note (a note is capped at `[memory] max_chars`, 600) but
+an `OwnerSection` in the store's `kv` (`memory/service.py`, key `owner.section`): `dot_lines`, which the reflection
+rewrites, `owner_lines`, the owner's own, kept as they are, and `updated_at`; `owner_section(store)` and
+`set_owner_section`. The nightly reflection, after it retired, when the day had runs: `_describe_owner` asks the
+review model (`owner_writer_for`, purpose `owner`, tool `describe_owner`, `OwnerDraft` of at most twelve lines)
+with the section as it stands, the owner's lines ("the truth, never to be contradicted or repeated"), up to fifty
+of the owner's notes and up to thirty of the day's goals (secrets redacted); `owner_lines_within` flattens the
+answer, caps it at twelve lines and `[memory] owner_chars` (1500) characters; the section is written when the lines
+changed, and `Reflection.owner_updated` says so. The prompt's memory section opens with "What you know about the
+user, kept by your nightly reflection; a line marked (you said) is the user's own and outranks the others" and the
+lines (`owner_prompt_lines`: the owner's first, marked, then Dot's; `PromptInputs.owner`); the section stands even
+when no note was recalled. The API: `GET /api/memories/owner` and `PUT /api/memories/owner` (`OwnerLinesRequest`,
+up to twenty lines of 300 characters; Dot's lines stay). The Memory page opens with the card "What Dot knows about
+you": Dot's lines as a list (or that nothing is known yet), "Your lines" as a textarea, one per line, with "Save your
+lines". Tests: `tests/unit/test_reflection.py` (the cap and the budget of the lines, the prompt's order);
+`tests/smoke/test_reflection.py` (the reflection writes the section from the day's goals; the API shows it and
+keeps the owner's lines beside Dot's).
 
 **What.** The nightly reflection keeps one standing note tagged `owner` (at most `[memory] owner_chars`): the
 language, the hours, the tools and sites you use, the ways you asked for things, the limits you set, distilled
@@ -6064,3 +6082,4 @@ skills, the score), with the same Drop. Tests: unit for the scoping; the agents 
 - 2026-10-11 (Fable 5.1): item 90 merged as `fa775a0` (PR #104, MYP-230 Done): the score lifts, rests and retires the agent's notes. The daemon restarted on `fa775a0`.
 - 2026-10-11 (Fable 5.1): `tests/smoke/test_continuity_live.py` (live, not in CI) had failed since the prompt outgrew its 14k window (the system prompt and the tools are about 18k tokens now); its window is 24k, the three tests pass against the cloud model (fixed with item 91).
 - 2026-10-11 (Fable 5.1): item 91 merged as `9222a5d` (PR #105, MYP-231 Done): the run's starting notes fit a token budget. The daemon restarted on `9222a5d`.
+- 2026-10-11 (Fable 5.1): item 92 merged as `3074107` (PR #106, MYP-232 Done): learned skills of any kind of work, the Skills tab. The daemon restarted on `3074107`.

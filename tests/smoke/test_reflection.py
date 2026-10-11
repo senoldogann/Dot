@@ -22,7 +22,7 @@ import pytest_asyncio
 from dotagent.agent.lessons import LESSON_TAG, LESSONS_PROPOSED
 from dotagent.agent.manager import RunManager
 from dotagent.agent.reflection import REFLECTION_KEY, Reflection, last_reflection, reflection_cron, summary_line
-from dotagent.agent.review import LESSONS_TOOL
+from dotagent.agent.review import LESSONS_TOOL, OWNER_TOOL
 from dotagent.config import AppConfig, load_default_config
 from dotagent.core.errors import NotFoundError
 from dotagent.core.paths import db_path
@@ -32,7 +32,15 @@ from dotagent.evals.scripted import ScriptedProvider
 from dotagent.evals.types import ScriptedCall, ScriptedTurn
 from dotagent.llm.router import parse_model_ref
 from dotagent.llm.types import ChatRequest, DeltaSink, ModelInfo, ModelReply
-from dotagent.memory.service import JOURNAL_TAG, REFLECTION_SOURCE, REST_TAG, MemoryHit, recall
+from dotagent.memory.service import (
+    JOURNAL_TAG,
+    REFLECTION_SOURCE,
+    REST_TAG,
+    MemoryHit,
+    OwnerSection,
+    owner_section,
+    recall,
+)
 from dotagent.runtime import Runtime, close_runtime, open_runtime
 from dotagent.scheduler.runner import Scheduler
 from dotagent.scheduler.timing import next_firing
@@ -162,6 +170,16 @@ def _finish(answer: str, success: bool) -> ScriptedTurn:
     return _turn(ScriptedCall(tool=FINISH_TOOL, arguments={"answer": answer, "success": success}))
 
 
+OWNER_LINE_LANGUAGE: str = "Writes goals in English and keeps notes in notes.txt."
+OWNER_LINE_FILES: str = "Works in a scratch workspace with small text files."
+OWNER_OWN_LINE: str = "I read Turkish; answer me in Turkish."
+
+
+def _owner(*lines: str) -> ScriptedTurn:
+    """The review model's answer to the owner writer's question."""
+    return _turn(ScriptedCall(tool=OWNER_TOOL, arguments={"lines": list(lines)}))
+
+
 def _lessons(*lessons: str) -> ScriptedTurn:
     return _turn(ScriptedCall(tool=LESSONS_TOOL, arguments={"lessons": list(lessons)}))
 
@@ -227,6 +245,8 @@ async def test_the_reflection_learns_from_the_runs_the_loop_did_not_ask_tidies_t
         # The reflection's questions, about B and then C.
         _lessons(LESSON_FAILED),
         _lessons(LESSON_STOPPED),
+        # The owner writer's answer: what Dot knows about the owner after the day.
+        _owner(OWNER_LINE_LANGUAGE, OWNER_LINE_FILES),
     ]
     async with _home(login_env, turns) as home:
         store: Store = home.runtime.store
@@ -328,4 +348,22 @@ async def test_the_reflection_learns_from_the_runs_the_loop_did_not_ask_tidies_t
         assert not scheduler.reflecting()
         assert await last_reflection(store) == reflection
         assert sum(1 for request in home.model.requests if request.session_key.endswith(":lessons")) == 3
+
+        # The owner section was written from the day: the writer saw the goals, and the API shows and takes the
+        # owner's own lines, which the section keeps beside Dot's.
+        assert reflection.owner_updated
+        section: OwnerSection = await owner_section(store)
+        assert section.dot_lines == (OWNER_LINE_LANGUAGE, OWNER_LINE_FILES) and section.owner_lines == ()
+        asked_owner: list[str] = [
+            request.messages[-1].content for request in home.model.requests if request.session_key.endswith(":owner")
+        ]
+        assert len(asked_owner) == 1 and "Read the draft." in asked_owner[0]
+        async with _client(home) as client:
+            shown: httpx.Response = await client.get("/api/memories/owner")
+            assert shown.status_code == 200 and shown.json()["dot_lines"] == [OWNER_LINE_LANGUAGE, OWNER_LINE_FILES]
+            put: httpx.Response = await client.put("/api/memories/owner", json={"lines": [OWNER_OWN_LINE]})
+            assert put.status_code == 200, put.text
+            assert put.json()["owner_lines"] == [OWNER_OWN_LINE]
+        kept: OwnerSection = await owner_section(store)
+        assert kept.owner_lines == (OWNER_OWN_LINE,) and kept.dot_lines == section.dot_lines
         assert EVAL_SOURCE not in {run.source for run in (clean, failed, stopped, stumbled)}

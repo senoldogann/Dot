@@ -492,6 +492,11 @@ use_half_life_days = 30
 # score.
 score_days = 30
 score_min_uses = 3
+# The nightly reflection keeps one section of what Dot knows about you (your language, hours, tools and sites, the
+# ways you ask, the limits you set), rewritten from its previous version, your own notes and the day's runs, at most
+# owner_chars characters; it opens the memory part of every prompt. The Memory page shows it first: the lines you
+# write there are yours, kept as they are and never rewritten.
+owner_chars = 1500
 
 [scheduler]
 # IANA name ("Europe/Helsinki") of the zone that cron expressions and one-time moments are read in; "" = the zone the

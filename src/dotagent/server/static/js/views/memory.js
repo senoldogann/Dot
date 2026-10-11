@@ -362,8 +362,47 @@ export function mount(root, ctx) {
     }
   });
 
+  // What Dot knows about you (item 93): the reflection's lines, read-only, and your own lines, which you edit.
+  const dotLines = el("ul", { class: "owner-lines" });
+  const ownLines = el("textarea", {
+    class: "textarea",
+    rows: "3",
+    maxlength: "6000",
+    placeholder: "One line each, for example: I read Turkish; answer me in Turkish.",
+    "aria-label": "Your lines",
+  });
+  const saveOwn = el("button", { class: "btn", type: "button" }, "Save your lines");
+  const ownerHint = el("span", { class: "hint" });
+  function paintOwner(section) {
+    dotLines.replaceChildren(
+      ...(section.dot_lines.length === 0
+        ? [el("li", { class: "muted" }, "Nothing yet. The nightly reflection writes these lines from your notes and the day's runs.")]
+        : section.dot_lines.map((line) => el("li", null, line))),
+    );
+    ownLines.value = section.owner_lines.join("\n");
+    ownerHint.textContent = section.updated_at > 0 ? `Updated ${ago(section.updated_at)}` : "";
+  }
+  async function loadOwner() {
+    paintOwner(await api.get("/memories/owner"));
+  }
+  saveOwn.addEventListener("click", () =>
+    attempt(async () => {
+      const lines = ownLines.value.split("\n").map((line) => line.trim()).filter((line) => line !== "");
+      paintOwner(await api.put("/memories/owner", { lines }));
+      toast("ok", "Your lines are kept; the reflection never rewrites them.");
+    }),
+  );
+
   root.append(
     paneHead("Notes that Dot keeps between runs. It recalls the ones that fit the task at hand.", null),
+    el(
+      "section",
+      { class: "card card-pad stack" },
+      el("div", { class: "row" }, el("div", { class: "section-label grow" }, "What Dot knows about you"), ownerHint),
+      dotLines,
+      field("Your lines", ownLines, "Corrections and facts in your own words; Dot's lines above never contradict them."),
+      el("div", { class: "row" }, el("span", { class: "spacer" }), saveOwn),
+    ),
     el(
       "section",
       { class: "card card-pad stack" },
@@ -378,6 +417,7 @@ export function mount(root, ctx) {
     el("div", { class: "cluster" }, more),
   );
   attempt(reload);
+  attempt(loadOwner);
   return () => {
     disposed = true;
   };

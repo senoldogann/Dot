@@ -41,6 +41,7 @@ def _prompt(tool_names: list[str], team: tuple[AgentBrief, ...]) -> str:
             [],
             None,
             team,
+            (),
         )
     )
 
