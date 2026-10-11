@@ -5008,7 +5008,7 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 85  | Motion: the sidebar slides, the panel slides, folds fade, pages cross-fade | done        | 7f02492 |
 | 86  | Agents: profiles with a face, a role, a model and their own chats         | done        | bd12b54 |
 | 87  | Agents together: messages between agents, the team's thread, the harness  | done        | 23c6b5c |
-| 88  | Desktop and web, one interface: the Tauri shell on the same pages         | in progress |         |
+| 88  | Desktop and web, one interface: the Tauri shell on the same pages         | done        | c4d9b88 |
 
 ### 77. The type system: Inter and Geist Mono, seven sizes, three weights
 
@@ -5198,6 +5198,11 @@ list: "the area on the right looks cheap and its texts hug the left; fix it; mak
 sidebar opening and closing smoothly is one example; read arXiv 2609.20804, it may help; let us create custom agents
 as in Grok, have them talk to each other and work together, and make the design like theirs, on desktop and web."
 
+**Status (2026-10-11): built.** Items 84 to 88 merged the same day (`82c06b8`, `7f02492`, `bd12b54`, `23c6b5c`,
+`c4d9b88`), each with its screenshot tour read; the tour now shoots the Agents, agent, Team and desktop-shell pages
+too. What waits: the owner's own agents (none exist until made on the Agents page), and the daemon restarted on the
+newest main once no run is active.
+
 **What the paper gave (arXiv 2609.20804, "An Empirical Study of Harness Design for Coding Agents", Fan et al.,
 17 Sep 2026; read by a research agent on 2026-10-11, medium trust: the HTML was read to 100k of 164k characters).**
 One agent at a time, on SWE-Bench Verified and Terminal-Bench, 176 settings. Context management matters most under a
@@ -5343,7 +5348,7 @@ stop after 8 failing), and a tool set per role.
 
 ### 88. Desktop and web, one interface: the Tauri shell on the same pages
 
-**Status: in progress.** Built on `item-88-desktop` (MYP-228).
+**Status: done.** Merged as `c4d9b88` (PR #98, MYP-228).
 
 **Design, as built (2026-10-11).** The shell (`desktop/src-tauri/src/lib.rs`) opens its one window at the size the
 tour reviews (1280 × 860, the minimum 390 × 600) with `TitleBarStyle::Overlay` and a hidden title: the system draws
@@ -5869,3 +5874,4 @@ reviewed in the tour; the dependabot alert on `glib` in `desktop/src-tauri/Cargo
 - 2026-10-11 (Fable 5.1): item 85 merged as `7f02492` (PR #95, MYP-225 Done). Item 86 built on branch `item-86-agents` (MYP-226): `AgentRecord` and the `agents` table, `RunRecord.agent_id`, `start_for_agent`, the agent's section first in the prompt, its tools as the run's bound, `/api/agents`, the Agents page, the agent's page with its composer, the home composer's Agent menu, the agent's face in the rows and the bar.
 - 2026-10-11 (Fable 5.1): item 86 merged as `bd12b54` (PR #96, MYP-226 Done). Item 87 started on branch `item-87-team` (MYP-227).
 - 2026-10-11 (Fable 5.1): item 87 merged as `23c6b5c` (PR #97, MYP-227 Done). Item 88 started on branch `item-88-desktop` (MYP-228).
+- 2026-10-11 (Fable 5.1): item 88 merged as `c4d9b88` (PR #98, MYP-228 Done). Part 10 is built: items 84 to 88 merged (`82c06b8`, `7f02492`, `bd12b54`, `23c6b5c`, `c4d9b88`). The glib alert dismissed as not used (item 88's record). Item 76's reading (part 8) is still due on or after 2026-10-18.
