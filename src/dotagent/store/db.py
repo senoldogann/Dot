@@ -40,6 +40,8 @@ from dotagent.store.models import (
     CampaignRecord,
     EventRecord,
     MemoryRecord,
+    MemoryScore,
+    MemoryUseHow,
     PushSubscription,
     RuleRecord,
     RunMode,
@@ -96,6 +98,11 @@ CREATE VIRTUAL TABLE IF NOT EXISTS memories_fts USING fts5(
     id UNINDEXED, content, tags, tokenize = 'unicode61 remove_diacritics 2'
 );
 CREATE TABLE IF NOT EXISTS memory_vectors (id TEXT PRIMARY KEY, dim INTEGER NOT NULL, vec BLOB NOT NULL);
+CREATE TABLE IF NOT EXISTS memory_uses (
+    run_id TEXT NOT NULL, memory_id TEXT NOT NULL, handed_at REAL NOT NULL, how TEXT NOT NULL, status TEXT
+);
+CREATE INDEX IF NOT EXISTS memory_uses_memory ON memory_uses(memory_id);
+CREATE INDEX IF NOT EXISTS memory_uses_run ON memory_uses(run_id);
 CREATE TABLE IF NOT EXISTS schedules (
     id TEXT PRIMARY KEY, name TEXT NOT NULL, cron TEXT, run_at REAL, goal TEXT NOT NULL,
     mode TEXT NOT NULL, enabled INTEGER NOT NULL, created_at REAL NOT NULL, last_run_at REAL,
@@ -1433,8 +1440,10 @@ class Store:
         return [_memory(row) for row in rows]
 
     @_writing
-    async def mark_memories_used(self, memory_ids: Sequence[str], when: float) -> None:
-        """Count one more use of each note, at ``when``; its ``updated_at`` stays."""
+    async def mark_memories_used(self, run_id: str, memory_ids: Sequence[str], when: float, how: MemoryUseHow) -> None:
+        """Count one more use of each note, at ``when``, and record that run ``run_id`` was handed it (``how``: at its
+        start, by a search, or as a changed note); the note's ``updated_at`` stays. The use is scored once the run
+        ends (:meth:`close_memory_uses`)."""
         if not memory_ids:
             return
         marks: str = ",".join("?" for _ in memory_ids)
@@ -1442,7 +1451,38 @@ class Store:
             f"UPDATE memories SET used_count = used_count + 1, last_used_at = ? WHERE id IN ({marks})",
             (when, *memory_ids),
         )
+        await self._db.executemany(
+            "INSERT INTO memory_uses(run_id, memory_id, handed_at, how, status) VALUES(?, ?, ?, ?, NULL)",
+            [(run_id, memory_id, when, how) for memory_id in memory_ids],
+        )
         await self._db.commit()
+
+    @_writing
+    async def close_memory_uses(self, run_id: str, status: RunStatus) -> None:
+        """Score the notes run ``run_id`` was handed with how it ended."""
+        await self._db.execute(
+            "UPDATE memory_uses SET status = ? WHERE run_id = ? AND status IS NULL", (status, run_id)
+        )
+        await self._db.commit()
+
+    async def memory_scores(self, memory_ids: Sequence[str]) -> dict[str, MemoryScore]:
+        """How the runs ended that were handed each of ``memory_ids``; a note no run was handed is absent."""
+        if not memory_ids:
+            return {}
+        marks: str = ",".join("?" for _ in memory_ids)
+        rows = await self._all(
+            "SELECT memory_id, COUNT(DISTINCT run_id) AS handed,"
+            " COUNT(DISTINCT CASE WHEN status = 'done' THEN run_id END) AS done,"
+            " COUNT(DISTINCT CASE WHEN status = 'failed' THEN run_id END) AS failed"
+            f" FROM memory_uses WHERE memory_id IN ({marks}) GROUP BY memory_id",
+            tuple(memory_ids),
+        )
+        return {
+            str(row["memory_id"]): MemoryScore(
+                handed=int(row["handed"]), done=int(row["done"]), failed=int(row["failed"])
+            )
+            for row in rows
+        }
 
     @_writing
     async def clear_memory_vectors(self) -> None:

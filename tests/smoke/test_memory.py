@@ -342,7 +342,7 @@ async def test_a_note_a_run_was_handed_lately_comes_before_one_no_run_built_on(w
     await save_memory(words_only, "The user's dog Biscuit sleeps in the kitchen at night.", [], AGENT_RUN)
     before: list[str] = [hit.record.id for hit in await recall(words_only, "Biscuit", 5)]
     assert len(before) == 2
-    await words_only.store.mark_memories_used([before[-1]], time.time())
+    await words_only.store.mark_memories_used(AGENT_RUN, [before[-1]], time.time(), "start")
     after: list[str] = [hit.record.id for hit in await recall(words_only, "Biscuit", 5)]
     assert after == [before[-1], before[0]]
 

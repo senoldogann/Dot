@@ -253,8 +253,9 @@ resume_within_s = 1800
 # review model draws at most three lessons from it: one sentence each, about how to do things. "propose" leaves them on
 # the run's page, where each can be saved to memory or dismissed; "auto" saves them as notes tagged lesson, except
 # after a run that read content third parties can author (web pages, files from others), whose lessons are only
-# proposed. Later runs find a saved lesson like any note of the agent. "off" until evals show that it helps.
-lessons = "off"
+# proposed. Later runs find a saved lesson like any note of the agent; what each lesson did for the runs it was handed
+# to is scored (dotx stats, the Memory page). "off" learns nothing.
+lessons = "propose"
 # Once a day at reflection_time (a time of day in [scheduler] timezone; "off" never), Dot reflects on the runs that
 # ended since the last reflection: it draws lessons from the runs the loop did not ask at their end, the failed and
 # the stopped ones among them, under the lessons setting above (none while it is "off"); folds the lesson notes that
@@ -267,8 +268,9 @@ lesson_rest_days = 60
 # the review model distils how it got there into a playbook: a skill folder playbook-<host>/SKILL.md under
 # <home>/playbooks with the steps, the parameters and the evidence, offered to later runs like a skill. One playbook
 # per host; a playbook read by two runs that then failed is retired (moved under .retired) and no longer offered.
-# false until a live comparison shows that the second run on a site takes fewer steps.
-playbooks = false
+# dotx stats compares the acting steps and seconds of the runs that read a playbook with the runs on the same host
+# that did not. false distils nothing.
+playbooks = true
 # Before write_file or edit_file changes a file, the run notes the change in its journal, and its first change to a file
 # keeps a copy of the file as it was, so that `dotx undo RUN_ID` can take the changes of the run back. A file larger
 # than undo_max_file_bytes, or one whose copy would bring the copies of the run past undo_max_run_bytes, is changed

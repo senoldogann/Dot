@@ -39,6 +39,8 @@ WEB_TOOLS: frozenset[str] = frozenset({"web_fetch", "web_search", "web_crawl", "
 REJECTED_PREFIX: str = "Invalid arguments for "
 # Compactions are given per this many steps.
 _PER_STEPS: int = 100
+# The notes listed by how many runs were handed them.
+_NOTES_SHOWN: int = 10
 # How much of a failed result's text the statistics read: the cause is in its first line.
 _FAILURE_CHARS: int = 200
 # The scope of the rows: the runs created since a time, or one run.
@@ -82,6 +84,38 @@ SELECT r.model, json_extract(e.data, '$.tool'), json_extract(e.data, '$.ok'), js
        json_extract(e.data, '$.waited_s'), substr(json_extract(e.data, '$.text'), 1, {_FAILURE_CHARS})
 FROM runs r JOIN events e ON e.run_id = r.id
 WHERE {{scope}} AND e.kind = 'tool_result'
+"""
+# One row per learning event kind of the runs: the kind, how many, and for lessons_proposed how many lessons in all.
+_LEARNING_EVENTS_SQL: str = """
+SELECT e.kind, COUNT(*), COALESCE(SUM(json_array_length(json_extract(e.data, '$.lessons'))), 0)
+FROM runs r JOIN events e ON e.run_id = r.id
+WHERE {scope} AND e.kind IN ('lessons_proposed', 'lesson_saved', 'lesson_dismissed', 'playbook_written', 'playbook_retired')
+GROUP BY e.kind
+"""
+# One row per note the runs were handed: the note, the runs handed it, and how many of them ended done.
+_USES_SQL: str = """
+SELECT u.memory_id, COUNT(DISTINCT u.run_id), COUNT(DISTINCT CASE WHEN u.status = 'done' THEN u.run_id END)
+FROM runs r JOIN memory_uses u ON u.run_id = r.id
+WHERE {scope}
+GROUP BY u.memory_id
+"""
+# One row: how many runs were handed a note.
+_RUNS_HANDED_SQL: str = """
+SELECT COUNT(DISTINCT u.run_id) FROM runs r JOIN memory_uses u ON u.run_id = r.id WHERE {scope}
+"""
+# One row per run and site: the act calls of the run on the site, counted.
+_RUN_ACTS_SQL: str = """
+SELECT r.id, json_extract(e.data, '$.site'), COUNT(*)
+FROM runs r JOIN events e ON e.run_id = r.id
+WHERE {scope} AND e.kind = 'tool_result' AND json_extract(e.data, '$.tool') IN ('browser_act', 'desktop_act')
+GROUP BY r.id, json_extract(e.data, '$.site')
+"""
+# One row per run that read a playbook with the skill tool.
+_PLAYBOOK_READS_SQL: str = """
+SELECT DISTINCT r.id
+FROM runs r JOIN events e ON e.run_id = r.id
+WHERE {scope} AND e.kind = 'tool_call' AND json_extract(e.data, '$.tool') = 'skill'
+  AND json_extract(e.data, '$.args.name') LIKE 'playbook-%'
 """
 # One row per model: the events of its runs, counted. A tool result with ``"ok": false`` is a failed call.
 _EVENTS_SQL: str = """
@@ -329,14 +363,55 @@ class RunCosts(FrozenModel):
     tools: tuple[ToolStats, ...]
 
 
+class NoteScore(FrozenModel):
+    """One note the runs were handed: how many runs, and how many of them ended done."""
+
+    memory_id: str
+    handed: int
+    done: int
+
+
+class RunGroup(FrozenModel):
+    """Runs on one host that did or did not read its playbook: how many, and their act calls and seconds per run."""
+
+    runs: int
+    acts_per_run: float
+    seconds_per_run: float
+
+
+class PlaybookComparison(FrozenModel):
+    """On one host, the runs that read its playbook against the ones that did not (both groups non-empty)."""
+
+    host: str
+    read: RunGroup
+    unread: RunGroup
+
+
+class LearningStats(FrozenModel):
+    """What the runs of the window learned and were handed: the lessons proposed, saved and dismissed; the notes
+    handed to runs with how those runs ended (the most handed first, at most ``_NOTES_SHOWN``); the playbooks
+    written and retired, the runs that read one, and per host the comparison of item 89."""
+
+    lessons_proposed: int
+    lessons_saved: int
+    lessons_dismissed: int
+    runs_handed_notes: int
+    notes: tuple[NoteScore, ...]
+    playbooks_written: int
+    playbooks_retired: int
+    runs_reading_playbooks: int
+    comparisons: tuple[PlaybookComparison, ...]
+
+
 class RunStatistics(FrozenModel):
-    """The statistics of the runs in a window: per model, the busiest first; per tool, the slowest in all first; and
-    per site, the one with the most act calls first."""
+    """The statistics of the runs in a window: per model, the busiest first; per tool, the slowest in all first; per
+    site, the one with the most act calls first; and what the runs learned."""
 
     models: tuple[ModelStats, ...]
     tools: tuple[ToolStats, ...]
     sites: tuple[SiteStats, ...]
     channels: tuple[ChannelStats, ...]
+    learning: LearningStats
 
 
 class _EventCounts(FrozenModel):
@@ -397,6 +472,11 @@ class _Rows(FrozenModel):
     tools: list[tuple[object, ...]]
     acts: list[tuple[object, ...]]
     steps: list[tuple[object, ...]]
+    learning_events: list[tuple[object, ...]]
+    uses: list[tuple[object, ...]]
+    runs_handed: int
+    run_acts: list[tuple[object, ...]]
+    playbook_reads: list[tuple[object, ...]]
 
 
 def _read_rows(database: Path, scope: str, value: float | str) -> _Rows:
@@ -411,6 +491,11 @@ def _read_rows(database: Path, scope: str, value: float | str) -> _Rows:
                 tools=connection.execute(_TOOLS_SQL.format(scope=scope), (value,)).fetchall(),
                 acts=connection.execute(_ACTS_SQL.format(scope=scope), (value,)).fetchall(),
                 steps=connection.execute(_STEPS_SQL.format(scope=scope), (value,)).fetchall(),
+                learning_events=connection.execute(_LEARNING_EVENTS_SQL.format(scope=scope), (value,)).fetchall(),
+                uses=connection.execute(_USES_SQL.format(scope=scope), (value,)).fetchall(),
+                runs_handed=int(connection.execute(_RUNS_HANDED_SQL.format(scope=scope), (value,)).fetchone()[0]),
+                run_acts=connection.execute(_RUN_ACTS_SQL.format(scope=scope), (value,)).fetchall(),
+                playbook_reads=connection.execute(_PLAYBOOK_READS_SQL.format(scope=scope), (value,)).fetchall(),
             )
     except sqlite3.Error as error:
         raise StoreError(
@@ -709,6 +794,97 @@ def _model_stats(
 _NO_EVENTS: _EventCounts = _EventCounts(tool_calls=0, tool_errors=0, invalid_arguments=0, stalls=0, compactions=0)
 
 
+def _learning_counts(rows: list[tuple[object, ...]]) -> dict[str, tuple[int, int]]:
+    """Per learning event kind: how many events, and how many lessons they proposed."""
+    return {str(row[0]): (int(_number(row[1], "count")), int(_number(row[2], "lessons"))) for row in rows}
+
+
+def note_scores(rows: list[tuple[object, ...]]) -> tuple[NoteScore, ...]:
+    """The notes handed to the runs, the most handed first, then the most done; at most :data:`_NOTES_SHOWN`."""
+    scores: list[NoteScore] = [
+        NoteScore(memory_id=str(row[0]), handed=int(_number(row[1], "handed")), done=int(_number(row[2], "done")))
+        for row in rows
+    ]
+    return tuple(sorted(scores, key=lambda score: (-score.handed, -score.done, score.memory_id))[:_NOTES_SHOWN])
+
+
+class _RunOnHost(FrozenModel):
+    run_id: str
+    host: str
+    acts: int
+    seconds: float
+    read_playbook: bool
+
+
+def _runs_on_hosts(
+    runs: list[tuple[object, ...]], run_acts: list[tuple[object, ...]], playbook_reads: list[tuple[object, ...]]
+) -> list[_RunOnHost]:
+    """Every finished run that acted on a site, with the site it acted on most, its act calls there and its seconds."""
+    readers: set[str] = {str(row[0]) for row in playbook_reads}
+    acts_of: dict[str, dict[str, int]] = {}
+    for row in run_acts:
+        if row[1] is None:
+            continue
+        acts_of.setdefault(str(row[0]), {})[str(row[1])] = int(_number(row[2], "acts"))
+    found: list[_RunOnHost] = []
+    for run in runs:
+        run_id: str = str(run[6])
+        sites: dict[str, int] = acts_of.get(run_id, {})
+        if not sites or run[8] is None:
+            continue
+        host: str = max(sites, key=lambda site: (sites[site], site))
+        found.append(
+            _RunOnHost(
+                run_id=run_id,
+                host=host,
+                acts=sites[host],
+                seconds=_number(run[8], "finished_at") - _number(run[7], "created_at"),
+                read_playbook=run_id in readers,
+            )
+        )
+    return found
+
+
+def _group(members: list[_RunOnHost]) -> RunGroup:
+    count: int = len(members)
+    return RunGroup(
+        runs=count,
+        acts_per_run=sum(member.acts for member in members) / count,
+        seconds_per_run=sum(member.seconds for member in members) / count,
+    )
+
+
+def playbook_comparisons(
+    runs: list[tuple[object, ...]], run_acts: list[tuple[object, ...]], playbook_reads: list[tuple[object, ...]]
+) -> tuple[PlaybookComparison, ...]:
+    """Per host with runs of both kinds, the runs that read its playbook against the ones that did not; the host
+    with the most reading runs first."""
+    on_hosts: list[_RunOnHost] = _runs_on_hosts(runs, run_acts, playbook_reads)
+    hosts: list[str] = sorted({member.host for member in on_hosts})
+    comparisons: list[PlaybookComparison] = []
+    for host in hosts:
+        read: list[_RunOnHost] = [m for m in on_hosts if m.host == host and m.read_playbook]
+        unread: list[_RunOnHost] = [m for m in on_hosts if m.host == host and not m.read_playbook]
+        if read and unread:
+            comparisons.append(PlaybookComparison(host=host, read=_group(read), unread=_group(unread)))
+    return tuple(sorted(comparisons, key=lambda comparison: (-comparison.read.runs, comparison.host)))
+
+
+def learning_stats(rows: _Rows) -> LearningStats:
+    counts: dict[str, tuple[int, int]] = _learning_counts(rows.learning_events)
+    return LearningStats(
+        lessons_proposed=counts.get("lessons_proposed", (0, 0))[1],
+        lessons_saved=counts.get("lesson_saved", (0, 0))[0],
+        lessons_dismissed=counts.get("lesson_dismissed", (0, 0))[0],
+        runs_handed_notes=rows.runs_handed,
+        notes=note_scores(rows.uses),
+        playbooks_written=counts.get("playbook_written", (0, 0))[0],
+        playbooks_retired=counts.get("playbook_retired", (0, 0))[0],
+        runs_reading_playbooks=len(rows.playbook_reads),
+        comparisons=playbook_comparisons(rows.runs, rows.run_acts, rows.playbook_reads),
+    )
+
+
 def _statistics(rows: _Rows) -> RunStatistics:
     runs: list[tuple[object, ...]] = rows.runs
     counts: dict[str, _EventCounts] = _counts_by_model(rows.events)
@@ -734,6 +910,7 @@ def _statistics(rows: _Rows) -> RunStatistics:
         tools=tool_stats(tools),
         sites=site_stats(acts),
         channels=channel_stats(tools),
+        learning=learning_stats(rows),
     )
 
 

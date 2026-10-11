@@ -123,6 +123,7 @@ def memories_router(ctx: ServerContext) -> APIRouter:
             total=await index.store.count_memories(),
             items=items,
             resting=[record.id for record in items if resting(record, now, index.config.rest_days)],
+            scores=await index.store.memory_scores([record.id for record in items]),
         )
 
     @router.get("/memories/search")
