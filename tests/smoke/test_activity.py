@@ -292,7 +292,11 @@ async def test_the_sections_show_what_waits_what_works_and_a_campaign_session_wi
             for width, scheme in schemes:
                 page = await browser.new_page(viewport={"width": width, "height": 900}, color_scheme=scheme)
                 await page.goto(ui_url(host, port, TOKEN))
+                # The Cost card lives in the side panel (item 96): the panel on, and opened as a drawer on a phone.
+                await page.evaluate("localStorage.setItem('dot.inspector', 'on')")
                 await page.goto(f"http://{host}:{port}/#/runs/{working.id}")
+                if width < 960:
+                    await page.locator("button[aria-label='Run details']").click()
                 card = page.locator(".cost-card")
                 await expect(card.locator(".fold-summary")).to_contain_text("steps")
                 await card.locator(".fold-toggle").click()

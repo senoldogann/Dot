@@ -5016,7 +5016,7 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 93  | The owner, in one section: what the reflection knows about how you work         | done        | 6d64e43 |
 | 94  | An agent learns for itself: lessons, skills and a score per agent                | done        | 937cca4 |
 | 95  | The sidebar, smaller: the nav under New chat, sections that fold, rows cut short   | in progress |         |
-| 96  | The run page: the arrow above the composer, the cost in the side panel            | planned     |         |
+| 96  | The run page: the arrow above the composer, the cost in the side panel            | in progress |         |
 | 97  | Chrome in the background: the live view shows the page, the window stays put       | planned     |         |
 | 98  | The web that is refused: 999, 403 and their kind meet the browser, not the end     | planned     |         |
 | 99  | The team that grows: a run makes a lasting teammate and knows of it                | planned     |         |
@@ -5665,7 +5665,16 @@ sidebar shots are read by eye.
 
 ### 96. The run page: the arrow above the composer, the cost in the side panel
 
-**Status: planned.**
+**Status: in progress (2026-10-11).**
+
+**Design, as built (2026-10-11).** `run.js`: the jump button is a round icon button (`.btn.icon-only.jump`, 36 px,
+the surface with a raised shadow) prepended to the dock, positioned by it (absolute, centred, its bottom 8 px above
+the dock's frame), shown by the same rule as before (the answer below the window, or a live run not followed) and
+with the words "Jump to latest" / "Jump to the answer" as its title and label; a delegated run's dock, which has no
+composer, keeps only the arrow (`.dock-bare`). The cost card (`cost.js`, unchanged)
+leaves the conversation column for the side panel's content, after Details and before Plan; the conversation
+begins with the earlier turns. Tests: `tests/smoke/test_activity.py` turns the panel on (`dot.inspector`) and opens
+the drawer at the phone width before it reads the Cost card; the run page shots read by eye.
 
 **What.** "Jump to latest" becomes a round button with a down arrow, centred just above the composer (inside the
 dock, absolute), shown while the page is not at its end or an answer waits below the fold, with the words as its
