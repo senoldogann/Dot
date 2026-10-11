@@ -4,16 +4,16 @@
 
 import { approvalCard, fromRecord, LEFT_IN_RUN } from "../approvals.js";
 import { api } from "../api.js";
-import { createAttachments, readyToSend } from "../attachments.js";
-import { wireComposer } from "../composer.js";
+import { readyToSend } from "../attachments.js";
+import { composerFrame, composerPill } from "../composer.js";
 import { el, modelName } from "../dom.js";
-import { allModels, offersChoice, savedLevel } from "../efforts.js";
+import { allModels, forgetLevel, levelLabel, offersChoice, savedLevel, saveLevel } from "../efforts.js";
 import { icon } from "../icons.js";
 import { segmented } from "../panels.js";
-import { providerLabel } from "../providers.js";
-import { reasoningSelect } from "../reasoning.js";
-import { approvalLabel, approvalsPicker, goalModePicker, standingPicker } from "../runmodes.js";
+import { anchoredPopover } from "../popover.js";
 import { buildPresence } from "../presence.js";
+import { providerLabel } from "../providers.js";
+import { approvalLabel, approvalsPicker, goalModePicker, standingPicker } from "../runmodes.js";
 import { onCompose } from "../shortcuts.js";
 import { getSnapshot, loadModels, onChange, refresh } from "../state.js";
 import { attempt } from "../ui.js";
@@ -31,10 +31,6 @@ function defaultRefOf(snapshot) {
   return snapshot.status === null ? null : snapshot.status.models.main;
 }
 
-function defaultOptionText(ref) {
-  return ref === null ? "Default model" : `Default (${modelName(ref)})`;
-}
-
 /** The models that can call tools, grouped by provider: runs need tools, so the others would only fail. */
 function toolGroups(providers) {
   return providers
@@ -42,18 +38,44 @@ function toolGroups(providers) {
     .filter((group) => group.models.length > 0);
 }
 
-function pick(caption, control) {
-  return el("label", { class: "composer-pick" }, el("span", { class: "composer-pick-label" }, caption), control);
+/** The words of the daemon's default model, for the row that follows it. */
+function defaultRowText(ref) {
+  return ref === null ? "Default model" : `Default (${modelName(ref)})`;
 }
 
-function buildComposer(ctx) {
-  const goal = el("textarea", { class: "textarea", rows: "3", placeholder: "Message Dot", "aria-label": "Goal" });
-  // The approval mode stays in sight on the Options button, since it decides whether the run asks before it acts.
-  const approvalTag = el("span", { class: "chip", hidden: true });
+/** The option row of a popover's list: the label on the left, a tick when it is the one chosen. */
+function optionRow(label, selected, onPick) {
+  return el("button", { class: "pop-option", type: "button", role: "option", "aria-selected": String(selected), onclick: onPick }, el("span", null, label), icon("check"));
+}
+
+/** `listener` is the home's face (presence.js `listen`): it hears the box and the send. */
+function buildComposer(ctx, listener) {
+  const frame = composerFrame({
+    label: "New chat",
+    boxLabel: "Goal",
+    placeholder: "Message Dot",
+    rows: 3,
+    maxPx: MAX_GOAL_PX,
+    commands: MODES.map((option) => ({
+      label: `/${option.id}`,
+      hint: `${option.label}: ${option.hint}`,
+      insert: "",
+      run: () => {
+        mode.set(option.id);
+        modePicked(option.id);
+      },
+    })),
+    send: submit,
+    sendLabel: "Start",
+    draftKey: "home",
+    listener,
+  });
+  const { textarea: goal, attachments } = frame;
+  // The approval mode stays in sight as the Options pill's value, since it decides whether the run asks before it acts.
+  const optionsPill = composerPill({ id: "options", caption: "Options", value: "" });
   const approvals = approvalsPicker((shown) => {
-    approvalTag.hidden = shown === null;
-    approvalTag.className = `chip approvals-${shown}`;
-    approvalTag.textContent = shown === null ? "" : approvalLabel(shown);
+    optionsPill.setValue(shown === null ? "" : approvalLabel(shown), "");
+    optionsPill.setTone(shown === "yolo" ? "warn" : null);
   });
   const goalMode = goalModePicker();
   // A campaign checks its outcome itself, so goal mode does not apply to one; the switch only shows for a task.
@@ -65,12 +87,18 @@ function buildComposer(ctx) {
     goal.focus();
   }
   const mode = segmented(MODES, "task", modePicked);
+  // Approvals and goal mode are kept per browser and keep going is for the odd goal, so the three wait in one popover.
+  const optionsMenu = anchoredPopover({
+    anchor: optionsPill.element,
+    frame: frame.element,
+    label: "Options",
+    build: () => [approvals.element, goalMode.element, standing.element, approvals.warning],
+  });
   // The agent the run is for (item 86): Dot, or one the owner made; the menu only shows once an agent exists. A
   // campaign is Dot's own work, so Keep going hides while an agent is picked.
   const agentOption = el("option", { value: "" }, "Dot");
   const agent = el("select", { class: "select sm", "aria-label": "Agent" }, agentOption);
-  const agentPick = pick("Agent", agent);
-  agentPick.hidden = true;
+  const agentPill = el("label", { class: "composer-pill composer-pill-select", hidden: true }, el("span", { class: "composer-pill-caption" }, "Agent"), agent);
   let agents = [];
   function agentPicked() {
     const chosen = agents.find((candidate) => candidate.id === agent.value) ?? null;
@@ -83,61 +111,68 @@ function buildComposer(ctx) {
     .then((summaries) => {
       agents = summaries.map((summary) => summary.record).filter((record) => record.id !== "dot");
       agent.append(...agents.map((record) => el("option", { value: record.id }, record.name)));
-      agentPick.hidden = agents.length === 0;
+      agentPill.hidden = agents.length === 0;
     })
     .catch((error) => {
       console.warn("the agents could not be listed", error);
     });
-  const defaultOption = el("option", { value: "" });
-  const model = el("select", { class: "select sm", "aria-label": "Model" }, defaultOption);
-  const reasoning = el("span", { class: "composer-reasoning", hidden: true });
-  const attachments = createAttachments({ dropTarget: goal, input: goal });
-  // Approvals and goal mode are kept per browser and keep going is for the odd goal, so the three wait behind one button.
-  const more = el("div", { class: "composer-more", hidden: true }, approvals.element, goalMode.element, standing.element, approvals.warning);
-  const moreButton = el(
-    "button",
-    { class: "btn ghost sm", type: "button", "aria-expanded": "false", title: "Approvals, goal mode and keep going" },
-    icon("sliders"),
-    el("span", null, "Options"),
-    approvalTag,
-  );
-  moreButton.addEventListener("click", () => {
-    more.hidden = !more.hidden;
-    moreButton.setAttribute("aria-expanded", String(!more.hidden));
-  });
-  const start = el(
-    "button",
-    { class: "btn primary send", type: "button", title: "Start (Enter)", "aria-label": "Start" },
-    icon("arrowUp"),
-    el("span", { class: "label" }, "Start"),
-  );
+  // The model: the daemon's default until one is picked; its reasoning levels, when it offers a choice, in the same menu.
+  const modelPill = composerPill({ id: "model", caption: "Model", value: "" });
+  let chosenRef = "";
   let providers = [];
   let shownDefault = NOTHING_SHOWN;
 
   // The model a run would use now: the one picked, else the daemon's default.
   function selectedInfo() {
-    const ref = model.value === "" ? defaultRefOf(getSnapshot()) : model.value;
+    const ref = chosenRef === "" ? defaultRefOf(getSnapshot()) : chosenRef;
     return allModels(providers).find((candidate) => candidate.ref === ref) ?? null;
   }
 
-  // The reasoning menu only exists for a model that offers more than one level.
-  function paintReasoning() {
-    const info = selectedInfo();
-    if (info === null || !offersChoice(info)) {
-      reasoning.hidden = true;
-      reasoning.replaceChildren();
-      return;
-    }
-    reasoning.replaceChildren(pick("Reasoning", reasoningSelect(info, "Reasoning level")));
-    reasoning.hidden = false;
-  }
-
-  // The closed menu shows the model name only; its tooltip carries the whole reference.
+  // The pill shows the model's name and, for a model with levels, the level chosen; its tooltip the whole reference.
   function paintModel() {
     const info = selectedInfo();
-    model.title = info === null ? "" : info.ref;
-    paintReasoning();
+    const ref = chosenRef === "" ? defaultRefOf(getSnapshot()) : chosenRef;
+    const level = info !== null && offersChoice(info) ? savedLevel(info) : null;
+    modelPill.setValue(ref === null ? "Default" : modelName(ref), level === null ? "" : levelLabel(level));
+    modelPill.element.title = info === null ? "" : info.ref;
+    modelMenu.repaint();
   }
+
+  function reasoningRow(info) {
+    const levels = [{ id: "", label: info.default_effort === null ? "Default" : `Default (${levelLabel(info.default_effort)})`, hint: "The daemon's own choice" }];
+    levels.push(...info.efforts.map((level) => ({ id: level, label: levelLabel(level), hint: "" })));
+    const control = segmented(levels, savedLevel(info) ?? "", (id) => {
+      if (id === "") {
+        forgetLevel(info);
+      } else {
+        saveLevel(info, id);
+      }
+      paintModel();
+    });
+    control.element.setAttribute("aria-label", "Reasoning level");
+    return el("div", { class: "composer-pick", role: "group", "aria-label": "Reasoning" }, el("span", { class: "composer-pick-label" }, "Reasoning"), control.element);
+  }
+
+  function pickModel(ref) {
+    chosenRef = ref;
+    paintModel();
+  }
+
+  function modelRows() {
+    const list = el("div", { role: "listbox", "aria-label": "Model" }, optionRow(defaultRowText(defaultRefOf(getSnapshot())), chosenRef === "", () => pickModel("")));
+    for (const group of toolGroups(providers)) {
+      list.append(el("div", { class: "pop-group" }, providerLabel(group.provider)));
+      for (const info of group.models) {
+        const row = optionRow(modelName(info.ref), chosenRef === info.ref, () => pickModel(info.ref));
+        row.title = info.ref;
+        list.append(row);
+      }
+    }
+    const info = selectedInfo();
+    return info !== null && offersChoice(info) ? [list, reasoningRow(info)] : [list];
+  }
+
+  const modelMenu = anchoredPopover({ anchor: modelPill.element, frame: frame.element, label: "Model", build: modelRows });
 
   // Called on every status update; it only does work when the daemon's default model changed.
   function syncDefault() {
@@ -146,7 +181,6 @@ function buildComposer(ctx) {
       return;
     }
     shownDefault = ref;
-    defaultOption.textContent = defaultOptionText(ref);
     paintModel();
   }
 
@@ -168,13 +202,14 @@ function buildComposer(ctx) {
     }
     const info = selectedInfo();
     starting = true;
-    start.disabled = true;
+    frame.sendButton.disabled = true;
+    listener.sending();
     try {
       await attempt(async () => {
         const created = await api.post("/runs", {
           goal: text,
           mode: mode.value(),
-          model: model.value === "" ? null : model.value,
+          model: chosenRef === "" ? null : chosenRef,
           effort: info !== null && offersChoice(info) ? savedLevel(info) : null,
           approvals: approvals.value(),
           goal_mode: mode.value() === "chat" || standing.value() ? null : goalMode.value(),
@@ -183,49 +218,23 @@ function buildComposer(ctx) {
           attachments: attachments.ids(),
           agent_id: agent.value === "" ? null : agent.value,
         });
-        attachments.clear();
+        frame.clear();
         ctx.navigate(`/runs/${created.id}`);
       });
     } finally {
       starting = false;
-      start.disabled = false;
+      frame.sendButton.disabled = false;
     }
   }
 
-  start.addEventListener("click", submit);
-  // Enter starts the run like it sends a message in a chat; Shift+Enter keeps a new line; "/" opens the slash menu,
-  // whose commands here pick the kind of run.
-  const composer = wireComposer(goal, {
-    maxPx: MAX_GOAL_PX,
-    send: submit,
-    commands: MODES.map((option) => ({
-      label: `/${option.id}`,
-      hint: `${option.label}: ${option.hint}`,
-      insert: "",
-      run: () => {
-        mode.set(option.id);
-        modePicked(option.id);
-      },
-    })),
-  });
-  model.addEventListener("change", paintModel);
   loadModels().then(
     (loaded) => {
       providers = loaded;
-      for (const group of toolGroups(loaded)) {
-        model.append(
-          el(
-            "optgroup",
-            { label: providerLabel(group.provider) },
-            group.models.map((info) => el("option", { value: info.ref, title: info.ref }, modelName(info.ref))),
-          ),
-        );
-      }
       paintModel();
     },
     (error) => {
       console.warn("the model list is unavailable", error);
-      model.title = `The model list could not be loaded: ${error.message}`;
+      modelPill.element.title = `The model list could not be loaded: ${error.message}`;
     },
   );
   syncDefault();
@@ -237,29 +246,17 @@ function buildComposer(ctx) {
     goalMode.sync();
   }
 
-  const element = el(
-    "section",
-    { class: "card composer", "aria-label": "New chat" },
-    composer.menu,
-    goal,
-    attachments.list,
-    attachments.picker,
-    el(
-      "div",
-      { class: "composer-bar" },
-      el("div", { class: "composer-options" }, attachments.button, mode.element, agentPick, pick("Model", model), reasoning, moreButton),
-      start,
-    ),
-    more,
-    standing.note,
-  );
+  frame.options.append(attachments.button, mode.element, agentPill, modelPill.element, optionsPill.element);
+  frame.element.append(standing.note);
   const stopStatus = onChange(syncStatus);
   return {
-    element,
+    element: frame.element,
     focus: () => goal.focus(),
     dispose: () => {
       stopStatus();
-      composer.dispose();
+      optionsMenu.dispose();
+      modelMenu.dispose();
+      frame.dispose();
     },
   };
 }
@@ -298,9 +295,9 @@ function buildApprovals() {
 }
 
 export function mount(root, ctx) {
-  const composer = buildComposer(ctx);
-  const approvals = buildApprovals();
   const presence = buildPresence();
+  const composer = buildComposer(ctx, presence.listen);
+  const approvals = buildApprovals();
   root.append(
     el(
       "div",

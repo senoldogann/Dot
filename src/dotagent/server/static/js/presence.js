@@ -91,8 +91,15 @@ export function todaySections(activity) {
     .map(({ key, title, nested }) => ({ key, title, rows: nested.slice(0, ROWS_SHOWN), more: Math.max(0, nested.length - ROWS_SHOWN) }));
 }
 
+// Where the face looks while the composer has the focus (down at it), and for how long it stays attentive after a
+// keystroke, and excited after a send.
+const AT_THE_COMPOSER = { yaw: 0, pitch: -34, mix: 1, spin: 0, wander: 0.2 };
+const TYPING_MS = 1500;
+const SENDING_MS = 1500;
+
 /** Build the presence: `element` (the face, the greeting and the now line), `strip` (the Today strip, placed where the
- * page wants it), `focusable`, and `dispose()`. */
+ * page wants it), `listen` (`{ focus(on), typing(), sending() }`: the face looks down at the composer while it has the
+ * focus, goes attentive as the owner types and excited for a moment on send), and `dispose()`. */
 export function buildPresence() {
   // Dot's face moves here (item 103), with a wink now and then at rest.
   const live = liveFace("dot", overallState(getSnapshot()), null, 96);
@@ -104,6 +111,18 @@ export function buildPresence() {
   const strip = el("section", { class: "home-today", "aria-label": "Today", hidden: true });
   let activity = null;
   let disposed = false;
+  let moodTimer = 0;
+
+  function expressFor(expression, ms) {
+    clearTimeout(moodTimer);
+    live.express(expression);
+    moodTimer = setTimeout(() => live.express(null), ms);
+  }
+  const listen = {
+    focus: (on) => live.look(on ? AT_THE_COMPOSER : null),
+    typing: () => expressFor("attentive", TYPING_MS),
+    sending: () => expressFor("excited", SENDING_MS),
+  };
 
   function paintGreeting(snapshot) {
     const state = overallState(snapshot);
@@ -173,8 +192,10 @@ export function buildPresence() {
   return {
     element,
     strip,
+    listen,
     dispose: () => {
       disposed = true;
+      clearTimeout(moodTimer);
       live.dispose();
       stopChange();
       stopLifecycle();

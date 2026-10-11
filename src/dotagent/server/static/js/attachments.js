@@ -42,10 +42,11 @@ export function sentFiles(files) {
 
 /**
  * The attach button, the list of attached files and the drop/paste handling for one message box. `dropTarget` takes
- * dropped files and `input` pasted ones. `ids()` names the uploaded files for the message, `busy()` is true while one
- * is still uploading, and `clear()` empties the list after the message went.
+ * dropped files and `input` pasted ones. `ids()` names the uploaded files for the message, `ready()` describes them
+ * (`{ id, name, size }`) for a draft and `restore(files)` lists them again from one, `busy()` is true while one is
+ * still uploading, `clear()` empties the list after the message went, and `onChange()` runs after every change.
  */
-export function createAttachments({ dropTarget, input }) {
+export function createAttachments({ dropTarget, input, onChange }) {
   const entries = [];
   const picker = el("input", { type: "file", multiple: true, hidden: true, "aria-hidden": "true", tabindex: "-1" });
   const button = el(
@@ -57,6 +58,7 @@ export function createAttachments({ dropTarget, input }) {
 
   function paint() {
     list.hidden = entries.length === 0;
+    onChange();
   }
 
   function remove(entry) {
@@ -75,6 +77,18 @@ export function createAttachments({ dropTarget, input }) {
     entry.state = state;
     entry.node.className = `attach-chip ${state}`;
     entry.status.textContent = text;
+    onChange();
+  }
+
+  function chip(name, preview, status, entry) {
+    return el(
+      "span",
+      { class: "attach-chip uploading", title: name },
+      preview === null ? icon("file") : el("img", { class: "attach-thumb", src: preview, alt: "" }),
+      el("span", null, clip(name, NAME_CHARS)),
+      status,
+      el("button", { class: "btn ghost sm attach-remove", type: "button", title: "Remove", "aria-label": `Remove ${name}`, onclick: () => remove(entry) }, icon("x")),
+    );
   }
 
   async function upload(entry) {
@@ -101,15 +115,8 @@ export function createAttachments({ dropTarget, input }) {
       const isImage = file.type.startsWith("image/");
       const preview = isImage ? URL.createObjectURL(file) : null;
       const status = el("span", { class: "muted" }, "Uploading…");
-      const entry = { file, id: null, state: "uploading", preview, status, node: null };
-      entry.node = el(
-        "span",
-        { class: "attach-chip uploading", title: file.name },
-        preview === null ? icon("file") : el("img", { class: "attach-thumb", src: preview, alt: "" }),
-        el("span", null, clip(file.name, NAME_CHARS)),
-        status,
-        el("button", { class: "btn ghost sm attach-remove", type: "button", title: "Remove", "aria-label": `Remove ${file.name}`, onclick: () => remove(entry) }, icon("x")),
-      );
+      const entry = { file, id: null, name: file.name, size: file.size, state: "uploading", preview, status, node: null };
+      entry.node = chip(file.name, preview, status, entry);
       entries.push(entry);
       list.append(entry.node);
       upload(entry);
@@ -147,6 +154,18 @@ export function createAttachments({ dropTarget, input }) {
     picker,
     list,
     ids: () => entries.filter((entry) => entry.state === "ready").map((entry) => entry.id),
+    ready: () => entries.filter((entry) => entry.state === "ready").map((entry) => ({ id: entry.id, name: entry.name, size: entry.size })),
+    restore: (files) => {
+      for (const { id, name, size } of files) {
+        const status = el("span", { class: "muted" }, sizeLabel(size));
+        const entry = { file: null, id, name, size, state: "ready", preview: null, status, node: null };
+        entry.node = chip(name, null, status, entry);
+        entry.node.className = "attach-chip ready";
+        entries.push(entry);
+        list.append(entry.node);
+      }
+      paint();
+    },
     busy: () => entries.some((entry) => entry.state === "uploading"),
     failed: () => entries.some((entry) => entry.state === "failed"),
     clear: () => {

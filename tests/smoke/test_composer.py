@@ -1,6 +1,6 @@
-"""The composer's slash menu (item 64): typing ``/`` on the new chat page opens the menu of commands and skills, letters
-filter it, the arrows move, Enter picks without sending, Escape closes; Shift+Enter breaks a line. Wide and on a
-phone."""
+"""The composer (items 64 and 104): typing ``/`` on the new chat page opens the menu of commands and skills, letters
+filter it, the arrows move, Enter picks without sending, Escape closes; Shift+Enter breaks a line. The bar's pills
+open the Model and the Options menus; a draft survives a navigation. Wide and on a phone."""
 
 import asyncio
 import time
@@ -155,6 +155,66 @@ async def test_a_slash_opens_the_menu_letters_filter_it_and_enter_picks_without_
                 await goal.type("second")
                 await expect(goal).to_have_value("first\nsecond")
                 await expect(page).to_have_url(f"http://{host}:{port}/#/runs")
+                await page.close()
+        finally:
+            await browser.close()
+
+
+async def test_the_pills_open_their_menus_and_a_draft_survives_a_navigation(
+    runtime: Runtime, client: httpx.AsyncClient, tmp_path: Path
+) -> None:
+    host: str = client.base_url.host
+    port: int | None = client.base_url.port
+    assert port is not None
+    async with async_playwright() as playwright:
+        browser: Browser = await playwright.chromium.launch(channel=runtime.config.browser.channel, headless=True)
+        try:
+            for width in (1280, 390):
+                page: Page = await browser.new_page(viewport={"width": width, "height": 900})
+                await page.goto(ui_url(host, port, TOKEN))
+                goal = page.locator(GOAL)
+                popover = page.locator(".composer .composer-popover[aria-label='Model']")
+                await expect(popover).to_be_hidden()
+                # The Model pill: the daemon's default is the row ticked; picking the scripted model names it on the pill.
+                model_pill = page.locator(".composer-pill[data-pill='model']")
+                await expect(model_pill).to_contain_text("scripted")
+                await model_pill.click()
+                await expect(popover).to_be_visible()
+                await expect(popover.locator("[role=option][aria-selected=true]")).to_contain_text("Default (scripted)")
+                await page.screenshot(path=str(tmp_path / f"model-menu-{width}.png"))
+                last = popover.locator("[role=option]").last
+                picked: str = await last.inner_text()
+                await last.click()
+                await expect(popover.locator("[role=option][aria-selected=true]")).to_have_text(picked)
+                await page.keyboard.press("Escape")
+                await expect(popover).to_be_hidden()
+                assert await model_pill.get_attribute("aria-expanded") == "false"
+                # The Options pill carries the approvals as its value and opens the approvals, goal mode and keep going.
+                options_pill = page.locator(".composer-pill[data-pill='options']")
+                await expect(options_pill).to_contain_text("Ask")
+                await options_pill.click()
+                popover = page.locator(".composer .composer-popover[aria-label='Options']")
+                await expect(popover.get_by_role("group", name="Approvals")).to_be_visible()
+                await expect(popover.get_by_role("switch", name="Goal mode")).to_be_visible()
+                await expect(popover.get_by_role("switch", name="Keep going until done")).to_be_visible()
+                await page.screenshot(path=str(tmp_path / f"options-menu-{width}.png"))
+                await popover.get_by_role("button", name="YOLO").click()
+                await expect(options_pill).to_contain_text("YOLO")
+                await expect(options_pill).to_have_attribute("data-tone", "warn")
+                await popover.get_by_role("button", name="Ask").click()
+                await expect(options_pill).to_contain_text("Ask")
+                # A click outside (on the empty page under the composer) closes the menu.
+                await page.mouse.click(width - 20, 880)
+                await expect(popover).to_be_hidden()
+                # A draft keeps: the text typed and not sent is there again after a walk to another page.
+                await goal.fill("keep me for later")
+                await page.goto(f"http://{host}:{port}/#/agents")
+                await page.goto(f"http://{host}:{port}/#/runs")
+                await expect(page.locator(GOAL)).to_have_value("keep me for later")
+                await page.locator(GOAL).fill("")
+                await page.goto(f"http://{host}:{port}/#/agents")
+                await page.goto(f"http://{host}:{port}/#/runs")
+                await expect(page.locator(GOAL)).to_have_value("")
                 await page.close()
         finally:
             await browser.close()

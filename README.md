@@ -847,12 +847,15 @@ so). Under the composer, the **Today** strip lists it: what waits for you, what 
 schedules that fire and the campaigns whose next session starts), what was learned today (the lessons and the day's
 journal) and what ended, each row as on the Activity page and each opening what it is about; five rows a section,
 then "and N more in Activity". The line and the strip follow the lifecycle stream, so an answer or a run's end moves
-them at once; `GET /api/activity` carries the two new lists as `learned_today` and `due`. The composer is the goal,
-then one line with the mode (Task, Chat
-or Research), the model and, for a model that offers a choice, its reasoning level (kept in the browser per model).
-**Options** at the end of that line opens the approval mode (Ask, Auto or YOLO; the mode in use always shows on the
-button), the Goal mode switch and Keep going (see
-[Autonomy](#autonomy-approvals-goal-mode-and-the-end-of-a-run)). Enter starts the run, Shift+Enter adds a line. `/` at
+them at once; `GET /api/activity` carries the two new lists as `learned_today` and `due`. The composer is one frame: the goal, the
+files attached under it, then a bar of pills: the attach button, the mode (Task, Chat or Research), the Agent menu
+once an agent exists, **Model** (the daemon's default or one picked, by provider; the same menu holds the reasoning
+level of a model that offers a choice, kept in the browser per model) and **Options** (the approval mode, Ask, Auto or
+YOLO, which the pill always shows, the Goal mode switch and Keep going, see
+[Autonomy](#autonomy-approvals-goal-mode-and-the-end-of-a-run)). Each pill opens its menu above it; Escape or a click
+outside closes it. What you typed and attached and did not send is kept in this browser and is there again when you
+come back (so is the box of each run). Dot's face looks down at the box while you write and brightens when you send.
+Enter starts the run, Shift+Enter adds a line. `/` at
 the start of a word opens the slash menu over the box: the commands of the composer (`/task`, `/chat`, `/research`
 here; `/btw` in the box of a run), the skills by name with their description, and each MCP server with its tools, read
 from the daemon as a run reads them (`GET /api/palette`); letters filter, the arrows move, Enter or Tab picks and
@@ -872,7 +875,8 @@ its parent still works ("Runs on its own" once not) and "Open parent". The tool 
 stretch of work fold into a single
 "Worked for 12 s (model 8 s) · 5 tool calls" line, where the part in brackets is how much of that time the model's turns
 took (open it for every call, result and screenshot), while approvals, questions and policy notes stay in the open. The
-answer of the run is the last message, with a Copy button and when it finished and how long the run took. While the
+answer of the run is the last message, with a Copy button and when it finished and how long the run took. The box at the bottom is the same frame as the home's, with the attach button and the send in its bar; what you
+typed there and did not send waits for you. While the
 end of the conversation, or its answer, is below the window, a round arrow just above the composer leads there. In the
 side panel (Run details), after Details, a folded **Cost** card carries the bill of the run in one line (its minutes,
 steps and tokens); open, it says where
@@ -949,7 +953,9 @@ flat, a surface with a hairline and a 12 px radius and no shadow (shadows stay o
 composer in focus); section labels are sentence case; the facts of a row are spans a gap apart rather than one dotted
 string; an empty list is one line that says so and what to do; your messages sit on the raised surface. Controls:
 buttons, inputs and selects 36 px tall on an 8 px corner with a hairline (32 for the small ones), the same 2 px focus
-ring on each, a select with its own drawn chevron, field labels on the interface line and hints on the small one,
+ring on each, a select with its own drawn chevron, field labels on the interface line and hints on the small one, the composer's
+menus as pills of 32 px (a muted caption, the value, a chevron; borderless at rest, a hairline under the pointer) that
+open a panel above them,
 table rows 40 px with their content on the middle; `#/controls` shows every control on one page for checking a look.
 Faces: every actor is a character (below); an agent wears the look you choose, Dot its own (Settings › General), and
 an actor without one (a delegated run, a campaign, a schedule) the shape and colour its id's hue gives it, one of
