@@ -4624,8 +4624,8 @@ says so), $10 per 1,000 searches plus tokens (the docs; a failed search is not b
 
 | #   | Item                                                                     | Status      | Commits |
 | --- | ------------------------------------------------------------------------ | ----------- | ------- |
-| 69  | The Anthropic rung: Haiku 5.5 searches through the API's own web search | in progress |         |
-| 70  | Reflection: Dot's day in review, every night                             | planned     |         |
+| 69  | The Anthropic rung: Haiku 5.5 searches through the API's own web search | done        | 927a720 |
+| 70  | Reflection: Dot's day in review, every night                             | in progress |         |
 | 71  | Memory that rests: use decides what is recalled                          | planned     |         |
 | 72  | The home that says "I am here"                                           | planned     |         |
 | 73  | Motion with meaning                                                      | planned     |         |
@@ -4635,7 +4635,7 @@ says so), $10 per 1,000 searches plus tokens (the docs; a failed search is not b
 
 ### 69. The Anthropic rung: Haiku 5.5 searches through the API's own web search
 
-**Status: in progress.** Built on `item-69-anthropic-rung` (MYP-209).
+**Status: done.** Merged as `927a720` (PR #77, squash; MYP-209 Done).
 
 **What.** A search rung that asks `claude-haiku-5-5` with the Messages API's `web_search` server tool and reads its
 results as hits (title, address, the cited text, the page's age), second on the ladder after `ollama` when the
@@ -4682,7 +4682,7 @@ The live smoke test ran one search with the machine's key: 1 passed in 5.5 s, hi
 
 ### 70. Reflection: Dot's day in review, every night
 
-**Status: planned.**
+**Status: in progress.** Built on `item-70-reflection` (MYP-210).
 
 **What.** Once a day, unattended, Dot reads the runs that ended since the last reflection and writes what it learned:
 lessons from failed and cancelled runs too (today only runs that ended done teach), one short journal note for the
@@ -4707,6 +4707,31 @@ reflection on a scripted review model; asserts the lessons, the merge, the journ
 **Touchpoints.** `agent/reflection.py` (new), `agent/lessons.py`, `agent/review.py`, `memory/service.py`,
 `scheduler/runner.py`, `config.py`, `defaults.toml`, `cli_reflect.py` (new), `server/activity.py`,
 `tests/smoke/test_reflection.py`, README (Memory, Schedules).
+
+**Design, as built (2026-10-11).** As planned, with these differences. The last reflection is a record in the store's
+key/value table (`reflection.last`, a `Reflection` with `at`, `since`, the counts and the journal's id), not an event:
+events belong to runs, and the reflection is none; the first reflection reads the last day. The scheduler keeps no
+built-in `ScheduleRecord`: `Scheduler.tick` asks `reflection_due(time_of_day, anchor, now, zone)` (the daily cron of
+`[agent] reflection_time` after the anchor, which is the later of the last reflection and the last attempt or the
+scheduler's making), and runs `RunManager.reflect` in a task of its own, so a night the daemon slept through is caught
+up once at its next tick and a failure waits for the next night. The lesson writer is not changed: the reflection
+builds a `LessonCase` from the stored `tool_result` events (`digest_of`, `call_facts` as the loop keeps failures and
+resolved calls, `read_outside` for the taint from the result kinds and the web and browser channels) and asks through
+`lessons.learn_from` with the run's ending as one more signal (`ending_signal`: "The run ended failed: …", "The run was
+stopped before it finished: …"); a run the loop asked at its end (a `lessons_proposed` or `lessons_failed` event) is not
+asked again, and with `[agent] lessons = "off"` no lesson is drawn while the merge, the retirement and the journal
+still happen. Duplicates are found by the cosine of the stored vectors (0.92) when both notes have one and by
+`lessons.repeats` (the words) otherwise, each note in at most one pair; the older is deleted, the newer keeps both
+notes' tags, and the log line `lesson_merged` keeps the older's text and source. Retirement adds the `rest` tag;
+`memory.recall` drops a resting note, so `memory_search`, the prompt's notes and the lesson writer's known notes no
+longer see it, while `dotx memory list` and the Memory page do (item 71 makes use the ranking). The journal note's
+source is the word `reflection` (`memory.service.REFLECTION_SOURCE`), so it is neither an owner's note (which would
+reach every run) nor linked to a run; the Memory page says "Written by the nightly reflection" and the model reads
+"your nightly reflection wrote it". No journal is written when nothing happened. Activity gets the row kind
+`reflection` ("Reflected on 4 runs: 2 lessons, 1 merged, 1 retired.", opens the Memory page) for a reflection that
+ran today. Smoke test: four scripted runs (done, failed, stopped, done after a stumble that the loop asked at its end),
+two twin lessons and a stale one, the scheduler's tick at 03:30 fires the reflection; asserts the two questions, the
+three saved lessons, the merge, the rest, the journal, the Activity row and that the next tick does not fire again.
 
 ### 71. Memory that rests: use decides what is recalled
 
@@ -5306,3 +5331,4 @@ here.
   system with memory; a design that says I am here; Haiku 5.5 for web search?"): items 69 to 76. The Models API
   confirmed `claude-haiku-5-5` supports the `web_search` server tool; the docs price it at $10 per 1,000 searches plus
   tokens, so it is a second rung, not a free first one. Daemon restarted on e475368 (pid 66449) with no run active.
+- 2026-10-11 (Fable 5.1): item 69 merged 927a720 (PR #77, MYP-209 Done). Item 70 built on branch `item-70-reflection` (MYP-210): `agent/reflection.py` (reflect, reflection_due, stored_case, duplicate_pairs, to_retire, journal), the scheduler's tick fires it at `[agent] reflection_time`, `rest`/`journal` tags, `dotx reflect`, the Activity row; unit and smoke tests.

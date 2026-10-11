@@ -65,6 +65,10 @@ class DoctorCommand(FrozenModel):
     name: Literal["doctor"]
 
 
+class ReflectCommand(FrozenModel):
+    name: Literal["reflect"]
+
+
 class BrowserLoginCommand(FrozenModel):
     name: Literal["browser-login"]
     url: str | None
@@ -289,6 +293,7 @@ type Command = Annotated[
     | AuthSetCommand
     | AuthStatusCommand
     | DoctorCommand
+    | ReflectCommand
     | BrowserLoginCommand
     | BrowserImportChromeCommand
     | BrowserAttachCommand

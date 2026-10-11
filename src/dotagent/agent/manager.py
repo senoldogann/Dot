@@ -23,6 +23,7 @@ from dotagent.agent.lessons import LessonCase, dismiss_lesson, learn, save_lesso
 from dotagent.agent.loop import AgentRun, RunEnd, RunOpening, run_agent
 from dotagent.agent.plan import EMPTY_PLAN, PLAN_EVENT, plan_from_event
 from dotagent.agent.playbooks import learn_playbook, playbook_case
+from dotagent.agent.reflection import Reflection, reflect
 from dotagent.agent.resume import (
     RESUME_SOURCE,
     CutOff,
@@ -487,6 +488,11 @@ class RunManager:
     def learning(self, run_id: str) -> bool:
         """Whether the lessons of a run that ended are being drawn."""
         return run_id in self._learning
+
+    async def reflect(self, now: float) -> Reflection:
+        """One reflection at ``now`` (:func:`dotagent.agent.reflection.reflect`), under the lock of the owner's
+        decisions on lessons, so a lesson it saves with ``auto`` is decided once like any other."""
+        return await reflect(self._runtime, self._deciding, now)
 
     async def learned(self, run_id: str) -> None:
         """Block until the lessons of a run that ended are drawn (returns immediately when none are being drawn).

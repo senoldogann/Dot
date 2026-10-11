@@ -6,6 +6,7 @@ import time
 from zoneinfo import ZoneInfo
 
 from dotagent.agent.manager import RunManager, thread_title
+from dotagent.agent.reflection import Reflection, last_reflection, reflection_due, summary_line
 from dotagent.core.errors import DotError, RunConflict, StoreError
 from dotagent.core.logs import get_logger
 from dotagent.runtime import Runtime
@@ -32,6 +33,10 @@ class Scheduler:
     one. Firings that were missed collapse into one, and into none when they are overdue by more than the grace period.
     A schedule whose previous run is still going skips the firing. The store is the only persistent state; the
     instance remembers which schedules have a run in flight.
+
+    The nightly reflection (item 70) fires here too, at ``[agent] reflection_time``: once its daily time has passed
+    since the last reflection (or since the last attempt, or since this scheduler was made), it runs in a task of its
+    own, so the schedules due at the same time wait for nothing. A night the daemon slept through is caught up once.
     """
 
     def __init__(self, runtime: Runtime, manager: RunManager) -> None:
@@ -41,6 +46,8 @@ class Scheduler:
         self._in_flight: dict[str, str] = {}
         self._watchers: set[asyncio.Task[None]] = set()
         self._loop: asyncio.Task[None] | None = None
+        self._reflected_from: float = time.time()
+        self._reflecting: asyncio.Task[None] | None = None
 
     async def start(self) -> asyncio.Task[None]:
         """Begin ticking in the background; what an earlier process left unfinished is marked as interrupted.
@@ -71,17 +78,48 @@ class Scheduler:
             loop.result()
 
     async def drain(self) -> None:
-        """Wait until every run that finished has been written to its schedule."""
+        """Wait until every run that finished has been written to its schedule, and a reflection under way is over."""
         if self._watchers:
             await asyncio.wait(set(self._watchers))
+        if self._reflecting is not None:
+            await asyncio.wait({self._reflecting})
+
+    def reflecting(self) -> bool:
+        """Whether a reflection is under way."""
+        return self._reflecting is not None and not self._reflecting.done()
 
     async def tick(self, now: float) -> None:
-        """Fire every switched-on schedule that is due at ``now``, and start the next session of every active campaign
-        that is. A campaign's session is never skipped as overdue: the campaign goes on where it stopped."""
+        """Fire every switched-on schedule that is due at ``now``, start the next session of every active campaign
+        that is, and start the reflection when its time has come. A campaign's session is never skipped as overdue:
+        the campaign goes on where it stopped."""
         for record in await self._runtime.store.due_schedules(now):
             await self._fire(record, now)
         for campaign in await self._runtime.store.due_campaigns(now):
             await self._start_session(campaign.id)
+        await self._reflect_if_due(now)
+
+    async def _reflect_if_due(self, now: float) -> None:
+        """Start the reflection in a task when its daily time has passed since the last one (or the last attempt)."""
+        if self.reflecting():
+            return
+        last: Reflection | None = await last_reflection(self._runtime.store)
+        anchor: float = max(self._reflected_from, last.at if last is not None else 0.0)
+        if not reflection_due(self._runtime.config.agent.reflection_time, anchor, now, self._zone):
+            return
+        self._reflected_from = now
+        self._reflecting = asyncio.create_task(self._reflect(now), name="reflection")
+
+    async def _reflect(self, now: float) -> None:
+        """Task body of a reflection: its outcome is logged; a failure is logged with what failed and the next attempt
+        is the next daily time."""
+        try:
+            reflection: Reflection = await self._manager.reflect(now)
+        except DotError as exc:
+            log.error("reflection_failed", error=exc.message, context=exc.context)
+        except Exception:
+            log.exception("reflection crashed")
+        else:
+            log.info("reflection_fired", summary=summary_line(reflection))
 
     async def _tick_forever(self) -> None:
         tick_s: float = self._runtime.config.scheduler.tick_s
