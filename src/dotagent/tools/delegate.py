@@ -2,13 +2,14 @@
 
 import secrets
 import time
+from collections.abc import Sequence
 from typing import Literal
 
-from pydantic import Field
+from pydantic import Field, JsonValue
 
 from dotagent.agent.helpers import Roster, current_roster, roster_text
-from dotagent.agent.plan import EMPTY_PLAN, PLAN_EVENT, PlanPayload, checked_step_number, plan_from_event
-from dotagent.core.errors import ToolExecutionError
+from dotagent.agent.plan import EMPTY_PLAN, PLAN_EVENT, PlanItem, PlanPayload, checked_step_number, plan_from_event
+from dotagent.core.errors import ToolExecutionError, ToolInputError
 from dotagent.core.text import truncate_tail
 from dotagent.policy.types import ActionInfo
 from dotagent.store.models import EventRecord, RunMode, RunRecord
@@ -52,9 +53,10 @@ class DelegateArgs(ToolArgs):
         ge=1,
         le=20,
         description=(
-            "The number of the plan step this part is, only once update_plan recorded a plan with that step (a part for a "
-            "step the plan does not have is refused): when the delegated run ends, that step is marked done with its "
-            "report as the evidence, or failed when the run did not end done, so you need not mark it yourself."
+            "The number of the plan step this part is: when the delegated run ends, that step is marked done with its "
+            "report as the evidence, or failed when the run did not end done, so you need not mark it yourself. A step "
+            "the plan does not have (or no plan yet) does not stop the delegation: the run goes, its result says so, "
+            "and nothing is marked."
         ),
     )
 
@@ -66,8 +68,10 @@ def default_child_mode(parent: RunMode) -> RunMode:
 
 async def _model_for(asked: str | None, ctx: ToolContext) -> str | None:
     """The model the delegated run starts on: ``None`` (the parent's own) unless ``asked`` names a helper model that can
-    answer now."""
-    if asked is None or asked.strip() == (await ctx.runtime.store.get_run(ctx.run_id)).model.strip():
+    answer now. A blank name is the parent's own too: a model's slip, like a step the plan does not have."""
+    if asked is None or not asked.strip():
+        return None
+    if asked.strip() == (await ctx.runtime.store.get_run(ctx.run_id)).model.strip():
         return None
     roster: Roster = await current_roster(
         ctx.runtime.router, ctx.runtime.config.providers, ctx.runtime.config.models.helpers
@@ -81,14 +85,37 @@ async def _model_for(asked: str | None, ctx: ToolContext) -> str | None:
     )
 
 
-async def _checked_step(step: int | None, ctx: ToolContext) -> int | None:
-    """``step`` once the run's plan has it (``None`` when none was named): a part is not started for a step that does
-    not exist."""
+_UNPLANNED_MARK: str = " is not in the plan ("
+
+
+def unplanned_step_note(steps: Sequence[PlanItem], step: int) -> str | None:
+    """The first line of a delegate result whose ``step`` the plan does not have (``None`` when it does): the
+    delegation runs all the same, and nothing is marked."""
+    try:
+        checked_step_number(steps, step)
+    except ToolInputError:
+        return (
+            f"Step {step}{_UNPLANNED_MARK}the plan has {len(steps)} steps); the delegated run ran, nothing was marked."
+        )
+    return None
+
+
+async def _unplanned(step: int | None, ctx: ToolContext) -> str | None:
+    """The note of a ``step`` the run's plan does not have; ``None`` when none was named or the plan has it."""
     if step is None:
         return None
     latest: EventRecord | None = await ctx.runtime.store.last_event(ctx.run_id, PLAN_EVENT)
     plan: PlanPayload = EMPTY_PLAN if latest is None else plan_from_event(latest)
-    return checked_step_number(plan.steps, step)
+    return unplanned_step_note(plan.steps, step)
+
+
+def closing_step(call_step: JsonValue, result: ToolResult) -> int | None:
+    """The plan step a delegate result closes: the step the call named, unless the result's first line says the plan
+    did not have it."""
+    if not isinstance(call_step, int):
+        return None
+    first: str = result.text.split("\n", 1)[0]
+    return None if first.startswith("Step ") and _UNPLANNED_MARK in first else call_step
 
 
 def delegated_evidence(result: ToolResult) -> str:
@@ -110,12 +137,14 @@ def _fence(run: RunRecord, body: str, nonce: str) -> str:
     return f'<delegate_content nonce="{nonce}" run="{run.id}">\n{safe}\n</delegate_content nonce="{nonce}">'
 
 
-def render_outcome(outcome: DelegateOutcome, nonce: str, step: int | None) -> ToolResult:
+def render_outcome(outcome: DelegateOutcome, nonce: str, step: int | None, unplanned: str | None) -> ToolResult:
     """What the delegating run reads back: how the run ended, on which model, and its report, fenced when it saw
-    untrusted content; with ``step``, that the plan step closes from it."""
+    untrusted content; with ``step``, that the plan step closes from it; with ``unplanned`` (the note of a step the
+    plan did not have), that note first."""
     run: RunRecord = outcome.run
-    # The first line stays the plain header: it is what the evidence of the plan step starts with.
-    header: str = f"Delegated run {run.id} on {run.model} ended as {run.status} after {run.steps} steps."
+    # Without a note, the first line stays the plain header: it is what the evidence of the plan step starts with.
+    ended: str = f"Delegated run {run.id} on {run.model} ended as {run.status} after {run.steps} steps."
+    header: str = ended if unplanned is None else f"{unplanned}\n{ended}"
     report: str = run.result.strip() or _NO_REPORT
     body: str = f"{header}\n{_fence(run, report, nonce)}" if outcome.tainted else f"{header}\n{report}"
     closing: str = (
@@ -141,11 +170,12 @@ def _delegate_tool() -> RegisteredTool:
         if spawner is None:
             raise ToolExecutionError("this run cannot start other runs", {"run_id": ctx.run_id})
         mode: RunMode = args.mode if args.mode is not None else default_child_mode(ctx.mode)
-        step: int | None = await _checked_step(args.step, ctx)
+        unplanned: str | None = await _unplanned(args.step, ctx)
         outcome: DelegateOutcome = await spawner.delegate(
             ctx.run_id, args.goal, mode, await _model_for(args.model, ctx)
         )
-        return render_outcome(outcome, secrets.token_hex(_NONCE_BYTES), step)
+        step: int | None = None if unplanned is not None else args.step
+        return render_outcome(outcome, secrets.token_hex(_NONCE_BYTES), step, unplanned)
 
     return make_tool(
         name=DELEGATE_TOOL,
@@ -155,7 +185,8 @@ def _delegate_tool() -> RegisteredTool:
             "deep research question) and to do independent parts at the same time: call it several times in one "
             "turn. The agent uses your tools and your model, or the helper model you name; it cannot ask the user "
             "questions, consult a helper or delegate again. Do not delegate what one or two tool calls can do. Name "
-            "the plan step the part is (step) and its report closes that step."
+            "the plan step the part is (step) and its report closes that step; a step the plan does not have runs "
+            "all the same and closes nothing."
         ),
         args_model=DelegateArgs,
         modes=ALL_MODES,

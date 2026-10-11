@@ -7,8 +7,6 @@ from dataclasses import dataclass, replace
 from datetime import datetime
 from typing import Literal
 
-from pydantic import JsonValue
-
 from dotagent.agent.attachments import (
     ATTACHMENTS_EVENT,
     StoredAttachment,
@@ -177,7 +175,7 @@ from dotagent.store.stats import ACT_TOOLS
 from dotagent.tools.campaign import CAMPAIGN_TOOLS
 from dotagent.tools.consult import CONSULT_TOOL
 from dotagent.tools.context import Spawner, ToolContext
-from dotagent.tools.delegate import DELEGATE_TOOL, delegated_evidence
+from dotagent.tools.delegate import DELEGATE_TOOL, closing_step, delegated_evidence
 from dotagent.tools.groups import CORE_GROUP, groups_event, groups_of, hidden_tools, offered_specs, used_groups
 from dotagent.tools.meta import ASK_USER_TOOL, FINISH_TOOL, USE_TOOLS_TOOL, FinishArgs, UseToolsArgs
 from dotagent.tools.posts import POST_TOOLS
@@ -647,11 +645,13 @@ class SendBack(FrozenModel):
 
 
 def _delegated_closings(outcomes: Sequence[ToolOutcome]) -> list[tuple[int, ToolOutcome]]:
-    """The delegate calls of one step that named a plan step and ran, with that step."""
+    """The delegate calls of one step that named a plan step the plan had and ran, with that step."""
     closings: list[tuple[int, ToolOutcome]] = []
     for outcome in outcomes:
-        step: JsonValue = outcome.call.arguments.get("step")
-        if outcome.call.name == DELEGATE_TOOL and outcome.action is not None and isinstance(step, int):
+        if outcome.call.name != DELEGATE_TOOL or outcome.action is None:
+            continue
+        step: int | None = closing_step(outcome.call.arguments.get("step"), outcome.result)
+        if step is not None:
             closings.append((step, outcome))
     return closings
 
