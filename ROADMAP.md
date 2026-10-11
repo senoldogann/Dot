@@ -4250,8 +4250,8 @@ parked: its premises (tool-call deltas in the stream) are still not in the code.
 | 61  | Summaries that pass their own check                                      | done        | a8c602f |
 | 62  | A delegate before the plan is a step, not a lost turn                   | done        | 056b153 |
 | 63  | The soft look: light and dark, every surface                             | done        | 9e86fda |
-| 64  | The composer: a slash menu of commands, skills and MCP tools             | in progress |         |
-| 65  | The chrome that stays: the run's head and side panel while it scrolls    | planned     |         |
+| 64  | The composer: a slash menu of commands, skills and MCP tools             | done        | d36d375 |
+| 65  | The chrome that stays: the run's head and side panel while it scrolls    | in progress |         |
 | 66  | One door for the store's writes                                          | done        | 5c7eada |
 | 67  | The inspector's cards: folded, no stray null, a view that follows the run | done        | 8255af7 |
 | 68  | Delegated runs in sight: the sidebar and the chat                        | done        | 278f256 |
@@ -4486,7 +4486,7 @@ settings in held dark were looked at.
 
 ### 64. The composer: a slash menu of commands, skills and MCP tools
 
-**Status: in progress.** Built on `item-64-slash-composer` (MYP-206).
+**Status: done.** Built on `item-64-slash-composer` (MYP-206), merged d36d375 (PR #73).
 
 **What.** Typing `/` at the start of a word in the composer (the new-run page and the run's dock) opens a menu over the
 caret: the commands (`/btw`, the run modes, approvals, model), the skills by name with their one-line description, and
@@ -4533,7 +4533,7 @@ leave no text, Shift+Enter breaks a line. The dock of a run is wired by the same
 
 ### 65. The chrome that stays: the run's head and side panel while it scrolls
 
-**Status: planned.**
+**Status: in progress.** Built on `item-65-sticky-chrome` (MYP-207).
 
 **What.** On the run page the head (Dot's face and state, the model chip, the mode chips, Cancel) stays at the top of
 the conversation while it scrolls, the inspector stays beside it to its full height with its own scroll, the dock
@@ -4550,7 +4550,22 @@ the `.page` column is the one scroll container (no `overflow` on `.run-layout`, 
 the head shows the face, the state and Cancel in one row. A smoke test scrolls a long scripted run at 1280 and 390 px
 and asserts the head's and the inspector's bounding boxes stay in the viewport; screenshots in both schemes.
 
-**Touchpoints.** `static/css/run.css`, `app.css`, `static/js/layout.js`, `static/js/views/run.js`,
+**Design, as built (2026-10-11).** The window was already the one scroll container (the stage bar and the sidebar are
+sticky to it), so no scroll container moved. `layout.js` `trackStagebar(stagebar)` keeps the bar's height in
+`--stagebar-h` on the page element through a `ResizeObserver` (the banner, the density and the width change it;
+`app.css` declares 56 px as the value before the first measure); `shell.js` calls it once the bar is built. The
+head (`.chat-head`, app.css) is `position: sticky; top: var(--stagebar-h)` on a backdrop of the page colour at 88 %
+with a blur, within `.run-main`, so it stays while the messages pass under it; the inspector's offset and height
+follow the same property instead of the fixed 68 px. Under 720 px the head is one row: the face at 28 px, the name
+with the state and the date, and the buttons; the chips (model, mode, parent, campaign) are hidden there and read in
+the Details card. `run.js` did not change: the head's markup already had the parts. The smoke test
+`tests/smoke/test_run_chrome.py` plays a scripted run of thirty shell steps, opens it with the steps unfolded and the
+panel on, checks that `--stagebar-h` equals the bar's measured bottom, scrolls to the middle and asserts the head's
+top sits at the bar's bottom (within 1.5 px), the panel's top just under the bar and its bottom inside the viewport
+(at 1280), no chip visible in the head (at 390), and the dock inside the viewport below the head; screenshots at 1280
+and 390 px in both schemes were looked at.
+
+**Touchpoints.** `static/css/run.css`, `app.css`, `static/js/layout.js`, `static/js/shell.js`,
 `tests/smoke/test_run_chrome.py`, README.
 
 ## Log
