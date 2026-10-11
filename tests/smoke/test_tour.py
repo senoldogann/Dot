@@ -75,8 +75,8 @@ _STEPS: tuple[tuple[str, str], ...] = (
         "ls -A",
     ),
     (
-        "Counting the lines of the notes, which looks like the file that changes most and may be the newest of the three.",
-        "wc -l notes.md",
+        "Checking where the folder is, so the count is of the workspace and not of a folder further up the tree.",
+        "pwd",
     ),
     (
         "Measuring the folder, to say how much the three files weigh together and whether any of them is unexpectedly large.",
@@ -95,8 +95,8 @@ _STEPS: tuple[tuple[str, str], ...] = (
         "ls -A",
     ),
     (
-        "Checking the notes once more, since a line count that changed would mean the file was written while reading.",
-        "wc -l notes.md",
+        "Checking the folder once more, since a change of directory in between would make the count another folder's.",
+        "pwd",
     ),
     (
         "Measuring the folder a second time, so the size in the answer is the one of the moment it is written.",
