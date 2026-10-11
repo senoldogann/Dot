@@ -2597,6 +2597,19 @@ dialog.lightbox img {
     display: none;
   }
 
+  /* The bar's buttons keep their icon alone on a phone; the name keeps its first word. */
+  .stage-tools .btn .label {
+    display: none;
+  }
+
+  .stage-tools .btn {
+    padding: 0 8px;
+  }
+
+  .stage-name {
+    min-width: 56px;
+  }
+
   .stage-tools .chip {
     display: none;
   }
