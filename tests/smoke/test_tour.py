@@ -163,9 +163,17 @@ async def _shoot(context: BrowserContext, base: str, pages: tuple[tuple[str, str
             await page.evaluate("document.documentElement.dataset.shell = 'desktop'")
             await page.wait_for_timeout(_SETTLE_MS)
             await page.screenshot(path=str(out / f"{tag}-home-desktop.png"), full_page=False)
-            await page.evaluate("document.querySelector('.shell').dataset.sidebar = 'closed'")
-            await page.wait_for_timeout(_SETTLE_MS)
+            # The sidebar goes and comes back through its own buttons (item 100: setting the state on the element had
+            # hidden the sidebar and its opener from every later desk shot).
+            hide = page.get_by_role("button", name="Hide sidebar")
+            docked: bool = await hide.is_visible()
+            if docked:
+                await hide.click()
+                await page.wait_for_timeout(_SETTLE_MS)
             await page.screenshot(path=str(out / f"{tag}-home-desktop-closed.png"), full_page=False)
+            if docked:
+                await page.get_by_role("button", name="Show sidebar").click()
+                await page.wait_for_timeout(_SETTLE_MS)
             await page.evaluate("delete document.documentElement.dataset.shell")
         if name == "run":
             # The side panel with its Details card open (item 84): on a wide window beside the chat, on a phone a drawer.

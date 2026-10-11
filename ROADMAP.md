@@ -5019,8 +5019,8 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 96  | The run page: the arrow above the composer, the cost in the side panel            | done        | 3a8a20b |
 | 97  | Chrome in the background: the live view shows the page, the window stays put       | done        | 558621b |
 | 98  | The web that is refused: 999, 403 and their kind meet the browser, not the end     | done        | 65433d0 |
-| 99  | The team that grows: a run makes a lasting teammate and knows of it                | in progress |         |
-| 100 | The review: every feature of parts 1 to 12 read once more on the live pages        | planned     |         |
+| 99  | The team that grows: a run makes a lasting teammate and knows of it                | done        | 724768e |
+| 100 | The review: every feature of parts 1 to 12 read once more on the live pages        | in progress |         |
 
 ### 77. The type system: Inter and Geist Mono, seven sizes, three weights
 
@@ -5756,7 +5756,7 @@ snippet of the page (`web_search` with the URL), or Take over for a login wall. 
 
 ### 99. The team that grows: a run makes a lasting teammate and knows of it
 
-**Status: in progress (2026-10-11).**
+**Status: done.** Merged as `724768e` (PR #115, MYP-239 Done).
 
 **Design, as built (2026-10-11).** `AgentRecord.made_by: str | None` (the run that made the agent, `None` for the
 owner; the `agents` table gains the column through `_ADDED_AGENT_COLUMNS`, NULL for every earlier agent), and
@@ -5793,7 +5793,37 @@ no agents. The record keeps `made_by` (the run that made the agent, `None` for t
 
 ### 100. The review: every feature of parts 1 to 12 read once more on the live pages
 
-**Status: planned.**
+**Status: in progress (2026-10-11).**
+
+**Findings, as built (2026-10-11).** Three readings. (1) The tour: 84 shots (21 pages, two schemes, two widths) read
+by four readers against the README and the as-built sections of items 92 to 99, their findings checked by eye and,
+for the colours, measured on the live UI with Playwright (computed styles, both schemes). (2) The offline smoke suite
+in full (`-m "not live and not internet and not hosted and not desktop"`, the tour apart): 312 passed, 1 skipped, 3
+failed, the three being `test_tool_groups`' expectations of the groups that are off, which item 99's `team` group had
+changed; fixed on item 99's branch before its merge. (3) The owner's daemon through the API, read-only: healthy,
+no run active, 2 agents (Dot and one the owner made), 23 memories, 3 schedules, 2 campaigns, 27 runs of the day,
+1 team message; it runs `269eab5` (Part 11), so items 95 to 99 reach it with the restart that closes this part.
+
+Fixed here. The focused composer wore a 1 px accent border with a 3 px ring, which in the Neutral look (its accent is
+ink) read as the heavy dark frame the owner asked to be gone in item 95; `.composer:focus-within` and
+`.dock-inner:focus-within` now keep `--border-strong` with a 10 % ring. The switch's knob on a switched-on switch was
+`--knob` (near white) on the accent track, which in the dark scheme is near white too (measured: track
+rgb(230,228,222), knob rgb(245,244,240)); the knob now takes `--on-accent`. The Settings › System head said "its safety
+switch" for the control the card calls "Emergency stop". The Agents head promised "a model" the rows do not show. The
+README's list of Settings tabs lacked Skills (item 92). The tour set the shell's sidebar closed for the desktop-shell
+shot and never opened it, so every later desk shot lacked the sidebar and the readers took that for a defect; the
+tour restores it. Checked and not a defect: the emergency stop in the dark scheme (measured rgb(42,11,11) on
+rgb(255,143,136), well above 4.5:1, the reader had taken the text for white); the schedules page's "scheduler is not
+running" line beside a green daemon dot (the tour's server has no scheduler; the owner's daemon reports it running);
+`#/controls` (the design-token gallery, a development page that stays); the Team page's empty copy naming
+`message_agent` (the README names tools to the owner throughout).
+
+Left for the next part, each small: the Models tab's table on a phone scrolls sideways without a cue (the Reasoning
+and Context columns sit off-screen); the run page's composer placeholder is cut under the send button on a phone;
+the Activity page's empty sections say what is empty but not what to do; the Browser tab's status grid wraps to 3 + 1
+cells with a stray divider; the tour shoots Skills, Memory and the run page without content enough to show the
+learned-skill rows, the lesson scores or the jump arrow, and the Dot's computer card on an ended run still offers
+Watch. The desktop shell (Tauri) was not shot: it wraps the same pages, and the tour emulates only its sidebar inset.
 
 **What.** Not code first: the tour of every page in both schemes and both widths is read by eye against the
 README, page by page (home, run, activity, agents, agent, team, campaigns, schedules, settings' eight tabs, the
@@ -6323,3 +6353,4 @@ written as the next part's first items. The findings go in this section as built
 - 2026-10-11 (Fable 5.1): item 96 merged as `3a8a20b` (PR #112, MYP-236 Done): the round arrow above the composer (`.jump`, `.dock-bare` for delegated runs), the cost card in the side panel after Details.
 - 2026-10-11 (Fable 5.1): item 97 merged as `558621b` (PR #113, MYP-237 Done): `[browser] raise_window` off by default, the focus given back after the launch, the Settings › Browser switch, `POST /api/browser/raise`.
 - 2026-10-11 (Fable 5.1): item 98 merged as `65433d0` (PR #114, MYP-238 Done): 999 among the refused statuses, the host memory per run, a browser's navigation headers, quiet reads behind the user's tab, refused pages in a crawl, the next rung in one line.
+- 2026-10-11 (Fable 5.1): item 99 merged as `724768e` (PR #115, MYP-239 Done): `create_agent` in the `team` tool group, `AgentRecord.made_by`, the Team section that offers to make a teammate, the note of the agents that joined, "Made by Dot" on the Agents page.

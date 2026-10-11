@@ -920,7 +920,7 @@ notifications and the token this browser is signed in with), **Models** (one fol
 of each model and a menu to choose one; a provider without a key, or whose key was refused, says so and links to API
 keys), **API keys** (the key of each provider; see
 [Models and providers](#models-and-providers)), **Browser** (which Chrome Dot browses with and what Chrome has to allow
-first; see [Browser use](#browser-use)), **Rules**, **Memory**, **Schedules** and **System** (the daemon, the emergency
+first; see [Browser use](#browser-use)), **Rules**, **Memory**, **Skills**, **Schedules** and **System** (the daemon, the emergency
 stop and the health checks in a fold, closed, with the number of failures on its line). Which folds are open is kept in
 the browser. The tabs sit beside their content when the window has the room and above it otherwise; the earlier
 addresses of the memory, schedules, rules and system pages lead to their tabs.
