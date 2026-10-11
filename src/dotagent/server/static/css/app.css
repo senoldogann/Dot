@@ -979,6 +979,11 @@ a.pill:hover {
   grid-column: 1 / -1;
 }
 
+/* The bill of a run (cost.js): nine short cells, so they go three abreast on a wide page and two on a phone. */
+.cost-grid {
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+}
+
 .kv dt {
   font-size: var(--fs-xs);
   color: var(--muted);

@@ -4,6 +4,7 @@ import { api, follow } from "../api.js";
 import { approvalCard, fromRecord, LEFT_IN_CAMPAIGN, LEFT_IN_RUN } from "../approvals.js";
 import { createAttachments, readyToSend } from "../attachments.js";
 import { createComputer } from "../computer.js";
+import { createCostCard } from "../cost.js";
 import { createDetails } from "../details.js";
 import { clip, dateTime, dateTimeFull, debounce, el, modelName } from "../dom.js";
 import { levelLabel } from "../efforts.js";
@@ -34,6 +35,8 @@ const LESSON_KINDS = new Set(["lessons_proposed", "lesson_saved", "lesson_dismis
 const LESSON_STATES = { saved: { mark: "check", text: "Saved to memory" }, dismissed: { mark: "x", text: "Dismissed" } };
 // A replayed run brings its question events in a burst: one refresh after it is enough.
 const QUESTIONS_SETTLE_MS = 120;
+// How often the cost card is read again while the run works (its numbers come from a query over the run's events).
+const COST_REFRESH_MS = 10_000;
 // What the Actions panel says of a file change, by the state of its undo (see undo.restore.UndoStep).
 const EDIT_STATES = {
   ready: { tone: "b-ok", text: "can be taken back" },
@@ -132,6 +135,7 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
   let finishedAt = run.finished_at;
   let following = active;
   let ticker = null;
+  let costTicker = null;
   let scrollQueued = false;
   let answerNode = null;
   // A run that is over when the page opens lands on its answer; a live one only when the reader follows it.
@@ -227,6 +231,21 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
       output: Math.max(run.output_tokens, seen.output),
       finishedAt,
     });
+  }
+
+  // ------------------------------------------------------------------------------------------------ cost
+  // What the run cost and where (see cost.js): read on arrival, every COST_REFRESH_MS while it works, once at its end.
+  const cost = createCostCard();
+
+  async function paintCost() {
+    try {
+      const costs = await api.get(`/runs/${runId}/stats`);
+      if (!signal.aborted) {
+        cost.paint(costs);
+      }
+    } catch (error) {
+      console.warn("the cost of the run could not be read", error);
+    }
   }
 
   // --------------------------------------------------------------------------------------------- lessons
@@ -495,9 +514,12 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
     send.setAttribute("aria-label", sendText);
     if (active && ticker === null) {
       ticker = setInterval(paintStats, 1000);
+      costTicker = setInterval(paintCost, COST_REFRESH_MS);
     } else if (!active && ticker !== null) {
       clearInterval(ticker);
+      clearInterval(costTicker);
       ticker = null;
+      costTicker = null;
     }
   }
 
@@ -587,6 +609,7 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
       finishedAt = run.finished_at;
       paintStats();
       syncControls();
+      paintCost();
       paintLessons(fresh.lessons);
       paintQuestions(fresh.questions);
     } catch (error) {
@@ -776,6 +799,7 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
       chatHead,
       connectionNote,
       problem,
+      cost.element,
       earlierTurns(history.earlier),
       // A resumed run's goal is the one of the run above it; its timeline opens with how it resumed that run.
       run.source === RESUME_SOURCE ? null : userMessage(run.goal, dateTimeFull(run.created_at)),
@@ -792,6 +816,7 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
   root.replaceChildren(layout, jump);
   inspector.arrange();
   paintStats();
+  paintCost();
   syncControls();
   paintLessons(detail.lessons);
   paintQuestions(detail.questions);
@@ -846,7 +871,9 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
     inspector.dispose();
     if (ticker !== null) {
       clearInterval(ticker);
+      clearInterval(costTicker);
       ticker = null;
+      costTicker = null;
     }
   };
 }
