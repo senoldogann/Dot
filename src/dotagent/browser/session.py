@@ -125,6 +125,33 @@ def browser_gone(error: Exception) -> bool:
     return isinstance(error, PlaywrightError) or driver_lost(error)
 
 
+PopupFate = Literal["closed", "gone"]
+
+
+def popup_fate(error: Exception, closed: bool) -> PopupFate | None:
+    """What became of a popup Dot could not adopt (item 57): it closed itself before Dot finished registering it
+    ("closed": a sign-in callback that redirects and closes, the common case), the browser is gone ("gone"), or neither,
+    so the error is a bug and is raised."""
+    if closed:
+        return "closed"
+    if browser_gone(error):
+        return "gone"
+    return None
+
+
+def closed_popup_note(url: str) -> str:
+    """The note the opener carries when a popup it opened closed itself before the model could see it."""
+    return f"a tab opened and closed itself ({truncate_middle(url, _LAUNCH_ERROR_CHARS)}); there is no tab to switch to"
+
+
+def closed_tab_stop(url: str) -> str:
+    """Why a batch stopped when the tab it worked in closed: the page did that, and the thread's current tab follows."""
+    return f"the tab was closed by the page (it was at {truncate_middle(url, _LAUNCH_ERROR_CHARS)}); the tab now current is shown below"
+
+
+_CLOSED_STEP_DETAIL: str = "the page closed under this step"
+
+
 def connection_broke(error: Exception) -> BrowserError:
     return BrowserError(
         "the connection to the browser broke; it restarts on the next call, so repeat the step",
@@ -164,7 +191,7 @@ class _Capture:
 def describe_surprise(before: _Watch, after: _Watch) -> str | None:
     """Why a batch should stop after a step, or ``None`` when the page behaved as expected."""
     if after.closed:
-        return "the tab was closed by the page"
+        return closed_tab_stop(after.url)
     if after.tabs > before.tabs:
         return "a new tab opened; use browser_switch_tab to work in it"
     if after.tabs < before.tabs:
@@ -502,24 +529,43 @@ class BrowserSession:
         task.add_done_callback(self._adopting.discard)
 
     async def _adopt_popup(self, page: Page) -> None:
-        """A page that a tab of ours opened belongs to the same thread; any other new page is not ours to touch."""
+        """A page that a tab of ours opened belongs to the same thread; any other new page is not ours to touch. A popup
+        that closes itself while this runs (a sign-in callback) is a note on its opener, not an error."""
         try:
             opener: Page | None = await page.opener()
-            if opener is None:
-                return
-            owner: tuple[ThreadTabs, Tab] | None = self._owner_of(opener)
-            if owner is None:
-                return
-            thread, opener_tab = owner
+        except Exception as error:
+            self._popup_lost(error, page, None)
+            return
+        if opener is None:
+            return
+        owner: tuple[ThreadTabs, Tab] | None = self._owner_of(opener)
+        if owner is None:
+            return
+        thread, opener_tab = owner
+        try:
             tab: Tab = await self._register(page)
         except Exception as error:
-            if not browser_gone(error):
-                raise
-            _log.warning("browser_popup_not_adopted", error=truncate_middle(str(error), _LAUNCH_ERROR_CHARS))
+            self._popup_lost(error, page, opener_tab)
+            return
+        if page.is_closed():
+            add_note(opener_tab, closed_popup_note(page.url))
             return
         thread.tabs.append(tab)
         add_note(opener_tab, f"a new tab opened as tab {len(thread.tabs)}")
         await self._enforce_cap(thread)
+
+    def _popup_lost(self, error: Exception, page: Page, opener_tab: Tab | None) -> None:
+        """Account for a popup that could not be adopted; an error that is neither a closed page nor a gone browser is
+        raised as it is."""
+        fate: PopupFate | None = popup_fate(error, page.is_closed())
+        if fate is None:
+            raise error
+        if fate == "closed":
+            _log.info("browser_popup_closed_itself", url=truncate_middle(page.url, _LAUNCH_ERROR_CHARS))
+            if opener_tab is not None:
+                add_note(opener_tab, closed_popup_note(page.url))
+            return
+        _log.warning("browser_popup_not_adopted", error=truncate_middle(str(error), _LAUNCH_ERROR_CHARS))
 
     def _owner_of(self, page: Page) -> tuple[ThreadTabs, Tab] | None:
         for thread in self._threads.values():
@@ -881,6 +927,13 @@ class BrowserSession:
             try:
                 await run_step(tab.page, step, _ms(config.action_timeout_s), secret_field)
             except BrowserError as error:
+                if tab.page.is_closed():
+                    # The page closed under the step (a callback that did its job, a tab the user closed): not a failure.
+                    reports.append(
+                        StepReport(index=index, description=description, outcome="skipped", detail=_CLOSED_STEP_DETAIL)
+                    )
+                    stopped = closed_tab_stop(tab.page.url)
+                    continue
                 reports.append(
                     StepReport(index=index, description=description, outcome="failed", detail=_error_detail(error))
                 )

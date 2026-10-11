@@ -1036,7 +1036,10 @@ Both modes share what follows.
   `type`, `insert`, `select`, `press`, `check`, `uncheck`, `scroll_into_view`, `drag` and `click_at`. After a step Dot
   waits until the page has settled (no DOM change for `settle_quiet_ms`, 60 ms, at most `settle_max_ms`) and reports
   popups, dialogs and downloads that appeared. The result is the part of the page that changed, with the refs of the
-  last snapshot still valid; a page that did not change comes back as one line that says so.
+  last snapshot still valid; a page that did not change comes back as one line that says so. A tab that closes under
+  a batch (a sign-in callback that did its job, a tab the user closed) stops the batch without a failed step: the
+  result says the page closed it and shows the tab that is now current. A popup that opens and closes itself before
+  the model could see it is a note on the page that opened it.
 - `fill` replaces a form field's value, `type` presses a key per character (autocomplete sees them), `insert` puts the
   text in at once at the caret without key events (long text, post composers, code editors) and `drag` moves an
   element onto the element `to_ref` (HTML5 drag and drop or a library driven by the mouse). `insert` goes only into a
@@ -1074,6 +1077,9 @@ screenshots and coordinates. macOS must grant the app that runs Dot three permis
 events** and **Screen Recording**. `dotx desktop check` shows which it has and `dotx desktop setup` asks macOS for the
 missing ones and opens their Settings panes.
 
+- `desktop_apps` lists the running applications and `desktop_open_app` brings one to the front, starting it when it is
+  not running: by name (Terminal), bundle id (com.apple.Terminal) or bundle path (/Applications/Terminal.app). A path
+  to anything else (a binary) is refused at once with those three forms, instead of being retried against Launch Services.
 - `desktop_snapshot` lists an application's window as elements with a role, a name, a value, a state, a position and a ref
   (`a12`). A second view lists only what changed; `query` finds elements anywhere in the application and `scope =
   menu_bar` lists the menu bar. `desktop_read` reads one element's full text.

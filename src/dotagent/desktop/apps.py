@@ -156,8 +156,16 @@ def require_app(query: str, apps: Sequence[AppInfo]) -> AppInfo:
     return app
 
 
-def _open_arguments(query: str) -> list[str]:
-    if query.endswith(".app") and "/" in query:
+def open_arguments(query: str) -> list[str]:
+    """The arguments ``open`` takes for ``query``: a bundle path, a bundle id or an application name. A path to anything
+    but a bundle (a binary such as ``.../bin/node``) is refused here: Launch Services would fail it six times over."""
+    if "/" in query and not query.endswith(".app"):
+        raise DesktopError(
+            f"{query!r} is a file path, not an application; name the application (Terminal), its bundle id "
+            "(com.apple.Terminal) or its bundle (/Applications/Terminal.app)",
+            {"query": query},
+        )
+    if query.endswith(".app"):
         return [query]
     if _BUNDLE_ID_SHAPE.match(query):
         return ["-b", query]
@@ -166,7 +174,7 @@ def _open_arguments(query: str) -> list[str]:
 
 def launch(query: str) -> None:
     """Ask Launch Services to open an application by bundle id, path or name; it comes to the front."""
-    arguments: list[str] = _open_arguments(query)
+    arguments: list[str] = open_arguments(query)
     for attempt in range(1, _LAUNCH_ATTEMPTS + 1):
         outcome: subprocess.CompletedProcess[str] = subprocess.run(
             ["open", *arguments], capture_output=True, text=True, timeout=_COMMAND_TIMEOUT_S, check=False

@@ -3642,8 +3642,8 @@ closed pages) then; 58 (the bill on the run page) last, since it shows 53's numb
 | 53  | The numbers of a long run                                                | done    | 4967717 |
 | 54  | Long browser tasks in the eval set                                       | done    | 7df5799 |
 | 55  | Context that stays: a compaction every forty steps, not seven            | done    | 57a000e |
-| 56  | The web without guessing                                                 | in progress |         |
-| 57  | The browser's closed pages                                               | planned |         |
+| 56  | The web without guessing                                                 | done        | 227e264 |
+| 57  | The browser's closed pages                                               | in progress |         |
 | 58  | The bill of a run, on its page                                           | planned |         |
 
 ### 53. The numbers of a long run
@@ -3859,6 +3859,8 @@ with the front page's matching link, a partner's host and an unrelated page left
 
 ### 57. The browser's closed pages
 
+**Status: done.** Built on `item-57-closed-pages` (MYP-197).
+
 **What.** A page that closes under Dot (a popup that closes itself, an OAuth callback that redirects and closes, a
 tab the user closes) is reported as that, in the tool result, with the tab that is now current; no traceback in the
 daemon's log, no failed act for a page that did its job.
@@ -3874,6 +3876,28 @@ closes itself and a page that navigates away and closes during an act. The two w
 with their causes before the design is final.
 
 **Touchpoints.** `browser/session.py`, `browser/driver.py`, `tools/browser.py`, `tests/smoke/test_browser_*.py`.
+
+**Design, as built (2026-10-11).** The log, read first: the four `_adopt_popup` tracebacks were `keep_focused`
+(attach mode) raising `BrowserError` on a LinkedIn sign-in callback popup that had already closed itself, and
+`_adopt_popup` re-raising because `browser_gone` knows Playwright's errors, not Dot's; the 13 `browser_context_closed`
+follow `browser_started` (5), `browser_idle_thread_released` (3: the last tab of Dot's own Chrome closing closes the
+persistent context) and `daemon_stopping` (2), none a fault; the 10 `launch_retry` were one `desktop_open_app` of a
+path to a `node` binary, which Launch Services fails with -600 (the "still shutting down" code) six times over; the
+`list.remove(x)` traceback is inside Playwright's frame bookkeeping (`_on_frame_detached`), logged by pyee, not Dot's.
+The store holds no act result with a closed-target error, so the "two failed acts" of the audit are not reproduced
+from the data. Built: `popup_fate(error, closed)` decides what became of a popup Dot could not adopt ("closed" when
+the page is closed, whatever the error; "gone" when the browser is; neither is raised), `_adopt_popup` uses it in two
+places (the opener lookup, the registration) and a popup found closed after registering is not appended; the opener
+gets `closed_popup_note` ("a tab opened and closed itself (url); there is no tab to switch to"). In `_run_steps` a
+`BrowserError` on a page that is closed is a "skipped" step ("the page closed under this step"), and both that and
+the surprise detector stop the batch with `closed_tab_stop`: "the tab was closed by the page (it was at url); the tab
+now current is shown below", which `act` already shows (`_current_tab` drops closed tabs). `open_arguments` refuses a
+path that is not a bundle with a message naming the three forms, before any retry. Tests: `tests/unit/test_closed_pages.py`
+(the fate, the notes, the refusal) and two smoke tests in `test_browser.py`: a popup that closes itself at once (one tab
+kept, a later act works on the opener) and a tab closed by its page in the middle of a batch (no failed step, the stop
+line, the Home tab shown). Against `main` the second fails on the stop line only: with a 60 ms grace the close is seen
+by the surprise detector, so the closed-target error inside a step is not forced by the test; the unit test holds the
+cause of the tracebacks (a `BrowserError` on a closed page is "closed").
 
 **Done when.** The two regressions are tests that fail on `main` before and pass after; the owner's daemon log shows
 no `_adopt_popup` traceback after a week on the version.
@@ -4522,3 +4546,5 @@ rows carry minutes and tokens.
   two site tasks in CI). Next: item 55 (context that stays; decision 33).
 - 2026-10-11 (Fable 5.1): item 55 merged 57a000e (PR #59, MYP-195 Done; gate + desktop jobs green). Decision 33 settled by the
   instrument: budget 96 k, `num_ctx_cloud` 262144, summaries capped at 1,500 words. Next: item 56 (the web without guessing).
+- 2026-10-11 (Fable 5.1): item 56 merged 227e264 (PR #60, MYP-196 Done; gate + desktop jobs green). The DuckDuckGo limit
+  stands (25 of 93 web failures throttled in the owner's last 30 days). Next: item 57 (the browser's closed pages).
