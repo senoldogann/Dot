@@ -49,6 +49,7 @@ function agentRow({ record, latest }) {
     { class: "list-row agent-row", href: hrefOf(record), dataset: { agent: record.id } },
     faceOf(record, latest),
     el("div", { class: "row-main" }, el("div", { class: "row-title" }, record.name), secondLine(record, latest)),
+    record.made_by === null ? null : el("span", { class: "agent-made" }, "Made by Dot"),
     latest === null ? null : el("span", { class: "agent-when" }, ago(latest.created_at)),
   );
 }
@@ -344,6 +345,7 @@ function who(record) {
     actorFace(record.id, "idle"),
     el("div", { class: "home-name" }, record.name),
     record.role === "" ? null : el("p", { class: "home-greeting" }, record.role),
+    record.made_by === null ? null : el("p", { class: "home-greeting agent-made" }, "Made by Dot in one of its runs"),
   );
 }
 

@@ -115,7 +115,7 @@ async def _run(store: Store, thread: ThreadRecord, agent_id: str | None, status:
 async def test_the_store_keeps_an_agents_lessons_and_scores_them_by_its_own_runs(tmp_path: Path) -> None:
     store: Store = await Store.open(tmp_path / "dot.sqlite3", tmp_path / "screenshots")
     try:
-        scout: AgentRecord = await store.create_agent("Scout", "Finds sources", "", "", None, None, [])
+        scout: AgentRecord = await store.create_agent("Scout", "Finds sources", "", "", None, None, [], None)
         thread: ThreadRecord = await store.create_thread("t", "test")
         lesson: MemoryRecord = await store.add_memory("Log in first.", ["lesson"], "run_1", scout.id, None)
         dots: MemoryRecord = await store.add_memory("Dot's note.", [], None, None, None)

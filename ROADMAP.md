@@ -5018,8 +5018,8 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 95  | The sidebar, smaller: the nav under New chat, sections that fold, rows cut short   | done        | f3dce6e |
 | 96  | The run page: the arrow above the composer, the cost in the side panel            | done        | 3a8a20b |
 | 97  | Chrome in the background: the live view shows the page, the window stays put       | done        | 558621b |
-| 98  | The web that is refused: 999, 403 and their kind meet the browser, not the end     | in progress |         |
-| 99  | The team that grows: a run makes a lasting teammate and knows of it                | planned     |         |
+| 98  | The web that is refused: 999, 403 and their kind meet the browser, not the end     | done        | 65433d0 |
+| 99  | The team that grows: a run makes a lasting teammate and knows of it                | in progress |         |
 | 100 | The review: every feature of parts 1 to 12 read once more on the live pages        | planned     |         |
 
 ### 77. The type system: Inter and Geist Mono, seven sizes, three weights
@@ -5718,7 +5718,7 @@ on the owner's Mac and recorded here.
 
 ### 98. The web that is refused: 999, 403 and their kind meet the browser, not the end
 
-**Status: in progress (2026-10-11).**
+**Status: done.** Merged as `65433d0` (PR #114, MYP-238 Done).
 
 **Design, as built (2026-10-11).** `web/types.py` `REFUSED_STATUS = {401, 403, 429, 503, 999}`, the one set
 `tools/web.py` (`_UNREADABLE_STATUS`) and `web/crawl.py` read; `session._CHALLENGE_STATUS` gains 999 so a wall that
@@ -5756,7 +5756,31 @@ snippet of the page (`web_search` with the URL), or Take over for a login wall. 
 
 ### 99. The team that grows: a run makes a lasting teammate and knows of it
 
-**Status: planned.**
+**Status: in progress (2026-10-11).**
+
+**Design, as built (2026-10-11).** `AgentRecord.made_by: str | None` (the run that made the agent, `None` for the
+owner; the `agents` table gains the column through `_ADDED_AGENT_COLUMNS`, NULL for every earlier agent), and
+`Store.create_agent(..., made_by)`; the Agents route passes `None`. `tools/team.py` `create_agent`
+(`CreateAgentArgs`: name, role, instructions, `tools` empty for every tool, `model` empty for the configured one, the
+bounds of the Agents page's `AgentRequest`; kind `meta`, risk `low`, the `persistence` flag like `memory_save`, so
+`ask` asks once the run has read untrusted content and `yolo` makes it): the model reference is parsed, the tools
+must exist in the registry, a name already taken (by name or id, case apart) is refused with the agent named, effort
+and approvals stay the configured ones, `made_by` is the run; the result (`render_made`) names the agent, its role
+and tools, says it lasts under Agents and how to message it. `build_team_tools` registers both tools; `create_agent` is the one tool of the `team` group ("making a lasting
+teammate agent for a kind of work that recurs"), off until a grouped run turns it on with `use_tools`, since its
+definition would push the core group past a third of the tool definitions (`test_tool_groups`).
+`prompt._team_section`: nothing without `message_agent`; with no team and `create_agent`, "The owner has no agents
+yet … make one with create_agent … Never make one for a single step"; with a team and `create_agent`, the team list
+and a line that a new teammate may be made for work none of them covers. `loop.py`: `create_agent` joins
+`_NOT_FOR_DELEGATED_RUNS` (an answering run is a delegated run); `message_agent` is removed without a team only when
+`create_agent` is not among the run's tools (the check moved after the agent's own tool bounds); `known_agents` holds
+the team's ids at the start and, each step after the memories check, a run that may message lists the agents and
+appends `_new_teammates_note` (names and roles, "made by you, by the owner or by another run") for the ones it did not
+know, as a stored note like the memory note. `agents.js`: the row gets "Made by Dot" (`.agent-made`) and the agent's
+page "Made by Dot in one of its runs" under the role. README: Agents. Tests: `test_team` (the Team section with and
+without a team and the tool), `test_tool_groups` (the `team` group), `test_agents` smoke (a scripted run makes Pilot, the next
+step's request carries the note and offers `message_agent`, the record keeps `made_by`, the Agents list shows the
+mark).
 
 **What.** A `create_agent` tool (name, role, instructions, tools, optional model) makes an agent as the Agents page
 does, under the owner's approvals (kind `meta`, the `persistence` flag: `ask` asks once, `yolo` makes it), and the
@@ -6298,3 +6322,4 @@ written as the next part's first items. The findings go in this section as built
 - 2026-10-11 (Fable 5.1): item 95 merged as `f3dce6e` (PR #111, MYP-235 Done): the nav under the search, sections that fold (`dot.sideFolds`), Working rows cut to their first words, focus rings in the theme's `--ring`.
 - 2026-10-11 (Fable 5.1): item 96 merged as `3a8a20b` (PR #112, MYP-236 Done): the round arrow above the composer (`.jump`, `.dock-bare` for delegated runs), the cost card in the side panel after Details.
 - 2026-10-11 (Fable 5.1): item 97 merged as `558621b` (PR #113, MYP-237 Done): `[browser] raise_window` off by default, the focus given back after the launch, the Settings › Browser switch, `POST /api/browser/raise`.
+- 2026-10-11 (Fable 5.1): item 98 merged as `65433d0` (PR #114, MYP-238 Done): 999 among the refused statuses, the host memory per run, a browser's navigation headers, quiet reads behind the user's tab, refused pages in a crawl, the next rung in one line.

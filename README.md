@@ -1349,6 +1349,16 @@ ranks its notes by, and the ones its page shows, count its own runs alone. An ag
 ("What it learned": its lessons with how its runs fared after each, with Forget, and its skills with Share and Drop),
 and the Memory page marks a lesson with its agent's name. A note a run saves with `memory_save` is Dot's, for every run.
 
+A run can make a teammate itself (item 99). The `create_agent` tool (a name, a role, instructions, the tools it may
+use, a model if one is wanted) makes an agent as the Agents page does, under your approvals (the `persistence` flag,
+like saving a note: `ask` asks once the run has read untrusted content, `yolo` makes it); the agent lasts after the
+run, its record keeps the run that made it, and the Agents page marks it "Made by Dot". The prompt's Team section
+tells a run with no teammate that it may make one for a kind of work that recurs and deserves a role of its own,
+never for a single step; `message_agent` is offered whenever `create_agent` is, so a teammate made mid-run can be
+messaged at once. Every step, a run that may message the team learns of the agents that joined since it started
+(made by it, by you or by another run) through a note with their names and roles. Delegated runs and the runs that
+answer a message make no agents.
+
 Agents work together through messages. A run (Dot's or an agent's) sends one with the `message_agent` tool, naming
 the agent and the message; the agent answers in a run of its own (its instructions, its tools, its model) that
 cannot see the sender's conversation, and the reply comes back as the tool's result, the way a delegated run's

@@ -7,7 +7,7 @@ from dotagent.agent.prompt import AgentBrief, build_system_prompt, collect_promp
 from dotagent.config import load_default_config
 from dotagent.store.models import AgentRecord, RunRecord
 from dotagent.tools.context import DelegateOutcome
-from dotagent.tools.team import MESSAGE_AGENT_TOOL, find_agent, render_reply
+from dotagent.tools.team import CREATE_AGENT_TOOL, MESSAGE_AGENT_TOOL, find_agent, render_reply
 
 SCOUT: AgentRecord = AgentRecord(
     id="agt_1",
@@ -20,6 +20,7 @@ SCOUT: AgentRecord = AgentRecord(
     tools=(),
     created_at=1.0,
     updated_at=1.0,
+    made_by=None,
 )
 TEAM: tuple[AgentBrief, ...] = (AgentBrief(name="Scout", role="Finds and checks sources", instructions=""),)
 
@@ -49,8 +50,19 @@ def _prompt(tool_names: list[str], team: tuple[AgentBrief, ...]) -> str:
 def test_the_prompt_lists_the_team_only_when_the_run_may_message_it() -> None:
     with_tool: str = _prompt([MESSAGE_AGENT_TOOL, "shell"], TEAM)
     assert "# Team" in with_tool and "  - Scout: Finds and checks sources" in with_tool
+    assert "create_agent" not in with_tool
     assert "# Team" not in _prompt(["shell"], TEAM)
     assert "# Team" not in _prompt([MESSAGE_AGENT_TOOL], ())
+
+
+def test_the_prompt_offers_to_make_a_teammate_when_the_run_may_and_says_so_without_any() -> None:
+    alone: str = _prompt([MESSAGE_AGENT_TOOL, CREATE_AGENT_TOOL], ())
+    assert "# Team" in alone and "no agents yet" in alone and "make one with create_agent" in alone
+    assert "  - Scout" not in alone
+    together: str = _prompt([MESSAGE_AGENT_TOOL, CREATE_AGENT_TOOL], TEAM)
+    assert "  - Scout: Finds and checks sources" in together and "make a new teammate with create_agent" in together
+    # Without the message tool there is no team to speak of, create or not.
+    assert "# Team" not in _prompt([CREATE_AGENT_TOOL], ())
 
 
 def test_an_agent_is_found_by_its_name_whatever_the_case_or_by_its_id() -> None:

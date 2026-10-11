@@ -332,6 +332,7 @@ def _agent(row: aiosqlite.Row) -> AgentRecord:
         tools=_tool_names(parse_json_value(row["tools"], "agent tools")),
         created_at=row["created_at"],
         updated_at=row["updated_at"],
+        made_by=row["made_by"],
     )
 
 
@@ -485,6 +486,8 @@ _ADDED_SCHEDULE_COLUMNS: tuple[tuple[str, str], ...] = (
 
 # Columns of ``campaigns`` added later: NULL means the daemon's browser, which is where an older campaign's sessions ran.
 _ADDED_CAMPAIGN_COLUMNS: tuple[tuple[str, str], ...] = (("browser", "TEXT"),)
+# Columns of ``agents`` added later: NULL means the owner made the agent (item 99).
+_ADDED_AGENT_COLUMNS: tuple[tuple[str, str], ...] = (("made_by", "TEXT"),)
 
 
 async def _add_columns(connection: aiosqlite.Connection, table: str, added: Sequence[tuple[str, str]]) -> None:
@@ -501,6 +504,7 @@ async def _add_missing_columns(connection: aiosqlite.Connection) -> None:
     await _add_columns(connection, "memories", _ADDED_MEMORY_COLUMNS)
     await _add_columns(connection, "schedules", _ADDED_SCHEDULE_COLUMNS)
     await _add_columns(connection, "campaigns", _ADDED_CAMPAIGN_COLUMNS)
+    await _add_columns(connection, "agents", _ADDED_AGENT_COLUMNS)
     await connection.execute("CREATE INDEX IF NOT EXISTS runs_campaign ON runs(campaign_id, created_at)")
 
 
@@ -1804,8 +1808,9 @@ class Store:
         effort: Effort | None,
         approvals: ApprovalMode | None,
         tools: Sequence[str],
+        made_by: str | None,
     ) -> AgentRecord:
-        """Store a new agent (item 86)."""
+        """Store a new agent (item 86); ``made_by`` is the run that made it (item 99), ``None`` for the owner."""
         now: float = time.time()
         record: AgentRecord = AgentRecord(
             id=new_id("agt"),
@@ -1818,10 +1823,11 @@ class Store:
             tools=tuple(tools),
             created_at=now,
             updated_at=now,
+            made_by=made_by,
         )
         await self._db.execute(
-            "INSERT INTO agents(id, name, role, instructions, model, effort, approvals, tools, created_at, updated_at)"
-            " VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            "INSERT INTO agents(id, name, role, instructions, model, effort, approvals, tools, created_at, updated_at,"
+            " made_by) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (
                 record.id,
                 record.name,
@@ -1833,6 +1839,7 @@ class Store:
                 dumps_compact(list(record.tools)),
                 record.created_at,
                 record.updated_at,
+                record.made_by,
             ),
         )
         await self._db.commit()

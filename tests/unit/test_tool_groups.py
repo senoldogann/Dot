@@ -60,6 +60,7 @@ AUTO: AgentConfig = DEFAULTS.model_copy(update={"tool_surface": "auto"})
         ("apple_script", "desktop"),
         ("schedule_list", "schedule"),
         ("terminal_send", "terminal"),
+        ("create_agent", "team"),
         ("memory_update", "memory_admin"),
         ("memory_forget", "memory_admin"),
         ("mcp__github__create_issue", "mcp__github"),
@@ -71,8 +72,13 @@ def test_each_tool_is_in_the_group_of_what_it_reaches(tool: str, group: str) -> 
 
 
 def test_the_core_group_holds_what_most_runs_need_and_is_about_a_third_of_the_tool_definitions() -> None:
-    assert groups_of(TASK_TOOLS) == ("browser", "memory_admin", "schedule", "terminal", "desktop")
-    assert groups_of([spec.name for spec in specs_for_mode(REGISTRY, "research")]) == ("browser", "schedule", "desktop")
+    assert groups_of(TASK_TOOLS) == ("browser", "memory_admin", "schedule", "team", "terminal", "desktop")
+    assert groups_of([spec.name for spec in specs_for_mode(REGISTRY, "research")]) == (
+        "browser",
+        "schedule",
+        "team",
+        "desktop",
+    )
     core: tuple[ToolSpec, ...] = offered_specs(TASK_SPECS, frozenset({CORE_GROUP}))
     assert {spec.name for spec in core} == {
         "read_file",
@@ -113,7 +119,7 @@ def test_the_tools_of_the_groups_that_are_off_are_hidden_with_their_group() -> N
     assert {spec.name for spec in offered} | set(hidden) == set(TASK_TOOLS)
     assert {spec.name for spec in offered} & set(hidden) == set()
     assert {"schedule_create", "schedule_list", "schedule_delete"} <= {spec.name for spec in offered}
-    assert set(hidden.values()) == {"browser", "desktop", "memory_admin", "terminal"}
+    assert set(hidden.values()) == {"browser", "desktop", "memory_admin", "team", "terminal"}
     assert (hidden["apple_script"], hidden["memory_forget"]) == ("desktop", "memory_admin")
 
 
@@ -143,6 +149,7 @@ def test_the_prompt_lists_the_groups_only_when_the_tools_are_grouped() -> None:
         "- memory_admin: correcting or forgetting saved notes (memory_update, memory_forget)",
         "- schedule: goals that run later, once or on a cron expression (schedule_create, schedule_list, "
         "schedule_delete)",
+        "- team: making a lasting teammate agent for a kind of work that recurs (create_agent)",
         "- terminal: programs that ask questions, REPLs and servers that stay up, on a terminal of their own "
         "(terminal_open, terminal_send, terminal_read, terminal_close)",
         "- desktop: the Mac's applications, windows, clipboard and AppleScript (desktop_apps, desktop_open_app, "
