@@ -30,7 +30,6 @@ from dotagent.tools.meta import FINISH_TOOL, USE_TOOLS_TOOL
 from dotagent.tools.registry import build_registry, specs_for_mode
 from dotagent.tools.schedule import build_schedule_tools
 from dotagent.tools.shell import read_login_env
-from dotagent.tools.team import MESSAGE_AGENT_TOOL
 
 pytestmark = pytest.mark.asyncio(loop_scope="module")
 
@@ -190,20 +189,20 @@ async def test_a_call_of_a_tool_whose_group_is_off_turns_the_group_on_and_the_ne
     assert "- schedule: goals that run later, once or on a cron expression (schedule_create, schedule_list, " in (
         played.steps[0].messages[0].content
     )
-    off: list[str] = ["browser", "memory_admin", "schedule", "terminal"]
+    off: list[str] = ["browser", "memory_admin", "schedule", "team", "terminal"]
     assert played.groups == (
         {"step": 0, "on": ["core"], "off": off, "turned_on": [], "reason": '[agent] tool_surface is "grouped"'},
         {
             "step": 1,
             "on": ["core", "schedule"],
-            "off": ["browser", "memory_admin", "terminal"],
+            "off": ["browser", "memory_admin", "team", "terminal"],
             "turned_on": ["schedule"],
             "reason": "",
         },
         {
             "step": 3,
             "on": ["core", "memory_admin", "schedule"],
-            "off": ["browser", "terminal"],
+            "off": ["browser", "team", "terminal"],
             "turned_on": ["memory_admin"],
             "reason": "",
         },
@@ -223,7 +222,7 @@ async def test_the_next_run_of_a_thread_starts_with_the_groups_the_thread_used(l
         {
             "step": 0,
             "on": ["core", "schedule"],
-            "off": ["browser", "memory_admin", "terminal"],
+            "off": ["browser", "memory_admin", "team", "terminal"],
             "turned_on": [],
             "reason": reason,
         },
@@ -240,12 +239,12 @@ async def test_a_run_that_offers_every_tool_has_no_groups_and_answers_use_tools_
     assert played.record.status == "done"
     assert played.groups == ()
     # Every tool of the mode at every step, as before there were groups (skill is left out: no skill is installed; so
-    # are consult, as no helper model is set up, message_agent, as the owner made no agent, and the campaign tools,
-    # which only a session of a campaign has).
+    # are consult, as no helper model is set up, and the campaign tools, which only a session of a campaign has;
+    # message_agent stays although the owner made no agent, since the run may make one with create_agent, item 99).
     every: list[str] = [
         spec.name
         for spec in specs_for_mode(build_registry(_tool_groups(config, False)), "task")
-        if spec.name not in {USE_TOOLS_TOOL, "skill", CONSULT_TOOL, MESSAGE_AGENT_TOOL, *CAMPAIGN_TOOLS}
+        if spec.name not in {USE_TOOLS_TOOL, "skill", CONSULT_TOOL, *CAMPAIGN_TOOLS}
     ]
     assert all(_names(step) == every for step in played.steps)
     assert all("# Tool groups" not in step.messages[0].content for step in played.steps)
