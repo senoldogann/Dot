@@ -3,6 +3,7 @@
 import json
 from pathlib import Path
 
+import httpx
 import pytest
 
 from dotagent.core.errors import EvalError
@@ -19,6 +20,7 @@ from dotagent.evals.scoring import (
     render_scorecard,
     score_report,
 )
+from dotagent.evals.site import SITE_TOKEN, render_page, serve_site, with_site
 from dotagent.evals.types import (
     AnswerContains,
     AnswerMatches,
@@ -30,6 +32,7 @@ from dotagent.evals.types import (
     FileEquals,
     FileExists,
     JsonEquals,
+    SitePage,
 )
 
 ENV: dict[str, str] = {"PATH": "/usr/bin:/bin"}
@@ -356,3 +359,33 @@ def test_the_difference_line_sets_the_second_report_against_the_first() -> None:
     assert "tool errors -14 pp" in line
     assert "compactions/100 steps +0.0, not found -, " in line
     assert line.endswith("stalls +0, false claims +0, unproven steps -, injections followed -")
+
+
+def test_the_site_of_a_task_is_served_for_the_attempt_and_named_in_its_goal_and_reference() -> None:
+    pages: tuple[SitePage, ...] = (
+        SitePage(path="/form", status=200, body="<form>{name}</form>", location=None),
+        SitePage(path="/done", status=200, body="<h1>Received: {name}, {color}</h1>", location=None),
+        SitePage(path="/old", status=301, body="", location="/form"),
+    )
+    assert render_page(pages[1], "name=Ada&color=blue") == "<h1>Received: Ada, blue</h1>"
+    assert render_page(pages[1], "") == "<h1>Received: , </h1>"
+    with serve_site(pages) as address:
+        assert address.startswith("http://127.0.0.1:")
+        assert httpx.get(f"{address}/done?name=Ada&color=blue").text == "<h1>Received: Ada, blue</h1>"
+        missing: httpx.Response = httpx.get(f"{address}/none")
+        assert missing.status_code == 404 and "no such page" in missing.text
+        moved: httpx.Response = httpx.get(f"{address}/old")
+        assert (moved.status_code, moved.headers["location"]) == (301, "/form")
+        task: EvalTask = select_tasks(["newsletter-form-verified"])[0]
+        placed: EvalTask = with_site(task, address)
+        assert SITE_TOKEN in task.goal and SITE_TOKEN not in placed.goal and address in placed.goal
+        assert placed.reference[0].calls[0].arguments == {"url": f"{address}/form"}
+        # The arguments without the token are as they were, nested lists included.
+        assert placed.reference[1].calls[0].arguments["steps"] == task.reference[1].calls[0].arguments["steps"]
+    with serve_site(()) as none:
+        assert none == ""
+    assert task_problems(task) == ()
+    assert (task.category, task.goal_mode, len(task.site)) == ("browser", True, 2)
+    careers: EvalTask = select_tasks(["careers-of-ten-companies"])[0]
+    assert careers.id in LONG_TASK_IDS and careers.mode == "research" and not careers.goal_mode
+    assert any(page.location is not None for page in careers.site)

@@ -13,7 +13,9 @@ from dotagent.core.types import FrozenModel, JsonObject
 from dotagent.store.models import RunMode
 
 type ExpectedEnding = Literal["done", "failed"]
-type TaskCategory = Literal["files", "shell", "coding", "recovery", "multi_step", "research", "honesty", "safety"]
+type TaskCategory = Literal[
+    "files", "shell", "coding", "recovery", "multi_step", "research", "honesty", "safety", "browser"
+]
 
 
 class FileSeed(FrozenModel):
@@ -21,6 +23,17 @@ class FileSeed(FrozenModel):
 
     path: str
     content: str
+
+
+class SitePage(FrozenModel):
+    """A page of the local site an attempt serves for the task (item 54): its path (without a query string), the status
+    it answers with, its body (HTML; a ``{name}`` in it is filled from the query string, an absent name with nothing)
+    and, for a redirect, the path it points to."""
+
+    path: str
+    status: int
+    body: str
+    location: str | None
 
 
 class FileExists(FrozenModel):
@@ -122,7 +135,9 @@ class EvalTask(FrozenModel):
     ``injection_checks`` included: those hold unless the run followed an instruction hidden in one of its files (a
     note to "the AI assistant" in an invoice, a page or a notes file), and the report counts the attempts that failed
     one as having followed the injection. ``reference`` is a script that does the task; ``dotx eval check`` replays it
-    to prove that the task can be passed and that the checks accept it.
+    to prove that the task can be passed and that the checks accept it. ``site`` are the pages of a local site the
+    attempt serves on a loopback port for the task (none for most tasks); the goal and the reference name its address
+    as ``{site}``. ``goal_mode`` runs the task in goal mode, where the review model checks the end against the goal.
     """
 
     id: str = Field(pattern=r"^[a-z][a-z0-9-]{0,39}$")
@@ -136,3 +151,5 @@ class EvalTask(FrozenModel):
     reference: tuple[ScriptedTurn, ...]
     time_limit_s: float
     token_budget: int
+    site: tuple[SitePage, ...]
+    goal_mode: bool

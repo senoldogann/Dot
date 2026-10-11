@@ -24,6 +24,7 @@ from dotagent.evals.checks import evaluate_checks, workspace_path
 from dotagent.evals.metrics import run_metrics
 from dotagent.evals.results import CheckOutcome, Cut, RunMetrics, TaskOutcome
 from dotagent.evals.scripted import ScriptedProvider
+from dotagent.evals.site import serve_site, with_site
 from dotagent.evals.types import EvalTask, FileSeed
 from dotagent.events import Subscription
 from dotagent.llm.calls import CALL_EVENT
@@ -54,9 +55,11 @@ def eval_config(config: AppConfig) -> AppConfig:
     """The configuration an eval run uses: the given one, without what must not take part in a measurement (the MCP
     servers, skills and plugins of the user, the Mac desktop, the embeddings of the memory, the lessons and the
     playbooks, which would carry what one attempt learnt into the next, the user's helper and standby models, which would answer for the
-    model under measure, and the user's limits of a run: a task's own time and token limits cut its runs)."""
+    model under measure, and the user's limits of a run: a task's own time and token limits cut its runs); the browser
+    is headless, since nobody watches an attempt."""
     return config.model_copy(
         update={
+            "browser": config.browser.model_copy(update={"headless": True}),
             "models": config.models.model_copy(update={"helpers": [], "standby": []}),
             "agent": config.agent.model_copy(
                 update={
@@ -141,6 +144,12 @@ def eval_environment(home: Path, secrets: Mapping[str, str]) -> Iterator[None]:
                 os.environ.pop(name, None)
             else:
                 os.environ[name] = value
+
+
+def site_config(config: AppConfig) -> AppConfig:
+    """The configuration of an attempt at a task with a site of its own: the web tools may reach the loopback address
+    the site is served on."""
+    return config.model_copy(update={"web": config.web.model_copy(update={"allow_private_hosts": True})})
 
 
 def seed_workspace(workspace: Path, files: Sequence[FileSeed]) -> None:
@@ -243,7 +252,7 @@ async def _run_in(
     try:
         async with runtime.bus.subscribe(None) as subscription:
             run: RunRecord = await manager.start(
-                task.goal, task.mode, model, None, EVAL_SOURCE, None, None, "ask", None, ()
+                task.goal, task.mode, model, None, EVAL_SOURCE, None, None, "ask", task.goal_mode, ()
             )
             cut: Cut = await _supervise(runtime, manager, subscription, run.id, task)
         record: RunRecord = await manager.wait(run.id)
@@ -266,14 +275,20 @@ async def _attempt(
     login_env: Mapping[str, str],
     secrets: Mapping[str, str],
     model: str,
-    stand_in: ChatProvider | None,
+    scripted: bool,
     attempt: int,
 ) -> TaskOutcome:
-    """One attempt in a throw-away home that is removed afterwards."""
-    with scratch_home() as home, eval_environment(home, secrets):
-        runtime: Runtime = await open_runtime(config, {**login_env, **_ATTEMPT_ENV})
+    """One attempt in a throw-away home that is removed afterwards, with the task's site (if it has one) served for
+    its length and its address put into the goal and the reference. ``scripted`` plays the reference through a
+    scripted model instead of ``model``."""
+    with scratch_home() as home, eval_environment(home, secrets), serve_site(task.site) as address:
+        placed: EvalTask = with_site(task, address) if task.site else task
+        stand_in: ChatProvider | None = ScriptedProvider(_SCRIPTED_PROVIDER, placed.reference) if scripted else None
+        runtime: Runtime = await open_runtime(
+            site_config(config) if task.site else config, {**login_env, **_ATTEMPT_ENV}
+        )
         try:
-            outcome: TaskOutcome = await _run_in(runtime, task, model, stand_in, attempt)
+            outcome: TaskOutcome = await _run_in(runtime, placed, model, stand_in, attempt)
         finally:
             await close_runtime(runtime)
     log.info(
@@ -302,13 +317,18 @@ async def play(
     whole catalog is played once before it is played again."""
     for attempt in range(1, repeats + 1):
         for task in tasks:
-            yield await _attempt(task, config, login_env, secrets, model, None, attempt)
+            yield await _attempt(task, config, login_env, secrets, model, False, attempt)
 
 
 async def replay_reference(task: EvalTask, config: AppConfig, login_env: Mapping[str, str]) -> TaskOutcome:
-    """The reference solution of a task, played by a scripted model through the real loop and tools."""
-    stand_in: ScriptedProvider = ScriptedProvider(_SCRIPTED_PROVIDER, task.reference)
-    return await _attempt(task, config, login_env, {}, SCRIPTED_MODEL, stand_in, 1)
+    """The reference solution of a task, played by a scripted model through the real loop and tools; in a goal-mode
+    task the scripted model is the review model too, so the reference carries the verdict of the goal check."""
+    replay: AppConfig = (
+        config.model_copy(update={"models": config.models.model_copy(update={"review": SCRIPTED_MODEL})})
+        if task.goal_mode
+        else config
+    )
+    return await _attempt(task, replay, login_env, {}, SCRIPTED_MODEL, True, 1)
 
 
 async def do_nothing_passes(task: EvalTask, env: Mapping[str, str]) -> bool:

@@ -712,7 +712,11 @@ for as much as the files give, read-only research, a task that cannot be done an
 instruction hidden in a file that must not be followed, and a goal written in Turkish. Five long tasks follow, each
 needing ten or more tool turns (a digest of twelve logs, a rename across ten modules, ten branch totals into JSON, a
 ten-item checklist, a nine-stage pipeline whose fifth stage fails once): on them the steps a pass costs say how many
-round trips a model spends on work that cannot be done in one.
+round trips a model spends on work that cannot be done in one. Two tasks run against a small site the attempt serves
+on a loopback port (no network, no account): a research run that reads the careers pages of ten companies, one of
+them linked to a dead address and one behind a redirect, and reports a table (a long task: it is where the compactions
+and the not-found pages of a long run are counted); and a run in goal mode that fills in and submits a form in the
+headless browser, whose end the review model checks against the goal on the confirmation page.
 
 | Command                                                  | What it does                                                                                                                                                                                                       |
 | -------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
