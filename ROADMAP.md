@@ -5362,7 +5362,7 @@ window drags by them, which a browser ignores; the capability (`capabilities/def
 and closed. The dependabot alert on `glib` 0.18 (`Cargo.lock`): glib is reached only through gtk and webkit2gtk,
 Tauri's Linux backend, and the shell is built for macOS alone, where the crate is not compiled; Tauri 2.12 pins gtk
 0.18, so `cargo update -p glib` locks nothing; the alert is dismissed as not used, with that reason, and this
-paragraph is its record. `cargo fmt --check` and `cargo clippy --all-targets -- -D warnings` stay clean.
+paragraph is its record. `cargo fmt --check` and `cargo clippy --all-targets -- -D warnings` stay clean. The drag fix (the capability and the sidebar head's space) merged as `06cb620` (PR #100).
 
 **What.** The desktop app (`desktop/`) shows the same pages as the web at the same size, the sidebar and the panel
 behaving the same; whatever the shell does of its own (the window's title, the traffic lights' room, the menu) is
@@ -5876,3 +5876,4 @@ reviewed in the tour; the dependabot alert on `glib` in `desktop/src-tauri/Cargo
 - 2026-10-11 (Fable 5.1): item 86 merged as `bd12b54` (PR #96, MYP-226 Done). Item 87 started on branch `item-87-team` (MYP-227).
 - 2026-10-11 (Fable 5.1): item 87 merged as `23c6b5c` (PR #97, MYP-227 Done). Item 88 started on branch `item-88-desktop` (MYP-228).
 - 2026-10-11 (Fable 5.1): item 88 merged as `c4d9b88` (PR #98, MYP-228 Done). Part 10 is built: items 84 to 88 merged (`82c06b8`, `7f02492`, `bd12b54`, `23c6b5c`, `c4d9b88`). The glib alert dismissed as not used (item 88's record). Item 76's reading (part 8) is still due on or after 2026-10-18.
+- 2026-10-11 (Fable 5.1): the desktop shell rebuilt on the owner's Mac after part 10; its first drag raised an ACL error, fixed as `06cb620` (PR #100, under item 88): the start-dragging capability and the sidebar head owning its space. Verified by dragging both bars of the rebuilt `Dot.app`.
