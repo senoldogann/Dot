@@ -2,13 +2,14 @@
 
 import asyncio
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Protocol
 
 from dotagent.browser.session import BrowserSession
 from dotagent.policy.types import ActionInfo, ApprovalMode, QuestionMode
 from dotagent.store.models import RunMode, RunRecord
+from dotagent.web.refused import RefusedHosts
 
 if TYPE_CHECKING:
     from dotagent.agent.verify import RunFacts
@@ -68,3 +69,5 @@ class ToolContext:
     output_chars: int
     facts: Callable[[], "RunFacts"]
     spawner: Spawner | None = None
+    # The hosts that refused this run's plain requests (item 98); the next fetch of one goes to the browser first.
+    refused_hosts: RefusedHosts = field(default_factory=RefusedHosts)

@@ -108,7 +108,7 @@ _LAUNCH_ARGS: list[str] = [
 _LAUNCH_ERROR_CHARS: int = 900
 # A page that answered with a bot wall gets this long to pass its own check (a challenge page reloads itself) before
 # it is read as it stands: 202 is DuckDuckGo's check, the others are the usual walls.
-_CHALLENGE_STATUS: frozenset[int] = frozenset({202, 403, 429, 503})
+_CHALLENGE_STATUS: frozenset[int] = frozenset({202, 403, 429, 503, 999})
 _CHALLENGE_WAIT_MS: int = 8000
 _DRIVER_LOST: str = "Connection closed while reading from the driver"
 # Chrome exits by itself a few seconds after the driver that started it died.
@@ -868,30 +868,27 @@ class BrowserSession:
 
     @property
     def quiet_reads(self) -> bool:
-        """Whether a page may be read in a tab the user never sees: true in Dot's own Chrome, false in the user's."""
-        return self._config.mode == "own"
+        """Whether a page may be read in a tab the user does not work in: a scratch tab of Dot's own Chrome, or a tab
+        opened behind the user's in the user's Chrome and closed after the read (item 98). True in both modes."""
+        return True
 
     @property
     def human_like(self) -> bool:
         """Whether a page read here passes the bot checks a plain request meets: Dot's own Chrome with a visible window.
         A headless Chrome is told apart (measured 2026-10-11: DuckDuckGo shows it a CAPTCHA and a visible Chrome its
-        results), so it does not count."""
-        return self.quiet_reads and not self._config.headless
+        results), so it does not count; the user's Chrome is not used for searches."""
+        return self._config.mode == "own" and not self._config.headless
 
     async def read_page(self, url: str) -> RenderedDocument:
         """Read ``url`` in a tab of its own, one no thread owns and that closes when the read is over: the address the
         page ended on, the status of its last main response and its HTML after JavaScript ran and the page settled. A
         page that answered with a bot wall gets a few seconds to pass its own check first. For the web tools, when a
-        plain request was turned away; only in Dot's own Chrome (``quiet_reads``)."""
+        plain request was turned away. In the user's Chrome the tab opens behind the user's (item 98)."""
         self._require_allowed(url)
-        if not self.quiet_reads:
-            raise BrowserError(
-                "pages are read quietly only in Dot's own Chrome, not in the user's", {"mode": self._config.mode}
-            )
         config: BrowserConfig = self._config
         context: BrowserContext = await self._ensure_context()
         try:
-            page: Page = await context.new_page()
+            page: Page = await self._scratch_page(context)
         except PlaywrightError as error:
             raise BrowserError(
                 "opening a tab failed", {"error": truncate_middle(str(error), _LAUNCH_ERROR_CHARS)}
@@ -923,6 +920,20 @@ class BrowserSession:
         finally:
             await self._close_scratch(page)
         return RenderedDocument(url=landed, status=statuses[-1] if statuses else first, html=html)
+
+    async def _scratch_page(self, context: BrowserContext) -> Page:
+        """A new tab for a quiet read: in Dot's own Chrome a plain new page; in the user's Chrome a target created in
+        the background through CDP, so the tab the user works in keeps the front (Playwright's ``new_page`` opens in
+        the foreground)."""
+        if self._browser is None:
+            return await context.new_page()
+        cdp: CDPSession = await self._browser.new_browser_cdp_session()
+        try:
+            async with context.expect_page() as opened:
+                await cdp.send("Target.createTarget", {"url": "about:blank", "background": True})
+            return await opened.value
+        finally:
+            await cdp.detach()
 
     async def _close_scratch(self, page: Page) -> None:
         try:

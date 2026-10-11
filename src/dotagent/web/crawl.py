@@ -25,7 +25,7 @@ from dotagent.web.client import WebClient
 from dotagent.web.gate import RequestGate
 from dotagent.web.pdf import pdf_to_text
 from dotagent.web.text import DocumentKind, ReadablePage, decode_body, document_kind, html_to_text
-from dotagent.web.types import FetchedDocument
+from dotagent.web.types import REFUSED_STATUS, FetchedDocument
 
 log = get_logger(__name__)
 
@@ -184,12 +184,16 @@ def _robots_url(url: str) -> str:
 class _Crawl:
     """The state of one crawl: what was seen, the per-host gates, the robots rules per host."""
 
-    def __init__(self, web: WebClient, config: WebConfig, user_agent: str, renderer: Renderer | None) -> None:
+    def __init__(
+        self, web: WebClient, config: WebConfig, user_agent: str, renderer: Renderer | None, quiet: Renderer | None
+    ) -> None:
         self.web: WebClient = web
         self.config: WebConfig = config
         self.crawl: CrawlConfig = config.crawl
         self.user_agent: str = user_agent
         self.renderer: Renderer | None = renderer
+        # A reader of pages in a tab the user does not work in (item 98), for the pages that refuse the plain request.
+        self.quiet: Renderer | None = quiet
         self.gates: dict[str, RequestGate] = {}
         self.robots: dict[str, RobotFileParser | None] = {}
         self.disallowed: list[str] = []
@@ -226,6 +230,31 @@ class _Crawl:
         self.disallowed.append(url)
         return False
 
+    async def _read_refused(self, document: FetchedDocument, depth: int) -> CrawledPage | SkippedPage:
+        """A page that turned the plain request away, read in the browser (item 98): its text, no links (the crawl
+        does not follow a page it could not fetch); when the browser could not show it, left out with both reasons."""
+        try:
+            text: str = await self.quiet(document.url, self.crawl.page_max_chars) if self.quiet else ""
+        except BrowserError as error:
+            return SkippedPage(
+                url=document.url, reason=f"HTTP {document.status}; the browser could not read it: {error.message}"
+            )
+        if not text.strip():
+            return SkippedPage(url=document.url, reason=f"HTTP {document.status}; the browser showed an empty page")
+        return CrawledPage(
+            url=document.url,
+            depth=depth,
+            status=document.status,
+            kind="html",
+            title="",
+            description="",
+            text=text[: self.crawl.page_max_chars],
+            links=(),
+            rendered=True,
+            truncated=len(text) > self.crawl.page_max_chars,
+            problem=f"the plain request got HTTP {document.status}, read in the browser",
+        )
+
     async def _render(self, url: str) -> tuple[str, str]:
         """The visible text a browser shows for ``url``, or the problem that kept it from showing one."""
         if self.renderer is None:
@@ -245,6 +274,8 @@ class _Crawl:
                 )
             except WebError as error:
                 return SkippedPage(url=url, reason=error.message)
+        if document.status in REFUSED_STATUS and self.quiet is not None:
+            return await self._read_refused(document, depth)
         if not 200 <= document.status < 300:
             return SkippedPage(url=url, reason=f"HTTP {document.status}")
         kind: DocumentKind = document_kind(document.media_type, document.body[:512])
@@ -297,12 +328,14 @@ async def crawl(
     max_pages: int,
     max_depth: int,
     renderer: Renderer | None,
+    quiet: Renderer | None,
 ) -> CrawlResult:
     """Crawl from ``start`` within ``scope``, breadth first, at most ``max_pages`` pages and ``max_depth`` links deep
     (the start is depth 0). ``renderer`` shows a page in a browser when the crawl decides one is needed; ``None`` when
-    no browser can be used, which the page's ``problem`` then says."""
+    no browser can be used, which the page's ``problem`` then says. ``quiet`` reads a page that refused the plain
+    request in a tab the user does not work in (item 98); ``None`` leaves such a page out."""
     started: float = time.monotonic()
-    state: _Crawl = _Crawl(web, config, config.user_agent, renderer)
+    state: _Crawl = _Crawl(web, config, config.user_agent, renderer, quiet)
     first: str = normalized(start)
     seen: dict[str, None] = {first: None}
     frontier: list[str] = [first]

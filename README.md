@@ -312,9 +312,14 @@ is shown a CAPTCHA, measured 2026-10-11). An engine that limits this machine is 
 The first line of a result names the engine that answered, every rung skipped with its reason, and the age of a
 remembered answer. Bing is not a rung: without a session its page answers some queries with the results of another query.
 `web_fetch` reads HTML and PDF and refuses localhost, LAN and cloud-metadata addresses unless `[web] allow_private_hosts` is set.
-A page that turns the plain request away (HTTP 401, 403, 429 or 503) or shows little text without JavaScript is read
-in Dot's own Chrome when the run's browser is Dot's own, in a tab of its own that closes after the read; the first line
-of the result says so. A page that refuses the browser too says that, with both answers.
+A page that turns the plain request away (HTTP 401, 403, 429, 503 or 999, LinkedIn's refusal) or shows little text
+without JavaScript is read in the run's Chrome, in a tab the owner does not work in that closes after the read: a
+scratch tab of Dot's own Chrome, or a tab opened behind the owner's in the owner's attached Chrome (item 98); the
+first line of the result says so. A host that refused a plain request once is remembered for the run, and the next
+fetch of that host goes to the browser first. The plain request itself sends the headers a browser's address bar
+sends (`Sec-Fetch-*`, `Upgrade-Insecure-Requests`) with the same user agent. A page that refuses the browser too says
+that, with both answers, and names the next rung in one line: another source, `web_search` with the address as the
+query for the hosted search's snippet, or `browser_open` and Take over for a login wall.
 A page that is not there (HTTP 404 or 410) is reported with the links of the host's front page that share a word with
 the address asked for (a dozen at most), so the next turn opens the right page instead of guessing another address;
 the system prompt says the same (find a page with `web_search` or `web_crawl`, never by trying `/careers/` on a hunch).
@@ -330,6 +335,9 @@ index that lists the pages with their depth, size and how they were read, the ad
 more addresses were found within the scope but not read. A page that shows little text without JavaScript (fewer than
 400 characters and three or more script tags) is rendered once in Dot's own browser tab and read from the screen
 (`render = "auto"`; `"never"` fetches only, `"always"` renders every page); PDFs are read as `web_fetch` reads them.
+A page that turns the plain request away is read the way `web_fetch` reads one, in a tab the owner does not work in,
+and the index says so (`rendered; the plain request got HTTP 403, read in the browser`); its links are not followed.
+A page that refuses the browser too is left out with both answers.
 `robots.txt` is read once per host: with `robots = "report"` the addresses it disallows are named in the index but
 fetched, with `"obey"` they are left out. The crawl goes through the same client as `web_fetch`, so the address rules
 and the browser's host lists hold for every page. When the pages do not fit one result, each becomes a Markdown file
