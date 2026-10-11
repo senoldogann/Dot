@@ -5004,7 +5004,7 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 81  | Dark, first paint and the tour: every page read in both schemes          | done        | 04693d7 |
 | 82  | Delegated runs as rows: face, state, last line, time; the child's bar    | done        | 6454345 |
 | 83  | Faces for the actors: a hue each, alive in the rows and the bar          | done        | d760ea3 |
-| 84  | The side panel: inset bodies, facts as spans, one card grammar           | in progress |         |
+| 84  | The side panel: inset bodies, facts as spans, one card grammar           | done        | 82c06b8 |
 | 85  | Motion: the sidebar slides, the panel slides, folds fade, pages cross-fade | in progress |         |
 | 86  | Agents: profiles with a face, a role, a model and their own chats         | planned     |         |
 | 87  | Agents together: messages between agents, the team's thread, the harness  | planned     |         |
@@ -5220,7 +5220,7 @@ the time. Agents work together through the delegation Dot already has: an agent 
 
 ### 84. The side panel: inset bodies, facts as spans, one card grammar
 
-**Status: in progress.** Built on `item-84-side-panel` (MYP-224).
+**Status: done.** Merged as `82c06b8` (PR #94, squash; MYP-224 Done).
 
 **Design, as built (2026-10-11).** `.inspector .fold > .fold-body` is inset `12px 16px 16px` (the actions list,
 whose rows draw their own padding edge to edge, is exempt by `:has(> .actions-list)`); `.plan-list` drops the
@@ -5797,3 +5797,4 @@ reviewed in the tour; the dependabot alert on `glib` in `desktop/src-tauri/Cargo
 - 2026-10-11 (Fable 5.1): item 81 merged as `04693d7` (PR #90, MYP-221 Done). Item 82 built on branch `item-82-delegated` (MYP-222): the delegated run as a row, the child's breadcrumb and pill; the bar's title now gives way with an ellipsis and a delegated run's bar carries no chips (its pill has them).
 - 2026-10-11 (Fable 5.1): item 82 merged as `6454345` (PR #91, MYP-222 Done). Item 83 built on branch `item-83-faces` (MYP-223): `actors.js`, eight hue tokens, the faces in the rows, the pages and the bar, `ActivityRow.actor_id`.
 - 2026-10-11 (Fable 5.1): item 83 merged as `d760ea3` (PR #92, MYP-223 Done). Part 9 is built: items 77 to 83 merged (`ffa00cb`, `7a7e43f`, `ab5f33a`, `132ce0d`, `04693d7`, `6454345`, `d760ea3`); the screenshot tour read after each. Item 76's reading (part 8) is still due on or after 2026-10-18. The daemon restarted on `d760ea3`.
+- 2026-10-11 (Fable 5.1): Part 10 planned (items 84-88) from the owner's word and arXiv 2609.20804. Item 84 merged as `82c06b8` (PR #94, MYP-224 Done). Item 85 built on branch `item-85-motion` (MYP-225): the sidebar's slide, the drawer's slide, unfolding bodies, pages coming in.
