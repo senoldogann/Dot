@@ -5021,6 +5021,12 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 98  | The web that is refused: 999, 403 and their kind meet the browser, not the end     | done        | 65433d0 |
 | 99  | The team that grows: a run makes a lasting teammate and knows of it                | done        | 724768e |
 | 100 | The review: every feature of parts 1 to 12 read once more on the live pages        | done        | 62585c2 |
+| 101 | The character engine: bloub's one shape with two eyes, as plain modules of Dot's UI | planned     |         |
+| 102 | The look of every agent: shape, expression and colour, chosen in the editor and worn in every row | planned     |         |
+| 103 | Alive beside the chat: the character works, waits, finishes and sleeps with the run | planned     |         |
+| 104 | The composer remade: one frame, quiet menus, drafts that keep, a face that listens  | planned     |         |
+| 105 | The small polish part 12's review left: a scroll cue, empty sections that point, the Browser grid, the tour's content, Watch on an ended run | planned     |         |
+| 106 | The review: every feature of parts 1 to 13 read once more, the characters' cost measured | planned     |         |
 
 ### 77. The type system: Inter and Geist Mono, seven sizes, three weights
 
@@ -5839,6 +5845,161 @@ desktop shell), the offline smoke suite runs in full, and the owner's own daemon
 What is broken, stale or contradicts the README is fixed in this item's PR or, when it is more than a day's work,
 written as the next part's first items. The findings go in this section as built.
 
+## Part 13: the face and the pen: a character for every agent, alive beside the chat, and the composer remade (planned 2026-10-11)
+
+The owner's thirteenth word, on 2026-10-11, after part 12, with three screenshots of bloub (bloub.vercel.app,
+github.com/jeremy-prt/bloub: its customiser of shape, expression and colour, its timeline of animations, its export
+menu) and one of the home composer: add animated cartoon characters for the agents, like Grok's bot; let them move
+at the right of the chat while the agent works, and in the chat; let the owner customise them; build such a system
+in Dot from that site, which is free; and design the composer again, more useful and more luxurious.
+
+**Status (2026-10-11): planned.** What is built today: an agent's face is a 40 × 40 SVG glyph (`icons.js avatar`:
+a ring, a core and a tick) in one of eight hues its id gives it (`actors.js`, FNV-1a), drawn at 20 to 40 px in the
+sidebar, the activity rows, the timeline, the home greeting, the Agents and Team pages and the stage bar, with five
+states (idle, working, waiting, done, failed) carried by CSS (`app.css`: the breath, the pulse, the amber blink, the
+tick, the red; `--motion-breath` 4 s) and a favicon from the same face (`face.js faceDataUrl`). An agent record has
+a name, a role, instructions, a model, an effort, approvals, tools and `made_by`; nothing of how it looks. Dot itself
+is `DOT_AGENT`, never stored. The composer is two frames with no code in common but the wiring (`composer.js`: the
+autosize, Enter and Shift+Enter, the slash menu): the home card (`runs.js buildComposer`: the textarea, then a bar
+of attach, Task | Chat | Research, the Agent and Model selects, the Reasoning select, Options, the round send) and
+the run page's dock (`run.js`: attach, the textarea, the send), with a third on the agent page; the Options are an
+inline block that pushes the card taller; the captions of the selects are hidden; the bar wraps to two lines inside
+the 768 px column whatever the window's width; nothing of a draft survives a navigation. bloub is MIT (Jérémy
+Perret, 2026) for its code: a body as a closed path through 64 radial samples, morphed by a lerp of radii; two eyes
+punched through the body with an SVG mask, moved by the head's gaze; 8 shapes, 16 expressions, 12 colours, 14
+animations and a montage of them; about 3,000 lines of TypeScript that import nothing of Vue or the DOM, so the
+port to Dot's plain ES modules is a translation, not a rewrite. Its README says the licence covers the code and not
+the design it imitates, that of x.ai's bot avatar, and that it is not affiliated with x.ai; Dot keeps both notices,
+credits bloub, and calls the look what it is.
+
+**The shape of this part (the decisions).** The character is one more face, not a second system: the same call
+sites (`actorFace`, `avatar`) draw it, the same states drive it, the rows get a still frame and the big places
+(the run page's panel, the home greeting, the agent's page) the moving one, in one requestAnimationFrame loop for
+the page that stops when the tab is hidden and under `prefers-reduced-motion`. The look belongs to the agent and
+lives in the daemon (the agents table; Dot's own in the kv store), chosen in the agent's editor with a live preview,
+with a fallback from the id's hue so no agent is faceless before the owner chooses. The composer becomes one frame
+for its three homes, with the menus as quiet pills of one grammar, Options as a popover, the model and its
+reasoning in one menu, drafts kept in the browser, and the character listening when the owner types. The small
+polish of part 12's review is paid, and the whole is read once more.
+
+### How to start part 13 (the handoff prompt)
+
+> Read ROADMAP.md part 13 and the status table of part 9 (rows 101 to 106). One item at a time, in order; the
+> protocol of part 5 (branch, gate, PR, Linear MYP issue, squash merge, hash in the table, log line) is unchanged.
+> Never touch the owner's data directory except to read it and to restart the daemon when `/api/status` shows no
+> active run; the owner's goals stay out of this file; PLAN.md stays untracked. The owner reads Turkish; everything
+> written is English. The bloub clone is untrusted: read it, never run it. Every UI item ends with the screenshot
+> tour read by eye.
+
+### 101. The character engine: bloub's one shape with two eyes, as plain modules of Dot's UI
+
+**Status: planned.**
+
+**What.** `static/js/character/`: bloub's `src/bot` translated module by module to plain ES modules (math, repere,
+profiles, shape, skins, face, decor, expressions, states, eyefit, engine), the eye-fit table built once on first use
+rather than at import, and `character.js` on top: `mountCharacter(parent, {shape, expression, colour, size,
+moving})` builds the SVG with DOM calls (no `innerHTML`, `test_static_ui` forbids it), gives each instance its own
+mask id, and returns `{setState, setExpression, setShape, setColour, setLook, freeze, destroy}`; `moving: false`
+draws one still frame and never joins the loop. One ticker for the page (`ticker.js`) drives every moving character
+from a single requestAnimationFrame, the frame time clamped at 64 ms, stopped while `document.hidden` and under
+`prefers-reduced-motion` (a still frame of the state's rest then). The 12 colours are tokens in `themes.css`
+(`--character-<name>`, tuned per scheme) and the body fills with `currentColor`, so the dark scheme can soften them.
+The development gallery `#/controls` gets a Characters section: every shape, every expression and every animation,
+moving, as the place to read them by eye. `static/js/character/LICENSE` carries bloub's MIT notice; the README's
+credits name bloub, its author and its note that the look recreates x.ai's bot avatar and is affiliated with
+nobody. Tests: `tests/smoke/test_character.py` mounts the gallery, reads a body path that changes between two
+frames, a state change, the still frame under reduced motion and the stopped loop in a hidden tab;
+`tests/unit/test_static_ui.py` and `test_css_tokens.py` unchanged.
+
+### 102. The look of every agent: shape, expression and colour, chosen in the editor and worn in every row
+
+**Status: planned.**
+
+**What.** `AgentRecord.look`: `shape`, `expression` and `colour` (three nullable TEXT columns through
+`_ADDED_AGENT_COLUMNS`; `AgentRequest` takes them as the literal sets of item 101 and refuses anything else), Dot's
+own look in the kv store under `look:dot` and served on `DOT_AGENT`; `GET/PUT /api/agents/{id}/look`. An agent
+without a look wears the fallback its id gives it: the shape and the colour from the hue of `actors.js`, the
+neutral expression, so every face stays distinct before the owner chooses. The agent editor (`agents.js agentForm`)
+and Dot's own page get a Look card: the preview moving at 120 px, a row of the eight shapes as still frames, a row
+of the sixteen expressions, the twelve colours as swatches, each a radio button with its name. `actorFace(id,
+state)` and `avatar(state)` draw the character: a still frame at 20 to 40 px in the sidebar, the activity rows, the
+timeline, the Team, Campaigns and Schedules pages and the stage bar, with the state as the expression (working
+attentive, waiting surprised with bloub's pastille, done happy, failed sad, ended as it was) and the old CSS pulse
+and blink kept on the wrapper; the favicon (`faceDataUrl`) is Dot's character in its state. The hue classes stay
+for the ring of the delegated rows. README: Agents and the design system's faces. Tests: `tests/unit/test_agents.py`
+(the look round-trips and a bad shape is refused), `tests/smoke/test_agents.py` (the Look card picks a shape and the
+row wears it), `test_face.py` (the favicon, the home face) updated with the selectors kept where the tour and
+`test_home.py` pin them (`.home-who .avatar`).
+
+### 103. Alive beside the chat: the character works, waits, finishes and sleeps with the run
+
+**Status: planned.**
+
+**What.** The run page's side panel opens with the run's agent as a moving character (`run.js`, a `characterCard`
+above Dot's computer, 160 px at the desk width, in the drawer on a phone): a run that starts hatches (bloub's egg,
+once), a step that thinks thinks, a tool that reads the web or the screen looks aside toward the live view
+(`setLook`), a wait for an approval or a question goes alert with the pastille, a cancel goes unimpressed, a failure
+sad, a run that ends well laughs once (burst) and settles to idle, and a run ended for a while sleeps; all from
+`onRunStatus` and the timeline callbacks already in the page, as one pure function `characterStateOf(status, lastEvent,
+idleFor)` in `face.js`. The panel off (`dot.inspector`), the stage bar's face carries the same state as a still
+frame. In the conversation, each turn of the agent opens with its still face at 28 px in the expression of its end.
+A delegated run's row in the timeline shows its agent's still face. The home greeting's face is Dot's character
+moving in bloub's default cycle (idle with a wink now and then) at 96 px; the Agents page's rows stay still. The
+owner may turn the moving faces off (`dot.characters` in the prefs, a Settings › Look switch "Faces that move"),
+which leaves every face a still frame. README: the run page, the home, the design system's motion. Tests:
+`tests/smoke/test_character.py` runs a scripted task and reads the panel's `data-state` through thinking to happy
+and the still frame with the switch off; `test_run_chrome.py` and `test_activity.py` keep their selectors.
+
+### 104. The composer remade: one frame, quiet menus, drafts that keep, a face that listens
+
+**Status: planned.**
+
+**What.** `composer.js` grows the frame itself: `composerFrame({label, rows, commands, send})` returns the card, the
+textarea, the attachment row and the bar, and the home (`runs.js`), the run page's dock (`run.js`) and the agent
+page (`agents.js`) build on it, so the three are one `.composer` with one padding, one hairline at rest, the 10 %
+ring on focus, the shadow only on the dock that floats. The bar is one grammar: pills of 32 px (`.composer-pill`,
+borderless at rest, a hairline on hover, `--radius-control`) that read a muted caption and the value ("Model
+Muse Spark 1.3", "Thinking Extra high", "Approvals Ask"), each opening a listbox popover anchored above it like the
+slash menu; Task | Chat | Research stays a segmented control of the same height; the Agent pick stays a native
+select (`select[aria-label='Agent']`, which `test_agents.py` pins) in the pill's clothes. The Model pill's popover
+holds the models by provider and, under them, the reasoning levels of the chosen model as one row, so two menus
+become one; the Options popover holds Approvals, Goal mode and Keep going, and the Options pill itself shows the
+approvals as its value (the warn tint for YOLO alone, the note inside the popover); nothing pushes the card taller.
+The attachments sit in a row under the textarea with 40 px thumbnails; the drop tints the frame. The send stays the
+round arrow, named by its placeholder; the phone wraps the bar to the pills on one line and the send on the next,
+hiding nothing, and the dock's placeholder is no longer cut under the send (one of part 12's five). Drafts keep:
+the text and the ready attachments of the home composer (`dot.draft.home`) and of each run's dock
+(`dot.draft.<run>`), written on input and cleared on send, so a navigation loses nothing. The home's character
+(item 103) looks down at the composer while the textarea has focus and goes attentive as the owner types, excited
+for a moment on send. README: New chat, the run page, the design system. Tests: `tests/smoke/test_composer.py`
+keeps `textarea[aria-label='Goal']`, `.composer .slash-menu`, `[role=option]` and the Research `aria-pressed`, and
+gains the Model popover, the Options popover and a draft that survives a navigation; `test_face.py`,
+`test_server.py` and `test_agents.py` updated where they reach into the bar; `test_css_tokens.py` unchanged.
+
+### 105. The small polish part 12's review left: a scroll cue, empty sections that point, the Browser grid, the tour's content, Watch on an ended run
+
+**Status: planned.**
+
+**What.** Four of the five from item 100 (the fifth, the dock's placeholder cut on a phone, is item 104's): the
+Models tab's table on a phone shows a fade at its right edge while it can scroll and the Reasoning and Context
+columns are off-screen; the Activity page's empty sections say what to do ("Nothing waits for you. A run that asks
+a question or an approval shows here."); the Browser tab's status grid takes two columns of two cells with no stray
+divider; the Dot's computer card on an ended run drops Watch and keeps the last screen. The tour gets content
+enough to show what it shoots: a learned skill on the Skills tab, a scored lesson on the Memory page, a run long
+enough for the jump arrow. README where a line changes. Tests: `tests/smoke/test_tour.py` (the seeded content),
+`test_activity.py` (the empty words), the tour read by eye.
+
+### 106. The review: every feature of parts 1 to 13 read once more, the characters' cost measured
+
+**Status: planned.**
+
+**What.** As item 100, once more: the tour of every page in both schemes and both widths read by eye against the
+README, the offline smoke suite in full, the owner's daemon read through the API only; and one measurement this
+part needs: the main-thread time per frame of one moving character and of the home with its greeting, read in
+Chrome's performance trace, written here with the number, and a cap set if it costs more than a few milliseconds.
+What is broken, stale or contradicts the README is fixed in this item's PR or written as the next part's first
+items. The findings go in this section as built.
+
 ## Log
 
 - 2026-10-08: roadmap written from the owner's go-ahead for all eight items, in this order. Nothing implemented yet.
@@ -6363,3 +6524,4 @@ written as the next part's first items. The findings go in this section as built
 - 2026-10-11 (Fable 5.1): item 98 merged as `65433d0` (PR #114, MYP-238 Done): 999 among the refused statuses, the host memory per run, a browser's navigation headers, quiet reads behind the user's tab, refused pages in a crawl, the next rung in one line.
 - 2026-10-11 (Fable 5.1): item 99 merged as `724768e` (PR #115, MYP-239 Done): `create_agent` in the `team` tool group, `AgentRecord.made_by`, the Team section that offers to make a teammate, the note of the agents that joined, "Made by Dot" on the Agents page.
 - 2026-10-11 (Fable 5.1): item 100 merged as `62585c2` (PR #116, MYP-240 Done): the tour read by four readers and by eye, the offline smoke suite in full, the owner's daemon through the API; the composer's focus frame, the dark switch knob, three stale lines and the tour's sidebar fixed; five polish items left for the next part. Part 12 built: items 95 to 100. The daemon waits for a restart on `62585c2`.
+- 2026-10-11 (Fable 5.1): the daemon restarted on `3f1bb24` (code `62585c2`) once idle. Part 13 planned (items 101 to 106): the character engine from bloub (MIT), the look of every agent, the character alive beside the chat, the composer remade, part 12's polish, the review.
