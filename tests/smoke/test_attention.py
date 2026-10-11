@@ -203,9 +203,9 @@ async def test_a_run_tells_only_when_you_are_not_looking_at_it(
             # Looking at the run: its page open, the tab visible, the window active. Nothing is told.
             looked: RunRecord = await _start(manager, "Count to one")
             await page.goto(f"{base}/#/runs/{looked.id}")
-            await expect(page.locator(".chat-head .avatar")).to_have_attribute("data-state", "working")
+            await expect(page.locator(".stage-title .avatar")).to_have_attribute("data-state", "working")
             await _ended(manager, looked)
-            await expect(page.locator(".chat-head .avatar")).to_have_attribute("data-state", "done")
+            await expect(page.locator(".stage-title .avatar")).to_have_attribute("data-state", "done")
             assert await _told(page, 1) == []
 
             # Another page open (the home): told.
@@ -233,7 +233,7 @@ async def test_a_run_tells_only_when_you_are_not_looking_at_it(
             await expect(always).to_have_attribute("aria-checked", "true")
             watched: RunRecord = await _start(manager, "Count to four")
             await page.goto(f"{base}/#/runs/{watched.id}")
-            await expect(page.locator(".chat-head .avatar")).to_have_attribute("data-state", "working")
+            await expect(page.locator(".stage-title .avatar")).to_have_attribute("data-state", "working")
             await _ended(manager, watched)
             notes = await _told(page, 3)
             assert [note["body"] for note in notes] == ["Count to two", "Count to three", "Count to four"]

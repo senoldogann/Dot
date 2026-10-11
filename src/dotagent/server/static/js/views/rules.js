@@ -4,7 +4,7 @@
 import { api } from "../api.js";
 import { clip, el } from "../dom.js";
 import { icon } from "../icons.js";
-import { emptyPanel, errorPanel, field, loadingPanel, pageHead, segmented } from "../panels.js";
+import { emptyPanel, errorPanel, field, loadingPanel, paneHead, segmented } from "../panels.js";
 import { attempt, confirmDialog, toast } from "../ui.js";
 
 const QUOTE_CHARS = 100;
@@ -251,7 +251,7 @@ export function mount(root, ctx) {
 
   const form = buildForm(reload);
   root.append(
-    pageHead("Rules", "Your own answers to “may Dot do this?”, applied before the safety preset.", null),
+    paneHead("Your own answers to “may Dot do this?”, applied before the safety preset.", null),
     el(
       "div",
       { class: "note" },

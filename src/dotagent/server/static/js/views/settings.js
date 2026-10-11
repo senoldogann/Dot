@@ -1,6 +1,7 @@
 // The settings: one page with the tabs down its left side; each tab is drawn by the module that owns it.
 
 import { el } from "../dom.js";
+import { setStageTitle } from "../stage.js";
 import { icon } from "../icons.js";
 import * as keys from "./keys.js";
 import * as memory from "./memory.js";
@@ -46,15 +47,13 @@ export function mount(root, ctx) {
       el(
         "div",
         { class: "settings" },
-        el(
-          "div",
-          { class: "settings-side" },
-          el("h1", { class: "settings-title" }, "Settings"),
-          el("nav", { class: "settings-nav", "aria-label": "Settings" }, TABS.map((candidate) => tabLink(candidate, candidate.id === tab.id))),
-        ),
+        el("div", { class: "settings-side" }, el("nav", { class: "settings-nav", "aria-label": "Settings" }, TABS.map((candidate) => tabLink(candidate, candidate.id === tab.id)))),
         pane,
       ),
     ),
   );
-  return tab.mount(pane, ctx);
+  const dispose = tab.mount(pane, ctx);
+  // The bar names the page; the open tab names the pane.
+  setStageTitle(el("h1", { class: "stage-h1" }, "Settings"));
+  return dispose;
 }

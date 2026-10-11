@@ -1,6 +1,7 @@
 // Small building blocks the pages share: headings, the loading, empty and failed states, status badges, segmented controls
 // and the blocks that fold away.
 
+import { setStageTitle } from "./stage.js";
 import { el } from "./dom.js";
 import { icon } from "./icons.js";
 import { readPref, writePref } from "./prefs.js";
@@ -10,12 +11,17 @@ const FOLD_KEY_PREFIX = "dot.fold.";
 
 /** The heading of a page: a title, an optional one-line subtitle and optional controls on the right. */
 export function pageHead(title, subtitle, actions) {
-  return el(
-    "div",
-    { class: "page-head" },
-    el("div", { class: "grow" }, el("h1", { class: "page-title" }, title), subtitle === "" ? null : el("div", { class: "page-sub" }, subtitle)),
-    actions,
-  );
+  setStageTitle(el("h1", { class: "stage-h1" }, title));
+  return paneHead(subtitle, actions);
+}
+
+/** The line under the bar on a page whose name the bar already shows (a settings pane): the description and the
+ * actions; nothing when both are empty. */
+export function paneHead(subtitle, actions) {
+  if (subtitle === "" && actions === null) {
+    return null;
+  }
+  return el("div", { class: "page-head" }, el("div", { class: "grow page-sub" }, subtitle), actions);
 }
 
 /** A spinner for a place that is still loading, to sit inside a card. */

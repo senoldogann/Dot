@@ -4,7 +4,7 @@
 import { api } from "../api.js";
 import { el } from "../dom.js";
 import { icon } from "../icons.js";
-import { errorPanel, loadingPanel, pageHead } from "../panels.js";
+import { errorPanel, loadingPanel, paneHead } from "../panels.js";
 import { providerLabel, providerOf } from "../providers.js";
 import { forgetModels, getSnapshot, onChange, refresh } from "../state.js";
 import { attempt, confirmDialog, toast } from "../ui.js";
@@ -364,7 +364,7 @@ export function mount(root, ctx) {
   }
 
   root.append(
-    pageHead("API keys", "The keys Dot signs in to the model providers and the typed judge with. The page never shows a whole key.", null),
+    paneHead("The keys Dot signs in to the model providers and the typed judge with. The page never shows a whole key.", null),
     holder,
     el(
       "div",

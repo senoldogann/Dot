@@ -860,10 +860,12 @@ on a finished one. A Details panel shows the status, the model and its reasoning
 the model turns, the tool calls (with the failed ones), the tokens (of every model call of the run: its steps and its
 side calls, such as compactions, reviews and the goal check), the duration and the run id, then the plan, an Actions
 card and the latest screenshots. It stays closed until the panel button in the head of the run opens it (the choice is
-kept in the browser); open, it sits beside the conversation from 960 px and is a drawer below that. The head of the
-run (Dot's face and state, the model and mode chips, the panel button, Cancel) and the panel stay in place under the
-stage bar while the conversation scrolls, and the box stays at the bottom; on a phone the head is one line with the
-face, the name, the state and the buttons.
+kept in the browser); open, it sits beside the conversation from 960 px and is a drawer below that. The run's head
+is the top bar itself: Dot's face, name, state and start on the left, the model and mode chips, the panel button,
+Continue and Cancel on the right before the daemon's pills; the bar is solid with a hairline under it, so nothing
+scrolls under a blur, the panel stays in place under it, and the box stays at the bottom. On a phone the bar keeps the
+face, the name and the buttons; the chips wait in the Details card. Every other page names itself in the same bar
+(Activity, Campaigns, Settings) and opens with one line of description.
 
 The panel's cards (Dot's computer, Details, Plan, Actions, Screen) arrive folded, each with a one-line summary, and
 open at a click; the choice is kept per card. **Dot's computer**, at the top of that panel while a run is going on,

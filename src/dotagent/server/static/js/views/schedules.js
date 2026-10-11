@@ -5,7 +5,7 @@ import { api } from "../api.js";
 import { clip, debounce, el, modelName } from "../dom.js";
 import { allModels, levelLabel } from "../efforts.js";
 import { icon } from "../icons.js";
-import { emptyPanel, errorPanel, field, loadingPanel, pageHead, segmented } from "../panels.js";
+import { emptyPanel, errorPanel, field, loadingPanel, paneHead, segmented } from "../panels.js";
 import { APPROVAL_OPTIONS, approvalLabel } from "../runmodes.js";
 import { getSnapshot, loadModels, onLifecycle } from "../state.js";
 import { attempt, confirmDialog, toast } from "../ui.js";
@@ -499,7 +499,7 @@ export function mount(root, ctx) {
   schedulerNote.hidden = status === null || status.scheduler_running;
   const form = scheduleForm({ view: null, onSaved: reload, onCancel: null });
   root.append(
-    pageHead("Schedules", "Goals that Dot runs by itself, once or on a repeating schedule.", null),
+    paneHead("Goals that Dot runs by itself, once or on a repeating schedule.", null),
     el(
       "div",
       { class: "note" },
