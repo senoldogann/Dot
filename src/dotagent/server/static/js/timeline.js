@@ -632,7 +632,8 @@ export function createTimeline({ rootRunId, startedAt, onGrow, onPlan, onStats, 
 
     memories(scope, record) {
       const count = plural(record.data.ids.length, "memory", "memories");
-      const text = record.data.live === true ? `Picked up ${count} saved while the run worked` : `Recalled ${count}`;
+      const tokens = typeof record.data.tokens === "number" ? `, ${plural(record.data.tokens, "token", "tokens")}` : "";
+      const text = record.data.live === true ? `Picked up ${count} saved while the run worked` : `Recalled ${count}${tokens}`;
       note(scope, record.ts, "database", text, "");
     },
 

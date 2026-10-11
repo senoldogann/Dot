@@ -49,11 +49,11 @@ requires_model = pytest.mark.skipif(not model_is_listed(), reason=f"needs the lo
 @pytest.fixture(scope="module")
 def home(tmp_path_factory: pytest.TempPathFactory) -> Path:
     path: Path = tmp_path_factory.mktemp("home")
-    # The system prompt and the tool specs are about 10k tokens; 14k leaves room for one big output only, so the run
+    # The system prompt and the tool specs are about 18k tokens; 24k leaves room for one big output only, so the run
     # below has to compact whether or not old tool results were trimmed first.
     (path / "config.toml").write_text(
         f'[models]\nmain = "{MAIN_REF}"\nfast = "{MISSING_REF}"\nreview = "{MAIN_REF}"\n\n'
-        '[agent]\ncontext_tokens = 14000\n\n[policy]\napprovals = "yolo"\n',
+        '[agent]\ncontext_tokens = 24000\n\n[policy]\napprovals = "yolo"\n',
         encoding="utf-8",
     )
     return path

@@ -13,6 +13,8 @@ _SECRET_PATTERNS: tuple[re.Pattern[str], ...] = (
 )
 
 _BLOB_THRESHOLD: int = 400
+# A cheap overestimate of how many characters one token holds, for budgets estimated before a provider counts.
+CHARS_PER_TOKEN: float = 3.2
 
 
 def fold_search(text: str) -> str:
@@ -82,3 +84,8 @@ def redact_json(value: JsonValue) -> JsonValue:
     if isinstance(value, dict):
         return {key: redact_json(item) for key, item in value.items()}
     return value
+
+
+def estimate_text_tokens(text: str) -> int:
+    """A cheap overestimate of the tokens of ``text`` (:data:`CHARS_PER_TOKEN`)."""
+    return round(len(text) / CHARS_PER_TOKEN)

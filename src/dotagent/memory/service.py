@@ -18,6 +18,7 @@ from dataclasses import dataclass
 
 from dotagent.config import AppConfig, MemoryConfig
 from dotagent.core.errors import InvalidValueError
+from dotagent.core.text import estimate_text_tokens
 from dotagent.core.types import FrozenModel
 from dotagent.memory.embedder import Embedder, build_embedder
 from dotagent.memory.ranking import Similar, Vector, fused_scores, most_similar, ranked_by_use
@@ -242,25 +243,60 @@ def _closest_first(notes: Sequence[MemoryRecord], similarities: dict[str, float]
     return ranked[:limit]
 
 
-async def prompt_memories(index: MemoryIndex, query: str) -> list[MemoryRecord]:
-    """The notes a run starts with, without repeats: the standing ones (tagged ``core``), the ones the user wrote
-    (all of them up to ``user_limit``, past that the ones closest to ``query``) and the agent's notes related to
-    ``query`` (the goal and the earlier goals of its thread) that do not rest (:func:`resting`).
+class Remembered(FrozenModel):
+    """The notes a run starts with and the tokens they are estimated to take."""
+
+    records: tuple[MemoryRecord, ...]
+    tokens: int
+
+
+# The tokens a note's rendered line adds to its text and tags: who wrote it and when.
+_NOTE_LINE_TOKENS: int = 12
+# How many standing and user notes are read before the budget picks among them.
+_FETCH_NOTES: int = 200
+
+
+def note_tokens(record: MemoryRecord) -> int:
+    """The tokens a note takes in the prompt, estimated: its text, its tags and the line around them."""
+    return estimate_text_tokens(record.content + "".join(f" #{tag}" for tag in record.tags)) + _NOTE_LINE_TOKENS
+
+
+def memory_budget(config: MemoryConfig, context_length: int | None) -> int:
+    """The tokens a run's starting notes may take: ``inject_share`` of the model's window, at most
+    ``inject_tokens``; ``inject_tokens`` alone when the provider does not say the window."""
+    if context_length is None:
+        return config.inject_tokens
+    return min(config.inject_tokens, round(context_length * config.inject_share))
+
+
+def fit_notes(notes: Sequence[MemoryRecord], budget: int, spent: int) -> tuple[list[MemoryRecord], int]:
+    """``notes`` in order, each taken when it still fits ``budget`` after ``spent`` tokens; a note that does not fit
+    is passed over, a shorter one after it may still fit. Returns the taken notes and the tokens spent in all."""
+    taken: list[MemoryRecord] = []
+    for note in notes:
+        cost: int = note_tokens(note)
+        if spent + cost <= budget:
+            taken.append(note)
+            spent += cost
+    return taken, spent
+
+
+async def prompt_memories(index: MemoryIndex, query: str, budget: int) -> Remembered:
+    """The notes a run starts with, without repeats, as many as fit ``budget`` tokens (:func:`fit_notes`), in this
+    order: the standing ones (tagged ``core``, newest first), the ones the user wrote (closest to ``query`` first)
+    and the agent's notes related to ``query`` (the goal and the earlier goals of its thread; by fit and score) that
+    do not rest (:func:`resting`). A note that does not fit is left to ``memory_search``.
 
     A goal is full of everyday words that match unrelated notes, so when embeddings are on only the notes whose
     meaning clearly fits the query are taken; ``memory_search`` still finds the others, and the resting ones."""
     config: MemoryConfig = index.config
-    standing: list[MemoryRecord] = (
-        await index.store.memories_with_tag(CORE_TAG, config.core_limit) if config.core_limit > 0 else []
-    )
+    standing: list[MemoryRecord] = await index.store.memories_with_tag(CORE_TAG, _FETCH_NOTES)
     candidates: list[MemoryHit] = await recall(index, query, config.candidate_pool)
     similarities: dict[str, float] = {hit.record.id: hit.similarity for hit in candidates if hit.similarity is not None}
-    written: list[MemoryRecord] = (
-        await index.store.user_memories(config.user_limit * 4) if config.user_limit > 0 else []
-    )
+    written: list[MemoryRecord] = await index.store.user_memories(_FETCH_NOTES)
     known: set[str] = {record.id for record in standing}
     users: list[MemoryRecord] = _closest_first(
-        [record for record in written if record.id not in known], similarities, config.user_limit
+        [record for record in written if record.id not in known], similarities, _FETCH_NOTES
     )
     known.update(record.id for record in users)
     related: list[MemoryHit] = (
@@ -278,7 +314,12 @@ async def prompt_memories(index: MemoryIndex, query: str) -> list[MemoryRecord]:
         if hit.record.id not in known
         and not resting(hit.record, now, config.rest_days, balances.get(hit.record.id), config.score_min_uses)
     ]
-    return [*standing, *users, *fresh[: config.inject_top_k]]
+    taken: list[MemoryRecord] = []
+    spent: int = 0
+    for group in (standing, users, fresh):
+        part, spent = fit_notes(group, budget, spent)
+        taken.extend(part)
+    return Remembered(records=tuple(taken), tokens=spent)
 
 
 async def update_memory_note(index: MemoryIndex, memory_id: str, content: str, tags: Sequence[str]) -> MemoryRecord:

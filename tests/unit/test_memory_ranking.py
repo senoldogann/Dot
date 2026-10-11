@@ -4,6 +4,7 @@ import math
 
 import pytest
 
+from dotagent.config import MemoryConfig, load_default_config
 from dotagent.core.errors import ProviderProtocolError, StoreError
 from dotagent.memory.embedder import parse_embeddings, parse_openai_embeddings
 from dotagent.memory.ranking import (
@@ -16,7 +17,7 @@ from dotagent.memory.ranking import (
     unit_vector,
     use_lift,
 )
-from dotagent.memory.service import normalize_tags, normalize_text, resting
+from dotagent.memory.service import fit_notes, memory_budget, normalize_tags, normalize_text, note_tokens, resting
 from dotagent.store.models import MemoryRecord, MemoryScore
 
 DAY_S: float = 86400.0
@@ -226,3 +227,24 @@ def test_a_note_rests_once_its_score_is_negative_over_enough_runs() -> None:
     assert not resting(
         _note("yours", None, NOW - DAY_S, 4, NOW, ()), NOW, 90, MemoryScore(handed=3, done=0, failed=3), 3
     )
+
+
+def test_the_budget_is_a_share_of_the_window_capped_and_the_cap_alone_without_a_window() -> None:
+    config: MemoryConfig = load_default_config().memory
+    assert config.inject_tokens == 1500 and config.inject_share == 0.02
+    assert memory_budget(config, None) == 1500
+    assert memory_budget(config, 32_000) == 640
+    assert memory_budget(config, 200_000) == 1500
+
+
+def test_notes_are_taken_in_order_while_they_fit_and_a_shorter_one_after_a_long_one_still_fits() -> None:
+    short: MemoryRecord = _note("short", "run_1", NOW, 0, None, ())
+    long_note: MemoryRecord = _note("long", "run_1", NOW, 0, None, ()).model_copy(update={"content": "x" * 640})
+    second: MemoryRecord = _note("second", "run_1", NOW, 0, None, ("lesson",))
+    assert note_tokens(short) == round(len(short.content) / 3.2) + 12
+    assert note_tokens(second) == round((len(second.content) + len(" #lesson")) / 3.2) + 12
+    budget: int = note_tokens(short) + note_tokens(second) + 5
+    taken, spent = fit_notes([short, long_note, second], budget, 0)
+    assert [note.id for note in taken] == ["short", "second"]
+    assert spent == note_tokens(short) + note_tokens(second)
+    assert fit_notes([short], budget, budget) == ([], budget)
