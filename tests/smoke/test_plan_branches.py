@@ -184,25 +184,36 @@ async def test_the_independent_steps_run_side_by_side_and_their_reports_close_th
     assert all(end - child.created_at >= _WORK_S for child, end in zip(played.children, finished, strict=True))
 
 
-async def test_a_delegation_for_a_step_the_plan_does_not_have_starts_no_run(login_env: dict[str, str]) -> None:
+async def test_a_delegation_for_a_step_the_plan_does_not_have_runs_and_closes_nothing(
+    login_env: dict[str, str],
+) -> None:
     parent: ScriptedProvider = ScriptedProvider(
         "ollama",
         [
-            _turn(_plan(_PLAN[:1]), _call(DELEGATE_TOOL, {"goal": "Fetch the reviews.", "step": 5})),
+            _turn(
+                _plan(_PLAN[:1]),
+                _call(DELEGATE_TOOL, {"goal": "Fetch the reviews.", "model": REVIEWS_HELPER, "step": 5}),
+            ),
             # The open step is closed before the finish, else the loop asks once to close it.
             _turn(
-                _call(MARK_PLAN_STEP_TOOL, {"step": 1, "status": "skipped", "evidence": "the delegation was refused"}),
-                _call(FINISH_TOOL, {"answer": "Nothing was fetched.", "success": False}),
+                _call(MARK_PLAN_STEP_TOOL, {"step": 1, "status": "skipped", "evidence": "the reviews came first"}),
+                _call(FINISH_TOOL, {"answer": "Reviews: 4.2 of 5.", "success": True}),
             ),
         ],
     )
-    async with _session(login_env, {"ollama": parent}) as (runtime, manager):
+    providers: dict[str, ChatProvider] = {"ollama": parent, "openai": _worker("openai", "Reviews: 4.2 of 5.")}
+    async with _session(login_env, providers) as (runtime, manager):
         played: Played = await _play(runtime, manager)
-    assert played.record.status == "failed", played.record
+    assert played.record.status == "done", played.record
+    # The delegation ran all the same; the result says first that the step was not in the plan.
     result: JsonObject = played.results(DELEGATE_TOOL)[0]
-    assert result["ok"] is False
-    assert "the plan has steps 1 to 1; there is no step 5" in str(result["text"])
-    assert played.children == ()
-    # The refused call closed nothing: the step was still open when the run marked it itself.
+    assert result["ok"] is True
+    lines: list[str] = str(result["text"]).split("\n")
+    assert lines[0] == "Step 5 is not in the plan (the plan has 1 steps); the delegated run ran, nothing was marked."
+    assert lines[1].startswith("Delegated run ") and lines[1].endswith(" ended as done after 2 steps.")
+    assert "Plan step" not in str(result["text"])
+    assert len(played.children) == 1 and played.children[0].model == REVIEWS_HELPER
+    # The call closed nothing and the loop asked for no mark: the step was still open when the run marked it itself.
     assert [step["status"] for step in played.data(PLAN_EVENT)[0]["steps"]] == ["pending"]  # type: ignore[index]
     assert [step["status"] for step in played.data(PLAN_EVENT)[-1]["steps"]] == ["skipped"]  # type: ignore[index]
+    assert not any("could not be closed" in str(event.data.get("text", "")) for event in played.events)

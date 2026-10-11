@@ -4247,8 +4247,8 @@ parked: its premises (tool-call deltas in the stream) are still not in the code.
 | #   | Item                                                                     | Status      | Commits |
 | --- | ------------------------------------------------------------------------ | ----------- | ------- |
 | 60  | The live numbers of parts 5 and 6                                        | planned     |         |
-| 61  | Summaries that pass their own check                                      | in progress |         |
-| 62  | A delegate before the plan is a step, not a lost turn                   | planned     |         |
+| 61  | Summaries that pass their own check                                      | done        | a8c602f |
+| 62  | A delegate before the plan is a step, not a lost turn                   | in progress |         |
 | 63  | The soft look: light and dark, every surface                             | planned     |         |
 | 64  | The composer: a slash menu of commands, skills and MCP tools             | planned     |         |
 | 65  | The chrome that stays: the run's head and side panel while it scrolls    | planned     |         |
@@ -4363,7 +4363,7 @@ item.
 
 ### 61. Summaries that pass their own check
 
-**Status: in progress.** Built on `item-61-summary-check` (MYP-203).
+**Status: done.** Built on `item-61-summary-check` (MYP-203), merged a8c602f (PR #70).
 
 **What.** A compaction summary that names an address the history holds is not "unverified" because the model cut the
 address short; a summary that lacks a section is asked for again once, with the missing sections named, before the
@@ -4406,7 +4406,7 @@ README (compaction paragraph).
 
 ### 62. A delegate before the plan is a step, not a lost turn
 
-**Status: planned.**
+**Status: in progress.** Built on `item-62-delegate-step` (MYP-204).
 
 **What.** `delegate` with a `step` the plan does not have runs the delegation and says in its result that the step was
 not in the plan, instead of refusing the call and losing the turn.
@@ -4419,6 +4419,18 @@ not have is a model's slip, not a danger: the delegation itself is harmless to r
 such step the delegation runs with `step=None` and the result's first line says "step N is not in the plan (the plan
 has K steps); the delegated run ran, nothing was marked". The argument description says so. The two live delegate smoke
 tests pass again; a unit test on the first line.
+
+**Design, as built (2026-10-11).** `tools/delegate.py`: `unplanned_step_note(steps, step)` is the first line of the
+result when the plan has no such step ("Step 3 is not in the plan (the plan has 2 steps); the delegated run ran,
+nothing was marked."), `None` when it has; the tool reads the plan before the delegation and renders the note first
+and the usual header second, with no "Plan step … is marked" line. The loop closes plan steps from the call's `step`
+argument, so `closing_step(call_step, result)` reads the result's first line and gives no step for an unplanned one,
+and `_delegated_closings` uses it: no "could not be closed, mark them yourself" note for a step that was never in the
+plan. The live run of the first smoke test showed a second slip of the same kind: `delegate` with `model=""`, which
+`_model_for` refused as "is not a helper model"; a blank name is now the parent's own model. The argument
+descriptions, the tool description, the prompt's Delegation section and README say that an unplanned step runs and
+closes nothing. Unit test `tests/unit/test_delegate.py` on the note, the result's lines and `closing_step`; the two
+live delegate smoke tests pass again (2 passed in 24 s on `gpt-oss:20b-cloud`).
 
 **Touchpoints.** `tools/delegate.py`, `tests/unit/test_delegate.py`, `tests/smoke/test_delegate.py`, README.
 

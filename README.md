@@ -204,7 +204,8 @@ answer (a small model that is offered both writes the call out as text).
   which steps are ready now (open, waiting for nothing open or failed) and which are held by a failed step. Steps that
   are ready together are independent, so the run can hand each to `delegate` in one turn, naming the step; the
   delegated run's report then closes the step (done with the report's start as evidence, or failed) without a mark of
-  the run's own. A run that calls `finish` with steps still open is asked once to close them. A plan can also hold the run's
+  the run's own; a step the plan does not have (a slip, or a delegate before the plan) does not stop the delegation:
+  the run goes, the result's first line says the step was not in the plan, and nothing is marked. A run that calls `finish` with steps still open is asked once to close them. A plan can also hold the run's
   targets (`targets` of `update_plan`, at
   most 600 characters): for a goal that names an outcome, what the run will reach and how its own tools measure it.
   They stay until new targets replace them (an `update_plan` without `targets`, or with an empty text, keeps them), are
