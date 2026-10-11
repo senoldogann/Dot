@@ -6,6 +6,7 @@ import { createAttachments, readyToSend } from "../attachments.js";
 import { createComputer } from "../computer.js";
 import { createCostCard } from "../cost.js";
 import { createDetails } from "../details.js";
+import { wireComposer } from "../composer.js";
 import { clip, dateTime, dateTimeFull, debounce, el, modelName } from "../dom.js";
 import { levelLabel } from "../efforts.js";
 import { continuedIn, earlierTurns, loadHistory, RESUME_SOURCE } from "../history.js";
@@ -361,13 +362,15 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
   const send = el("button", { class: "btn primary send", type: "button" }, icon("arrowUp"), sendLabel);
   const dockInner = el("div", { class: "dock-inner" });
   const attachments = createAttachments({ dropTarget: dockInner, input });
-  dockInner.append(attachments.button, attachments.picker, input, send);
+  // Enter sends and Shift+Enter breaks a line; "/" opens the slash menu, whose one command here asks on the side.
+  const composer = wireComposer(input, {
+    maxPx: MAX_INPUT_PX,
+    send: () => submit(),
+    commands: [{ label: "/btw", hint: "Ask on the side: the run never sees the question.", insert: "/btw " }],
+  });
+  const autosize = composer.autosize;
+  dockInner.append(composer.menu, attachments.button, attachments.picker, input, send);
   const dock = el("div", { class: "dock" }, attachments.list, dockInner);
-
-  function autosize() {
-    input.style.height = "auto";
-    input.style.height = `${Math.min(input.scrollHeight, MAX_INPUT_PX)}px`;
-  }
 
   // Steer messages that are sent but not read yet; each one leaves when the run reports reading it.
   const waitingMessages = [];
@@ -493,13 +496,6 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
   }
 
   send.addEventListener("click", submit);
-  input.addEventListener("input", autosize);
-  input.addEventListener("keydown", (event) => {
-    if (event.key === "Enter" && !event.shiftKey && !event.isComposing) {
-      event.preventDefault();
-      submit();
-    }
-  });
 
   function syncControls() {
     cancelButton.hidden = !active;
@@ -870,6 +866,7 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
     stopLifecycle();
     computer.dispose();
     inspector.dispose();
+    composer.dispose();
     if (ticker !== null) {
       clearInterval(ticker);
       clearInterval(costTicker);

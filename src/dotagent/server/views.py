@@ -337,6 +337,30 @@ class ProviderModels(FrozenModel):
     problem: ProviderProblem | None
 
 
+class PaletteSkill(FrozenModel):
+    name: str
+    description: str
+    source: str
+
+
+class PaletteTool(FrozenModel):
+    name: str
+    description: str
+
+
+class PaletteServer(FrozenModel):
+    name: str
+    tools: tuple[PaletteTool, ...]
+
+
+class PaletteView(FrozenModel):
+    """What the composer's slash menu offers besides its own commands: the skills a run can use and the MCP servers
+    with the tools the model calls."""
+
+    skills: tuple[PaletteSkill, ...]
+    servers: tuple[PaletteServer, ...]
+
+
 class PermissionsView(FrozenModel):
     """What macOS has granted to the program that runs the daemon, and the Settings panes that grant the rest."""
 

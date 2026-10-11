@@ -273,7 +273,8 @@ answer (a small model that is offered both writes the call out as text).
   mark (see [Safety](#safety)).
 - A run belongs to the daemon, not to the page that started it: leave the chat and it goes on, its status stays live in
   the sidebar, and you can steer it when you come back.
-- `/btw <question>` in the box of a run asks on the side: the run's model answers from what the run has done so far,
+- `/btw <question>` in the box of a run (the slash menu offers it) asks on the side: the run's model answers from what
+  the run has done so far,
   without tools, and the run neither sees the question nor stops for it. Several can be asked at once. The question and
   the answer are `aside_question` and `aside_answer` events, never messages of the conversation.
 - Files can go with a goal or a steering message (attach, drop or paste them in the web UI; at most 10 of 20 MB each).
@@ -807,7 +808,11 @@ browser only) and one composer, centred in the window: the goal, then one line w
 or Research), the model and, for a model that offers a choice, its reasoning level (kept in the browser per model).
 **Options** at the end of that line opens the approval mode (Ask, Auto or YOLO; the mode in use always shows on the
 button), the Goal mode switch and Keep going (see
-[Autonomy](#autonomy-approvals-goal-mode-and-the-end-of-a-run)). Enter starts the run, Shift+Enter adds a line. A run
+[Autonomy](#autonomy-approvals-goal-mode-and-the-end-of-a-run)). Enter starts the run, Shift+Enter adds a line. `/` at
+the start of a word opens the slash menu over the box: the commands of the composer (`/task`, `/chat`, `/research`
+here; `/btw` in the box of a run), the skills by name with their description, and each MCP server with its tools, read
+from the daemon as a run reads them (`GET /api/palette`); letters filter, the arrows move, Enter or Tab picks and
+Escape closes. A skill picked reads "use the skill NAME: " in the box, a tool its name, a command does its work. A run
 that waits for your approval shows above the composer.
 
 A run opens as a conversation under Dot's face and name, with the state of the run and when it started. The face is the

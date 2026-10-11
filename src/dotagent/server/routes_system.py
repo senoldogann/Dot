@@ -21,10 +21,12 @@ from dotagent.llm.router import ModelRef, ModelRouter
 from dotagent.llm.traits import effective_effort
 from dotagent.llm.types import KNOWN_PROVIDERS, Effort, ModelInfo
 from dotagent.server.context import ServerContext
+from dotagent.server.palette import palette_view
 from dotagent.server.views import (
     FailsafeView,
     HealthView,
     ModelOption,
+    PaletteView,
     PermissionsView,
     ProviderModels,
     ProviderProblem,
@@ -32,6 +34,8 @@ from dotagent.server.views import (
     PushSubscribeRequest,
     StatusView,
 )
+from dotagent.skills.catalog import load_skills, playbook_root
+from dotagent.skills.types import SkillCatalog
 from dotagent.store.models import ApprovalRecord, PushSubscription
 
 _IMAGE_NAME: re.Pattern[str] = re.compile(r"^[0-9a-f]{24}\.(png|jpg|webp|gif)$")
@@ -137,6 +141,14 @@ def system_router(ctx: ServerContext) -> APIRouter:
                 *(_provider_models(ctx.runtime.router, name, default_effort) for name in KNOWN_PROVIDERS)
             )
         )
+
+    @router.get("/palette")
+    async def palette() -> PaletteView:
+        """The skills and the MCP tools for the composer's slash menu, read from the folders as a run reads them."""
+        catalog: SkillCatalog = await asyncio.to_thread(
+            load_skills, config.skills, ctx.runtime.plugins.plugins, playbook_root(config)
+        )
+        return palette_view(catalog.skills, ctx.runtime.mcp.tools)
 
     @router.get("/doctor")
     async def doctor() -> list[CheckResult]:

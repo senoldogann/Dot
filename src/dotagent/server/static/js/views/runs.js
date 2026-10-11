@@ -4,6 +4,7 @@
 import { approvalCard, fromRecord, LEFT_IN_RUN } from "../approvals.js";
 import { api } from "../api.js";
 import { createAttachments, readyToSend } from "../attachments.js";
+import { wireComposer } from "../composer.js";
 import { el, modelName } from "../dom.js";
 import { allModels, offersChoice, savedLevel } from "../efforts.js";
 import { dotName } from "../face.js";
@@ -57,11 +58,12 @@ function buildComposer(ctx) {
   // A campaign checks its outcome itself, so goal mode does not apply to one; the switch only shows for a task.
   const standing = standingPicker((on) => goalMode.setAvailable(!on));
   // A chat has no goal to check, so the goal switch only belongs to the other two kinds of run; only a task keeps going.
-  const mode = segmented(MODES, "task", (id) => {
+  function modePicked(id) {
     standing.setAvailable(id === "task");
     goalMode.setAvailable(id !== "chat" && !standing.value());
     goal.focus();
-  });
+  }
+  const mode = segmented(MODES, "task", modePicked);
   const defaultOption = el("option", { value: "" });
   const model = el("select", { class: "select sm", "aria-label": "Model" }, defaultOption);
   const reasoning = el("span", { class: "composer-reasoning", hidden: true });
@@ -124,11 +126,6 @@ function buildComposer(ctx) {
     paintModel();
   }
 
-  function growGoal() {
-    goal.style.height = "auto";
-    goal.style.height = `${Math.min(goal.scrollHeight, MAX_GOAL_PX)}px`;
-  }
-
   // True from the moment a run is being started until the answer is in: Enter does not look at the disabled button, so
   // a second press must be refused here, or one goal would start two runs.
   let starting = false;
@@ -171,13 +168,20 @@ function buildComposer(ctx) {
   }
 
   start.addEventListener("click", submit);
-  goal.addEventListener("input", growGoal);
-  // Enter starts the run like it sends a message in a chat; Shift+Enter keeps a new line.
-  goal.addEventListener("keydown", (event) => {
-    if (event.key === "Enter" && !event.shiftKey && !event.isComposing) {
-      event.preventDefault();
-      submit();
-    }
+  // Enter starts the run like it sends a message in a chat; Shift+Enter keeps a new line; "/" opens the slash menu,
+  // whose commands here pick the kind of run.
+  const composer = wireComposer(goal, {
+    maxPx: MAX_GOAL_PX,
+    send: submit,
+    commands: MODES.map((option) => ({
+      label: `/${option.id}`,
+      hint: `${option.label}: ${option.hint}`,
+      insert: "",
+      run: () => {
+        mode.set(option.id);
+        modePicked(option.id);
+      },
+    })),
   });
   model.addEventListener("change", paintModel);
   loadModels().then(
@@ -211,6 +215,7 @@ function buildComposer(ctx) {
   const element = el(
     "section",
     { class: "card composer", "aria-label": "New chat" },
+    composer.menu,
     goal,
     attachments.list,
     attachments.picker,
@@ -223,7 +228,15 @@ function buildComposer(ctx) {
     more,
     standing.note,
   );
-  return { element, focus: () => goal.focus(), dispose: onChange(syncStatus) };
+  const stopStatus = onChange(syncStatus);
+  return {
+    element,
+    focus: () => goal.focus(),
+    dispose: () => {
+      stopStatus();
+      composer.dispose();
+    },
+  };
 }
 
 function buildApprovals() {
