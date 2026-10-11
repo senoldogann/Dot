@@ -14,7 +14,7 @@ from pathlib import Path
 import httpx
 import pytest
 import pytest_asyncio
-from playwright.async_api import Browser, BrowserContext, Page, async_playwright
+from playwright.async_api import Browser, BrowserContext, Page, async_playwright, expect
 
 from dotagent.agent.manager import RunManager
 from dotagent.agent.playbooks import Playbook, playbook_name, read_meta, write_playbook
@@ -360,7 +360,39 @@ async def test_an_agent_is_made_runs_in_its_own_voice_and_bounds_and_leaves_its_
             await page_ui.goto(f"http://{host}:{port}/#/runs/{run_id}")
             await page_ui.wait_for_timeout(_SETTLE_MS)
             assert await page_ui.locator(".stage-title .stage-name").inner_text() == "Scout"
-            assert await page_ui.locator(".stage-title .avatar[data-hue]").count() == 1
+            assert await page_ui.locator(".stage-title .avatar[data-hue][data-shape]").count() == 1
+            # A look given to the agent (item 102) is worn in the bar, in its row and on its page.
+            dressed = await client.put(
+                f"/api/agents/{agent_id}/look", json={"shape": "droplet", "expression": "curious", "colour": "violet"}
+            )
+            assert dressed.status_code == 200, dressed.text
+            assert dressed.json()["look"] == {"shape": "droplet", "expression": "curious", "colour": "violet"}
+            await page_ui.goto(f"http://{host}:{port}/#/agents")
+            await page_ui.wait_for_timeout(_SETTLE_MS)
+            worn = page_ui.locator(f".agent-row[data-agent='{agent_id}'] .avatar")
+            assert await worn.get_attribute("data-colour") == "violet"
+            assert await worn.get_attribute("data-shape") == "droplet"
+            assert await worn.get_attribute("data-hue") is None
+            await page_ui.goto(f"http://{host}:{port}/#/runs/{run_id}")
+            await page_ui.wait_for_timeout(_SETTLE_MS)
+            assert await page_ui.locator(".stage-title .avatar[data-colour='violet']").count() == 1
+            # The editor's Look field: a moving preview and the shapes, expressions and colours as faces.
+            await page_ui.goto(f"http://{host}:{port}/#/agents/{agent_id}")
+            await page_ui.wait_for_timeout(_SETTLE_MS)
+            await page_ui.locator(".stage-tools").get_by_role("button", name="Edit", exact=True).click()
+            await expect(page_ui.locator(".look-picker .look-option")).to_have_count(8 + 16 + 12)
+            await expect(
+                page_ui.locator(".look-preview .character[data-still='false'][data-shape='droplet']")
+            ).to_have_count(1)
+            assert await page_ui.locator(".look-picker input[value='violet']").is_checked()
+            await page_ui.screenshot(path=str(out / "editor.png"), full_page=True)
+            # Dot's own look is a card of Settings › General.
+            await page_ui.goto(f"http://{host}:{port}/#/settings/general")
+            await page_ui.wait_for_timeout(_SETTLE_MS)
+            dot_look = page_ui.locator('section[aria-label="Dot\'s look"]')
+            await dot_look.scroll_into_view_if_needed()
+            await expect(dot_look.locator(".look-preview .character[data-colour='amber']")).to_have_count(1)
+            await dot_look.screenshot(path=str(out / "dot-look.png"))
             await page_ui.screenshot(path=str(out / "run.png"))
             await context.close()
         finally:

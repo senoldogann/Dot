@@ -1,18 +1,16 @@
-// Dot's face as the state: one mark, five states, the same wherever it shows. `idle` is still, `working` breathes,
-// `waiting` wears an amber ring, `done` shows a green tick for a moment, `failed` is red. The favicon and the
-// notification icon carry the same face, drawn as a standalone SVG in the colours of the light look. The name Dot
+// Dot's face as the state: one character (actors.js), five states, the same wherever it shows. `idle` is still,
+// `working` wears the attentive look and pulses, `waiting` wears the notification pastille, `done` smiles for a moment,
+// `failed` is sad. The favicon and the notification icon carry the same face, drawn as a standalone SVG. The name Dot
 // answers to in the greeting and at the head of a run is a preference of this browser.
 
+import { DOT_ID, FACE_OF_STATE, lookOf } from "./actors.js";
+import { stillSvg } from "./character/still.js";
 import { readPref, writePref } from "./prefs.js";
 
 const NAME_KEY = "dot.name";
 const DEFAULT_NAME = "Dot";
 export const NAME_CHARS = 24;
 const STATE_OF_STATUS = { queued: "working", running: "working", blocked: "waiting", failed: "failed" };
-// The standalone face: the yellow of the owner's bubbles, the mark in dark ink, the ring in the colour of the state.
-const FACE_FILL = "#ffcd3c";
-const INK = "#1a1a1a";
-const RING_OF_STATE = { idle: INK, working: INK, waiting: "#8f5600", done: "#0b7a4b", failed: "#c0262d" };
 
 /** The state the face shows for a run being looked at. A run that ended done, or was cancelled, rests. */
 export function faceState(status) {
@@ -33,24 +31,10 @@ export function overallState(snapshot) {
   return active > 0 ? "working" : "idle";
 }
 
-export function setFaceState(face, state) {
-  face.setAttribute("data-state", state);
-}
-
-/** The face as a standalone SVG document, for the favicon and the notification icon. */
+/** The face as a standalone SVG document, for the favicon and the notification icon: Dot's character in the state. */
 export function faceSvg(state) {
-  const ring = RING_OF_STATE[state] ?? INK;
-  const muted = state === "idle" ? ' stroke-opacity="0.35"' : "";
-  const mark =
-    state === "done"
-      ? `<path d="M10.5 16.5l3.5 3.5 7.5-7.5" fill="none" stroke="${ring}" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>`
-      : `<circle cx="16" cy="16" r="${state === "working" ? 5.5 : 4.5}" fill="${state === "failed" ? ring : INK}"/>`;
-  return (
-    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" data-state="${state}">` +
-    `<circle cx="16" cy="16" r="16" fill="${FACE_FILL}"/>` +
-    `<circle cx="16" cy="16" r="9" fill="none" stroke="${ring}"${muted} stroke-width="2"/>` +
-    `${mark}</svg>`
-  );
+  const { animation, expression } = FACE_OF_STATE[state];
+  return stillSvg(lookOf(DOT_ID, null), animation, expression, state);
 }
 
 export function faceDataUrl(state) {

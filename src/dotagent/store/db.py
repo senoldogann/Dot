@@ -30,6 +30,7 @@ from dotagent.policy.types import ApprovalMode, PaceClass
 from dotagent.store.endings import RESULT_RESTARTED
 from dotagent.store.models import (
     WORKING_STATUSES,
+    AgentLook,
     AgentRecord,
     ApprovalRecord,
     ApprovalStatus,
@@ -333,7 +334,15 @@ def _agent(row: aiosqlite.Row) -> AgentRecord:
         created_at=row["created_at"],
         updated_at=row["updated_at"],
         made_by=row["made_by"],
+        look=_look_of(row),
     )
+
+
+def _look_of(row: aiosqlite.Row) -> AgentLook | None:
+    """The look of a stored agent: ``None`` while any of its three parts is unset."""
+    if row["shape"] is None or row["expression"] is None or row["colour"] is None:
+        return None
+    return AgentLook(shape=row["shape"], expression=row["expression"], colour=row["colour"])
 
 
 def _campaign(row: aiosqlite.Row) -> CampaignRecord:
@@ -487,7 +496,15 @@ _ADDED_SCHEDULE_COLUMNS: tuple[tuple[str, str], ...] = (
 # Columns of ``campaigns`` added later: NULL means the daemon's browser, which is where an older campaign's sessions ran.
 _ADDED_CAMPAIGN_COLUMNS: tuple[tuple[str, str], ...] = (("browser", "TEXT"),)
 # Columns of ``agents`` added later: NULL means the owner made the agent (item 99).
-_ADDED_AGENT_COLUMNS: tuple[tuple[str, str], ...] = (("made_by", "TEXT"),)
+_ADDED_AGENT_COLUMNS: tuple[tuple[str, str], ...] = (
+    ("made_by", "TEXT"),
+    # The look (item 102): all three NULL for an agent that wears the fallback of its id's hue.
+    ("shape", "TEXT"),
+    ("expression", "TEXT"),
+    ("colour", "TEXT"),
+)
+# The kv key of Dot's own look (item 102), an ``AgentLook`` as JSON.
+DOT_LOOK_KEY: str = "look:dot"
 
 
 async def _add_columns(connection: aiosqlite.Connection, table: str, added: Sequence[tuple[str, str]]) -> None:
@@ -1809,8 +1826,10 @@ class Store:
         approvals: ApprovalMode | None,
         tools: Sequence[str],
         made_by: str | None,
+        look: AgentLook | None,
     ) -> AgentRecord:
-        """Store a new agent (item 86); ``made_by`` is the run that made it (item 99), ``None`` for the owner."""
+        """Store a new agent (item 86); ``made_by`` is the run that made it (item 99), ``None`` for the owner; ``look``
+        is its character (item 102), ``None`` for the fallback of its id's hue."""
         now: float = time.time()
         record: AgentRecord = AgentRecord(
             id=new_id("agt"),
@@ -1824,10 +1843,11 @@ class Store:
             created_at=now,
             updated_at=now,
             made_by=made_by,
+            look=look,
         )
         await self._db.execute(
             "INSERT INTO agents(id, name, role, instructions, model, effort, approvals, tools, created_at, updated_at,"
-            " made_by) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            " made_by, shape, expression, colour) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (
                 record.id,
                 record.name,
@@ -1840,6 +1860,9 @@ class Store:
                 record.created_at,
                 record.updated_at,
                 record.made_by,
+                None if look is None else look.shape,
+                None if look is None else look.expression,
+                None if look is None else look.colour,
             ),
         )
         await self._db.commit()
@@ -1855,16 +1878,48 @@ class Store:
         effort: Effort | None,
         approvals: ApprovalMode | None,
         tools: Sequence[str],
+        look: AgentLook | None,
     ) -> AgentRecord:
         """Replace what the agent is; its id and its runs stay."""
         await self.get_agent(agent_id)
         await self._db.execute(
             "UPDATE agents SET name = ?, role = ?, instructions = ?, model = ?, effort = ?, approvals = ?, tools = ?,"
-            " updated_at = ? WHERE id = ?",
-            (name, role, instructions, model, effort, approvals, dumps_compact(list(tools)), time.time(), agent_id),
+            " updated_at = ?, shape = ?, expression = ?, colour = ? WHERE id = ?",
+            (
+                name,
+                role,
+                instructions,
+                model,
+                effort,
+                approvals,
+                dumps_compact(list(tools)),
+                time.time(),
+                None if look is None else look.shape,
+                None if look is None else look.expression,
+                None if look is None else look.colour,
+                agent_id,
+            ),
         )
         await self._db.commit()
         return await self.get_agent(agent_id)
+
+    async def set_agent_look(self, agent_id: str, look: AgentLook) -> AgentRecord:
+        """Give the agent a look (item 102) and nothing else."""
+        await self.get_agent(agent_id)
+        await self._db.execute(
+            "UPDATE agents SET shape = ?, expression = ?, colour = ?, updated_at = ? WHERE id = ?",
+            (look.shape, look.expression, look.colour, time.time(), agent_id),
+        )
+        await self._db.commit()
+        return await self.get_agent(agent_id)
+
+    async def dot_look(self) -> AgentLook | None:
+        """Dot's own look (item 102), ``None`` until the owner chooses one."""
+        value: str | None = await self.kv_get(DOT_LOOK_KEY)
+        return None if value is None else AgentLook.model_validate_json(value)
+
+    async def set_dot_look(self, look: AgentLook) -> None:
+        await self.kv_set(DOT_LOOK_KEY, look.model_dump_json())
 
     async def get_agent(self, agent_id: str) -> AgentRecord:
         rows = await self._all("SELECT * FROM agents WHERE id = ?", (agent_id,))

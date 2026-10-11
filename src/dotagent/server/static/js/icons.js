@@ -189,19 +189,6 @@ export function brandMark() {
   );
 }
 
-/** Dot's face: the mark on a round badge of the bubble colour, at the head of a conversation and of the home page. Its
- * `data-state` (face.js) is what the face tells: idle, working, waiting, done or failed; the tick shows in `done`. */
-export function avatar(state) {
-  return svg(
-    "svg",
-    { class: "avatar", viewBox: "0 0 40 40", "aria-hidden": "true", "data-state": state },
-    svg("circle", { class: "face", cx: 20, cy: 20, r: 20 }),
-    svg("circle", { class: "ring", cx: 20, cy: 20, r: 11 }),
-    svg("circle", { class: "core", cx: 20, cy: 20, r: 5 }),
-    svg("path", { class: "tick", d: "M14 20.5l4 4 8-8" }),
-  );
-}
-
 /** An inline SVG icon; its size follows the font size of the surrounding text. */
 export function icon(name) {
   const shapes = SHAPES[name];

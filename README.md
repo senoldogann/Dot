@@ -915,8 +915,8 @@ decision, who decided and the note; and every file the run, or a run it delegate
 taken back, as before the run). A file as the run left it has a button, Restore or Delete, that takes that one change
 back once the run has ended (`POST /api/runs/{id}/undo`); the card itself is `GET /api/runs/{id}/actions`.
 
-**Settings** (`#/settings`) is one page with tabs: **General** (the look of this browser, the two switches below, desktop
-notifications and the token this browser is signed in with), **Models** (one fold per provider, with the reasoning levels
+**Settings** (`#/settings`) is one page with tabs: **General** (the look of this browser, Dot's own look, the two
+switches below, desktop notifications and the token this browser is signed in with), **Models** (one fold per provider, with the reasoning levels
 of each model and a menu to choose one; a provider without a key, or whose key was refused, says so and links to API
 keys), **API keys** (the key of each provider; see
 [Models and providers](#models-and-providers)), **Browser** (which Chrome Dot browses with and what Chrome has to allow
@@ -933,9 +933,7 @@ lists sit (comfortable or compact). Two switches follow the look until you set t
 visual system. Colour: every colour is a token of `themes.css` naming its light and its dark value in one place;
 surfaces step up by lightness (page, sunken sidebar, raised cards) rather than by shadow in dark; borders are the text
 colour at a small alpha so they sit on every surface; the text tiers are measured against every surface by a unit
-test (4.5:1 for text and its second tier, 3:1 for the muted and faint ones); the yellow is Dot's face alone, and every other actor (an agent, a delegated run, a campaign, a schedule) wears the same
-mark in a hue of its own, one of eight chosen by a hash of its id, so it keeps its face in the sidebar, the lists,
-the rows of a chat and the bar of its own page. Type:
+test (4.5:1 for text and its second tier, 3:1 for the muted and faint ones); the yellow is the owner's bubbles. Type:
 Inter for the interface and the answers, Geist Mono for code and identifiers, both served from Dot's own origin
 (`static/fonts`, SIL Open Font License); seven sizes each with its line-height (12/16 badges and chips, 13/18 meta
 and hints, 14/20 the interface, 15/24 prose and the composer, 17/24 section titles, 20/28 page titles, 24/32 the
@@ -947,7 +945,10 @@ string; an empty list is one line that says so and what to do; your messages sit
 buttons, inputs and selects 36 px tall on an 8 px corner with a hairline (32 for the small ones), the same 2 px focus
 ring on each, a select with its own drawn chevron, field labels on the interface line and hints on the small one,
 table rows 40 px with their content on the middle; `#/controls` shows every control on one page for checking a look.
-Characters: the animated faces (`static/js/character/`) are a port of bloub (github.com/jeremy-prt/bloub, MIT, Jérémy
+Faces: every actor is a character (below); an agent wears the look you choose, Dot its own (Settings › General), and
+an actor without one (a delegated run, a campaign, a schedule) the shape and colour its id's hue gives it, one of
+eight, so it keeps its face in the sidebar, the lists, the rows of a chat and the bar of its own page. Characters:
+the animated faces (`static/js/character/`) are a port of bloub (github.com/jeremy-prt/bloub, MIT, Jérémy
 Perret) to plain ES modules, one filled shape with two eyes that are holes in it, in eight shapes, sixteen
 expressions, twelve colours (the theme's `--character-*` tokens) and fourteen animations; bloub recreates the
 behaviour of x.ai's bot avatar as an exercise and is affiliated with nobody, and neither is Dot: the licence covers
@@ -1338,9 +1339,12 @@ defaults: a run cannot schedule itself into another approval mode.
 
 An agent is a profile you make for a kind of work: a name, a role in one line, instructions, and bounds for its runs
 (a model, a reasoning level, approvals, the tools it may use; each left out takes the configured one, no tool picked
-means every tool). It wears the mark in a hue of its own wherever it shows. **Agents** in the sidebar lists Dot first
-and then your agents, each with its newest chat; **New agent** opens the editor; an agent's page greets with its
-face and role, takes a message for it ("Message Scout") and lists its chats, with Edit and Delete in the bar. The
+means every tool) and a look: a shape, a rest expression and a colour of the character (see the design system), picked
+in the editor's Look field with a moving preview, worn as a still face wherever the agent shows, and until you choose
+one the shape and colour its id's hue gives it (`PUT /api/agents/{id}/look` sets the look alone; Dot's own is the
+"Dot's look" card of Settings › General, kept by the daemon for every browser). **Agents** in the sidebar lists Dot
+first and then your agents, each with its newest chat; **New agent** opens the editor; an agent's page greets with
+its face and role, takes a message for it ("Message Scout") and lists its chats, with Edit and Delete in the bar. The
 home composer offers an Agent menu once an agent exists, Dot by default. A run of an agent opens its system prompt
 with the agent's own section ("You are Scout, an agent the owner made: ..." and your instructions), ahead of Dot's
 rules, which still hold; its tools are the ones the agent names plus finishing, asking you and turning tool groups on.

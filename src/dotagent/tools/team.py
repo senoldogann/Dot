@@ -151,7 +151,7 @@ def _create_agent_tool() -> RegisteredTool:
                 {"agent": taken.name, "role": taken.role},
             )
         made: AgentRecord = await ctx.runtime.store.create_agent(
-            name, args.role.strip(), args.instructions.strip(), args.model, None, None, args.tools, ctx.run_id
+            name, args.role.strip(), args.instructions.strip(), args.model, None, None, args.tools, ctx.run_id, None
         )
         return ok(render_made(made))
 

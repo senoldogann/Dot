@@ -30,9 +30,9 @@ from dotagent.tools.meta import ASK_USER_TOOL, FINISH_TOOL
 
 pytestmark = [pytest.mark.browser, pytest.mark.asyncio(loop_scope="module")]
 
-# The animation of the face's core by state (item 73): a slow breath at rest, a pulse at work, and none of either
+# The animation of the face by state (items 73 and 102): a slow breath at rest, a pulse at work, and none of either
 # under reduced motion, where the transforms go and the fades stay.
-_CORE_ANIMATION: str = "getComputedStyle(document.querySelector('.home-who .avatar .core')).animationName"
+_CORE_ANIMATION: str = "getComputedStyle(document.querySelector('.home-who .avatar')).animationName"
 _DRAWER_TRANSITION: str = "getComputedStyle(document.querySelector('.sidebar')).transitionDuration"
 
 _PROVIDER: str = "ollama"
@@ -257,12 +257,12 @@ async def test_the_face_breathes_at_rest_pulses_at_work_and_holds_still_under_re
             await page.goto(f"{base}/#/runs")
             face = page.locator(".home-who .avatar")
             await expect(face).to_have_attribute("data-state", "idle")
-            assert await page.evaluate(_CORE_ANIMATION) == "breathe"
+            assert await page.evaluate(_CORE_ANIMATION) == "breathe-face"
             run: RunRecord = await manager.start(
                 "Rest a while", "task", SCRIPTED_MODEL, None, "test", None, None, "yolo", False, ()
             )
             await expect(face).to_have_attribute("data-state", "working")
-            assert await page.evaluate(_CORE_ANIMATION) == "pulse-core"
+            assert await page.evaluate(_CORE_ANIMATION) == "pulse-face"
             # Reduced motion: the core holds still in both states, while the fades stay (the slash menu fades in).
             await page.emulate_media(reduced_motion="reduce")
             assert await page.evaluate(_CORE_ANIMATION) == "none"
@@ -282,7 +282,7 @@ async def test_the_face_breathes_at_rest_pulses_at_work_and_holds_still_under_re
             await page.wait_for_function("document.querySelector('.shell')?.dataset.nav === 'drawer'")
             assert set((await page.evaluate(_DRAWER_TRANSITION)).split(", ")) == {"0s"}
             await page.emulate_media(reduced_motion="no-preference")
-            assert await page.evaluate(_CORE_ANIMATION) == "breathe"
+            assert await page.evaluate(_CORE_ANIMATION) == "breathe-face"
             assert "0.2s" in (await page.evaluate(_DRAWER_TRANSITION)).split(", ")
             await page.close()
         finally:

@@ -143,7 +143,7 @@ function scheduleRow(view, handlers) {
     "div",
     { class: "list-row", dataset: { schedule: record.id } },
     toggle,
-    actorFace(record.id, "idle"),
+    actorFace(record.id, "idle", null),
     el(
       "div",
       { class: "row-main" },

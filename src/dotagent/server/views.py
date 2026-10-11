@@ -13,6 +13,7 @@ from dotagent.llm.types import Effort
 from dotagent.policy.types import ApprovalMode
 from dotagent.secrets import SecretSource
 from dotagent.store.models import (
+    AgentLook,
     AgentRecord,
     ApprovalRecord,
     ApprovalStatus,
@@ -215,7 +216,8 @@ class KeyRequest(FrozenModel):
 
 class AgentRequest(FrozenModel):
     """Make or change an agent (item 86). ``model`` empty and ``effort``/``approvals`` ``None`` take the configured
-    ones; ``tools`` empty lets the agent use every tool."""
+    ones; ``tools`` empty lets the agent use every tool; ``look`` ``None`` leaves the face its id's hue gives it (item
+    102)."""
 
     name: str = Field(min_length=1, max_length=60)
     role: str = Field(max_length=120)
@@ -224,6 +226,7 @@ class AgentRequest(FrozenModel):
     effort: Effort | None
     approvals: ApprovalMode | None
     tools: list[str]
+    look: AgentLook | None = None
 
 
 class AgentSummary(FrozenModel):

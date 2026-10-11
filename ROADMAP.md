@@ -5021,8 +5021,8 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 98  | The web that is refused: 999, 403 and their kind meet the browser, not the end     | done        | 65433d0 |
 | 99  | The team that grows: a run makes a lasting teammate and knows of it                | done        | 724768e |
 | 100 | The review: every feature of parts 1 to 12 read once more on the live pages        | done        | 62585c2 |
-| 101 | The character engine: bloub's one shape with two eyes, as plain modules of Dot's UI | in progress |         |
-| 102 | The look of every agent: shape, expression and colour, chosen in the editor and worn in every row | planned     |         |
+| 101 | The character engine: bloub's one shape with two eyes, as plain modules of Dot's UI | done        | 8c3a590 |
+| 102 | The look of every agent: shape, expression and colour, chosen in the editor and worn in every row | in progress |         |
 | 103 | Alive beside the chat: the character works, waits, finishes and sleeps with the run | planned     |         |
 | 104 | The composer remade: one frame, quiet menus, drafts that keep, a face that listens  | planned     |         |
 | 105 | The small polish part 12's review left: a scroll cue, empty sections that point, the Browser grid, the tour's content, Watch on an ended run | planned     |         |
@@ -5893,7 +5893,7 @@ polish of part 12's review is paid, and the whole is read once more.
 
 ### 101. The character engine: bloub's one shape with two eyes, as plain modules of Dot's UI
 
-**Status: in progress.**
+**Status: done.** Merged as `8c3a590` (PR #119, MYP-241 Done).
 
 **Design, as built (2026-10-11).** `static/js/character/`: bloub's `src/bot` module by module (`math`, `repere`,
 `profiles`, `shape`, `skins`, `face`, `expressions`, `decor`, `states`, `eyefit`, `engine`), the types dropped, the
@@ -5939,7 +5939,34 @@ frames, a state change, the still frame under reduced motion and the stopped loo
 
 ### 102. The look of every agent: shape, expression and colour, chosen in the editor and worn in every row
 
-**Status: planned.**
+**Status: in progress.**
+
+**Design, as built (2026-10-11).** `AgentLook` (`store/models.py`: `shape`, `expression`, `colour`, each a literal of
+the character's catalogue) on `AgentRecord.look`, `None` for the fallback; three nullable columns (`shape`,
+`expression`, `colour`) through `_ADDED_AGENT_COLUMNS`, read back as one look when all three are set;
+`Store.create_agent` and `update_agent` take the look, `set_agent_look` the look alone, and Dot's own lives in the kv
+store under `look:dot` (`dot_look`, `set_dot_look`). `AgentRequest.look` (`None` when absent, so an older client and
+`create_agent` of item 99 keep working); `PUT /api/agents/{id}/look` with an `AgentLook` body, Dot included; `GET
+/api/agents` and `/api/agents/dot` serve `DOT_AGENT` wearing the kv look (`dot_record`). `actors.js`: the registry of
+looks (`rememberLook`, `loadLooks` from `GET /api/agents`, called by `main.js` once the daemon answers; the Agents
+page and the editor keep it current), `fallbackLook(id)` (Dot: the circle in amber, the colour of its old badge;
+any other actor: the shape and the colour of its hue, among the character's twelve), `FACE_OF_STATE` (idle: the
+look's own expression; working: attentive; waiting: the notify animation with its pastille; done: happy; failed:
+sad), `actorFace(id, state, look)` (a still character of 40 px, `tight`, with the class `avatar`, `data-state` on it
+and `data-hue` when it wears the fallback; the handle kept in a WeakMap), `dotFace(state)`, `setActorState(face,
+state)`. `icons.js avatar` and `face.js setFaceState` are gone; the favicon and the notification icon are Dot's
+character as a standalone SVG (`character/still.js stillSvg`, bloub's hex on white paper, `data-state` kept on the
+root). `character.js` carries `data-animation`, `data-shape`, `data-expression`, `data-colour`, takes `tight`, and
+watches the reduced-motion query only while it moves. `lookpicker.js`: the preview moving at 120 px, then the
+shapes, the expressions and the colours as radio buttons each with a still face (`.look-option`, the picked one
+with the strong border); in the agent editor as the Look field (a new agent starts from the fallback of an unnamed
+id) and in Settings › General as the "Dot's look" card with Save. CSS: the face's state on the wrapper
+(`breathe-face` at rest, `pulse-face` at work, the blink of `.ended`), the old `.face`/`.ring`/`.core`/`.tick` and
+hue rules gone; reduced motion stills the wrapper. README: Agents, Settings › General, the design system's faces.
+Tests: `tests/unit/test_agents.py` (the look round-trips in the store, the look alone, Dot's in the kv store, a
+look outside the catalogue is refused), `tests/smoke/test_agents.py` (a look put on Scout is worn in its row and in
+the bar, no hue then), `test_face.py` (the wrapper's animation names), `test_character.py` (the Faces card's five
+characters counted); the Agents page, an agent's page, the editor and Settings › General read by eye.
 
 **What.** `AgentRecord.look`: `shape`, `expression` and `colour` (three nullable TEXT columns through
 `_ADDED_AGENT_COLUMNS`; `AgentRequest` takes them as the literal sets of item 101 and refuses anything else), Dot's
@@ -6551,3 +6578,4 @@ items. The findings go in this section as built.
 - 2026-10-11 (Fable 5.1): item 99 merged as `724768e` (PR #115, MYP-239 Done): `create_agent` in the `team` tool group, `AgentRecord.made_by`, the Team section that offers to make a teammate, the note of the agents that joined, "Made by Dot" on the Agents page.
 - 2026-10-11 (Fable 5.1): item 100 merged as `62585c2` (PR #116, MYP-240 Done): the tour read by four readers and by eye, the offline smoke suite in full, the owner's daemon through the API; the composer's focus frame, the dark switch knob, three stale lines and the tour's sidebar fixed; five polish items left for the next part. Part 12 built: items 95 to 100. The daemon waits for a restart on `62585c2`.
 - 2026-10-11 (Fable 5.1): the daemon restarted on `3f1bb24` (code `62585c2`) once idle. Part 13 planned (items 101 to 106): the character engine from bloub (MIT), the look of every agent, the character alive beside the chat, the composer remade, part 12's polish, the review.
+- 2026-10-11 (Fable 5.1): item 101 merged as `8c3a590` (PR #119, MYP-241 Done): bloub ported to `static/js/character/` (MIT notice kept), `mountCharacter`, one ticker per page, the `--character-*` tokens, the Characters card of `#/controls`.

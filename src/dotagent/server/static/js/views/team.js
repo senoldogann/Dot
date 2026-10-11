@@ -2,10 +2,10 @@
 // agent that sent it to the agent that answered, with the reply under it once the answering run ended, the time, and
 // the runs behind it (the sender's and the answer's). Dot is a member like any agent, with its own face.
 
-import { actorFace } from "../actors.js";
+import { actorFace, dotFace } from "../actors.js";
 import { api } from "../api.js";
 import { ago, clip, el } from "../dom.js";
-import { avatar, icon } from "../icons.js";
+import { icon } from "../icons.js";
 import { emptyPanel, errorPanel, loadingPanel, pageHead, statusBadge } from "../panels.js";
 import { onLifecycle } from "../state.js";
 import { attempt } from "../ui.js";
@@ -17,7 +17,7 @@ const WORKING = new Set(["queued", "running", "blocked"]);
 
 function faceOf(id, working) {
   const state = working ? "working" : "idle";
-  return id === DOT_ID ? avatar(state) : actorFace(id, state);
+  return id === DOT_ID ? dotFace(state) : actorFace(id, state, null);
 }
 
 function memberLink(id, name) {

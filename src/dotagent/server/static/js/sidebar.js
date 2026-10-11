@@ -121,7 +121,7 @@ function activityRow(row, onNavigate, children, child) {
     },
     row.actor_id === null
       ? el("span", { class: `status-dot s-${row.section === "waiting" ? "blocked" : "running"}` })
-      : actorFace(row.actor_id, row.section === "waiting" ? "waiting" : "working"),
+      : actorFace(row.actor_id, row.section === "waiting" ? "waiting" : "working", null),
     el(
       "span",
       { class: "side-run-goal" },
