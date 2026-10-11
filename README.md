@@ -925,7 +925,9 @@ lighter than its body, and a folded step of the timeline is one line whose durat
 flat: a surface with a hairline and a 12 px radius, no shadow (shadows stay on what floats: menus, dialogs, the
 composer in focus); section labels are sentence case; the facts of a row are spans a gap apart rather than one dotted
 string; an empty list is one line that says so and what to do; your messages sit on the raised surface, the yellow
-being Dot's face alone.
+being Dot's face alone. The controls are one grammar: buttons, inputs and selects 36 px tall on an 8 px corner with a
+hairline (32 for the small ones), the same 2 px focus ring on each, a select with its own drawn chevron, field labels
+on the interface line and hints on the small one, table rows 40 px with their content on the middle.
 
 While you are elsewhere, the tab title counts the approvals that wait: `(2) New chat · Dot`. Settings › General ›
 Notifications adds
