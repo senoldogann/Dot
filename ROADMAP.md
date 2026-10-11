@@ -4159,11 +4159,11 @@ Ollama (`OLLAMA_API_KEY`) has no check and is the first rung whenever the key is
 
 | #   | Item                                                                     | Status      | Commits |
 | --- | ------------------------------------------------------------------------ | ----------- | ------- |
-| 59  | The web that does not fail                                               | in progress |         |
+| 59  | The web that does not fail                                               | done        | 725e301 |
 
 ### 59. The web that does not fail
 
-**Status: in progress.** Built on `item-59-web-that-does-not-fail` (MYP-199).
+**Status: done.** Built on `item-59-web-that-does-not-fail` (MYP-199), merged 725e301 (PR #64).
 
 **What.** A search fails only when every engine does, and a page is read when any way of reading it works. `web_search`
 climbs a ladder of engines and says which rung answered; `web_fetch` reads a page that turned the plain request away in
@@ -4676,3 +4676,6 @@ hosted search the first rung and is the owner's call.
   Chrome. Measured and rejected: Bing (another query's results for three of six queries); measured and gated: a headless
   Chrome meets DuckDuckGo's CAPTCHA, a visible one gets results. `[web] search_attempts` removed. Gate: format, check,
   mypy clean; unit 723; `dotx eval check` ok; smoke web_fetch, web, doctor, crawl 29 passed.
+- 2026-10-11 (Fable 5.1): item 59 merged 725e301 (PR #64, MYP-199 Done; gate + desktop jobs green). Daemon restarted on
+  725e301 with no active run. The live number is the owner's next research run: `dotx stats --run ID` web failures,
+  throttled, against 25 of 93 in the thirty days before; the engine named in each search result says which rung carried it.
