@@ -54,6 +54,7 @@ from dotagent.tools.base import (
     ok,
     ok_with_images,
 )
+from dotagent.tools.batch import batch_cut_note, first_steps
 from dotagent.tools.context import ToolContext
 
 _NONCE_BYTES: int = 8
@@ -286,7 +287,8 @@ class ActArgs(ToolArgs):
         description=(
             "Steps run in order: every step you can predict without a new look at the window (a call with one step "
             "costs a model round trip for one click). The batch stops at the first failure or when the screen "
-            "surprises you (a dialog, a different application); the remaining steps are then skipped. Example: "
+            "surprises you (a dialog, a different application); the remaining steps are then skipped. A batch holds "
+            "a few dozen steps (25 by default); more are cut to the first ones, and the result says so. Example: "
             '[{"action": "set_value", "ref": "a3", "text": "notes.md"}, {"action": "press", "ref": "a7"}].'
         ),
     )
@@ -311,26 +313,19 @@ def _batch_kind(steps: list[Step], contexts: tuple[StepContext, ...]) -> ActionK
 
 def _act_tool() -> RegisteredTool:
     async def classify(args: ActArgs, ctx: ToolContext) -> ActionInfo:
-        limit: int = ctx.runtime.config.desktop.max_batch_steps
-        if len(args.steps) > limit:
-            raise ToolInputError(
-                f"A batch holds at most {limit} steps; send the first {limit} and look at the result before the rest.",
-                {"steps": len(args.steps), "limit": limit},
-            )
-        contexts: tuple[StepContext, ...] = await ctx.runtime.desktop.preview(ctx.thread_id, args.app, args.steps)
+        steps: list[Step] = first_steps(args.steps, ctx.runtime.config.desktop.max_batch_steps)
+        contexts: tuple[StepContext, ...] = await ctx.runtime.desktop.preview(ctx.thread_id, args.app, steps)
         assessment: StepAssessment = combine_assessments(
             [
                 assess_step(step, context, ctx.workspace, ctx.runtime.protected)
-                for step, context in zip(args.steps, contexts, strict=True)
+                for step, context in zip(steps, contexts, strict=True)
             ]
         )
         app: str = contexts[0].app if contexts else (args.app or "")
         summary: str = f"{app}: " + "; ".join(
-            _step_label(step, context) for step, context in zip(args.steps, contexts, strict=True)
+            _step_label(step, context) for step, context in zip(steps, contexts, strict=True)
         )
-        return _action(
-            DESKTOP_ACT_TOOL, _batch_kind(args.steps, contexts), assessment.risk, summary, app, assessment.flags
-        )
+        return _action(DESKTOP_ACT_TOOL, _batch_kind(steps, contexts), assessment.risk, summary, app, assessment.flags)
 
     async def run(args: ActArgs, ctx: ToolContext, authorized: ActionInfo) -> ToolResult:
         async def review(step_review: StepReview) -> None:
@@ -353,9 +348,14 @@ def _act_tool() -> RegisteredTool:
             )
 
         secure_field: SecureFieldCheck = enter_secure_field if ctx.approvals == "yolo" else refuse_secure_field
-        outcome: ActOutcome = await ctx.runtime.desktop.act(ctx.thread_id, args.app, args.steps, review, secure_field)
+        limit: int = ctx.runtime.config.desktop.max_batch_steps
+        outcome: ActOutcome = await ctx.runtime.desktop.act(
+            ctx.thread_id, args.app, first_steps(args.steps, limit), review, secure_field
+        )
         source: str = outcome.view.app.name if outcome.view is not None else (args.app or "application")
-        return _screen_result(render_act_outcome(outcome, source, _nonce()))
+        note: str = batch_cut_note(len(args.steps), limit)
+        rendered: str = render_act_outcome(outcome, source, _nonce())
+        return _screen_result(f"{note}\n{rendered}" if note else rendered)
 
     return make_reviewed_tool(
         name=DESKTOP_ACT_TOOL,

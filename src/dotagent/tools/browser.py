@@ -65,6 +65,7 @@ from dotagent.tools.base import (
     ok,
     ok_with_images,
 )
+from dotagent.tools.batch import batch_cut_note, first_steps
 from dotagent.tools.context import ToolContext
 
 _NONCE_BYTES: int = 8
@@ -266,7 +267,8 @@ class ActArgs(ToolArgs):
         min_length=1,
         description=(
             "Steps run in order against the latest snapshot: every step you can predict without a new look at the "
-            "page (a call with one step costs a model round trip for one click). The batch stops at the first failure "
+            "page (a call with one step costs a model round trip for one click); a batch holds a few steps (5 by "
+            "default), and more are cut to the first ones with the result saying so. The batch stops at the first failure "
             "or when the page surprises you (new tab, dialog, download, navigation); the remaining steps are then "
             "skipped. Example: "
             '[{"action": "fill", "ref": "e5", "text": "Ada"}, {"action": "select", "ref": "e7", "text": "blue"}, '
@@ -352,20 +354,13 @@ async def _page_check(expected: str, outcome: ActOutcome, ctx: ToolContext) -> P
 
 def _act_tool() -> RegisteredTool:
     async def classify(args: ActArgs, ctx: ToolContext) -> ActionInfo:
-        limit: int = ctx.runtime.config.browser.max_batch_steps
-        if len(args.steps) > limit:
-            raise ToolInputError(
-                f"A batch holds at most {limit} steps; send the first {limit} and look at the result before the rest.",
-                {"steps": len(args.steps), "limit": limit},
-            )
-        elements: list[Element | None] = [_element_at(step.ref, ctx) for step in args.steps]
-        targets: list[Element | None] = [_element_at(step.to_ref, ctx) for step in args.steps]
-        judged: list[tuple[Step, Element | None, Element | None]] = list(
-            zip(args.steps, elements, targets, strict=True)
-        )
+        steps: list[Step] = first_steps(args.steps, ctx.runtime.config.browser.max_batch_steps)
+        elements: list[Element | None] = [_element_at(step.ref, ctx) for step in steps]
+        targets: list[Element | None] = [_element_at(step.to_ref, ctx) for step in steps]
+        judged: list[tuple[Step, Element | None, Element | None]] = list(zip(steps, elements, targets, strict=True))
         assessed: list[StepAssessment] = [assess_step(step, element, target) for step, element, target in judged]
         assessment: StepAssessment = combine_assessments(assessed)
-        kind: ActionKind = _act_kind(args.steps)
+        kind: ActionKind = _act_kind(steps)
         summary: str = "; ".join(_step_label(step, element, target) for step, element, target in judged)
         target: str = ctx.browser.current_url(ctx.thread_id) or ""
         # The typed judge reads the clicks whose labels no pattern knows; it can only add reasons, never take one away.
@@ -405,10 +400,14 @@ def _act_tool() -> RegisteredTool:
         return action.model_copy(update={"summary": f"{summary} (amount {render_amount(amount)})", "amount": amount})
 
     async def run(args: ActArgs, ctx: ToolContext, authorized: ActionInfo) -> ToolResult:
+        limit: int = ctx.runtime.config.browser.max_batch_steps
         outcome: ActOutcome = await ctx.browser.act(
-            ctx.thread_id, args.steps, args.accept_dialogs, _secret_field_check(ctx, authorized)
+            ctx.thread_id, first_steps(args.steps, limit), args.accept_dialogs, _secret_field_check(ctx, authorized)
         )
         rendered: str = render_act_outcome(outcome, _nonce(), _body_budget(ctx))
+        note: str = batch_cut_note(len(args.steps), limit)
+        if note:
+            rendered = f"{note}\n{rendered}"
         if args.expect is None:
             return ok(rendered)
         check: PageCheck | None = await _page_check(args.expect, outcome, ctx)
