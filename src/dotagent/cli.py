@@ -338,6 +338,9 @@ def build_parser() -> argparse.ArgumentParser:
         default="all",
         help="what to show: the numbers per model, the act calls per site (a page's host or an application), or both",
     )
+    stats.add_argument(
+        "--run", metavar="ID", default=None, help="the numbers of one run instead: what it cost and where"
+    )
 
     commands.add_parser("daemon", help="run Dot in this terminal: the API, the web UI, the agent and the schedules")
     commands.add_parser("open", help="open the web UI of the running daemon in your default browser, signed in")

@@ -8,7 +8,7 @@ from pathlib import Path
 import pytest
 import pytest_asyncio
 
-from dotagent.cli_stats import render_stats
+from dotagent.cli_stats import render_run_costs, render_stats
 from dotagent.core.errors import StoreError
 from dotagent.core.types import JsonObject
 from dotagent.llm.calls import CALL_EVENT
@@ -19,10 +19,14 @@ from dotagent.store.models import RunRecord, RunStatus
 from dotagent.store.stats import (
     ActStats,
     ModelStats,
+    RunCosts,
     RunStatistics,
     TimeStats,
     ToolStats,
+    WebFailures,
+    collect_run_costs,
     collect_statistics,
+    failure_cause,
     nearest_rank,
 )
 
@@ -64,6 +68,19 @@ def _timed_result(tool: str, ok: bool, seconds: float, waited_s: float) -> tuple
         "images": [],
         "seconds": seconds,
         "waited_s": waited_s,
+    }
+
+
+def _failed_result(tool: str, text: str, seconds: float) -> tuple[str, JsonObject]:
+    """A failed result with the text that says why."""
+    return "tool_result", {
+        "call_id": "c",
+        "tool": tool,
+        "ok": False,
+        "text": text,
+        "images": [],
+        "seconds": seconds,
+        "waited_s": 0.0,
     }
 
 
@@ -129,7 +146,8 @@ async def database(tmp_path: Path) -> AsyncIterator[Path]:
             ("assistant", {"step": 1}),
             ("assistant", {"step": 2, "seconds": 1.5}),
             ("assistant", {"step": 7, "seconds": 4.0}),
-            ("assistant", {"step": 12, "seconds": 9.0}),
+            # The newest step recorded the input tokens it sent as well; the older ones did not.
+            ("assistant", {"step": 12, "seconds": 9.0, "input_tokens": 12000}),
             _model_call("step", 1.0, 100),
             _model_call("step", 3.0, 0),
             _model_call("step", 2.0, 0),
@@ -146,6 +164,16 @@ async def database(tmp_path: Path) -> AsyncIterator[Path]:
             _act_result("browser_act", "x.com", 1, True, 2.0),
             _act_result("browser_act", "x.com", 4, True, 3.0),
             _act_result("desktop_act", "Safari", 1, False, 1.0),
+            # The web failures by cause, the calls refused for their arguments, and a delegated run.
+            *[_call({"url": f"https://x.test/{number}"}) for number in range(8)],
+            _failed_result("web_fetch", "web_fetch got HTTP 404 from https://x.test/careers/. <web_content>", 0.1),
+            _failed_result("web_fetch", "the host name could not be resolved | context={}", 0.1),
+            _failed_result("web_search", "DuckDuckGo is limiting the searches of this machine (its bot check).", 0.1),
+            _failed_result("web_fetch", "web_fetch got HTTP 403 from https://x.test/search. <web_content>", 0.1),
+            _failed_result("web_fetch", "the request failed in transit | context={}", 0.1),
+            _failed_result("web_search", "Invalid arguments for web_search: max_results: Input should be <= 10.", 0.1),
+            _failed_result("shell", "Invalid arguments for shell: command: Field required.", 0.1),
+            _timed_result("delegate", True, 30.0, 0.0),
         ],
     )
     # Made before the calls were timed: it recorded no model call.
@@ -180,11 +208,20 @@ def test_the_runs_and_their_events_are_counted_per_model(database: Path) -> None
     assert first.runs == 2
     assert [(count.ending, count.runs) for count in first.endings] == [("finished", 1), ("stopped", 1)]
     assert (first.steps, first.input_tokens, first.output_tokens) == (4, 4000, 400)
-    assert (first.tool_calls, first.tool_errors, first.invalid_arguments) == (7, 3, 1)
-    assert (first.stalls, first.compactions) == (1, 1)
+    assert (first.tool_calls, first.tool_errors, first.invalid_arguments) == (15, 10, 1)
+    # Two calls were refused for arguments that did not fit, whatever the tool.
+    assert first.rejected_arguments == 2
+    assert (first.stalls, first.compaction.compactions) == (1, 1)
+    # One compaction over the four steps of the model's runs, 4 of the 320.5 model seconds.
+    assert first.compaction.per_100_steps == 25.0
+    assert first.compaction.share == pytest.approx(4.0 / 320.5)
+    assert first.web == WebFailures(not_found=2, throttled=1, blocked=1, transit=1, other=0)
+    assert (first.delegation.runs, first.delegation.seconds) == (1, 30.0)
     second: ModelStats = _by_model(stats)["ollama:b"]
     assert [(count.ending, count.runs) for count in second.endings] == [("stalled", 1)]
     assert (second.tool_calls, second.tool_errors, second.invalid_arguments) == (2, 2, 0)
+    assert second.web == WebFailures(not_found=0, throttled=0, blocked=0, transit=0, other=0)
+    assert second.compaction.per_100_steps == 0.0
 
 
 def test_a_longer_window_takes_in_the_older_runs(database: Path) -> None:
@@ -214,10 +251,10 @@ def test_the_acts_the_slowdown_curve_and_the_sites_come_from_the_counted_events(
     first: ModelStats = _by_model(stats)["ollama:a"]
     # The three act results recorded without their steps are left out; of the three counted, two carried one step.
     assert first.acts == ActStats(acts=3, single=2, failed=1, seconds_median=2.0)
-    assert [(band.first, band.last, band.steps, band.seconds_median) for band in first.bands] == [
-        (1, 5, 1, 1.5),
-        (6, 10, 1, 4.0),
-        (11, 20, 1, 9.0),
+    assert [(band.first, band.last, band.steps, band.seconds_median, band.tokens_median) for band in first.bands] == [
+        (1, 5, 1, 1.5, None),
+        (6, 10, 1, 4.0, None),
+        (11, 20, 1, 9.0, 12000),
     ]
     assert _by_model(stats)["ollama:b"].acts == ActStats(acts=0, single=0, failed=0, seconds_median=None)
     assert _by_model(stats)["ollama:b"].bands == ()
@@ -230,14 +267,58 @@ def test_the_acts_the_slowdown_curve_and_the_sites_come_from_the_counted_events(
 def test_the_tools_are_listed_slowest_first_with_their_wait_at_the_gate(database: Path) -> None:
     tools: tuple[ToolStats, ...] = collect_statistics(database, time.time() - 30 * DAY_S).tools
     assert [(entry.tool, entry.calls, entry.failed) for entry in tools] == [
+        ("delegate", 1, 0),
         ("browser_act", 5, 1),
-        ("shell", 5, 3),
+        ("shell", 6, 4),
         ("desktop_act", 1, 1),
+        ("web_fetch", 4, 4),
         ("read_file", 1, 0),
+        ("web_search", 2, 2),
     ]
-    browser: ToolStats = tools[0]
+    browser: ToolStats = tools[1]
     assert (browser.seconds_total, browser.seconds_median, browser.waited_s) == (14.0, 2.0, 1.5)
-    assert tools[1].waited_s == 8.0
+    assert tools[2].waited_s == 8.0
+
+
+def test_the_cause_of_a_failure_is_read_from_its_first_line() -> None:
+    assert failure_cause("web_fetch", "web_fetch got HTTP 404 from https://x.test/a.\nmore") == "not_found"
+    assert failure_cause("web_fetch", "the host name could not be resolved | context={}") == "not_found"
+    assert failure_cause("web_fetch", "web_fetch got HTTP 429 from https://x.test/a.") == "throttled"
+    assert (
+        failure_cause("web_search", "DuckDuckGo answered with a page that has no results and no empty-result notice")
+        == "throttled"
+    )
+    assert failure_cause("web_fetch", "web_fetch got HTTP 401 from https://x.test/a.") == "blocked"
+    assert failure_cause("web_crawl", "the request failed in transit | context={}") == "transit"
+    assert failure_cause("web_fetch", "web_fetch got HTTP 500 from https://x.test/a.") == "other"
+    # The cause of a refused call is its arguments, whatever the tool; a shell failure is no web failure.
+    assert failure_cause("shell", "Invalid arguments for shell: command: Field required.") == "rejected_arguments"
+    assert failure_cause("shell", "web_fetch got HTTP 404 (quoted by a command)") == "other"
+
+
+def test_the_costs_of_one_run_are_read_the_same_way(database: Path) -> None:
+    with sqlite3.connect(f"{database.as_uri()}?mode=ro", uri=True) as connection:
+        run_id, created_at = connection.execute(
+            "SELECT id, created_at FROM runs WHERE model = 'ollama:a' AND steps = 3"
+        ).fetchone()
+    costs: RunCosts = collect_run_costs(database, run_id, created_at + 600)
+    assert (costs.run_id, costs.status, costs.stats.model, costs.stats.runs, costs.stats.steps) == (
+        run_id,
+        "done",
+        "ollama:a",
+        1,
+        3,
+    )
+    # A finished run's minutes run to its end, which the fixture set right after its creation.
+    assert costs.minutes < 1.0
+    assert costs.stats.compaction.compactions == 1 and costs.stats.web.not_found == 2
+    assert costs.tool_seconds == pytest.approx(45.95) and costs.waited_s == pytest.approx(1.5)
+    assert costs.tools[0].tool == "delegate"
+    with pytest.raises(StoreError):
+        collect_run_costs(database, "run_none", created_at)
+    lines: list[str] = render_run_costs(costs)
+    assert lines[0].startswith(f"Run {run_id} (done) on ollama:a: ") and "3 steps" in lines[0]
+    assert f"  tool calls took {45.95:.1f} s, of which 1.5 s at the gate" in lines
 
 
 def test_the_nearest_rank_is_a_value_that_occurred() -> None:
@@ -267,9 +348,15 @@ def test_the_statistics_are_rendered_per_model_in_plain_words(database: Path) ->
     assert lines[0] == "3 runs in the last 30 days."
     assert "ollama:a: 2 runs" in text
     assert "finished 1, stopped" in text
-    assert "7 calls, 3 failed (43 %), 1 with arguments that were not valid JSON" in text
+    assert (
+        "15 calls, 10 failed (67 %), 1 with arguments that were not valid JSON, 2 refused for arguments that did not "
+        "fit (a turn lost each)"
+    ) in text
+    assert "stalls 1, compactions 1 (25.0 per 100 steps, 4.0 s, 1 % of the model time)" in text
+    assert "web failures: not found 2, throttled 1, blocked 1, in transit 1, other 0" in text
+    assert "delegated runs 1, waited 30.0 s for them" in text
     assert "acts: 3 calls, 67 % with one step, 33 % failed, median 2.0 s" in text
-    assert "step model call by step number: 1-5 1.5 s (1), 6-10 4.0 s (1), 11-20 9.0 s (1)" in text
+    assert "by step number: 1-5 1.5 s (1), 6-10 4.0 s (1), 11-20 9.0 s / 12.0 k tokens (1)" in text
     assert "acts: none counted" in text
     time_row: str = next(line for line in lines if line.strip().startswith("ollama:a ") and "of 2" in line)
     assert time_row.split() == ["ollama:a", "1", "of", "2", "320.5", "2.5", "10.0", "4.0", "4.5", "150", "25", "%"]

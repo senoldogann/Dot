@@ -7,6 +7,7 @@ from collections import Counter
 from collections.abc import Sequence
 from contextlib import closing
 from pathlib import Path
+from typing import Literal
 
 from pydantic import TypeAdapter
 
@@ -31,8 +32,22 @@ _SLOW_SHARE: float = 0.9
 ACT_TOOLS: frozenset[str] = frozenset({"browser_act", "desktop_act"})
 # The step bands of the slowdown curve: the first step of each; the last band is open.
 _BAND_STARTS: tuple[int, ...] = (1, 6, 11, 21, 41)
+# The web tools whose failures are told apart by cause.
+WEB_TOOLS: frozenset[str] = frozenset({"web_fetch", "web_search", "web_crawl", "web_extract"})
+# The first words of the result of a call whose arguments did not fit the tool (``tools/base.py``): a turn lost to it.
+REJECTED_PREFIX: str = "Invalid arguments for "
+# Compactions are given per this many steps.
+_PER_STEPS: int = 100
+# How much of a failed result's text the statistics read: the cause is in its first line.
+_FAILURE_CHARS: int = 200
+# The scope of the rows: the runs created since a time, or one run.
+_SINCE_SCOPE: str = "r.created_at >= ?"
+_RUN_SCOPE: str = "r.id = ?"
 
-_RUNS_SQL: str = "SELECT model, status, result, steps, input_tokens, output_tokens FROM runs WHERE created_at >= ?"
+_RUNS_SQL: str = """
+SELECT r.model, r.status, r.result, r.steps, r.input_tokens, r.output_tokens, r.id, r.created_at, r.finished_at
+FROM runs r WHERE {scope}
+"""
 # One row per model call of the runs: the model of its run, the run, what the call was for, its seconds, the tokens the
 # provider served from its cache, whether it got a reply (no error) and its input tokens.
 _CALLS_SQL: str = """
@@ -40,7 +55,7 @@ SELECT r.model, r.id, json_extract(e.data, '$.purpose'), json_extract(e.data, '$
        json_extract(e.data, '$.cached_tokens'), json_extract(e.data, '$.error') IS NULL,
        json_extract(e.data, '$.input_tokens')
 FROM runs r JOIN events e ON e.run_id = r.id
-WHERE r.created_at >= ? AND e.kind = ?
+WHERE {scope} AND e.kind = ?
 """
 # One row per act call (browser_act, desktop_act) that came back: the model of its run, the site it acted on (the
 # page's host or the application), the steps it carried (NULL for a call recorded before they were counted), whether
@@ -49,22 +64,23 @@ _ACTS_SQL: str = """
 SELECT r.model, json_extract(e.data, '$.site'), json_extract(e.data, '$.steps'), json_extract(e.data, '$.ok'),
        json_extract(e.data, '$.seconds')
 FROM runs r JOIN events e ON e.run_id = r.id
-WHERE r.created_at >= ? AND e.kind = 'tool_result' AND json_extract(e.data, '$.tool') IN ('browser_act', 'desktop_act')
+WHERE {scope} AND e.kind = 'tool_result' AND json_extract(e.data, '$.tool') IN ('browser_act', 'desktop_act')
 """
-# One row per step of the runs: the model of its run, the step's number in its run and the seconds its model call
-# took (NULL for a step recorded before that was measured).
+# One row per step of the runs: the model of its run, the step's number in its run, the seconds its model call took
+# and the input tokens it sent (NULL for a step recorded before that was measured).
 _STEPS_SQL: str = """
-SELECT r.model, json_extract(e.data, '$.step'), json_extract(e.data, '$.seconds')
+SELECT r.model, json_extract(e.data, '$.step'), json_extract(e.data, '$.seconds'), json_extract(e.data, '$.input_tokens')
 FROM runs r JOIN events e ON e.run_id = r.id
-WHERE r.created_at >= ? AND e.kind = 'assistant'
+WHERE {scope} AND e.kind = 'assistant'
 """
-# One row per tool call of the runs that came back: the tool, whether it worked (``"ok": false`` is a failed call), its
-# seconds and the part of them it spent at the gate (NULL for a call recorded before that was measured).
-_TOOLS_SQL: str = """
-SELECT json_extract(e.data, '$.tool'), json_extract(e.data, '$.ok'), json_extract(e.data, '$.seconds'),
-       json_extract(e.data, '$.waited_s')
+# One row per tool call of the runs that came back: the model of its run, the tool, whether it worked (``"ok": false``
+# is a failed call), its seconds, the part of them it spent at the gate (NULL for a call recorded before that was
+# measured) and the start of its text, where the cause of a failure is.
+_TOOLS_SQL: str = f"""
+SELECT r.model, json_extract(e.data, '$.tool'), json_extract(e.data, '$.ok'), json_extract(e.data, '$.seconds'),
+       json_extract(e.data, '$.waited_s'), substr(json_extract(e.data, '$.text'), 1, {_FAILURE_CHARS})
 FROM runs r JOIN events e ON e.run_id = r.id
-WHERE r.created_at >= ? AND e.kind = 'tool_result'
+WHERE {{scope}} AND e.kind = 'tool_result'
 """
 # One row per model: the events of its runs, counted. A tool result with ``"ok": false`` is a failed call.
 _EVENTS_SQL: str = """
@@ -75,7 +91,7 @@ SELECT r.model,
        COALESCE(SUM(e.kind = 'stall'), 0),
        COALESCE(SUM(e.kind = 'compacted'), 0)
 FROM runs r JOIN events e ON e.run_id = r.id
-WHERE r.created_at >= ?
+WHERE {scope}
 GROUP BY r.model
 """
 # One row: the newest finished runs of one model and the counts of their events. A failed tool result without a risk was
@@ -130,21 +146,59 @@ class ActSample(FrozenModel):
 
 
 class StepSample(FrozenModel):
-    """One step of a run: the model of its run, the step's number in its run and the seconds its model call took."""
+    """One step of a run: the model of its run, the step's number in its run, the seconds its model call took and the
+    input tokens it sent (``None`` for a step recorded before they were)."""
 
     model: str
     step: int
     seconds: float
+    input_tokens: int | None
 
 
 class ToolSample(FrozenModel):
-    """One tool call that came back: its tool, whether it worked, its seconds and the part of them it spent at the gate
-    (an approval, the review model's answer; 0 for a call recorded before that was measured)."""
+    """One tool call that came back: the model of its run, its tool, whether it worked, its seconds, the part of them it
+    spent at the gate (an approval, the review model's answer; 0 for a call recorded before that was measured) and the
+    start of its text, where the cause of a failure is."""
 
+    model: str
     tool: str
     ok: bool
     seconds: float
     waited_s: float
+    text: str
+
+
+type FailureCause = Literal["not_found", "throttled", "blocked", "transit", "rejected_arguments", "other"]
+
+
+class WebFailures(FrozenModel):
+    """The failed calls of the web tools (:data:`WEB_TOOLS`) by cause: a page or host that is not there (HTTP 404, an
+    unresolved name: an address the model guessed), a site that limits the machine (HTTP 429, DuckDuckGo's bot check),
+    a site that refuses (HTTP 401, 403), a request that failed in transit, and the rest. A call refused for its
+    arguments is counted in :attr:`ModelStats.rejected_arguments`, not here."""
+
+    not_found: int
+    throttled: int
+    blocked: int
+    transit: int
+    other: int
+
+
+class CompactionStats(FrozenModel):
+    """How often the runs compacted and what it cost: the compactions, their number per 100 steps (``None`` without
+    a step), their seconds and the share of the model seconds they took (``None`` without a timed call)."""
+
+    compactions: int
+    per_100_steps: float | None
+    seconds: float
+    share: float | None
+
+
+class DelegationStats(FrozenModel):
+    """The ``delegate`` calls that came back and the seconds the delegating runs waited for them in all."""
+
+    runs: int
+    seconds: float
 
 
 class TimeStats(FrozenModel):
@@ -176,13 +230,15 @@ class ActStats(FrozenModel):
 
 
 class StepBand(FrozenModel):
-    """The model-call seconds of the steps whose number in their run falls in a band (``last`` 0: open-ended): the
-    slowdown curve of a run, one band at a time."""
+    """The model-call seconds and the input tokens of the steps whose number in their run falls in a band (``last`` 0:
+    open-ended): the slowdown curve of a run and the growth of its context, one band at a time. ``tokens_median`` is
+    ``None`` when no step of the band recorded its tokens."""
 
     first: int
     last: int
     steps: int
     seconds_median: float
+    tokens_median: int | None
 
 
 class SiteStats(FrozenModel):
@@ -225,11 +281,28 @@ class ModelStats(FrozenModel):
     tool_calls: int
     tool_errors: int
     invalid_arguments: int
+    rejected_arguments: int
     stalls: int
-    compactions: int
+    compaction: CompactionStats
+    web: WebFailures
+    delegation: DelegationStats
     time: TimeStats
     acts: ActStats
     bands: tuple[StepBand, ...]
+
+
+class RunCosts(FrozenModel):
+    """What one run cost and where it went: its minutes of wall time (to its end, or to now while it works), the numbers
+    of its model (as :class:`ModelStats` counts them for one run), its tool calls' seconds and the part spent at the
+    gate, and its tools, the slowest first."""
+
+    run_id: str
+    status: RunStatus
+    minutes: float
+    stats: ModelStats
+    tool_seconds: float
+    waited_s: float
+    tools: tuple[ToolStats, ...]
 
 
 class RunStatistics(FrozenModel):
@@ -302,18 +375,18 @@ class _Rows(FrozenModel):
     steps: list[tuple[object, ...]]
 
 
-def _read_rows(database: Path, since: float) -> _Rows:
-    """The runs created since ``since``, the counts of their events, their model calls, their tool calls, their act
-    calls and their steps. Blocking."""
+def _read_rows(database: Path, scope: str, value: float | str) -> _Rows:
+    """The runs in ``scope`` (:data:`_SINCE_SCOPE` with a time, :data:`_RUN_SCOPE` with a run id), the counts of their
+    events, their model calls, their tool calls, their act calls and their steps. Blocking."""
     try:
         with closing(sqlite3.connect(f"{database.as_uri()}?mode=ro", uri=True, timeout=_BUSY_TIMEOUT_S)) as connection:
             return _Rows(
-                runs=connection.execute(_RUNS_SQL, (since,)).fetchall(),
-                events=connection.execute(_EVENTS_SQL, (INVALID_ARGUMENTS_KEY, since)).fetchall(),
-                calls=connection.execute(_CALLS_SQL, (since, CALL_EVENT)).fetchall(),
-                tools=connection.execute(_TOOLS_SQL, (since,)).fetchall(),
-                acts=connection.execute(_ACTS_SQL, (since,)).fetchall(),
-                steps=connection.execute(_STEPS_SQL, (since,)).fetchall(),
+                runs=connection.execute(_RUNS_SQL.format(scope=scope), (value,)).fetchall(),
+                events=connection.execute(_EVENTS_SQL.format(scope=scope), (INVALID_ARGUMENTS_KEY, value)).fetchall(),
+                calls=connection.execute(_CALLS_SQL.format(scope=scope), (value, CALL_EVENT)).fetchall(),
+                tools=connection.execute(_TOOLS_SQL.format(scope=scope), (value,)).fetchall(),
+                acts=connection.execute(_ACTS_SQL.format(scope=scope), (value,)).fetchall(),
+                steps=connection.execute(_STEPS_SQL.format(scope=scope), (value,)).fetchall(),
             )
     except sqlite3.Error as error:
         raise StoreError(
@@ -361,7 +434,12 @@ def _act_samples(rows: list[tuple[object, ...]]) -> list[ActSample]:
 def _step_samples(rows: list[tuple[object, ...]]) -> list[StepSample]:
     """The steps whose model call was timed; the ones recorded before that are left out."""
     return [
-        StepSample(model=str(row[0]), step=int(_number(row[1], "step")), seconds=_number(row[2], "seconds"))
+        StepSample(
+            model=str(row[0]),
+            step=int(_number(row[1], "step")),
+            seconds=_number(row[2], "seconds"),
+            input_tokens=None if row[3] is None else int(_number(row[3], "input_tokens")),
+        )
         for row in rows
         if row[2] is not None
     ]
@@ -370,13 +448,71 @@ def _step_samples(rows: list[tuple[object, ...]]) -> list[StepSample]:
 def _tool_samples(rows: list[tuple[object, ...]]) -> list[ToolSample]:
     return [
         ToolSample(
-            tool=str(row[0]),
-            ok=row[1] != 0,
-            seconds=_number(row[2], "seconds"),
-            waited_s=0.0 if row[3] is None else _number(row[3], "waited_s"),
+            model=str(row[0]),
+            tool=str(row[1]),
+            ok=row[2] != 0,
+            seconds=_number(row[3], "seconds"),
+            waited_s=0.0 if row[4] is None else _number(row[4], "waited_s"),
+            text="" if row[5] is None else str(row[5]),
         )
         for row in rows
     ]
+
+
+def failure_cause(tool: str, text: str) -> FailureCause:
+    """The cause of a failed call from the start of its text: the arguments did not fit the tool (any tool), or for a
+    web tool, what the web answered: not there, limiting, refusing, lost in transit, or something else."""
+    if text.startswith(REJECTED_PREFIX):
+        return "rejected_arguments"
+    first: str = text.splitlines()[0] if text else ""
+    if tool not in WEB_TOOLS:
+        return "other"
+    if "HTTP 404" in first or "could not be resolved" in first:
+        return "not_found"
+    if "HTTP 429" in first or "is limiting" in first or "no results and no empty-result notice" in first:
+        return "throttled"
+    if "HTTP 401" in first or "HTTP 403" in first:
+        return "blocked"
+    if "failed in transit" in first:
+        return "transit"
+    return "other"
+
+
+def web_failures(samples: Sequence[ToolSample]) -> WebFailures:
+    """The failed web calls among ``samples`` by cause; the ones refused for their arguments are not counted."""
+    causes: Counter[FailureCause] = Counter(
+        failure_cause(sample.tool, sample.text) for sample in samples if sample.tool in WEB_TOOLS and not sample.ok
+    )
+    return WebFailures(
+        not_found=causes["not_found"],
+        throttled=causes["throttled"],
+        blocked=causes["blocked"],
+        transit=causes["transit"],
+        other=causes["other"],
+    )
+
+
+def rejected_arguments(samples: Sequence[ToolSample]) -> int:
+    """How many calls were refused because their arguments did not fit the tool: a turn lost each."""
+    return sum(
+        1 for sample in samples if not sample.ok and failure_cause(sample.tool, sample.text) == "rejected_arguments"
+    )
+
+
+def compaction_stats(compactions: int, steps: int, time: TimeStats) -> CompactionStats:
+    """The compactions against the steps and the model seconds of the same runs."""
+    return CompactionStats(
+        compactions=compactions,
+        per_100_steps=None if steps == 0 else _PER_STEPS * compactions / steps,
+        seconds=time.compaction_seconds,
+        share=None if time.model_seconds == 0 else time.compaction_seconds / time.model_seconds,
+    )
+
+
+def delegation_stats(samples: Sequence[ToolSample]) -> DelegationStats:
+    """The ``delegate`` calls among ``samples`` and the seconds they took in all."""
+    mine: list[ToolSample] = [sample for sample in samples if sample.tool == "delegate"]
+    return DelegationStats(runs=len(mine), seconds=sum(sample.seconds for sample in mine))
 
 
 def nearest_rank(values: Sequence[float], share: float) -> float | None:
@@ -422,8 +558,21 @@ def step_bands(samples: Sequence[StepSample]) -> tuple[StepBand, ...]:
         mine: list[float] = [
             sample.seconds for sample in samples if sample.step >= first and (last == 0 or sample.step <= last)
         ]
+        tokens: list[int] = [
+            sample.input_tokens
+            for sample in samples
+            if sample.input_tokens is not None and sample.step >= first and (last == 0 or sample.step <= last)
+        ]
         if mine:
-            bands.append(StepBand(first=first, last=last, steps=len(mine), seconds_median=statistics.median(mine)))
+            bands.append(
+                StepBand(
+                    first=first,
+                    last=last,
+                    steps=len(mine),
+                    seconds_median=statistics.median(mine),
+                    tokens_median=None if not tokens else round(statistics.median(tokens)),
+                )
+            )
     return tuple(bands)
 
 
@@ -495,50 +644,98 @@ def gui_share(channels: Sequence[ChannelStats]) -> float | None:
     return sum(entry.calls for entry in channels if is_gui(entry.channel)) / acting
 
 
-def collect_statistics(database: Path, since: float) -> RunStatistics:
-    """Per model and per tool, what the runs created since ``since`` did. The database is opened read-only, so a
-    running daemon is not disturbed, and no text of a run is read. Blocking."""
-    rows: _Rows = _read_rows(database, since)
+def _model_stats(
+    model: str,
+    runs: list[tuple[object, ...]],
+    counts: _EventCounts,
+    calls: Sequence[CallSample],
+    tools: Sequence[ToolSample],
+    acts: Sequence[ActSample],
+    steps: Sequence[StepSample],
+) -> ModelStats:
+    """The numbers of the runs of ``model`` among the rows (every sample given is of its runs)."""
+    endings: Counter[Ending] = Counter(classify_ending(_STATUS.validate_python(row[1]), str(row[2])) for row in runs)
+    total_steps: int = sum(int(str(row[3])) for row in runs)
+    time: TimeStats = time_stats(calls)
+    return ModelStats(
+        model=model,
+        runs=len(runs),
+        endings=tuple(
+            EndingCount(ending=ending, runs=count)
+            for ending, count in sorted(endings.items(), key=lambda item: (-item[1], _ENDING_ORDER[item[0]]))
+        ),
+        steps=total_steps,
+        input_tokens=sum(int(str(row[4])) for row in runs),
+        output_tokens=sum(int(str(row[5])) for row in runs),
+        tool_calls=counts.tool_calls,
+        tool_errors=counts.tool_errors,
+        invalid_arguments=counts.invalid_arguments,
+        rejected_arguments=rejected_arguments(tools),
+        stalls=counts.stalls,
+        compaction=compaction_stats(counts.compactions, total_steps, time),
+        web=web_failures(tools),
+        delegation=delegation_stats(tools),
+        time=time,
+        acts=act_stats(acts),
+        bands=step_bands(steps),
+    )
+
+
+_NO_EVENTS: _EventCounts = _EventCounts(tool_calls=0, tool_errors=0, invalid_arguments=0, stalls=0, compactions=0)
+
+
+def _statistics(rows: _Rows) -> RunStatistics:
     runs: list[tuple[object, ...]] = rows.runs
     counts: dict[str, _EventCounts] = _counts_by_model(rows.events)
     calls: list[CallSample] = _call_samples(rows.calls)
+    tools: list[ToolSample] = _tool_samples(rows.tools)
     acts: list[ActSample] = _act_samples(rows.acts)
     steps: list[StepSample] = _step_samples(rows.steps)
     models: list[str] = list(dict.fromkeys(str(row[0]) for row in runs))
-    stats: list[ModelStats] = []
-    for model in models:
-        mine: list[tuple[object, ...]] = [row for row in runs if row[0] == model]
-        endings: Counter[Ending] = Counter(
-            classify_ending(_STATUS.validate_python(row[1]), str(row[2])) for row in mine
+    stats: list[ModelStats] = [
+        _model_stats(
+            model,
+            [row for row in runs if row[0] == model],
+            counts.get(model, _NO_EVENTS),
+            [call for call in calls if call.model == model],
+            [sample for sample in tools if sample.model == model],
+            [sample for sample in acts if sample.model == model],
+            [sample for sample in steps if sample.model == model],
         )
-        found: _EventCounts = counts.get(
-            model, _EventCounts(tool_calls=0, tool_errors=0, invalid_arguments=0, stalls=0, compactions=0)
-        )
-        stats.append(
-            ModelStats(
-                model=model,
-                runs=len(mine),
-                endings=tuple(
-                    EndingCount(ending=ending, runs=count)
-                    for ending, count in sorted(endings.items(), key=lambda item: (-item[1], _ENDING_ORDER[item[0]]))
-                ),
-                steps=sum(int(str(row[3])) for row in mine),
-                input_tokens=sum(int(str(row[4])) for row in mine),
-                output_tokens=sum(int(str(row[5])) for row in mine),
-                tool_calls=found.tool_calls,
-                tool_errors=found.tool_errors,
-                invalid_arguments=found.invalid_arguments,
-                stalls=found.stalls,
-                compactions=found.compactions,
-                time=time_stats([call for call in calls if call.model == model]),
-                acts=act_stats([sample for sample in acts if sample.model == model]),
-                bands=step_bands([sample for sample in steps if sample.model == model]),
-            )
-        )
-    tools: list[ToolSample] = _tool_samples(rows.tools)
+        for model in models
+    ]
     return RunStatistics(
         models=tuple(sorted(stats, key=lambda entry: entry.runs, reverse=True)),
         tools=tool_stats(tools),
         sites=site_stats(acts),
         channels=channel_stats(tools),
+    )
+
+
+def collect_statistics(database: Path, since: float) -> RunStatistics:
+    """Per model and per tool, what the runs created since ``since`` did. The database is opened read-only, so a
+    running daemon is not disturbed, and no text of a run is read beyond the first line of a failed tool result, where
+    its cause is. Blocking."""
+    return _statistics(_read_rows(database, _SINCE_SCOPE, since))
+
+
+def collect_run_costs(database: Path, run_id: str, now: float) -> RunCosts:
+    """What the run ``run_id`` cost and where it went, read the same way; its minutes run to its end, or to ``now``
+    while it works. Blocking."""
+    rows: _Rows = _read_rows(database, _RUN_SCOPE, run_id)
+    if not rows.runs:
+        raise StoreError("there is no such run", {"database": str(database), "run_id": run_id})
+    run: tuple[object, ...] = rows.runs[0]
+    created_at: float = _number(run[7], "created_at")
+    finished_at: float = now if run[8] is None else _number(run[8], "finished_at")
+    statistics_of_run: RunStatistics = _statistics(rows)
+    tools: list[ToolSample] = _tool_samples(rows.tools)
+    return RunCosts(
+        run_id=str(run[6]),
+        status=_STATUS.validate_python(run[1]),
+        minutes=max(0.0, finished_at - created_at) / 60,
+        stats=statistics_of_run.models[0],
+        tool_seconds=sum(sample.seconds for sample in tools),
+        waited_s=sum(sample.waited_s for sample in tools),
+        tools=statistics_of_run.tools,
     )

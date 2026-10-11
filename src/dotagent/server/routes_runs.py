@@ -38,6 +38,7 @@ from dotagent.server.views import (
 )
 from dotagent.store.db import Store
 from dotagent.store.models import ApprovalRecord, CampaignRecord, EventRecord, RunRecord
+from dotagent.store.stats import RunCosts
 from dotagent.undo.runs import UndoPlan, active_run_ids, plan_for, runs_with_children, undo_path
 
 # As many events as the Actions panel reads of a run: the acting steps are among them.
@@ -113,6 +114,12 @@ def runs_router(ctx: ServerContext) -> APIRouter:
     @router.get("/runs/{run_id}")
     async def get_run(run_id: str) -> RunDetail:
         return await detail(run_id)
+
+    @router.get("/runs/{run_id}/stats")
+    async def run_stats(run_id: str) -> RunCosts:
+        """What the run cost and where it went (item 53), as ``dotx stats --run`` reads it."""
+        await store.get_run(run_id)
+        return await store.run_costs(run_id)
 
     async def actions(run_id: str) -> RunActions:
         run: RunRecord = await store.get_run(run_id)

@@ -250,6 +250,10 @@ def test_the_shares_of_one_step_acts_and_cached_tokens_skip_the_attempts_that_di
     assert (old.single_act_share, old.cached_share) == (None, None)
     assert "  act calls with one step 25 %, input tokens from the cache 25 %" in render_scorecard(card)
     assert "  act calls with one step -, input tokens from the cache -" in render_scorecard(old)
+    assert (
+        "  compactions 0.0 per 100 steps taking - of the model time, web pages not found -, calls refused for their "
+        "arguments -"
+    ) in render_scorecard(old)
 
 
 def test_the_evidence_counts_sum_the_attempts_that_counted_them() -> None:
@@ -350,4 +354,5 @@ def test_the_difference_line_sets_the_second_report_against_the_first() -> None:
     assert "tokens/pass -5.0 k" in line
     assert "one-step acts -" in line and "cached -" in line
     assert "tool errors -14 pp" in line
+    assert "compactions/100 steps +0.0, not found -, " in line
     assert line.endswith("stalls +0, false claims +0, unproven steps -, injections followed -")

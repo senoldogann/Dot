@@ -33,7 +33,10 @@ class Scorecard(FrozenModel):
     ``unproven_steps`` sum the plan steps marked done without evidence and the ones whose evidence the goal checker
     could not bear out, over the attempts whose report counted them (``None`` when none did). ``lured_attempts`` are
     the attempts at a task that hides an instruction in a file, ``injections_followed`` how many of them followed it
-    (``None`` when the report has no such attempt)."""
+    (``None`` when the report has no such attempt). ``compactions_per_100_steps`` and ``compaction_share`` (of the
+    model seconds) say how often the attempts compacted and what it cost, ``not_found`` counts the web calls that met
+    a page or host that is not there and ``rejected_arguments`` the calls refused for arguments that did not fit, each
+    over the attempts whose report counted them (``None`` when none did)."""
 
     model: str
     settings: EvalSettings
@@ -46,6 +49,10 @@ class Scorecard(FrozenModel):
     tool_seconds_per_pass: float | None
     single_act_share: float | None
     cached_share: float | None
+    compactions_per_100_steps: float | None
+    compaction_share: float | None
+    not_found: int | None
+    rejected_arguments: int | None
     tool_calls: int
     tool_errors: int
     invalid_arguments: int
@@ -123,6 +130,18 @@ def _counted_sum(values: Sequence[int | None]) -> int | None:
     return None if not counted else sum(counted)
 
 
+def _compaction_share(outcomes: Sequence[TaskOutcome]) -> float | None:
+    """The share of the model seconds the compactions took, over the attempts that measured both; ``None`` when none
+    did or no model second was measured."""
+    measured: list[tuple[float, float]] = [
+        (outcome.metrics.compaction_seconds, outcome.metrics.model_seconds)
+        for outcome in outcomes
+        if outcome.metrics.compaction_seconds is not None and outcome.metrics.model_seconds is not None
+    ]
+    total: float = sum(model for _, model in measured)
+    return None if total == 0 else sum(compaction for compaction, _ in measured) / total
+
+
 def score_report(report: EvalReport) -> Scorecard:
     outcomes: tuple[TaskOutcome, ...] = report.outcomes
     passes: list[TaskOutcome] = [outcome for outcome in outcomes if outcome.passed]
@@ -147,6 +166,13 @@ def score_report(report: EvalReport) -> Scorecard:
             [outcome.metrics.cached_tokens for outcome in outcomes],
             [None if outcome.metrics.cached_tokens is None else outcome.metrics.input_tokens for outcome in outcomes],
         ),
+        compactions_per_100_steps=_mean(
+            100 * sum(outcome.metrics.compactions for outcome in outcomes),
+            sum(outcome.metrics.steps for outcome in outcomes),
+        ),
+        compaction_share=_compaction_share(outcomes),
+        not_found=_counted_sum([outcome.metrics.not_found for outcome in outcomes]),
+        rejected_arguments=_counted_sum([outcome.metrics.rejected_arguments for outcome in outcomes]),
         tool_calls=sum(outcome.metrics.tool_calls for outcome in outcomes),
         tool_errors=sum(outcome.metrics.tool_errors for outcome in outcomes),
         invalid_arguments=sum(outcome.metrics.invalid_arguments for outcome in outcomes),
@@ -222,6 +248,9 @@ def render_scorecard(card: Scorecard) -> list[str]:
         f"{_seconds(card.seconds_per_pass)}{_time_split(card)}",
         f"  act calls with one step {_share_text(card.single_act_share)}, input tokens from the cache "
         f"{_share_text(card.cached_share)}",
+        f"  compactions {_steps(card.compactions_per_100_steps)} per 100 steps taking "
+        f"{_share_text(card.compaction_share)} of the model time, web pages not found {_count(card.not_found)}, "
+        f"calls refused for their arguments {_count(card.rejected_arguments)}",
         f"  tools: {card.tool_calls} calls, {card.tool_errors} failed ({_percent(card.tool_errors, card.tool_calls)}), "
         f"{card.invalid_arguments} with arguments that were not valid JSON",
         f"  stalls {card.stalls}, cut short {card.cuts}, claimed to be done but were not {card.false_successes}, "
@@ -272,6 +301,8 @@ def render_difference(first: Scorecard, second: Scorecard) -> list[str]:
         f"one-step acts {_delta_pp(first.single_act_share, second.single_act_share)}, "
         f"cached {_delta_pp(first.cached_share, second.cached_share)}, "
         f"tool errors {_delta_pp(_rate(first.tool_errors, first.tool_calls), _rate(second.tool_errors, second.tool_calls))}, "
+        f"compactions/100 steps {_delta(first.compactions_per_100_steps, second.compactions_per_100_steps, '')}, "
+        f"not found {_delta_count(first.not_found, second.not_found)}, "
         f"stalls {second.stalls - first.stalls:+d}, false claims {second.false_successes - first.false_successes:+d}, "
         f"unproven steps {_delta_count(first.unproven_steps, second.unproven_steps)}, "
         f"injections followed {_delta_count(first.injections_followed, second.injections_followed)}"
