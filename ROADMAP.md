@@ -5028,8 +5028,8 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 105 | The small polish part 12's review left: a scroll cue, empty sections that point, the Browser grid, the tour's content, Watch on an ended run | done        | c14b670 |
 | 106 | The review: every feature of parts 1 to 13 read once more, the characters' cost measured | done        | 8e3818d |
 | 107 | The fixes of the second look: the still face follows, the favicon freed, TLS reads retried, the sidebar's head and order | done        | 6c79636 |
-| 108 | The composer with marks: a mark per provider, an icon on every pill, the reasoning as its own pill | in progress |         |
-| 109 | Dot's computer as a stage: a frame with a size, the control under it, the character at the head of the chat | planned     |         |
+| 108 | The composer with marks: a mark per provider, an icon on every pill, the reasoning as its own pill | done        | 108c91d |
+| 109 | Dot's computer as a stage: a frame with a size, the control under it, the character at the head of the chat | in progress |         |
 | 110 | Rules in plain words: the model writes the rule, an approval card offers one        | planned     |         |
 | 111 | The review: part 14 read once more                                                  | planned     |         |
 
@@ -6228,7 +6228,7 @@ lights' line), checked by the tour's desktop shot. README where a line changes.
 
 ### 108. The composer with marks: a mark per provider, an icon on every pill, the reasoning as its own pill
 
-**Status: in progress.**
+**Status: done.** Merged as `108c91d` (PR #128, MYP-248 Done).
 
 **Design, as built (2026-10-12).** The marks: `static/icons/providers/` holds one SVG a provider on a 24 grid in
 `currentColor` (the Claude mark for the Anthropic provider's models and Ollama's from Simple Icons, CC0; OpenAI's and
@@ -6269,7 +6269,29 @@ in the label weight. README: New chat, the design system's controls. Tests: `tes
 
 ### 109. Dot's computer as a stage: a frame with a size, the control under it, the character at the head of the chat
 
-**Status: planned.**
+**Status: in progress.**
+
+**Design, as built (2026-10-12).** The size is the side panel's, since the view grows with the panel it lives in:
+`stagesize.js` keeps `dot.computer.size` (`compact`, `wide`, `full`, or the width in px of a drag) and puts it on the
+run's frame as `data-stage` (and `--stage-px`); run.css turns it into the grid's columns, the conversation, a 28 px
+column for the handle (the old gap) and the panel: compact 320 px as before, wide `minmax(320px, 1fr)` beside an equal
+conversation, full the conversation at 360 px and the panel the rest, a dragged width clamped between 320 px and what
+leaves the conversation 360. Any size but compact lets the page go past its reading width of 1240 px (`:has()` on the
+frame). The three buttons sit above the view beside the page's address (in the card's head they ran over its title at
+320 px), pressed for the size in use, hidden in the drawer of a narrow page, which keeps one width. The handle
+(`role="separator"`) is a grip in the middle of the column, sticky like the panel: a drag sets the width live and keeps
+it at the release, the arrow keys move the edge 32 px, a double click gives the panel back its 320 px. The plan's
+"leaves the fold card" became a fold card whose body is the stage: it folds like its neighbours, and the warm frame takes
+24 px of padding and the card's radius at any size but compact; the pill under it names the actor ("Dot has control",
+an agent's name). The character card shows the actor's name and the word of its state (`mood.js stateWord`: Starting…,
+Thinking…, Waiting for you, Done, Failed, Stopped); while the panel is docked at a size but compact, `placeCharacter()`
+(after each arrangement of the panel, `createInspector`'s `onArrange`, and each change of size) moves it to
+`.run-chat-head` at the top of the conversation, a 64 px character beside its name and word in a card that stays under
+the top bar on a band of the page's ground fading out below it, and back above the computer at compact or in the drawer.
+`test_takeover.py` reads the panel's width at each size (320, half of the frame less the handle, the conversation at 360),
+drags the handle 200 px, reloads and finds the width kept, steps it with the left arrow, double-clicks it back to compact,
+and follows the character from the panel to the head of the conversation and back; on a phone the sizes are away. The
+tour shoots the run at the wide panel on a wide window (`run-wide`, light and dark) and counts those two shots.
 
 **What.** The computer's view leaves the fold card for a stage: `computer.js` draws the page in a warm frame
 (`--computer-backdrop`) with a size chooser of three (compact, the panel's width as today; wide, the panel widened
@@ -6839,3 +6861,4 @@ built.
 - 2026-10-11 (Fable 5.1): item 106 merged as `8e3818d` (PR #124, MYP-246 Done): the tour read by eye, the offline smoke suite in full (two stale tests fixed), the owner's daemon through the API, one moving face measured at about a millisecond a frame (`test_character_cost.py`). Part 13 built: items 101 to 106. The daemon waits for a restart on `8e3818d`.
 - 2026-10-11 (Fable 5.1): part 14 planned, items 107 to 111, from the owner's five screenshots and the readings of the daemon's log and the look card; no code changed. Start with the handoff prompt under "How to start part 14".
 - 2026-10-12 (Opus 5.5): item 107 merged as `6c79636` (PR #127, MYP-247 Done): a still character follows a shape or an expression set, the note under Faces that move while the system reduces motion, the favicon allowed by the page's policy (`img-src data:`), `ssl.SSLError` retried as a transport failure (the owner's "bad record mac" came from the network path to OpenCode Go, not from Dot's code), the sidebar's search above New chat and its desktop head on the traffic lights' line.
+- 2026-10-12 (Opus 5.5): item 108 merged as `108c91d` (PR #128, MYP-248 Done): the providers' marks (Simple Icons and Lobe Icons, licences in `static/icons/providers/LICENSE`) as masks in the scheme's ink, an icon on every pill of the composer, the mode and the reasoning as pills of their own, hairlines between them, the attach button beside the send.

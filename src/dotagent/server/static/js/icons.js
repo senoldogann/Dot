@@ -161,6 +161,13 @@ const SHAPES = {
   ],
   panelLeft: [["rect", { width: 18, height: 18, x: 3, y: 3, rx: 2 }], ["path", { d: "M9 3v18" }]],
   panelRight: [["rect", { width: 18, height: 18, x: 3, y: 3, rx: 2 }], ["path", { d: "M15 3v18" }]],
+  columns: [["rect", { width: 18, height: 18, x: 3, y: 3, rx: 2 }], ["path", { d: "M12 3v18" }]],
+  maximize: [
+    ["polyline", { points: "15 3 21 3 21 9" }],
+    ["polyline", { points: "9 21 3 21 3 15" }],
+    ["line", { x1: 21, x2: 14, y1: 3, y2: 10 }],
+    ["line", { x1: 3, x2: 10, y1: 21, y2: 14 }],
+  ],
   key: [
     ["path", { d: "m15.5 7.5 2.3 2.3a1 1 0 0 0 1.4 0l2.1-2.1a1 1 0 0 0 0-1.4L19 4" }],
     ["path", { d: "m21 2-9.6 9.6" }],

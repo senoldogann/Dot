@@ -18,9 +18,10 @@ const STRIP_LIMIT = 24;
  * The panel for a run page whose frame is `layout`, with `content` (a list of nodes) above the screens. The frame gets
  * `data-inspector="on"` while the panel sits beside the conversation and `"off"` otherwise. Returns `element` (the panel) and
  * `scrim` (the veil behind the drawer), both to put inside the frame, `toggle` (the header button that shows or hides the
- * panel), `arrange()` (call it once the frame is on the page), `addImage(name)` and `dispose()`.
+ * panel), `arrange()` (call it once the frame is on the page), `addImage(name)` and `dispose()`. `onArrange()` runs after
+ * every arrangement, once the frame says where the panel is.
  */
-export function createInspector({ layout, content }) {
+export function createInspector({ layout, content, onArrange }) {
   const names = [];
   const thumbs = [];
   let selected = -1;
@@ -164,6 +165,7 @@ export function createInspector({ layout, content }) {
     const shown = room ? wanted : drawerOpen;
     toggle.setAttribute("aria-pressed", String(shown));
     toggle.title = shown ? "Hide the details" : "Show the details";
+    onArrange();
   }
 
   // The drawer slides (item 85): shown first, then opened once its first frame is laid out so the slide plays; closing,

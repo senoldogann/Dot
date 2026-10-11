@@ -35,3 +35,23 @@ export function entranceOf(before, after) {
   }
   return null;
 }
+
+/** The word under the run's character for its status (item 109): what it is doing, said the way the reader reads it. */
+export function stateWord(status) {
+  switch (status) {
+    case "queued":
+      return "Starting…";
+    case "running":
+      return "Thinking…";
+    case "blocked":
+      return "Waiting for you";
+    case "done":
+      return "Done";
+    case "failed":
+      return "Failed";
+    case "cancelled":
+      return "Stopped";
+    default:
+      throw new Error(`unknown run status: ${status}`);
+  }
+}

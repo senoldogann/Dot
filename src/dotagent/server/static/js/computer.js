@@ -13,11 +13,13 @@ const WAITING_FOR_FRAME = "Waiting for the page: the first frame comes when the 
 const CLOSED_HINT = "Watch the page Dot's browser is on. Nothing is sent while the view is closed.";
 
 /**
- * The card for the run `runId`, which is `active` (still going on) and `held` (the reader has its browser). Returns
- * `element`, `setHeld(flag)` (the timeline calls it on the takeover and handback events), `setActive(flag)` (the stream
- * stops with the run) and `dispose()`.
+ * The card for the run `runId`, which is `active` (still going on) and `held` (the reader has its browser); `name` is
+ * the actor whose browser it is ("Dot has control"), `sizes` the size chooser of the panel (stagesize.js), above the
+ * view beside the page's address.
+ * Returns `element`, `setHeld(flag)` (the timeline calls it on the takeover and handback events), `setActive(flag)` (the
+ * stream stops with the run) and `dispose()`.
  */
-export function createComputer({ runId, active, held }) {
+export function createComputer({ runId, active, held, name, sizes }) {
   let isActive = active;
   let isHeld = held;
   let hasPage = false;
@@ -37,7 +39,7 @@ export function createComputer({ runId, active, held }) {
     id: "run-computer",
     title: "Dot's computer",
     actions: watchButton,
-    body: el("div", { class: "stack tight computer-body" }, screen, address, pill),
+    body: el("div", { class: "stack tight computer-body" }, el("div", { class: "computer-toolbar" }, address, sizes), screen, pill),
     openByDefault: false,
   });
   const element = card.element;
@@ -53,7 +55,7 @@ export function createComputer({ runId, active, held }) {
       empty.textContent = watching ? WAITING_FOR_FRAME : isActive && !hasPage ? NO_PAGE_YET : CLOSED_HINT;
     }
     card.setSummary(address.textContent);
-    who.textContent = isHeld ? "You have control" : "Dot has control";
+    who.textContent = isHeld ? "You have control" : `${name} has control`;
     handButton.textContent = isHeld ? "Return control" : "Take over";
     handButton.title = isHeld ? "Let the run go on; it is told the page may have changed" : "Hold the run at its next tool call and use the browser yourself";
     pill.hidden = !isActive;

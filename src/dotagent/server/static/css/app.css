@@ -337,6 +337,23 @@ textarea {
   padding: var(--space-2);
 }
 
+/* The character's name and the word of its state (item 109), under it in the panel. */
+.character-caption {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 0 16px 16px;
+}
+
+.character-name {
+  font-weight: var(--weight-label);
+}
+
+.character-word {
+  color: var(--muted);
+  font-size: var(--text-sm);
+}
+
 .bubble[role="article"] {
   display: grid;
   grid-template-columns: 28px minmax(0, 1fr);
