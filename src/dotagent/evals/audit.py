@@ -4,6 +4,7 @@ import re
 from collections.abc import Sequence
 from pathlib import Path
 
+from dotagent.agent.review import GOAL_TOOL
 from dotagent.core.errors import EvalError
 from dotagent.evals.checks import workspace_path
 from dotagent.evals.types import AnswerMatches, Check, EvalTask, ScriptedCall
@@ -21,10 +22,12 @@ def _path_problem(path: str) -> str | None:
 
 
 def _final_call(task: EvalTask) -> ScriptedCall | None:
-    """The last tool call of the reference solution."""
+    """The last tool call of the reference solution, leaving out the verdicts of the goal check that follow the finish
+    of a goal-mode task (the scripted model plays the review model there too)."""
     for turn in reversed(task.reference):
-        if turn.calls:
-            return turn.calls[-1]
+        calls: list[ScriptedCall] = [call for call in turn.calls if call.tool != GOAL_TOOL]
+        if calls:
+            return calls[-1]
     return None
 
 

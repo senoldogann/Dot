@@ -146,3 +146,18 @@ async def test_a_run_that_uses_more_tokens_than_its_task_allows_is_cut(
     assert outcome.cut == "token_budget"
     assert outcome.status == "cancelled"
     assert not outcome.passed
+
+
+async def test_the_site_tasks_are_served_for_the_attempt_and_count_the_numbers_of_a_long_run(
+    config: AppConfig, login_env: dict[str, str]
+) -> None:
+    """The careers task reads ten pages of a site served for the attempt, meets the one that is not there and reports
+    it; the form task fills in and submits the form in the headless browser and the scripted review model's verdict
+    ends its goal mode (item 54). Item 53's numbers come out of the attempts."""
+    careers: TaskOutcome = await replay_reference(select_tasks(["careers-of-ten-companies"])[0], config, login_env)
+    assert careers.passed, careers
+    assert careers.metrics.steps >= 12 and careers.metrics.tool_errors == 1
+    assert (careers.metrics.not_found, careers.metrics.rejected_arguments) == (1, 0)
+    form: TaskOutcome = await replay_reference(select_tasks(["newsletter-form-verified"])[0], config, login_env)
+    assert form.passed, form
+    assert form.status == "done" and form.metrics.unproven_steps == 0

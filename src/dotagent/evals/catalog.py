@@ -2,8 +2,9 @@
 result by what is left in the workspace and by the answer, and carries a reference solution.
 
 A task has to be passable and has to need work: ``dotx eval check`` replays every reference through the real loop and
-tools, and proves that a run that only says "done" fails every task. Tasks are meant to be done with the file tools and
-the shell alone, so that a result does not depend on the network, on a signed-in account or on the Mac's desktop.
+tools, and proves that a run that only says "done" fails every task. Tasks are meant to be done with the file tools,
+the shell and, for the two site tasks, a local site served for the attempt, so that a result does not depend on the
+network, on a signed-in account or on the Mac's desktop.
 """
 
 import json
@@ -28,6 +29,7 @@ from dotagent.evals.types import (
     JsonEquals,
     ScriptedCall,
     ScriptedTurn,
+    SitePage,
     TaskCategory,
 )
 from dotagent.store.models import RunMode
@@ -74,6 +76,18 @@ def _edit(path: str, old: str, new: str, replace_all: bool) -> ScriptedCall:
 
 def _finish(answer: str, success: bool) -> ScriptedTurn:
     return _turn(_call(FINISH_TOOL, answer=answer, success=success))
+
+
+def _fetch(url: str) -> ScriptedTurn:
+    return _turn(_call("web_fetch", url=url))
+
+
+def _page(path: str, body: str) -> SitePage:
+    return SitePage(path=path, status=200, body=body, location=None)
+
+
+def _redirect(path: str, location: str) -> SitePage:
+    return SitePage(path=path, status=301, body="", location=location)
 
 
 def _runs(*argv: str) -> CommandSucceeds:
@@ -135,6 +149,24 @@ def _task(
         reference=tuple(reference),
         time_limit_s=TIME_LIMIT_S,
         token_budget=TOKEN_BUDGET,
+        site=(),
+        goal_mode=False,
+    )
+
+
+def _site_task(
+    task_id: str,
+    goal: str,
+    mode: RunMode,
+    goal_mode: bool,
+    site: Sequence[SitePage],
+    checks: Sequence[Check],
+    reference: Sequence[ScriptedTurn],
+) -> EvalTask:
+    """A task on a local site served for the attempt, whose address ``{site}`` stands for in the goal and the
+    reference; the workspace starts empty and the end is judged by the answer."""
+    return _task(task_id, "browser", goal, mode, "done", (), checks, reference).model_copy(
+        update={"site": tuple(site), "goal_mode": goal_mode}
     )
 
 
@@ -967,7 +999,38 @@ LONG_TASK_IDS: tuple[str, ...] = (
     "branch-totals-json",
     "checklist-ten-files",
     "pipeline-with-flaky-stage",
+    "careers-of-ten-companies",
 )
+# The ten companies of careers-of-ten-companies, each with the open roles its careers page lists (the first title is
+# unique to the company, so a report that names it read the page). Dogwood's link is dead (its page is not there) and
+# Ginkgo's careers address redirects to another path.
+_COMPANIES: tuple[tuple[str, tuple[str, ...]], ...] = (
+    ("Alder", ("Kotlin Backend Engineer", "Site Reliability Engineer")),
+    ("Birch", ("Rust Platform Engineer",)),
+    ("Cedar", ("Embedded Firmware Engineer", "QA Engineer", "Product Designer")),
+    ("Dogwood", ()),
+    ("Elm", ("Data Platform Engineer", "Analytics Engineer")),
+    ("Fir", ("iOS Engineer",)),
+    ("Ginkgo", ("Machine Learning Engineer", "Research Scientist", "Technical Writer")),
+    ("Hazel", ("Security Engineer", "Cloud Architect")),
+    ("Iroko", ("Frontend Engineer",)),
+    ("Juniper", ("DevOps Engineer", "Solutions Engineer")),
+)
+_DEAD_COMPANY: str = "Dogwood"
+_REDIRECTED_COMPANY: str = "Ginkgo"
+_FORM_PAGE: str = _lines(
+    "<!doctype html><title>Newsletter form</title><h1>Newsletter</h1>",
+    '<form action="/done" method="get">',
+    '<label>Name <input name="name"></label>',
+    '<label>Color <select name="color"><option value="red">Red</option><option value="blue">Blue</option></select></label>',
+    '<label><input type="checkbox" name="agree"> I agree</label>',
+    '<button type="submit">Submit form</button>',
+    "</form>",
+)
+_DONE_PAGE: str = (
+    "<!doctype html><title>Done</title><h1>Received: {name}, {color}</h1><p>Your answers were recorded.</p>"
+)
+_CONFIRMATION: str = "Received: Ada, blue"
 # Errors per day of the twelve logs of digest-twelve-days, and their sum.
 _DAY_ERRORS: tuple[int, ...] = (1, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3, 0)
 _MODULES: tuple[str, ...] = tuple(f"m{number:02d}" for number in range(1, 11))
@@ -1124,9 +1187,114 @@ def _long_tasks() -> tuple[EvalTask, ...]:
     )
 
 
+def _careers_path(company: str) -> str:
+    """The path the index links a company's careers page under: Dogwood's is not there, Ginkgo's moves."""
+    if company == _DEAD_COMPANY:
+        return f"/{company.lower()}/jobs/"
+    return f"/{company.lower()}/careers/"
+
+
+def _careers_page(company: str, roles: tuple[str, ...]) -> str:
+    items: str = "".join(f"<li>{role}</li>" for role in roles)
+    return f"<!doctype html><title>{company} careers</title><h1>Open roles at {company}</h1><ul>{items}</ul>"
+
+
+def _careers_site() -> tuple[SitePage, ...]:
+    index: str = (
+        "<!doctype html><title>Companies</title><h1>Ten companies</h1><ul>"
+        + "".join(
+            f'<li>{company}: <a href="{_careers_path(company)}">{company} careers</a></li>' for company, _ in _COMPANIES
+        )
+        + "</ul>"
+    )
+    pages: list[SitePage] = [_page("/companies/", index)]
+    for company, roles in _COMPANIES:
+        if company == _DEAD_COMPANY:
+            continue
+        if company == _REDIRECTED_COMPANY:
+            moved: str = f"/{company.lower()}/open-roles/"
+            pages.append(_redirect(_careers_path(company), moved))
+            pages.append(_page(moved, _careers_page(company, roles)))
+        else:
+            pages.append(_page(_careers_path(company), _careers_page(company, roles)))
+    return tuple(pages)
+
+
+def _careers_report() -> str:
+    rows: list[str] = ["| Company | Open roles | First role |", "| --- | --- | --- |"]
+    for company, roles in _COMPANIES:
+        if company == _DEAD_COMPANY:
+            rows.append(f"| {company} | could not be read: its careers page answers HTTP 404 (not found) | - |")
+        else:
+            rows.append(f"| {company} | {len(roles)} | {roles[0]} |")
+    return "\n".join(rows)
+
+
+def _site_tasks() -> tuple[EvalTask, ...]:
+    """The two tasks on a local site (item 54): a long research run over ten careers pages, one of them not there and
+    one behind a redirect, and a goal-mode run that fills in and submits a form in the browser."""
+    careers_checks: tuple[Check, ...] = (
+        *(_says(company) for company, _ in _COMPANIES),
+        *(_says(roles[0]) for _, roles in _COMPANIES if roles),
+        _matches(rf"(?i){_DEAD_COMPANY}[^\n]{{0,120}}(not found|404|could not|cannot|unreachable)"),
+    )
+    return (
+        _site_task(
+            "careers-of-ten-companies",
+            "Read {site}/companies/ and then the careers page of each of the ten companies it links to. Report a table "
+            "with one row per company: the company, how many open roles its careers page lists, and the title of the "
+            "first one. For a company whose careers page cannot be read, say so in its row instead of trying other "
+            "addresses.",
+            "research",
+            False,
+            _careers_site(),
+            careers_checks,
+            (
+                _fetch("{site}/companies/"),
+                *(_fetch("{site}" + _careers_path(company)) for company, _ in _COMPANIES),
+                _finish(_careers_report(), True),
+            ),
+        ),
+        _site_task(
+            "newsletter-form-verified",
+            "Open {site}/form in the browser. Fill Name with Ada, choose the colour blue, tick 'I agree' and press "
+            f"'Submit form'. The goal is reached when the confirmation page says '{_CONFIRMATION}'; report what it "
+            "says.",
+            "task",
+            True,
+            (_page("/form", _FORM_PAGE), _page("/done", _DONE_PAGE)),
+            (_says(_CONFIRMATION),),
+            (
+                _turn(_call("browser_open", url="{site}/form")),
+                _turn(
+                    _call(
+                        "browser_act",
+                        steps=[
+                            {"action": "fill", "ref": "e5", "text": "Ada"},
+                            {"action": "select", "ref": "e7", "text": "Blue"},
+                            {"action": "check", "ref": "e9"},
+                            {"action": "click", "ref": "e10"},
+                        ],
+                        expect=f"the confirmation page says {_CONFIRMATION}",
+                    )
+                ),
+                _finish(f"The confirmation page says: {_CONFIRMATION}.", True),
+                _turn(
+                    _call(
+                        "goal_verdict",
+                        decision="achieved",
+                        reason=f"The confirmation page shows {_CONFIRMATION}, as the goal asks.",
+                        unproven_steps=[],
+                    )
+                ),
+            ),
+        ),
+    )
+
+
 def all_tasks() -> tuple[EvalTask, ...]:
-    """Every task of the catalog, in a fixed order: the small tasks, then the long ones."""
-    return (*_catalog(), *_long_tasks())
+    """Every task of the catalog, in a fixed order: the small tasks, then the long ones, then the two on a site."""
+    return (*_catalog(), *_long_tasks(), *_site_tasks())
 
 
 def select_tasks(task_ids: Sequence[str]) -> tuple[EvalTask, ...]:

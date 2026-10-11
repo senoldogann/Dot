@@ -3639,8 +3639,8 @@ closed pages) then; 58 (the bill on the run page) last, since it shows 53's numb
 
 | #   | Item                                                                     | Status  | Commits |
 | --- | ------------------------------------------------------------------------ | ------- | ------- |
-| 53  | The numbers of a long run                                                | in progress |         |
-| 54  | Long browser tasks in the eval set                                       | planned |         |
+| 53  | The numbers of a long run                                                | done    | 4967717 |
+| 54  | Long browser tasks in the eval set                                       | in progress |         |
 | 55  | Context that stays: a compaction every forty steps, not seven            | planned |         |
 | 56  | The web without guessing                                                 | planned |         |
 | 57  | The browser's closed pages                                               | planned |         |
@@ -3711,6 +3711,8 @@ owner's runs is in this item (done).
 
 ### 54. Long browser tasks in the eval set
 
+**Status: done.** Built on `item-54-long-browser-tasks` (MYP-194).
+
 **What.** Two long tasks against the test fixture site (the local server of the browser smoke tests): a *research*
 task that reads ten or more pages, one of them linked to a dead address and one behind a redirect, and reports a
 table; and a *goal-mode* task on a form whose outcome must be verified on the page (so `expect` and the goal check
@@ -3724,10 +3726,31 @@ smoke tests' site (extend it rather than add a second one); the scripted turns s
 site, follow links, meet the 404, report it); the checks read the report's table and the form's state. The runner
 starts the fixture server for a browser task and the browser in headless mode in the attempt's home.
 
-**Touchpoints.** `evals/catalog.py`, `evals/runner.py`, the fixture site under `tests/`, README "Evaluation".
+**Design, as built.** The reading of the code corrected the plan in three places. A task is data with no server, and
+the smoke tests' fixture sites are each test's own (`ThreadingHTTPServer` in the test module), so the site became
+part of the task: `EvalTask` gains `site` (a tuple of `SitePage`: path, status, body, redirect location; a `{name}` in
+a body is filled from the query string) and `goal_mode`; `evals/site.py` serves the pages on a free loopback port for
+the length of the attempt (`serve_site`) and `with_site` puts the address in for `{site}` in the goal and in the
+arguments of the reference, which cannot know the port when it is written. The runner (`_attempt`) serves the site,
+places the task, builds the scripted stand-in from the placed reference, and lets the web tools reach the loopback
+address for such a task only (`site_config`: `web.allow_private_hosts`); every eval attempt runs the browser headless
+(`eval_config`). The form task is not long (three tool turns): its point is `expect` on `browser_act` and the goal
+check at the end, so it is a `browser` task outside `LONG_TASK_IDS`, while `careers-of-ten-companies` (twelve turns:
+the index, ten careers pages of which Dogwood's answers 404 and Ginkgo's redirects, the finish) joins the long ids.
+In a goal-mode task the scripted model is the review model too (`replay_reference` sets `[models] review`), so the
+reference ends with the `goal_verdict` turn after `finish`, and the audit's final-call rule leaves such verdict turns
+out. `TaskCategory` gains `browser`. The refs of the form's reference (`e5`, `e7`, `e9`, `e10`) were read from a
+snapshot of the page in Dot's own headless Chrome. Tests: `tests/unit/test_evals.py` (the server: pages, 404, redirect,
+the query placeholders; the placement of the address; the two tasks' shape), `tests/smoke/test_evals_runner.py` (both
+references replayed through the real loop and tools: the careers attempt counts one not-found page and twelve or
+more steps, the form attempt passes its goal check), and `dotx eval check` plays both in the gate.
 
-**Done when.** `dotx eval check` plays both offline; `dotx eval run --task ID --model REF` plays them live; the
-report shows compactions and fetch failures (item 53) for them.
+**Touchpoints.** `evals/types.py`, `evals/site.py` (new), `evals/runner.py`, `evals/catalog.py`, `evals/audit.py`,
+README "Measuring the agent", `tests/unit/test_evals.py`, `tests/smoke/test_evals_runner.py`.
+
+**Done when.** `dotx eval check` plays both offline (done); `dotx eval run --task ID --model REF` plays them live (the
+same path with a model instead of the script; the owner's paid run); the report shows compactions and fetch failures
+(item 53) for them (done: the smoke test reads them from the attempts).
 
 ### 55. Context that stays: a compaction every forty steps, not seven
 
@@ -4435,3 +4458,5 @@ rows carry minutes and tokens.
   runs read through the API and `dotx stats` (never their files) and the daemon's logs: items 53 to 58 (the numbers of
   a long run, long browser tasks in the eval set, context that stays, the web without guessing, the browser's closed
   pages, the bill on the run page) and decision 33 (the context budget, measured in 55). Next: item 53.
+- 2026-10-11 (Fable 5.1): item 53 merged 4967717 (PR #57, MYP-193 Done; gate + desktop jobs green). The baseline of the
+  owner's runs is in the item. Next: item 54 (long browser tasks in the eval set).
