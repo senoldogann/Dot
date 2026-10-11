@@ -4995,7 +4995,7 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | --- | ------------------------------------------------------------------------ | ----------- | ------- |
 | 77  | The type system: Inter and Geist Mono, seven sizes, three weights        | done        | ffa00cb |
 | 78  | One bar: the top bar carries the page, the run's head and the daemon     | done        | 7a7e43f |
-| 79  | Flat surfaces and plain words: cards, labels, meta, chips, empty states  | in progress |         |
+| 79  | Flat surfaces and plain words: cards, labels, meta, chips, empty states  | done        | ab5f33a |
 | 80  | Forms and controls: one grammar for inputs, selects, switches, tables    | in progress |         |
 | 81  | Dark, first paint and the tour: every page read in both schemes          | planned     |         |
 | 82  | Delegated runs as rows: face, state, last line, time; the child's bar    | planned     |         |
@@ -5057,7 +5057,7 @@ The phone header is the same bar. Nothing has a translucent backdrop any more.
 
 ### 79. Flat surfaces and plain words: cards, labels, meta, chips, empty states
 
-**Status: in progress.** Built on `item-79-flat-surfaces` (MYP-219).
+**Status: done.** Merged as `ab5f33a` (PR #88, squash; MYP-219 Done).
 
 **Design, as built (2026-10-11).** `--radius` is 12 px and `.card` is a surface with a hairline and no shadow; the
 shadow tokens stay on what floats (menus, dialogs, the composer's focus, the sidebar's open row). `.section-label` is
@@ -5632,3 +5632,4 @@ item 82, the sidebar's sections, the Campaigns and Schedules pages and the bar o
 - 2026-10-11 (Fable 5.1): item 74 built on branch `item-74-quiet-chrome` (MYP-214, PR #82). Item 75 built on branch `item-75-not-looking` (MYP-215): `attention.js` `isLooking`/`worthATell(runId)`, the "Tell me even when I am looking" switch, the attention smoke test with a stubbed Notification.
 - 2026-10-11 (Fable 5.1): item 74 merged as `f809abd` (PR #82). Item 75 merged as `9643889` (PR #83) on the local gate: GitHub Actions refused both jobs (billing), see its status line. Item 76 opened: the baseline is written, the week starts with the daemon restart of today. The daemon's hourly task on `anthropic:claude-sonnet-5-5` failed three times running (04:28, 05:29, 06:31): Chrome did not accept the remote debugging connection on 9222 within 60 s; the owner's Chrome, not the code, as far as the store shows (told the owner).
 - 2026-10-11 (Fable 5.1): Part 9 planned (items 77-83; items 82 and 83 from the owner's references: Claude Code's subagent rows and child page, Grok's moving agent faces). Item 77 merged as `ffa00cb` (PR #86, MYP-217 Done): Inter and Geist Mono self-hosted, seven sizes, three weights, the token test, the screenshot tour. Item 78 merged as `7a7e43f` (PR #87, MYP-218 Done): `stage.js`, one solid top bar, the run's head in it, the settings' single title. Item 79 built on branch `item-79-flat-surfaces` (MYP-219): flat cards, sentence-case labels, `.meta-facts`, one-line empty states, the bubble on the raised surface.
+- 2026-10-11 (Fable 5.1): item 79 merged as `ab5f33a` (PR #88, MYP-219 Done). Item 80 built on branch `item-80-forms` (MYP-220): one control grammar (36/32 px, 8 px corner, one focus ring, the drawn chevron, 40 px table rows).
