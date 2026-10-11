@@ -809,17 +809,19 @@ The web UI is laid out like a chat app: the chats in a sidebar on the left, one 
 page of their own.
 
 The sidebar lists your chats (the conversation threads) grouped by day, newest activity first; a live dot marks those
-with a run going on, waiting for you or failed, and a chat opens at its latest run. Above the list: **New chat** (⇧⌘O)
-and a search over the titles (⌘K or `/`); below it, **Settings**. **Select** turns the list into checkboxes: tick chats
+with a run going on, waiting for you or failed, and a chat opens at its latest run. Above the list: **New chat** (⇧⌘O),
+a search over the titles (⌘K or `/`) and the ways to **Agents**, **Activity** and **Campaigns**; in the foot,
+**Settings**. The sections (Waiting for you, Working, Chats) fold on a click of their label, and the folds are kept
+between visits. **Select** turns the list into checkboxes: tick chats
 (or Select all) and **Delete** asks once, then removes them with every run, step, event and approval of theirs. A chat
 with a run under way is refused: wait for the run to end, or cancel it. Escape leaves the selection. Under 860 px the
 sidebar becomes a drawer.
 
 Above the chats, two sections appear while they have rows: **Waiting for you** (the approvals and questions runs wait
 for, and a run whose browser you took over) and **Working** (the runs going on, a session of a campaign, a run
-delegated by another, and a schedule that fires within the hour), each row with its state dot, what it is, the channel
-it last worked in (browser, files, shell, desktop, mail) and what it needs; a row opens the run. **Activity**
-(`#/activity`, below the list next to Campaigns) is the same in full, with the runs that ended today and a filter by
+delegated by another, and a schedule that fires within the hour), each row with its state dot, the first words of
+its title on one line, and under it the channel it last worked in (browser, files, shell, desktop, mail) and what it
+needs; a row opens the run. **Activity** (`#/activity`) is the same in full, with the runs that ended today and a filter by
 kind (runs, campaigns, schedules); it is `GET /api/activity`. A run that ended shows how long it took and what it cost
 in tokens. Both follow the lifecycle stream, so a run moves between the sections the moment it starts, waits, is taken
 over or ends. A run delegated by another run sits under the run that delegated it, in both the sidebar and the Activity

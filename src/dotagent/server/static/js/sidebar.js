@@ -1,11 +1,13 @@
-// The sidebar: a new chat, a search over the chats, the chats themselves (several of them can be deleted at once) and the
-// way to the settings.
+// The sidebar: a new chat, a search over the chats, the ways to the agents, the activity and the campaigns, what waits
+// and what works (folded or not, as the owner left them), the chats themselves (several of them can be deleted at once)
+// and, in the foot, the way to the settings.
 
 import { ApiError, api, request } from "./api.js";
-import { clip, debounce, el, foldSearch, plural } from "./dom.js";
+import { clip, clipWords, debounce, el, foldSearch, plural } from "./dom.js";
 import { brandMark, icon } from "./icons.js";
 import { actorFace } from "./actors.js";
 import { nestRows, progressFacts } from "./nesting.js";
+import { readPref, writePref } from "./prefs.js";
 import { requestCompose } from "./shortcuts.js";
 import { onLifecycle } from "./state.js";
 import { attempt, confirmDialog, toast } from "./ui.js";
@@ -21,6 +23,11 @@ const ACTIVITY_SECTIONS = [
   { key: "working", label: "Working" },
 ];
 const DAY_LABELS = ["Today", "Yesterday", "Previous 7 days", "Older"];
+// A row of the activity sections shows this many words of its title at most, on one line (item 95).
+const ROW_WORDS = 7;
+const ROW_CHARS = 56;
+// Which sections the owner folded (`waiting`, `working`, `chats`), kept between visits.
+const FOLDS_KEY = "dot.sideFolds";
 // What a status dot means, for screen readers; a chat whose latest run is done or cancelled shows no dot and needs no word.
 const STATUS_WORD = { queued: "queued", running: "running", blocked: "waiting for you", failed: "failed" };
 const BUSY_MESSAGE = "A chat with a run under way cannot be deleted. Wait for the run to end, or cancel it, and try again.";
@@ -49,6 +56,25 @@ function groupByDay(chats, now) {
 
 function matchesQuery(chat, needle) {
   return needle === "" || foldSearch(chat.title).includes(needle);
+}
+
+/** The folded sections, as saved; anything unreadable counts as nothing folded. */
+function readFolds() {
+  try {
+    const folds = JSON.parse(readPref(FOLDS_KEY) ?? "{}");
+    return folds !== null && typeof folds === "object" ? folds : {};
+  } catch {
+    return {};
+  }
+}
+
+/** A section's label as the button that folds it: a chevron that turns, the words, a count. */
+function foldLabel(tag, folded, onToggle, ...words) {
+  return el(
+    tag,
+    { class: "side-label" },
+    el("button", { class: "side-fold", type: "button", "aria-expanded": folded ? "false" : "true", onclick: onToggle }, icon("chevron"), ...words),
+  );
 }
 
 function mark(node, current) {
@@ -99,8 +125,8 @@ function activityRow(row, onNavigate, children, child) {
     el(
       "span",
       { class: "side-run-goal" },
-      clip(row.title, 120),
-      facts.length === 0 ? null : el("small", { class: "side-activity-detail meta-facts" }, ...facts.map((fact) => el("span", null, fact))),
+      el("span", { class: "side-activity-title" }, clipWords(row.title, ROW_WORDS, ROW_CHARS)),
+      facts.length === 0 ? null : el("small", { class: "side-activity-detail" }, facts.join(" · ")),
     ),
   );
 }
@@ -165,7 +191,15 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
     icon("panelLeft"),
   );
   const selectButton = el("button", { class: "btn ghost sm", type: "button", hidden: true, onclick: () => enterSelectMode() }, "Select");
-  const head = el("div", { class: "side-list-head" }, el("h2", { class: "side-label" }, "Chats"), selectButton);
+  let folds = readFolds();
+  function toggleFold(key) {
+    folds = { ...folds, [key]: folds[key] !== true };
+    writePref(FOLDS_KEY, JSON.stringify(folds));
+    paintActivity();
+    paintChats();
+  }
+  const chatsLabel = foldLabel("h2", folds.chats === true, () => toggleFold("chats"), "Chats");
+  const head = el("div", { class: "side-list-head" }, chatsLabel, selectButton);
   const count = el("span", { class: "grow side-count" });
   const allButton = el("button", { class: "btn sm", type: "button", onclick: () => toggleAll() }, "Select all");
   const deleteButton = el(
@@ -253,6 +287,10 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
     selectButton.hidden = selecting || chats === null || chats.length === 0;
     head.hidden = selecting;
     bar.hidden = !selecting;
+    // The chats fold under their label (item 95); choosing chats to delete needs them in sight.
+    const foldedChats = folds.chats === true && !selecting;
+    chatsLabel.firstChild.setAttribute("aria-expanded", foldedChats ? "false" : "true");
+    list.hidden = foldedChats;
     if (failure !== null) {
       list.replaceChildren(
         el(
@@ -421,14 +459,15 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
     const groups = activity === null ? [] : ACTIVITY_SECTIONS.filter(({ key }) => activity[key].length > 0);
     activityNav.hidden = groups.length === 0;
     activityNav.replaceChildren(
-      ...groups.map(({ key, label }) =>
-        el(
+      ...groups.map(({ key, label }) => {
+        const folded = folds[key] === true;
+        return el(
           "section",
-          { class: "side-group", "data-section": key },
-          el("h3", { class: "side-label" }, `${label} `, el("span", { class: "side-label-count" }, String(activity[key].length))),
-          activityRows(activity[key], onNavigate),
-        ),
-      ),
+          { class: "side-group", "data-section": key, "data-folded": folded ? "true" : null },
+          foldLabel("h3", folded, () => toggleFold(key), `${label} `, el("span", { class: "side-label-count" }, String(activity[key].length))),
+          folded ? null : activityRows(activity[key], onNavigate),
+        );
+      }),
     );
   }
 
@@ -577,10 +616,11 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
         el("kbd", { "aria-hidden": "true" }, "⇧⌘O"),
       ),
       el("label", { class: "side-search" }, icon("search"), search, el("kbd", { "aria-hidden": "true" }, "⌘K")),
+      el("nav", { class: "side-links", "aria-label": "Pages" }, agentsLink, activityLink, campaignsLink),
       activityNav,
       el("nav", { class: "side-recent", "aria-label": "Chats" }, head, bar, list),
     ),
-    el("div", { class: "side-foot" }, agentsLink, activityLink, campaignsLink, settingsLink),
+    el("div", { class: "side-foot" }, settingsLink),
   );
 
   return {

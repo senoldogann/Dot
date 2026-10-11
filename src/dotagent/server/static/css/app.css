@@ -151,7 +151,7 @@ textarea {
 }
 
 :focus-visible {
-  outline: 2px solid var(--accent);
+  outline: 2px solid var(--ring);
   outline-offset: 2px;
 }
 
@@ -656,10 +656,11 @@ a.pill:hover {
   border-color: var(--control);
 }
 
+/* A field in focus: a soft ring of the accent, not a frame (item 95). */
 .input:focus,
 .select:focus,
 .textarea:focus {
-  outline: 2px solid var(--accent);
+  outline: 2px solid var(--ring);
   outline-offset: 1px;
 }
 
@@ -2418,8 +2419,10 @@ details[open] > summary .chev {
   background: transparent;
 }
 
+/* The dock's frame shows the focus; its textarea draws no ring of its own. */
 .dock-inner .textarea:focus {
   box-shadow: none;
+  outline: none;
 }
 
 /* The box is one line high when empty, so on a narrow page its hint stays on that line and is cut at the edge instead of

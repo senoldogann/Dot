@@ -72,6 +72,8 @@
   --shadow-ink-soft: light-dark(rgb(28 27 25 / 10%), rgb(0 0 0 / 30%));
   --shadow-ink-deep: light-dark(rgb(28 27 25 / 24%), rgb(0 0 0 / 60%));
   --shadow: 0 1px 2px var(--shadow-ink), 0 4px 16px var(--shadow-ink);
+  /* The focus ring: the accent at a third, so focus is seen without a dark frame (item 95). */
+  --ring: color-mix(in srgb, var(--accent) 38%, transparent);
   --shadow-seg: 0 1px 2px var(--shadow-ink-soft);
   --shadow-knob: 0 1px 2px var(--shadow-ink-soft);
   --shadow-raised: 0 2px 8px var(--shadow-ink);
