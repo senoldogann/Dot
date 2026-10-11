@@ -25,3 +25,13 @@ export function writePref(key, value) {
     // Same as above: the page keeps the value in memory.
   }
 }
+
+/** Forget a preference. */
+export function clearPref(key) {
+  setHere.delete(key);
+  try {
+    localStorage.removeItem(key);
+  } catch {
+    // Same as above.
+  }
+}

@@ -5023,7 +5023,7 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 100 | The review: every feature of parts 1 to 12 read once more on the live pages        | done        | 62585c2 |
 | 101 | The character engine: bloub's one shape with two eyes, as plain modules of Dot's UI | done        | 8c3a590 |
 | 102 | The look of every agent: shape, expression and colour, chosen in the editor and worn in every row | done        | f6afe5d |
-| 103 | Alive beside the chat: the character works, waits, finishes and sleeps with the run | planned     |         |
+| 103 | Alive beside the chat: the character works, waits, finishes and sleeps with the run | done        | 0a0fdaa |
 | 104 | The composer remade: one frame, quiet menus, drafts that keep, a face that listens  | planned     |         |
 | 105 | The small polish part 12's review left: a scroll cue, empty sections that point, the Browser grid, the tour's content, Watch on an ended run | planned     |         |
 | 106 | The review: every feature of parts 1 to 13 read once more, the characters' cost measured | planned     |         |
@@ -5987,7 +5987,7 @@ row wears it), `test_face.py` (the favicon, the home face) updated with the sele
 
 ### 103. Alive beside the chat: the character works, waits, finishes and sleeps with the run
 
-**Status: in progress.**
+**Status: done.** Merged as `0a0fdaa` (PR #121, MYP-243 Done).
 
 Design, as built (2026-10-11). The run page's side panel opens with the run's actor as a moving character: a new
 card `charactercard.js` (`createCharacterCard({id, look, status, endedAt, size})`, a `section.card.character-card`
@@ -6026,7 +6026,32 @@ and the still frame with the switch off; `test_run_chrome.py` and `test_activity
 
 ### 104. The composer remade: one frame, quiet menus, drafts that keep, a face that listens
 
-**Status: planned.**
+**Status: in progress.**
+
+Design, as built (2026-10-11). `composer.js` grows the frame itself: `composerFrame({label, boxLabel, placeholder,
+rows, maxPx, commands, send, sendLabel, draftKey, listener})` returns the card with the slash menu over it, the box,
+the attached files in a row under it (40 px thumbnails; a drop tints the whole frame) and the bar with an `options`
+row to fill and the round send; the home (`runs.js`), the run page's dock (`run.js`) and the agent page (`agents.js`)
+build on it, so the three are one `.composer` with one padding, a hairline at rest, a stronger one under the pointer,
+the 10 % ring in focus and the shadow on the dock alone. The bar is one grammar: pills of 32 px (`composerPill`, a
+muted caption and the value, "Model scripted", "Options Ask"; borderless at rest, a hairline under the pointer and
+while open), each opening a panel above it inside the frame (`popover.js anchoredPopover`: built when it opens,
+closed by Escape, by a click outside or by its pill, the pill says `aria-expanded`); Task | Chat | Research stays a
+segmented control; the Agent pick stays `select[aria-label='Agent']` in the pill's clothes. The Model panel lists the
+daemon's default and the models by provider as a listbox and, under them, the reasoning levels of the chosen model as
+one row, so two menus became one; the pill shows the model's name and, after it, the level chosen. The Options panel
+holds Approvals, Goal mode and Keep going with the YOLO note, and the Options pill shows the approvals as its value, in
+the warn tint for YOLO alone; nothing pushes the card taller. The phone wraps the pills over as many lines as they
+need and gives the send a line of its own; the dock's placeholder is cut at the frame's edge, no longer under the send
+(the fifth of item 100). Drafts keep: the text and the ready files of the home composer (`dot.draft.home`) and of each
+run's dock (`dot.draft.<run id>`), written on every change (`attachments.ready()`, `restore(files)`) and cleared on
+send (`frame.clear()`), so a navigation loses nothing; a draft that cannot be read is dropped with a warning. The
+home's character listens (`presence.js listen`, `liveFace.look/express`): it looks down at the composer while the box
+has the focus, goes attentive for 1.5 s after each keystroke and excited for 1.5 s on send. README: New chat, the run
+page, the design system's controls. Tests: `tests/smoke/test_composer.py` keeps the slash menu's and gains the Model
+and Options panels (the tick, the pick, Escape, the warn tint, a click outside) and a draft that survives a
+navigation; `test_face.py`, `test_server.py` and `test_agents.py` keep their selectors; `test_css_tokens.py`
+unchanged.
 
 **What.** `composer.js` grows the frame itself: `composerFrame({label, rows, commands, send})` returns the card, the
 textarea, the attachment row and the bar, and the home (`runs.js`), the run page's dock (`run.js`) and the agent
@@ -6601,3 +6626,4 @@ items. The findings go in this section as built.
 - 2026-10-11 (Fable 5.1): the daemon restarted on `3f1bb24` (code `62585c2`) once idle. Part 13 planned (items 101 to 106): the character engine from bloub (MIT), the look of every agent, the character alive beside the chat, the composer remade, part 12's polish, the review.
 - 2026-10-11 (Fable 5.1): item 101 merged as `8c3a590` (PR #119, MYP-241 Done): bloub ported to `static/js/character/` (MIT notice kept), `mountCharacter`, one ticker per page, the `--character-*` tokens, the Characters card of `#/controls`.
 - 2026-10-11 (Fable 5.1): item 102 merged as `f6afe5d` (PR #120, MYP-242 Done): `AgentLook` on the record and in the editor, Dot's look in Settings › General, every face a still character (`actors.js`), the favicon from `character/still.js`, `hues.js` pure.
+- 2026-10-11 (Fable 5.1): item 103 merged as `0a0fdaa` (PR #121, MYP-243 Done): the run page's character card with its moods (`mood.js`, `charactercard.js`), the turns and the answer with the actor's still face, the home's face moving.

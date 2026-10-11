@@ -109,8 +109,11 @@ export function dotFace(state) {
   return actorFace(DOT_ID, state, null);
 }
 
-/** A face that moves (item 103) at `size` pixels: alive while faces move, with a wink now and then at rest; still
- * otherwise. `dispose()` stops it. */
+/**
+ * A moving face of an actor (the home): wearing `look` or the remembered one, in bloub's idle cycle with a wink now and
+ * then while at rest, a still frame with the moving faces off. Returns `element`, `look(direction)`, `express(id)` and
+ * `dispose()`.
+ */
 export function liveFace(id, state, look, size) {
   const chosen = lookOf(id, look);
   const fragment = document.createDocumentFragment();
@@ -147,6 +150,10 @@ export function liveFace(id, state, look, size) {
   winkLater();
   return {
     element: face,
+    // Where the face looks when something outside drives it (the composer); null gives the head back to its pose.
+    look: (direction) => handle.setLook(direction),
+    // The expression to wear for a moment; null returns to the look's own for the state the face is in.
+    express: (expression) => handle.setExpression(expression ?? expressionFor(chosen, face.dataset.state)),
     dispose: () => {
       clearTimeout(timer);
       handle.destroy();

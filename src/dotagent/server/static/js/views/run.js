@@ -3,11 +3,11 @@
 import { actorFace, dotFace, setActorState } from "../actors.js";
 import { api, follow } from "../api.js";
 import { approvalCard, fromRecord, LEFT_IN_CAMPAIGN, LEFT_IN_RUN } from "../approvals.js";
-import { createAttachments, readyToSend } from "../attachments.js";
+import { readyToSend } from "../attachments.js";
 import { createComputer } from "../computer.js";
 import { createCostCard } from "../cost.js";
 import { createDetails } from "../details.js";
-import { wireComposer } from "../composer.js";
+import { composerFrame } from "../composer.js";
 import { clip, dateTime, dateTimeFull, debounce, duration, el, modelName } from "../dom.js";
 import { levelLabel } from "../efforts.js";
 import { continuedIn, earlierTurns, loadHistory, RESUME_SOURCE } from "../history.js";
@@ -415,20 +415,23 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
   }
 
   // ------------------------------------------------------------------------------------------------ dock
-  const input = el("textarea", { class: "textarea", rows: "1", "aria-label": "Message for Dot" });
-  const sendLabel = el("span", { class: "label" });
-  const send = el("button", { class: "btn primary send", type: "button" }, icon("arrowUp"), sendLabel);
-  const dockInner = el("div", { class: "dock-inner" });
-  const attachments = createAttachments({ dropTarget: dockInner, input });
-  // Enter sends and Shift+Enter breaks a line; "/" opens the slash menu, whose one command here asks on the side.
-  const composer = wireComposer(input, {
+  // The shared frame (composer.js): Enter sends and Shift+Enter breaks a line; "/" opens the slash menu, whose one
+  // command here asks on the side; what is typed and not sent is kept for this run.
+  const frame = composerFrame({
+    label: "Message",
+    boxLabel: "Message for Dot",
+    placeholder: "",
+    rows: 1,
     maxPx: MAX_INPUT_PX,
-    send: () => submit(),
     commands: [{ label: "/btw", hint: "Ask on the side: the run never sees the question.", insert: "/btw " }],
+    send: () => submit(),
+    sendLabel: "Steer",
+    draftKey: runId,
+    listener: null,
   });
-  const autosize = composer.autosize;
-  dockInner.append(composer.menu, attachments.button, attachments.picker, input, send);
-  const dock = el("div", { class: "dock" }, attachments.list, dockInner);
+  const { textarea: input, attachments, sendButton: send } = frame;
+  frame.options.append(attachments.button);
+  const dock = el("div", { class: "dock" }, frame.element);
 
   // Steer messages that are sent but not read yet; each one leaves when the run reports reading it.
   const waitingMessages = [];
@@ -482,7 +485,7 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
   // The tokens of the answer count in the run's totals, read again once it is in (a finished run streams nothing more).
   function askAside(question) {
     input.value = "";
-    autosize();
+    frame.autosize();
     const done = holdAside(question);
     attempt(() => api.post(`/runs/${runId}/btw`, { text: question })).finally(() => {
       done();
@@ -529,9 +532,7 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
             releaseMessage(entry);
             throw error;
           }
-          input.value = "";
-          autosize();
-          attachments.clear();
+          frame.clear();
           return;
         }
         const next = await api.post("/runs", {
@@ -544,7 +545,7 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
           thread_id: run.thread_id,
           attachments: files,
         });
-        attachments.clear();
+        frame.clear();
         ctx.navigate(`/runs/${next.id}`);
       });
     } finally {
@@ -560,16 +561,12 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
     resumeButton.hidden = active || !resumable;
     // A delegated run is not steered: its dock keeps only the arrow down (item 96).
     const delegated = run.parent_run_id !== null;
-    dockInner.hidden = delegated;
-    attachments.list.hidden = delegated || attachments.list.hidden;
+    frame.element.hidden = delegated;
     dock.classList.toggle("dock-bare", delegated);
     input.placeholder = active
       ? "Steer this run (Dot reads it before its next step), or ask on the side with /btw…"
       : "Follow up in the same conversation, or ask about this run with /btw…";
-    const sendText = active ? "Steer" : "Follow up";
-    sendLabel.textContent = sendText;
-    send.title = sendText;
-    send.setAttribute("aria-label", sendText);
+    frame.setSendLabel(active ? "Steer" : "Follow up");
     if (active && ticker === null) {
       ticker = setInterval(paintStats, 1000);
       costTicker = setInterval(paintCost, COST_REFRESH_MS);
@@ -942,7 +939,7 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
     computer.dispose();
     inspector.dispose();
     character.dispose();
-    composer.dispose();
+    frame.dispose();
     if (ticker !== null) {
       clearInterval(ticker);
       clearInterval(costTicker);

@@ -5,7 +5,8 @@
 
 import { actorFace, dotFace, fallbackLook, rememberLook } from "../actors.js";
 import { api } from "../api.js";
-import { wireComposer } from "../composer.js";
+import { readyToSend } from "../attachments.js";
+import { composerFrame } from "../composer.js";
 import { ago, clip, el, modelName } from "../dom.js";
 import { allModels, levelLabel } from "../efforts.js";
 import { icon } from "../icons.js";
@@ -309,13 +310,20 @@ function runRow(run) {
 
 /** The composer of an agent's page: a message for the agent, sent with Enter; the run takes the agent's bounds. */
 function agentComposer(record, ctx) {
-  const goal = el("textarea", { class: "textarea", rows: "3", placeholder: `Message ${record.name}`, "aria-label": "Message" });
-  const start = el(
-    "button",
-    { class: "btn primary send", type: "button", title: "Start (Enter)", "aria-label": "Start" },
-    icon("arrowUp"),
-    el("span", { class: "label" }, "Start"),
-  );
+  const frame = composerFrame({
+    label: `Message ${record.name}`,
+    boxLabel: "Message",
+    placeholder: `Message ${record.name}`,
+    rows: 3,
+    maxPx: MAX_GOAL_PX,
+    commands: [],
+    send: submit,
+    sendLabel: "Start",
+    draftKey: null,
+    listener: null,
+  });
+  const { textarea: goal, attachments } = frame;
+  frame.options.append(attachments.button);
   let starting = false;
 
   async function submit() {
@@ -324,8 +332,11 @@ function agentComposer(record, ctx) {
       goal.focus();
       return;
     }
+    if (!readyToSend(attachments)) {
+      return;
+    }
     starting = true;
-    start.disabled = true;
+    frame.sendButton.disabled = true;
     try {
       await attempt(async () => {
         const created = await api.post("/runs", {
@@ -337,27 +348,19 @@ function agentComposer(record, ctx) {
           goal_mode: null,
           standing: false,
           thread_id: null,
-          attachments: [],
+          attachments: attachments.ids(),
           agent_id: record.id,
         });
+        frame.clear();
         ctx.navigate(`/runs/${created.id}`);
       });
     } finally {
       starting = false;
-      start.disabled = false;
+      frame.sendButton.disabled = false;
     }
   }
 
-  start.addEventListener("click", submit);
-  const composer = wireComposer(goal, { maxPx: MAX_GOAL_PX, send: submit, commands: [] });
-  const element = el(
-    "section",
-    { class: "card composer", "aria-label": `Message ${record.name}` },
-    composer.menu,
-    goal,
-    el("div", { class: "composer-bar" }, el("div", { class: "composer-options" }), start),
-  );
-  return { element, focus: () => goal.focus(), dispose: composer.dispose };
+  return { element: frame.element, focus: () => goal.focus(), dispose: frame.dispose };
 }
 
 /** The agent's greeting: its face, name and role, like Dot's on the home page. */
