@@ -4,6 +4,8 @@
 
 :root {
   color-scheme: light dark;
+  /* The stage bar's height, measured by layout.js once the page is up; this is the bar's height without a banner. */
+  --stagebar-h: 56px;
   /* Type: one sans (the system's), a serif voice where a look asks for it, and six sizes. */
   --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", system-ui, sans-serif;
   --voice: var(--font);
@@ -1237,7 +1239,15 @@ a.pill:hover {
   grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
   align-items: start;
   gap: 8px 12px;
-  padding-bottom: 6px;
+  padding: 4px 8px 8px;
+  margin-inline: -8px;
+  /* The head stays at the top of the conversation while it scrolls (item 65): under the stage bar, on a soft backdrop
+     the messages pass under. The window is the scroll container; no ancestor of the head may have an overflow. */
+  position: sticky;
+  top: var(--stagebar-h);
+  z-index: 10;
+  background: color-mix(in srgb, var(--bg) 88%, transparent);
+  backdrop-filter: saturate(1.3) blur(10px);
 }
 
 .chat-who {
@@ -2304,6 +2314,44 @@ dialog.lightbox img {
 
 /* ---------- small screens ---------- */
 
+/* On a phone the head is one line: the face, the name with the state, and the run's buttons; the chips wait in the
+   side panel's Details card. */
+@media (max-width: 720px) {
+  .chat-head {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .chat-who {
+    grid-column: 2;
+    flex-direction: row;
+    align-items: center;
+    gap: 8px;
+    justify-self: start;
+    min-width: 0;
+  }
+
+  .chat-who .avatar {
+    margin-bottom: 0;
+    width: 28px;
+    height: 28px;
+  }
+
+  .chat-who-name {
+    white-space: nowrap;
+  }
+
+  .chat-tools {
+    grid-column: 3;
+    flex-wrap: nowrap;
+  }
+
+  .chat-tools .chip {
+    display: none;
+  }
+}
+
 @media (max-width: 720px) {
   .page {
     padding: 18px 12px 70px;
@@ -2327,21 +2375,7 @@ dialog.lightbox img {
     padding: 5px 8px;
   }
 
-  /* On a phone Dot's face and name come first and the run's chips and buttons get a centred line under them. */
-  .chat-head {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  .chat-who,
-  .chat-tools {
-    grid-column: 1;
-    justify-self: center;
-  }
-
-  .chat-tools {
-    justify-content: center;
-  }
-
+  /* The head's one-line phone layout is with the other chat-head rules, in the 720 px block above. */
   .chat-model {
     display: none;
   }
