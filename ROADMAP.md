@@ -4998,8 +4998,8 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 79  | Flat surfaces and plain words: cards, labels, meta, chips, empty states  | done        | ab5f33a |
 | 80  | Forms and controls: one grammar for inputs, selects, switches, tables    | done        | 132ce0d |
 | 81  | Dark, first paint and the tour: every page read in both schemes          | done        | 04693d7 |
-| 82  | Delegated runs as rows: face, state, last line, time; the child's bar    | in progress |         |
-| 83  | Faces for the actors: a hue each, alive in the rows and the bar          | planned     |         |
+| 82  | Delegated runs as rows: face, state, last line, time; the child's bar    | done        | 6454345 |
+| 83  | Faces for the actors: a hue each, alive in the rows and the bar          | in progress |         |
 
 ### 77. The type system: Inter and Geist Mono, seven sizes, three weights
 
@@ -5128,7 +5128,7 @@ and what the earlier items missed fixed here; README's visual-system section rew
 
 ### 82. Delegated runs as rows: face, state, last line, time; the child's bar
 
-**Status: in progress.** Built on `item-82-delegated` (MYP-222). The owner's reference (2026-10-11): Claude Code's
+**Status: done.** Merged as `6454345` (PR #91, squash; MYP-222 Done). The owner's reference (2026-10-11): Claude Code's
 subagent list and page.
 
 **Design, as built (2026-10-11).** `timeline.js` `childScope` draws a delegated run as `details.child` whose summary
@@ -5159,7 +5159,22 @@ same row.
 
 ### 83. Faces for the actors: a hue each, alive in the rows and the bar
 
-**Status: planned.** The owner's reference (2026-10-11): the character marks of OpenAI's dots and Grok's companions.
+**Status: in progress.** Built on `item-83-faces` (MYP-223). The owner's reference (2026-10-11): the character marks
+of OpenAI's dots and Grok's companions.
+
+**Design, as built (2026-10-11).** `static/js/actors.js`: `hashId` (FNV-1a over the UTF-16 code units, 32-bit),
+`hueOf(id)` (the hash modulo 8) and `actorFace(id, state)`, the same `avatar` as Dot's with `data-hue` set; the eight
+hues are tokens of `themes.css` (`--hue-0` … `--hue-7`, light-dark pairs light enough for the ink mark in both
+schemes: coral, apricot, leaf, mint, sky, lavender, pink, sand) and `app.css` paints `.avatar[data-hue] .face` with
+them; Dot's face keeps the bubble yellow. The face lives as it did (the breath, the pulse, the waiting ring, the
+tick and the red), and a `.ended` face blinks its core once on the blink token before it breathes again (the
+delegated row at its end). Where it shows: the delegated row of item 82 (`actorFace(runId)`), the bar of a delegated
+run's page (`run.js`), the sidebar's activity rows and the Activity page's rows (24 px) by the row's new `actor_id`
+(`ActivityRow.actor_id` in `views.py`, filled by `activity.py`: the campaign's id for a session, a delegated run's
+own, a schedule's, `None` for Dot's own runs, which keep the dot and the kind icon), the Campaigns page's rows (28
+px, working while active, at rest once achieved or stopped) and the Schedules page's rows (28 px, at rest). One SVG,
+no raster. `tests/unit/test_actors.py` runs `hueOf` in node from the module and holds it to a Python mirror of the
+hash for six ids, and holds that every hue has its token and its rule.
 
 **What.** Dot's face stays the yellow dot. Every other actor gets the same mark in its own hue, chosen from a ring of
 eight by a hash of its id: a delegated run, a campaign, a schedule. The face lives (item 73's motion): it breathes at
@@ -5668,3 +5683,4 @@ item 82, the sidebar's sections, the Campaigns and Schedules pages and the bar o
 - 2026-10-11 (Fable 5.1): item 79 merged as `ab5f33a` (PR #88, MYP-219 Done). Item 80 built on branch `item-80-forms` (MYP-220): one control grammar (36/32 px, 8 px corner, one focus ring, the drawn chevron, 40 px table rows).
 - 2026-10-11 (Fable 5.1): item 80 merged as `132ce0d` (PR #89, MYP-220 Done). Item 81 built on branch `item-81-dark` (MYP-221): the dark shots read and kept, `boot.js` for the first paint, the tour's first-paint test, README's visual system as the current state.
 - 2026-10-11 (Fable 5.1): item 81 merged as `04693d7` (PR #90, MYP-221 Done). Item 82 built on branch `item-82-delegated` (MYP-222): the delegated run as a row, the child's breadcrumb and pill; the bar's title now gives way with an ellipsis and a delegated run's bar carries no chips (its pill has them).
+- 2026-10-11 (Fable 5.1): item 82 merged as `6454345` (PR #91, MYP-222 Done). Item 83 built on branch `item-83-faces` (MYP-223): `actors.js`, eight hue tokens, the faces in the rows, the pages and the bar, `ActivityRow.actor_id`.

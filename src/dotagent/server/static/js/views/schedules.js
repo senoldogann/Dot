@@ -1,6 +1,7 @@
 // Schedules: goals that Dot carries out by itself, once or on a cron schedule, while the daemon runs. Each schedule keeps
 // how its runs start (mode, approvals, goal mode, model, reasoning level, time zone) and can be changed later.
 
+import { actorFace } from "../actors.js";
 import { api } from "../api.js";
 import { clip, debounce, el, modelName } from "../dom.js";
 import { allModels, levelLabel } from "../efforts.js";
@@ -142,6 +143,7 @@ function scheduleRow(view, handlers) {
     "div",
     { class: "list-row", dataset: { schedule: record.id } },
     toggle,
+    actorFace(record.id, "idle"),
     el(
       "div",
       { class: "row-main" },

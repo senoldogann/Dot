@@ -910,7 +910,9 @@ lists sit (comfortable or compact). Two switches follow the look until you set t
 visual system. Colour: every colour is a token of `themes.css` naming its light and its dark value in one place;
 surfaces step up by lightness (page, sunken sidebar, raised cards) rather than by shadow in dark; borders are the text
 colour at a small alpha so they sit on every surface; the text tiers are measured against every surface by a unit
-test (4.5:1 for text and its second tier, 3:1 for the muted and faint ones); the yellow is Dot's face alone. Type:
+test (4.5:1 for text and its second tier, 3:1 for the muted and faint ones); the yellow is Dot's face alone, and every other actor (a delegated run, a campaign, a schedule) wears the same
+mark in a hue of its own, one of eight chosen by a hash of its id, so it keeps its face in the sidebar, the lists,
+the rows of a chat and the bar of its own page. Type:
 Inter for the interface and the answers, Geist Mono for code and identifiers, both served from Dot's own origin
 (`static/fonts`, SIL Open Font License); seven sizes each with its line-height (12/16 badges and chips, 13/18 meta
 and hints, 14/20 the interface, 15/24 prose and the composer, 17/24 section titles, 20/28 page titles, 24/32 the

@@ -77,7 +77,15 @@ def _approval_row(approval: ApprovalRecord, run: RunRecord, kind: str, detail: s
         tokens=None,
         steps=None,
         parent_run_id=None,
+        actor_id=None,
     )
+
+
+def _actor_of(run: RunRecord) -> str | None:
+    """Whose face the row wears: the campaign's for a session, a delegated run's own, none for a run of Dot's own."""
+    if run.campaign_id is not None:
+        return run.campaign_id
+    return run.id if run.parent_run_id is not None else None
 
 
 async def _run_row(store: Store, run: RunRecord, section: str, kind: str, detail: str, title: str) -> ActivityRow:
@@ -97,6 +105,7 @@ async def _run_row(store: Store, run: RunRecord, section: str, kind: str, detail
         tokens=None if run.finished_at is None else run.input_tokens + run.output_tokens,
         steps=run.steps,
         parent_run_id=run.parent_run_id,
+        actor_id=_actor_of(run),
     )
 
 
@@ -128,6 +137,7 @@ def _schedule_row(schedule: ScheduleRecord, now: float) -> ActivityRow:
         tokens=None,
         steps=None,
         parent_run_id=None,
+        actor_id=schedule.id,
     )
 
 
@@ -148,6 +158,7 @@ def _note_row(note: MemoryRecord, kind: str) -> ActivityRow:
         tokens=None,
         steps=None,
         parent_run_id=None,
+        actor_id=None,
     )
 
 
@@ -167,6 +178,7 @@ def _due_schedule_row(schedule: ScheduleRecord, due: float) -> ActivityRow:
         tokens=None,
         steps=None,
         parent_run_id=None,
+        actor_id=schedule.id,
     )
 
 
@@ -186,6 +198,7 @@ def _due_campaign_row(campaign: CampaignRecord, due: float) -> ActivityRow:
         tokens=None,
         steps=None,
         parent_run_id=None,
+        actor_id=campaign.id,
     )
 
 
@@ -239,6 +252,7 @@ def _reflection_row(reflection: Reflection) -> ActivityRow:
         tokens=None,
         steps=None,
         parent_run_id=None,
+        actor_id=None,
     )
 
 

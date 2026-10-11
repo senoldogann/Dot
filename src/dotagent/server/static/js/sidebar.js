@@ -4,6 +4,7 @@
 import { ApiError, api, request } from "./api.js";
 import { clip, debounce, el, foldSearch, plural } from "./dom.js";
 import { brandMark, icon } from "./icons.js";
+import { actorFace } from "./actors.js";
 import { nestRows, progressFacts } from "./nesting.js";
 import { requestCompose } from "./shortcuts.js";
 import { onLifecycle } from "./state.js";
@@ -92,7 +93,9 @@ function activityRow(row, onNavigate, children, child) {
       "aria-label": words === "" ? row.title : `${row.title} (${words})`,
       onclick: onNavigate,
     },
-    el("span", { class: `status-dot s-${row.section === "waiting" ? "blocked" : "running"}` }),
+    row.actor_id === null
+      ? el("span", { class: `status-dot s-${row.section === "waiting" ? "blocked" : "running"}` })
+      : actorFace(row.actor_id, row.section === "waiting" ? "waiting" : "working"),
     el(
       "span",
       { class: "side-run-goal" },

@@ -2,6 +2,7 @@
 // you stop it. The list shows where each campaign stands; a campaign's page shows its targets, the questions its sessions
 // left for you, its ledger and its sessions, with the controls to stop it, let it go on or mark it achieved.
 
+import { actorFace } from "../actors.js";
 import { api } from "../api.js";
 import { approvalCard, fromRecord, LEFT_IN_CAMPAIGN } from "../approvals.js";
 import { ago, clip, compact, dateTime, debounce, el, modelName, plural } from "../dom.js";
@@ -19,6 +20,8 @@ const LIFECYCLE_KINDS = new Set(["run_started", "run_finished", "approval_reques
 const WAITING_STATUSES = new Set(["pending", "left"]);
 const RELOAD_DELAY_MS = 400;
 const STATUS_TONES = { active: "b-info", achieved: "b-ok", stopped: "b-muted" };
+// The face a campaign wears in its row (item 83): working while active, at rest once achieved or stopped.
+const CAMPAIGN_FACE = { active: "working", achieved: "idle", stopped: "idle" };
 const ENTRY_TONES = { progress: "b-ok", setback: "b-bad", strategy: "b-info", question: "b-warn", note: "b-muted" };
 const TITLE_CHARS = 70;
 const PREVIEW_CHARS = 220;
@@ -81,6 +84,7 @@ function campaignRow(summary) {
   return el(
     "div",
     { class: "list-row", dataset: { campaign: record.id } },
+    actorFace(record.id, CAMPAIGN_FACE[record.status] ?? "idle"),
     el(
       "div",
       { class: "row-main" },

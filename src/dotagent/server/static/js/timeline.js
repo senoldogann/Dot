@@ -8,8 +8,9 @@
 import { approvalCard, fromEvent, LEFT_IN_RUN } from "./approvals.js";
 import { sentFiles } from "./attachments.js";
 import { clip, compact, dateTime, dateTimeFull, duration, el, plural } from "./dom.js";
+import { actorFace } from "./actors.js";
 import { faceState } from "./face.js";
-import { avatar, icon } from "./icons.js";
+import { icon } from "./icons.js";
 import { foldSteps } from "./layout.js";
 import { answerMessage, userMessage } from "./messages.js";
 import { prose } from "./prose.js";
@@ -199,7 +200,7 @@ export function createTimeline({ rootRunId, startedAt, onGrow, onPlan, onStats, 
 
   function childScope(runId, data, ts) {
     const parent = scopes.get(data.parent_run_id) ?? scopes.get(rootRunId);
-    const face = avatar("working");
+    const face = actorFace(runId, "working");
     const status = el("span", { role: "img" });
     paintRing(status, "running");
     // The mode and, once it starts, the model of the delegated run: for a screen reader; the row shows none of it.
@@ -339,6 +340,7 @@ export function createTimeline({ rootRunId, startedAt, onGrow, onPlan, onStats, 
       }
       paintRing(scope.panel.status, status);
       scope.panel.face.setAttribute("data-state", faceState(status));
+      scope.panel.face.classList.add("ended");
       paintChild(scope, record.ts, [status, plural(scope.panel.steps, "step", "steps")]);
       // The parent resumes when the delegated run is over; the time in between was spent on the delegation.
       scope.parent.boundary = record.ts;

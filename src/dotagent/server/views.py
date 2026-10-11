@@ -458,7 +458,8 @@ class ActivityRow(FrozenModel):
     started waiting, working or ended, ``href`` opens it in the web UI. A run that ended carries its ``minutes`` of
     wall time and its ``tokens`` (input and output together); every other row has ``None`` for both. A row for a run
     carries its ``steps`` and, for a delegated run, the ``parent_run_id`` of the run that delegated it, so the lists
-    can nest it under its parent; the other rows have ``None`` for both."""
+    can nest it under its parent; the other rows have ``None`` for both. ``actor_id`` names the actor whose face the
+    row wears (actors.js): the delegated run's own id, the campaign's, the schedule's; ``None`` for Dot's own."""
 
     id: str
     section: ActivitySection
@@ -474,6 +475,7 @@ class ActivityRow(FrozenModel):
     tokens: int | None
     steps: int | None
     parent_run_id: str | None
+    actor_id: str | None
 
 
 class ActivityView(FrozenModel):
