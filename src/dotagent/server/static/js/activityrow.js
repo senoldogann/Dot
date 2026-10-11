@@ -3,6 +3,8 @@
 // state and how long ago. The lifecycle events that change the lists are named here too.
 
 import { ago, compact, duration, el } from "./dom.js";
+import { actorFace } from "./actors.js";
+import { faceState } from "./face.js";
 import { icon } from "./icons.js";
 import { statusBadge } from "./panels.js";
 
@@ -55,7 +57,7 @@ export function activityRow(item, child) {
   return el(
     "a",
     { class: child ? "activity-row activity-child" : "activity-row", href: item.href, "aria-label": `${item.title} (${facts.join(", ")})` },
-    el("span", { class: "activity-icon" }, icon(KIND_ICON[item.kind] ?? "bolt")),
+    item.actor_id === null ? el("span", { class: "activity-icon" }, icon(KIND_ICON[item.kind] ?? "bolt")) : actorFace(item.actor_id, faceState(item.status)),
     el("span", { class: "activity-main" }, el("span", { class: "activity-title" }, item.title), el("span", { class: "small muted meta-facts" }, ...facts.map((fact) => el("span", null, fact)))),
     el("span", { class: "activity-side" }, badge, el("span", { class: "small muted" }, ago(item.since))),
   );

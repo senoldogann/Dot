@@ -1,5 +1,6 @@
 // One run as a conversation: the question, what Dot did about it, its answer, and the box to steer the run or to follow up on it.
 
+import { actorFace } from "../actors.js";
 import { api, follow } from "../api.js";
 import { approvalCard, fromRecord, LEFT_IN_CAMPAIGN, LEFT_IN_RUN } from "../approvals.js";
 import { createAttachments, readyToSend } from "../attachments.js";
@@ -132,7 +133,8 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
   const runId = detail.run.id;
   let run = detail.run;
   let status = run.status;
-  const face = avatar(faceState(status));
+  // Dot's face on Dot's own run; a delegated run wears the face of its own hue (item 83).
+  const face = run.parent_run_id === null ? avatar(faceState(status)) : actorFace(run.id, faceState(status));
   let model = run.model;
   let active = detail.active;
   // The daemon cut the run off and a new run can go on from where it stopped.

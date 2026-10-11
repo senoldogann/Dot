@@ -330,6 +330,59 @@ textarea {
   fill: var(--bad);
 }
 
+/* The other actors (actors.js, item 83): the same mark in the hue the actor's id chose. */
+.avatar[data-hue="0"] .face {
+  fill: var(--hue-0);
+}
+
+.avatar[data-hue="1"] .face {
+  fill: var(--hue-1);
+}
+
+.avatar[data-hue="2"] .face {
+  fill: var(--hue-2);
+}
+
+.avatar[data-hue="3"] .face {
+  fill: var(--hue-3);
+}
+
+.avatar[data-hue="4"] .face {
+  fill: var(--hue-4);
+}
+
+.avatar[data-hue="5"] .face {
+  fill: var(--hue-5);
+}
+
+.avatar[data-hue="6"] .face {
+  fill: var(--hue-6);
+}
+
+.avatar[data-hue="7"] .face {
+  fill: var(--hue-7);
+}
+
+/* A face whose run just ended blinks its core once, then rests. */
+.avatar.ended .core {
+  animation:
+    blink var(--motion-blink) ease-in-out 1,
+    breathe var(--motion-breath) ease-in-out var(--motion-blink) infinite;
+}
+
+/* The faces in the rows and the sidebar: 24 px; in a list's row 28. */
+.child-face .avatar,
+.side-run .avatar,
+.activity-row .avatar {
+  width: 24px;
+  height: 24px;
+}
+
+.list-row > .avatar {
+  width: 28px;
+  height: 28px;
+}
+
 .pill {
   display: inline-flex;
   align-items: center;
