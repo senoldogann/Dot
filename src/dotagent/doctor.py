@@ -53,7 +53,7 @@ from dotagent.skills.catalog import load_skills, playbook_root
 from dotagent.skills.types import SkillCatalog, SkillProblem
 from dotagent.tools.shell import read_login_env
 from dotagent.web.client import WebClient
-from dotagent.web.search import SearchBackend, SearchChoice, resolved_backend, search_ollama
+from dotagent.web.search import SearchChoice, search_ladder, search_ollama
 from dotagent.web.types import SearchHit
 
 _PROBE_TIMEOUT_S: float = 5.0
@@ -150,14 +150,16 @@ def _check_key(provider: str, variable: str, present: bool, needed: bool) -> Che
 
 
 def _search_row(config: AppConfig, ollama_key_present: bool) -> CheckResult:
-    """The backend web_search uses: what [web] search_backend says, and what auto resolves to on this Mac."""
+    """The engines web_search climbs: what [web] search_backend says, and what auto resolves to on this Mac (the browser
+    rung joins when the run's browser is Dot's own Chrome with a visible window)."""
     choice: SearchChoice = config.web.search_backend
-    backend: SearchBackend = resolved_backend(choice, ollama_key_present)
+    visible_own: bool = config.browser.mode == "own" and not config.browser.headless
+    ladder: str = " -> ".join(search_ladder(choice, ollama_key_present, visible_own))
     variable: str = config.providers.ollama.api_key_env
     if choice != "auto":
-        return _result("web search", True, False, f"{backend} ([web] search_backend)")
+        return _result("web search", True, False, f"{ladder} ([web] search_backend)")
     reason: str = f"{variable} is set" if ollama_key_present else f"{variable} is not set"
-    return _result("web search", True, False, f"{backend} (auto: {reason})")
+    return _result("web search", True, False, f"{ladder} (auto: {reason})")
 
 
 async def _check_openai_api(router: ModelRouter, required: bool) -> CheckResult:

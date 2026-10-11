@@ -323,15 +323,15 @@ terminal_sessions = 3
 terminal_idle_s = 1800.0
 
 [web]
-# "duckduckgo" needs no key; "ollama" uses the hosted web_search API and needs OLLAMA_API_KEY (each search counts
-# against the key's allowance); "auto" is ollama when OLLAMA_API_KEY is set and duckduckgo otherwise (dotx doctor
-# shows the choice).
+# "auto" climbs a ladder of engines until one answers: the hosted web_search API of Ollama when OLLAMA_API_KEY is set
+# (each search counts against the key's allowance; it has no bot check), then the HTML pages of DuckDuckGo and Brave
+# Search (no key), then DuckDuckGo opened in Dot's own Chrome when the run's browser is Dot's own (its bot check runs
+# there and passes). An engine that limits this machine is benched (DuckDuckGo 10 minutes, Brave 90 seconds) and the
+# searches of that time skip it at once; the result names the engine that answered and the rungs skipped. A named engine
+# ("duckduckgo", "brave", "ollama") is that engine alone. dotx doctor shows the ladder.
 search_backend = "auto"
-# DuckDuckGo answers a burst of searches with its bot check (HTTP 202). Searches start at least this far apart; one
-# that meets the check pauses all searches for 8 s and is tried again (search_attempts tries in all). The hosted
-# search of Ollama has no such check.
+# The scraped searches (DuckDuckGo, Bing) start at least this far apart.
 search_spacing_s = 1.0
-search_attempts = 3
 fetch_timeout_s = 25.0
 fetch_max_bytes = 3000000
 # A PDF can only be read whole, so it gets a larger limit than a page.

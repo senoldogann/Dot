@@ -155,8 +155,11 @@ def site() -> Iterator[str]:
 def settings(tmp_path_factory: pytest.TempPathFactory) -> Path:
     path: Path = tmp_path_factory.mktemp("settings") / "config.toml"
     # The backend is pinned: with auto, a key of Ollama on this Mac would send the test search to the hosted service.
+    # The browser is the user's, so a page that turns the plain request away is reported, not read in Dot's own Chrome
+    # (that path has its own test in test_web_fetch.py).
     path.write_text(
-        f'[web]\nsearch_backend = "duckduckgo"\nallow_private_hosts = true\nfetch_max_bytes = {_CUT_BYTES}\n',
+        f'[web]\nsearch_backend = "duckduckgo"\nallow_private_hosts = true\nfetch_max_bytes = {_CUT_BYTES}\n\n'
+        '[browser]\nmode = "attach"\n',
         encoding="utf-8",
     )
     return path

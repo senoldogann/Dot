@@ -4125,6 +4125,99 @@ rows carry minutes and tokens.
     compactions of a 41-step run from 2 to 0 at +25 % input tokens a step; the owner's next long run is the live
     number. The room after a compaction and the summariser's transcript were measured and left alone.
 
+## Part 6: the web that does not fail (planned 2026-10-11)
+
+The owner's sixth word, on 2026-10-11, after part 5: "build a different structure for web search and fetch, one in
+which failure disappears; then continue with the next tasks". Planned from the owner's own runs as `dotx stats --days
+30` and the store read them (read-only; the goals stay out of this file) and from measurements of the public engines
+made the same day from this Mac.
+
+**What the owner's runs show.** 32 `web_search` calls, 18 failed: every one DuckDuckGo's bot check (HTTP 202), met on
+the third try after two pauses of 8 s, 16 to 40 s lost each. 561 `web_fetch` calls, 75 failed: 51 not found (item 56
+answers those), 9 HTTP 429 from LinkedIn job pages and a Brave result page, 15 results that said "browser_open uses a
+real Chrome and may get through" and so cost the model another turn, the rest in transit. Of the 93 web failures, 25
+were throttling.
+
+**What the engines answer this Mac (2026-10-11, plain requests with Dot's user agent, then Dot's own Chrome).**
+DuckDuckGo's HTML page answers until its check comes and then shows a plain request its 202 page, a headless Chrome an
+image CAPTCHA ("select all squares containing a duck") and a visible Chrome its results (10 of 10 relevant on two
+queries). Bing's HTML page answers a plain request, but three of six queries came back with another query's results
+(YouTube monetisation pages for a Finnish job query) or an empty notice for a company with open positions; a wrong
+answer is worse than a skipped rung, so Bing is not one. Brave Search's HTML page answered five queries in a row with
+18 to 20 relevant results each and the sixth with HTTP 429 ("flagged as suspicious"), a limit that held for more than
+ten minutes and in the browser too. Startpage, Mojeek, Qwant and Yahoo turn a plain request away. The hosted search of
+Ollama (`OLLAMA_API_KEY`) has no check and is the first rung whenever the key is set.
+
+### How to start part 6 (the handoff prompt)
+
+> Read ROADMAP.md part 6 and the status table below. One item at a time, in order; the protocol of part 5 (branch,
+> gate, PR, Linear MYP issue, squash merge, hash in the table, log line) is unchanged. Never touch the owner's data
+> directory except to read it and to restart the daemon when `/api/status` shows no active run; PLAN.md stays
+> untracked. The owner reads Turkish; everything written is English.
+
+### Status, part 6
+
+| #   | Item                                                                     | Status      | Commits |
+| --- | ------------------------------------------------------------------------ | ----------- | ------- |
+| 59  | The web that does not fail                                               | in progress |         |
+
+### 59. The web that does not fail
+
+**Status: in progress.** Built on `item-59-web-that-does-not-fail` (MYP-199).
+
+**What.** A search fails only when every engine does, and a page is read when any way of reading it works. `web_search`
+climbs a ladder of engines and says which rung answered; `web_fetch` reads a page that turned the plain request away in
+Dot's own Chrome itself, in the same call, and says so.
+
+**Why.** Half the searches of the owner's research runs died on one engine's bot check after wasting sixteen seconds
+each, and the fetches that met a wall told the model to spend another turn on `browser_open`. Both are structure, not
+luck: one engine with retries is one point of failure; a hint to the model is a turn lost.
+
+**Design.** `web/ladder.py` holds what the client and the search module share: `SearchEngine`, `SearchOutcome`
+(hits, the engine that answered, the rungs skipped with their reasons, the age of a remembered answer), `EngineBench`
+(which engines sit out and until when, `BENCH_S` per engine: DuckDuckGo 600 s, Brave 90 s, the browser 600 s, Ollama
+60 s) and `AnswerMemory` (the outcome of each query for `MEMORY_S` = 600 s, queries equal up to case and spacing).
+`web/search.py` is the ladder: `search_ladder(choice, ollama_key_present, browser_present)` gives the rungs (`auto`:
+ollama when its key is present, duckduckgo, brave, browser when the run's browser is Dot's own with a visible window; a
+named engine alone), `climb` asks them in turn (a benched rung skipped with the time it has left, a `WebThrottledError`
+benches and skips, another `WebError` skips, every rung skipped raises an error naming each engine and its reason),
+`search` reads the memory first and keeps the outcome, `engine_attempts` builds the tries a run can make (Ollama with
+its key, the browser with a page reader). `parse_brave` reads `div[data-type="web"]` blocks (the class names carry
+build hashes; the data attribute and the words `title` and `description` stay); Brave has no empty-result notice this
+code reads, so a page without web results benches it for 90 s and the next rung answers, and the error says so. The
+browser rung opens DuckDuckGo's HTML page in Dot's own Chrome and parses it like the plain one. `[web] search_attempts`
+is gone (a rung is tried once; the next rung is the retry); `search_spacing_s` paces the two scraped engines.
+`BrowserSession.read_page(url)` reads a page in a scratch tab no thread owns (a `context.new_page()` that
+`_adopt_popup` leaves alone since it has no opener), waits for the page to settle and, after a 202, 403, 429 or 503,
+up to 8 s for the challenge to reload, keeps the status of the last main-frame response, closes the tab in `finally`
+and returns `RenderedDocument(url, status, html)`; `quiet_reads` (own mode) says a scratch tab is allowed, `human_like`
+(own mode and not headless) that a bot check will pass. `web_fetch` reads a page whose plain request got 401, 403,
+429 or 503, or whose HTML is a JavaScript shell, through `read_page` when `quiet_reads`, renders it like a plain fetch
+under a first line "Read in Dot's browser: the plain request got HTTP 429." and, when the browser got an error status
+too, says both ("in Dot's browser too"); without an own Chrome the old report with the `browser_open` hint stands. The
+search header reads "4 results for 'q' from brave (duckduckgo skipped: benched for 9 more min after it limited this
+machine). Read the best ones with web_fetch."; the action's target is the ladder ("duckduckgo/brave/browser"). The
+system prompt tells the model not to repeat a search or fetch that came back and not to reach for `browser_open` just
+to read. `dotx doctor` shows the ladder. `dotx stats` counts a throttled engine's message under throttled as before.
+
+**Touchpoints.** `web/ladder.py` (new), `web/search.py`, `web/client.py`, `browser/session.py`, `tools/web.py`,
+`agent/prompt.py`, `runtime.py`, `doctor.py`, `config.py`, `defaults.toml`, `tests/unit/test_search_ladder.py`,
+`tests/unit/test_research.py`, `tests/smoke/test_web_fetch.py` (a local site that answers 429 to a plain request and
+200 to a Chrome, a JavaScript shell, a 403 for everyone), `tests/smoke/test_web.py` (its browser is the user's, so the
+plain report is what it tests), README.
+
+**Live check (2026-10-11, this Mac, a temporary home).** The ladder through the tool: DuckDuckGo answered in 0.9 s;
+the same query with other case and spacing came from memory in 0.0 s with "the same query was answered 1 min ago";
+with DuckDuckGo benched Brave answered in 0.4 s; with both benched the visible own Chrome answered through DuckDuckGo
+in 1.4 s with the right pages and left no tab behind. The smoke test reads the 429 page and the shell through the
+headless own Chrome and reports the 403 page as refused in the browser too.
+
+**Open.** The live number is the owner's next research run: `dotx stats --run ID` web failures, throttled, against 25
+of 93 before. The bench and memory live in the daemon's web client, so they span runs and reset at a restart. Brave's
+limit after five quick searches means a long run with DuckDuckGo benched reaches the browser rung often; that rung
+needs `[browser] headless = false` and `mode = "own"`, which is the owner's setting. Setting `OLLAMA_API_KEY` makes the
+hosted search the first rung and is the owner's call.
+
 ## Log
 
 - 2026-10-08: roadmap written from the owner's go-ahead for all eight items, in this order. Nothing implemented yet.
@@ -4576,3 +4669,10 @@ rows carry minutes and tokens.
   fetches and no turn lost to argument validation (item 56), no `_adopt_popup` traceback after a week (item 57).
   Still open for the owner, unchanged from part 4: the phone's own check of item 52, decision 27, decision 26's
   follow-up, a signed desktop build.
+- 2026-10-11 (Fable 5.1): Part 6 planned at the owner's word ("build a structure for web search and fetch in which failure
+  disappears; then continue with the next tasks"): item 59 built on `item-59-web-that-does-not-fail` (MYP-199): the search
+  ladder (Ollama with its key, DuckDuckGo, Brave Search, DuckDuckGo in Dot's own visible Chrome) with a bench per engine
+  and a ten-minute answer memory, `web_fetch` reading a turned-away or JavaScript page in a scratch tab of Dot's own
+  Chrome. Measured and rejected: Bing (another query's results for three of six queries); measured and gated: a headless
+  Chrome meets DuckDuckGo's CAPTCHA, a visible one gets results. `[web] search_attempts` removed. Gate: format, check,
+  mypy clean; unit 723; `dotx eval check` ok; smoke web_fetch, web, doctor, crawl 29 passed.

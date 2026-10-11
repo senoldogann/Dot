@@ -64,7 +64,6 @@ from dotagent.tools.skill import build_skill_tool
 from dotagent.tools.terminal import build_terminal_tools
 from dotagent.tools.web import build_web_tools
 from dotagent.web.client import WebClient
-from dotagent.web.search import SearchBackend, resolved_backend
 
 log = get_logger(__name__)
 
@@ -85,8 +84,9 @@ class Runtime:
     desktop: DesktopSession
     terminals: Terminals
     web: WebClient
-    # The backend web_search uses, resolved once from [web] search_backend and the presence of Ollama's key.
-    search_backend: SearchBackend
+    # Whether the key of Ollama's hosted search was found when the runtime was built: the first rung of web_search's
+    # ladder when [web] search_backend is auto.
+    search_key_present: bool
     mcp: McpHub
     memory: MemoryIndex
     registry: ToolRegistry
@@ -212,7 +212,7 @@ async def open_runtime(config: AppConfig, login_env: dict[str, str]) -> Runtime:
             desktop=DesktopSession(sized_for_agent(config), failsafe_path()),
             terminals=Terminals(config.shell.terminal_sessions, config.shell.terminal_idle_s, shell_env),
             web=WebClient(config.web, config.browser.allowed_hosts, config.browser.blocked_hosts),
-            search_backend=resolved_backend(config.web.search_backend, ollama_key is not None),
+            search_key_present=ollama_key is not None,
             mcp=mcp,
             memory=memory,
             registry=registry,

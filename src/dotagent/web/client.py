@@ -17,6 +17,7 @@ from dotagent.core.logs import get_logger
 from dotagent.core.retry import RetryPolicy, retry_async
 from dotagent.web.addresses import is_public_address, order_addresses
 from dotagent.web.gate import RequestGate
+from dotagent.web.ladder import AnswerMemory, EngineBench
 from dotagent.web.types import FetchedDocument
 
 log = get_logger(__name__)
@@ -27,7 +28,6 @@ _CAUSE_DEPTH: int = 6
 _CONNECT_TIMEOUT_S: float = 10.0
 _RETRY: RetryPolicy = RetryPolicy(attempts=2, base_delay_s=0.4, max_delay_s=2.0)
 # A search that met the bot check of its engine tries again right away; the pause is the gate's (see search.py).
-_SEARCH_RETRY_DELAY_S: float = 0.2
 _REDIRECT_STATUS: frozenset[int] = frozenset({301, 302, 303, 307, 308})
 _ACCEPT: str = "text/html,application/xhtml+xml,application/xml;q=0.9,application/pdf;q=0.8,text/plain;q=0.7,*/*;q=0.5"
 _ACCEPT_LANGUAGE: str = "en-US,en;q=0.9,tr;q=0.8"
@@ -173,17 +173,17 @@ class _CheckedTransport(httpx.AsyncHTTPTransport):
 
 class WebClient:
     """Fetches documents from the web: public addresses only (unless ``web.allow_private_hosts``), no proxies from the
-    environment, no cookies kept, and the browser's host allow and block lists apply. ``search_gate`` and
-    ``search_retry`` pace the searches that go through a scraped result page."""
+    environment, no cookies kept, and the browser's host allow and block lists apply. ``search_gate`` paces the
+    searches that go through a scraped result page; ``search_bench`` holds the engines that limited this machine and
+    ``search_memory`` the answers of recent queries."""
 
     def __init__(self, config: WebConfig, allowed_hosts: Sequence[str], blocked_hosts: Sequence[str]) -> None:
         self._config: WebConfig = config
         self._allowed_hosts: tuple[str, ...] = tuple(allowed_hosts)
         self._blocked_hosts: tuple[str, ...] = tuple(blocked_hosts)
         self.search_gate: RequestGate = RequestGate(config.search_spacing_s)
-        self.search_retry: RetryPolicy = RetryPolicy(
-            attempts=config.search_attempts, base_delay_s=_SEARCH_RETRY_DELAY_S, max_delay_s=_SEARCH_RETRY_DELAY_S
-        )
+        self.search_bench: EngineBench = EngineBench()
+        self.search_memory: AnswerMemory = AnswerMemory()
         limits: httpx.Limits = httpx.Limits(max_connections=16, max_keepalive_connections=8, keepalive_expiry=30.0)
         self._client: httpx.AsyncClient = httpx.AsyncClient(
             transport=_CheckedTransport(_CheckedBackend(config.allow_private_hosts), limits),
