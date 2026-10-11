@@ -2,6 +2,7 @@
 // the middle of the window, the Today strip under them. The recent runs live in the sidebar; a run that waits for an
 // answer shows above, as a card.
 
+import { actorFace, DOT_ID } from "../actors.js";
 import { approvalCard, fromRecord, LEFT_IN_RUN } from "../approvals.js";
 import { api } from "../api.js";
 import { readyToSend } from "../attachments.js";
@@ -9,20 +10,21 @@ import { composerFrame, composerPill } from "../composer.js";
 import { el, modelName } from "../dom.js";
 import { allModels, forgetLevel, levelLabel, offersChoice, savedLevel, saveLevel } from "../efforts.js";
 import { icon } from "../icons.js";
-import { segmented } from "../panels.js";
 import { anchoredPopover } from "../popover.js";
 import { buildPresence } from "../presence.js";
-import { providerLabel } from "../providers.js";
+import { providerLabel, providerMark, providerOf } from "../providers.js";
 import { approvalLabel, approvalsPicker, goalModePicker, standingPicker } from "../runmodes.js";
 import { onCompose } from "../shortcuts.js";
 import { getSnapshot, loadModels, onChange, refresh } from "../state.js";
 import { attempt } from "../ui.js";
 
 const MODES = [
-  { id: "task", label: "Task", hint: "Carry the goal out end to end on this Mac" },
-  { id: "chat", label: "Chat", hint: "Converse; use tools whenever they help" },
-  { id: "research", label: "Research", hint: "Read-only: gather information and report, change nothing" },
+  { id: "task", label: "Task", hint: "Carry the goal out end to end on this Mac", icon: "target" },
+  { id: "chat", label: "Chat", hint: "Converse; use tools whenever they help", icon: "message" },
+  { id: "research", label: "Research", hint: "Read-only: gather information and report, change nothing", icon: "search" },
 ];
+// The Options pill's icon by approval mode: closed for Ask, a guard for Auto (a review model answers), open for YOLO.
+const APPROVAL_ICONS = { ask: "lock", auto: "shield", yolo: "lockOpen" };
 const MAX_GOAL_PX = 320;
 // Never a real value of a status, so the first synchronisation always paints.
 const NOTHING_SHOWN = false;
@@ -43,9 +45,16 @@ function defaultRowText(ref) {
   return ref === null ? "Default model" : `Default (${modelName(ref)})`;
 }
 
-/** The option row of a popover's list: the label on the left, a tick when it is the one chosen. */
-function optionRow(label, selected, onPick) {
-  return el("button", { class: "pop-option", type: "button", role: "option", "aria-selected": String(selected), onclick: onPick }, el("span", null, label), icon("check"));
+/** The option row of a popover's list: `lead` (a mark or an icon, or null), the label with its `hint` under it (or ""),
+ * and a tick when it is the one chosen. */
+function optionRow({ lead, label, hint, selected, onPick }) {
+  return el(
+    "button",
+    { class: "pop-option", type: "button", role: "option", "aria-selected": String(selected), onclick: onPick },
+    lead,
+    el("span", { class: "pop-option-text" }, el("span", null, label), hint === "" ? null : el("span", { class: "pop-option-hint" }, hint)),
+    icon("check"),
+  );
 }
 
 /** `listener` is the home's face (presence.js `listen`): it hears the box and the send. */
@@ -71,10 +80,13 @@ function buildComposer(ctx, listener) {
     listener,
   });
   const { textarea: goal, attachments } = frame;
-  // The approval mode stays in sight as the Options pill's value, since it decides whether the run asks before it acts.
-  const optionsPill = composerPill({ id: "options", caption: "Options", value: "" });
+  // The approval mode stays in sight as the Options pill's value and icon, since it decides whether the run asks
+  // before it acts.
+  const optionsPill = composerPill({ id: "options", caption: "Options", value: "", icon: null });
+  optionsPill.element.title = "Approvals, goal mode and keep going";
   const approvals = approvalsPicker((shown) => {
     optionsPill.setValue(shown === null ? "" : approvalLabel(shown), "");
+    optionsPill.setIcon(icon(shown === null ? "lock" : APPROVAL_ICONS[shown]));
     optionsPill.setTone(shown === "yolo" ? "warn" : null);
   });
   const goalMode = goalModePicker();
@@ -86,7 +98,43 @@ function buildComposer(ctx, listener) {
     goalMode.setAvailable(id !== "chat" && !standing.value());
     goal.focus();
   }
-  const mode = segmented(MODES, "task", modePicked);
+  // The mode (item 108): a pill with the mode's icon, its menu the three modes with what each does.
+  const modePill = composerPill({ id: "mode", caption: "Mode", value: "", icon: null });
+  let modeId = "task";
+  const mode = {
+    value: () => modeId,
+    set: (id) => {
+      modeId = id;
+      paintMode();
+    },
+  };
+  function pickMode(id) {
+    mode.set(id);
+    modeMenu.close();
+    modePicked(id);
+  }
+  const modeMenu = anchoredPopover({
+    anchor: modePill.element,
+    frame: frame.element,
+    label: "Mode",
+    build: () => [
+      el(
+        "div",
+        { role: "listbox", "aria-label": "Mode" },
+        ...MODES.map((option) =>
+          optionRow({ lead: icon(option.icon), label: option.label, hint: option.hint, selected: option.id === modeId, onPick: () => pickMode(option.id) }),
+        ),
+      ),
+    ],
+  });
+  function paintMode() {
+    const option = MODES.find((candidate) => candidate.id === modeId);
+    modePill.setValue(option.label, "");
+    modePill.setIcon(icon(option.icon));
+    modePill.element.title = option.hint;
+    modeMenu.repaint();
+  }
+  paintMode();
   // Approvals and goal mode are kept per browser and keep going is for the odd goal, so the three wait in one popover.
   const optionsMenu = anchoredPopover({
     anchor: optionsPill.element,
@@ -94,15 +142,17 @@ function buildComposer(ctx, listener) {
     label: "Options",
     build: () => [approvals.element, goalMode.element, standing.element, approvals.warning],
   });
-  // The agent the run is for (item 86): Dot, or one the owner made; the menu only shows once an agent exists. A
-  // campaign is Dot's own work, so Keep going hides while an agent is picked.
+  // The agent the run is for (item 86): Dot, or one the owner made, its still face on the pill (item 108); the menu only
+  // shows once an agent exists. A campaign is Dot's own work, so Keep going hides while an agent is picked.
   const agentOption = el("option", { value: "" }, "Dot");
   const agent = el("select", { class: "select sm", "aria-label": "Agent" }, agentOption);
-  const agentPill = el("label", { class: "composer-pill composer-pill-select", hidden: true }, el("span", { class: "composer-pill-caption" }, "Agent"), agent);
+  const agentFace = el("span", { class: "composer-pill-icon" }, actorFace(DOT_ID, "idle", null));
+  const agentPill = el("label", { class: "composer-pill composer-pill-select", "data-pill": "agent", title: "The agent the run is for", hidden: true }, agentFace, agent);
   let agents = [];
   function agentPicked() {
     const chosen = agents.find((candidate) => candidate.id === agent.value) ?? null;
     goal.placeholder = chosen === null ? "Message Dot" : `Message ${chosen.name}`;
+    agentFace.replaceChildren(chosen === null ? actorFace(DOT_ID, "idle", null) : actorFace(chosen.id, "idle", chosen.look));
     standing.setAvailable(chosen === null && mode.value() === "task");
   }
   agent.addEventListener("change", agentPicked);
@@ -116,8 +166,12 @@ function buildComposer(ctx, listener) {
     .catch((error) => {
       console.warn("the agents could not be listed", error);
     });
-  // The model: the daemon's default until one is picked; its reasoning levels, when it offers a choice, in the same menu.
-  const modelPill = composerPill({ id: "model", caption: "Model", value: "" });
+  // The model: the daemon's default until one is picked, worn with its provider's mark (item 108).
+  const modelPill = composerPill({ id: "model", caption: "Model", value: "", icon: null });
+  // The reasoning level of a model that offers a choice, kept in the browser per model; hidden for the others.
+  const reasoningPill = composerPill({ id: "reasoning", caption: "Reasoning", value: "", icon: icon("brain") });
+  reasoningPill.element.title = "Reasoning level";
+  reasoningPill.element.hidden = true;
   let chosenRef = "";
   let providers = [];
   let shownDefault = NOTHING_SHOWN;
@@ -128,51 +182,81 @@ function buildComposer(ctx, listener) {
     return allModels(providers).find((candidate) => candidate.ref === ref) ?? null;
   }
 
-  // The pill shows the model's name and, for a model with levels, the level chosen; its tooltip the whole reference.
+  // The Model pill shows the mark and the name, its tooltip the whole reference; the Reasoning pill the level chosen,
+  // or the one the daemon would use.
   function paintModel() {
     const info = selectedInfo();
     const ref = chosenRef === "" ? defaultRefOf(getSnapshot()) : chosenRef;
-    const level = info !== null && offersChoice(info) ? savedLevel(info) : null;
-    modelPill.setValue(ref === null ? "Default" : modelName(ref), level === null ? "" : levelLabel(level));
+    modelPill.setValue(ref === null ? "Default" : modelName(ref), "");
+    modelPill.setIcon(providerMark(ref === null ? "" : providerOf(ref)));
     modelPill.element.title = info === null ? "" : info.ref;
+    const choice = info !== null && offersChoice(info);
+    reasoningPill.element.hidden = !choice;
+    if (choice) {
+      const level = savedLevel(info) ?? info.default_effort;
+      reasoningPill.setValue(level === null ? "Default" : levelLabel(level), "");
+    } else {
+      reasoningMenu.close();
+    }
     modelMenu.repaint();
-  }
-
-  function reasoningRow(info) {
-    const levels = [{ id: "", label: info.default_effort === null ? "Default" : `Default (${levelLabel(info.default_effort)})`, hint: "The daemon's own choice" }];
-    levels.push(...info.efforts.map((level) => ({ id: level, label: levelLabel(level), hint: "" })));
-    const control = segmented(levels, savedLevel(info) ?? "", (id) => {
-      if (id === "") {
-        forgetLevel(info);
-      } else {
-        saveLevel(info, id);
-      }
-      paintModel();
-    });
-    control.element.setAttribute("aria-label", "Reasoning level");
-    return el("div", { class: "composer-pick", role: "group", "aria-label": "Reasoning" }, el("span", { class: "composer-pick-label" }, "Reasoning"), control.element);
+    reasoningMenu.repaint();
   }
 
   function pickModel(ref) {
     chosenRef = ref;
+    modelMenu.close();
     paintModel();
+    modelPill.element.focus();
+  }
+
+  function pickLevel(info, level) {
+    if (level === null) {
+      forgetLevel(info);
+    } else {
+      saveLevel(info, level);
+    }
+    reasoningMenu.close();
+    paintModel();
+    reasoningPill.element.focus();
   }
 
   function modelRows() {
-    const list = el("div", { role: "listbox", "aria-label": "Model" }, optionRow(defaultRowText(defaultRefOf(getSnapshot())), chosenRef === "", () => pickModel("")));
+    const fallback = defaultRefOf(getSnapshot());
+    const list = el(
+      "div",
+      { role: "listbox", "aria-label": "Model" },
+      optionRow({ lead: providerMark(fallback === null ? "" : providerOf(fallback)), label: defaultRowText(fallback), hint: "", selected: chosenRef === "", onPick: () => pickModel("") }),
+    );
     for (const group of toolGroups(providers)) {
       list.append(el("div", { class: "pop-group" }, providerLabel(group.provider)));
       for (const info of group.models) {
-        const row = optionRow(modelName(info.ref), chosenRef === info.ref, () => pickModel(info.ref));
+        const row = optionRow({ lead: providerMark(group.provider), label: modelName(info.ref), hint: "", selected: chosenRef === info.ref, onPick: () => pickModel(info.ref) });
         row.title = info.ref;
         list.append(row);
       }
     }
+    return [list];
+  }
+
+  function reasoningRows() {
     const info = selectedInfo();
-    return info !== null && offersChoice(info) ? [list, reasoningRow(info)] : [list];
+    if (info === null || !offersChoice(info)) {
+      return [];
+    }
+    const saved = savedLevel(info);
+    const fallback = info.default_effort === null ? "Default" : `Default (${levelLabel(info.default_effort)})`;
+    return [
+      el(
+        "div",
+        { role: "listbox", "aria-label": "Reasoning" },
+        optionRow({ lead: null, label: fallback, hint: "The daemon's own choice", selected: saved === null, onPick: () => pickLevel(info, null) }),
+        ...info.efforts.map((level) => optionRow({ lead: null, label: levelLabel(level), hint: "", selected: saved === level, onPick: () => pickLevel(info, level) })),
+      ),
+    ];
   }
 
   const modelMenu = anchoredPopover({ anchor: modelPill.element, frame: frame.element, label: "Model", build: modelRows });
+  const reasoningMenu = anchoredPopover({ anchor: reasoningPill.element, frame: frame.element, label: "Reasoning", build: reasoningRows });
 
   // Called on every status update; it only does work when the daemon's default model changed.
   function syncDefault() {
@@ -246,7 +330,7 @@ function buildComposer(ctx, listener) {
     goalMode.sync();
   }
 
-  frame.options.append(attachments.button, mode.element, agentPill, modelPill.element, optionsPill.element);
+  frame.options.append(modePill.element, agentPill, modelPill.element, reasoningPill.element, optionsPill.element);
   frame.element.append(standing.note);
   const stopStatus = onChange(syncStatus);
   return {
@@ -255,7 +339,9 @@ function buildComposer(ctx, listener) {
     dispose: () => {
       stopStatus();
       optionsMenu.dispose();
+      modeMenu.dispose();
       modelMenu.dispose();
+      reasoningMenu.dispose();
       frame.dispose();
     },
   };

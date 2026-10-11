@@ -4,13 +4,13 @@ open the Model and the Options menus; a draft survives a navigation. Wide and on
 
 import asyncio
 import time
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Callable
 from pathlib import Path
 
 import httpx
 import pytest
 import pytest_asyncio
-from playwright.async_api import Browser, Page, async_playwright, expect
+from playwright.async_api import Browser, ConsoleMessage, Page, Route, async_playwright, expect
 
 from dotagent.agent.manager import RunManager
 from dotagent.config import load_config
@@ -24,6 +24,38 @@ from dotagent.server.links import ui_url
 pytestmark = [pytest.mark.browser, pytest.mark.asyncio(loop_scope="module")]
 
 TOKEN: str = "composer-test-token"
+# A model that offers reasoning levels, added in the page to the daemon's list (the scripted model offers none), so the
+# Reasoning pill has levels to show.
+_THINKER: dict[str, object] = {
+    "ref": "ollama:thinker",
+    "vision": False,
+    "tools": True,
+    "thinking": True,
+    "context_length": 32768,
+    "efforts": ["low", "medium", "high"],
+    "default_effort": "medium",
+}
+
+
+def _collect_refusals(refused: list[str]) -> Callable[[ConsoleMessage], None]:
+    """A console listener that keeps what the page's Content-Security-Policy refused."""
+
+    def listen(message: ConsoleMessage) -> None:
+        if "Content Security Policy" in message.text:
+            refused.append(message.text)
+
+    return listen
+
+
+async def _with_a_thinking_model(route: Route) -> None:
+    response = await route.fetch()
+    providers: list[dict[str, list[dict[str, object]]]] = await response.json()
+    for provider in providers:
+        if provider["provider"] == "ollama":
+            provider["models"].append(_THINKER)
+    await route.fulfill(response=response, json=providers)
+
+
 SKILL: str = """---
 name: scan-catalogue
 description: "Scan a product catalogue page by page and report the items."
@@ -146,9 +178,7 @@ async def test_a_slash_opens_the_menu_letters_filter_it_and_enter_picks_without_
                 await expect(menu.locator("[role=option]")).to_have_count(1)
                 await goal.press("Tab")
                 await expect(goal).to_have_value("")
-                await expect(page.get_by_role("group").get_by_role("button", name="Research")).to_have_attribute(
-                    "aria-pressed", "true"
-                )
+                await expect(page.locator(".composer-pill[data-pill='mode']")).to_contain_text("Research")
                 # Shift+Enter breaks a line and sends nothing.
                 await goal.type("first")
                 await goal.press("Shift+Enter")
@@ -171,24 +201,67 @@ async def test_the_pills_open_their_menus_and_a_draft_survives_a_navigation(
         try:
             for width in (1280, 390):
                 page: Page = await browser.new_page(viewport={"width": width, "height": 900})
+                refused: list[str] = []
+                page.on("console", _collect_refusals(refused))
+                await page.route("**/api/models", _with_a_thinking_model)
                 await page.goto(ui_url(host, port, TOKEN))
                 goal = page.locator(GOAL)
                 popover = page.locator(".composer .composer-popover[aria-label='Model']")
                 await expect(popover).to_be_hidden()
-                # The Model pill: the daemon's default is the row ticked; picking the scripted model names it on the pill.
+                # The Model pill (item 108) wears the mark of its provider, an SVG of the page's own, and the model's name.
                 model_pill = page.locator(".composer-pill[data-pill='model']")
                 await expect(model_pill).to_contain_text("scripted")
+                mark = model_pill.locator(".provider-mark")
+                await expect(mark).to_have_attribute("data-provider", "ollama")
+                masked: str = await mark.evaluate("(node) => getComputedStyle(node).maskImage")
+                assert "icons/providers/ollama.svg" in masked, masked
+                served: httpx.Response = await client.get("/icons/providers/ollama.svg")
+                assert served.status_code == 200, served.status_code
+                assert served.headers["content-type"].startswith("image/svg+xml"), served.headers["content-type"]
+                # The scripted model offers no reasoning levels, so the Reasoning pill is away.
+                reasoning_pill = page.locator(".composer-pill[data-pill='reasoning']")
+                await expect(reasoning_pill).to_be_hidden()
+                # The menu: the daemon's default ticked, every model with its mark; a pick closes it and names the model.
                 await model_pill.click()
                 await expect(popover).to_be_visible()
                 await expect(popover.locator("[role=option][aria-selected=true]")).to_contain_text("Default (scripted)")
-                await page.screenshot(path=str(tmp_path / f"model-menu-{width}.png"))
-                last = popover.locator("[role=option]").last
-                picked: str = await last.inner_text()
-                await last.click()
-                await expect(popover.locator("[role=option][aria-selected=true]")).to_have_text(picked)
-                await page.keyboard.press("Escape")
+                await expect(popover.locator("[role=option] .provider-mark").first).to_have_attribute(
+                    "data-provider", "ollama"
+                )
+                await page.screenshot(path=str(tmp_path / f"model-menu-{width}.png"), animations="disabled")
+                await popover.get_by_role("option", name="thinker").click()
                 await expect(popover).to_be_hidden()
+                await expect(model_pill).to_contain_text("thinker")
+                # A model with levels brings the Reasoning pill: the daemon's level until one is picked, then the one picked.
+                await expect(reasoning_pill).to_contain_text("Medium")
+                await expect(reasoning_pill.locator("[data-icon='brain']")).to_have_count(1)
+                await reasoning_pill.click()
+                levels = page.locator(".composer .composer-popover[aria-label='Reasoning']")
+                await expect(levels.locator("[role=option]")).to_have_count(4)
+                await expect(levels.locator("[role=option][aria-selected=true]")).to_contain_text("Default (Medium)")
+                await page.screenshot(path=str(tmp_path / f"reasoning-menu-{width}.png"), animations="disabled")
+                await levels.get_by_role("option", name="High", exact=True).click()
+                await expect(levels).to_be_hidden()
+                await expect(reasoning_pill).to_contain_text("High")
+                # Back to the daemon's default: the Reasoning pill goes again.
+                await model_pill.click()
+                await popover.get_by_role("option", name="Default (scripted)").click()
+                await expect(reasoning_pill).to_be_hidden()
                 assert await model_pill.get_attribute("aria-expanded") == "false"
+                # The Mode pill: the mode's icon and name; its menu the three modes with what each does.
+                mode_pill = page.locator(".composer-pill[data-pill='mode']")
+                await expect(mode_pill).to_contain_text("Task")
+                await mode_pill.click()
+                modes = page.locator(".composer .composer-popover[aria-label='Mode']")
+                await expect(modes.locator("[role=option]")).to_have_count(3)
+                await modes.get_by_role("option", name="Chat").click()
+                await expect(modes).to_be_hidden()
+                await expect(mode_pill).to_contain_text("Chat")
+                await expect(mode_pill.locator("[data-icon='message']")).to_have_count(1)
+                await expect(goal).to_be_focused()
+                await mode_pill.click()
+                await modes.get_by_role("option", name="Task").click()
+                await expect(mode_pill).to_contain_text("Task")
                 # The Options pill carries the approvals as its value and opens the approvals, goal mode and keep going.
                 options_pill = page.locator(".composer-pill[data-pill='options']")
                 await expect(options_pill).to_contain_text("Ask")
@@ -197,12 +270,14 @@ async def test_the_pills_open_their_menus_and_a_draft_survives_a_navigation(
                 await expect(popover.get_by_role("group", name="Approvals")).to_be_visible()
                 await expect(popover.get_by_role("switch", name="Goal mode")).to_be_visible()
                 await expect(popover.get_by_role("switch", name="Keep going until done")).to_be_visible()
-                await page.screenshot(path=str(tmp_path / f"options-menu-{width}.png"))
+                await page.screenshot(path=str(tmp_path / f"options-menu-{width}.png"), animations="disabled")
                 await popover.get_by_role("button", name="YOLO").click()
                 await expect(options_pill).to_contain_text("YOLO")
                 await expect(options_pill).to_have_attribute("data-tone", "warn")
+                await expect(options_pill.locator("[data-icon='lockOpen']")).to_have_count(1)
                 await popover.get_by_role("button", name="Ask").click()
                 await expect(options_pill).to_contain_text("Ask")
+                await expect(options_pill.locator("[data-icon='lock']")).to_have_count(1)
                 # A click outside (on the empty page under the composer) closes the menu.
                 await page.mouse.click(width - 20, 880)
                 await expect(popover).to_be_hidden()
@@ -215,6 +290,7 @@ async def test_the_pills_open_their_menus_and_a_draft_survives_a_navigation(
                 await page.goto(f"http://{host}:{port}/#/agents")
                 await page.goto(f"http://{host}:{port}/#/runs")
                 await expect(page.locator(GOAL)).to_have_value("")
+                assert refused == [], refused
                 await page.close()
         finally:
             await browser.close()

@@ -848,12 +848,13 @@ schedules that fire and the campaigns whose next session starts), what was learn
 journal) and what ended, each row as on the Activity page and each opening what it is about; five rows a section,
 then "and N more in Activity". The line and the strip follow the lifecycle stream, so an answer or a run's end moves
 them at once; `GET /api/activity` carries the two new lists as `learned_today` and `due`. The composer is one frame: the goal, the
-files attached under it, then a bar of pills: the attach button, the mode (Task, Chat or Research), the Agent menu
-once an agent exists, **Model** (the daemon's default or one picked, by provider; the same menu holds the reasoning
-level of a model that offers a choice, kept in the browser per model) and **Options** (the approval mode, Ask, Auto or
-YOLO, which the pill always shows, the Goal mode switch and Keep going, see
-[Autonomy](#autonomy-approvals-goal-mode-and-the-end-of-a-run)). Each pill opens its menu above it; Escape or a click
-outside closes it. What you typed and attached and did not send is kept in this browser and is there again when you
+files attached under it, then a bar of pills, each an icon and its value with a hairline between two: the mode (Task,
+Chat or Research; its menu says what each does), the agent with its face once an agent exists, **Model** (the mark of
+its provider and its name: the daemon's default or one picked, by provider), **Reasoning** (a brain and the level, only
+for a model that offers a choice; kept in the browser per model) and **Options** (a lock, closed for Ask, a shield for
+Auto, open for YOLO: the approval mode, which the pill always shows, the Goal mode switch and Keep going, see
+[Autonomy](#autonomy-approvals-goal-mode-and-the-end-of-a-run)); the attach button and the send sit at the right end.
+Each pill opens its menu above it, and a pick or Escape or a click outside closes it. What you typed and attached and did not send is kept in this browser and is there again when you
 come back (so is the box of each run). Dot's face looks down at the box while you write and brightens when you send.
 Enter starts the run, Shift+Enter adds a line. `/` at
 the start of a word opens the slash menu over the box: the commands of the composer (`/task`, `/chat`, `/research`
@@ -954,8 +955,9 @@ composer in focus); section labels are sentence case; the facts of a row are spa
 string; an empty list is one line that says so and what to do; your messages sit on the raised surface. Controls:
 buttons, inputs and selects 36 px tall on an 8 px corner with a hairline (32 for the small ones), the same 2 px focus
 ring on each, a select with its own drawn chevron, field labels on the interface line and hints on the small one, the composer's
-menus as pills of 32 px (a muted caption, the value, a chevron; borderless at rest, a hairline under the pointer) that
-open a panel above them,
+menus as pills of 32 px (an icon of 16 px, the value, a chevron; borderless at rest, a hairline under the pointer and one
+between two pills) that open a panel above them, the providers' marks served from `static/icons/providers/` with their
+licences,
 table rows 40 px with their content on the middle; `#/controls` shows every control on one page for checking a look.
 Faces: every actor is a character (below); an agent wears the look you choose, Dot its own (Settings › General), and
 an actor without one (a delegated run, a campaign, a schedule) the shape and colour its id's hue gives it, one of

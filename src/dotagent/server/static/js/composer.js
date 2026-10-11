@@ -208,7 +208,7 @@ export function wireComposer(textarea, { maxPx, send, commands }) {
 /**
  * The frame the composers share: the slash menu over it, the box (`rows` high, `boxLabel` its name, growing with its
  * text up to `maxPx`), the attached files in a row under the box, then the bar with the `options` row on the left and
- * the round send button on the right (`sendLabel` its words). `commands` are the slash menu's own; `send()` runs on
+ * the attach button and the round send button on the right (`sendLabel` its words). `commands` are the slash menu's own; `send()` runs on
  * Enter and on the button. `draftKey` (or null) keeps the text and the ready files under `dot.draft.<key>` until
  * `clear()` after a send. `listener` (`{ focus(on), typing() }`, or null) hears the box, for a face that listens.
  * Returns `element`, `textarea`, `attachments`, `options`, `sendButton`, `setSendLabel(text)`, `autosize()`, `clear()`
@@ -236,7 +236,7 @@ export function composerFrame({ label, boxLabel, placeholder, rows, maxPx, comma
   const sendButton = el("button", { class: "btn primary send", type: "button", title: sendLabel, "aria-label": sendLabel }, icon("arrowUp"), sendText);
   const options = el("div", { class: "composer-options" });
   const wired = wireComposer(textarea, { maxPx, send, commands });
-  element.append(wired.menu, textarea, attachments.list, attachments.picker, el("div", { class: "composer-bar" }, options, sendButton));
+  element.append(wired.menu, textarea, attachments.list, attachments.picker, el("div", { class: "composer-bar" }, options, attachments.button, sendButton));
   sendButton.addEventListener("click", send);
 
   function onInput() {
@@ -287,17 +287,20 @@ export function composerFrame({ label, boxLabel, placeholder, rows, maxPx, comma
 }
 
 /**
- * A pill of the bar: a muted caption and the value it holds ("Model", "Muse Spark 1.3"), a chevron after them. `id`
- * names it (`data-pill`). `setValue(text, extra)` paints the value and a muted word after it (or ""); `setTone(tone)`
- * tints it ("warn", or null).
+ * A pill of the bar (item 108): an icon (`icon`, a node or null: the mark of a provider, a lock, a brain), the value it
+ * holds ("Muse Spark 1.3") and a chevron; `caption` names it for a screen reader ("Model") without showing. `id` names
+ * it (`data-pill`). `setValue(text, extra)` paints the value and a muted word after it (or ""); `setIcon(node)` swaps
+ * the icon; `setTone(tone)` tints it ("warn", or null).
  */
-export function composerPill({ id, caption, value }) {
+export function composerPill({ id, caption, value, icon: mark }) {
   const valueNode = el("span", { class: "composer-pill-value" }, value);
   const extraNode = el("span", { class: "composer-pill-extra", hidden: true });
+  const iconNode = el("span", { class: "composer-pill-icon" }, mark);
   const element = el(
     "button",
     { class: "composer-pill", type: "button", "data-pill": id },
-    el("span", { class: "composer-pill-caption" }, caption),
+    iconNode,
+    el("span", { class: "visually-hidden" }, caption),
     valueNode,
     extraNode,
     icon("chevron"),
@@ -308,6 +311,9 @@ export function composerPill({ id, caption, value }) {
       valueNode.textContent = text;
       extraNode.textContent = extra;
       extraNode.hidden = extra === "";
+    },
+    setIcon: (node) => {
+      iconNode.replaceChildren(node);
     },
     setTone: (tone) => {
       if (tone === null) {
