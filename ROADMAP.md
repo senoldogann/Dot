@@ -4246,12 +4246,12 @@ parked: its premises (tool-call deltas in the stream) are still not in the code.
 
 | #   | Item                                                                     | Status      | Commits |
 | --- | ------------------------------------------------------------------------ | ----------- | ------- |
-| 60  | The live numbers of parts 5 and 6                                        | planned     |         |
+| 60  | The live numbers of parts 5 and 6                                        | done        | (text)  |
 | 61  | Summaries that pass their own check                                      | done        | a8c602f |
 | 62  | A delegate before the plan is a step, not a lost turn                   | done        | 056b153 |
 | 63  | The soft look: light and dark, every surface                             | done        | 9e86fda |
 | 64  | The composer: a slash menu of commands, skills and MCP tools             | done        | d36d375 |
-| 65  | The chrome that stays: the run's head and side panel while it scrolls    | in progress |         |
+| 65  | The chrome that stays: the run's head and side panel while it scrolls    | done        | 5c3917f |
 | 66  | One door for the store's writes                                          | done        | 5c7eada |
 | 67  | The inspector's cards: folded, no stray null, a view that follows the run | done        | 8255af7 |
 | 68  | Delegated runs in sight: the sidebar and the chat                        | done        | 278f256 |
@@ -4349,7 +4349,7 @@ Activity page's nested row, the chat card's chip and link, at 1280 and 390 px in
 
 ### 60. The live numbers of parts 5 and 6
 
-**Status: planned.** A measurement, not code.
+**Status: done (2026-10-11).** A measurement, not code; the numbers follow the plan below.
 
 **What.** One research run of the owner's own kind (the kind the owner's seven runs were; the goal stays out of this
 file), started on the daemon at the owner's word on 2026-10-11 (`run_mv39kmag_ec5bb3`, `ollama:deepseek-v4.1-flash:cloud`,
@@ -4360,6 +4360,28 @@ searches (25 of 93 web failures before; near zero, item 59), the engine named in
 carried the run), `_adopt_popup` tracebacks in the log (none, item 57) and the cost card's numbers on the run page
 (item 58). Whatever the run shows that the parts did not foresee goes into the log and, when it is structure, into an
 item.
+
+**What the run showed (2026-10-11).** The first start (`run_mv39kmag_ec5bb3`) died with every other run in the
+`database is locked` crash of item 66; the run was started again as `run_mv3aaeat_5e1c03` on the daemon at 5c7eada
+(items 66 and 67 in; 61 to 65 not yet) and ended done in 28 min: 12 steps of its own and 5 delegated runs of 36, 47,
+57, 40 and 38 steps (230 steps in all), read with `dotx stats --run` and the store, read-only.
+
+| measure                                   | item 53 baseline            | this run                                     |
+| ----------------------------------------- | --------------------------- | -------------------------------------------- |
+| compactions per 100 steps                 | 13.8                        | 5.7 (13 in 230 steps; 3.5 to 8.5 per child)   |
+| model seconds in summaries                | 53 %                        | 3 to 6 % per child, 0 in the parent          |
+| not-found fetches per research run        | about 10                    | 0 in the parent, 1 to 7 per child (17 in all) |
+| throttled searches                        | 25 of 93 web failures       | 0 of 104 searches; every one from `ollama`   |
+| `_adopt_popup` tracebacks                 | present                     | 0 in the log                                 |
+| store `store_locked_retry` / unrecorded   | the crash                   | 0 and 0                                      |
+| input tokens a step                       | not measured                | 38 k parent, 59 to 63 k children, 53 to 73 % cached |
+
+Not foreseen: 6 of the 13 compaction checks failed, every one for a missing STATE section (one with an unverified
+identifier too), written by the fast model `gpt-oss:20b-cloud` at one attempt each; item 61's second ask with the
+section named was not on the daemon yet, so this is the measure it should move next time. Of 46 failed `web_fetch` /
+`web_extract` calls, 23 are `web_extract` answering "Extracted 0 of N sources" (the quotes did not match the pages)
+and the rest dead job links (404, 410), the ordinary wear of job boards; `web_extract` on job pages is a candidate for
+a later item. The parent waited 4 312 s on its delegated runs with 0 s at the gate.
 
 ### 61. Summaries that pass their own check
 
@@ -4533,7 +4555,7 @@ leave no text, Shift+Enter breaks a line. The dock of a run is wired by the same
 
 ### 65. The chrome that stays: the run's head and side panel while it scrolls
 
-**Status: in progress.** Built on `item-65-sticky-chrome` (MYP-207).
+**Status: done.** Built on `item-65-sticky-chrome` (MYP-207), merged 5c3917f (PR #74).
 
 **What.** On the run page the head (Dot's face and state, the model chip, the mode chips, Cancel) stays at the top of
 the conversation while it scrolls, the inspector stays beside it to its full height with its own scroll, the dock
@@ -5040,3 +5062,15 @@ and 390 px in both schemes were looked at.
   merged 8255af7 (PR #68, MYP-201 Done). Item 68 (delegated runs nested in the sidebar and the Activity page, a progress
   chip and a link on the chat's card) merged 278f256 (PR #69, MYP-202 Done). The long run was active at both merges, so
   the daemon stayed on 5c7eada.
+- 2026-10-11 (Fable 5.1): item 61 (the ellipsis of a cut value is not part of an identifier; a long known prefix counts;
+  the summary asked again with the missing sections named or the limit first) merged a8c602f (PR #70, MYP-203 Done).
+  Item 62 (a delegate for a step the plan lacks runs and says so; a blank model name is the parent's own; both live
+  delegate smoke tests pass) merged 056b153 (PR #71, MYP-204 Done). Item 63 (every token light-dark() in one place,
+  a warm grey scale, borders as ink at a small alpha, a Colour scheme choice, contrast measured by a unit test) merged
+  9e86fda (PR #72, MYP-205 Done); the controls smoke test's section count had been stale since item 58. Item 64 (the
+  slash menu: `GET /api/palette`, slash.js, composer.js shared by both composers) merged d36d375 (PR #73, MYP-206
+  Done). Item 65 (the head and the panel sticky under a measured stage bar, a one-line head on a phone) merged 5c3917f
+  (PR #74, MYP-207 Done). Item 60 measured on `run_mv3aaeat_5e1c03`: 5.7 compactions per 100 steps (13.8 before),
+  summaries 3 to 6 % of the model time (53 %), 0 throttled searches of 104 (every one from the `ollama` rung), 0
+  `_adopt_popup`, 0 store retries; 6 of 13 compaction checks failed for a missing STATE section (item 61 was not on the
+  daemon yet). Part 7 complete.
