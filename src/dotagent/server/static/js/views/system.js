@@ -1,6 +1,6 @@
 // The system page: how the daemon is doing, the emergency stop, the health checks and the models each provider offers.
 
-import { DOT_ID, lookOf, rememberLook } from "../actors.js";
+import { DOT_ID, facesMove, lookOf, rememberLook, setFacesMove } from "../actors.js";
 import { api, clearToken } from "../api.js";
 import {
   notificationsAvailable,
@@ -130,6 +130,14 @@ function buildAppearance() {
     write: setShowInspector,
     onToggled: paintLayout,
   });
+  // The faces that move (item 103): the home's, the run page's and the previews; off leaves every face still.
+  const faces = switchSetting({
+    label: "Faces that move",
+    hint: "Dot's face on the home and the face beside a chat move while they work and rest; off, every face is a still frame.",
+    read: facesMove,
+    write: setFacesMove,
+    onToggled: () => faces.paint(),
+  });
   const reset = el(
     "button",
     {
@@ -146,6 +154,7 @@ function buildAppearance() {
   function paintLayout() {
     fold.paint();
     inspector.paint();
+    faces.paint();
     reset.disabled = !hasOwnLayout();
     layoutNote.textContent = hasOwnLayout()
       ? "You set these two yourself; they stay as they are when you change the look."
@@ -195,6 +204,7 @@ function buildAppearance() {
       fold.element,
       inspector.element,
       el("div", { class: "setting" }, el("div", { class: "row" }, layoutNote, reset)),
+      faces.element,
     ),
   );
   return { element, dispose: stopListening };

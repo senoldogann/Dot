@@ -1,6 +1,8 @@
 // The messages of a conversation that more than one view draws: what the user wrote, and how a run ended with Dot's answer.
 
 import { copyText, dateTimeFull, duration, el } from "./dom.js";
+import { actorFace } from "./actors.js";
+import { faceStateAtEnd } from "./face.js";
 import { icon } from "./icons.js";
 import { prose } from "./prose.js";
 import { toast } from "./ui.js";
@@ -36,10 +38,11 @@ function copyButton(text) {
 }
 
 /**
- * How a run ended, in Dot's voice: the answer itself, then one line with the outcome, when it ended and how long the run took.
- * `startedAt` is null when the start of the run is not known; `href` leads to the run itself (null when the reader is there).
+ * How a run ended, as the actor's answer: the face of `actorId` (an agent id, a run id, or "dot") on the left, the answer
+ * itself or why there is none, then one line with the outcome, when it ended and how long the run took. `startedAt` is null
+ * when the start of the run is not known; `href` leads to the run itself (null when the reader is there).
  */
-export function answerMessage({ status, text, endedAt, startedAt, href }) {
+export function answerMessage({ actorId, status, text, endedAt, startedAt, href }) {
   const outcome = OUTCOMES[status] ?? { label: status, empty: "" };
   const written = text.trim() !== "";
   const facts = [outcome.label, dateTimeFull(endedAt)];
@@ -49,6 +52,7 @@ export function answerMessage({ status, text, endedAt, startedAt, href }) {
   return el(
     "article",
     { class: `answer ${status}`, "aria-label": "Answer" },
+    el("span", { class: "turn-face" }, actorFace(actorId, faceStateAtEnd(status), null)),
     status === "failed" ? el("div", { class: "answer-alert" }, icon("alert"), el("strong", null, "The run failed")) : null,
     written ? prose(text) : el("div", { class: "muted" }, outcome.empty),
     el(

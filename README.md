@@ -837,7 +837,8 @@ page, with its steps so far and its channel; the parent's row says how many runs
 delegated run's card carries a chip with its progress ("step 3 · web_fetch", then "done · 12 steps") and an **open**
 link to the run's own page.
 
-**New chat** is Dot's presence and one composer, centred in the window. The face shows the state of the whole of Dot
+**New chat** is Dot's presence and one composer, centred in the window. The face is Dot's character, moving (idle with
+a wink now and then; a still frame with "Faces that move" off), and shows the state of the whole of Dot
 (waiting when something waits for you, working while a run is active, else idle) under Dot's name (yours to give in
 Settings › General; Dot until then, and kept in this browser only); a greeting by the hour says your name when you gave
 one there ("Good morning, Ada. What should I work on?"; "Something waits for you." when it does) and one line says what
@@ -891,7 +892,12 @@ scrolls under a blur, the panel stays in place under it, and the box stays at th
 face, the name and the buttons; the chips wait in the Details card. Every other page names itself in the same bar
 (Agents, Activity, Campaigns, Settings) and opens with one line of description.
 
-The panel's cards (Dot's computer, Details, Plan, Actions, Screen) arrive folded, each with a one-line summary, and
+The panel opens with the run's actor as a moving character (Dot, or the agent the run belongs to, in its look): it
+hatches when a run starts under your eyes, thinks while the run works, looks aside toward the live view at each browser
+step, goes alert with a pastille while the run waits for you, laughs once when the run ends well and settles, rests sad
+after a failure and unimpressed after a cancel, and sleeps ten minutes after the end. In the conversation each turn of
+the actor, and the answer at the end, opens with its still face. The panel's cards (Dot's computer, Details, Plan,
+Actions, Screen) arrive folded, each with a one-line summary, and
 open at a click; the choice is kept per card. **Dot's computer**, at the top of that panel while a run is going on,
 shows the page of the run's browser as Chrome paints it (`GET /api/runs/{id}/screencast`, Chrome's own screencast,
 sent only while the view is open; a tab that does not change sends nothing). The view starts by itself at the run's
@@ -953,7 +959,9 @@ Perret) to plain ES modules, one filled shape with two eyes that are holes in it
 expressions, twelve colours (the theme's `--character-*` tokens) and fourteen animations; bloub recreates the
 behaviour of x.ai's bot avatar as an exercise and is affiliated with nobody, and neither is Dot: the licence covers
 the code, not the design it imitates (`static/js/character/LICENSE`). One loop drives every moving character on the
-page and stops while the tab is hidden; under reduced motion each shows one still frame. `#/controls` shows every
+page and stops while the tab is hidden; under reduced motion, or with "Faces that move" off in Settings › General, each
+shows one still frame. Three characters move: the home's face, the run page's panel character (its moods from the run's
+status, `static/js/mood.js`) and the look editor's preview; every other face is a still frame. `#/controls` shows every
 shape, expression, colour and animation.
 Space: every gap, padding and margin sits on one rhythm of 8 px (4 for the smallest, a 2 px hairline token for what
 sits a breath apart; a unit test checks it); the sidebar has no dividers between its groups, its labels are the

@@ -38,7 +38,7 @@ export async function loadHistory(run) {
 function turn(past) {
   const href = `#/runs/${past.id}`;
   const answer = FINISHED.has(past.status)
-    ? answerMessage({ status: past.status, text: past.result, endedAt: past.finished_at, startedAt: past.created_at, href })
+    ? answerMessage({ actorId: past.agent_id ?? "dot", status: past.status, text: past.result, endedAt: past.finished_at, startedAt: past.created_at, href })
     : el("div", { class: "note" }, icon("clock"), el("span", null, "This run is still going."), el("a", { class: "small", href }, "Open run"));
   const asked =
     past.source === RESUME_SOURCE
