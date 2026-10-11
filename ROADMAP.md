@@ -4630,8 +4630,8 @@ says so), $10 per 1,000 searches plus tokens (the docs; a failed search is not b
 | 72  | The home that says "I am here"                                           | done        | 9020ee0 |
 | 73  | Motion with meaning                                                      | done        | 1efede9 |
 | 74  | Quiet chrome: the surfaces recede, the work leads                        | done        | f809abd |
-| 75  | Told only when not looking                                               | in progress |         |
-| 76  | The live numbers of part 8                                               | planned     |         |
+| 75  | Told only when not looking                                               | done        | 9643889 |
+| 76  | The live numbers of part 8                                               | in progress |         |
 
 ### 69. The Anthropic rung: Haiku 5.5 searches through the API's own web search
 
@@ -4891,7 +4891,7 @@ and the sidebar, the Activity page and a run's page at 1280 and 390 in both sche
 
 ### 75. Told only when not looking
 
-**Status: in progress.** Built on `item-75-not-looking` (MYP-215).
+**Status: done.** Merged as `9643889` (PR #83, squash; MYP-215 Done). CI did not run for the PR (GitHub Actions: the account's payments failed or its spending limit is reached, both jobs refused in 5 s); merged on the local gate: format, lint, mypy, 763 unit tests, `dotx eval check`, the attention smoke test.
 
 **What.** A desktop notification or a push for a run that ended or asks fires only when the owner is not looking at
 that run: the tab hidden, or another page open (Claude Code desktop's rule); the tab title keeps counting; a setting
@@ -4919,7 +4919,21 @@ hidden notifies, and with the setting on a run that ends on its open page notifi
 
 ### 76. The live numbers of part 8
 
-**Status: planned.** A measurement, not code.
+**Status: in progress (2026-10-11).** A measurement, not code. The clock starts with the daemon restart of 2026-10-11
+after item 75 merged (the daemon had run e475368, none of items 69 to 75, until then); the reading is due on or after
+2026-10-18 and goes here under "What the week showed".
+
+**Baseline (2026-10-11, before the restart; `dotx stats` and the store, read-only).**
+
+| measure                                         | baseline                                     | read with                                   |
+| ----------------------------------------------- | -------------------------------------------- | ------------------------------------------- |
+| searches by rung, 30 days                       | ollama 129, anthropic 0 (the rung was not in) | `dotx stats` "searches answered"; cost card |
+| anthropic search dollars                        | 0                                            | the cost card's Searches cell                |
+| reflections run; lessons written/merged/retired | 0; 0/0/0 (`reflection.last` absent)          | Activity rows of kind `reflection`, the kv  |
+| notes tagged lesson / journal / rest            | 0 / 0 / 0 of 22 notes                        | Memory page groups                           |
+| notes used at least once                        | 21 of 22; resting 0 (every note younger)     | `used_count`, Memory page "Resting"          |
+| runs ended, 7 days                              | 22 (11 done, 9 failed, 2 cancelled)          | `dotx stats`, Activity "ended today"         |
+| notifications sent against runs ended           | not in the store: the browser decides and records nothing | a day's count by hand, notifications on, against "ended today" |
 
 **What.** After a week on the daemon: searches by rung and their dollars (item 69), reflections run and lessons
 written, merged and retired (item 70), notes resting and the share of recalled notes used (item 71), notifications
@@ -5422,3 +5436,4 @@ here.
 - 2026-10-11 (Fable 5.1): item 73 built on branch `item-73-motion` (MYP-213, PR #81). Item 74 built on branch `item-74-quiet-chrome` (MYP-214): the 4 px grid for every gap, padding and margin (`--space-half`), the sidebar without dividers, quiet pills, lighter card heads, step durations on hover; the spacing unit test.
 - 2026-10-11 (Fable 5.1): item 73 merged 1efede9 (PR #81, MYP-213 Done). The controls page's cost sample lacked the searches of item 69 (the page threw and drew nothing; the controls smoke test had not run since): fixed in item 74.
 - 2026-10-11 (Fable 5.1): item 74 built on branch `item-74-quiet-chrome` (MYP-214, PR #82). Item 75 built on branch `item-75-not-looking` (MYP-215): `attention.js` `isLooking`/`worthATell(runId)`, the "Tell me even when I am looking" switch, the attention smoke test with a stubbed Notification.
+- 2026-10-11 (Fable 5.1): item 74 merged as `f809abd` (PR #82). Item 75 merged as `9643889` (PR #83) on the local gate: GitHub Actions refused both jobs (billing), see its status line. Item 76 opened: the baseline is written, the week starts with the daemon restart of today. The daemon's hourly task on `anthropic:claude-sonnet-5-5` failed three times running (04:28, 05:29, 06:31): Chrome did not accept the remote debugging connection on 9222 within 60 s; the owner's Chrome, not the code, as far as the store shows (told the owner).
