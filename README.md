@@ -176,8 +176,11 @@ answer (a small model that is offered both writes the call out as text).
 
 - Old tool results and screenshots are trimmed, and the oldest part of the conversation is summarised by the fast
   model (`[models] fast`, the side work the run's slower model need not do), so a run stays inside its context budget:
-  `context_tokens`, or three quarters of the model's window when that is less. The summary may use a tenth of the
-  budget, so a long run's summary does not grow with each compaction until every step compacts. A compaction keeps the
+  `context_tokens` (96 000 by default), or three quarters of the model's window when that is less. A wider budget means
+  fewer summaries in a long run and more input tokens a step (up to twice as many at the end of a long run); 48 000 was
+  the default before 2026-10-11, and an owner on a metered key who weighs tokens over summaries sets it back. The
+  summary may use a tenth of the budget and never more than 1 500 words, so a long run's summary does not grow with
+  each compaction until every step compacts, and does not cost the fast model minutes of writing. A compaction keeps the
   newest messages that fit next to the system prompt, the tool definitions and its note in 85 % of the budget, and
   never less than the model's last reply with its results, so the steps after it have room. It is tried three times;
   when the fast model gives no text, a summary far over that limit, an error or a timeout, the run's own model writes
@@ -205,8 +208,10 @@ answer (a small model that is offered both writes the call out as text).
   the first line of the plan in the web UI and are printed under "plan" by `dotx run`, go into every note that carries
   the plan (a compaction, a reminder, a resumed run) and, in goal mode, to the goal check.
 - How much help a run gets depends on its model. The window is what one request of the model can hold; for Ollama it is
-  the smaller of the model's own window and `[providers.ollama] num_ctx`, which Dot sends with every request (the Models
-  table of the System page shows it). When three quarters of the window is less than `context_tokens`, the run's budget
+  the smaller of the model's own window and the `num_ctx` Dot sends with every request (the Models table of the System
+  page shows it): `[providers.ollama] num_ctx` (65 536) for a model that runs on this Mac, where it sets the memory of
+  the model's cache, and `num_ctx_cloud` (262 144) for a cloud model, whose name ends in `:cloud` and which runs on
+  Ollama's servers. When three quarters of the window is less than `context_tokens`, the run's budget
   is that, and `tool_output_chars`, the most one tool result may carry, shrinks in the same proportion (never below 2000
   characters). A model whose window cannot hold the system prompt and the tool definitions is refused at the start, with
   a hint. A model of the `weak` tier is reminded in task and research runs, every `reminder_every` steps, of the goal,

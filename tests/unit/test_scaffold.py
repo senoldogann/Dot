@@ -18,16 +18,16 @@ from dotagent.agent.scaffold import (
     scaffold_for,
 )
 from dotagent.cli_profile import render_profile
-from dotagent.config import AgentConfig, load_default_config
+from dotagent.config import AgentConfig, OllamaConfig, load_default_config
 from dotagent.core.errors import ConfigError
 from dotagent.core.types import JsonObject
-from dotagent.llm.ollama import parse_model_details
+from dotagent.llm.ollama import num_ctx_for, parse_model_details
 from dotagent.llm.types import INVALID_ARGUMENTS_KEY, ModelInfo
 from dotagent.store.db import Store
 from dotagent.store.models import RunRecord
 from dotagent.store.stats import ModelProfile, read_model_profile
 
-# The packaged defaults: context_tokens 48 000, tool_output_chars 12 000, scaffold "fixed", profile_min_calls 50,
+# The packaged defaults: context_tokens 96 000, tool_output_chars 12 000, scaffold "fixed", profile_min_calls 50,
 # weak_refusal_share 0.1, reminder_every 6.
 DEFAULTS: AgentConfig = load_default_config().agent
 MEASURED: AgentConfig = DEFAULTS.model_copy(update={"scaffold": "measured"})
@@ -55,20 +55,20 @@ def _profile(model: str, tool_calls: int, refused_calls: int) -> ModelProfile:
 def test_the_budget_follows_a_small_window_and_the_tool_output_shrinks_with_it() -> None:
     quiet: ModelProfile = _profile("ollama:a", 0, 0)
     small: Scaffold = scaffold_for(DEFAULTS, _info(32768), quiet)
-    assert (small.window, small.context_tokens, small.tool_output_chars) == (32768, 24576, 6144)
+    assert (small.window, small.context_tokens, small.tool_output_chars) == (32768, 24576, 3072)
     # Tool output never shrinks below 2000 characters.
     tiny: Scaffold = scaffold_for(DEFAULTS, _info(8192), quiet)
     assert (tiny.context_tokens, tiny.tool_output_chars) == (6144, 2000)
     # A large window, or none reported, leaves the configured budgets as they are.
-    for window in (64000, 1_048_576, None):
+    for window in (128_000, 1_048_576, None):
         roomy: Scaffold = scaffold_for(DEFAULTS, _info(window), quiet)
-        assert (roomy.context_tokens, roomy.tool_output_chars) == (48000, 12000)
+        assert (roomy.context_tokens, roomy.tool_output_chars) == (96000, 12000)
         assert scaffold_event(roomy, DEFAULTS)["cut_to_window"] is False
     assert scaffold_event(small, DEFAULTS) == {
         "model": "ollama:a",
         "window": 32768,
         "context_tokens": 24576,
-        "tool_output_chars": 6144,
+        "tool_output_chars": 3072,
         "cut_to_window": True,
         "tier": "standard",
         "reason": '[agent] scaffold is "fixed"',
@@ -121,6 +121,11 @@ def test_ollama_reports_the_smaller_of_the_model_window_and_num_ctx() -> None:
     assert parse_model_details("gpt-oss:20b", shown, 262144).info.context_length == 131072
     # A model that does not say its window gets the one every request is sent with.
     assert parse_model_details("m", {"capabilities": ["tools"]}, 65536).info.context_length == 65536
+    # A cloud model is asked for the cloud window, a model on this Mac for num_ctx (item 55).
+    ollama: OllamaConfig = load_default_config().providers.ollama
+    assert (num_ctx_for("gpt-oss:20b", ollama), num_ctx_for("deepseek-v4.1-flash:cloud", ollama)) == (65536, 262144)
+    cloud: JsonObject = {"capabilities": ["tools"], "model_info": {"deepseek_v41.context_length": 1_048_576}}
+    assert parse_model_details("deepseek-v4.1-flash:cloud", cloud, 262144).info.context_length == 262144
 
 
 def _call(call_id: str, args: JsonObject) -> tuple[str, JsonObject]:
@@ -203,7 +208,7 @@ def test_a_profile_and_the_scaffold_of_the_next_run_are_rendered_in_plain_words(
         "  tools: 4 calls, 3 failed (75 %), 2 refused before they ran (50 %), 1 with arguments that were not valid JSON",
         "  replies with neither text nor a tool call 1, stalls 1, compactions 1",
         "Its next run:",
-        "  window 32,768 tokens, context budget 24,576 tokens, tool output up to 6,144 characters",
+        "  window 32,768 tokens, context budget 24,576 tokens, tool output up to 3,072 characters",
         "  tier standard: 4 tool calls measured, 50 needed for a judgement",
         "  no reminders of the goal",
     ]
@@ -212,7 +217,7 @@ def test_a_profile_and_the_scaffold_of_the_next_run_are_rendered_in_plain_words(
     assert render_profile(unknown, scaffold_for(weak, _info(None), unknown)) == [
         "ollama:none: no finished runs yet",
         "Its next run:",
-        "  window not reported by its provider, context budget 48,000 tokens, tool output up to 12,000 characters",
+        "  window not reported by its provider, context budget 96,000 tokens, tool output up to 12,000 characters",
         "  tier weak: set by hand in [agent] tiers",
         "  reminded of the goal every 6 steps in task and research runs",
     ]

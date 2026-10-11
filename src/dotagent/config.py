@@ -36,6 +36,7 @@ class OllamaConfig(FrozenModel):
     base_url: str
     api_key_env: str
     num_ctx: int
+    num_ctx_cloud: int
     keep_alive: str
     connect_timeout_s: float
     read_timeout_s: float

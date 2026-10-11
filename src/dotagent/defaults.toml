@@ -61,6 +61,9 @@ helper_cooldown_s = 600
 base_url = "http://localhost:11434"
 api_key_env = "OLLAMA_API_KEY"
 num_ctx = 65536
+# The window asked of a cloud model (a name ending in ":cloud", run on Ollama's servers, so it costs this Mac no memory);
+# the model's own window caps it.
+num_ctx_cloud = 262144
 keep_alive = "30m"
 connect_timeout_s = 10.0
 read_timeout_s = 300.0
@@ -170,8 +173,10 @@ consult_max_per_run = 5
 tool_output_chars = 12000
 # The prompt budget of a run: past 60 % of it older tool output is shortened, past all of it the older part of the run is
 # summarized. A model whose window is smaller gets three quarters of its window instead (for Ollama the window is at most
-# [providers.ollama] num_ctx), and tool_output_chars shrinks in the same proportion.
-context_tokens = 48000
+# [providers.ollama] num_ctx, or num_ctx_cloud for a cloud model), and tool_output_chars shrinks in the same proportion.
+# A wider budget means fewer summaries in a long run and more input tokens a step (item 55, decision 33 of the roadmap):
+# 48000 was the budget before 2026-10-11; set it back on a metered key if the tokens weigh more than the summaries.
+context_tokens = 96000
 keep_recent_tool_results = 6
 keep_recent_screenshots = 2
 # The progress watchdog looks for the same step (same calls, same results) stall_limit times in a row and answers with

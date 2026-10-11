@@ -157,8 +157,14 @@ def choose_think(details: OllamaModelDetails, effort: Effort) -> str | bool | No
     return any(value is True for value in values)
 
 
+def num_ctx_for(model: str, config: OllamaConfig) -> int:
+    """The window asked of ``model`` with every request: ``num_ctx_cloud`` for a cloud model (a name ending in
+    ``:cloud``, which runs on Ollama's servers), ``num_ctx`` for one that runs on this Mac."""
+    return config.num_ctx_cloud if model.endswith(":cloud") else config.num_ctx
+
+
 def build_chat_payload(request: ChatRequest, details: OllamaModelDetails, config: OllamaConfig) -> JsonObject:
-    options: JsonObject = {"num_ctx": config.num_ctx}
+    options: JsonObject = {"num_ctx": num_ctx_for(request.model, config)}
     if request.temperature is not None:
         options["temperature"] = request.temperature
     if request.max_output_tokens is not None:
@@ -348,7 +354,7 @@ class OllamaProvider:
         if cached is not None:
             return cached
         shown: JsonObject = await self._post_json("/api/show", {"model": model}, "ollama.show")
-        details: OllamaModelDetails = parse_model_details(model, shown, self._config.num_ctx)
+        details: OllamaModelDetails = parse_model_details(model, shown, num_ctx_for(model, self._config))
         self._details_cache[model] = details
         return details
 
