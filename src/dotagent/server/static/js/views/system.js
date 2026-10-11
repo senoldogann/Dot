@@ -473,7 +473,8 @@ function modelsSummary(providers, inUse) {
   const failing = providers.filter((provider) => isFailing(provider, inUse.includes(provider.provider))).length;
   const keyless = providers.filter((provider) => provider.problem === "no_key" && !inUse.includes(provider.provider)).length;
   return [
-    el("span", null, `${plural(providers.length, "provider", "providers")} · ${plural(total, "model", "models")}`),
+    el("span", null, plural(providers.length, "provider", "providers")),
+    el("span", null, plural(total, "model", "models")),
     failing > 0 ? el("span", { class: "badge b-bad" }, `${failing} unavailable`) : null,
     keyless > 0 ? el("span", { class: "badge b-muted" }, `${keyless} without a key`) : null,
   ];

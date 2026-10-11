@@ -61,7 +61,7 @@
   --radius-xs: 6px;
   --radius-sm: 8px;
   --radius-control: 10px;
-  --radius: 14px;
+  --radius: 12px;
   --radius-lg: 20px;
   --radius-pill: 999px;
   /* Spacing (item 74): one rhythm of 8 px, 4 for the smallest, and the hairline for what sits a breath apart; every
@@ -429,7 +429,9 @@ a.pill:hover {
   letter-spacing: var(--tracking-title);
 }
 
+/* The description line keeps a readable width: when the actions would squeeze it, they go under it (item 79). */
 .page-sub {
+  flex-basis: 280px;
   color: var(--muted);
 }
 
@@ -452,12 +454,12 @@ a.pill:hover {
   max-width: 1000px;
 }
 
+/* A section's name in sentence case (item 79): the interface size in the label weight, a tier lighter than text. */
 .section-label {
-  font-size: var(--text-xs);
-  font-weight: var(--weight-title);
-  letter-spacing: var(--tracking-caps);
-  text-transform: uppercase;
-  color: var(--muted);
+  font-size: var(--text-ui);
+  line-height: var(--leading-ui);
+  font-weight: var(--weight-label);
+  color: var(--text-2);
   margin: 24px 0 8px;
 }
 
@@ -725,11 +727,11 @@ a.pill:hover {
 
 /* ---------- cards and badges ---------- */
 
+/* A card is flat (item 79): a surface with a hairline, no shadow; shadows belong to what floats (menus, dialogs). */
 .card {
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  box-shadow: var(--shadow);
 }
 
 .card-pad {
@@ -777,10 +779,11 @@ a.pill:hover {
   flex: none;
 }
 
+/* The facts beside a folded card's title sit a gap apart, like every meta line (item 79). */
 .fold-summary {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 12px;
   min-width: 0;
   overflow: hidden;
   color: var(--muted);
@@ -832,6 +835,25 @@ a.pill:hover {
   height: 28px;
   color: var(--faint);
   margin-bottom: 8px;
+}
+
+/* An empty place is one line that says so and what to do (item 79): no card, no icon. */
+.empty-line {
+  padding: 12px 0;
+  color: var(--muted);
+}
+
+.card > .empty-line,
+.card .empty-line {
+  padding: 12px 16px;
+}
+
+/* The facts of a row or an answer: separate spans a space apart, not one dotted string (item 79). */
+.meta-facts {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: var(--space-half) 12px;
+  min-width: 0;
 }
 
 .empty .spinner {
@@ -1032,10 +1054,8 @@ a.pill:hover {
 
 .table thead th {
   border-top: 0;
-  font-size: var(--text-xs);
-  font-weight: var(--weight-title);
-  letter-spacing: var(--tracking-caps);
-  text-transform: uppercase;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-label);
   color: var(--muted);
 }
 
@@ -1292,10 +1312,8 @@ a.pill:hover {
 .slash-group {
   padding: 8px 8px 4px;
   color: var(--muted);
-  font-size: var(--text-xs);
+  font-size: var(--text-sm);
   font-weight: var(--weight-label);
-  letter-spacing: var(--tracking-caps);
-  text-transform: uppercase;
 }
 
 .slash-option {
@@ -1574,6 +1592,7 @@ a.pill:hover {
   min-width: 0;
 }
 
+/* Your message sits on the raised surface (item 79); the yellow is Dot's face alone. */
 .bubble.user {
   align-self: flex-end;
   width: fit-content;
@@ -1581,8 +1600,8 @@ a.pill:hover {
   margin-left: auto;
   padding: 8px 16px;
   border-radius: var(--radius-lg);
-  background: var(--bubble);
-  color: var(--on-bubble);
+  background: var(--surface-2);
+  color: var(--text);
 }
 
 .bubble.live .stream {
@@ -1828,10 +1847,8 @@ details[open] > summary .chev {
 
 .tool-body h4 {
   margin: 0 0 4px;
-  font-size: var(--text-xs);
-  font-weight: var(--weight-title);
-  letter-spacing: var(--tracking-caps);
-  text-transform: uppercase;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-label);
   color: var(--muted);
 }
 

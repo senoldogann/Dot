@@ -124,7 +124,7 @@ export function buildPresence() {
           el("div", { class: "section-label" }, title),
           el(
             "div",
-            { class: "card home-today-list" },
+            { class: "home-today-list" },
             ...rows.map(({ row, children }) => [
               activityRow(row, false),
               children.length === 0 ? null : el("div", { class: "activity-children" }, children.map((kid) => activityRow(kid, true))),

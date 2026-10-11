@@ -193,7 +193,7 @@ export function mount(root, ctx) {
       return;
     }
     if (rules.length === 0) {
-      holder.replaceChildren(emptyPanel("shield", "No rules yet", "Without rules the safety preset decides every action."));
+      holder.replaceChildren(emptyPanel("No rules yet", "Without rules the safety preset decides every action."));
       return;
     }
     const handlers = {

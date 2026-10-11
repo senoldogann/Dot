@@ -261,10 +261,15 @@
 .side-label {
   margin: 0;
   padding: 12px 8px 4px;
-  font-size: var(--text-xs);
+  font-size: var(--text-sm);
+  line-height: var(--leading-sm);
   font-weight: var(--weight-label);
-  letter-spacing: var(--tracking-caps);
   color: var(--faint);
+}
+
+/* The count after a section's label: the same ink, the text weight. */
+.side-label-count {
+  font-weight: var(--weight-text);
 }
 
 .side-run .status-dot {

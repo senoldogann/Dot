@@ -1,6 +1,6 @@
 // The conversation of one run, built from its events as they arrive: what the agent said, which tools it used, what it
 // asked, what the delegated runs did and, at the end, the answer. Events of a delegated run land in a panel nested in the
-// tool call that started it. The tool calls between two messages sit in one group, "Worked for 12 s · 5 tool calls", that the
+// tool call that started it. The tool calls between two messages sit in one group, "Worked for 12 s" with "5 tool calls" beside it, that the
 // reader can fold away. A group is timed from the moment the work began (the start of the run or the last message) to the
 // moment it ended, so the groups of a run add up to the time the run took; the part of that time the model's turns took is
 // in brackets, "Worked for 12 s (model 8 s)".
@@ -93,7 +93,7 @@ function paintGroup(group) {
   }
   const model = group.modelSeconds > 0 ? ` (model ${duration(group.modelSeconds)})` : "";
   group.title.textContent = live ? "Working…" : `Worked for ${duration(Math.max(group.end - group.start, group.longest))}${model}`;
-  group.count.textContent = `· ${plural(group.calls, "tool call", "tool calls")}`;
+  group.count.textContent = plural(group.calls, "tool call", "tool calls");
   const troubles = [group.failedCalls > 0 ? `${group.failedCalls} failed` : "", group.cutCalls > 0 ? `${group.cutCalls} cut off` : ""];
   group.failed.hidden = group.failedCalls === 0 && group.cutCalls === 0;
   group.failed.textContent = troubles.filter((text) => text !== "").join(" · ");

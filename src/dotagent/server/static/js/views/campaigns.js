@@ -34,7 +34,7 @@ function campaignBadge(status) {
 
 /** The measures of a ledger entry as chips: `leads 12`. */
 function numberChips(numbers) {
-  return Object.entries(numbers).map(([name, value]) => el("span", { class: "chip mono" }, `${name} ${value}`));
+  return Object.entries(numbers).map(([name, value]) => el("span", { class: "chip" }, `${value} ${name.replaceAll("_", " ")}`));
 }
 
 /** Where an active campaign stands: the session working now, or when the next one starts. */
@@ -114,7 +114,7 @@ function mountList(root) {
       working = summaries.some((summary) => summary.working !== null);
       holder.replaceChildren(
         summaries.length === 0
-          ? emptyPanel("target", "No campaigns yet", "Switch on Keep going when you start a task, and Dot works on it until the outcome is verified.")
+          ? emptyPanel("No campaigns yet", "Switch on Keep going when you start a task, and Dot works on it until the outcome is verified.")
           : el("div", { class: "card" }, summaries.map(campaignRow)),
       );
     } catch (error) {

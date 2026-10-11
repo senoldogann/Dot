@@ -59,7 +59,7 @@ export function mount(root, ctx) {
           { class: "card activity-section", "data-section": key },
           el("div", { class: "card-head" }, el("span", null, title), el("span", { class: "small muted" }, String(items.length))),
           items.length === 0
-            ? emptyPanel("clock", empty, "")
+            ? emptyPanel(empty, "")
             : el(
                 "div",
                 { class: "activity-list" },

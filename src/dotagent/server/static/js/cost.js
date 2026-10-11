@@ -32,10 +32,11 @@ function spent(seconds, total) {
   return seconds <= 0 ? "None" : `${duration(seconds)} · ${share(seconds, total)}`;
 }
 
-/** The head line: "12m 03s · 48 steps · 1.2M in · 8.1k out". */
-export function costLine(costs) {
+/** The head line as four facts a gap apart: "12m 03s", "48 steps", "1.2M in", "8.1k out" (item 79). */
+export function costFacts(costs) {
   const stats = costs.stats;
-  return `${duration(costs.minutes * 60)} · ${stats.steps} steps · ${compact(stats.input_tokens)} in · ${compact(stats.output_tokens)} out`;
+  const facts = [duration(costs.minutes * 60), `${stats.steps} steps`, `${compact(stats.input_tokens)} in`, `${compact(stats.output_tokens)} out`];
+  return facts.map((fact) => el("span", null, fact));
 }
 
 export function createCostCard() {
@@ -54,7 +55,7 @@ export function createCostCard() {
     const compactions = stats.compaction.compactions === 0 ? "None" : `${stats.compaction.compactions}${perHundred}`;
     const delegated = stats.delegation.runs === 0 ? "None" : `${stats.delegation.runs} · ${duration(stats.delegation.seconds)} waited`;
     const searches = stats.searches.length === 0 ? "None" : stats.searches.map((entry) => `${entry.searches} ${entry.engine}`).join(" · ");
-    card.setSummary(costLine(costs));
+    card.setSummary(...costFacts(costs));
     grid.replaceChildren(
       cell("Model", spent(time.model_seconds, total), HINTS.model),
       cell("Summaries", spent(time.compaction_seconds, total), HINTS.summaries),
