@@ -148,8 +148,8 @@
 .icon-btn {
   display: inline-grid;
   place-items: center;
-  width: 34px;
-  height: 34px;
+  width: 36px;
+  height: 36px;
   flex: none;
   padding: 0;
   border: 0;
@@ -216,15 +216,15 @@
   gap: 8px;
   margin: 4px 0 8px;
   padding: 0 8px;
-  border: 1px solid var(--control);
+  border: 1px solid var(--border-strong);
   border-radius: var(--radius-control);
   background: var(--surface);
   color: var(--text-2);
 }
 
 .side-search:focus-within {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent);
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
 }
 
 .side-search:focus-within kbd {

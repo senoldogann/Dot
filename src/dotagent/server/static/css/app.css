@@ -60,7 +60,7 @@
   /* Shape: the radii of marks, controls, cards, bubbles and pills. A look may round them differently (themes.css). */
   --radius-xs: 6px;
   --radius-sm: 8px;
-  --radius-control: 10px;
+  --radius-control: 8px;
   --radius: 12px;
   --radius-lg: 20px;
   --radius-pill: 999px;
@@ -477,12 +477,15 @@ a.pill:hover {
 
 /* ---------- controls ---------- */
 
+/* One grammar for the controls (item 80): a button, an input and a select are 36 px tall on an 8 px radius with a
+   hairline of the strong border; the small button and select are 32; the focus ring is the page's 2 px accent outline. */
 .btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 8px;
-  padding: 8px 16px;
+  min-height: 36px;
+  padding: 0 16px;
   border-radius: var(--radius-control);
   border: 1px solid var(--border-strong);
   background: var(--surface);
@@ -548,13 +551,18 @@ a.pill:hover {
 }
 
 .btn.sm {
-  padding: 4px 8px;
+  min-height: 32px;
+  padding: 0 12px;
   font-size: var(--text-sm);
-  border-radius: var(--radius-sm);
 }
 
 .btn.icon-only {
-  padding: 8px;
+  width: 36px;
+  padding: 0;
+}
+
+.btn.sm.icon-only {
+  width: 32px;
 }
 
 /* The round button that starts a run or sends a message; its words are kept for screen readers and the tooltip. */
@@ -576,17 +584,28 @@ a.pill:hover {
   width: 100%;
   padding: 8px 12px;
   border-radius: var(--radius-control);
-  border: 1px solid var(--control);
+  border: 1px solid var(--border-strong);
   background: var(--surface);
   transition: border-color var(--motion-quick) var(--ease);
+}
+
+.input,
+.select {
+  height: 36px;
+  padding: 0 12px;
+}
+
+.input:hover,
+.select:hover,
+.textarea:hover {
+  border-color: var(--control);
 }
 
 .input:focus,
 .select:focus,
 .textarea:focus {
-  outline: none;
-  border-color: var(--accent);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent);
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
 }
 
 .input::placeholder,
@@ -597,20 +616,24 @@ a.pill:hover {
 
 .textarea {
   resize: vertical;
-  min-height: 44px;
-  line-height: var(--leading-md);
+  min-height: 36px;
+  line-height: var(--leading-ui);
 }
 
+/* A select draws its own chevron (static/icons/chevron.svg, a grey that reads in both schemes); the native one is hidden. */
 .select {
   width: auto;
   max-width: 100%;
-  padding-right: 28px;
+  padding-right: 32px;
+  appearance: none;
+  background: var(--surface) url("../icons/chevron.svg") no-repeat right 8px center / 16px 16px;
 }
 
 .select.sm {
-  padding: 4px 24px 4px 8px;
-  border-radius: var(--radius-sm);
+  height: 32px;
+  padding: 0 28px 0 8px;
   font-size: var(--text-sm);
+  background-position: right 8px center;
 }
 
 /* The reasoning menus of one table line up, whatever their longest option is. */
@@ -631,14 +654,17 @@ a.pill:hover {
   min-width: 0;
 }
 
+/* A field's label is the interface line in the label weight; its hint is the small line, muted (item 80). */
 .field-label {
-  font-size: var(--text-sm);
+  font-size: var(--text-ui);
+  line-height: var(--leading-ui);
   font-weight: var(--weight-label);
-  color: var(--text-2);
+  color: var(--text);
 }
 
 .hint {
   font-size: var(--text-sm);
+  line-height: var(--leading-sm);
   color: var(--muted);
 }
 
@@ -1034,7 +1060,10 @@ a.pill:hover {
   vertical-align: top;
 }
 
+/* A row is 40 px with one line in it and its cells sit on the middle (item 80). */
 .table td {
+  height: 40px;
+  vertical-align: middle;
   overflow-wrap: anywhere;
 }
 
@@ -1218,8 +1247,9 @@ a.pill:hover {
   background: transparent;
 }
 
+/* The composer's frame shows the focus; its textarea draws no ring of its own. */
 .composer .textarea:focus {
-  box-shadow: none;
+  outline: none;
 }
 
 /* The options of a run on the left, wrapping when the window is narrow; the start button stays at the bottom right. */

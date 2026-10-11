@@ -87,6 +87,8 @@ export function mount(root, ctx) {
     field("Text", el("input", { class: "input", type: "text", placeholder: "Placeholder", "aria-label": "Text" }), "A hint under the field."),
     field("Mono", el("input", { class: "input mono", type: "text", value: "^git (status|diff)", "aria-label": "Mono" }), ""),
     field("Select", el("select", { class: "select", "aria-label": "Select" }, el("option", null, "One"), el("option", null, "Two")), ""),
+    field("Small select", el("select", { class: "select sm", "aria-label": "Small select" }, el("option", null, "Medium"), el("option", null, "High")), ""),
+    field("Textarea", el("textarea", { class: "textarea", rows: "2", placeholder: "A longer text", "aria-label": "Textarea" }), ""),
     el("div", { class: "field" }, el("span", { class: "field-label" }, "Switches"), row(el("button", { class: "switch", type: "button", role: "switch", "aria-checked": "true", "aria-label": "On" }), el("button", { class: "switch", type: "button", role: "switch", "aria-checked": "false", "aria-label": "Off" }))),
     el("div", { class: "field wide" }, el("span", { class: "field-label" }, "Segmented"), row(segmented([{ id: "a", label: "One", hint: "" }, { id: "b", label: "Two", hint: "" }, { id: "c", label: "Three", hint: "" }], "a", () => {}).element, yolo.element)),
   );

@@ -4996,7 +4996,7 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 77  | The type system: Inter and Geist Mono, seven sizes, three weights        | done        | ffa00cb |
 | 78  | One bar: the top bar carries the page, the run's head and the daemon     | done        | 7a7e43f |
 | 79  | Flat surfaces and plain words: cards, labels, meta, chips, empty states  | in progress |         |
-| 80  | Forms and controls: one grammar for inputs, selects, switches, tables    | planned     |         |
+| 80  | Forms and controls: one grammar for inputs, selects, switches, tables    | in progress |         |
 | 81  | Dark, first paint and the tour: every page read in both schemes          | planned     |         |
 | 82  | Delegated runs as rows: face, state, last line, time; the child's bar    | planned     |         |
 | 83  | Faces for the actors: a hue each, alive in the rows and the bar          | planned     |         |
@@ -5081,7 +5081,21 @@ bubble on the raised surface; the home's "Ended today" list as rows on the page.
 
 ### 80. Forms and controls: one grammar for inputs, selects, switches, tables
 
-**Status: planned.**
+**Status: in progress.** Built on `item-80-forms` (MYP-220).
+
+**Design, as built (2026-10-11).** `--radius-control` is 8 px, so every button, input, select, segmented control,
+sidebar row and settings tab share one corner. `.btn` is 36 px tall (`min-height`, `padding: 0 16px`), `.btn.sm` 32
+(`padding: 0 12px`, the small size), an icon-only button as wide as it is tall; the radii of both are the control
+token. `.input` and `.select` are 36 px tall with `padding: 0 12px`, `.textarea` keeps `8px 12px` on the interface
+line-height with a 36 px floor; all three carry the strong border as a hairline, the mid-grey `--control` on hover,
+and focus is the page's ring: a 2 px accent outline at 1 px, no glow (the composer's textarea draws none, its frame
+shows the focus; the sidebar's search box takes the same ring and frame). A select hides the native chevron
+(`appearance: none`) and draws `static/icons/chevron.svg` at its right, a grey stroke that reads in both schemes;
+`.select.sm` is 32 px for the composer's model menu and the reasoning menus of the models table. `.field-label` is
+14/20 in the label weight on the text colour; `.hint` is 13/18 muted. A table cell is 40 px tall with its content on
+the middle; the model name stays Geist Mono at 13 and the capability chips are the chips of item 79. The sidebar's
+icon buttons are 36. The rule form and the schedule form already shared `.form-grid` (two columns, 16 px gap, `.wide`
+for a full row); the Controls page's Inputs card gains a small select and a textarea so the grammar is seen whole.
 
 **What.** Inputs and selects 36 px tall, radius 8, hairline, the same focus ring (2 px accent outline, offset 1);
 selects with a drawn chevron, the native one hidden; textareas with the same frame; segmented controls and switches
