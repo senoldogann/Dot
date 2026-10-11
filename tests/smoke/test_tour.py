@@ -253,6 +253,11 @@ async def _shoot(context: BrowserContext, base: str, pages: tuple[tuple[str, str
             await page.locator(".inspector .fold-toggle", has_text="Details").click()
             await page.wait_for_timeout(_SETTLE_MS)
             await page.screenshot(path=str(out / f"{tag}-run-panel.png"), full_page=False)
+            # The facts beside a fold's title are not cut at the panel's compact width (item 111).
+            clipped: list[str] = await page.locator(".inspector .fold-summary").evaluate_all(
+                "nodes => nodes.filter((node) => node.scrollWidth > node.clientWidth + 1).map((node) => node.textContent)"
+            )
+            assert clipped == [], clipped
             if await page.locator(".inspector[data-mode='docked']").is_visible():
                 # The panel at half the page (item 109), the character at the head of the conversation; then back.
                 await page.locator("section.computer button[aria-controls='fold-run-computer']").click()

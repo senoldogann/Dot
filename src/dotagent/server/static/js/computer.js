@@ -11,6 +11,8 @@ import { toast } from "./ui.js";
 const NO_PAGE_YET = "The run has not opened a page in its browser yet; the view starts by itself when it does.";
 const WAITING_FOR_FRAME = "Waiting for the page: the first frame comes when the run's browser paints.";
 const CLOSED_HINT = "Watch the page Dot's browser is on. Nothing is sent while the view is closed.";
+// A run that has ended has no page left to watch (item 111): Watch is gone, and so is the hint that offers it.
+const ENDED_HINT = "The run has ended. Its browser's page is shown here only while a run is going on.";
 
 /**
  * The card for the run `runId`, which is `active` (still going on) and `held` (the reader has its browser); `name` is
@@ -52,7 +54,7 @@ export function createComputer({ runId, active, held, name, sizes }) {
     watchButton.setAttribute("aria-pressed", String(watching));
     watchButton.hidden = !isActive;
     if (image.hidden) {
-      empty.textContent = watching ? WAITING_FOR_FRAME : isActive && !hasPage ? NO_PAGE_YET : CLOSED_HINT;
+      empty.textContent = watching ? WAITING_FOR_FRAME : !isActive ? ENDED_HINT : hasPage ? CLOSED_HINT : NO_PAGE_YET;
     }
     card.setSummary(address.textContent);
     who.textContent = isHeld ? "You have control" : `${name} has control`;
