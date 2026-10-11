@@ -4218,6 +4218,176 @@ limit after five quick searches means a long run with DuckDuckGo benched reaches
 needs `[browser] headless = false` and `mode = "own"`, which is the owner's setting. Setting `OLLAMA_API_KEY` makes the
 hosted search the first rung and is the owner's call.
 
+## Part 7: the long run measured, the summaries fixed, the soft look, the composer (planned 2026-10-11)
+
+The owner's seventh word, on 2026-10-11, after item 59: "run the long run yourself, I approve; then solve the other
+problems; and turn the app into a design with complete soft light and dark mode support: the composer in the chat can
+be better, `/` should show commands, skills, MCP servers; the panel on the right and the cancel and model names at the
+top should stay fixed while scrolling; think, research and do the best." Planned from the daemon's logs (read-only),
+the code at the points they name, and the measurements of the long run started for item 60.
+
+**What the logs show.** 64 `compaction_check_failed` warnings over the owner's runs: 47 flag only "unverified"
+identifiers, and the samples are addresses the summary cut short (`…/roles/1f5cb00f-…/sr-`, `…&tags=c`), so the exact
+match against the history fails on a string the history does contain in full; 17 lack a section (PROBLEMS 17, STATE
+15, GOAL 9, NEXT 8, DONE 7, several at once). 7 `summary_too_long` warnings, one of 5,450 words against a limit near
+1,500. The live-model delegate tests fail on main because the model calls `delegate` with `step=1` before any plan
+exists and item 35's rule refuses the call: a turn lost, in the evals and in the owner's runs alike. Item 25 stays
+parked: its premises (tool-call deltas in the stream) are still not in the code.
+
+### How to start part 7 (the handoff prompt)
+
+> Read ROADMAP.md part 7 and the status table below. One item at a time, in order, except item 60, which is written
+> when the long run of 2026-10-11 ends; the protocol of part 5 (branch, gate, PR, Linear MYP issue, squash merge, hash
+> in the table, log line) is unchanged. Never touch the owner's data directory except to read it and to restart the
+> daemon when `/api/status` shows no active run; PLAN.md stays untracked. The owner reads Turkish; everything written is
+> English.
+
+### Status, part 7
+
+| #   | Item                                                                     | Status      | Commits |
+| --- | ------------------------------------------------------------------------ | ----------- | ------- |
+| 60  | The live numbers of parts 5 and 6                                        | planned     |         |
+| 61  | Summaries that pass their own check                                      | planned     |         |
+| 62  | A delegate before the plan is a step, not a lost turn                   | planned     |         |
+| 63  | The soft look: light and dark, every surface                             | planned     |         |
+| 64  | The composer: a slash menu of commands, skills and MCP tools             | planned     |         |
+| 65  | The chrome that stays: the run's head and side panel while it scrolls    | planned     |         |
+
+### 60. The live numbers of parts 5 and 6
+
+**Status: planned.** A measurement, not code.
+
+**What.** One research run of the owner's own kind (the kind the owner's seven runs were; the goal stays out of this
+file), started on the daemon at the owner's word on 2026-10-11 (`run_mv39kmag_ec5bb3`, `ollama:deepseek-v4.1-flash:cloud`,
+effort max, approvals yolo, research mode), read with `dotx stats --run ID` when it ends and written here against the
+baseline of item 53: compactions per 100 steps (13.8 before; item 55 aims under 5), the share of model seconds in
+summaries (53 % before; a tenth), not-found fetches (about ten a research run before; near zero, item 56), throttled
+searches (25 of 93 web failures before; near zero, item 59), the engine named in each search result (which rung
+carried the run), `_adopt_popup` tracebacks in the log (none, item 57) and the cost card's numbers on the run page
+(item 58). Whatever the run shows that the parts did not foresee goes into the log and, when it is structure, into an
+item.
+
+### 61. Summaries that pass their own check
+
+**Status: planned.**
+
+**What.** A compaction summary that names an address the history holds is not "unverified" because the model cut the
+address short; a summary that lacks a section is asked for again once, with the missing sections named, before the
+note says "rely on the pinned facts"; a summary far too long is asked for again with the limit in front of it.
+
+**Why.** 47 of the 64 check failures in the owner's logs flag identifiers the history does contain, cut at a line's
+end; every one of them puts "treat these as unverified" into the note the run goes on from, so the run doubts what it
+knows. 17 notes lack a section, and the note then tells the run to lean on the pinned facts instead of a summary that
+could have been complete for one more fast-model call.
+
+**Design.** `continuity.check_continuity`: an identifier counts as known when a known identifier starts with it and it
+is at least 24 characters long (a cut address), or when it starts with a known identifier that is at least that long
+(an address with a fragment the history did not have); shorter identifiers keep the exact match. `loop._model_summary`:
+a reply that lacks a section is followed by one more attempt whose prompt names the sections missing and carries the
+first reply, on the same model; a reply over the word limit is followed by one more attempt whose prompt puts the limit
+and the overrun first; the attempts stay within `_SUMMARY_ATTEMPTS`. The `compacted` event records the attempts and
+the check as before, so the log and `dotx stats` show whether the second ask helped. A unit test on the check with cut
+addresses; a scaffold smoke test that the second ask repairs a summary a scripted fast model writes without PROBLEMS.
+
+**Touchpoints.** `agent/continuity.py`, `agent/loop.py`, `tests/unit/test_continuity.py`, `tests/smoke/test_scaffold.py`,
+README (compaction paragraph).
+
+### 62. A delegate before the plan is a step, not a lost turn
+
+**Status: planned.**
+
+**What.** `delegate` with a `step` the plan does not have runs the delegation and says in its result that the step was
+not in the plan, instead of refusing the call and losing the turn.
+
+**Why.** The live model (and the eval models since item 35) call `delegate` with `step=1` before `update_plan`
+recorded a plan; the refusal costs a turn and, in the two live delegate smoke tests, the test. A number the plan does
+not have is a model's slip, not a danger: the delegation itself is harmless to run.
+
+**Design.** `tools/delegate.py`: the step check moves from the argument validation into the run: when the plan has no
+such step the delegation runs with `step=None` and the result's first line says "step N is not in the plan (the plan
+has K steps); the delegated run ran, nothing was marked". The argument description says so. The two live delegate smoke
+tests pass again; a unit test on the first line.
+
+**Touchpoints.** `tools/delegate.py`, `tests/unit/test_delegate.py`, `tests/smoke/test_delegate.py`, README.
+
+### 63. The soft look: light and dark, every surface
+
+**Status: planned.**
+
+**What.** One soft look in light and dark: low-saturation warm neutrals, surfaces that step up by lightness rather than
+by shadow in dark, hairline borders at a small alpha, text in three tiers that meet WCAG AA on every surface, one warm
+accent; the system's scheme followed and the owner's choice kept; every view, control, chip, note, toast, menu, code
+block, table and the inspector checked at 1280 and 390 px in both schemes; the controls page (item 50) is the proof
+sheet.
+
+**Why.** Item 50 gave the app its tokens and themes, but the looks are hard-edged (pure white, graphite, black
+accent) and the dark scheme repeats the light one's borders and shadows; the owner asks for a complete soft light and
+dark design.
+
+**Design.** `themes.css`: the neutral look's tokens are rewritten as a layered scale (`--bg`, `--surface`,
+`--surface-2`, `--surface-3` as four lightness steps on a warm grey; `--border` and `--border-strong` as the text colour
+at 8 % and 16 % alpha so they sit on every surface; `--text`, `--text-2`, `--muted` as three tiers with measured
+contrast; `--accent` a warm amber from the bubble, not black; shadows only in light, surfaces one step lighter in
+dark), the same tokens in `@media (prefers-color-scheme: dark)` and under `[data-scheme="dark"]`/`"light"` for the
+owner's choice (`theme.js` already keeps it), `color-scheme` set on the root so form controls and scrollbars follow.
+`app.css`, `shell.css`, `run.css`, `settings.css`: every hard-coded colour and every `rgb(0 0 0 / x)` moves to a token;
+focus rings, selection, code blocks and tables get soft tokens. A unit test reads `themes.css` and checks that every
+token of the light block has a dark twin and that the text tiers meet 4.5:1 (body) and 3:1 (muted) against each
+surface (a contrast function in the test). Screenshots of the controls page, the run page, the Activity page and the
+settings at 1280 and 390 px in both schemes, looked at. What the research of 2026-10-11 into Radix Colors, Apple's
+dark mode guidance, Material 3 surfaces and the looks of Linear and Claude says is recorded as built.
+
+**Touchpoints.** `static/css/themes.css`, `app.css`, `shell.css`, `run.css`, `settings.css`, `static/js/theme.js`,
+`tests/unit/test_css_tokens.py`, `tests/smoke/test_controls.py`, README (visual system paragraph).
+
+### 64. The composer: a slash menu of commands, skills and MCP tools
+
+**Status: planned.**
+
+**What.** Typing `/` at the start of a word in the composer (the new-run page and the run's dock) opens a menu over the
+caret: the commands (`/btw`, the run modes, approvals, model), the skills by name with their one-line description, and
+the MCP servers with their tools; the arrow keys move, Enter picks, Escape closes, letters filter; a pick leaves a chip
+or the command's text in the composer. The composer grows with its text, sends on Enter and breaks a line on
+Shift+Enter, shows the attachments and the options in one soft frame.
+
+**Why.** The owner asks for it; today the only slash command is `/btw`, known from the README alone, and the skills
+and MCP servers a run can use are invisible until the model names them.
+
+**Design.** `GET /api/palette` (routes_system) returns the commands, the skills (`SkillCatalog`, name, description,
+source) and the MCP servers with their tools (`McpHub.tools`), typed in `views.py`. `static/js/slash.js`: a listbox
+(`role="listbox"`, `aria-activedescendant`) anchored above the composer, fed by the palette and filtered by the word
+after the slash, grouped Commands, Skills, MCP; selecting a skill inserts "use the skill NAME: " and a tool inserts
+its name, a command runs or inserts its text. `runs.js` and `run.js` share one composer module (`composer.js`:
+textarea, autosize, Enter/Shift+Enter, attachments, slash menu); the dock of a run keeps its send button. The system
+prompt is unchanged: a skill named in the goal is already read by the run. Unit test on the filter and grouping; a
+smoke test that types `/` and picks a skill from a fixture skills root, at 1280 and 390 px.
+
+**Touchpoints.** `server/routes_system.py`, `server/views.py`, `static/js/composer.js` (new), `static/js/slash.js`
+(new), `static/js/views/runs.js`, `static/js/views/run.js`, `app.css`, `tests/unit/test_slash.py`,
+`tests/smoke/test_composer.py`, README.
+
+### 65. The chrome that stays: the run's head and side panel while it scrolls
+
+**Status: planned.**
+
+**What.** On the run page the head (Dot's face and state, the model chip, the mode chips, Cancel) stays at the top of
+the conversation while it scrolls, the inspector stays beside it to its full height with its own scroll, the dock
+stays at the bottom; on a phone the head collapses to one line and the inspector is the drawer it is today.
+
+**Why.** The head scrolls away with the first messages, so Cancel and the model's name are out of reach in a long
+run; the inspector is sticky under the stage bar but its top offset is a fixed 68 px that the banner and the density
+break; the owner asks for both to stay.
+
+**Design.** `run.css`: `.chat-head` becomes `position: sticky; top: var(--stagebar-h)` with the bar's height measured
+into a custom property by `layout.js` (the banner changes it), a soft backdrop (`--bg` at 85 % with a blur) so the
+messages pass under it; `.inspector` takes the same offset and `max-height: calc(100dvh - var(--stagebar-h) - gap)`;
+the `.page` column is the one scroll container (no `overflow` on `.run-layout`, which would defeat sticky). At 390 px
+the head shows the face, the state and Cancel in one row. A smoke test scrolls a long scripted run at 1280 and 390 px
+and asserts the head's and the inspector's bounding boxes stay in the viewport; screenshots in both schemes.
+
+**Touchpoints.** `static/css/run.css`, `app.css`, `static/js/layout.js`, `static/js/views/run.js`,
+`tests/smoke/test_run_chrome.py`, README.
+
 ## Log
 
 - 2026-10-08: roadmap written from the owner's go-ahead for all eight items, in this order. Nothing implemented yet.
@@ -4679,3 +4849,8 @@ hosted search the first rung and is the owner's call.
 - 2026-10-11 (Fable 5.1): item 59 merged 725e301 (PR #64, MYP-199 Done; gate + desktop jobs green). Daemon restarted on
   725e301 with no active run. The live number is the owner's next research run: `dotx stats --run ID` web failures,
   throttled, against 25 of 93 in the thirty days before; the engine named in each search result says which rung carried it.
+- 2026-10-11 (Fable 5.1): Part 7 planned at the owner's word ("run the long run, I approve; solve the other problems; a
+  complete soft light and dark design; a composer with `/` for commands, skills and MCP; the head and the side panel fixed
+  while scrolling"): items 60 to 65. The long run of item 60 started on the daemon (`run_mv39kmag_ec5bb3`); the owner's
+  own task run was active at the time, so no daemon restart until both end. Evidence for item 61 from the daemon's log:
+  47 of 64 check failures are addresses the summary cut short.
