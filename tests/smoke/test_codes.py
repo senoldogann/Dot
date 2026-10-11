@@ -58,6 +58,7 @@ async def _prepare(runtime: Runtime, arguments: JsonObject) -> tuple[PreparedCal
         runtime=runtime,
         browser=runtime.browser,
         run_id="codes-test",
+        agent_id=None,
         thread_id="codes-test",
         mode="task",
         approvals="yolo",

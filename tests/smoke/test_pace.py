@@ -88,6 +88,7 @@ async def _yolo_context(runtime: Runtime) -> ToolContext:
         runtime=runtime,
         browser=runtime.browser,
         run_id=run.id,
+        agent_id=None,
         thread_id=thread.id,
         mode="task",
         approvals="yolo",

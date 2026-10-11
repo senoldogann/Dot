@@ -12,6 +12,8 @@ import { avatar, icon } from "../icons.js";
 import { emptyPanel, errorPanel, field, loadingPanel, pageHead, statusBadge } from "../panels.js";
 import { APPROVAL_OPTIONS } from "../runmodes.js";
 import { setStageTitle, setStageTools } from "../stage.js";
+import { scoreLine } from "./memory.js";
+import { skillRow } from "./skills.js";
 import { messageRow } from "./team.js";
 import { getSnapshot, loadModels, onLifecycle } from "../state.js";
 import { attempt, confirmDialog, toast } from "../ui.js";
@@ -345,6 +347,53 @@ function who(record) {
   );
 }
 
+/** A lesson the agent learned: the note, how the agent's own runs fared after it, and Forget. */
+function lessonRow(record, score, onForget) {
+  const forget = el("button", { class: "btn ghost sm", type: "button" }, "Forget");
+  forget.addEventListener("click", () => onForget(record));
+  return el(
+    "div",
+    { class: "list-row", "data-lesson": record.id },
+    el(
+      "div",
+      { class: "row-main" },
+      el("div", { class: "row-text" }, record.content),
+      el("div", { class: "row-meta" }, el("span", null, `Saved ${ago(record.created_at)}`), scoreLine(score)),
+    ),
+    el("div", { class: "row-actions" }, forget),
+  );
+}
+
+/** What the agent learned for itself (item 94): its lessons, then its skills; empty when it learned nothing yet. */
+function learnedSection(record, learned, actions) {
+  const parts = [el("div", { class: "section-label" }, "What it learned")];
+  if (learned.lessons.length === 0 && learned.skills.length === 0) {
+    parts.push(
+      emptyPanel(
+        "Nothing yet",
+        `${record.name}'s lessons and the skills it learns from its own work will be listed here, for its runs alone.`,
+      ),
+    );
+    return parts;
+  }
+  if (learned.lessons.length > 0) {
+    parts.push(
+      el("div", { class: "card" }, learned.lessons.map((lesson) => lessonRow(lesson, learned.scores[lesson.id], actions.forget))),
+    );
+  }
+  if (learned.skills.length > 0) {
+    parts.push(
+      el("div", { class: "section-label" }, "Skills"),
+      el(
+        "div",
+        { class: "card" },
+        learned.skills.map((skill) => skillRow({ ...skill, agentName: record.name }, actions.skillsChanged)),
+      ),
+    );
+  }
+  return parts;
+}
+
 function mountPage(root, ctx, agentId) {
   let disposed = false;
   let ticket = 0;
@@ -352,6 +401,7 @@ function mountPage(root, ctx, agentId) {
   const top = el("div", { class: "stack agent-top" });
   const runs = el("div", { class: "stack" });
   const messages = el("div", { class: "stack" });
+  const learned = el("div", { class: "stack agent-learned" });
   const page = el("div", { class: "stack" }, loadingPanel());
 
   function stageOf(record) {
@@ -396,6 +446,21 @@ function mountPage(root, ctx, agentId) {
     }
   }
 
+  async function forget(record) {
+    const confirmed = await confirmDialog({
+      title: "Forget this lesson?",
+      message: "The note is removed from memory; no run is handed it again.",
+      confirmLabel: "Forget",
+      danger: true,
+      focusCancel: true,
+    });
+    if (confirmed) {
+      await api.del(`/memories/${record.id}`);
+      toast("ok", "Lesson forgotten.");
+      await reload();
+    }
+  }
+
   async function reload() {
     const mine = ++ticket;
     try {
@@ -404,6 +469,16 @@ function mountPage(root, ctx, agentId) {
         return;
       }
       greet(detail.record);
+      learned.replaceChildren(
+        ...learnedSection(detail.record, detail.learned, {
+          forget: (record) => attempt(() => forget(record)),
+          skillsChanged: (list) => {
+            if (list !== null) {
+              attempt(reload);
+            }
+          },
+        }),
+      );
       runs.replaceChildren(
         el("div", { class: "section-label" }, "Chats"),
         detail.runs.length === 0
@@ -415,7 +490,7 @@ function mountPage(root, ctx, agentId) {
           ? []
           : [el("div", { class: "section-label" }, "Messages"), el("div", { class: "card" }, detail.messages.map(messageRow))]),
       );
-      page.replaceChildren(top, runs, messages);
+      page.replaceChildren(top, runs, learned, messages);
       composer.focus();
     } catch (error) {
       if (!disposed && mine === ticket) {

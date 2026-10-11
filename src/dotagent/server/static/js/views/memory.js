@@ -43,7 +43,7 @@ function noteText(text) {
 }
 
 /** How the runs a note was handed to ended: "Handed to 5 runs, 4 done"; nothing until a run was handed it. */
-function scoreLine(score) {
+export function scoreLine(score) {
   if (score === undefined || score.handed === 0) {
     return null;
   }
@@ -54,8 +54,12 @@ function scoreLine(score) {
   );
 }
 
-/** Who wrote a note and how often runs used it. */
+// The agents by id, from the page, so a lesson can say whose it is.
+let agentNames = {};
+
+/** Who wrote a note, whose lesson it is and how often runs used it. */
 function provenance(record) {
+  const whose = record.agent_id === null ? null : el("span", { class: "chip" }, `${agentNames[record.agent_id] ?? "An agent"}'s`);
   const author =
     record.source_run === "reflection"
       ? el("span", { class: "chip" }, "Written by the nightly reflection")
@@ -66,7 +70,7 @@ function provenance(record) {
     record.used_count > 0
       ? el("span", { title: dateTimeFull(record.last_used_at) }, `Used ${plural(record.used_count, "time", "times")}, last ${ago(record.last_used_at)}`)
       : el("span", null, "Not used yet");
-  return [author, used];
+  return [whose, author, used];
 }
 
 /** The note in place as a small form: its words and tags, saved with `onSave(content, tags)` or left with `onCancel`. */
@@ -230,6 +234,7 @@ export function mount(root, ctx) {
     try {
       if (text === "") {
         const page = await api.get(`/memories${query({ limit: PAGE_SIZE, offset: 0 })}`);
+        agentNames = page.agents;
         if (disposed || mine !== ticket) {
           return;
         }

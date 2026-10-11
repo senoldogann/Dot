@@ -15,7 +15,7 @@ from dotagent.memory.service import (
     MemoryHit,
     SavedMemory,
     forget_memory,
-    recall,
+    recall_for,
     save_memory,
     update_memory_note,
 )
@@ -106,7 +106,8 @@ def _save_tool() -> RegisteredTool:
         return _write_action("memory_save", f"Remember: {args.content}", flags)
 
     async def run(args: SaveArgs, ctx: ToolContext) -> ToolResult:
-        saved: SavedMemory = await save_memory(ctx.runtime.memory, args.content, args.tags, ctx.run_id)
+        # A note a run saves is Dot's, for every run; only lessons are an agent's own (item 94).
+        saved: SavedMemory = await save_memory(ctx.runtime.memory, args.content, args.tags, ctx.run_id, None)
         return ok(render_saved(saved))
 
     return make_tool(
@@ -137,7 +138,7 @@ def _search_tool() -> RegisteredTool:
         return _read_action("memory_search", f"Search saved notes for {args.query}")
 
     async def run(args: SearchArgs, ctx: ToolContext) -> ToolResult:
-        hits: list[MemoryHit] = await recall(ctx.runtime.memory, args.query, args.limit)
+        hits: list[MemoryHit] = await recall_for(ctx.runtime.memory, args.query, args.limit, ctx.agent_id)
         await ctx.runtime.memory.store.mark_memories_used(
             ctx.run_id, [hit.record.id for hit in hits], time.time(), "search"
         )

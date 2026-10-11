@@ -39,6 +39,7 @@ def _note(
         created_at=created_at,
         updated_at=created_at,
         source_run=source_run,
+        agent_id=None,
         used_count=used,
         last_used_at=last_used_at,
     )

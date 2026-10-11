@@ -5013,8 +5013,8 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 90  | Memory that keeps what helps: the score decides what is recalled, rests, retires | done        | fa775a0 |
 | 91  | Recall by budget: the notes a run starts with fit a token budget, best first     | done        | 9222a5d |
 | 92  | Skills from its own work: a task that went well becomes a skill for its kind     | done        | 3074107 |
-| 93  | The owner, in one section: what the reflection knows about how you work         | in progress |         |
-| 94  | An agent learns for itself: lessons, skills and a score per agent                | planned     |         |
+| 93  | The owner, in one section: what the reflection knows about how you work         | done        | 6d64e43 |
+| 94  | An agent learns for itself: lessons, skills and a score per agent                | in progress |         |
 
 ### 77. The type system: Inter and Geist Mono, seven sizes, three weights
 
@@ -5530,7 +5530,7 @@ scripted run that is distilled, a second run of the kind offered the skill, and 
 
 ### 93. The owner, in one section: what the reflection knows about how you work
 
-**Status: in progress (2026-10-11).**
+**Status: done.** Merged as `6d64e43` (PR #107, MYP-233 Done).
 
 **Design, as built (2026-10-11).** The section is not a note (a note is capped at `[memory] max_chars`, 600) but
 an `OwnerSection` in the store's `kv` (`memory/service.py`, key `owner.section`): `dot_lines`, which the reflection
@@ -5560,7 +5560,29 @@ reflection smoke extended.
 
 ### 94. An agent learns for itself: lessons, skills and a score per agent
 
-**Status: planned.**
+**Status: in progress (2026-10-11).**
+
+**Design, as built (2026-10-11).** A note carries `agent_id` (a column added to `memories`, `None` for Dot's; the
+notes of an older database are Dot's): a lesson saved from a run, by `auto` or by the owner, is the run's agent's;
+a note a run saves with `memory_save`, a journal note, a note the owner writes are Dot's. `visible_to(record,
+agent_id)` (`memory/service.py`) says what a run may be handed: Dot's notes go to every run, an agent's to its own;
+`recall_for(index, query, limit, agent_id)` searches among them (the `memory_search` tool, with the run's agent)
+while `recall` stays the owner's view of every note (the Memory page, `dotx memory`, the lesson writer's check for
+a note that says it already); `prompt_memories` takes the agent and hands the standing notes, the owner's, the
+agent's own lessons and then Dot's, within the budget. Scores: `Store.agent_memory_scores(ids, since, agent_id)`
+counts the agent's runs alone (a join on `runs`), and `recent_scores_for` ranks and rests a run's notes by the
+scores of its own runs (Dot's by every run). Learned skills: `PlaybookMeta.agent_id` and `shared` (absent in the
+records written before, which are Dot's), `offered_to(meta, agent_id)` and `offered_skills(skills, entries,
+agent_id)`, applied in the loop before the prompt (a learned skill without a readable record is not offered); the
+run that writes a skill marks it its agent's, and a skill of the same kind is updated only among the ones the run
+is offered; `share_playbook(root, name, shared)` and `PUT /api/skills/learned/{name}`. A deleted agent leaves its
+lessons (`Store.delete_agent`) and its skills (`release_playbooks`) to Dot. The API: `GET /api/agents/{id}` gains
+`learned` (`AgentLearning`: the lessons, their scores by the agent's runs, the skills); `GET /api/memories` gains
+`agents` (names by id) and the learned-skill views `agent_id` and `shared`. The agent's page shows "What it
+learned": the lessons with Forget, the skills with Share and Drop; Settings › Skills names the agent on a skill and
+offers Share; the Memory page marks a lesson "Scout's". Tests: `tests/unit/test_agent_learning.py` (visibility,
+offering, sharing and release, the store's scoping and scores); `tests/smoke/test_agents.py` (an agent's lesson
+reaches its run and not Dot's, the page lists it, the deleted agent leaves it to Dot).
 
 **What.** A lesson, a learned skill and a memory use carry the agent (`agent_id`; `None` is Dot). An agent's run
 is handed its own lessons first, then Dot's shared ones; its learned skills are offered to it alone unless the
@@ -6083,3 +6105,4 @@ skills, the score), with the same Drop. Tests: unit for the scoping; the agents 
 - 2026-10-11 (Fable 5.1): `tests/smoke/test_continuity_live.py` (live, not in CI) had failed since the prompt outgrew its 14k window (the system prompt and the tools are about 18k tokens now); its window is 24k, the three tests pass against the cloud model (fixed with item 91).
 - 2026-10-11 (Fable 5.1): item 91 merged as `9222a5d` (PR #105, MYP-231 Done): the run's starting notes fit a token budget. The daemon restarted on `9222a5d`.
 - 2026-10-11 (Fable 5.1): item 92 merged as `3074107` (PR #106, MYP-232 Done): learned skills of any kind of work, the Skills tab. The daemon restarted on `3074107`.
+- 2026-10-11 (Fable 5.1): item 93 merged as `6d64e43` (PR #107, MYP-233 Done): the owner section the reflection keeps, the owner's own lines beside it, the Memory page card. The daemon restarted on `6d64e43`.

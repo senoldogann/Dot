@@ -140,6 +140,7 @@ async def _call(runtime: Runtime, name: str, arguments: JsonObject) -> tuple[Too
         runtime=runtime,
         browser=runtime.browser,
         run_id="mcp-test",
+        agent_id=None,
         thread_id="mcp-test",
         mode="task",
         approvals="ask",

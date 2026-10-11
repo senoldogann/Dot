@@ -1,21 +1,30 @@
-"""Routes for agents (item 86): the profiles the owner makes, each with a face, a role, a model and its own chats."""
+"""Routes for agents (item 86): the profiles the owner makes, each with a face, a role, a model, its own chats and
+what it learned for itself (item 94)."""
 
+import asyncio
 import time
 
 from fastapi import APIRouter
 
+from dotagent.agent.playbooks import PlaybookEntry, list_playbooks, release_playbooks
 from dotagent.core.errors import InvalidValueError
+from dotagent.core.paths import playbooks_dir
 from dotagent.llm.router import parse_model_ref
 from dotagent.server.activity import start_of_today
 from dotagent.server.context import ServerContext
-from dotagent.server.views import AgentDetail, AgentRequest, AgentSummary, TeamMessage, TeamView
+from dotagent.server.routes_system import learned_skill_view
+from dotagent.server.views import AgentDetail, AgentLearning, AgentRequest, AgentSummary, TeamMessage, TeamView
 from dotagent.store.db import Store
-from dotagent.store.models import DOT_AGENT, DOT_AGENT_ID, AgentRecord, RunRecord
+from dotagent.store.models import DOT_AGENT, DOT_AGENT_ID, AgentRecord, MemoryRecord, RunRecord
 
 # How many of its newest runs an agent's page shows.
 _PAGE_RUNS: int = 50
 # How many of the newest messages an agent sent or received its page shows.
 _PAGE_MESSAGES: int = 50
+# How many of its newest lessons an agent's page shows.
+_PAGE_LESSONS: int = 100
+# What Dot's page says it learned: nothing here, since Dot's lessons and skills are the Memory and Skills pages.
+_NOTHING_LEARNED: AgentLearning = AgentLearning(lessons=[], scores={}, skills=())
 
 
 def _checked(request: AgentRequest, known: frozenset[str]) -> AgentRequest:
@@ -95,11 +104,12 @@ def agents_router(ctx: ServerContext) -> APIRouter:
     @router.get("/agents/{agent_id}")
     async def get_agent(agent_id: str) -> AgentDetail:
         if agent_id == DOT_AGENT_ID:
-            return AgentDetail(record=DOT_AGENT, runs=[], messages=[])
+            return AgentDetail(record=DOT_AGENT, runs=[], messages=[], learned=_NOTHING_LEARNED)
         return AgentDetail(
             record=await store.get_agent(agent_id),
             runs=await store.agent_runs(agent_id, _PAGE_RUNS),
             messages=await team_messages(store, await store.agent_messages(agent_id, _PAGE_MESSAGES)),
+            learned=await agent_learning(store, agent_id),
         )
 
     @router.put("/agents/{agent_id}")
@@ -123,5 +133,17 @@ def agents_router(ctx: ServerContext) -> APIRouter:
         if agent_id == DOT_AGENT_ID:
             raise InvalidValueError("Dot is not an agent to delete", {"agent_id": agent_id})
         await store.delete_agent(agent_id)
+        await asyncio.to_thread(release_playbooks, playbooks_dir(), agent_id)
 
     return router
+
+
+async def agent_learning(store: Store, agent_id: str) -> AgentLearning:
+    """What the agent learned (item 94): its lessons with the scores of its own runs, and its learned skills."""
+    lessons: list[MemoryRecord] = await store.agent_memories(agent_id, _PAGE_LESSONS)
+    entries: tuple[PlaybookEntry, ...] = await asyncio.to_thread(list_playbooks, playbooks_dir())
+    return AgentLearning(
+        lessons=lessons,
+        scores=await store.agent_memory_scores([lesson.id for lesson in lessons], 0.0, agent_id),
+        skills=tuple(learned_skill_view(entry) for entry in entries if entry.meta.agent_id == agent_id),
+    )

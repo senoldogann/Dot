@@ -250,6 +250,7 @@ async def interrupted_calls(runtime: Runtime, run: RunRecord) -> tuple[Interrupt
         runtime=runtime,
         browser=runtime.browser,
         run_id=run.id,
+        agent_id=run.agent_id,
         thread_id=run.thread_id,
         mode=run.mode,
         approvals=run.approvals,

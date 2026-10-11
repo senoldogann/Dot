@@ -144,7 +144,7 @@ BUDGET: int = 2000
 
 async def _save_all(index: MemoryIndex, notes: list[str]) -> None:
     for note in notes:
-        await save_memory(index, note, [], None)
+        await save_memory(index, note, [], None, None)
 
 
 async def _best(index: MemoryIndex, query: str) -> str:
@@ -172,8 +172,8 @@ async def test_a_query_that_fits_nothing_finds_nothing(memory: MemoryIndex) -> N
 
 @requires_embedder
 async def test_the_same_text_stays_one_note_and_its_tags_merge(memory: MemoryIndex) -> None:
-    first = await save_memory(memory, DARK_MODE, [], "run-1")
-    again = await save_memory(memory, f"  {DARK_MODE}\n", ["Editor"], "run-2")
+    first = await save_memory(memory, DARK_MODE, [], "run-1", None)
+    again = await save_memory(memory, f"  {DARK_MODE}\n", ["Editor"], "run-2", None)
     assert first.created and not again.created
     assert again.record.id == first.record.id
     assert again.record.tags == ("editor",)
@@ -183,12 +183,12 @@ async def test_the_same_text_stays_one_note_and_its_tags_merge(memory: MemoryInd
 @requires_embedder
 async def test_a_note_that_says_nearly_the_same_comes_back_with_the_old_one(memory: MemoryIndex) -> None:
     await _save_all(memory, ["The user lives in Istanbul.", DOG])
-    moved = await save_memory(memory, "The user lives in Ankara.", [], None)
+    moved = await save_memory(memory, "The user lives in Ankara.", [], None, None)
     assert moved.created
     assert [hit.record.content for hit in moved.similar] == ["The user lives in Istanbul."]
     assert moved.similar[0].similarity is not None
     assert moved.similar[0].similarity >= memory.config.similar_threshold
-    assert (await save_memory(memory, LAPTOP, [], None)).similar == ()
+    assert (await save_memory(memory, LAPTOP, [], None, None)).similar == ()
 
 
 @requires_embedder
@@ -216,23 +216,23 @@ async def test_reindex_embeds_every_note_again(memory: MemoryIndex) -> None:
 @requires_embedder
 async def test_a_run_starts_with_the_standing_notes_and_the_ones_that_fit_its_goal(memory: MemoryIndex) -> None:
     standing: str = "Always answer the user in Turkish."
-    await save_memory(memory, standing, ["core"], None)
+    await save_memory(memory, standing, ["core"], None, None)
     # Notes an earlier run saved: only the ones that fit the goal come along.
     for note in [DOG, LAPTOP, DARK_MODE]:
-        await save_memory(memory, note, [], AGENT_RUN)
+        await save_memory(memory, note, [], AGENT_RUN, None)
     related_records: tuple[MemoryRecord, ...] = (
-        await prompt_memories(memory, "Take Biscuit the dog to the vet.", BUDGET)
+        await prompt_memories(memory, "Take Biscuit the dog to the vet.", BUDGET, None)
     ).records
     related: list[str] = [r.content for r in related_records]
     assert related[0] == standing
     assert DOG in related
     assert len(related) == len(set(related))
     assert [
-        r.content for r in (await prompt_memories(memory, "Find a recipe for sourdough bread.", BUDGET)).records
+        r.content for r in (await prompt_memories(memory, "Find a recipe for sourdough bread.", BUDGET, None)).records
     ] == [standing]
     # A budget with room for the standing note alone leaves the dog's note to memory_search, and says what it spent.
     tight: Remembered = await prompt_memories(
-        memory, "Take Biscuit the dog to the vet.", note_tokens(related_records[0])
+        memory, "Take Biscuit the dog to the vet.", note_tokens(related_records[0]), None
     )
     assert [r.content for r in tight.records] == [standing]
     assert tight.tokens == note_tokens(related_records[0])
@@ -240,10 +240,10 @@ async def test_a_run_starts_with_the_standing_notes_and_the_ones_that_fit_its_go
 
 @requires_embedder
 async def test_a_note_the_user_wrote_reaches_every_run_even_when_its_goal_is_unrelated(memory: MemoryIndex) -> None:
-    await save_memory(memory, DOG, [], AGENT_RUN)
-    await save_memory(memory, CITY, ["aboutme"], None)
+    await save_memory(memory, DOG, [], AGENT_RUN, None)
+    await save_memory(memory, CITY, ["aboutme"], None, None)
     given: list[str] = [
-        r.content for r in (await prompt_memories(memory, "Find a recipe for sourdough bread.", BUDGET)).records
+        r.content for r in (await prompt_memories(memory, "Find a recipe for sourdough bread.", BUDGET, None)).records
     ]
     assert given == [CITY]
 
@@ -262,7 +262,7 @@ async def test_a_failing_embedder_fails_the_call_instead_of_saving_without_meani
     )
     async with _opened(tmp_path, broken) as index:
         with pytest.raises(ProviderTransportError):
-            await save_memory(index, DOG, [], None)
+            await save_memory(index, DOG, [], None, None)
         assert await index.store.count_memories() == 0
 
 
@@ -344,7 +344,7 @@ async def test_the_real_openai_api_refuses_a_made_up_key_with_a_typed_error(
 
 
 async def test_without_embeddings_only_the_words_are_searched(words_only: MemoryIndex) -> None:
-    saved = await save_memory(words_only, DOG, [], None)
+    saved = await save_memory(words_only, DOG, [], None, None)
     await _save_all(words_only, [LAPTOP, CITY])
     assert saved.similar == ()
     assert await words_only.store.all_memory_vectors() == []
@@ -356,8 +356,8 @@ async def test_without_embeddings_only_the_words_are_searched(words_only: Memory
 
 
 async def test_a_note_a_run_was_handed_lately_comes_before_one_no_run_built_on(words_only: MemoryIndex) -> None:
-    await save_memory(words_only, "The user's dog Biscuit eats at seven in the morning.", [], AGENT_RUN)
-    await save_memory(words_only, "The user's dog Biscuit sleeps in the kitchen at night.", [], AGENT_RUN)
+    await save_memory(words_only, "The user's dog Biscuit eats at seven in the morning.", [], AGENT_RUN, None)
+    await save_memory(words_only, "The user's dog Biscuit sleeps in the kitchen at night.", [], AGENT_RUN, None)
     before: list[str] = [hit.record.id for hit in await recall(words_only, "Biscuit", 5)]
     assert len(before) == 2
     await words_only.store.mark_memories_used(AGENT_RUN, [before[-1]], time.time(), "start")
@@ -380,14 +380,14 @@ def _backdate(database: Path, memory_id: str, created_at: float) -> None:
 async def test_an_agent_note_no_run_was_handed_for_long_rests_while_the_users_notes_never_do(
     words_only: MemoryIndex, tmp_path: Path
 ) -> None:
-    old_agent: SavedMemory = await save_memory(words_only, DOG, [], AGENT_RUN)
-    old_user: SavedMemory = await save_memory(words_only, CITY, [], None)
+    old_agent: SavedMemory = await save_memory(words_only, DOG, [], AGENT_RUN, None)
+    old_user: SavedMemory = await save_memory(words_only, CITY, [], None, None)
     long_ago: float = time.time() - (words_only.config.rest_days + 1) * 86400.0
     _backdate(tmp_path / "dot.db", old_agent.record.id, long_ago)
     _backdate(tmp_path / "dot.db", old_user.record.id, long_ago)
     given: list[str] = [
         record.content
-        for record in (await prompt_memories(words_only, "Take Biscuit the dog to the vet.", BUDGET)).records
+        for record in (await prompt_memories(words_only, "Take Biscuit the dog to the vet.", BUDGET, None)).records
     ]
     assert given == [CITY]
     # A search still finds the resting note, and it is listed as resting.
@@ -408,9 +408,9 @@ async def test_a_word_found_in_most_notes_does_not_make_a_match(words_only: Memo
 
 async def test_a_note_must_be_a_single_short_fact(words_only: MemoryIndex) -> None:
     with pytest.raises(StoreError, match="empty"):
-        await save_memory(words_only, " \n ", [], None)
+        await save_memory(words_only, " \n ", [], None, None)
     with pytest.raises(StoreError, match=str(words_only.config.max_chars)):
-        await save_memory(words_only, "word " * 200, [], None)
+        await save_memory(words_only, "word " * 200, [], None, None)
     assert await words_only.store.count_memories() == 0
 
 
@@ -432,6 +432,7 @@ async def _prepare(runtime: Runtime, name: str, arguments: JsonObject) -> tuple[
         runtime=runtime,
         browser=runtime.browser,
         run_id="memory-test",
+        agent_id=None,
         thread_id="memory-test",
         mode="task",
         approvals="ask",

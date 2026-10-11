@@ -260,13 +260,13 @@ async def test_the_reflection_learns_from_the_runs_the_loop_did_not_ask_tidies_t
         assert [run.status for run in (clean, failed, stopped, stumbled)] == ["done", "failed", "cancelled", "done"]
         assert await store.last_event(stumbled.id, LESSONS_PROPOSED) is not None
         # Two lesson notes that say the same, and one that no run was handed for over sixty days.
-        older: MemoryRecord = await store.add_memory(TWIN_OLDER, (LESSON_TAG,), "run_old", None)
-        newer: MemoryRecord = await store.add_memory(TWIN_NEWER, (LESSON_TAG, "pdf"), "run_new", None)
-        stale: MemoryRecord = await store.add_memory(STALE, (LESSON_TAG,), "run_stale", None)
+        older: MemoryRecord = await store.add_memory(TWIN_OLDER, (LESSON_TAG,), "run_old", None, None)
+        newer: MemoryRecord = await store.add_memory(TWIN_NEWER, (LESSON_TAG, "pdf"), "run_new", None, None)
+        stale: MemoryRecord = await store.add_memory(STALE, (LESSON_TAG,), "run_stale", None, None)
         _backdate(older.id, time.time() - 2 * _DAY_S)
         _backdate(stale.id, time.time() - 61 * _DAY_S)
         # And one handed to three runs that all failed: its score retires it.
-        hurt: MemoryRecord = await store.add_memory(HURT, (LESSON_TAG,), "run_hurt", None)
+        hurt: MemoryRecord = await store.add_memory(HURT, (LESSON_TAG,), "run_hurt", None, None)
         for run_id in ("run_h1", "run_h2", "run_h3"):
             await store.mark_memories_used(run_id, [hurt.id], time.time(), "start")
             await store.close_memory_uses(run_id, "failed")

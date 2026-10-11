@@ -172,7 +172,7 @@ async def test_the_home_greets_says_what_is_going_on_and_follows_the_day(
     ended: RunRecord = await _start(manager, "Count the files", "ask")
     async with asyncio.timeout(_RUN_WAIT_S):
         assert (await manager.wait(ended.id)).status == "done"
-    await runtime.store.add_memory(_LESSON, ("lesson",), ended.id, None)
+    await runtime.store.add_memory(_LESSON, ("lesson",), ended.id, None, None)
     due_at: float = time.time() + _DUE_AHEAD_S
     moment: datetime = datetime.fromtimestamp(due_at, tz=runtime.schedule_zone)
     await create_schedule(

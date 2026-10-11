@@ -251,12 +251,53 @@ class TeamView(FrozenModel):
     messages: list[TeamMessage]
 
 
+class LearnedSkillView(FrozenModel):
+    """A skill Dot or an agent learned from its own work (:mod:`dotagent.agent.playbooks`): its name and description,
+    the kind of work, where it acted, the runs it comes from, how it fared (``uses`` done after reading it,
+    ``failures``), whether it is retired, whose it is (``agent_id``, ``None`` for Dot's) and whether an agent's is
+    ``shared`` with every run (item 94)."""
+
+    name: str
+    description: str
+    kind: str
+    host: str
+    runs: tuple[str, ...]
+    uses: int
+    failures: int
+    retired: bool
+    written_at: float
+    updated_at: float
+    agent_id: str | None
+    shared: bool
+
+
+class LearnedSkillsView(FrozenModel):
+    items: tuple[LearnedSkillView, ...]
+
+
+class SkillShareRequest(FrozenModel):
+    """Whether an agent's learned skill is offered to every run (item 94)."""
+
+    shared: bool
+
+
+class AgentLearning(FrozenModel):
+    """What an agent learned for itself (item 94): its lessons (newest first) with how its own runs ended after
+    being handed each (``scores``, per lesson some run was handed), and its learned skills, active and retired."""
+
+    lessons: list[MemoryRecord]
+    scores: dict[str, MemoryScore]
+    skills: tuple[LearnedSkillView, ...]
+
+
 class AgentDetail(FrozenModel):
-    """An agent's page: the record, its newest runs (newest first) and the newest messages it sent or received."""
+    """An agent's page: the record, its newest runs (newest first), the newest messages it sent or received and what
+    it learned."""
 
     record: AgentRecord
     runs: list[RunRecord]
     messages: list[TeamMessage]
+    learned: AgentLearning
 
 
 class CampaignChip(FrozenModel):
@@ -363,12 +404,13 @@ class CampaignDetail(FrozenModel):
 class MemoryPage(FrozenModel):
     """A page of the notes, newest change first; ``resting`` names the items that rest
     (:func:`dotagent.memory.service.resting`), so the page can group them; ``scores`` says, per item some run was
-    handed, how those runs ended."""
+    handed, how those runs ended; ``agents`` names the agents, by id, so the page can say whose a lesson is."""
 
     total: int
     items: list[MemoryRecord]
     resting: list[str]
     scores: dict[str, MemoryScore]
+    agents: dict[str, str]
 
 
 class ScheduleView(FrozenModel):
@@ -408,27 +450,6 @@ class ProviderModels(FrozenModel):
     models: list[ModelOption]
     error: str | None
     problem: ProviderProblem | None
-
-
-class LearnedSkillView(FrozenModel):
-    """A skill Dot learned from its own work (:mod:`dotagent.agent.playbooks`): its name and description, the kind of
-    work, where it acted, the runs it comes from, how it fared (``uses`` done after reading it, ``failures``) and
-    whether it is retired."""
-
-    name: str
-    description: str
-    kind: str
-    host: str
-    runs: tuple[str, ...]
-    uses: int
-    failures: int
-    retired: bool
-    written_at: float
-    updated_at: float
-
-
-class LearnedSkillsView(FrozenModel):
-    items: tuple[LearnedSkillView, ...]
 
 
 class PaletteSkill(FrozenModel):

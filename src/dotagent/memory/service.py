@@ -67,6 +67,12 @@ class MemoryHit(FrozenModel):
     similarity: float | None
 
 
+def visible_to(record: MemoryRecord, agent_id: str | None) -> bool:
+    """Whether a run of the agent ``agent_id`` (``None`` for Dot) may be handed ``record`` (item 94): Dot's notes go
+    to every run, an agent's lessons to its own runs alone."""
+    return record.agent_id is None or record.agent_id == agent_id
+
+
 class SavedMemory(FrozenModel):
     """The outcome of saving: the note, whether it is new, and the existing notes that say nearly the same."""
 
@@ -158,9 +164,12 @@ async def _similar_notes(index: MemoryIndex, vector: Vector) -> tuple[MemoryHit,
     return tuple(MemoryHit(record=record, similarity=scores[record.id]) for record in records)
 
 
-async def save_memory(index: MemoryIndex, content: str, tags: Sequence[str], run_id: str | None) -> SavedMemory:
-    """Save a note. The same text twice stays one note (the tags are merged); a new note comes back with the existing
-    notes that are nearly the same, so the caller can retire the ones that are outdated."""
+async def save_memory(
+    index: MemoryIndex, content: str, tags: Sequence[str], run_id: str | None, agent_id: str | None
+) -> SavedMemory:
+    """Save a note, Dot's or, with ``agent_id``, an agent's own (:func:`visible_to`). The same text twice stays one
+    note (the tags are merged, the owner kept); a new note comes back with the existing notes that are nearly the
+    same, so the caller can retire the ones that are outdated."""
     text: str = _checked_text(content, index.config.max_chars)
     clean_tags: tuple[str, ...] = normalize_tags(tags)
     existing: MemoryRecord | None = await index.store.find_memory_by_content(text)
@@ -176,7 +185,7 @@ async def save_memory(index: MemoryIndex, content: str, tags: Sequence[str], run
         await backfill(index)
         vector = (await index.embedder.embed([text]))[0]
         similar = await _similar_notes(index, vector)
-    created: MemoryRecord = await index.store.add_memory(text, clean_tags, run_id, vector)
+    created: MemoryRecord = await index.store.add_memory(text, clean_tags, run_id, agent_id, vector)
     return SavedMemory(record=created, created=True, similar=similar)
 
 
@@ -204,15 +213,37 @@ def resting(record: MemoryRecord, now: float, rest_days: int, score: MemoryScore
 
 
 async def recent_scores(index: MemoryIndex, memory_ids: Sequence[str], now: float) -> dict[str, MemoryScore]:
-    """The scores of ``memory_ids`` over the last ``[memory] score_days``."""
+    """The scores of ``memory_ids`` over the last ``[memory] score_days``, from every run."""
     return await index.store.memory_scores(memory_ids, now - index.config.score_days * 86400.0)
 
 
+async def recent_scores_for(
+    index: MemoryIndex, memory_ids: Sequence[str], now: float, agent_id: str | None
+) -> dict[str, MemoryScore]:
+    """The scores of ``memory_ids`` over the last ``[memory] score_days`` as a run of ``agent_id`` ranks by them:
+    from every run for Dot (``None``), from the agent's own runs for an agent (item 94)."""
+    since: float = now - index.config.score_days * 86400.0
+    if agent_id is None:
+        return await index.store.memory_scores(memory_ids, since)
+    return await index.store.agent_memory_scores(memory_ids, since, agent_id)
+
+
 async def recall(index: MemoryIndex, query: str, limit: int) -> list[MemoryHit]:
-    """The ``limit`` notes that best fit ``query``, best first: the fusion of the two rankers, with the agent's notes
-    lifted by how lately a run was handed them (:func:`dotagent.memory.ranking.ranked_by_use`, half-life
-    ``[memory] use_half_life_days``) and by their score (:func:`recent_scores`), either way. A note the reflection
-    retired (tagged ``rest``) is never one."""
+    """The ``limit`` notes that best fit ``query``, best first, among every note (the owner's view: the Memory page,
+    ``dotx memory``, the lesson writer's check for a note that says it already): the fusion of the two rankers, with
+    the agent's notes lifted by how lately a run was handed them (:func:`dotagent.memory.ranking.ranked_by_use`,
+    half-life ``[memory] use_half_life_days``) and by their score (:func:`recent_scores`), either way. A note the
+    reflection retired (tagged ``rest``) is never one."""
+    return await _recall(index, query, limit, None, False)
+
+
+async def recall_for(index: MemoryIndex, query: str, limit: int, agent_id: str | None) -> list[MemoryHit]:
+    """Like :func:`recall`, as a run of the agent ``agent_id`` searches (``None`` for Dot's run): among the notes it
+    may be handed (:func:`visible_to`), by the scores of its own runs (:func:`recent_scores_for`)."""
+    return await _recall(index, query, limit, agent_id, True)
+
+
+async def _recall(index: MemoryIndex, query: str, limit: int, agent_id: str | None, scoped: bool) -> list[MemoryHit]:
     text: str = normalize_text(query)[:_QUERY_CHARS]
     total: int = await index.store.count_memories()
     if not text or limit <= 0 or total == 0:
@@ -231,10 +262,14 @@ async def recall(index: MemoryIndex, query: str, limit: int) -> list[MemoryHit]:
         similarities = {item.id: item.similarity for item in close}
     scores: dict[str, float] = fused_scores(rankings)
     candidates: list[MemoryRecord] = [
-        record for record in await index.store.get_memories(list(scores)) if REST_TAG not in record.tags
+        record
+        for record in await index.store.get_memories(list(scores))
+        if REST_TAG not in record.tags and (not scoped or visible_to(record, agent_id))
     ]
     now: float = time.time()
-    balances: dict[str, MemoryScore] = await recent_scores(index, [record.id for record in candidates], now)
+    balances: dict[str, MemoryScore] = await recent_scores_for(
+        index, [record.id for record in candidates], now, agent_id
+    )
     ranked: list[MemoryRecord] = ranked_by_use(
         scores, candidates, now, config.use_half_life_days * 86400.0, balances, config.score_min_uses, limit
     )
@@ -336,22 +371,28 @@ def fit_notes(notes: Sequence[MemoryRecord], budget: int, spent: int) -> tuple[l
     return taken, spent
 
 
-async def prompt_memories(index: MemoryIndex, query: str, budget: int) -> Remembered:
-    """The notes a run starts with, without repeats, as many as fit ``budget`` tokens (:func:`fit_notes`), in this
-    order: the standing ones (tagged ``core``, newest first), the ones the user wrote (closest to ``query`` first)
-    and the agent's notes related to ``query`` (the goal and the earlier goals of its thread; by fit and score) that
-    do not rest (:func:`resting`). A note that does not fit is left to ``memory_search``.
+async def prompt_memories(index: MemoryIndex, query: str, budget: int, agent_id: str | None) -> Remembered:
+    """The notes a run of the agent ``agent_id`` (``None`` for Dot) starts with, without repeats, as many as fit
+    ``budget`` tokens (:func:`fit_notes`), in this order: the standing ones (tagged ``core``, newest first), the ones
+    the user wrote (closest to ``query`` first), the agent's own lessons and then Dot's notes related to ``query``
+    (the goal and the earlier goals of its thread; by fit and the agent's own scores) that do not rest
+    (:func:`resting`). Only the notes the run may be handed are among them (:func:`visible_to`); a note that does not
+    fit is left to ``memory_search``.
 
     A goal is full of everyday words that match unrelated notes, so when embeddings are on only the notes whose
     meaning clearly fits the query are taken; ``memory_search`` still finds the others, and the resting ones."""
     config: MemoryConfig = index.config
-    standing: list[MemoryRecord] = await index.store.memories_with_tag(CORE_TAG, _FETCH_NOTES)
-    candidates: list[MemoryHit] = await recall(index, query, config.candidate_pool)
+    standing: list[MemoryRecord] = [
+        record for record in await index.store.memories_with_tag(CORE_TAG, _FETCH_NOTES) if visible_to(record, agent_id)
+    ]
+    candidates: list[MemoryHit] = await recall_for(index, query, config.candidate_pool, agent_id)
     similarities: dict[str, float] = {hit.record.id: hit.similarity for hit in candidates if hit.similarity is not None}
     written: list[MemoryRecord] = await index.store.user_memories(_FETCH_NOTES)
     known: set[str] = {record.id for record in standing}
     users: list[MemoryRecord] = _closest_first(
-        [record for record in written if record.id not in known], similarities, _FETCH_NOTES
+        [record for record in written if record.id not in known and visible_to(record, agent_id)],
+        similarities,
+        _FETCH_NOTES,
     )
     known.update(record.id for record in users)
     related: list[MemoryHit] = (
@@ -362,16 +403,18 @@ async def prompt_memories(index: MemoryIndex, query: str, budget: int) -> Rememb
         ]
     )
     now: float = time.time()
-    balances: dict[str, MemoryScore] = await recent_scores(index, [hit.record.id for hit in related], now)
+    balances: dict[str, MemoryScore] = await recent_scores_for(index, [hit.record.id for hit in related], now, agent_id)
     fresh: list[MemoryRecord] = [
         hit.record
         for hit in related
         if hit.record.id not in known
         and not resting(hit.record, now, config.rest_days, balances.get(hit.record.id), config.score_min_uses)
     ]
+    own: list[MemoryRecord] = [record for record in fresh if record.agent_id is not None]
+    shared: list[MemoryRecord] = [record for record in fresh if record.agent_id is None]
     taken: list[MemoryRecord] = []
     spent: int = 0
-    for group in (standing, users, fresh):
+    for group in (standing, users, own, shared):
         part, spent = fit_notes(group, budget, spent)
         taken.extend(part)
     return Remembered(records=tuple(taken), tokens=spent)

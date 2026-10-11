@@ -5,6 +5,7 @@ import time
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, replace
 from datetime import datetime
+from pathlib import Path
 from typing import Literal
 
 from dotagent.agent.attachments import (
@@ -66,6 +67,7 @@ from dotagent.agent.plan import (
     render_plan,
     with_step_status,
 )
+from dotagent.agent.playbooks import PlaybookEntry, list_playbooks, offered_skills
 from dotagent.agent.progress import (
     SINGLE_ACTION_STEPS,
     ActCall,
@@ -139,7 +141,14 @@ from dotagent.agent.verify import (
 from dotagent.agent.vision import text_for_blind_model
 from dotagent.browser.session import BrowserSession
 from dotagent.config import AgentConfig
-from dotagent.core.errors import ConfigError, MissingSecretError, ProviderError, RunCancelled, ToolInputError
+from dotagent.core.errors import (
+    ConfigError,
+    MissingSecretError,
+    NotFoundError,
+    ProviderError,
+    RunCancelled,
+    ToolInputError,
+)
 from dotagent.core.jsonutil import dumps_compact
 from dotagent.core.logs import get_logger
 from dotagent.core.text import CHARS_PER_TOKEN, redact_secrets, truncate_middle
@@ -167,7 +176,7 @@ from dotagent.memory.service import Remembered, memory_budget, owner_prompt_line
 from dotagent.policy.types import QuestionMode
 from dotagent.runtime import Runtime
 from dotagent.skills.catalog import load_skills, playbook_root
-from dotagent.skills.types import SkillCatalog
+from dotagent.skills.types import Skill, SkillCatalog
 from dotagent.store.endings import GOAL_CHECK_MARK, RESULT_EMPTY_REPLIES
 from dotagent.store.models import AgentRecord, CampaignRecord, EventRecord, MemoryRecord, RunMode, RunRecord
 from dotagent.store.stats import ACT_TOOLS
@@ -627,6 +636,20 @@ def _turned_on(outcomes: Sequence[ToolOutcome], hidden: Mapping[str, str], on: f
         if outcome.call.name in hidden or (outcome.call.name == USE_TOOLS_TOOL and not outcome.result.is_error)
     )
     return tuple(dict.fromkeys(group for group in named if group not in on))
+
+
+async def _offered_learned(runtime: Runtime, run: RunRecord, skills: SkillCatalog) -> tuple[Skill, ...]:
+    """The skills of ``skills`` a run is offered: every one but the learned skills of other agents (item 94,
+    :func:`dotagent.agent.playbooks.offered_skills`); with the learned skills' records unreadable, none of them."""
+    root: Path | None = playbook_root(runtime.config)
+    if root is None:
+        return skills.skills
+    try:
+        entries: tuple[PlaybookEntry, ...] = await asyncio.to_thread(list_playbooks, root)
+    except NotFoundError as error:
+        log.warning("playbooks_unreadable", run_id=run.id, error=error.message, context=error.context)
+        entries = ()
+    return offered_skills(skills.skills, entries, run.agent_id)
 
 
 async def _memory_query(runtime: Runtime, run: RunRecord) -> str:
@@ -1249,6 +1272,7 @@ async def run_agent(agent: AgentRun) -> RunEnd:
     )
     for problem in skills.problems:
         log.warning("skill_skipped", run_id=run.id, path=str(problem.path), reason=problem.reason)
+    skills = skills.model_copy(update={"skills": await _offered_learned(runtime, run, skills)})
     if not skills.skills:
         specs = tuple(spec for spec in specs if spec.name != SKILL_TOOL)
     if config.consult_max_per_run == 0:
@@ -1278,6 +1302,7 @@ async def run_agent(agent: AgentRun) -> RunEnd:
         runtime.memory,
         await _memory_query(runtime, run),
         memory_budget(runtime.config.memory, info.context_length),
+        run.agent_id,
     )
     remembered: tuple[MemoryRecord, ...] = recalled.records
     if remembered:
@@ -1336,6 +1361,7 @@ async def run_agent(agent: AgentRun) -> RunEnd:
         runtime=runtime,
         browser=await _browser_of(runtime, run),
         run_id=run.id,
+        agent_id=run.agent_id,
         thread_id=run.thread_id,
         mode=run.mode,
         approvals=run.approvals,
