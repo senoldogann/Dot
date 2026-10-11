@@ -198,6 +198,12 @@ class BrowserModeRequest(FrozenModel):
     mode: BrowserMode
 
 
+class BrowserRaiseRequest(FrozenModel):
+    """Whether Dot's Chrome is brought to the front while a run works (item 97)."""
+
+    raise_window: bool
+
+
 class KeyRequest(FrozenModel):
     """An API key to save: printable characters without spaces, as the keys of every provider are."""
 
@@ -510,6 +516,7 @@ class BrowserView(FrozenModel):
     port: int | None
     inspect_page: str
     attach_timeout_s: float
+    raise_window: bool
 
 
 class KeyView(FrozenModel):

@@ -396,6 +396,10 @@ attach_timeout_s = 60.0
 # Used in "own" mode.
 channel = "chrome"
 headless = false
+# Whether Dot's Chrome comes to the front while a run works: false keeps the window where it is (the app that had the
+# focus gets it back when Chrome starts, and switching tabs does not raise the window); the run's page shows the page
+# under "Dot's computer" either way, and Take over always brings the tab to the front. Settings › Browser switches it.
+raise_window = false
 viewport_width = 1280
 viewport_height = 860
 navigation_timeout_s = 30.0

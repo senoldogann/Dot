@@ -888,8 +888,11 @@ open at a click; the choice is kept per card. **Dot's computer**, at the top of 
 shows the page of the run's browser as Chrome paints it (`GET /api/runs/{id}/screencast`, Chrome's own screencast,
 sent only while the view is open; a tab that does not change sends nothing). The view starts by itself at the run's
 first browser step and says, until then, that the run has not opened a page; **Watch** and **Close the view** open
-and close it by hand. A pill under it says who has the browser. **Take over**
-holds the run at its next tool call, brings the tab to the front and the pill reads "You have control": the Chrome
+and close it by hand. A pill under it says who has the browser. Since that view shows the page, Dot's own Chrome stays
+in the background while a run works (`[browser] raise_window`, off by default, item 97): the app you were in gets the
+focus back right after Chrome starts, and switching tabs does not raise the window; Settings › Browser has the switch
+"Bring Chrome to the front while working" for the other way round. **Take over**
+holds the run at its next tool call, brings the tab to the front either way and the pill reads "You have control": the Chrome
 window is on your Mac, so sign in, pass a CAPTCHA or do a step yourself; **Return control** lets the run go on, and the
 result of the tool call that waited tells the model how long you had the browser and that the page may have changed,
 so it takes a snapshot first. The timeline keeps both moments (`takeover`, `handback`), and `dotx run` prints them. A
@@ -1126,12 +1129,15 @@ Dot works with are the ones of your Chrome, so nothing is copied and nothing goe
 - Dot closes the tabs it opened when they have been idle for `tab_idle_s`. If Dot itself crashes they stay open.
 - Calls that arrive while Dot waits for the click queue behind it, and each may in turn wait up to `attach_timeout_s` if
   you do not click.
-- Only the stable Google Chrome on its default data directory is supported. `channel` and `headless` apply to `own` only.
+- Only the stable Google Chrome on its default data directory is supported. `channel`, `headless` and `raise_window`
+  apply to `own` only.
 
 The mode can also switch without a restart: Settings › Browser in the web UI, or `POST /api/browser/mode` with
 `{"mode": "own"}` or `{"mode": "attach"}`. The live switch runs the same one-blank-tab proof; it is refused with 409
 while runs are active, and a failed proof leaves the session in the Chrome it had (422). `dotx browser attach` and
-`dotx browser detach` only write the mode, which the service takes up on its next start.
+`dotx browser detach` only write the mode, which the service takes up on its next start. The same tab's switch "Bring
+Chrome to the front while working" is `POST /api/browser/raise` with `{"raise_window": true}` or `false`: it takes
+effect at the next browser call, Chrome is not restarted, and the value is written to `config.toml` the same way.
 
 Both modes share what follows.
 
@@ -1173,6 +1179,10 @@ Both modes share what follows.
 - `[browser] allowed_hosts` and `blocked_hosts` limit the sites of the browser tools and of `web_fetch`; a host also
   matches its subdomains, and an empty `allowed_hosts` means every site. The blocked list starts with the
   cloud-metadata hosts.
+- `raise_window = false` (the default) keeps the window in the background while a run works: macOS brings a newly
+  started Chrome to the front, so the app that had the focus is brought back as soon as Chrome's window has appeared,
+  and switching tabs does not raise the window (the run's page shows the page under Dot's computer). With `true`
+  the window comes to the front at the start and on each tab switch. Take over brings the tab to the front either way.
 - `headless = true` hides the window. Starting Chrome and loading the first page took about 2 seconds with it on an
   Apple-silicon Mac; later calls take well under a second. When Chrome crashes or the connection to it is lost, the
   next call starts it again.
