@@ -5,17 +5,20 @@ import { facesMove, lookOf } from "./actors.js";
 import { mountCharacter } from "./character/character.js";
 import { STATE_BY_ID } from "./character/states.js";
 import { el } from "./dom.js";
-import { entranceOf, restingMood } from "./mood.js";
+import { entranceOf, restingMood, stateWord } from "./mood.js";
 
 const ASIDE = { yaw: 38, pitch: -16, mix: 1, spin: 0, wander: 0.3 };
 const ASIDE_MS = 2500;
 
-/** `createCharacterCard({ id, look, status, endedAt, size })` returns `{ element, onStatus(status, endedAt), lookAside(),
- * dispose }`; `onStatus` with the status unchanged does nothing. */
-export function createCharacterCard({ id, look, status, endedAt, size }) {
+/** `createCharacterCard({ id, name, look, status, endedAt, size })` returns `{ element, onStatus(status, endedAt),
+ * lookAside(), dispose }`; `onStatus` with the status unchanged does nothing. Under the character: `name` and the word
+ * of the run's status ("Thinking…", item 109). */
+export function createCharacterCard({ id, name, look, status, endedAt, size }) {
   const chosen = lookOf(id, look);
   const stage = el("div", { class: "character-stage" });
-  const element = el("section", { class: "card character-card", "aria-label": "The face of the run" }, stage);
+  const word = el("span", { class: "character-word" });
+  const caption = el("div", { class: "character-caption" }, el("span", { class: "character-name" }, name), word);
+  const element = el("section", { class: "card character-card", "aria-label": "The face of the run" }, stage, caption);
   const handle = mountCharacter(stage, { ...chosen, size, moving: facesMove(), label: "The face of the run" });
   let current = null;
   let timer = 0;
@@ -38,6 +41,7 @@ export function createCharacterCard({ id, look, status, endedAt, size }) {
     }
     const entrance = entranceOf(current, status);
     current = status;
+    word.textContent = stateWord(status);
     clearTimeout(timer);
     if (entrance === null) {
       rest(status, at);

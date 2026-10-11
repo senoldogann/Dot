@@ -253,6 +253,14 @@ async def _shoot(context: BrowserContext, base: str, pages: tuple[tuple[str, str
             await page.locator(".inspector .fold-toggle", has_text="Details").click()
             await page.wait_for_timeout(_SETTLE_MS)
             await page.screenshot(path=str(out / f"{tag}-run-panel.png"), full_page=False)
+            if await page.locator(".inspector[data-mode='docked']").is_visible():
+                # The panel at half the page (item 109), the character at the head of the conversation; then back.
+                await page.locator("section.computer button[aria-controls='fold-run-computer']").click()
+                sizes = page.locator("section.computer .stage-sizes")
+                await sizes.get_by_role("button", name="Wide").click()
+                await page.wait_for_timeout(_SETTLE_MS)
+                await page.screenshot(path=str(out / f"{tag}-run-wide.png"), full_page=False)
+                await sizes.get_by_role("button", name="Compact").click()
     await page.close()
 
 
@@ -342,7 +350,9 @@ async def test_every_page_in_both_schemes_at_both_widths(
         finally:
             await browser.close()
     shots: list[Path] = await asyncio.to_thread(lambda: sorted(out.glob("*.png")))
-    assert len(shots) == len(_SCHEMES) * len(_SIZES) * (len(pages) + 5)
+    # Five more shots a scheme and a size (the first page, the desktop shell twice, the run's top and its panel), and
+    # the run at the wide panel on a wide window (item 109), where the panel sits beside the conversation.
+    assert len(shots) == len(_SCHEMES) * len(_SIZES) * (len(pages) + 5) + len(_SCHEMES)
     print(f"\ntour: {out}")
 
 

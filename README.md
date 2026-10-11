@@ -897,17 +897,25 @@ scrolls under a blur, the panel stays in place under it, and the box stays at th
 face, the name and the buttons; the chips wait in the Details card. Every other page names itself in the same bar
 (Agents, Activity, Campaigns, Settings) and opens with one line of description.
 
-The panel opens with the run's actor as a moving character (Dot, or the agent the run belongs to, in its look): it
+The panel opens with the run's actor as a moving character (Dot, or the agent the run belongs to, in its look), its
+name and the word of its state under it ("Thinking…", "Waiting for you", "Done", "Failed", "Stopped"): it
 hatches when a run starts under your eyes, thinks while the run works, looks aside toward the live view at each browser
 step, goes alert with a pastille while the run waits for you, laughs once when the run ends well and settles, rests sad
 after a failure and unimpressed after a cancel, and sleeps ten minutes after the end. In the conversation each turn of
 the actor, and the answer at the end, opens with its still face. The panel's cards (Dot's computer, Details, Plan,
 Actions, Screen) arrive folded, each with a one-line summary, and
-open at a click; the choice is kept per card. **Dot's computer**, at the top of that panel while a run is going on,
-shows the page of the run's browser as Chrome paints it (`GET /api/runs/{id}/screencast`, Chrome's own screencast,
+open at a click; the choice is kept per card. Beside the conversation the panel has a size: three buttons above Dot's
+computer make it **Compact** (its own 320 px), **Wide** (half of the page) or **Full** (the conversation at its narrowest,
+360 px, the rest for the panel), and the handle between the conversation and the panel drags it to any width between
+(the arrow keys move it a step, a double click gives it back its own width); the size is kept in the browser
+(`dot.computer.size`). While the panel is wider than its own width, the character stands at the head of the
+conversation with its name and its state word, staying in sight as the conversation scrolls, and the computer's view
+grows with the panel in its warm frame. The drawer of a narrow page has one width. **Dot's computer**, at the top of
+that panel while a run is going on, shows the page of the run's browser as Chrome paints it (`GET /api/runs/{id}/screencast`, Chrome's own screencast,
 sent only while the view is open; a tab that does not change sends nothing). The view starts by itself at the run's
 first browser step and says, until then, that the run has not opened a page; **Watch** and **Close the view** open
-and close it by hand; once the run has ended the card keeps the last screen and Watch goes. A pill under it says who has the browser. Since that view shows the page, Dot's own Chrome stays
+and close it by hand; once the run has ended the card keeps the last screen and Watch goes. A pill under it says who has the browser ("Dot has
+control", or the agent's name). Since that view shows the page, Dot's own Chrome stays
 in the background while a run works (`[browser] raise_window`, off by default, item 97): the app you were in gets the
 focus back right after Chrome starts, and switching tabs does not raise the window; Settings › Browser has the switch
 "Bring Chrome to the front while working" for the other way round. **Take over**

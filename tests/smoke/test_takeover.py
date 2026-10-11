@@ -281,6 +281,69 @@ async def test_a_takeover_holds_the_run_until_the_handback_and_the_waiting_call_
     assert final.json()["held"] is False
 
 
+_BOX_WIDTH: str = "(node) => node.getBoundingClientRect().width"
+# The handle's column between the conversation and the panel, the panel's own width, the narrowest conversation.
+_HANDLE_PX: float = 28
+_COMPACT_PX: float = 320
+_CHAT_MIN_PX: float = 360
+
+
+async def _width(page: Page, selector: str) -> float:
+    return float(await page.locator(selector).evaluate(_BOX_WIDTH))
+
+
+async def _the_sizes_set_the_panel(page: Page, tmp_path: Path) -> None:
+    """Item 109: the sizes on Dot's computer set the panel's width, the handle drags it and the arrow keys step it, the
+    width is kept over a reload, a double click gives the panel back its own width, and a panel wider than its own
+    puts the run's character at the head of the conversation."""
+    layout: Locator = page.locator(".run-layout")
+    sizes: Locator = page.locator("section.computer .stage-sizes")
+    await expect(sizes.get_by_role("button", name="Compact")).to_have_attribute("aria-pressed", "true")
+    assert abs(await _width(page, ".inspector") - _COMPACT_PX) <= 1
+    await expect(page.locator(".inspector .character-card .character-name")).to_have_text("Dot")
+    await sizes.get_by_role("button", name="Wide").click()
+    await expect(layout).to_have_attribute("data-stage", "wide")
+    await expect(sizes.get_by_role("button", name="Wide")).to_have_attribute("aria-pressed", "true")
+    half: float = (await _width(page, ".run-layout") - _HANDLE_PX) / 2
+    assert abs(await _width(page, ".inspector") - half) <= 2, half
+    head: Locator = page.locator(".run-chat-head .character-card")
+    await expect(head).to_be_visible()
+    await expect(head.locator(".character-name")).to_have_text("Dot")
+    await expect(head.locator(".character-word")).not_to_be_empty()
+    await page.screenshot(path=str(tmp_path / "computer-1280-wide.png"), animations="disabled")
+    await sizes.get_by_role("button", name="Full").click()
+    await expect(layout).to_have_attribute("data-stage", "full")
+    await expect(sizes.get_by_role("button", name="Full")).to_have_attribute("aria-pressed", "true")
+    assert abs(await _width(page, ".run-main") - _CHAT_MIN_PX) <= 1
+    await page.screenshot(path=str(tmp_path / "computer-1280-full.png"), animations="disabled")
+    # Dragged 200 px to the right, the panel narrows by as much; the width is kept over a reload.
+    handle: Locator = page.locator(".stage-handle")
+    box = await handle.bounding_box()
+    assert box is not None
+    before: float = await _width(page, ".inspector")
+    x: float = box["x"] + box["width"] / 2
+    y: float = box["y"] + box["height"] / 2
+    await page.mouse.move(x, y)
+    await page.mouse.down()
+    await page.mouse.move(x + 200, y, steps=8)
+    await page.mouse.up()
+    await expect(layout).to_have_attribute("data-stage", "custom")
+    dragged: float = await _width(page, ".inspector")
+    assert abs(dragged - (before - 200)) <= 2, (before, dragged)
+    await page.reload()
+    await expect(layout).to_have_attribute("data-stage", "custom")
+    assert abs(await _width(page, ".inspector") - dragged) <= 2
+    # The left arrow widens the panel a step; a double click gives it back its own width and the character its place.
+    await handle.focus()
+    await page.keyboard.press("ArrowLeft")
+    assert abs(await _width(page, ".inspector") - (dragged + 32)) <= 2
+    await handle.dblclick()
+    await expect(layout).to_have_attribute("data-stage", "compact")
+    assert abs(await _width(page, ".inspector") - _COMPACT_PX) <= 1
+    await expect(page.locator(".run-chat-head")).to_be_hidden()
+    await expect(page.locator(".inspector .character-card")).to_be_visible()
+
+
 async def test_the_run_page_shows_the_computer_card_with_the_pill_wide_and_on_a_phone_in_both_looks(
     runtime: Runtime, manager: RunManager, client: httpx.AsyncClient, tmp_path: Path
 ) -> None:
@@ -319,6 +382,16 @@ async def test_the_run_page_shows_the_computer_card_with_the_pill_wide_and_on_a_
                 await card.get_by_role("button", name="Watch").click()
                 await expect(card.get_by_role("button", name="Close the view")).to_be_visible()
                 await page.screenshot(path=str(tmp_path / f"computer-{width}-{scheme}.png"))
+                if width < 960:
+                    # The drawer of a narrow page has one width: no sizes there.
+                    await expect(card.locator(".stage-sizes")).to_be_hidden()
+                elif scheme == "light":
+                    await _the_sizes_set_the_panel(page, tmp_path)
+                else:
+                    await card.locator(".stage-sizes").get_by_role("button", name="Wide").click()
+                    await page.screenshot(
+                        path=str(tmp_path / f"computer-{width}-{scheme}-wide.png"), animations="disabled"
+                    )
                 await page.close()
             page = await browser.new_page(viewport={"width": 1280, "height": 900})
             await page.goto(ui_url(host, port, TOKEN))

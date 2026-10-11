@@ -15,11 +15,109 @@
   display: block;
 }
 
+/* Beside the conversation the panel has its own 320 px, with the handle (item 109) in the 28 px between them. */
 .run-layout[data-inspector="on"] {
+  --chat-w: minmax(0, 1fr);
+  --panel-w: 320px;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 320px;
-  gap: 28px;
+  grid-template-columns: var(--chat-w) 28px var(--panel-w);
   align-items: start;
+}
+
+/* The panel's width (item 109, stagesize.js): half of the page, the conversation at its narrowest, or as dragged; never
+   under its own 320 px, and the conversation never under 360. */
+.run-layout[data-inspector="on"][data-stage="wide"] {
+  --panel-w: minmax(320px, 1fr);
+}
+
+.run-layout[data-inspector="on"][data-stage="full"] {
+  --chat-w: 360px;
+  --panel-w: minmax(320px, 1fr);
+}
+
+.run-layout[data-inspector="on"][data-stage="custom"] {
+  --panel-w: clamp(320px, var(--stage-px), calc(100% - 388px));
+}
+
+/* A panel wider than its own width takes the page: the frame lets go of its reading width. */
+.page[data-layout="run"]:has(.run-layout[data-inspector="on"]:not([data-stage="compact"])) {
+  max-width: none;
+}
+
+/* The handle between the conversation and the panel: a grip that grows under the pointer; dragged it sets the panel's
+   width, the arrow keys move it a step, a double click gives the panel back its own. It stays in sight with the panel. */
+.stage-handle {
+  display: none;
+}
+
+.run-layout[data-inspector="on"] > .stage-handle {
+  position: sticky;
+  top: calc(var(--stagebar-h) + 12px);
+  display: grid;
+  place-items: center;
+  height: calc(100vh - var(--stagebar-h) - 24px);
+  height: calc(100dvh - var(--stagebar-h) - 24px);
+  cursor: col-resize;
+  touch-action: none;
+}
+
+.stage-handle::before {
+  content: "";
+  width: 4px;
+  height: 48px;
+  border-radius: var(--radius-pill);
+  background: var(--border);
+  transition:
+    height var(--motion-quick) var(--ease),
+    background-color var(--motion-quick) var(--ease);
+}
+
+.stage-handle:hover::before,
+.stage-handle[data-dragging="true"]::before {
+  height: 96px;
+  background: var(--border-strong);
+}
+
+.stage-handle:focus-visible {
+  outline: none;
+}
+
+.stage-handle:focus-visible::before {
+  height: 96px;
+  background: var(--accent);
+}
+
+/* At the head of the conversation while the panel is wider than its own width: the run's character at 64 px beside
+   its name and the word of its state, in a card that stays under the top bar as the conversation scrolls, on a band of
+   the page's ground that fades out below it, so the turns pass under the band instead of around the card. */
+.run-chat-head {
+  position: sticky;
+  top: var(--stagebar-h);
+  z-index: 3;
+  padding: 8px 0 16px;
+  background: linear-gradient(var(--bg) 70%, transparent);
+}
+
+.run-chat-head .character-card {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  padding: 4px 20px 4px 4px;
+  box-shadow: var(--shadow-raised);
+}
+
+.run-chat-head .character-card .character-stage {
+  padding: 0;
+}
+
+.run-chat-head .character-card .character {
+  width: 64px;
+  height: 64px;
+}
+
+.run-chat-head .character-card .character-caption {
+  align-items: flex-start;
+  padding: 0;
 }
 
 /* The conversation keeps one reading width, centred in the room the panel leaves it. */
@@ -232,6 +330,45 @@
   padding: 12px;
   border-radius: var(--radius-control);
   background: var(--computer-backdrop);
+}
+
+/* A wide panel makes the view a stage: more of the warm frame around the page. */
+.run-layout[data-inspector="on"]:not([data-stage="compact"]) .computer-screen {
+  padding: 24px;
+  border-radius: var(--radius);
+}
+
+/* Above the view: the page's address and the sizes; the sizes are the docked panel's, the drawer has one width. */
+.computer-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 28px;
+}
+
+.computer-toolbar .computer-url {
+  flex: 1;
+  min-width: 0;
+}
+
+.stage-sizes {
+  display: flex;
+  margin-left: auto;
+}
+
+.stage-sizes .btn {
+  width: 28px;
+  min-height: 28px;
+  color: var(--muted);
+}
+
+.stage-sizes .btn[aria-pressed="true"] {
+  background: var(--surface-3);
+  color: var(--text);
+}
+
+.inspector[data-mode="drawer"] .stage-sizes {
+  display: none;
 }
 
 .computer-screen .hint {
