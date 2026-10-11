@@ -3640,8 +3640,8 @@ closed pages) then; 58 (the bill on the run page) last, since it shows 53's numb
 | #   | Item                                                                     | Status  | Commits |
 | --- | ------------------------------------------------------------------------ | ------- | ------- |
 | 53  | The numbers of a long run                                                | done    | 4967717 |
-| 54  | Long browser tasks in the eval set                                       | in progress |         |
-| 55  | Context that stays: a compaction every forty steps, not seven            | planned |         |
+| 54  | Long browser tasks in the eval set                                       | done    | 7df5799 |
+| 55  | Context that stays: a compaction every forty steps, not seven            | in progress |         |
 | 56  | The web without guessing                                                 | planned |         |
 | 57  | The browser's closed pages                                               | planned |         |
 | 58  | The bill of a run, on its page                                           | planned |         |
@@ -3754,6 +3754,8 @@ same path with a model instead of the script; the owner's paid run); the report 
 
 ### 55. Context that stays: a compaction every forty steps, not seven
 
+**Status: done.** Built on `item-55-context` (MYP-195).
+
 **What.** A long run on a model with a large window compacts rarely, and a compaction costs a tenth of what it does
 now. Targets, read with item 53 on the long tasks and on the owner's next runs: compactions per 100 steps under 5
 (from 12.6 over the owner's DeepSeek runs, 13.8 on the longest), the summaries' share of model seconds under 10 %
@@ -3773,11 +3775,43 @@ shrink earlier: `shrink_old_tool_results` at the soft limit keeps `keep_recent_t
 12,000 characters; the number and the size scale with the budget as `tool_output_chars` already does. The check of a
 summary (`check_continuity`) stays; its failures are counted by 53.
 
-**Touchpoints.** `agent/loop.py` (`_compact`, the budget shares), `agent/scaffold.py`, `agent/continuity.py`,
-`defaults.toml`, `config.py`, README "How a run works" (compaction), `tests/unit/test_compaction*.py`.
+**Design, as built.** The measurement came first, with the instrument of `tests/smoke/test_scaffold.py` (a scripted
+model that reports the loop's own estimate as its usage, so the budget arithmetic is exact): a run of 40 turns of
+three `read_file` calls each, every result 12,000 characters, the shape of a browser run's multi-action steps, played
+once per arm with the module constants set for the arm (`/tmp/dot_ctx.py` on the Mac that measured, not committed).
+At the budget of 48,000: 41 steps, 2 compactions (4.9 per 100 steps), 13 k tokens to the summariser each, a mean step
+of 40 k tokens; the room left after a compaction (`_COMPACTED_SHARE` 0.85 against 0.70) and a shorter transcript for
+the summariser (120,000 against 80,000 characters) changed none of the three numbers, because what fills the budget
+between compactions is the stale tool results already cut to 700 characters, not the tail a compaction keeps, and the
+transcript sent to the summariser was 13 k tokens, far under its cap. At a budget of 96,000: no compaction in the same
+41 steps, a mean step of 50 k tokens (+25 %), the largest 63 k. So the two moves the plan called (2) and (3) were
+dropped as measured no-ops, and the item is the budget (decision 33) and one cost of a compaction the instrument did
+not reach but the owner's runs did: the summary's size.
 
-**Done when.** The three numbers on the long tasks before and after each move are in this item and decision 33; the
-defaults that win are set; the owner's next long run is read with `dotx stats --run` and logged.
+(1) `[agent] context_tokens` is 96,000 (was 48,000); the rule that a smaller window gives three quarters of itself
+stands, so a local model with a 65 k window keeps its 49 k budget and only models that can hold more get more. For
+Ollama the window is the smaller of the model's own and the `num_ctx` sent with each request, and `num_ctx = 65536`
+is right for a model on this Mac (it sets the memory of its cache), so a cloud model (a name ending in `:cloud`, run on
+Ollama's servers) now gets `[providers.ollama] num_ctx_cloud = 262144` (`num_ctx_for(model, config)` in
+`llm/ollama.py`, used for the request and for the window `/api/show` is read against): the owner's
+`deepseek-v4.1-flash:cloud` (1,048,576) and `glm-5.3-flash:cloud` get the 96 k budget, `minimax-m2.7:cloud` (196,608)
+and `gpt-oss:20b-cloud` (131,072) too, a local 65 k model stays as it was. (2) A summary is asked for in at most 1,500
+words (`_SUMMARY_MAX_WORDS`), where the budget's tenth allowed 3,600 at 48 k and would have allowed 7,200 at 96 k: a
+longer summary costs the fast model's output seconds at every compaction and sits in the note every later step
+carries. The trade of (1) is written into `defaults.toml` and the README: a wider budget means fewer summaries and more
+input tokens a step (up to twice; +25 % in the instrument), so an owner on a metered key who weighs tokens over
+summaries sets `context_tokens = 48000` back. Not changed: `keep_recent_tool_results`, `_COMPACTED_SHARE`, the
+transcript cap, the shrink to 700 characters (measured no-ops here). The live numbers are the owner's: the next long
+run on the restarted daemon, read with `dotx stats --run ID`, against the baseline in item 53 (13.8 compactions per
+100 steps, 53 % of the model seconds on the longest run).
+
+**Touchpoints.** `agent/loop.py` (`_SUMMARY_MAX_WORDS`), `defaults.toml`, `config.py` (`OllamaConfig.num_ctx_cloud`),
+`llm/ollama.py` (`num_ctx_for`), README "How a run works" and "Models and providers", `tests/unit/test_scaffold.py`,
+`tests/smoke/test_scaffold.py`.
+
+**Done when.** The numbers of the instrument before and after each move are in this item and decision 33 (done); the
+defaults that win are set (done: the budget and the cloud window; the no-ops left alone); the owner's next long run is
+read with `dotx stats --run` and logged (the owner's run, after the daemon restart).
 
 ### 56. The web without guessing
 
@@ -4024,6 +4058,11 @@ rows carry minutes and tokens.
     (minimax-m2.7), 131,072 (gpt-oss:20b) and 1,048,576 (deepseek-v4.1-flash, glm-5.3-flash). A wider budget means
     fewer summaries and more tokens a step; the right number is measured in item 55 on the long tasks and on the
     owner's own runs, and the owner's `config.toml` is set to the winner at their standing word. Open until item 55.
+    Decided on 2026-10-11 by the measurement in item 55: the budget is 96,000 and a cloud model of Ollama is asked
+    for a 262,144 window (`num_ctx_cloud`), so the owner's models get the 96 k budget without a change to their
+    `config.toml`; a local model keeps three quarters of its own window. In the instrument the wider budget took the
+    compactions of a 41-step run from 2 to 0 at +25 % input tokens a step; the owner's next long run is the live
+    number. The room after a compaction and the summariser's transcript were measured and left alone.
 
 ## Log
 
@@ -4460,3 +4499,5 @@ rows carry minutes and tokens.
   pages, the bill on the run page) and decision 33 (the context budget, measured in 55). Next: item 53.
 - 2026-10-11 (Fable 5.1): item 53 merged 4967717 (PR #57, MYP-193 Done; gate + desktop jobs green). The baseline of the
   owner's runs is in the item. Next: item 54 (long browser tasks in the eval set).
+- 2026-10-11 (Fable 5.1): item 54 merged 7df5799 (PR #58, MYP-194 Done; gate + desktop jobs green, `dotx eval check` plays the
+  two site tasks in CI). Next: item 55 (context that stays; decision 33).

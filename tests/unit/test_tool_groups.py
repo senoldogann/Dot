@@ -197,7 +197,7 @@ def test_auto_groups_the_tools_of_a_weak_model_and_of_a_window_that_cut_the_budg
         "grouped",
         '[agent] tool_surface is "auto" and the model\'s window cut the context budget to 18,000 tokens',
     )
-    assert surface_for(AUTO, _scaffold("standard", 48_000))[0] == "full"
+    assert surface_for(AUTO, _scaffold("standard", 96_000))[0] == "full"
 
 
 def _outcome(call_id: str, name: str, arguments: JsonObject, result: ToolResult) -> ToolOutcome:

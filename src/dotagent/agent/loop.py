@@ -193,6 +193,9 @@ _SUMMARY_ATTEMPTS: int = 3
 _QUERY_EARLIER_RUNS: int = 3
 _SOFT_LIMIT_SHARE: float = 0.6
 _SUMMARY_TRANSCRIPT_CHARS: int = 120_000
+# A summary is never asked for in more words than this, whatever the budget: a longer one costs the writer's seconds
+# at every compaction and fills the note that every later step carries (item 55).
+_SUMMARY_MAX_WORDS: int = 1500
 # A summary may take this share of the run's context budget. Each compaction summarises the previous summary again, so
 # without a limit the summary grows until it alone fills the budget and every step compacts.
 _SUMMARY_SHARE: float = 0.1
@@ -328,7 +331,7 @@ async def _model_summary(
     their whole answer on thinking); a summary far over its word limit is asked again too. A provider error or a
     timeout ends the attempts at once, as the provider already retried what can be retried.
     """
-    max_words: int = round(context_tokens * _SUMMARY_SHARE * _WORDS_PER_TOKEN)
+    max_words: int = min(_SUMMARY_MAX_WORDS, round(context_tokens * _SUMMARY_SHARE * _WORDS_PER_TOKEN))
     prompt: str = _SUMMARY_PROMPT.format(max_words=max_words)
     problem: str | None = None
     for attempt in range(1, _SUMMARY_ATTEMPTS + 1):

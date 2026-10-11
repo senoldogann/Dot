@@ -239,8 +239,8 @@ async def test_a_small_window_cuts_the_budget_and_the_tool_output_and_the_run_co
     small: Played = await _play(_config({}, 6), login_env, 26_000, turns)
     roomy: Played = await _play(_config({}, 6), login_env, None, turns)
 
-    assert small.scaffolds == (_scaffold(26_000, 19_500, 4875, True),)
-    assert roomy.scaffolds == (_scaffold(None, 48_000, 12_000, False),)
+    assert small.scaffolds == (_scaffold(26_000, 19_500, 2438, True),)
+    assert roomy.scaffolds == (_scaffold(None, 96_000, 12_000, False),)
     assert (small.record.status, roomy.record.status) == ("done", "done")
 
     small_pages: list[str] = _pages(small)
@@ -250,7 +250,7 @@ async def test_a_small_window_cuts_the_budget_and_the_tool_output_and_the_run_co
     for page in [*small_pages, *roomy_pages]:
         assert "chars omitted" not in page
         assert page.endswith("to continue]")
-    assert max(len(page) for page in small_pages) <= 4875 < min(len(page) for page in roomy_pages)
+    assert max(len(page) for page in small_pages) <= 2438 < min(len(page) for page in roomy_pages)
 
     # The small budget is kept by compacting with summaries of the fast model; the large one is never reached.
     assert len(small.compactions) > 1
