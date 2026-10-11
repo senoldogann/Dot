@@ -16,6 +16,7 @@ from dotagent.memory.service import (
     SavedMemory,
     forget_memory,
     recall,
+    resting,
     save_memory,
     update_memory_note,
 )
@@ -116,8 +117,12 @@ def memories_router(ctx: ServerContext) -> APIRouter:
 
     @router.get("/memories")
     async def list_memories(query: Annotated[MemoriesQuery, Query()]) -> MemoryPage:
+        items: list[MemoryRecord] = await index.store.list_memories(query.limit, query.offset)
+        now: float = time.time()
         return MemoryPage(
-            total=await index.store.count_memories(), items=await index.store.list_memories(query.limit, query.offset)
+            total=await index.store.count_memories(),
+            items=items,
+            resting=[record.id for record in items if resting(record, now, index.config.rest_days)],
         )
 
     @router.get("/memories/search")

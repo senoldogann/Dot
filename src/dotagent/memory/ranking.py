@@ -1,17 +1,22 @@
-"""Ranking helpers for the notes: cosine similarity over unit vectors and reciprocal rank fusion. All pure."""
+"""Ranking helpers for the notes: cosine similarity over unit vectors, reciprocal rank fusion, and the lift a note
+gets from having been used lately (item 71). All pure."""
 
 import heapq
 import math
-from collections.abc import Iterable, Sequence
+from collections.abc import Iterable, Mapping, Sequence
 
 from dotagent.core.errors import ProviderProtocolError, StoreError
 from dotagent.core.types import FrozenModel, JsonObject
+from dotagent.store.models import MemoryRecord
 
 type Vector = tuple[float, ...]
 
 # Reciprocal rank fusion: an item at rank r in a list scores 1 / (damping + r). 60 is the value of the original paper;
 # it keeps one list's first place from outweighing a second list's third place.
 _FUSION_DAMPING: int = 60
+# A note used a moment ago is lifted by as much as a second place in one list, so two rankers agreeing on a note no run
+# built on still beat one ranker and a recent use; the lift halves every half-life.
+_USE_LIFT: float = 1.0 / (_FUSION_DAMPING + 2)
 
 
 class Similar(FrozenModel):
@@ -48,11 +53,39 @@ def most_similar(query: Vector, stored: Iterable[tuple[str, Vector]], minimum: f
     return heapq.nlargest(limit, close, key=lambda item: item.similarity)
 
 
-def reciprocal_rank_fusion(rankings: Sequence[Sequence[str]], limit: int) -> list[str]:
-    """One best-first list out of several: an id scores in every ranking that has it; ties keep the order of first
-    appearance."""
+def fused_scores(rankings: Sequence[Sequence[str]]) -> dict[str, float]:
+    """The reciprocal rank fusion score of every id in ``rankings``, in the order of first appearance: an id scores in
+    every ranking that has it."""
     scores: dict[str, float] = {}
     for ranking in rankings:
         for rank, identifier in enumerate(ranking, start=1):
             scores[identifier] = scores.get(identifier, 0.0) + 1.0 / (_FUSION_DAMPING + rank)
+    return scores
+
+
+def reciprocal_rank_fusion(rankings: Sequence[Sequence[str]], limit: int) -> list[str]:
+    """One best-first list out of several (:func:`fused_scores`); ties keep the order of first appearance."""
+    scores: dict[str, float] = fused_scores(rankings)
     return sorted(scores, key=scores.__getitem__, reverse=True)[:limit]
+
+
+def use_lift(last_used_at: float | None, now: float, half_life_s: float) -> float:
+    """How much a note's last use lifts it, 0 to 1: 1 for a use at ``now`` (or later, by a clock that moved), halving
+    every ``half_life_s`` seconds, 0 for a note never handed to a run."""
+    if last_used_at is None:
+        return 0.0
+    return math.pow(0.5, max(0.0, now - last_used_at) / half_life_s)
+
+
+def ranked_by_use(
+    scores: Mapping[str, float], notes: Sequence[MemoryRecord], now: float, half_life_s: float, limit: int
+) -> list[MemoryRecord]:
+    """``notes`` best first, at most ``limit``: each note's fused score plus the lift of its last use
+    (:func:`use_lift`, worth a second place in one list at most) when the note is the agent's; the notes the user
+    wrote stand on their fused score alone. Ties keep the order of ``notes``."""
+
+    def score(note: MemoryRecord) -> float:
+        lift: float = 0.0 if note.source_run is None else use_lift(note.last_used_at, now, half_life_s) * _USE_LIFT
+        return scores.get(note.id, 0.0) + lift
+
+    return sorted(notes, key=score, reverse=True)[:limit]

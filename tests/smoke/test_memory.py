@@ -9,6 +9,8 @@ model calls. That model is multilingual: Turkish notes are found by meaning too.
 import asyncio
 import math
 import re
+import sqlite3
+import time
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -26,11 +28,13 @@ from dotagent.memory.embedder import OpenAIEmbedder, build_embedder, build_ollam
 from dotagent.memory.service import (
     MemoryHit,
     MemoryIndex,
+    SavedMemory,
     close_memory_index,
     open_memory_index,
     prompt_memories,
     recall,
     reindex,
+    resting,
     save_memory,
     sync_embedding_model,
 )
@@ -331,6 +335,50 @@ async def test_without_embeddings_only_the_words_are_searched(words_only: Memory
     assert [(hit.record.content, hit.similarity) for hit in hits] == [(DOG, None)]
     assert await recall(words_only, "pet", 5) == []
     assert await _best(words_only, "İstanbul") == CITY
+
+
+async def test_a_note_a_run_was_handed_lately_comes_before_one_no_run_built_on(words_only: MemoryIndex) -> None:
+    await save_memory(words_only, "The user's dog Biscuit eats at seven in the morning.", [], AGENT_RUN)
+    await save_memory(words_only, "The user's dog Biscuit sleeps in the kitchen at night.", [], AGENT_RUN)
+    before: list[str] = [hit.record.id for hit in await recall(words_only, "Biscuit", 5)]
+    assert len(before) == 2
+    await words_only.store.mark_memories_used([before[-1]], time.time())
+    after: list[str] = [hit.record.id for hit in await recall(words_only, "Biscuit", 5)]
+    assert after == [before[-1], before[0]]
+
+
+def _backdate(database: Path, memory_id: str, created_at: float) -> None:
+    """Make a note look as if an older daemon had written it."""
+    connection: sqlite3.Connection = sqlite3.connect(database)
+    try:
+        connection.execute(
+            "UPDATE memories SET created_at = ?, updated_at = ? WHERE id = ?", (created_at, created_at, memory_id)
+        )
+        connection.commit()
+    finally:
+        connection.close()
+
+
+async def test_an_agent_note_no_run_was_handed_for_long_rests_while_the_users_notes_never_do(
+    words_only: MemoryIndex, tmp_path: Path
+) -> None:
+    old_agent: SavedMemory = await save_memory(words_only, DOG, [], AGENT_RUN)
+    old_user: SavedMemory = await save_memory(words_only, CITY, [], None)
+    long_ago: float = time.time() - (words_only.config.rest_days + 1) * 86400.0
+    _backdate(tmp_path / "dot.db", old_agent.record.id, long_ago)
+    _backdate(tmp_path / "dot.db", old_user.record.id, long_ago)
+    given: list[str] = [
+        record.content for record in await prompt_memories(words_only, "Take Biscuit the dog to the vet.")
+    ]
+    assert given == [CITY]
+    # A search still finds the resting note, and it is listed as resting.
+    assert [hit.record.content for hit in await recall(words_only, "Biscuit", 5)] == [DOG]
+    now: float = time.time()
+    assert [
+        record.id
+        for record in await words_only.store.list_memories(10, 0)
+        if resting(record, now, words_only.config.rest_days)
+    ] == [old_agent.record.id]
 
 
 async def test_a_word_found_in_most_notes_does_not_make_a_match(words_only: MemoryIndex) -> None:

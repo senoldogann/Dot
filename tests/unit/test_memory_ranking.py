@@ -6,8 +6,40 @@ import pytest
 
 from dotagent.core.errors import ProviderProtocolError, StoreError
 from dotagent.memory.embedder import parse_embeddings, parse_openai_embeddings
-from dotagent.memory.ranking import Similar, most_similar, reciprocal_rank_fusion, unit_vector
-from dotagent.memory.service import normalize_tags, normalize_text
+from dotagent.memory.ranking import (
+    Similar,
+    fused_scores,
+    most_similar,
+    ranked_by_use,
+    reciprocal_rank_fusion,
+    unit_vector,
+    use_lift,
+)
+from dotagent.memory.service import normalize_tags, normalize_text, resting
+from dotagent.store.models import MemoryRecord
+
+DAY_S: float = 86400.0
+NOW: float = 1_000_000_000.0
+
+
+def _note(
+    identifier: str,
+    source_run: str | None,
+    created_at: float,
+    used: int,
+    last_used_at: float | None,
+    tags: tuple[str, ...],
+) -> MemoryRecord:
+    return MemoryRecord(
+        id=identifier,
+        content=f"Note {identifier} says something of twenty characters.",
+        tags=tags,
+        created_at=created_at,
+        updated_at=created_at,
+        source_run=source_run,
+        used_count=used,
+        last_used_at=last_used_at,
+    )
 
 
 def test_unit_vector_has_length_one() -> None:
@@ -48,6 +80,46 @@ def test_fusion_rewards_agreement_between_rankings() -> None:
     assert reciprocal_rank_fusion([["a", "b", "c"]], 10) == ["a", "b", "c"]
     assert reciprocal_rank_fusion([], 10) == []
     assert reciprocal_rank_fusion([[], []], 10) == []
+
+
+def test_fused_scores_add_up_over_the_rankings_in_order_of_first_appearance() -> None:
+    assert fused_scores([["a", "b"], ["c", "b"]]) == {"a": 1 / 61, "b": 1 / 62 + 1 / 62, "c": 1 / 61}
+    assert fused_scores([]) == {}
+
+
+def test_the_lift_of_a_use_is_one_now_halves_every_half_life_and_is_nothing_for_a_note_never_used() -> None:
+    assert use_lift(None, NOW, 30 * DAY_S) == 0.0
+    assert use_lift(NOW, NOW, 30 * DAY_S) == 1.0
+    assert use_lift(NOW + DAY_S, NOW, 30 * DAY_S) == 1.0
+    assert use_lift(NOW - 30 * DAY_S, NOW, 30 * DAY_S) == pytest.approx(0.5)
+    assert use_lift(NOW - 60 * DAY_S, NOW, 30 * DAY_S) == pytest.approx(0.25)
+
+
+def test_a_used_agent_note_overtakes_an_unused_one_of_the_same_score_but_not_two_rankers_agreeing() -> None:
+    scores: dict[str, float] = fused_scores([["unused", "used", "agreed"], ["agreed", "yours"]])
+    unused: MemoryRecord = _note("unused", "run_1", NOW - DAY_S, 0, None, ())
+    used: MemoryRecord = _note("used", "run_1", NOW - DAY_S, 3, NOW - 3600.0, ())
+    agreed: MemoryRecord = _note("agreed", "run_1", NOW - DAY_S, 0, None, ())
+    yours: MemoryRecord = _note("yours", None, NOW - DAY_S, 5, NOW, ())
+    ranked: list[str] = [note.id for note in ranked_by_use(scores, [unused, used, agreed, yours], NOW, 30 * DAY_S, 10)]
+    # agreed: third in one list and first in the other; used: second in one list plus a lift worth a second place.
+    assert ranked == ["agreed", "used", "unused", "yours"]
+    # The user's note stands on its fused score alone: used today, it is not lifted over an agent note it tied with.
+    tied: dict[str, float] = fused_scores([["yours", "used"], ["used", "yours"]])
+    assert [note.id for note in ranked_by_use(tied, [yours, used], NOW, 30 * DAY_S, 10)] == ["used", "yours"]
+    assert [note.id for note in ranked_by_use(scores, [unused, used, agreed, yours], NOW, 30 * DAY_S, 2)] == [
+        "agreed",
+        "used",
+    ]
+
+
+def test_an_agent_note_no_run_was_handed_for_rest_days_rests_and_the_users_and_core_notes_never_do() -> None:
+    assert resting(_note("old", "run_1", NOW - 91 * DAY_S, 0, None, ()), NOW, 90)
+    assert not resting(_note("young", "run_1", NOW - 89 * DAY_S, 0, None, ()), NOW, 90)
+    assert not resting(_note("used", "run_1", NOW - 400 * DAY_S, 1, NOW - 200 * DAY_S, ()), NOW, 90)
+    assert resting(_note("retired", "run_1", NOW - DAY_S, 7, NOW, ("lesson", "rest")), NOW, 90)
+    assert not resting(_note("yours", None, NOW - 400 * DAY_S, 0, None, ()), NOW, 90)
+    assert not resting(_note("standing", "run_1", NOW - 400 * DAY_S, 0, None, ("core",)), NOW, 90)
 
 
 def test_text_is_one_line() -> None:

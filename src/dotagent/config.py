@@ -260,6 +260,10 @@ class MemoryConfig(FrozenModel):
     inject_min_similarity: float
     similar_threshold: float
     max_chars: int
+    # After how many days without a run being handed it an agent's note rests (not handed to a run on its own), and
+    # the half-life of the lift a note's last use gives it in a search.
+    rest_days: int = Field(ge=1)
+    use_half_life_days: float = Field(gt=0, allow_inf_nan=False)
 
 
 class ShellConfig(FrozenModel):

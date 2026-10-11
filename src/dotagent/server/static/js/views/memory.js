@@ -152,6 +152,9 @@ export function mount(root, ctx) {
   let hits = [];
   let total = 0;
   let shownQuery = "";
+  // The ids of the listed notes that rest: no run was handed them for [memory] rest_days, or the reflection retired
+  // them. They are listed apart; a search still finds them.
+  let resting = new Set();
 
   const content = el("textarea", {
     class: "textarea",
@@ -183,7 +186,24 @@ export function mount(root, ctx) {
         : `${plural(hits.length, "result", "results")} for “${clip(shownQuery, 40)}”`;
     more.hidden = shownQuery !== "" || hits.length >= total;
     if (hits.length > 0) {
-      holder.replaceChildren(el("div", { class: "card" }, hits.map((hit) => memoryRow(hit, rowActions))));
+      const awake = hits.filter((hit) => !resting.has(hit.record.id));
+      const asleep = hits.filter((hit) => resting.has(hit.record.id));
+      const parts = [];
+      if (awake.length > 0) {
+        parts.push(el("div", { class: "card" }, awake.map((hit) => memoryRow(hit, rowActions))));
+      }
+      if (asleep.length > 0) {
+        parts.push(
+          el(
+            "div",
+            { class: "row section-head", dataset: { resting: "" } },
+            el("div", { class: "section-label grow" }, "Resting"),
+            el("span", { class: "hint" }, "No run was handed these lately; a search still finds them, runs no longer start with them."),
+          ),
+          el("div", { class: "card" }, asleep.map((hit) => memoryRow(hit, rowActions))),
+        );
+      }
+      holder.replaceChildren(...parts);
     } else if (shownQuery === "") {
       holder.replaceChildren(emptyPanel("database", "Nothing remembered yet", "Add a note above, or ask Dot to remember something during a run."));
     } else {
@@ -202,6 +222,7 @@ export function mount(root, ctx) {
         }
         hits = page.items.map((record) => ({ record, similarity: null }));
         total = page.total;
+        resting = new Set(page.resting);
       } else {
         const found = await api.get(`/memories/search${query({ q: text, limit: SEARCH_LIMIT })}`);
         if (disposed || mine !== ticket) {
@@ -209,6 +230,7 @@ export function mount(root, ctx) {
         }
         hits = found;
         total = found.length;
+        resting = new Set();
       }
       shownQuery = text;
       paint();
@@ -238,6 +260,7 @@ export function mount(root, ctx) {
       }
       hits = [...hits, ...page.items.map((record) => ({ record, similarity: null }))];
       total = page.total;
+      resting = new Set([...resting, ...page.resting]);
       paint();
     } finally {
       more.disabled = false;

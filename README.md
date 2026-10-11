@@ -1170,6 +1170,11 @@ dotx memory reindex      # embed every note again, for example after changing [m
 - A note tagged `core` goes into every run (at most `core_limit` of them), and so does a note you wrote yourself (at
   most `user_limit`), together with up to `inject_top_k` other notes that are close enough to the goal and the earlier
   goals of the conversation (`inject_min_similarity`).
+- Use decides what is recalled: a note handed to a run counts as used, and a search lifts the agent's notes a run was
+  handed lately (a use a moment ago is worth a second place in one ranking; the lift halves every `use_half_life_days`,
+  30), so the notes that help overtake the ones first written. An agent's note that no run was handed for `rest_days`
+  (90) rests: the Memory page lists it under "Resting", a search still finds it, but runs no longer start with it on
+  its own. Your notes and the `core` ones never rest.
 - A note saved or changed while a run works reaches that run at its next step.
 - Two tags are the nightly reflection's: `journal` on the day's note, `rest` on a lesson no run was handed for sixty
   days, which searches skip (the list and the page still show it; take the tag off to wake it).

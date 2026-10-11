@@ -464,6 +464,12 @@ inject_min_similarity = 0.55
 # A new note this close to an existing one is reported to the model, which decides whether the old one is outdated.
 similar_threshold = 0.85
 max_chars = 600
+# A search lifts the agent's notes that a run was handed lately (a use a moment ago is worth a first place; the lift
+# halves every use_half_life_days), so the notes that help overtake the ones first written. An agent's note that no run
+# was handed for rest_days rests: the Memory page lists it under "Resting", a search still finds it, but it is no longer
+# handed to a run on its own. Your notes and the standing ones (core) never rest.
+rest_days = 90
+use_half_life_days = 30
 
 [scheduler]
 # IANA name ("Europe/Helsinki") of the zone that cron expressions and one-time moments are read in; "" = the zone the

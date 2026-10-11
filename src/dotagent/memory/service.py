@@ -12,6 +12,7 @@ the notes that have no vector, so a search always covers every note.
 """
 
 import re
+import time
 from collections.abc import Sequence
 from dataclasses import dataclass
 
@@ -19,7 +20,7 @@ from dotagent.config import AppConfig, MemoryConfig
 from dotagent.core.errors import InvalidValueError
 from dotagent.core.types import FrozenModel
 from dotagent.memory.embedder import Embedder, build_embedder
-from dotagent.memory.ranking import Similar, Vector, most_similar, reciprocal_rank_fusion
+from dotagent.memory.ranking import Similar, Vector, fused_scores, most_similar, ranked_by_use
 from dotagent.memory.words import lowercase, search_terms
 from dotagent.store.db import Store
 from dotagent.store.models import MemoryRecord
@@ -181,8 +182,21 @@ async def _distinctive_terms(store: Store, terms: tuple[str, ...], total: int) -
     return tuple(term for term in terms if counts[term] <= total * _MAX_NOTE_SHARE)
 
 
+def resting(record: MemoryRecord, now: float, rest_days: int) -> bool:
+    """Whether a note rests: it is the agent's (the user's notes and the standing ones never rest) and either the
+    reflection retired it (tagged ``rest``) or no run was handed it in ``rest_days`` days since it was written. A
+    resting note is not handed to a run on its own; a search still finds it unless it was retired."""
+    if record.source_run is None or CORE_TAG in record.tags:
+        return False
+    if REST_TAG in record.tags:
+        return True
+    return record.used_count == 0 and record.created_at < now - rest_days * 86400.0
+
+
 async def recall(index: MemoryIndex, query: str, limit: int) -> list[MemoryHit]:
-    """The ``limit`` notes that best fit ``query``, best first; a note that rests (tagged ``rest``) is never one."""
+    """The ``limit`` notes that best fit ``query``, best first: the fusion of the two rankers, with the agent's notes
+    lifted by how lately a run was handed them (:func:`dotagent.memory.ranking.ranked_by_use`, half-life
+    ``[memory] use_half_life_days``). A note the reflection retired (tagged ``rest``) is never one."""
     text: str = normalize_text(query)[:_QUERY_CHARS]
     total: int = await index.store.count_memories()
     if not text or limit <= 0 or total == 0:
@@ -199,12 +213,14 @@ async def recall(index: MemoryIndex, query: str, limit: int) -> list[MemoryHit]:
         )
         rankings.append([item.id for item in close])
         similarities = {item.id: item.similarity for item in close}
-    records: list[MemoryRecord] = await index.store.get_memories(reciprocal_rank_fusion(rankings, limit))
-    return [
-        MemoryHit(record=record, similarity=similarities.get(record.id))
-        for record in records
-        if REST_TAG not in record.tags
+    scores: dict[str, float] = fused_scores(rankings)
+    candidates: list[MemoryRecord] = [
+        record for record in await index.store.get_memories(list(scores)) if REST_TAG not in record.tags
     ]
+    ranked: list[MemoryRecord] = ranked_by_use(
+        scores, candidates, time.time(), config.use_half_life_days * 86400.0, limit
+    )
+    return [MemoryHit(record=record, similarity=similarities.get(record.id)) for record in ranked]
 
 
 def _closest_first(notes: Sequence[MemoryRecord], similarities: dict[str, float], limit: int) -> list[MemoryRecord]:
@@ -218,10 +234,10 @@ def _closest_first(notes: Sequence[MemoryRecord], similarities: dict[str, float]
 async def prompt_memories(index: MemoryIndex, query: str) -> list[MemoryRecord]:
     """The notes a run starts with, without repeats: the standing ones (tagged ``core``), the ones the user wrote
     (all of them up to ``user_limit``, past that the ones closest to ``query``) and the agent's notes related to
-    ``query`` (the goal and the earlier goals of its thread).
+    ``query`` (the goal and the earlier goals of its thread) that do not rest (:func:`resting`).
 
     A goal is full of everyday words that match unrelated notes, so when embeddings are on only the notes whose
-    meaning clearly fits the query are taken; ``memory_search`` still finds the others."""
+    meaning clearly fits the query are taken; ``memory_search`` still finds the others, and the resting ones."""
     config: MemoryConfig = index.config
     standing: list[MemoryRecord] = (
         await index.store.memories_with_tag(CORE_TAG, config.core_limit) if config.core_limit > 0 else []
@@ -243,7 +259,10 @@ async def prompt_memories(index: MemoryIndex, query: str) -> list[MemoryRecord]:
             hit for hit in candidates if hit.similarity is not None and hit.similarity >= config.inject_min_similarity
         ]
     )
-    fresh: list[MemoryRecord] = [hit.record for hit in related if hit.record.id not in known]
+    now: float = time.time()
+    fresh: list[MemoryRecord] = [
+        hit.record for hit in related if hit.record.id not in known and not resting(hit.record, now, config.rest_days)
+    ]
     return [*standing, *users, *fresh[: config.inject_top_k]]
 
 

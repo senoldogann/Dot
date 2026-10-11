@@ -4625,8 +4625,8 @@ says so), $10 per 1,000 searches plus tokens (the docs; a failed search is not b
 | #   | Item                                                                     | Status      | Commits |
 | --- | ------------------------------------------------------------------------ | ----------- | ------- |
 | 69  | The Anthropic rung: Haiku 5.5 searches through the API's own web search | done        | 927a720 |
-| 70  | Reflection: Dot's day in review, every night                             | in progress |         |
-| 71  | Memory that rests: use decides what is recalled                          | planned     |         |
+| 70  | Reflection: Dot's day in review, every night                             | done        | dd13ec9 |
+| 71  | Memory that rests: use decides what is recalled                          | in progress |         |
 | 72  | The home that says "I am here"                                           | planned     |         |
 | 73  | Motion with meaning                                                      | planned     |         |
 | 74  | Quiet chrome: the surfaces recede, the work leads                        | planned     |         |
@@ -4682,7 +4682,7 @@ The live smoke test ran one search with the machine's key: 1 passed in 5.5 s, hi
 
 ### 70. Reflection: Dot's day in review, every night
 
-**Status: in progress.** Built on `item-70-reflection` (MYP-210).
+**Status: done.** Merged as `dd13ec9` (PR #78, squash; MYP-210 Done).
 
 **What.** Once a day, unattended, Dot reads the runs that ended since the last reflection and writes what it learned:
 lessons from failed and cancelled runs too (today only runs that ended done teach), one short journal note for the
@@ -4735,7 +4735,7 @@ three saved lessons, the merge, the rest, the journal, the Activity row and that
 
 ### 71. Memory that rests: use decides what is recalled
 
-**Status: planned.**
+**Status: in progress.** Built on `item-71-memory-rests` (MYP-211).
 
 **What.** A note that a run recalled and built on is marked as used (the store has `mark_memories_used`); the ranking
 of auto-recalled agent notes favours notes used lately and lets notes never used rest after `[memory] rest_days`
@@ -4753,6 +4753,23 @@ and shows uses; `GET /memories` carries both. Unit test on the ranking with date
 **Touchpoints.** `memory/ranking.py`, `memory/service.py`, `store/db.py`, `server/routes_data.py`, `views.py`,
 `static/js/views/memory.js`, `defaults.toml`, `tests/unit/test_memory_ranking.py`, `tests/smoke/test_memory.py`,
 README (Memory).
+
+**Design, as built (2026-10-11).** As planned, with these differences. The store needed no migration: `memories`
+already had `used_count` and `last_used_at` (named so, not `use_count`), written by `mark_memories_used` when a run
+starts with a note, is handed one that changed, or finds one with `memory_search`. The ranking is
+`ranking.fused_scores` (the reciprocal rank fusion scores, kept) plus `ranked_by_use(scores, notes, now, half_life_s,
+limit)`: an agent's note gets `use_lift` (1 for a use now, halving every `[memory] use_half_life_days`, 0 never used)
+times a second place in one list (1/62), so two rankers agreeing on an unused note still beat one ranker and a recent
+use; the user's notes stand on their fused score alone. `recall` fetches every fused candidate and ranks it so (the
+cut to `limit` comes after the lift), still dropping a note the reflection retired (tag `rest`, item 70). Rest is
+derived, not stored: `service.resting(record, now, rest_days)` is true for an agent's note (a source, no `core` tag)
+that carries the `rest` tag or that no run was handed (`used_count == 0`) in `[memory] rest_days` since it was written;
+`prompt_memories` skips resting notes among the related ones, a search still finds them (unless retired).
+`GET /api/memories` carries `resting`, the ids of the page's items that rest, and the Memory page lists them under a
+"Resting" head with the hint "No run was handed these lately; a search still finds them, runs no longer start with
+them"; the uses were shown already ("Used 3 times, last 2 days ago"). Unit tests on the scores, the lift, the order and
+the rest rule; the words-only memory smoke tests gain a use that reorders a search and an old agent note that rests
+while the user's old note still reaches the run.
 
 ### 72. The home that says "I am here"
 
@@ -5332,3 +5349,4 @@ here.
   confirmed `claude-haiku-5-5` supports the `web_search` server tool; the docs price it at $10 per 1,000 searches plus
   tokens, so it is a second rung, not a free first one. Daemon restarted on e475368 (pid 66449) with no run active.
 - 2026-10-11 (Fable 5.1): item 69 merged 927a720 (PR #77, MYP-209 Done). Item 70 built on branch `item-70-reflection` (MYP-210): `agent/reflection.py` (reflect, reflection_due, stored_case, duplicate_pairs, to_retire, journal), the scheduler's tick fires it at `[agent] reflection_time`, `rest`/`journal` tags, `dotx reflect`, the Activity row; unit and smoke tests.
+- 2026-10-11 (Fable 5.1): item 70 merged dd13ec9 (PR #78, MYP-210 Done). Item 71 built on branch `item-71-memory-rests` (MYP-211): `ranking.fused_scores`/`use_lift`/`ranked_by_use`, `service.resting`, `[memory] rest_days`/`use_half_life_days`, `MemoryPage.resting`, the Memory page's Resting group; unit and smoke tests.
