@@ -378,7 +378,8 @@ max_depth = 3
 concurrency = 4
 per_host_spacing_s = 0.5
 # "auto": a page that shows little text without JavaScript is rendered once in Dot's own browser and read from the
-# screen; "never": plain fetches only; "always": every HTML page is rendered.
+# screen; "never": plain fetches only; "always": every HTML page is rendered. A page that turns the plain request away
+# is read in a tab the owner does not work in whatever this says (item 98).
 render = "auto"
 # "report": robots.txt is read and the addresses it disallows are named in the result, but fetched; "obey": they are
 # left out.

@@ -44,7 +44,7 @@ from dotagent.web.ladder import SearchEngine, SearchOutcome
 from dotagent.web.pdf import pdf_to_text
 from dotagent.web.search import AnthropicSearch, ReadPage, engine_attempts, search, search_ladder
 from dotagent.web.text import DocumentKind, ReadablePage, decode_body, document_kind, html_to_text
-from dotagent.web.types import FetchedDocument, SearchHit
+from dotagent.web.types import REFUSED_STATUS, FetchedDocument, SearchHit
 
 _NONCE_BYTES: int = 8
 _HEADROOM_CHARS: int = 1200  # room next to the text for the header, the fence lines and the hints
@@ -59,8 +59,13 @@ _CRAWL_FOLDER: str = "crawl"
 _MAX_SOURCES: int = 20
 _MAX_FIELDS: int = 20
 _WINDOW_SLACK: float = 0.8  # a window ends at a line or word break found in its last fifth
-# A plain request turned away: when the run's browser is Dot's own Chrome the page is read there instead (item 59).
-_UNREADABLE_STATUS: frozenset[int] = frozenset({401, 403, 429, 503})
+# A plain request turned away: the page is read in the browser instead when the run may read quietly (items 59, 98).
+_UNREADABLE_STATUS: frozenset[int] = REFUSED_STATUS
+# What the result says when the browser was refused too (item 98): the next rung, in one line.
+_NEXT_RUNG: str = (
+    "The site refuses this machine. Next: another source for the same facts; web_search with the address as the "
+    "query, for the hosted search's snippet of the page; for a login wall, browser_open and ask the owner to Take over."
+)
 # A page that is not there (item 56): the result says so and lists the front page's links that may be the one meant.
 _NOT_THERE_STATUS: frozenset[int] = frozenset({404, 410})
 _LIKELY_LINKS: int = 12
@@ -216,14 +221,23 @@ def likely_links(links: tuple[str, ...], asked: str, limit: int) -> tuple[str, .
 
 
 def render_http_failure(
-    shown_url: str, document: FetchedDocument, excerpt: str, nonce: str, likely: tuple[str, ...], front_problem: str
+    shown_url: str,
+    document: FetchedDocument,
+    excerpt: str,
+    nonce: str,
+    likely: tuple[str, ...],
+    front_problem: str,
+    browser_problem: str,
 ) -> str:
     """The result of a fetch the web answered with an error status. A page that is not there says so and lists
     ``likely``, the front page's links that may be the page meant (``front_problem`` says why the front page could not be
-    read, when it could not)."""
+    read, when it could not). ``browser_problem`` says why the run's browser could not read a refused page instead,
+    when it was asked and could not (item 98)."""
     lines: list[str] = [f"web_fetch got HTTP {document.status} from {shown_url}."]
+    if browser_problem:
+        lines.append(browser_problem)
     if document.status in _UNREADABLE_STATUS:
-        lines.append("Some sites turn plain requests away; browser_open uses a real Chrome and may get through.")
+        lines.append(f"Some sites turn plain requests away. {_NEXT_RUNG}")
     if document.status in _NOT_THERE_STATUS:
         lines.append(
             "The page is not there. Do not try other addresses on a hunch: find the page with web_search (site:host "
@@ -285,26 +299,19 @@ def browser_document(rendered: RenderedDocument) -> FetchedDocument:
 
 def render_browser_failure(shown_url: str, why: str, status: int, excerpt: str, nonce: str) -> str:
     """The result when Dot's browser got an error status too: both answers, then what the page said."""
-    lines: list[str] = [
-        f"web_fetch got HTTP {status} from {shown_url} in Dot's browser too ({why}).",
-        "The site refuses this machine; use another source for the same facts, or ask the owner to open it.",
-    ]
+    lines: list[str] = [f"web_fetch got HTTP {status} from {shown_url} in Dot's browser too ({why}).", _NEXT_RUNG]
     if excerpt:
         lines.append(fence_untrusted(shown_url, excerpt, nonce))
     return "\n".join(lines)
 
 
 async def _fetch_in_browser(ctx: ToolContext, args: FetchArgs, url: str, shown_url: str, why: str) -> ToolResult:
-    """Read ``url`` in Dot's own Chrome because the plain request did not do (``why`` says what it got), and render the
-    page the way a plain fetch is rendered, with a first line that says how it was read."""
+    """Read ``url`` in the run's browser because the plain request did not do (``why`` says what it got), and render
+    the page the way a plain fetch is rendered, with a first line that says how it was read. A browser that cannot
+    open the page raises :class:`BrowserError`; the caller falls back to the plain answer and says so."""
     config: AppConfig = ctx.runtime.config
     nonce: str = _nonce()
-    try:
-        rendered: RenderedDocument = await ctx.browser.read_page(url)
-    except BrowserError as error:
-        return fail(
-            f"web_fetch could not read {shown_url}: {why}, and Dot's browser could not open it: {error.message}"
-        )
+    rendered: RenderedDocument = await ctx.browser.read_page(url)
     document: FetchedDocument = browser_document(rendered)
     readable: _Readable = await _readable(document, "html", config.web.fetch_max_bytes)
     if not 200 <= document.status < 300:
@@ -320,6 +327,10 @@ async def _fetch_in_browser(ctx: ToolContext, args: FetchArgs, url: str, shown_u
     return mark_untrusted(ok(f"Read in Dot's browser: {why}.\n{body}"))
 
 
+def _browser_problem(error: BrowserError) -> str:
+    return f"Dot's browser could not read it either: {error.message}."
+
+
 def _fetch_tool() -> RegisteredTool:
     def classify(args: FetchArgs, ctx: ToolContext) -> ActionInfo:
         url: str = checked_url(args.url, ctx.runtime.config.browser)
@@ -328,11 +339,21 @@ def _fetch_tool() -> RegisteredTool:
     async def run(args: FetchArgs, ctx: ToolContext) -> ToolResult:
         config: AppConfig = ctx.runtime.config
         url: str = checked_url(args.url, config.browser)
+        shown_url: str = _clip(url, _SHOWN_URL_CHARS)
+        # Why the run's browser could not read the page when it was asked to (item 98); empty until it was.
+        browser_problem: str = ""
+        # A host that refused this run's plain request once is not asked plainly again (item 98).
+        if ctx.refused_hosts.remembers(url) and ctx.browser.quiet_reads:
+            try:
+                return await _fetch_in_browser(
+                    ctx, args, url, shown_url, "the host turned an earlier plain request away"
+                )
+            except BrowserError as error:
+                browser_problem = _browser_problem(error)
         document: FetchedDocument = await ctx.runtime.web.get(
             url, max(config.web.fetch_max_bytes, config.web.pdf_max_bytes)
         )
         kind: DocumentKind = document_kind(document.media_type, document.body[:512])
-        shown_url: str = _clip(url, _SHOWN_URL_CHARS)
         nonce: str = _nonce()
         if not 200 <= document.status < 300:
             excerpt: _Readable = (
@@ -340,10 +361,15 @@ def _fetch_tool() -> RegisteredTool:
                 if kind in ("html", "text")
                 else _Readable("", "", "")
             )
-            if document.status in _UNREADABLE_STATUS and ctx.browser.quiet_reads:
-                return await _fetch_in_browser(
-                    ctx, args, url, shown_url, f"the plain request got HTTP {document.status}"
-                )
+            if document.status in _UNREADABLE_STATUS:
+                ctx.refused_hosts.note(url)
+            if document.status in _UNREADABLE_STATUS and ctx.browser.quiet_reads and not browser_problem:
+                try:
+                    return await _fetch_in_browser(
+                        ctx, args, url, shown_url, f"the plain request got HTTP {document.status}"
+                    )
+                except BrowserError as error:
+                    browser_problem = _browser_problem(error)
             likely, front_problem = (
                 await _front_page_links(ctx, url, config.web.fetch_max_bytes)
                 if document.status in _NOT_THERE_STATUS
@@ -352,7 +378,13 @@ def _fetch_tool() -> RegisteredTool:
             return mark_untrusted(
                 fail(
                     render_http_failure(
-                        shown_url, document, excerpt.text[:_ERROR_EXCERPT_CHARS], nonce, likely, front_problem
+                        shown_url,
+                        document,
+                        excerpt.text[:_ERROR_EXCERPT_CHARS],
+                        nonce,
+                        likely,
+                        front_problem,
+                        browser_problem,
                     )
                 )
             )
@@ -362,8 +394,13 @@ def _fetch_tool() -> RegisteredTool:
                 f"({len(document.body)} bytes), not a page, a PDF or a text file."
             )
         readable: _Readable = await _readable(document, kind, config.web.fetch_max_bytes)
-        if _needs_javascript(document, kind, readable) and ctx.browser.quiet_reads:
-            return await _fetch_in_browser(ctx, args, url, shown_url, "the page shows little text without JavaScript")
+        if _needs_javascript(document, kind, readable) and ctx.browser.quiet_reads and not browser_problem:
+            try:
+                return await _fetch_in_browser(
+                    ctx, args, url, shown_url, "the page shows little text without JavaScript"
+                )
+            except BrowserError as error:
+                browser_problem = _browser_problem(error)
         if args.start > len(readable.text):
             return fail(
                 f"start={args.start} is past the end of the document, which has {len(readable.text)} characters."
@@ -374,6 +411,8 @@ def _fetch_tool() -> RegisteredTool:
         )
         if _needs_javascript(document, kind, readable):
             text += "\nNote: this page shows little text without JavaScript; browser_open renders it in a real Chrome."
+            if browser_problem:
+                text += f" {browser_problem}"
         return mark_untrusted(ok(text))
 
     return make_tool(
@@ -381,8 +420,8 @@ def _fetch_tool() -> RegisteredTool:
         description=(
             "Download a page, PDF or text file and return it as clean text, with headings, lists, tables and link "
             "addresses kept. Fast and light: no browser, no JavaScript, no login. A long document comes in parts; pass "
-            "start to continue. A page that turns the plain request away or needs JavaScript is read in Dot's own "
-            "Chrome when the run has it, and the result says so. For a login or clicking, use browser_open."
+            "start to continue. A page that turns the plain request away or needs JavaScript is read in a tab of the "
+            "run's Chrome that you never see, and the result says so. For a login or clicking, use browser_open."
         ),
         args_model=FetchArgs,
         modes=ALL_MODES,
@@ -589,6 +628,21 @@ def _renderer_for(ctx: ToolContext) -> Renderer:
     return render
 
 
+def _quiet_renderer_for(ctx: ToolContext) -> Renderer | None:
+    """A page read in a tab the user does not work in (item 98), as text; ``None`` when the run's browser cannot."""
+    if not ctx.browser.quiet_reads:
+        return None
+
+    async def render(url: str, max_chars: int) -> str:
+        rendered: RenderedDocument = await ctx.browser.read_page(url)
+        if not 200 <= rendered.status < 300:
+            raise BrowserError(f"the browser got HTTP {rendered.status} too", {"url": url})
+        page: ReadablePage = await asyncio.to_thread(html_to_text, rendered.html, rendered.url)
+        return page.text[:max_chars]
+
+    return render
+
+
 class CrawlArgs(ToolArgs):
     url: str = Field(description="Where the crawl starts.")
     scope: ScopeKind = Field(
@@ -612,7 +666,9 @@ def _crawl_tool() -> RegisteredTool:
         max_pages: int = min(args.max_pages, config.web.crawl.max_pages)
         max_depth: int = min(args.max_depth, config.web.crawl.max_depth)
         renderer: Renderer | None = None if config.web.crawl.render == "never" else _renderer_for(ctx)
-        result: CrawlResult = await crawl(ctx.runtime.web, config.web, url, scope, max_pages, max_depth, renderer)
+        result: CrawlResult = await crawl(
+            ctx.runtime.web, config.web, url, scope, max_pages, max_depth, renderer, _quiet_renderer_for(ctx)
+        )
         if not result.pages:
             return fail(render_index(result, ()))
         nonce: str = _nonce()

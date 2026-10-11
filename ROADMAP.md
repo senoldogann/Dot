@@ -5017,8 +5017,8 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 94  | An agent learns for itself: lessons, skills and a score per agent                | done        | 937cca4 |
 | 95  | The sidebar, smaller: the nav under New chat, sections that fold, rows cut short   | done        | f3dce6e |
 | 96  | The run page: the arrow above the composer, the cost in the side panel            | done        | 3a8a20b |
-| 97  | Chrome in the background: the live view shows the page, the window stays put       | in progress |         |
-| 98  | The web that is refused: 999, 403 and their kind meet the browser, not the end     | planned     |         |
+| 97  | Chrome in the background: the live view shows the page, the window stays put       | done        | 558621b |
+| 98  | The web that is refused: 999, 403 and their kind meet the browser, not the end     | in progress |         |
 | 99  | The team that grows: a run makes a lasting teammate and knows of it                | planned     |         |
 | 100 | The review: every feature of parts 1 to 12 read once more on the live pages        | planned     |         |
 
@@ -5683,7 +5683,7 @@ starts at the first turn; `tests/smoke/test_activity.py` follows it there.
 
 ### 97. Chrome in the background: the live view shows the page, the window stays put
 
-**Status: in progress (2026-10-11).**
+**Status: done.** Merged as `558621b` (PR #113, MYP-237 Done).
 
 **Design, as built (2026-10-11).** `BrowserConfig.raise_window` (`defaults.toml` `[browser] raise_window = false`,
 with the comment that the run's page shows the page either way). `browser/window.py`: `focused_app()` (the frontmost
@@ -5718,7 +5718,32 @@ on the owner's Mac and recorded here.
 
 ### 98. The web that is refused: 999, 403 and their kind meet the browser, not the end
 
-**Status: planned.**
+**Status: in progress (2026-10-11).**
+
+**Design, as built (2026-10-11).** `web/types.py` `REFUSED_STATUS = {401, 403, 429, 503, 999}`, the one set
+`tools/web.py` (`_UNREADABLE_STATUS`) and `web/crawl.py` read; `session._CHALLENGE_STATUS` gains 999 so a wall that
+reloads itself gets its seconds. `web/refused.py`: `host_of(url)` (lower case, the port kept) and `RefusedHosts`
+(`note`, `remembers`, `len`), one per run as `ToolContext.refused_hosts` (a `default_factory`, like `spawner`'s
+default); `web_fetch` notes the host of every refused plain request and, when the host is remembered and the run may
+read quietly, goes to the browser at once ("the host turned an earlier plain request away"). `web/client.py`
+`request_headers(method, user_agent, extra)`: a GET carries `Sec-Fetch-Dest: document`, `Sec-Fetch-Mode: navigate`,
+`Sec-Fetch-Site: none`, `Sec-Fetch-User: ?1` and `Upgrade-Insecure-Requests: 1`; a POST (the APIs) does not; the
+caller's headers come last. `BrowserSession.quiet_reads` is true in both modes: `read_page` opens its scratch tab with
+`_scratch_page`, a plain `new_page` in Dot's own Chrome and, in the user's, a target created through a browser-level
+CDP session with `Target.createTarget {background: true}` (Playwright's `new_page` would open in the foreground),
+awaited through `context.expect_page`; `human_like` (the search rung) stays Dot's own visible Chrome. The crawl takes
+a second renderer, `quiet` (`_quiet_renderer_for`: `read_page` then `html_to_text`, a non-2xx in the browser raised as
+`BrowserError`): a refused page becomes a `CrawledPage` with `rendered=True`, no links and the problem "the plain
+request got HTTP 403, read in the browser", or a `SkippedPage` with both reasons. A browser that cannot open the page at all (`BrowserError`, the user's Chrome not running) is not the end either:
+`web_fetch` falls back to the plain answer, with the line "Dot's browser could not read it either: …" before the next
+rung (`render_http_failure`'s `browser_problem`), and a remembered host whose browser read fails gets the plain
+request after all. `render_browser_failure` and the
+refused line of `render_http_failure` end with `_NEXT_RUNG` (another source; `web_search` with the address as the
+query; `browser_open` and Take over for a login wall). The `web_fetch` description says the tab is one the model never
+sees. README: Browsing and search, Crawling. Tests: `test_refused_web` (the host memory, the headers), `test_web_fetch`
+(`/wall-999`, `/open`; the memory sends the second fetch of the host to the browser first, a fresh context does not),
+`test_crawl` (a walled corner: the 403 page read in the browser, the page refused twice left out with both reasons),
+`test_browser_attach` (a quiet read in the user's Chrome leaves the user's tab in front and no tab behind).
 
 **What.** 999 joins the statuses `web_fetch` retries in the browser; a refused page in a crawl is read in the
 browser too when the run may read quietly; the owner's attached Chrome reads quietly in a background tab (opened
@@ -6272,3 +6297,4 @@ written as the next part's first items. The findings go in this section as built
 - 2026-10-11 (Fable 5.1): the daemon restarted on `269eab5` once idle. Part 12 planned (items 95 to 100): the sidebar smaller, the run page's arrow and cost, Chrome in the background, the web that is refused, the team that grows, the review.
 - 2026-10-11 (Fable 5.1): item 95 merged as `f3dce6e` (PR #111, MYP-235 Done): the nav under the search, sections that fold (`dot.sideFolds`), Working rows cut to their first words, focus rings in the theme's `--ring`.
 - 2026-10-11 (Fable 5.1): item 96 merged as `3a8a20b` (PR #112, MYP-236 Done): the round arrow above the composer (`.jump`, `.dock-bare` for delegated runs), the cost card in the side panel after Details.
+- 2026-10-11 (Fable 5.1): item 97 merged as `558621b` (PR #113, MYP-237 Done): `[browser] raise_window` off by default, the focus given back after the launch, the Settings › Browser switch, `POST /api/browser/raise`.

@@ -85,6 +85,13 @@ def _pdf(sentence: str) -> bytes:
 
 _PDF: bytes = _pdf("Data sheet of the catalogue")
 _ROBOTS: str = "User-agent: *\nDisallow: /catalogue/private/\n"
+# A corner of the site with a page that turns plain requests away (item 98): /walled/wall.html answers 403 unless a
+# Chrome asks, /walled/gone.html refuses everyone.
+_WALLED_INDEX: str = (
+    '<!doctype html><title>Walled</title><main><h1>Walled</h1><a href="/walled/wall.html">Wall</a> '
+    '<a href="/walled/gone.html">Gone</a> <a href="/walled/open.html">Open</a></main>'
+)
+_WALL_SENTENCE: str = "Behind the wall: the walled corner has three pages."
 
 
 class _Handler(BaseHTTPRequestHandler):
@@ -108,6 +115,16 @@ class _Handler(BaseHTTPRequestHandler):
             body = b"<!doctype html><title>Secret</title><p>Not for robots.</p>"
         elif path == "/blog/news.html":
             body = b"<!doctype html><title>News</title><p>Outside the catalogue.</p>"
+        elif path == "/walled/":
+            body = _WALLED_INDEX.encode()
+        elif path == "/walled/open.html":
+            body = b"<!doctype html><title>Open</title><p>Open to everyone.</p>"
+        elif path == "/walled/wall.html":
+            chrome: bool = "Chrome" in self.headers.get("User-Agent", "")
+            body = f"<!doctype html><title>Wall</title><p>{_WALL_SENTENCE}</p>".encode() if chrome else b"<p>No.</p>"
+            status = 200 if chrome else 403
+        elif path == "/walled/gone.html":
+            body, status = b"<p>Denied for everyone.</p>", 403
         else:
             body, status = b"<!doctype html><title>Gone</title><p>Nothing.</p>", 404
         self.send_response(status)
@@ -204,6 +221,24 @@ async def test_the_crawl_stays_in_scope_within_its_limits_renders_the_app_page_a
     fences: list[str] = [match.group(2) for match in _FENCE.finditer(result.text)]
     assert len(fences) == 11
     assert fences[0].startswith("# Catalogue\nSource:")
+
+
+async def test_a_page_that_refuses_the_plain_request_is_read_in_the_browser_and_one_that_refuses_both_is_left_out(
+    runtime: Runtime, site: str
+) -> None:
+    result, _ = await _call(
+        runtime, "web_crawl", {"url": f"{site}/walled/", "scope": "prefix", "max_pages": 10}, 200_000
+    )
+    assert not result.is_error, result.text
+    head: str = result.text.split("\n\n", 1)[0]
+    assert head.startswith("Crawled 3 pages from")
+    assert f"{site}/walled/wall.html  (no title)" in head
+    assert "rendered; the plain request got HTTP 403, read in the browser" in head
+    assert _WALL_SENTENCE in result.text
+    assert (
+        f"Left out (1):\n- {site}/walled/gone.html: HTTP 403; the browser could not read it: the browser got HTTP 403 too"
+        in head
+    )
 
 
 async def test_a_crawl_that_does_not_fit_one_result_is_written_to_files_the_extraction_reads(

@@ -23,6 +23,7 @@ from dotagent.policy.types import ActionInfo
 from dotagent.runtime import Runtime, build_runtime, close_runtime
 from dotagent.tools.base import ToolResult
 from dotagent.tools.context import ToolContext
+from dotagent.web.refused import RefusedHosts
 
 pytestmark = pytest.mark.asyncio(loop_scope="module")
 
@@ -49,14 +50,21 @@ _SHELL_HTML: str = (
 
 
 class _WallHandler(BaseHTTPRequestHandler):
-    """A site that turns plain requests away: ``/wall`` answers 429 unless a Chrome asks, ``/forbidden`` answers 403
-    to everyone, ``/shell`` is a page whose text a script writes."""
+    """A site that turns plain requests away: ``/wall`` answers 429 and ``/wall-999`` 999 unless a Chrome asks,
+    ``/forbidden`` answers 403 to everyone, ``/shell`` is a page whose text a script writes, ``/open`` is open to all
+    and says whether the request came from a Chrome."""
 
     def do_GET(self) -> None:
         path: str = self.path.split("?", 1)[0]
         chrome: bool = "Chrome" in self.headers.get("User-Agent", "")
         if path == "/wall":
             status, body = (200, f"<title>Roles</title><p>{_WALL_TEXT}</p>") if chrome else (429, "<p>Slow down.</p>")
+        elif path == "/wall-999":
+            status, body = (
+                (200, f"<title>Roles</title><p>{_WALL_TEXT}</p>") if chrome else (999, "<p>Request denied.</p>")
+            )
+        elif path == "/open":
+            status, body = 200, f"<title>Open</title><p>Asked by {'a Chrome' if chrome else 'a plain request'}.</p>"
         elif path == "/forbidden":
             status, body = 403, "<p>Access denied for everyone.</p>"
         elif path == "/shell":
@@ -116,6 +124,10 @@ async def runtime(tmp_path_factory: pytest.TempPathFactory) -> AsyncIterator[Run
 
 
 async def _fetch(runtime: Runtime, url: str) -> ToolResult:
+    return await _fetch_as(runtime, url, RefusedHosts())
+
+
+async def _fetch_as(runtime: Runtime, url: str, refused: RefusedHosts) -> ToolResult:
     ctx: ToolContext = ToolContext(
         runtime=runtime,
         browser=runtime.browser,
@@ -130,6 +142,7 @@ async def _fetch(runtime: Runtime, url: str) -> ToolResult:
         cancel=asyncio.Event(),
         output_chars=12000,
         facts=new_facts,
+        refused_hosts=refused,
     )
     arguments: JsonObject = {"url": url}
     prepared = await runtime.registry.tools["web_fetch"].prepare(arguments, ctx)
@@ -163,8 +176,24 @@ async def test_a_page_that_turns_the_plain_request_away_is_read_in_dots_own_chro
     refused: ToolResult = await _fetch(runtime, f"{wall}/forbidden")
     assert refused.is_error
     assert refused.text.startswith(
-        f"web_fetch got HTTP 403 from {wall}/forbidden in Dot's browser too (the plain request got HTTP 403)."
+        f"web_fetch got HTTP 403 from {wall}/forbidden in Dot's browser too (the plain request got HTTP 403).\n"
+        "The site refuses this machine. Next: another source"
     )
     assert "Access denied for everyone." in refused.text
     # The scratch tab left no tab behind for the thread.
     assert runtime.browser.current_url("fetch-test") is None
+
+
+async def test_a_host_that_refused_once_is_read_in_the_browser_first_from_then_on(runtime: Runtime, wall: str) -> None:
+    refused: RefusedHosts = RefusedHosts()
+    walled: ToolResult = await _fetch_as(runtime, f"{wall}/wall-999", refused)
+    assert not walled.is_error
+    assert walled.text.startswith("Read in Dot's browser: the plain request got HTTP 999.")
+    assert _WALL_TEXT in walled.text and len(refused) == 1
+    # The same host again: the plain request is not made, the browser reads the page at once.
+    again: ToolResult = await _fetch_as(runtime, f"{wall}/open", refused)
+    assert again.text.startswith("Read in Dot's browser: the host turned an earlier plain request away.")
+    assert "Asked by a Chrome." in again.text
+    # Another run has no such memory: the plain request is made and the page read as fetched.
+    fresh: ToolResult = await _fetch(runtime, f"{wall}/open")
+    assert fresh.text.startswith("Fetched ") and "Asked by a plain request." in fresh.text

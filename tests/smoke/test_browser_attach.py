@@ -27,7 +27,7 @@ from dotagent.browser.login import chrome_arguments
 from dotagent.browser.modes import adopt_mode, browser_data_dir
 from dotagent.browser.profile_lock import profile_holder_pid
 from dotagent.browser.safety import refuse_secret_field
-from dotagent.browser.session import BrowserSession
+from dotagent.browser.session import BrowserSession, RenderedDocument
 from dotagent.browser.types import ActOutcome, Attachment, PageView, Screenshot, Step
 from dotagent.config import BrowserConfig, load_config
 from dotagent.core.errors import BrowserError
@@ -247,6 +247,25 @@ async def test_the_agent_works_in_tabs_of_its_own_and_the_tabs_of_the_user_stay(
     await wait_for_tabs(chrome.port, [f"{site}/mine"])
     assert chrome.process.returncode is None
     assert profile_holder_pid(chrome.data_dir) == chrome.process.pid
+
+
+async def test_a_page_is_read_quietly_in_a_tab_behind_the_users_and_the_tab_closes_after(
+    chrome: ScratchChrome, attach_config: BrowserConfig, site: str, tmp_path: Path
+) -> None:
+    session: BrowserSession = BrowserSession(attach_config, chrome.data_dir, tmp_path / "downloads")
+    try:
+        assert session.quiet_reads and not session.human_like
+        rendered: RenderedDocument = await session.read_page(f"{site}/other")
+        assert (rendered.url, rendered.status) == (f"{site}/other", 200)
+        assert "Another page of the user" in rendered.html
+        await wait_for_tabs(chrome.port, [f"{site}/mine"])
+        # The read left nothing behind for a thread, and the user's tab is the one in front.
+        assert session.current_url("quiet") is None
+        front: PageView = await session.open_url("quiet", f"{site}/")
+        assert [tab.url for tab in front.tabs] == [f"{site}/"]
+    finally:
+        await session.aclose()
+    await wait_for_tabs(chrome.port, [f"{site}/mine"])
 
 
 async def test_a_tab_the_user_opens_meanwhile_is_not_taken_over(

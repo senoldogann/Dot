@@ -31,6 +31,29 @@ _RETRY: RetryPolicy = RetryPolicy(attempts=2, base_delay_s=0.4, max_delay_s=2.0)
 _REDIRECT_STATUS: frozenset[int] = frozenset({301, 302, 303, 307, 308})
 _ACCEPT: str = "text/html,application/xhtml+xml,application/xml;q=0.9,application/pdf;q=0.8,text/plain;q=0.7,*/*;q=0.5"
 _ACCEPT_LANGUAGE: str = "en-US,en;q=0.9,tr;q=0.8"
+# What a browser sends with the address bar's navigation (item 98); a wall that looks for them lets the request by.
+_NAVIGATION_HEADERS: dict[str, str] = {
+    "Sec-Fetch-Dest": "document",
+    "Sec-Fetch-Mode": "navigate",
+    "Sec-Fetch-Site": "none",
+    "Sec-Fetch-User": "?1",
+    "Upgrade-Insecure-Requests": "1",
+}
+
+
+def request_headers(method: str, user_agent: str, extra: Mapping[str, str]) -> dict[str, str]:
+    """The headers of one request: the user agent, what is accepted, and on a GET the headers a browser sends when its
+    address bar navigates. ``extra`` (an API's headers) comes last and wins."""
+    navigation: dict[str, str] = _NAVIGATION_HEADERS if method == "GET" else {}
+    return {
+        "User-Agent": user_agent,
+        "Accept": _ACCEPT,
+        "Accept-Language": _ACCEPT_LANGUAGE,
+        **navigation,
+        **extra,
+    }
+
+
 # A connection that could not be opened has sent nothing, so another try is safe even for a POST.
 _TRANSIENT_ERRORS: tuple[type[httpx.HTTPError], ...] = (
     httpx.ConnectError,
@@ -250,12 +273,7 @@ class WebClient:
             request: httpx.Request = self._client.build_request(
                 method,
                 url,
-                headers={
-                    "User-Agent": self._config.user_agent,
-                    "Accept": _ACCEPT,
-                    "Accept-Language": _ACCEPT_LANGUAGE,
-                    **headers,
-                },
+                headers=request_headers(method, self._config.user_agent, headers),
                 content=content,
             )
             response: httpx.Response = await self._client.send(request, stream=True)

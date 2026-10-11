@@ -47,19 +47,24 @@ def test_the_likely_links_share_a_word_stay_on_the_host_and_leave_the_address_it
 
 def test_a_missing_page_says_so_and_lists_the_links_or_why_there_are_none() -> None:
     listed: str = render_http_failure(
-        "https://acme.example/careers/", _document(404), "", "n", ("https://acme.example/company/open-roles/",), ""
+        "https://acme.example/careers/", _document(404), "", "n", ("https://acme.example/company/open-roles/",), "", ""
     )
     assert listed.startswith("web_fetch got HTTP 404 from https://acme.example/careers/.\nThe page is not there.")
     assert "- https://acme.example/company/open-roles/" in listed
-    none: str = render_http_failure("https://acme.example/careers/", _document(410), "", "n", (), "")
+    none: str = render_http_failure("https://acme.example/careers/", _document(410), "", "n", (), "", "")
     assert "links to nothing that shares a word" in none
     unread: str = render_http_failure(
-        "https://acme.example/careers/", _document(404), "", "n", (), "it answered HTTP 500"
+        "https://acme.example/careers/", _document(404), "", "n", (), "it answered HTTP 500", ""
     )
     assert "could not be read either: it answered HTTP 500" in unread
     # Another error status gets no such lines; a refusal points at the browser.
-    refused: str = render_http_failure("https://acme.example/careers/", _document(403), "", "n", (), "")
-    assert "not there" not in refused and "browser_open" in refused
+    refused: str = render_http_failure("https://acme.example/careers/", _document(403), "", "n", (), "", "")
+    assert "not there" not in refused and "browser_open" in refused and "web_search with the address" in refused
+    # When the run's browser was asked and could not read the page, the result says so before the next rung.
+    unopened: str = render_http_failure(
+        "https://acme.example/careers/", _document(403), "", "n", (), "", "Dot's browser could not read it either: x."
+    )
+    assert unopened.split("\n")[1] == "Dot's browser could not read it either: x."
 
 
 def test_an_oversized_request_is_cut_to_its_limit_and_the_result_says_so() -> None:
