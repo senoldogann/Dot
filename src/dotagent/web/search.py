@@ -22,6 +22,7 @@ from pydantic import BaseModel, ConfigDict, ValidationError
 
 from dotagent.core.errors import WebError, WebThrottledError
 from dotagent.core.logs import get_logger
+from dotagent.core.types import FrozenModel
 from dotagent.web.client import WebClient
 from dotagent.web.ladder import BENCH_S, EngineBench, SearchEngine, SearchOutcome, Skipped
 from dotagent.web.text import decode_body
@@ -31,7 +32,10 @@ log = get_logger(__name__)
 
 # What the configuration may say: ``auto`` is the whole ladder (the hosted search of Ollama when its key is present,
 # the browser rung when the run's browser is Dot's own Chrome); a named engine is that engine alone.
-SearchChoice = Literal["auto", "duckduckgo", "brave", "ollama"]
+SearchChoice = Literal["auto", "duckduckgo", "brave", "ollama", "anthropic"]
+# Where the Anthropic rung stands when its key is present: after Ollama's free search (auto), before it (first), or
+# nowhere (off); ``None`` at the call site means the key is absent.
+AnthropicRung = Literal["auto", "first", "off"]
 
 # One try of one engine: the hits for a query, at most the number asked.
 type Attempt = Callable[[str, int], Awaitable[tuple[SearchHit, ...]]]
@@ -45,6 +49,17 @@ _BRAVE_URL: str = "https://search.brave.com/search"
 _BRAVE_HOSTS: frozenset[str] = frozenset({"search.brave.com"})
 _OLLAMA_SEARCH_URL: str = "https://ollama.com/api/web_search"
 _OLLAMA_MAX_RESULTS: int = 10
+_ANTHROPIC_MESSAGES_URL: str = "https://api.anthropic.com/v1/messages"
+_ANTHROPIC_VERSION: str = "2023-06-01"
+_ANTHROPIC_SEARCH_TOOL: str = "web_search_20250305"
+# Room for the one sentence the relay writes after the search; the results come in the tool block, not in the text.
+_ANTHROPIC_MAX_TOKENS: int = 400
+_ANTHROPIC_SYSTEM: str = (
+    "You are a search relay. Call web_search exactly once with the user's words as the query, then answer in one "
+    "short sentence that cites the results. Do not answer from memory."
+)
+# The error codes of the server tool that say the service is limiting this key or is down: the rung sits out.
+_ANTHROPIC_BENCHED_CODES: frozenset[str] = frozenset({"too_many_requests", "unavailable"})
 _PAGE_BYTES: int = 1_000_000
 _API_BYTES: int = 1_000_000
 _MAX_SNIPPET_CHARS: int = 600
@@ -218,16 +233,20 @@ def parse_brave(html: str) -> ResultsPage:
     return ResultsPage(hits=tuple(hits.values()), announced_no_results=False)
 
 
-def search_ladder(choice: SearchChoice, ollama_key_present: bool, browser_present: bool) -> tuple[SearchEngine, ...]:
+def search_ladder(
+    choice: SearchChoice, ollama_key_present: bool, anthropic: AnthropicRung | None, browser_present: bool
+) -> tuple[SearchEngine, ...]:
     """The engines a search climbs, in order. ``auto`` is the whole ladder: Ollama's hosted search when its key is
-    present, DuckDuckGo, Brave, and DuckDuckGo in Dot's own Chrome when the run's browser is Dot's own. A named engine is
-    that engine alone."""
+    present, the Anthropic rung where ``anthropic`` puts it (``None``: no key), DuckDuckGo, Brave, and DuckDuckGo in
+    Dot's own Chrome when the run's browser is Dot's own. A named engine is that engine alone."""
     match choice:
         case "auto":
-            first: tuple[SearchEngine, ...] = ("ollama",) if ollama_key_present else ()
+            ollama: tuple[SearchEngine, ...] = ("ollama",) if ollama_key_present else ()
+            hosted: tuple[SearchEngine, ...] = () if anthropic is None or anthropic == "off" else ("anthropic",)
+            head: tuple[SearchEngine, ...] = (*hosted, *ollama) if anthropic == "first" else (*ollama, *hosted)
             last: tuple[SearchEngine, ...] = ("browser",) if browser_present else ()
-            return (*first, "duckduckgo", "brave", *last)
-        case "duckduckgo" | "brave" | "ollama":
+            return (*head, "duckduckgo", "brave", *last)
+        case "duckduckgo" | "brave" | "ollama" | "anthropic":
             return (choice,)
 
 
@@ -287,10 +306,18 @@ async def search(
     return outcome
 
 
+class AnthropicSearch(FrozenModel):
+    """What the Anthropic rung needs: the key and the model (``claude-haiku-5-5`` by default) that relays the search."""
+
+    api_key: str
+    model: str
+
+
 def engine_attempts(
-    client: WebClient, ollama_key: str | None, read_page: ReadPage | None
+    client: WebClient, ollama_key: str | None, anthropic: AnthropicSearch | None, read_page: ReadPage | None
 ) -> dict[SearchEngine, Attempt]:
-    """The tries of the engines this run can ask: Ollama's with its key, the browser's with a page reader."""
+    """The tries of the engines this run can ask: Ollama's with its key, Anthropic's with its key and model, the
+    browser's with a page reader."""
 
     async def duckduckgo(query: str, max_results: int) -> tuple[SearchHit, ...]:
         return await search_duckduckgo(client, query, max_results)
@@ -306,6 +333,13 @@ def engine_attempts(
             return await search_ollama(client, key, query, max_results)
 
         attempts["ollama"] = ollama
+    if anthropic is not None:
+        relay: AnthropicSearch = anthropic
+
+        async def hosted(query: str, max_results: int) -> tuple[SearchHit, ...]:
+            return await search_anthropic(client, relay, query, max_results)
+
+        attempts["anthropic"] = hosted
     if read_page is not None:
         reader: ReadPage = read_page
 
@@ -416,3 +450,124 @@ async def search_ollama(client: WebClient, api_key: str, query: str, max_results
         )
         for entry in entries[:max_results]
     )
+
+
+class _AnthropicCitation(BaseModel):
+    model_config = ConfigDict(extra="ignore", frozen=True)
+
+    url: str
+    cited_text: str
+
+
+class _AnthropicResult(BaseModel):
+    model_config = ConfigDict(extra="ignore", frozen=True)
+
+    url: str
+    title: str
+    page_age: str | None = None
+
+
+class _AnthropicToolError(BaseModel):
+    model_config = ConfigDict(extra="ignore", frozen=True)
+
+    error_code: str
+
+
+class _AnthropicBlock(BaseModel):
+    """A block of the answer: a ``text`` with its citations, or a ``web_search_tool_result`` whose content is the list
+    of results or one error object."""
+
+    model_config = ConfigDict(extra="ignore", frozen=True)
+
+    type: str
+    text: str | None = None
+    citations: list[_AnthropicCitation] | None = None
+    content: list[_AnthropicResult] | _AnthropicToolError | None = None
+
+
+class _AnthropicMessage(BaseModel):
+    model_config = ConfigDict(extra="ignore", frozen=True)
+
+    content: list[_AnthropicBlock]
+
+
+def anthropic_search_body(model: str, query: str) -> bytes:
+    """The one Messages request of a search: the relay prompt, the query and the server tool with one use."""
+    return json.dumps(
+        {
+            "model": model,
+            "max_tokens": _ANTHROPIC_MAX_TOKENS,
+            "system": _ANTHROPIC_SYSTEM,
+            "messages": [{"role": "user", "content": query}],
+            "tools": [{"type": _ANTHROPIC_SEARCH_TOOL, "name": "web_search", "max_uses": 1}],
+        }
+    ).encode()
+
+
+def parse_anthropic(body: bytes, query: str, max_results: int) -> tuple[SearchHit, ...]:
+    """The hits of a Messages answer: the results of its ``web_search_tool_result`` block, each with the text the
+    relay cited from it as the snippet (empty when it cited nothing from that page). A tool error that says the
+    service limits this key or is down benches the rung; another one fails the search with its code."""
+    try:
+        message: _AnthropicMessage = _AnthropicMessage.model_validate_json(body)
+    except ValidationError as exc:
+        raise WebError(
+            "the Anthropic API answered with a body that does not match its documented shape",
+            {"query": query, "error": str(exc)[:_ERROR_BODY_CHARS]},
+        ) from exc
+    cited: dict[str, str] = {}
+    results: list[_AnthropicResult] = []
+    for block in message.content:
+        if block.type == "web_search_tool_result":
+            if isinstance(block.content, _AnthropicToolError):
+                code: str = block.content.error_code
+                if code in _ANTHROPIC_BENCHED_CODES:
+                    raise WebThrottledError(
+                        f"the Anthropic web search is limiting this key or is unavailable ({code})",
+                        {"query": query, "code": code},
+                    )
+                raise WebError(f"the Anthropic web search refused the search ({code})", {"query": query, "code": code})
+            results.extend(block.content or [])
+        elif block.type == "text":
+            for citation in block.citations or []:
+                cited.setdefault(citation.url, citation.cited_text)
+    hits: list[SearchHit] = []
+    seen: set[str] = set()
+    for result in results:
+        if result.url in seen:
+            continue
+        seen.add(result.url)
+        age: str = "" if result.page_age is None else f" ({result.page_age})"
+        hits.append(
+            SearchHit(
+                title=_flat(result.title, _MAX_TITLE_CHARS),
+                url=result.url,
+                snippet=_flat(f"{cited.get(result.url, '')}{age}".strip(), _MAX_SNIPPET_CHARS),
+            )
+        )
+    return tuple(hits[:max_results])
+
+
+async def search_anthropic(
+    client: WebClient, relay: AnthropicSearch, query: str, max_results: int
+) -> tuple[SearchHit, ...]:
+    """Search through the Messages API's own ``web_search`` server tool, relayed by ``relay.model``: one request, one
+    search (the API bills each search next to the tokens; a failed search is not billed)."""
+    headers: dict[str, str] = {"x-api-key": relay.api_key, "anthropic-version": _ANTHROPIC_VERSION}
+    document = await client.post_json(
+        _ANTHROPIC_MESSAGES_URL, headers, anthropic_search_body(relay.model, query), _API_BYTES
+    )
+    if document.status == 429:
+        raise WebThrottledError(
+            "the Anthropic API is limiting this key (HTTP 429)", {"query": query, "status": document.status}
+        )
+    if document.status != 200:
+        raise WebError(
+            "the Anthropic API did not answer the search",
+            {
+                "query": query,
+                "status": document.status,
+                "body": decode_body(document.body, document.charset)[:_ERROR_BODY_CHARS],
+            },
+        )
+    return parse_anthropic(document.body, query, max_results)

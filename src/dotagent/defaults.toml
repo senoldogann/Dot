@@ -46,6 +46,9 @@ vision = "ollama:gemma4:cloud"
 fast = "ollama:gpt-oss:20b-cloud"
 # Answers for you where [policy] approvals = "auto", and checks the answer of a run in goal mode.
 review = "ollama:minimax-m2.7:cloud"
+# The model that relays a web search through the Anthropic API's own web_search tool (the "anthropic" rung of
+# [web] search_backend, when ANTHROPIC_API_KEY is set). Haiku: the search costs one cent plus a few hundred tokens.
+search = "anthropic:claude-haiku-5-5"
 effort = "medium"
 # Models of other providers that a run may ask for advice (the consult tool) or run a delegated part of the work on, in
 # order of preference, for example ["anthropic:claude-opus-5-5", "openai:gpt-5.5"].
@@ -330,6 +333,10 @@ terminal_idle_s = 1800.0
 # searches of that time skip it at once; the result names the engine that answered and the rungs skipped. A named engine
 # ("duckduckgo", "brave", "ollama") is that engine alone. dotx doctor shows the ladder.
 search_backend = "auto"
+# The Anthropic rung (the API's own web search, relayed by [models] search; $10 per 1,000 searches plus the tokens,
+# documented 2026-10) joins the auto ladder when ANTHROPIC_API_KEY is set: "auto" puts it after Ollama's free search,
+# "first" before it, "off" leaves it out. A named search_backend = "anthropic" uses it alone.
+anthropic_search = "auto"
 # The scraped searches (DuckDuckGo, Bing) start at least this far apart.
 search_spacing_s = 1.0
 fetch_timeout_s = 25.0

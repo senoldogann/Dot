@@ -90,6 +90,8 @@ class ModelsConfig(FrozenModel):
     vision: str
     fast: str
     review: str
+    # The Anthropic model that relays a web search through the API's own search tool (item 69); "anthropic:" only.
+    search: str
     effort: Effort
     helpers: list[str]
     standby: list[str]
@@ -272,7 +274,10 @@ class CrawlConfig(FrozenModel):
 
 
 class WebConfig(FrozenModel):
-    search_backend: Literal["auto", "duckduckgo", "brave", "ollama"]
+    search_backend: Literal["auto", "duckduckgo", "brave", "ollama", "anthropic"]
+    # Where the Anthropic rung stands on the auto ladder when ANTHROPIC_API_KEY is set: after Ollama's free search
+    # (auto), before it (first), or not at all (off).
+    anthropic_search: Literal["auto", "first", "off"]
     search_spacing_s: float
     fetch_timeout_s: float
     fetch_max_bytes: int

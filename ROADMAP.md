@@ -4624,7 +4624,7 @@ says so), $10 per 1,000 searches plus tokens (the docs; a failed search is not b
 
 | #   | Item                                                                     | Status      | Commits |
 | --- | ------------------------------------------------------------------------ | ----------- | ------- |
-| 69  | The Anthropic rung: Haiku 5.5 searches through the API's own web search | planned     |         |
+| 69  | The Anthropic rung: Haiku 5.5 searches through the API's own web search | in progress |         |
 | 70  | Reflection: Dot's day in review, every night                             | planned     |         |
 | 71  | Memory that rests: use decides what is recalled                          | planned     |         |
 | 72  | The home that says "I am here"                                           | planned     |         |
@@ -4635,7 +4635,7 @@ says so), $10 per 1,000 searches plus tokens (the docs; a failed search is not b
 
 ### 69. The Anthropic rung: Haiku 5.5 searches through the API's own web search
 
-**Status: planned.**
+**Status: in progress.** Built on `item-69-anthropic-rung` (MYP-209).
 
 **What.** A search rung that asks `claude-haiku-5-5` with the Messages API's `web_search` server tool and reads its
 results as hits (title, address, the cited text, the page's age), second on the ladder after `ollama` when the
@@ -4659,9 +4659,26 @@ config line. The spend is recorded in `spends` with kind `web_search`; `dotx sta
 by engine and the dollars. Doctor's search row names the rung. Unit test on the parsing and the errors (recorded
 bodies); a live smoke test with the key (skipped without) runs one search and asserts a hit and a spend.
 
-**Touchpoints.** `web/ladder.py`, `web/search.py`, `web/client.py`, `config.py`, `defaults.toml`, `store` (spends),
-`store/stats.py`, `cli_stats`, `doctor.py`, `server/static/js/cost.js`, `tests/unit/test_search_anthropic.py`,
-`tests/smoke/test_search_anthropic.py`, README (web tools and ladder).
+**Design, as built (2026-10-11).** As planned, with three differences. The request goes through the `WebClient`'s
+`post_json` like Ollama's (`search_anthropic(client, AnthropicSearch(api_key, model), query, max_results)`), not
+through the provider's client: one place for the web's requests, and the provider's retry policy is for the model's
+own calls. No spend row and no price in the config: the `spends` table is the pacing budget of a host (item 23), not
+a ledger, and a price written into Dot goes stale; instead `store/stats.py` `search_counts` reads the engine from the
+first line of every `web_search` result ("N results for … from anthropic"), `dotx stats` prints "searches answered:
+ollama 12, anthropic 3" and the cost card a "Searches" cell whose hint says what a search on the Anthropic rung costs;
+the price stays in README with its date. Snippets: the server tool returns pages as `encrypted_content`, not text, so
+a hit's snippet is the text the relay cited from that page (the `cited_text` of the answer's citations) with the page's
+age, and empty when it cited nothing. The ladder: `search_ladder(choice, ollama_key_present, anthropic, browser)`
+where `anthropic` is `[web] anthropic_search` when the key is set and `None` without it; `auto` puts the rung after
+`ollama`, `"first"` before, `"off"` nowhere; `search_backend = "anthropic"` names it alone. `[models] search`
+(`anthropic:claude-haiku-5-5`) must be an Anthropic model, refused at the call otherwise. The relay prompt asks for
+exactly one search with the user's words and one citing sentence; `max_tokens` 400; HTTP 429 and the tool errors
+`too_many_requests` and `unavailable` bench the rung for 120 s, other tool errors fail the search with their code.
+The live smoke test ran one search with the machine's key: 1 passed in 5.5 s, hits with addresses and titles.
+
+**Touchpoints.** `web/ladder.py`, `web/search.py`, `config.py`, `defaults.toml`, `runtime.py`, `tools/web.py`,
+`doctor.py`, `store/stats.py`, `cli_stats.py`, `server/static/js/cost.js`, `tests/unit/test_search_anthropic.py`,
+`tests/unit/test_research.py`, `tests/smoke/test_search_anthropic.py`, README (models table, web tools and ladder).
 
 ### 70. Reflection: Dot's day in review, every night
 
