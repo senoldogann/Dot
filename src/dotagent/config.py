@@ -272,9 +272,8 @@ class CrawlConfig(FrozenModel):
 
 
 class WebConfig(FrozenModel):
-    search_backend: Literal["auto", "duckduckgo", "ollama"]
+    search_backend: Literal["auto", "duckduckgo", "brave", "ollama"]
     search_spacing_s: float
-    search_attempts: int
     fetch_timeout_s: float
     fetch_max_bytes: int
     pdf_max_bytes: int

@@ -16,9 +16,10 @@ from urllib.parse import urlsplit, urlunsplit
 from pydantic import Field
 
 from dotagent.browser.safety import url_flags
+from dotagent.browser.session import RenderedDocument
 from dotagent.browser.snapshot import fence_untrusted
 from dotagent.config import AppConfig
-from dotagent.core.errors import ProviderError, ToolInputError, WebError
+from dotagent.core.errors import BrowserError, ProviderError, ToolInputError, WebError
 from dotagent.core.types import JsonObject
 from dotagent.policy.elements import looks_like_key
 from dotagent.policy.types import ActionInfo, Flag
@@ -38,8 +39,9 @@ from dotagent.web.crawl import (
     scope_of,
 )
 from dotagent.web.extract import Extraction, FieldSpec, extract
+from dotagent.web.ladder import SearchEngine, SearchOutcome
 from dotagent.web.pdf import pdf_to_text
-from dotagent.web.search import search_duckduckgo, search_ollama
+from dotagent.web.search import ReadPage, engine_attempts, search, search_ladder
 from dotagent.web.text import DocumentKind, ReadablePage, decode_body, document_kind, html_to_text
 from dotagent.web.types import FetchedDocument, SearchHit
 
@@ -56,6 +58,7 @@ _CRAWL_FOLDER: str = "crawl"
 _MAX_SOURCES: int = 20
 _MAX_FIELDS: int = 20
 _WINDOW_SLACK: float = 0.8  # a window ends at a line or word break found in its last fifth
+# A plain request turned away: when the run's browser is Dot's own Chrome the page is read there instead (item 59).
 _UNREADABLE_STATUS: frozenset[int] = frozenset({401, 403, 429, 503})
 # A page that is not there (item 56): the result says so and lists the front page's links that may be the one meant.
 _NOT_THERE_STATUS: frozenset[int] = frozenset({404, 410})
@@ -266,6 +269,56 @@ class FetchArgs(ToolArgs):
     )
 
 
+def browser_document(rendered: RenderedDocument) -> FetchedDocument:
+    """A page read in the browser, in the shape of a plain fetch, so that it is read and rendered the same way."""
+    return FetchedDocument(
+        url=rendered.url,
+        status=rendered.status,
+        media_type="text/html",
+        charset="utf-8",
+        body=rendered.html.encode("utf-8"),
+        truncated=False,
+        redirected_from=(),
+    )
+
+
+def render_browser_failure(shown_url: str, why: str, status: int, excerpt: str, nonce: str) -> str:
+    """The result when Dot's browser got an error status too: both answers, then what the page said."""
+    lines: list[str] = [
+        f"web_fetch got HTTP {status} from {shown_url} in Dot's browser too ({why}).",
+        "The site refuses this machine; use another source for the same facts, or ask the owner to open it.",
+    ]
+    if excerpt:
+        lines.append(fence_untrusted(shown_url, excerpt, nonce))
+    return "\n".join(lines)
+
+
+async def _fetch_in_browser(ctx: ToolContext, args: FetchArgs, url: str, shown_url: str, why: str) -> ToolResult:
+    """Read ``url`` in Dot's own Chrome because the plain request did not do (``why`` says what it got), and render the
+    page the way a plain fetch is rendered, with a first line that says how it was read."""
+    config: AppConfig = ctx.runtime.config
+    nonce: str = _nonce()
+    try:
+        rendered: RenderedDocument = await ctx.browser.read_page(url)
+    except BrowserError as error:
+        return fail(
+            f"web_fetch could not read {shown_url}: {why}, and Dot's browser could not open it: {error.message}"
+        )
+    document: FetchedDocument = browser_document(rendered)
+    readable: _Readable = await _readable(document, "html", config.web.fetch_max_bytes)
+    if not 200 <= document.status < 300:
+        return mark_untrusted(
+            fail(render_browser_failure(shown_url, why, document.status, readable.text[:_ERROR_EXCERPT_CHARS], nonce))
+        )
+    if args.start > len(readable.text):
+        return fail(f"start={args.start} is past the end of the document, which has {len(readable.text)} characters.")
+    cut_at: int | None = _cut_at(document, "html", config.web.fetch_max_bytes)
+    body: str = render_document(
+        shown_url, document, readable, cut_at, args.start, _text_budget(ctx.output_chars), nonce
+    )
+    return mark_untrusted(ok(f"Read in Dot's browser: {why}.\n{body}"))
+
+
 def _fetch_tool() -> RegisteredTool:
     def classify(args: FetchArgs, ctx: ToolContext) -> ActionInfo:
         url: str = checked_url(args.url, ctx.runtime.config.browser)
@@ -286,6 +339,10 @@ def _fetch_tool() -> RegisteredTool:
                 if kind in ("html", "text")
                 else _Readable("", "", "")
             )
+            if document.status in _UNREADABLE_STATUS and ctx.browser.quiet_reads:
+                return await _fetch_in_browser(
+                    ctx, args, url, shown_url, f"the plain request got HTTP {document.status}"
+                )
             likely, front_problem = (
                 await _front_page_links(ctx, url, config.web.fetch_max_bytes)
                 if document.status in _NOT_THERE_STATUS
@@ -304,6 +361,8 @@ def _fetch_tool() -> RegisteredTool:
                 f"({len(document.body)} bytes), not a page, a PDF or a text file."
             )
         readable: _Readable = await _readable(document, kind, config.web.fetch_max_bytes)
+        if _needs_javascript(document, kind, readable) and ctx.browser.quiet_reads:
+            return await _fetch_in_browser(ctx, args, url, shown_url, "the page shows little text without JavaScript")
         if args.start > len(readable.text):
             return fail(
                 f"start={args.start} is past the end of the document, which has {len(readable.text)} characters."
@@ -321,7 +380,8 @@ def _fetch_tool() -> RegisteredTool:
         description=(
             "Download a page, PDF or text file and return it as clean text, with headings, lists, tables and link "
             "addresses kept. Fast and light: no browser, no JavaScript, no login. A long document comes in parts; pass "
-            "start to continue. When the page needs JavaScript, a login or clicking, use browser_open instead."
+            "start to continue. A page that turns the plain request away or needs JavaScript is read in Dot's own "
+            "Chrome when the run has it, and the result says so. For a login or clicking, use browser_open."
         ),
         args_model=FetchArgs,
         modes=ALL_MODES,
@@ -360,37 +420,72 @@ def wanted_results(asked: int) -> tuple[int, str]:
     return _MAX_RESULTS, f" (max_results {asked} lowered to {_MAX_RESULTS}, the most a search returns)"
 
 
+def skipped_note(outcome: SearchOutcome) -> str:
+    """What the header says about the rungs the search went past, and about an answer that came from memory."""
+    parts: list[str] = [f"{entry.engine} skipped: {entry.reason}" for entry in outcome.skipped]
+    if outcome.age_s > 0:
+        parts.append(f"the same query was answered {max(1, round(outcome.age_s / 60))} min ago; this is that answer")
+    return f" ({'; '.join(parts)})" if parts else ""
+
+
+def _page_reader(ctx: ToolContext) -> ReadPage | None:
+    """A reader of pages in Dot's own visible Chrome for the browser rung, or ``None`` when the run's browser is the
+    user's or headless (a headless Chrome meets the engine's CAPTCHA)."""
+    if not ctx.browser.human_like:
+        return None
+
+    async def read(url: str) -> str:
+        try:
+            return (await ctx.browser.read_page(url)).html
+        except BrowserError as error:
+            raise WebError(f"Dot's browser could not open the search: {error.message}", dict(error.context)) from error
+
+    return read
+
+
 def _search_tool() -> RegisteredTool:
+    def rungs(ctx: ToolContext) -> tuple[SearchEngine, ...]:
+        return search_ladder(
+            ctx.runtime.config.web.search_backend, ctx.runtime.search_key_present, ctx.browser.human_like
+        )
+
     def classify(args: SearchArgs, ctx: ToolContext) -> ActionInfo:
         flags: tuple[Flag, ...] = ("exfiltration",) if looks_like_key(args.query) else ()
-        backend: str = ctx.runtime.search_backend
-        return _action("web_search", f"Search the web for {args.query}", backend, flags)
+        return _action("web_search", f"Search the web for {args.query}", "/".join(rungs(ctx)), flags)
 
     async def run(args: SearchArgs, ctx: ToolContext) -> ToolResult:
         config: AppConfig = ctx.runtime.config
         wanted, lowered = wanted_results(args.max_results)
-        hits: tuple[SearchHit, ...]
-        match ctx.runtime.search_backend:
-            case "duckduckgo":
-                hits = await search_duckduckgo(ctx.runtime.web, args.query, wanted)
-            case "ollama":
-                key: str = await asyncio.to_thread(
-                    require_secret, config.providers.ollama.api_key_env, "web_search with the ollama search backend"
-                )
-                hits = await search_ollama(ctx.runtime.web, key, args.query, wanted)
-        if not hits:
-            return ok(f"No results for {_clip(args.query, _SHOWN_URL_CHARS)!r}. Try other words or a broader query.")
-        header: str = (
-            f"{len(hits)} results for {_clip(args.query, _SHOWN_URL_CHARS)!r} ({ctx.runtime.search_backend}){lowered}. "
-            "Read the best ones with web_fetch."
+        ladder: tuple[SearchEngine, ...] = rungs(ctx)
+        key: str | None = (
+            await asyncio.to_thread(
+                require_secret, config.providers.ollama.api_key_env, "web_search with the ollama search engine"
+            )
+            if "ollama" in ladder
+            else None
         )
-        return mark_untrusted(ok("\n".join((header, fence_untrusted("web_search", render_hits(hits), _nonce())))))
+        outcome: SearchOutcome = await search(
+            ctx.runtime.web, ladder, engine_attempts(ctx.runtime.web, key, _page_reader(ctx)), args.query, wanted
+        )
+        if not outcome.hits:
+            return ok(
+                f"No results for {_clip(args.query, _SHOWN_URL_CHARS)!r} from {outcome.engine}{skipped_note(outcome)}. "
+                "Try other words or a broader query."
+            )
+        header: str = (
+            f"{len(outcome.hits)} results for {_clip(args.query, _SHOWN_URL_CHARS)!r} from {outcome.engine}{lowered}"
+            f"{skipped_note(outcome)}. Read the best ones with web_fetch."
+        )
+        return mark_untrusted(
+            ok("\n".join((header, fence_untrusted("web_search", render_hits(outcome.hits), _nonce()))))
+        )
 
     return make_tool(
         name="web_search",
         description=(
             "Search the web and get titles, addresses and short snippets. Use it to find pages or recent facts, then "
-            "read the best results with web_fetch. Needs no browser."
+            "read the best results with web_fetch. Several engines stand behind it, tried in turn, so a search that "
+            "fails outright is rare; the result names the engine that answered."
         ),
         args_model=SearchArgs,
         modes=ALL_MODES,

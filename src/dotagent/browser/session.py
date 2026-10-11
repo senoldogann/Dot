@@ -20,7 +20,7 @@ from pathlib import Path
 from typing import Literal
 from urllib.parse import urldefrag
 
-from playwright.async_api import Browser, BrowserContext, CDPSession, Page, Playwright, async_playwright
+from playwright.async_api import Browser, BrowserContext, CDPSession, Page, Playwright, Response, async_playwright
 from playwright.async_api import Error as PlaywrightError
 from pydantic import JsonValue
 
@@ -104,6 +104,10 @@ _LAUNCH_ARGS: list[str] = [
     "--no-default-browser-check",
 ]
 _LAUNCH_ERROR_CHARS: int = 900
+# A page that answered with a bot wall gets this long to pass its own check (a challenge page reloads itself) before
+# it is read as it stands: 202 is DuckDuckGo's check, the others are the usual walls.
+_CHALLENGE_STATUS: frozenset[int] = frozenset({202, 403, 429, 503})
+_CHALLENGE_WAIT_MS: int = 8000
 _DRIVER_LOST: str = "Connection closed while reading from the driver"
 # Chrome exits by itself a few seconds after the driver that started it died.
 _CHROME_EXIT_WAIT_S: float = 10.0
@@ -212,6 +216,22 @@ def _error_detail(error: BrowserError) -> str:
         )
     raw: object = error.context.get("error")
     return f"{error.message}: {raw}" if isinstance(raw, str) and raw else error.message
+
+
+@dataclass(frozen=True)
+class RenderedDocument:
+    """A page read in a scratch tab: the address it ended on, the status of its last main response and its HTML after
+    JavaScript ran."""
+
+    url: str
+    status: int
+    html: str
+
+
+def _note_main_status(page: Page, response: Response, statuses: list[int]) -> None:
+    """Keep the status of each main-frame document response, so a bot wall that reloads into the page is read right."""
+    if response.frame == page.main_frame and response.request.is_navigation_request():
+        statuses.append(response.status)
 
 
 class BrowserSession:
@@ -831,6 +851,72 @@ class BrowserSession:
             capture: _Capture = await self._capture(tab)
             tab.lines = capture.lines
             return FindResult(url=tab.page.url, hits=link_lines(capture.lines, tab.page.url, needle, limit))
+
+    @property
+    def quiet_reads(self) -> bool:
+        """Whether a page may be read in a tab the user never sees: true in Dot's own Chrome, false in the user's."""
+        return self._config.mode == "own"
+
+    @property
+    def human_like(self) -> bool:
+        """Whether a page read here passes the bot checks a plain request meets: Dot's own Chrome with a visible window.
+        A headless Chrome is told apart (measured 2026-10-11: DuckDuckGo shows it a CAPTCHA and a visible Chrome its
+        results), so it does not count."""
+        return self.quiet_reads and not self._config.headless
+
+    async def read_page(self, url: str) -> RenderedDocument:
+        """Read ``url`` in a tab of its own, one no thread owns and that closes when the read is over: the address the
+        page ended on, the status of its last main response and its HTML after JavaScript ran and the page settled. A
+        page that answered with a bot wall gets a few seconds to pass its own check first. For the web tools, when a
+        plain request was turned away; only in Dot's own Chrome (``quiet_reads``)."""
+        self._require_allowed(url)
+        if not self.quiet_reads:
+            raise BrowserError(
+                "pages are read quietly only in Dot's own Chrome, not in the user's", {"mode": self._config.mode}
+            )
+        config: BrowserConfig = self._config
+        context: BrowserContext = await self._ensure_context()
+        try:
+            page: Page = await context.new_page()
+        except PlaywrightError as error:
+            raise BrowserError(
+                "opening a tab failed", {"error": truncate_middle(str(error), _LAUNCH_ERROR_CHARS)}
+            ) from error
+        statuses: list[int] = []
+        page.on("response", lambda response: _note_main_status(page, response, statuses))
+        try:
+            first: int | None = await navigate(
+                page, url, _ms(config.navigation_timeout_s), config.navigation_attempts, config.navigation_backoff_ms
+            )
+            if first is None:
+                raise BrowserError("the address started a download, not a page", {"url": url})
+            if first in _CHALLENGE_STATUS:
+                with contextlib.suppress(PlaywrightError):
+                    await page.wait_for_event("load", timeout=_CHALLENGE_WAIT_MS)
+            await wait_dom_quiet(page, config.settle_quiet_ms, config.settle_max_ms, _ms(config.navigation_timeout_s))
+            landed: str = page.url
+            verdict = check_url(landed, config.allowed_hosts, config.blocked_hosts)
+            if not verdict.allowed:
+                raise BrowserError(
+                    "the page ended up on a URL that may not be opened", {"landed": landed, "reason": verdict.reason}
+                )
+            try:
+                html: str = await page.content()
+            except PlaywrightError as error:
+                raise BrowserError(
+                    "reading the page failed", {"url": url, "error": truncate_middle(str(error), _LAUNCH_ERROR_CHARS)}
+                ) from error
+        finally:
+            await self._close_scratch(page)
+        return RenderedDocument(url=landed, status=statuses[-1] if statuses else first, html=html)
+
+    async def _close_scratch(self, page: Page) -> None:
+        try:
+            await page.close()
+        except Exception as error:
+            if not browser_gone(error):
+                raise
+            _log.warning("browser_tab_close_failed", error=truncate_middle(str(error), _LAUNCH_ERROR_CHARS))
 
     async def read_text(self, thread_id: str, ref: str | None, offset: int, max_chars: int) -> TextView:
         async with self._locked(thread_id) as thread:

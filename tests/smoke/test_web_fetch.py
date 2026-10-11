@@ -1,9 +1,13 @@
-"""web_fetch against a local site (item 56): a page that is not there is reported with the links of the host's front
-page that share a word with the address asked for, so the next turn opens the right page instead of guessing another.
-The site is served the way an eval attempt serves its own; the web client is allowed the loopback address."""
+"""web_fetch against local sites. Item 56: a page that is not there is reported with the links of the host's front page
+that share a word with the address asked for, so the next turn opens the right page instead of guessing another. Item
+59: a page that turns the plain request away (HTTP 429) or shows little without JavaScript is read in Dot's own
+headless Chrome, and the result says so; a page that refuses the browser too says that. The sites are served on the
+loopback address, which the web client is allowed."""
 
 import asyncio
+import threading
 from collections.abc import AsyncIterator, Iterator
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 import pytest
@@ -34,6 +38,42 @@ _PAGES: tuple[SitePage, ...] = (
 )
 
 
+_WALL_TEXT: str = "Open roles at Acme: Senior Developer, Oulu."
+_SHELL_HTML: str = (
+    "<!doctype html><html><head><title>Shell</title>"
+    + "".join(f"<script>var s{number} = {number};</script>" for number in range(12))
+    + "<script>document.addEventListener('DOMContentLoaded', () => {"
+    "document.getElementById('app').textContent = 'Rendered by the script: forty open roles.'; });</script>"
+    '</head><body><div id="app"></div></body></html>'
+)
+
+
+class _WallHandler(BaseHTTPRequestHandler):
+    """A site that turns plain requests away: ``/wall`` answers 429 unless a Chrome asks, ``/forbidden`` answers 403
+    to everyone, ``/shell`` is a page whose text a script writes."""
+
+    def do_GET(self) -> None:
+        path: str = self.path.split("?", 1)[0]
+        chrome: bool = "Chrome" in self.headers.get("User-Agent", "")
+        if path == "/wall":
+            status, body = (200, f"<title>Roles</title><p>{_WALL_TEXT}</p>") if chrome else (429, "<p>Slow down.</p>")
+        elif path == "/forbidden":
+            status, body = 403, "<p>Access denied for everyone.</p>"
+        elif path == "/shell":
+            status, body = 200, _SHELL_HTML
+        else:
+            status, body = 404, "<p>No such page.</p>"
+        payload: bytes = body.encode("utf-8")
+        self.send_response(status)
+        self.send_header("Content-Type", "text/html; charset=utf-8")
+        self.send_header("Content-Length", str(len(payload)))
+        self.end_headers()
+        self.wfile.write(payload)
+
+    def log_message(self, format: str, *args: object) -> None:
+        return None
+
+
 class _Gate:
     async def authorize(self, info: ActionInfo) -> str:
         return ""
@@ -46,6 +86,16 @@ class _Gate:
 def site() -> Iterator[str]:
     with serve_site(_PAGES) as address:
         yield address
+
+
+@pytest.fixture(scope="module")
+def wall() -> Iterator[str]:
+    server: ThreadingHTTPServer = ThreadingHTTPServer(("127.0.0.1", 0), _WallHandler)
+    thread: threading.Thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    yield f"http://127.0.0.1:{server.server_address[1]}"
+    server.shutdown()
+    server.server_close()
 
 
 @pytest_asyncio.fixture(scope="module", loop_scope="module")
@@ -98,3 +148,22 @@ async def test_a_page_that_is_not_there_is_reported_with_the_front_pages_likely_
     assert unrelated.is_error and "links to nothing that shares a word" in unrelated.text
     there: ToolResult = await _fetch(runtime, f"{site}/about/")
     assert not there.is_error and "About Acme." in there.text
+
+
+async def test_a_page_that_turns_the_plain_request_away_is_read_in_dots_own_chrome(runtime: Runtime, wall: str) -> None:
+    read: ToolResult = await _fetch(runtime, f"{wall}/wall")
+    assert not read.is_error and read.untrusted
+    assert read.text.startswith("Read in Dot's browser: the plain request got HTTP 429.\nFetched ")
+    assert _WALL_TEXT in read.text
+    shell: ToolResult = await _fetch(runtime, f"{wall}/shell")
+    assert not shell.is_error
+    assert shell.text.startswith("Read in Dot's browser: the page shows little text without JavaScript.")
+    assert "Rendered by the script: forty open roles." in shell.text
+    refused: ToolResult = await _fetch(runtime, f"{wall}/forbidden")
+    assert refused.is_error
+    assert refused.text.startswith(
+        f"web_fetch got HTTP 403 from {wall}/forbidden in Dot's browser too (the plain request got HTTP 403)."
+    )
+    assert "Access denied for everyone." in refused.text
+    # The scratch tab left no tab behind for the thread.
+    assert runtime.browser.current_url("fetch-test") is None

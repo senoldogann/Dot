@@ -292,9 +292,18 @@ answer (a small model that is offered both writes the call out as text).
 
 The shell and the file tools work in `<home>/workspace` unless a path says otherwise. A shell command runs with the
 `PATH` of your login shell, in its own process group (cancelling a run ends the whole group) and under a timeout
-(`[shell] default_timeout_s`, at most `max_timeout_s`). `web_search` uses the hosted search of Ollama when `OLLAMA_API_KEY`
-is set and DuckDuckGo, which needs no key, otherwise (`[web] search_backend`, default `auto`; `dotx doctor` shows the
-choice); `web_fetch` reads HTML and PDF and refuses localhost, LAN and cloud-metadata addresses unless `[web] allow_private_hosts` is set.
+(`[shell] default_timeout_s`, at most `max_timeout_s`). `web_search` climbs a ladder of engines until one answers
+(`[web] search_backend`, default `auto`; `dotx doctor` shows the ladder): the hosted search of Ollama when `OLLAMA_API_KEY`
+is set (no bot check), then the HTML pages of DuckDuckGo and Brave Search (no key), then DuckDuckGo opened in Dot's own
+Chrome when the run's browser is Dot's own with a visible window (its bot check runs there and passes; a headless Chrome
+is shown a CAPTCHA, measured 2026-10-11). An engine that limits this machine is benched (DuckDuckGo 10 minutes, Brave
+90 seconds) and the searches of that time skip it at once; the same query within 10 minutes is answered from memory.
+The first line of a result names the engine that answered, every rung skipped with its reason, and the age of a
+remembered answer. Bing is not a rung: without a session its page answers some queries with the results of another query.
+`web_fetch` reads HTML and PDF and refuses localhost, LAN and cloud-metadata addresses unless `[web] allow_private_hosts` is set.
+A page that turns the plain request away (HTTP 401, 403, 429 or 503) or shows little text without JavaScript is read
+in Dot's own Chrome when the run's browser is Dot's own, in a tab of its own that closes after the read; the first line
+of the result says so. A page that refuses the browser too says that, with both answers.
 A page that is not there (HTTP 404 or 410) is reported with the links of the host's front page that share a word with
 the address asked for (a dozen at most), so the next turn opens the right page instead of guessing another address;
 the system prompt says the same (find a page with `web_search` or `web_crawl`, never by trying `/careers/` on a hunch).
@@ -707,7 +716,7 @@ these were counted (before item 22 of the roadmap) are left out of the acts line
 The numbers of a long run follow under each model: the **compactions** per 100 steps, their seconds and their share of
 the model time (a run on a small context budget pays a summary every few steps); the **web failures** by cause, read
 from the first line of each failed `web_fetch`, `web_search`, `web_crawl` or `web_extract` result (not found: HTTP 404
-or a host name that does not resolve, which is an address the model guessed; throttled: HTTP 429 or DuckDuckGo's bot
+or a host name that does not resolve, which is an address the model guessed; throttled: HTTP 429 or an engine's bot
 check; blocked: HTTP 401 or 403; in transit; other); the calls of any tool **refused for arguments that did not fit**
 (a turn lost each, on top of the calls whose arguments were not valid JSON); the **delegated runs** and the seconds
 the run waited for them; and the step line adds the median input tokens a step sent per band, the growth of the
@@ -1448,10 +1457,11 @@ src/dotagent/
   live daemon. No model worked from a real skill or plugin folder (discovery, `dotx skills list` and the `skill` tool ran
   on real folders).
 - The shell guardrail is best-effort and not a sandbox (see [Safety](#safety)).
-- DuckDuckGo answers a burst of searches with its bot check (HTTP 202). Dot spaces its searches (`search_spacing_s`) and
-  retries a blocked one (`search_attempts`), but a long research run can still meet the check (`dotx stats` counts these
-  under the web failures). The hosted Ollama search
-  has no such limit: with `search_backend = "auto"` (the default) Dot uses it as soon as `OLLAMA_API_KEY` is set.
+- DuckDuckGo answers a burst of searches with its bot check (HTTP 202) and Brave Search with a rate limit (HTTP 429)
+  after a handful in quick succession. Dot spaces its searches (`search_spacing_s`), benches an engine that limits it
+  and moves to the next rung, so a search fails outright only when every engine does (`dotx stats` counts these under
+  the web failures; the browser rung needs Dot's own Chrome with a visible window). The hosted Ollama search has no such
+  limit: with `search_backend = "auto"` (the default) it is the first rung as soon as `OLLAMA_API_KEY` is set.
 - The thresholds of the memory search were measured on a small hand-written set of English and Turkish notes
   (indicative, not a benchmark); another language, another embedding model or a much larger memory may need other
   `min_similarity` values.

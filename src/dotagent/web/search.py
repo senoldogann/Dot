@@ -1,6 +1,18 @@
-"""Web search backends: the HTML page of DuckDuckGo (no key) and the hosted search API of Ollama (needs a key)."""
+"""Web search as a ladder of engines, so that one engine's bot check is a rung skipped, not a failed call.
+
+The rungs, in the order ``auto`` climbs them: the hosted search of Ollama (needs a key, has no bot check), the HTML page
+of DuckDuckGo, the HTML page of Brave Search (both scraped, no key), and DuckDuckGo's HTML page opened in Dot's own
+Chrome, where its bot check runs and passes. An engine that limits this machine is benched for a while, so the searches
+that follow skip it at once instead of waiting on it; the one answer is remembered for a while, so the same query asked
+again costs no engine anything. The result names the engine that answered and every rung skipped, with its reason.
+
+Bing is not a rung: without a session its HTML page answers some queries with the results of another query, and a
+wrong answer is worse than a skipped rung (measured 2026-10-11: three of six queries).
+"""
 
 import json
+import time
+from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import dataclass, field
 from html.parser import HTMLParser
 from typing import Literal
@@ -9,18 +21,28 @@ from urllib.parse import parse_qs, quote_plus, urlsplit
 from pydantic import BaseModel, ConfigDict, ValidationError
 
 from dotagent.core.errors import WebError, WebThrottledError
-from dotagent.core.retry import retry_async
+from dotagent.core.logs import get_logger
 from dotagent.web.client import WebClient
+from dotagent.web.ladder import BENCH_S, EngineBench, SearchEngine, SearchOutcome, Skipped
 from dotagent.web.text import decode_body
 from dotagent.web.types import SearchHit
 
-# The backend searches go to, and what the configuration may say: ``auto`` picks the hosted search of Ollama when its
-# key is present (it has no bot check) and DuckDuckGo otherwise.
-SearchBackend = Literal["duckduckgo", "ollama"]
-SearchChoice = Literal["auto", "duckduckgo", "ollama"]
+log = get_logger(__name__)
+
+# What the configuration may say: ``auto`` is the whole ladder (the hosted search of Ollama when its key is present,
+# the browser rung when the run's browser is Dot's own Chrome); a named engine is that engine alone.
+SearchChoice = Literal["auto", "duckduckgo", "brave", "ollama"]
+
+# One try of one engine: the hits for a query, at most the number asked.
+type Attempt = Callable[[str, int], Awaitable[tuple[SearchHit, ...]]]
+# A page read in Dot's own Chrome: the HTML after JavaScript ran. The web tools hand it in so that this module does
+# not depend on the browser.
+type ReadPage = Callable[[str], Awaitable[str]]
 
 _DUCKDUCKGO_URL: str = "https://html.duckduckgo.com/html/"
 _DUCKDUCKGO_HOSTS: frozenset[str] = frozenset({"duckduckgo.com", "www.duckduckgo.com", "html.duckduckgo.com"})
+_BRAVE_URL: str = "https://search.brave.com/search"
+_BRAVE_HOSTS: frozenset[str] = frozenset({"search.brave.com"})
 _OLLAMA_SEARCH_URL: str = "https://ollama.com/api/web_search"
 _OLLAMA_MAX_RESULTS: int = 10
 _PAGE_BYTES: int = 1_000_000
@@ -28,11 +50,10 @@ _API_BYTES: int = 1_000_000
 _MAX_SNIPPET_CHARS: int = 600
 _MAX_TITLE_CHARS: int = 200
 _ERROR_BODY_CHARS: int = 500
-# DuckDuckGo answers 202 with a bot check instead of results; 429 is the plain rate limit.
-_THROTTLED_STATUS: frozenset[int] = frozenset({202, 429})
-# After the bot check no search of this machine starts for this long, so a burst of waiting searches does not keep
-# the engine angry.
-_THROTTLE_PAUSE_S: float = 8.0
+# DuckDuckGo answers 202 with a bot check instead of results; 429 is the plain rate limit of both scraped engines (Brave
+# reaches it after a handful of searches in quick succession), and 403 a machine turned away.
+_DUCKDUCKGO_THROTTLED_STATUS: frozenset[int] = frozenset({202, 429})
+_BRAVE_THROTTLED_STATUS: frozenset[int] = frozenset({403, 429})
 
 
 def _flat(text: str, limit: int) -> str:
@@ -126,55 +147,230 @@ def parse_duckduckgo(html: str) -> ResultsPage:
     return ResultsPage(hits=tuple(hits.values()), announced_no_results=parser.announced_no_results)
 
 
-def resolved_backend(choice: SearchChoice, ollama_key_present: bool) -> SearchBackend:
-    """The backend ``choice`` names; ``auto`` is Ollama's hosted search with its key and DuckDuckGo without."""
+def brave_address(href: str) -> str | None:
+    """The page a Brave result link leads to: an absolute web address; Brave's own pages are dropped."""
+    absolute: str = f"https:{href}" if href.startswith("//") else href
+    try:
+        parts = urlsplit(absolute)
+        host: str | None = parts.hostname
+    except ValueError:
+        return None
+    if parts.scheme not in ("http", "https") or not host or host in _BRAVE_HOSTS:
+        return None
+    return absolute
+
+
+class _BraveParser(HTMLParser):
+    """Reads the result blocks of ``search.brave.com/search``: a ``div[data-type="web"]`` holding the result's link, a
+    ``title`` div and a ``description`` div (the class names of the page carry build hashes; the data attribute and
+    these two words are what stays). The page has no empty-result notice this parser knows, so a page without web
+    results is reported as such and the engine benched briefly."""
+
+    def __init__(self) -> None:
+        super().__init__(convert_charrefs=True)
+        self.drafts: list[_Draft] = []
+        self._depth: int = 0
+        self._capture: list[str] | None = None
+
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        attributes: dict[str, str] = {name: value or "" for name, value in attrs}
+        classes: tuple[str, ...] = tuple(attributes.get("class", "").split())
+        if tag == "div" and attributes.get("data-type") == "web":
+            self.drafts.append(_Draft(advertisement=False))
+            self._depth = 1
+            self._capture = None
+            return
+        if self._depth == 0:
+            return
+        draft: _Draft = self.drafts[-1]
+        if tag == "div":
+            self._depth += 1
+            if "title" in classes:
+                self._capture = draft.title
+            elif "description" in classes or "snippet-description" in classes:
+                self._capture = draft.snippet
+        elif tag == "a" and not draft.href and attributes.get("href", "").startswith(("http://", "https://", "//")):
+            draft.href = attributes["href"]
+
+    def handle_endtag(self, tag: str) -> None:
+        if self._depth and tag == "div":
+            self._capture = None
+            self._depth -= 1
+
+    def handle_data(self, data: str) -> None:
+        if self._capture is not None:
+            self._capture.append(data)
+
+
+def parse_brave(html: str) -> ResultsPage:
+    """The web results of a Brave Search result page, in order, each address once."""
+    parser: _BraveParser = _BraveParser()
+    parser.feed(html)
+    parser.close()
+    hits: dict[str, SearchHit] = {}
+    for draft in parser.drafts:
+        address: str | None = brave_address(draft.href)
+        title: str = _flat("".join(draft.title), _MAX_TITLE_CHARS)
+        if address is not None and title and address not in hits:
+            hits[address] = SearchHit(
+                title=title, url=address, snippet=_flat("".join(draft.snippet), _MAX_SNIPPET_CHARS)
+            )
+    return ResultsPage(hits=tuple(hits.values()), announced_no_results=False)
+
+
+def search_ladder(choice: SearchChoice, ollama_key_present: bool, browser_present: bool) -> tuple[SearchEngine, ...]:
+    """The engines a search climbs, in order. ``auto`` is the whole ladder: Ollama's hosted search when its key is
+    present, DuckDuckGo, Brave, and DuckDuckGo in Dot's own Chrome when the run's browser is Dot's own. A named engine is
+    that engine alone."""
     match choice:
         case "auto":
-            return "ollama" if ollama_key_present else "duckduckgo"
-        case "duckduckgo" | "ollama":
-            return choice
+            first: tuple[SearchEngine, ...] = ("ollama",) if ollama_key_present else ()
+            last: tuple[SearchEngine, ...] = ("browser",) if browser_present else ()
+            return (*first, "duckduckgo", "brave", *last)
+        case "duckduckgo" | "brave" | "ollama":
+            return (choice,)
 
 
-def _is_throttled(exc: Exception) -> bool:
-    return isinstance(exc, WebThrottledError)
+def bench_note(remaining_s: float) -> str:
+    return f"benched for {max(1, round(remaining_s / 60))} more min after it limited this machine"
 
 
-def _no_hint(exc: Exception) -> float | None:
-    return None
+async def climb(
+    rungs: tuple[SearchEngine, ...],
+    attempts: Mapping[SearchEngine, Attempt],
+    bench: EngineBench,
+    query: str,
+    max_results: int,
+    now: Callable[[], float],
+) -> SearchOutcome:
+    """Ask the engines of ``rungs`` in turn until one answers. A benched engine is skipped with the time it has left;
+    one that limits this machine is benched for its ``BENCH_S`` and skipped; one that fails otherwise is skipped with its
+    error. When every rung is skipped the error names each engine and its reason."""
+    skipped: list[Skipped] = []
+    for engine in rungs:
+        remaining: float | None = bench.remaining(engine, now())
+        if remaining is not None:
+            skipped.append(Skipped(engine=engine, reason=bench_note(remaining)))
+            continue
+        try:
+            hits: tuple[SearchHit, ...] = await attempts[engine](query, max_results)
+        except WebThrottledError as error:
+            bench.bench(engine, BENCH_S[engine], now())
+            log.warning("search_engine_benched", engine=engine, seconds=BENCH_S[engine], error=error.message)
+            skipped.append(Skipped(engine=engine, reason=error.message))
+        except WebError as error:
+            log.warning("search_engine_failed", engine=engine, error=error.message)
+            skipped.append(Skipped(engine=engine, reason=error.message))
+        else:
+            return SearchOutcome(hits=hits, engine=engine, skipped=tuple(skipped), age_s=0.0)
+    raise WebError(
+        "; ".join(f"{entry.engine}: {entry.reason}" for entry in skipped),
+        {"query": query, "engines": [entry.engine for entry in skipped]},
+    )
 
 
-async def _search_duckduckgo_once(client: WebClient, query: str, max_results: int) -> tuple[SearchHit, ...]:
-    await client.search_gate.turn()
-    url: str = f"{_DUCKDUCKGO_URL}?q={quote_plus(query)}"
-    document = await client.get(url, _PAGE_BYTES)
-    if document.status in _THROTTLED_STATUS:
-        client.search_gate.cool_down(_THROTTLE_PAUSE_S)
-        raise WebThrottledError(
-            "DuckDuckGo is limiting the searches of this machine (its bot check). Wait a while, read known pages with "
-            'web_fetch instead, or set web.search_backend = "ollama" (needs OLLAMA_API_KEY)',
-            {"query": query, "status": document.status, "tries": client.search_retry.attempts},
-        )
-    if document.status != 200:
-        raise WebError("DuckDuckGo did not answer the search", {"query": query, "status": document.status})
-    page: ResultsPage = parse_duckduckgo(decode_body(document.body, document.charset))
+async def search(
+    client: WebClient,
+    rungs: tuple[SearchEngine, ...],
+    attempts: Mapping[SearchEngine, Attempt],
+    query: str,
+    max_results: int,
+) -> SearchOutcome:
+    """A query's outcome: the one remembered from the last ``MEMORY_S`` when there is one (cut to ``max_results``),
+    else the ladder climbed and the outcome kept."""
+    now: float = time.monotonic()
+    remembered: SearchOutcome | None = client.search_memory.recall(query, now)
+    if remembered is not None:
+        return remembered.model_copy(update={"hits": remembered.hits[:max_results]})
+    outcome: SearchOutcome = await climb(rungs, attempts, client.search_bench, query, max_results, time.monotonic)
+    client.search_memory.keep(query, outcome, now)
+    return outcome
+
+
+def engine_attempts(
+    client: WebClient, ollama_key: str | None, read_page: ReadPage | None
+) -> dict[SearchEngine, Attempt]:
+    """The tries of the engines this run can ask: Ollama's with its key, the browser's with a page reader."""
+
+    async def duckduckgo(query: str, max_results: int) -> tuple[SearchHit, ...]:
+        return await search_duckduckgo(client, query, max_results)
+
+    async def brave(query: str, max_results: int) -> tuple[SearchHit, ...]:
+        return await search_brave(client, query, max_results)
+
+    attempts: dict[SearchEngine, Attempt] = {"duckduckgo": duckduckgo, "brave": brave}
+    if ollama_key is not None:
+        key: str = ollama_key
+
+        async def ollama(query: str, max_results: int) -> tuple[SearchHit, ...]:
+            return await search_ollama(client, key, query, max_results)
+
+        attempts["ollama"] = ollama
+    if read_page is not None:
+        reader: ReadPage = read_page
+
+        async def browser(query: str, max_results: int) -> tuple[SearchHit, ...]:
+            return await search_in_browser(reader, query, max_results)
+
+        attempts["browser"] = browser
+    return attempts
+
+
+def _results_or_error(page: ResultsPage, engine: str, query: str, size: int, max_results: int) -> tuple[SearchHit, ...]:
+    """The hits of a result page; a page with neither results nor an empty-result notice is the engine's bot check or
+    a changed layout (or, for Brave, which has no notice this module reads, a query nothing matches), so the engine
+    sits out briefly and the next rung answers."""
     if not page.hits and not page.announced_no_results:
-        raise WebError(
-            "DuckDuckGo answered with a page that has no results and no empty-result notice (a bot check or a "
-            "changed page layout)",
-            {"query": query, "status": document.status, "bytes": len(document.body)},
+        raise WebThrottledError(
+            f"{engine} answered with a page that has no results and no empty-result notice (a bot check, a changed "
+            "page layout or a query nothing matches)",
+            {"query": query, "bytes": size},
         )
     return page.hits[:max_results]
 
 
 async def search_duckduckgo(client: WebClient, query: str, max_results: int) -> tuple[SearchHit, ...]:
-    """Search through the HTML page of DuckDuckGo. Searches start one after another at a steady pace, and one that meets
-    the bot check of the engine is tried again after a pause; when the tries are used up the last error is raised. A page
-    with neither results nor an empty-result notice (a changed layout) is an error rather than an empty answer."""
+    """Search through the HTML page of DuckDuckGo; the scraped searches start at a steady pace."""
+    await client.search_gate.turn()
+    document = await client.get(duckduckgo_url(query), _PAGE_BYTES)
+    if document.status in _DUCKDUCKGO_THROTTLED_STATUS:
+        raise WebThrottledError(
+            "DuckDuckGo is limiting the searches of this machine (its bot check)",
+            {"query": query, "status": document.status},
+        )
+    if document.status != 200:
+        raise WebError("DuckDuckGo did not answer the search", {"query": query, "status": document.status})
+    page: ResultsPage = parse_duckduckgo(decode_body(document.body, document.charset))
+    return _results_or_error(page, "DuckDuckGo", query, len(document.body), max_results)
 
-    async def attempt() -> tuple[SearchHit, ...]:
-        return await _search_duckduckgo_once(client, query, max_results)
 
-    return await retry_async(attempt, _is_throttled, _no_hint, client.search_retry, "duckduckgo search")
+def duckduckgo_url(query: str) -> str:
+    return f"{_DUCKDUCKGO_URL}?q={quote_plus(query)}"
+
+
+def brave_url(query: str) -> str:
+    return f"{_BRAVE_URL}?q={quote_plus(query)}&source=web"
+
+
+async def search_brave(client: WebClient, query: str, max_results: int) -> tuple[SearchHit, ...]:
+    """Search through the HTML page of Brave Search; the scraped searches start at a steady pace."""
+    await client.search_gate.turn()
+    document = await client.get(brave_url(query), _PAGE_BYTES)
+    if document.status in _BRAVE_THROTTLED_STATUS:
+        raise WebThrottledError(
+            "Brave Search is limiting the searches of this machine", {"query": query, "status": document.status}
+        )
+    if document.status != 200:
+        raise WebError("Brave Search did not answer the search", {"query": query, "status": document.status})
+    page: ResultsPage = parse_brave(decode_body(document.body, document.charset))
+    return _results_or_error(page, "Brave Search", query, len(document.body), max_results)
+
+
+async def search_in_browser(read_page: ReadPage, query: str, max_results: int) -> tuple[SearchHit, ...]:
+    """Search through DuckDuckGo's HTML page opened in Dot's own Chrome, where its bot check runs and passes; the page
+    is read like the plain one."""
+    html: str = await read_page(duckduckgo_url(query))
+    return _results_or_error(parse_duckduckgo(html), "DuckDuckGo in Dot's browser", query, len(html), max_results)
 
 
 class _OllamaResult(BaseModel):
