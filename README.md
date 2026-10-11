@@ -69,6 +69,7 @@ A model is written `provider:model`. The `[models]` table of the configuration s
 | `main`              | the agent loop                                                                            | `ollama:minimax-m2.7:cloud` |
 | `vision`            | describing the images a tool returns, when `main` cannot see them                         | `ollama:gemma4:cloud`       |
 | `fast`              | writing the summary of a compaction (see [Tools](#tools))                                 | `ollama:gpt-oss:20b-cloud`  |
+| `search`            | relaying a web search through the Anthropic API's own search tool (see [Tools](#tools))   | `anthropic:claude-haiku-5-5` |
 | `review`            | answering the policy's questions in `auto` approvals, and checking a run against its goal | `ollama:minimax-m2.7:cloud` |
 | `effort`            | default reasoning level of a run on `main` (see below)                                    | `medium`                    |
 | `helpers`           | models a run may ask for advice or hand a part of its work to (see below)                 | `[]`                        |
@@ -301,10 +302,13 @@ The shell and the file tools work in `<home>/workspace` unless a path says other
 `PATH` of your login shell, in its own process group (cancelling a run ends the whole group) and under a timeout
 (`[shell] default_timeout_s`, at most `max_timeout_s`). `web_search` climbs a ladder of engines until one answers
 (`[web] search_backend`, default `auto`; `dotx doctor` shows the ladder): the hosted search of Ollama when `OLLAMA_API_KEY`
-is set (no bot check), then the HTML pages of DuckDuckGo and Brave Search (no key), then DuckDuckGo opened in Dot's own
+is set (no bot check), then the Anthropic API's own web search when `ANTHROPIC_API_KEY` is set (relayed by `[models]
+search`, Haiku 5.5 by default; the API bills $10 per 1,000 searches next to the tokens, a failed search is not billed;
+`[web] anthropic_search = "first"` puts it before Ollama, `"off"` leaves it out), then the HTML pages of DuckDuckGo and
+Brave Search (no key), then DuckDuckGo opened in Dot's own
 Chrome when the run's browser is Dot's own with a visible window (its bot check runs there and passes; a headless Chrome
 is shown a CAPTCHA, measured 2026-10-11). An engine that limits this machine is benched (DuckDuckGo 10 minutes, Brave
-90 seconds) and the searches of that time skip it at once; the same query within 10 minutes is answered from memory.
+90 seconds, the Anthropic rung 2 minutes) and the searches of that time skip it at once; the same query within 10 minutes is answered from memory.
 The first line of a result names the engine that answered, every rung skipped with its reason, and the age of a
 remembered answer. Bing is not a rung: without a session its page answers some queries with the results of another query.
 `web_fetch` reads HTML and PDF and refuses localhost, LAN and cloud-metadata addresses unless `[web] allow_private_hosts` is set.

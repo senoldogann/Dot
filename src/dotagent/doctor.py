@@ -53,7 +53,7 @@ from dotagent.skills.catalog import load_skills, playbook_root
 from dotagent.skills.types import SkillCatalog, SkillProblem
 from dotagent.tools.shell import read_login_env
 from dotagent.web.client import WebClient
-from dotagent.web.search import SearchChoice, search_ladder, search_ollama
+from dotagent.web.search import AnthropicRung, SearchChoice, search_ladder, search_ollama
 from dotagent.web.types import SearchHit
 
 _PROBE_TIMEOUT_S: float = 5.0
@@ -149,17 +149,23 @@ def _check_key(provider: str, variable: str, present: bool, needed: bool) -> Che
     return _result(name, False, False, f"not set; add it to use {provider} models: dotx auth set {variable}")
 
 
-def _search_row(config: AppConfig, ollama_key_present: bool) -> CheckResult:
-    """The engines web_search climbs: what [web] search_backend says, and what auto resolves to on this Mac (the browser
-    rung joins when the run's browser is Dot's own Chrome with a visible window)."""
+def _search_row(config: AppConfig, ollama_key_present: bool, anthropic_key_present: bool) -> CheckResult:
+    """The engines web_search climbs: what [web] search_backend says, and what auto resolves to on this Mac (the Anthropic
+    rung joins when its key is set, the browser rung when the run's browser is Dot's own Chrome with a visible window)."""
     choice: SearchChoice = config.web.search_backend
     visible_own: bool = config.browser.mode == "own" and not config.browser.headless
-    ladder: str = " -> ".join(search_ladder(choice, ollama_key_present, visible_own))
-    variable: str = config.providers.ollama.api_key_env
+    anthropic: AnthropicRung | None = config.web.anthropic_search if anthropic_key_present else None
+    ladder: str = " -> ".join(search_ladder(choice, ollama_key_present, anthropic, visible_own))
     if choice != "auto":
         return _result("web search", True, False, f"{ladder} ([web] search_backend)")
-    reason: str = f"{variable} is set" if ollama_key_present else f"{variable} is not set"
-    return _result("web search", True, False, f"{ladder} (auto: {reason})")
+    keys: str = ", ".join(
+        f"{variable} is {'set' if present else 'not set'}"
+        for variable, present in (
+            (config.providers.ollama.api_key_env, ollama_key_present),
+            (config.providers.anthropic.api_key_env, anthropic_key_present),
+        )
+    )
+    return _result("web search", True, False, f"{ladder} (auto: {keys})")
 
 
 async def _check_openai_api(router: ModelRouter, required: bool) -> CheckResult:
@@ -594,7 +600,7 @@ async def _service_checks(config: AppConfig) -> list[CheckResult]:
         _check_key("openai", config.providers.openai.api_key_env, openai_present, "openai" in used),
         _check_key("opencode go", config.providers.opencode_go.api_key_env, go_present, "opencode_go" in used),
         _check_key("anthropic", config.providers.anthropic.api_key_env, anthropic_present, "anthropic" in used),
-        _search_row(config, ollama_present),
+        _search_row(config, ollama_present, anthropic_present),
     ]
     try:
         if openai_present:

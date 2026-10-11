@@ -88,6 +88,8 @@ class Runtime:
     # Whether the key of Ollama's hosted search was found when the runtime was built: the first rung of web_search's
     # ladder when [web] search_backend is auto.
     search_key_present: bool
+    # Whether ANTHROPIC_API_KEY (or the configured variable) is set: the Anthropic rung joins the ladder when it is.
+    anthropic_key_present: bool
     mcp: McpHub
     memory: MemoryIndex
     registry: ToolRegistry
@@ -191,6 +193,7 @@ async def open_runtime(config: AppConfig, login_env: dict[str, str]) -> Runtime:
     schedule_zone: ZoneInfo = await asyncio.to_thread(resolve_zone, config.scheduler.timezone)
     shell_env: dict[str, str] = child_env(login_env, config.shell.pass_env)
     ollama_key: str | None = await asyncio.to_thread(resolve_secret, config.providers.ollama.api_key_env)
+    anthropic_key: str | None = await asyncio.to_thread(resolve_secret, config.providers.anthropic.api_key_env)
     typesafe_key: str | None = await asyncio.to_thread(resolve_secret, config.judge.api_key_env)
     plugins: PluginCatalog = await asyncio.to_thread(load_plugins, config.plugins, config.mcp)
     push_keys: PushKeys = await asyncio.to_thread(read_or_create_keys, vapid_path())
@@ -225,6 +228,7 @@ async def open_runtime(config: AppConfig, login_env: dict[str, str]) -> Runtime:
             terminals=Terminals(config.shell.terminal_sessions, config.shell.terminal_idle_s, shell_env),
             web=WebClient(config.web, config.browser.allowed_hosts, config.browser.blocked_hosts),
             search_key_present=ollama_key is not None,
+            anthropic_key_present=anthropic_key is not None,
             mcp=mcp,
             memory=memory,
             registry=registry,

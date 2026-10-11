@@ -1,6 +1,7 @@
 """Numbers about the runs that really happened, read from the database file without changing it."""
 
 import math
+import re
 import sqlite3
 import statistics
 from collections import Counter
@@ -184,6 +185,28 @@ class WebFailures(FrozenModel):
     other: int
 
 
+class SearchCount(FrozenModel):
+    """How many searches one engine answered (the first line of a ``web_search`` result names it)."""
+
+    engine: str
+    searches: int
+
+
+_SEARCH_ANSWER: re.Pattern[str] = re.compile(r"^(?:\d+ results|No results) for .* from ([a-z]+)")
+
+
+def search_counts(samples: Sequence[ToolSample]) -> tuple[SearchCount, ...]:
+    """The searches that came back, by the engine that answered, most first."""
+    engines: Counter[str] = Counter()
+    for sample in samples:
+        if sample.tool != "web_search" or not sample.ok:
+            continue
+        match: re.Match[str] | None = _SEARCH_ANSWER.match(sample.text.splitlines()[0] if sample.text else "")
+        if match is not None:
+            engines[match.group(1)] += 1
+    return tuple(SearchCount(engine=engine, searches=count) for engine, count in engines.most_common())
+
+
 class CompactionStats(FrozenModel):
     """How often the runs compacted and what it cost: the compactions, their number per 100 steps (``None`` without
     a step), their seconds and the share of the model seconds they took (``None`` without a timed call)."""
@@ -285,6 +308,7 @@ class ModelStats(FrozenModel):
     stalls: int
     compaction: CompactionStats
     web: WebFailures
+    searches: tuple[SearchCount, ...]
     delegation: DelegationStats
     time: TimeStats
     acts: ActStats
@@ -674,6 +698,7 @@ def _model_stats(
         stalls=counts.stalls,
         compaction=compaction_stats(counts.compactions, total_steps, time),
         web=web_failures(tools),
+        searches=search_counts(tools),
         delegation=delegation_stats(tools),
         time=time,
         acts=act_stats(acts),

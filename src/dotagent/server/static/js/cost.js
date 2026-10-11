@@ -15,6 +15,7 @@ const HINTS = {
   input: "The tokens sent to the model in all its calls, and the share the provider served from its cache",
   output: "The tokens the model wrote",
   compactions: "How often the context was summarised to fit the budget",
+  searches: "The web searches that came back, by the engine that answered (the anthropic rung costs one cent a search)",
   delegated: "The runs this run delegated and how long it waited for them",
 };
 
@@ -52,6 +53,7 @@ export function createCostCard() {
     const perHundred = stats.compaction.per_100_steps === null ? "" : ` · ${stats.compaction.per_100_steps.toFixed(1)} per 100 steps`;
     const compactions = stats.compaction.compactions === 0 ? "None" : `${stats.compaction.compactions}${perHundred}`;
     const delegated = stats.delegation.runs === 0 ? "None" : `${stats.delegation.runs} · ${duration(stats.delegation.seconds)} waited`;
+    const searches = stats.searches.length === 0 ? "None" : stats.searches.map((entry) => `${entry.searches} ${entry.engine}`).join(" · ");
     card.setSummary(costLine(costs));
     grid.replaceChildren(
       cell("Model", spent(time.model_seconds, total), HINTS.model),
@@ -63,6 +65,7 @@ export function createCostCard() {
       cell("Output tokens", compact(stats.output_tokens), HINTS.output),
       cell("Compactions", compactions, HINTS.compactions),
       cell("Delegated runs", delegated, HINTS.delegated),
+      cell("Searches", searches, HINTS.searches),
     );
   }
 

@@ -19,8 +19,9 @@ from dotagent.browser.safety import url_flags
 from dotagent.browser.session import RenderedDocument
 from dotagent.browser.snapshot import fence_untrusted
 from dotagent.config import AppConfig
-from dotagent.core.errors import BrowserError, ProviderError, ToolInputError, WebError
+from dotagent.core.errors import BrowserError, ProviderError, ToolExecutionError, ToolInputError, WebError
 from dotagent.core.types import JsonObject
+from dotagent.llm.router import ModelRef, parse_model_ref
 from dotagent.policy.elements import looks_like_key
 from dotagent.policy.types import ActionInfo, Flag
 from dotagent.secrets import require_secret
@@ -41,7 +42,7 @@ from dotagent.web.crawl import (
 from dotagent.web.extract import Extraction, FieldSpec, extract
 from dotagent.web.ladder import SearchEngine, SearchOutcome
 from dotagent.web.pdf import pdf_to_text
-from dotagent.web.search import ReadPage, engine_attempts, search, search_ladder
+from dotagent.web.search import AnthropicSearch, ReadPage, engine_attempts, search, search_ladder
 from dotagent.web.text import DocumentKind, ReadablePage, decode_body, document_kind, html_to_text
 from dotagent.web.types import FetchedDocument, SearchHit
 
@@ -445,9 +446,26 @@ def _page_reader(ctx: ToolContext) -> ReadPage | None:
 
 def _search_tool() -> RegisteredTool:
     def rungs(ctx: ToolContext) -> tuple[SearchEngine, ...]:
+        config: AppConfig = ctx.runtime.config
         return search_ladder(
-            ctx.runtime.config.web.search_backend, ctx.runtime.search_key_present, ctx.browser.human_like
+            config.web.search_backend,
+            ctx.runtime.search_key_present,
+            config.web.anthropic_search if ctx.runtime.anthropic_key_present else None,
+            ctx.browser.human_like,
         )
+
+    async def anthropic_relay(config: AppConfig) -> AnthropicSearch:
+        """The key and the model of the Anthropic rung; a [models] search that is not an Anthropic model is refused."""
+        ref: ModelRef = parse_model_ref(config.models.search)
+        if ref.provider != "anthropic":
+            raise ToolExecutionError(
+                "[models] search must name an Anthropic model for the anthropic search engine",
+                {"search": config.models.search},
+            )
+        key: str = await asyncio.to_thread(
+            require_secret, config.providers.anthropic.api_key_env, "web_search with the anthropic search engine"
+        )
+        return AnthropicSearch(api_key=key, model=ref.model)
 
     def classify(args: SearchArgs, ctx: ToolContext) -> ActionInfo:
         flags: tuple[Flag, ...] = ("exfiltration",) if looks_like_key(args.query) else ()
@@ -464,8 +482,13 @@ def _search_tool() -> RegisteredTool:
             if "ollama" in ladder
             else None
         )
+        relay: AnthropicSearch | None = await anthropic_relay(config) if "anthropic" in ladder else None
         outcome: SearchOutcome = await search(
-            ctx.runtime.web, ladder, engine_attempts(ctx.runtime.web, key, _page_reader(ctx)), args.query, wanted
+            ctx.runtime.web,
+            ladder,
+            engine_attempts(ctx.runtime.web, key, relay, _page_reader(ctx)),
+            args.query,
+            wanted,
         )
         if not outcome.hits:
             return ok(

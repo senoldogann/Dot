@@ -18,6 +18,7 @@ from dotagent.store.stats import (
     ModelStats,
     RunCosts,
     RunStatistics,
+    SearchCount,
     SiteStats,
     StepBand,
     TimeStats,
@@ -63,6 +64,7 @@ def render_model(stats: ModelStats) -> list[str]:
         "arguments that did not fit (a turn lost each)",
         f"  stalls {stats.stalls}, compactions {_compaction(stats.compaction)}",
         f"  web failures: {_web(stats.web)}",
+        f"  searches answered: {_searches(stats.searches)}",
         f"  delegated runs {stats.delegation.runs}, waited {_seconds(stats.delegation.seconds)} s for them",
         f"  acts: {_acts(stats.acts)}",
         f"  step model call and input tokens by step number: {_bands(stats.bands)}",
@@ -76,6 +78,10 @@ def _compaction(compaction: CompactionStats) -> str:
         f"{compaction.compactions} ({per} per 100 steps, {_seconds(compaction.seconds)} s, "
         f"{_share(compaction.share)} of the model time)"
     )
+
+
+def _searches(searches: Sequence[SearchCount]) -> str:
+    return "none" if not searches else ", ".join(f"{entry.engine} {entry.searches}" for entry in searches)
 
 
 def _web(web: WebFailures) -> str:
