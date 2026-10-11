@@ -51,6 +51,7 @@ from dotagent.store.models import (
     ThreadSummary,
 )
 from dotagent.store.stats import ModelProfile, RunCosts, collect_run_costs, read_model_profile
+from dotagent.tools.team import TEAM_SOURCE
 
 _SCHEMA: str = """
 CREATE TABLE IF NOT EXISTS threads (
@@ -1800,6 +1801,23 @@ class Store:
         """The newest ``limit`` runs of the agent, newest first."""
         rows = await self._all(
             "SELECT * FROM runs WHERE agent_id = ? ORDER BY created_at DESC LIMIT ?", (agent_id, limit)
+        )
+        return [_run(row) for row in rows]
+
+    async def team_runs(self, since: float) -> list[RunRecord]:
+        """The runs behind the messages between agents (item 87) started at or after ``since``, oldest first."""
+        rows = await self._all(
+            "SELECT * FROM runs WHERE source = ? AND created_at >= ? ORDER BY created_at", (TEAM_SOURCE, since)
+        )
+        return [_run(row) for row in rows]
+
+    async def agent_messages(self, agent_id: str, limit: int) -> list[RunRecord]:
+        """The newest ``limit`` runs behind the messages the agent sent or received (item 87), newest first."""
+        rows = await self._all(
+            "SELECT runs.* FROM runs LEFT JOIN runs AS sender ON sender.id = runs.parent_run_id"
+            " WHERE runs.source = ? AND (runs.agent_id = ? OR sender.agent_id = ?)"
+            " ORDER BY runs.created_at DESC LIMIT ?",
+            (TEAM_SOURCE, agent_id, agent_id, limit),
         )
         return [_run(row) for row in rows]
 

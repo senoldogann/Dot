@@ -200,7 +200,8 @@ export function createTimeline({ rootRunId, startedAt, onGrow, onPlan, onStats, 
 
   function childScope(runId, data, ts) {
     const parent = scopes.get(data.parent_run_id) ?? scopes.get(rootRunId);
-    const face = actorFace(runId, "working");
+    // A run of an agent (item 87, a message to it) wears the agent's face; any other delegated run its own.
+    const face = actorFace(data.agent_id ?? runId, "working");
     const status = el("span", { role: "img" });
     paintRing(status, "running");
     // The mode and, once it starts, the model of the delegated run: for a screen reader; the row shows none of it.

@@ -102,7 +102,7 @@ def test_a_conversation_whose_start_was_summarised_is_taken_whole() -> None:
 def _prompt(approvals: ApprovalMode, goal_mode: bool) -> str:
     return build_system_prompt(
         collect_prompt_inputs(
-            "task", "cli", "aggressive", approvals, "wait", goal_mode, Path("/tmp/work"), [], [], [], None, [], None
+            "task", "cli", "aggressive", approvals, "wait", goal_mode, Path("/tmp/work"), [], [], [], None, [], None, ()
         )
     )
 
@@ -148,7 +148,20 @@ def test_yolo_changes_only_the_secrets_line_and_the_approvals_line_of_the_prompt
 def _asking(source: str, questions: QuestionMode, tool_names: list[str]) -> str:
     return build_system_prompt(
         collect_prompt_inputs(
-            "task", source, "aggressive", "ask", questions, False, Path("/tmp/work"), [], tool_names, [], None, [], None
+            "task",
+            source,
+            "aggressive",
+            "ask",
+            questions,
+            False,
+            Path("/tmp/work"),
+            [],
+            tool_names,
+            [],
+            None,
+            [],
+            None,
+            (),
         )
     )
 
@@ -171,7 +184,7 @@ def test_the_prompt_mentions_goal_mode_only_when_it_is_on() -> None:
 def _in_mode(mode: RunMode) -> str:
     return build_system_prompt(
         collect_prompt_inputs(
-            mode, "cli", "aggressive", "ask", "wait", False, Path("/tmp/work"), [], [], [], None, [], None
+            mode, "cli", "aggressive", "ask", "wait", False, Path("/tmp/work"), [], [], [], None, [], None, ()
         )
     )
 

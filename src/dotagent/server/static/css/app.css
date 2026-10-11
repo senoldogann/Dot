@@ -3053,3 +3053,39 @@ dialog.lightbox img {
 .cluster.end {
   justify-content: flex-end;
 }
+
+/* The Team thread (item 87): the two faces of a message, the sender's over the receiver's, then the line and reply. */
+.team-faces {
+  display: flex;
+  flex: none;
+  align-items: center;
+}
+
+.team-faces .avatar {
+  width: 28px;
+  height: 28px;
+}
+
+.team-faces .avatar + .avatar {
+  margin-left: -8px;
+}
+
+.team-heads {
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.team-member {
+  font-weight: var(--weight-label);
+  color: var(--text);
+}
+
+.team-arrow {
+  display: inline-flex;
+  color: var(--muted);
+}
+
+.team-reply {
+  padding-left: 12px;
+  border-left: 2px solid var(--border-strong);
+}

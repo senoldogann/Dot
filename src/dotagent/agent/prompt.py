@@ -18,6 +18,7 @@ from dotagent.tools.delegate import DELEGATE_SOURCE, DELEGATE_TOOL
 from dotagent.tools.groups import group_lines
 from dotagent.tools.meta import ASK_USER_TOOL, USE_TOOLS_TOOL
 from dotagent.tools.skill import SKILL_TOOL
+from dotagent.tools.team import MESSAGE_AGENT_TOOL
 
 
 class AgentBrief(FrozenModel):
@@ -51,6 +52,8 @@ class PromptInputs(FrozenModel):
     helpers: tuple[str, ...]
     # The agent the run belongs to (item 86): its name, role and instructions open the prompt; None for Dot.
     agent: AgentBrief | None
+    # The other agents the run may message (item 87), by name and role; empty when there are none.
+    team: tuple[AgentBrief, ...]
 
 
 _MODE_TEXT: dict[RunMode, str] = {
@@ -464,10 +467,25 @@ def build_system_prompt(inputs: PromptInputs) -> str:
         _skills_section(inputs.skills, inputs.tool_names),
         _delegate_section(inputs.tool_names),
         _helpers_section(inputs.helpers, inputs.tool_names),
+        _team_section(inputs.team, inputs.tool_names),
         _environment(inputs),
         _memory_section(inputs.memories),
     ]
     return "\n\n".join(section for section in sections if section)
+
+
+def _team_section(team: Sequence[AgentBrief], tool_names: Sequence[str]) -> str:
+    """The agents the run may message (item 87): a line each, and when to send one a message."""
+    if not team or MESSAGE_AGENT_TOOL not in tool_names:
+        return ""
+    lines: list[str] = [
+        "# Team",
+        "- The owner made agents that work with you. Send one a message with message_agent when a part of the work "
+        "fits its role better than yours; it works in a run of its own, cannot see this conversation, and its reply "
+        "comes back as the result. The team:",
+        *(f"  - {member.name}: {member.role}" if member.role else f"  - {member.name}" for member in team),
+    ]
+    return "\n".join(lines)
 
 
 def _agent_section(agent: AgentBrief | None) -> str:
@@ -496,6 +514,7 @@ def collect_prompt_inputs(
     campaign_session: int | None,
     helpers: Sequence[str],
     agent: AgentBrief | None,
+    team: Sequence[AgentBrief],
 ) -> PromptInputs:
     """Gather the facts about this machine and moment that the prompt states."""
     return PromptInputs(
@@ -516,4 +535,5 @@ def collect_prompt_inputs(
         campaign_session=campaign_session,
         helpers=tuple(helpers),
         agent=agent,
+        team=tuple(team),
     )

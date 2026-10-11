@@ -186,7 +186,7 @@ async def test_the_sections_show_what_waits_what_works_and_a_campaign_session_wi
     )
     await _first_tool_call(runtime, working.id)
     # A run the working run delegated (item 68): it works at the same time and hangs under its parent in the lists.
-    delegation = asyncio.create_task(manager.delegate(working.id, "Scan the catalogue", "task", None))
+    delegation = asyncio.create_task(manager.delegate(working.id, "Scan the catalogue", "task", None, None))
     delegated: RunRecord = await _child_of(runtime, working.id)
     await _first_tool_call(runtime, delegated.id)
     session: RunRecord = await manager.start_session(campaign.id)

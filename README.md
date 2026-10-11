@@ -1292,7 +1292,19 @@ home composer offers an Agent menu once an agent exists, Dot by default. A run o
 with the agent's own section ("You are Scout, an agent the owner made: ..." and your instructions), ahead of Dot's
 rules, which still hold; its tools are the ones the agent names plus finishing, asking you and turning tool groups on.
 The run's page wears the agent's face and name in the bar with a chip to its page; its rows on the Activity page and
-in the sidebar wear the face too. Deleting an agent leaves its chats to Dot. The API: `GET /api/agents` (Dot first,
+in the sidebar wear the face too. Deleting an agent leaves its chats to Dot.
+
+Agents work together through messages. A run (Dot's or an agent's) sends one with the `message_agent` tool, naming
+the agent and the message; the agent answers in a run of its own (its instructions, its tools, its model) that
+cannot see the sender's conversation, and the reply comes back as the tool's result, the way a delegated run's
+report does. The prompt lists the team by name and role under "Team" whenever there is another agent to message;
+an agent does not message itself, and an answering run messages no one further. The sender's chat shows the
+exchange as a delegated row wearing the agent's face. **Team** (a button on the Agents page, `#/team`) is today's
+thread of these messages: who to whom, the message, the reply, the time and the two runs; an agent's page lists the
+messages it sent or received. `GET /api/team` gives the thread. Three `[agent]` settings follow the harness study
+arXiv 2609.20804: `context_elide_share` (0.6, past which older tool output is shortened), `context_summarise_share`
+(0.85 of the configured budget, past which the older part of the run is summarised) and `plan_each_turn` (on: the open plan is appended to
+the system message of every step). The API: `GET /api/agents` (Dot first,
 each agent with its newest run), `POST /api/agents`, `GET`/`PUT`/`DELETE /api/agents/{id}` (Dot is neither changed
 nor deleted), `GET /api/tools` (the names an agent may be given), and `POST /api/runs` with `agent_id`.
 

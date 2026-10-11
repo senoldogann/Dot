@@ -149,7 +149,7 @@ async def test_a_delegated_run_cannot_delegate_again(runtime: Runtime, manager: 
     parent: RunRecord = await _stored_run(runtime, "task", None, "test")
     child: RunRecord = await _stored_run(runtime, "task", parent.id, DELEGATE_SOURCE)
     with pytest.raises(RunConflict) as refused:
-        await manager.delegate(child.id, "anything", "task", None)
+        await manager.delegate(child.id, "anything", "task", None, None)
     assert "cannot delegate further" in refused.value.message
     assert manager.active_run_ids() == []
 
@@ -157,7 +157,7 @@ async def test_a_delegated_run_cannot_delegate_again(runtime: Runtime, manager: 
 async def test_a_research_run_only_delegates_research(runtime: Runtime, manager: RunManager) -> None:
     parent: RunRecord = await _stored_run(runtime, "research", None, "test")
     with pytest.raises(RunConflict) as refused:
-        await manager.delegate(parent.id, "anything", "task", None)
+        await manager.delegate(parent.id, "anything", "task", None, None)
     assert "only delegate research" in refused.value.message
     assert manager.active_run_ids() == []
     assert await _children_of(runtime, parent.id) == []
@@ -215,7 +215,7 @@ async def test_stopping_the_waiting_caller_stops_the_delegated_run(runtime: Runt
     marker: str = f"sleep 47.{secrets.randbelow(900) + 100}"
     parent: RunRecord = await _stored_run(runtime, "task", None, "test")
     goal: str = f"Run the shell command `{marker}`, then call finish."
-    waiting: asyncio.Task[object] = asyncio.create_task(manager.delegate(parent.id, goal, "task", None))
+    waiting: asyncio.Task[object] = asyncio.create_task(manager.delegate(parent.id, goal, "task", None, None))
     child_id: str = await _until_a_run_is_active(manager)
     await _until_running(marker)
     waiting.cancel()

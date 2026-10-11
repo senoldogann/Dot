@@ -62,6 +62,7 @@ from dotagent.tools.registry import ToolRegistry, build_registry
 from dotagent.tools.schedule import build_schedule_tools
 from dotagent.tools.shell import build_shell_tool, child_env, read_login_env
 from dotagent.tools.skill import build_skill_tool
+from dotagent.tools.team import build_team_tools
 from dotagent.tools.terminal import build_terminal_tools
 from dotagent.tools.web import build_web_tools
 from dotagent.web.client import WebClient
@@ -118,6 +119,7 @@ def _tool_groups(config: AppConfig, judge_items: bool) -> tuple[tuple[Registered
         build_schedule_tools(),
         build_campaign_tools(),
         build_delegate_tools(),
+        build_team_tools(),
         build_consult_tools(),
         build_meta_tools(),
         (build_skill_tool(),),

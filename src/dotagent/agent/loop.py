@@ -181,18 +181,18 @@ from dotagent.tools.meta import ASK_USER_TOOL, FINISH_TOOL, USE_TOOLS_TOOL, Fini
 from dotagent.tools.posts import POST_TOOLS
 from dotagent.tools.registry import ToolRegistry, specs_for_mode
 from dotagent.tools.skill import SKILL_TOOL
+from dotagent.tools.team import MESSAGE_AGENT_TOOL
 
 log = get_logger(__name__)
 
 # A delegated run reports to its parent: it neither delegates again nor asks the user, and its parent asks the helpers.
 # The tools every agent keeps whatever its list says (item 86): the ones that end a run, ask, and turn groups on.
 AGENT_CORE_TOOLS: tuple[str, ...] = (FINISH_TOOL, ASK_USER_TOOL, USE_TOOLS_TOOL)
-_NOT_FOR_DELEGATED_RUNS: frozenset[str] = frozenset({DELEGATE_TOOL, ASK_USER_TOOL, CONSULT_TOOL})
+_NOT_FOR_DELEGATED_RUNS: frozenset[str] = frozenset({DELEGATE_TOOL, ASK_USER_TOOL, CONSULT_TOOL, MESSAGE_AGENT_TOOL})
 
 _SUMMARY_KEEP_TAIL: int = 8
 _SUMMARY_ATTEMPTS: int = 3
 _QUERY_EARLIER_RUNS: int = 3
-_SOFT_LIMIT_SHARE: float = 0.6
 _SUMMARY_TRANSCRIPT_CHARS: int = 120_000
 # A summary is never asked for in more words than this, whatever the budget: a longer one costs the writer's seconds
 # at every compaction and fills the note that every later step carries (item 55).
@@ -200,10 +200,11 @@ _SUMMARY_MAX_WORDS: int = 1500
 # A summary may take this share of the run's context budget. Each compaction summarises the previous summary again, so
 # without a limit the summary grows until it alone fills the budget and every step compacts.
 _SUMMARY_SHARE: float = 0.1
-# Right after a compaction the prompt takes about this share of the budget at most: the fixed part, the continuity note
-# (its summary and its pinned facts may take a _SUMMARY_SHARE each) and the newest messages in what is left. The rest
-# is room for the steps that follow, so that a run with a small budget does not compact again at its next step.
-_COMPACTED_SHARE: float = 0.85
+# A compaction leaves this share of the compaction point free under it: right after it the prompt holds the fixed
+# part, the continuity note (its summary and its pinned facts may take a _SUMMARY_SHARE of the budget each) and the
+# newest messages in what is left, and the room is for the steps that follow, so that a run with a small budget does
+# not compact again at its next step.
+_COMPACTION_ROOM: float = 0.15
 _WORDS_PER_TOKEN: float = 0.75
 # A summary longer than its limit by more than this factor is asked for again.
 _SUMMARY_SLACK: float = 1.5
@@ -324,6 +325,15 @@ class Compaction(FrozenModel):
     problem: str | None
     fast_problem: str | None
     check: ContinuityCheck | None
+
+
+async def _with_plan(agent: AgentRun, system: Message) -> Message:
+    """The system message with the run's plan after it while the plan has open steps (item 87); the message itself
+    when there is no plan or every step is closed."""
+    plan: PlanPayload = await _current_plan(agent)
+    if not plan.steps or not open_steps(plan.steps):
+        return system
+    return system.model_copy(update={"content": f"{system.content}\n\n# Your plan now\n{plan_lines(plan)}"})
 
 
 async def _current_plan(agent: AgentRun) -> PlanPayload:
@@ -503,13 +513,18 @@ async def _fit_context(
     config: AgentConfig = agent.runtime.config.agent
     current: list[Message] = drop_old_images(history, config.keep_recent_screenshots)
     estimated: int = round(estimate_tokens([system, *current], specs) * ratio)
-    if estimated > context_tokens * _SOFT_LIMIT_SHARE:
+    if estimated > context_tokens * config.context_elide_share:
         current = shrink_old_tool_results(current, config.keep_recent_tool_results)
         estimated = round(estimate_tokens([system, *current], specs) * ratio)
-    if estimated > context_tokens:
+    # The compaction point (item 87): context_summarise_share of the configured budget, or the run's whole budget when
+    # a small window cut it under that, since a budget that small has no share to spare.
+    summarise_at: float = min(config.context_tokens * config.context_summarise_share, context_tokens)
+    if estimated > summarise_at:
         # The budget in the units of estimate_tokens, before its calibration against the provider's counts.
         plain: float = context_tokens / ratio
-        tail_tokens: int = round(plain * (_COMPACTED_SHARE - 2 * _SUMMARY_SHARE)) - estimate_tokens([system], specs)
+        tail_tokens: int = round(
+            summarise_at / ratio * (1 - _COMPACTION_ROOM) - 2 * _SUMMARY_SHARE * plain
+        ) - estimate_tokens([system], specs)
         head, tail = split_for_summary(current, _SUMMARY_KEEP_TAIL, tail_tokens)
         if head:
             ledger = with_compaction(ledger)
@@ -1221,6 +1236,12 @@ async def run_agent(agent: AgentRun) -> RunEnd:
         specs = tuple(spec for spec in specs if spec.name not in CAMPAIGN_TOOLS | POST_TOOLS)
     # The agent the run belongs to (item 86) bounds its tools: the ones it names, and the core tools in any case.
     agent_record: AgentRecord | None = None if run.agent_id is None else await runtime.store.get_agent(run.agent_id)
+    # The team (item 87): the other agents, whom the run may message; without any, the tool goes.
+    team: tuple[AgentRecord, ...] = tuple(
+        member for member in await runtime.store.list_agents() if member.id != run.agent_id
+    )
+    if not team:
+        specs = tuple(spec for spec in specs if spec.name != MESSAGE_AGENT_TOOL)
     if agent_record is not None and agent_record.tools:
         agent_tools: frozenset[str] = frozenset(agent_record.tools) | frozenset(AGENT_CORE_TOOLS)
         specs = tuple(spec for spec in specs if spec.name in agent_tools)
@@ -1278,6 +1299,7 @@ async def run_agent(agent: AgentRun) -> RunEnd:
                 None
                 if agent_record is None
                 else AgentBrief(name=agent_record.name, role=agent_record.role, instructions=agent_record.instructions),
+                [AgentBrief(name=member.name, role=member.role, instructions="") for member in team],
             )
         )
     )
@@ -1403,8 +1425,13 @@ async def run_agent(agent: AgentRun) -> RunEnd:
         )
         registry: ToolRegistry = callable_tools if allowed is None else _only(callable_tools, allowed)
         hidden: dict[str, str] = hidden_tools(specs, on) if allowed is None else {}
+        # The open plan at the end of the system prompt of every step (item 87), rebuilt from the newest plan event so
+        # that nothing accumulates in the history; the prompt's own text stays the same for the provider's cache.
+        step_system: Message = (
+            await _with_plan(agent, system) if config.plan_each_turn and run.mode != "chat" else system
+        )
         history, estimated, ledger = await _fit_context(
-            agent, history, system, offered, ratio, ledger, scaffold.context_tokens
+            agent, history, step_system, offered, ratio, ledger, scaffold.context_tokens
         )
         routed: _Candidate | None = (
             None
@@ -1418,7 +1445,7 @@ async def run_agent(agent: AgentRun) -> RunEnd:
         routed_effort: Effort | None = None if routed is None else effective_effort(routed.info.efforts, effort)
         request: ChatRequest = ChatRequest(
             model=step_ref.model,
-            messages=(system, *history),
+            messages=(step_system, *history),
             tools=offered,
             temperature=None,
             max_output_tokens=None,

@@ -180,6 +180,17 @@ tool_output_chars = 12000
 # A wider budget means fewer summaries in a long run and more input tokens a step (item 55, decision 33 of the roadmap):
 # 48000 was the budget before 2026-10-11; set it back on a metered key if the tokens weigh more than the summaries.
 context_tokens = 96000
+# Where in the budget the harness acts (item 87, after arXiv 2609.20804): past context_elide_share of the run's budget
+# older tool output is shortened; past context_summarise_share of context_tokens the older part of the run is
+# summarised into a note (a model whose window cuts the budget under that point summarises when its budget is full).
+# The paper's finding is that eliding first and summarising at 85 % keeps a run's answers at the quality of a run that
+# never compacts; 1.0 would summarise only when the budget is full, as before.
+context_elide_share = 0.6
+context_summarise_share = 0.85
+# The open plan at the end of the system prompt of every step (the paper: a plan re-injected each turn keeps a long run
+# on its steps); off, the plan reaches the model only at a compaction, a reminder and when it tries to end with open
+# steps.
+plan_each_turn = true
 keep_recent_tool_results = 6
 keep_recent_screenshots = 2
 # The progress watchdog looks for the same step (same calls, same results) stall_limit times in a row and answers with

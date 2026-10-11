@@ -39,13 +39,13 @@ def _title(text: str) -> str:
     return first if len(first) <= _TITLE_CHARS else f"{first[: _TITLE_CHARS - 1]}…"
 
 
-def _start_of_today(now: float) -> float:
+def start_of_today(now: float) -> float:
     today: datetime = datetime.fromtimestamp(now).astimezone()
     return today.replace(hour=0, minute=0, second=0, microsecond=0).timestamp()
 
 
 def _end_of_today(now: float) -> float:
-    return _start_of_today(now) + 86400.0
+    return start_of_today(now) + 86400.0
 
 
 def _clock(moment: float) -> str:
@@ -292,7 +292,7 @@ async def activity_view(store: Store, manager: RunManager, now: float) -> Activi
         if schedule.enabled and schedule.next_run_at is not None and schedule.next_run_at - now <= _DUE_WITHIN_S:
             working.append(_schedule_row(schedule, now))
     recent: list[ActivityRow] = []
-    today: float = _start_of_today(now)
+    today: float = start_of_today(now)
     for run in await store.list_runs(_RECENT_RUNS, None):
         if run.status in _ENDED and run.finished_at is not None and run.finished_at >= today:
             recent.append(await _run_row(store, run, "recent", "run", "", _title(run.goal)))

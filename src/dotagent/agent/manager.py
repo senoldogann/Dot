@@ -80,6 +80,7 @@ from dotagent.store.models import (
 from dotagent.tools.context import DelegateOutcome
 from dotagent.tools.delegate import DELEGATE_SOURCE
 from dotagent.tools.meta import ASK_USER_TOOL
+from dotagent.tools.team import TEAM_SOURCE
 
 log = get_logger(__name__)
 
@@ -363,35 +364,41 @@ class RunManager:
             planned += 1
         return planned
 
-    async def delegate(self, parent_run_id: str, goal: str, mode: RunMode, model: str | None) -> DelegateOutcome:
+    async def delegate(
+        self, parent_run_id: str, goal: str, mode: RunMode, model: str | None, agent_id: str | None
+    ) -> DelegateOutcome:
         """Run ``goal`` as a run of its own on ``model``, or on the parent's model as it is stored now when that is
         ``None`` (after a switch to a standby model, the standby), and wait until it ends.
 
         The delegated run starts as untrusted as its parent is, can do no more than its parent (a research run only
         delegates research) and cannot delegate again. It answers the policy's questions the way its parent does and
         takes the parent's instructions as its own; the parent checks its result, so goal mode is not applied to it
-        again. It is stopped when the waiting caller is cancelled.
+        again. It is stopped when the waiting caller is cancelled. With ``agent_id`` (item 87, a message to an agent)
+        the run is the agent's: its source is ``team``, it carries the agent's id, and the agent's own model, effort
+        and approvals bound it where the agent names them, the parent's where it does not.
         """
         parent: RunRecord = await self._runtime.store.get_run(parent_run_id)
+        agent: AgentRecord | None = None if agent_id is None else await self._runtime.store.get_agent(agent_id)
         if parent.parent_run_id is not None:
             raise RunConflict(
                 "a delegated run cannot delegate further", {"run_id": parent.id, "parent_run_id": parent.parent_run_id}
             )
         if parent.mode == "research" and mode != "research":
             raise RunConflict("a research run can only delegate research", {"run_id": parent.id, "mode": mode})
+        own_model: str = parent.model if model is None else model
         _, handle = await self._launch(
             goal,
             mode,
-            parent.model if model is None else model,
+            own_model if agent is None or agent.model == "" else agent.model,
             None,
-            DELEGATE_SOURCE,
+            DELEGATE_SOURCE if agent is None else TEAM_SOURCE,
             parent.id,
-            parent.effort,
-            parent.approvals,
+            parent.effort if agent is None or agent.effort is None else agent.effort,
+            parent.approvals if agent is None or agent.approvals is None else agent.approvals,
             False,
             RunOpening(text=goal, files=(), resumed=None),
             None,
-            None,
+            agent_id,
         )
         try:
             await handle.finished.wait()
@@ -856,6 +863,7 @@ class RunManager:
                 "approvals": approval_mode,
                 "goal_mode": with_goal_mode,
                 "parent_run_id": parent_run_id,
+                "agent_id": agent_id,
                 "models": {
                     "steps": model_ref,
                     "compaction": model_ref,
