@@ -3641,8 +3641,8 @@ closed pages) then; 58 (the bill on the run page) last, since it shows 53's numb
 | --- | ------------------------------------------------------------------------ | ------- | ------- |
 | 53  | The numbers of a long run                                                | done    | 4967717 |
 | 54  | Long browser tasks in the eval set                                       | done    | 7df5799 |
-| 55  | Context that stays: a compaction every forty steps, not seven            | in progress |         |
-| 56  | The web without guessing                                                 | planned |         |
+| 55  | Context that stays: a compaction every forty steps, not seven            | done    | 57a000e |
+| 56  | The web without guessing                                                 | in progress |         |
 | 57  | The browser's closed pages                                               | planned |         |
 | 58  | The bill of a run, on its page                                           | planned |         |
 
@@ -3815,6 +3815,8 @@ read with `dotx stats --run` and logged (the owner's run, after the daemon resta
 
 ### 56. The web without guessing
 
+**Status: done.** Built on `item-56-web` (MYP-196).
+
 **What.** A research run finds pages instead of guessing their address, and a wrong guess costs one turn that says
 what is there. Targets (item 53): not-found fetches per research run near zero (from about ten), turns lost to
 argument validation zero.
@@ -3834,6 +3836,23 @@ the README's known limit is rewritten.
 
 **Touchpoints.** `tools/web.py`, `web/fetch.py`, `agent/prompt.py`, `tools/browser.py` (the batch), README "Tools"
 and "Status and known limits", `tests/unit/test_web_tools.py`, a smoke test against the fixture site's dead link.
+
+**Design, as built (2026-10-11).** (1) `tools/web.py`: on HTTP 404 or 410 `web_fetch` reads the host's front page
+(`front_page`, one more request, skipped when the front page was the address asked) and lists its links on the same
+host that share a word of three characters or more with the asked path and query (`path_words`, `likely_links`,
+twelve at most, in page order, the address itself left out); the matched words are not repeated, the link shows them.
+The first line stays the failure, the second says the page is not there and names `web_search` (`site:host words`)
+and `web_crawl`. When the front page cannot be read, the result says why (its status, a web error's message, not an
+HTML page); when it links to nothing matching, the result says that. An unresolved host is already a `WebError` with
+its own message and has no front page to read, so it is left as it was. (2) The prompt's "# Web" bullet is in. (3)
+`max_results` says "1 to 10" and a larger number is lowered to 10 with the search header saying so (`wanted_results`);
+a browser or desktop batch over `max_batch_steps` runs its first steps and the result opens with how many remain
+(`tools/batch.py`: `first_steps`, `batch_cut_note`, shared by both tools, the two `ToolInputError` refusals gone; the
+descriptions say 5 and 25 by default). (4) The throttling was read with item 53 on the owner's runs of the last 30
+days: 25 of 93 web failures throttled, 18 of 32 `web_search` calls failed, so the known limit stands; the README's
+line now points at `dotx stats` for the count. Tests: `tests/unit/test_web_tools.py` (the words, the likely links,
+the rendering, the cut) and `tests/smoke/test_web_fetch.py` (a site served with `evals/site.py`, a dead path answered
+with the front page's matching link, a partner's host and an unrelated page left out).
 
 **Done when.** The fixture's dead link returns the front page's matching links in the smoke test; a `max_results` of
 20 returns ten results and says so; the prompt line is in; the owner's next research run shows the numbers.
@@ -4501,3 +4520,5 @@ rows carry minutes and tokens.
   owner's runs is in the item. Next: item 54 (long browser tasks in the eval set).
 - 2026-10-11 (Fable 5.1): item 54 merged 7df5799 (PR #58, MYP-194 Done; gate + desktop jobs green, `dotx eval check` plays the
   two site tasks in CI). Next: item 55 (context that stays; decision 33).
+- 2026-10-11 (Fable 5.1): item 55 merged 57a000e (PR #59, MYP-195 Done; gate + desktop jobs green). Decision 33 settled by the
+  instrument: budget 96 k, `num_ctx_cloud` 262144, summaries capped at 1,500 words. Next: item 56 (the web without guessing).

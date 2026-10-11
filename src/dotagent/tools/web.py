@@ -6,10 +6,12 @@ with a fresh random nonce; the line above the fence is produced by Dot.
 
 import asyncio
 import json
+import re
 import secrets
 import time
 from dataclasses import dataclass
 from pathlib import Path
+from urllib.parse import urlsplit, urlunsplit
 
 from pydantic import Field
 
@@ -24,7 +26,17 @@ from dotagent.secrets import require_secret
 from dotagent.tools.base import ALL_MODES, RegisteredTool, ToolArgs, ToolResult, fail, make_tool, mark_untrusted, ok
 from dotagent.tools.browser import checked_url
 from dotagent.tools.context import ToolContext
-from dotagent.web.crawl import CrawledPage, CrawlResult, Renderer, Scope, ScopeKind, crawl, looks_like_shell, scope_of
+from dotagent.web.crawl import (
+    CrawledPage,
+    CrawlResult,
+    Renderer,
+    Scope,
+    ScopeKind,
+    crawl,
+    looks_like_shell,
+    page_links,
+    scope_of,
+)
 from dotagent.web.extract import Extraction, FieldSpec, extract
 from dotagent.web.pdf import pdf_to_text
 from dotagent.web.search import search_duckduckgo, search_ollama
@@ -45,6 +57,14 @@ _MAX_SOURCES: int = 20
 _MAX_FIELDS: int = 20
 _WINDOW_SLACK: float = 0.8  # a window ends at a line or word break found in its last fifth
 _UNREADABLE_STATUS: frozenset[int] = frozenset({401, 403, 429, 503})
+# A page that is not there (item 56): the result says so and lists the front page's links that may be the one meant.
+_NOT_THERE_STATUS: frozenset[int] = frozenset({404, 410})
+_LIKELY_LINKS: int = 12
+# The shortest word of an address that counts when the front page's links are matched against it.
+_PATH_WORD_CHARS: int = 3
+_PATH_WORDS: re.Pattern[str] = re.compile(r"[a-z0-9]+")
+# The most results web_search returns; a larger number asked is lowered to it, and the result says so.
+_MAX_RESULTS: int = 10
 
 
 def _nonce() -> str:
@@ -163,13 +183,78 @@ def render_document(
     return "\n".join(parts)
 
 
-def render_http_failure(shown_url: str, document: FetchedDocument, excerpt: str, nonce: str) -> str:
+def path_words(url: str) -> frozenset[str]:
+    """The words of an address's path and query (lower case, letters and digits, three characters or more): what a
+    guessed address says about the page meant."""
+    parts: tuple[str, ...] = urlsplit(url)[2:4]
+    return frozenset(word for word in _PATH_WORDS.findall(" ".join(parts).lower()) if len(word) >= _PATH_WORD_CHARS)
+
+
+def front_page(url: str) -> str:
+    """The front page of the host of ``url``."""
+    parts = urlsplit(url)
+    return urlunsplit((parts.scheme, parts.netloc, "/", "", ""))
+
+
+def likely_links(links: tuple[str, ...], asked: str, limit: int) -> tuple[str, ...]:
+    """Of the front page's ``links``, the ones on the same host that share a word with the address asked for, the
+    address itself left out, at most ``limit`` in page order: the pages a guessed address may have meant."""
+    wanted: frozenset[str] = path_words(asked)
+    host: str = urlsplit(asked).netloc.lower()
+    found: list[str] = []
+    for link in links:
+        if link == asked or urlsplit(link).netloc.lower() != host or not wanted & path_words(link):
+            continue
+        found.append(link)
+        if len(found) == limit:
+            break
+    return tuple(found)
+
+
+def render_http_failure(
+    shown_url: str, document: FetchedDocument, excerpt: str, nonce: str, likely: tuple[str, ...], front_problem: str
+) -> str:
+    """The result of a fetch the web answered with an error status. A page that is not there says so and lists
+    ``likely``, the front page's links that may be the page meant (``front_problem`` says why the front page could not be
+    read, when it could not)."""
     lines: list[str] = [f"web_fetch got HTTP {document.status} from {shown_url}."]
     if document.status in _UNREADABLE_STATUS:
         lines.append("Some sites turn plain requests away; browser_open uses a real Chrome and may get through.")
+    if document.status in _NOT_THERE_STATUS:
+        lines.append(
+            "The page is not there. Do not try other addresses on a hunch: find the page with web_search (site:host "
+            "words) or web_crawl of the host, or pick one of the links below."
+        )
+        if likely:
+            lines.append("Links on the host's front page that share a word with the address asked for:")
+            lines.extend(f"- {link}" for link in likely)
+        elif front_problem:
+            lines.append(f"The host's front page could not be read either: {front_problem}")
+        else:
+            lines.append("The host's front page links to nothing that shares a word with the address asked for.")
     if excerpt:
         lines.append(fence_untrusted(document.url, excerpt, nonce))
     return "\n".join(lines)
+
+
+async def _front_page_links(ctx: ToolContext, url: str, max_bytes: int) -> tuple[tuple[str, ...], str]:
+    """The front page's links that may be the page ``url`` meant, and the problem when the front page could not be
+    read (an error status, or a web error, which is reported, not hidden)."""
+    root: str = front_page(url)
+    if root == url:
+        return (), ""
+    try:
+        document: FetchedDocument = await ctx.runtime.web.get(root, max_bytes)
+    except WebError as error:
+        return (), error.message
+    if not 200 <= document.status < 300:
+        return (), f"it answered HTTP {document.status}"
+    if document_kind(document.media_type, document.body[:512]) != "html":
+        return (), "it is not an HTML page"
+    links: tuple[str, ...] = await asyncio.to_thread(
+        page_links, decode_body(document.body[:max_bytes], document.charset), document.url
+    )
+    return likely_links(links, url, _LIKELY_LINKS), ""
 
 
 class FetchArgs(ToolArgs):
@@ -201,8 +286,17 @@ def _fetch_tool() -> RegisteredTool:
                 if kind in ("html", "text")
                 else _Readable("", "", "")
             )
+            likely, front_problem = (
+                await _front_page_links(ctx, url, config.web.fetch_max_bytes)
+                if document.status in _NOT_THERE_STATUS
+                else ((), "")
+            )
             return mark_untrusted(
-                fail(render_http_failure(shown_url, document, excerpt.text[:_ERROR_EXCERPT_CHARS], nonce))
+                fail(
+                    render_http_failure(
+                        shown_url, document, excerpt.text[:_ERROR_EXCERPT_CHARS], nonce, likely, front_problem
+                    )
+                )
             )
         if kind == "binary":
             return fail(
@@ -254,7 +348,16 @@ class SearchArgs(ToolArgs):
         max_length=400,
         description="What to look for, worded the way you would type it into a search engine.",
     )
-    max_results: int = Field(default=8, ge=1, le=10, description="How many results to return.")
+    max_results: int = Field(
+        default=8, ge=1, description="How many results to return, 1 to 10; a larger number is lowered to 10."
+    )
+
+
+def wanted_results(asked: int) -> tuple[int, str]:
+    """How many results a search returns for the number asked, and the note the header carries when it was lowered."""
+    if asked <= _MAX_RESULTS:
+        return asked, ""
+    return _MAX_RESULTS, f" (max_results {asked} lowered to {_MAX_RESULTS}, the most a search returns)"
 
 
 def _search_tool() -> RegisteredTool:
@@ -265,18 +368,22 @@ def _search_tool() -> RegisteredTool:
 
     async def run(args: SearchArgs, ctx: ToolContext) -> ToolResult:
         config: AppConfig = ctx.runtime.config
+        wanted, lowered = wanted_results(args.max_results)
         hits: tuple[SearchHit, ...]
         match ctx.runtime.search_backend:
             case "duckduckgo":
-                hits = await search_duckduckgo(ctx.runtime.web, args.query, args.max_results)
+                hits = await search_duckduckgo(ctx.runtime.web, args.query, wanted)
             case "ollama":
                 key: str = await asyncio.to_thread(
                     require_secret, config.providers.ollama.api_key_env, "web_search with the ollama search backend"
                 )
-                hits = await search_ollama(ctx.runtime.web, key, args.query, args.max_results)
+                hits = await search_ollama(ctx.runtime.web, key, args.query, wanted)
         if not hits:
             return ok(f"No results for {_clip(args.query, _SHOWN_URL_CHARS)!r}. Try other words or a broader query.")
-        header: str = f"{len(hits)} results for {_clip(args.query, _SHOWN_URL_CHARS)!r} ({ctx.runtime.search_backend}). Read the best ones with web_fetch."
+        header: str = (
+            f"{len(hits)} results for {_clip(args.query, _SHOWN_URL_CHARS)!r} ({ctx.runtime.search_backend}){lowered}. "
+            "Read the best ones with web_fetch."
+        )
         return mark_untrusted(ok("\n".join((header, fence_untrusted("web_search", render_hits(hits), _nonce())))))
 
     return make_tool(

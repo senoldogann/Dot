@@ -295,6 +295,10 @@ The shell and the file tools work in `<home>/workspace` unless a path says other
 (`[shell] default_timeout_s`, at most `max_timeout_s`). `web_search` uses the hosted search of Ollama when `OLLAMA_API_KEY`
 is set and DuckDuckGo, which needs no key, otherwise (`[web] search_backend`, default `auto`; `dotx doctor` shows the
 choice); `web_fetch` reads HTML and PDF and refuses localhost, LAN and cloud-metadata addresses unless `[web] allow_private_hosts` is set.
+A page that is not there (HTTP 404 or 410) is reported with the links of the host's front page that share a word with
+the address asked for (a dozen at most), so the next turn opens the right page instead of guessing another address;
+the system prompt says the same (find a page with `web_search` or `web_crawl`, never by trying `/careers/` on a hunch).
+`web_search` returns up to 10 results; a larger `max_results` is lowered to 10 and the result says so.
 
 **Crawling and extraction.** `web_crawl(url, scope, max_pages, max_depth)` reads many pages of one site in one call:
 breadth first from the start address, following the links within the scope (`prefix`, the pages under the start
@@ -1027,7 +1031,8 @@ Both modes share what follows.
   label or the value of one of them, written as listed; a choice that is not there is refused at once with the options
   that are, the closest first, instead of waiting for the timeout. An option that a script adds within a second of the
   call is still found. A very long list is cut with the number of options left out and the current choice.
-- `browser_act` runs up to `max_batch_steps` steps in one call: `click`, `double_click`, `right_click`, `hover`, `fill`,
+- `browser_act` runs up to `max_batch_steps` steps in one call (5 by default; a longer batch is cut to the first ones and
+  the result says how many remain, so the call is not lost): `click`, `double_click`, `right_click`, `hover`, `fill`,
   `type`, `insert`, `select`, `press`, `check`, `uncheck`, `scroll_into_view`, `drag` and `click_at`. After a step Dot
   waits until the page has settled (no DOM change for `settle_quiet_ms`, 60 ms, at most `settle_max_ms`) and reports
   popups, dialogs and downloads that appeared. The result is the part of the page that changed, with the refs of the
@@ -1072,7 +1077,8 @@ missing ones and opens their Settings panes.
 - `desktop_snapshot` lists an application's window as elements with a role, a name, a value, a state, a position and a ref
   (`a12`). A second view lists only what changed; `query` finds elements anywhere in the application and `scope =
   menu_bar` lists the menu bar. `desktop_read` reads one element's full text.
-- `desktop_act` runs up to `max_batch_steps` steps in one call: `click`, `double_click`, `right_click`, `hover`, `press`,
+- `desktop_act` runs up to `max_batch_steps` steps in one call (25 by default; a longer batch is cut the same way):
+  `click`, `double_click`, `right_click`, `hover`, `press`,
   `focus`, `set_value`, `type`, `paste`, `key`, `scroll`, `drag`, `menu`, `wait` and `activate`. A step names an element
   by its ref or a point by its coordinates. `press`, `focus` and `set_value` work through accessibility without moving
   the pointer; `click`, `hover`, `scroll` and `drag` are real pointer events; `type`, `paste` and `key` are keyboard
@@ -1431,7 +1437,8 @@ src/dotagent/
   on real folders).
 - The shell guardrail is best-effort and not a sandbox (see [Safety](#safety)).
 - DuckDuckGo answers a burst of searches with its bot check (HTTP 202). Dot spaces its searches (`search_spacing_s`) and
-  retries a blocked one (`search_attempts`), but a long research run can still meet the check. The hosted Ollama search
+  retries a blocked one (`search_attempts`), but a long research run can still meet the check (`dotx stats` counts these
+  under the web failures). The hosted Ollama search
   has no such limit: with `search_backend = "auto"` (the default) Dot uses it as soon as `OLLAMA_API_KEY` is set.
 - The thresholds of the memory search were measured on a small hand-written set of English and Turkish notes
   (indicative, not a benchmark); another language, another embedding model or a much larger memory may need other
