@@ -7,7 +7,7 @@ from collections.abc import Iterable, Mapping, Sequence
 
 from dotagent.core.errors import ProviderProtocolError, StoreError
 from dotagent.core.types import FrozenModel, JsonObject
-from dotagent.store.models import MemoryRecord
+from dotagent.store.models import MemoryRecord, MemoryScore
 
 type Vector = tuple[float, ...]
 
@@ -77,15 +77,32 @@ def use_lift(last_used_at: float | None, now: float, half_life_s: float) -> floa
     return math.pow(0.5, max(0.0, now - last_used_at) / half_life_s)
 
 
+def balance_lift(score: MemoryScore | None, min_uses: int) -> float:
+    """How much a note's score moves it, -1 to 1: its balance (the runs handed it that ended done, less the ones
+    that failed) over ``min_uses``, capped at one either way; 0 until ``min_uses`` runs were handed it."""
+    if score is None or score.handed < min_uses:
+        return 0.0
+    return max(-1.0, min(1.0, (score.done - score.failed) / min_uses))
+
+
 def ranked_by_use(
-    scores: Mapping[str, float], notes: Sequence[MemoryRecord], now: float, half_life_s: float, limit: int
+    scores: Mapping[str, float],
+    notes: Sequence[MemoryRecord],
+    now: float,
+    half_life_s: float,
+    balances: Mapping[str, MemoryScore],
+    min_uses: int,
+    limit: int,
 ) -> list[MemoryRecord]:
     """``notes`` best first, at most ``limit``: each note's fused score plus the lift of its last use
-    (:func:`use_lift`, worth a second place in one list at most) when the note is the agent's; the notes the user
-    wrote stand on their fused score alone. Ties keep the order of ``notes``."""
+    (:func:`use_lift`, worth a second place in one list at most) and of its balance (:func:`balance_lift`, worth
+    as much, either way) when the note is the agent's; the notes the user wrote stand on their fused score alone.
+    Ties keep the order of ``notes``."""
 
     def score(note: MemoryRecord) -> float:
-        lift: float = 0.0 if note.source_run is None else use_lift(note.last_used_at, now, half_life_s) * _USE_LIFT
-        return scores.get(note.id, 0.0) + lift
+        if note.source_run is None:
+            return scores.get(note.id, 0.0)
+        lift: float = use_lift(note.last_used_at, now, half_life_s) + balance_lift(balances.get(note.id), min_uses)
+        return scores.get(note.id, 0.0) + lift * _USE_LIFT
 
     return sorted(notes, key=score, reverse=True)[:limit]

@@ -55,6 +55,7 @@ LESSON_STOPPED: str = "A command that sleeps for long holds the whole run; prefe
 TWIN_OLDER: str = "pdftotext keeps the columns of a table only with the -layout flag."
 TWIN_NEWER: str = "pdftotext keeps the columns of a table only with the -layout flag set."
 STALE: str = "Large CSV files load faster with the csv module than with pandas on this Mac."
+HURT: str = "Paste the whole page into the answer instead of reading it first."
 _PROVIDER: str = parse_model_ref(SCRIPTED_MODEL).provider
 _TIME_LIMIT_S: float = 60.0
 _STEP_WAIT_S: float = 20.0
@@ -244,6 +245,11 @@ async def test_the_reflection_learns_from_the_runs_the_loop_did_not_ask_tidies_t
         stale: MemoryRecord = await store.add_memory(STALE, (LESSON_TAG,), "run_stale", None)
         _backdate(older.id, time.time() - 2 * _DAY_S)
         _backdate(stale.id, time.time() - 61 * _DAY_S)
+        # And one handed to three runs that all failed: its score retires it.
+        hurt: MemoryRecord = await store.add_memory(HURT, (LESSON_TAG,), "run_hurt", None)
+        for run_id in ("run_h1", "run_h2", "run_h3"):
+            await store.mark_memories_used(run_id, [hurt.id], time.time(), "start")
+            await store.close_memory_uses(run_id, "failed")
         assert await store.kv_get(REFLECTION_KEY) is None
 
         scheduler: Scheduler = Scheduler(home.runtime, home.manager)
@@ -266,9 +272,9 @@ async def test_the_reflection_learns_from_the_runs_the_loop_did_not_ask_tidies_t
             4,
             2,
             1,
-            1,
+            2,
         )
-        assert summary_line(reflection) == "Reflected on 4 runs: 2 lessons, 1 merged, 1 retired."
+        assert summary_line(reflection) == "Reflected on 4 runs: 2 lessons, 1 merged, 2 retired."
 
         # The review model was asked once about the failed and the stopped run, with their ending as a signal, and not
         # about the clean run nor again about the one the loop asked at its end.
@@ -297,6 +303,7 @@ async def test_the_reflection_learns_from_the_runs_the_loop_did_not_ask_tidies_t
         assert (await store.get_memory(newer.id)).tags == ("lesson", "pdf")
         rested: MemoryRecord = await store.get_memory(stale.id)
         assert rested.tags == (LESSON_TAG, REST_TAG)
+        assert (await store.get_memory(hurt.id)).tags == (LESSON_TAG, REST_TAG)
         hits: list[MemoryHit] = await recall(home.runtime.memory, STALE, 5)
         assert stale.id not in {hit.record.id for hit in hits}
         assert stale.id in {note.id for note in await store.list_memories(50, 0)}
@@ -306,7 +313,7 @@ async def test_the_reflection_learns_from_the_runs_the_loop_did_not_ask_tidies_t
         assert len(journals) == 1 and journals[0].id == reflection.journal
         assert journals[0].source_run == REFLECTION_SOURCE
         assert "I worked on 4 runs (2 done, 1 failed, 1 cancelled). Learned: " in journals[0].content
-        assert "Tidied the lessons: 1 merged, 1 retired." in journals[0].content
+        assert "Tidied the lessons: 1 merged, 2 retired." in journals[0].content
         assert LESSON_FAILED in journals[0].content
 
         # Activity lists the reflection among what ended today; the next tick does not fire it again.

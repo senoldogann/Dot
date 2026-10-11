@@ -16,6 +16,7 @@ from dotagent.memory.service import (
     SavedMemory,
     forget_memory,
     recall,
+    recent_scores,
     resting,
     save_memory,
     update_memory_note,
@@ -45,7 +46,7 @@ from dotagent.server.views import (
     SearchQuery,
 )
 from dotagent.store.db import Store
-from dotagent.store.models import MemoryRecord, RuleRecord, ScheduleOptions, ScheduleRecord
+from dotagent.store.models import MemoryRecord, MemoryScore, RuleRecord, ScheduleOptions, ScheduleRecord
 
 
 def _checked_pattern(pattern: str) -> str:
@@ -119,11 +120,17 @@ def memories_router(ctx: ServerContext) -> APIRouter:
     async def list_memories(query: Annotated[MemoriesQuery, Query()]) -> MemoryPage:
         items: list[MemoryRecord] = await index.store.list_memories(query.limit, query.offset)
         now: float = time.time()
+        ids: list[str] = [record.id for record in items]
+        recent: dict[str, MemoryScore] = await recent_scores(index, ids, now)
         return MemoryPage(
             total=await index.store.count_memories(),
             items=items,
-            resting=[record.id for record in items if resting(record, now, index.config.rest_days)],
-            scores=await index.store.memory_scores([record.id for record in items]),
+            resting=[
+                record.id
+                for record in items
+                if resting(record, now, index.config.rest_days, recent.get(record.id), index.config.score_min_uses)
+            ],
+            scores=await index.store.memory_scores(ids, 0.0),
         )
 
     @router.get("/memories/search")

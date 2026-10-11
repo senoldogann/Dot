@@ -16,7 +16,7 @@ function here is pure except the ones that take the store or the runtime.
 """
 
 import asyncio
-from collections.abc import Mapping, Sequence
+from collections.abc import Mapping, Sequence, Set
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
@@ -39,12 +39,20 @@ from dotagent.core.text import redact_secrets
 from dotagent.core.types import FrozenModel
 from dotagent.evals import EVAL_SOURCE
 from dotagent.memory.ranking import Vector
-from dotagent.memory.service import JOURNAL_TAG, REFLECTION_SOURCE, REST_TAG, SavedMemory, normalize_tags, save_memory
+from dotagent.memory.service import (
+    JOURNAL_TAG,
+    REFLECTION_SOURCE,
+    REST_TAG,
+    SavedMemory,
+    normalize_tags,
+    recent_scores,
+    save_memory,
+)
 from dotagent.policy.types import TAINTING_KINDS
 from dotagent.runtime import Runtime
 from dotagent.scheduler.timing import next_firing
 from dotagent.store.db import Store
-from dotagent.store.models import EventRecord, MemoryRecord, RunRecord, RunStatus
+from dotagent.store.models import EventRecord, MemoryRecord, MemoryScore, RunRecord, RunStatus
 
 log = get_logger(__name__)
 
@@ -236,6 +244,21 @@ def to_retire(notes: Sequence[MemoryRecord], now: float, rest_days: int) -> list
     ]
 
 
+def to_retire_by_score(
+    notes: Sequence[MemoryRecord], scores: Mapping[str, MemoryScore], min_uses: int, owner_saved: Set[str]
+) -> list[tuple[MemoryRecord, MemoryScore]]:
+    """The lesson notes that rest from now on for their score: not resting yet, handed to at least ``min_uses`` runs
+    lately, of which more failed than ended done; a lesson the owner saved (``owner_saved``) is never one."""
+    found: list[tuple[MemoryRecord, MemoryScore]] = []
+    for note in notes:
+        score: MemoryScore | None = scores.get(note.id)
+        if REST_TAG in note.tags or note.id in owner_saved or score is None:
+            continue
+        if score.handed >= min_uses and score.done < score.failed:
+            found.append((note, score))
+    return found
+
+
 def _own(notes: Sequence[MemoryRecord]) -> list[MemoryRecord]:
     """The notes Dot wrote: the ones with a source."""
     return [note for note in notes if note.source_run is not None]
@@ -321,10 +344,34 @@ async def _merge(runtime: Runtime, notes: Sequence[MemoryRecord]) -> int:
 
 
 async def _retire(runtime: Runtime, notes: Sequence[MemoryRecord], now: float) -> int:
+    """Rest the lessons no run was handed for long, and the ones whose score says they did not help; the log says
+    which reason, with the numbers."""
     retired: int = 0
-    for note in to_retire(notes, now, runtime.config.agent.lesson_rest_days):
+    aged: list[MemoryRecord] = to_retire(notes, now, runtime.config.agent.lesson_rest_days)
+    for note in aged:
         await runtime.store.set_memory_tags(note.id, (*note.tags, REST_TAG))
-        log.info("lesson_retired", memory_id=note.id, last_used_at=note.last_used_at, created_at=note.created_at)
+        log.info(
+            "lesson_retired",
+            memory_id=note.id,
+            reason="unused",
+            last_used_at=note.last_used_at,
+            created_at=note.created_at,
+        )
+        retired += 1
+    rested: set[str] = {note.id for note in aged}
+    left: list[MemoryRecord] = [note for note in notes if note.id not in rested]
+    scores: dict[str, MemoryScore] = await recent_scores(runtime.memory, [note.id for note in left], now)
+    owner_saved: set[str] = await runtime.store.owner_saved_memory_ids()
+    for note, score in to_retire_by_score(left, scores, runtime.config.memory.score_min_uses, owner_saved):
+        await runtime.store.set_memory_tags(note.id, (*note.tags, REST_TAG))
+        log.info(
+            "lesson_retired",
+            memory_id=note.id,
+            reason="score",
+            handed=score.handed,
+            done=score.done,
+            failed=score.failed,
+        )
         retired += 1
     return retired
 

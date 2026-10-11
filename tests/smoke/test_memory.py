@@ -377,7 +377,7 @@ async def test_an_agent_note_no_run_was_handed_for_long_rests_while_the_users_no
     assert [
         record.id
         for record in await words_only.store.list_memories(10, 0)
-        if resting(record, now, words_only.config.rest_days)
+        if resting(record, now, words_only.config.rest_days, None, words_only.config.score_min_uses)
     ] == [old_agent.record.id]
 
 

@@ -683,8 +683,10 @@ model for the lessons of the task and research runs the loop did not ask at thei
 included, with how the run ended as one more signal, under the `lessons` setting above (`propose` leaves them on the
 run's page, `auto` saves them, `off` draws none); it folds the lesson notes that say the same into the newer one (by
 the embeddings when both have one, by the words otherwise); it rests a lesson that no run was handed for
-`lesson_rest_days` (60) by tagging it `rest`, after which searches skip it while `dotx memory list` and the Memory page
-still show it; and when anything happened it writes the day's journal note, tagged `journal` ("On 2026-10-11 I worked
+`lesson_rest_days` (60), or whose score says it did not help (handed to `[memory] score_min_uses` runs in the last
+`score_days`, more of which failed than ended done; a lesson you saved yourself is never retired this way), by tagging
+it `rest`, after which searches skip it while `dotx memory list` and the Memory page still show it, and the log line
+`lesson_retired` says which reason with the numbers; and when anything happened it writes the day's journal note, tagged `journal` ("On 2026-10-11 I worked
 on 4 runs (2 done, 1 failed, 1 cancelled). Learned: … Tidied the lessons: 1 merged, 1 retired."). The reflection
 touches only the notes Dot wrote, never yours. A night the daemon slept through is caught up once at its start.
 Activity lists the reflection among what ended today; `dotx reflect` runs one now.
@@ -1223,6 +1225,9 @@ dotx memory reindex      # embed every note again, for example after changing [m
   (90) rests: the Memory page lists it under "Resting", a search still finds it, but runs no longer start with it on
   its own. Your notes and the `core` ones never rest. Under each note the page says how the runs it was handed to
   ended ("Handed to 5 runs, 4 done"); every use is recorded with the run's end, which `dotx stats` reads.
+- The score decides too: over the last `score_days` (30), a note's balance is the runs handed it that ended done less
+  the ones that failed. Once `score_min_uses` (3) runs were handed it, the balance lifts or lowers the note in a search
+  as much as a fresh use would, and a negative balance rests it at once, before the nightly reflection retires it.
 - A note saved or changed while a run works reaches that run at its next step.
 - Two tags are the nightly reflection's: `journal` on the day's note, `rest` on a lesson no run was handed for sixty
   days, which searches skip (the list and the page still show it; take the tag off to wake it).

@@ -323,7 +323,7 @@ async def test_auto_saves_the_lessons_of_a_run_and_drops_a_lesson_a_saved_note_a
         assert await run_lessons(store, second.id) is None
         assert await store.count_memories() == 1
         # The second run was handed the lesson and ended done: the lesson's score says so.
-        assert await store.memory_scores([memory_id]) == {memory_id: MemoryScore(handed=1, done=1, failed=0)}
+        assert await store.memory_scores([memory_id], 0.0) == {memory_id: MemoryScore(handed=1, done=1, failed=0)}
 
 
 async def test_the_lessons_of_a_run_that_read_a_web_page_are_only_proposed(
