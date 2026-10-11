@@ -1244,6 +1244,11 @@ a.pill:hover {
   overflow-x: auto;
 }
 
+/* While more of the table lies to the right (scrollcue.js), the edge fades to say so. */
+.table-scroll[data-scroll="more"] {
+  mask-image: linear-gradient(to right, var(--bg) calc(100% - 40px), transparent);
+}
+
 /* The lines between the cells are each cell's own top and left shadow, so a last row that is not full ends where its cells
    end instead of filling up with the line colour; the shadows along the outer edge are clipped away. */
 .kv {
@@ -1263,8 +1268,10 @@ a.pill:hover {
   grid-column: 1 / -1;
 }
 
-/* The bill of a run (cost.js): nine short cells, so they go three abreast on a wide page and two on a phone. */
-.cost-grid {
+/* Short cells (the bill of a run in cost.js, the Browser tab's four facts) go three or four abreast on a wide page and
+   two on a phone, so a phone never sees three and a stray one. */
+.cost-grid,
+.kv-pairs {
   grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
 }
 

@@ -22,6 +22,7 @@ import { foldCard, foldGroup, inlineError, inlineLoading, paneHead, segmented } 
 import { providerLabel, providerOf } from "../providers.js";
 import { reasoningSelect } from "../reasoning.js";
 import { approvalLabel } from "../runmodes.js";
+import { scrollCue } from "../scrollcue.js";
 import { forgetModels, getSnapshot, loadModels, onChange, refresh } from "../state.js";
 import { SCHEMES, THEMES, chooseScheme, chooseTheme, currentScheme, currentTheme, onThemeChange, themeInUse } from "../theme.js";
 import { attempt, confirmDialog, toast } from "../ui.js";
@@ -520,6 +521,7 @@ function buildModels(isDisposed) {
     painted = { providers, mainModel, usage };
     card.setSummary(...modelsSummary(providers, inUse));
     body.replaceChildren(...providers.map((provider) => providerBlock(provider, mainModel, inUse.includes(provider.provider))));
+    cueTables();
   }
 
   async function load() {
@@ -543,7 +545,16 @@ function buildModels(isDisposed) {
     }
   }
 
-  return { element: card.element, load, paint };
+  // On a phone the tables scroll sideways: a cue on each says while more lies to the right.
+  let cues = [];
+  function cueTables() {
+    for (const stop of cues) {
+      stop();
+    }
+    cues = [...body.querySelectorAll(".table-scroll")].map(scrollCue);
+  }
+
+  return { element: card.element, load, paint, dispose: cueTables };
 }
 
 function buildTokenCard() {
@@ -580,7 +591,7 @@ const BROWSER_MODES = [
  */
 function buildBrowser(isDisposed) {
   let view = null;
-  const facts = el("dl", { class: "kv" }, inlineLoading());
+  const facts = el("dl", { class: "kv kv-pairs" }, inlineLoading());
   const problem = el("div", { class: "note bad", hidden: true }, icon("alert"), el("span"));
   const steps = el("ol", { class: "browser-steps" });
   const modes = segmented(BROWSER_MODES, BROWSER_MODES[0].id, (id) => attempt(() => choose(id)));
@@ -838,6 +849,7 @@ export function mountModels(root, ctx) {
   return () => {
     disposed = true;
     stop();
+    models.dispose();
   };
 }
 

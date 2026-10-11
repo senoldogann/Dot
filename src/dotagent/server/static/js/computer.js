@@ -1,6 +1,6 @@
 // Dot's computer: the page of the run's browser as Chrome paints it, and the handover of that browser to the reader.
 // Nothing is cast while the view is closed; the card is shown for a run that is going on and keeps its last frame once
-// the run has ended.
+// the run has ended, when Watch goes too (there is no page left to watch).
 
 import { api, sse } from "./api.js";
 import { el } from "./dom.js";
@@ -48,7 +48,7 @@ export function createComputer({ runId, active, held }) {
     const watching = controller !== null;
     watchButton.textContent = watching ? "Close the view" : "Watch";
     watchButton.setAttribute("aria-pressed", String(watching));
-    watchButton.disabled = !isActive;
+    watchButton.hidden = !isActive;
     if (image.hidden) {
       empty.textContent = watching ? WAITING_FOR_FRAME : isActive && !hasPage ? NO_PAGE_YET : CLOSED_HINT;
     }

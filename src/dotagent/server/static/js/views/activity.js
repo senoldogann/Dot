@@ -10,9 +10,9 @@ import { emptyPanel, errorPanel, loadingPanel, pageHead, segmented } from "../pa
 import { onChange, onLifecycle } from "../state.js";
 
 const SECTIONS = [
-  { key: "waiting", title: "Waiting for you", empty: "Nothing waits for you." },
-  { key: "working", title: "Working", empty: "Nothing is working right now." },
-  { key: "recent", title: "Ended today", empty: "No run ended today." },
+  { key: "waiting", title: "Waiting for you", empty: "Nothing waits for you", hint: "A run that asks a question or an approval shows here." },
+  { key: "working", title: "Working", empty: "Nothing is working right now", hint: "A run you start shows here while it works." },
+  { key: "recent", title: "Ended today", empty: "No run ended today", hint: "A run that ends shows here with what it took and cost." },
 ];
 // The filter over the kinds of rows: every kind, or one family of them.
 const FILTERS = [
@@ -52,14 +52,14 @@ export function mount(root, ctx) {
       return;
     }
     body.replaceChildren(
-      ...SECTIONS.map(({ key, title, empty }) => {
+      ...SECTIONS.map(({ key, title, empty, hint }) => {
         const items = shown(view[key]);
         return el(
           "section",
           { class: "card activity-section", "data-section": key },
           el("div", { class: "card-head" }, el("span", null, title), el("span", { class: "small muted" }, String(items.length))),
           items.length === 0
-            ? emptyPanel(empty, "")
+            ? emptyPanel(empty, hint)
             : el(
                 "div",
                 { class: "activity-list" },
