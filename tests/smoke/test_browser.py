@@ -69,7 +69,11 @@ _PAGES: dict[str, str] = {
 <label>Number <select name="number">{_NUMBERS}</select></label>""",
     "/done": """<!doctype html><title>Done</title><h1>Received</h1><p id="q"></p>
 <script>document.getElementById('q').textContent = decodeURIComponent(location.search)</script>""",
-    "/popup": "<!doctype html><title>Popup</title><h1>Popup page</h1><button>Close me</button>",
+    "/popup": """<!doctype html><title>Popup</title><h1>Popup page</h1><button>Close me</button>
+<button onclick="window.close()">Close now</button>""",
+    # A popup that does its job and closes at once, the way a sign-in callback does (item 57).
+    "/opener": '<!doctype html><title>Opener</title><a href="/selfclose" target="_blank">Sign in</a><button>Stay</button>',
+    "/selfclose": "<!doctype html><title>Callback</title><script>window.close()</script>",
     "/frame": """<!doctype html><title>Frame</title>
 <button onclick="document.getElementById('o').textContent = 'clicked inside frame'">Frame button</button>
 <span id="o"></span>""",
@@ -311,6 +315,40 @@ async def test_batch_stops_when_the_page_opens_a_tab_and_the_tab_can_be_used(
     assert 'button "Close me"' in switched.body
     back: PageView = await browser.close_tab("popup", 2)
     assert back.title == "Home"
+
+
+async def test_a_popup_that_closes_itself_is_a_note_not_an_error(browser: BrowserSession, site: str) -> None:
+    view: PageView = await browser.open_url("callback", f"{site}/opener")
+    outcome: ActOutcome = await act(
+        browser, "callback", [Step(action="click", ref=ref_of(view.body, 'link "Sign in"'))], False
+    )
+    assert outcome.steps[0].outcome == "done"
+    # The popup is adopted and closes, or closes before Dot could adopt it; either way the thread keeps one tab, no act
+    # failed, and a later act works on the opener.
+    assert len(outcome.view.tabs) == 1
+    stayed: ActOutcome = await act(
+        browser, "callback", [Step(action="click", ref=ref_of(outcome.view.body, 'button "Stay"'))], False
+    )
+    assert [report.outcome for report in stayed.steps] == ["done"]
+    assert stayed.view.title == "Opener"
+
+
+async def test_a_tab_that_closes_under_a_batch_stops_it_without_a_failure_and_shows_the_current_tab(
+    browser: BrowserSession, site: str
+) -> None:
+    view: PageView = await browser.open_url("closing", f"{site}/")
+    await act(browser, "closing", [Step(action="click", ref=ref_of(view.body, 'link "Open popup"'))], False)
+    popup: PageView = await browser.switch_tab("closing", 2)
+    steps: list[Step] = [
+        Step(action="click", ref=ref_of(popup.body, 'button "Close now"')),
+        Step(action="click", ref=ref_of(popup.body, 'button "Close me"')),
+    ]
+    outcome: ActOutcome = await act(browser, "closing", steps, False)
+    assert "failed" not in [report.outcome for report in outcome.steps]
+    assert outcome.steps[1].outcome == "skipped"
+    assert outcome.stopped is not None and outcome.stopped.startswith("the tab was closed by the page")
+    assert "the tab now current is shown below" in outcome.stopped
+    assert outcome.view.title == "Home" and len(outcome.view.tabs) == 1
 
 
 async def test_dialogs_are_resolved_and_reported(browser: BrowserSession, site: str) -> None:
