@@ -20,11 +20,12 @@ from dotagent.agent.reflection import (
     reflection_due,
     summary_line,
     to_retire,
+    to_retire_by_score,
     wants_reflection,
 )
 from dotagent.agent.verify import CallFact
 from dotagent.config import AppConfig, load_default_config
-from dotagent.store.models import MemoryRecord, RunRecord, RunStatus
+from dotagent.store.models import MemoryRecord, MemoryScore, RunRecord, RunStatus
 
 ZONE: ZoneInfo = ZoneInfo("Europe/Helsinki")
 DAY_S: float = 86400.0
@@ -191,3 +192,20 @@ def test_the_reflection_time_is_a_time_of_day_or_off() -> None:
     for bad in ("3:30", "24:00", "night", ""):
         with pytest.raises(ValidationError, match="time of day"):
             config.agent.model_validate({**config.agent.model_dump(), "reflection_time": bad})
+
+
+def test_a_lesson_whose_score_is_negative_over_enough_runs_rests_unless_the_owner_saved_it() -> None:
+    now: float = 100 * DAY_S
+    hurt: MemoryRecord = _note("hurt", "x" * 30, now - DAY_S, now, ("lesson",))
+    helped: MemoryRecord = _note("helped", "y" * 30, now - DAY_S, now, ("lesson",))
+    few: MemoryRecord = _note("few", "z" * 30, now - DAY_S, now, ("lesson",))
+    kept: MemoryRecord = _note("kept", "w" * 30, now - DAY_S, now, ("lesson",))
+    resting: MemoryRecord = _note("resting", "v" * 30, now - DAY_S, now, ("lesson", "rest"))
+    scores: dict[str, MemoryScore] = {
+        "hurt": MemoryScore(handed=3, done=1, failed=2),
+        "helped": MemoryScore(handed=3, done=3, failed=0),
+        "few": MemoryScore(handed=2, done=0, failed=2),
+        "kept": MemoryScore(handed=5, done=0, failed=5),
+        "resting": MemoryScore(handed=5, done=0, failed=5),
+    }
+    assert to_retire_by_score([hurt, helped, few, kept, resting], scores, 3, {"kept"}) == [(hurt, scores["hurt"])]

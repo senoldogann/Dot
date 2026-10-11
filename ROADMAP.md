@@ -5009,8 +5009,8 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 86  | Agents: profiles with a face, a role, a model and their own chats         | done        | bd12b54 |
 | 87  | Agents together: messages between agents, the team's thread, the harness  | done        | 23c6b5c |
 | 88  | Desktop and web, one interface: the Tauri shell on the same pages         | done        | c4d9b88 |
-| 89  | Learning on, and measured: every note handed to a run is scored by how it ended | in progress |         |
-| 90  | Memory that keeps what helps: the score decides what is recalled, rests, retires | planned     |         |
+| 89  | Learning on, and measured: every note handed to a run is scored by how it ended | done        | a779b72 |
+| 90  | Memory that keeps what helps: the score decides what is recalled, rests, retires | in progress |         |
 | 91  | Recall by budget: the notes a run starts with fit a token budget, best first     | planned     |         |
 | 92  | Skills from its own work: a task that went well becomes a skill for its kind     | planned     |         |
 | 93  | The owner, in one section: what the reflection knows about how you work         | planned     |         |
@@ -5406,7 +5406,7 @@ measured with `dotx stats` and the Memory page before it is widened.
 
 ### 89. Learning on, and measured: every note handed to a run is scored by how the run ended
 
-**Status: in progress (2026-10-11).**
+**Status: done.** Merged as `a779b72` (PR #103, MYP-229 Done).
 
 **Design, as built (2026-10-11).** The store's `memory_uses` table (`run_id`, `memory_id`, `handed_at`, `how`,
 `status`) records every note a run is handed: `Store.mark_memories_used(run_id, ids, when, how)` writes one row per
@@ -5439,7 +5439,23 @@ and ends, the use recorded with its status.
 
 ### 90. Memory that keeps what helps: the score decides what is recalled, rests and is retired
 
-**Status: planned.**
+**Status: in progress (2026-10-11).**
+
+**Design, as built (2026-10-11).** `[memory] score_days` (30) and `score_min_uses` (3) in `MemoryConfig`.
+`Store.memory_scores(ids, since)` takes the window (`0.0` for all time; the Memory page shows all time) and
+`recent_scores(index, ids, now)` in `memory/service.py` reads the window's scores. `balance_lift(score, min_uses)`
+in `memory/ranking.py` is the balance (done less failed) over `min_uses`, capped at one either way and nothing
+under `min_uses` runs; `ranked_by_use` adds it to the use lift of an agent's note (both worth `_USE_LIFT`), so
+`recall` (and with it `memory_search`) lifts a note that helped and lowers one that did not. `resting(record, now,
+rest_days, score, min_uses)` rests a note whose score is negative over at least `min_uses` runs, besides the two
+older reasons; `prompt_memories` and the Memory page route read the window's scores for it. The reflection's
+`_retire` first rests the aged lessons (`to_retire`), then `to_retire_by_score(notes, scores, min_uses,
+owner_saved)`: a lesson handed to `min_uses` runs lately of which more failed than ended done, unless the owner
+saved it from a run's page (`Store.owner_saved_memory_ids`, the `lesson_saved` events by the owner); each
+`lesson_retired` log line carries `reason` (`unused` or `score`) with the numbers, and the journal's retired count
+includes both. Tests: `tests/unit/test_memory_ranking.py` (the balance lift and its cap, the rest by score);
+`tests/unit/test_reflection.py` (`to_retire_by_score` with an owner-saved lesson kept); `tests/smoke/test_reflection.py`
+(a lesson handed to three failed runs is retired by the nightly reflection beside the aged one).
 
 **What.** Recall lifts an agent's note by its balance (done minus failed among the runs it was handed to, over the
 last `[memory] score_days`), besides the use lift of item 71; a note with a negative balance over at least
@@ -6006,3 +6022,4 @@ skills, the score), with the same Drop. Tests: unit for the scoping; the agents 
 - 2026-10-11 (Fable 5.1): item 88 merged as `c4d9b88` (PR #98, MYP-228 Done). Part 10 is built: items 84 to 88 merged (`82c06b8`, `7f02492`, `bd12b54`, `23c6b5c`, `c4d9b88`). The glib alert dismissed as not used (item 88's record). Item 76's reading (part 8) is still due on or after 2026-10-18.
 - 2026-10-11 (Fable 5.1): the desktop shell rebuilt on the owner's Mac after part 10; its first drag raised an ACL error, fixed as `06cb620` (PR #100, under item 88): the start-dragging capability and the sidebar head owning its space. Verified by dragging both bars of the rebuilt `Dot.app`.
 - 2026-10-11 (Fable 5.1): part 11 planned (items 89 to 94): learning on and measured, memory scored by outcome, recall by token budget, skills from the agent's own work, the owner's section, learning per agent.
+- 2026-10-11 (Fable 5.1): item 89 merged as `a779b72` (PR #103, MYP-229 Done): learning on (`propose`, playbooks on) and measured (`memory_uses`, the Learning section of `dotx stats`, the score on the Memory page). The daemon restarted on `a779b72`.

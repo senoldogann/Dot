@@ -1457,6 +1457,15 @@ class Store:
         )
         await self._db.commit()
 
+    async def owner_saved_memory_ids(self) -> set[str]:
+        """The notes the owner saved as lessons from a run's page (a ``lesson_saved`` event by the owner)."""
+        rows = await self._all(
+            "SELECT json_extract(data, '$.memory_id') AS memory_id FROM events"
+            " WHERE kind = 'lesson_saved' AND json_extract(data, '$.by') = 'owner'",
+            (),
+        )
+        return {str(row["memory_id"]) for row in rows if row["memory_id"] is not None}
+
     @_writing
     async def close_memory_uses(self, run_id: str, status: RunStatus) -> None:
         """Score the notes run ``run_id`` was handed with how it ended."""
@@ -1465,8 +1474,9 @@ class Store:
         )
         await self._db.commit()
 
-    async def memory_scores(self, memory_ids: Sequence[str]) -> dict[str, MemoryScore]:
-        """How the runs ended that were handed each of ``memory_ids``; a note no run was handed is absent."""
+    async def memory_scores(self, memory_ids: Sequence[str], since: float) -> dict[str, MemoryScore]:
+        """How the runs ended that were handed each of ``memory_ids`` since ``since`` (``0.0`` for ever); a note no
+        run was handed is absent."""
         if not memory_ids:
             return {}
         marks: str = ",".join("?" for _ in memory_ids)
@@ -1474,8 +1484,8 @@ class Store:
             "SELECT memory_id, COUNT(DISTINCT run_id) AS handed,"
             " COUNT(DISTINCT CASE WHEN status = 'done' THEN run_id END) AS done,"
             " COUNT(DISTINCT CASE WHEN status = 'failed' THEN run_id END) AS failed"
-            f" FROM memory_uses WHERE memory_id IN ({marks}) GROUP BY memory_id",
-            tuple(memory_ids),
+            f" FROM memory_uses WHERE memory_id IN ({marks}) AND handed_at >= ? GROUP BY memory_id",
+            (*memory_ids, since),
         )
         return {
             str(row["memory_id"]): MemoryScore(

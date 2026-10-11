@@ -8,6 +8,7 @@ from dotagent.core.errors import ProviderProtocolError, StoreError
 from dotagent.memory.embedder import parse_embeddings, parse_openai_embeddings
 from dotagent.memory.ranking import (
     Similar,
+    balance_lift,
     fused_scores,
     most_similar,
     ranked_by_use,
@@ -16,7 +17,7 @@ from dotagent.memory.ranking import (
     use_lift,
 )
 from dotagent.memory.service import normalize_tags, normalize_text, resting
-from dotagent.store.models import MemoryRecord
+from dotagent.store.models import MemoryRecord, MemoryScore
 
 DAY_S: float = 86400.0
 NOW: float = 1_000_000_000.0
@@ -101,25 +102,27 @@ def test_a_used_agent_note_overtakes_an_unused_one_of_the_same_score_but_not_two
     used: MemoryRecord = _note("used", "run_1", NOW - DAY_S, 3, NOW - 3600.0, ())
     agreed: MemoryRecord = _note("agreed", "run_1", NOW - DAY_S, 0, None, ())
     yours: MemoryRecord = _note("yours", None, NOW - DAY_S, 5, NOW, ())
-    ranked: list[str] = [note.id for note in ranked_by_use(scores, [unused, used, agreed, yours], NOW, 30 * DAY_S, 10)]
+    ranked: list[str] = [
+        note.id for note in ranked_by_use(scores, [unused, used, agreed, yours], NOW, 30 * DAY_S, {}, 3, 10)
+    ]
     # agreed: third in one list and first in the other; used: second in one list plus a lift worth a second place.
     assert ranked == ["agreed", "used", "unused", "yours"]
     # The user's note stands on its fused score alone: used today, it is not lifted over an agent note it tied with.
     tied: dict[str, float] = fused_scores([["yours", "used"], ["used", "yours"]])
-    assert [note.id for note in ranked_by_use(tied, [yours, used], NOW, 30 * DAY_S, 10)] == ["used", "yours"]
-    assert [note.id for note in ranked_by_use(scores, [unused, used, agreed, yours], NOW, 30 * DAY_S, 2)] == [
+    assert [note.id for note in ranked_by_use(tied, [yours, used], NOW, 30 * DAY_S, {}, 3, 10)] == ["used", "yours"]
+    assert [note.id for note in ranked_by_use(scores, [unused, used, agreed, yours], NOW, 30 * DAY_S, {}, 3, 2)] == [
         "agreed",
         "used",
     ]
 
 
 def test_an_agent_note_no_run_was_handed_for_rest_days_rests_and_the_users_and_core_notes_never_do() -> None:
-    assert resting(_note("old", "run_1", NOW - 91 * DAY_S, 0, None, ()), NOW, 90)
-    assert not resting(_note("young", "run_1", NOW - 89 * DAY_S, 0, None, ()), NOW, 90)
-    assert not resting(_note("used", "run_1", NOW - 400 * DAY_S, 1, NOW - 200 * DAY_S, ()), NOW, 90)
-    assert resting(_note("retired", "run_1", NOW - DAY_S, 7, NOW, ("lesson", "rest")), NOW, 90)
-    assert not resting(_note("yours", None, NOW - 400 * DAY_S, 0, None, ()), NOW, 90)
-    assert not resting(_note("standing", "run_1", NOW - 400 * DAY_S, 0, None, ("core",)), NOW, 90)
+    assert resting(_note("old", "run_1", NOW - 91 * DAY_S, 0, None, ()), NOW, 90, None, 3)
+    assert not resting(_note("young", "run_1", NOW - 89 * DAY_S, 0, None, ()), NOW, 90, None, 3)
+    assert not resting(_note("used", "run_1", NOW - 400 * DAY_S, 1, NOW - 200 * DAY_S, ()), NOW, 90, None, 3)
+    assert resting(_note("retired", "run_1", NOW - DAY_S, 7, NOW, ("lesson", "rest")), NOW, 90, None, 3)
+    assert not resting(_note("yours", None, NOW - 400 * DAY_S, 0, None, ()), NOW, 90, None, 3)
+    assert not resting(_note("standing", "run_1", NOW - 400 * DAY_S, 0, None, ("core",)), NOW, 90, None, 3)
 
 
 def test_text_is_one_line() -> None:
@@ -194,3 +197,32 @@ def test_malformed_openai_embedding_answers_are_refused_with_their_context(answe
     with pytest.raises(ProviderProtocolError) as caught:
         parse_openai_embeddings(answer, 2, {"url": "https://openai.test"})  # type: ignore[arg-type]
     assert caught.value.context["url"] == "https://openai.test"
+
+
+def test_the_balance_lift_counts_from_min_uses_and_is_capped_either_way() -> None:
+    assert balance_lift(None, 3) == 0.0
+    assert balance_lift(MemoryScore(handed=2, done=2, failed=0), 3) == 0.0
+    assert balance_lift(MemoryScore(handed=3, done=3, failed=0), 3) == 1.0
+    assert balance_lift(MemoryScore(handed=4, done=1, failed=3), 3) == pytest.approx(-2 / 3)
+    assert balance_lift(MemoryScore(handed=9, done=0, failed=9), 3) == -1.0
+    helped: MemoryRecord = _note("helped", "run_1", NOW - 40 * DAY_S, 3, NOW - 10 * DAY_S, ())
+    hurt: MemoryRecord = _note("hurt", "run_1", NOW - 40 * DAY_S, 3, NOW - DAY_S, ())
+    balances: dict[str, MemoryScore] = {
+        "helped": MemoryScore(handed=3, done=3, failed=0),
+        "hurt": MemoryScore(handed=3, done=0, failed=3),
+    }
+    # The fresher use would put hurt first; its score puts helped first.
+    assert [note.id for note in ranked_by_use({}, [hurt, helped], NOW, 30 * DAY_S, balances, 3, 10)] == [
+        "helped",
+        "hurt",
+    ]
+
+
+def test_a_note_rests_once_its_score_is_negative_over_enough_runs() -> None:
+    fresh: MemoryRecord = _note("fresh", "run_1", NOW - DAY_S, 4, NOW, ())
+    assert resting(fresh, NOW, 90, MemoryScore(handed=3, done=1, failed=2), 3)
+    assert not resting(fresh, NOW, 90, MemoryScore(handed=2, done=0, failed=2), 3)
+    assert not resting(fresh, NOW, 90, MemoryScore(handed=3, done=2, failed=1), 3)
+    assert not resting(
+        _note("yours", None, NOW - DAY_S, 4, NOW, ()), NOW, 90, MemoryScore(handed=3, done=0, failed=3), 3
+    )

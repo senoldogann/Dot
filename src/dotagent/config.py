@@ -270,6 +270,9 @@ class MemoryConfig(FrozenModel):
     # the half-life of the lift a note's last use gives it in a search.
     rest_days: int = Field(ge=1)
     use_half_life_days: float = Field(gt=0, allow_inf_nan=False)
+    # The window of a note's score (how the runs handed it ended) and the runs it takes before the score counts.
+    score_days: int = Field(ge=1)
+    score_min_uses: int = Field(ge=1)
 
 
 class ShellConfig(FrozenModel):

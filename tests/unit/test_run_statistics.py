@@ -448,7 +448,7 @@ async def test_a_note_is_scored_by_how_the_runs_handed_it_ended(tmp_path: Path) 
     store: Store = await Store.open(tmp_path / "dot.sqlite3", tmp_path / "screenshots")
     thread = await store.create_thread("t", "test")
     note = await store.add_memory("A note.", [], "run_earlier", None)
-    assert await store.memory_scores([note.id]) == {}
+    assert await store.memory_scores([note.id], 0.0) == {}
     done: RunRecord = await _run(store, thread.id, "ollama:a", "done", "answer", 1, 10)
     await store.mark_memories_used(done.id, [note.id], time.time(), "start")
     await store.mark_memories_used(done.id, [note.id], time.time(), "live")
@@ -457,6 +457,6 @@ async def test_a_note_is_scored_by_how_the_runs_handed_it_ended(tmp_path: Path) 
         thread.id, "goal", "task", "ollama:a", None, "test", "medium", "ask", False, None, None
     )
     await store.mark_memories_used(working.id, [note.id], time.time(), "search")
-    assert await store.memory_scores([note.id]) == {note.id: MemoryScore(handed=2, done=1, failed=0)}
+    assert await store.memory_scores([note.id], 0.0) == {note.id: MemoryScore(handed=2, done=1, failed=0)}
     assert (await store.get_memory(note.id)).used_count == 3
     await store.close()

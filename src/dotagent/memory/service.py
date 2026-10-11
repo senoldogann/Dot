@@ -23,7 +23,7 @@ from dotagent.memory.embedder import Embedder, build_embedder
 from dotagent.memory.ranking import Similar, Vector, fused_scores, most_similar, ranked_by_use
 from dotagent.memory.words import lowercase, search_terms
 from dotagent.store.db import Store
-from dotagent.store.models import MemoryRecord
+from dotagent.store.models import MemoryRecord, MemoryScore
 
 CORE_TAG: str = "core"
 # The tags the nightly reflection (:mod:`dotagent.agent.reflection`) writes: the day's journal note, and a lesson
@@ -182,21 +182,30 @@ async def _distinctive_terms(store: Store, terms: tuple[str, ...], total: int) -
     return tuple(term for term in terms if counts[term] <= total * _MAX_NOTE_SHARE)
 
 
-def resting(record: MemoryRecord, now: float, rest_days: int) -> bool:
+def resting(record: MemoryRecord, now: float, rest_days: int, score: MemoryScore | None, min_uses: int) -> bool:
     """Whether a note rests: it is the agent's (the user's notes and the standing ones never rest) and either the
-    reflection retired it (tagged ``rest``) or no run was handed it in ``rest_days`` days since it was written. A
-    resting note is not handed to a run on its own; a search still finds it unless it was retired."""
+    reflection retired it (tagged ``rest``), or no run was handed it in ``rest_days`` days since it was written, or
+    its ``score`` (how the runs handed it lately ended) is negative over at least ``min_uses`` runs. A resting note
+    is not handed to a run on its own; a search still finds it unless it was retired."""
     if record.source_run is None or CORE_TAG in record.tags:
         return False
     if REST_TAG in record.tags:
         return True
+    if score is not None and score.handed >= min_uses and score.done < score.failed:
+        return True
     return record.used_count == 0 and record.created_at < now - rest_days * 86400.0
+
+
+async def recent_scores(index: MemoryIndex, memory_ids: Sequence[str], now: float) -> dict[str, MemoryScore]:
+    """The scores of ``memory_ids`` over the last ``[memory] score_days``."""
+    return await index.store.memory_scores(memory_ids, now - index.config.score_days * 86400.0)
 
 
 async def recall(index: MemoryIndex, query: str, limit: int) -> list[MemoryHit]:
     """The ``limit`` notes that best fit ``query``, best first: the fusion of the two rankers, with the agent's notes
     lifted by how lately a run was handed them (:func:`dotagent.memory.ranking.ranked_by_use`, half-life
-    ``[memory] use_half_life_days``). A note the reflection retired (tagged ``rest``) is never one."""
+    ``[memory] use_half_life_days``) and by their score (:func:`recent_scores`), either way. A note the reflection
+    retired (tagged ``rest``) is never one."""
     text: str = normalize_text(query)[:_QUERY_CHARS]
     total: int = await index.store.count_memories()
     if not text or limit <= 0 or total == 0:
@@ -217,8 +226,10 @@ async def recall(index: MemoryIndex, query: str, limit: int) -> list[MemoryHit]:
     candidates: list[MemoryRecord] = [
         record for record in await index.store.get_memories(list(scores)) if REST_TAG not in record.tags
     ]
+    now: float = time.time()
+    balances: dict[str, MemoryScore] = await recent_scores(index, [record.id for record in candidates], now)
     ranked: list[MemoryRecord] = ranked_by_use(
-        scores, candidates, time.time(), config.use_half_life_days * 86400.0, limit
+        scores, candidates, now, config.use_half_life_days * 86400.0, balances, config.score_min_uses, limit
     )
     return [MemoryHit(record=record, similarity=similarities.get(record.id)) for record in ranked]
 
@@ -260,8 +271,12 @@ async def prompt_memories(index: MemoryIndex, query: str) -> list[MemoryRecord]:
         ]
     )
     now: float = time.time()
+    balances: dict[str, MemoryScore] = await recent_scores(index, [hit.record.id for hit in related], now)
     fresh: list[MemoryRecord] = [
-        hit.record for hit in related if hit.record.id not in known and not resting(hit.record, now, config.rest_days)
+        hit.record
+        for hit in related
+        if hit.record.id not in known
+        and not resting(hit.record, now, config.rest_days, balances.get(hit.record.id), config.score_min_uses)
     ]
     return [*standing, *users, *fresh[: config.inject_top_k]]
 
