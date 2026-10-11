@@ -695,6 +695,17 @@ the `tool_result` event with the steps of the batch): acts, the share with one s
 median call. `--by site` prints the sites table only, `--by model` everything but it. Acts and steps recorded before
 these were counted (before item 22 of the roadmap) are left out of the acts lines and the sites table.
 
+The numbers of a long run follow under each model: the **compactions** per 100 steps, their seconds and their share of
+the model time (a run on a small context budget pays a summary every few steps); the **web failures** by cause, read
+from the first line of each failed `web_fetch`, `web_search`, `web_crawl` or `web_extract` result (not found: HTTP 404
+or a host name that does not resolve, which is an address the model guessed; throttled: HTTP 429 or DuckDuckGo's bot
+check; blocked: HTTP 401 or 403; in transit; other); the calls of any tool **refused for arguments that did not fit**
+(a turn lost each, on top of the calls whose arguments were not valid JSON); the **delegated runs** and the seconds
+the run waited for them; and the step line adds the median input tokens a step sent per band, the growth of the
+context. **`dotx stats --run ID`** prints the same for one run: its minutes of wall time (to now while it works), its
+tool calls' seconds and the part spent at the gate, then the lines above and its tools. The daemon serves the same as
+`GET /api/runs/{id}/stats`.
+
 **`dotx eval`** plays a catalog of small tasks against a model and judges each by what is left in a workspace of its own:
 file edits, shell work, fixing code until its test passes, recovering from an error, multi-step work, a goal that asks
 for as much as the files give, read-only research, a task that cannot be done and has to end as an honest failure, an
@@ -719,9 +730,10 @@ the share of the act calls that carried one step and the share of the input toke
 as `dotx stats` counts them, over every attempt), how often a tool call failed, stalls, runs that were cut, runs that
 said they were done and were not, plan steps marked done without evidence (zero since the plan tools require it) and
 done steps whose evidence the goal check could not bear out (counted from the `goal_check` events, so only in goal
-mode), how many of the attempts at a task that hides an instruction in one of its files (a note "to the AI assistant"
-in an invoice, a hidden block in a saved page, a line in a notes file) followed it, and the tasks that passed only in
-some attempts. The token ceiling of an attempt
+mode), compactions per 100 steps and the share of the model time their summaries took, web pages not found and calls
+refused for their arguments (as `dotx stats` counts them; `-` in a report saved before they were), how many of the
+attempts at a task that hides an instruction in one of its files (a note "to the AI assistant" in an invoice, a hidden
+block in a saved page, a line in a notes file) followed it, and the tasks that passed only in some attempts. The token ceiling of an attempt
 counts every model call of the run and of the runs it delegated to, side calls included; a report saved before model
 calls were timed counted the steps' tokens only and has no seconds, and one saved before acts and cached tokens were
 counted shows `-` for their shares. `dotx eval run` saves its report after every attempt, so an interrupted run keeps

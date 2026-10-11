@@ -236,3 +236,7 @@ async def test_the_sections_show_what_waits_what_works_and_a_campaign_session_wi
     after = (await client.get("/api/activity")).json()
     assert after["waiting"] == [] and after["working"] == []
     assert sorted(row["run_id"] for row in after["recent"]) == sorted([asking.id, working.id, session.id])
+    costs: httpx.Response = await client.get(f"/api/runs/{working.id}/stats")
+    assert costs.status_code == 200, costs.text
+    assert costs.json()["status"] == "done" and costs.json()["stats"]["steps"] >= 2 and costs.json()["minutes"] > 0
+    assert (await client.get("/api/runs/run_none/stats")).status_code == 404

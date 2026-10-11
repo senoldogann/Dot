@@ -30,7 +30,7 @@ def test_the_channel_follows_the_tool(tool: str, channel: Channel) -> None:
 
 def test_the_gui_share_counts_the_browser_and_the_desktop_among_the_acting_calls() -> None:
     def sample(tool: str, ok: bool) -> ToolSample:
-        return ToolSample(tool=tool, ok=ok, seconds=1.0, waited_s=0.0)
+        return ToolSample(model="ollama:a", tool=tool, ok=ok, seconds=1.0, waited_s=0.0, text="")
 
     channels: tuple[ChannelStats, ...] = channel_stats(
         [

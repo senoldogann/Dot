@@ -49,7 +49,7 @@ from dotagent.store.models import (
     ThreadRecord,
     ThreadSummary,
 )
-from dotagent.store.stats import ModelProfile, read_model_profile
+from dotagent.store.stats import ModelProfile, RunCosts, collect_run_costs, read_model_profile
 
 _SCHEMA: str = """
 CREATE TABLE IF NOT EXISTS threads (
@@ -972,6 +972,10 @@ class Store:
     async def model_profile(self, model: str, runs: int) -> ModelProfile:
         """How reliably ``model`` worked in its newest ``runs`` finished runs, read on a read-only connection."""
         return await asyncio.to_thread(read_model_profile, self._database, model, runs)
+
+    async def run_costs(self, run_id: str) -> RunCosts:
+        """What the run cost and where it went, read on a read-only connection; its minutes run to now while it works."""
+        return await asyncio.to_thread(collect_run_costs, self._database, run_id, time.time())
 
     # ----- approvals -------------------------------------------------------------------------
 

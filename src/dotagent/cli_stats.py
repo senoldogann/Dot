@@ -14,12 +14,16 @@ from dotagent.store.endings import ENDING_LABELS
 from dotagent.store.stats import (
     ActStats,
     ChannelStats,
+    CompactionStats,
     ModelStats,
+    RunCosts,
     RunStatistics,
     SiteStats,
     StepBand,
     TimeStats,
     ToolStats,
+    WebFailures,
+    collect_run_costs,
     collect_statistics,
     gui_share,
 )
@@ -55,11 +59,30 @@ def render_model(stats: ModelStats) -> list[str]:
         f"  steps {stats.steps} ({_per(stats.steps, stats.runs)} a run), input tokens {_count(stats.input_tokens)} "
         f"({_per(stats.input_tokens, stats.steps)} a step), output tokens {_count(stats.output_tokens)}",
         f"  tools: {stats.tool_calls} calls, {stats.tool_errors} failed ({_percent(stats.tool_errors, stats.tool_calls)}), "
-        f"{stats.invalid_arguments} with arguments that were not valid JSON",
-        f"  stalls {stats.stalls}, compactions {stats.compactions}",
+        f"{stats.invalid_arguments} with arguments that were not valid JSON, {stats.rejected_arguments} refused for "
+        "arguments that did not fit (a turn lost each)",
+        f"  stalls {stats.stalls}, compactions {_compaction(stats.compaction)}",
+        f"  web failures: {_web(stats.web)}",
+        f"  delegated runs {stats.delegation.runs}, waited {_seconds(stats.delegation.seconds)} s for them",
         f"  acts: {_acts(stats.acts)}",
-        f"  step model call by step number: {_bands(stats.bands)}",
+        f"  step model call and input tokens by step number: {_bands(stats.bands)}",
     ]
+
+
+def _compaction(compaction: CompactionStats) -> str:
+    """The compactions in one line: how many, per 100 steps, their seconds and their share of the model time."""
+    per: str = "-" if compaction.per_100_steps is None else f"{compaction.per_100_steps:.1f}"
+    return (
+        f"{compaction.compactions} ({per} per 100 steps, {_seconds(compaction.seconds)} s, "
+        f"{_share(compaction.share)} of the model time)"
+    )
+
+
+def _web(web: WebFailures) -> str:
+    return (
+        f"not found {web.not_found}, throttled {web.throttled}, blocked {web.blocked}, in transit {web.transit}, "
+        f"other {web.other}"
+    )
 
 
 def _seconds(value: float | None) -> str:
@@ -81,11 +104,13 @@ def _acts(acts: ActStats) -> str:
 
 
 def _bands(bands: Sequence[StepBand]) -> str:
-    """The slowdown curve in one line: the median seconds of a step's model call per band of step numbers."""
+    """The slowdown curve in one line: the median seconds of a step's model call and, when the steps recorded them,
+    the median input tokens it sent, per band of step numbers."""
     if not bands:
         return "no timed steps"
     return ", ".join(
-        f"{band.first}-{band.last if band.last else ''} {_seconds(band.seconds_median)} s ({band.steps})"
+        f"{band.first}-{band.last if band.last else ''} {_seconds(band.seconds_median)} s"
+        f"{'' if band.tokens_median is None else f' / {_count(band.tokens_median)} tokens'} ({band.steps})"
         for band in bands
     )
 
@@ -187,7 +212,23 @@ def render_stats(stats: RunStatistics, days: int, by: Literal["model", "site", "
     return lines
 
 
+def render_run_costs(costs: RunCosts) -> list[str]:
+    """What one run cost and where it went: its minutes, its model's numbers, its tools' seconds and its tools."""
+    stats: ModelStats = costs.stats
+    head: list[str] = [
+        f"Run {costs.run_id} ({costs.status}) on {stats.model}: {costs.minutes:.1f} min, {stats.steps} steps, "
+        f"input tokens {_count(stats.input_tokens)} ({_per(stats.input_tokens, stats.steps)} a step), "
+        f"output tokens {_count(stats.output_tokens)}",
+        f"  tool calls took {_seconds(costs.tool_seconds)} s, of which {_seconds(costs.waited_s)} s at the gate",
+    ]
+    return [*head, *render_model(stats)[3:], "", *render_time([stats]), "", *render_tools(costs.tools)]
+
+
 async def cmd_stats(command: StatsCommand) -> int:
+    if command.run is not None:
+        costs: RunCosts = await asyncio.to_thread(collect_run_costs, db_path(), command.run, time.time())
+        sys.stdout.write("\n".join(render_run_costs(costs)) + "\n")
+        return 0
     since: float = time.time() - command.days * _DAY_S
     stats: RunStatistics = await asyncio.to_thread(collect_statistics, db_path(), since)
     sys.stdout.write("\n".join(render_stats(stats, command.days, command.by)) + "\n")

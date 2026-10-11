@@ -11,7 +11,7 @@ from dotagent.evals.results import RunMetrics
 from dotagent.llm.calls import CALL_EVENT
 from dotagent.llm.types import invalid_arguments_text
 from dotagent.store.models import EventRecord, RunRecord
-from dotagent.store.stats import ACT_TOOLS
+from dotagent.store.stats import ACT_TOOLS, WEB_TOOLS, failure_cause
 
 # A question nobody answered: one the run waited for (which the harness declines), or one it left and went on without.
 _UNANSWERED_KINDS: frozenset[str] = frozenset({"approval_requested", QUESTION_LEFT_EVENT})
@@ -34,6 +34,24 @@ def _seconds(events: Sequence[EventRecord], kind: str) -> float:
             raise EvalError("an event lacks the seconds the harness counts", {"kind": kind, "event_id": event.id})
         total += seconds
     return total
+
+
+def _compaction_seconds(events: Sequence[EventRecord]) -> float:
+    """The seconds the model calls that wrote a compaction's summary took in all."""
+    total: float = 0.0
+    for event in events:
+        if event.kind != CALL_EVENT or event.data.get("purpose") != "compaction":
+            continue
+        seconds: JsonValue = event.data.get("seconds")
+        if not isinstance(seconds, int | float):
+            raise EvalError("a model call lacks the seconds the harness counts", {"event_id": event.id})
+        total += seconds
+    return total
+
+
+def _failure_text(event: EventRecord) -> str:
+    text: JsonValue = event.data.get("text")
+    return text if isinstance(text, str) else ""
 
 
 def _batch_steps(event: EventRecord) -> int:
@@ -78,6 +96,9 @@ def run_metrics(run: RunRecord, events: Sequence[EventRecord]) -> RunMetrics:
     """The numbers of one run: its record gives steps and tokens, its events give the rest."""
     results: list[EventRecord] = [event for event in events if event.kind == "tool_result"]
     acts: list[EventRecord] = [event for event in results if event.data.get("tool") in ACT_TOOLS]
+    failures: list[tuple[str, str]] = [
+        (str(event.data.get("tool")), _failure_text(event)) for event in results if event.data.get("ok") is False
+    ]
     return RunMetrics(
         steps=run.steps,
         input_tokens=run.input_tokens,
@@ -95,4 +116,7 @@ def run_metrics(run: RunRecord, events: Sequence[EventRecord]) -> RunMetrics:
         cached_tokens=_cached_tokens(events),
         unevidenced_steps=_unevidenced_steps(events),
         unproven_steps=_unproven_steps(events),
+        compaction_seconds=round(_compaction_seconds(events), 3),
+        not_found=sum(1 for tool, text in failures if tool in WEB_TOOLS and failure_cause(tool, text) == "not_found"),
+        rejected_arguments=sum(1 for tool, text in failures if failure_cause(tool, text) == "rejected_arguments"),
     )

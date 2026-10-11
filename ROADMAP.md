@@ -3586,18 +3586,21 @@ file), the daemon's logs, and what the code does at the points they name. Every 
 of 160, 217 and 260 steps (17, 18 and 51 minutes), four research runs delegated by them of 24 to 53 steps.
 
 - *Context.* 96 steps a run, 40.1 k input tokens a step, 23.0 M input tokens over the six DeepSeek runs, 61 % of them
-  cached. The 260-step run compacted 63 times, once every four steps; the summaries took 1,004 of the 3,323 model
-  seconds of those runs, 30 % of the model time, written by the fast model (`gpt-oss:20b-cloud`) from up to 120,000
-  characters of transcript each time. The cause is the budget, not the ledger: `[agent] context_tokens = 48000` and
+  cached. Those runs compacted 72 times over 573 steps (12.6 per 100 steps); the 260-step run 36 times, once every
+  seven steps, and its summaries took 690 of its 1,309 model seconds (53 %); over the six runs the summaries took
+  1,004 of the 3,323 model seconds, 30 % of the model time, written by the fast model (`gpt-oss:20b-cloud`) from up
+  to 120,000 characters of transcript each time (the figures as item 53 reads them, 2026-10-11). The cause is the
+  budget, not the ledger: `[agent] context_tokens = 48000` and
   `[providers.ollama] num_ctx = 65536` give the run about 48 k tokens, the fixed part and six kept tool results of up to
   12,000 characters fill it in a few browser steps, and the pinned ledger is bounded (40 actions, 60 addresses). 64
   `compaction_check_failed` warnings and 7 `summary_too_long` say the fast model's summaries often miss a section or
   run long, so the note leans on the pinned facts.
-- *The open web.* 561 `web_fetch` calls, 75 failed: about twenty HTTP 404 on career pages whose address the model
-  guessed (`/careers/`, `/ura/`, `/yhteystiedot/`), two DNS failures and two transit failures of the same kind, two
-  HTTP 429 from LinkedIn, two HTTP 403 from search engines the model fetched as pages (Mojeek, Ecosia) when
-  `web_search` was throttled. 32 `web_search` calls, 18 failed: 10 by DuckDuckGo's bot check, 3 by a result page with
-  no results, 5 by `max_results` above 10 (a turn lost to a validation message each). Those runs predate the restart
+- *The open web.* 561 `web_fetch` calls, 75 failed, and 32 `web_search` calls, 18 failed; by cause, as item 53
+  counts them over the six DeepSeek runs: 51 not found (HTTP 404 on career pages whose address the model guessed,
+  `/careers/`, `/ura/`, `/yhteystiedot/`, and host names that did not resolve), 25 throttled (DuckDuckGo's bot check,
+  its result page without results, HTTP 429 from LinkedIn), 3 blocked (HTTP 403 from search engines the model fetched
+  as pages, Mojeek and Ecosia, when `web_search` was throttled), 9 in transit; and 7 calls refused for arguments that
+  did not fit (5 of them `max_results` above 10, a turn lost to a validation message each). Those runs predate the restart
   that made the hosted Ollama search live for the daemon (item 34, decision 18): the throttling is unmeasured since.
   Two `browser_act` batches were refused for more than five steps and two for an action name outside the list.
 - *The browser.* The daemon's error log holds two tracebacks of `BrowserSession._adopt_popup`
@@ -3636,14 +3639,16 @@ closed pages) then; 58 (the bill on the run page) last, since it shows 53's numb
 
 | #   | Item                                                                     | Status  | Commits |
 | --- | ------------------------------------------------------------------------ | ------- | ------- |
-| 53  | The numbers of a long run                                                | planned |         |
+| 53  | The numbers of a long run                                                | in progress |         |
 | 54  | Long browser tasks in the eval set                                       | planned |         |
-| 55  | Context that stays: a compaction every forty steps, not four             | planned |         |
+| 55  | Context that stays: a compaction every forty steps, not seven            | planned |         |
 | 56  | The web without guessing                                                 | planned |         |
 | 57  | The browser's closed pages                                               | planned |         |
 | 58  | The bill of a run, on its page                                           | planned |         |
 
 ### 53. The numbers of a long run
+
+**Status: done.** Built on `item-53-long-run-numbers` (MYP-193).
 
 **What.** `dotx stats` (per model and per run), the eval report and a new `GET /runs/{run_id}/stats` report what
 part 5 is judged by: compactions per 100 steps and the share of model seconds they took; input tokens a step as a curve
@@ -3664,11 +3669,45 @@ and by `dotx stats --run ID`. The eval `RunMetrics` and the scorecard carry comp
 of the owner's seven runs (the figures in the part's head) is written into this item once the code reads them, so the
 difference after 55 and 56 is a number, not a memory.
 
-**Touchpoints.** `store/stats.py`, `cli_stats.py`, `server/routes_runs.py`, `server/views.py`, `evals/metrics.py`,
-`evals/results.py`, `evals/scoring.py`, README "Statistics", `tests/unit/test_run_statistics.py`.
+**Design, as built.** The reading of the code corrected the plan in three places. The summary calls are already
+tagged (`model_call` events carry `purpose = "compaction"`, item 9), so no new event was needed: `CompactionStats`
+(count, per 100 steps, seconds, share of the model seconds) is computed from the counts and `TimeStats` that existed.
+The `assistant` event already records the input tokens of its step, so the curve is the old `StepBand` with a
+`tokens_median` (``None`` for a band whose steps recorded none). The delegated wait needs no new reading either: the
+`delegate` tool's result carries the whole wait, so `DelegationStats` is its calls and seconds. New in
+`store/stats.py`: every query takes a scope (`r.created_at >= ?` or `r.id = ?`), so one pipeline serves the window
+and one run; `_TOOLS_SQL` reads the model of the run and the first 200 characters of the result's text, where the
+cause is; `failure_cause(tool, text)` (pure, its own test) tells a call refused for its arguments (the text starts
+with `Invalid arguments for`, any tool) from a web tool's not found (HTTP 404, a host name that did not resolve),
+throttled (HTTP 429, DuckDuckGo's check, its result page without results), blocked (401, 403), in transit, other;
+`WebFailures`, `rejected_arguments`, `collect_run_costs(database, run_id, now)` with `RunCosts` (the run, its minutes
+to its end or to ``now``, its `ModelStats`, its tool seconds and the part at the gate, its tools). `ModelStats` gains
+`compaction`, `web`, `rejected_arguments`, `delegation` (and loses the bare `compactions` count, now in
+`compaction`). `Store.run_costs(run_id)` reads it on the read-only connection like the model profile;
+`GET /api/runs/{run_id}/stats` returns it (404 for no such run); `dotx stats --run ID` prints it. The eval
+`RunMetrics` gains `compaction_seconds`, `not_found`, `rejected_arguments` (``None`` in older reports), the
+`Scorecard` `compactions_per_100_steps`, `compaction_share`, `not_found`, `rejected_arguments`, shown in the card and
+in the difference line. Tests: `tests/unit/test_run_statistics.py` (the causes, the compaction numbers, the token
+curve, the delegation, one run's costs and their rendering), `test_evals.py` (the card and the difference line),
+`tests/smoke/test_activity.py` (the route on a finished scripted run, and 404).
 
-**Done when.** `dotx stats` prints the five numbers per model, `dotx stats --run ID` and the route per run, the eval
-report per task; the unit tests over a fixed event set check each; the baseline of the owner's runs is in this item.
+**The baseline, the owner's runs read on 2026-10-11 with this code (the seven runs of 2026-10-09 and 10).**
+`ollama:deepseek-v4.1-flash:cloud`, 6 runs, 573 steps: compactions 72 (12.6 per 100 steps, 1,004 s, 30 % of the
+model time); web failures not found 51, throttled 25, blocked 3, in transit 9; 7 calls refused for their arguments;
+delegated runs 3, waited 1,781 s; input tokens a step by band 22.0 k (1-5), 34.0 k (6-10), 39.6 k (11-20), 37.7 k
+(21-40). The 260-step run alone: 51.4 min, 11.1 M input tokens (42.7 k a step), compactions 36 (13.8 per 100 steps,
+690 s, 53 % of its 1,309 model seconds), delegated runs 2 waited 1,498 s, 67 % cached. `ollama:glm-5.3-flash:cloud`,
+1 run of 217 steps: compactions 6 (2.8 per 100 steps, its calls untimed), 3 refused for their arguments, no web
+failure.
+
+**Touchpoints.** `store/stats.py`, `store/db.py`, `cli_stats.py`, `cli_commands.py`, `cli.py`,
+`server/routes_runs.py`, `evals/metrics.py`, `evals/results.py`, `evals/scoring.py`, README "Measuring the agent",
+`tests/unit/test_run_statistics.py`, `tests/unit/test_evals.py`, `tests/unit/test_channels.py`,
+`tests/smoke/test_activity.py`.
+
+**Done when.** `dotx stats` prints the five numbers per model (done), `dotx stats --run ID` and the route per run
+(done), the eval report per task (done); the unit tests over a fixed event set check each (done); the baseline of the
+owner's runs is in this item (done).
 
 ### 54. Long browser tasks in the eval set
 
@@ -3690,15 +3729,15 @@ starts the fixture server for a browser task and the browser in headless mode in
 **Done when.** `dotx eval check` plays both offline; `dotx eval run --task ID --model REF` plays them live; the
 report shows compactions and fetch failures (item 53) for them.
 
-### 55. Context that stays: a compaction every forty steps, not four
+### 55. Context that stays: a compaction every forty steps, not seven
 
 **What.** A long run on a model with a large window compacts rarely, and a compaction costs a tenth of what it does
 now. Targets, read with item 53 on the long tasks and on the owner's next runs: compactions per 100 steps under 5
-(from 24 on the owner's longest run), the summaries' share of model seconds under 10 % (from 30 %), input tokens a
-step not above today's 40 k on the same budget.
+(from 12.6 over the owner's DeepSeek runs, 13.8 on the longest), the summaries' share of model seconds under 10 %
+(from 30 % over those runs, 53 % on the longest), input tokens a step not above today's 40 k on the same budget.
 
-**Why.** The numbers in the part's head: the budget is 48 k tokens on a model that holds a million, and every fourth
-step pays a 16-second summary of 120,000 characters to the fast model, which then misses sections.
+**Why.** The numbers in the part's head: the budget is 48 k tokens on a model that holds a million, and every seventh
+step pays a 19-second summary of up to 120,000 characters to the fast model, which then misses sections.
 
 **Design (from the audit; the measured choice is decision 33).** Three moves, each measured alone before it stays:
 (1) the budget follows the model: `context_budget` already takes three quarters of the window, so what cuts it is

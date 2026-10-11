@@ -28,7 +28,10 @@ class RunMetrics(FrozenModel):
     saved before they were counted has none of the three. ``unevidenced_steps`` are the steps the run's last plan marks
     done without evidence (zero since the plan tools require it; a report saved before has none), ``unproven_steps``
     the done steps whose evidence the goal checker found nothing in the digest or the facts to bear out, summed over
-    its checks (none in a report saved before the checker judged them, or in a run without goal mode)."""
+    its checks (none in a report saved before the checker judged them, or in a run without goal mode).
+    ``compaction_seconds`` is the time the summaries of its compactions took, ``not_found`` the web calls that met a
+    page or host that is not there (an address the model guessed), ``rejected_arguments`` the calls refused because
+    their arguments did not fit the tool (a turn lost each); a report saved before item 53 counted none of the three."""
 
     steps: int
     input_tokens: int
@@ -46,6 +49,9 @@ class RunMetrics(FrozenModel):
     cached_tokens: int | None = None
     unevidenced_steps: int | None = None
     unproven_steps: int | None = None
+    compaction_seconds: float | None = None
+    not_found: int | None = None
+    rejected_arguments: int | None = None
 
 
 class TaskOutcome(FrozenModel):
