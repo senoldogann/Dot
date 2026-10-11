@@ -294,8 +294,12 @@ class CampaignDetail(FrozenModel):
 
 
 class MemoryPage(FrozenModel):
+    """A page of the notes, newest change first; ``resting`` names the items that rest
+    (:func:`dotagent.memory.service.resting`), so the page can group them."""
+
     total: int
     items: list[MemoryRecord]
+    resting: list[str]
 
 
 class ScheduleView(FrozenModel):
