@@ -3,6 +3,7 @@
 look. The density chosen in Settings › Appearance lands on the page element."""
 
 import asyncio
+import re
 import time
 from collections.abc import AsyncIterator
 from pathlib import Path
@@ -25,7 +26,12 @@ from dotagent.server.links import ui_url
 pytestmark = [pytest.mark.browser, pytest.mark.asyncio(loop_scope="module")]
 
 TOKEN: str = "controls-test-token"
-_SECTIONS: int = 11
+# The relative luminance of the page's background, 0 (black) to 1 (white), from its computed colour.
+_LUMINANCE: str = """(() => {
+  const [r, g, b] = getComputedStyle(document.body).backgroundColor.match(/[0-9.]+/g).map(Number);
+  return (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
+})()"""
+_SECTIONS: int = 12
 
 
 @pytest_asyncio.fixture(scope="module", loop_scope="module")
@@ -120,6 +126,25 @@ async def test_every_control_draws_in_both_looks_wide_and_on_a_phone_at_both_den
             await expect(page.locator("html")).to_have_attribute("data-density", "compact")
             await expect(page.locator(".control-section")).to_have_count(_SECTIONS)
             await page.screenshot(path=str(tmp_path / "controls-compact-1280-light.png"), full_page=True)
+            await page.close()
+
+            # The owner holds a colour scheme: Dark on a light system darkens the page at once and after a reload.
+            page = await browser.new_page(viewport={"width": 1280, "height": 900}, color_scheme="light")
+            await page.goto(ui_url(host, port, TOKEN))
+            await page.goto(f"{base}/#/settings/general")
+            await expect(page.locator("html")).not_to_have_attribute("data-scheme", re.compile(".+"))
+            assert await page.evaluate(_LUMINANCE) > 0.8
+            await page.get_by_role("group", name="Colour scheme").get_by_role("button", name="Dark").click()
+            await expect(page.locator("html")).to_have_attribute("data-scheme", "dark")
+            assert await page.evaluate("getComputedStyle(document.documentElement).colorScheme") == "dark"
+            assert await page.evaluate(_LUMINANCE) < 0.2
+            await page.reload()
+            await expect(page.locator("html")).to_have_attribute("data-scheme", "dark")
+            assert await page.evaluate(_LUMINANCE) < 0.2
+            await page.screenshot(path=str(tmp_path / "settings-held-dark-1280.png"))
+            await page.get_by_role("group", name="Colour scheme").get_by_role("button", name="System").click()
+            await expect(page.locator("html")).not_to_have_attribute("data-scheme", re.compile(".+"))
+            assert await page.evaluate(_LUMINANCE) > 0.8
             await page.close()
         finally:
             await browser.close()

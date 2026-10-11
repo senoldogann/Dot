@@ -1,155 +1,116 @@
-/* The looks: every colour of the interface, one block per look, light and dark following the system. The neutral look
-   is the base; the others are chosen with data-theme on the page element and change the colour tokens first and the
-   shape second. app.css holds the shape, type and spacing tokens and draws the controls on all of them. */
+/* The looks: every colour of the interface, one block per look. Each token names its light and its dark value in one
+   place with light-dark(); which one is used follows the page's colour scheme: the system's, or the owner's choice
+   set with data-scheme on the page element (theme.js). The neutral look is the base; the others are chosen with
+   data-theme on the page element and change the colour tokens first and the shape second. app.css holds the shape,
+   type and spacing tokens and draws the controls on all of them.
 
-/* ---------- neutral: white and graphite with a black accent, the base look ---------- */
+   The scale (item 63): warm greys with little saturation; surfaces step up by lightness (bg, surface, surface-2,
+   surface-3) in both schemes, so depth comes from the step and not from a shadow in dark; borders are the text colour
+   at a small alpha, so they sit on every surface; the text tiers (text, text-2, muted, faint) are measured against
+   every surface by tests/unit/test_css_tokens.py (4.5:1 for the first two, 3:1 for the last two); shadows are
+   nearly gone in dark. The accent is an ink, not the amber of the bubble: an amber reads at under 2:1 on a light
+   surface, and the accent paints text, focus rings and the send button. */
 
 :root {
-  --bg: #ffffff;
-  --sidebar: #f9f9f9;
-  --surface: #ffffff;
-  --surface-2: #f5f5f5;
-  --surface-3: #ececec;
-  --border: #e5e5e5;
-  --border-strong: #cdcdcd;
-  --control: #8a8a8a;
-  --text: #0d0d0d;
-  --text-2: #404040;
-  --muted: #6a6a6a;
-  --faint: #707070;
-  --accent: #0d0d0d;
-  --accent-strong: #000000;
-  --accent-weak: #f0f0f0;
-  --on-accent: #ffffff;
-  --ok: #0b7a4b;
-  --ok-weak: #e4f4eb;
-  --warn: #8f5600;
-  --warn-weak: #fff1d6;
-  --warn-border: #e8c068;
-  --bad: #c0262d;
-  --bad-weak: #fdecec;
-  --bad-border: #f0b4b4;
-  --on-bad: #ffffff;
+  color-scheme: light dark;
+}
+
+:root[data-scheme="light"] {
+  color-scheme: light;
+}
+
+:root[data-scheme="dark"] {
+  color-scheme: dark;
+}
+
+/* ---------- neutral: warm grey and ink, the base look ---------- */
+
+:root {
+  --bg: light-dark(#f8f7f4, #1b1a18);
+  --sidebar: light-dark(#f2f1ed, #151412);
+  --surface: light-dark(#fdfcfa, #22211f);
+  --surface-2: light-dark(#f3f2ee, #2a2927);
+  --surface-3: light-dark(#e9e8e3, #343230);
+  --border: light-dark(rgb(28 27 25 / 8%), rgb(236 234 229 / 9%));
+  --border-strong: light-dark(rgb(28 27 25 / 16%), rgb(236 234 229 / 18%));
+  --control: light-dark(#85837d, #8a8882);
+  --text: light-dark(#1c1b19, #ecebe6);
+  --text-2: light-dark(#4b4a46, #c6c4bd);
+  --muted: light-dark(#6a6965, #a19f98);
+  --faint: light-dark(#767470, #94928b);
+  --accent: light-dark(#2b2a27, #e6e4de);
+  --accent-strong: light-dark(#1c1b19, #f5f4f0);
+  --accent-weak: light-dark(#ecebe6, #2f2e2b);
+  --on-accent: light-dark(#fbfaf7, #1b1a18);
+  --ok: light-dark(#1b7349, #62cf98);
+  --ok-weak: light-dark(#e3f2e8, #163527);
+  --on-ok: light-dark(#ffffff, #0f2419);
+  --warn: light-dark(#8a5400, #ecb458);
+  --warn-weak: light-dark(#fbefd6, #362a10);
+  --warn-border: light-dark(#e3c37a, #6a5020);
+  --bad: light-dark(#b8322f, #ff8f88);
+  --bad-weak: light-dark(#fbebe9, #3b1c1b);
+  --bad-border: light-dark(#efb8b4, #6e3331);
+  --on-bad: light-dark(#ffffff, #2a0b0b);
   /* The owner's messages and Dot's face: one warm accent, with dark ink on it in light and dark alike. */
-  --bubble: #ffcd3c;
-  --on-bubble: #1a1a1a;
-  --shadow: 0 1px 2px rgb(0 0 0 / 4%), 0 4px 16px rgb(0 0 0 / 4%);
-  --on-ok: #ffffff;
-  --knob: #ffffff;
-  --scrim: rgb(0 0 0 / 42%);
-  --scrim-strong: rgb(0 0 0 / 80%);
-  --shadow-seg: 0 1px 2px rgb(0 0 0 / 12%);
-  --shadow-knob: 0 1px 2px rgb(0 0 0 / 25%);
-  --shadow-raised: 0 2px 8px rgb(0 0 0 / 8%);
-  --shadow-float: 0 6px 18px rgb(0 0 0 / 24%);
-  --shadow-overlay: 0 0 40px rgb(0 0 0 / 28%);
-  --shadow-modal: 0 20px 60px rgb(0 0 0 / 35%);
+  --bubble: light-dark(#ffcd3c, #e9b93a);
+  --on-bubble: #1c1b19;
+  --knob: light-dark(#ffffff, #f5f4f0);
+  --scrim: light-dark(rgb(28 27 25 / 40%), rgb(0 0 0 / 55%));
+  --scrim-strong: light-dark(rgb(28 27 25 / 78%), rgb(0 0 0 / 80%));
+  /* Shadows: a trace of ink in light, none in dark but under what floats over a scrim. */
+  --shadow-ink: light-dark(rgb(28 27 25 / 5%), transparent);
+  --shadow-ink-soft: light-dark(rgb(28 27 25 / 10%), rgb(0 0 0 / 30%));
+  --shadow-ink-deep: light-dark(rgb(28 27 25 / 24%), rgb(0 0 0 / 60%));
+  --shadow: 0 1px 2px var(--shadow-ink), 0 4px 16px var(--shadow-ink);
+  --shadow-seg: 0 1px 2px var(--shadow-ink-soft);
+  --shadow-knob: 0 1px 2px var(--shadow-ink-soft);
+  --shadow-raised: 0 2px 8px var(--shadow-ink);
+  --shadow-float: 0 6px 18px var(--shadow-ink-deep);
+  --shadow-overlay: 0 0 40px var(--shadow-ink-deep);
+  --shadow-modal: 0 20px 60px var(--shadow-ink-deep);
   /* Dot's computer (run.css): the warm backdrop behind the live view, from the yellow of the bubbles. */
   --computer-backdrop: linear-gradient(160deg, color-mix(in srgb, var(--bubble) 55%, #ffffff), var(--bubble) 70%, color-mix(in srgb, var(--bubble) 80%, #000000));
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #212121;
-    --sidebar: #171717;
-    --surface: #262626;
-    --surface-2: #2f2f2f;
-    --surface-3: #3a3a3a;
-    --border: #3a3a3a;
-    --border-strong: #4d4d4d;
-    --control: #7d7d7d;
-    --text: #ececec;
-    --text-2: #d0d0d0;
-    --muted: #a6a6a6;
-    --faint: #9c9c9c;
-    --accent: #ececec;
-    --accent-strong: #ffffff;
-    --accent-weak: #333333;
-    --on-accent: #171717;
-    --ok: #5fd39b;
-    --ok-weak: #14382a;
-    --warn: #f2b552;
-    --warn-weak: #3a2a0c;
-    --warn-border: #6d4e14;
-    --bad: #ff8a8a;
-    --bad-weak: #3d1a1a;
-    --bad-border: #703030;
-    --on-bad: #2a0b0b;
-    --bubble: #f0bf3a;
-    --on-bubble: #1a1a1a;
-    --shadow: 0 1px 2px rgb(0 0 0 / 30%), 0 6px 18px rgb(0 0 0 / 25%);
-    --scrim: rgb(0 0 0 / 55%);
-    --shadow-raised: 0 2px 8px rgb(0 0 0 / 30%);
-  }
-}
-
-
 /* ---------- paper: warm paper, a serif voice for answers and one terracotta accent ---------- */
 
 :root[data-theme="paper"] {
-  --bg: #faf9f5;
-  --sidebar: #f5f4ed;
-  --surface: #ffffff;
-  --surface-2: #f5f4ed;
-  --surface-3: #ece9de;
-  --border: #e8e6dc;
-  --border-strong: #d3d0c1;
-  --control: #8a8777;
-  --text: #141413;
-  --text-2: #3d3d3a;
-  --muted: #66655e;
-  --faint: #6e6d65;
-  --accent: #b5532f;
-  --accent-strong: #9a4426;
-  --accent-weak: #f6e6dc;
-  --on-accent: #ffffff;
-  --ok: #1f7a4d;
-  --ok-weak: #e5f1e6;
-  --warn: #8f5600;
-  --warn-weak: #fbefd3;
-  --warn-border: #e0bd6a;
-  --bad: #b3261e;
-  --bad-weak: #fbe9e6;
-  --bad-border: #eeb4ad;
-  --on-bad: #ffffff;
+  --bg: light-dark(#faf9f5, #262624);
+  --sidebar: light-dark(#f5f4ed, #1f1e1d);
+  --surface: light-dark(#fffefb, #30302e);
+  --surface-2: light-dark(#f5f4ed, #383735);
+  --surface-3: light-dark(#ece9de, #43423f);
+  --border: light-dark(rgb(20 20 19 / 9%), rgb(250 249 245 / 9%));
+  --border-strong: light-dark(rgb(20 20 19 / 18%), rgb(250 249 245 / 18%));
+  --control: light-dark(#8a8777, #8a877d);
+  --text: light-dark(#141413, #faf9f5);
+  --text-2: light-dark(#3d3d3a, #dcd9cd);
+  --muted: light-dark(#66655e, #b9b7ab);
+  --faint: light-dark(#6e6d65, #aeac9f);
+  --accent: light-dark(#b5532f, #d97757);
+  --accent-strong: light-dark(#9a4426, #ec9b7e);
+  --accent-weak: light-dark(#f6e6dc, #4a3328);
+  --on-accent: light-dark(#ffffff, #1f1e1d);
+  --ok: light-dark(#1f7a4d, #6fd39f);
+  --ok-weak: light-dark(#e5f1e6, #193a2b);
+  --on-ok: light-dark(#ffffff, #0f2419);
+  --warn: light-dark(#8f5600, #f0b955);
+  --warn-weak: light-dark(#fbefd3, #3b2c10);
+  --warn-border: light-dark(#e0bd6a, #75561a);
+  --bad: light-dark(#b3261e, #ff8f86);
+  --bad-weak: light-dark(#fbe9e6, #44201d);
+  --bad-border: light-dark(#eeb4ad, #7a3a35);
+  --on-bad: light-dark(#ffffff, #2a0b0b);
   --bubble: var(--accent-weak);
   --on-bubble: var(--text);
-  --shadow: 0 1px 2px rgb(20 20 19 / 5%), 0 6px 20px rgb(20 20 19 / 5%);
+  --shadow-ink: light-dark(rgb(20 20 19 / 5%), transparent);
+  --shadow-ink-soft: light-dark(rgb(20 20 19 / 10%), rgb(0 0 0 / 30%));
+  --shadow-ink-deep: light-dark(rgb(20 20 19 / 22%), rgb(0 0 0 / 60%));
   --radius: 12px;
   --radius-control: 8px;
   --radius-lg: 20px;
   --voice: ui-serif, "New York", Georgia, "Times New Roman", serif;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root[data-theme="paper"] {
-    --bg: #262624;
-    --sidebar: #1f1e1d;
-    --surface: #30302e;
-    --surface-2: #383735;
-    --surface-3: #43423f;
-    --border: #3d3c39;
-    --border-strong: #55534e;
-    --control: #8a877d;
-    --text: #faf9f5;
-    --text-2: #dcd9cd;
-    --muted: #b9b7ab;
-    --faint: #aeac9f;
-    --accent: #d97757;
-    --accent-strong: #ec9b7e;
-    --accent-weak: #4a3328;
-    --on-accent: #1f1e1d;
-    --ok: #6fd39f;
-    --ok-weak: #193a2b;
-    --warn: #f0b955;
-    --warn-weak: #3b2c10;
-    --warn-border: #75561a;
-    --bad: #ff8f86;
-    --bad-weak: #44201d;
-    --bad-border: #7a3a35;
-    --on-bad: #2a0b0b;
-    --shadow: 0 1px 2px rgb(0 0 0 / 30%), 0 6px 18px rgb(0 0 0 / 25%);
-  }
 }
 
 :root[data-theme="paper"] .page-title,

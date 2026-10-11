@@ -13,7 +13,7 @@ import { providerLabel, providerOf } from "../providers.js";
 import { reasoningSelect } from "../reasoning.js";
 import { approvalLabel } from "../runmodes.js";
 import { forgetModels, getSnapshot, loadModels, onChange, refresh } from "../state.js";
-import { THEMES, chooseTheme, currentTheme, onThemeChange, themeInUse } from "../theme.js";
+import { SCHEMES, THEMES, chooseScheme, chooseTheme, currentScheme, currentTheme, onThemeChange, themeInUse } from "../theme.js";
 import { attempt, confirmDialog, toast } from "../ui.js";
 
 const NOT_SET = "—";
@@ -103,7 +103,7 @@ function buildAppearance() {
 
   function describe(id) {
     const theme = THEMES.find((candidate) => candidate.id === id);
-    detail.textContent = `${theme.hint} Light and dark follow your system; the choice is kept in this browser.`;
+    detail.textContent = `${theme.hint} The choice is kept in this browser.`;
   }
 
   const fold = switchSetting({
@@ -144,6 +144,12 @@ function buildAppearance() {
 
   const options = THEMES.map((theme) => ({ id: theme.id, label: theme.label, hint: theme.hint }));
   const choice = segmented(options, currentTheme(), chooseTheme);
+  const scheme = segmented(
+    SCHEMES.map((option) => ({ id: option.id, label: option.label, hint: option.hint })),
+    currentScheme(),
+    chooseScheme,
+  );
+  scheme.element.setAttribute("aria-label", "Colour scheme");
   const density = segmented(
     DENSITIES.map((option) => ({ id: option.id, label: option.label, hint: option.hint })),
     currentDensity(),
@@ -164,6 +170,12 @@ function buildAppearance() {
       "div",
       { class: "card-pad stack" },
       el("div", { class: "setting" }, el("div", { class: "row" }, el("span", { class: "grow" }, "Look"), choice.element), detail),
+      el(
+        "div",
+        { class: "setting" },
+        el("div", { class: "row" }, el("span", { class: "grow" }, "Colour scheme"), scheme.element),
+        el("div", { class: "hint" }, "System follows light and dark as your system is; Light or Dark holds one. Kept in this browser."),
+      ),
       el(
         "div",
         { class: "setting" },

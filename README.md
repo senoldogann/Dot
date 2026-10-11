@@ -863,13 +863,16 @@ stop and the health checks in a fold, closed, with the number of failures on its
 the browser. The tabs sit beside their content when the window has the room and above it otherwise; the earlier
 addresses of the memory, schedules, rules and system pages lead to their tabs.
 
-Settings › General › Appearance switches between two looks on the same layout: **Neutral** (cool, round and quiet; the
-default) and **Paper** (warm paper tones with a serif heading). **Density** sets how close the rows, cards and lists
-sit (comfortable or compact). Two switches follow the look until you set them yourself: fold the tool steps (on in
-Neutral) and the Details panel (off in both). Light and dark follow the system. The choices are kept in the browser
-only. The looks are one visual system: every colour is a token of `themes.css`, one block per look, and the type
-sizes, radii and spacing are tokens of `app.css` that every control is drawn on; `#/controls` shows every control on
-one page for checking a look.
+Settings › General › Appearance switches between two looks on the same layout: **Neutral** (warm grey and ink, round
+and quiet; the default) and **Paper** (warm paper tones with a serif heading and a terracotta accent). **Colour
+scheme** follows the system (the default) or holds light or dark. **Density** sets how close the rows, cards and
+lists sit (comfortable or compact). Two switches follow the look until you set them yourself: fold the tool steps
+(on in Neutral) and the Details panel (off in both). The choices are kept in the browser only. The looks are one
+visual system, soft in both schemes: every colour is a token of `themes.css` that names its light and its dark value
+in one place; surfaces step up by lightness rather than by shadow in dark, borders are the text colour at a small
+alpha so they sit on every surface, and the text tiers are measured against every surface (4.5:1 for text, 3:1 for
+labels) by a unit test. The type sizes, radii and spacing are tokens of `app.css` that every control is drawn on;
+`#/controls` shows every control on one page for checking a look.
 
 While you are elsewhere, the tab title counts the approvals that wait: `(2) New chat · Dot`. Settings › General ›
 Notifications adds

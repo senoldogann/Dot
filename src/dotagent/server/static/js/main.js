@@ -7,7 +7,7 @@ import { brandMark, icon } from "./icons.js";
 import { buildShell } from "./shell.js";
 import { getSnapshot, onChange, refresh, runLifecycle } from "./state.js";
 import { applyStoredDensity } from "./layout.js";
-import { applyStoredTheme } from "./theme.js";
+import { applyStoredScheme, applyStoredTheme } from "./theme.js";
 import { attempt, toast } from "./ui.js";
 import * as activity from "./views/activity.js";
 import * as campaigns from "./views/campaigns.js";
@@ -250,6 +250,7 @@ async function boot() {
 
 // The look goes on first, before any screen is drawn, so the page never shows in the wrong skin.
 applyStoredTheme();
+applyStoredScheme();
 applyStoredDensity();
 // The service worker keeps the shell files for when the Mac is out of reach and shows the pushes of the daemon; a
 // browser that has none (or an insecure address) simply has neither.
