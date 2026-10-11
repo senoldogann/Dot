@@ -8,6 +8,7 @@ from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Query
 
+from dotagent.agent.review import RuleDrafter, RuleWordsRequest, ToolBrief, rule_drafter_for
 from dotagent.config import SchedulerConfig
 from dotagent.core.errors import InvalidValueError, NotFoundError
 from dotagent.memory.service import (
@@ -24,6 +25,7 @@ from dotagent.memory.service import (
     set_owner_section,
     update_memory_note,
 )
+from dotagent.policy.drafting import DraftedRule
 from dotagent.scheduler.plans import (
     ScheduleRequest,
     create_schedule,
@@ -42,6 +44,7 @@ from dotagent.server.views import (
     MemoryPage,
     MemoryRequest,
     OwnerLinesRequest,
+    RuleDraftRequest,
     RuleEnabledRequest,
     RuleRequest,
     ScheduleCreateRequest,
@@ -100,6 +103,25 @@ def rules_router(ctx: ServerContext) -> APIRouter:
         return await store.add_rule(
             request.behavior, request.tool_glob, _checked_pattern(request.match_regex), request.description
         )
+
+    @router.post("/rules/draft")
+    async def draft_rule(request: RuleDraftRequest) -> DraftedRule:
+        """A rule drafted by the review model from the owner's words, checked against the tools Dot has, with the
+        sentence it reads back as for its description; nothing is kept until the owner adds it. Words that make no
+        rule are answered 422 with the model's reason."""
+        drafter: RuleDrafter = rule_drafter_for(
+            ctx.runtime.router,
+            ctx.runtime.config.models.review,
+            ctx.runtime.config.agent.model_call_timeout_s,
+            f"rules:{int(time.time())}",
+        )
+        tools: tuple[ToolBrief, ...] = tuple(
+            ToolBrief(name=name, description=entry.spec.description)
+            for name, entry in sorted(ctx.runtime.registry.tools.items())
+        )
+        drafted: DraftedRule = await drafter(RuleWordsRequest(sentence=request.sentence, tools=tools))
+        _checked_pattern(drafted.match_regex)
+        return drafted
 
     @router.patch("/rules/{rule_id}")
     async def set_rule_enabled(rule_id: str, request: RuleEnabledRequest) -> RuleRecord:

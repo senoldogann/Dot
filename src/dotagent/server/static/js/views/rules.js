@@ -1,5 +1,8 @@
 // Rules: your own answers to "may Dot do this?", checked in order before the safety preset decides. A rule reads as a
-// sentence: "When Dot would use {tool}, matching {pattern}: {answer}", and the answer is one of four.
+// sentence: "When Dot would use {tool}, matching {pattern}: {answer}", and the answer is one of four. A rule can be
+// said in your own words (item 110): the review model drafts its parts, the daemon writes the pattern from them, and
+// the draft fills the form, its description the sentence the rule reads back as, to be checked and added;
+// `#/settings/rules?sentence=…` (an approval card's "Make a rule of this") puts a sentence in the box.
 
 import { api } from "../api.js";
 import { clip, el } from "../dom.js";
@@ -8,6 +11,14 @@ import { emptyPanel, errorPanel, field, loadingPanel, paneHead, segmented } from
 import { attempt, confirmDialog, toast } from "../ui.js";
 
 const QUOTE_CHARS = 100;
+// A pattern longer than this is cut in the sentence a rule reads as; the whole of it is its tooltip and in the form.
+const PATTERN_CHARS = 40;
+// Sentences to start from: a click puts one in the box.
+const EXAMPLES = [
+  "Let Dot run git status and git diff without asking",
+  "Ask me before Dot deletes anything with rm",
+  "Hand me every step on mybank.com",
+];
 // The four answers, in the order of the control. `label` is the answer as it reads in the sentence; `text` says what
 // Dot does then.
 const ANSWERS = [
@@ -36,11 +47,11 @@ function answerOf(id) {
   return ANSWERS.find((answer) => answer.id === id) ?? { id, label: id, tone: "b-muted", text: "" };
 }
 
-/** The sentence a rule reads as, up to the answer: "When Dot would use shell, matching ^git push:". */
+/** The sentence a rule reads as, up to the answer: "When Dot would use shell, matching \bgit push\b:". */
 function sentence(toolGlob, matchRegex) {
   const parts = ["When Dot would use ", el("code", { class: "mono" }, toolGlob === "" ? "…" : toolGlob)];
   if (matchRegex !== "") {
-    parts.push(", matching ", el("code", { class: "mono" }, matchRegex));
+    parts.push(", matching ", el("code", { class: "mono", title: matchRegex }, clip(matchRegex, PATTERN_CHARS)));
   }
   parts.push(":");
   return parts;
@@ -104,7 +115,7 @@ function buildForm(onCreated) {
     maxlength: "500",
     autocomplete: "off",
     spellcheck: "false",
-    placeholder: "^git (status|diff|log)",
+    placeholder: "\\bgit (status|diff|log)\\b",
     "aria-label": "Pattern",
   });
   const description = el("input", {
@@ -160,6 +171,17 @@ function buildForm(onCreated) {
     }
   }
 
+  // A drafted rule fills the fields, to be checked and added.
+  function fill(rule) {
+    glob.value = rule.tool_glob;
+    regex.value = rule.match_regex;
+    description.value = rule.description;
+    answers.set(rule.behavior);
+    paintPreview();
+    element.scrollIntoView({ block: "nearest" });
+    create.focus({ preventScroll: true });
+  }
+
   create.addEventListener("click", () => attempt(submit));
   paintPreview();
   const element = el(
@@ -173,14 +195,111 @@ function buildForm(onCreated) {
       field(
         "matching",
         regex,
-        "Optional regular expression, case-insensitive, searched in a one-line summary of the action and its target. Empty means every time.",
+        "Optional regular expression, case-insensitive, searched in the action's summary (a shell command's starts with “Run:”) and its target (the command, path or address). Empty means every time.",
       ),
       el("div", { class: "field wide" }, el("span", { class: "field-label" }, "Then"), answers.element, answerHint),
       field("Why", description, "Optional. Shown when the rule decides."),
     ),
     el("div", { class: "row" }, el("span", { class: "spacer" }), create),
   );
-  return { element };
+  return { element, fill };
+}
+
+/**
+ * The rule in your own words: a sentence, the examples to start from and the Draft button. `onDrafted(rule)` gets the
+ * daemon's draft (`behavior`, `tool_glob`, `match_regex`, and `description`, the sentence it reads back as). Returns
+ * the element, `start(text)`, which puts a sentence in the box for a change before it is drafted, and `reset()`, which
+ * empties the box and what the last draft said, once the rule is added.
+ */
+function buildWords(onDrafted, isDisposed) {
+  const words = el("textarea", {
+    class: "textarea rule-words",
+    rows: "2",
+    maxlength: "500",
+    placeholder: "For example: let Dot run npm test without asking me",
+    "aria-label": "The rule in your words",
+  });
+  const draft = el("button", { class: "btn primary", type: "button" }, icon("sparkle"), "Draft the rule");
+  const outcome = el("div", { class: "rule-outcome", role: "status", hidden: true });
+  const examples = el(
+    "div",
+    { class: "rule-examples", role: "group", "aria-label": "Examples" },
+    EXAMPLES.map((text) =>
+      el(
+        "button",
+        {
+          class: "rule-example",
+          type: "button",
+          onclick: () => {
+            words.value = text;
+            words.focus();
+          },
+        },
+        text,
+      ),
+    ),
+  );
+
+  function show(tone, ...parts) {
+    outcome.className = `rule-outcome ${tone}`;
+    outcome.replaceChildren(...parts);
+    outcome.hidden = false;
+  }
+
+  async function run() {
+    const text = words.value.trim();
+    if (text === "") {
+      words.focus();
+      return;
+    }
+    draft.disabled = true;
+    show("busy", el("span", { class: "spinner" }), el("span", null, "Drafting the rule…"));
+    let drafted;
+    try {
+      drafted = await api.post("/rules/draft", { sentence: text });
+    } catch (error) {
+      if (!isDisposed()) {
+        // 422: the words make no rule, and the model says why; anything else is a failure to draft.
+        show("bad", icon("alert"), el("span", null, error.status === 422 ? error.message : `The rule could not be drafted: ${error.message}`));
+      }
+      return;
+    } finally {
+      draft.disabled = false;
+    }
+    if (isDisposed()) {
+      return;
+    }
+    show("ok", icon("check"), el("span", null, el("span", { class: "rule-readback" }, drafted.description), " Check it below, then add it."));
+    onDrafted(drafted);
+  }
+
+  draft.addEventListener("click", () => attempt(run));
+  words.addEventListener("keydown", (event) => {
+    if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
+      event.preventDefault();
+      attempt(run);
+    }
+  });
+  const element = el(
+    "section",
+    { class: "card card-pad stack" },
+    field("Say the rule in your words", words, "Dot drafts the rule from it into the form below; nothing applies until you add it."),
+    examples,
+    el("div", { class: "rule-words-foot" }, outcome, draft),
+  );
+  return {
+    element,
+    start: (text) => {
+      words.value = text.slice(0, 500);
+      words.focus();
+      words.setSelectionRange(words.value.length, words.value.length);
+    },
+    reset: () => {
+      words.value = "";
+      outcome.hidden = true;
+      outcome.replaceChildren();
+    },
+  };
 }
 
 export function mount(root, ctx) {
@@ -249,7 +368,11 @@ export function mount(root, ctx) {
     await reload();
   }
 
-  const form = buildForm(reload);
+  const form = buildForm(async () => {
+    words.reset();
+    await reload();
+  });
+  const words = buildWords((drafted) => form.fill(drafted), () => disposed);
   root.append(
     paneHead("Your own answers to “may Dot do this?”, applied before the safety preset.", null),
     el(
@@ -259,13 +382,24 @@ export function mount(root, ctx) {
       el(
         "span",
         null,
-        "The first enabled rule that matches an action decides it. Rules cannot lift the protections that are always on: reading secrets and sending them out is refused, research runs stay read-only, and money or credentials are handed to you. A yolo run goes past all of these but the read-only research runs, and a hand-off rule still stops it there too.",
+        "Rules cannot lift the protections that are always on: reading secrets and sending them out is refused, research runs stay read-only, and money or credentials are handed to you. A yolo run goes past all of these but the read-only research runs, and a hand-off rule still stops it there too.",
       ),
     ),
+    words.element,
     form.element,
-    el("div", { class: "section-label" }, "Checked in this order"),
+    el(
+      "div",
+      { class: "section-head rule-order" },
+      el("div", { class: "section-label" }, "Checked in this order"),
+      el("div", { class: "hint" }, "The first enabled rule that fits an action decides it; a new rule goes to the end."),
+    ),
     holder,
   );
+  // The sentence an approval card sends ("Make a rule of this"), in the address after the tab's name.
+  const asked = new URLSearchParams(location.hash.split("?")[1] ?? "").get("sentence");
+  if (asked !== null && asked.trim() !== "") {
+    words.start(asked.trim());
+  }
   attempt(reload);
   return () => {
     disposed = true;

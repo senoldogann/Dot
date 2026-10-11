@@ -2428,6 +2428,23 @@ details[open] > summary .chev {
   gap: 8px;
 }
 
+/* The way from an approval to a rule (item 110): a quiet link under the action, apart from the answers. */
+.approval-rule {
+  display: inline-flex;
+  align-self: flex-start;
+  align-items: center;
+  gap: 4px;
+  font-size: var(--text-sm);
+  line-height: var(--leading-sm);
+  color: var(--text-2);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.approval-rule:hover {
+  color: var(--text);
+}
+
 .approval-actions .input {
   flex: 1;
   min-width: 180px;
