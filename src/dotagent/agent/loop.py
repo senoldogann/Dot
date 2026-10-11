@@ -94,7 +94,7 @@ from dotagent.agent.progress import (
     single_action_streak,
     stop_result,
 )
-from dotagent.agent.prompt import build_system_prompt, clock_note, collect_prompt_inputs
+from dotagent.agent.prompt import AgentBrief, build_system_prompt, clock_note, collect_prompt_inputs
 from dotagent.agent.resume import RESUMED_EVENT, Resumption, resumed_event_data
 from dotagent.agent.review import (
     GoalChecker,
@@ -170,7 +170,7 @@ from dotagent.runtime import Runtime
 from dotagent.skills.catalog import load_skills, playbook_root
 from dotagent.skills.types import SkillCatalog
 from dotagent.store.endings import GOAL_CHECK_MARK, RESULT_EMPTY_REPLIES
-from dotagent.store.models import CampaignRecord, EventRecord, MemoryRecord, RunMode, RunRecord
+from dotagent.store.models import AgentRecord, CampaignRecord, EventRecord, MemoryRecord, RunMode, RunRecord
 from dotagent.store.stats import ACT_TOOLS
 from dotagent.tools.campaign import CAMPAIGN_TOOLS
 from dotagent.tools.consult import CONSULT_TOOL
@@ -185,6 +185,8 @@ from dotagent.tools.skill import SKILL_TOOL
 log = get_logger(__name__)
 
 # A delegated run reports to its parent: it neither delegates again nor asks the user, and its parent asks the helpers.
+# The tools every agent keeps whatever its list says (item 86): the ones that end a run, ask, and turn groups on.
+AGENT_CORE_TOOLS: tuple[str, ...] = (FINISH_TOOL, ASK_USER_TOOL, USE_TOOLS_TOOL)
 _NOT_FOR_DELEGATED_RUNS: frozenset[str] = frozenset({DELEGATE_TOOL, ASK_USER_TOOL, CONSULT_TOOL})
 
 _SUMMARY_KEEP_TAIL: int = 8
@@ -1217,6 +1219,11 @@ async def run_agent(agent: AgentRun) -> RunEnd:
         specs = tuple(spec for spec in specs if spec.name not in _NOT_FOR_DELEGATED_RUNS)
     if run.campaign_id is None:
         specs = tuple(spec for spec in specs if spec.name not in CAMPAIGN_TOOLS | POST_TOOLS)
+    # The agent the run belongs to (item 86) bounds its tools: the ones it names, and the core tools in any case.
+    agent_record: AgentRecord | None = None if run.agent_id is None else await runtime.store.get_agent(run.agent_id)
+    if agent_record is not None and agent_record.tools:
+        agent_tools: frozenset[str] = frozenset(agent_record.tools) | frozenset(AGENT_CORE_TOOLS)
+        specs = tuple(spec for spec in specs if spec.name in agent_tools)
     skills: SkillCatalog = await asyncio.to_thread(
         load_skills, runtime.config.skills, runtime.plugins.plugins, playbook_root(runtime.config)
     )
@@ -1268,6 +1275,9 @@ async def run_agent(agent: AgentRun) -> RunEnd:
                 skills.skills,
                 None if run.campaign_id is None else await _session_number(agent, run.campaign_id),
                 helpers,
+                None
+                if agent_record is None
+                else AgentBrief(name=agent_record.name, role=agent_record.role, instructions=agent_record.instructions),
             )
         )
     )

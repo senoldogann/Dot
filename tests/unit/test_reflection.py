@@ -54,6 +54,7 @@ def _run(status: RunStatus, mode: str, parent: str | None, source: str) -> RunRe
         approvals="ask",
         goal_mode=False,
         campaign_id=None,
+        agent_id=None,
     )
 
 

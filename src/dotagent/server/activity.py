@@ -82,7 +82,10 @@ def _approval_row(approval: ApprovalRecord, run: RunRecord, kind: str, detail: s
 
 
 def _actor_of(run: RunRecord) -> str | None:
-    """Whose face the row wears: the campaign's for a session, a delegated run's own, none for a run of Dot's own."""
+    """Whose face the row wears: the agent's for a run of an agent (item 86), the campaign's for a session, a delegated
+    run's own, none for a run of Dot's own."""
+    if run.agent_id is not None:
+        return run.agent_id
     if run.campaign_id is not None:
         return run.campaign_id
     return run.id if run.parent_run_id is not None else None

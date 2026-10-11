@@ -13,6 +13,7 @@ from dotagent.llm.types import Effort
 from dotagent.policy.types import ApprovalMode
 from dotagent.secrets import SecretSource
 from dotagent.store.models import (
+    AgentRecord,
     ApprovalRecord,
     ApprovalStatus,
     Behavior,
@@ -98,6 +99,8 @@ class StartRunRequest(FrozenModel):
     standing: bool = False
     # The Chrome a campaign works in; None takes [agent] campaign_browser. Only with standing.
     browser: BrowserMode | None = None
+    # The agent the run belongs to (item 86); None for Dot. Not with standing.
+    agent_id: str | None = None
     attachments: list[str] = Field(default_factory=list, max_length=MAX_ATTACHMENTS)
 
 
@@ -194,6 +197,33 @@ class KeyRequest(FrozenModel):
 # --------------------------------------------------------------------------------------------- responses
 
 
+class AgentRequest(FrozenModel):
+    """Make or change an agent (item 86). ``model`` empty and ``effort``/``approvals`` ``None`` take the configured
+    ones; ``tools`` empty lets the agent use every tool."""
+
+    name: str = Field(min_length=1, max_length=60)
+    role: str = Field(max_length=120)
+    instructions: str = Field(max_length=_GOAL_CHARS)
+    model: str
+    effort: Effort | None
+    approvals: ApprovalMode | None
+    tools: list[str]
+
+
+class AgentSummary(FrozenModel):
+    """An agent as the list shows it: the record and its newest run, ``None`` before it ran."""
+
+    record: AgentRecord
+    latest: RunRecord | None
+
+
+class AgentDetail(FrozenModel):
+    """An agent's page: the record and its newest runs, newest first."""
+
+    record: AgentRecord
+    runs: list[RunRecord]
+
+
 class CampaignChip(FrozenModel):
     """The campaign a run is a session of, as the run's page names it; ``session`` is the run's number among the
     campaign's sessions."""
@@ -208,7 +238,8 @@ class RunDetail(FrozenModel):
     where it stopped (see ``agent.resume``); ``lessons`` is what became of the lessons drawn from the run once it ended,
     ``None`` when none were (see ``agent.lessons``); ``questions`` are the questions the run left for the user that are
     still open, oldest first; ``campaign`` is the campaign the run is a session of, ``None`` for any other run;
-    ``held`` is true while the user has taken the run's browser over (``POST /runs/{id}/takeover``)."""
+    ``held`` is true while the user has taken the run's browser over (``POST /runs/{id}/takeover``); ``agent`` is the
+    agent the run belongs to (item 86), ``None`` for Dot."""
 
     run: RunRecord
     children: list[RunRecord]
@@ -216,6 +247,7 @@ class RunDetail(FrozenModel):
     resumable: bool
     lessons: RunLessons | None
     questions: list[ApprovalRecord]
+    agent: AgentRecord | None
     campaign: CampaignChip | None
     held: bool
 

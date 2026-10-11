@@ -52,7 +52,7 @@ class RunRecord(FrozenModel):
     """One run. ``effort`` is the reasoning level it was started with (``None`` for runs stored before it was kept);
     ``approvals`` and ``goal_mode`` are the approval mode and the goal mode it ran with (runs stored before they were
     kept hold ``ask`` and ``False``, which is how those runs behaved). ``campaign_id`` is the campaign the run is a
-    session of, ``None`` for any other run."""
+    session of, ``None`` for any other run. ``agent_id`` is the agent the run belongs to (item 86), ``None`` for Dot."""
 
     id: str
     thread_id: str
@@ -72,6 +72,40 @@ class RunRecord(FrozenModel):
     approvals: ApprovalMode
     goal_mode: bool
     campaign_id: str | None
+    agent_id: str | None
+
+
+class AgentRecord(FrozenModel):
+    """An agent the owner made (item 86): a name, a role in one line, the instructions that join the system prompt of
+    its runs, and the bounds of its runs: ``model`` (empty for the configured one), ``effort`` and ``approvals``
+    (``None`` for the configured ones) and ``tools``, the names of the tools it may use (empty for every tool). Its
+    face is the mark in the hue its id gives it (actors.js). Dot itself is ``DOT_AGENT``, never stored."""
+
+    id: str
+    name: str
+    role: str
+    instructions: str
+    model: str
+    effort: Effort | None
+    approvals: ApprovalMode | None
+    tools: tuple[str, ...]
+    created_at: float
+    updated_at: float
+
+
+DOT_AGENT_ID: str = "dot"
+DOT_AGENT: AgentRecord = AgentRecord(
+    id=DOT_AGENT_ID,
+    name="Dot",
+    role="Your assistant",
+    instructions="",
+    model="",
+    effort=None,
+    approvals=None,
+    tools=(),
+    created_at=0.0,
+    updated_at=0.0,
+)
 
 
 class EventRecord(FrozenModel):

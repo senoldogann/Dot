@@ -66,6 +66,7 @@ from dotagent.store.endings import (
 )
 from dotagent.store.models import (
     WORKING_STATUSES,
+    AgentRecord,
     ApprovalRecord,
     BrowserMode,
     CampaignEntry,
@@ -180,6 +181,46 @@ class RunManager:
             goal_mode,
             RunOpening(text=goal, files=files, resumed=None),
             None,
+            None,
+        )
+        return run
+
+    async def start_for_agent(
+        self,
+        agent: AgentRecord,
+        goal: str,
+        mode: RunMode,
+        model: str | None,
+        thread_id: str | None,
+        source: str,
+        effort: Effort | None,
+        approvals: ApprovalMode | None,
+        goal_mode: bool | None,
+        files: tuple[StoredAttachment, ...],
+    ) -> RunRecord:
+        """Queue a run of ``agent`` (item 86): what the request leaves out, the agent's own bounds fill in (its model,
+        effort and approvals), and what the agent leaves out, the configured ones; the run carries the agent's id and
+        the loop adds its instructions to the prompt and keeps its tools."""
+        model_ref: str | None = model if model is not None else (agent.model if agent.model != "" else None)
+        level: Effort | None = effort if effort is not None else agent.effort
+        approval_mode: ApprovalMode | None = approvals if approvals is not None else agent.approvals
+        if level is not None:
+            await self._check_effort(
+                parse_model_ref(model_ref if model_ref is not None else self._runtime.config.models.main), level
+            )
+        run, _ = await self._launch(
+            goal,
+            mode,
+            model_ref,
+            thread_id,
+            source,
+            None,
+            level,
+            approval_mode,
+            goal_mode,
+            RunOpening(text=goal, files=files, resumed=None),
+            None,
+            agent.id,
         )
         return run
 
@@ -242,6 +283,7 @@ class RunManager:
                 False,
                 RunOpening(text=goal, files=files, resumed=None),
                 campaign.id,
+                None,
             )
         except DotError:
             # A campaign whose opening session never started was never under way, nor was a thread made for it.
@@ -291,6 +333,7 @@ class RunManager:
                 False,
                 RunOpening(text=brief, files=(), resumed=None),
                 campaign.id,
+                None,
             )
         except DotError:
             await runtime.store.delete_thread(thread.id)
@@ -347,6 +390,7 @@ class RunManager:
             parent.approvals,
             False,
             RunOpening(text=goal, files=(), resumed=None),
+            None,
             None,
         )
         try:
@@ -576,6 +620,7 @@ class RunManager:
             asked.goal_mode,
             RunOpening(text=goal, files=(), resumed=None),
             None,
+            None,
         )
         log.info("question_answered", approval_id=question.id, run_id=run.id, delivered="run")
 
@@ -687,6 +732,7 @@ class RunManager:
             old.goal_mode,
             RunOpening(text=resume_note(old.goal, resumption), files=(), resumed=resumption),
             None,
+            None,
         )
         log.info("run_resumed", run_id=run.id, from_run_id=old.id, cut_off=cut_off, automatic=automatic)
         return run
@@ -704,6 +750,7 @@ class RunManager:
         goal_mode: bool | None,
         opening: RunOpening,
         campaign_id: str | None,
+        agent_id: str | None,
     ) -> tuple[RunRecord, RunHandle]:
         """Create the run, register it and start its task. A run launched by an active, untrusted parent is untrusted;
         ``campaign_id`` makes it a session of that campaign."""
@@ -729,6 +776,7 @@ class RunManager:
                 with_goal_mode,
                 opening,
                 campaign_id,
+                agent_id,
             )
         self._claim_thread(thread_id)
         try:
@@ -749,6 +797,7 @@ class RunManager:
                 with_goal_mode,
                 opening,
                 campaign_id,
+                agent_id,
             )
         finally:
             self._claimed.discard(thread_id)
@@ -773,6 +822,7 @@ class RunManager:
         with_goal_mode: bool,
         opening: RunOpening,
         campaign_id: str | None,
+        agent_id: str | None,
     ) -> tuple[RunRecord, RunHandle]:
         """Create the run record and its gate, start its task and register its handle."""
         runtime: Runtime = self._runtime
@@ -783,7 +833,17 @@ class RunManager:
             else await self._session_instructions(goal, campaign_id)
         )
         run: RunRecord = await runtime.store.create_run(
-            thread_id, goal, mode, model_ref, parent_run_id, source, level, approval_mode, with_goal_mode, campaign_id
+            thread_id,
+            goal,
+            mode,
+            model_ref,
+            parent_run_id,
+            source,
+            level,
+            approval_mode,
+            with_goal_mode,
+            campaign_id,
+            agent_id,
         )
         await runtime.bus.emit(
             run.id,

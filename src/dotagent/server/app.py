@@ -25,6 +25,7 @@ from dotagent.core.errors import (
 from dotagent.core.logs import get_logger
 from dotagent.server.context import ServerContext
 from dotagent.server.guard import LocalGuard
+from dotagent.server.routes_agents import agents_router
 from dotagent.server.routes_browser import browser_router
 from dotagent.server.routes_campaigns import campaigns_router
 from dotagent.server.routes_data import memories_router, rules_router, schedules_router
@@ -76,6 +77,7 @@ def create_app(ctx: ServerContext) -> FastAPI:
     app.include_router(memories_router(ctx))
     app.include_router(schedules_router(ctx))
     app.include_router(campaigns_router(ctx))
+    app.include_router(agents_router(ctx))
     app.include_router(browser_router(ctx))
     app.include_router(keys_router(ctx))
 

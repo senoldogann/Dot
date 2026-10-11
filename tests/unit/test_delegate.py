@@ -32,6 +32,7 @@ def _run(status: RunStatus) -> RunRecord:
         approvals="yolo",
         goal_mode=False,
         campaign_id=None,
+        agent_id=None,
     )
 
 

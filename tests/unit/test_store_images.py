@@ -46,7 +46,7 @@ async def test_deleting_a_thread_removes_its_screenshots_but_keeps_shared_ones(t
         await store.append_messages(first.id, [user_message("a", (own, shared))])
         await store.append_messages(second.id, [user_message("b", (shared,))])
         run: RunRecord = await store.create_run(
-            first.id, "goal", "task", "ollama:x", None, "test", "medium", "ask", False, None
+            first.id, "goal", "task", "ollama:x", None, "test", "medium", "ask", False, None, None
         )
         await store.add_event(run.id, "tool_result", {"images": await store.save_images([from_event])})
         assert _names(images) == {image_file_name(image) for image in (own, shared, from_event)}

@@ -30,6 +30,7 @@ from dotagent.policy.types import ApprovalMode, PaceClass
 from dotagent.store.endings import RESULT_RESTARTED
 from dotagent.store.models import (
     WORKING_STATUSES,
+    AgentRecord,
     ApprovalRecord,
     ApprovalStatus,
     Behavior,
@@ -105,6 +106,10 @@ CREATE TABLE IF NOT EXISTS campaigns (
     status TEXT NOT NULL, thread_id TEXT NOT NULL, model TEXT NOT NULL, effort TEXT NOT NULL, approvals TEXT NOT NULL,
     files TEXT NOT NULL, cron TEXT, next_session_at REAL, created_at REAL NOT NULL, updated_at REAL NOT NULL,
     evidence TEXT NOT NULL, browser TEXT
+);
+CREATE TABLE IF NOT EXISTS agents (
+    id TEXT PRIMARY KEY, name TEXT NOT NULL, role TEXT NOT NULL, instructions TEXT NOT NULL, model TEXT NOT NULL,
+    effort TEXT, approvals TEXT, tools TEXT NOT NULL, created_at REAL NOT NULL, updated_at REAL NOT NULL
 );
 CREATE TABLE IF NOT EXISTS campaign_entries (
     id TEXT PRIMARY KEY, campaign_id TEXT NOT NULL, run_id TEXT, ts REAL NOT NULL, kind TEXT NOT NULL,
@@ -296,6 +301,29 @@ def _run(row: aiosqlite.Row) -> RunRecord:
         approvals=row["approvals"],
         goal_mode=bool(row["goal_mode"]),
         campaign_id=row["campaign_id"],
+        agent_id=row["agent_id"],
+    )
+
+
+def _tool_names(value: object) -> tuple[str, ...]:
+    """The stored tool list of an agent: a JSON array of names."""
+    if not isinstance(value, list) or not all(isinstance(item, str) for item in value):
+        raise StoreError("a stored agent has a tool list that is not a list of names", {"tools": repr(value)})
+    return tuple(value)
+
+
+def _agent(row: aiosqlite.Row) -> AgentRecord:
+    return AgentRecord(
+        id=row["id"],
+        name=row["name"],
+        role=row["role"],
+        instructions=row["instructions"],
+        model=row["model"],
+        effort=row["effort"],
+        approvals=row["approvals"],
+        tools=_tool_names(parse_json_value(row["tools"], "agent tools")),
+        created_at=row["created_at"],
+        updated_at=row["updated_at"],
     )
 
 
@@ -427,6 +455,7 @@ _ADDED_RUN_COLUMNS: tuple[tuple[str, str], ...] = (
     ("approvals", "TEXT NOT NULL DEFAULT 'ask'"),
     ("goal_mode", "INTEGER NOT NULL DEFAULT 0"),
     ("campaign_id", "TEXT"),
+    ("agent_id", "TEXT"),
 )
 # Columns of ``memories`` added later: notes of an older database were never counted as used.
 _ADDED_MEMORY_COLUMNS: tuple[tuple[str, str], ...] = (
@@ -844,6 +873,7 @@ class Store:
         approvals: ApprovalMode,
         goal_mode: bool,
         campaign_id: str | None,
+        agent_id: str | None,
     ) -> RunRecord:
         record: RunRecord = RunRecord(
             id=new_id("run"),
@@ -864,11 +894,12 @@ class Store:
             approvals=approvals,
             goal_mode=goal_mode,
             campaign_id=campaign_id,
+            agent_id=agent_id,
         )
         await self._db.execute(
             "INSERT INTO runs(id, thread_id, goal, mode, model, status, created_at, finished_at, result, steps,"
-            " input_tokens, output_tokens, parent_run_id, source, effort, approvals, goal_mode, campaign_id)"
-            " VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            " input_tokens, output_tokens, parent_run_id, source, effort, approvals, goal_mode, campaign_id, agent_id)"
+            " VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (
                 record.id,
                 record.thread_id,
@@ -888,6 +919,7 @@ class Store:
                 record.approvals,
                 int(record.goal_mode),
                 record.campaign_id,
+                record.agent_id,
             ),
         )
         await self._db.commit()
@@ -1680,6 +1712,106 @@ class Store:
         return [_campaign(row) for row in rows]
 
     @_writing
+    # ---------------------------------------------------------------------------------------------------- agents
+
+    async def create_agent(
+        self,
+        name: str,
+        role: str,
+        instructions: str,
+        model: str,
+        effort: Effort | None,
+        approvals: ApprovalMode | None,
+        tools: Sequence[str],
+    ) -> AgentRecord:
+        """Store a new agent (item 86)."""
+        now: float = time.time()
+        record: AgentRecord = AgentRecord(
+            id=new_id("agt"),
+            name=name,
+            role=role,
+            instructions=instructions,
+            model=model,
+            effort=effort,
+            approvals=approvals,
+            tools=tuple(tools),
+            created_at=now,
+            updated_at=now,
+        )
+        await self._db.execute(
+            "INSERT INTO agents(id, name, role, instructions, model, effort, approvals, tools, created_at, updated_at)"
+            " VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (
+                record.id,
+                record.name,
+                record.role,
+                record.instructions,
+                record.model,
+                record.effort,
+                record.approvals,
+                dumps_compact(list(record.tools)),
+                record.created_at,
+                record.updated_at,
+            ),
+        )
+        await self._db.commit()
+        return record
+
+    async def update_agent(
+        self,
+        agent_id: str,
+        name: str,
+        role: str,
+        instructions: str,
+        model: str,
+        effort: Effort | None,
+        approvals: ApprovalMode | None,
+        tools: Sequence[str],
+    ) -> AgentRecord:
+        """Replace what the agent is; its id and its runs stay."""
+        await self.get_agent(agent_id)
+        await self._db.execute(
+            "UPDATE agents SET name = ?, role = ?, instructions = ?, model = ?, effort = ?, approvals = ?, tools = ?,"
+            " updated_at = ? WHERE id = ?",
+            (name, role, instructions, model, effort, approvals, dumps_compact(list(tools)), time.time(), agent_id),
+        )
+        await self._db.commit()
+        return await self.get_agent(agent_id)
+
+    async def get_agent(self, agent_id: str) -> AgentRecord:
+        rows = await self._all("SELECT * FROM agents WHERE id = ?", (agent_id,))
+        if not rows:
+            raise NotFoundError("agent not found", {"agent_id": agent_id})
+        return _agent(rows[0])
+
+    async def list_agents(self) -> list[AgentRecord]:
+        """Every agent the owner made, oldest first."""
+        rows = await self._all("SELECT * FROM agents ORDER BY created_at", ())
+        return [_agent(row) for row in rows]
+
+    async def delete_agent(self, agent_id: str) -> None:
+        """Forget the agent; its runs stay, as Dot's (their ``agent_id`` is cleared)."""
+        await self.get_agent(agent_id)
+        await self._db.execute("UPDATE runs SET agent_id = NULL WHERE agent_id = ?", (agent_id,))
+        await self._db.execute("DELETE FROM agents WHERE id = ?", (agent_id,))
+        await self._db.commit()
+
+    async def agent_runs(self, agent_id: str, limit: int) -> list[RunRecord]:
+        """The newest ``limit`` runs of the agent, newest first."""
+        rows = await self._all(
+            "SELECT * FROM runs WHERE agent_id = ? ORDER BY created_at DESC LIMIT ?", (agent_id, limit)
+        )
+        return [_run(row) for row in rows]
+
+    async def latest_agent_runs(self) -> dict[str, RunRecord]:
+        """The newest run of every agent that ran, by agent id."""
+        rows = await self._all(
+            "SELECT * FROM runs WHERE agent_id IS NOT NULL AND created_at = ("
+            "SELECT MAX(created_at) FROM runs AS newest WHERE newest.agent_id = runs.agent_id)",
+            (),
+        )
+        return {row["agent_id"]: _run(row) for row in rows}
+
     async def delete_campaign(self, campaign_id: str) -> None:
         """Delete a campaign and its ledger; its sessions stay as runs of their threads."""
         await self._db.execute("DELETE FROM campaign_entries WHERE campaign_id = ?", (campaign_id,))

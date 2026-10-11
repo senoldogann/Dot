@@ -206,6 +206,7 @@ def test_a_session_number_counts_the_sessions_of_the_campaign_from_one() -> None
             approvals="yolo",
             goal_mode=False,
             campaign_id="cmp_1",
+            agent_id=None,
         )
         for run_id in ("run_a", "run_b", "run_c")
     ]

@@ -313,7 +313,7 @@ def test_a_server_table_that_mixes_the_two_ways_to_reach_it_is_refused(
 def _prompt(tool_names: list[str], skills: list[Skill]) -> str:
     return build_system_prompt(
         collect_prompt_inputs(
-            "task", "cli", "aggressive", "ask", "wait", False, Path("/tmp/work"), [], tool_names, skills, None, []
+            "task", "cli", "aggressive", "ask", "wait", False, Path("/tmp/work"), [], tool_names, skills, None, [], None
         )
     )
 

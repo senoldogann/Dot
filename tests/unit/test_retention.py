@@ -8,7 +8,9 @@ from dotagent.store.models import RunRecord
 
 
 async def _ended_run(store: Store, thread_id: str, goal: str) -> RunRecord:
-    run: RunRecord = await store.create_run(thread_id, goal, "task", "ollama:x", None, "test", None, "ask", False, None)
+    run: RunRecord = await store.create_run(
+        thread_id, goal, "task", "ollama:x", None, "test", None, "ask", False, None, None
+    )
     await store.add_event(run.id, "run_started", {})
     await store.add_event(run.id, "tool_result", {"tool": "shell", "ok": True, "text": "ok"})
     await store.finish_run(run.id, "done", "done")
@@ -27,7 +29,7 @@ async def test_only_the_events_of_runs_that_ended_before_the_moment_are_deleted_
         await store._db.execute("UPDATE runs SET finished_at = ? WHERE id = ?", (cut + 10.0, recent.id))
         await store._db.commit()
         working: RunRecord = await store.create_run(
-            thread.id, "working", "task", "ollama:x", None, "test", None, "ask", False, None
+            thread.id, "working", "task", "ollama:x", None, "test", None, "ask", False, None, None
         )
         await store.add_event(working.id, "run_started", {})
         assert await store.events_of_runs_ended_before(cut) == (1, 2)

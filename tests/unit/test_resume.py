@@ -46,6 +46,7 @@ def _run(status: RunStatus, result: str, source: str, parent_run_id: str | None)
         approvals="yolo",
         goal_mode=False,
         campaign_id=None,
+        agent_id=None,
     )
 
 
