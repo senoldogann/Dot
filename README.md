@@ -904,7 +904,12 @@ lists sit (comfortable or compact). Two switches follow the look until you set t
 visual system, soft in both schemes: every colour is a token of `themes.css` that names its light and its dark value
 in one place; surfaces step up by lightness rather than by shadow in dark, borders are the text colour at a small
 alpha so they sit on every surface, and the text tiers are measured against every surface (4.5:1 for text, 3:1 for
-labels) by a unit test. The type sizes, radii and spacing are tokens of `app.css` that every control is drawn on;
+labels) by a unit test. The type is one system: Inter for the interface and the answers and Geist Mono for code and
+identifiers, both served from Dot's own origin (`static/fonts`, SIL Open Font License), seven sizes each with its
+line-height (12/16 for badges, 13/18 for meta and hints, 14/20 for the interface, 15/24 for prose and the composer,
+17/24 for section titles, 20/28 for page titles, 24/32 for the greeting), three weights (400 text, 500 labels and
+names, 600 titles) and tabular numerals throughout; a unit test refuses any size, weight, line-height or family in
+the sheets that is not one of these tokens. The radii and spacing are tokens of `app.css` as well, that every control is drawn on;
 `#/controls` shows every control on one page for checking a look. Motion is tokens too: three durations (120, 200 and
 320 ms) and two easings for what changes, and the rhythms of what repeats (the face's breath and pulse, a blink, a
 spin); a unit test holds every transition and animation to them. The face breathes slowly at rest and pulses while a

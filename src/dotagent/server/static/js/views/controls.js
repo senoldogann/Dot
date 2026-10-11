@@ -116,7 +116,7 @@ export function mount(root, ctx) {
   const type = el(
     "div",
     { class: "stack tight" },
-    ...[["fs-2xl", "Page title"], ["fs-xl", "Section title"], ["fs-lg", "Prose in Paper"], ["fs-md", "Composer and bubbles"], ["fs-sm", "Hints and meta"], ["fs-xs", "Badges and chips"]].map(([token, words]) =>
+    ...[["text-2xl", "The home's greeting"], ["text-xl", "Page title"], ["text-lg", "Section title"], ["text-md", "Prose and the composer"], ["text-ui", "The interface: sidebar, buttons, labels"], ["text-sm", "Meta and hints"], ["text-xs", "Badges and chips"]].map(([token, words]) =>
       el("div", { class: `row type-sample ${token}` }, el("span", { class: "grow" }, words), el("code", { class: "mono small muted" }, `--${token}`)),
     ),
   );

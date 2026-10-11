@@ -1,6 +1,8 @@
 """The visual system (item 50): the colours of the interface live in ``themes.css`` alone, and the other sheets draw
 every control on the tokens: no literal colour, font size or radius outside the token blocks. The soft look (item 63):
-every text tier reads on every surface of every look in both schemes, measured as WCAG contrast."""
+every text tier reads on every surface of every look in both schemes, measured as WCAG contrast. The type system
+(item 77): every size, weight, line-height, letter-spacing and family in the sheets is a token, the two faces are
+served from the static directory, and the CSP lets the page load them."""
 
 import re
 from pathlib import Path
@@ -10,7 +12,13 @@ import pytest
 _CSS: Path = Path(__file__).resolve().parents[2] / "src" / "dotagent" / "server" / "static" / "css"
 _DRAWN: tuple[str, ...] = ("app.css", "shell.css", "run.css", "settings.css")
 _COLOUR: re.Pattern[str] = re.compile(r"#[0-9a-fA-F]{3,8}\b|\brgba?\(|\bhsla?\(|\bwhite\b|\bblack\b")
-_FONT_SIZE: re.Pattern[str] = re.compile(r"font-size:\s*[0-9.]+px")
+_FONT_SIZE: re.Pattern[str] = re.compile(r"font-size:\s*[0-9.]+(px|em|rem|%)")
+# A weight, line-height, letter-spacing or family written as a number or a name instead of a token (item 77); the
+# @font-face blocks declare the faces and their weight ranges and are the one place a number belongs.
+_TYPE_LITERAL: re.Pattern[str] = re.compile(
+    r"^\s*((font-weight|line-height|letter-spacing|font-family):(?!\s*var\()|font:(?!\s*(inherit|var\()))"
+)
+_FONTS: Path = _CSS.parent / "fonts"
 _RADIUS: re.Pattern[str] = re.compile(r"border-radius:\s*[0-9.]+px")
 # A gap, padding or margin, whose pixel values are on the 4 px grid or tokens (item 74).
 _SPACING: re.Pattern[str] = re.compile(r"^\s*(gap|row-gap|column-gap|padding(-[a-z-]+)?|margin(-[a-z-]+)?):")
@@ -69,8 +77,11 @@ def test_the_tokens_are_declared_once_each_in_the_base_look() -> None:
     app: str = (_CSS / "app.css").read_text(encoding="utf-8")
     themes: str = (_CSS / "themes.css").read_text(encoding="utf-8")
     for token in (
-        "--fs-xs",
-        "--fs-2xl",
+        "--text-xs",
+        "--text-2xl",
+        "--leading-ui",
+        "--weight-title",
+        "--tracking-title",
         "--radius-xs",
         "--radius-pill",
         "--space-1",
@@ -181,3 +192,42 @@ def test_the_surfaces_step_up_by_lightness_in_dark_and_down_in_light() -> None:
         assert light == sorted(light, reverse=True), (look, light)
         assert dark == sorted(dark), (look, dark)
         assert _luminance(pairs["--bg"][1]) < dark[0], look
+
+
+def _outside_font_face(name: str) -> list[tuple[int, str]]:
+    """The lines of a sheet that are not inside an ``@font-face`` block."""
+    kept: list[tuple[int, str]] = []
+    inside: bool = False
+    for number, line in _lines(name):
+        if line.startswith("@font-face"):
+            inside = True
+        elif inside and line.startswith("}"):
+            inside = False
+        elif not inside:
+            kept.append((number, line))
+    return kept
+
+
+@pytest.mark.parametrize("name", (*_DRAWN, "themes.css"))
+def test_every_weight_line_height_letter_spacing_and_family_is_a_token(name: str) -> None:
+    """Item 77: three weights, seven line-heights, two trackings and three families, all named; no number of its own."""
+    hits: list[str] = [
+        f"{name}:{n}: {line.strip()}" for n, line in _outside_font_face(name) if _TYPE_LITERAL.match(line)
+    ]
+    assert hits == [], hits
+
+
+def test_the_faces_are_served_from_the_static_directory_with_their_licences() -> None:
+    app: str = (_CSS / "app.css").read_text(encoding="utf-8")
+    for face in ("InterVariable.woff2", "InterVariable-Italic.woff2", "GeistMono-Variable.woff2"):
+        assert (_FONTS / face).stat().st_size > 10_000, face
+        assert f'url("../fonts/{face}")' in app, face
+    for licence in ("LICENSE-Inter.txt", "LICENSE-GeistMono.txt"):
+        assert "SIL Open Font License" in (_FONTS / licence).read_text(encoding="utf-8"), licence
+
+
+def test_the_content_security_policy_lets_the_page_load_its_own_fonts() -> None:
+    from dotagent.server.guard import SECURITY_HEADERS
+
+    policy: str = dict(SECURITY_HEADERS)["Content-Security-Policy"]
+    assert "font-src 'self'" in policy
