@@ -56,6 +56,8 @@ class ToolContext:
     # The browser session this run works in: the daemon's, or the one of the mode its campaign asked for.
     browser: BrowserSession
     run_id: str
+    # The agent whose run it is (item 94), ``None`` for Dot's: what the memory tools search as.
+    agent_id: str | None
     thread_id: str
     mode: RunMode
     approvals: ApprovalMode

@@ -1,6 +1,8 @@
 """Agents (item 86) through the API and the real loop: an agent is made, a run is started for it on the scripted
 model, the run wears the agent (its id, its prompt, its bounds), the Agents page and the agent's page show it, and the
-agent's end leaves its chats to Dot. No network and no model service: the scripted model answers.
+agent's end leaves its chats to Dot. An agent learns for itself (item 94): its lesson and its learned skill reach its
+own run and not Dot's, its page lists them, and the agent's end leaves them to Dot. No network and no model service:
+the scripted model answers.
 """
 
 import asyncio
@@ -15,12 +17,16 @@ import pytest_asyncio
 from playwright.async_api import Browser, BrowserContext, Page, async_playwright
 
 from dotagent.agent.manager import RunManager
+from dotagent.agent.playbooks import Playbook, playbook_name, read_meta, write_playbook
+from dotagent.agent.review import PlaybookDraft
 from dotagent.config import load_config
+from dotagent.core.paths import playbooks_dir
 from dotagent.evals.runner import SCRIPTED_MODEL
 from dotagent.evals.scripted import ScriptedProvider
 from dotagent.evals.types import ScriptedCall, ScriptedTurn
 from dotagent.llm.router import parse_model_ref
 from dotagent.llm.types import ChatRequest, DeltaSink, ModelInfo, ModelReply
+from dotagent.memory.service import save_memory
 from dotagent.runtime import Runtime, build_runtime, close_runtime
 from dotagent.server.app import create_app
 from dotagent.server.context import ServerContext
@@ -34,6 +40,12 @@ _PROVIDER: str = parse_model_ref(SCRIPTED_MODEL).provider
 _RUN_WAIT_S: float = 60.0
 _SETTLE_MS: int = 700
 TOKEN: str = f"MARKER-{secrets.token_hex(8)}"
+LESSON: str = "Primary sources on the matter are listed in the ministry's own register first."
+SKILL_KIND: str = "Check a claim against the ministry register"
+SKILL_NAME: str = playbook_name(SKILL_KIND)
+FINISH: ScriptedTurn = ScriptedTurn(
+    text="", calls=(ScriptedCall(tool=FINISH_TOOL, arguments={"answer": "Two sources.", "success": True}),)
+)
 
 
 class _Recorder:
@@ -68,7 +80,8 @@ MODEL: _Recorder = _Recorder()
 async def runtime(tmp_path_factory: pytest.TempPathFactory) -> AsyncIterator[Runtime]:
     home: Path = tmp_path_factory.mktemp("home")
     (home / "config.toml").write_text(
-        f'[browser]\nheadless = true\n\n[models]\nmain = "{SCRIPTED_MODEL}"\n', encoding="utf-8"
+        f'[browser]\nheadless = true\n\n[models]\nmain = "{SCRIPTED_MODEL}"\n\n[memory]\nembed_enabled = false\n',
+        encoding="utf-8",
     )
     patch: pytest.MonkeyPatch = pytest.MonkeyPatch()
     patch.setenv("DOT_HOME", str(home))
@@ -122,6 +135,41 @@ async def client(runtime: Runtime, manager: RunManager) -> AsyncIterator[httpx.A
         await serving
 
 
+def _skill(agent_id: str) -> Playbook:
+    """A learned skill of the agent, as a run of its would have written it."""
+    return Playbook(
+        name=SKILL_NAME,
+        kind=SKILL_KIND,
+        host="register.example.gov",
+        draft=PlaybookDraft(
+            kind=SKILL_KIND,
+            description="Look a claim up in the ministry register and quote the entry.",
+            when="A goal that asks to check a claim against the register.",
+            steps=("Open the register's search.", "Search <claim> and quote the entry."),
+            parameters=("<claim>: the claim to check",),
+        ),
+        run_id="run-earlier",
+        agent_id=agent_id,
+        goal="Check the claim",
+        written_at=time.time(),
+        acting_steps=4,
+    )
+
+
+def _system_prompt(request: ChatRequest) -> str:
+    return next(message.content for message in request.messages if message.role == "system")
+
+
+async def _finished(client: httpx.AsyncClient, manager: RunManager, body: dict[str, object]) -> str:
+    """Start a run through the API with ``body`` and wait for its end; its id."""
+    started = await client.post("/api/runs", json=body)
+    assert started.status_code == 201, started.text
+    run_id: str = started.json()["id"]
+    async with asyncio.timeout(_RUN_WAIT_S):
+        await manager.wait(run_id)
+    return run_id
+
+
 def _agent(tools: list[str]) -> dict[str, object]:
     return {
         "name": "Scout",
@@ -139,7 +187,8 @@ async def test_an_agent_is_made_runs_in_its_own_voice_and_bounds_and_leaves_its_
 ) -> None:
     refused = await client.post("/api/agents", json=_agent(["no_such_tool"]))
     assert refused.status_code == 422, refused.text
-    made = await client.post("/api/agents", json=_agent(["shell"]))
+    # The agent may read skills too, so its runs are offered its own learned skill under Skills (item 94).
+    made = await client.post("/api/agents", json=_agent(["shell", "skill"]))
     assert made.status_code == 201, made.text
     agent_id: str = made.json()["id"]
     listed = await client.get("/api/agents")
@@ -149,14 +198,7 @@ async def test_an_agent_is_made_runs_in_its_own_voice_and_bounds_and_leaves_its_
         answer = await forbidden
         assert answer.status_code == 422, answer.text
 
-    MODEL.script = ScriptedProvider(
-        _PROVIDER,
-        [
-            ScriptedTurn(
-                text="", calls=(ScriptedCall(tool=FINISH_TOOL, arguments={"answer": "Two sources.", "success": True}),)
-            )
-        ],
-    )
+    MODEL.script = ScriptedProvider(_PROVIDER, [FINISH])
     started = await client.post("/api/runs", json={"goal": "Find two sources on the matter", "agent_id": agent_id})
     assert started.status_code == 201, started.text
     run_id: str = started.json()["id"]
@@ -182,6 +224,37 @@ async def test_an_agent_is_made_runs_in_its_own_voice_and_bounds_and_leaves_its_
     activity = await client.get("/api/activity")
     recent = [row for row in activity.json()["recent"] if row["id"] == run_id]
     assert [row["actor_id"] for row in recent] == [agent_id], activity.text
+
+    # The agent learns for itself (item 94): a lesson of its run and a skill of its own reach its next run, in the
+    # prompt's notes and under Skills, and not Dot's run; its page lists them, scored by its own runs.
+    await save_memory(runtime.memory, LESSON, ("lesson",), run_id, agent_id)
+    await asyncio.to_thread(write_playbook, playbooks_dir(), _skill(agent_id))
+    MODEL.script = ScriptedProvider(_PROVIDER, [FINISH, FINISH])
+    second_id: str = await _finished(client, manager, {"goal": "Find two sources on the matter", "agent_id": agent_id})
+    own_prompt: str = _system_prompt(MODEL.requests[-1])
+    assert LESSON in own_prompt and SKILL_NAME in own_prompt, own_prompt[-1500:]
+    dots_id: str = await _finished(client, manager, {"goal": "Find two sources on the matter"})
+    dots_prompt: str = _system_prompt(MODEL.requests[-1])
+    assert LESSON not in dots_prompt and SKILL_NAME not in dots_prompt, dots_prompt[-1500:]
+    page = await client.get(f"/api/agents/{agent_id}")
+    learned = page.json()["learned"]
+    assert [lesson["content"] for lesson in learned["lessons"]] == [LESSON]
+    lesson_id: str = learned["lessons"][0]["id"]
+    assert learned["scores"] == {lesson_id: {"handed": 1, "done": 1, "failed": 0}}
+    assert [(skill["name"], skill["agent_id"], skill["shared"]) for skill in learned["skills"]] == [
+        (SKILL_NAME, agent_id, False)
+    ]
+    assert [run["id"] for run in page.json()["runs"]] == [second_id, run_id]
+    assert dots_id != second_id
+    # The Memory page names the agent on the lesson; shared, the skill reaches Dot's run too.
+    memories = await client.get("/api/memories")
+    assert memories.json()["agents"] == {agent_id: "Scout"}
+    assert [note["agent_id"] for note in memories.json()["items"] if note["id"] == lesson_id] == [agent_id]
+    shared = await client.put(f"/api/skills/learned/{SKILL_NAME}", json={"shared": True})
+    assert shared.status_code == 200 and shared.json()["items"][0]["shared"] is True, shared.text
+    MODEL.script = ScriptedProvider(_PROVIDER, [FINISH])
+    await _finished(client, manager, {"goal": "Find two sources on the matter"})
+    assert SKILL_NAME in _system_prompt(MODEL.requests[-1]) and LESSON not in _system_prompt(MODEL.requests[-1])
 
     host: str = client.base_url.host
     port: int | None = client.base_url.port
@@ -213,7 +286,11 @@ async def test_an_agent_is_made_runs_in_its_own_voice_and_bounds_and_leaves_its_
             assert (
                 await page_ui.locator("textarea[aria-label='Message']").get_attribute("placeholder") == "Message Scout"
             )
-            assert await page_ui.locator(".list-row[data-run]").count() == 1
+            assert await page_ui.locator(".list-row[data-run]").count() == 2
+            # What it learned: the lesson with its score, the skill with Share.
+            assert await page_ui.locator(".agent-learned [data-lesson]").count() == 1
+            learned_text: str = await page_ui.locator(".agent-learned").inner_text()
+            assert LESSON in learned_text and SKILL_NAME in learned_text and "Handed to 1 run, 1 done" in learned_text
             await page_ui.screenshot(path=str(out / "agent.png"))
             # The run's page wears the agent's face and name in the bar.
             await page_ui.goto(f"http://{host}:{port}/#/runs/{run_id}")
@@ -229,3 +306,6 @@ async def test_an_agent_is_made_runs_in_its_own_voice_and_bounds_and_leaves_its_
     assert gone.status_code == 204, gone.text
     assert (await client.get(f"/api/runs/{run_id}")).json()["run"]["agent_id"] is None
     assert (await client.get(f"/api/agents/{agent_id}")).status_code == 404
+    # Its lesson and its skill stay, as Dot's.
+    assert (await runtime.store.get_memory(lesson_id)).agent_id is None
+    assert read_meta(playbooks_dir() / SKILL_NAME).agent_id is None

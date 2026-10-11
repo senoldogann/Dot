@@ -404,7 +404,7 @@ async def test_the_learning_section_scores_the_notes_handed_to_runs_and_compares
 ) -> None:
     store: Store = await Store.open(tmp_path / "dot.sqlite3", tmp_path / "screenshots")
     thread = await store.create_thread("t", "test")
-    note = await store.add_memory("Log in before the search.", ["lesson"], "run_earlier", None)
+    note = await store.add_memory("Log in before the search.", ["lesson"], "run_earlier", None, None)
     reader: RunRecord = await _run(store, thread.id, "ollama:a", "done", "answer", 3, 300)
     await store.mark_memories_used(reader.id, [note.id], time.time(), "start")
     await store.close_memory_uses(reader.id, "done")
@@ -447,7 +447,7 @@ async def test_the_learning_section_scores_the_notes_handed_to_runs_and_compares
 async def test_a_note_is_scored_by_how_the_runs_handed_it_ended(tmp_path: Path) -> None:
     store: Store = await Store.open(tmp_path / "dot.sqlite3", tmp_path / "screenshots")
     thread = await store.create_thread("t", "test")
-    note = await store.add_memory("A note.", [], "run_earlier", None)
+    note = await store.add_memory("A note.", [], "run_earlier", None, None)
     assert await store.memory_scores([note.id], 0.0) == {}
     done: RunRecord = await _run(store, thread.id, "ollama:a", "done", "answer", 1, 10)
     await store.mark_memories_used(done.id, [note.id], time.time(), "start")

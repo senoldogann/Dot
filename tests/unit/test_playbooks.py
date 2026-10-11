@@ -86,6 +86,7 @@ def _playbook() -> Playbook:
         host=HOST,
         draft=_draft(),
         run_id="run-1",
+        agent_id=None,
         goal="Find the price of a lamp on shop.example.com",
         written_at=1_700_000_000.0,
         acting_steps=3,
@@ -148,6 +149,8 @@ def test_a_playbook_is_a_skill_the_catalog_loads(tmp_path: Path) -> None:
         updated_at=1_700_000_000.0,
         uses=0,
         failures=0,
+        agent_id=None,
+        shared=False,
     )
     with pytest.raises(FileExistsError):
         write_playbook(tmp_path, _playbook())

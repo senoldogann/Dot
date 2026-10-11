@@ -331,6 +331,7 @@ async def _context_in(runtime: Runtime, campaign_id: str | None, approvals: Appr
         runtime=runtime,
         browser=runtime.browser,
         run_id=run.id,
+        agent_id=None,
         thread_id=thread.id,
         mode="task",
         approvals=approvals,

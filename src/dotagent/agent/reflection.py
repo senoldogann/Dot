@@ -438,7 +438,7 @@ async def reflect(runtime: Runtime, deciding: asyncio.Lock, now: float) -> Refle
     if runs or merged or retired:
         day: str = datetime.fromtimestamp(now, tz=runtime.schedule_zone).strftime("%Y-%m-%d")
         text: str = journal_text(day, runs, lessons, merged, retired, runtime.config.memory.max_chars)
-        saved: SavedMemory = await save_memory(runtime.memory, text, (JOURNAL_TAG,), REFLECTION_SOURCE)
+        saved: SavedMemory = await save_memory(runtime.memory, text, (JOURNAL_TAG,), REFLECTION_SOURCE, None)
         journal = saved.record.id
     reflection: Reflection = Reflection(
         at=now,

@@ -275,6 +275,11 @@ async def _failed(runtime: Runtime, run_id: str, error: DotError, what: str) -> 
     await runtime.bus.emit(run_id, LESSONS_FAILED, {"error": f"{what}: {shorten_reason(error.message)}"}, True)
 
 
+async def _agent_of(store: Store, run_id: str) -> str | None:
+    """Whose lesson a run's lesson is (item 94): the run's agent's, ``None`` for Dot's run."""
+    return (await store.get_run(run_id)).agent_id
+
+
 async def _save_all(runtime: Runtime, deciding: asyncio.Lock, run_id: str, lessons: tuple[str, ...]) -> None:
     """``auto``: save every lesson that the owner did not save or dismiss first, each under ``deciding``. An error (an
     embedding service that fails) stops it, and the lessons not saved stay proposed."""
@@ -283,7 +288,9 @@ async def _save_all(runtime: Runtime, deciding: asyncio.Lock, run_id: str, lesso
             if (await _lesson_of(runtime.store, run_id, index)).state != "proposed":
                 continue
             try:
-                saved: SavedMemory = await save_memory(runtime.memory, lesson, (LESSON_TAG,), run_id)
+                saved: SavedMemory = await save_memory(
+                    runtime.memory, lesson, (LESSON_TAG,), run_id, await _agent_of(runtime.store, run_id)
+                )
             except DotError as error:
                 await _failed(runtime, run_id, error, "A lesson could not be saved")
                 return
@@ -403,12 +410,14 @@ async def _proposed_lesson(store: Store, run_id: str, index: int) -> LessonView:
 
 
 async def save_lesson(runtime: Runtime, deciding: asyncio.Lock, run_id: str, index: int) -> SavedMemory:
-    """Save a proposed lesson of a run as a note tagged ``lesson`` whose source is the run (the owner's choice). It
-    holds ``deciding`` from the look at the lesson to its ``lesson_saved`` event, so a second decision on the same
-    lesson (another page, ``auto``) waits and then finds it decided."""
+    """Save a proposed lesson of a run as a note tagged ``lesson`` whose source is the run and whose owner is the
+    run's agent (the owner's choice). It holds ``deciding`` from the look at the lesson to its ``lesson_saved``
+    event, so a second decision on the same lesson (another page, ``auto``) waits and then finds it decided."""
     async with deciding:
         lesson: LessonView = await _proposed_lesson(runtime.store, run_id, index)
-        saved: SavedMemory = await save_memory(runtime.memory, lesson.text, (LESSON_TAG,), run_id)
+        saved: SavedMemory = await save_memory(
+            runtime.memory, lesson.text, (LESSON_TAG,), run_id, await _agent_of(runtime.store, run_id)
+        )
         await _emit_saved(runtime, run_id, index, saved, "owner")
     return saved
 

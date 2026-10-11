@@ -135,6 +135,7 @@ def memories_router(ctx: ServerContext) -> APIRouter:
                 if resting(record, now, index.config.rest_days, recent.get(record.id), index.config.score_min_uses)
             ],
             scores=await index.store.memory_scores(ids, 0.0),
+            agents={agent.id: agent.name for agent in await index.store.list_agents()},
         )
 
     @router.get("/memories/owner")
@@ -158,7 +159,7 @@ def memories_router(ctx: ServerContext) -> APIRouter:
 
     @router.post("/memories", status_code=201)
     async def add_memory(request: MemoryRequest) -> SavedMemory:
-        return await save_memory(index, request.content, request.tags, None)
+        return await save_memory(index, request.content, request.tags, None, None)
 
     @router.patch("/memories/{memory_id}")
     async def edit_memory(memory_id: str, request: MemoryRequest) -> MemoryRecord:

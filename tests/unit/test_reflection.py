@@ -70,6 +70,7 @@ def _note(
         created_at=created_at,
         updated_at=created_at,
         source_run="run_0",
+        agent_id=None,
         used_count=0 if last_used_at is None else 1,
         last_used_at=last_used_at,
     )

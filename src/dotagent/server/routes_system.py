@@ -11,7 +11,7 @@ from fastapi import APIRouter
 from fastapi.responses import FileResponse
 
 from dotagent import __version__
-from dotagent.agent.playbooks import PlaybookEntry, drop_playbook, list_playbooks
+from dotagent.agent.playbooks import PlaybookEntry, drop_playbook, list_playbooks, share_playbook
 from dotagent.config import AppConfig
 from dotagent.core.errors import DotError, MissingSecretError, NotFoundError, ProviderAuthError
 from dotagent.core.paths import dot_home, failsafe_path, playbooks_dir, screenshots_dir
@@ -35,6 +35,7 @@ from dotagent.server.views import (
     ProviderProblem,
     PushKeyView,
     PushSubscribeRequest,
+    SkillShareRequest,
     StatusView,
 )
 from dotagent.skills.catalog import load_skills, playbook_root
@@ -158,6 +159,13 @@ def system_router(ctx: ServerContext) -> APIRouter:
         entries: tuple[PlaybookEntry, ...] = await asyncio.to_thread(list_playbooks, playbooks_dir())
         return LearnedSkillsView(items=tuple(learned_skill_view(entry) for entry in entries))
 
+    @router.put("/skills/learned/{name}")
+    async def share_learned_skill(name: str, request: SkillShareRequest) -> LearnedSkillsView:
+        """Offer an agent's learned skill to every run, or to its agent's alone again; the list after it."""
+        await asyncio.to_thread(share_playbook, playbooks_dir(), name, request.shared)
+        entries: tuple[PlaybookEntry, ...] = await asyncio.to_thread(list_playbooks, playbooks_dir())
+        return LearnedSkillsView(items=tuple(learned_skill_view(entry) for entry in entries))
+
     @router.get("/palette")
     async def palette() -> PaletteView:
         """The skills and the MCP tools for the composer's slash menu, read from the folders as a run reads them."""
@@ -224,4 +232,6 @@ def learned_skill_view(entry: PlaybookEntry) -> LearnedSkillView:
         retired=entry.retired,
         written_at=entry.meta.written_at,
         updated_at=entry.meta.updated_at,
+        agent_id=entry.meta.agent_id,
+        shared=entry.meta.shared,
     )

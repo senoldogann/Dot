@@ -49,7 +49,7 @@ async def test_a_note_is_found_whatever_the_letters_or_the_ending(
     index: MemoryIndex = await open_memory_index(store, _words_only(tmp_path, monkeypatch))
     try:
         for content in (MEETING, CITY, LAPTOP, WATER):
-            await save_memory(index, content, [], None)
+            await save_memory(index, content, [], None, None)
         assert await _found(index, query) == [note]
     finally:
         await store.close()
@@ -61,7 +61,7 @@ async def test_a_database_with_an_index_of_the_old_form_is_rebuilt_when_opened(
     database: Path = tmp_path / "dot.db"
     store: Store = await Store.open(database, tmp_path / "images")
     index: MemoryIndex = await open_memory_index(store, _words_only(tmp_path, monkeypatch))
-    await save_memory(index, MEETING, ["toplantı"], None)
+    await save_memory(index, MEETING, ["toplantı"], None, None)
     await store.close()
 
     # What an older version left behind: the text in the index as written.

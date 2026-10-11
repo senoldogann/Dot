@@ -421,6 +421,7 @@ def _memory(row: aiosqlite.Row) -> MemoryRecord:
         created_at=row["created_at"],
         updated_at=row["updated_at"],
         source_run=row["source_run"],
+        agent_id=row["agent_id"],
         used_count=row["used_count"],
         last_used_at=row["last_used_at"],
     )
@@ -465,10 +466,11 @@ _ADDED_RUN_COLUMNS: tuple[tuple[str, str], ...] = (
     ("campaign_id", "TEXT"),
     ("agent_id", "TEXT"),
 )
-# Columns of ``memories`` added later: notes of an older database were never counted as used.
+# Columns of ``memories`` added later: notes of an older database were never counted as used, and are Dot's.
 _ADDED_MEMORY_COLUMNS: tuple[tuple[str, str], ...] = (
     ("used_count", "INTEGER NOT NULL DEFAULT 0"),
     ("last_used_at", "REAL"),
+    ("agent_id", "TEXT"),
 )
 # Columns of ``schedules`` added later: NULL means "what the configuration says when the schedule fires", which is how
 # the schedules of an older database ran.
@@ -1292,7 +1294,12 @@ class Store:
 
     @_writing
     async def add_memory(
-        self, content: str, tags: Sequence[str], source_run: str | None, vector: Sequence[float] | None
+        self,
+        content: str,
+        tags: Sequence[str],
+        source_run: str | None,
+        agent_id: str | None,
+        vector: Sequence[float] | None,
     ) -> MemoryRecord:
         now: float = time.time()
         record: MemoryRecord = MemoryRecord(
@@ -1302,13 +1309,15 @@ class Store:
             created_at=now,
             updated_at=now,
             source_run=source_run,
+            agent_id=agent_id,
             used_count=0,
             last_used_at=None,
         )
         tag_text: str = ",".join(record.tags)
         await self._db.execute(
-            "INSERT INTO memories(id, content, tags, created_at, updated_at, source_run) VALUES(?, ?, ?, ?, ?, ?)",
-            (record.id, content, tag_text, now, now, source_run),
+            "INSERT INTO memories(id, content, tags, created_at, updated_at, source_run, agent_id)"
+            " VALUES(?, ?, ?, ?, ?, ?, ?)",
+            (record.id, content, tag_text, now, now, source_run, agent_id),
         )
         await self._db.execute(
             "INSERT INTO memories_fts(id, content, tags) VALUES(?, ?, ?)",
@@ -1423,6 +1432,13 @@ class Store:
         )
         return [_memory(row) for row in rows]
 
+    async def agent_memories(self, agent_id: str, limit: int) -> list[MemoryRecord]:
+        """The most recently changed notes that are the agent's own (item 94)."""
+        rows = await self._all(
+            "SELECT * FROM memories WHERE agent_id = ? ORDER BY updated_at DESC LIMIT ?", (agent_id, limit)
+        )
+        return [_memory(row) for row in rows]
+
     async def user_memories(self, limit: int) -> list[MemoryRecord]:
         """The most recently changed notes the user wrote (no run saved them)."""
         rows = await self._all(
@@ -1477,6 +1493,20 @@ class Store:
     async def memory_scores(self, memory_ids: Sequence[str], since: float) -> dict[str, MemoryScore]:
         """How the runs ended that were handed each of ``memory_ids`` since ``since`` (``0.0`` for ever); a note no
         run was handed is absent."""
+        return await self._memory_scores(memory_ids, since, "", ())
+
+    async def agent_memory_scores(
+        self, memory_ids: Sequence[str], since: float, agent_id: str
+    ) -> dict[str, MemoryScore]:
+        """Like :meth:`memory_scores`, counting only the runs of the agent ``agent_id`` (item 94: an agent's scores
+        are its own)."""
+        return await self._memory_scores(
+            memory_ids, since, " AND run_id IN (SELECT id FROM runs WHERE agent_id = ?)", (agent_id,)
+        )
+
+    async def _memory_scores(
+        self, memory_ids: Sequence[str], since: float, extra: str, params: tuple[str, ...]
+    ) -> dict[str, MemoryScore]:
         if not memory_ids:
             return {}
         marks: str = ",".join("?" for _ in memory_ids)
@@ -1484,8 +1514,8 @@ class Store:
             "SELECT memory_id, COUNT(DISTINCT run_id) AS handed,"
             " COUNT(DISTINCT CASE WHEN status = 'done' THEN run_id END) AS done,"
             " COUNT(DISTINCT CASE WHEN status = 'failed' THEN run_id END) AS failed"
-            f" FROM memory_uses WHERE memory_id IN ({marks}) AND handed_at >= ? GROUP BY memory_id",
-            (*memory_ids, since),
+            f" FROM memory_uses WHERE memory_id IN ({marks}) AND handed_at >= ?{extra} GROUP BY memory_id",
+            (*memory_ids, since, *params),
         )
         return {
             str(row["memory_id"]): MemoryScore(
@@ -1841,9 +1871,10 @@ class Store:
         return [_agent(row) for row in rows]
 
     async def delete_agent(self, agent_id: str) -> None:
-        """Forget the agent; its runs stay, as Dot's (their ``agent_id`` is cleared)."""
+        """Forget the agent; its runs and its lessons stay, as Dot's (their ``agent_id`` is cleared)."""
         await self.get_agent(agent_id)
         await self._db.execute("UPDATE runs SET agent_id = NULL WHERE agent_id = ?", (agent_id,))
+        await self._db.execute("UPDATE memories SET agent_id = NULL WHERE agent_id = ?", (agent_id,))
         await self._db.execute("DELETE FROM agents WHERE id = ?", (agent_id,))
         await self._db.commit()
 

@@ -671,7 +671,8 @@ is decided once: a second save or dismissal of it, from another page or after `a
 and `dotx resume` show the lessons after the answer; Ctrl-C skips the wait, and the exit status stays the run's. With
 `auto` they are saved at once, except after a run that read content others can write (web pages, mail, downloads),
 which could plant a lesson: those are only proposed, and the page says why. A saved lesson is a note of the agent like
-the others: a later run gets it when it fits its goal, and the Memory page edits or forgets it. Delegated runs, chats,
+the others: a later run gets it when it fits its goal, and the Memory page edits or forgets it; a lesson of an agent's
+run is that agent's own (see Agents). Delegated runs, chats,
 runs that failed or were stopped, and evals (which always run without lessons) are not asked at their end; the nightly
 reflection asks about the failed and the stopped ones. `lessons` is `"propose"` by default; `"off"` learns nothing.
 Every note a run is handed (at its start, by `memory_search`, or changed while it ran) is recorded with how the run
@@ -1315,7 +1316,16 @@ home composer offers an Agent menu once an agent exists, Dot by default. A run o
 with the agent's own section ("You are Scout, an agent the owner made: ..." and your instructions), ahead of Dot's
 rules, which still hold; its tools are the ones the agent names plus finishing, asking you and turning tool groups on.
 The run's page wears the agent's face and name in the bar with a chip to its page; its rows on the Activity page and
-in the sidebar wear the face too. Deleting an agent leaves its chats to Dot.
+in the sidebar wear the face too. Deleting an agent leaves its chats, its lessons and its learned skills to Dot.
+
+An agent learns for itself. A lesson drawn from an agent's run is the agent's own (the note carries its `agent_id`),
+and so is a skill its run was distilled into (`agent_id` in `playbook.json`); Dot's lessons and skills are everyone's.
+An agent's run is handed its own lessons first, then Dot's notes, never another agent's, at its start and through
+`memory_search` alike; it is offered its own learned skills and Dot's, and another agent's only once you mark that
+skill shared (Settings › Skills or the agent's page, `PUT /api/skills/learned/{name}` with `shared`). The scores it
+ranks its notes by, and the ones its page shows, count its own runs alone. An agent's page lists what it learned
+("What it learned": its lessons with how its runs fared after each, with Forget, and its skills with Share and Drop),
+and the Memory page marks a lesson with its agent's name. A note a run saves with `memory_save` is Dot's, for every run.
 
 Agents work together through messages. A run (Dot's or an agent's) sends one with the `message_agent` tool, naming
 the agent and the message; the agent answers in a run of its own (its instructions, its tools, its model) that
@@ -1469,7 +1479,7 @@ fails, or a folder that cannot be written, leaves a `playbook_failed` event on t
 `playbook_written` event and a retired one a `playbook_retired` event. The distillation reads pages third parties
 wrote, so the skill never takes an instruction from them as a step, and never holds a secret, a one-time code, an
 e-mail address or a home path. Settings › Skills lists the learned skills (kind, where, the runs, how they fared, the
-retired ones apart) with Drop; `dotx playbooks list` shows them with their use, `dotx playbooks show NAME` prints one
+retired ones apart, an agent's with its name and Share) with Drop; `dotx playbooks list` shows them with their use, `dotx playbooks show NAME` prints one
 and `dotx playbooks drop NAME` removes one, active or retired. Delegated runs, chats and evals (which always run
 without learned skills) write none. `dotx stats` counts the skills written, retired and read, and compares, per host,
 the runs that read a skill with the runs on that host that did not (act calls and seconds a run).

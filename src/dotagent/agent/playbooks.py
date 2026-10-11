@@ -111,6 +111,7 @@ class Playbook(FrozenModel):
     host: str
     draft: PlaybookDraft
     run_id: str
+    agent_id: str | None
     goal: str
     written_at: float
     acting_steps: int
@@ -119,7 +120,9 @@ class Playbook(FrozenModel):
 class PlaybookMeta(FrozenModel):
     """``playbook.json``: the kind the skill is matched by, where it comes from (``runs``, the first one first, with
     the acting steps each took) and how it fared since. ``uses`` counts the runs that read it and ended done,
-    ``failures`` the runs that read it and failed."""
+    ``failures`` the runs that read it and failed. ``agent_id`` is the agent whose skill it is (item 94), ``None``
+    for Dot's, offered to every run; an agent's is offered to its runs alone until the owner marks it ``shared``.
+    Both are absent from the record of a skill written before item 94, which is Dot's."""
 
     name: str
     kind: str
@@ -130,6 +133,8 @@ class PlaybookMeta(FrozenModel):
     updated_at: float
     uses: int
     failures: int
+    agent_id: str | None = None
+    shared: bool = False
 
 
 class PlaybookEntry(FrozenModel):
@@ -267,6 +272,8 @@ def meta_of(playbook: Playbook, earlier: PlaybookMeta | None) -> PlaybookMeta:
             updated_at=playbook.written_at,
             uses=0,
             failures=0,
+            agent_id=playbook.agent_id,
+            shared=False,
         )
     return earlier.model_copy(
         update={
@@ -284,6 +291,21 @@ def recorded(meta: PlaybookMeta, succeeded: bool) -> PlaybookMeta:
 
 def retires(meta: PlaybookMeta) -> bool:
     return meta.failures >= MAX_FAILURES
+
+
+def offered_to(meta: PlaybookMeta, agent_id: str | None) -> bool:
+    """Whether a run of the agent ``agent_id`` (``None`` for Dot) is offered the skill (item 94): Dot's and the shared
+    ones go to every run, an agent's own to its runs alone."""
+    return meta.shared or meta.agent_id is None or meta.agent_id == agent_id
+
+
+def offered_skills(
+    skills: Sequence[Skill], entries: Sequence[PlaybookEntry], agent_id: str | None
+) -> tuple[Skill, ...]:
+    """``skills`` without the learned ones a run of ``agent_id`` is not offered (:func:`offered_to`); a learned skill
+    without a readable record among ``entries`` is not offered either."""
+    offered: set[str] = {entry.meta.name for entry in entries if offered_to(entry.meta, agent_id)}
+    return tuple(skill for skill in skills if skill.source != PLAYBOOK_SOURCE or skill.name in offered)
 
 
 def playbook_folder(root: Path, name: str) -> Path:
@@ -336,13 +358,43 @@ def record_use(root: Path, name: str, succeeded: bool) -> PlaybookMeta:
     return meta
 
 
-def drop_playbook(root: Path, name: str) -> Path:
-    """Remove the playbook ``name``, active or retired; one that does not exist is not found."""
+def _folder_of(root: Path, name: str) -> Path:
+    """The folder of the playbook ``name``, active or retired; one that does not exist is not found."""
     for folder in (playbook_folder(root, name), root / RETIRED_DIR / name):
         if folder.is_dir():
-            shutil.rmtree(folder)
             return folder
     raise NotFoundError("there is no such learned skill", {"name": name})
+
+
+def _save_meta(folder: Path, meta: PlaybookMeta) -> None:
+    (folder / META_FILE).write_text(meta.model_dump_json(indent=2) + "\n", encoding="utf-8")
+
+
+def drop_playbook(root: Path, name: str) -> Path:
+    """Remove the playbook ``name``, active or retired; one that does not exist is not found."""
+    folder: Path = _folder_of(root, name)
+    shutil.rmtree(folder)
+    return folder
+
+
+def share_playbook(root: Path, name: str, shared: bool) -> PlaybookMeta:
+    """Mark the playbook ``name`` (active or retired) as offered to every run, or to its agent's alone again; Dot's
+    own is offered to every run either way. Returns the record after it."""
+    folder: Path = _folder_of(root, name)
+    meta: PlaybookMeta = read_meta(folder).model_copy(update={"shared": shared})
+    _save_meta(folder, meta)
+    return meta
+
+
+def release_playbooks(root: Path, agent_id: str) -> int:
+    """Make the playbooks of the agent ``agent_id`` Dot's (an agent that was deleted); how many there were."""
+    released: int = 0
+    for entry in list_playbooks(root):
+        if entry.meta.agent_id != agent_id:
+            continue
+        _save_meta(_folder_of(root, entry.meta.name), entry.meta.model_copy(update={"agent_id": None}))
+        released += 1
+    return released
 
 
 def _entries(folder: Path, retired: bool) -> list[PlaybookEntry]:
@@ -388,12 +440,16 @@ def same_kind(kind: str, entries: Sequence[PlaybookEntry], vectors: Sequence[Vec
     return next((entry for entry in active if close and entry.meta.name == close[0].id), None)
 
 
-async def _matching(runtime: Runtime, kind: str, entries: Sequence[PlaybookEntry]) -> PlaybookEntry | None:
-    active: list[PlaybookEntry] = [entry for entry in entries if not entry.retired]
+async def _matching(
+    runtime: Runtime, kind: str, entries: Sequence[PlaybookEntry], agent_id: str | None
+) -> PlaybookEntry | None:
+    """The active skill of ``kind`` among the ones a run of ``agent_id`` is offered (:func:`offered_to`), if any."""
+    offered: list[PlaybookEntry] = [entry for entry in entries if offered_to(entry.meta, agent_id)]
+    active: list[PlaybookEntry] = [entry for entry in offered if not entry.retired]
     if runtime.memory.embedder is None or not active:
-        return same_kind(kind, entries, None)
+        return same_kind(kind, offered, None)
     vectors: list[Vector] = await runtime.memory.embedder.embed([kind, *(entry.meta.kind for entry in active)])
-    return same_kind(kind, entries, vectors)
+    return same_kind(kind, offered, vectors)
 
 
 async def _write_from(
@@ -417,12 +473,15 @@ async def _write_from(
         host=host,
         draft=draft,
         run_id=run.id,
+        agent_id=run.agent_id,
         goal=redact_secrets(run.goal),
         written_at=time.time(),
         acting_steps=len(steps),
     )
     root: Path = playbooks_dir()
-    match: PlaybookEntry | None = await _matching(runtime, draft.kind, await asyncio.to_thread(list_playbooks, root))
+    match: PlaybookEntry | None = await _matching(
+        runtime, draft.kind, await asyncio.to_thread(list_playbooks, root), run.agent_id
+    )
     if match is not None:
         return await asyncio.to_thread(update_playbook, root, match.meta.name, playbook), match.meta.name, True
     if not slug(draft.kind):

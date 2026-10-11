@@ -144,7 +144,8 @@ class RuleRecord(FrozenModel):
 
 
 class MemoryRecord(FrozenModel):
-    """One note. ``source_run`` is the run that saved it, ``None`` for a note the user wrote; ``used_count`` and
+    """One note. ``source_run`` is the run that saved it, ``None`` for a note the user wrote; ``agent_id`` is the
+    agent whose lesson it is (item 94), ``None`` for Dot's, which every run may be handed; ``used_count`` and
     ``last_used_at`` say how often and when a run was handed it."""
 
     id: str
@@ -153,6 +154,7 @@ class MemoryRecord(FrozenModel):
     created_at: float
     updated_at: float
     source_run: str | None
+    agent_id: str | None
     used_count: int
     last_used_at: float | None
 

@@ -120,6 +120,7 @@ async def _fetch(runtime: Runtime, url: str) -> ToolResult:
         runtime=runtime,
         browser=runtime.browser,
         run_id="fetch-test",
+        agent_id=None,
         thread_id="fetch-test",
         mode="research",
         approvals="ask",

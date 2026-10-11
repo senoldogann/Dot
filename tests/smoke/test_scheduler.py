@@ -152,6 +152,7 @@ async def _prepare(runtime: Runtime, name: str, arguments: JsonObject) -> tuple[
         runtime=runtime,
         browser=runtime.browser,
         run_id="schedule-test",
+        agent_id=None,
         thread_id="schedule-test",
         mode="task",
         approvals="ask",

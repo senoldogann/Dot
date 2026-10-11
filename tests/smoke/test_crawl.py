@@ -167,6 +167,7 @@ async def _call(runtime: Runtime, name: str, arguments: JsonObject, output_chars
         runtime=runtime,
         browser=runtime.browser,
         run_id="crawl-test",
+        agent_id=None,
         thread_id="crawl-test",
         mode="research",
         approvals="ask",
