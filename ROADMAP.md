@@ -5025,7 +5025,7 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 102 | The look of every agent: shape, expression and colour, chosen in the editor and worn in every row | done        | f6afe5d |
 | 103 | Alive beside the chat: the character works, waits, finishes and sleeps with the run | done        | 0a0fdaa |
 | 104 | The composer remade: one frame, quiet menus, drafts that keep, a face that listens  | done        | 9261fa9 |
-| 105 | The small polish part 12's review left: a scroll cue, empty sections that point, the Browser grid, the tour's content, Watch on an ended run | planned     |         |
+| 105 | The small polish part 12's review left: a scroll cue, empty sections that point, the Browser grid, the tour's content, Watch on an ended run | done        | c14b670 |
 | 106 | The review: every feature of parts 1 to 13 read once more, the characters' cost measured | planned     |         |
 
 ### 77. The type system: Inter and Geist Mono, seven sizes, three weights
@@ -6077,7 +6077,7 @@ gains the Model popover, the Options popover and a draft that survives a navigat
 
 ### 105. The small polish part 12's review left: a scroll cue, empty sections that point, the Browser grid, the tour's content, Watch on an ended run
 
-**Status: in progress.**
+**Status: done.** Merged as `c14b670` (PR #123, MYP-245 Done).
 
 Design, as built (2026-10-11). The scroll cue: `scrollcue.js scrollCue(box)` sets `data-scroll` on a box that scrolls
 sideways ("more" while more lies to the right, else "end"), read on scroll and on resize; the Models tab cues each
@@ -6105,7 +6105,27 @@ enough for the jump arrow. README where a line changes. Tests: `tests/smoke/test
 
 ### 106. The review: every feature of parts 1 to 13 read once more, the characters' cost measured
 
-**Status: planned.**
+**Status: in progress.**
+
+**Findings, as built (2026-10-11).** Three readings and one measurement. (1) The tour as item 105 left it (23 pages,
+two schemes, two widths, 108 shots) read by eye against the README: the home with its moving face and the composer's
+pills, the run page from the top with the way down and from the answer, its panel with the character card, the
+Agents page and an agent's page, Activity with its pointing empty sections, Campaigns, Team, every Settings tab (the
+Models table with its cue on a phone, the Browser facts two and two, Skills with a learned row, Memory with a scored
+note), Controls; nothing found broken or contradicting the README. (2) The offline smoke suite in full (`-m "not live
+and not internet and not hosted and not desktop"`, the tour apart): 319 passed, 1 skipped, 2 failed, both the tests'
+own: `test_controls.py` still counted twelve sections of `#/controls` where item 101 added the thirteenth
+(Characters), and `test_phone.py` read the Activity page's sections before they were drawn (a count, not an
+expectation); both fixed in this item's PR. (3) The owner's daemon through the API, read-only: healthy, no active
+run, approvals Ask, the scheduler running, every doctor check green but "browser profile" (My Chrome is not attached
+to the daemon; a choice, not a defect); Dot and one agent, neither with a look yet, so both wear the fallback. The
+measurement: `tests/smoke/test_character_cost.py` reads Chrome's performance metrics (`Performance.getMetrics`,
+TaskDuration and its script, style and layout shares) over four seconds of frames: the home with its one moving face,
+greeting and composer costs 1.02 ms of main-thread time a frame (script 0.24, style 0.08, layout 0.19) against
+0.17 ms with the faces off, so one moving face is about 0.85 ms a frame; the gallery of `#/controls` with fourteen
+moving at once 3.40 ms. A few milliseconds at most, as the plan asked, so no further cap in the code: the test caps
+the home at 6 ms a frame and prints the three readings. README: the cost, in the design system's characters passage.
+Nothing is left for the next part's first items.
 
 **What.** As item 100, once more: the tour of every page in both schemes and both widths read by eye against the
 README, the offline smoke suite in full, the owner's daemon read through the API only; and one measurement this
@@ -6643,3 +6663,4 @@ items. The findings go in this section as built.
 - 2026-10-11 (Fable 5.1): item 102 merged as `f6afe5d` (PR #120, MYP-242 Done): `AgentLook` on the record and in the editor, Dot's look in Settings › General, every face a still character (`actors.js`), the favicon from `character/still.js`, `hues.js` pure.
 - 2026-10-11 (Fable 5.1): item 103 merged as `0a0fdaa` (PR #121, MYP-243 Done): the run page's character card with its moods (`mood.js`, `charactercard.js`), the turns and the answer with the actor's still face, the home's face moving.
 - 2026-10-11 (Fable 5.1): item 104 merged as `9261fa9` (PR #122, MYP-244 Done): one `composerFrame` for the three composers, the bar as pills with panels (`popover.js`), drafts kept per composer, the home's face listening.
+- 2026-10-11 (Fable 5.1): item 105 merged as `c14b670` (PR #123, MYP-245 Done): the scroll cue on the Models tables, the Activity page's empty sections that point, the Browser tab's facts two and two, Watch gone on an ended run, the tour seeded with a taller run, a scored lesson and a learned skill.

@@ -31,7 +31,7 @@ _LUMINANCE: str = """(() => {
   const [r, g, b] = getComputedStyle(document.body).backgroundColor.match(/[0-9.]+/g).map(Number);
   return (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
 })()"""
-_SECTIONS: int = 12
+_SECTIONS: int = 13
 
 
 @pytest_asyncio.fixture(scope="module", loop_scope="module")
