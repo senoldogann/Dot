@@ -891,6 +891,16 @@ a.pill:hover {
   padding: 0 16px 16px;
 }
 
+/* The side panel's cards (item 84): every body sits inside the card's padding, so no text hugs the edge; the actions
+   list draws its own rows edge to edge with their own padding. */
+.inspector .fold > .fold-body {
+  padding: 12px 16px 16px;
+}
+
+.inspector .fold > .fold-body:has(> .actions-list) {
+  padding: 0;
+}
+
 .visually-hidden {
   position: absolute;
   width: 1px;
@@ -1523,19 +1533,25 @@ a.pill:hover {
 }
 
 .plan-list {
-  padding: 8px 16px 12px;
+  padding: 0;
 }
 
 .facts {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
   gap: 8px 16px;
+  align-items: baseline;
   margin: 0;
   font-size: var(--text-sm);
+  line-height: var(--leading-sm);
 }
 
 .facts dt {
   color: var(--muted);
+}
+
+.facts dd {
+  color: var(--text);
 }
 
 .facts dd {

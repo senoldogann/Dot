@@ -5004,6 +5004,11 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 81  | Dark, first paint and the tour: every page read in both schemes          | done        | 04693d7 |
 | 82  | Delegated runs as rows: face, state, last line, time; the child's bar    | done        | 6454345 |
 | 83  | Faces for the actors: a hue each, alive in the rows and the bar          | done        | d760ea3 |
+| 84  | The side panel: inset bodies, facts as spans, one card grammar           | in progress |         |
+| 85  | Motion: the sidebar slides, the panel slides, folds fade, pages cross-fade | planned     |         |
+| 86  | Agents: profiles with a face, a role, a model and their own chats         | planned     |         |
+| 87  | Agents together: messages between agents, the team's thread, the harness  | planned     |         |
+| 88  | Desktop and web, one interface: the Tauri shell on the same pages         | planned     |         |
 
 ### 77. The type system: Inter and Geist Mono, seven sizes, three weights
 
@@ -5185,6 +5190,95 @@ eight by a hash of its id: a delegated run, a campaign, a schedule. The face liv
 rest, pulses while it works, blinks its core once when it ends, shows the tick or the cross as Dot's does; the rows of
 item 82, the sidebar's sections, the Campaigns and Schedules pages and the bar of a child's page all draw it at 24 or
 28 px. One SVG, one hue token per actor, no raster; a unit test for the hash and the ring.
+
+## Part 10: the side panel, motion, and agents that work together (planned 2026-10-11)
+
+The owner's tenth word, on 2026-10-11, with a screenshot of the run page's side panel and one of Grok's companion
+list: "the area on the right looks cheap and its texts hug the left; fix it; make things as animated as you can, the
+sidebar opening and closing smoothly is one example; read arXiv 2609.20804, it may help; let us create custom agents
+as in Grok, have them talk to each other and work together, and make the design like theirs, on desktop and web."
+
+**What the paper gave (arXiv 2609.20804, "An Empirical Study of Harness Design for Coding Agents", Fan et al.,
+17 Sep 2026; read by a research agent on 2026-10-11, medium trust: the HTML was read to 100k of 164k characters).**
+One agent at a time, on SWE-Bench Verified and Terminal-Bench, 176 settings. Context management matters most under a
+tight window (the gap between managed and none falls from 35.7 to 2.7 points from 32k to 128k; staged elision of
+stale tool outputs, then a summary near the limit, was cheapest); a persistent plan re-injected each turn helped the
+small model by 11.6 points and cut the large model's cost by 30%; a typed tool set helped the small model by 15
+points while the large one did better with bash alone at half the cost; a recall store of elided outputs was almost
+never used; stuck detection (a reminder after 5 identical calls, a stop after 8 failing ones) and guards at the tool
+layer (read before write, path limits, allow/ask/deny) were fixed. It does not study agents that message each other.
+What Dot takes from it (items 86 and 87): the plan and the context tiers per agent, a tool set per role, loop
+detection on every delegated run, and the per-run telemetry (turns, calls, cost, summaries) in the chat.
+
+**The shape of the agents (the decision of this part).** An agent is a profile Dot keeps: a name, a face (the mark in
+its own hue, item 83), a role in one line, instructions, a model and effort, an approvals mode, the tools it may use.
+Dot itself is the first agent and cannot be deleted. Every run belongs to one agent (Dot by default); the agent's
+instructions join the system prompt, its model and tools bound the run, its face names the run in the bar, the rows
+and the sidebar. An agent has its own chats, listed as Grok lists its companions: the face, the name, the last line,
+the time. Agents work together through the delegation Dot already has: an agent can send a message to another agent
+(a run of that agent, with the message, whose report comes back), and the team's thread shows who said what to whom.
+
+### 84. The side panel: inset bodies, facts as spans, one card grammar
+
+**Status: in progress.** Built on `item-84-side-panel` (MYP-224).
+
+**Design, as built (2026-10-11).** `.inspector .fold > .fold-body` is inset `12px 16px 16px` (the actions list,
+whose rows draw their own padding edge to edge, is exempt by `:has(> .actions-list)`); `.plan-list` drops the
+padding it carried for itself. The Details facts (`.facts`) sit on the small line with the label muted and the
+value in the text ink, baseline-aligned, 8 px between rows; "Tool calls" and "Tokens" are `.meta-facts` spans
+(`1`, `2 failed`; `2.0k in`, `100 out`) and the head's summary is two spans (`done`, `scripted`). The tour
+(`test_tour`) now opens the panel on the run page and the Details card and photographs it in both schemes at both
+widths (`*-run-panel.png`, 60 shots). The drawer on a phone is the same cards with the panel's head and its close.
+
+**What.** The run page's side panel (Dot's computer, Details, Plan, Actions, Screen) on one card grammar: every
+fold's body inset by the card's padding (16 px, 12 under the head) so no text hugs the edge; the Details facts as a
+two-column list with the label in the muted ink and the value on the text, 8 px between rows, the run id in mono
+with its copy button on the line; the head's summary as spans (`done`, `gemma4:cloud`), the tokens as spans; the
+Screen card's hint as the one-line empty state of item 79; the drawer on a narrow window with the same cards; the
+panel's scroll inside its own height.
+
+### 85. Motion: the sidebar slides, the panel slides, folds fade, pages cross-fade
+
+**Status: planned.**
+
+**What.** The docked sidebar opens and closes by sliding (the column's width and the sidebar's transform on the base
+duration, the page following) instead of appearing; the side panel's drawer slides in and out; a fold's body fades
+and rises 4 px when it opens; a page change cross-fades the stage (the old page out on the quick duration, the new
+in on the base); the chevrons turn; all on the motion tokens of item 73, and under reduced motion the slides go and
+the fades stay. A unit test holds every new transition to the tokens; the tour's shots stay still (they are taken
+after the motion settles).
+
+### 86. Agents: profiles with a face, a role, a model and their own chats
+
+**Status: planned.**
+
+**What.** A store table and API for agents (`id`, `name`, `role`, `instructions`, `model`, `effort`, `approvals`,
+`tools`, `created_at`); Dot as the built-in first agent; `RunRecord.agent_id`; the agent's instructions in the system
+prompt after Dot's own, its model and effort as the run's defaults, its tool set as the run's bound. An Agents page
+in the sidebar (above Activity): the list as Grok lists companions (the face in its hue, the name, the role or the
+last line of its latest chat, the time), "New agent" opening the editor (name, role, instructions, model, effort,
+approvals, tools), each agent's page listing its chats and holding its composer ("Message <name>"). The home's
+composer picks the agent (Dot by default). The bar, the rows and the sidebar name the agent by its face and name.
+
+### 87. Agents together: messages between agents, the team's thread, the harness
+
+**Status: planned.**
+
+**What.** A `message_agent` tool: a run sends a message to another agent, which runs with it (a delegated run of
+that agent, its instructions and tools) and whose report returns as the tool's result; the parent's chat shows it as
+the delegated row of item 82 with the agent's face; the agent's own page lists the exchange. A Team page: the thread
+of every message between agents today (who, to whom, the line, the time) with the runs behind them. The harness
+lessons of the paper as agent settings with defaults: the plan re-injected each turn (on), the context tiers (elide
+stale tool outputs at 60% of the window, summarise at 85%), loop detection (a reminder after 5 identical calls, a
+stop after 8 failing), and a tool set per role.
+
+### 88. Desktop and web, one interface: the Tauri shell on the same pages
+
+**Status: planned.**
+
+**What.** The desktop app (`desktop/`) shows the same pages as the web at the same size, the sidebar and the panel
+behaving the same; whatever the shell does of its own (the window's title, the traffic lights' room, the menu) is
+reviewed in the tour; the dependabot alert on `glib` in `desktop/src-tauri/Cargo.lock` is resolved.
 
 ## Log
 
