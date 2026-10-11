@@ -4948,6 +4948,10 @@ Claude and Grok are tidier and each has a text family and size hierarchy; pay at
 research and fix". Planned from a screenshot tour of every page in both schemes and at 1280 and 390 (36 shots, read),
 an inventory of the stylesheets, and a web research round on the three products.
 
+**Status (2026-10-11): built.** Items 77 to 83 merged the same day, each with its screenshot tour read; the tour itself
+(`tests/smoke/test_tour.py`, 56 shots) and the token tests (type, spacing, motion, contrast, the hue ring) hold the
+system. What is left of the redesign is the owner's eye on the live daemon, and the item 76 reading of part 8.
+
 **What the research gave.** The live stylesheets of chatgpt.com, claude.ai and grok.com could not be read (403, text
 only); the numbers come from third-party extractions and are low to medium trust. What they agree on: four to seven
 type sizes in use (ChatGPT about 13, 14, 15, 16, 20, 24, 32), three weights at most (400, 500, 600; no 700 in the
@@ -4999,7 +5003,7 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 80  | Forms and controls: one grammar for inputs, selects, switches, tables    | done        | 132ce0d |
 | 81  | Dark, first paint and the tour: every page read in both schemes          | done        | 04693d7 |
 | 82  | Delegated runs as rows: face, state, last line, time; the child's bar    | done        | 6454345 |
-| 83  | Faces for the actors: a hue each, alive in the rows and the bar          | in progress |         |
+| 83  | Faces for the actors: a hue each, alive in the rows and the bar          | done        | d760ea3 |
 
 ### 77. The type system: Inter and Geist Mono, seven sizes, three weights
 
@@ -5159,7 +5163,7 @@ same row.
 
 ### 83. Faces for the actors: a hue each, alive in the rows and the bar
 
-**Status: in progress.** Built on `item-83-faces` (MYP-223). The owner's reference (2026-10-11): the character marks
+**Status: done.** Merged as `d760ea3` (PR #92, squash; MYP-223 Done). The owner's reference (2026-10-11): the character marks
 of OpenAI's dots and Grok's companions.
 
 **Design, as built (2026-10-11).** `static/js/actors.js`: `hashId` (FNV-1a over the UTF-16 code units, 32-bit),
@@ -5684,3 +5688,4 @@ item 82, the sidebar's sections, the Campaigns and Schedules pages and the bar o
 - 2026-10-11 (Fable 5.1): item 80 merged as `132ce0d` (PR #89, MYP-220 Done). Item 81 built on branch `item-81-dark` (MYP-221): the dark shots read and kept, `boot.js` for the first paint, the tour's first-paint test, README's visual system as the current state.
 - 2026-10-11 (Fable 5.1): item 81 merged as `04693d7` (PR #90, MYP-221 Done). Item 82 built on branch `item-82-delegated` (MYP-222): the delegated run as a row, the child's breadcrumb and pill; the bar's title now gives way with an ellipsis and a delegated run's bar carries no chips (its pill has them).
 - 2026-10-11 (Fable 5.1): item 82 merged as `6454345` (PR #91, MYP-222 Done). Item 83 built on branch `item-83-faces` (MYP-223): `actors.js`, eight hue tokens, the faces in the rows, the pages and the bar, `ActivityRow.actor_id`.
+- 2026-10-11 (Fable 5.1): item 83 merged as `d760ea3` (PR #92, MYP-223 Done). Part 9 is built: items 77 to 83 merged (`ffa00cb`, `7a7e43f`, `ab5f33a`, `132ce0d`, `04693d7`, `6454345`, `d760ea3`); the screenshot tour read after each. Item 76's reading (part 8) is still due on or after 2026-10-18. The daemon restarted on `d760ea3`.
