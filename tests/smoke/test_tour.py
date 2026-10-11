@@ -1,7 +1,8 @@
 """The screenshot tour (item 77): every page of the interface, in both colour schemes at 1280 and 390, written as PNGs
 into the test's temp directory for reading by eye after each item of part 9. A scripted run with a shell step and a
 note in memory give the pages something to show. The test asserts only that every page comes up with its title and
-that the two faces are the ones the page uses; the looking is the reader's."""
+that the two faces are the ones the page uses; the looking is the reader's. A second test holds that a dark scheme kept
+in the browser is on the page element before the first paint (item 81: boot.js in the document's head)."""
 
 import asyncio
 import time
@@ -196,3 +197,43 @@ async def test_every_page_in_both_schemes_at_both_widths(
     shots: list[Path] = await asyncio.to_thread(lambda: sorted(out.glob("*.png")))
     assert len(shots) == len(_SCHEMES) * len(_SIZES) * (len(pages) + 1)
     print(f"\ntour: {out}")
+
+
+# Records, before any page script runs, the document's state at the moment the scheme lands on the page element.
+_WATCH_SCHEME: str = """
+localStorage.setItem("dot.scheme", "dark");
+// The page element does not exist yet when this runs, so the document is watched and the page element's attribute found.
+new MutationObserver(() => {
+  if (window.__schemeAt === undefined && document.documentElement.dataset.scheme === "dark") {
+    window.__schemeAt = document.readyState;
+  }
+}).observe(document, { subtree: true, attributes: true, attributeFilter: ["data-scheme"] });
+"""
+
+
+async def test_a_held_dark_scheme_is_on_the_page_before_the_first_paint(
+    runtime: Runtime, client: httpx.AsyncClient
+) -> None:
+    host: str = client.base_url.host
+    port: int | None = client.base_url.port
+    assert port is not None
+    async with async_playwright() as playwright:
+        browser: Browser = await playwright.chromium.launch(channel=runtime.config.browser.channel, headless=True)
+        try:
+            context: BrowserContext = await browser.new_context(
+                viewport={"width": 1280, "height": 860}, color_scheme="light"
+            )
+            await context.add_init_script(_WATCH_SCHEME)
+            page: Page = await context.new_page()
+            await page.goto(ui_url(host, port, TOKEN))
+            await page.wait_for_timeout(_SETTLE_MS)
+            state: list[str] = await page.evaluate(
+                "[window.__schemeAt, document.documentElement.dataset.scheme, getComputedStyle(document.body).backgroundColor]"
+            )
+            assert state[0] == "loading", state
+            assert state[1] == "dark", state
+            red: int = int(state[2].removeprefix("rgb(").split(",")[0])
+            assert red < 64, state
+            await context.close()
+        finally:
+            await browser.close()

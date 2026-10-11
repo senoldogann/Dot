@@ -100,7 +100,10 @@ def test_the_scripts_never_turn_text_into_markup_or_code() -> None:
 def test_the_page_has_no_inline_code_and_loads_only_files_that_exist() -> None:
     page: str = (STATIC_DIR / "index.html").read_text(encoding="utf-8")
     scripts: list[re.Match[str]] = list(SCRIPT_TAG.finditer(page))
-    assert [script["attributes"].strip() for script in scripts] == ['type="module" src="js/main.js"']
+    assert [script["attributes"].strip() for script in scripts] == [
+        'src="js/boot.js"',
+        'type="module" src="js/main.js"',
+    ]
     assert all(script["body"].strip() == "" for script in scripts)
     assert FORBIDDEN_IN_PAGE.search(page) is None
     missing: list[str] = [reference for reference in REFERENCE.findall(page) if not (STATIC_DIR / reference).is_file()]

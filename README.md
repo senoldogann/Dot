@@ -903,31 +903,33 @@ and quiet; the default) and **Paper** (warm paper tones with a serif heading and
 scheme** follows the system (the default) or holds light or dark. **Density** sets how close the rows, cards and
 lists sit (comfortable or compact). Two switches follow the look until you set them yourself: fold the tool steps
 (on in Neutral) and the Details panel (off in both). The choices are kept in the browser only. The looks are one
-visual system, soft in both schemes: every colour is a token of `themes.css` that names its light and its dark value
-in one place; surfaces step up by lightness rather than by shadow in dark, borders are the text colour at a small
-alpha so they sit on every surface, and the text tiers are measured against every surface (4.5:1 for text, 3:1 for
-labels) by a unit test. The type is one system: Inter for the interface and the answers and Geist Mono for code and
-identifiers, both served from Dot's own origin (`static/fonts`, SIL Open Font License), seven sizes each with its
-line-height (12/16 for badges, 13/18 for meta and hints, 14/20 for the interface, 15/24 for prose and the composer,
-17/24 for section titles, 20/28 for page titles, 24/32 for the greeting), three weights (400 text, 500 labels and
-names, 600 titles) and tabular numerals throughout; a unit test refuses any size, weight, line-height or family in
-the sheets that is not one of these tokens. The radii and spacing are tokens of `app.css` as well, that every control is drawn on;
-`#/controls` shows every control on one page for checking a look. Motion is tokens too: three durations (120, 200 and
-320 ms) and two easings for what changes, and the rhythms of what repeats (the face's breath and pulse, a blink, a
-spin); a unit test holds every transition and animation to them. The face breathes slowly at rest and pulses while a
-run works; cards, rows, the slash menu and the toasts fade in; a state badge cross-fades. Under the system's
-reduced-motion setting every transform goes (the breath, the pulse, the spinners, the drawer's slide) and the fades
-stay, so a state change is still seen. The chrome is quiet so the work leads: every gap, padding and margin sits on
-one rhythm of 8 px (4 for the smallest, a 2 px hairline token for what sits a breath apart; a unit test checks it),
-the sidebar has no dividers between its groups, its labels are the lightest ink that reads and its open row is a
-surface step rather than a tint, the stage bar's pills show a border only when they count something, a card's head is
-lighter than its body, and a folded step of the timeline is one line whose duration shows on hover. Cards are
-flat: a surface with a hairline and a 12 px radius, no shadow (shadows stay on what floats: menus, dialogs, the
+visual system. Colour: every colour is a token of `themes.css` naming its light and its dark value in one place;
+surfaces step up by lightness (page, sunken sidebar, raised cards) rather than by shadow in dark; borders are the text
+colour at a small alpha so they sit on every surface; the text tiers are measured against every surface by a unit
+test (4.5:1 for text and its second tier, 3:1 for the muted and faint ones); the yellow is Dot's face alone. Type:
+Inter for the interface and the answers, Geist Mono for code and identifiers, both served from Dot's own origin
+(`static/fonts`, SIL Open Font License); seven sizes each with its line-height (12/16 badges and chips, 13/18 meta
+and hints, 14/20 the interface, 15/24 prose and the composer, 17/24 section titles, 20/28 page titles, 24/32 the
+greeting), three weights (400 text, 500 labels and names, 600 titles), tabular numerals throughout; a unit test
+refuses any size, weight, line-height or family in the sheets that is not one of these tokens. Surfaces: cards are
+flat, a surface with a hairline and a 12 px radius and no shadow (shadows stay on what floats: menus, dialogs, the
 composer in focus); section labels are sentence case; the facts of a row are spans a gap apart rather than one dotted
-string; an empty list is one line that says so and what to do; your messages sit on the raised surface, the yellow
-being Dot's face alone. The controls are one grammar: buttons, inputs and selects 36 px tall on an 8 px corner with a
-hairline (32 for the small ones), the same 2 px focus ring on each, a select with its own drawn chevron, field labels
-on the interface line and hints on the small one, table rows 40 px with their content on the middle.
+string; an empty list is one line that says so and what to do; your messages sit on the raised surface. Controls:
+buttons, inputs and selects 36 px tall on an 8 px corner with a hairline (32 for the small ones), the same 2 px focus
+ring on each, a select with its own drawn chevron, field labels on the interface line and hints on the small one,
+table rows 40 px with their content on the middle; `#/controls` shows every control on one page for checking a look.
+Space: every gap, padding and margin sits on one rhythm of 8 px (4 for the smallest, a 2 px hairline token for what
+sits a breath apart; a unit test checks it); the sidebar has no dividers between its groups, its labels are the
+lightest ink that reads and its open row is a surface step rather than a tint; the top bar's pills show a border only
+when they count something; a card's head is lighter than its body; a folded step of the timeline is one line whose
+duration shows on hover. Motion: three durations (120, 200 and 320 ms) and two easings for what changes, and the
+rhythms of what repeats (the face's breath and pulse, a blink, a spin); a unit test holds every transition and
+animation to them. The face breathes slowly at rest and pulses while a run works; cards, rows, the slash menu and the
+toasts fade in; a state badge cross-fades. Under the system's reduced-motion setting every transform goes (the
+breath, the pulse, the spinners, the drawer's slide) and the fades stay, so a state change is still seen. The look,
+the scheme and the density you chose are put on the page by a small script in the document's head before the first
+paint, so a held dark scheme never flashes light on the way in; a screenshot tour (`tests/smoke/test_tour.py`)
+photographs every page in both schemes at 1280 and 390 for reading by eye.
 
 While you are elsewhere, the tab title counts the approvals that wait: `(2) New chat · Dot`. Settings › General ›
 Notifications adds
