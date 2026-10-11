@@ -18,3 +18,13 @@ __pycache__/
 desktop/node_modules/
 desktop/src-tauri/target/
 desktop/src-tauri/gen/
+
+# Never tracked: the owner's working notes and reports, local data, logs, the real config
+PLAN.md
+reports/
+config.toml
+*.sqlite3
+*.sqlite3-*
+*.db
+*.log
+.DS_Store
