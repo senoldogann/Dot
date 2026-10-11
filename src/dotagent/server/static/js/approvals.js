@@ -82,6 +82,21 @@ function takeoverOffer(runId) {
   return el("div", { class: "row takeover-offer" }, button, text);
 }
 
+/**
+ * The way from an approval to a rule (item 110): the Rules page with a sentence in its box that names the tool and the
+ * action, for the owner to change before Dot drafts the rule.
+ */
+function ruleOffer(approval) {
+  const action = typeof approval.args.summary === "string" ? approval.args.summary : approval.summary;
+  const sentence = `Let Dot use ${approval.tool} for this without asking me: ${clip(action, 300)}`;
+  return el(
+    "a",
+    { class: "approval-rule", href: `#/settings/rules?sentence=${encodeURIComponent(sentence)}` },
+    icon("shield"),
+    "Make a rule of this",
+  );
+}
+
 /** The parts of a card that are there: `replaceChildren` would turn a part left out (null) into the text "null". */
 function present(...parts) {
   return parts.filter((part) => part !== null);
@@ -208,6 +223,7 @@ export function approvalCard({ approval, heading, onSettled, leftNote }) {
         el("div", { class: "approval-text" }, text),
         isLeft ? el("div", { class: "small muted" }, leftNote) : null,
         isQuestion ? options : technicalDetails(approval.args),
+        isQuestion || isHandoff ? null : ruleOffer(approval),
         isHandoff && approval.status === "pending" && approval.tool.startsWith("browser_") ? takeoverOffer(approval.runId) : null,
         el(
           "div",

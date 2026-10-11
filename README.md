@@ -399,8 +399,17 @@ currency. Empty by default.
    decides, with one of four answers: *do it* (`allow`), *do it, whatever it has read* (`preapproved`: the question
    untrusted content raises is skipped too), *ask me first* (`ask`) or *hand it to me* (`handoff`: Dot stops, says what
    it needs done and waits; on a browser step you can take the browser over, do it and give it back; when you say you
-   did it, the run goes on from there). A rule reads as a sentence in Settings › Rules, "When Dot would use `shell`,
-   matching `^git push`: ask me first", and is managed there or through `/api/rules`.
+   did it, the run goes on from there). The expression is searched, case-insensitive, in the action's one-line summary
+   (a shell command's starts with `Run: `), a line break and its target (the command, the path, the address). A rule
+   reads as a sentence in Settings › Rules, "When Dot would use `shell`, matching `\bgit push\b`: ask me first", and
+   is managed there or through `/api/rules`. It can also be said in your own words ("let Dot run git status and git
+   diff without asking me"): the review model drafts its parts, the tool, the answer and the commands or words the
+   action must mention, and Dot writes the expression from them, so that a rule that lets Dot run a command fits it
+   run alone with plain arguments (after a `cd` at most; nothing chained to it, substituted into it or sent on with
+   `|` or `>`), and a rule that stops Dot fits the command or the word wherever the action mentions it, as a whole
+   word (`x.com` does not fit `netflix.com`). The draft fills the form, its description the sentence the rule reads
+   back as ("For “git status” run alone in the shell, …: Dot does it without asking."), and applies once you add it.
+   An approval card offers *Make a rule of this*, which opens the tab with a sentence about the action in the box.
 5. *The preset* decides everything that is left:
 
 | Preset                 | Asks before                                                                                                                 |
@@ -1062,6 +1071,7 @@ The REST API (all under `/api`; bodies and replies are JSON, event streams are s
 | `GET /threads?limit=N`, `DELETE /threads` (`{"ids": […]}`)                      | the chats, newest activity first; delete some with their runs (409 with the ids while one has a run under way) |
 | `GET /approvals`, `POST /approvals/{id}/decision`                               | pending approvals; answer one                                |
 | `GET\|POST /rules`, `PATCH\|DELETE /rules/{id}`                                 | custom policy rules                                          |
+| `POST /rules/draft` (`{"sentence": …}`)                                         | a rule drafted from your words, not kept (422 with the model's reason when the words make no rule) |
 | `GET /memories`, `GET /memories/search`, `POST /memories`, `PATCH\|DELETE /memories/{id}` | notes                                             |
 | `GET\|POST /schedules`, `GET\|PATCH /schedules/{id}`, `POST /schedules/{id}/enable\|disable`, `DELETE /schedules/{id}` | schedules (`PATCH` takes the whole schedule) |
 | `GET\|POST\|DELETE /failsafe`, `GET /images/{name}`                             | emergency stop; screenshots of runs                          |

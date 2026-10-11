@@ -12,9 +12,9 @@ from dotagent.core.types import FrozenModel, JsonObject
 log = get_logger(__name__)
 
 # What a model call is for: a step of a run, the summary of a compaction, a judgement of the review model (an approval
-# in auto mode, the goal check, the progress consultant's second opinion, the lessons), a description of images for a
-# model that cannot see (of a tool's result or of an attachment), a side question (/btw), or a question of the run to
-# one of its helper models (the consult tool).
+# in auto mode, the goal check, the progress consultant's second opinion, the lessons, a rule drafted from the owner's
+# words), a description of images for a model that cannot see (of a tool's result or of an attachment), a side
+# question (/btw), or a question of the run to one of its helper models (the consult tool).
 type CallPurpose = Literal[
     "step",
     "compaction",
@@ -24,6 +24,7 @@ type CallPurpose = Literal[
     "lessons",
     "playbook",
     "owner",
+    "rule_draft",
     "extract",
     "vision",
     "attachment",

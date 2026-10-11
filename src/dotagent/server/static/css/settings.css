@@ -247,6 +247,82 @@
   }
 }
 
+/* The rule in your own words (item 110): the sentences to start from are soft pills under the box; on the line of
+   the Draft button, what the draft says: the read-back in the text colour, or why no rule came of the words. */
+.rule-examples {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.rule-example {
+  min-height: 28px;
+  padding: 4px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  background: var(--surface-2);
+  color: var(--text-2);
+  font-size: var(--text-sm);
+  line-height: var(--leading-sm);
+  text-align: left;
+  cursor: pointer;
+  transition:
+    color var(--motion-quick) var(--ease),
+    border-color var(--motion-quick) var(--ease);
+}
+
+.rule-example:hover {
+  color: var(--text);
+  border-color: var(--border-strong);
+}
+
+/* The Draft button keeps the end of its line; what the draft said takes the rest, or the line above it on a phone. */
+.rule-words-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: flex-end;
+  gap: 8px 16px;
+}
+
+.rule-outcome {
+  display: flex;
+  flex: 1 1 240px;
+  align-items: flex-start;
+  gap: 8px;
+  min-width: 0;
+  padding-top: 8px;
+  font-size: var(--text-sm);
+  line-height: var(--leading-sm);
+  color: var(--muted);
+}
+
+.rule-outcome .icon,
+.rule-outcome .spinner {
+  flex: none;
+  margin-top: var(--space-half);
+}
+
+.rule-outcome.ok .icon {
+  color: var(--ok);
+}
+
+.rule-outcome.bad {
+  color: var(--bad);
+}
+
+/* The order of the rules: its name, and under it the one line on how they are read. */
+.rule-order {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.rule-readback {
+  color: var(--text);
+  font-weight: var(--weight-label);
+}
+
 /* The name field of Settings › General sits at the end of its row, like a switch would. */
 .name-input {
   max-width: 220px;

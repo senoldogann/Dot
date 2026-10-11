@@ -5029,8 +5029,8 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 106 | The review: every feature of parts 1 to 13 read once more, the characters' cost measured | done        | 8e3818d |
 | 107 | The fixes of the second look: the still face follows, the favicon freed, TLS reads retried, the sidebar's head and order | done        | 6c79636 |
 | 108 | The composer with marks: a mark per provider, an icon on every pill, the reasoning as its own pill | done        | 108c91d |
-| 109 | Dot's computer as a stage: a frame with a size, the control under it, the character at the head of the chat | in progress |         |
-| 110 | Rules in plain words: the model writes the rule, an approval card offers one        | planned     |         |
+| 109 | Dot's computer as a stage: a frame with a size, the control under it, the character at the head of the chat | done        | b5d42c0 |
+| 110 | Rules in plain words: the model writes the rule, an approval card offers one        | in progress |         |
 | 111 | The review: part 14 read once more                                                  | planned     |         |
 
 ### 77. The type system: Inter and Geist Mono, seven sizes, three weights
@@ -6269,7 +6269,7 @@ in the label weight. README: New chat, the design system's controls. Tests: `tes
 
 ### 109. Dot's computer as a stage: a frame with a size, the control under it, the character at the head of the chat
 
-**Status: in progress.**
+**Status: done.** Merged as `b5d42c0` (PR #129, MYP-249 Done).
 
 **Design, as built (2026-10-12).** The size is the side panel's, since the view grows with the panel it lives in:
 `stagesize.js` keeps `dot.computer.size` (`compact`, `wide`, `full`, or the width in px of a drag) and puts it on the
@@ -6306,7 +6306,35 @@ the tour shoots the run page at the wide size.
 
 ### 110. Rules in plain words: the model writes the rule, an approval card offers one
 
-**Status: planned.**
+**Status: in progress.**
+
+**Design, as built (2026-10-12).** The model never writes the pattern. `POST /api/rules/draft` (`{"sentence"}`) asks the
+review model (`[models] review`, call purpose `rule_draft`, outside any run) for the parts of a rule in one forced call
+of `draft_rule` (`policy/drafting.py`, `RuleDraft`): the tool, a name or a glob from the daemon's tools, each listed
+with the first sentence of its description; the answer; the shell commands the rule is about or the words the action
+must mention; and `problem`, why no rule can be made of the words. `rule_from_draft` writes the pattern to fit what
+`match_rule` searches (the summary, a line break, the target) and to err on the side of the answer: a rule that lets Dot
+act fits each command alone with plain arguments, after a `cd` at most (anchored on the target's one line; a command
+with `;`, `&`, `|`, a backtick, `$`, `<`, `>`, `(` or `)` is refused), a rule that stops Dot fits a command or a word
+anywhere, as a whole word (`x.com` not inside `netflix.com`). A draft whose glob fits no tool, that gives commands for
+another tool than the shell or with mentions, or a command that is not plain, is asked for once more like a reply that
+is not a verdict (`_decide_checked` in `agent/review.py`); a `problem` is answered 422 with the model's sentence. The
+drafted rule's description is the sentence it reads back as, written in code as well ("For “git status” or “git diff”
+run alone in the shell, with plain arguments (after a cd at most): Dot does it without asking."), so the list says in
+words what a long pattern fits; a pattern past 40 characters is cut in the sentence a rule reads as, whole in its
+tooltip and in the form. The plan's model-written "why" and read-back line became this one sentence. The Rules tab opens
+with "Say the rule in your words": the box, three sentences to start from, Draft the rule (also ⌘/Ctrl-Enter), and on
+the button's line the read-back or the model's reason; the draft fills the form below and the focus goes to Add rule,
+and the box empties once the rule is added. The plan's form prefilled from an approval's arguments became a sentence:
+"Make a rule of this", under the action of an approval card (not a question or a hand-off), opens
+`#/settings/rules?sentence=Let Dot use {tool} for this without asking me: {summary}` with the sentence in the box, to be
+changed before it is drafted. The line on the order of the rules sits under "Checked in this order". The form's
+placeholder `^git (status|diff|log)` and the README's `^git push` never fitted a shell action, whose summary starts with
+"Run: ": they read `\bgit (status|diff|log)\b` and `\bgit push\b` now, and the field's hint says what is searched.
+Tests: `tests/unit/test_rule_drafting.py` (the patterns against the shell tool's own description of a command through
+`match_rule`, the checks, the read-back, the drafter's second ask and its `problem` with a scripted reply);
+`tests/smoke/test_rules.py` (no rule from a question about the weather, a git rule drafted, read back, filled and added,
+the box emptied, the phone in dark, and the approval card's offer opening the tab with its sentence).
 
 **What.** `POST /api/rules/draft` takes a sentence ("let Dot run git status and git diff without asking", "always
 ask me before it posts on X") and returns a `RuleRequest` drafted by the fast model with a typed reply (tool glob,
@@ -6862,3 +6890,4 @@ built.
 - 2026-10-11 (Fable 5.1): part 14 planned, items 107 to 111, from the owner's five screenshots and the readings of the daemon's log and the look card; no code changed. Start with the handoff prompt under "How to start part 14".
 - 2026-10-12 (Opus 5.5): item 107 merged as `6c79636` (PR #127, MYP-247 Done): a still character follows a shape or an expression set, the note under Faces that move while the system reduces motion, the favicon allowed by the page's policy (`img-src data:`), `ssl.SSLError` retried as a transport failure (the owner's "bad record mac" came from the network path to OpenCode Go, not from Dot's code), the sidebar's search above New chat and its desktop head on the traffic lights' line.
 - 2026-10-12 (Opus 5.5): item 108 merged as `108c91d` (PR #128, MYP-248 Done): the providers' marks (Simple Icons and Lobe Icons, licences in `static/icons/providers/LICENSE`) as masks in the scheme's ink, an icon on every pill of the composer, the mode and the reasoning as pills of their own, hairlines between them, the attach button beside the send.
+- 2026-10-12 (Opus 5.5): item 109 merged as `b5d42c0` (PR #129, MYP-249 Done): the computer's panel in three sizes and a drag handle kept per browser (`stagesize.js`), the control pill under the view naming the actor, the character with its name and the word of its state at the head of the chat while the panel is wide or full.

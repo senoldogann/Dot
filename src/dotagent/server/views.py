@@ -146,6 +146,12 @@ class RuleRequest(FrozenModel):
     description: str = Field(max_length=300)
 
 
+class RuleDraftRequest(FrozenModel):
+    """A rule in the owner's own words, for the review model to draft (item 110)."""
+
+    sentence: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=500)]
+
+
 class RuleEnabledRequest(FrozenModel):
     enabled: bool
 
