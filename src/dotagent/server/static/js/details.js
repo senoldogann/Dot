@@ -20,8 +20,8 @@ export function createDetails(run) {
   const status = el("dd");
   const model = el("dd");
   const turns = el("dd");
-  const calls = el("dd");
-  const tokens = el("dd");
+  const calls = el("dd", { class: "meta-facts" });
+  const tokens = el("dd", { class: "meta-facts" });
   const took = el("dd");
   const copy = el(
     "button",
@@ -73,10 +73,10 @@ export function createDetails(run) {
     status.replaceChildren(statusBadge(state.status));
     model.textContent = state.model === "" ? "Default" : modelName(state.model);
     model.title = state.model;
-    card.setSummary(`${state.status} · ${model.textContent}`);
+    card.setSummary(el("span", null, state.status), el("span", null, model.textContent));
     turns.textContent = String(state.steps);
-    calls.textContent = state.failed === 0 ? String(state.calls) : `${state.calls} · ${state.failed} failed`;
-    tokens.textContent = `${compact(state.input)} in · ${compact(state.output)} out`;
+    calls.replaceChildren(...[el("span", null, String(state.calls)), ...(state.failed === 0 ? [] : [el("span", null, `${state.failed} failed`)])]);
+    tokens.replaceChildren(el("span", null, `${compact(state.input)} in`), el("span", null, `${compact(state.output)} out`));
     const end = state.finishedAt === null ? Date.now() / 1000 : state.finishedAt;
     took.textContent = duration(Math.max(0, end - run.created_at));
   }

@@ -154,6 +154,12 @@ async def _shoot(context: BrowserContext, base: str, pages: tuple[tuple[str, str
         )
         assert faces[0].startswith('"Inter"') or faces[0].startswith("Inter"), faces
         await page.screenshot(path=str(out / f"{tag}-{name}.png"), full_page=False)
+        if name == "run":
+            # The side panel with its Details card open (item 84): on a wide window beside the chat, on a phone a drawer.
+            await page.get_by_role("button", name="Run details").click()
+            await page.locator(".inspector .fold-toggle", has_text="Details").click()
+            await page.wait_for_timeout(_SETTLE_MS)
+            await page.screenshot(path=str(out / f"{tag}-run-panel.png"), full_page=False)
     await page.close()
 
 
@@ -195,7 +201,7 @@ async def test_every_page_in_both_schemes_at_both_widths(
         finally:
             await browser.close()
     shots: list[Path] = await asyncio.to_thread(lambda: sorted(out.glob("*.png")))
-    assert len(shots) == len(_SCHEMES) * len(_SIZES) * (len(pages) + 1)
+    assert len(shots) == len(_SCHEMES) * len(_SIZES) * (len(pages) + 2)
     print(f"\ntour: {out}")
 
 
