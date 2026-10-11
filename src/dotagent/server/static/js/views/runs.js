@@ -60,11 +60,34 @@ function buildComposer(ctx) {
   const standing = standingPicker((on) => goalMode.setAvailable(!on));
   // A chat has no goal to check, so the goal switch only belongs to the other two kinds of run; only a task keeps going.
   function modePicked(id) {
-    standing.setAvailable(id === "task");
+    standing.setAvailable(id === "task" && agent.value === "");
     goalMode.setAvailable(id !== "chat" && !standing.value());
     goal.focus();
   }
   const mode = segmented(MODES, "task", modePicked);
+  // The agent the run is for (item 86): Dot, or one the owner made; the menu only shows once an agent exists. A
+  // campaign is Dot's own work, so Keep going hides while an agent is picked.
+  const agentOption = el("option", { value: "" }, "Dot");
+  const agent = el("select", { class: "select sm", "aria-label": "Agent" }, agentOption);
+  const agentPick = pick("Agent", agent);
+  agentPick.hidden = true;
+  let agents = [];
+  function agentPicked() {
+    const chosen = agents.find((candidate) => candidate.id === agent.value) ?? null;
+    goal.placeholder = chosen === null ? "Message Dot" : `Message ${chosen.name}`;
+    standing.setAvailable(chosen === null && mode.value() === "task");
+  }
+  agent.addEventListener("change", agentPicked);
+  api
+    .get("/agents")
+    .then((summaries) => {
+      agents = summaries.map((summary) => summary.record).filter((record) => record.id !== "dot");
+      agent.append(...agents.map((record) => el("option", { value: record.id }, record.name)));
+      agentPick.hidden = agents.length === 0;
+    })
+    .catch((error) => {
+      console.warn("the agents could not be listed", error);
+    });
   const defaultOption = el("option", { value: "" });
   const model = el("select", { class: "select sm", "aria-label": "Model" }, defaultOption);
   const reasoning = el("span", { class: "composer-reasoning", hidden: true });
@@ -158,6 +181,7 @@ function buildComposer(ctx) {
           standing: standing.value(),
           thread_id: null,
           attachments: attachments.ids(),
+          agent_id: agent.value === "" ? null : agent.value,
         });
         attachments.clear();
         ctx.navigate(`/runs/${created.id}`);
@@ -223,7 +247,7 @@ function buildComposer(ctx) {
     el(
       "div",
       { class: "composer-bar" },
-      el("div", { class: "composer-options" }, attachments.button, mode.element, pick("Model", model), reasoning, moreButton),
+      el("div", { class: "composer-options" }, attachments.button, mode.element, agentPick, pick("Model", model), reasoning, moreButton),
       start,
     ),
     more,

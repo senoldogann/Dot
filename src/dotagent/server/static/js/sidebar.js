@@ -187,6 +187,7 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
   );
   let activity = null;
   const activityNav = el("nav", { class: "side-activity-nav", "aria-label": "Activity", hidden: true });
+  const agentsLink = el("a", { class: "side-link", href: "#/agents", onclick: onNavigate }, icon("user"), el("span", null, "Agents"));
   const activityLink = el("a", { class: "side-link", href: "#/activity", onclick: onNavigate }, icon("bolt"), el("span", null, "Activity"));
   const campaignsLink = el("a", { class: "side-link", href: "#/campaigns", onclick: onNavigate }, icon("target"), el("span", null, "Campaigns"));
   const settingsLink = el("a", { class: "side-link", href: "#/settings", onclick: onNavigate }, icon("sliders"), el("span", null, "Settings"));
@@ -579,7 +580,7 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
       activityNav,
       el("nav", { class: "side-recent", "aria-label": "Chats" }, head, bar, list),
     ),
-    el("div", { class: "side-foot" }, activityLink, campaignsLink, settingsLink),
+    el("div", { class: "side-foot" }, agentsLink, activityLink, campaignsLink, settingsLink),
   );
 
   return {
@@ -592,6 +593,7 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
       close.focus();
     },
     setRoute({ tab, runId }) {
+      mark(agentsLink, tab === "agents");
       mark(activityLink, tab === "activity");
       mark(campaignsLink, tab === "campaigns");
       mark(settingsLink, tab === "settings");

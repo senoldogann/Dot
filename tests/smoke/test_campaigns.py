@@ -411,6 +411,7 @@ async def test_a_session_the_daemon_cut_off_is_not_resumed_and_the_next_session_
             "ask",
             False,
             campaign.id,
+            None,
         )
         await store.set_run_status(cut.id, "running")
         # What the daemon does when it starts again after it died while the session ran.

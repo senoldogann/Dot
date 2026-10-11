@@ -20,6 +20,14 @@ from dotagent.tools.meta import ASK_USER_TOOL, USE_TOOLS_TOOL
 from dotagent.tools.skill import SKILL_TOOL
 
 
+class AgentBrief(FrozenModel):
+    """What the prompt says of the agent a run belongs to (item 86)."""
+
+    name: str
+    role: str
+    instructions: str
+
+
 class PromptInputs(FrozenModel):
     mode: RunMode
     source: str
@@ -41,6 +49,8 @@ class PromptInputs(FrozenModel):
     campaign_session: int | None
     # The helper models that could answer when the run started, in the order they are asked.
     helpers: tuple[str, ...]
+    # The agent the run belongs to (item 86): its name, role and instructions open the prompt; None for Dot.
+    agent: AgentBrief | None
 
 
 _MODE_TEXT: dict[RunMode, str] = {
@@ -446,6 +456,7 @@ def clock_note(now: datetime) -> str:
 
 def build_system_prompt(inputs: PromptInputs) -> str:
     sections: list[str] = [
+        _agent_section(inputs.agent),
         f"{_WORK}\n{_ending(inputs.mode, inputs.campaign_session)}",
         f"{_REST}\n- {_SECRETS_ENTERED if inputs.approvals == 'yolo' else _SECRETS_REFUSED}\n{_CLOSING}",
         _mcp_section(inputs.tool_names),
@@ -457,6 +468,18 @@ def build_system_prompt(inputs: PromptInputs) -> str:
         _memory_section(inputs.memories),
     ]
     return "\n\n".join(section for section in sections if section)
+
+
+def _agent_section(agent: AgentBrief | None) -> str:
+    """The agent's own voice, first: who it is and what the owner told it (item 86)."""
+    if agent is None:
+        return ""
+    lines: list[str] = [f"You are {agent.name}, an agent the owner made: {agent.role}".rstrip(": ") + "."]
+    if agent.instructions.strip():
+        lines.append(
+            f"The owner's instructions to you, which you follow within the rules below:\n{agent.instructions.strip()}"
+        )
+    return "\n".join(lines)
 
 
 def collect_prompt_inputs(
@@ -472,6 +495,7 @@ def collect_prompt_inputs(
     skills: Sequence[Skill],
     campaign_session: int | None,
     helpers: Sequence[str],
+    agent: AgentBrief | None,
 ) -> PromptInputs:
     """Gather the facts about this machine and moment that the prompt states."""
     return PromptInputs(
@@ -491,4 +515,5 @@ def collect_prompt_inputs(
         skills=tuple(skills),
         campaign_session=campaign_session,
         helpers=tuple(helpers),
+        agent=agent,
     )

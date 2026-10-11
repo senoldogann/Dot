@@ -13,7 +13,9 @@ from dotagent.store.models import ThreadRecord
 
 async def _runs_and_thread(store: Store) -> tuple[ThreadRecord, str]:
     thread: ThreadRecord = await store.create_thread("t", "test")
-    run = await store.create_run(thread.id, "goal", "task", "ollama:m", None, "test", "medium", "ask", False, None)
+    run = await store.create_run(
+        thread.id, "goal", "task", "ollama:m", None, "test", "medium", "ask", False, None, None
+    )
     return thread, run.id
 
 

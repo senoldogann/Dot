@@ -9,7 +9,7 @@ from dotagent.store.models import EventRecord, RunRecord, RunStatus, ThreadRecor
 
 async def _run_with_status(store: Store, thread: ThreadRecord, status: RunStatus) -> RunRecord:
     run: RunRecord = await store.create_run(
-        thread.id, "goal", "task", "ollama:m", None, "test", "medium", "ask", False, None
+        thread.id, "goal", "task", "ollama:m", None, "test", "medium", "ask", False, None, None
     )
     await store.set_run_status(run.id, status)
     return run

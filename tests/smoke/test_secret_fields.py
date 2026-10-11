@@ -117,7 +117,7 @@ async def _context(runtime: Runtime, approvals: ApprovalMode) -> tuple[ToolConte
     """A run of ``approvals`` in the store, its gate and the context its tools get."""
     thread: ThreadRecord = await runtime.store.create_thread("secret fields", "test")
     run: RunRecord = await runtime.store.create_run(
-        thread.id, GOAL, "task", "ollama:none", None, "test", "medium", approvals, False, None
+        thread.id, GOAL, "task", "ollama:none", None, "test", "medium", approvals, False, None, None
     )
     gate: RunGate = RunGate(
         runtime.store,

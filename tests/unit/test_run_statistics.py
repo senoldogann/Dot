@@ -37,7 +37,7 @@ async def _run(
     store: Store, thread_id: str, model: str, status: RunStatus, result: str, steps: int, tokens: int
 ) -> RunRecord:
     run: RunRecord = await store.create_run(
-        thread_id, "goal", "task", model, None, "test", "medium", "ask", False, None
+        thread_id, "goal", "task", model, None, "test", "medium", "ask", False, None, None
     )
     await store.set_run_steps(run.id, steps)
     await store.add_run_tokens(run.id, tokens, tokens // 10)

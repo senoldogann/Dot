@@ -37,7 +37,7 @@ from dotagent.server.views import (
     UndoRequest,
 )
 from dotagent.store.db import Store
-from dotagent.store.models import ApprovalRecord, CampaignRecord, EventRecord, RunRecord
+from dotagent.store.models import AgentRecord, ApprovalRecord, CampaignRecord, EventRecord, RunRecord
 from dotagent.store.stats import RunCosts
 from dotagent.undo.runs import UndoPlan, active_run_ids, plan_for, runs_with_children, undo_path
 
@@ -73,6 +73,7 @@ def runs_router(ctx: ServerContext) -> APIRouter:
             questions=await store.list_left_questions(run_id),
             campaign=await campaign_of(run),
             held=ctx.manager.held(run_id),
+            agent=None if run.agent_id is None else await store.get_agent(run.agent_id),
         )
 
     @router.get("/runs")
@@ -97,6 +98,20 @@ def runs_router(ctx: ServerContext) -> APIRouter:
                 request.goal_mode,
                 files,
                 request.browser,
+            )
+        if request.agent_id is not None:
+            agent: AgentRecord = await store.get_agent(request.agent_id)
+            return await ctx.manager.start_for_agent(
+                agent,
+                request.goal,
+                request.mode,
+                request.model,
+                request.thread_id,
+                UI_SOURCE,
+                request.effort,
+                request.approvals,
+                request.goal_mode,
+                files,
             )
         return await ctx.manager.start(
             request.goal,

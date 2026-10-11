@@ -2978,3 +2978,78 @@ dialog.lightbox img {
   color: var(--text);
   background: var(--surface-2);
 }
+
+/* ---------- agents (item 86) ---------- */
+
+/* An agent's row is one link: the face, the name over the newest chat or the role, and when that chat started. */
+.agent-row {
+  align-items: center;
+  color: inherit;
+}
+
+.agent-row:hover {
+  background: color-mix(in srgb, var(--text) 3%, transparent);
+  text-decoration: none;
+}
+
+.agent-row .row-text {
+  margin-top: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.agent-when {
+  flex: none;
+  color: var(--muted);
+  font-size: var(--text-sm);
+}
+
+/* The agent's greeting sits over its composer like Dot's on the home page, with its chats under them. */
+.agent-page {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.agent-top {
+  gap: 24px;
+  padding-top: 24px;
+}
+
+.agent-who .home-greeting {
+  font-size: var(--text-md);
+}
+
+/* The tools an agent may use: one checkbox chip per tool, wrapping. */
+.tool-picks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.tool-pick {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 12px 4px 8px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-control);
+  background: var(--surface);
+  font-size: var(--text-sm);
+  cursor: pointer;
+}
+
+.tool-pick:has(input:checked) {
+  border-color: var(--accent);
+  background: var(--accent-weak);
+}
+
+.tool-pick input {
+  margin: 0;
+  accent-color: var(--accent);
+}
+
+.cluster.end {
+  justify-content: flex-end;
+}
