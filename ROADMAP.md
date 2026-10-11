@@ -5033,6 +5033,10 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 110 | Rules in plain words: the model writes the rule, an approval card offers one        | done        | 6da73c4 |
 | 111 | The review: part 14 read once more                                                  | done        | 5d96935 |
 | 112 | Both eyes move: one key per eye in the character's drawing                          | done        | 392132c |
+| 113 | The quiet head: no character card at the head of the chat, no brand in the sidebar  | planned     |         |
+| 114 | Dot's mark and its opening: a dot that looks, the wordmark, the icons, a bounce at launch | planned     |         |
+| 115 | The composer once more: one bar that never wraps, labels that fold, a quiet warning | planned     |         |
+| 116 | The deep review: every part of the code read once more, and fixed                   | planned     |         |
 
 ### 77. The type system: Inter and Geist Mono, seven sizes, three weights
 
@@ -6428,6 +6432,99 @@ size, neither of them the neutral's (before the fix the first eye's matrix was t
 test counted the orbit's ring gradients at once, before the first ring enters some 50 ms after the mount, and failed
 whenever the page opened faster than that; it now waits for the first.
 
+## Part 15: the finish: a quiet head, Dot's own mark and its opening, the composer once more, a deep review (planned 2026-10-12)
+
+The owner's fifteenth word, on 2026-10-12, after part 14, with two screenshots (the card at the head of a run's
+conversation, Dot's character with “Failed” under its name; the home's composer with its five pills, the last fallen to
+a line of its own): the SSL error once more, OpenCode Go's or not; the character card at the head of the chat is not
+needed; the Dot icon and name at the top of the sidebar go; a new logo for Dot, drawn as SVG and used where one is
+needed; a short opening when the app starts, the icons coming in with a bounce; the composer still does not look good,
+research the best structure on the web if need be; then a deep code review that fixes what it finds, and the project is
+finished: the owner starts testing, new features come later. Design matters, in every part.
+
+**Status (2026-10-12): planned.** What is built today, and what the readings found: the SSL crash the owner saw (run
+`run_mv4gcno3_2ef1f7`, 02:28:55) ran on the daemon of part 13 (`f48e2b5`), thirteen minutes before the restart at 02:41
+put item 107's retry in place; its traceback is the one item 107 caught (a TLS read of the response's head in
+`stream_model_reply`), which `tests/unit/test_transport_retry.py` holds, so only the answer changes. The run page shows
+its agent's character with its name and the word of its state (`charactercard.js`, items 103 and 109) at the head of the
+conversation while the panel is wide, at the head of the panel otherwise. The sidebar's head, and the top bar with the
+sidebar away, carry the brand: the ring-and-core glyph (`icons.js brandMark`) and the name. The same glyph is the static
+favicon, the sign-in card's, the desktop shell's page for a daemon that is down and, rendered by
+`desktop/icons/render.py`, the app's icon, its menu bar icons and the web app's; nothing plays when the app opens. The
+composer's bar wraps its pills (`.composer-options` has `flex-wrap: wrap`): at the owner's width the fifth pill falls to
+a line of its own behind a stray hairline; the agent pill keeps a wide gap before its chevron; YOLO wears a fill and a
+border in the warn colour; the box is 84 px tall before a word is typed; the goal mode's hint is a two-line paragraph
+inside the frame.
+
+**The shape of this part (the decisions).** First the quiet head: the character card leaves the run page (the state
+stays in the top bar's face and badge), the brand leaves the sidebar and the top bar. Then Dot's own mark: a dot that
+looks, a yellow disc with two capsule eyes after the character's own, and a wordmark in which it is the o of “dot”, set
+between the stems of a d and a t drawn in one line. The mark is the favicon, the app's icon on a dark tile, the menu
+bar's and the web app's icons; the wordmark heads the sign-in card and the desktop shell's page. The opening plays the
+wordmark in about a second when the app starts: the d and the t hop up, the dot drops in, bounces and opens its eyes;
+once per window, skipped by a click or a key, not at all when the system reduces motion, and it never holds the app
+back. The composer is rebuilt on a research of open composers (Vercel's chatbot, Open WebUI, assistant-ui, measured from
+their code): one bar that never wraps, the labels folding to icons as the frame narrows, a rounder frame, a box of one
+line that grows, the risky approvals as a quiet warn-coloured dot and word, the goal's hint one line under the frame.
+Last, the deep review: four readers, each on a part of the code, every finding checked by hand before it is fixed. After
+it Dot is finished as a product to test: no new feature until the owner's testing asks for one.
+
+### How to start part 15 (the handoff prompt)
+
+> Read ROADMAP.md part 15 and the status table of part 9 (rows 113 to 116). One item at a time, in order; the protocol
+> of part 5 (branch, gate, PR, Linear MYP issue, squash merge, hash in the table, log line) is unchanged. Never touch
+> the owner's data directory except to read it and to restart the daemon when `/api/status` shows no active run; the
+> owner's goals stay out of this file; PLAN.md stays untracked. The owner reads Turkish; everything written is English.
+> Every UI item ends with the screenshot tour read by eye.
+
+### 113. The quiet head: no character card at the head of the chat, no brand in the sidebar
+
+**Status: planned.**
+
+**What.** The run page loses the character card (`charactercard.js`, and `mood.js` if nothing else reads it, with their
+CSS and their tests): the run's state stays in the top bar's face and badge, the timeline keeps its turn faces, the home
+keeps its moving face. The sidebar's head keeps its toggle alone (on the traffic lights' line in the desktop shell); the
+top bar with the sidebar away drops the brand too. README where a line changes. Tests: the tour, `test_face.py`.
+
+### 114. Dot's mark and its opening: a dot that looks, the wordmark, the icons, a bounce at launch
+
+**Status: planned.**
+
+**What.** The mark: a yellow disc with two capsule eyes looking up and to the right, after the character's rest pose,
+drawn on a grid that holds at 16 px. The wordmark: “dot” with the mark as its o, between a d and a t drawn in one line
+with round ends, in ink. Where they go: the static favicon (the tab's live icon stays the character in its state), the
+sign-in card, the desktop shell's page for a daemon that is down, the app's icon (the mark on a dark rounded tile), the
+three menu bar icons and the web app's icons, rendered by `desktop/icons/render.py` from the same SVG. The opening: the
+wordmark in the middle of the window over the page's ground; the d and the t hop up, the dot drops in, squashes on two
+bounces and opens its eyes, then all of it fades into the app. About a second in all, CSS keyframes on motion tokens,
+once per window session (so on every launch of the desktop shell), skipped by any click or key, not played under Reduce
+motion, hidden from screen readers and transparent to the pointer, so it never holds the app back. Tests: a smoke test
+that sees the opening play and leave, and not play under reduced motion or a second time; the tour waits for it.
+
+### 115. The composer once more: one bar that never wraps, labels that fold, a quiet warning
+
+**Status: planned.**
+
+**What.** On the research of 2026-10-12 (Vercel's chatbot `multimodal-input.tsx`, Open WebUI's `MessageInput.svelte`,
+assistant-ui's Composer: radii of 16 to 24 px, a one-line box that grows, controls of 28 to 32 px, a round send in the
+ink with a quiet disabled state): a rounder frame with a hairline, a box of one line that grows, one bar with attach and
+the mode at the left and the agent, the model with its mark, the effort, the approvals and the send at the right. The
+bar never wraps: as the frame narrows the effort and the mode fold to their icons, the model's name gives way with an
+ellipsis, the agent's name goes; the approvals and the send never move. YOLO is a quiet pill, a warn dot and the word,
+no fill. The goal's hint is one line under the frame, its sentence in the pill's menu. The run's dock and the agent's
+page take the same frame. Tests: `test_composer.py` measures the bar on one line at 1280, 800, 560 and 390 px; the tour.
+
+### 116. The deep review: every part of the code read once more, and fixed
+
+**Status: planned.**
+
+**What.** Four readers, each on a part of the code, asked for real defects only (wrong behaviour, crashes, races,
+swallowed errors, leaks, holes in the policy or the auth): the agent and the model calls; the tools, the policy, the
+browser, the desktop and the web; the server, the store, the scheduler and the desktop shell; the interface's code after
+items 113 to 115. Every finding is checked by hand against the code before it is fixed here; what cannot be fixed here
+is written down. Then the whole: the gate, the offline smoke suite, the eval check, the tour read by eye, the daemon
+restarted. Findings as built.
+
 ## Log
 
 - 2026-10-08: roadmap written from the owner's go-ahead for all eight items, in this order. Nothing implemented yet.
@@ -6966,3 +7063,4 @@ whenever the page opened faster than that; it now waits for the first.
 - 2026-10-12 (Opus 5.5): item 110 merged as `6da73c4` (PR #130, MYP-250 Done): a rule said in words, drafted by the review model into its parts (`draft_rule`), the pattern written by Dot so that a rule that lets Dot act fits a command alone and one that stops it fits a word anywhere, read back in a sentence that is the rule's description; the Rules tab's "Say the rule in your words" card, and "Make a rule of this" on an approval card.
 - 2026-10-12 (Opus 5.5): item 111 merged as `5d96935` (PR #131, MYP-251 Done): the tour read by eye by two readers and checked wherever they doubted, the offline smoke suite in full (324 passed, two failures that pass alone), the owner's daemon through the API and its two SSL crashes identified; the panel's fold facts wrap under the title at its compact width, an ended run's computer card says why it is empty, the run composer's placeholder follows the run's state.
 - 2026-10-12 (Opus 5.5): item 112 merged as `392132c` (PR #132, MYP-252 Done): both eyes of every face move again (`sync` hands the key its index, a repeated key is an error), a test that reads each eye on its own, the gallery test waiting for the orbit's first ring. Part 14 built: items 107 to 112. The daemon waits for a restart on `392132c`.
+- 2026-10-12 (Opus 5.5): part 15 planned, items 113 to 116, from the owner's word with two screenshots, the daemon's log (the SSL crash ran before the restart) and a research of open composers; no code changed.
