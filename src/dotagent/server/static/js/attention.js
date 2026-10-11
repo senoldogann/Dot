@@ -1,5 +1,6 @@
-// How Dot gets your attention when you are not looking at the page: the tab title counts the approvals that wait, and
-// desktop notifications (off until you switch them on) say when Dot needs an answer or a run has ended.
+// How Dot gets your attention when you are not looking: the tab title counts the approvals that wait, and desktop
+// notifications (off until you switch them on) say when Dot needs an answer or a run has ended, unless you are looking
+// at that run (its page open, the tab visible, the window active; item 75), or you asked to be told even then.
 
 import { api } from "./api.js";
 import { faceDataUrl, overallState } from "./face.js";
@@ -7,6 +8,8 @@ import { readPref, writePref } from "./prefs.js";
 import { getSnapshot, onChange, onLifecycle } from "./state.js";
 
 const NOTIFY_KEY = "dot.notify";
+// Whether to tell about a run even while its page is in view (item 75); off until switched on.
+const ALWAYS_KEY = "dot.notify.always";
 // Whether this browser is subscribed to the daemon's web push: then the pushes tell, and the page itself stays quiet.
 const PUSH_KEY = "dot.push";
 const BODY_CHARS = 140;
@@ -104,13 +107,30 @@ function shorten(text) {
   return flat.length > BODY_CHARS ? `${flat.slice(0, BODY_CHARS - 1)}…` : flat;
 }
 
-/** Whether nobody is looking at the page: its tab is in the background or its window is not the active one. */
-function awayFromPage() {
-  return document.visibilityState === "hidden" || !document.hasFocus();
+/** Whether to tell about a run even while you are looking at it. */
+export function tellEvenWhenLooking() {
+  return readPref(ALWAYS_KEY) === "on";
 }
 
-function worthATell() {
-  return notificationsOn() && awayFromPage() && readPref(PUSH_KEY) !== "on";
+export function setTellEvenWhenLooking(on) {
+  writePref(ALWAYS_KEY, on ? "on" : "off");
+  return tellEvenWhenLooking();
+}
+
+/** Whether you are looking at the run `runId`: its own page is open (`hash`), the tab is visible and the window is the
+ * active one. Pure, so the rule can be read alone; `lookingAt` reads the page. */
+export function isLooking(runId, { hash, visibility, focused }) {
+  return visibility === "visible" && focused && hash === `#/runs/${runId}`;
+}
+
+function lookingAt(runId) {
+  return isLooking(runId, { hash: location.hash, visibility: document.visibilityState, focused: document.hasFocus() });
+}
+
+/** Whether a notification about `runId` is worth sending: notifications are on, the daemon does not push to this
+ * browser, and you are not looking at the run (or asked to be told even then). The tab title counts either way. */
+function worthATell(runId) {
+  return notificationsOn() && readPref(PUSH_KEY) !== "on" && (tellEvenWhenLooking() || !lookingAt(runId));
 }
 
 /** In the desktop shell the notification is the system's; a click brings Dot to the front, where Waiting for you leads on. */
@@ -136,7 +156,7 @@ function tellAboutApproval(event) {
 
 async function tellAboutEnd(event) {
   const { run } = await api.get(`/runs/${event.run_id}`);
-  if (run.parent_run_id !== null || !worthATell()) {
+  if (run.parent_run_id !== null || !worthATell(run.id)) {
     return;
   }
   tell({
@@ -151,7 +171,7 @@ async function tellAboutEnd(event) {
 /** What a failure to notify costs: nothing but a line in the console, so it never stops the page from updating. */
 function onLifecycleEvent(event) {
   try {
-    if (!worthATell()) {
+    if (!worthATell(event.run_id)) {
       return;
     }
     if (event.kind === "approval_requested") {
