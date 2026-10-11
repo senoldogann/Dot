@@ -264,13 +264,15 @@ lessons = "propose"
 # the same by hand.
 reflection_time = "03:30"
 lesson_rest_days = 60
-# After a goal-mode run of its own that the goal check found achieved and that acted on a web site or an application,
-# the review model distils how it got there into a playbook: a skill folder playbook-<host>/SKILL.md under
-# <home>/playbooks with the steps, the parameters and the evidence, offered to later runs like a skill. One playbook
-# per host; a playbook read by two runs that then failed is retired (moved under .retired) and no longer offered.
-# dotx stats compares the acting steps and seconds of the runs that read a playbook with the runs on the same host
-# that did not. false distils nothing.
+# After a task run of its own that ended done (its answer checked, or its goal found achieved) with at least
+# skill_min_steps acting steps, the review model distils how it got there into a learned skill: a folder
+# learned-<kind>/SKILL.md under <home>/playbooks with the kind of work, the steps, the parameters and the evidence,
+# offered to later runs like a skill and read as advice. A later run of the same kind (matched by meaning) updates the
+# skill instead of writing another. A skill read by two runs that then failed is retired (moved under .retired) and no
+# longer offered; Settings › Skills lists them with Drop. dotx stats counts the skills written, retired and read, and
+# compares the runs that read one on a host with the runs on that host that did not. false distils nothing.
 playbooks = true
+skill_min_steps = 4
 # Before write_file or edit_file changes a file, the run notes the change in its journal, and its first change to a file
 # keeps a copy of the file as it was, so that `dotx undo RUN_ID` can take the changes of the run back. A file larger
 # than undo_max_file_bytes, or one whose copy would bring the copies of the run past undo_max_run_bytes, is changed

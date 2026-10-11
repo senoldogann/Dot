@@ -12,6 +12,7 @@ from dotagent.agent.playbooks import (
     PlaybookMeta,
     acting_digest,
     acting_steps,
+    distils,
     drop_playbook,
     list_playbooks,
     main_site,
@@ -19,7 +20,9 @@ from dotagent.agent.playbooks import (
     read_meta,
     record_use,
     render_playbook,
+    same_kind,
     slug,
+    update_playbook,
     used_playbooks,
     write_playbook,
 )
@@ -57,14 +60,18 @@ EVENTS: tuple[EventRecord, ...] = (
     _result(8, "c4", "browser_open", "other.example.org", True, "Opened"),
     _call(9, "c5", "write_file", {"path": "prices.csv"}),
     _result(10, "c5", "write_file", "", True, "wrote 3 lines"),
-    _call(11, "c6", "skill", {"name": "playbook-shop-example-com"}),
-    _result(12, "c6", "skill", "", True, "Skill playbook-shop-example-com"),
+    _call(11, "c6", "skill", {"name": "learned-find-a-product-s-price"}),
+    _result(12, "c6", "skill", "", True, "Skill learned-find-a-product-s-price"),
     _call(13, "c7", "skill", {"name": "x-twitter-growth"}),
 )
 
 
+KIND: str = "Find a product's price"
+
+
 def _draft() -> PlaybookDraft:
     return PlaybookDraft(
+        kind=KIND,
         description='Search a product on shop.example.com and read its "price" from the first result.',
         when="A goal that asks for the price of a product on shop.example.com.",
         steps=("Open https://shop.example.com/search.", "Fill the search field (ref e7) with <product>."),
@@ -74,7 +81,8 @@ def _draft() -> PlaybookDraft:
 
 def _playbook() -> Playbook:
     return Playbook(
-        name=playbook_name(HOST),
+        name=playbook_name(KIND),
+        kind=KIND,
         host=HOST,
         draft=_draft(),
         run_id="run-1",
@@ -84,19 +92,23 @@ def _playbook() -> Playbook:
     )
 
 
-def test_the_main_site_is_the_one_most_results_name_and_its_steps_make_the_digest() -> None:
+def test_the_main_site_is_the_one_most_results_name_and_every_acting_call_makes_the_digest() -> None:
     assert main_site(EVENTS) == HOST
     assert main_site(EVENTS[8:]) == ""
-    steps = acting_steps(EVENTS, HOST)
+    steps = acting_steps(EVENTS)
+    # The skill reads are not acting; the write on this Mac and the other site's call are.
     assert [(step.tool, step.ok) for step in steps] == [
         ("browser_open", True),
         ("browser_act", False),
         ("browser_act", True),
+        ("browser_open", True),
+        ("write_file", True),
     ]
     digest: str = acting_digest(steps)
     assert digest.startswith('1. browser_open {"url":"https://shop.example.com/search"} -> ok: Opened the search page')
     assert "2. browser_act " in digest and "-> FAILED: e5 is not a text field" in digest
-    assert used_playbooks(EVENTS) == ("playbook-shop-example-com",)
+    assert used_playbooks(EVENTS) == ("learned-find-a-product-s-price",)
+    assert distils("done", len(steps), 4) and not distils("done", len(steps), 6) and not distils("failed", 9, 4)
 
 
 @pytest.mark.parametrize(
@@ -108,28 +120,59 @@ def test_the_main_site_is_the_one_most_results_name_and_its_steps_make_the_diges
         ("", ""),
     ],
 )
-def test_a_host_or_application_becomes_a_skill_name(host: str, expected: str) -> None:
+def test_a_kind_of_work_becomes_a_skill_name(host: str, expected: str) -> None:
     assert slug(host) == expected
 
 
 def test_a_playbook_is_a_skill_the_catalog_loads(tmp_path: Path) -> None:
     file: Path = write_playbook(tmp_path, _playbook())
-    skill: Skill = parse_skill(file, file.read_text(encoding="utf-8"), "playbook")
-    assert skill.name == "playbook-shop-example-com"
+    skill: Skill = parse_skill(file, file.read_text(encoding="utf-8"), "learned")
+    assert skill.name == "learned-find-a-product-s-price"
     assert skill.description == "Search a product on shop.example.com and read its 'price' from the first result."
     assert (
         "## Steps\n\n1. Open https://shop.example.com/search.\n2. Fill the search field (ref e7) with <product>."
         in skill.body
     )
-    assert "- Run: run-1, verified by its goal check on 2023-11-14" in skill.body
-    assert render_playbook(_playbook()).startswith("---\nname: playbook-shop-example-com\n")
-    catalog: SkillCatalog = load_catalog((SkillRoot(path=tmp_path, source="playbook"),))
-    assert [entry.name for entry in catalog.skills] == ["playbook-shop-example-com"] and catalog.problems == ()
+    assert "## Kind of work\n\nFind a product's price\n" in skill.body
+    assert "verified on 2023-11-14" in skill.body and "- Run run-1: 3 acting steps" in skill.body
+    assert render_playbook(_playbook(), None).startswith("---\nname: learned-find-a-product-s-price\n")
+    catalog: SkillCatalog = load_catalog((SkillRoot(path=tmp_path, source="learned"),))
+    assert [entry.name for entry in catalog.skills] == ["learned-find-a-product-s-price"] and catalog.problems == ()
     assert read_meta(file.parent) == PlaybookMeta(
-        name="playbook-shop-example-com", host=HOST, run_id="run-1", written_at=1_700_000_000.0, uses=0, failures=0
+        name="learned-find-a-product-s-price",
+        kind=KIND,
+        host=HOST,
+        runs=("run-1",),
+        acting_steps=(3,),
+        written_at=1_700_000_000.0,
+        updated_at=1_700_000_000.0,
+        uses=0,
+        failures=0,
     )
     with pytest.raises(FileExistsError):
         write_playbook(tmp_path, _playbook())
+    # A later run of the same kind updates the skill: its steps, every run in the evidence, the record kept.
+    later: Playbook = _playbook().model_copy(
+        update={"run_id": "run-2", "acting_steps": 2, "written_at": 1_700_100_000.0}
+    )
+    record_use(tmp_path, later.name, True)
+    update_playbook(tmp_path, later.name, later)
+    body: str = file.read_text(encoding="utf-8")
+    assert "(2 runs, the last one verified on 2023-11-16)" in body
+    assert "- Run run-1: 3 acting steps\n- Run run-2: 2 acting steps\n" in body
+    meta: PlaybookMeta = read_meta(file.parent)
+    assert (meta.runs, meta.acting_steps, meta.uses, meta.updated_at) == (
+        ("run-1", "run-2"),
+        (3, 2),
+        1,
+        1_700_100_000.0,
+    )
+    entries = list_playbooks(tmp_path)
+    assert same_kind("find a PRODUCT'S price", entries, None) is entries[0]
+    assert same_kind("audit an X profile", entries, None) is None
+    # By meaning: the first vector is the new kind's, the rest the entries' in order.
+    assert same_kind("price of a product", entries, [(1.0, 0.0), (0.9, 0.1)]) is entries[0]
+    assert same_kind("price of a product", entries, [(1.0, 0.0), (0.0, 1.0)]) is None
 
 
 def test_a_playbook_that_two_runs_read_and_failed_is_retired_and_no_longer_loaded(tmp_path: Path) -> None:
@@ -142,7 +185,7 @@ def test_a_playbook_that_two_runs_read_and_failed_is_retired_and_no_longer_loade
     assert meta.failures == MAX_FAILURES
     assert not (tmp_path / name).exists()
     assert (tmp_path / RETIRED_DIR / name / SKILL_FILE).is_file()
-    assert load_catalog((SkillRoot(path=tmp_path, source="playbook"),)).skills == ()
+    assert load_catalog((SkillRoot(path=tmp_path, source="learned"),)).skills == ()
     entries = list_playbooks(tmp_path)
     assert [(entry.skill.name, entry.retired, entry.meta.uses) for entry in entries] == [(name, True, 1)]
     assert drop_playbook(tmp_path, name) == tmp_path / RETIRED_DIR / name

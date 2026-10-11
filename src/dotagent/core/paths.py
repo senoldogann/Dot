@@ -90,8 +90,8 @@ def skills_dir() -> Path:
 
 
 def playbooks_dir() -> Path:
-    """Where Dot keeps the playbooks it distilled from runs that reached their goal: one ``playbook-<host>/SKILL.md``
-    folder per host or application, the retired ones under ``.retired``."""
+    """Where Dot keeps the skills it learned from its own runs that went well: one ``learned-<kind>/SKILL.md`` folder
+    per kind of work, the retired ones under ``.retired``."""
     return dot_home() / "playbooks"
 
 

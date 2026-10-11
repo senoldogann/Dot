@@ -5011,8 +5011,8 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 88  | Desktop and web, one interface: the Tauri shell on the same pages         | done        | c4d9b88 |
 | 89  | Learning on, and measured: every note handed to a run is scored by how it ended | done        | a779b72 |
 | 90  | Memory that keeps what helps: the score decides what is recalled, rests, retires | done        | fa775a0 |
-| 91  | Recall by budget: the notes a run starts with fit a token budget, best first     | in progress |         |
-| 92  | Skills from its own work: a task that went well becomes a skill for its kind     | planned     |         |
+| 91  | Recall by budget: the notes a run starts with fit a token budget, best first     | done        | 9222a5d |
+| 92  | Skills from its own work: a task that went well becomes a skill for its kind     | in progress |         |
 | 93  | The owner, in one section: what the reflection knows about how you work         | planned     |         |
 | 94  | An agent learns for itself: lessons, skills and a score per agent                | planned     |         |
 
@@ -5466,7 +5466,7 @@ the resting and the retirement; the reflection smoke extended.
 
 ### 91. Recall by budget: the notes a run starts with fit a token budget, best first
 
-**Status: in progress (2026-10-11).**
+**Status: done.** Merged as `9222a5d` (PR #105, MYP-231 Done).
 
 **Design, as built (2026-10-11).** `[memory] inject_tokens` (1500) and `inject_share` (0.02) replace `inject_top_k`,
 `core_limit` and `user_limit`. `memory_budget(config, context_length)` in `memory/service.py` is the share of the
@@ -5490,7 +5490,31 @@ carries the tokens spent. Tests: unit for the packing; the prompt-size assertion
 
 ### 92. Skills from its own work: a task that went well becomes a skill for the next of its kind
 
-**Status: planned.**
+**Status: in progress (2026-10-11).**
+
+**Design, as built (2026-10-11).** The playbook module (`agent/playbooks.py`, its name kept) writes learned skills
+of any kind of work. The gate: `playbook_case` as before (playbooks on, a task run of its own, not an eval, ended
+done or failed), then `distils(status, steps, min_steps)`: done, with at least `[agent] skill_min_steps` (4) acting
+steps, where `acting_steps(events)` is every tool result but the planning, asking, remembering, consulting,
+skill-reading and finishing tools (`_NOT_ACTING`); goal mode is no longer required, a done end being a checked
+answer or an achieved goal. The review model's `PlaybookDraft` gains `kind` (3 to 60 characters, "as a later run
+would name its own task"), its prompt speaks of work on a site, in an application, in the shell, on files or
+through an API, and the request names where the run acted most (`main_site`, or `NO_SITE` = "this Mac"). The
+skill's folder is `learned-<slug(kind)>` under `<home>/playbooks` (not `<home>/skills/learned` as planned: the
+catalog reads that root as a skills directory of its own, source `learned`, and the folder of before is kept);
+`same_kind(kind, entries, vectors)` finds the active skill of the kind, by cosine at least 0.85 between the kind's
+embedding and each entry's (`runtime.memory.embedder`) or by slug equality without embeddings, and
+`update_playbook` rewrites that skill from the new run (the steps the newer run's, the evidence every run with its
+acting steps, the record kept: `PlaybookMeta` now holds `kind`, `runs`, `acting_steps`, `updated_at`). The SKILL.md
+says it is advice from Dot's own work, to follow with the run's own parameters and judgement; the prompt's note on
+`learned-` skills says the same; `used_playbooks` and the stats query accept both prefixes. The API: `GET
+/api/skills/learned` (active first, then retired; `LearnedSkillView`) and `DELETE /api/skills/learned/{name}`;
+Settings gains a Skills tab (`views/skills.js`: the rows with kind, place, runs, record; Retired apart; Drop with a
+confirm). `dotx playbooks` keeps its name and speaks of learned skills. The playbook comparison of item 89 stays per
+host. Tests: `tests/unit/test_playbooks.py` (every acting call in the digest, the gate, the update with its
+evidence, the kind match by name and by vectors); `tests/smoke/test_learned_skills.py` (a scripted run of three
+acting steps is distilled, the writer saw the steps and the place, the next run's prompt offers the skill as advice,
+a short run is not distilled, the API lists and drops it).
 
 **What.** Playbooks become skills of the agent's own work: after a task run of its own that ended done with the
 goal check's "achieved" or a verified answer, in any mode, that took at least `[agent] skill_min_steps` acting
@@ -6039,3 +6063,4 @@ skills, the score), with the same Drop. Tests: unit for the scoping; the agents 
 - 2026-10-11 (Fable 5.1): item 89 merged as `a779b72` (PR #103, MYP-229 Done): learning on (`propose`, playbooks on) and measured (`memory_uses`, the Learning section of `dotx stats`, the score on the Memory page). The daemon restarted on `a779b72`.
 - 2026-10-11 (Fable 5.1): item 90 merged as `fa775a0` (PR #104, MYP-230 Done): the score lifts, rests and retires the agent's notes. The daemon restarted on `fa775a0`.
 - 2026-10-11 (Fable 5.1): `tests/smoke/test_continuity_live.py` (live, not in CI) had failed since the prompt outgrew its 14k window (the system prompt and the tools are about 18k tokens now); its window is 24k, the three tests pass against the cloud model (fixed with item 91).
+- 2026-10-11 (Fable 5.1): item 91 merged as `9222a5d` (PR #105, MYP-231 Done): the run's starting notes fit a token budget. The daemon restarted on `9222a5d`.

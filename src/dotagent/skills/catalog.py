@@ -22,7 +22,7 @@ class SkillRoot(FrozenModel):
 
 
 # Where a skill that Dot distilled itself was found (:mod:`dotagent.agent.playbooks`).
-PLAYBOOK_SOURCE: str = "playbook"
+PLAYBOOK_SOURCE: str = "learned"
 
 
 def skill_roots(config: SkillsConfig, plugins: Sequence[Plugin], playbooks: Path | None) -> tuple[SkillRoot, ...]:

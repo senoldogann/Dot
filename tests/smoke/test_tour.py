@@ -47,6 +47,7 @@ _PAGES: tuple[tuple[str, str], ...] = (
     ("settings-keys", "#/settings/keys"),
     ("settings-browser", "#/settings/browser"),
     ("settings-rules", "#/settings/rules"),
+    ("settings-skills", "#/settings/skills"),
     ("memory", "#/memory"),
     ("schedules", "#/schedules"),
     ("settings-system", "#/settings/system"),
