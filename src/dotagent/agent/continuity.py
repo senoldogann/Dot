@@ -12,7 +12,7 @@ without a model. Every function here is pure.
 """
 
 import re
-from collections.abc import Sequence
+from collections.abc import Collection, Sequence
 
 from dotagent.agent.plan import PlanPayload, plan_lines
 from dotagent.core.jsonutil import dumps_compact
@@ -42,7 +42,12 @@ _IDENTIFIER: re.Pattern[str] = re.compile(
     r"|(?:~|/Users|/tmp|/private|/var|/opt|/Applications|/Library)(?:/[\w.@+\-]+)+"  # absolute paths
     r"|\b(?:run|thr|mem|sch|apv|rule)_[a-z0-9]{6,}_[a-z0-9]{4,}\b"  # Dot's own ids
 )
-_TRAILING_PUNCTUATION: str = ".,;:!?"
+# The ellipsis is the mark Dot's own renderings leave on a value they cut (the pinned actions, a page's text), which
+# a summary copies as it is.
+_TRAILING_PUNCTUATION: str = ".,;:!?…"
+# An identifier that starts with a known identifier this long is that address with a fragment or a query the
+# history did not have; a shorter known identifier says little about what follows it.
+_LONG_IDENTIFIER_CHARS: int = 24
 
 
 class LedgerAction(FrozenModel):
@@ -159,12 +164,33 @@ def summary_part(text: str) -> str:
     return body.split("\n## Consistency check", 1)[0].strip()
 
 
-def check_continuity(summary: str, reference: str, ledger: RunLedger) -> ContinuityCheck:
-    """Validate a model's summary against ``reference`` (the full text of the history it replaces) and the ledger."""
+def missing_sections(summary: str) -> tuple[str, ...]:
+    """The required headings ``summary`` lacks."""
     upper: str = summary.upper()
-    missing: tuple[str, ...] = tuple(section for section in SUMMARY_SECTIONS if section not in upper)
+    return tuple(section for section in SUMMARY_SECTIONS if section not in upper)
+
+
+def _is_known(name: str, known: str, known_names: Collection[str]) -> bool:
+    """Whether the history holds ``name`` (a cut identifier is a part of its whole) or a long identifier it starts
+    with."""
+    return name in known or any(
+        len(other) >= _LONG_IDENTIFIER_CHARS and name.startswith(other) for other in known_names
+    )
+
+
+def check_continuity(summary: str, reference: str, ledger: RunLedger) -> ContinuityCheck:
+    """Validate a model's summary against ``reference`` (the full text of the history it replaces) and the ledger.
+
+    An identifier counts as known when the history holds it, whole or cut short (a trailing ellipsis, the mark of a
+    value Dot cut, is not part of it), or when it starts with a known identifier of at least 24 characters (an
+    address with a fragment the history did not have).
+    """
+    missing: tuple[str, ...] = missing_sections(summary)
     known: str = "\n".join([reference, ledger.goal, *ledger.instructions, *ledger.touched])
-    unverified: tuple[str, ...] = tuple(sorted(name for name in identifiers(summary) if name not in known))
+    known_names: set[str] = identifiers(known)
+    unverified: tuple[str, ...] = tuple(
+        sorted(name for name in identifiers(summary) if not _is_known(name, known, known_names))
+    )
     return ContinuityCheck(
         ok=bool(summary.strip()) and not missing and not unverified,
         missing_sections=missing,

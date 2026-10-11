@@ -80,6 +80,22 @@ def test_the_check_flags_identifiers_the_history_never_mentioned() -> None:
     assert missing.missing_sections == ("STATE", "PROBLEMS", "NEXT")
 
 
+def test_the_check_takes_an_address_cut_short_or_lengthened_as_known_and_another_one_not() -> None:
+    page: str = "https://docs.example.com/guides/backups/restore-from-snapshot"
+    reference: str = history_text([user_message(GOAL, ()), user_message(f"read {page} and ~/Reports/a.md", ())])
+    ledger = new_ledger(GOAL)
+    # The model copied the address as a rendering cut it, ellipsis and all, or added a fragment the history lacks.
+    cut = check_continuity(SUMMARY + f"\nSee {page[:40]}…", reference, ledger)
+    assert cut.ok, cut.unverified
+    lengthened = check_continuity(SUMMARY + f"\nSee {page}#step-3", reference, ledger)
+    assert lengthened.ok, lengthened.unverified
+    # Another page under the same prefix is not this one, and a short known path says nothing about a longer one.
+    other = check_continuity(
+        SUMMARY + f"\nSee {page.rsplit('/', 1)[0]}/delete-all and ~/Reports/a.md.bak", reference, ledger
+    )
+    assert other.unverified == ("https://docs.example.com/guides/backups/delete-all", "~/Reports/a.md.bak")
+
+
 def test_a_continuity_note_pins_the_facts_and_a_new_compaction_reads_only_its_summary() -> None:
     ledger = with_compaction(
         with_actions(new_ledger(GOAL), [(_call("write_file", {"path": "~/Reports/week41.md"}), True, "ok")])

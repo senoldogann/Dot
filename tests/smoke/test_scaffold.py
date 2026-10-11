@@ -146,6 +146,16 @@ class BrokenFastProvider(WindowedProvider):
         return await super().complete(request, sink)
 
 
+class ForgetfulFastProvider(WindowedProvider):
+    """The scripted model next to a fast model that leaves PROBLEMS out of a summary until asked for it by name."""
+
+    async def complete(self, request: ChatRequest, sink: DeltaSink) -> ModelReply:
+        if request.session_key.endswith(_SUMMARY_KEY) and "lacked the sections PROBLEMS" not in _said(request):
+            reply: ModelReply = await super().complete(request, sink)
+            return reply.model_copy(update={"text": _SUMMARY.replace("PROBLEMS: none.\n", "")})
+        return await super().complete(request, sink)
+
+
 async def _play(
     config: AppConfig, login_env: dict[str, str], window: int | None, turns: Sequence[ScriptedTurn]
 ) -> Played:
@@ -288,6 +298,26 @@ async def test_a_fast_model_that_fails_leaves_the_summary_to_the_runs_own_model_
     for compaction in played.compactions:
         assert (compaction["method"], compaction["model"]) == ("model", own)
         assert compaction["fast_problem"] == "the fast model is down"
+
+
+async def test_a_summary_that_lacks_a_section_is_asked_for_again_with_the_section_named(
+    login_env: dict[str, str],
+) -> None:
+    played: Played = await _play_with(
+        _config({}, 6), login_env, ForgetfulFastProvider(ScriptedProvider(_PROVIDER, _reading(40)), 24_000)
+    )
+    assert played.record.status == "done"
+    assert len(played.compactions) > 1
+    for compaction in played.compactions:
+        # The second ask, with the section named and the draft carried along, gave a summary that passes its check.
+        assert (compaction["method"], compaction["attempts"]) == ("model", 2)
+        assert compaction["problem"] == "the summary lacked the sections PROBLEMS"
+        check = compaction["check"]
+        assert isinstance(check, dict) and check["ok"] and check["missing_sections"] == []
+    # Two summary requests per compaction: the second names the missing section and carries the first reply.
+    assert len(played.summaries) == 2 * len(played.compactions)
+    second: str = _said(played.summaries[1])
+    assert "lacked the sections PROBLEMS" in second and "DECISIONS: read on to the end." in second
 
 
 async def test_every_model_call_of_a_run_leaves_its_seconds_and_tokens_and_the_totals_hold_them_all(
