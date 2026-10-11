@@ -4627,8 +4627,8 @@ says so), $10 per 1,000 searches plus tokens (the docs; a failed search is not b
 | 69  | The Anthropic rung: Haiku 5.5 searches through the API's own web search | done        | 927a720 |
 | 70  | Reflection: Dot's day in review, every night                             | done        | dd13ec9 |
 | 71  | Memory that rests: use decides what is recalled                          | done        | 6896e53 |
-| 72  | The home that says "I am here"                                           | in progress |         |
-| 73  | Motion with meaning                                                      | planned     |         |
+| 72  | The home that says "I am here"                                           | done        | 9020ee0 |
+| 73  | Motion with meaning                                                      | in progress |         |
 | 74  | Quiet chrome: the surfaces recede, the work leads                        | planned     |         |
 | 75  | Told only when not looking                                               | planned     |         |
 | 76  | The live numbers of part 8                                               | planned     |         |
@@ -4773,7 +4773,7 @@ while the user's old note still reaches the run.
 
 ### 72. The home that says "I am here"
 
-**Status: in progress.** Built on `item-72-home-presence` (MYP-212).
+**Status: done.** Merged as `9020ee0` (PR #80, squash; MYP-212 Done).
 
 **What.** The home is Dot's presence: the face in its state, a greeting by the time of day with the owner's name
 (Settings › General), one line of now ("Working on 2 runs · 1 waits for you · 3 ended today · 1 lesson"), a Today
@@ -4817,7 +4817,7 @@ today · 1 lesson" and the face to idle.
 
 ### 73. Motion with meaning
 
-**Status: planned.**
+**Status: in progress.** Built on `item-73-motion` (MYP-213).
 
 **What.** Motion tokens (`--motion-quick` 120 ms, `--motion-base` 200 ms, `--motion-slow` 320 ms, one standard
 easing and one emphasised), the face breathes while idle and pulses while working, cards and rows enter with a short
@@ -4835,6 +4835,23 @@ all day need motion that is short, consistent and switchable.
 
 **Touchpoints.** `app.css`, `shell.css`, `run.css`, `static/js/face.js`, `tests/unit/test_css_tokens.py`,
 `tests/smoke/test_face.py`, README (the visual system).
+
+**Design, as built (2026-10-11).** As planned, with these differences. The tokens sit with the spacing tokens in
+`app.css`: `--motion-quick` 120 ms, `--motion-base` 200 ms, `--motion-slow` 320 ms, `--ease` and `--ease-emphasis`,
+and, because what repeats has a rhythm of its own, `--motion-breath` 4 s, `--motion-pulse` 1.6 s, `--motion-blink`
+1.4 s, `--motion-spin` 0.8 s, `--motion-moment` 3 s (the tick of a run that ended) and `--motion-shimmer` 1.8 s; the
+unit test flags any literal duration in a drawn sheet (`0s` is the instant, not a duration), so `run.css` and
+`settings.css`, which had none, pass as they are. `face.js` did not change: the state attribute it sets already picks
+the animation, so the face's core breathes at `idle` (`breathe`, scale 1.12, slow) and pulses at `working`
+(`pulse-core`, scale 1.4, which was the old `breath`); the ring's blink at `waiting` and the tick's moment at `done`
+stay. `.card`, `.slash-menu` and `.toast` fade in (`fade-in`, opacity only; the toast's `rise` slide is gone); the
+rows of the Activity list and the Today strip are inside cards and fade with them, so no rule of their own; a badge
+cross-fades its colours. Reduced motion no longer stops every animation and transition with `!important`: it names
+what transforms (the core's breath and pulse, the spinners, the switch's knob, the chevron, the drawer's slide in
+`shell.css`) and leaves the fades, the blink and the tick, so the block that forced the tick to show without motion is
+gone with the blanket rule. Smoke test in `tests/smoke/test_face.py`: the core's computed `animation-name` is
+`breathe` at rest and `pulse-core` at work, `none` in both under emulated reduced motion while a card still fades in,
+and the drawer's transition is `0s` under it.
 
 ### 74. Quiet chrome: the surfaces recede, the work leads
 
@@ -5372,3 +5389,5 @@ here.
 - 2026-10-11 (Fable 5.1): item 69 merged 927a720 (PR #77, MYP-209 Done). Item 70 built on branch `item-70-reflection` (MYP-210): `agent/reflection.py` (reflect, reflection_due, stored_case, duplicate_pairs, to_retire, journal), the scheduler's tick fires it at `[agent] reflection_time`, `rest`/`journal` tags, `dotx reflect`, the Activity row; unit and smoke tests.
 - 2026-10-11 (Fable 5.1): item 70 merged dd13ec9 (PR #78, MYP-210 Done). Item 71 built on branch `item-71-memory-rests` (MYP-211): `ranking.fused_scores`/`use_lift`/`ranked_by_use`, `service.resting`, `[memory] rest_days`/`use_half_life_days`, `MemoryPage.resting`, the Memory page's Resting group; unit and smoke tests.
 - 2026-10-11 (Fable 5.1): item 71 merged 6896e53 (PR #79, MYP-211 Done). Item 72 built on branch `item-72-home-presence` (MYP-212): `presence.js` (greeting, nowLine, todaySections, the owner's name), `activityrow.js` shared by the Activity page and the home, `/api/activity` `learned_today` and `due`, the Today strip; smoke test with screenshots.
+- 2026-10-11 (Fable 5.1): item 72 built on branch `item-72-home-presence` (MYP-212, PR #80). Item 73 built on branch `item-73-motion` (MYP-213): motion tokens, the face's breath and pulse, fades, reduced motion that keeps the fades, the duration unit test and the face smoke test.
+- 2026-10-11 (Fable 5.1): item 72 merged 9020ee0 (PR #80, MYP-212 Done).

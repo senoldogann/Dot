@@ -12,6 +12,8 @@ _DRAWN: tuple[str, ...] = ("app.css", "shell.css", "run.css", "settings.css")
 _COLOUR: re.Pattern[str] = re.compile(r"#[0-9a-fA-F]{3,8}\b|\brgba?\(|\bhsla?\(|\bwhite\b|\bblack\b")
 _FONT_SIZE: re.Pattern[str] = re.compile(r"font-size:\s*[0-9.]+px")
 _RADIUS: re.Pattern[str] = re.compile(r"border-radius:\s*[0-9.]+px")
+# A literal duration (0.2s, 150ms); 0s is the instant and no token.
+_DURATION: re.Pattern[str] = re.compile(r"(?<![\w.-])(?!0s\b)\d*\.?\d+m?s\b")
 
 
 def _lines(name: str) -> list[tuple[int, str]]:
@@ -36,10 +38,34 @@ def test_font_sizes_and_radii_are_tokens(name: str) -> None:
     assert hits == [], hits
 
 
+@pytest.mark.parametrize("name", _DRAWN)
+def test_every_transition_and_animation_runs_on_a_motion_token(name: str) -> None:
+    """Item 73: the durations live in the motion tokens; a sheet names one, never a number of its own."""
+    hits: list[str] = [
+        f"{name}:{n}: {line.strip()}"
+        for n, line in _lines(name)
+        if _DURATION.search(line) and not line.strip().startswith("--") and not line.strip().startswith("/*")
+    ]
+    assert hits == [], hits
+
+
 def test_the_tokens_are_declared_once_each_in_the_base_look() -> None:
     app: str = (_CSS / "app.css").read_text(encoding="utf-8")
     themes: str = (_CSS / "themes.css").read_text(encoding="utf-8")
-    for token in ("--fs-xs", "--fs-2xl", "--radius-xs", "--radius-pill", "--space-1", "--pad-card", "--gap-stack"):
+    for token in (
+        "--fs-xs",
+        "--fs-2xl",
+        "--radius-xs",
+        "--radius-pill",
+        "--space-1",
+        "--pad-card",
+        "--gap-stack",
+        "--motion-quick",
+        "--motion-base",
+        "--motion-slow",
+        "--ease",
+        "--ease-emphasis",
+    ):
         assert app.count(f"{token}:") >= 1, token
     for token in (
         "--bg",

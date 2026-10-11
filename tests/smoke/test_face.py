@@ -30,6 +30,11 @@ from dotagent.tools.meta import ASK_USER_TOOL, FINISH_TOOL
 
 pytestmark = [pytest.mark.browser, pytest.mark.asyncio(loop_scope="module")]
 
+# The animation of the face's core by state (item 73): a slow breath at rest, a pulse at work, and none of either
+# under reduced motion, where the transforms go and the fades stay.
+_CORE_ANIMATION: str = "getComputedStyle(document.querySelector('.home-who .avatar .core')).animationName"
+_DRAWER_TRANSITION: str = "getComputedStyle(document.querySelector('.sidebar')).transitionDuration"
+
 _PROVIDER: str = "ollama"
 TOKEN: str = "face-test-token"
 _STEP_WAIT_S: float = 20.0
@@ -231,3 +236,48 @@ async def test_the_face_tells_the_state_through_a_runs_life_and_wears_the_name(
         async with asyncio.timeout(_RUN_WAIT_S):
             ended: RunRecord = await manager.wait(run.id)
     assert ended.status == "done", ended
+
+
+async def test_the_face_breathes_at_rest_pulses_at_work_and_holds_still_under_reduced_motion(
+    runtime: Runtime, manager: RunManager, client: httpx.AsyncClient
+) -> None:
+    host: str = client.base_url.host
+    port: int | None = client.base_url.port
+    assert port is not None
+    base: str = f"http://{host}:{port}"
+    MODEL.script = ScriptedProvider(
+        _PROVIDER,
+        [_turn("shell", {"command": f"sleep {_WORK_S}"}), _turn(FINISH_TOOL, {"answer": "Rested.", "success": True})],
+    )
+    async with async_playwright() as playwright:
+        browser: Browser = await playwright.chromium.launch(channel=runtime.config.browser.channel, headless=True)
+        try:
+            page: Page = await browser.new_page(viewport={"width": 1280, "height": 900})
+            await page.goto(ui_url(host, port, TOKEN))
+            await page.goto(f"{base}/#/runs")
+            face = page.locator(".home-who .avatar")
+            await expect(face).to_have_attribute("data-state", "idle")
+            assert await page.evaluate(_CORE_ANIMATION) == "breathe"
+            run: RunRecord = await manager.start(
+                "Rest a while", "task", SCRIPTED_MODEL, None, "test", None, None, "yolo", False, ()
+            )
+            await expect(face).to_have_attribute("data-state", "working")
+            assert await page.evaluate(_CORE_ANIMATION) == "pulse-core"
+            # Reduced motion: the core holds still in both states, while the fades stay.
+            await page.emulate_media(reduced_motion="reduce")
+            assert await page.evaluate(_CORE_ANIMATION) == "none"
+            assert await page.evaluate("getComputedStyle(document.querySelector('.card')).animationName") == "fade-in"
+            async with asyncio.timeout(_RUN_WAIT_S):
+                await manager.wait(run.id)
+            await expect(face).to_have_attribute("data-state", "idle", timeout=_STEP_WAIT_S * 1000)
+            assert await page.evaluate(_CORE_ANIMATION) == "none"
+            # On a phone the sidebar is a drawer: its slide is a transition of the base length, none under reduced motion.
+            await page.set_viewport_size({"width": 390, "height": 800})
+            await page.wait_for_function("document.querySelector('.shell')?.dataset.nav === 'drawer'")
+            assert set((await page.evaluate(_DRAWER_TRANSITION)).split(", ")) == {"0s"}
+            await page.emulate_media(reduced_motion="no-preference")
+            assert await page.evaluate(_CORE_ANIMATION) == "breathe"
+            assert "0.2s" in (await page.evaluate(_DRAWER_TRANSITION)).split(", ")
+            await page.close()
+        finally:
+            await browser.close()

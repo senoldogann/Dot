@@ -34,6 +34,19 @@
   --pad-row: var(--space-3) var(--space-4);
   --pad-side: 7px 10px;
   --gap-stack: var(--space-3);
+  /* Motion (item 73): three durations and two easings for what changes, and the rhythms of what repeats; every
+     transition and animation names one (tests/unit/test_css_tokens.py), and reduced motion keeps the fades. */
+  --motion-quick: 120ms;
+  --motion-base: 200ms;
+  --motion-slow: 320ms;
+  --ease: cubic-bezier(0.2, 0, 0, 1);
+  --ease-emphasis: cubic-bezier(0.3, 0, 0, 1);
+  --motion-breath: 4s;
+  --motion-pulse: 1.6s;
+  --motion-blink: 1.4s;
+  --motion-spin: 0.8s;
+  --motion-moment: 3s;
+  --motion-shimmer: 1.8s;
 }
 
 /* Compact density (Settings › Appearance): the rows, cards and stacks sit closer. */
@@ -226,8 +239,8 @@ textarea {
   transform-origin: center;
 }
 
-/* The face as the state (face.js): still when idle, a slow breath while it works, an amber ring while it waits for you,
-   a green tick for a moment when a run ends done, red when it failed. */
+/* The face as the state (face.js): a slow breath while idle (here, at rest), a pulse while it works, an amber ring
+   while it waits for you, a green tick for a moment when a run ends done, red when it failed. */
 .avatar .tick {
   fill: none;
   stroke: var(--ok);
@@ -237,26 +250,30 @@ textarea {
   opacity: 0;
 }
 
+.avatar[data-state="idle"] .core {
+  animation: breathe var(--motion-breath) ease-in-out infinite;
+}
+
 .avatar[data-state="working"] .core {
-  animation: breath 2.8s ease-in-out infinite;
+  animation: pulse-core var(--motion-pulse) ease-in-out infinite;
 }
 
 .avatar[data-state="waiting"] .ring {
   stroke: var(--warn);
   stroke-opacity: 1;
-  animation: blink 1.4s ease-in-out infinite;
+  animation: blink var(--motion-blink) ease-in-out infinite;
 }
 
 .avatar[data-state="done"] .ring {
-  animation: ring-ok 3s ease forwards;
+  animation: ring-ok var(--motion-moment) var(--ease) forwards;
 }
 
 .avatar[data-state="done"] .core {
-  animation: core-away 3s ease forwards;
+  animation: core-away var(--motion-moment) var(--ease) forwards;
 }
 
 .avatar[data-state="done"] .tick {
-  animation: tick-moment 3s ease forwards;
+  animation: tick-moment var(--motion-moment) var(--ease) forwards;
 }
 
 .avatar[data-state="failed"] .ring {
@@ -329,7 +346,7 @@ a.pill:hover {
 
 .live-dot.reconnecting {
   background: var(--warn);
-  animation: blink 1.2s ease-in-out infinite;
+  animation: blink var(--motion-blink) ease-in-out infinite;
 }
 
 .page {
@@ -413,9 +430,9 @@ a.pill:hover {
   cursor: pointer;
   white-space: nowrap;
   transition:
-    background 0.12s,
-    border-color 0.12s,
-    opacity 0.12s;
+    background var(--motion-quick) var(--ease),
+    border-color var(--motion-quick) var(--ease),
+    opacity var(--motion-quick) var(--ease);
 }
 
 .btn:hover:not(:disabled) {
@@ -500,7 +517,7 @@ a.pill:hover {
   border-radius: var(--radius-control);
   border: 1px solid var(--control);
   background: var(--surface);
-  transition: border-color 0.12s;
+  transition: border-color var(--motion-quick) var(--ease);
 }
 
 .input:focus,
@@ -618,7 +635,7 @@ a.pill:hover {
   border: 0;
   background: var(--control);
   cursor: pointer;
-  transition: background 0.15s;
+  transition: background var(--motion-quick) var(--ease);
 }
 
 .switch::after {
@@ -631,7 +648,7 @@ a.pill:hover {
   border-radius: 50%;
   background: var(--knob);
   box-shadow: var(--shadow-knob);
-  transition: transform 0.15s;
+  transition: transform var(--motion-quick) var(--ease);
 }
 
 .switch[aria-checked="true"] {
@@ -654,6 +671,7 @@ a.pill:hover {
   border: 1px solid var(--border);
   border-radius: var(--radius);
   box-shadow: var(--shadow);
+  animation: fade-in var(--motion-base) var(--ease);
 }
 
 .card-pad {
@@ -776,6 +794,9 @@ a.pill:hover {
   line-height: 1.6;
   background: var(--surface-3);
   color: var(--text-2);
+  transition:
+    background-color var(--motion-base) var(--ease),
+    color var(--motion-base) var(--ease);
   white-space: nowrap;
 }
 
@@ -828,7 +849,7 @@ a.pill:hover {
 
 .status-dot.s-running {
   background: var(--accent);
-  animation: pulse 1.6s ease-out infinite;
+  animation: pulse var(--motion-pulse) ease-out infinite;
 }
 
 .status-dot.s-done {
@@ -841,7 +862,7 @@ a.pill:hover {
 
 .status-dot.s-blocked {
   background: var(--warn);
-  animation: blink 1.4s ease-in-out infinite;
+  animation: blink var(--motion-blink) ease-in-out infinite;
 }
 
 .chip {
@@ -1095,8 +1116,8 @@ a.pill:hover {
   border-color: var(--border-strong);
   background: var(--surface);
   transition:
-    border-color 0.12s,
-    box-shadow 0.12s;
+    border-color var(--motion-quick) var(--ease),
+    box-shadow var(--motion-quick) var(--ease);
 }
 
 .composer:focus-within {
@@ -1205,6 +1226,7 @@ a.pill:hover {
   border: 1px solid var(--border-strong);
   background: var(--surface);
   box-shadow: var(--shadow-float);
+  animation: fade-in var(--motion-quick) var(--ease);
 }
 
 .slash-group {
@@ -1392,7 +1414,7 @@ a.pill:hover {
 
 .plan-step.in_progress .mark {
   border-color: var(--accent);
-  animation: pulse 1.6s ease-out infinite;
+  animation: pulse var(--motion-pulse) ease-out infinite;
 }
 
 .plan-step.done .mark {
@@ -1505,7 +1527,7 @@ a.pill:hover {
   margin-left: 2px;
   vertical-align: text-bottom;
   background: var(--accent);
-  animation: blink 1s steps(2) infinite;
+  animation: blink var(--motion-blink) steps(2) infinite;
 }
 
 .prose {
@@ -1704,7 +1726,7 @@ a.pill:hover {
 
 .chev {
   color: var(--faint);
-  transition: transform 0.15s;
+  transition: transform var(--motion-quick) var(--ease);
   flex: none;
 }
 
@@ -1840,7 +1862,7 @@ details[open] > summary .chev {
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
-  animation: shimmer 1.8s linear infinite;
+  animation: shimmer var(--motion-shimmer) linear infinite;
 }
 
 .approval {
@@ -1959,12 +1981,12 @@ details[open] > summary .chev {
 .status-ring.s-running,
 .status-ring.s-queued {
   border-top-color: var(--text);
-  animation: spin 0.9s linear infinite;
+  animation: spin var(--motion-spin) linear infinite;
 }
 
 .status-ring.s-blocked {
   border-color: var(--warn);
-  animation: blink 1.4s ease-in-out infinite;
+  animation: blink var(--motion-blink) ease-in-out infinite;
 }
 
 .status-ring.s-done {
@@ -2089,8 +2111,8 @@ details[open] > summary .chev {
   background: var(--surface);
   box-shadow: var(--shadow);
   transition:
-    border-color 0.12s,
-    box-shadow 0.12s;
+    border-color var(--motion-quick) var(--ease),
+    box-shadow var(--motion-quick) var(--ease);
 }
 
 .dock-inner:focus-within {
@@ -2151,7 +2173,7 @@ details[open] > summary .chev {
   color: var(--bg);
   box-shadow: var(--shadow);
   cursor: pointer;
-  animation: rise 0.18s ease-out;
+  animation: fade-in var(--motion-base) var(--ease);
   word-break: break-word;
 }
 
@@ -2243,7 +2265,7 @@ dialog.lightbox img {
   border-radius: 50%;
   border: 2px solid var(--border-strong);
   border-top-color: var(--accent);
-  animation: spin 0.8s linear infinite;
+  animation: spin var(--motion-spin) linear infinite;
 }
 
 @keyframes spin {
@@ -2258,7 +2280,14 @@ dialog.lightbox img {
   }
 }
 
-@keyframes breath {
+/* The idle breath is slight and slow; the working pulse is wide and quick. */
+@keyframes breathe {
+  50% {
+    transform: scale(1.12);
+  }
+}
+
+@keyframes pulse-core {
   50% {
     transform: scale(1.4);
   }
@@ -2315,30 +2344,25 @@ dialog.lightbox img {
   }
 }
 
-@keyframes rise {
+@keyframes fade-in {
   from {
     opacity: 0;
-    transform: translateY(6px);
   }
 }
 
+/* Reduced motion (item 73): every transform goes (the breath and the pulse of the face, the spinners, the switch's
+   knob and the chevron on the move) and the fades stay, so a state change is still seen. */
 @media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
-    animation: none !important;
-    transition: none !important;
-  }
-}
-
-/* Without motion the tick of a run that ended done simply shows, in place of the core. */
-@media (prefers-reduced-motion: reduce) {
-  .avatar[data-state="done"] .tick {
-    opacity: 1;
+  .avatar[data-state="idle"] .core,
+  .avatar[data-state="working"] .core,
+  .spinner,
+  .status-ring.s-queued {
+    animation: none;
   }
 
-  .avatar[data-state="done"] .core {
-    opacity: 0;
+  .switch::after,
+  .chev {
+    transition: none;
   }
 }
 
