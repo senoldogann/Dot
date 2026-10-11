@@ -22,14 +22,16 @@ function known(map, id, what) {
   return found;
 }
 
-// Keeps a group's children in step with a list: one child per item, made on first sight, updated every frame,
-// removed when its item is gone.
+// Keeps a group's children in step with a list: one child per item, keyed by `keyOf(item, index)`, made on first
+// sight, updated every frame, removed when its item is gone. Two items with one key would share a child, the last
+// drawn over the first while another child kept its old picture (item 112), so a repeated key is an error.
 function sync(group, items, keyOf, make, update) {
   const existing = new Map();
   for (const child of group.children) existing.set(child.dataset.key, child);
   const seen = new Set();
-  for (const item of items) {
-    const key = keyOf(item);
+  for (const [index, item] of items.entries()) {
+    const key = keyOf(item, index);
+    if (seen.has(key)) throw new Error(`two items of one character drawing share the key ${key}`);
     seen.add(key);
     let node = existing.get(key);
     if (!node) {

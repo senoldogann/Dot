@@ -5031,7 +5031,8 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 108 | The composer with marks: a mark per provider, an icon on every pill, the reasoning as its own pill | done        | 108c91d |
 | 109 | Dot's computer as a stage: a frame with a size, the control under it, the character at the head of the chat | done        | b5d42c0 |
 | 110 | Rules in plain words: the model writes the rule, an approval card offers one        | done        | 6da73c4 |
-| 111 | The review: part 14 read once more                                                  | in progress |         |
+| 111 | The review: part 14 read once more                                                  | done        | 5d96935 |
+| 112 | Both eyes move: one key per eye in the character's drawing                          | in progress |         |
 
 ### 77. The type system: Inter and Geist Mono, seven sizes, three weights
 
@@ -6349,7 +6350,7 @@ drafts a rule from a sentence against the scripted model and keeps it; the appro
 
 ### 111. The review: part 14 read once more
 
-**Status: in progress.**
+**Status: done.** Merged as `5d96935` (PR #131, MYP-251 Done).
 
 **Findings, as built (2026-10-12).** Three readings. (1) The tour (23 pages, two schemes, two widths, 90 shots) read
 against the README by two readers, and by eye wherever they doubted: the sidebar with its search first, the composer's
@@ -6392,6 +6393,27 @@ started as a browser macOS does not hand links to (another bundle, such as Chrom
 offline smoke suite in full, the owner's daemon read through the API only. What is broken, stale or contradicts the
 README is fixed in this item's PR or written as the next part's first items. The findings go in this section as
 built.
+
+### 112. Both eyes move: one key per eye in the character's drawing
+
+**Status: in progress.**
+
+The owner's word on 2026-10-12, during item 111, with a screenshot of Dot's look in Settings (the circle, attentive, the
+preview's eyes one above the other like an exclamation mark): one of Dot's eyes always moves and the other does not,
+whatever the character.
+
+**Design, as built (2026-10-12).** `character.js` draws a frame by keeping each group of the SVG in step with a list
+(`sync`): one child per item, found again by its key. The eyes' key was their index, `(_, i) => String(i)`, but `sync`
+called `keyOf(item)` alone, so both eyes had the key `undefined`. The first frame made two paths; from the second on,
+both eyes were written into one of them (the outer eye, written last, won) and the other kept the inner eye of the first
+frame, where and as the character was first drawn: on every moving face (the home's, the run page's, the look's preview,
+the gallery's) and on a still one whose look changed, as the preview under Reduce motion. `sync` now hands `keyOf` the
+index too, and a key repeated within one frame is an error rather than a child shared in silence; the rings, their
+gradients and the dots had keys of their own and were right. Tests: `test_character.py` reads each eye on its own: both
+eyes' matrices change over half a second on a moving face, and a still face set to surprised draws two round eyes of one
+size, neither of them the neutral's (before the fix the first eye's matrix was the same at both reads). The gallery's
+test counted the orbit's ring gradients at once, before the first ring enters some 50 ms after the mount, and failed
+whenever the page opened faster than that; it now waits for the first.
 
 ## Log
 
@@ -6929,3 +6951,4 @@ built.
 - 2026-10-12 (Opus 5.5): item 108 merged as `108c91d` (PR #128, MYP-248 Done): the providers' marks (Simple Icons and Lobe Icons, licences in `static/icons/providers/LICENSE`) as masks in the scheme's ink, an icon on every pill of the composer, the mode and the reasoning as pills of their own, hairlines between them, the attach button beside the send.
 - 2026-10-12 (Opus 5.5): item 109 merged as `b5d42c0` (PR #129, MYP-249 Done): the computer's panel in three sizes and a drag handle kept per browser (`stagesize.js`), the control pill under the view naming the actor, the character with its name and the word of its state at the head of the chat while the panel is wide or full.
 - 2026-10-12 (Opus 5.5): item 110 merged as `6da73c4` (PR #130, MYP-250 Done): a rule said in words, drafted by the review model into its parts (`draft_rule`), the pattern written by Dot so that a rule that lets Dot act fits a command alone and one that stops it fits a word anywhere, read back in a sentence that is the rule's description; the Rules tab's "Say the rule in your words" card, and "Make a rule of this" on an approval card.
+- 2026-10-12 (Opus 5.5): item 111 merged as `5d96935` (PR #131, MYP-251 Done): the tour read by eye by two readers and checked wherever they doubted, the offline smoke suite in full (324 passed, two failures that pass alone), the owner's daemon through the API and its two SSL crashes identified; the panel's fold facts wrap under the title at its compact width, an ended run's computer card says why it is empty, the run composer's placeholder follows the run's state.

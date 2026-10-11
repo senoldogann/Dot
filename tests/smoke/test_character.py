@@ -139,8 +139,9 @@ async def test_the_gallery_shows_still_frames_and_moving_animations(
         moving = ".character[data-still='false']"
         await expect(page.locator(f"{moving}[data-animation='idle'] mask g path")).to_have_count(2)
         await expect(page.locator(f"{moving}[data-animation='thinking'] mask g path")).to_have_count(0)
-        # The rings of the orbit carry a gradient each, and their back half is drawn before the body.
-        assert await page.locator(".character[data-animation='orbit'] linearGradient").count() >= 1
+        # The rings of the orbit carry a gradient each, and their back half is drawn before the body. The first ring
+        # enters some 50 ms after the mount, so the check waits for it (item 112: a page that opened faster raced it).
+        await expect(page.locator(".character[data-animation='orbit'] linearGradient").first).to_be_attached()
         assert await _path_moves(page, _ORBIT)
         assert not await _path_moves(page, _STILL_CIRCLE)
         assert await page.evaluate(_TICKER) is True
@@ -198,6 +199,32 @@ async def test_a_still_character_follows_a_shape_and_an_expression_set(
     await page.evaluate("window.__character.setExpression('happy')")
     assert await page.evaluate(_EYES) != eyes_before, "the still eyes keep the old expression"
     await page.close()
+
+
+_EYE_PATHS: str = "[...window.__character.element.querySelectorAll('mask g path')]"
+
+
+async def test_both_eyes_move_and_both_follow_an_expression(browser: Browser, client: httpx.AsyncClient) -> None:
+    # Item 112: the eyes were keyed by an index the drawing never passed, so both shared one key; from the second
+    # frame on, one eye's path took both eyes' values and the other kept its first frame, on every face.
+    page: Page = await _open(browser, client, False, "light")
+    assert await page.evaluate(_MOUNT) == "idle"
+    first: list[str] = await page.evaluate(f"{_EYE_PATHS}.map((p) => p.getAttribute('transform'))")
+    await page.wait_for_timeout(500)
+    second: list[str] = await page.evaluate(f"{_EYE_PATHS}.map((p) => p.getAttribute('transform'))")
+    assert len(first) == len(second) == 2, (first, second)
+    assert [before != after for before, after in zip(first, second, strict=True)] == [True, True], (first, second)
+    await page.close()
+
+    still: Page = await _open(browser, client, True, "light")
+    assert await still.evaluate(_MOUNT) == "idle"
+    neutral: list[str] = await still.evaluate(f"{_EYE_PATHS}.map((p) => p.getAttribute('d'))")
+    # Surprised has two round eyes of one size, each unlike the neutral's.
+    await still.evaluate("window.__character.setExpression('surprised')")
+    surprised: list[str] = await still.evaluate(f"{_EYE_PATHS}.map((p) => p.getAttribute('d'))")
+    assert len(neutral) == len(surprised) == 2, (neutral, surprised)
+    assert surprised[0] == surprised[1] and surprised[0] not in neutral, (neutral, surprised)
+    await still.close()
 
 
 async def test_dots_look_card_previews_the_pick_under_reduced_motion(
