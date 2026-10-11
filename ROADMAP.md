@@ -5009,7 +5009,7 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 86  | Agents: profiles with a face, a role, a model and their own chats         | done        | bd12b54 |
 | 87  | Agents together: messages between agents, the team's thread, the harness  | done        | 23c6b5c |
 | 88  | Desktop and web, one interface: the Tauri shell on the same pages         | done        | c4d9b88 |
-| 89  | Learning on, and measured: every note handed to a run is scored by how it ended | planned     |         |
+| 89  | Learning on, and measured: every note handed to a run is scored by how it ended | in progress |         |
 | 90  | Memory that keeps what helps: the score decides what is recalled, rests, retires | planned     |         |
 | 91  | Recall by budget: the notes a run starts with fit a token budget, best first     | planned     |         |
 | 92  | Skills from its own work: a task that went well becomes a skill for its kind     | planned     |         |
@@ -5406,7 +5406,27 @@ measured with `dotx stats` and the Memory page before it is widened.
 
 ### 89. Learning on, and measured: every note handed to a run is scored by how the run ended
 
-**Status: planned.**
+**Status: in progress (2026-10-11).**
+
+**Design, as built (2026-10-11).** The store's `memory_uses` table (`run_id`, `memory_id`, `handed_at`, `how`,
+`status`) records every note a run is handed: `Store.mark_memories_used(run_id, ids, when, how)` writes one row per
+note besides counting the use (`how` is `start` for the notes the run begins with, `search` for a `memory_search`
+hit, `live` for a note changed while the run worked; `MemoryUseHow` in `store/models.py`), and the run manager's
+end of a run calls `close_memory_uses(run_id, status)`, which stamps the run's status on its rows (a row of a run
+that still works has none). `memory_scores(ids)` folds the rows into a `MemoryScore` per note (`handed` runs,
+`done`, `failed`; distinct runs, so a note handed twice to one run counts once). Playbook reads keep their own
+record (`playbook.json` and the `skill` tool calls in the events). `[agent] lessons` defaults to `propose` and
+`[agent] playbooks` to `true` (`defaults.toml`; evals still pin both off in `eval_config`). `dotx stats` ends with a
+**Learning** section (`LearningStats` in `store/stats.py`, read with four more queries of the window's runs):
+lessons proposed (the lessons of every `lessons_proposed` event), saved and dismissed; the runs handed a note and
+the ten most handed notes with their done count; playbooks written and retired and the runs that read one; and
+per host with runs of both kinds, the runs that read its playbook against the runs that did not, as act calls and
+seconds a run (`playbook_comparisons`: a run's host is the site of most of its act calls; only finished runs). The
+Memory page's `MemoryPage.scores` carries the score of every listed note some run was handed, and the row says
+"Handed to 5 runs, 4 done" (the title holds the failed count). Tests: `tests/unit/test_run_statistics.py` (the
+scores of the store, the Learning section from seeded events and uses, its rendering);
+`tests/smoke/test_lessons.py` (the default is `propose`; the lesson a second run was handed carries that run's end
+in its score).
 
 **What.** A `memory_uses` table records every note handed to a run (the run, the note, when, how: at the start,
 by `memory_search`, as a changed note) and, when the run ends, its status; the same for every playbook a run read.

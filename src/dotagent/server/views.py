@@ -21,6 +21,7 @@ from dotagent.store.models import (
     CampaignEntry,
     CampaignRecord,
     MemoryRecord,
+    MemoryScore,
     RunMode,
     RunRecord,
     RunStatus,
@@ -353,11 +354,13 @@ class CampaignDetail(FrozenModel):
 
 class MemoryPage(FrozenModel):
     """A page of the notes, newest change first; ``resting`` names the items that rest
-    (:func:`dotagent.memory.service.resting`), so the page can group them."""
+    (:func:`dotagent.memory.service.resting`), so the page can group them; ``scores`` says, per item some run was
+    handed, how those runs ended."""
 
     total: int
     items: list[MemoryRecord]
     resting: list[str]
+    scores: dict[str, MemoryScore]
 
 
 class ScheduleView(FrozenModel):

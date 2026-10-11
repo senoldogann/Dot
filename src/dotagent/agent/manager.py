@@ -994,6 +994,7 @@ class RunManager:
                 await self._keep_answers(run, [inbox.get_nowait() for _ in range(inbox.qsize())])
                 clean: str = truncate_tail(redact_secrets(result), _RESULT_CHARS)
                 await runtime.store.finish_run(run.id, status, clean)
+                await runtime.store.close_memory_uses(run.id, status)
                 await runtime.bus.emit(
                     run.id, "run_finished", {"status": status, "result": clean, "needs": redact_secrets(needs)}, True
                 )

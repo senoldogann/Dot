@@ -8,17 +8,20 @@ from pathlib import Path
 import pytest
 import pytest_asyncio
 
-from dotagent.cli_stats import render_run_costs, render_stats
+from dotagent.cli_stats import render_learning, render_run_costs, render_stats
 from dotagent.core.errors import StoreError
 from dotagent.core.types import JsonObject
 from dotagent.llm.calls import CALL_EVENT
 from dotagent.llm.types import INVALID_ARGUMENTS_KEY
 from dotagent.store.db import Store
 from dotagent.store.endings import RESULT_STALLED, RESULT_STOPPED
-from dotagent.store.models import RunRecord, RunStatus
+from dotagent.store.models import MemoryScore, RunRecord, RunStatus
 from dotagent.store.stats import (
     ActStats,
+    LearningStats,
     ModelStats,
+    NoteScore,
+    PlaybookComparison,
     RunCosts,
     RunStatistics,
     TimeStats,
@@ -31,6 +34,17 @@ from dotagent.store.stats import (
 )
 
 DAY_S: float = 86400.0
+NO_LEARNING: LearningStats = LearningStats(
+    lessons_proposed=0,
+    lessons_saved=0,
+    lessons_dismissed=0,
+    runs_handed_notes=0,
+    notes=(),
+    playbooks_written=0,
+    playbooks_retired=0,
+    runs_reading_playbooks=0,
+    comparisons=(),
+)
 
 
 async def _run(
@@ -367,6 +381,82 @@ def test_the_statistics_are_rendered_per_model_in_plain_words(database: Path) ->
     assert site_row.split() == ["x.com", "2", "50", "%", "0", "%", "2.5"]
     assert render_stats(stats, 30, "site")[2].startswith("Sites, from the browser and desktop act calls")
     assert not any(line.startswith("Sites") for line in render_stats(stats, 30, "model"))
-    assert render_stats(RunStatistics(models=(), tools=(), sites=(), channels=()), 7, "all") == [
+    assert render_stats(RunStatistics(models=(), tools=(), sites=(), channels=(), learning=NO_LEARNING), 7, "all") == [
         "No runs in the last 7 days."
     ]
+
+
+def _act(site: str) -> tuple[str, JsonObject]:
+    return "tool_result", {
+        "call_id": "a",
+        "tool": "browser_act",
+        "ok": True,
+        "text": "",
+        "images": [],
+        "seconds": 1.0,
+        "site": site,
+        "steps": 1,
+    }
+
+
+async def test_the_learning_section_scores_the_notes_handed_to_runs_and_compares_the_playbook_runs(
+    tmp_path: Path,
+) -> None:
+    store: Store = await Store.open(tmp_path / "dot.sqlite3", tmp_path / "screenshots")
+    thread = await store.create_thread("t", "test")
+    note = await store.add_memory("Log in before the search.", ["lesson"], "run_earlier", None)
+    reader: RunRecord = await _run(store, thread.id, "ollama:a", "done", "answer", 3, 300)
+    await store.mark_memories_used(reader.id, [note.id], time.time(), "start")
+    await store.close_memory_uses(reader.id, "done")
+    await _events(
+        store,
+        reader.id,
+        [
+            ("tool_call", {"call_id": "s", "tool": "skill", "args": {"name": "playbook-x-com"}}),
+            _act("x.com"),
+            _act("x.com"),
+            ("lessons_proposed", {"lessons": ["a", "b"], "tainted": False}),
+            ("lesson_saved", {"index": 0, "by": "owner", "memory_id": note.id}),
+            ("playbook_written", {"name": "playbook-x-com", "host": "x.com", "path": "p"}),
+        ],
+    )
+    other: RunRecord = await _run(store, thread.id, "ollama:a", "failed", "no", 5, 500)
+    await store.mark_memories_used(other.id, [note.id], time.time(), "search")
+    await store.close_memory_uses(other.id, "failed")
+    await _events(store, other.id, [_act("x.com"), _act("x.com"), _act("x.com"), _act("x.com"), _act("Safari")])
+    await store.close()
+    stats: RunStatistics = collect_statistics(tmp_path / "dot.sqlite3", time.time() - DAY_S)
+    learning: LearningStats = stats.learning
+    assert (learning.lessons_proposed, learning.lessons_saved, learning.lessons_dismissed) == (2, 1, 0)
+    assert learning.runs_handed_notes == 2
+    assert learning.notes == (NoteScore(memory_id=note.id, handed=2, done=1),)
+    assert (learning.playbooks_written, learning.playbooks_retired, learning.runs_reading_playbooks) == (1, 0, 1)
+    assert len(learning.comparisons) == 1
+    comparison: PlaybookComparison = learning.comparisons[0]
+    assert comparison.host == "x.com"
+    assert comparison.read.runs == 1 and comparison.read.acts_per_run == 2.0
+    assert comparison.unread.runs == 1 and comparison.unread.acts_per_run == 4.0
+    lines: list[str] = render_learning(learning)
+    assert lines[0] == "Learning"
+    assert lines[1] == "  lessons: 2 proposed, 1 saved, 0 dismissed"
+    assert lines[2] == f"  notes handed to 2 runs; {note.id} to 2 (1 done)"
+    assert lines[3] == "  playbooks: 1 written, 0 retired, read by 1 runs"
+    assert lines[4].startswith("  x.com: with its playbook 1 runs, 2.0 acts and ")
+
+
+async def test_a_note_is_scored_by_how_the_runs_handed_it_ended(tmp_path: Path) -> None:
+    store: Store = await Store.open(tmp_path / "dot.sqlite3", tmp_path / "screenshots")
+    thread = await store.create_thread("t", "test")
+    note = await store.add_memory("A note.", [], "run_earlier", None)
+    assert await store.memory_scores([note.id]) == {}
+    done: RunRecord = await _run(store, thread.id, "ollama:a", "done", "answer", 1, 10)
+    await store.mark_memories_used(done.id, [note.id], time.time(), "start")
+    await store.mark_memories_used(done.id, [note.id], time.time(), "live")
+    await store.close_memory_uses(done.id, "done")
+    working: RunRecord = await store.create_run(
+        thread.id, "goal", "task", "ollama:a", None, "test", "medium", "ask", False, None, None
+    )
+    await store.mark_memories_used(working.id, [note.id], time.time(), "search")
+    assert await store.memory_scores([note.id]) == {note.id: MemoryScore(handed=2, done=1, failed=0)}
+    assert (await store.get_memory(note.id)).used_count == 3
+    await store.close()

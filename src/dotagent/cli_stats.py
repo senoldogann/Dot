@@ -15,6 +15,7 @@ from dotagent.store.stats import (
     ActStats,
     ChannelStats,
     CompactionStats,
+    LearningStats,
     ModelStats,
     RunCosts,
     RunStatistics,
@@ -201,6 +202,32 @@ def render_sites(sites: Sequence[SiteStats]) -> list[str]:
     ]
 
 
+def render_learning(learning: LearningStats) -> list[str]:
+    """What the runs learned and were handed: the lessons, the notes with how the runs handed them ended, the
+    playbooks and, per host, the runs that read one against the ones that did not."""
+    lines: list[str] = [
+        "Learning",
+        f"  lessons: {learning.lessons_proposed} proposed, {learning.lessons_saved} saved, "
+        f"{learning.lessons_dismissed} dismissed",
+        f"  notes handed to {learning.runs_handed_notes} runs"
+        + (
+            "; " + ", ".join(f"{score.memory_id} to {score.handed} ({score.done} done)" for score in learning.notes)
+            if learning.notes
+            else ""
+        ),
+        f"  playbooks: {learning.playbooks_written} written, {learning.playbooks_retired} retired, "
+        f"read by {learning.runs_reading_playbooks} runs",
+    ]
+    for comparison in learning.comparisons:
+        lines.append(
+            f"  {comparison.host}: with its playbook {comparison.read.runs} runs, "
+            f"{comparison.read.acts_per_run:.1f} acts and {comparison.read.seconds_per_run:.0f} s a run; "
+            f"without {comparison.unread.runs} runs, {comparison.unread.acts_per_run:.1f} acts and "
+            f"{comparison.unread.seconds_per_run:.0f} s a run"
+        )
+    return lines
+
+
 def render_stats(stats: RunStatistics, days: int, by: Literal["model", "site", "all"]) -> list[str]:
     if not stats.models:
         return [f"No runs in the last {days} days."]
@@ -215,6 +242,8 @@ def render_stats(stats: RunStatistics, days: int, by: Literal["model", "site", "
         lines.extend(["", *render_channels(stats.channels)])
     if by != "model":
         lines.extend(["", *render_sites(stats.sites)] if by == "all" else render_sites(stats.sites))
+    if by != "site":
+        lines.extend(["", *render_learning(stats.learning)])
     return lines
 
 

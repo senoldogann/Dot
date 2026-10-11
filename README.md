@@ -673,7 +673,9 @@ and `dotx resume` show the lessons after the answer; Ctrl-C skips the wait, and 
 which could plant a lesson: those are only proposed, and the page says why. A saved lesson is a note of the agent like
 the others: a later run gets it when it fits its goal, and the Memory page edits or forgets it. Delegated runs, chats,
 runs that failed or were stopped, and evals (which always run without lessons) are not asked at their end; the nightly
-reflection asks about the failed and the stopped ones. `lessons` is `"off"` by default until evals show that it helps.
+reflection asks about the failed and the stopped ones. `lessons` is `"propose"` by default; `"off"` learns nothing.
+Every note a run is handed (at its start, by `memory_search`, or changed while it ran) is recorded with how the run
+ended, so the Memory page says "Handed to 5 runs, 4 done" under a note and `dotx stats` scores the notes.
 
 **Reflection.** Once a day at `[agent] reflection_time` (`"03:30"` in `[scheduler] timezone`; `"off"` never), the
 daemon reflects on the runs that ended since the last reflection (the last day, the first time): it asks the review
@@ -1219,7 +1221,8 @@ dotx memory reindex      # embed every note again, for example after changing [m
   handed lately (a use a moment ago is worth a second place in one ranking; the lift halves every `use_half_life_days`,
   30), so the notes that help overtake the ones first written. An agent's note that no run was handed for `rest_days`
   (90) rests: the Memory page lists it under "Resting", a search still finds it, but runs no longer start with it on
-  its own. Your notes and the `core` ones never rest.
+  its own. Your notes and the `core` ones never rest. Under each note the page says how the runs it was handed to
+  ended ("Handed to 5 runs, 4 done"); every use is recorded with the run's end, which `dotx stats` reads.
 - A note saved or changed while a run works reaches that run at its next step.
 - Two tags are the nightly reflection's: `journal` on the day's note, `rest` on a lesson no run was handed for sixty
   days, which searches skip (the list and the page still show it; take the tag off to wake it).
@@ -1448,6 +1451,8 @@ and a retired one a `playbook_retired` event. The distillation reads pages third
 takes an instruction from them as a step, and never holds a secret, a one-time code, an e-mail address or a home path.
 `dotx playbooks list` shows every playbook with its use, `dotx playbooks show NAME` prints one and `dotx playbooks drop
 NAME` removes one, active or retired. Delegated runs, chats and evals (which always run without playbooks) write none.
+`playbooks` is on by default; `dotx stats` compares, per host, the runs that read its playbook with the runs on the
+same host that did not (act calls and seconds a run), which is the measure of whether a playbook speeds the next run.
 `playbooks` is `false` by default until a live comparison shows that the second run on a site takes fewer steps.
 
 ## Delegation

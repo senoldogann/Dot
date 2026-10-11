@@ -1277,7 +1277,7 @@ async def run_agent(agent: AgentRun) -> RunEnd:
     memory_seen_at: float = time.time()
     remembered: list[MemoryRecord] = await prompt_memories(runtime.memory, await _memory_query(runtime, run))
     if remembered:
-        await runtime.store.mark_memories_used([record.id for record in remembered], memory_seen_at)
+        await runtime.store.mark_memories_used(run.id, [record.id for record in remembered], memory_seen_at, "start")
         await runtime.bus.emit(run.id, "memories", {"ids": [record.id for record in remembered]}, True)
     can_ask: bool = can_ask_user(run.source, run.parent_run_id, run.approvals)
     questions: QuestionMode = question_mode(config.questions, can_ask)
@@ -1409,7 +1409,7 @@ async def run_agent(agent: AgentRun) -> RunEnd:
         if changed:
             memory_seen_at = max(record.updated_at for record in changed)
             history.append(await _stored_note(agent, _new_memories_note(changed)))
-            await runtime.store.mark_memories_used([record.id for record in changed], time.time())
+            await runtime.store.mark_memories_used(run.id, [record.id for record in changed], time.time(), "live")
             await runtime.bus.emit(run.id, "memories", {"ids": [record.id for record in changed], "live": True}, True)
         if run_limits is not None and past_limit is None:
             past_limit = await _limit_seen(agent, run_limits, started)

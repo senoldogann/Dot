@@ -34,7 +34,7 @@ from dotagent.runtime import Runtime, close_runtime, open_runtime
 from dotagent.server.app import create_app
 from dotagent.server.context import ServerContext
 from dotagent.store.db import Store
-from dotagent.store.models import EventRecord, MemoryRecord, RunRecord
+from dotagent.store.models import EventRecord, MemoryRecord, MemoryScore, RunRecord
 from dotagent.tools.meta import FINISH_TOOL
 from dotagent.tools.shell import read_login_env
 
@@ -322,6 +322,8 @@ async def test_auto_saves_the_lessons_of_a_run_and_drops_a_lesson_a_saved_note_a
         assert f"- {LESSON}" in prompts[0]
         assert await run_lessons(store, second.id) is None
         assert await store.count_memories() == 1
+        # The second run was handed the lesson and ended done: the lesson's score says so.
+        assert await store.memory_scores([memory_id]) == {memory_id: MemoryScore(handed=1, done=1, failed=0)}
 
 
 async def test_the_lessons_of_a_run_that_read_a_web_page_are_only_proposed(
@@ -336,8 +338,8 @@ async def test_the_lessons_of_a_run_that_read_a_web_page_are_only_proposed(
         assert await home.runtime.store.count_memories() == 0
 
 
-async def test_lessons_are_off_by_default_and_a_run_is_then_not_asked_for_any(login_env: dict[str, str]) -> None:
-    assert load_default_config().agent.lessons == "off"
+async def test_lessons_are_proposed_by_default_and_off_leaves_a_run_unasked(login_env: dict[str, str]) -> None:
+    assert load_default_config().agent.lessons == "propose"
     async with _home(_config("off"), login_env, _stumbles(NOTES, ())) as home:
         run: RunRecord = await _run(home)
         assert _asked(home, run) == []

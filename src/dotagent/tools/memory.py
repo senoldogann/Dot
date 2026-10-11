@@ -138,7 +138,9 @@ def _search_tool() -> RegisteredTool:
 
     async def run(args: SearchArgs, ctx: ToolContext) -> ToolResult:
         hits: list[MemoryHit] = await recall(ctx.runtime.memory, args.query, args.limit)
-        await ctx.runtime.memory.store.mark_memories_used([hit.record.id for hit in hits], time.time())
+        await ctx.runtime.memory.store.mark_memories_used(
+            ctx.run_id, [hit.record.id for hit in hits], time.time(), "search"
+        )
         return ok(render_hits(args.query, hits))
 
     return make_tool(

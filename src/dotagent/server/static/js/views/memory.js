@@ -42,6 +42,18 @@ function noteText(text) {
   return el("div", null, body, toggle);
 }
 
+/** How the runs a note was handed to ended: "Handed to 5 runs, 4 done"; nothing until a run was handed it. */
+function scoreLine(score) {
+  if (score === undefined || score.handed === 0) {
+    return null;
+  }
+  return el(
+    "span",
+    { title: `${score.done} ended done, ${score.failed} failed` },
+    `Handed to ${plural(score.handed, "run", "runs")}, ${score.done} done`,
+  );
+}
+
 /** Who wrote a note and how often runs used it. */
 function provenance(record) {
   const author =
@@ -83,7 +95,7 @@ function editForm(record, onSave, onCancel) {
  * One note with its tags, its age, who wrote it and buttons to correct or forget it. `similarity` is null unless the
  * row is a search hit; `actions` is `{ forget(record), edit(record, content, tags) }`.
  */
-function memoryRow({ record, similarity }, actions) {
+function memoryRow({ record, similarity, score }, actions) {
   const row = el("div", { class: "list-row", dataset: { memory: record.id } });
   const forget = el(
     "button",
@@ -114,6 +126,7 @@ function memoryRow({ record, similarity }, actions) {
           record.tags.map((tag) => el("span", { class: "chip" }, tag)),
           el("span", { title: dateTimeFull(record.created_at) }, `Saved ${ago(record.created_at)}`),
           provenance(record),
+          scoreLine(score),
         ),
       ),
       el("div", { class: "row-actions" }, edit, forget),
@@ -220,7 +233,7 @@ export function mount(root, ctx) {
         if (disposed || mine !== ticket) {
           return;
         }
-        hits = page.items.map((record) => ({ record, similarity: null }));
+        hits = page.items.map((record) => ({ record, similarity: null, score: page.scores[record.id] }));
         total = page.total;
         resting = new Set(page.resting);
       } else {
@@ -258,7 +271,7 @@ export function mount(root, ctx) {
       if (disposed || mine !== ticket) {
         return;
       }
-      hits = [...hits, ...page.items.map((record) => ({ record, similarity: null }))];
+      hits = [...hits, ...page.items.map((record) => ({ record, similarity: null, score: page.scores[record.id] }))];
       total = page.total;
       resting = new Set([...resting, ...page.resting]);
       paint();

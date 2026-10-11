@@ -13,6 +13,8 @@ RunStatus = Literal["queued", "running", "done", "blocked", "failed", "cancelled
 # A run in one of these has not ended.
 WORKING_STATUSES: frozenset[RunStatus] = frozenset({"queued", "running", "blocked"})
 RunMode = Literal["task", "chat", "research"]
+# How a run was handed a note: at its start, by a memory_search call, or as a note changed while it ran.
+MemoryUseHow = Literal["start", "search", "live"]
 # ``pending``: a run waits for the answer; ``left``: a question a run left for the user and went on without (it is never
 # expired; answering it carries the work on in its thread).
 ApprovalStatus = Literal["pending", "left", "approved", "denied", "expired"]
@@ -153,6 +155,15 @@ class MemoryRecord(FrozenModel):
     source_run: str | None
     used_count: int
     last_used_at: float | None
+
+
+class MemoryScore(FrozenModel):
+    """How the runs a note was handed to ended: ``handed`` runs in all, of which ``done`` ended done and ``failed``
+    failed (the rest were cancelled, or still work)."""
+
+    handed: int
+    done: int
+    failed: int
 
 
 class ScheduleOptions(FrozenModel):
