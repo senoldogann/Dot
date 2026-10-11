@@ -876,8 +876,8 @@ files and the folder, left the third and exited 1; a second `--apply` left only 
 ## Part 2: standing goals, yolo without questions, faster steps, helpers (planned 2026-10-09)
 
 The owner's second ask, after the eight items (the verbatim Turkish is in `PLAN.md`, part 8): browser and computer
-use must be faster; a goal such as "earn money with the information I gave you" or "go to X.com and do what it takes
-to grow my audience" must be worked on **until the outcome is there**, not until the run feels done; a `yolo` run must
+use must be faster; an open-ended goal (earn something with what the owner gave, grow an audience on a platform) must be
+worked on **until the outcome is there**, not until the run feels done; a `yolo` run must
 never ask what it can do itself (a run asked the owner to type a one-time code that had arrived in the owner's own
 webmail); a run on one provider should be able to ask a model of another provider for help, and a missing key or an
 exhausted quota must not break anything; and the agent should be able to do any job on this Mac, write code in a
@@ -1088,7 +1088,7 @@ fill from what it reads itself, and a run that nobody watches (`yolo`, scheduled
 questions: a question for the owner is left with the run, the run goes on, and the owner's answer later carries the work
 on.
 
-**Why.** On 2026-10-09 a `yolo` run applying for a job stopped at an e-mail verification code that had arrived in the
+**Why.** On 2026-10-09 a `yolo` run signing up on a site stopped at an e-mail verification code that had arrived in the
 owner's webmail, which the run could open, and asked the owner to type the six digits. Three things made it ask (the
 lines are those of `4741bed`, before this item): the browser refused to type into password, one-time-code and card
 fields in every mode (`browser/driver.py:280-286`, called for `fill` and `type` at `:348` and `:351`); the prompt said
@@ -1496,8 +1496,8 @@ clean console), and the lines of `dotx run` replayed from the same run.
 on it in sessions, through restarts and days, until the outcome is verified by evidence or the owner stops it. Nothing
 else stops it.
 
-**Why.** This is the owner's main ask of 2026-10-09: "a system that does not stop until I see the result; when I say
-earn money and give the information, it must not stop until the money is where it belongs". Before this item (the lines
+**Why.** This is the owner's main ask of 2026-10-09: "a system that does not stop until the owner sees the result;
+when the owner names an outcome and gives the information, it must not stop until the outcome is there". Before this item (the lines
 are those of `12ad395`) a run ended by `finish`, by text replies, by the watchdog, by the goal check's patience or at a
 limit (`run_agent`, `agent/loop.py:839`); a schedule the agent creates cannot carry the owner's approval mode
 (`tools/schedule.py:99-101`) and starts every firing in a new thread with only the goal text
@@ -2747,8 +2747,8 @@ campaign that asks for a closed Chrome is refused and one on Dot's own starts wi
 cap passes in `yolo` and `auto`, is recorded with the amount, and counts against the day; over the cap or on an
 unlisted host the money hard stop holds in every mode.
 
-**Why.** dots allows advance approval for a specific purchase; Dot has only the hard stop. The owner's "earn money"
-goals need small spends (a domain, a listing fee).
+**Why.** dots allows advance approval for a specific purchase; Dot has only the hard stop. Open-ended goals of the owner's kind
+need small spends (a domain, a listing fee).
 
 **Design, as built.** `[policy.spend]` is a table of sites (the host without `www.`) to `SpendCap(per_purchase,
 per_day)`, plain numbers. The amount is read in the browser tool's classification of a payment step
