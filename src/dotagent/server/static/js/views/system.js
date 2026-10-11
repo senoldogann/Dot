@@ -572,6 +572,21 @@ function buildBrowser(isDisposed) {
   const problem = el("div", { class: "note bad", hidden: true }, icon("alert"), el("span"));
   const steps = el("ol", { class: "browser-steps" });
   const modes = segmented(BROWSER_MODES, BROWSER_MODES[0].id, (id) => attempt(() => choose(id)));
+  const raise = switchSetting({
+    label: "Bring Chrome to the front while working",
+    hint:
+      "Off, Dot's Chrome stays where it is while a run works and the app you were in keeps the focus; the run's page shows the page under Dot's computer either way, and Take over always brings the tab to the front.",
+    read: () => view !== null && view.raise_window,
+    write: async (on) => {
+      view = await api.post("/browser/raise", { raise_window: on });
+    },
+    onToggled: () => {
+      if (!isDisposed()) {
+        raise.paint();
+        toast("ok", view.raise_window ? "Chrome comes to the front while working." : "Chrome stays in the background.");
+      }
+    },
+  });
   const reload = el(
     "button",
     { class: "btn ghost sm", type: "button", title: "Look at Chrome again", "aria-label": "Look again", onclick: () => attempt(load) },
@@ -613,6 +628,7 @@ function buildBrowser(isDisposed) {
 
   function paint() {
     modes.set(view.mode);
+    raise.paint();
     const port = view.port === null ? "" : `, port ${view.port}`;
     facts.replaceChildren(
       entry("Chrome", view.chrome_running ? "running" : "not running"),
@@ -683,6 +699,7 @@ function buildBrowser(isDisposed) {
           "My Chrome opens tabs in the Chrome you already use, signed in as you are. Own Chrome keeps a profile apart from yours.",
         ),
       ),
+      raise.element,
       facts,
       problem,
       el("div", { class: "stack tight" }, el("div", { class: "section-label" }, "To let Dot join your Chrome"), steps),

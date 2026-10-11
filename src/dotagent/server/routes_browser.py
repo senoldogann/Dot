@@ -8,11 +8,11 @@ from pydantic import JsonValue
 from dotagent.browser.attach import INSPECT_PAGE, ChromeState, inspect_chrome
 from dotagent.browser.modes import adopt_mode
 from dotagent.browser.session import BrowserSession
-from dotagent.config_edit import set_browser_mode
+from dotagent.config_edit import set_browser_mode, set_browser_setting
 from dotagent.core.errors import RunConflict
 from dotagent.core.paths import chrome_data_dir, config_path
 from dotagent.server.context import ServerContext
-from dotagent.server.views import BrowserModeRequest, BrowserView
+from dotagent.server.views import BrowserModeRequest, BrowserRaiseRequest, BrowserView
 
 
 def browser_router(ctx: ServerContext) -> APIRouter:
@@ -29,6 +29,7 @@ def browser_router(ctx: ServerContext) -> APIRouter:
             port=chrome.port,
             inspect_page=INSPECT_PAGE,
             attach_timeout_s=session.config.attach_timeout_s,
+            raise_window=session.config.raise_window,
         )
 
     @router.get("/browser")
@@ -42,6 +43,13 @@ def browser_router(ctx: ServerContext) -> APIRouter:
             raise RunConflict("the browser cannot be switched while runs are active", {"active_runs": active})
         await adopt_mode(session, request.mode)
         await asyncio.to_thread(set_browser_mode, config_path(), request.mode)
+        return await state()
+
+    @router.post("/browser/raise")
+    async def set_raise(request: BrowserRaiseRequest) -> BrowserView:
+        """Whether Chrome is brought to the front while a run works (item 97); takes effect at once and is kept."""
+        session.set_raise_window(request.raise_window)
+        await asyncio.to_thread(set_browser_setting, config_path(), "raise_window", request.raise_window)
         return await state()
 
     return router

@@ -556,6 +556,21 @@ async def test_the_browser_mode_is_reported_and_only_switched_when_chrome_is_the
     assert (written.browser.mode, written.policy.preset) == ("own", "cautious")
 
 
+async def test_whether_chrome_is_raised_is_reported_switched_live_and_kept(
+    client: httpx.AsyncClient, home: Path
+) -> None:
+    assert (await client.get("/api/browser")).json()["raise_window"] is False
+    raised: httpx.Response = await client.post("/api/browser/raise", json={"raise_window": True})
+    assert raised.status_code == 200, raised.text
+    assert raised.json()["raise_window"] is True
+    assert (await client.get("/api/browser")).json()["raise_window"] is True
+    assert load_config(home / "config.toml").browser.raise_window is True
+    lowered: httpx.Response = await client.post("/api/browser/raise", json={"raise_window": False})
+    assert lowered.json()["raise_window"] is False
+    assert load_config(home / "config.toml").browser.raise_window is False
+    assert (await client.post("/api/browser/raise", json={"raise_window": "maybe"})).status_code == 422
+
+
 def _desktop_is_fully_permitted() -> bool:
     granted: Permissions = check_permissions()
     return granted.accessibility and granted.post_event and granted.screen_recording

@@ -77,11 +77,13 @@ from dotagent.browser.types import (
     Viewport,
 )
 from dotagent.browser.upstream import ignore_repeated_frame_detach
+from dotagent.browser.window import focused_app, give_focus_back
 from dotagent.config import BrowserConfig
 from dotagent.core.errors import ApprovalRejected, BrowserError, HandedOff, PolicyDenied
 from dotagent.core.logs import get_logger
 from dotagent.core.text import truncate_middle
 from dotagent.core.types import JsonObject
+from dotagent.desktop.types import AppInfo
 from dotagent.store.models import BrowserMode
 
 _log = get_logger("dotagent.browser.session")
@@ -299,6 +301,10 @@ class BrowserSession:
             )
         keychain: KeychainMode = await asyncio.to_thread(read_keychain_mode, self._profile)
         playwright: Playwright = await self._driver()
+        # With the window kept in the background (item 97), whoever has the focus now gets it back after the launch.
+        earlier: AppInfo | None = (
+            None if config.headless or config.raise_window else await asyncio.to_thread(focused_app)
+        )
         try:
             context: BrowserContext = await playwright.chromium.launch_persistent_context(
                 user_data_dir=str(self._profile),
@@ -327,9 +333,12 @@ class BrowserSession:
             mode=config.mode,
             channel=config.channel,
             headless=config.headless,
+            raise_window=config.raise_window,
             profile=str(self._profile),
             keychain=keychain,
         )
+        if earlier is not None:
+            await asyncio.to_thread(give_focus_back, earlier)
         return _Opened(context=context, spare_pages=tuple(context.pages))
 
     async def _attach(self) -> _Opened:
@@ -441,6 +450,11 @@ class BrowserSession:
     def connected(self) -> bool:
         """Whether a Chrome is started or connected at the moment (one starts on the first call that needs it)."""
         return self._context is not None
+
+    def set_raise_window(self, raise_window: bool) -> None:
+        """Whether the window is raised while a run works, from the next call on; Chrome is not restarted."""
+        self._config = self._config.model_copy(update={"raise_window": raise_window})
+        _log.info("browser_raise_window", raise_window=raise_window)
 
     async def switch(self, config: BrowserConfig, profile_dir: Path) -> None:
         """Work in the Chrome that ``config`` and ``profile_dir`` name from the next call on: the current one is let go
@@ -1124,7 +1138,9 @@ class BrowserSession:
             self._require_tab_index(thread, index)
             thread.active = index - 1
             tab: Tab = thread.tabs[thread.active]
-            await bring_to_front(tab.page)
+            # The tab is made the window's visible one only when the window may be raised (item 97).
+            if self._config.raise_window:
+                await bring_to_front(tab.page)
             return await self._full_view(thread, tab)
 
     async def close_tab(self, thread_id: str, index: int) -> PageView:

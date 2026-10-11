@@ -1,4 +1,5 @@
-"""Switching ``[browser] mode`` in the user's config.toml: the comments and the other settings stay as written."""
+"""Switching ``[browser] mode`` and ``raise_window`` in the user's config.toml: the comments and the other settings stay
+as written."""
 
 import stat
 import tomllib
@@ -7,7 +8,7 @@ from pathlib import Path
 import pytest
 
 from dotagent.config import BrowserMode
-from dotagent.config_edit import set_browser_mode, with_browser_mode
+from dotagent.config_edit import set_browser_mode, set_browser_setting, with_browser_mode, with_browser_setting
 from dotagent.core.errors import ConfigError
 from dotagent.core.types import JsonObject
 
@@ -105,3 +106,24 @@ def test_a_browser_table_written_as_an_inline_table_is_refused_and_left_as_it_wa
     with pytest.raises(ConfigError, match='add mode = "attach" under \\[browser\\] by hand'):
         set_browser_mode(path, "attach")
     assert path.read_text(encoding="utf-8") == original
+
+
+def test_raise_window_is_added_or_replaced_like_the_mode_and_the_mode_stays(tmp_path: Path) -> None:
+    assert with_browser_setting("", "raise_window", True) == "[browser]\nraise_window = true\n"
+    text: str = '[browser]\nmode = "attach"\nraise_window = true  # keep\n\n[agent]\nstall_limit = 4\n'
+    assert with_browser_setting(text, "raise_window", False) == (
+        '[browser]\nmode = "attach"\nraise_window = false  # keep\n\n[agent]\nstall_limit = 4\n'
+    )
+    path: Path = tmp_path / "config.toml"
+    path.write_text('[browser]\nmode = "attach"\n', encoding="utf-8")
+    set_browser_setting(path, "raise_window", True)
+    assert path.read_text(encoding="utf-8") == '[browser]\nraise_window = true\nmode = "attach"\n'
+    set_browser_mode(path, "own")
+    assert path.read_text(encoding="utf-8") == '[browser]\nraise_window = true\nmode = "own"\n'
+
+
+def test_a_raise_window_written_as_a_string_is_replaced_by_the_boolean(tmp_path: Path) -> None:
+    path: Path = tmp_path / "config.toml"
+    path.write_text('[browser]\nraise_window = "yes"  # typo\n', encoding="utf-8")
+    set_browser_setting(path, "raise_window", True)
+    assert path.read_text(encoding="utf-8") == "[browser]\nraise_window = true  # typo\n"

@@ -209,6 +209,8 @@ class BrowserConfig(FrozenModel):
     attach_timeout_s: float
     channel: str
     headless: bool
+    # Whether Dot's Chrome is brought to the front while a run works (item 97); Take over brings it either way.
+    raise_window: bool
     viewport_width: int
     viewport_height: int
     navigation_timeout_s: float

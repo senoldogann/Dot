@@ -5015,9 +5015,9 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 92  | Skills from its own work: a task that went well becomes a skill for its kind     | done        | 3074107 |
 | 93  | The owner, in one section: what the reflection knows about how you work         | done        | 6d64e43 |
 | 94  | An agent learns for itself: lessons, skills and a score per agent                | done        | 937cca4 |
-| 95  | The sidebar, smaller: the nav under New chat, sections that fold, rows cut short   | in progress |         |
-| 96  | The run page: the arrow above the composer, the cost in the side panel            | in progress |         |
-| 97  | Chrome in the background: the live view shows the page, the window stays put       | planned     |         |
+| 95  | The sidebar, smaller: the nav under New chat, sections that fold, rows cut short   | done        | f3dce6e |
+| 96  | The run page: the arrow above the composer, the cost in the side panel            | done        | 3a8a20b |
+| 97  | Chrome in the background: the live view shows the page, the window stays put       | in progress |         |
 | 98  | The web that is refused: 999, 403 and their kind meet the browser, not the end     | planned     |         |
 | 99  | The team that grows: a run makes a lasting teammate and knows of it                | planned     |         |
 | 100 | The review: every feature of parts 1 to 12 read once more on the live pages        | planned     |         |
@@ -5640,7 +5640,7 @@ teammates while it works. And the whole is read once more, page by page, before 
 
 ### 95. The sidebar, smaller: the nav under New chat, sections that fold, rows cut short
 
-**Status: in progress (2026-10-11).**
+**Status: done.** Merged as `f3dce6e` (PR #111, MYP-235 Done).
 
 **Design, as built (2026-10-11).** `sidebar.js`: a `nav.side-links` with Agents, Activity and Campaigns sits under
 the search; the foot keeps Settings. Each section's label is a button (`foldLabel`, `.side-fold`, a chevron that
@@ -5665,7 +5665,7 @@ sidebar shots are read by eye.
 
 ### 96. The run page: the arrow above the composer, the cost in the side panel
 
-**Status: in progress (2026-10-11).**
+**Status: done.** Merged as `3a8a20b` (PR #112, MYP-236 Done).
 
 **Design, as built (2026-10-11).** `run.js`: the jump button is a round icon button (`.btn.icon-only.jump`, 36 px,
 the surface with a raised shadow) prepended to the dock, positioned by it (absolute, centred, its bottom 8 px above
@@ -5683,7 +5683,31 @@ starts at the first turn; `tests/smoke/test_activity.py` follows it there.
 
 ### 97. Chrome in the background: the live view shows the page, the window stays put
 
-**Status: planned.**
+**Status: in progress (2026-10-11).**
+
+**Design, as built (2026-10-11).** `BrowserConfig.raise_window` (`defaults.toml` `[browser] raise_window = false`,
+with the comment that the run's page shows the page either way). `browser/window.py`: `focused_app()` (the frontmost
+pid through the accessibility API, matched against `list_apps()`; `None` when the desktop cannot be asked, logged as
+`focused_app_unknown`) and `give_focus_back(app)` (waits up to 2 s for Chrome to take the front, then `activate(app,
+2.0)`; a Chrome that never took it leaves nothing to do; a desktop that refuses is logged as `focus_not_returned`, the
+run goes on). `BrowserSession._launch_own` records the focused app before the launch when the config is headed and
+`raise_window` is off, logs `raise_window` in `browser_started` and gives the focus back after the context is up, both
+in `asyncio.to_thread`. `switch_tab` calls `bring_to_front` only when `self._config.raise_window`; `focus()` (Take over)
+still calls it. `set_raise_window(bool)` changes the live config with `model_copy` (`browser_raise_window` log), no
+restart. `config_edit`: `with_browser_setting(text, key, value)` / `set_browser_setting(path, key, value)` for the
+`[browser]` keys `mode` and `raise_window` (a boolean written as `true`/`false`, a quoted-or-boolean value regex per key,
+the same parse-again proof), `with_browser_mode` / `set_browser_mode` kept as thin wrappers. `POST /api/browser/raise`
+(`BrowserRaiseRequest(raise_window)`) sets the session and writes the file; `BrowserView.raise_window`. Settings ›
+Browser: `switchSetting` "Bring Chrome to the front while working" under the mode row, painted from the view. README:
+Dot's computer, the Browser use list and the `own` notes. Tests: `test_config_edit` (raise_window added, replaced with
+its comment kept, the mode untouched; a non-boolean value in the file refused), `test_server` (the route reports,
+switches live, writes the file, refuses a non-boolean).
+
+**Checked by hand (2026-10-11, the owner's Mac).** A script with a temporary home started Dot's own headed Chrome
+against a local page twice. With `raise_window = false`: the app that had the focus (Dot's desktop shell) was frontmost
+again 1.5 s after the launch (`focus_returned`, the whole open took 3.1 s), and `switch_tab` left another app in front.
+With `raise_window = true`: Chrome was frontmost after the launch and after `switch_tab`. A headed launch is not
+possible in CI, so this stays a hand check.
 
 **What.** `[browser] raise_window` (false by default): with it off, `switch_tab` no longer raises the window, the
 app that had the focus before Dot's Chrome launched gets it back right after the launch, and only Take over raises
@@ -6246,3 +6270,5 @@ written as the next part's first items. The findings go in this section as built
 - 2026-10-11 (Fable 5.1): item 93 merged as `6d64e43` (PR #107, MYP-233 Done): the owner section the reflection keeps, the owner's own lines beside it, the Memory page card. The daemon restarted on `6d64e43`.
 - 2026-10-11 (Fable 5.1): item 94 merged as `937cca4` (PR #108, MYP-234 Done): an agent's lessons, skills and scores its own, the agent's page "What it learned". Part 11 built: items 89 to 94. The daemon waits for a restart on `937cca4` (two of the owner's runs were active).
 - 2026-10-11 (Fable 5.1): the daemon restarted on `269eab5` once idle. Part 12 planned (items 95 to 100): the sidebar smaller, the run page's arrow and cost, Chrome in the background, the web that is refused, the team that grows, the review.
+- 2026-10-11 (Fable 5.1): item 95 merged as `f3dce6e` (PR #111, MYP-235 Done): the nav under the search, sections that fold (`dot.sideFolds`), Working rows cut to their first words, focus rings in the theme's `--ring`.
+- 2026-10-11 (Fable 5.1): item 96 merged as `3a8a20b` (PR #112, MYP-236 Done): the round arrow above the composer (`.jump`, `.dock-bare` for delegated runs), the cost card in the side panel after Details.
