@@ -401,8 +401,6 @@
   overflow: hidden;
   font-size: var(--text-xs);
   color: var(--muted);
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 /* Delegated runs under the run that delegated them (item 68). */

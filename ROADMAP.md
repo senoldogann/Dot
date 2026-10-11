@@ -4997,8 +4997,8 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 78  | One bar: the top bar carries the page, the run's head and the daemon     | done        | 7a7e43f |
 | 79  | Flat surfaces and plain words: cards, labels, meta, chips, empty states  | done        | ab5f33a |
 | 80  | Forms and controls: one grammar for inputs, selects, switches, tables    | done        | 132ce0d |
-| 81  | Dark, first paint and the tour: every page read in both schemes          | in progress |         |
-| 82  | Delegated runs as rows: face, state, last line, time; the child's bar    | planned     |         |
+| 81  | Dark, first paint and the tour: every page read in both schemes          | done        | 04693d7 |
+| 82  | Delegated runs as rows: face, state, last line, time; the child's bar    | in progress |         |
 | 83  | Faces for the actors: a hue each, alive in the rows and the bar          | planned     |         |
 
 ### 77. The type system: Inter and Geist Mono, seven sizes, three weights
@@ -5105,7 +5105,7 @@ name in Geist Mono at 13, the capability chips as in item 79, the reasoning sele
 
 ### 81. Dark, first paint and the tour: every page read in both schemes
 
-**Status: in progress.** Built on `item-81-dark` (MYP-221).
+**Status: done.** Merged as `04693d7` (PR #90, squash; MYP-221 Done).
 
 **Design, as built (2026-10-11).** The dark tiers stood: the tour's dark shots were read page by page (home, run,
 activity, every settings pane, the phone run) and the three surfaces (page `#1b1a18`, sunken sidebar `#151412`,
@@ -5128,7 +5128,26 @@ and what the earlier items missed fixed here; README's visual-system section rew
 
 ### 82. Delegated runs as rows: face, state, last line, time; the child's bar
 
-**Status: planned.** The owner's reference (2026-10-11): Claude Code's subagent list and page.
+**Status: in progress.** Built on `item-82-delegated` (MYP-222). The owner's reference (2026-10-11): Claude Code's
+subagent list and page.
+
+**Design, as built (2026-10-11).** `timeline.js` `childScope` draws a delegated run as `details.child` whose summary
+is the row: `.child-face` (the 24 px face, `avatar("working")`, with the status ring at its corner, 12 px, the same
+ring as before: turning, amber, green with a check, red, dashed), `.child-main` with `.child-title` (the goal, one
+line) over `.child-last` (the `.meta-facts` spans, class `child-progress`: "starting", then "step 3" and the tool,
+then the end state and the steps), `.child-time` (the time since the run was queued, repainted on every step and at
+the end by `paintChild`), the `a.child-open` link to its page and the chevron; the mode and model stay in a hidden
+span for a screen reader. The face rests or turns red at the end (`faceState`). The card: a hairline, the 12 px
+radius, the surface; a `.child` that follows a `.child` loses the 8 px gap and its top corners and draws one
+hairline between them (`:has(+ .child)`), so rows share one card. The sidebar's rows take `progressFacts(row)`
+(`nesting.js`, the array that `progressWords` used to join with dots) as spans in `.meta-facts`. The run page
+(`run.js`) of a delegated run puts `a.stage-crumb` (the parent's goal, loaded from `/runs/{parent}`, clipped to 56)
+and a `.stage-sep` before its own goal in `.stage-name`; the name gives way with an ellipsis, the crumb first, and
+on a phone the crumb hides. Under the conversation, where the dock would be, `.child-foot` is a pill of facts: the
+model and effort, `Completed in 1m 46s` / `Failed after` / `Stopped after` / `Working for` (repainted with the
+stats each second while the run works), "Part of a working run" or "Runs on its own" from the parent's `active`,
+and "Open parent"; the "Delegated by another run" chip is gone from the tools. `test_activity` opens the delegated
+run's page and holds the crumb's link and the pill's words, and photographs it.
 
 **What.** A delegated run in the parent's chat and in the sidebar is one row: the actor's face with a state dot at
 its corner (green ended, blue working, red failed), the goal as the title, the last line it said or did as a muted
@@ -5648,3 +5667,4 @@ item 82, the sidebar's sections, the Campaigns and Schedules pages and the bar o
 - 2026-10-11 (Fable 5.1): Part 9 planned (items 77-83; items 82 and 83 from the owner's references: Claude Code's subagent rows and child page, Grok's moving agent faces). Item 77 merged as `ffa00cb` (PR #86, MYP-217 Done): Inter and Geist Mono self-hosted, seven sizes, three weights, the token test, the screenshot tour. Item 78 merged as `7a7e43f` (PR #87, MYP-218 Done): `stage.js`, one solid top bar, the run's head in it, the settings' single title. Item 79 built on branch `item-79-flat-surfaces` (MYP-219): flat cards, sentence-case labels, `.meta-facts`, one-line empty states, the bubble on the raised surface.
 - 2026-10-11 (Fable 5.1): item 79 merged as `ab5f33a` (PR #88, MYP-219 Done). Item 80 built on branch `item-80-forms` (MYP-220): one control grammar (36/32 px, 8 px corner, one focus ring, the drawn chevron, 40 px table rows).
 - 2026-10-11 (Fable 5.1): item 80 merged as `132ce0d` (PR #89, MYP-220 Done). Item 81 built on branch `item-81-dark` (MYP-221): the dark shots read and kept, `boot.js` for the first paint, the tour's first-paint test, README's visual system as the current state.
+- 2026-10-11 (Fable 5.1): item 81 merged as `04693d7` (PR #90, MYP-221 Done). Item 82 built on branch `item-82-delegated` (MYP-222): the delegated run as a row, the child's breadcrumb and pill; the bar's title now gives way with an ellipsis and a delegated run's bar carries no chips (its pill has them).

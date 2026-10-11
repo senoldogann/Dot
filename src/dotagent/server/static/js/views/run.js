@@ -7,7 +7,7 @@ import { createComputer } from "../computer.js";
 import { createCostCard } from "../cost.js";
 import { createDetails } from "../details.js";
 import { wireComposer } from "../composer.js";
-import { clip, dateTime, dateTimeFull, debounce, el, modelName } from "../dom.js";
+import { clip, dateTime, dateTimeFull, debounce, duration, el, modelName } from "../dom.js";
 import { levelLabel } from "../efforts.js";
 import { continuedIn, earlierTurns, loadHistory, RESUME_SOURCE } from "../history.js";
 import { dotName, faceState, faceStateAtEnd, setFaceState } from "../face.js";
@@ -21,6 +21,9 @@ import { createTimeline } from "../timeline.js";
 import { attempt, confirmDialog, toast } from "../ui.js";
 
 const TERMINAL = new Set(["done", "failed", "cancelled"]);
+// A delegated run's goal in the bar and the words of its pill (item 82).
+const CRUMB_CHARS = 56;
+const FOOT_WORDS = { done: "Completed in", failed: "Failed after", cancelled: "Stopped after" };
 // The chips of a run that does not ask the user (the default needs none): the words and what they mean.
 const APPROVAL_CHIPS = {
   auto: { text: "Auto-approve", hint: "A review model answered the questions of the safety policy in your place" },
@@ -179,8 +182,53 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
     icon("arrowRight"),
     el("span", { class: "label" }, "Continue"),
   );
-  const parentChip =
-    run.parent_run_id === null ? null : el("a", { class: "chip", href: `#/runs/${run.parent_run_id}` }, icon("branch"), "Delegated by another run");
+  // A delegated run (item 82) names its parent in the bar as a breadcrumb, the parent's goal a link before its own, and
+  // closes its conversation with a pill: the model, how long it took, whether its parent still works, the way back.
+  const parentId = run.parent_run_id;
+  const crumb = parentId === null ? null : el("a", { class: "stage-crumb", href: `#/runs/${parentId}` }, "Parent run");
+  const crumbSep = parentId === null ? null : el("span", { class: "stage-sep", "aria-hidden": "true" }, "/");
+  const stageName = el("span", { class: "stage-name" }, parentId === null ? dotName() : clip(run.goal, CRUMB_CHARS));
+  const footTime = el("span", null);
+  const footParent = el("span", null, "Part of another run");
+  const foot =
+    parentId === null
+      ? null
+      : el(
+          "div",
+          { class: "child-foot-row" },
+          el(
+            "div",
+            { class: "child-foot meta-facts" },
+            el("span", null, run.effort === null ? modelName(run.model) : `${modelName(run.model)} ${levelLabel(run.effort)}`),
+            APPROVAL_CHIPS[run.approvals] === undefined ? null : el("span", null, APPROVAL_CHIPS[run.approvals].text),
+            footTime,
+            footParent,
+            el("a", { href: `#/runs/${parentId}` }, "Open parent"),
+          ),
+        );
+
+  /** The pill's time: how long the run has worked, or took, as it stands now. */
+  function paintFoot() {
+    if (foot === null) {
+      return;
+    }
+    const seconds = Math.max((finishedAt ?? Date.now() / 1000) - run.created_at, 0);
+    footTime.textContent = `${FOOT_WORDS[status] ?? "Working for"} ${duration(seconds)}`;
+  }
+
+  if (parentId !== null) {
+    api
+      .get(`/runs/${parentId}`)
+      .then((parent) => {
+        if (signal.aborted) {
+          return;
+        }
+        crumb.textContent = clip(parent.run.goal, CRUMB_CHARS);
+        crumb.title = parent.run.goal;
+        footParent.textContent = parent.active ? "Part of a working run" : "Runs on its own";
+      })
+      .catch((error) => console.warn("the parent run could not be loaded", error));
+  }
   const campaign = detail.campaign;
   const campaignChip =
     campaign === null
@@ -215,6 +263,7 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
   }
 
   function paintStats() {
+    paintFoot();
     statusSlot.replaceChildren(statusBadge(status));
     // The tick of a run that just ended stays for its moment; every other state follows the status.
     if (face.getAttribute("data-state") !== "done") {
@@ -778,8 +827,9 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
   // Dot's face, name, the run's state and its start name the page in the top bar (item 78); the run's chips and
   // buttons are the bar's tools, the chips waiting in the side panel's Details card on a phone. The goal, the first
   // message, is the page's heading for a reader of the structure.
-  setStageTitle(face, el("span", { class: "stage-name" }, dotName()), el("span", { class: "stage-sub" }, statusSlot, el("span", { class: "stage-time" }, dateTime(run.created_at))));
-  setStageTools(modelChip, ...modeChips, parentChip, campaignChip, inspector.toggle, resumeButton, cancelButton);
+  setStageTitle(face, crumb, crumbSep, stageName, el("span", { class: "stage-sub" }, statusSlot, el("span", { class: "stage-time" }, dateTime(run.created_at))));
+  // A delegated run's chips are in its pill and in the Details card; its bar keeps the room for the breadcrumb.
+  setStageTools(...(parentId === null ? [modelChip, ...modeChips, campaignChip] : []), inspector.toggle, resumeButton, cancelButton);
 
   layout.append(
     el(
@@ -798,6 +848,7 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
       lessonsCard,
       continuedIn(history.later),
       dock,
+      foot,
     ),
     inspector.element,
     inspector.scrim,

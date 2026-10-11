@@ -1397,6 +1397,7 @@ a.pill:hover {
   display: flex;
   align-items: center;
   gap: 8px;
+  flex: 0 1 auto;
   min-width: 0;
   font-weight: var(--weight-label);
 }
@@ -1420,7 +1421,12 @@ a.pill:hover {
   height: 28px;
 }
 
+/* The name gives way with an ellipsis when the bar is short; a breadcrumb's parent gives way first. */
 .stage-name {
+  flex: 0 1 auto;
+  min-width: 72px;
+  overflow: hidden;
+  text-overflow: ellipsis;
   white-space: nowrap;
 }
 
@@ -1428,6 +1434,7 @@ a.pill:hover {
   display: flex;
   align-items: center;
   gap: 8px;
+  flex: none;
   min-width: 0;
   color: var(--muted);
   font-size: var(--text-sm);
@@ -2054,49 +2061,126 @@ details[open] > summary .chev {
   gap: 8px;
 }
 
-/* A delegated run is a chip with its status ring and goal; opened, the run's steps hang under it. */
-.child > summary {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  max-width: 100%;
-  padding: 4px 12px 4px 8px;
+/* A delegated run is a row (item 82): the face with its state at the corner, the goal over its last line, the time it
+   has taken, the way to its page and a chevron; opened, the run's steps hang under it. Rows that follow each other
+   share one card, a hairline between them. */
+.child {
   border: 1px solid var(--border);
-  border-radius: var(--radius-pill);
+  border-radius: var(--radius);
   background: var(--surface);
+}
+
+.child:has(+ .child) {
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
+.child + .child {
+  margin-top: -8px;
+  border-top: 0;
+  border-top-left-radius: 0;
+  border-top-right-radius: 0;
+}
+
+.child + .child > summary {
+  border-top: 1px solid var(--border);
+}
+
+.child > summary {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 12px;
   cursor: pointer;
   list-style: none;
 }
 
 .child > summary:hover {
-  border-color: var(--border-strong);
+  background: var(--surface-2);
 }
 
 .child > summary::-webkit-details-marker {
   display: none;
 }
 
-.child > summary .truncate {
-  flex: 0 1 auto;
-  min-width: 0;
+.child-face {
+  position: relative;
+  flex: none;
+  width: 24px;
+  height: 24px;
 }
 
-/* The mode and model of the delegated run, quiet beside its goal; they give way first when the line is short. */
-.child > summary .chip {
-  flex: 0 3 auto;
+.child-face .avatar {
+  width: 24px;
+  height: 24px;
+}
+
+.child-face .status-ring {
+  position: absolute;
+  right: -3px;
+  bottom: -3px;
+  width: 12px;
+  height: 12px;
+  background: var(--surface);
+}
+
+.child-main {
+  flex: 1;
   min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-half);
+}
+
+.child-title {
   overflow: hidden;
   text-overflow: ellipsis;
-  padding: 0;
-  border: 0;
-  background: none;
+  white-space: nowrap;
+  font-weight: var(--weight-label);
+}
+
+.child-time {
+  flex: none;
   color: var(--muted);
+  font-size: var(--text-sm);
 }
 
 .child > .timeline {
-  margin: 8px 0 0 16px;
-  padding-left: 16px;
+  margin: 0 12px 12px 36px;
+  padding-left: 12px;
   border-left: 1px solid var(--border);
+}
+
+/* The bar's breadcrumb on a delegated run's page: the parent's goal, a link, then the run's own. */
+.stage-crumb {
+  flex: 0 3 auto;
+  min-width: 48px;
+  max-width: 240px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--muted);
+  font-weight: var(--weight-text);
+}
+
+.stage-sep {
+  color: var(--faint);
+}
+
+/* The pill that closes a delegated run's conversation: the model, the time, whether its parent works, the way back. */
+.child-foot-row {
+  display: flex;
+  justify-content: center;
+}
+
+.child-foot {
+  justify-content: center;
+  padding: 8px 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  background: var(--surface);
+  color: var(--muted);
+  font-size: var(--text-sm);
 }
 
 /* The status of a delegated run on its chip: a ring that turns while the run works and blinks amber while it waits for
@@ -2506,6 +2590,26 @@ dialog.lightbox img {
     display: none;
   }
 
+  /* The breadcrumb's parent waits in the pill under the conversation; the bar keeps the run's own name. */
+  .stage-crumb,
+  .stage-sep,
+  .stagebar-row:has(.stage-crumb) .stage-sub {
+    display: none;
+  }
+
+  /* The bar's buttons keep their icon alone on a phone; the name keeps its first word. */
+  .stage-tools .btn .label {
+    display: none;
+  }
+
+  .stage-tools .btn {
+    padding: 0 8px;
+  }
+
+  .stage-name {
+    min-width: 56px;
+  }
+
   .stage-tools .chip {
     display: none;
   }
@@ -2757,11 +2861,6 @@ dialog.lightbox img {
   margin-left: 28px;
   padding-left: 8px;
   border-left: 1px solid var(--border);
-}
-
-.child > summary .child-progress {
-  flex: none;
-  font-variant-numeric: tabular-nums;
 }
 
 .child > summary .child-open {

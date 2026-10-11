@@ -8,7 +8,8 @@
 import { approvalCard, fromEvent, LEFT_IN_RUN } from "./approvals.js";
 import { sentFiles } from "./attachments.js";
 import { clip, compact, dateTime, dateTimeFull, duration, el, plural } from "./dom.js";
-import { icon } from "./icons.js";
+import { faceState } from "./face.js";
+import { avatar, icon } from "./icons.js";
 import { foldSteps } from "./layout.js";
 import { answerMessage, userMessage } from "./messages.js";
 import { prose } from "./prose.js";
@@ -198,11 +199,14 @@ export function createTimeline({ rootRunId, startedAt, onGrow, onPlan, onStats, 
 
   function childScope(runId, data, ts) {
     const parent = scopes.get(data.parent_run_id) ?? scopes.get(rootRunId);
+    const face = avatar("working");
     const status = el("span", { role: "img" });
     paintRing(status, "running");
-    const meta = el("span", { class: "chip" }, data.mode ?? "task");
-    // What the delegated run is doing now: its step and its last tool, then how it ended and how many steps it took.
-    const progress = el("span", { class: "chip child-progress" }, "starting");
+    // The mode and, once it starts, the model of the delegated run: for a screen reader; the row shows none of it.
+    const meta = el("span", { class: "visually-hidden" }, data.mode ?? "task");
+    // The last line of the delegated run: its step and tool, then how it ended and how many steps it took.
+    const progress = el("span", { class: "child-last small muted meta-facts child-progress" }, el("span", null, "starting"));
+    const time = el("span", { class: "child-time" });
     const open = el(
       "a",
       { class: "child-open", href: `#/runs/${runId}`, title: "Open the delegated run's own page", "aria-label": "Open the delegated run" },
@@ -210,15 +214,16 @@ export function createTimeline({ rootRunId, startedAt, onGrow, onPlan, onStats, 
     );
     open.addEventListener("click", (event) => event.stopPropagation());
     const inner = el("div", { class: "timeline" });
-    // A chip with the delegated run's status ring and goal; opened, the run's steps hang under it.
+    // One row (item 82): the face with its state at the corner, the goal over the last line, the time it has taken,
+    // the way to its page and the chevron; opened, the run's steps hang under it.
     const summary = el(
       "summary",
-      null,
-      status,
+      { class: "child-row" },
+      el("span", { class: "child-face" }, face, status),
       el("span", { class: "visually-hidden" }, "Delegated run:"),
-      el("span", { class: "truncate" }, clip(data.goal ?? "", GOAL_CHARS)),
+      el("span", { class: "child-main" }, el("span", { class: "child-title" }, clip(data.goal ?? "", GOAL_CHARS)), progress),
       meta,
-      progress,
+      time,
       open,
       el("span", { class: "chev" }, icon("chevron")),
     );
@@ -227,9 +232,15 @@ export function createTimeline({ rootRunId, startedAt, onGrow, onPlan, onStats, 
       scope.touched = true;
     });
     place(parent, node, ts);
-    const scope = makeScope({ runId, container: inner, panel: { node, status, meta, progress, steps: 0 }, parent, began: ts });
+    const scope = makeScope({ runId, container: inner, panel: { node, face, status, meta, progress, time, steps: 0 }, parent, began: ts });
     scopes.set(runId, scope);
     return scope;
+  }
+
+  /** The row of a delegated run as it stands at `ts`: its last line as facts and the time it has taken. */
+  function paintChild(scope, ts, facts) {
+    scope.panel.progress.replaceChildren(...facts.map((fact) => el("span", null, fact)));
+    scope.panel.time.textContent = duration(Math.max(ts - scope.began, 0));
   }
 
   /**
@@ -327,7 +338,8 @@ export function createTimeline({ rootRunId, startedAt, onGrow, onPlan, onStats, 
         return;
       }
       paintRing(scope.panel.status, status);
-      scope.panel.progress.textContent = `${status} · ${scope.panel.steps === 1 ? "1 step" : `${scope.panel.steps} steps`}`;
+      scope.panel.face.setAttribute("data-state", faceState(status));
+      paintChild(scope, record.ts, [status, plural(scope.panel.steps, "step", "steps")]);
       // The parent resumes when the delegated run is over; the time in between was spent on the delegation.
       scope.parent.boundary = record.ts;
       if (status === "done" && !scope.touched) {
@@ -411,7 +423,7 @@ export function createTimeline({ rootRunId, startedAt, onGrow, onPlan, onStats, 
         onBrowserStep();
       }
       if (scope.panel !== null) {
-        scope.panel.progress.textContent = `step ${scope.panel.steps} · ${data.tool}`;
+        paintChild(scope, record.ts, [`step ${scope.panel.steps}`, data.tool]);
       }
       showCall(scope, { id: data.call_id, tool: data.tool, args: data.args });
     },
