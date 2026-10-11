@@ -4628,8 +4628,8 @@ says so), $10 per 1,000 searches plus tokens (the docs; a failed search is not b
 | 70  | Reflection: Dot's day in review, every night                             | done        | dd13ec9 |
 | 71  | Memory that rests: use decides what is recalled                          | done        | 6896e53 |
 | 72  | The home that says "I am here"                                           | done        | 9020ee0 |
-| 73  | Motion with meaning                                                      | in progress |         |
-| 74  | Quiet chrome: the surfaces recede, the work leads                        | planned     |         |
+| 73  | Motion with meaning                                                      | done        | 1efede9 |
+| 74  | Quiet chrome: the surfaces recede, the work leads                        | in progress |         |
 | 75  | Told only when not looking                                               | planned     |         |
 | 76  | The live numbers of part 8                                               | planned     |         |
 
@@ -4817,7 +4817,7 @@ today · 1 lesson" and the face to idle.
 
 ### 73. Motion with meaning
 
-**Status: in progress.** Built on `item-73-motion` (MYP-213).
+**Status: done.** Merged as `1efede9` (PR #81, squash; MYP-213 Done).
 
 **What.** Motion tokens (`--motion-quick` 120 ms, `--motion-base` 200 ms, `--motion-slow` 320 ms, one standard
 easing and one emphasised), the face breathes while idle and pulses while working, cards and rows enter with a short
@@ -4851,11 +4851,13 @@ what transforms (the core's breath and pulse, the spinners, the switch's knob, t
 `shell.css`) and leaves the fades, the blink and the tick, so the block that forced the tick to show without motion is
 gone with the blanket rule. Smoke test in `tests/smoke/test_face.py`: the core's computed `animation-name` is
 `breathe` at rest and `pulse-core` at work, `none` in both under emulated reduced motion while a card still fades in,
-and the drawer's transition is `0s` under it.
+and the drawer's transition is `0s` under it. Taken back in item 74: the fade of `.card`, because a list that repaints
+on every lifecycle event (the Today strip, the Activity page) blinked with it; the slash menu and the toasts, which
+appear once, keep theirs.
 
 ### 74. Quiet chrome: the surfaces recede, the work leads
 
-**Status: planned.**
+**Status: in progress.** Built on `item-74-quiet-chrome` (MYP-214).
 
 **What.** The parts that orient recede so the conversation leads (Linear's rule): the sidebar without dividers
 between its groups, its labels lighter and its active row a surface step, the stage bar's pills quieter until they
@@ -4871,6 +4873,21 @@ settings at 1280 and 390 in both schemes, looked at; the controls page updated.
 
 **Touchpoints.** `shell.css`, `app.css`, `run.css`, `views/controls.js`, `tests/unit/test_css_tokens.py`,
 `tests/smoke/test_controls.py`, README (the visual system).
+
+**Design, as built (2026-10-11).** As planned, with these differences. The rhythm: every `gap`, `padding` and
+`margin` of the four drawn sheets (157 declarations, `settings.css` included) was moved to the 4 px grid by one
+rounding (3 and 5 to 4, 6 to 10 to 8, 11 to 13 to 12, 14 to 18 to 16, 22 to 26 to 24, 50 to 48, 70 to 72) and the
+hairline (1 and 2 px) became the token `--space-half`; `--pad-side` is now two space tokens. The unit test reads those
+properties and flags a pixel value off the grid; one new token, not several, since the grid itself is the rule.
+The sidebar's one divider (above the foot) is gone; `.side-label` is `--faint` at weight 500; the open row is
+`--surface` with the lightest shadow, a step up from the sidebar's ground in both schemes (`--surface-2` would not
+show: it is a shade of the sidebar's own ground). The stage bar's pills lose their border and ground unless they
+carry a count (`.warn`, `.run`); the connection pill was already its dot alone. `.card-head` is weight 500 in the
+second ink over a 70 % line. The timeline's folded step was one line already (`.tool-sum` ellipsis); the duration
+(`.tool-time`) now shows on hover, on focus and while the step is open. "One primary action per list row" needed no
+change: a row that opens something is a link, and Enter follows it. `views/controls.js` did not change: the controls
+page draws the same classes and shows the new rhythm by itself. Looked at: the controls page in both looks, the home
+and the sidebar, the Activity page and a run's page at 1280 and 390 in both schemes from the existing smoke tests.
 
 ### 75. Told only when not looking
 
@@ -5391,3 +5408,5 @@ here.
 - 2026-10-11 (Fable 5.1): item 71 merged 6896e53 (PR #79, MYP-211 Done). Item 72 built on branch `item-72-home-presence` (MYP-212): `presence.js` (greeting, nowLine, todaySections, the owner's name), `activityrow.js` shared by the Activity page and the home, `/api/activity` `learned_today` and `due`, the Today strip; smoke test with screenshots.
 - 2026-10-11 (Fable 5.1): item 72 built on branch `item-72-home-presence` (MYP-212, PR #80). Item 73 built on branch `item-73-motion` (MYP-213): motion tokens, the face's breath and pulse, fades, reduced motion that keeps the fades, the duration unit test and the face smoke test.
 - 2026-10-11 (Fable 5.1): item 72 merged 9020ee0 (PR #80, MYP-212 Done).
+- 2026-10-11 (Fable 5.1): item 73 built on branch `item-73-motion` (MYP-213, PR #81). Item 74 built on branch `item-74-quiet-chrome` (MYP-214): the 4 px grid for every gap, padding and margin (`--space-half`), the sidebar without dividers, quiet pills, lighter card heads, step durations on hover; the spacing unit test.
+- 2026-10-11 (Fable 5.1): item 73 merged 1efede9 (PR #81, MYP-213 Done). The controls page's cost sample lacked the searches of item 69 (the page threw and drew nothing; the controls smoke test had not run since): fixed in item 74.

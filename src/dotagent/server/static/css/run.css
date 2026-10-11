@@ -31,7 +31,7 @@
 }
 
 .run-main > * + * {
-  margin-top: 14px;
+  margin-top: 16px;
 }
 
 /* ---------- lessons drawn from a run ---------- */
@@ -72,8 +72,8 @@
   align-items: center;
   /* On a phone a long title, the count and the badge of failed calls go on to a second line instead of out of view. */
   flex-wrap: wrap;
-  gap: 2px 8px;
-  padding: 5px 8px 5px 4px;
+  gap: var(--space-half) 8px;
+  padding: 4px 8px 4px 4px;
   border-radius: var(--radius-sm);
   color: var(--text-2);
   font-size: var(--fs-sm);
@@ -127,9 +127,9 @@
 .steps-body {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  margin: 4px 0 2px 13px;
-  padding-left: 14px;
+  gap: 8px;
+  margin: 4px 0 var(--space-half) 12px;
+  padding-left: 16px;
   border-left: 2px solid var(--border);
 }
 
@@ -142,11 +142,11 @@
   top: calc(var(--stagebar-h) + 12px);
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 16px;
   max-height: calc(100vh - var(--stagebar-h) - 24px);
   max-height: calc(100dvh - var(--stagebar-h) - 24px);
   overflow-y: auto;
-  padding: 2px;
+  padding: var(--space-half);
 }
 
 .inspector-head {
@@ -162,7 +162,7 @@
   z-index: 40;
   width: min(360px, 92vw);
   max-height: none;
-  padding: 14px 14px 24px;
+  padding: 16px 16px 24px;
   border-left: 1px solid var(--border);
   background: var(--bg);
   box-shadow: var(--shadow-overlay);
@@ -248,8 +248,8 @@
 
 .inspector-strip {
   display: flex;
-  gap: 6px;
-  padding: 3px;
+  gap: 8px;
+  padding: 4px;
   overflow-x: auto;
 }
 
