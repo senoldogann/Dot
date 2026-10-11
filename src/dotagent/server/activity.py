@@ -1,15 +1,25 @@
-"""Activity: everything in motion in one list (item 47). Three sections, read from the live runs, the approvals and
-the schedules: what waits for the user, what works now, and what ended today. The sidebar shows the first two above
-the chats; the Activity page shows all three."""
+"""Activity: everything in motion in one list (item 47). Five sections, read from the live runs, the approvals, the
+schedules, the campaigns and the notes: what waits for the user, what works now, what ended today, what was learned
+today (the journal and the lessons, item 72) and what is due later today. The sidebar shows the first two above the
+chats; the Activity page shows the first three; the home's Today strip shows all five."""
 
 import time
 from datetime import datetime
 
+from dotagent.agent.lessons import LESSON_TAG
 from dotagent.agent.manager import RunManager
 from dotagent.agent.reflection import Reflection, last_reflection, summary_line
+from dotagent.memory.service import JOURNAL_TAG
 from dotagent.server.views import ActivityRow, ActivityView
 from dotagent.store.db import Store
-from dotagent.store.models import ApprovalRecord, CampaignRecord, EventRecord, RunRecord, ScheduleRecord
+from dotagent.store.models import (
+    ApprovalRecord,
+    CampaignRecord,
+    EventRecord,
+    MemoryRecord,
+    RunRecord,
+    ScheduleRecord,
+)
 
 # The channel of a run is that of its latest tool result; a run without one has worked in no channel yet.
 _LAST_RESULT: int = 1
@@ -19,6 +29,9 @@ _DUE_WITHIN_S: float = 3600.0
 _RECENT_RUNS: int = 60
 _TITLE_CHARS: int = 120
 _ENDED: frozenset[str] = frozenset({"done", "failed", "cancelled"})
+# How many lesson notes are read for the ones written today, and how many journal notes for today's.
+_LESSONS_READ: int = 50
+_JOURNALS_READ: int = 3
 
 
 def _title(text: str) -> str:
@@ -29,6 +42,15 @@ def _title(text: str) -> str:
 def _start_of_today(now: float) -> float:
     today: datetime = datetime.fromtimestamp(now).astimezone()
     return today.replace(hour=0, minute=0, second=0, microsecond=0).timestamp()
+
+
+def _end_of_today(now: float) -> float:
+    return _start_of_today(now) + 86400.0
+
+
+def _clock(moment: float) -> str:
+    """``14:30``, in this Mac's zone, as the day's rows say when something is due."""
+    return datetime.fromtimestamp(moment).astimezone().strftime("%H:%M")
 
 
 async def _channel(store: Store, run_id: str) -> str:
@@ -109,6 +131,97 @@ def _schedule_row(schedule: ScheduleRecord, now: float) -> ActivityRow:
     )
 
 
+def _note_row(note: MemoryRecord, kind: str) -> ActivityRow:
+    """A lesson or the journal written today: a lesson opens the run it came from, the journal the Memory page."""
+    return ActivityRow(
+        id=note.id,
+        section="learned",
+        kind=kind,
+        title=_title(note.content),
+        detail="",
+        channel="",
+        since=note.created_at,
+        href=f"#/runs/{note.source_run}" if kind == "lesson" and note.source_run is not None else "#/memory",
+        run_id=None,
+        status="",
+        minutes=None,
+        tokens=None,
+        steps=None,
+        parent_run_id=None,
+    )
+
+
+def _due_schedule_row(schedule: ScheduleRecord, due: float) -> ActivityRow:
+    return ActivityRow(
+        id=f"due-{schedule.id}",
+        section="due",
+        kind="schedule",
+        title=_title(schedule.name),
+        detail=f"fires at {_clock(due)}",
+        channel="",
+        since=due,
+        href="#/settings/schedules",
+        run_id=None,
+        status="scheduled",
+        minutes=None,
+        tokens=None,
+        steps=None,
+        parent_run_id=None,
+    )
+
+
+def _due_campaign_row(campaign: CampaignRecord, due: float) -> ActivityRow:
+    return ActivityRow(
+        id=f"due-{campaign.id}",
+        section="due",
+        kind="campaign",
+        title=_title(campaign.title),
+        detail=f"next session at {_clock(due)}",
+        channel="",
+        since=due,
+        href=f"#/campaigns/{campaign.id}",
+        run_id=None,
+        status="scheduled",
+        minutes=None,
+        tokens=None,
+        steps=None,
+        parent_run_id=None,
+    )
+
+
+async def _learned_today(store: Store, today: float) -> list[ActivityRow]:
+    """The journal note and the lessons written today, newest first."""
+    rows: list[ActivityRow] = [
+        _note_row(note, "journal")
+        for note in await store.memories_with_tag(JOURNAL_TAG, _JOURNALS_READ)
+        if note.created_at >= today
+    ]
+    rows.extend(
+        _note_row(note, "lesson")
+        for note in await store.memories_with_tag(LESSON_TAG, _LESSONS_READ)
+        if note.created_at >= today
+    )
+    rows.sort(key=lambda row: row.since, reverse=True)
+    return rows
+
+
+async def _due_today(store: Store, now: float) -> list[ActivityRow]:
+    """The schedules that fire and the campaigns whose next session starts before the day ends, soonest first."""
+    end: float = _end_of_today(now)
+    rows: list[ActivityRow] = [
+        _due_schedule_row(schedule, schedule.next_run_at)
+        for schedule in await store.list_schedules()
+        if schedule.enabled and schedule.next_run_at is not None and schedule.next_run_at <= end
+    ]
+    rows.extend(
+        _due_campaign_row(campaign, campaign.next_session_at)
+        for campaign in await store.list_campaigns()
+        if campaign.status == "active" and campaign.next_session_at is not None and campaign.next_session_at <= end
+    )
+    rows.sort(key=lambda row: row.since)
+    return rows
+
+
 def _reflection_row(reflection: Reflection) -> ActivityRow:
     """The reflection that ran today, among what ended: it opens the Memory page, where its journal and lessons are."""
     return ActivityRow(
@@ -133,7 +246,8 @@ async def activity_view(store: Store, manager: RunManager, now: float) -> Activi
     """The three sections at ``now``: waiting (the approvals and questions runs wait for, the questions runs left for
     the user, the runs the user holds),
     working (the live runs that wait for nothing, the schedules due within the hour), recent (the runs that ended
-    today and the reflection that ran today, newest first)."""
+    today and the reflection that ran today, newest first), learned_today (the journal and the lessons written today)
+    and due (the schedules and campaign sessions due before the day ends)."""
     waiting: list[ActivityRow] = []
     working: list[ActivityRow] = []
     live: dict[str, RunRecord] = {}
@@ -171,7 +285,14 @@ async def activity_view(store: Store, manager: RunManager, now: float) -> Activi
     waiting.sort(key=lambda row: row.since)
     working.sort(key=lambda row: row.since)
     recent.sort(key=lambda row: row.since, reverse=True)
-    return ActivityView(waiting=waiting, working=working, recent=recent, generated_at=now)
+    return ActivityView(
+        waiting=waiting,
+        working=working,
+        recent=recent,
+        learned_today=await _learned_today(store, today),
+        due=await _due_today(store, now),
+        generated_at=now,
+    )
 
 
 async def current_activity(store: Store, manager: RunManager) -> ActivityView:

@@ -2,14 +2,13 @@
 // `GET /activity`; a row opens the run, the campaign or the schedules. Reloaded on the lifecycle events and with the
 // status refresh while something works.
 
+import { activityRow, LIFECYCLE_KINDS } from "../activityrow.js";
 import { api } from "../api.js";
-import { ago, compact, duration, el } from "../dom.js";
-import { icon } from "../icons.js";
+import { el } from "../dom.js";
 import { nestRows } from "../nesting.js";
-import { emptyPanel, errorPanel, loadingPanel, pageHead, segmented, statusBadge } from "../panels.js";
+import { emptyPanel, errorPanel, loadingPanel, pageHead, segmented } from "../panels.js";
 import { onChange, onLifecycle } from "../state.js";
 
-const LIFECYCLE_KINDS = new Set(["run_queued", "run_started", "run_finished", "approval_requested", "approval_decided", "takeover", "handback"]);
 const SECTIONS = [
   { key: "waiting", title: "Waiting for you", empty: "Nothing waits for you." },
   { key: "working", title: "Working", empty: "Nothing is working right now." },
@@ -22,50 +21,6 @@ const FILTERS = [
   { id: "campaigns", label: "Campaigns", kinds: new Set(["campaign"]) },
   { id: "schedules", label: "Schedules", kinds: new Set(["schedule"]) },
 ];
-const KIND_ICON = {
-  run: "bolt",
-  delegated: "branch",
-  campaign: "target",
-  approval: "shield",
-  question: "help",
-  takeover: "hand",
-  schedule: "calendar",
-  reflection: "sparkle",
-};
-const KIND_WORD = {
-  run: "run",
-  delegated: "delegated run",
-  campaign: "campaign session",
-  approval: "approval",
-  question: "question",
-  takeover: "taken over",
-  schedule: "schedule",
-  reflection: "reflection",
-};
-
-function row(item, child) {
-  const facts = [KIND_WORD[item.kind] ?? item.kind, item.channel, item.detail].filter((part) => part !== "");
-  if (item.steps !== null && item.steps > 0 && item.minutes === null) {
-    facts.push(item.steps === 1 ? "1 step" : `${item.steps} steps`);
-  }
-  if (item.minutes !== null) {
-    // A run that ended: how long it took and what it cost in tokens.
-    facts.push(`${duration(item.minutes * 60)} · ${compact(item.tokens)} tokens`);
-  }
-  return el(
-    "a",
-    { class: child ? "activity-row activity-child" : "activity-row", href: item.href, "aria-label": `${item.title} (${facts.join(", ")})` },
-    el("span", { class: "activity-icon" }, icon(KIND_ICON[item.kind] ?? "bolt")),
-    el(
-      "span",
-      { class: "activity-main" },
-      el("span", { class: "activity-title" }, item.title),
-      el("span", { class: "small muted" }, facts.join(" · ")),
-    ),
-    el("span", { class: "activity-side" }, item.status === "scheduled" ? null : statusBadge(item.status), el("span", { class: "small muted" }, ago(item.since))),
-  );
-}
-
 export function mount(root, ctx) {
   let view = null;
   let failure = null;
@@ -109,8 +64,8 @@ export function mount(root, ctx) {
                 "div",
                 { class: "activity-list" },
                 ...nestRows(items).map(({ row: item, children }) => [
-                  row(item, false),
-                  children.length === 0 ? null : el("div", { class: "activity-children" }, children.map((kid) => row(kid, true))),
+                  activityRow(item, false),
+                  children.length === 0 ? null : el("div", { class: "activity-children" }, children.map((kid) => activityRow(kid, true))),
                 ]),
               ),
         );

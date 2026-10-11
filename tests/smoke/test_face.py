@@ -191,7 +191,7 @@ async def test_the_face_tells_the_state_through_a_runs_life_and_wears_the_name(
                 page = await browser.new_page(viewport={"width": 1280, "height": 900}, color_scheme="light")
                 await page.goto(ui_url(host, port, TOKEN))
                 await page.goto(f"{base}/#/settings/general")
-                name = page.get_by_label("Name")
+                name = page.get_by_label("Name", exact=True)
                 await name.fill(_NAME)
                 await name.press("Enter")
                 await page.goto(f"{base}/#/runs/{run.id}")

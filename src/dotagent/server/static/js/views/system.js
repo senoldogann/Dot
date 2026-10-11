@@ -6,6 +6,7 @@ import { compact, copyText, dateTimeFull, duration, el, plural } from "../dom.js
 import { offersChoice } from "../efforts.js";
 import { engageFailsafe, releaseFailsafe } from "../failsafe.js";
 import { dotName, NAME_CHARS, setDotName } from "../face.js";
+import { OWNER_CHARS, ownerName, setOwnerName } from "../presence.js";
 import { icon } from "../icons.js";
 import { chooseDensity, currentDensity, DENSITIES, followTheme, foldSteps, hasOwnLayout, setFoldSteps, setShowInspector, showInspector } from "../layout.js";
 import { foldCard, foldGroup, inlineError, inlineLoading, pageHead, segmented } from "../panels.js";
@@ -672,8 +673,28 @@ function buildBrowser(isDisposed) {
 }
 
 /** The look of this browser, how it draws your attention, and the token it is signed in with. */
-/** What Dot is called in the greeting of a new chat and at the head of a run: a preference of this browser. */
+/** What Dot is called in the greeting of a new chat and at the head of a run, and what it calls you (item 72): both
+ * preferences of this browser. */
 function buildNameCard() {
+  const owner = el("input", {
+    class: "input name-input",
+    type: "text",
+    maxlength: String(OWNER_CHARS),
+    autocomplete: "off",
+    placeholder: "Your name",
+    value: ownerName(),
+    "aria-label": "Your name",
+  });
+  owner.addEventListener("change", () => {
+    owner.value = setOwnerName(owner.value);
+    toast("ok", owner.value === "" ? "The greeting says no name." : `The greeting says “${owner.value}”.`);
+  });
+  owner.addEventListener("keydown", (event) => {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      owner.blur();
+    }
+  });
   const input = el("input", {
     class: "input name-input",
     type: "text",
@@ -704,6 +725,12 @@ function buildNameCard() {
         { class: "setting" },
         el("div", { class: "row" }, el("span", { class: "grow" }, "What Dot is called"), input),
         el("div", { class: "hint" }, "In the greeting of a new chat and at the head of a run. Kept in this browser; the daemon and the model never see it."),
+      ),
+      el(
+        "div",
+        { class: "setting" },
+        el("div", { class: "row" }, el("span", { class: "grow" }, "What Dot calls you"), owner),
+        el("div", { class: "hint" }, "In the greeting of the home (“Good morning, Ada.”). Kept in this browser too; blank greets without a name."),
       ),
     ),
   );

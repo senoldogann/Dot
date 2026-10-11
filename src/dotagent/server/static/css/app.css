@@ -1016,7 +1016,8 @@ a.pill:hover {
   display: grid;
   /* minmax(0, 1fr): a wide child (a long command in an approval) must shrink with the window, not stretch the column */
   grid-template-columns: minmax(0, 1fr);
-  grid-template-rows: 1fr auto 1fr;
+  /* The presence and the composer sit in the upper third; the Today strip (item 72) takes the room below them. */
+  grid-template-rows: minmax(0, 1fr) auto minmax(0, 3fr);
   row-gap: 16px;
 }
 
@@ -1053,8 +1054,37 @@ a.pill:hover {
   letter-spacing: -0.01em;
 }
 
-.home-hint {
+.home-greeting {
+  margin: 0;
+  color: var(--text-2);
+  font-size: var(--fs-lg);
+}
+
+/* One line of now (item 72): what works, what waits, what ended, what was learned, what is due. */
+.home-now {
+  margin: 0;
   color: var(--muted);
+  font-size: var(--fs-sm);
+}
+
+/* The Today strip under the composer: a section per kind of thing that has rows, the rows as on the Activity page. */
+.home-today {
+  grid-row: 3;
+  align-self: start;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  width: 100%;
+}
+
+.home-today-list .activity-row:first-child {
+  border-top: 0;
+}
+
+.home-today-more {
+  justify-content: center;
+  color: var(--muted);
+  font-size: var(--fs-sm);
 }
 
 .composer {

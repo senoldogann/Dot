@@ -441,11 +441,15 @@ class StatusView(FrozenModel):
     models: ModelsConfig
 
 
-ActivitySection = Literal["waiting", "working", "recent"]
-# What a row of the Activity list is: a run of its own, a run delegated by another, a session of a campaign, an
-# approval or a question a run waits for, a run the user holds (``takeover``), a schedule due within the hour, the
-# reflection that ran today.
-ActivityKind = Literal["run", "delegated", "campaign", "approval", "question", "takeover", "schedule", "reflection"]
+# The sections: what waits for the user, what works now, what ended today, what was learned today (item 72: the
+# journal and the lessons) and what is due later today (schedules, a campaign's next session).
+ActivitySection = Literal["waiting", "working", "recent", "learned", "due"]
+# What a row of the Activity list is: a run of its own, a run delegated by another, a session of a campaign (or the
+# next one due), an approval or a question a run waits for, a run the user holds (``takeover``), a schedule due, the
+# reflection that ran today, a lesson or the journal note written today.
+ActivityKind = Literal[
+    "run", "delegated", "campaign", "approval", "question", "takeover", "schedule", "reflection", "lesson", "journal"
+]
 
 
 class ActivityRow(FrozenModel):
@@ -473,11 +477,14 @@ class ActivityRow(FrozenModel):
 
 
 class ActivityView(FrozenModel):
-    """``GET /activity``: what waits for the user, what works now, what ended today (see ``server.activity``)."""
+    """``GET /activity``: what waits for the user, what works now, what ended today, what was learned today and what
+    is due later today (see ``server.activity``)."""
 
     waiting: list[ActivityRow]
     working: list[ActivityRow]
     recent: list[ActivityRow]
+    learned_today: list[ActivityRow]
+    due: list[ActivityRow]
     generated_at: float
 
 

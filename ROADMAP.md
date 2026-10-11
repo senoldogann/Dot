@@ -4626,8 +4626,8 @@ says so), $10 per 1,000 searches plus tokens (the docs; a failed search is not b
 | --- | ------------------------------------------------------------------------ | ----------- | ------- |
 | 69  | The Anthropic rung: Haiku 5.5 searches through the API's own web search | done        | 927a720 |
 | 70  | Reflection: Dot's day in review, every night                             | done        | dd13ec9 |
-| 71  | Memory that rests: use decides what is recalled                          | in progress |         |
-| 72  | The home that says "I am here"                                           | planned     |         |
+| 71  | Memory that rests: use decides what is recalled                          | done        | 6896e53 |
+| 72  | The home that says "I am here"                                           | in progress |         |
 | 73  | Motion with meaning                                                      | planned     |         |
 | 74  | Quiet chrome: the surfaces recede, the work leads                        | planned     |         |
 | 75  | Told only when not looking                                               | planned     |         |
@@ -4735,7 +4735,7 @@ three saved lessons, the merge, the rest, the journal, the Activity row and that
 
 ### 71. Memory that rests: use decides what is recalled
 
-**Status: in progress.** Built on `item-71-memory-rests` (MYP-211).
+**Status: done.** Merged as `6896e53` (PR #79, squash; MYP-211 Done).
 
 **What.** A note that a run recalled and built on is marked as used (the store has `mark_memories_used`); the ranking
 of auto-recalled agent notes favours notes used lately and lets notes never used rest after `[memory] rest_days`
@@ -4773,7 +4773,7 @@ while the user's old note still reaches the run.
 
 ### 72. The home that says "I am here"
 
-**Status: planned.**
+**Status: in progress.** Built on `item-72-home-presence` (MYP-212).
 
 **What.** The home is Dot's presence: the face in its state, a greeting by the time of day with the owner's name
 (Settings › General), one line of now ("Working on 2 runs · 1 waits for you · 3 ended today · 1 lesson"), a Today
@@ -4793,6 +4793,27 @@ ended run and reads the now line and the strip.
 
 **Touchpoints.** `static/js/presence.js` (new), `views/runs.js`, `server/activity.py`, `views.py`, `app.css`,
 `tests/smoke/test_home.py`, README (the web UI).
+
+**Design, as built (2026-10-11).** As planned, with these differences. The row of the Activity list moved to
+`static/js/activityrow.js` (`activityRow`, `rowFacts`, `KIND_ICON`, `KIND_WORD`, `LIFECYCLE_KINDS`), which the Activity
+page and the home's strip both draw from, so a row reads the same in both places; a row whose status is empty or
+``scheduled`` (a thing due, a lesson, the journal) carries no state badge. `/api/activity` gains `learned_today` (the
+journal note and the lesson notes written today, newest first; a lesson opens the run it came from, the journal the
+Memory page) and `due` (the switched-on schedules firing and the active campaigns' next sessions before the day ends,
+soonest first, "fires at 14:30" in this Mac's zone); the Activity page keeps its three sections. `presence.js` holds
+the words as pure functions: `greeting(hour, owner, state)` (Hello before 5, Good morning, Good afternoon from 12, Good
+evening from 18; the verb from the face's state: "What should I work on?", "I'm on it. Anything else?", "Something waits
+for you."), `nowLine(activity)` ("Working on 2 runs · 1 waits for you · 3 ended today · 1 lesson · the day's journal ·
+2 things due today"; a quiet day: "A quiet day so far: nothing works, nothing waits, nothing ended.") and
+`todaySections(activity)` (Waits for you, Working, Due today, Learned today, Ended today; only the sections with rows,
+five rows each and "and N more in Activity"). The owner's name is a preference of the browser like Dot's (`dot.owner`,
+"What Dot calls you" under Settings › General › Name), never sent to the daemon. The strip stands under the composer,
+not above it, so the composer keeps its place in the middle and a long day grows downwards; the face's state and the
+greeting's verb follow the status snapshot (`overallState`), the line and the strip reload on the lifecycle events and,
+while something works, on the status refresh. Smoke test (`tests/smoke/test_home.py`): a run that ended, a lesson note,
+a schedule due in five minutes, a run that asks and a run that sleeps; the home at 1280 and 390 in both schemes, the
+greeting with the name, the now line, the five sections, then the answer and the runs' end move the line to "3 ended
+today · 1 lesson" and the face to idle.
 
 ### 73. Motion with meaning
 
@@ -5350,3 +5371,4 @@ here.
   tokens, so it is a second rung, not a free first one. Daemon restarted on e475368 (pid 66449) with no run active.
 - 2026-10-11 (Fable 5.1): item 69 merged 927a720 (PR #77, MYP-209 Done). Item 70 built on branch `item-70-reflection` (MYP-210): `agent/reflection.py` (reflect, reflection_due, stored_case, duplicate_pairs, to_retire, journal), the scheduler's tick fires it at `[agent] reflection_time`, `rest`/`journal` tags, `dotx reflect`, the Activity row; unit and smoke tests.
 - 2026-10-11 (Fable 5.1): item 70 merged dd13ec9 (PR #78, MYP-210 Done). Item 71 built on branch `item-71-memory-rests` (MYP-211): `ranking.fused_scores`/`use_lift`/`ranked_by_use`, `service.resting`, `[memory] rest_days`/`use_half_life_days`, `MemoryPage.resting`, the Memory page's Resting group; unit and smoke tests.
+- 2026-10-11 (Fable 5.1): item 71 merged 6896e53 (PR #79, MYP-211 Done). Item 72 built on branch `item-72-home-presence` (MYP-212): `presence.js` (greeting, nowLine, todaySections, the owner's name), `activityrow.js` shared by the Activity page and the home, `/api/activity` `learned_today` and `due`, the Today strip; smoke test with screenshots.
