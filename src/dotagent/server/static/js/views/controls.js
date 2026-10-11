@@ -37,6 +37,10 @@ const FAKE_COSTS = {
     compaction: { compactions: 36, per_100_steps: 13.8, seconds: 420.5, share: 0.26 },
     delegation: { runs: 2, seconds: 310.0 },
     time: { model_seconds: 1630.0, compaction_seconds: 420.5, cached_tokens: 7_100_000, cached_share: 0.76 },
+    searches: [
+      { engine: "ollama", searches: 12 },
+      { engine: "anthropic", searches: 3 },
+    ],
   },
   tool_seconds: 980.0,
   waited_s: 140.0,

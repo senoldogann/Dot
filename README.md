@@ -910,7 +910,11 @@ labels) by a unit test. The type sizes, radii and spacing are tokens of `app.css
 spin); a unit test holds every transition and animation to them. The face breathes slowly at rest and pulses while a
 run works; cards, rows, the slash menu and the toasts fade in; a state badge cross-fades. Under the system's
 reduced-motion setting every transform goes (the breath, the pulse, the spinners, the drawer's slide) and the fades
-stay, so a state change is still seen.
+stay, so a state change is still seen. The chrome is quiet so the work leads: every gap, padding and margin sits on
+one rhythm of 8 px (4 for the smallest, a 2 px hairline token for what sits a breath apart; a unit test checks it),
+the sidebar has no dividers between its groups, its labels are the lightest ink that reads and its open row is a
+surface step rather than a tint, the stage bar's pills show a border only when they count something, a card's head is
+lighter than its body, and a folded step of the timeline is one line whose duration shows on hover.
 
 While you are elsewhere, the tab title counts the approvals that wait: `(2) New chat · Dot`. Settings › General ›
 Notifications adds

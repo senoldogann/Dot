@@ -263,10 +263,16 @@ async def test_the_face_breathes_at_rest_pulses_at_work_and_holds_still_under_re
             )
             await expect(face).to_have_attribute("data-state", "working")
             assert await page.evaluate(_CORE_ANIMATION) == "pulse-core"
-            # Reduced motion: the core holds still in both states, while the fades stay.
+            # Reduced motion: the core holds still in both states, while the fades stay (the slash menu fades in).
             await page.emulate_media(reduced_motion="reduce")
             assert await page.evaluate(_CORE_ANIMATION) == "none"
-            assert await page.evaluate("getComputedStyle(document.querySelector('.card')).animationName") == "fade-in"
+            await page.locator(".home .composer textarea").fill("/")
+            await expect(page.locator(".slash-menu")).to_be_visible()
+            assert (
+                await page.evaluate("getComputedStyle(document.querySelector('.slash-menu')).animationName")
+                == "fade-in"
+            )
+            await page.locator(".home .composer textarea").fill("")
             async with asyncio.timeout(_RUN_WAIT_S):
                 await manager.wait(run.id)
             await expect(face).to_have_attribute("data-state", "idle", timeout=_STEP_WAIT_S * 1000)

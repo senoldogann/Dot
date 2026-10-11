@@ -12,6 +12,9 @@ _DRAWN: tuple[str, ...] = ("app.css", "shell.css", "run.css", "settings.css")
 _COLOUR: re.Pattern[str] = re.compile(r"#[0-9a-fA-F]{3,8}\b|\brgba?\(|\bhsla?\(|\bwhite\b|\bblack\b")
 _FONT_SIZE: re.Pattern[str] = re.compile(r"font-size:\s*[0-9.]+px")
 _RADIUS: re.Pattern[str] = re.compile(r"border-radius:\s*[0-9.]+px")
+# A gap, padding or margin, whose pixel values are on the 4 px grid or tokens (item 74).
+_SPACING: re.Pattern[str] = re.compile(r"^\s*(gap|row-gap|column-gap|padding(-[a-z-]+)?|margin(-[a-z-]+)?):")
+_PX: re.Pattern[str] = re.compile(r"(\d+)px")
 # A literal duration (0.2s, 150ms); 0s is the instant and no token.
 _DURATION: re.Pattern[str] = re.compile(r"(?<![\w.-])(?!0s\b)\d*\.?\d+m?s\b")
 
@@ -39,6 +42,19 @@ def test_font_sizes_and_radii_are_tokens(name: str) -> None:
 
 
 @pytest.mark.parametrize("name", _DRAWN)
+def test_every_gap_padding_and_margin_is_a_token_or_on_the_four_pixel_grid(name: str) -> None:
+    """Item 74: one rhythm of 8 px, 4 for the smallest; the hairline is the token --space-half."""
+    hits: list[str] = [
+        f"{name}:{n}: {line.strip()}"
+        for n, line in _lines(name)
+        if _SPACING.match(line)
+        and not line.strip().startswith("--")
+        and any(int(px) % 4 != 0 for px in _PX.findall(line))
+    ]
+    assert hits == [], hits
+
+
+@pytest.mark.parametrize("name", _DRAWN)
 def test_every_transition_and_animation_runs_on_a_motion_token(name: str) -> None:
     """Item 73: the durations live in the motion tokens; a sheet names one, never a number of its own."""
     hits: list[str] = [
@@ -60,6 +76,7 @@ def test_the_tokens_are_declared_once_each_in_the_base_look() -> None:
         "--space-1",
         "--pad-card",
         "--gap-stack",
+        "--space-half",
         "--motion-quick",
         "--motion-base",
         "--motion-slow",

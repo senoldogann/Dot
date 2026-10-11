@@ -23,7 +23,9 @@
   --radius: 14px;
   --radius-lg: 20px;
   --radius-pill: 999px;
-  /* Spacing: a 4 px grid, and the paddings that density changes. */
+  /* Spacing (item 74): one rhythm of 8 px, 4 for the smallest, and the hairline for what sits a breath apart; every
+     gap, padding and margin is a token or on the 4 px grid (tests/unit/test_css_tokens.py). */
+  --space-half: 2px;
   --space-1: 4px;
   --space-2: 8px;
   --space-3: 12px;
@@ -32,7 +34,7 @@
   --space-6: 24px;
   --pad-card: var(--space-4);
   --pad-row: var(--space-3) var(--space-4);
-  --pad-side: 7px 10px;
+  --pad-side: var(--space-2) var(--space-2);
   --gap-stack: var(--space-3);
   /* Motion (item 73): three durations and two easings for what changes, and the rhythms of what repeats; every
      transition and animation names one (tests/unit/test_css_tokens.py), and reduced motion keeps the fades. */
@@ -53,7 +55,7 @@
 :root[data-density="compact"] {
   --pad-card: var(--space-3);
   --pad-row: var(--space-2) var(--space-3);
-  --pad-side: var(--space-1) 10px;
+  --pad-side: var(--space-1) var(--space-2);
   --gap-stack: var(--space-2);
 }
 
@@ -162,7 +164,7 @@ textarea {
 }
 
 .stack.tight {
-  gap: 6px;
+  gap: 8px;
 }
 
 .cluster {
@@ -175,7 +177,7 @@ textarea {
 .row {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
 }
 
 .spacer {
@@ -187,7 +189,7 @@ textarea {
 .brand {
   display: flex;
   align-items: center;
-  gap: 9px;
+  gap: 8px;
   font-weight: 650;
   font-size: var(--fs-lg);
   letter-spacing: -0.01em;
@@ -288,8 +290,8 @@ textarea {
 .pill {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 3px 10px;
+  gap: 8px;
+  padding: 4px 8px;
   border-radius: var(--radius-pill);
   border: 1px solid var(--border);
   background: var(--surface);
@@ -316,9 +318,16 @@ a.pill:hover {
   color: var(--on-accent);
 }
 
+/* The stage bar's pills are quiet until they have something to say: a count that waits or runs is loud, the rest sit
+   without a border or a ground (item 74). */
+.stagebar .pill:not(.warn, .run) {
+  border-color: transparent;
+  background: transparent;
+}
+
 /* A live connection shows as its dot alone (shell.js). */
 .pill.quiet {
-  padding-inline: 6px;
+  padding-inline: 8px;
   border-color: transparent;
   background: none;
 }
@@ -329,7 +338,7 @@ a.pill:hover {
 }
 
 .btn.failsafe {
-  padding-inline: 7px;
+  padding-inline: 8px;
 }
 
 .live-dot {
@@ -352,18 +361,18 @@ a.pill:hover {
 .page {
   max-width: 1040px;
   margin: 0 auto;
-  padding: 26px 20px 80px;
+  padding: 24px 20px 80px;
 }
 
 .page > * + * {
-  margin-top: 14px;
+  margin-top: 16px;
 }
 
 .page-head {
   display: flex;
   align-items: flex-end;
   gap: 12px;
-  margin-bottom: 18px;
+  margin-bottom: 16px;
   flex-wrap: wrap;
 }
 
@@ -375,14 +384,14 @@ a.pill:hover {
 
 .page-sub {
   color: var(--muted);
-  margin-top: 2px;
+  margin-top: var(--space-half);
 }
 
 .banner {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 10px 20px;
+  padding: 8px 20px;
   background: var(--bad-weak);
   color: var(--bad);
   border-bottom: 1px solid var(--bad-border);
@@ -399,7 +408,7 @@ a.pill:hover {
   letter-spacing: 0.05em;
   text-transform: uppercase;
   color: var(--muted);
-  margin: 26px 0 10px;
+  margin: 24px 0 8px;
 }
 
 .section-label:first-child {
@@ -407,7 +416,7 @@ a.pill:hover {
 }
 
 .section-head {
-  margin: 26px 0 10px;
+  margin: 24px 0 8px;
 }
 
 .section-head .section-label {
@@ -420,8 +429,8 @@ a.pill:hover {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 7px;
-  padding: 7px 14px;
+  gap: 8px;
+  padding: 8px 16px;
   border-radius: var(--radius-control);
   border: 1px solid var(--border-strong);
   background: var(--surface);
@@ -487,13 +496,13 @@ a.pill:hover {
 }
 
 .btn.sm {
-  padding: 4px 10px;
+  padding: 4px 8px;
   font-size: var(--fs-sm);
   border-radius: var(--radius-sm);
 }
 
 .btn.icon-only {
-  padding: 6px;
+  padding: 8px;
 }
 
 /* The round button that starts a run or sends a message; its words are kept for screen readers and the tooltip. */
@@ -513,7 +522,7 @@ a.pill:hover {
 .select,
 .textarea {
   width: 100%;
-  padding: 8px 11px;
+  padding: 8px 12px;
   border-radius: var(--radius-control);
   border: 1px solid var(--control);
   background: var(--surface);
@@ -547,7 +556,7 @@ a.pill:hover {
 }
 
 .select.sm {
-  padding: 3px 24px 3px 9px;
+  padding: 4px 24px 4px 8px;
   border-radius: var(--radius-sm);
   font-size: var(--fs-sm);
 }
@@ -566,7 +575,7 @@ a.pill:hover {
 .field {
   display: flex;
   flex-direction: column;
-  gap: 5px;
+  gap: 4px;
   min-width: 0;
 }
 
@@ -583,7 +592,7 @@ a.pill:hover {
 
 .form-grid {
   display: grid;
-  gap: 14px;
+  gap: 16px;
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
@@ -593,8 +602,8 @@ a.pill:hover {
 
 .segmented {
   display: inline-flex;
-  padding: 2px;
-  gap: 2px;
+  padding: var(--space-half);
+  gap: var(--space-half);
   border-radius: var(--radius-control);
   background: var(--surface-3);
 }
@@ -671,20 +680,21 @@ a.pill:hover {
   border: 1px solid var(--border);
   border-radius: var(--radius);
   box-shadow: var(--shadow);
-  animation: fade-in var(--motion-base) var(--ease);
 }
 
 .card-pad {
   padding: var(--pad-card);
 }
 
+/* A card's head orients and recedes (item 74): a lighter weight, the second ink, a lighter line under it. */
 .card-head {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   padding: 12px 16px;
-  border-bottom: 1px solid var(--border);
-  font-weight: 600;
+  border-bottom: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
+  color: var(--text-2);
+  font-weight: 500;
 }
 
 /* Cards and groups whose body folds away. The head is a button; its actions sit beside it and never fold the card. */
@@ -695,8 +705,8 @@ a.pill:hover {
   gap: 8px;
   flex: 1 1 auto;
   min-width: 0;
-  margin: -6px 0 -6px -8px;
-  padding: 6px 8px;
+  margin: -8px 0 -8px -8px;
+  padding: 8px 8px;
   border: 0;
   border-radius: var(--radius-control);
   background: transparent;
@@ -736,7 +746,7 @@ a.pill:hover {
 .fold-group > .fold-toggle {
   width: 100%;
   margin: 0;
-  padding: 10px 16px;
+  padding: 8px 16px;
   border-radius: 0;
   font-weight: 400;
 }
@@ -746,14 +756,14 @@ a.pill:hover {
 }
 
 .fold-group > .fold-body {
-  padding: 0 16px 14px;
+  padding: 0 16px 16px;
 }
 
 .visually-hidden {
   position: absolute;
   width: 1px;
   height: 1px;
-  margin: -1px;
+  margin: -var(--space-half);
   padding: 0;
   overflow: hidden;
   clip-path: inset(50%);
@@ -771,7 +781,7 @@ a.pill:hover {
   width: 28px;
   height: 28px;
   color: var(--faint);
-  margin-bottom: 6px;
+  margin-bottom: 8px;
 }
 
 .empty .spinner {
@@ -786,8 +796,8 @@ a.pill:hover {
 .badge {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
-  padding: 1px 9px;
+  gap: 4px;
+  padding: var(--space-half) 8px;
   border-radius: var(--radius-pill);
   font-size: var(--fs-xs);
   font-weight: 600;
@@ -868,7 +878,7 @@ a.pill:hover {
 .chip {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
+  gap: 4px;
   padding: 0 8px;
   border-radius: var(--radius-xs);
   background: var(--surface-2);
@@ -897,7 +907,7 @@ a.pill:hover {
 .list-row {
   display: flex;
   align-items: flex-start;
-  gap: 14px;
+  gap: 16px;
   padding: var(--pad-row);
   border-top: 1px solid var(--border);
 }
@@ -917,7 +927,7 @@ a.pill:hover {
 }
 
 .row-text {
-  margin-top: 2px;
+  margin-top: var(--space-half);
   white-space: pre-wrap;
   word-break: break-word;
 }
@@ -926,8 +936,8 @@ a.pill:hover {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 6px 8px;
-  margin-top: 6px;
+  gap: 8px 8px;
+  margin-top: 8px;
   color: var(--muted);
   font-size: var(--fs-sm);
 }
@@ -947,7 +957,7 @@ a.pill:hover {
 .table th,
 .table td {
   text-align: left;
-  padding: 9px 14px;
+  padding: 8px 16px;
   border-top: 1px solid var(--border);
   vertical-align: top;
 }
@@ -993,7 +1003,7 @@ a.pill:hover {
 
 .kv > div {
   background: var(--surface);
-  padding: 11px 16px;
+  padding: 12px 16px;
   min-width: 0;
   box-shadow: -1px -1px 0 0 var(--border);
 }
@@ -1013,7 +1023,7 @@ a.pill:hover {
 }
 
 .kv dd {
-  margin: 2px 0 0;
+  margin: var(--space-half) 0 0;
   font-weight: 550;
   word-break: break-word;
 }
@@ -1051,7 +1061,7 @@ a.pill:hover {
   grid-row: 2;
   display: flex;
   flex-direction: column;
-  gap: 22px;
+  gap: 24px;
 }
 
 /* Dot greets above the composer, as at the head of a conversation. */
@@ -1066,7 +1076,7 @@ a.pill:hover {
 .home-who .avatar {
   width: 56px;
   height: 56px;
-  margin-bottom: 6px;
+  margin-bottom: 8px;
 }
 
 .home-name {
@@ -1109,10 +1119,10 @@ a.pill:hover {
 }
 
 .composer {
-  padding: 14px 14px 12px;
+  padding: 16px 16px 12px;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
   border-color: var(--border-strong);
   background: var(--surface);
   transition:
@@ -1147,8 +1157,8 @@ a.pill:hover {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: end;
-  gap: 10px;
-  padding-top: 10px;
+  gap: 8px;
+  padding-top: 8px;
   border-top: 1px solid var(--border);
 }
 
@@ -1156,7 +1166,7 @@ a.pill:hover {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 8px 10px;
+  gap: 8px 8px;
   min-width: 0;
 }
 
@@ -1164,7 +1174,7 @@ a.pill:hover {
 .composer-pick {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   min-width: 0;
 }
 
@@ -1221,7 +1231,7 @@ a.pill:hover {
   z-index: 5;
   max-height: 320px;
   overflow-y: auto;
-  padding: 6px;
+  padding: 8px;
   border-radius: var(--radius);
   border: 1px solid var(--border-strong);
   background: var(--surface);
@@ -1230,7 +1240,7 @@ a.pill:hover {
 }
 
 .slash-group {
-  padding: 8px 10px 4px;
+  padding: 8px 8px 4px;
   color: var(--muted);
   font-size: var(--fs-xs);
   font-weight: 600;
@@ -1241,8 +1251,8 @@ a.pill:hover {
 .slash-option {
   display: flex;
   align-items: baseline;
-  gap: 10px;
-  padding: 7px 10px;
+  gap: 8px;
+  padding: 8px 8px;
   border-radius: var(--radius-sm);
   cursor: pointer;
 }
@@ -1269,7 +1279,7 @@ a.pill:hover {
 }
 
 .slash-note {
-  padding: 8px 10px;
+  padding: 8px 8px;
   color: var(--muted);
   font-size: var(--fs-sm);
 }
@@ -1279,7 +1289,7 @@ a.pill:hover {
 .back {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   color: var(--muted);
   margin-bottom: 12px;
 }
@@ -1307,7 +1317,7 @@ a.pill:hover {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 2px;
+  gap: var(--space-half);
 }
 
 .chat-who .avatar {
@@ -1321,7 +1331,7 @@ a.pill:hover {
 .chat-who-sub {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   color: var(--muted);
   font-size: var(--fs-xs);
 }
@@ -1333,7 +1343,7 @@ a.pill:hover {
   flex-wrap: wrap;
   justify-content: flex-end;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   min-width: 0;
 }
 
@@ -1344,7 +1354,7 @@ a.pill:hover {
 }
 
 .plan-list {
-  padding: 10px 16px 12px;
+  padding: 8px 16px 12px;
 }
 
 .facts {
@@ -1379,8 +1389,8 @@ a.pill:hover {
 .plan-targets {
   display: flex;
   align-items: flex-start;
-  gap: 9px;
-  padding: 3px 0 8px;
+  gap: 8px;
+  padding: 4px 0 8px;
   margin-bottom: 4px;
   border-bottom: 1px solid var(--border);
   font-weight: 500;
@@ -1388,7 +1398,7 @@ a.pill:hover {
 }
 
 .plan-targets .icon {
-  margin-top: 3px;
+  margin-top: 4px;
   width: 14px;
   height: 14px;
   flex: none;
@@ -1397,8 +1407,8 @@ a.pill:hover {
 .plan-step {
   display: flex;
   align-items: flex-start;
-  gap: 9px;
-  padding: 3px 0;
+  gap: 8px;
+  padding: 4px 0;
 }
 
 .plan-step .mark {
@@ -1437,7 +1447,7 @@ a.pill:hover {
 .plan-step .body {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: var(--space-half);
   min-width: 0;
 }
 
@@ -1454,7 +1464,7 @@ a.pill:hover {
   color: var(--muted);
   border: 1px solid var(--border-strong);
   border-radius: var(--radius-pill);
-  padding: 0 7px;
+  padding: 0 8px;
   white-space: nowrap;
 }
 
@@ -1495,7 +1505,7 @@ a.pill:hover {
 .timeline {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
 }
 
 /* Dot's answers are not boxed: they read as text on the page. Only what the user wrote sits in a rounded bubble. */
@@ -1508,7 +1518,7 @@ a.pill:hover {
   width: fit-content;
   max-width: 85%;
   margin-left: auto;
-  padding: 10px 16px;
+  padding: 8px 16px;
   border-radius: var(--radius-lg);
   background: var(--bubble);
   color: var(--on-bubble);
@@ -1524,7 +1534,7 @@ a.pill:hover {
   display: inline-block;
   width: 7px;
   height: 14px;
-  margin-left: 2px;
+  margin-left: var(--space-half);
   vertical-align: text-bottom;
   background: var(--accent);
   animation: blink var(--motion-blink) steps(2) infinite;
@@ -1574,7 +1584,7 @@ a.pill:hover {
 
 .prose blockquote {
   margin: 0;
-  padding: 2px 12px;
+  padding: var(--space-half) 12px;
   border-left: 3px solid var(--border-strong);
   color: var(--text-2);
 }
@@ -1588,7 +1598,7 @@ a.pill:hover {
 .prose code {
   font-family: var(--mono);
   font-size: 0.9em;
-  padding: 1px 5px;
+  padding: var(--space-half) 4px;
   border-radius: var(--radius-xs);
   background: var(--surface-2);
   border: 1px solid var(--border);
@@ -1596,7 +1606,7 @@ a.pill:hover {
 
 .prose pre {
   margin: 0;
-  padding: 10px 12px;
+  padding: 8px 12px;
   border-radius: var(--radius-sm);
   background: var(--surface-2);
   border: 1px solid var(--border);
@@ -1621,7 +1631,7 @@ a.pill:hover {
 .prose th,
 .prose td {
   border: 1px solid var(--border);
-  padding: 5px 10px;
+  padding: 4px 8px;
   min-width: 4rem;
   text-align: left;
   /* Words stay whole: a narrow window scrolls the table sideways instead of squeezing its columns into pieces. */
@@ -1650,7 +1660,7 @@ a.pill:hover {
 .tool-head {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   padding: 8px 12px;
   cursor: pointer;
   list-style: none;
@@ -1717,11 +1727,20 @@ a.pill:hover {
   color: var(--bad);
 }
 
+/* The duration of a step shows on hover and while the step is open, so a folded row is one quiet line (item 74). */
 .tool-time {
   color: var(--faint);
   font-size: var(--fs-xs);
   flex: none;
   font-variant-numeric: tabular-nums;
+  opacity: 0;
+  transition: opacity var(--motion-quick) var(--ease);
+}
+
+.tool-head:hover .tool-time,
+.tool-head:focus-visible .tool-time,
+.tool[open] > .tool-head .tool-time {
+  opacity: 1;
 }
 
 .chev {
@@ -1752,7 +1771,7 @@ details[open] > summary .chev {
 
 .out {
   margin: 0;
-  padding: 10px 12px;
+  padding: 8px 12px;
   border-radius: var(--radius-sm);
   background: var(--surface-2);
   border: 1px solid var(--border);
@@ -1801,7 +1820,7 @@ details[open] > summary .chev {
 }
 
 .note .icon {
-  margin-top: 2px;
+  margin-top: var(--space-half);
 }
 
 /* A link at the end of a note stays on one line; the text before it wraps. It is underlined: in the neutral theme the
@@ -1836,7 +1855,7 @@ details[open] > summary .chev {
 
 .auto-decision .icon {
   flex: none;
-  margin-top: 2px;
+  margin-top: var(--space-half);
 }
 
 .auto-decision.yolo {
@@ -1869,10 +1888,10 @@ details[open] > summary .chev {
   border: 1px solid var(--warn-border);
   background: var(--warn-weak);
   border-radius: var(--radius);
-  padding: 12px 14px;
+  padding: 12px 16px;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
 }
 
 .approval.high {
@@ -1919,7 +1938,7 @@ details[open] > summary .chev {
 .options {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
+  gap: 8px;
 }
 
 /* A delegated run is a chip with its status ring and goal; opened, the run's steps hang under it. */
@@ -1962,7 +1981,7 @@ details[open] > summary .chev {
 }
 
 .child > .timeline {
-  margin: 10px 0 0 15px;
+  margin: 8px 0 0 16px;
   padding-left: 16px;
   border-left: 1px solid var(--border);
 }
@@ -2065,14 +2084,14 @@ details[open] > summary .chev {
 .turn {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 16px;
 }
 
 .continued a {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 10px 14px;
+  gap: 8px;
+  padding: 8px 16px;
   border: 1px solid var(--border);
   border-radius: var(--radius-control);
   background: var(--surface);
@@ -2096,8 +2115,8 @@ details[open] > summary .chev {
 .dock {
   position: sticky;
   bottom: 0;
-  margin-top: 22px;
-  padding: 14px 0 18px;
+  margin-top: 24px;
+  padding: 16px 0 16px;
   background: linear-gradient(to top, var(--bg) 72%, transparent);
 }
 
@@ -2124,7 +2143,7 @@ details[open] > summary .chev {
 
 .dock-inner .textarea {
   border: 0;
-  padding: 6px 2px;
+  padding: 8px var(--space-half);
   min-height: 0;
   resize: none;
   max-height: 160px;
@@ -2166,8 +2185,8 @@ details[open] > summary .chev {
 .toast {
   display: flex;
   align-items: flex-start;
-  gap: 9px;
-  padding: 10px 14px;
+  gap: 8px;
+  padding: 8px 16px;
   border-radius: var(--radius-control);
   background: var(--text);
   color: var(--bg);
@@ -2178,7 +2197,7 @@ details[open] > summary .chev {
 }
 
 .toast .icon {
-  margin-top: 2px;
+  margin-top: var(--space-half);
 }
 
 .toast.error {
@@ -2201,19 +2220,19 @@ dialog.modal::backdrop {
 }
 
 .modal-body {
-  padding: 18px 20px 6px;
+  padding: 16px 20px 8px;
 }
 
 .modal-body h3 {
   font-size: var(--fs-lg);
-  margin-bottom: 6px;
+  margin-bottom: 8px;
 }
 
 .modal-actions {
   display: flex;
   justify-content: flex-end;
   gap: 8px;
-  padding: 14px 20px 18px;
+  padding: 16px 20px 16px;
 }
 
 dialog.lightbox {
@@ -2249,7 +2268,7 @@ dialog.lightbox img {
 
 .code-line {
   display: block;
-  padding: 8px 10px;
+  padding: 8px 8px;
   border-radius: var(--radius-sm);
   background: var(--surface-2);
   border: 1px solid var(--border);
@@ -2374,7 +2393,7 @@ dialog.lightbox img {
   .chat-head {
     grid-template-columns: auto minmax(0, 1fr) auto;
     align-items: center;
-    gap: 10px;
+    gap: 8px;
   }
 
   .chat-who {
@@ -2408,7 +2427,7 @@ dialog.lightbox img {
 
 @media (max-width: 720px) {
   .page {
-    padding: 18px 12px 70px;
+    padding: 16px 12px 72px;
   }
 
   .form-grid {
@@ -2426,7 +2445,7 @@ dialog.lightbox img {
 
   .prose th,
   .prose td {
-    padding: 5px 8px;
+    padding: 4px 8px;
   }
 
   /* The head's one-line phone layout is with the other chat-head rules, in the 720 px block above. */
@@ -2456,13 +2475,13 @@ dialog.lightbox img {
 
   .fold-toggle {
     flex-wrap: wrap;
-    row-gap: 2px;
+    row-gap: var(--space-half);
   }
 
   .fold-summary {
     flex: 1 0 100%;
     flex-wrap: wrap;
-    padding-left: 26px;
+    padding-left: 24px;
     white-space: normal;
   }
 
@@ -2478,7 +2497,7 @@ dialog.lightbox img {
   align-items: baseline;
   gap: 8px;
   max-width: 80%;
-  padding: 6px 12px;
+  padding: 8px 12px;
   border: 1px dashed var(--border-strong);
   border-radius: var(--radius);
   white-space: pre-wrap;
@@ -2502,7 +2521,7 @@ dialog.lightbox img {
 .aside-head {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   margin-bottom: 4px;
   color: var(--muted);
   font-size: var(--fs-xs);
@@ -2524,7 +2543,7 @@ dialog.lightbox img {
 .attach-list {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
+  gap: 8px;
 }
 
 .dock > .attach-list {
@@ -2539,9 +2558,9 @@ dialog.lightbox img {
 .attach-chip {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   max-width: 100%;
-  padding: 3px 4px 3px 8px;
+  padding: 4px 4px 4px 8px;
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   background: var(--surface-2);
@@ -2585,11 +2604,11 @@ dialog.lightbox img {
 }
 
 .actions-group-title {
-  padding: 10px 16px 0;
+  padding: 8px 16px 0;
 }
 
 .actions-group .hint {
-  padding: 6px 16px 12px;
+  padding: 8px 16px 12px;
 }
 
 .action-edit[data-state="ready"] .row-title {
@@ -2608,7 +2627,7 @@ dialog.lightbox img {
   align-items: center;
   gap: 12px;
   min-width: 0;
-  padding: 10px 14px;
+  padding: 8px 16px;
   border-top: 1px solid var(--border);
   color: var(--text);
 }
@@ -2629,7 +2648,7 @@ dialog.lightbox img {
   flex: 1;
   flex-direction: column;
   min-width: 0;
-  gap: 2px;
+  gap: var(--space-half);
 }
 
 .activity-title {
@@ -2655,7 +2674,7 @@ dialog.lightbox img {
 
 .activity-children {
   margin-left: 28px;
-  padding-left: 10px;
+  padding-left: 8px;
   border-left: 1px solid var(--border);
 }
 
@@ -2667,7 +2686,7 @@ dialog.lightbox img {
 .child > summary .child-open {
   flex: none;
   display: inline-flex;
-  padding: 2px;
+  padding: var(--space-half);
   border-radius: var(--radius-sm);
   color: var(--muted);
 }

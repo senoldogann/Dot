@@ -52,7 +52,7 @@
 .stagebar-left {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
 }
 
 .stagebar-right {
@@ -124,7 +124,7 @@
   align-items: center;
   gap: 8px;
   flex: none;
-  padding: 12px 10px 6px 16px;
+  padding: 12px 8px 8px 16px;
 }
 
 .side-head .brand {
@@ -137,8 +137,8 @@
   min-height: 0;
   display: flex;
   flex-direction: column;
-  gap: 2px;
-  padding: 6px 8px 12px;
+  gap: var(--space-half);
+  padding: 8px 8px 12px;
   overflow-y: auto;
   overscroll-behavior: contain;
 }
@@ -173,7 +173,7 @@
 .side-run {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   min-width: 0;
   padding: var(--pad-side);
   border-radius: var(--radius-control);
@@ -193,9 +193,11 @@
   text-decoration: none;
 }
 
+/* The row that is open is a surface step up from the sidebar, not a tint (item 74). */
 .side-link[aria-current="page"],
 .side-run[aria-current="page"] {
-  background: color-mix(in srgb, var(--text) 7%, transparent);
+  background: var(--surface);
+  box-shadow: 0 1px 2px var(--shadow-ink);
   color: var(--text);
   font-weight: 550;
 }
@@ -211,7 +213,7 @@
   align-items: center;
   gap: 8px;
   margin: 4px 0 8px;
-  padding: 0 10px;
+  padding: 0 8px;
   border: 1px solid var(--control);
   border-radius: var(--radius-control);
   background: var(--surface);
@@ -230,7 +232,7 @@
 .side-search-input {
   flex: 1;
   min-width: 0;
-  padding: 7px 0;
+  padding: 8px 0;
   border: 0;
   background: transparent;
   outline: none;
@@ -246,20 +248,21 @@
 .side-group {
   display: flex;
   flex-direction: column;
-  gap: 1px;
+  gap: var(--space-half);
 }
 
 .side-recent {
-  margin-top: 6px;
+  margin-top: 8px;
 }
 
+/* The group labels orient and recede: the lightest ink that still reads, a lighter weight (item 74). */
 .side-label {
   margin: 0;
-  padding: 12px 10px 4px;
+  padding: 12px 8px 4px;
   font-size: var(--fs-xs);
-  font-weight: 600;
+  font-weight: 500;
   letter-spacing: 0.03em;
-  color: var(--muted);
+  color: var(--faint);
 }
 
 .side-run .status-dot {
@@ -284,8 +287,8 @@
 .side-list-head {
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 8px 2px 2px 0;
+  gap: 8px;
+  padding: 8px var(--space-half) var(--space-half) 0;
 }
 
 .side-list-head .side-label {
@@ -297,16 +300,16 @@
 .side-select-bar {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  margin: 8px 0 6px;
-  padding: 8px 8px 8px 10px;
+  gap: 8px;
+  margin: 8px 0 8px;
+  padding: 8px 8px 8px 8px;
   border: 1px solid var(--border);
   border-radius: var(--radius-control);
   background: var(--surface);
 }
 
 .side-select-bar .row {
-  gap: 6px;
+  gap: 8px;
 }
 
 .side-select-bar .row:last-child {
@@ -344,7 +347,7 @@
   flex-wrap: wrap;
   align-items: center;
   gap: 8px;
-  padding: 10px;
+  padding: 8px;
   color: var(--muted);
   font-size: var(--fs-sm);
 }
@@ -354,8 +357,7 @@
   flex: none;
   display: flex;
   flex-direction: column;
-  padding: 8px 8px 10px;
-  border-top: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
+  padding: 8px;
 }
 
 /* With the sidebar next to the page, the way back to the list is always in sight. */
@@ -367,7 +369,7 @@
   .stagebar-row {
     min-height: 48px;
     gap: 8px;
-    padding: 6px 10px;
+    padding: 8px 8px;
   }
 }
 
@@ -394,7 +396,7 @@
 
 /* Delegated runs under the run that delegated them (item 68). */
 .side-children {
-  margin-left: 18px;
+  margin-left: 16px;
   padding-left: 8px;
   border-left: 1px solid var(--border);
 }
