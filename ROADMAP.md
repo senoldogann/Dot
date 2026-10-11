@@ -5357,7 +5357,8 @@ alike (the shell navigates to the daemon's UI; nothing is rendered twice). The U
 `window.__TAURI__`: `boot.js` sets `data-shell="desktop"` on the page element at first paint, and `shell.css` keeps
 room for the traffic lights (84 px on the left, a 52 px bar) in the sidebar's head, or in the top bar while the
 sidebar is away (closed, or a drawer); both bars and the down page's body carry `data-tauri-drag-region`, so the
-window drags by them, which a browser ignores. The tour shoots the home page with the shell's room, the sidebar open
+window drags by them, which a browser ignores; the capability (`capabilities/default.json`) grants
+`core:window:allow-start-dragging` to the remote page, without which the drag region raises an ACL error. The tour shoots the home page with the shell's room, the sidebar open
 and closed. The dependabot alert on `glib` 0.18 (`Cargo.lock`): glib is reached only through gtk and webkit2gtk,
 Tauri's Linux backend, and the shell is built for macOS alone, where the crate is not compiled; Tauri 2.12 pins gtk
 0.18, so `cargo update -p glib` locks nothing; the alert is dismissed as not used, with that reason, and this
