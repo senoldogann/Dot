@@ -5015,6 +5015,12 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 92  | Skills from its own work: a task that went well becomes a skill for its kind     | done        | 3074107 |
 | 93  | The owner, in one section: what the reflection knows about how you work         | done        | 6d64e43 |
 | 94  | An agent learns for itself: lessons, skills and a score per agent                | done        | 937cca4 |
+| 95  | The sidebar, smaller: the nav under New chat, sections that fold, rows cut short   | planned     |         |
+| 96  | The run page: the arrow above the composer, the cost in the side panel            | planned     |         |
+| 97  | Chrome in the background: the live view shows the page, the window stays put       | planned     |         |
+| 98  | The web that is refused: 999, 403 and their kind meet the browser, not the end     | planned     |         |
+| 99  | The team that grows: a run makes a lasting teammate and knows of it                | planned     |         |
+| 100 | The review: every feature of parts 1 to 12 read once more on the live pages        | planned     |         |
 
 ### 77. The type system: Inter and Geist Mono, seven sizes, three weights
 
@@ -5594,6 +5600,113 @@ owner marks a skill shared; its scores are its own. The agent's page shows what 
 skills, the score), with the same Drop. Tests: unit for the scoping; the agents smoke extended.
 
 
+## Part 12: the frame and the hands: a smaller sidebar, Chrome in the background, the web that is refused, the team that grows (planned 2026-10-11)
+
+The owner's twelfth word, on 2026-10-11, after part 11, with two screenshots of the sidebar and the composer: move
+Agents, Activity and Campaigns up under New chat; let the chat sections fold; in Working, show the subagents' and
+the chats' names cut after a few words, the card is too big; when the agent can drive Chrome in the background,
+stop bringing Chrome to the front, as a choice to turn on and off, since the right panel already shows what the
+agent does; make "Jump to latest" a down arrow right above the composer, shown while scrolled up; show the cost on
+the right side or in another area; let a working agent make itself lasting teammate agents, know of them, and do
+everything together with them; review every feature built so far together with the new ones; find a solution to
+the 999 and 403 errors; and make the dark borders that appear on focus either go or take a light colour of the
+theme.
+
+**Status (2026-10-11): planned.** What is built today: one sidebar function (`sidebar.js`) with "New chat", the
+search, the Waiting and Working sections (a working run with its delegated runs nested, titles cut at 120
+characters but wrapped), the chats by day, and a foot with Agents, Activity, Campaigns and Settings; no section
+folds. The run page's "Jump to latest" is a fixed button at the bottom right; the cost card (item 58) stands in
+the conversation column; the side panel (item 84) holds Dot's computer, Details, Plan, Actions and Screen. Chrome
+is raised by `switch_tab` and by Take over, and by its own launch. `web_fetch` retries 401, 403, 429 and 503 in
+Dot's own Chrome and nothing in the owner's attached Chrome; 999 (LinkedIn's refusal) is a plain failure; crawl
+skips every refused page. The team is read once at a run's start, and only the owner makes agents. Focus is a
+two-pixel accent outline on every control, and the composer's inner textarea shows it as a dark frame.
+
+**The shape of this part (the decisions).** The frame gets out of the way: the sidebar is a list of short names,
+folded by the owner's choice and remembered; focus is visible to the keyboard and quiet to the mouse. Chrome
+belongs to the agent, not the screen: with the live view in the panel, the window is raised only when the owner
+takes over. A refused page is a step, not an end: the tools climb from the plain request to the browser, remember
+which host refuses in the run, and tell the model the next rung in one line. The team grows from the work: a run
+may make a lasting agent for a kind of work, under the owner's approvals, and every run learns of the new
+teammates while it works. And the whole is read once more, page by page, before the next part.
+
+### How to start part 12 (the handoff prompt)
+
+> Read ROADMAP.md part 12 and the status table of part 9 (rows 95 to 100). One item at a time, in order; the
+> protocol of part 5 (branch, gate, PR, Linear MYP issue, squash merge, hash in the table, log line) is unchanged.
+> Never touch the owner's data directory except to read it and to restart the daemon when `/api/status` shows no
+> active run; the owner's goals stay out of this file; PLAN.md stays untracked. The owner reads Turkish; everything
+> written is English. Every UI item ends with the screenshot tour read by eye.
+
+### 95. The sidebar, smaller: the nav under New chat, sections that fold, rows cut short
+
+**Status: planned.**
+
+**What.** Agents, Activity and Campaigns move up under New chat and the search, as links of the same row grammar;
+Settings stays in the foot. Waiting, Working and Chats each fold on a click of their label (a chevron turns), and
+the fold is remembered (`dot.sideFolds` in the prefs). A working row shows its title cut after a few words
+(`clipWords`), on one line, with its channel and its step as one short line under it; a delegated run under it the
+same, smaller; the rows take the compact padding whatever the density. Focus: the keyboard gets a soft ring (the
+accent at low opacity, one pixel of border), the mouse none (`:focus:not(:focus-visible)`), and the composer's inner
+textarea never draws a frame of its own. Tests: `tests/smoke/test_activity.py` keeps its selectors; the tour's
+sidebar shots are read by eye.
+
+### 96. The run page: the arrow above the composer, the cost in the side panel
+
+**Status: planned.**
+
+**What.** "Jump to latest" becomes a round button with a down arrow, centred just above the composer (inside the
+dock, absolute), shown while the page is not at its end or an answer waits below the fold, with the words as its
+tooltip. The cost card leaves the conversation column for the side panel, after Details, and the conversation
+starts at the first turn; `tests/smoke/test_activity.py` follows it there.
+
+### 97. Chrome in the background: the live view shows the page, the window stays put
+
+**Status: planned.**
+
+**What.** `[browser] raise_window` (false by default): with it off, `switch_tab` no longer raises the window, the
+app that had the focus before Dot's Chrome launched gets it back right after the launch, and only Take over raises
+the window. Settings › Browser gets the switch "Bring Chrome to the front while working" (`POST /api/browser/raise`,
+`config_edit` like the mode), with the words that the panel's live view shows the page either way. README: Dot's
+computer and Browser use. A smoke test with a headed launch is not possible in CI; the behaviour is checked by hand
+on the owner's Mac and recorded here.
+
+### 98. The web that is refused: 999, 403 and their kind meet the browser, not the end
+
+**Status: planned.**
+
+**What.** 999 joins the statuses `web_fetch` retries in the browser; a refused page in a crawl is read in the
+browser too when the run may read quietly; the owner's attached Chrome reads quietly in a background tab (opened
+behind the owner's tab, closed after), so attach mode has the fallback as well. A host that refused the plain
+request is remembered for the run, and the next fetch of that host goes to the browser first. The plain request
+sends the headers a browser sends (`Sec-Fetch-*`, `Upgrade-Insecure-Requests`) with the same user agent. When the
+browser is refused too, the tool's answer names the next rung in one line: another source, the hosted search's
+snippet of the page (`web_search` with the URL), or Take over for a login wall. Tests: the fixture site gains a
+`/wall-999`; unit tests for the host memory and the headers; the smoke `test_web_fetch` reads the refused pages.
+
+### 99. The team that grows: a run makes a lasting teammate and knows of it
+
+**Status: planned.**
+
+**What.** A `create_agent` tool (name, role, instructions, tools, optional model) makes an agent as the Agents page
+does, under the owner's approvals (kind `meta`, the `persistence` flag: `ask` asks once, `yolo` makes it), and the
+run's answer names it. `message_agent` stays offered whenever `create_agent` is, so a run that makes a teammate can
+message it at once; the prompt's Team section says, with no teammate, that the run may make one for a kind of work
+that deserves its own. Every step, the loop compares the agents with the ones the run started with and appends a
+note of the new teammates (name and role) the way changed notes are appended. Delegated and answering runs make
+no agents. The record keeps `made_by` (the run that made the agent, `None` for the owner) and the Agents page says
+"Made by Dot". README: Agents.
+
+### 100. The review: every feature of parts 1 to 12 read once more on the live pages
+
+**Status: planned.**
+
+**What.** Not code first: the tour of every page in both schemes and both widths is read by eye against the
+README, page by page (home, run, activity, agents, agent, team, campaigns, schedules, settings' eight tabs, the
+desktop shell), the offline smoke suite runs in full, and the owner's own daemon is read through the API only.
+What is broken, stale or contradicts the README is fixed in this item's PR or, when it is more than a day's work,
+written as the next part's first items. The findings go in this section as built.
+
 ## Log
 
 - 2026-10-08: roadmap written from the owner's go-ahead for all eight items, in this order. Nothing implemented yet.
@@ -6111,3 +6224,4 @@ skills, the score), with the same Drop. Tests: unit for the scoping; the agents 
 - 2026-10-11 (Fable 5.1): item 92 merged as `3074107` (PR #106, MYP-232 Done): learned skills of any kind of work, the Skills tab. The daemon restarted on `3074107`.
 - 2026-10-11 (Fable 5.1): item 93 merged as `6d64e43` (PR #107, MYP-233 Done): the owner section the reflection keeps, the owner's own lines beside it, the Memory page card. The daemon restarted on `6d64e43`.
 - 2026-10-11 (Fable 5.1): item 94 merged as `937cca4` (PR #108, MYP-234 Done): an agent's lessons, skills and scores its own, the agent's page "What it learned". Part 11 built: items 89 to 94. The daemon waits for a restart on `937cca4` (two of the owner's runs were active).
+- 2026-10-11 (Fable 5.1): the daemon restarted on `269eab5` once idle. Part 12 planned (items 95 to 100): the sidebar smaller, the run page's arrow and cost, Chrome in the background, the web that is refused, the team that grows, the review.
