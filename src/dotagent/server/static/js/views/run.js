@@ -430,7 +430,6 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
     listener: null,
   });
   const { textarea: input, attachments, sendButton: send } = frame;
-  frame.options.append(attachments.button);
   const dock = el("div", { class: "dock" }, frame.element);
 
   // Steer messages that are sent but not read yet; each one leaves when the run reports reading it.

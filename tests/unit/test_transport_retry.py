@@ -14,13 +14,12 @@ from dotagent.llm.http import is_retryable_provider_error, transport_error_types
 from dotagent.llm.provider_errors import classify_opencode
 from dotagent.llm.types import StreamDelta
 
-pytestmark = pytest.mark.asyncio
-
 
 def test_a_tls_error_is_a_transport_error() -> None:
     assert ssl.SSLError in transport_error_types()
 
 
+@pytest.mark.asyncio
 async def test_a_tls_read_that_fails_is_retried_and_the_last_failure_raised() -> None:
     calls: list[str] = []
     resets: list[str] = []

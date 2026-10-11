@@ -323,7 +323,6 @@ function agentComposer(record, ctx) {
     listener: null,
   });
   const { textarea: goal, attachments } = frame;
-  frame.options.append(attachments.button);
   let starting = false;
 
   async function submit() {

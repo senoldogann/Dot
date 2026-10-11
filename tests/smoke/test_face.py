@@ -294,7 +294,8 @@ async def test_the_face_breathes_at_rest_pulses_at_work_and_holds_still_under_re
             assert await page.evaluate(_CORE_ANIMATION) == "none"
             # On a phone the sidebar is a drawer: its slide is a transition of the base length, none under reduced motion.
             await page.set_viewport_size({"width": 390, "height": 800})
-            await page.wait_for_function("document.querySelector('.shell')?.dataset.nav === 'drawer'")
+            # A string predicate polled in the page is refused by its policy (no 'unsafe-eval') once the first check fails.
+            await expect(page.locator(".shell")).to_have_attribute("data-nav", "drawer")
             assert set((await page.evaluate(_DRAWER_TRANSITION)).split(", ")) == {"0s"}
             await page.emulate_media(reduced_motion="no-preference")
             assert await page.evaluate(_CORE_ANIMATION) == "none"

@@ -70,6 +70,8 @@
   --character-grey: #a3a3a3;
   --character-cream: light-dark(#d9d4c6, #f1efe9);
   --character-notify: #2496e8;
+  /* The Claude mark of the composer's model pill (item 108), in Anthropic's own colour; every other mark is ink. */
+  --mark-claude: #d97757;
   --knob: light-dark(#ffffff, #f5f4f0);
   --scrim: light-dark(rgb(28 27 25 / 40%), rgb(0 0 0 / 55%));
   --scrim-strong: light-dark(rgb(28 27 25 / 78%), rgb(0 0 0 / 80%));

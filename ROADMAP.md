@@ -5027,8 +5027,8 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 104 | The composer remade: one frame, quiet menus, drafts that keep, a face that listens  | done        | 9261fa9 |
 | 105 | The small polish part 12's review left: a scroll cue, empty sections that point, the Browser grid, the tour's content, Watch on an ended run | done        | c14b670 |
 | 106 | The review: every feature of parts 1 to 13 read once more, the characters' cost measured | done        | 8e3818d |
-| 107 | The fixes of the second look: the still face follows, the favicon freed, TLS reads retried, the sidebar's head and order | in progress |         |
-| 108 | The composer with marks: a mark per provider, an icon on every pill, the reasoning as its own pill | planned     |         |
+| 107 | The fixes of the second look: the still face follows, the favicon freed, TLS reads retried, the sidebar's head and order | done        | 6c79636 |
+| 108 | The composer with marks: a mark per provider, an icon on every pill, the reasoning as its own pill | in progress |         |
 | 109 | Dot's computer as a stage: a frame with a size, the control under it, the character at the head of the chat | planned     |         |
 | 110 | Rules in plain words: the model writes the rule, an approval card offers one        | planned     |         |
 | 111 | The review: part 14 read once more                                                  | planned     |         |
@@ -6197,7 +6197,7 @@ more at the end.
 
 ### 107. The fixes of the second look: the still face follows, the favicon freed, TLS reads retried, the sidebar's head and order
 
-**Status: in progress.**
+**Status: done.** Merged as `6c79636` (PR #127, MYP-247 Done).
 
 **Design, as built (2026-10-12).** The still face: `character.js` tells the engine a time already past
 (`-SHAPE_MORPH`) when a shape or an expression is set while the character is not subscribed to the ticker, so the
@@ -6228,7 +6228,33 @@ lights' line), checked by the tour's desktop shot. README where a line changes.
 
 ### 108. The composer with marks: a mark per provider, an icon on every pill, the reasoning as its own pill
 
-**Status: planned.**
+**Status: in progress.**
+
+**Design, as built (2026-10-12).** The marks: `static/icons/providers/` holds one SVG a provider on a 24 grid in
+`currentColor` (the Claude mark for the Anthropic provider's models and Ollama's from Simple Icons, CC0; OpenAI's and
+OpenCode's from Lobe Icons, MIT; a ring with a core of Dot's own for any other provider), with their sources, licences
+and a trademark line in its `LICENSE`. `providerMark(provider)` (`providers.js`) is a span the page paints as a CSS
+mask of the provider's SVG (`.provider-mark[data-provider]`), so a mark takes the colour of the text around it and the
+policy's `img-src 'self'` covers it; the Claude mark keeps Anthropic's colour (`--mark-claude`). The plan's `src` became
+the mask: an image could not take the ink of the scheme. `composerPill` takes an `icon` node, keeps its caption for
+screen readers only and gains `setIcon`; `icon()` names itself (`data-icon`). The home's bar: the mode left its
+segmented control for a pill (a target for Task, a speech bubble for Chat, the search glass for Research; its menu the
+three with what each does); the agent pill wears its agent's still face; the Model pill the mark of the chosen model's
+provider and its name, its menu the models alone, each row with its mark under its provider's heading; a Reasoning
+pill (a brain) shows the level chosen or the daemon's, only for a model that offers a choice, its menu the levels as a
+listbox; the Options pill a lock closed for Ask, a shield for Auto (a review model answers) and a lock open for YOLO. A
+pick closes its menu and gives the focus back to the pill. A hairline stands between two shown pills (the `::before` of
+the second, outside its box, so the tint under the pointer leaves it), not on a phone, where the pills wrap and the
+attach button and the send stay at the end of the last line. The frame puts the attach button with the send at the
+right end, in every composer. Soft at rest: the pills
+in the secondary ink, the values in the label weight, the icons at 16 px, the chevron at 14 in the muted ink.
+`test_composer.py` reads the Ollama mark on the Model pill (its `data-provider`, the computed mask, the SVG served as
+`image/svg+xml`) with no refusal of the page's policy in the console, picks a model with levels (added in the page to
+the daemon's list through `page.route` on `/api/models`, since the scripted model offers none) and its level through the
+Reasoning pill, walks the Mode menu and reads the Options pill's locks; the menus are shot with their animations
+finished. The module-wide asyncio mark of `test_transport_retry.py` (item 107) warned on its sync test: the async test
+carries the mark alone. `test_face.py` waited for the drawer with a string predicate, which the page's policy refuses
+(no `'unsafe-eval'`) whenever the first check fails: an `expect` on the shell's `data-nav` instead.
 
 **What.** `static/icons/providers/<provider>.svg`: a mark for each provider Dot knows (Anthropic, OpenAI, Ollama,
 OpenCode Go, and the generic one for the rest), simple single-colour SVGs that take `currentColor`, with their
@@ -6812,3 +6838,4 @@ built.
 - 2026-10-11 (Fable 5.1): item 105 merged as `c14b670` (PR #123, MYP-245 Done): the scroll cue on the Models tables, the Activity page's empty sections that point, the Browser tab's facts two and two, Watch gone on an ended run, the tour seeded with a taller run, a scored lesson and a learned skill.
 - 2026-10-11 (Fable 5.1): item 106 merged as `8e3818d` (PR #124, MYP-246 Done): the tour read by eye, the offline smoke suite in full (two stale tests fixed), the owner's daemon through the API, one moving face measured at about a millisecond a frame (`test_character_cost.py`). Part 13 built: items 101 to 106. The daemon waits for a restart on `8e3818d`.
 - 2026-10-11 (Fable 5.1): part 14 planned, items 107 to 111, from the owner's five screenshots and the readings of the daemon's log and the look card; no code changed. Start with the handoff prompt under "How to start part 14".
+- 2026-10-12 (Opus 5.5): item 107 merged as `6c79636` (PR #127, MYP-247 Done): a still character follows a shape or an expression set, the note under Faces that move while the system reduces motion, the favicon allowed by the page's policy (`img-src data:`), `ssl.SSLError` retried as a transport failure (the owner's "bad record mac" came from the network path to OpenCode Go, not from Dot's code), the sidebar's search above New chat and its desktop head on the traffic lights' line.
