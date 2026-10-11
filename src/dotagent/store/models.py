@@ -81,7 +81,8 @@ class AgentRecord(FrozenModel):
     """An agent the owner made (item 86): a name, a role in one line, the instructions that join the system prompt of
     its runs, and the bounds of its runs: ``model`` (empty for the configured one), ``effort`` and ``approvals``
     (``None`` for the configured ones) and ``tools``, the names of the tools it may use (empty for every tool). Its
-    face is the mark in the hue its id gives it (actors.js). Dot itself is ``DOT_AGENT``, never stored."""
+    face is the mark in the hue its id gives it (actors.js). ``made_by`` is the run that made it with ``create_agent``
+    (item 99), ``None`` for one the owner made. Dot itself is ``DOT_AGENT``, never stored."""
 
     id: str
     name: str
@@ -93,6 +94,7 @@ class AgentRecord(FrozenModel):
     tools: tuple[str, ...]
     created_at: float
     updated_at: float
+    made_by: str | None
 
 
 DOT_AGENT_ID: str = "dot"
@@ -107,6 +109,7 @@ DOT_AGENT: AgentRecord = AgentRecord(
     tools=(),
     created_at=0.0,
     updated_at=0.0,
+    made_by=None,
 )
 
 

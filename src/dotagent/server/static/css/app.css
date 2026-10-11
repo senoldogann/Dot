@@ -3024,6 +3024,14 @@ dialog.lightbox img {
   font-size: var(--text-sm);
 }
 
+/* An agent a run made (item 99). */
+.agent-made {
+  flex: none;
+  color: var(--muted);
+  font-size: var(--text-xs);
+  white-space: nowrap;
+}
+
 /* The agent's greeting sits over its composer like Dot's on the home page, with its chats under them. */
 .agent-page {
   display: flex;

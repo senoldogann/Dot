@@ -18,7 +18,7 @@ from dotagent.tools.delegate import DELEGATE_SOURCE, DELEGATE_TOOL
 from dotagent.tools.groups import group_lines
 from dotagent.tools.meta import ASK_USER_TOOL, USE_TOOLS_TOOL
 from dotagent.tools.skill import SKILL_TOOL
-from dotagent.tools.team import MESSAGE_AGENT_TOOL
+from dotagent.tools.team import CREATE_AGENT_TOOL, MESSAGE_AGENT_TOOL
 
 
 class AgentBrief(FrozenModel):
@@ -486,9 +486,23 @@ def build_system_prompt(inputs: PromptInputs) -> str:
 
 
 def _team_section(team: Sequence[AgentBrief], tool_names: Sequence[str]) -> str:
-    """The agents the run may message (item 87): a line each, and when to send one a message."""
-    if not team or MESSAGE_AGENT_TOOL not in tool_names:
+    """The agents the run may message (item 87): a line each, and when to send one a message. A run that may make a
+    teammate (item 99) is told when one is worth making, and, with no team yet, that it may start one."""
+    if MESSAGE_AGENT_TOOL not in tool_names:
         return ""
+    may_make: bool = CREATE_AGENT_TOOL in tool_names
+    if not team:
+        if not may_make:
+            return ""
+        return "\n".join(
+            [
+                "# Team",
+                "- The owner has no agents yet. For a kind of work that recurs and deserves a role of its own "
+                "(checking sources, writing copy, watching a site), make one with create_agent: it lasts beyond this "
+                "run, has its own page under Agents, and answers message_agent in runs of its own. Never make one "
+                "for a single step.",
+            ]
+        )
     lines: list[str] = [
         "# Team",
         "- The owner made agents that work with you. Send one a message with message_agent when a part of the work "
@@ -496,6 +510,11 @@ def _team_section(team: Sequence[AgentBrief], tool_names: Sequence[str]) -> str:
         "comes back as the result. The team:",
         *(f"  - {member.name}: {member.role}" if member.role else f"  - {member.name}" for member in team),
     ]
+    if may_make:
+        lines.append(
+            "- You may make a new teammate with create_agent for a kind of work that recurs and none of them covers; "
+            "it lasts beyond this run. Never make one for a single step."
+        )
     return "\n".join(lines)
 
 

@@ -35,7 +35,9 @@ def test_the_tools_an_agent_always_keeps_are_the_ones_that_end_ask_and_turn_grou
 async def test_the_store_keeps_agents_and_their_runs_and_a_deleted_agents_runs_become_dots(tmp_path: Path) -> None:
     store: Store = await Store.open(tmp_path / "dot.sqlite3", tmp_path / "screenshots")
     try:
-        agent: AgentRecord = await store.create_agent("Scout", "Finds sources", "Be brief.", "", None, None, ["shell"])
+        agent: AgentRecord = await store.create_agent(
+            "Scout", "Finds sources", "Be brief.", "", None, None, ["shell"], None
+        )
         assert await store.list_agents() == [agent]
         assert await store.latest_agent_runs() == {}
         thread: ThreadRecord = await store.create_thread("t", "ui")

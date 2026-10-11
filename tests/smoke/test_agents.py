@@ -33,6 +33,7 @@ from dotagent.server.context import ServerContext
 from dotagent.server.daemon import DotServer, bind_listener, serving_config
 from dotagent.server.links import ui_url
 from dotagent.tools.meta import FINISH_TOOL
+from dotagent.tools.team import CREATE_AGENT_TOOL, MESSAGE_AGENT_TOOL
 
 pytestmark = pytest.mark.asyncio(loop_scope="module")
 
@@ -180,6 +181,69 @@ def _agent(tools: list[str]) -> dict[str, object]:
         "approvals": "yolo",
         "tools": tools,
     }
+
+
+async def test_a_run_makes_a_lasting_teammate_and_learns_of_it_at_its_next_step(
+    runtime: Runtime, manager: RunManager, client: httpx.AsyncClient, tmp_path: Path
+) -> None:
+    make: ScriptedTurn = ScriptedTurn(
+        text="",
+        calls=(
+            ScriptedCall(
+                tool=CREATE_AGENT_TOOL,
+                arguments={"name": "Pilot", "role": "Writes copy", "instructions": "Be brief.", "tools": ["shell"]},
+            ),
+        ),
+    )
+    MODEL.script = ScriptedProvider(_PROVIDER, [make, FINISH])
+    run_id: str = await _finished(
+        client, manager, {"goal": "Set up a copywriter for the recurring newsletter", "approvals": "yolo"}
+    )
+    detail = await client.get(f"/api/runs/{run_id}")
+    assert detail.json()["run"]["status"] == "done", detail.text
+    agents = (await client.get("/api/agents")).json()
+    pilot = next(row["record"] for row in agents if row["record"]["name"] == "Pilot")
+    assert (pilot["role"], pilot["tools"], pilot["made_by"]) == ("Writes copy", ["shell"], run_id)
+    # The first step offered message_agent though the run could make a teammate before it had one; the second step's
+    # request carries the note of the newcomer.
+    first, second = MODEL.requests[-2], MODEL.requests[-1]
+    assert {CREATE_AGENT_TOOL, MESSAGE_AGENT_TOOL} <= {spec.name for spec in first.tools}
+    notes: list[str] = [
+        message.content
+        for message in second.messages
+        if isinstance(message.content, str) and "joined the team" in message.content
+    ]
+    assert notes and "- Pilot: Writes copy" in notes[0], [m.content for m in second.messages][-3:]
+    # A second run with the same name is refused and told whom to message instead.
+    MODEL.script = ScriptedProvider(_PROVIDER, [make, FINISH])
+    again: str = await _finished(client, manager, {"goal": "Set up a copywriter again", "approvals": "yolo"})
+    refused = [
+        message.content
+        for message in MODEL.requests[-1].messages
+        if isinstance(message.content, str) and "an agent has that name already" in message.content
+    ]
+    assert refused, again
+    assert len([row for row in (await client.get("/api/agents")).json() if row["record"]["name"] == "Pilot"]) == 1
+
+    host: str = client.base_url.host
+    port: int | None = client.base_url.port
+    assert port is not None
+    async with async_playwright() as playwright:
+        browser: Browser = await playwright.chromium.launch(channel=runtime.config.browser.channel, headless=True)
+        try:
+            context: BrowserContext = await browser.new_context(viewport={"width": 1280, "height": 860})
+            page_ui: Page = await context.new_page()
+            await page_ui.goto(ui_url(host, port, TOKEN))
+            await page_ui.wait_for_timeout(_SETTLE_MS)
+            await page_ui.goto(f"http://{host}:{port}/#/agents")
+            await page_ui.wait_for_timeout(_SETTLE_MS)
+            row = page_ui.locator(f".agent-row[data-agent='{pilot['id']}']")
+            assert await row.locator(".agent-made").inner_text() == "Made by Dot"
+            await page_ui.screenshot(path=str(tmp_path / "agents-made-by-dot.png"))
+        finally:
+            await browser.close()
+    # The teammate goes the way any agent goes, so the next test starts with Dot alone.
+    assert (await client.delete(f"/api/agents/{pilot['id']}")).status_code == 204
 
 
 async def test_an_agent_is_made_runs_in_its_own_voice_and_bounds_and_leaves_its_chats_to_dot(

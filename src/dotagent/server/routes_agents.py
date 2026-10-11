@@ -99,6 +99,7 @@ def agents_router(ctx: ServerContext) -> APIRouter:
             checked.effort,
             checked.approvals,
             checked.tools,
+            None,
         )
 
     @router.get("/agents/{agent_id}")

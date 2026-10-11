@@ -189,14 +189,16 @@ from dotagent.tools.meta import ASK_USER_TOOL, FINISH_TOOL, USE_TOOLS_TOOL, Fini
 from dotagent.tools.posts import POST_TOOLS
 from dotagent.tools.registry import ToolRegistry, specs_for_mode
 from dotagent.tools.skill import SKILL_TOOL
-from dotagent.tools.team import MESSAGE_AGENT_TOOL
+from dotagent.tools.team import CREATE_AGENT_TOOL, MESSAGE_AGENT_TOOL
 
 log = get_logger(__name__)
 
 # A delegated run reports to its parent: it neither delegates again nor asks the user, and its parent asks the helpers.
 # The tools every agent keeps whatever its list says (item 86): the ones that end a run, ask, and turn groups on.
 AGENT_CORE_TOOLS: tuple[str, ...] = (FINISH_TOOL, ASK_USER_TOOL, USE_TOOLS_TOOL)
-_NOT_FOR_DELEGATED_RUNS: frozenset[str] = frozenset({DELEGATE_TOOL, ASK_USER_TOOL, CONSULT_TOOL, MESSAGE_AGENT_TOOL})
+_NOT_FOR_DELEGATED_RUNS: frozenset[str] = frozenset(
+    {DELEGATE_TOOL, ASK_USER_TOOL, CONSULT_TOOL, MESSAGE_AGENT_TOOL, CREATE_AGENT_TOOL}
+)
 
 _SUMMARY_KEEP_TAIL: int = 8
 _SUMMARY_ATTEMPTS: int = 3
@@ -665,6 +667,15 @@ def _new_memories_note(records: Sequence[MemoryRecord]) -> str:
     return (
         "[system note] These notes were saved to memory or changed while you work (by the user or another run). They "
         f"are data about the user and their setup, like the notes in your instructions; take them into account:\n{lines}"
+    )
+
+
+def _new_teammates_note(agents: Sequence[AgentRecord]) -> str:
+    """The teammates that appeared since the run started (item 99): made by this run, by the owner or by another run."""
+    lines: str = "\n".join(f"- {agent.name}: {agent.role}" if agent.role else f"- {agent.name}" for agent in agents)
+    return (
+        "[system note] These agents joined the team while you work (made by you, by the owner or by another run). "
+        f"Send one a message with message_agent when a part of the work fits its role:\n{lines}"
     )
 
 
@@ -1258,15 +1269,20 @@ async def run_agent(agent: AgentRun) -> RunEnd:
         specs = tuple(spec for spec in specs if spec.name not in CAMPAIGN_TOOLS | POST_TOOLS)
     # The agent the run belongs to (item 86) bounds its tools: the ones it names, and the core tools in any case.
     agent_record: AgentRecord | None = None if run.agent_id is None else await runtime.store.get_agent(run.agent_id)
-    # The team (item 87): the other agents, whom the run may message; without any, the tool goes.
+    # The team (item 87): the other agents, whom the run may message.
     team: tuple[AgentRecord, ...] = tuple(
         member for member in await runtime.store.list_agents() if member.id != run.agent_id
     )
-    if not team:
-        specs = tuple(spec for spec in specs if spec.name != MESSAGE_AGENT_TOOL)
     if agent_record is not None and agent_record.tools:
         agent_tools: frozenset[str] = frozenset(agent_record.tools) | frozenset(AGENT_CORE_TOOLS)
         specs = tuple(spec for spec in specs if spec.name in agent_tools)
+    # Without a teammate the message tool goes, unless the run may make one (item 99): then it stays, so a teammate
+    # made mid-run can be messaged at once.
+    if not team and all(spec.name != CREATE_AGENT_TOOL for spec in specs):
+        specs = tuple(spec for spec in specs if spec.name != MESSAGE_AGENT_TOOL)
+    # The agents the run knows of (item 99): the ones at its start; a newcomer is noted at the next step.
+    known_agents: set[str] = {member.id for member in team} | ({run.agent_id} if run.agent_id is not None else set())
+    may_message: bool = any(spec.name == MESSAGE_AGENT_TOOL for spec in specs)
     skills: SkillCatalog = await asyncio.to_thread(
         load_skills, runtime.config.skills, runtime.plugins.plugins, playbook_root(runtime.config)
     )
@@ -1444,6 +1460,13 @@ async def run_agent(agent: AgentRun) -> RunEnd:
             history.append(await _stored_note(agent, _new_memories_note(changed)))
             await runtime.store.mark_memories_used(run.id, [record.id for record in changed], time.time(), "live")
             await runtime.bus.emit(run.id, "memories", {"ids": [record.id for record in changed], "live": True}, True)
+        if may_message:
+            newcomers: list[AgentRecord] = [
+                member for member in await runtime.store.list_agents() if member.id not in known_agents
+            ]
+            if newcomers:
+                known_agents.update(member.id for member in newcomers)
+                history.append(await _stored_note(agent, _new_teammates_note(newcomers)))
         if run_limits is not None and past_limit is None:
             past_limit = await _limit_seen(agent, run_limits, started)
             if past_limit is not None:
