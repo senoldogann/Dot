@@ -42,7 +42,7 @@ export function rowFacts(item) {
   }
   if (item.minutes !== null) {
     // A run that ended: how long it took and what it cost in tokens.
-    facts.push(`${duration(item.minutes * 60)} · ${compact(item.tokens)} tokens`);
+    facts.push(duration(item.minutes * 60), `${compact(item.tokens)} tokens`);
   }
   return facts;
 }
@@ -56,7 +56,7 @@ export function activityRow(item, child) {
     "a",
     { class: child ? "activity-row activity-child" : "activity-row", href: item.href, "aria-label": `${item.title} (${facts.join(", ")})` },
     el("span", { class: "activity-icon" }, icon(KIND_ICON[item.kind] ?? "bolt")),
-    el("span", { class: "activity-main" }, el("span", { class: "activity-title" }, item.title), el("span", { class: "small muted" }, facts.join(" · "))),
+    el("span", { class: "activity-main" }, el("span", { class: "activity-title" }, item.title), el("span", { class: "small muted meta-facts" }, ...facts.map((fact) => el("span", null, fact)))),
     el("span", { class: "activity-side" }, badge, el("span", { class: "small muted" }, ago(item.since))),
   );
 }

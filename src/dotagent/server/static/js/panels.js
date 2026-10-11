@@ -45,14 +45,8 @@ export function loadingPanel() {
   return el("div", { class: "card" }, inlineLoading());
 }
 
-export function emptyPanel(iconName, title, text) {
-  return el(
-    "div",
-    { class: "card empty" },
-    icon(iconName),
-    el("div", { class: "row-title" }, title),
-    text === "" ? null : el("div", null, text),
-  );
+export function emptyPanel(title, text) {
+  return el("div", { class: "empty-line" }, text === "" ? title : `${title}. ${text}`);
 }
 
 export function errorPanel(error, retry) {

@@ -838,7 +838,7 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
     }
     console.error("the run stream ended", error);
     if (error.status === 404) {
-      root.replaceChildren(backLink(), emptyPanel("search", "Run not found", `No run has the id ${runId}.`));
+      root.replaceChildren(backLink(), emptyPanel("Run not found", `No run has the id ${runId}.`));
       return;
     }
     toast("error", `Live updates stopped: ${error.message}`);
@@ -884,7 +884,7 @@ export function mount(root, ctx) {
       if (controller.signal.aborted) {
         return;
       }
-      const problem = error.status === 404 ? emptyPanel("search", "Run not found", `No run has the id ${runId}.`) : errorPanel(error, () => attempt(open));
+      const problem = error.status === 404 ? emptyPanel("Run not found", `No run has the id ${runId}.`) : errorPanel(error, () => attempt(open));
       root.replaceChildren(backLink(), problem);
       return;
     }

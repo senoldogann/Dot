@@ -230,9 +230,9 @@ async def test_the_sections_show_what_waits_what_works_and_a_campaign_session_wi
                         await page.get_by_role("button", name="Show sidebar").click()
                     sidebar = page.locator("#sidebar")
                     await expect(sidebar.locator("[data-section=waiting] .side-label")).to_have_text(
-                        "Waiting for you · 1"
+                        "Waiting for you 1"
                     )
-                    await expect(sidebar.locator("[data-section=working] .side-label")).to_have_text("Working · 3")
+                    await expect(sidebar.locator("[data-section=working] .side-label")).to_have_text("Working 3")
                     await expect(sidebar.locator("[data-section=working] a.side-activity")).to_have_count(3)
                     # The delegated run hangs under its parent, with its steps; the parent says it delegated one.
                     nested = sidebar.locator("[data-section=working] .side-children a.side-child")

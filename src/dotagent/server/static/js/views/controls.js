@@ -107,12 +107,12 @@ export function mount(root, ctx) {
   const bubbles = el(
     "div",
     { class: "stack" },
-    el("div", { class: "bubble user" }, "Your message, in the yellow bubble."),
+    el("div", { class: "bubble user" }, "Your message, on the raised surface."),
     el("div", { class: "bubble", role: "article" }, el("div", { class: "prose" }, el("p", null, "Dot's answer, in the voice of the look. "), el("code", { class: "mono" }, "code"))),
   );
   const costSample = createCostCard();
   costSample.paint(FAKE_COSTS);
-  const panels = el("div", { class: "stack" }, loadingPanel(), emptyPanel("clock", "Nothing here yet", "An empty panel with its hint."), errorPanel(new Error("Something went wrong"), () => {}));
+  const panels = el("div", { class: "stack" }, loadingPanel(), emptyPanel("Nothing here yet", "An empty panel with its hint."), errorPanel(new Error("Something went wrong"), () => {}));
   const type = el(
     "div",
     { class: "stack tight" },

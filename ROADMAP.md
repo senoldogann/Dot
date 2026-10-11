@@ -4994,8 +4994,8 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | #   | Item                                                                     | Status      | Commits |
 | --- | ------------------------------------------------------------------------ | ----------- | ------- |
 | 77  | The type system: Inter and Geist Mono, seven sizes, three weights        | done        | ffa00cb |
-| 78  | One bar: the top bar carries the page, the run's head and the daemon     | in progress |         |
-| 79  | Flat surfaces and plain words: cards, labels, meta, chips, empty states  | planned     |         |
+| 78  | One bar: the top bar carries the page, the run's head and the daemon     | done        | 7a7e43f |
+| 79  | Flat surfaces and plain words: cards, labels, meta, chips, empty states  | in progress |         |
 | 80  | Forms and controls: one grammar for inputs, selects, switches, tables    | planned     |         |
 | 81  | Dark, first paint and the tour: every page read in both schemes          | planned     |         |
 | 82  | Delegated runs as rows: face, state, last line, time; the child's bar    | planned     |         |
@@ -5033,7 +5033,7 @@ refuses any size, weight or line-height off the scale. `tests/smoke/test_tour.py
 
 ### 78. One bar: the top bar carries the page, the run's head and the daemon
 
-**Status: in progress.** Built on `item-78-one-bar` (MYP-218).
+**Status: done.** Merged as `7a7e43f` (PR #87, squash; MYP-218 Done).
 
 **Design, as built (2026-10-11).** `static/js/stage.js` owns two slots the shell places in the bar once, between the
 sidebar opener and the daemon's pills: the page's name (`setStageTitle`) and the page's tools (`setStageTools`);
@@ -5057,7 +5057,21 @@ The phone header is the same bar. Nothing has a translucent backdrop any more.
 
 ### 79. Flat surfaces and plain words: cards, labels, meta, chips, empty states
 
-**Status: planned.**
+**Status: in progress.** Built on `item-79-flat-surfaces` (MYP-219).
+
+**Design, as built (2026-10-11).** `--radius` is 12 px and `.card` is a surface with a hairline and no shadow; the
+shadow tokens stay on what floats (menus, dialogs, the composer's focus, the sidebar's open row). `.section-label` is
+sentence case at 14/20 in the label weight on `--text-2`; the table head, the slash menu's group names and a tool
+body's heading drop their uppercase and tracking for 13 at the label weight. A row's facts and an answer's facts are
+spans in `.meta-facts` (inline flex, wrapping, a 12 px gap), not one string joined with middle dots; the Cost card's
+head line is four such spans (`costFacts`) and a step group's count stands beside its title without a dot; the sidebar's
+section labels carry their count in a `.side-label-count` span at the text weight. `emptyPanel(title, text)` returns
+one `.empty-line` (muted, 12 px of padding, 16 inside a card): the icon and the card are gone, the title and the
+sentence read as one line. The campaign cards' numbers read as "3 sessions", in Inter, not as `sessions 3` in mono.
+The owner's bubble sits on `--surface-2` in the text colour; the yellow is Dot's face alone (the Controls page says
+so). The Models card's head reads "4 providers" and "1 model" as two spans; a page's description line has a flex
+basis of 280 px, so on a phone the filters go under it instead of squeezing it to one word a line. The home's "Ended today" list is rows on the page, not a card. `test_activity` reads the labels as "Waiting
+for you 1" and "Working 3".
 
 **What.** Cards flat: hairline, radius 12, no shadow (shadows stay on menus, dialogs, the composer's focus); list
 rows inside a card without a second border; section labels sentence case at 14/20 weight 500 (the uppercase class
@@ -5603,3 +5617,4 @@ item 82, the sidebar's sections, the Campaigns and Schedules pages and the bar o
 - 2026-10-11 (Fable 5.1): item 73 merged 1efede9 (PR #81, MYP-213 Done). The controls page's cost sample lacked the searches of item 69 (the page threw and drew nothing; the controls smoke test had not run since): fixed in item 74.
 - 2026-10-11 (Fable 5.1): item 74 built on branch `item-74-quiet-chrome` (MYP-214, PR #82). Item 75 built on branch `item-75-not-looking` (MYP-215): `attention.js` `isLooking`/`worthATell(runId)`, the "Tell me even when I am looking" switch, the attention smoke test with a stubbed Notification.
 - 2026-10-11 (Fable 5.1): item 74 merged as `f809abd` (PR #82). Item 75 merged as `9643889` (PR #83) on the local gate: GitHub Actions refused both jobs (billing), see its status line. Item 76 opened: the baseline is written, the week starts with the daemon restart of today. The daemon's hourly task on `anthropic:claude-sonnet-5-5` failed three times running (04:28, 05:29, 06:31): Chrome did not accept the remote debugging connection on 9222 within 60 s; the owner's Chrome, not the code, as far as the store shows (told the owner).
+- 2026-10-11 (Fable 5.1): Part 9 planned (items 77-83; items 82 and 83 from the owner's references: Claude Code's subagent rows and child page, Grok's moving agent faces). Item 77 merged as `ffa00cb` (PR #86, MYP-217 Done): Inter and Geist Mono self-hosted, seven sizes, three weights, the token test, the screenshot tour. Item 78 merged as `7a7e43f` (PR #87, MYP-218 Done): `stage.js`, one solid top bar, the run's head in it, the settings' single title. Item 79 built on branch `item-79-flat-surfaces` (MYP-219): flat cards, sentence-case labels, `.meta-facts`, one-line empty states, the bubble on the raised surface.

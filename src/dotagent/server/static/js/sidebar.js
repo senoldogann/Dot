@@ -415,7 +415,7 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
         el(
           "section",
           { class: "side-group", "data-section": key },
-          el("h3", { class: "side-label" }, `${label} · ${activity[key].length}`),
+          el("h3", { class: "side-label" }, `${label} `, el("span", { class: "side-label-count" }, String(activity[key].length))),
           activityRows(activity[key], onNavigate),
         ),
       ),

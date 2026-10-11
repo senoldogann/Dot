@@ -843,8 +843,8 @@ that waits for your approval shows above the composer.
 A run opens as a conversation under Dot's face and name, with the state of the run and when it started. The face is the
 state: still when the run rests, a slow breath while it works, an amber ring while it waits for you, a green tick for
 a moment when the run ends done, red when it failed (with reduced motion the tick simply shows). Its chips (the
-model, the approval mode, goal mode) and buttons sit on the right. Your goal is the first message, in the yellow bubble
-of your messages. A delegated run is a chip with its goal and a status ring (turning while it works, amber while it
+model, the approval mode, goal mode) and buttons sit on the right. Your goal is the first message, in the bubble
+of your messages on the raised surface. A delegated run is a chip with its goal and a status ring (turning while it works, amber while it
 waits for you, green with a check when it is done, red when it failed); open it for its steps. The tool calls of one
 stretch of work fold into a single
 "Worked for 12 s (model 8 s) · 5 tool calls" line, where the part in brackets is how much of that time the model's turns
@@ -921,7 +921,11 @@ stay, so a state change is still seen. The chrome is quiet so the work leads: ev
 one rhythm of 8 px (4 for the smallest, a 2 px hairline token for what sits a breath apart; a unit test checks it),
 the sidebar has no dividers between its groups, its labels are the lightest ink that reads and its open row is a
 surface step rather than a tint, the stage bar's pills show a border only when they count something, a card's head is
-lighter than its body, and a folded step of the timeline is one line whose duration shows on hover.
+lighter than its body, and a folded step of the timeline is one line whose duration shows on hover. Cards are
+flat: a surface with a hairline and a 12 px radius, no shadow (shadows stay on what floats: menus, dialogs, the
+composer in focus); section labels are sentence case; the facts of a row are spans a gap apart rather than one dotted
+string; an empty list is one line that says so and what to do; your messages sit on the raised surface, the yellow
+being Dot's face alone.
 
 While you are elsewhere, the tab title counts the approvals that wait: `(2) New chat · Dot`. Settings › General ›
 Notifications adds

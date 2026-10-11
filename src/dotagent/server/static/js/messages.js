@@ -55,7 +55,7 @@ export function answerMessage({ status, text, endedAt, startedAt, href }) {
       "div",
       { class: "answer-foot" },
       written ? copyButton(text) : null,
-      el("span", { class: "answer-facts" }, facts.join(" · ")),
+      el("span", { class: "answer-facts meta-facts" }, ...facts.map((fact) => el("span", null, fact))),
       href === null ? null : el("a", { class: "small", href }, "Open run"),
     ),
   );

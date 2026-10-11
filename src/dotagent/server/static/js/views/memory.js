@@ -205,9 +205,9 @@ export function mount(root, ctx) {
       }
       holder.replaceChildren(...parts);
     } else if (shownQuery === "") {
-      holder.replaceChildren(emptyPanel("database", "Nothing remembered yet", "Add a note above, or ask Dot to remember something during a run."));
+      holder.replaceChildren(emptyPanel("Nothing remembered yet", "Add a note above, or ask Dot to remember something during a run."));
     } else {
-      holder.replaceChildren(emptyPanel("search", "Nothing matches", "Try other words or a shorter query."));
+      holder.replaceChildren(emptyPanel("Nothing matches", "Try other words or a shorter query."));
     }
   }
 
