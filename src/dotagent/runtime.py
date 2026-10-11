@@ -11,6 +11,7 @@ from dotagent.agent.judge import Judge, TypeSafeService, judge_for
 from dotagent.browser.pool import BrowserPool
 from dotagent.browser.session import BrowserSession
 from dotagent.config import AppConfig
+from dotagent.core.errors import StoreError
 from dotagent.core.logs import get_logger
 from dotagent.core.notify import Notifier, show_notification
 from dotagent.core.paths import (
@@ -154,7 +155,18 @@ def _call_recorder(store: Store, bus: EventBus) -> CallRecorder:
         if call.run_id is None:
             await log_model_call(call)
             return
-        await store.add_run_tokens(call.run_id, call.input_tokens, call.output_tokens)
+        try:
+            await store.add_run_tokens(call.run_id, call.input_tokens, call.output_tokens)
+        except StoreError as error:
+            # Bookkeeping: a run must not die because its token totals could not be written this once. The loss is
+            # logged with the numbers, so the totals of the run are known to be short by this call.
+            log.error(
+                "model_call_not_recorded",
+                run_id=call.run_id,
+                input_tokens=call.input_tokens,
+                output_tokens=call.output_tokens,
+                error=error.message,
+            )
         await bus.emit(call.run_id, CALL_EVENT, call_event_data(call), True)
 
     return record

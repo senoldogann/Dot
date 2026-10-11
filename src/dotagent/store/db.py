@@ -12,16 +12,16 @@ import re
 import sqlite3
 import struct
 import time
-from collections.abc import Iterable, Iterator, Sequence
-from contextlib import contextmanager
+from collections.abc import Awaitable, Callable, Coroutine, Iterable, Sequence
 from pathlib import Path
-from typing import Literal
+from typing import Concatenate, Literal
 
 import aiosqlite
 
 from dotagent.core.errors import NotFoundError, StoreError
 from dotagent.core.ids import new_id
 from dotagent.core.jsonutil import dumps_compact, parse_json_object, parse_json_value
+from dotagent.core.logs import get_logger
 from dotagent.core.text import fold_search
 from dotagent.core.types import JsonArray, JsonObject
 from dotagent.llm.calls import CALL_EVENT, CallPurpose
@@ -130,7 +130,6 @@ _EXTENSIONS: dict[str, str] = {
 
 
 # How long a write waits for another writer; the same 10 s as the busy timeout of the shared connection.
-_WRITE_WAIT_S: float = 10.0
 
 # A screenshot saved this recently may belong to a message or event that is not stored yet, so deleting a chat leaves it
 # for ``orphan_images`` to find later.
@@ -239,51 +238,6 @@ def encode_message(message: Message, image_dir: Path) -> str:
         {"media_type": image.media_type, "file": _write_image(image_dir, image)} for image in message.images
     ]
     return dumps_compact(dumped)
-
-
-@contextmanager
-def _write_transaction(database: Path) -> Iterator[sqlite3.Connection]:
-    """One write transaction on a connection of its own: all of it is stored or none of it.
-
-    The write lock is taken up front, so concurrent units wait for each other (up to ``_WRITE_WAIT_S``) instead of
-    reading stale numbers, and any error rolls the whole unit back before it is raised again.
-    """
-    connection: sqlite3.Connection = sqlite3.connect(database, timeout=_WRITE_WAIT_S, isolation_level=None)
-    try:
-        connection.execute("PRAGMA synchronous=NORMAL")
-        connection.execute("BEGIN IMMEDIATE")
-        yield connection
-        connection.execute("COMMIT")
-    except BaseException:
-        if connection.in_transaction:
-            connection.execute("ROLLBACK")
-        raise
-    finally:
-        connection.close()
-
-
-def _append_unit(database: Path, image_dir: Path, thread_id: str, messages: Sequence[Message], now: float) -> None:
-    bodies: list[str] = [encode_message(message, image_dir) for message in messages]
-    with _write_transaction(database) as connection:
-        top: tuple[int] = connection.execute(
-            "SELECT COALESCE(MAX(seq), -1) FROM messages WHERE thread_id = ?", (thread_id,)
-        ).fetchone()
-        rows: list[tuple[str, int, str]] = [
-            (thread_id, int(top[0]) + 1 + offset, body) for offset, body in enumerate(bodies)
-        ]
-        connection.executemany("INSERT INTO messages(thread_id, seq, body) VALUES(?, ?, ?)", rows)
-        connection.execute("UPDATE threads SET updated_at = ? WHERE id = ?", (now, thread_id))
-
-
-def _replace_unit(database: Path, image_dir: Path, thread_id: str, messages: Sequence[Message], now: float) -> None:
-    bodies: list[str] = [encode_message(message, image_dir) for message in messages]
-    with _write_transaction(database) as connection:
-        connection.execute("DELETE FROM messages WHERE thread_id = ?", (thread_id,))
-        connection.executemany(
-            "INSERT INTO messages(thread_id, seq, body) VALUES(?, ?, ?)",
-            [(thread_id, index, body) for index, body in enumerate(bodies)],
-        )
-        connection.execute("UPDATE threads SET updated_at = ? WHERE id = ?", (now, thread_id))
 
 
 def decode_message(body: str, image_dir: Path, load_images: bool) -> Message:
@@ -530,6 +484,52 @@ async def _refresh_memory_index(connection: aiosqlite.Connection) -> None:
     await connection.executemany("INSERT INTO memories_fts(id, content, tags) VALUES(?, ?, ?)", wanted)
 
 
+log = get_logger(__name__)
+
+# A write that finds the database locked (another process writes: dotx prune, a tool of the owner's) is tried again
+# after these pauses, each try logged; then the error is raised as a StoreError. The daemon's own writes never lock
+# each other out: they all go through one connection, one at a time (``_writing``).
+_LOCKED_RETRY_DELAYS_S: tuple[float, ...] = (0.2, 0.5, 1.0, 2.0)
+
+
+def _is_locked(error: sqlite3.OperationalError) -> bool:
+    text: str = str(error).lower()
+    return "locked" in text or "busy" in text
+
+
+def _writing[**P, R](
+    method: Callable[Concatenate["Store", P], Awaitable[R]],
+) -> Callable[Concatenate["Store", P], Coroutine[object, object, R]]:
+    """A method that writes: it runs alone on the connection, so a unit of several statements is committed whole and
+    never shares a transaction with another writer; a lock held by another process is waited out with retries."""
+
+    async def run(self: "Store", /, *args: P.args, **kwargs: P.kwargs) -> R:
+        async with self._write_lock:
+            for attempt, delay in enumerate(_LOCKED_RETRY_DELAYS_S, start=1):
+                try:
+                    return await method(self, *args, **kwargs)
+                except sqlite3.OperationalError as error:
+                    if not _is_locked(error):
+                        raise
+                    await self._db.rollback()
+                    log.warning(
+                        "store_locked_retry", method=method.__name__, attempt=attempt, delay_s=delay, error=str(error)
+                    )
+                    await asyncio.sleep(delay)
+            try:
+                return await method(self, *args, **kwargs)
+            except sqlite3.OperationalError as error:
+                if not _is_locked(error):
+                    raise
+                await self._db.rollback()
+                raise StoreError(
+                    "the database stayed locked by another process",
+                    {"method": method.__name__, "tries": len(_LOCKED_RETRY_DELAYS_S) + 1, "error": str(error)},
+                ) from error
+
+    return run
+
+
 class Store:
     """Connector to the SQLite database."""
 
@@ -537,6 +537,8 @@ class Store:
         self._db: aiosqlite.Connection = connection
         self._database: Path = database
         self._image_dir: Path = image_dir
+        # The one door for writes (``_writing``): the daemon's writers take turns on the one connection.
+        self._write_lock: asyncio.Lock = asyncio.Lock()
 
     @classmethod
     async def open(cls, path: Path, image_dir: Path) -> "Store":
@@ -569,6 +571,7 @@ class Store:
         row: aiosqlite.Row | None = await self._one("SELECT value FROM kv WHERE key = ?", (key,))
         return None if row is None else str(row["value"])
 
+    @_writing
     async def kv_set(self, key: str, value: str) -> None:
         await self._db.execute(
             "INSERT INTO kv(key, value) VALUES(?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value",
@@ -578,6 +581,7 @@ class Store:
 
     # ----- threads and messages ------------------------------------------------------------
 
+    @_writing
     async def create_thread(self, title: str, source: str) -> ThreadRecord:
         now: float = time.time()
         record: ThreadRecord = ThreadRecord(
@@ -600,10 +604,12 @@ class Store:
         rows: list[aiosqlite.Row] = await self._all("SELECT * FROM threads ORDER BY updated_at DESC LIMIT ?", (limit,))
         return [_thread(row) for row in rows]
 
+    @_writing
     async def rename_thread(self, thread_id: str, title: str) -> None:
         await self._db.execute("UPDATE threads SET title = ? WHERE id = ?", (title, thread_id))
         await self._db.commit()
 
+    @_writing
     async def delete_thread(self, thread_id: str) -> None:
         await self._db.execute("DELETE FROM messages WHERE thread_id = ?", (thread_id,))
         await self._db.execute("DELETE FROM threads WHERE id = ?", (thread_id,))
@@ -629,6 +635,7 @@ class Store:
         )
         return [_summary(row) for row in rows]
 
+    @_writing
     async def delete_threads(self, thread_ids: Sequence[str]) -> list[str]:
         """Delete chats with everything they hold, in one transaction: their messages, their runs, the runs those
         delegated to (recursively) with the events and approvals of all of them, and the threads of the delegated runs
@@ -716,6 +723,7 @@ class Store:
         )
         return (0, 0) if row is None else (int(row["runs"]), int(row["events"]))
 
+    @_writing
     async def delete_events_of_runs_ended_before(self, before: float) -> int:
         """Delete the events of the runs that ended before ``before``; the runs stay. Returns how many events went.
         The screenshots those events named become orphans for :meth:`orphan_images`."""
@@ -752,14 +760,54 @@ class Store:
         async with self._db.execute("PRAGMA wal_checkpoint(TRUNCATE)") as cursor:
             await cursor.fetchall()
 
+    def _encoded(self, messages: Sequence[Message]) -> list[str]:
+        return [encode_message(message, self._image_dir) for message in messages]
+
+    @_writing
+    async def _unit(self, statements: Callable[[], Awaitable[None]]) -> None:
+        """Run ``statements`` as one transaction on the connection: all of it is stored or none of it. The write lock
+        is held throughout, so no other writer's statement or commit lands inside the unit."""
+        await self._db.execute("BEGIN IMMEDIATE")
+        try:
+            await statements()
+        except BaseException:
+            await self._db.rollback()
+            raise
+        await self._db.commit()
+
     async def append_messages(self, thread_id: str, messages: Sequence[Message]) -> None:
         """Add ``messages`` after the thread's last one: all of them are stored or none, and concurrent appends to one
         thread are numbered one after the other."""
-        await asyncio.to_thread(_append_unit, self._database, self._image_dir, thread_id, messages, time.time())
+        bodies: list[str] = await asyncio.to_thread(self._encoded, messages)
+        now: float = time.time()
+
+        async def statements() -> None:
+            top: aiosqlite.Row | None = await self._one(
+                "SELECT COALESCE(MAX(seq), -1) AS top FROM messages WHERE thread_id = ?", (thread_id,)
+            )
+            first: int = (0 if top is None else int(top["top"])) + 1
+            await self._db.executemany(
+                "INSERT INTO messages(thread_id, seq, body) VALUES(?, ?, ?)",
+                [(thread_id, first + offset, body) for offset, body in enumerate(bodies)],
+            )
+            await self._db.execute("UPDATE threads SET updated_at = ? WHERE id = ?", (now, thread_id))
+
+        await self._unit(statements)
 
     async def replace_messages(self, thread_id: str, messages: Sequence[Message]) -> None:
         """Swap the thread's whole history for ``messages`` in one step: a failure or a stop leaves the old history."""
-        await asyncio.to_thread(_replace_unit, self._database, self._image_dir, thread_id, messages, time.time())
+        bodies: list[str] = await asyncio.to_thread(self._encoded, messages)
+        now: float = time.time()
+
+        async def statements() -> None:
+            await self._db.execute("DELETE FROM messages WHERE thread_id = ?", (thread_id,))
+            await self._db.executemany(
+                "INSERT INTO messages(thread_id, seq, body) VALUES(?, ?, ?)",
+                [(thread_id, index, body) for index, body in enumerate(bodies)],
+            )
+            await self._db.execute("UPDATE threads SET updated_at = ? WHERE id = ?", (now, thread_id))
+
+        await self._unit(statements)
 
     async def load_messages(self, thread_id: str, keep_recent_images: int) -> list[Message]:
         """Load a thread's history; only the newest ``keep_recent_images`` screenshots are re-inflated."""
@@ -783,6 +831,7 @@ class Store:
 
     # ----- runs ------------------------------------------------------------------------------
 
+    @_writing
     async def create_run(
         self,
         thread_id: str,
@@ -844,20 +893,24 @@ class Store:
         await self._db.commit()
         return record
 
+    @_writing
     async def set_run_status(self, run_id: str, status: RunStatus) -> None:
         await self._db.execute("UPDATE runs SET status = ? WHERE id = ?", (status, run_id))
         await self._db.commit()
 
+    @_writing
     async def set_run_steps(self, run_id: str, steps: int) -> None:
         await self._db.execute("UPDATE runs SET steps = ? WHERE id = ?", (steps, run_id))
         await self._db.commit()
 
+    @_writing
     async def set_run_model(self, run_id: str, model: str, effort: Effort | None) -> None:
         """The model a run works on from now on (a standby model, once its own model cannot answer) and the reasoning
         level it asks that model for (``None``: the configured default)."""
         await self._db.execute("UPDATE runs SET model = ?, effort = ? WHERE id = ?", (model, effort, run_id))
         await self._db.commit()
 
+    @_writing
     async def add_run_tokens(self, run_id: str, input_tokens: int, output_tokens: int) -> None:
         """Add the tokens of one model call of a run (a step or a side call) to its totals."""
         await self._db.execute(
@@ -866,6 +919,7 @@ class Store:
         )
         await self._db.commit()
 
+    @_writing
     async def finish_run(self, run_id: str, status: RunStatus, result: str) -> None:
         await self._db.execute(
             "UPDATE runs SET status = ?, result = ?, finished_at = ? WHERE id = ?",
@@ -901,6 +955,7 @@ class Store:
         )
         return 0 if row is None else int(row["n"])
 
+    @_writing
     async def mark_interrupted_runs(self) -> int:
         """Runs left active by a crashed daemon (queued, running, or blocked on a question) become 'failed', finished
         at their last sign of life: their newest event, else the time they were created. Each one also gets, at that
@@ -929,6 +984,7 @@ class Store:
 
     # ----- events ----------------------------------------------------------------------------
 
+    @_writing
     async def add_event(self, run_id: str, kind: str, data: JsonObject) -> EventRecord:
         now: float = time.time()
         cursor: aiosqlite.Cursor = await self._db.execute(
@@ -979,6 +1035,7 @@ class Store:
 
     # ----- approvals -------------------------------------------------------------------------
 
+    @_writing
     async def _insert_approval(self, record: ApprovalRecord) -> None:
         await self._db.execute(
             "INSERT INTO approvals(id, run_id, created_at, decided_at, status, tool, summary, severity, args, decided_by, note)"
@@ -1068,6 +1125,7 @@ class Store:
         await self._insert_approval(record)
         return record
 
+    @_writing
     async def decide_approval(
         self, approval_id: str, status: ApprovalStatus, decided_by: str, note: str
     ) -> ApprovalRecord:
@@ -1102,6 +1160,7 @@ class Store:
         )
         return [_approval(row) for row in rows]
 
+    @_writing
     async def expire_pending_approvals(self) -> int:
         cursor = await self._db.execute(
             "UPDATE approvals SET status = 'expired', decided_at = ?, decided_by = 'system', note = 'daemon restarted'"
@@ -1117,6 +1176,7 @@ class Store:
         rows = await self._all("SELECT * FROM rules ORDER BY position, created_at", ())
         return [_rule(row) for row in rows]
 
+    @_writing
     async def add_rule(self, behavior: Behavior, tool_glob: str, match_regex: str, description: str) -> RuleRecord:
         row = await self._one("SELECT COALESCE(MAX(position), 0) AS top FROM rules", ())
         position: int = (0 if row is None else int(row["top"])) + 1
@@ -1147,16 +1207,19 @@ class Store:
         await self._db.commit()
         return record
 
+    @_writing
     async def set_rule_enabled(self, rule_id: str, enabled: bool) -> None:
         await self._db.execute("UPDATE rules SET enabled = ? WHERE id = ?", (1 if enabled else 0, rule_id))
         await self._db.commit()
 
+    @_writing
     async def delete_rule(self, rule_id: str) -> None:
         await self._db.execute("DELETE FROM rules WHERE id = ?", (rule_id,))
         await self._db.commit()
 
     # ----- push subscriptions ------------------------------------------------------------------
 
+    @_writing
     async def add_push_subscription(self, endpoint: str, p256dh: str, auth: str) -> PushSubscription:
         """Keep a browser's subscription; the same endpoint again takes the new keys."""
         record: PushSubscription = PushSubscription(endpoint=endpoint, p256dh=p256dh, auth=auth, created_at=time.time())
@@ -1180,12 +1243,14 @@ class Store:
             for row in rows
         ]
 
+    @_writing
     async def delete_push_subscription(self, endpoint: str) -> None:
         await self._db.execute("DELETE FROM push_subscriptions WHERE endpoint = ?", (endpoint,))
         await self._db.commit()
 
     # ----- memories --------------------------------------------------------------------------
 
+    @_writing
     async def add_memory(
         self, content: str, tags: Sequence[str], source_run: str | None, vector: Sequence[float] | None
     ) -> MemoryRecord:
@@ -1217,6 +1282,7 @@ class Store:
         await self._db.commit()
         return record
 
+    @_writing
     async def update_memory(
         self, memory_id: str, content: str, tags: Sequence[str], vector: Sequence[float] | None
     ) -> MemoryRecord:
@@ -1239,6 +1305,7 @@ class Store:
         await self._db.commit()
         return await self.get_memory(memory_id)
 
+    @_writing
     async def set_memory_tags(self, memory_id: str, tags: Sequence[str]) -> MemoryRecord:
         """Replace the tags of a memory; its text and vector stay."""
         tag_text: str = ",".join(tags)
@@ -1249,6 +1316,7 @@ class Store:
         await self._db.commit()
         return await self.get_memory(memory_id)
 
+    @_writing
     async def delete_memory(self, memory_id: str) -> bool:
         cursor = await self._db.execute("DELETE FROM memories WHERE id = ?", (memory_id,))
         await self._db.execute("DELETE FROM memories_fts WHERE id = ?", (memory_id,))
@@ -1331,6 +1399,7 @@ class Store:
         )
         return [_memory(row) for row in rows]
 
+    @_writing
     async def mark_memories_used(self, memory_ids: Sequence[str], when: float) -> None:
         """Count one more use of each note, at ``when``; its ``updated_at`` stays."""
         if not memory_ids:
@@ -1342,6 +1411,7 @@ class Store:
         )
         await self._db.commit()
 
+    @_writing
     async def clear_memory_vectors(self) -> None:
         await self._db.execute("DELETE FROM memory_vectors")
         await self._db.commit()
@@ -1353,6 +1423,7 @@ class Store:
         )
         return [_memory(row) for row in rows]
 
+    @_writing
     async def set_memory_vector(self, memory_id: str, vector: Sequence[float]) -> None:
         await self._db.execute(
             "INSERT INTO memory_vectors(id, dim, vec) VALUES(?, ?, ?)"
@@ -1363,6 +1434,7 @@ class Store:
 
     # ----- schedules -------------------------------------------------------------------------
 
+    @_writing
     async def add_schedule(
         self,
         name: str,
@@ -1411,6 +1483,7 @@ class Store:
         await self._db.commit()
         return record
 
+    @_writing
     async def update_schedule(
         self,
         schedule_id: str,
@@ -1449,6 +1522,7 @@ class Store:
         )
         return [_schedule(row) for row in rows]
 
+    @_writing
     async def record_schedule_fire(
         self, schedule_id: str, fired_at: float, next_run_at: float | None, thread_id: str, status: str
     ) -> None:
@@ -1459,6 +1533,7 @@ class Store:
         )
         await self._db.commit()
 
+    @_writing
     async def record_schedule_skip(self, schedule_id: str, next_run_at: float | None, status: str) -> None:
         """A due firing that did not start a run: move on to ``next_run_at`` (``None`` ends the schedule)."""
         await self._db.execute(
@@ -1468,10 +1543,12 @@ class Store:
         )
         await self._db.commit()
 
+    @_writing
     async def set_schedule_status(self, schedule_id: str, status: str) -> None:
         await self._db.execute("UPDATE schedules SET last_status = ? WHERE id = ?", (status, schedule_id))
         await self._db.commit()
 
+    @_writing
     async def set_schedule_enabled(self, schedule_id: str, enabled: bool, next_run_at: float | None) -> None:
         await self._db.execute(
             "UPDATE schedules SET enabled = ?, next_run_at = ? WHERE id = ?",
@@ -1479,12 +1556,14 @@ class Store:
         )
         await self._db.commit()
 
+    @_writing
     async def delete_schedule(self, schedule_id: str) -> None:
         await self._db.execute("DELETE FROM schedules WHERE id = ?", (schedule_id,))
         await self._db.commit()
 
     # ----- campaigns -------------------------------------------------------------------------
 
+    @_writing
     async def create_campaign(
         self,
         title: str,
@@ -1555,6 +1634,7 @@ class Store:
         rows = await self._all("SELECT * FROM campaigns ORDER BY status = 'active' DESC, created_at DESC", ())
         return [_campaign(row) for row in rows]
 
+    @_writing
     async def _update_campaign(self, campaign_id: str, assignments: str, params: Sequence[object]) -> None:
         cursor: aiosqlite.Cursor = await self._db.execute(
             f"UPDATE campaigns SET {assignments}, updated_at = ? WHERE id = ?", (*params, time.time(), campaign_id)
@@ -1599,12 +1679,14 @@ class Store:
         )
         return [_campaign(row) for row in rows]
 
+    @_writing
     async def delete_campaign(self, campaign_id: str) -> None:
         """Delete a campaign and its ledger; its sessions stay as runs of their threads."""
         await self._db.execute("DELETE FROM campaign_entries WHERE campaign_id = ?", (campaign_id,))
         await self._db.execute("DELETE FROM campaigns WHERE id = ?", (campaign_id,))
         await self._db.commit()
 
+    @_writing
     async def add_campaign_entry(
         self, campaign_id: str, run_id: str | None, kind: CampaignEntryKind, text: str, numbers: dict[str, float]
     ) -> CampaignEntry:
@@ -1647,6 +1729,7 @@ class Store:
         )
         return None if row is None else _campaign_entry(row)
 
+    @_writing
     async def record_paced_action(self, host: str, pace: PaceClass, ts: float, run_id: str) -> None:
         """Count a public or social action of ``run_id`` on ``host`` (:mod:`dotagent.policy.pace`)."""
         await self._db.execute(
@@ -1654,6 +1737,7 @@ class Store:
         )
         await self._db.commit()
 
+    @_writing
     async def record_spend(self, host: str, amount: float, currency: str, ts: float, run_id: str) -> None:
         """Count a pre-approved spend against the site's day."""
         await self._db.execute(

@@ -259,7 +259,9 @@ answer (a small model that is offered both writes the call out as text).
   did in most trial runs). Dot does not reinterpret such text: it is nudged first when tools were used, otherwise it
   becomes the result as written. Use a larger model as `main` for task and research runs.
 - At most `max_concurrent_runs` runs go at once; the others wait. Delegated runs do not count.
-- Runs, their events and their conversations are stored in a SQLite database, so the web UI can replay them. A run
+- Runs, their events and their conversations are stored in a SQLite database (WAL mode; the daemon writes through one
+  connection, one writer at a time, and waits out a lock held by another process with logged retries before it gives
+  an error; a token count that cannot be written is logged, not fatal to the run), so the web UI can replay them. A run
   that a crashed daemon left behind is marked as failed the next time Dot starts, as ended at its last event. It can be
   resumed, and so can a run that a shutdown of the daemon cut off (see
   [Autonomy](#autonomy-approvals-goal-mode-and-the-end-of-a-run)).
