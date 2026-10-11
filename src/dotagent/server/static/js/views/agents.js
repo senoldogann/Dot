@@ -253,7 +253,7 @@ function mountList(root, ctx) {
   const newButton = el("button", { class: "btn primary", type: "button", onclick: openEditor }, icon("plus"), el("span", { class: "label" }, "New agent"));
   const teamLink = el("a", { class: "btn ghost", href: "#/team", title: "Today's messages between agents" }, icon("branch"), el("span", { class: "label" }, "Team"));
   root.append(
-    pageHead("Agents", "Dot, and the agents you made: each with a face, a role, a model and its own chats.", el("div", { class: "cluster" }, teamLink, newButton)),
+    pageHead("Agents", "Dot, and the agents you made: each with a face, a role and its own chats.", el("div", { class: "cluster" }, teamLink, newButton)),
     editorSlot,
     holder,
   );

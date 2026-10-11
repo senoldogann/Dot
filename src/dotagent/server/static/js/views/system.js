@@ -810,7 +810,7 @@ export function mountBrowser(root, ctx) {
   };
 }
 
-/** The daemon, its safety switch and its health checks. */
+/** The daemon, its emergency stop and its health checks. */
 export function mountSystem(root, ctx) {
   let disposed = false;
   const daemon = buildDaemon();
@@ -822,7 +822,7 @@ export function mountSystem(root, ctx) {
     failsafe.paint(snapshot);
   }
 
-  root.append(paneHead("The daemon, its safety switch and its health checks.", null), daemon.element, failsafe.element, doctor.element);
+  root.append(paneHead("The daemon, its emergency stop and its health checks.", null), daemon.element, failsafe.element, doctor.element);
   const stop = onChange(paint);
   paint(getSnapshot());
   attempt(refresh);

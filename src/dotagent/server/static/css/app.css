@@ -800,6 +800,8 @@ a.pill:hover {
 
 .switch[aria-checked="true"]::after {
   transform: translateX(14px);
+  /* The knob takes the accent's text colour, so it stays visible on a light accent in the dark scheme (item 100). */
+  background: var(--on-accent);
 }
 
 .switch:disabled {
@@ -1295,11 +1297,13 @@ a.pill:hover {
     box-shadow var(--motion-quick) var(--ease);
 }
 
+/* A focused composer keeps a quiet border (item 100): the accent is ink in the Neutral look, and a 1 px ink border
+   with a ring read as a heavy frame. */
 .composer:focus-within {
-  border-color: var(--accent);
+  border-color: var(--border-strong);
   box-shadow:
     var(--shadow),
-    0 0 0 3px color-mix(in srgb, var(--accent) 16%, transparent);
+    0 0 0 3px color-mix(in srgb, var(--accent) 10%, transparent);
 }
 
 .composer .textarea {
@@ -2411,10 +2415,10 @@ details[open] > summary .chev {
 }
 
 .dock-inner:focus-within {
-  border-color: var(--accent);
+  border-color: var(--border-strong);
   box-shadow:
     var(--shadow),
-    0 0 0 3px color-mix(in srgb, var(--accent) 16%, transparent);
+    0 0 0 3px color-mix(in srgb, var(--accent) 10%, transparent);
 }
 
 .dock-inner .textarea {
