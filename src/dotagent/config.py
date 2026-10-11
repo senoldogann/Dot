@@ -275,6 +275,8 @@ class MemoryConfig(FrozenModel):
     # The window of a note's score (how the runs handed it ended) and the runs it takes before the score counts.
     score_days: int = Field(ge=1)
     score_min_uses: int = Field(ge=1)
+    # The most characters Dot's part of the owner section (what it knows about you) holds.
+    owner_chars: int = Field(ge=100)
 
 
 class ShellConfig(FrozenModel):

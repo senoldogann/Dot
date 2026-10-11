@@ -163,7 +163,7 @@ from dotagent.llm.types import (
 )
 from dotagent.llm.typesafe import ChoiceAnswer
 from dotagent.memory.render import render_note
-from dotagent.memory.service import Remembered, memory_budget, prompt_memories
+from dotagent.memory.service import Remembered, memory_budget, owner_prompt_lines, owner_section, prompt_memories
 from dotagent.policy.types import QuestionMode
 from dotagent.runtime import Runtime
 from dotagent.skills.catalog import load_skills, playbook_root
@@ -1306,6 +1306,7 @@ async def run_agent(agent: AgentRun) -> RunEnd:
                 if agent_record is None
                 else AgentBrief(name=agent_record.name, role=agent_record.role, instructions=agent_record.instructions),
                 [AgentBrief(name=member.name, role=member.role, instructions="") for member in team],
+                owner_prompt_lines(await owner_section(runtime.store)),
             )
         )
     )

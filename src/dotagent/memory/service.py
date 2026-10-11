@@ -16,8 +16,10 @@ import time
 from collections.abc import Sequence
 from dataclasses import dataclass
 
+from pydantic import ValidationError
+
 from dotagent.config import AppConfig, MemoryConfig
-from dotagent.core.errors import InvalidValueError
+from dotagent.core.errors import InvalidValueError, StoreError
 from dotagent.core.text import estimate_text_tokens
 from dotagent.core.types import FrozenModel
 from dotagent.memory.embedder import Embedder, build_embedder
@@ -33,6 +35,10 @@ JOURNAL_TAG: str = "journal"
 REST_TAG: str = "rest"
 # The source of a note the reflection wrote, in place of a run's id.
 REFLECTION_SOURCE: str = "reflection"
+# The kv key of the owner section (item 93): what Dot knows about the owner, kept by the nightly reflection.
+OWNER_KEY: str = "owner.section"
+# The most lines Dot's part of the owner section holds.
+OWNER_LINES: int = 12
 _MODEL_KEY: str = "memory.embed_model"
 _BACKFILL_BATCH: int = 32
 _QUERY_CHARS: int = 1500
@@ -241,6 +247,55 @@ def _closest_first(notes: Sequence[MemoryRecord], similarities: dict[str, float]
         notes, key=lambda record: (-similarities.get(record.id, -1.0), -record.updated_at)
     )
     return ranked[:limit]
+
+
+class OwnerSection(FrozenModel):
+    """What Dot knows about the owner: ``dot_lines``, which the nightly reflection rewrites from the owner's notes and
+    the day's runs, and ``owner_lines``, the owner's own corrections, kept as they are and never rewritten;
+    ``updated_at`` is when either last changed (``0.0`` before anything was written)."""
+
+    dot_lines: tuple[str, ...]
+    owner_lines: tuple[str, ...]
+    updated_at: float
+
+
+EMPTY_OWNER: OwnerSection = OwnerSection(dot_lines=(), owner_lines=(), updated_at=0.0)
+
+
+async def owner_section(store: Store) -> OwnerSection:
+    """The owner section the store holds, empty before the first reflection wrote one."""
+    raw: str | None = await store.kv_get(OWNER_KEY)
+    if raw is None:
+        return EMPTY_OWNER
+    try:
+        return OwnerSection.model_validate_json(raw)
+    except ValidationError as exc:
+        raise StoreError("the owner section cannot be read", {"key": OWNER_KEY, "error": str(exc)}) from exc
+
+
+async def set_owner_section(store: Store, section: OwnerSection) -> None:
+    await store.kv_set(OWNER_KEY, section.model_dump_json())
+
+
+def owner_lines_within(lines: Sequence[str], owner_chars: int) -> tuple[str, ...]:
+    """``lines`` as Dot's part of the section: one line each, without blanks, at most :data:`OWNER_LINES`, and no
+    more than ``owner_chars`` characters in all (the lines past the budget are left out)."""
+    kept: list[str] = []
+    spent: int = 0
+    for line in lines:
+        flat: str = " ".join(line.split())
+        if not flat or len(kept) >= OWNER_LINES:
+            continue
+        if spent + len(flat) > owner_chars:
+            break
+        kept.append(flat)
+        spent += len(flat)
+    return tuple(kept)
+
+
+def owner_prompt_lines(section: OwnerSection) -> tuple[str, ...]:
+    """The section as the prompt lists it: the owner's own lines first, marked as theirs, then Dot's."""
+    return (*(f"(you said) {line}" for line in section.owner_lines), *section.dot_lines)
 
 
 class Remembered(FrozenModel):

@@ -1,8 +1,8 @@
 """The shapes the HTTP interface takes and gives. Records of the store are returned as they are."""
 
-from typing import Literal
+from typing import Annotated, Literal
 
-from pydantic import Field, JsonValue
+from pydantic import Field, JsonValue, StringConstraints
 
 from dotagent.agent.attachments import MAX_ATTACHMENT_BYTES, MAX_ATTACHMENTS
 from dotagent.agent.lessons import RunLessons
@@ -147,6 +147,14 @@ class RuleRequest(FrozenModel):
 
 class RuleEnabledRequest(FrozenModel):
     enabled: bool
+
+
+class OwnerLinesRequest(FrozenModel):
+    """The owner's own lines of the owner section (item 93), one fact each; Dot's lines stay as they are."""
+
+    lines: list[Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=300)]] = Field(
+        max_length=20
+    )
 
 
 class MemoryRequest(FrozenModel):

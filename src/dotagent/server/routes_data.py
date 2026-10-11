@@ -13,12 +13,15 @@ from dotagent.core.errors import InvalidValueError, NotFoundError
 from dotagent.memory.service import (
     MemoryHit,
     MemoryIndex,
+    OwnerSection,
     SavedMemory,
     forget_memory,
+    owner_section,
     recall,
     recent_scores,
     resting,
     save_memory,
+    set_owner_section,
     update_memory_note,
 )
 from dotagent.scheduler.plans import (
@@ -38,6 +41,7 @@ from dotagent.server.views import (
     MemoriesQuery,
     MemoryPage,
     MemoryRequest,
+    OwnerLinesRequest,
     RuleEnabledRequest,
     RuleRequest,
     ScheduleCreateRequest,
@@ -132,6 +136,21 @@ def memories_router(ctx: ServerContext) -> APIRouter:
             ],
             scores=await index.store.memory_scores(ids, 0.0),
         )
+
+    @router.get("/memories/owner")
+    async def get_owner_section() -> OwnerSection:
+        """What Dot knows about the owner: the reflection's lines and the owner's own."""
+        return await owner_section(index.store)
+
+    @router.put("/memories/owner")
+    async def set_owner_lines(request: OwnerLinesRequest) -> OwnerSection:
+        """Replace the owner's own lines; the reflection's lines stay, and the next reflection keeps the owner's."""
+        before: OwnerSection = await owner_section(index.store)
+        section: OwnerSection = OwnerSection(
+            dot_lines=before.dot_lines, owner_lines=tuple(request.lines), updated_at=time.time()
+        )
+        await set_owner_section(index.store, section)
+        return section
 
     @router.get("/memories/search")
     async def search_memories(query: Annotated[SearchQuery, Query()]) -> list[MemoryHit]:

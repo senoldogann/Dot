@@ -13,7 +13,7 @@ from dotagent.tools.meta import ASK_USER_TOOL, FINISH_TOOL, USE_TOOLS_TOOL
 def _prompt(agent: AgentBrief | None) -> str:
     return build_system_prompt(
         collect_prompt_inputs(
-            "task", "ui", "aggressive", "ask", "wait", False, Path("/tmp/work"), [], [], [], None, [], agent, ()
+            "task", "ui", "aggressive", "ask", "wait", False, Path("/tmp/work"), [], [], [], None, [], agent, (), ()
         )
     )
 

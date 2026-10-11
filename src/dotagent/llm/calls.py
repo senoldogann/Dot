@@ -23,6 +23,7 @@ type CallPurpose = Literal[
     "progress",
     "lessons",
     "playbook",
+    "owner",
     "extract",
     "vision",
     "attachment",
