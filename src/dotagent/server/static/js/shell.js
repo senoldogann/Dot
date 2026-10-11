@@ -115,7 +115,8 @@ export function buildShell({ homeRoute }) {
   const stagebar = el(
     "header",
     { class: "stagebar" },
-    el("div", { class: "stagebar-row" }, opener, stageTitleSlot(), stageToolsSlot(), el("div", { class: "stagebar-right" }, indicators.pills)),
+    // The bar drags the desktop shell's window (item 88); a browser ignores the attribute.
+    el("div", { class: "stagebar-row", "data-tauri-drag-region": "" }, opener, stageTitleSlot(), stageToolsSlot(), el("div", { class: "stagebar-right" }, indicators.pills)),
     indicators.banner,
   );
   const stage = el("div", { class: "stage" }, stagebar, main);

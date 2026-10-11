@@ -555,7 +555,7 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
     { class: "sidebar", id: "sidebar", "aria-label": "Sidebar" },
     el(
       "div",
-      { class: "side-head" },
+      { class: "side-head", "data-tauri-drag-region": "" },
       el("a", { class: "brand", href: homeHref, "aria-label": "Dot", onclick: onNavigate }, brandMark(), el("span", { class: "brand-name" }, "Dot")),
       close,
     ),

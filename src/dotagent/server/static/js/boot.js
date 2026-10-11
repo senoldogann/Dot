@@ -16,4 +16,8 @@
       document.documentElement.dataset[names[key]] = stored;
     }
   });
+  // Inside the desktop shell (Tauri, item 88) the page keeps room for the traffic lights in its top bars.
+  if (typeof window.__TAURI__ === "object" && window.__TAURI__ !== null) {
+    document.documentElement.dataset.shell = "desktop";
+  }
 })();
