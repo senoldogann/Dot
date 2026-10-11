@@ -863,6 +863,7 @@ its provider and its name: the daemon's default or one picked, by provider), **R
 for a model that offers a choice; kept in the browser per model) and **Options** (a lock, closed for Ask, a shield for
 Auto, open for YOLO: the approval mode, which the pill always shows, the Goal mode switch and Keep going, see
 [Autonomy](#autonomy-approvals-goal-mode-and-the-end-of-a-run)); the attach button and the send sit at the right end.
+On a phone the pills wrap over as many lines as they need, without the hairlines.
 Each pill opens its menu above it, and a pick or Escape or a click outside closes it. What you typed and attached and did not send is kept in this browser and is there again when you
 come back (so is the box of each run). Dot's face looks down at the box while you write and brightens when you send.
 Enter starts the run, Shift+Enter adds a line. `/` at

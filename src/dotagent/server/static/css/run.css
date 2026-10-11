@@ -236,6 +236,7 @@
 /* The panel stays beside the conversation under the stage bar, whose height layout.js measures into --stagebar-h (the
    banner and the density change it), to its full height with its own scroll. */
 .inspector {
+  container: inspector / inline-size;
   position: sticky;
   top: calc(var(--stagebar-h) + 12px);
   display: flex;
@@ -245,6 +246,22 @@
   max-height: calc(100dvh - var(--stagebar-h) - 24px);
   overflow-y: auto;
   padding: var(--space-half);
+}
+
+/* At the panel's compact width the facts beside a fold's title (the cost's "123 ms · 13 steps · 13k in · 650 out")
+   do not fit beside it: they take the line under it, as on a phone (item 111). */
+@container inspector (max-width: 420px) {
+  .fold-toggle {
+    flex-wrap: wrap;
+    row-gap: var(--space-half);
+  }
+
+  .fold-summary {
+    flex: 1 0 100%;
+    flex-wrap: wrap;
+    padding-left: 24px;
+    white-space: normal;
+  }
 }
 
 .inspector-head {

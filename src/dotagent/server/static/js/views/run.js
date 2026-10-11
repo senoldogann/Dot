@@ -563,9 +563,8 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
     const delegated = run.parent_run_id !== null;
     frame.element.hidden = delegated;
     dock.classList.toggle("dock-bare", delegated);
-    input.placeholder = active
-      ? "Steer this run (Dot reads it before its next step), or ask on the side with /btw…"
-      : "Follow up in the same conversation, or ask about this run with /btw…";
+    // Short enough for one line of a phone's composer (item 111).
+    input.placeholder = active ? "Steer this run, or /btw to ask on the side" : "Follow up, or /btw to ask on the side";
     frame.setSendLabel(active ? "Steer" : "Follow up");
     if (active && ticker === null) {
       ticker = setInterval(paintStats, 1000);

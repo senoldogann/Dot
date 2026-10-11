@@ -5030,8 +5030,8 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 107 | The fixes of the second look: the still face follows, the favicon freed, TLS reads retried, the sidebar's head and order | done        | 6c79636 |
 | 108 | The composer with marks: a mark per provider, an icon on every pill, the reasoning as its own pill | done        | 108c91d |
 | 109 | Dot's computer as a stage: a frame with a size, the control under it, the character at the head of the chat | done        | b5d42c0 |
-| 110 | Rules in plain words: the model writes the rule, an approval card offers one        | in progress |         |
-| 111 | The review: part 14 read once more                                                  | planned     |         |
+| 110 | Rules in plain words: the model writes the rule, an approval card offers one        | done        | 6da73c4 |
+| 111 | The review: part 14 read once more                                                  | in progress |         |
 
 ### 77. The type system: Inter and Geist Mono, seven sizes, three weights
 
@@ -6306,7 +6306,7 @@ the tour shoots the run page at the wide size.
 
 ### 110. Rules in plain words: the model writes the rule, an approval card offers one
 
-**Status: in progress.**
+**Status: done.** Merged as `6da73c4` (PR #130, MYP-250 Done).
 
 **Design, as built (2026-10-12).** The model never writes the pattern. `POST /api/rules/draft` (`{"sentence"}`) asks the
 review model (`[models] review`, call purpose `rule_draft`, outside any run) for the parts of a rule in one forced call
@@ -6349,7 +6349,44 @@ drafts a rule from a sentence against the scripted model and keeps it; the appro
 
 ### 111. The review: part 14 read once more
 
-**Status: planned.**
+**Status: in progress.**
+
+**Findings, as built (2026-10-12).** Three readings. (1) The tour (23 pages, two schemes, two widths, 90 shots) read
+against the README by two readers, and by eye wherever they doubted: the sidebar with its search first, the composer's
+marks and pills, the run page's panel at each size with the character at the head of the conversation, the Rules tab's
+words card, and every other page as item 106 left it. Three defects, fixed in this item's PR: at the panel's compact
+width the facts beside a fold's title were cut ("Cost 123 ms 13 steps 13k in 650 o"), so the panel is a container now
+(`container: inspector`) and under 420 px those facts take the line under the title, as on a phone, which the tour
+checks (no `.fold-summary` of the panel wider than its box); the computer card of a run that had ended without showing a
+page still offered to watch it ("Watch the page Dot's browser is on…") when Watch had gone, and now says that the run
+has ended and that the page shows only while a run is going on; the run page's placeholders were cut on a phone ("…or
+ask abo") and read "Steer this run, or /btw to ask on the side" and "Follow up, or /btw to ask on the side". The README
+did not say that the composer's pills wrap on a phone without their hairlines; it does. Doubts that held as designed:
+the Models table scrolls sideways on a phone with its cue (item 105); a skill of Dot's has Drop and no Share, since
+Dot's skills are everyone's; the emergency stop in dark is dark ink on its salmon ground; New agent and Team are icons
+on a phone. (2) The offline smoke suite in full (`-m "not live and not internet and not hosted and not desktop"`, the
+tour apart): 324 passed, 1 skipped, 2 failed, both passing alone.
+`test_browser_attach.py::test_a_tab_the_user_opens_meanwhile_is_not_taken_over` found in the headless Chrome it had
+started a tab of `https://x.com/ClaudeDevs`, which no test opens: a link opened elsewhere on this Mac in that minute,
+which macOS handed to the newest Chrome (below); `test_character_cost.py` lost its page in the middle of its four
+seconds of frames while the disk had 4.3 GB left (the system freed 57 GB minutes later). The eval check: every task can
+be passed and cannot be passed by doing nothing. (3) The owner's daemon through the API, read-only: healthy, every check
+of the doctor green, no run active, no approval waiting, the code of `f48e2b5` until this part's restart. The two
+`SSLV3_ALERT_BAD_RECORD_MAC` errors of the owner's screenshots are the runs `run_mv47c2a5_34b576` and
+`run_mv47fc7z_6f3685` (2026-10-11 22:15 and 22:16, `opencode_go:muse-spark-1.3-contributor`), a TLS read that item 107
+retries once the daemon restarts; the five runs that died on `database is locked` at 06:30 that day were item 66's.
+Until the restart the page, served from the working tree, is newer than the daemon: the Rules tab's Draft answers 404
+until then.
+
+**Left for the next part.** (a) The desktop shell's top line. Item 107 put the sidebar's head on the traffic lights'
+line (their centre 15 px down), but with the sidebar away the top bar keeps its 52 px and centres its toggle and brand
+at 26 px, under the lights' line, and with the sidebar open the top bar's own controls sit at 24 px beside a head at 15.
+One line for the lights, the head and the top bar, in both states, wants the lights moved to the bar's centre
+(`traffic_light_position` of the Tauri window, `desktop/src-tauri/src/lib.rs`) and the head with them, checked in the
+desktop shell itself, which the tour cannot draw. (b) A link opened elsewhere on the Mac may land in a Chrome that Dot
+started: seen once, in the smoke suite's headless Chrome. Whether a link the owner opens lands in Dot's own Chrome
+(`own` mode, a second Google Chrome with Dot's profile) while it runs was not checked; if it does, Dot's Chrome could be
+started as a browser macOS does not hand links to (another bundle, such as Chrome for Testing).
 
 **What.** As item 106: the tour of every page in both schemes and both widths read by eye against the README, the
 offline smoke suite in full, the owner's daemon read through the API only. What is broken, stale or contradicts the
@@ -6891,3 +6928,4 @@ built.
 - 2026-10-12 (Opus 5.5): item 107 merged as `6c79636` (PR #127, MYP-247 Done): a still character follows a shape or an expression set, the note under Faces that move while the system reduces motion, the favicon allowed by the page's policy (`img-src data:`), `ssl.SSLError` retried as a transport failure (the owner's "bad record mac" came from the network path to OpenCode Go, not from Dot's code), the sidebar's search above New chat and its desktop head on the traffic lights' line.
 - 2026-10-12 (Opus 5.5): item 108 merged as `108c91d` (PR #128, MYP-248 Done): the providers' marks (Simple Icons and Lobe Icons, licences in `static/icons/providers/LICENSE`) as masks in the scheme's ink, an icon on every pill of the composer, the mode and the reasoning as pills of their own, hairlines between them, the attach button beside the send.
 - 2026-10-12 (Opus 5.5): item 109 merged as `b5d42c0` (PR #129, MYP-249 Done): the computer's panel in three sizes and a drag handle kept per browser (`stagesize.js`), the control pill under the view naming the actor, the character with its name and the word of its state at the head of the chat while the panel is wide or full.
+- 2026-10-12 (Opus 5.5): item 110 merged as `6da73c4` (PR #130, MYP-250 Done): a rule said in words, drafted by the review model into its parts (`draft_rule`), the pattern written by Dot so that a rule that lets Dot act fits a command alone and one that stops it fits a word anywhere, read back in a sentence that is the rule's description; the Rules tab's "Say the rule in your words" card, and "Make a rule of this" on an approval card.
