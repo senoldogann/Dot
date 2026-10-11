@@ -5007,8 +5007,8 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 84  | The side panel: inset bodies, facts as spans, one card grammar           | done        | 82c06b8 |
 | 85  | Motion: the sidebar slides, the panel slides, folds fade, pages cross-fade | done        | 7f02492 |
 | 86  | Agents: profiles with a face, a role, a model and their own chats         | done        | bd12b54 |
-| 87  | Agents together: messages between agents, the team's thread, the harness  | in progress |         |
-| 88  | Desktop and web, one interface: the Tauri shell on the same pages         | planned     |         |
+| 87  | Agents together: messages between agents, the team's thread, the harness  | done        | 23c6b5c |
+| 88  | Desktop and web, one interface: the Tauri shell on the same pages         | in progress |         |
 
 ### 77. The type system: Inter and Geist Mono, seven sizes, three weights
 
@@ -5304,7 +5304,7 @@ composer picks the agent (Dot by default). The bar, the rows and the sidebar nam
 
 ### 87. Agents together: messages between agents, the team's thread, the harness
 
-**Status: in progress.** Built on `item-87-team` (MYP-227).
+**Status: done.** Merged as `23c6b5c` (PR #97, MYP-227).
 
 **Design, as built (2026-10-11).** The `message_agent` tool (`tools/team.py`): `agent` (a name, read without regard
 to case, or an id) and `message`; the run's spawner starts a run of that agent (`RunManager.delegate` with
@@ -5343,7 +5343,20 @@ stop after 8 failing), and a tool set per role.
 
 ### 88. Desktop and web, one interface: the Tauri shell on the same pages
 
-**Status: planned.**
+**Status: in progress.** Built on `item-88-desktop` (MYP-228).
+
+**Design, as built (2026-10-11).** The shell (`desktop/src-tauri/src/lib.rs`) opens its one window at the size the
+tour reviews (1280 × 860, the minimum 390 × 600) with `TitleBarStyle::Overlay` and a hidden title: the system draws
+only the traffic lights over the page, and the page is the web UI as the browser shows it, pages, sidebar and panel
+alike (the shell navigates to the daemon's UI; nothing is rendered twice). The UI knows the shell by
+`window.__TAURI__`: `boot.js` sets `data-shell="desktop"` on the page element at first paint, and `shell.css` keeps
+room for the traffic lights (84 px on the left, a 52 px bar) in the sidebar's head, or in the top bar while the
+sidebar is away (closed, or a drawer); both bars and the down page's body carry `data-tauri-drag-region`, so the
+window drags by them, which a browser ignores. The tour shoots the home page with the shell's room, the sidebar open
+and closed. The dependabot alert on `glib` 0.18 (`Cargo.lock`): glib is reached only through gtk and webkit2gtk,
+Tauri's Linux backend, and the shell is built for macOS alone, where the crate is not compiled; Tauri 2.12 pins gtk
+0.18, so `cargo update -p glib` locks nothing; the alert is dismissed as not used, with that reason, and this
+paragraph is its record. `cargo fmt --check` and `cargo clippy --all-targets -- -D warnings` stay clean.
 
 **What.** The desktop app (`desktop/`) shows the same pages as the web at the same size, the sidebar and the panel
 behaving the same; whatever the shell does of its own (the window's title, the traffic lights' room, the menu) is
@@ -5855,3 +5868,4 @@ reviewed in the tour; the dependabot alert on `glib` in `desktop/src-tauri/Cargo
 - 2026-10-11 (Fable 5.1): Part 10 planned (items 84-88) from the owner's word and arXiv 2609.20804. Item 84 merged as `82c06b8` (PR #94, MYP-224 Done). Item 85 built on branch `item-85-motion` (MYP-225): the sidebar's slide, the drawer's slide, unfolding bodies, pages coming in.
 - 2026-10-11 (Fable 5.1): item 85 merged as `7f02492` (PR #95, MYP-225 Done). Item 86 built on branch `item-86-agents` (MYP-226): `AgentRecord` and the `agents` table, `RunRecord.agent_id`, `start_for_agent`, the agent's section first in the prompt, its tools as the run's bound, `/api/agents`, the Agents page, the agent's page with its composer, the home composer's Agent menu, the agent's face in the rows and the bar.
 - 2026-10-11 (Fable 5.1): item 86 merged as `bd12b54` (PR #96, MYP-226 Done). Item 87 started on branch `item-87-team` (MYP-227).
+- 2026-10-11 (Fable 5.1): item 87 merged as `23c6b5c` (PR #97, MYP-227 Done). Item 88 started on branch `item-88-desktop` (MYP-228).

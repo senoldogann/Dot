@@ -434,3 +434,15 @@
 .side-child .side-run-goal {
   font-size: var(--text-sm);
 }
+
+/* Inside the desktop shell (item 88) the system draws the traffic lights over the top left of the page: the sidebar's
+   head keeps room for them, and so does the top bar when the sidebar is away (closed, or a drawer). */
+:root[data-shell="desktop"] .side-head {
+  padding-left: 84px;
+  min-height: 52px;
+}
+
+:root[data-shell="desktop"] .shell:not([data-nav="docked"][data-sidebar="open"]) .stagebar-row {
+  padding-left: 84px;
+  min-height: 52px;
+}

@@ -156,6 +156,16 @@ async def _shoot(context: BrowserContext, base: str, pages: tuple[tuple[str, str
         )
         assert faces[0].startswith('"Inter"') or faces[0].startswith("Inter"), faces
         await page.screenshot(path=str(out / f"{tag}-{name}.png"), full_page=False)
+        if name == "home":
+            # Inside the desktop shell (item 88) the page keeps room for the traffic lights: in the sidebar's head, and
+            # in the top bar once the sidebar is away.
+            await page.evaluate("document.documentElement.dataset.shell = 'desktop'")
+            await page.wait_for_timeout(_SETTLE_MS)
+            await page.screenshot(path=str(out / f"{tag}-home-desktop.png"), full_page=False)
+            await page.evaluate("document.querySelector('.shell').dataset.sidebar = 'closed'")
+            await page.wait_for_timeout(_SETTLE_MS)
+            await page.screenshot(path=str(out / f"{tag}-home-desktop-closed.png"), full_page=False)
+            await page.evaluate("delete document.documentElement.dataset.shell")
         if name == "run":
             # The side panel with its Details card open (item 84): on a wide window beside the chat, on a phone a drawer.
             await page.get_by_role("button", name="Run details").click()
@@ -221,7 +231,7 @@ async def test_every_page_in_both_schemes_at_both_widths(
         finally:
             await browser.close()
     shots: list[Path] = await asyncio.to_thread(lambda: sorted(out.glob("*.png")))
-    assert len(shots) == len(_SCHEMES) * len(_SIZES) * (len(pages) + 2)
+    assert len(shots) == len(_SCHEMES) * len(_SIZES) * (len(pages) + 4)
     print(f"\ntour: {out}")
 
 

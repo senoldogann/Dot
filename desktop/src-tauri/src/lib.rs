@@ -15,7 +15,8 @@ use tauri::image::Image;
 use tauri::menu::{Menu, MenuItem, PredefinedMenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
 use tauri::{
-    AppHandle, Manager, RunEvent, WebviewUrl, WebviewWindow, WebviewWindowBuilder, WindowEvent,
+    AppHandle, Manager, RunEvent, TitleBarStyle, WebviewUrl, WebviewWindow, WebviewWindowBuilder,
+    WindowEvent,
 };
 use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut, ShortcutState};
 
@@ -116,14 +117,19 @@ fn tray_icon(state: &str) -> Image<'static> {
         .expect("the tray icons are PNG files rendered by desktop/icons/render.py")
 }
 
-/// The one window, made on first use. The shell's own drag-and-drop handler is off so the composer's HTML drop works.
+/// The one window, made on first use, at the size the web UI's screenshot tour reviews (item 88). The title bar is
+/// the web UI's own top bars: the system draws only the traffic lights over the page, the page keeps room for them
+/// (`data-shell="desktop"`, set by the UI when it runs in the shell) and drags the window by its bars. The shell's
+/// own drag-and-drop handler is off so the composer's HTML drop works.
 fn window(app: &AppHandle, url: WebviewUrl) -> tauri::Result<WebviewWindow> {
     if let Some(existing) = app.get_webview_window(WINDOW) {
         return Ok(existing);
     }
     WebviewWindowBuilder::new(app, WINDOW, url)
         .title("Dot")
-        .inner_size(1180.0, 820.0)
+        .title_bar_style(TitleBarStyle::Overlay)
+        .hidden_title(true)
+        .inner_size(1280.0, 860.0)
         .min_inner_size(390.0, 600.0)
         .disable_drag_drop_handler()
         .build()
