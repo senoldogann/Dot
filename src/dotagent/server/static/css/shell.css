@@ -150,9 +150,14 @@
   padding: 12px 8px 8px 16px;
 }
 
+/* The brand keeps to its own width and the close button sits at the end, so the space between belongs to the
+   head itself: that is the desktop shell's drag region, and a drag starts only on the element that carries it. */
 .side-head .brand {
-  flex: 1;
-  min-width: 0;
+  flex: none;
+}
+
+.side-head > .icon-btn {
+  margin-left: auto;
 }
 
 .side-body {
