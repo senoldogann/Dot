@@ -5015,7 +5015,7 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 92  | Skills from its own work: a task that went well becomes a skill for its kind     | done        | 3074107 |
 | 93  | The owner, in one section: what the reflection knows about how you work         | done        | 6d64e43 |
 | 94  | An agent learns for itself: lessons, skills and a score per agent                | done        | 937cca4 |
-| 95  | The sidebar, smaller: the nav under New chat, sections that fold, rows cut short   | planned     |         |
+| 95  | The sidebar, smaller: the nav under New chat, sections that fold, rows cut short   | in progress |         |
 | 96  | The run page: the arrow above the composer, the cost in the side panel            | planned     |         |
 | 97  | Chrome in the background: the live view shows the page, the window stays put       | planned     |         |
 | 98  | The web that is refused: 999, 403 and their kind meet the browser, not the end     | planned     |         |
@@ -5640,7 +5640,19 @@ teammates while it works. And the whole is read once more, page by page, before 
 
 ### 95. The sidebar, smaller: the nav under New chat, sections that fold, rows cut short
 
-**Status: planned.**
+**Status: in progress (2026-10-11).**
+
+**Design, as built (2026-10-11).** `sidebar.js`: a `nav.side-links` with Agents, Activity and Campaigns sits under
+the search; the foot keeps Settings. Each section's label is a button (`foldLabel`, `.side-fold`, a chevron that
+turns) that folds the section: Waiting and Working drop their rows, Chats hides its list (not while chats are being
+chosen for deletion); the folds live in the prefs as `dot.sideFolds` (JSON, one key per section). A row of the
+activity sections shows `clipWords(title, 7, 56)` (`dom.js`: the first seven words, at most 56 characters, with an
+ellipsis) on one line, and its facts joined with " · " on one line under it, both cut with an ellipsis; the rows
+take four pixels of vertical padding whatever the density, the faces in them are 20 px, and the delegated rows sit
+12 px in. Focus: `--ring` (themes.css: the accent at 38 %) replaces the accent in every outline (`:focus-visible`,
+the fields, the search, the picked chats, the drop zone excepted); the dock's textarea draws no outline of its own,
+since the dock's frame shows the focus. Tests: `tests/unit/test_css_tokens.py` (the detail line uses the leading
+token), `tests/smoke/test_activity.py` unchanged, the tour's home and the activity test's sidebar shots read.
 
 **What.** Agents, Activity and Campaigns move up under New chat and the search, as links of the same row grammar;
 Settings stays in the foot. Waiting, Working and Chats each fold on a click of their label (a chevron turns), and

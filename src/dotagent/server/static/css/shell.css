@@ -249,7 +249,7 @@
 }
 
 .side-search:focus-within {
-  outline: 2px solid var(--accent);
+  outline: 2px solid var(--ring);
   outline-offset: 1px;
 }
 
@@ -296,6 +296,37 @@
 /* The count after a section's label: the same ink, the text weight. */
 .side-label-count {
   font-weight: var(--weight-text);
+}
+
+/* A section's label is the button that folds it (item 95): the chevron points down while open, right while folded. */
+.side-fold {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.side-fold .icon {
+  width: 12px;
+  height: 12px;
+  flex: none;
+  transform: rotate(90deg);
+  transition: transform var(--motion-quick) var(--ease);
+}
+
+.side-fold[aria-expanded="false"] .icon {
+  transform: rotate(0deg);
+}
+
+.side-fold:hover {
+  color: var(--text-2);
 }
 
 .side-run .status-dot {
@@ -364,7 +395,7 @@
 }
 
 .side-pick:has(.side-check:focus-visible) {
-  box-shadow: inset 0 0 0 2px var(--accent);
+  box-shadow: inset 0 0 0 2px var(--ring);
 }
 
 .side-check {
@@ -410,11 +441,21 @@
   }
 }
 
-/* The activity sections above the chats: a row is a chat row with a second, smaller line. */
+/* The ways to the agents, the activity and the campaigns, under the search (item 95). */
+.side-links {
+  margin-top: 4px;
+}
+
+/* The activity sections above the chats: a row is a short chat row (a few words of the title on one line) with a
+   second, smaller line of facts, on one line too; the rows keep the compact padding whatever the density (item 95). */
 .side-activity-nav {
   display: flex;
   flex-direction: column;
   margin-top: 4px;
+}
+
+.side-activity {
+  padding: 4px 8px;
 }
 
 .side-activity .side-run-goal {
@@ -423,15 +464,28 @@
   white-space: normal;
 }
 
+.side-activity-title,
 .side-activity-detail {
+  display: block;
   overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.side-activity-detail {
   font-size: var(--text-xs);
+  line-height: var(--leading-xs);
   color: var(--muted);
+}
+
+.side-activity .avatar {
+  width: 20px;
+  height: 20px;
 }
 
 /* Delegated runs under the run that delegated them (item 68). */
 .side-children {
-  margin-left: 16px;
+  margin-left: 12px;
   padding-left: 8px;
   border-left: 1px solid var(--border);
 }

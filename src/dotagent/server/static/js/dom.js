@@ -90,6 +90,14 @@ export function clip(text, limit) {
   return flat.length <= limit ? flat : `${flat.slice(0, limit - 1)}…`;
 }
 
+/** The first `words` words of `text`, and at most `limit` characters, with an ellipsis when something was cut. */
+export function clipWords(text, words, limit) {
+  const flat = text.replace(/\s+/g, " ").trim();
+  const parts = flat.split(" ");
+  const short = parts.length <= words ? flat : `${parts.slice(0, words).join(" ")}…`;
+  return short.length <= limit ? short : clip(short, limit);
+}
+
 /**
  * `text` as it is compared when looking for a name: case, accents and the Turkish dotted and dotless i do not matter, so
  * "İstanbul", "ISTANBUL" and "istanbul" are one word, and so are "Işık" and "isik". The same fold as `fold_search` in
