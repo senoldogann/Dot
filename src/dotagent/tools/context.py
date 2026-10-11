@@ -36,9 +36,12 @@ class DelegateOutcome:
 class Spawner(Protocol):
     """Starts runs on behalf of a running one."""
 
-    async def delegate(self, parent_run_id: str, goal: str, mode: RunMode, model: str | None) -> DelegateOutcome:
-        """Run ``goal`` as a run of its own on ``model`` (``None``: the parent's model), wait until it ends and report
-        how it ended."""
+    async def delegate(
+        self, parent_run_id: str, goal: str, mode: RunMode, model: str | None, agent_id: str | None
+    ) -> DelegateOutcome:
+        """Run ``goal`` as a run of its own on ``model`` (``None``: the parent's model), as a run of the agent
+        ``agent_id`` names when one is (item 87: its instructions, its tools and its bounds), wait until it ends and
+        report how it ended."""
         ...
 
 

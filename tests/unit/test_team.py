@@ -1,0 +1,101 @@
+"""The team (item 87): the prompt lists the agents a run may message, an agent is found by name, a reply is rendered
+as the tool's result, and the harness settings of the paper have their defaults."""
+
+from pathlib import Path
+
+from dotagent.agent.prompt import AgentBrief, build_system_prompt, collect_prompt_inputs
+from dotagent.config import load_default_config
+from dotagent.store.models import AgentRecord, RunRecord
+from dotagent.tools.context import DelegateOutcome
+from dotagent.tools.team import MESSAGE_AGENT_TOOL, find_agent, render_reply
+
+SCOUT: AgentRecord = AgentRecord(
+    id="agt_1",
+    name="Scout",
+    role="Finds and checks sources",
+    instructions="",
+    model="",
+    effort=None,
+    approvals=None,
+    tools=(),
+    created_at=1.0,
+    updated_at=1.0,
+)
+TEAM: tuple[AgentBrief, ...] = (AgentBrief(name="Scout", role="Finds and checks sources", instructions=""),)
+
+
+def _prompt(tool_names: list[str], team: tuple[AgentBrief, ...]) -> str:
+    return build_system_prompt(
+        collect_prompt_inputs(
+            "task",
+            "ui",
+            "aggressive",
+            "ask",
+            "wait",
+            False,
+            Path("/tmp/work"),
+            [],
+            tool_names,
+            [],
+            None,
+            [],
+            None,
+            team,
+        )
+    )
+
+
+def test_the_prompt_lists_the_team_only_when_the_run_may_message_it() -> None:
+    with_tool: str = _prompt([MESSAGE_AGENT_TOOL, "shell"], TEAM)
+    assert "# Team" in with_tool and "  - Scout: Finds and checks sources" in with_tool
+    assert "# Team" not in _prompt(["shell"], TEAM)
+    assert "# Team" not in _prompt([MESSAGE_AGENT_TOOL], ())
+
+
+def test_an_agent_is_found_by_its_name_whatever_the_case_or_by_its_id() -> None:
+    assert find_agent([SCOUT], "scout ") == SCOUT
+    assert find_agent([SCOUT], "agt_1") == SCOUT
+    assert find_agent([SCOUT], "Pilot") is None
+
+
+def _run(status: str, result: str) -> RunRecord:
+    return RunRecord(
+        id="run_2",
+        thread_id="thr_2",
+        goal="Find two sources",
+        mode="task",
+        model="scripted:m",
+        status=status,  # type: ignore[arg-type]
+        result=result,
+        created_at=1.0,
+        finished_at=2.0,
+        steps=3,
+        input_tokens=0,
+        output_tokens=0,
+        parent_run_id="run_1",
+        source="team",
+        effort=None,
+        approvals="yolo",
+        goal_mode=False,
+        campaign_id=None,
+        agent_id="agt_1",
+    )
+
+
+def test_a_reply_names_the_agent_and_fences_what_an_untrusted_run_wrote() -> None:
+    trusted = render_reply(SCOUT, DelegateOutcome(run=_run("done", "Two sources."), tainted=False), "abc")
+    assert not trusted.is_error and trusted.text.startswith(
+        "Scout (run run_2) ended as done after 3 steps.\nTwo sources."
+    )
+    tainted = render_reply(SCOUT, DelegateOutcome(run=_run("failed", ""), tainted=True), "abc")
+    assert (
+        tainted.is_error
+        and tainted.untrusted
+        and '<agent_reply nonce="abc" run="run_2">' in tainted.text
+        and "(it replied nothing)" in tainted.text
+    )
+
+
+def test_the_harness_settings_of_the_paper_have_its_defaults() -> None:
+    agent = load_default_config().agent
+    assert (agent.context_elide_share, agent.context_summarise_share, agent.plan_each_turn) == (0.6, 0.85, True)

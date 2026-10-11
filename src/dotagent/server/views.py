@@ -23,6 +23,7 @@ from dotagent.store.models import (
     MemoryRecord,
     RunMode,
     RunRecord,
+    RunStatus,
     ScheduleRecord,
 )
 from dotagent.undo.restore import UndoAction, UndoState
@@ -217,11 +218,36 @@ class AgentSummary(FrozenModel):
     latest: RunRecord | None
 
 
+class TeamMessage(FrozenModel):
+    """A message between agents (item 87) as the Team page shows it: the run behind it (``run_id``, the run of the
+    agent that answered), the run that sent it (``parent_run_id``), who sent it and to whom (Dot's id is ``dot``),
+    the message, the reply (``None`` until the run ends), the run's status and the moments."""
+
+    run_id: str
+    parent_run_id: str
+    from_id: str
+    from_name: str
+    to_id: str
+    to_name: str
+    message: str
+    reply: str | None
+    status: RunStatus
+    ts: float
+    finished_at: float | None
+
+
+class TeamView(FrozenModel):
+    """``GET /api/team``: today's messages between agents, oldest first."""
+
+    messages: list[TeamMessage]
+
+
 class AgentDetail(FrozenModel):
-    """An agent's page: the record and its newest runs, newest first."""
+    """An agent's page: the record, its newest runs (newest first) and the newest messages it sent or received."""
 
     record: AgentRecord
     runs: list[RunRecord]
+    messages: list[TeamMessage]
 
 
 class CampaignChip(FrozenModel):

@@ -40,6 +40,7 @@ _PAGES: tuple[tuple[str, str], ...] = (
     ("activity", "#/activity"),
     ("campaigns", "#/campaigns"),
     ("agents", "#/agents"),
+    ("team", "#/team"),
     ("controls", "#/controls"),
     ("settings-general", "#/settings/general"),
     ("settings-models", "#/settings/models"),

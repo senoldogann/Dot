@@ -12,6 +12,7 @@ import { avatar, icon } from "../icons.js";
 import { emptyPanel, errorPanel, field, loadingPanel, pageHead, statusBadge } from "../panels.js";
 import { APPROVAL_OPTIONS } from "../runmodes.js";
 import { setStageTitle, setStageTools } from "../stage.js";
+import { messageRow } from "./team.js";
 import { getSnapshot, loadModels, onLifecycle } from "../state.js";
 import { attempt, confirmDialog, toast } from "../ui.js";
 
@@ -247,8 +248,9 @@ function mountList(root, ctx) {
   }
 
   const newButton = el("button", { class: "btn primary", type: "button", onclick: openEditor }, icon("plus"), el("span", { class: "label" }, "New agent"));
+  const teamLink = el("a", { class: "btn ghost", href: "#/team", title: "Today's messages between agents" }, icon("branch"), el("span", { class: "label" }, "Team"));
   root.append(
-    pageHead("Agents", "Dot, and the agents you made: each with a face, a role, a model and its own chats.", newButton),
+    pageHead("Agents", "Dot, and the agents you made: each with a face, a role, a model and its own chats.", el("div", { class: "cluster" }, teamLink, newButton)),
     editorSlot,
     holder,
   );
@@ -349,6 +351,7 @@ function mountPage(root, ctx, agentId) {
   let composer = null;
   const top = el("div", { class: "stack agent-top" });
   const runs = el("div", { class: "stack" });
+  const messages = el("div", { class: "stack" });
   const page = el("div", { class: "stack" }, loadingPanel());
 
   function stageOf(record) {
@@ -407,7 +410,12 @@ function mountPage(root, ctx, agentId) {
           ? emptyPanel("No chats yet", `Send ${detail.record.name} a message above.`)
           : el("div", { class: "card" }, detail.runs.map(runRow)),
       );
-      page.replaceChildren(top, runs);
+      messages.replaceChildren(
+        ...(detail.messages.length === 0
+          ? []
+          : [el("div", { class: "section-label" }, "Messages"), el("div", { class: "card" }, detail.messages.map(messageRow))]),
+      );
+      page.replaceChildren(top, runs, messages);
       composer.focus();
     } catch (error) {
       if (!disposed && mine === ticket) {

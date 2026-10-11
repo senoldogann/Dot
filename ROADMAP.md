@@ -5006,8 +5006,8 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 83  | Faces for the actors: a hue each, alive in the rows and the bar          | done        | d760ea3 |
 | 84  | The side panel: inset bodies, facts as spans, one card grammar           | done        | 82c06b8 |
 | 85  | Motion: the sidebar slides, the panel slides, folds fade, pages cross-fade | done        | 7f02492 |
-| 86  | Agents: profiles with a face, a role, a model and their own chats         | in progress |         |
-| 87  | Agents together: messages between agents, the team's thread, the harness  | planned     |         |
+| 86  | Agents: profiles with a face, a role, a model and their own chats         | done        | bd12b54 |
+| 87  | Agents together: messages between agents, the team's thread, the harness  | in progress |         |
 | 88  | Desktop and web, one interface: the Tauri shell on the same pages         | planned     |         |
 
 ### 77. The type system: Inter and Geist Mono, seven sizes, three weights
@@ -5264,7 +5264,7 @@ after the motion settles).
 
 ### 86. Agents: profiles with a face, a role, a model and their own chats
 
-**Status: in progress.** Built on `item-86-agents` (MYP-226).
+**Status: done.** Merged as `bd12b54` (PR #96, MYP-226).
 
 **Design, as built (2026-10-11).** An agent is an `AgentRecord` (`store/models.py`): `name`, `role` (one line),
 `instructions`, `model` (empty for the configured one), `effort` and `approvals` (`None` for the configured ones),
@@ -5304,7 +5304,34 @@ composer picks the agent (Dot by default). The bar, the rows and the sidebar nam
 
 ### 87. Agents together: messages between agents, the team's thread, the harness
 
-**Status: planned.**
+**Status: in progress.** Built on `item-87-team` (MYP-227).
+
+**Design, as built (2026-10-11).** The `message_agent` tool (`tools/team.py`): `agent` (a name, read without regard
+to case, or an id) and `message`; the run's spawner starts a run of that agent (`RunManager.delegate` with
+`agent_id`: the source `team`, the parent's id, the agent's model, effort and approvals where it names them and
+the parent's where it does not; the mode is the parent's as `delegate` hands it on) and waits; the reply comes back
+as "Scout (run …) ended as done after N steps." and the run's result, fenced in `<agent_reply>` and marked untrusted
+when the run read untrusted content, an error result when the run did not end done. An agent does not message
+itself, and a delegated run (of any kind) messages no one (`_NOT_FOR_DELEGATED_RUNS`), so the thread stays one
+level deep; a run with no other agent to message is not offered the tool. The prompt's `# Team` section lists the
+other agents by name and role and says when to message one; it comes after the helpers and only with the tool. The
+`run_queued` event carries `agent_id`, so the delegated row in the sender's chat wears the agent's face
+(`timeline.js`). The thread is read from the runs (no new table): `Store.team_runs(since)` (the `team` source,
+oldest first) and `Store.agent_messages(agent_id, limit)` (sent or received, through the sender run's agent);
+`GET /api/team` gives today's messages as `TeamMessage` rows (the sender and receiver by id and name, Dot as
+`dot`, the message, the reply once the run ended, the status, the runs behind it) and an agent's page carries its
+newest messages. `views/team.js` at `#/team` (the Agents page's Team button, the agents tab) draws the thread as one
+card: the two faces overlapping, "Dot → Scout" with the status, the message, the reply quoted under it, the time and
+the two runs; the agent's page shows the same rows under its chats. The harness lessons of the paper are three
+`[agent]` settings with defaults (`defaults.toml`): `context_elide_share` (0.6; past it older tool output is
+shortened), `context_summarise_share` (0.85; past it the older part of the run is summarised, where before only the
+full budget did), and `plan_each_turn` (on; the open plan is appended to the system message of every step of a task
+or research run, rebuilt from the newest plan event so nothing accumulates in the history and the prompt's own text
+stays cacheable). Loop detection stays the watchdog of item 2 (`stall_limit`, `failure_streak`), and a tool set per
+role is the agent's tool list of item 86. Tests: `tests/unit/test_team.py` (the Team section, the name lookup, the
+reply's rendering, the defaults); `tests/smoke/test_team.py` (Dot's run messages Scout on the scripted model, Scout's
+run answers in its voice without the tool, the reply reaches Dot's run, the Team page, the agent's page and the
+delegated row read in Chrome); the tour shoots `#/team`.
 
 **What.** A `message_agent` tool: a run sends a message to another agent, which runs with it (a delegated run of
 that agent, its instructions and tools) and whose report returns as the tool's result; the parent's chat shows it as
@@ -5827,3 +5854,4 @@ reviewed in the tour; the dependabot alert on `glib` in `desktop/src-tauri/Cargo
 - 2026-10-11 (Fable 5.1): item 83 merged as `d760ea3` (PR #92, MYP-223 Done). Part 9 is built: items 77 to 83 merged (`ffa00cb`, `7a7e43f`, `ab5f33a`, `132ce0d`, `04693d7`, `6454345`, `d760ea3`); the screenshot tour read after each. Item 76's reading (part 8) is still due on or after 2026-10-18. The daemon restarted on `d760ea3`.
 - 2026-10-11 (Fable 5.1): Part 10 planned (items 84-88) from the owner's word and arXiv 2609.20804. Item 84 merged as `82c06b8` (PR #94, MYP-224 Done). Item 85 built on branch `item-85-motion` (MYP-225): the sidebar's slide, the drawer's slide, unfolding bodies, pages coming in.
 - 2026-10-11 (Fable 5.1): item 85 merged as `7f02492` (PR #95, MYP-225 Done). Item 86 built on branch `item-86-agents` (MYP-226): `AgentRecord` and the `agents` table, `RunRecord.agent_id`, `start_for_agent`, the agent's section first in the prompt, its tools as the run's bound, `/api/agents`, the Agents page, the agent's page with its composer, the home composer's Agent menu, the agent's face in the rows and the bar.
+- 2026-10-11 (Fable 5.1): item 86 merged as `bd12b54` (PR #96, MYP-226 Done). Item 87 started on branch `item-87-team` (MYP-227).

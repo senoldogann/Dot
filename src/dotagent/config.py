@@ -123,6 +123,12 @@ class AgentConfig(FrozenModel):
     consult_max_per_run: int = Field(ge=0)
     tool_output_chars: int
     context_tokens: int
+    # The harness lessons of arXiv 2609.20804 (item 87): past context_elide_share of the budget older tool output is
+    # shortened, past context_summarise_share the older part of the run is summarised; plan_each_turn puts the open
+    # plan at the end of the system prompt of every step.
+    context_elide_share: float = Field(gt=0, le=1, allow_inf_nan=False)
+    context_summarise_share: float = Field(gt=0, le=1, allow_inf_nan=False)
+    plan_each_turn: bool
     keep_recent_tool_results: int
     keep_recent_screenshots: int
     stall_limit: int

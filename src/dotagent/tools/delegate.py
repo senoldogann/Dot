@@ -172,7 +172,7 @@ def _delegate_tool() -> RegisteredTool:
         mode: RunMode = args.mode if args.mode is not None else default_child_mode(ctx.mode)
         unplanned: str | None = await _unplanned(args.step, ctx)
         outcome: DelegateOutcome = await spawner.delegate(
-            ctx.run_id, args.goal, mode, await _model_for(args.model, ctx)
+            ctx.run_id, args.goal, mode, await _model_for(args.model, ctx), None
         )
         step: int | None = None if unplanned is not None else args.step
         return render_outcome(outcome, secrets.token_hex(_NONCE_BYTES), step, unplanned)

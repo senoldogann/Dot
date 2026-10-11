@@ -90,6 +90,7 @@ def test_the_core_group_holds_what_most_runs_need_and_is_about_a_third_of_the_to
         "memory_search",
         "write_notes",
         "delegate",
+        "message_agent",
         "consult",
         "finish",
         "ask_user",
@@ -118,7 +119,7 @@ def test_the_tools_of_the_groups_that_are_off_are_hidden_with_their_group() -> N
 
 def _inputs(tool_names: list[str]) -> PromptInputs:
     return collect_prompt_inputs(
-        "task", "cli", "aggressive", "ask", "wait", False, Path("/tmp/work"), [], tool_names, [], None, [], None
+        "task", "cli", "aggressive", "ask", "wait", False, Path("/tmp/work"), [], tool_names, [], None, [], None, ()
     )
 
 
