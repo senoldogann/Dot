@@ -967,7 +967,9 @@ behaviour of x.ai's bot avatar as an exercise and is affiliated with nobody, and
 the code, not the design it imitates (`static/js/character/LICENSE`). One loop drives every moving character on the
 page and stops while the tab is hidden; under reduced motion, or with "Faces that move" off in Settings › General, each
 shows one still frame. Three characters move: the home's face, the run page's panel character (its moods from the run's
-status, `static/js/mood.js`) and the look editor's preview; every other face is a still frame. `#/controls` shows every
+status, `static/js/mood.js`) and the look editor's preview; every other face is a still frame. One moving face costs
+about a millisecond of main-thread time a frame (`tests/smoke/test_character_cost.py` reads it from Chrome's
+performance metrics and caps it). `#/controls` shows every
 shape, expression, colour and animation.
 Space: every gap, padding and margin sits on one rhythm of 8 px (4 for the smallest, a 2 px hairline token for what
 sits a breath apart; a unit test checks it); the sidebar has no dividers between its groups, its labels are the

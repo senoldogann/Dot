@@ -17,7 +17,7 @@ import pytest
 import pytest_asyncio
 from cryptography.hazmat.primitives.asymmetric import ec
 from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
-from playwright.async_api import Browser, Page, async_playwright
+from playwright.async_api import Browser, Page, async_playwright, expect
 
 from dotagent.agent.manager import RunManager
 from dotagent.config import load_config
@@ -286,6 +286,6 @@ async def test_the_shell_of_the_web_app_is_served_and_the_service_worker_registe
             scope: str = await page.evaluate("navigator.serviceWorker.ready.then((registration) => registration.scope)")
             assert scope == f"http://{host}:{port}/"
             await page.goto(f"http://{host}:{port}/#/activity")
-            assert await page.locator(".activity-section").count() == 3
+            await expect(page.locator(".activity-section")).to_have_count(3)
         finally:
             await browser.close()
