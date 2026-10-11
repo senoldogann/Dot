@@ -200,10 +200,11 @@ _SUMMARY_MAX_WORDS: int = 1500
 # A summary may take this share of the run's context budget. Each compaction summarises the previous summary again, so
 # without a limit the summary grows until it alone fills the budget and every step compacts.
 _SUMMARY_SHARE: float = 0.1
-# Right after a compaction the prompt takes about this share of the budget at most: the fixed part, the continuity note
-# (its summary and its pinned facts may take a _SUMMARY_SHARE each) and the newest messages in what is left. The rest
-# is room for the steps that follow, so that a run with a small budget does not compact again at its next step.
-_COMPACTED_SHARE: float = 0.85
+# A compaction leaves this share of the compaction point free under it: right after it the prompt holds the fixed
+# part, the continuity note (its summary and its pinned facts may take a _SUMMARY_SHARE of the budget each) and the
+# newest messages in what is left, and the room is for the steps that follow, so that a run with a small budget does
+# not compact again at its next step.
+_COMPACTION_ROOM: float = 0.15
 _WORDS_PER_TOKEN: float = 0.75
 # A summary longer than its limit by more than this factor is asked for again.
 _SUMMARY_SLACK: float = 1.5
@@ -515,10 +516,15 @@ async def _fit_context(
     if estimated > context_tokens * config.context_elide_share:
         current = shrink_old_tool_results(current, config.keep_recent_tool_results)
         estimated = round(estimate_tokens([system, *current], specs) * ratio)
-    if estimated > context_tokens * config.context_summarise_share:
+    # The compaction point (item 87): context_summarise_share of the configured budget, or the run's whole budget when
+    # a small window cut it under that, since a budget that small has no share to spare.
+    summarise_at: float = min(config.context_tokens * config.context_summarise_share, context_tokens)
+    if estimated > summarise_at:
         # The budget in the units of estimate_tokens, before its calibration against the provider's counts.
         plain: float = context_tokens / ratio
-        tail_tokens: int = round(plain * (_COMPACTED_SHARE - 2 * _SUMMARY_SHARE)) - estimate_tokens([system], specs)
+        tail_tokens: int = round(
+            summarise_at / ratio * (1 - _COMPACTION_ROOM) - 2 * _SUMMARY_SHARE * plain
+        ) - estimate_tokens([system], specs)
         head, tail = split_for_summary(current, _SUMMARY_KEEP_TAIL, tail_tokens)
         if head:
             ledger = with_compaction(ledger)

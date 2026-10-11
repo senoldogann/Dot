@@ -5324,8 +5324,8 @@ newest messages. `views/team.js` at `#/team` (the Agents page's Team button, the
 card: the two faces overlapping, "Dot → Scout" with the status, the message, the reply quoted under it, the time and
 the two runs; the agent's page shows the same rows under its chats. The harness lessons of the paper are three
 `[agent]` settings with defaults (`defaults.toml`): `context_elide_share` (0.6; past it older tool output is
-shortened), `context_summarise_share` (0.85; past it the older part of the run is summarised, where before only the
-full budget did), and `plan_each_turn` (on; the open plan is appended to the system message of every step of a task
+shortened), `context_summarise_share` (0.85 of the configured budget; past it the older part of the run is summarised, where
+before only the full budget did; a window that cuts the budget under that point summarises at its budget), and `plan_each_turn` (on; the open plan is appended to the system message of every step of a task
 or research run, rebuilt from the newest plan event so nothing accumulates in the history and the prompt's own text
 stays cacheable). Loop detection stays the watchdog of item 2 (`stall_limit`, `failure_streak`), and a tool set per
 role is the agent's tool list of item 86. Tests: `tests/unit/test_team.py` (the Team section, the name lookup, the
