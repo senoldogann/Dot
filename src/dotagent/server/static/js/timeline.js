@@ -107,12 +107,14 @@ function paintGroup(group) {
  * `onStats({ step, input, output })` after every model turn and every side call of the run (`step` 0: a compaction, a
  * review, a description of images), `onCalls({ calls, failed })` after every tool call of the run,
  * `onRunStatus({ status, model, endedAt })` (`endedAt` is null until the run is over), `onAnswer(node)` when the answer is
- * on the page and `onImage(name)` for every screenshot a tool returned.
+ * on the page, `onImage(name)` for every screenshot a tool returned and `onBrowserStep()` for the root run's first
+ * browser tool call (Dot's computer starts its view on it).
  */
-export function createTimeline({ rootRunId, startedAt, onGrow, onPlan, onStats, onCalls, onRunStatus, onAnswer, onImage, onQuestionLeft, onHeld }) {
+export function createTimeline({ rootRunId, startedAt, onGrow, onPlan, onStats, onCalls, onRunStatus, onAnswer, onImage, onQuestionLeft, onHeld, onBrowserStep }) {
   const element = el("div", { class: "timeline" });
   const scopes = new Map();
   const cards = new Map();
+  let browserSeen = false;
   const totals = { calls: 0, failed: 0 };
 
   // `began` is when the run started; `boundary` is when the work since the last message started.
@@ -388,6 +390,10 @@ export function createTimeline({ rootRunId, startedAt, onGrow, onPlan, onStats, 
       if (data.tool === FINISH_TOOL) {
         scope.finishing.set(data.call_id, data.args);
         return;
+      }
+      if (scope.runId === rootRunId && data.tool.startsWith("browser_") && !browserSeen) {
+        browserSeen = true;
+        onBrowserStep();
       }
       showCall(scope, { id: data.call_id, tool: data.tool, args: data.args });
     },

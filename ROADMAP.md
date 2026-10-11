@@ -4252,13 +4252,13 @@ parked: its premises (tool-call deltas in the stream) are still not in the code.
 | 63  | The soft look: light and dark, every surface                             | planned     |         |
 | 64  | The composer: a slash menu of commands, skills and MCP tools             | planned     |         |
 | 65  | The chrome that stays: the run's head and side panel while it scrolls    | planned     |         |
-| 66  | One door for the store's writes                                          | in progress |         |
-| 67  | The inspector's cards: folded, no stray null, a view that follows the run | planned     |         |
+| 66  | One door for the store's writes                                          | done        | 5c7eada |
+| 67  | The inspector's cards: folded, no stray null, a view that follows the run | in progress |         |
 | 68  | Delegated runs in sight: the sidebar and the chat                        | planned     |         |
 
 ### 66. One door for the store's writes
 
-**Status: in progress.** Built on `item-66-one-writer` (MYP-200). Put first in the part: on 2026-10-11 at 06:30 the
+**Status: done.** Built on `item-66-one-writer` (MYP-200), merged 5c7eada (PR #67). Put first in the part: on 2026-10-11 at 06:30 the
 long run of item 60, its four delegated runs and nothing else died in the same 150 ms with
 `sqlite3.OperationalError: database is locked` raised from `add_run_tokens`, the write that follows every model call.
 
@@ -4291,8 +4291,9 @@ that holds `BEGIN IMMEDIATE` on a connection of its own for 0.6 s delays a token
 
 ### 67. The inspector's cards: folded, no stray null, a view that follows the run
 
-**Status: planned.** From the owner's screenshots of 2026-10-11: the Actions card shows the word "null" under its last
-group, the cards of the side panel open by themselves, and "Dot's computer" did not show the page while the run worked.
+**Status: in progress.** Built on `item-67-inspector-cards` (MYP-201). From the owner's screenshots of 2026-10-11: the
+Actions card shows the word "null" under its last group, the cards of the side panel open by themselves, and "Dot's
+computer" did not show the page while the run worked.
 
 **What.** The side panel's cards (Dot's computer, Details, Plan, Actions) arrive folded with a one-line summary each
 and open at a click, the owner's choice kept per card; no card renders a null; the live view starts by itself while a
@@ -4303,6 +4304,19 @@ which the Actions and Plan cards pass); `run.js`: the four cards fold by default
 computer becomes a `foldCard` whose summary is the page's address; `computer.js`: `start()` runs when the run is active
 and the browser has a page (the first `browser_*` tool call), stops at the end; the run page's smoke test checks the
 folded state, the summaries and that no card's text contains "null".
+
+**Design, as built (2026-10-11).** The null was `actionsBody.replaceChildren(..., null)`: the DOM turns a null child
+into the text "null" (the `el()` helper skips nulls, `replaceChildren` does not); the optional hint is now spread in
+only when it exists, and `foldCard` passes `actions ?? null` through `el()`. Five fold cards in the panel, all folded
+by default (`openByDefault: false`, the owner's choice kept per card as before): Dot's computer (summary: the page's
+address, else "no page yet", "watching" or "ended"; the Watch button in the head, outside the toggle), Details
+(summary "status · model"), Plan, Actions, Screen (the caption in the head). `timeline.js` gained `onBrowserStep()`,
+called once at the root run's first `browser_*` tool call; `computer.js` `notePage()` starts the view on it while the
+run is active, and the empty hint says "the run has not opened a page in its browser yet" until then, so a run that
+searches over plain HTTP (item 59) is not mistaken for a broken view. The daemon's screencast was probed on the live
+run of item 60 while it searched: no frames, no page, as the hint now says. Smoke: the Actions card is hidden until its
+toggle is clicked and the panel's text has no "null"; the computer card is opened before its pill is checked, at 1280
+and 390 px in both schemes.
 
 ### 68. Delegated runs in sight: the sidebar and the chat
 

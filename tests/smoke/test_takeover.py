@@ -311,6 +311,9 @@ async def test_the_run_page_shows_the_computer_card_with_the_pill_wide_and_on_a_
                 await page.get_by_role("button", name="Run details").click()
                 card: Locator = page.locator("section.computer")
                 await expect(card).to_be_visible()
+                # The card arrives folded (item 67) with the page's address or state as its summary; open it.
+                await expect(card.locator("#fold-run-computer")).to_be_hidden()
+                await card.locator("button[aria-controls='fold-run-computer']").click()
                 await expect(card.locator(".computer-pill")).to_contain_text("You have control")
                 await expect(card.get_by_role("button", name="Return control")).to_be_visible()
                 await card.get_by_role("button", name="Watch").click()
@@ -321,6 +324,7 @@ async def test_the_run_page_shows_the_computer_card_with_the_pill_wide_and_on_a_
             await page.goto(ui_url(host, port, TOKEN))
             await page.goto(f"http://{host}:{port}/#/runs/{run.id}")
             await page.get_by_role("button", name="Run details").click()
+            await page.locator("section.computer button[aria-controls='fold-run-computer']").click()
             await expect(page.locator("section.computer .computer-pill")).to_be_visible()
             assert (await client.post(f"/api/runs/{run.id}/handback")).status_code == 202
             async with asyncio.timeout(_RUN_WAIT_S):
