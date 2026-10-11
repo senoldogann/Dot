@@ -5009,6 +5009,12 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 86  | Agents: profiles with a face, a role, a model and their own chats         | done        | bd12b54 |
 | 87  | Agents together: messages between agents, the team's thread, the harness  | done        | 23c6b5c |
 | 88  | Desktop and web, one interface: the Tauri shell on the same pages         | done        | c4d9b88 |
+| 89  | Learning on, and measured: every note handed to a run is scored by how it ended | planned     |         |
+| 90  | Memory that keeps what helps: the score decides what is recalled, rests, retires | planned     |         |
+| 91  | Recall by budget: the notes a run starts with fit a token budget, best first     | planned     |         |
+| 92  | Skills from its own work: a task that went well becomes a skill for its kind     | planned     |         |
+| 93  | The owner, in one section: what the reflection knows about how you work         | planned     |         |
+| 94  | An agent learns for itself: lessons, skills and a score per agent                | planned     |         |
 
 ### 77. The type system: Inter and Geist Mono, seven sizes, three weights
 
@@ -5367,6 +5373,108 @@ paragraph is its record. `cargo fmt --check` and `cargo clippy --all-targets -- 
 **What.** The desktop app (`desktop/`) shows the same pages as the web at the same size, the sidebar and the panel
 behaving the same; whatever the shell does of its own (the window's title, the traffic lights' room, the menu) is
 reviewed in the tour; the dependabot alert on `glib` in `desktop/src-tauri/Cargo.lock` is resolved.
+
+## Part 11: the agent that learns: lessons, skills from its own work, memory that keeps what helps (planned 2026-10-11)
+
+The owner's eleventh word, on 2026-10-11, after part 10: "does it have its own continuous learning, a strong memory
+that drops what is not needed? If it learns and keeps skills it gets faster and better; it would not rely on them
+alone, but it would be fast. It must be excellent, different from and freer than Grok's and OpenAI's agents."
+
+**Status (2026-10-11): planned.** What is built today (items 7, 36, 70, 71): one note store with the owner's, the
+agent's and the reflection's notes; recall by words and meaning with a lift by recent use; lessons drawn after a
+run (`[agent] lessons`, off); playbooks per web host after a goal-mode run (`[agent] playbooks`, off); a nightly
+reflection that merges, retires and journals; a note that rests after 90 days unused. Nothing learned is measured
+against the runs it was handed to, so the two switches stayed off for want of evidence, and the agent never
+distils a skill from work that was not a web site in goal mode.
+
+**The shape of the learning (the decisions of this part).** Learning is on, in the open: every lesson and every
+skill is a note or a folder the owner can read, edit and drop; nothing changes the agent's rules. What is learned
+is scored by what it did for the runs that were handed it, and the score, not the calendar alone, decides what is
+recalled, what rests and what is retired. A skill is distilled from the agent's own successful work of any kind,
+is offered as a skill is, is measured by the steps and seconds it saves on the next run of its kind, and is retired
+by its failures; a run reads it as advice and keeps its own judgement. The owner's own ways are one standing
+section the reflection keeps current and the owner corrects. An agent (part 10) learns for itself. Everything is
+measured with `dotx stats` and the Memory page before it is widened.
+
+### How to start part 11 (the handoff prompt)
+
+> Read ROADMAP.md part 11 and the status table of part 9 (rows 89 to 94). One item at a time, in order; the
+> protocol of part 5 (branch, gate, PR, Linear MYP issue, squash merge, hash in the table, log line) is unchanged.
+> Never touch the owner's data directory except to read it and to restart the daemon when `/api/status` shows no
+> active run; the owner's goals stay out of this file; PLAN.md stays untracked. The owner reads Turkish; everything
+> written is English.
+
+### 89. Learning on, and measured: every note handed to a run is scored by how the run ended
+
+**Status: planned.**
+
+**What.** A `memory_uses` table records every note handed to a run (the run, the note, when, how: at the start,
+by `memory_search`, as a changed note) and, when the run ends, its status; the same for every playbook a run read.
+`[agent] lessons` defaults to `propose`, `[agent] playbooks` to `true`; the owner's proposed lessons wait on the
+run page as before. `dotx stats` gains a Learning section: lessons proposed, saved and dismissed; notes handed,
+and of the runs handed each note how many ended done; playbooks written, read, retired, and the acting steps and
+seconds of the runs that read one against the runs on the same host that did not. The Memory page shows a note's
+score (handed to N runs, M done). Tests: unit for the table and the stats; smoke for a run that is handed a note
+and ends, the use recorded with its status.
+
+### 90. Memory that keeps what helps: the score decides what is recalled, rests and is retired
+
+**Status: planned.**
+
+**What.** Recall lifts an agent's note by its balance (done minus failed among the runs it was handed to, over the
+last `[memory] score_days`), besides the use lift of item 71; a note with a negative balance over at least
+`[memory] score_min_uses` runs rests at once, and the nightly reflection retires it (the `rest` tag, with a
+`lesson_retired` line saying why: "handed to 5 runs, 1 done"). A lesson the owner saved keeps its score but is never
+retired by it (the owner decides). The journal names what was retired for its score. Tests: unit for the balance,
+the resting and the retirement; the reflection smoke extended.
+
+### 91. Recall by budget: the notes a run starts with fit a token budget, best first
+
+**Status: planned.**
+
+**What.** `[memory] inject_tokens` replaces `inject_top_k`, `core_limit` and `user_limit` as the measure: the
+standing notes first, then the owner's, then the agent's, each ranked by fit and score, taken until the budget
+(estimated as the prompt is) is spent; a note that would not fit is left for `memory_search`. The budget scales
+with the model's context window (`inject_share` of it, capped by `inject_tokens`). The run's `memories` event
+carries the tokens spent. Tests: unit for the packing; the prompt-size assertions updated.
+
+### 92. Skills from its own work: a task that went well becomes a skill for the next of its kind
+
+**Status: planned.**
+
+**What.** Playbooks become skills of the agent's own work: after a task run of its own that ended done with the
+goal check's "achieved" or a verified answer, in any mode, that took at least `[agent] skill_min_steps` acting
+steps (shell, files, browser, desktop, an API), the review model distils how it got there into a skill folder
+`learned-<kind>/SKILL.md` under `<home>/skills/learned`, the kind named by the model from the goal (one line, a
+slug) and matched by meaning against the existing learned skills, so a second run of the same kind updates the
+skill rather than writing another (the parameters, the steps that changed, the evidence appended). A learned skill
+is offered like any skill, says it is learned and from which runs, and the run that uses it is told it is advice.
+The measure of item 89 compares the runs of one kind that read the skill against the ones that did not (acting
+steps, seconds, tokens); a skill read by two runs that then failed retires. The Skills page (Settings) lists the
+learned skills with their evidence and a Drop. Tests: unit for the kind matching and the rendering; smoke for a
+scripted run that is distilled, a second run of the kind offered the skill, and the retirement.
+
+### 93. The owner, in one section: what the reflection knows about how you work
+
+**Status: planned.**
+
+**What.** The nightly reflection keeps one standing note tagged `owner` (at most `[memory] owner_chars`): the
+language, the hours, the tools and sites you use, the ways you asked for things, the limits you set, distilled
+from the owner's notes and the runs of the period and rewritten each night from the previous version and the day;
+it opens the memory section of every prompt ("What Dot knows about you"), and the Memory page shows it first with
+Edit, so a wrong line is corrected by hand and the next reflection keeps the correction (the owner's edits are
+kept as their own lines the reflection does not rewrite). Tests: unit for the merge of the owner's lines; the
+reflection smoke extended.
+
+### 94. An agent learns for itself: lessons, skills and a score per agent
+
+**Status: planned.**
+
+**What.** A lesson, a learned skill and a memory use carry the agent (`agent_id`; `None` is Dot). An agent's run
+is handed its own lessons first, then Dot's shared ones; its learned skills are offered to it alone unless the
+owner marks a skill shared; its scores are its own. The agent's page shows what it learned (its lessons, its
+skills, the score), with the same Drop. Tests: unit for the scoping; the agents smoke extended.
+
 
 ## Log
 
@@ -5877,3 +5985,4 @@ reviewed in the tour; the dependabot alert on `glib` in `desktop/src-tauri/Cargo
 - 2026-10-11 (Fable 5.1): item 87 merged as `23c6b5c` (PR #97, MYP-227 Done). Item 88 started on branch `item-88-desktop` (MYP-228).
 - 2026-10-11 (Fable 5.1): item 88 merged as `c4d9b88` (PR #98, MYP-228 Done). Part 10 is built: items 84 to 88 merged (`82c06b8`, `7f02492`, `bd12b54`, `23c6b5c`, `c4d9b88`). The glib alert dismissed as not used (item 88's record). Item 76's reading (part 8) is still due on or after 2026-10-18.
 - 2026-10-11 (Fable 5.1): the desktop shell rebuilt on the owner's Mac after part 10; its first drag raised an ACL error, fixed as `06cb620` (PR #100, under item 88): the start-dragging capability and the sidebar head owning its space. Verified by dragging both bars of the rebuilt `Dot.app`.
+- 2026-10-11 (Fable 5.1): part 11 planned (items 89 to 94): learning on and measured, memory scored by outcome, recall by token budget, skills from the agent's own work, the owner's section, learning per agent.
