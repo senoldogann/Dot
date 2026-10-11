@@ -5,7 +5,7 @@
 import { activityRow, LIFECYCLE_KINDS } from "./activityrow.js";
 import { api } from "./api.js";
 import { el } from "./dom.js";
-import { dotFace, setActorState } from "./actors.js";
+import { liveFace, setActorState } from "./actors.js";
 import { dotName, overallState } from "./face.js";
 import { nestRows } from "./nesting.js";
 import { readPref, writePref } from "./prefs.js";
@@ -94,7 +94,9 @@ export function todaySections(activity) {
 /** Build the presence: `element` (the face, the greeting and the now line), `strip` (the Today strip, placed where the
  * page wants it), `focusable`, and `dispose()`. */
 export function buildPresence() {
-  const face = dotFace(overallState(getSnapshot()));
+  // Dot's face moves here (item 103), with a wink now and then at rest.
+  const live = liveFace("dot", overallState(getSnapshot()), null, 96);
+  const face = live.element;
   const name = el("div", { class: "home-name" }, dotName());
   const hello = el("p", { class: "home-greeting" });
   const now = el("p", { class: "home-now", "aria-live": "polite" }, "Looking around…");
@@ -173,6 +175,7 @@ export function buildPresence() {
     strip,
     dispose: () => {
       disposed = true;
+      live.dispose();
       stopChange();
       stopLifecycle();
     },

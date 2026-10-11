@@ -39,10 +39,12 @@ function sameText(first, second) {
   return first.replace(/\s+/g, " ").trim() === second.replace(/\s+/g, " ").trim();
 }
 
-function newBubble(container, step, live) {
+// A turn of the agent opens with its still face (item 103).
+function newBubble(scope, step, live) {
   const body = el("div", { class: live ? "stream" : "" });
-  const node = el("div", { class: live ? "bubble live" : "bubble", role: "article", "aria-label": "Dot" }, body);
-  container.append(node);
+  const face = el("span", { class: "turn-face" }, actorFace(scope.actorId, "idle", null));
+  const node = el("div", { class: live ? "bubble live" : "bubble", role: "article", "aria-label": "Dot" }, face, body);
+  scope.container.append(node);
   return { node, body, step, text: "" };
 }
 
@@ -112,7 +114,7 @@ function paintGroup(group) {
  * on the page, `onImage(name)` for every screenshot a tool returned and `onBrowserStep()` for the root run's first
  * browser tool call (Dot's computer starts its view on it).
  */
-export function createTimeline({ rootRunId, startedAt, onGrow, onPlan, onStats, onCalls, onRunStatus, onAnswer, onImage, onQuestionLeft, onHeld, onBrowserStep }) {
+export function createTimeline({ rootRunId, actorId, startedAt, onGrow, onPlan, onStats, onCalls, onRunStatus, onAnswer, onImage, onQuestionLeft, onHeld, onBrowserStep }) {
   const element = el("div", { class: "timeline" });
   const scopes = new Map();
   const cards = new Map();
@@ -120,9 +122,10 @@ export function createTimeline({ rootRunId, startedAt, onGrow, onPlan, onStats, 
   const totals = { calls: 0, failed: 0 };
 
   // `began` is when the run started; `boundary` is when the work since the last message started.
-  function makeScope({ runId, container, panel, parent, began }) {
+  function makeScope({ runId, actorId: actor, container, panel, parent, began }) {
     return {
       runId,
+      actorId: actor,
       container,
       panel,
       parent,
@@ -139,7 +142,7 @@ export function createTimeline({ rootRunId, startedAt, onGrow, onPlan, onStats, 
     };
   }
 
-  scopes.set(rootRunId, makeScope({ runId: rootRunId, container: element, panel: null, parent: null, began: startedAt }));
+  scopes.set(rootRunId, makeScope({ runId: rootRunId, actorId, container: element, panel: null, parent: null, began: startedAt }));
 
   /** The group is over at `ts`: whatever comes next starts a new one. */
   function endGroup(scope, ts) {
@@ -234,7 +237,7 @@ export function createTimeline({ rootRunId, startedAt, onGrow, onPlan, onStats, 
       scope.touched = true;
     });
     place(parent, node, ts);
-    const scope = makeScope({ runId, container: inner, panel: { node, face, status, meta, progress, time, steps: 0 }, parent, began: ts });
+    const scope = makeScope({ runId, actorId: data.agent_id ?? runId, container: inner, panel: { node, face, status, meta, progress, time, steps: 0 }, parent, began: ts });
     scopes.set(runId, scope);
     return scope;
   }
@@ -323,6 +326,7 @@ export function createTimeline({ rootRunId, startedAt, onGrow, onPlan, onStats, 
       settleGroups(scope, record.ts);
       dropRepeatedReply(scope, result);
       const answer = answerMessage({
+        actorId: scope.actorId,
         status,
         text: result,
         endedAt: record.ts,
@@ -373,7 +377,7 @@ export function createTimeline({ rootRunId, startedAt, onGrow, onPlan, onStats, 
       // A message ends the group of steps before it: the steps that follow it make a new one.
       endGroup(scope, record.ts);
       scope.boundary = record.ts;
-      const target = bubble ?? newBubble(scope.container, data.step, false);
+      const target = bubble ?? newBubble(scope, data.step, false);
       target.node.className = "bubble";
       target.body.replaceWith(prose(data.text));
       scope.reply = { node: target.node, text: data.text };
@@ -409,7 +413,7 @@ export function createTimeline({ rootRunId, startedAt, onGrow, onPlan, onStats, 
       }
       dropThinking(scope);
       if (scope.live === null || scope.live.step !== data.step) {
-        scope.live = newBubble(scope.container, data.step, true);
+        scope.live = newBubble(scope, data.step, true);
       }
       scope.live.text += data.text;
       scope.live.body.textContent = scope.live.text;

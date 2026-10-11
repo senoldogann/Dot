@@ -13,6 +13,7 @@ import { levelLabel } from "../efforts.js";
 import { continuedIn, earlierTurns, loadHistory, RESUME_SOURCE } from "../history.js";
 import { dotName, faceState, faceStateAtEnd } from "../face.js";
 import { icon } from "../icons.js";
+import { createCharacterCard } from "../charactercard.js";
 import { createInspector } from "../inspector.js";
 import { userMessage } from "../messages.js";
 import { emptyPanel, errorPanel, foldCard, loadingPanel, statusBadge } from "../panels.js";
@@ -684,6 +685,7 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
       return;
     }
     status = update.status;
+    character.onStatus(status, update.endedAt);
     if (update.model !== null) {
       model = update.model;
     }
@@ -811,13 +813,22 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
   }
 
   const computer = createComputer({ runId, active: detail.active, held: detail.held });
-  // The side panel (item 84): the computer, the details, the cost (item 96), the plan and the actions.
+  // The character beside the chat (item 103): the run's agent, moving with the run, at the head of the panel.
+  const character = createCharacterCard({
+    id: agent !== null ? agent.id : run.parent_run_id === null ? "dot" : run.id,
+    look: agent !== null ? agent.look : null,
+    status,
+    endedAt: run.finished_at,
+    size: 160,
+  });
+  // The side panel (item 84): the character, the computer, the details, the cost (item 96), the plan and the actions.
   const inspector = createInspector({
     layout,
-    content: [computer.element, details.element, cost.element, plan.element, actionsCard.element],
+    content: [character.element, computer.element, details.element, cost.element, plan.element, actionsCard.element],
   });
   const timeline = createTimeline({
     rootRunId: runId,
+    actorId: agent !== null ? agent.id : run.parent_run_id === null ? "dot" : run.id,
     startedAt: run.created_at,
     onGrow,
     onPlan: paintPlan,
@@ -837,7 +848,10 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
     onImage: inspector.addImage,
     onQuestionLeft: debounce(() => reconcile(), QUESTIONS_SETTLE_MS),
     onHeld: computer.setHeld,
-    onBrowserStep: computer.notePage,
+    onBrowserStep: (page) => {
+      computer.notePage(page);
+      character.lookAside();
+    },
   });
   const problem =
     historyProblem === null
@@ -927,6 +941,7 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
     stopLifecycle();
     computer.dispose();
     inspector.dispose();
+    character.dispose();
     composer.dispose();
     if (ticker !== null) {
       clearInterval(ticker);

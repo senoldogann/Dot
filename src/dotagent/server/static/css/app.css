@@ -329,6 +329,47 @@ textarea {
   fill: var(--character-notify);
 }
 
+/* The character beside the chat (charactercard.js, item 103) at the head of the side panel, and the face that opens a
+   turn of the agent in the conversation. */
+.character-card .character-stage {
+  display: flex;
+  justify-content: center;
+  padding: var(--space-2);
+}
+
+.bubble[role="article"] {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr);
+  column-gap: var(--space-2);
+  align-items: start;
+}
+
+.bubble[role="article"] > :not(.turn-face) {
+  grid-column: 2;
+}
+
+.turn-face {
+  display: block;
+  padding-top: 4px;
+}
+
+.turn-face .avatar {
+  width: 28px;
+  height: 28px;
+  animation: none;
+}
+
+/* The home's face moves on its own (item 103): no breath from the sheet on top of it. */
+.home-who .avatar.live {
+  width: 96px;
+  height: 96px;
+}
+
+.avatar.live[data-state="idle"],
+.avatar.live.ended {
+  animation: none;
+}
+
 /* The look picker (lookpicker.js, item 102): the preview, then the shapes, the expressions and the colours as rows of
    faces; the picked one wears the strong border. */
 .look-picker {
@@ -2353,8 +2394,16 @@ details[open] > summary .chev {
 
 /* The answer is Dot's last message: text on the page like the others, with a quiet line under it about how the run ended. */
 .answer {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr);
+  column-gap: var(--space-2);
+  align-items: start;
   min-width: 0;
   scroll-margin-top: 72px;
+}
+
+.answer > :not(.turn-face) {
+  grid-column: 2;
 }
 
 .answer-alert {

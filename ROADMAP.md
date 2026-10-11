@@ -5022,7 +5022,7 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 99  | The team that grows: a run makes a lasting teammate and knows of it                | done        | 724768e |
 | 100 | The review: every feature of parts 1 to 12 read once more on the live pages        | done        | 62585c2 |
 | 101 | The character engine: bloub's one shape with two eyes, as plain modules of Dot's UI | done        | 8c3a590 |
-| 102 | The look of every agent: shape, expression and colour, chosen in the editor and worn in every row | in progress |         |
+| 102 | The look of every agent: shape, expression and colour, chosen in the editor and worn in every row | done        | f6afe5d |
 | 103 | Alive beside the chat: the character works, waits, finishes and sleeps with the run | planned     |         |
 | 104 | The composer remade: one frame, quiet menus, drafts that keep, a face that listens  | planned     |         |
 | 105 | The small polish part 12's review left: a scroll cue, empty sections that point, the Browser grid, the tour's content, Watch on an ended run | planned     |         |
@@ -5939,7 +5939,7 @@ frames, a state change, the still frame under reduced motion and the stopped loo
 
 ### 102. The look of every agent: shape, expression and colour, chosen in the editor and worn in every row
 
-**Status: in progress.**
+**Status: done.** Merged as `f6afe5d` (PR #120, MYP-242 Done).
 
 **Design, as built (2026-10-11).** `AgentLook` (`store/models.py`: `shape`, `expression`, `colour`, each a literal of
 the character's catalogue) on `AgentRecord.look`, `None` for the fallback; three nullable columns (`shape`,
@@ -5987,7 +5987,27 @@ row wears it), `test_face.py` (the favicon, the home face) updated with the sele
 
 ### 103. Alive beside the chat: the character works, waits, finishes and sleeps with the run
 
-**Status: planned.**
+**Status: in progress.**
+
+Design, as built (2026-10-11). The run page's side panel opens with the run's actor as a moving character: a new
+card `charactercard.js` (`createCharacterCard({id, look, status, endedAt, size})`, a `section.card.character-card`
+with the character at 160 px, `data-mood` on it) above Dot's computer. Its resting mood is one pure function,
+`restingMood(status, endedFor)` in `mood.js`: queued and running think, blocked goes alert with the pastille
+(notify), done rests idle and, ten minutes after the end, sleeps; failed rests sad, cancelled unimpressed. The
+moment of a change is a second pure function, `entranceOf(before, after)`: a run first seen running hatches (bloub's
+egg, once), a run that ends done laughs once (burst) and settles; the card plays the entrance, then the resting mood.
+A browser step (`onBrowserStep`) turns the head aside toward the live view for 2.5 s (`lookAside`, `setLook`). The
+card follows `onRunStatus` and the sleep by its own timer, and dies with the page. The stage bar's face, every face
+in a chat and the delegated rows keep the still frames of item 102; the conversation's turns open with the actor's
+still face at 28 px (`timeline.js` carries the actor id of each scope: the run's agent, Dot, or the delegated run's
+agent), and the answer at the end wears the face of its end (`messages.js answerMessage({actorId, …})`, the same in
+the earlier turns of the thread). The home greeting's face is Dot's character moving at 96 px (`liveFace`, idle with
+a wink now and then, nothing from the sheet on top of it). "Faces that move" in Settings › General (`dot.characters`,
+item 102) stills the card's character too. CSS: `.character-card`, the `.bubble[role="article"]` and `.answer` grids
+with the `.turn-face` column, the home's live face. README: the home, the run page's panel, the design system's
+motion. Tests: `tests/smoke/test_face.py` runs a scripted task with a question and reads the card's `data-mood`
+through notify, thinking, burst and idle, the answer's face, and the still frame with the switch off; the home's
+face is read as moving on its own.
 
 **What.** The run page's side panel opens with the run's agent as a moving character (`run.js`, a `characterCard`
 above Dot's computer, 160 px at the desk width, in the drawer on a phone): a run that starts hatches (bloub's egg,
@@ -6580,3 +6600,4 @@ items. The findings go in this section as built.
 - 2026-10-11 (Fable 5.1): item 100 merged as `62585c2` (PR #116, MYP-240 Done): the tour read by four readers and by eye, the offline smoke suite in full, the owner's daemon through the API; the composer's focus frame, the dark switch knob, three stale lines and the tour's sidebar fixed; five polish items left for the next part. Part 12 built: items 95 to 100. The daemon waits for a restart on `62585c2`.
 - 2026-10-11 (Fable 5.1): the daemon restarted on `3f1bb24` (code `62585c2`) once idle. Part 13 planned (items 101 to 106): the character engine from bloub (MIT), the look of every agent, the character alive beside the chat, the composer remade, part 12's polish, the review.
 - 2026-10-11 (Fable 5.1): item 101 merged as `8c3a590` (PR #119, MYP-241 Done): bloub ported to `static/js/character/` (MIT notice kept), `mountCharacter`, one ticker per page, the `--character-*` tokens, the Characters card of `#/controls`.
+- 2026-10-11 (Fable 5.1): item 102 merged as `f6afe5d` (PR #120, MYP-242 Done): `AgentLook` on the record and in the editor, Dot's look in Settings › General, every face a still character (`actors.js`), the favicon from `character/still.js`, `hues.js` pure.

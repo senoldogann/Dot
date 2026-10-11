@@ -6,8 +6,14 @@
 import { api } from "./api.js";
 import { mountCharacter } from "./character/character.js";
 import { hueLook, hueOf } from "./hues.js";
+import { readPref, writePref } from "./prefs.js";
 
 export const DOT_ID = "dot";
+// Whether the big faces move (item 103): the home's, the run page's, the preview's; off leaves every face a still frame.
+const MOVE_KEY = "dot.characters";
+// A wink now and then while a live face rests: the pause between two, and the wink's own length.
+const WINK_EVERY_MS = [6000, 11000];
+const WINK_MS = 1600;
 // Dot before the owner chooses: the round face in the amber of its old badge.
 const DOT_LOOK = { shape: "circle", expression: "neutral", colour: "amber" };
 // How a face's state shows: the animation posed and, at rest, the expression that replaces the look's own.
@@ -61,6 +67,15 @@ export async function loadLooks() {
   }
 }
 
+/** Whether the faces that can move do, kept in this browser; on until switched off. */
+export function facesMove() {
+  return readPref(MOVE_KEY) !== "off";
+}
+
+export function setFacesMove(value) {
+  writePref(MOVE_KEY, value ? "on" : "off");
+}
+
 function expressionFor(look, state) {
   return FACE_OF_STATE[state].expression ?? look.expression;
 }
@@ -92,6 +107,51 @@ export function actorFace(id, state, look) {
 /** Dot's own face in a state. */
 export function dotFace(state) {
   return actorFace(DOT_ID, state, null);
+}
+
+/** A face that moves (item 103) at `size` pixels: alive while faces move, with a wink now and then at rest; still
+ * otherwise. `dispose()` stops it. */
+export function liveFace(id, state, look, size) {
+  const chosen = lookOf(id, look);
+  const fragment = document.createDocumentFragment();
+  const handle = mountCharacter(fragment, {
+    shape: chosen.shape,
+    expression: expressionFor(chosen, state),
+    colour: chosen.colour,
+    size,
+    moving: facesMove(),
+    state: FACE_OF_STATE[state].animation,
+    label: "",
+  });
+  const face = handle.element;
+  face.classList.add("avatar", "live");
+  face.dataset.state = state;
+  handles.set(face, { handle, look: chosen });
+  let timer = 0;
+  function winkLater() {
+    const [low, high] = WINK_EVERY_MS;
+    timer = setTimeout(() => {
+      if (face.dataset.state === "idle" && face.dataset.still === "false") {
+        handle.setState("wink");
+        timer = setTimeout(() => {
+          if (face.dataset.state === "idle") {
+            handle.setState("idle");
+          }
+          winkLater();
+        }, WINK_MS);
+      } else {
+        winkLater();
+      }
+    }, low + Math.random() * (high - low));
+  }
+  winkLater();
+  return {
+    element: face,
+    dispose: () => {
+      clearTimeout(timer);
+      handle.destroy();
+    },
+  };
 }
 
 /** Change the state a face shows: the expression and the animation follow. */

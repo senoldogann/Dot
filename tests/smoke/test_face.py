@@ -257,7 +257,9 @@ async def test_the_face_breathes_at_rest_pulses_at_work_and_holds_still_under_re
             await page.goto(f"{base}/#/runs")
             face = page.locator(".home-who .avatar")
             await expect(face).to_have_attribute("data-state", "idle")
-            assert await page.evaluate(_CORE_ANIMATION) == "breathe-face"
+            # The home's face moves on its own (item 103): the sheet's breath is for the still faces.
+            await expect(face).to_have_attribute("data-still", "false")
+            assert await page.evaluate(_CORE_ANIMATION) == "none"
             run: RunRecord = await manager.start(
                 "Rest a while", "task", SCRIPTED_MODEL, None, "test", None, None, "yolo", False, ()
             )
@@ -266,6 +268,7 @@ async def test_the_face_breathes_at_rest_pulses_at_work_and_holds_still_under_re
             # Reduced motion: the core holds still in both states, while the fades stay (the slash menu fades in).
             await page.emulate_media(reduced_motion="reduce")
             assert await page.evaluate(_CORE_ANIMATION) == "none"
+            await expect(face).to_have_attribute("data-still", "true")
             await page.locator(".home .composer textarea").fill("/")
             await expect(page.locator(".slash-menu")).to_be_visible()
             assert (
@@ -282,8 +285,70 @@ async def test_the_face_breathes_at_rest_pulses_at_work_and_holds_still_under_re
             await page.wait_for_function("document.querySelector('.shell')?.dataset.nav === 'drawer'")
             assert set((await page.evaluate(_DRAWER_TRANSITION)).split(", ")) == {"0s"}
             await page.emulate_media(reduced_motion="no-preference")
-            assert await page.evaluate(_CORE_ANIMATION) == "breathe-face"
+            assert await page.evaluate(_CORE_ANIMATION) == "none"
+            await expect(face).to_have_attribute("data-still", "false")
             assert "0.2s" in (await page.evaluate(_DRAWER_TRANSITION)).split(", ")
             await page.close()
         finally:
             await browser.close()
+
+
+async def test_the_character_beside_the_chat_works_waits_finishes_and_can_be_stilled(
+    runtime: Runtime, manager: RunManager, client: httpx.AsyncClient, tmp_path: Path
+) -> None:
+    host: str = client.base_url.host
+    port: int | None = client.base_url.port
+    assert port is not None
+    base: str = f"http://{host}:{port}"
+    MODEL.script = ScriptedProvider(
+        _PROVIDER,
+        [
+            _turn(ASK_USER_TOOL, {"question": "Which colour?"}),
+            _turn("shell", {"command": f"sleep {_WORK_S}"}),
+            _turn(FINISH_TOOL, {"answer": "Done.", "success": True}),
+        ],
+    )
+    run: RunRecord = await manager.start(
+        "Pick a colour", "task", SCRIPTED_MODEL, None, "test", None, None, "ask", False, ()
+    )
+    question: ApprovalRecord = await _pending_question(runtime, run.id)
+    try:
+        async with async_playwright() as playwright:
+            browser: Browser = await playwright.chromium.launch(channel=runtime.config.browser.channel, headless=True)
+            try:
+                page: Page = await browser.new_page(viewport={"width": 1280, "height": 900})
+                await page.goto(ui_url(host, port, TOKEN))
+                await page.evaluate("localStorage.setItem('dot.inspector', 'on')")
+                await page.goto(f"{base}/#/runs/{run.id}")
+                card = page.locator(".character-card")
+                character = card.locator(".character")
+                # Waiting for the answer: the notification pastille; the stage's face says waiting too.
+                await expect(card).to_have_attribute("data-mood", "notify")
+                await expect(character).to_have_attribute("data-still", "false")
+                await page.screenshot(path=str(tmp_path / "character-waiting.png"))
+                await manager.decide(question.id, True, "test", "blue")
+                await expect(card).to_have_attribute("data-mood", "thinking")
+                await page.screenshot(path=str(tmp_path / "character-thinking.png"))
+                # The end under the reader's eyes: the burst, then rest.
+                await expect(card).to_have_attribute("data-mood", "burst", timeout=(_WORK_S + 15) * 1000)
+                await expect(card).to_have_attribute("data-mood", "idle", timeout=5000)
+                # The answer wears the still face of its actor, at rest.
+                assert await page.locator(".answer .turn-face .avatar[data-state='done']").count() == 1
+                await page.screenshot(path=str(tmp_path / "character-done.png"))
+                # Faces that move, off: the card's character is a still frame.
+                await page.goto(f"{base}/#/settings/general")
+                await page.get_by_role("switch", name="Faces that move").click()
+                await page.goto(f"{base}/#/runs/{run.id}")
+                await expect(page.locator(".character-card .character")).to_have_attribute("data-still", "true")
+                await page.get_by_role("switch", name="Faces that move").count()
+                await page.goto(f"{base}/#/settings/general")
+                await page.get_by_role("switch", name="Faces that move").click()
+                await page.close()
+            finally:
+                await browser.close()
+    finally:
+        if (await runtime.store.get_approval(question.id)).status == "pending":
+            await manager.decide(question.id, True, "test", "blue")
+        async with asyncio.timeout(_RUN_WAIT_S):
+            ended: RunRecord = await manager.wait(run.id)
+    assert ended.status == "done", ended
