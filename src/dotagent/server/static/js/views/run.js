@@ -201,7 +201,7 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
   // ------------------------------------------------------------------------------------ details and plan
   const details = createDetails(run);
   const planBody = el("div", { class: "plan-list" });
-  const plan = foldCard({ id: "run-plan", title: "Plan", actions: null, body: planBody, openByDefault: true });
+  const plan = foldCard({ id: "run-plan", title: "Plan", actions: null, body: planBody, openByDefault: false });
   plan.element.hidden = true;
 
   function paintPlan(steps, targets) {
@@ -647,7 +647,7 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
   // ------------------------------------------------------------------------------------------- actions
   // What the run did and what can be undone: its acting steps, its approvals and its file changes (see server.actions).
   const actionsBody = el("div", { class: "actions-list" });
-  const actionsCard = foldCard({ id: "run-actions", title: "Actions", actions: null, body: actionsBody, openByDefault: true });
+  const actionsCard = foldCard({ id: "run-actions", title: "Actions", actions: null, body: actionsBody, openByDefault: false });
   // The paths being taken back, so that a second press does not send the same undo twice.
   const undoing = new Set();
 
@@ -732,7 +732,7 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
         view.edits.map((edit) => editRow(edit, view.ended)),
         "No file was changed with the file tools (what the shell, the browser or the desktop changed is not noted).",
       ),
-      view.ended || view.edits.length === 0 ? null : el("div", { class: "hint" }, "The buttons to take a change back come once the run has ended."),
+      ...(view.ended || view.edits.length === 0 ? [] : [el("div", { class: "hint" }, "The buttons to take a change back come once the run has ended.")]),
     );
   }
 
@@ -772,6 +772,7 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
     onImage: inspector.addImage,
     onQuestionLeft: debounce(() => reconcile(), QUESTIONS_SETTLE_MS),
     onHeld: computer.setHeld,
+    onBrowserStep: computer.notePage,
   });
   const problem =
     historyProblem === null

@@ -128,7 +128,7 @@ export function foldCard({ id, title, actions, body, openByDefault }) {
     el("span", { class: "fold-title" }, title),
     summary,
   );
-  const element = el("section", { class: "card fold" }, el("div", { class: "card-head" }, toggle, actions), content);
+  const element = el("section", { class: "card fold" }, el("div", { class: "card-head" }, toggle, actions ?? null), content);
 
   function paint() {
     const open = state.isOpen();

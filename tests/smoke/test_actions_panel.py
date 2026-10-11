@@ -152,8 +152,12 @@ async def test_the_web_ui_shows_the_panel_and_its_button_takes_a_change_back(
             await expect(page.locator(".shell")).to_be_visible()
             await page.goto(f"{address}/#/runs/{run.id}")
             await page.click("button[aria-label='Run details']")
+            # The cards of the panel arrive folded (item 67); the Actions card opens at a click and renders no null.
             panel = page.locator("#fold-run-actions")
+            await expect(panel).to_be_hidden()
+            await page.click("button[aria-controls='fold-run-actions']")
             await expect(panel).to_be_visible(timeout=_UI_TIMEOUT_MS)
+            assert "null" not in await page.locator(".inspector").inner_text()
             await expect(panel.locator(".action-step")).to_have_count(2)
             await expect(panel.locator(".action-edit[data-state='ready']")).to_have_count(2)
             notes = panel.locator(".action-edit", has_text="notes.txt")

@@ -5,7 +5,12 @@
 import { api, sse } from "./api.js";
 import { el } from "./dom.js";
 import { icon } from "./icons.js";
+import { foldCard } from "./panels.js";
 import { toast } from "./ui.js";
+
+const NO_PAGE_YET = "The run has not opened a page in its browser yet; the view starts by itself when it does.";
+const WAITING_FOR_FRAME = "Waiting for the page: the first frame comes when the run's browser paints.";
+const CLOSED_HINT = "Watch the page Dot's browser is on. Nothing is sent while the view is closed.";
 
 /**
  * The card for the run `runId`, which is `active` (still going on) and `held` (the reader has its browser). Returns
@@ -15,25 +20,29 @@ import { toast } from "./ui.js";
 export function createComputer({ runId, active, held }) {
   let isActive = active;
   let isHeld = held;
+  let hasPage = false;
   let controller = null;
   let objectUrl = null;
 
   const image = el("img", { class: "computer-image", alt: "The page of Dot's browser", hidden: true });
-  const empty = el("div", { class: "hint" }, "Watch the page Dot's browser is on. Nothing is sent while the view is closed.");
+  const empty = el("div", { class: "hint" }, CLOSED_HINT);
   const screen = el("div", { class: "computer-screen" }, image, empty);
   const address = el("div", { class: "small muted computer-url" });
   const who = el("span", { class: "computer-who" });
   const handButton = el("button", { class: "btn sm primary", type: "button", onclick: () => toggleHold() });
   const pill = el("div", { class: "computer-pill" }, icon("hand"), who, handButton);
   const watchButton = el("button", { class: "btn ghost sm", type: "button", "aria-pressed": "false", onclick: () => (controller === null ? start() : stop()) });
-  const element = el(
-    "section",
-    { class: "card card-pad stack tight computer", "aria-label": "Dot's computer" },
-    el("div", { class: "row" }, el("strong", { class: "grow" }, "Dot's computer"), watchButton),
-    screen,
-    address,
-    pill,
-  );
+  // A fold card: folded it shows where the browser is; open it shows the page. The watch button sits beside the title.
+  const card = foldCard({
+    id: "run-computer",
+    title: "Dot's computer",
+    actions: watchButton,
+    body: el("div", { class: "stack tight computer-body" }, screen, address, pill),
+    openByDefault: false,
+  });
+  const element = card.element;
+  element.classList.add("computer");
+  element.setAttribute("aria-label", "Dot's computer");
 
   function paint() {
     const watching = controller !== null;
@@ -41,10 +50,9 @@ export function createComputer({ runId, active, held }) {
     watchButton.setAttribute("aria-pressed", String(watching));
     watchButton.disabled = !isActive;
     if (image.hidden) {
-      empty.textContent = watching
-        ? "Waiting for the page: the first frame comes when the run's browser paints."
-        : "Watch the page Dot's browser is on. Nothing is sent while the view is closed.";
+      empty.textContent = watching ? WAITING_FOR_FRAME : isActive && !hasPage ? NO_PAGE_YET : CLOSED_HINT;
     }
+    card.setSummary(address.textContent);
     who.textContent = isHeld ? "You have control" : "Dot has control";
     handButton.textContent = isHeld ? "Return control" : "Take over";
     handButton.title = isHeld ? "Let the run go on; it is told the page may have changed" : "Hold the run at its next tool call and use the browser yourself";
@@ -116,6 +124,11 @@ export function createComputer({ runId, active, held }) {
   paint();
   return {
     element,
+    /** The run's browser has a page (its first browser step): the view starts by itself while the run works. */
+    notePage() {
+      hasPage = true;
+      start();
+    },
     setHeld(flag) {
       isHeld = flag;
       paint();

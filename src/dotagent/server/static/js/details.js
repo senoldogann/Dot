@@ -4,7 +4,7 @@
 import { compact, copyText, dateTimeFull, duration, el, modelName } from "./dom.js";
 import { levelLabel } from "./efforts.js";
 import { icon } from "./icons.js";
-import { statusBadge } from "./panels.js";
+import { foldCard, statusBadge } from "./panels.js";
 import { approvalLabel } from "./runmodes.js";
 import { attempt, toast } from "./ui.js";
 
@@ -43,11 +43,12 @@ export function createDetails(run) {
       ? null
       : fact("Delegated by", el("dd", null, el("a", { href: `#/runs/${run.parent_run_id}` }, "Open the parent run")));
 
-  const element = el(
-    "section",
-    { class: "card card-pad stack tight", "aria-label": "Details" },
-    el("strong", null, "Details"),
-    el(
+  const card = foldCard({
+    id: "run-details",
+    title: "Details",
+    actions: null,
+    openByDefault: false,
+    body: el(
       "dl",
       { class: "facts" },
       fact("Status", status),
@@ -64,12 +65,15 @@ export function createDetails(run) {
       fact("Run id", el("dd", { class: "run-id" }, el("code", { class: "mono" }, run.id), copy)),
       parent,
     ),
-  );
+  });
+  const element = card.element;
+  element.setAttribute("aria-label", "Details");
 
   function paint(state) {
     status.replaceChildren(statusBadge(state.status));
     model.textContent = state.model === "" ? "Default" : modelName(state.model);
     model.title = state.model;
+    card.setSummary(`${state.status} · ${model.textContent}`);
     turns.textContent = String(state.steps);
     calls.textContent = state.failed === 0 ? String(state.calls) : `${state.calls} · ${state.failed} failed`;
     tokens.textContent = `${compact(state.input)} in · ${compact(state.output)} out`;

@@ -5,6 +5,7 @@
 import { imageUrl } from "./api.js";
 import { el } from "./dom.js";
 import { icon } from "./icons.js";
+import { foldCard } from "./panels.js";
 import { setShowInspector, showInspector } from "./layout.js";
 import { onThemeChange } from "./theme.js";
 import { showImage } from "./ui.js";
@@ -32,14 +33,14 @@ export function createInspector({ layout, content }) {
   const caption = el("span", { class: "small muted" });
   const preview = el("button", { class: "inspector-shot", type: "button", hidden: true });
   const strip = el("div", { class: "inspector-strip", hidden: true });
-  const screens = el(
-    "section",
-    { class: "card card-pad stack tight" },
-    el("div", { class: "row" }, el("strong", { class: "grow" }, "Screen"), caption),
-    empty,
-    preview,
-    strip,
-  );
+  const screenCard = foldCard({
+    id: "run-screen",
+    title: "Screen",
+    actions: caption,
+    body: el("div", { class: "stack tight" }, empty, preview, strip),
+    openByDefault: false,
+  });
+  const screens = screenCard.element;
   const closeButton = el(
     "button",
     { class: "btn ghost sm icon-only", type: "button", title: "Close", "aria-label": "Close the details", onclick: () => setDrawer(false) },
