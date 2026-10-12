@@ -38,14 +38,15 @@ class ThreadSummary(FrozenModel):
     """One chat of the sidebar: a thread with the runs a person started on it (``run_count`` of them) and the latest of
     those runs, which the chat opens on. ``updated_at`` is the later of the last message and the start of the latest
     run; ``latest_created_at`` is when the latest run was created, which a message during the run does not move (the
-    sidebar counts a working chat's time from it). Threads that only hold delegated runs are not chats and are never
-    listed."""
+    sidebar counts a working chat's time from it). ``pinned_at`` is when the owner pinned the chat, ``None`` for one not
+    pinned (item 130). Threads that only hold delegated runs are not chats and are never listed."""
 
     id: str
     title: str
     source: str
     created_at: float
     updated_at: float
+    pinned_at: float | None
     run_count: int
     latest_run_id: str
     latest_status: RunStatus
