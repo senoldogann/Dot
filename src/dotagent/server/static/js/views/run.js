@@ -4,21 +4,23 @@ import { actorFace, dotFace, setActorState } from "../actors.js";
 import { api, follow } from "../api.js";
 import { approvalCard, fromRecord, LEFT_IN_CAMPAIGN, LEFT_IN_RUN } from "../approvals.js";
 import { readyToSend } from "../attachments.js";
+import { runChoices } from "../choices.js";
 import { createComputer } from "../computer.js";
 import { createCostCard } from "../cost.js";
 import { createDetails } from "../details.js";
 import { composerFrame } from "../composer.js";
 import { clip, dateTimeFull, debounce, duration, el, modelName } from "../dom.js";
-import { allModels, levelLabel, offersChoice } from "../efforts.js";
+import { levelLabel } from "../efforts.js";
 import { continuedIn, earlierTurns, loadHistory, RESUME_SOURCE } from "../history.js";
 import { dotName, faceState, faceStateAtEnd } from "../face.js";
 import { icon } from "../icons.js";
 import { createInspector } from "../inspector.js";
 import { userMessage } from "../messages.js";
 import { emptyPanel, errorPanel, foldCard, loadingPanel } from "../panels.js";
+import { heldChoice } from "../runmodes.js";
 import { setStageTitle, setStageTools } from "../stage.js";
 import { createStageSize } from "../stagesize.js";
-import { loadModels, onLifecycle } from "../state.js";
+import { onChange, onLifecycle } from "../state.js";
 import { createTimeline } from "../timeline.js";
 import { attempt, confirmDialog, toast } from "../ui.js";
 
@@ -409,6 +411,38 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
     listener: null,
   });
   const { textarea: input, attachments, sendButton: send } = frame;
+  // The choices of the next follow-up (item 133), after T3 Code's composer: the open run's mode, model with its
+  // reasoning, approvals and goal mode at first, held by the page. The agent stays the chat's, and Keep going is a
+  // new chat's, since a campaign starts from a goal of its own.
+  const levels = new Map(run.effort === null ? [] : [[run.model, run.effort]]);
+  const choices = runChoices({
+    frame,
+    kept: {
+      mode: run.mode,
+      model: run.model,
+      level: {
+        // A level the model does not offer is not given: the daemon refuses it (item 116).
+        read: (info) => {
+          const level = levels.get(info.ref) ?? null;
+          return level !== null && info.efforts.includes(level) ? level : null;
+        },
+        write: (info, level) => {
+          if (level === null) {
+            levels.delete(info.ref);
+          } else {
+            levels.set(info.ref, level);
+          }
+        },
+      },
+      approvals: heldChoice(run.approvals),
+      goalMode: heldChoice(run.goal_mode),
+    },
+    optionsTitle: "Approvals and goal mode",
+    more: () => [],
+    onMode: () => input.focus(),
+  });
+  frame.options.append(choices.pills.mode, choices.pills.model, choices.pills.reasoning, choices.pills.options);
+  const stopStatus = onChange(choices.sync);
   const dock = el("div", { class: "dock" }, resumeLine, frame.element);
 
   // Steer messages that are sent but not read yet; each one leaves when the run reports reading it.
@@ -472,16 +506,6 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
     });
   }
 
-  // The reasoning level a follow-up keeps: the run's own while its model offers a choice that includes it, otherwise
-  // the daemon's default, since a level given for a model without a choice is refused (item 116).
-  async function followUpEffort() {
-    if (run.model === "") {
-      return null;
-    }
-    const info = allModels(await loadModels()).find((candidate) => candidate.ref === run.model) ?? null;
-    return info !== null && offersChoice(info) && info.efforts.includes(run.effort) ? run.effort : null;
-  }
-
   // True from the moment a message is on its way until the answer is in: Enter does not look at the disabled button,
   // so a second press must be refused here, or a follow-up would start two runs on one thread.
   let sending = false;
@@ -524,13 +548,16 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
           frame.clear();
           return;
         }
+        // The level is checked against the model's own, so the models are known first.
+        await choices.ready();
+        const chosen = choices.value();
         const next = await api.post("/runs", {
           goal: text,
-          mode: run.mode,
-          model: run.model === "" ? null : run.model,
-          effort: await followUpEffort(),
-          approvals: run.approvals,
-          goal_mode: run.goal_mode,
+          mode: chosen.mode,
+          model: chosen.model,
+          effort: chosen.effort,
+          approvals: chosen.approvals,
+          goal_mode: chosen.goal_mode,
           thread_id: run.thread_id,
           agent_id: run.agent_id,
           attachments: files,
@@ -551,6 +578,8 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
     frame.element.hidden = delegated;
     dock.classList.toggle("dock-bare", delegated);
     frame.setStop(active && !delegated ? stopRun : null);
+    // A message steers the run under way, which keeps its own choices: the pills are the next follow-up's.
+    choices.setWaiting(active);
     footStop.hidden = !active;
     // Short enough for one line of a phone's composer (item 111).
     input.placeholder = active ? "Steer this run, or /btw to ask on the side" : "Follow up, or /btw to ask on the side";
@@ -934,6 +963,8 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
     computer.dispose();
     inspector.dispose();
     stage.dispose();
+    stopStatus();
+    choices.dispose();
     frame.dispose();
     if (ticker !== null) {
       clearInterval(ticker);

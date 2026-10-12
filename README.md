@@ -961,7 +961,12 @@ while the run works and once at its end. A strip under
 the head links the other runs of the same thread, and the box at the bottom steers a run that is going on or follows up
 on a finished one. While the run works and the box is empty, the box's send is the run's **Stop** (a round button in
 the danger colour with a square) and cancels it; a word typed turns it back into the send, and the message steers the
-run. A run the daemon cut off offers **Continue** on a line above the box. A Details panel shows the status, the agent
+run. The box wears the home's pills too, after T3 Code's composer: the mode, the model with its reasoning and the
+Options (approvals and goal mode), set at first to the open run's, and a follow-up starts its run with them on the same
+thread, for the same agent; they are the page's, not kept in the browser as the home's are, and Keep going stays a new
+chat's choice. While a run works the message steers it, and it keeps its own: the pills step back and say that they wait
+for the next follow-up. A run the daemon cut off offers **Continue** on a line above the box. A Details panel shows the
+status, the agent
 of a chat with one, the model and its reasoning level, the approval mode and goal mode, the campaign of a session, the
 model turns, the tool calls (with the failed ones), the tokens (of every model call of the run: its steps and its
 side calls, such as compactions, reviews and the goal check), the duration, the start and the run id, then the plan, an Actions

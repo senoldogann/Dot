@@ -1,7 +1,8 @@
 // The two choices of a run besides its goal: who answers the questions the safety policy raises (approvals) and whether a
 // checker keeps the run working until its goal is really reached (goal mode). The daemon has a default for both. A choice
 // made on the home page is kept per browser and goes with every run started from there until it is changed again; a person
-// who never chose anything leaves both to the daemon. A third switch makes a task a campaign (Keep going until done); it is
+// who never chose anything leaves both to the daemon. On a chat's page the choices start from the open run's and are held
+// by the page for the next follow-up (item 133). A third switch makes a task a campaign (Keep going until done); it is
 // chosen for one goal, so it is never kept.
 
 import { el } from "./dom.js";
@@ -44,23 +45,42 @@ function savedGoalMode() {
   return stored === "off" ? false : null;
 }
 
+/** The home's choice of approvals, kept per browser: `read()` gives it, or null when none was made; `write(id)` keeps it. */
+export const KEPT_APPROVALS = { read: savedApprovals, write: (id) => writePref(APPROVALS_KEY, id) };
+
+/** The home's choice of goal mode, kept per browser, as `KEPT_APPROVALS`. */
+export const KEPT_GOAL_MODE = { read: savedGoalMode, write: (on) => writePref(GOAL_MODE_KEY, on ? "on" : "off") };
+
+/** A choice held by one page from `initial`, as `KEPT_APPROVALS` reads and writes, and gone with the page: what a chat's
+ * page holds for its next follow-up (item 133). */
+export function heldChoice(initial) {
+  let value = initial;
+  return {
+    read: () => value,
+    write: (next) => {
+      value = next;
+    },
+  };
+}
+
 function pick(caption, control) {
   return el("div", { class: "composer-pick", role: "group", "aria-label": caption }, el("span", { class: "composer-pick-label" }, caption), control);
 }
 
 /**
- * The control that picks the approval mode of a new run. `value()` is the mode this browser chose, or null while it follows the
- * daemon (that is what a run is started with, so a later change of the daemon's default still applies); `sync()` shows the
- * choice or the daemon's default again after the status changed; `warning` is the line to show with the control.
- * `onPaint(mode)` runs whenever the mode shown changes, with null while neither a choice nor the daemon's status is known.
+ * The control that picks the approval mode of a new run, its choice in `kept` (`KEPT_APPROVALS` or a `heldChoice`).
+ * `value()` is the mode chosen, or null while it follows the daemon (that is what a run is started with, so a later
+ * change of the daemon's default still applies); `sync()` shows the choice or the daemon's default again after the status
+ * changed; `warning` is the line to show with the control. `onPaint(mode)` runs whenever the mode shown changes, with
+ * null while neither a choice nor the daemon's status is known.
  */
-export function approvalsPicker(onPaint) {
+export function approvalsPicker(onPaint, kept) {
   function shown() {
     const { status } = getSnapshot();
-    return savedApprovals() ?? (status === null ? null : status.approvals);
+    return kept.read() ?? (status === null ? null : status.approvals);
   }
   const control = segmented(APPROVAL_OPTIONS, shown(), (id) => {
-    writePref(APPROVALS_KEY, id);
+    kept.write(id);
     paint();
   });
   const warning = el("div", { class: "note warn", hidden: true }, icon("bolt"), el("span", null, YOLO_NOTE));
@@ -75,7 +95,7 @@ export function approvalsPicker(onPaint) {
   return {
     element: pick("Approvals", control.element),
     warning,
-    value: savedApprovals,
+    value: kept.read,
     sync: () => {
       control.set(shown());
       paint();
@@ -118,13 +138,14 @@ export function standingPicker(onToggle) {
 }
 
 /**
- * The switch that turns goal mode on or off for a new run. `value()`, `sync()` as for the approvals; `setAvailable(false)`
- * hides it for the kind of run that has no goal mode (a chat).
+ * The switch that turns goal mode on or off for a new run, its choice in `kept` (`KEPT_GOAL_MODE` or a `heldChoice`).
+ * `value()`, `sync()` as for the approvals; `setAvailable(false)` hides it for the kind of run that has no goal mode (a
+ * chat).
  */
-export function goalModePicker() {
+export function goalModePicker(kept) {
   function shown() {
     const { status } = getSnapshot();
-    return savedGoalMode() ?? (status !== null && status.goal_mode);
+    return kept.read() ?? (status !== null && status.goal_mode);
   }
   const toggle = el("button", { class: "switch", type: "button", role: "switch", "aria-checked": "false", "aria-label": "Goal mode" });
   const element = pick("Goal mode", toggle);
@@ -135,13 +156,13 @@ export function goalModePicker() {
   }
 
   toggle.addEventListener("click", () => {
-    writePref(GOAL_MODE_KEY, shown() ? "off" : "on");
+    kept.write(!shown());
     paint();
   });
   paint();
   return {
     element,
-    value: savedGoalMode,
+    value: kept.read,
     sync: paint,
     setAvailable: (available) => {
       element.hidden = !available;
