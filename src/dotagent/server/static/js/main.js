@@ -2,6 +2,7 @@
 
 import { loadLooks } from "./actors.js";
 import { ApiError, clearToken, forgetImages, hasToken, loadToken, onAuthLost, setToken } from "./api.js";
+import { loadOwnThemes } from "./appearance/own.js";
 import { applyStoredSettings } from "./appearance/settings.js";
 import { setPageTitle, watchAttention } from "./attention.js";
 import { el } from "./dom.js";
@@ -235,6 +236,7 @@ async function connect() {
   try {
     await refresh();
     await loadLooks();
+    await loadOwnThemes();
   } catch (error) {
     if (error instanceof ApiError && error.status === 401) {
       clearToken();

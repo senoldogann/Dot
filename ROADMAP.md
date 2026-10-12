@@ -5047,8 +5047,8 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 124 | The home's first screen: the composer in the middle, the day folded under it         | done        | 41ec542 |
 | 125 | What the failed runs showed: the journal's day, the snapshot's arguments             | done        | 36c0eeb |
 | 126 | Themes, after T3 Code: a page for the look, a theme for light and one for dark       | done        | c5dfc76 |
-| 127 | The interface, the motion and the type                                               | in progress |         |
-| 128 | Your own themes, kept by the daemon                                                  | planned     |         |
+| 127 | The interface, the motion and the type                                               | done        | 9c73d80 |
+| 128 | Your own themes, kept by the daemon                                                  | in progress |         |
 
 ### 77. The type system: Inter and Geist Mono, seven sizes, three weights
 
@@ -7248,7 +7248,7 @@ theme; the tour is read by eye.
 
 ### 127. The interface, the motion and the type
 
-**Status: in progress.**
+**Status: done.** Merged as `9c73d80` (PR #158, MYP-268 Done).
 
 **As built (2026-10-12).** The tab's Layout card became **Interface** (the contrast, the chat's width, the density, the
 two layout switches and their note), **Motion** gained the panels' slide, and **Type** follows them. Each setting is one
@@ -7292,7 +7292,45 @@ read by eye.
 
 ### 128. Your own themes, kept by the daemon
 
-**Status: planned.**
+**Status: in progress.**
+
+**As built (2026-10-12).** The daemon keeps the themes in `<home>/themes` (`core/paths.py themes_dir`), which
+`ensure_layout` leaves alone: the first theme saved makes it, mode 0700. `dotagent/themes.py` checks a theme file as T3
+Code's `themePalette.ts` and `environmentTheme.ts` do: version 1 or T3 Code's short form (a name, an appearance, a
+canvas and an accent in hex), a name of 1 to 48 UTF-16 units, T3 Code's 61 roles and no other key, colours in the
+grammar of `colour.js parseColour` (hex of 3, 4, 6 or 8 digits, `rgb()`, `oklch()`, `transparent`), a variant only for
+the other appearance, and an id, the file's name, of lowercase letters, digits and dashes that no theme of Dot's or T3
+Code's has. A file is opened with `O_NOFOLLOW | O_NONBLOCK` and weighed with `fstat`, so a link, a pipe or a folder is
+skipped, as are a file over 32 KB, the files past the 32nd and the ones past 192 KB in all; each is listed with its
+reason and logged as `theme_skipped`. A theme is written whole, through a temporary file and `os.replace`, one change of
+the folder at a time so that the caps are weighed against what is there. `server/routes_themes.py` serves `GET
+/api/themes` (the folder, its themes and the files skipped), `PUT` and `DELETE /api/themes/{id}`; a theme goes out with
+the keys it has only, since FastAPI wrote the missing ones as `null` and the page refused the themes it had just saved
+(the smoke test found it). On the page, `appearance/generator.js` ports T3 Code's generator: the 61 roles from a canvas
+and an accent, and a family of colours changed with the ones made with it (`withFamily`). `appearance/own.js` reads a
+theme file as the daemon does, fills the roles a theme leaves out from T3 Chat's palette as T3 Code does, lays an alpha
+over the canvas and maps the roles onto Dot's tokens through item 126's `paletteTokens`, so a theme of one's own holds
+Dot's rule as the built-ins do; `appearance/vscode.js` maps a VS Code colour theme's workbench colours as T3 Code's
+`vscodeThemeImport.ts` does. `theme.js` holds the themes of one's own beside the built-ins: until the daemon's list
+arrives a pick it does not know is pending and the values `boot.js` wrote stay; a theme deleted gives its schemes back
+to Neutral; and while the editor is open the page wears the palette being changed (`previewTokens`,
+`data-theme="draft"`) and the scheme's controls wait. The editor (`views/themeEditor.js`) has T3 Code's Background and
+Accent, an **Action** field of Dot's and, in a fold, the families (Sidebar, Surface, Highlight surface, Border, Input
+border, Text, Muted text, Message surface, Error and Warning), beside a sample of the chat. T3 Code's generator turns
+the action colour 50° of hue away from the accent, which painted Dot's buttons purple under a blue accent, so the action
+is set on its own and kept when the palette is made again. Create starts from the palettes of the themes in use, as T3
+Code's does; `managed` (the generator's alone, as T3 Code marks it) is written only when no palette was changed by hand;
+Duplicate reads a look's colours back from its tokens; Export downloads `<id>.json` with the derived colours written
+out; Add theme takes a file of 2 MB at most and gives the theme a free id. A card carries Duplicate, and on a theme of
+one's own Edit, Export and Delete, shown on hover where there is one; the folder's path and the files skipped sit under
+the gallery, the path broken anywhere, since on a phone it pushed the page 530 px wide. `static/js/appearance/LICENSE`
+names the new ports. `tests/unit/test_theme_folder.py` (19 tests) reads both forms, refuses fourteen kinds of file,
+saves, replaces and deletes, holds the three caps, lists a folder with a link, a folder, a broken file and a note in it,
+and checks that `generator.js` and `themes.py` name the same 61 roles. `tests/smoke/test_own_themes.py` makes a theme in
+both schemes in the editor, saves it and reads the file the daemon wrote, holds it to Dot's rule in both schemes,
+reloads with only `boot.js`, exports it, adds a VS Code theme, a short form and a file of another version, duplicates
+Grove and deletes the copy, reads a file put in the folder by hand and one that does not parse, and checks a phone's
+width. Export in the desktop app is not tried: its web view has no handler for a download.
 
 **What.** **Create theme** makes a theme from a background and an accent, the rest derived by T3 Code's generator,
 ported and held to Dot's thresholds, with an advanced view for the families of colours; **Duplicate** copies any theme
@@ -7862,3 +7900,4 @@ smoke test creates, picks, reloads, exports, imports a VS Code theme and deletes
 - 2026-10-12 (Opus 5.5): the rule drafter's fix merged as `8090ebc` (PR #154, under item 110, MYP-266 Done): the owner's sentence "Dot can run everything without permission from me" drafts a rule for every tool instead of a refusal in Spanish, and a sentence no rule can be made of is answered in English, with no note about a broad rule taken for a refusal; a hosted test on the owner's review model, 907 unit tests and the Rules page's smoke tests.
 - 2026-10-12 (Opus 5.5): part 19 planned, items 126 to 128, from the owner's word with three screenshots of T3 Code's Settings › Appearance and a reading of T3 Code's source (MIT): the page, its themes with a theme per scheme, its interface, motion and type settings, and themes of one's own kept by the daemon; no code changed.
 - 2026-10-12 (Opus 5.5): item 126 merged as `c5dfc76` (PR #157, MYP-267 Done): Settings › Appearance holds the colour scheme as three miniatures of the window and the themes as a gallery with a light and a dark orb each, after T3 Code's page; T3 Code's six palettes are ported and mapped onto Dot's tokens, every theme held to Dot's contrast rule in both schemes as the browser paints it (a dark card a palette draws on the page is lifted a step above it); a theme per scheme rides on the page element as `light-dark()` pairs and is there before the first paint; ⌥⌘A opens the tab and ⇧⌥⌘A steps through the schemes.
+- 2026-10-12 (Opus 5.5): item 127 merged as `9c73d80` (PR #158, MYP-268 Done): Settings › Appearance gains Interface (the contrast, 50 to 200 %, mixed as T3 Code mixes it; the chat's width; the density and the two layout switches), Motion (the panels' slide, 0 to 400 ms, and the faces that move) and Type (the interface's font and size, the answers', the composer's and the code's fonts and sizes with a preview each, font smoothing and wrapped code); every setting is kept in the browser and put on the page by `boot.js` before the first paint, nothing when it is the default; a range control joins `#/controls`; 907 unit tests and a smoke test that sets each one and reads it on the page and after a reload.

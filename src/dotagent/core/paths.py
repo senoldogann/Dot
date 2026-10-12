@@ -95,6 +95,12 @@ def playbooks_dir() -> Path:
     return dot_home() / "playbooks"
 
 
+def themes_dir() -> Path:
+    """Where the themes of one's own are kept: one ``<id>.json`` file of T3 Code's theme format per theme, made with the
+    first theme saved (item 128)."""
+    return dot_home() / "themes"
+
+
 def plugins_dir() -> Path:
     """Where the user's plugins live: one folder per plugin in the Claude Code layout."""
     return dot_home() / "plugins"

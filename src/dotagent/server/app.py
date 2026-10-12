@@ -33,6 +33,7 @@ from dotagent.server.routes_data import memories_router, rules_router, schedules
 from dotagent.server.routes_keys import keys_router
 from dotagent.server.routes_runs import runs_router
 from dotagent.server.routes_system import health_router, system_router
+from dotagent.server.routes_themes import themes_router
 from dotagent.server.routes_threads import threads_router
 from dotagent.server.views import ErrorView
 
@@ -83,6 +84,7 @@ def create_app(ctx: ServerContext) -> FastAPI:
     app.include_router(agents_router(ctx))
     app.include_router(browser_router(ctx))
     app.include_router(keys_router(ctx))
+    app.include_router(themes_router())
 
     @app.exception_handler(DotError)
     async def dot_error(request: Request, exc: DotError) -> JSONResponse:

@@ -757,6 +757,107 @@
   transform: scale(1.1);
 }
 
+/* A card's own buttons (item 128): Duplicate on every theme, and Edit, Export and Delete on one's own. They sit over the
+   card's button as the orbs do, and where a pointer can hover they come into sight with it, or with the focus. */
+.theme-card-actions {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  gap: var(--space-1);
+  pointer-events: none;
+}
+
+.theme-card-actions .btn {
+  pointer-events: auto;
+}
+
+@media (hover: hover) {
+  .theme-card-actions {
+    opacity: 0;
+    transition: opacity var(--motion-quick) var(--ease);
+  }
+
+  .theme-card:hover .theme-card-actions,
+  .theme-card:focus-within .theme-card-actions {
+    opacity: 1;
+  }
+}
+
+/* The folder of the themes, and the files of it the daemon left out, each with the reason: a path breaks anywhere
+   rather than push the page wider than a phone. */
+.theme-folder-path {
+  overflow-wrap: anywhere;
+}
+
+.theme-skipped {
+  margin: 0;
+  padding-left: var(--space-4);
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+
+/* The editor of a theme (item 128): the fields, and beside them a sample of what Dot draws, which stays in sight. */
+.theme-editor {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: var(--space-5);
+  align-items: start;
+}
+
+.colour-field {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.swatch {
+  flex: none;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  cursor: pointer;
+}
+
+.swatch::-webkit-color-swatch-wrapper {
+  padding: 0;
+}
+
+.swatch::-webkit-color-swatch {
+  border: 0;
+  border-radius: var(--radius-sm);
+}
+
+.swatch::-moz-color-swatch {
+  border: 0;
+  border-radius: var(--radius-sm);
+}
+
+.input.hex {
+  flex: none;
+  width: 11ch;
+  font-family: var(--mono);
+}
+
+.theme-sample {
+  position: sticky;
+  top: var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg);
+  color: var(--text);
+}
+
+.alert-line {
+  color: var(--bad);
+}
+
 @media (max-width: 720px) {
   .scheme-cards {
     gap: var(--space-2);
@@ -764,6 +865,14 @@
 
   .theme-gallery {
     grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  }
+
+  .theme-editor {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .theme-sample {
+    position: static;
   }
 }
 

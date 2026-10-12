@@ -1,9 +1,13 @@
 Parts of the modules of this folder are a port of T3 Code (https://github.com/pingdotgg/t3code, version 0.0.45 of its
 web app) to plain ES modules, under its licence below: the colour arithmetic of colour.js (apps/web/src/themePalette.ts),
 the palettes of palettes.js (packages/shared/src/themePalettes.ts), the drawing of a theme's orb in orbs.js
-(apps/web/src/components/settings/ThemePreviewCircles.tsx, packages/shared/src/themePreview.ts), and the contrast and
+(apps/web/src/components/settings/ThemePreviewCircles.tsx, packages/shared/src/themePreview.ts), the contrast and
 the families typed of settings.js (apps/web/src/appearanceContrast.ts, apps/web/src/appearanceFonts.ts) with the mixing
-of the contrast in ../../css/themes.css (apps/web/src/index.css). Dot is not affiliated with, endorsed by or connected
+of the contrast in ../../css/themes.css (apps/web/src/index.css), the palette generator and the families of colours of
+generator.js (apps/web/src/themePalette.ts, apps/web/src/components/settings/ThemeEditorPanel.tsx), the reading of a
+VS Code colour theme in vscode.js (apps/web/src/vscodeThemeImport.ts), and the theme file own.js reads and writes
+(apps/web/src/themePalette.ts, packages/contracts/src/server.ts), whose checks and caps the daemon's
+dotagent/themes.py follows (apps/server/src/environmentTheme.ts). Dot is not affiliated with, endorsed by or connected
 to T3 Tools Inc.; "T3 Code" and "T3 Chat" belong to their owner, and Dot names the two palettes that carry those names
 Clean and Rose.
 

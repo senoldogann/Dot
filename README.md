@@ -1003,7 +1003,18 @@ T3 Code paints its solid controls with, is Dot's accent) and held to the rule of
 that would read under its ratio is moved in lightness until it reads, and in dark a card lies a step above the page; a
 browser test measures every theme in both schemes as the page paints it. The two picks are written on the page as
 `light-dark()` pairs (nothing when one look is picked for both) and kept with the picks, so the first paint after a
-reload already wears them. **Interface**: **Contrast**, 50 to 200 % (100, the theme's own, by default): under 100 the
+reload already wears them. Themes of your own join the gallery: **Create theme** starts from the themes in use for light
+and dark, **Duplicate** (on a card, as Edit, Export and Delete are on one of your own) copies any theme, **Export**
+saves one as T3 Code's theme file, and **Delete** asks first and gives a scheme it was picked for back to Neutral. The
+editor takes a name and, for each scheme the theme has, the **Background** and the **Accent** its palette is made from,
+as T3 Code's generator makes one, and the **Action** colour Dot paints its buttons, switches and send button with (the
+generator turns it away from the accent, so Dot lets you set it); **Colour families** change one colour, and the ones
+made with it, at a time. The page wears the palette while you change it. **Add theme** reads a file: T3 Code's theme
+file (version 1, or the short form of a name, an appearance, a canvas and an accent) or a VS Code colour theme, mapped
+as T3 Code maps one. The daemon keeps them, one theme file each, in its home's `themes` folder (made with the first
+theme saved; 32 themes, 32 KB a file and 192 KB in all at most), so every browser has them; a file put there by hand
+shows after a reload, one Dot cannot read is listed under the gallery with the reason, and a colour a theme leaves out
+is T3 Chat's, as in T3 Code. **Interface**: **Contrast**, 50 to 200 % (100, the theme's own, by default): under 100 the
 text tiers and the lines fade toward the page, over it they move toward black in light and white in dark, the lines a
 quarter as far, as T3 Code mixes them; **Chat width**, how wide the home and a conversation read (Comfortable, 768 px,
 the default; Wide, 1152 px; Full); **Density**, how close the rows, cards and lists sit (comfortable or compact); and
@@ -1016,10 +1027,11 @@ which is a serif in Paper, the interface's, or a serif); the composer's font (th
 families typed) and size (12 to 20 px, 15 by default); the code's font (Geist Mono, SF Mono, Menlo, or families typed)
 and the size of an answer's code blocks (10 to 18 px, 13 by default), each with a line of preview; font smoothing (on)
 and long lines of code wrapped (off). The choices are kept in the browser only, and `boot.js` puts each of them on the
-page before the first paint. The palettes, the colour arithmetic, the orbs, the contrast's mixing and the families typed
-are a port of T3 Code (github.com/pingdotgg/t3code, MIT, T3 Tools Inc.) to plain ES modules
-(`static/js/appearance/LICENSE`); Dot is not affiliated with T3 Tools Inc. The looks are one visual system. Colour:
-every colour is a token of `themes.css` naming its light and its dark value in one place;
+page before the first paint. The palettes, the colour arithmetic, the orbs, the contrast's mixing, the families typed,
+the theme generator, the theme file with its checks and the VS Code import are a port of T3 Code
+(github.com/pingdotgg/t3code, MIT, T3 Tools Inc.) to plain ES modules (`static/js/appearance/LICENSE`); Dot is not
+affiliated with T3 Tools Inc. The looks are one visual system. Colour: every colour is a token of `themes.css` naming
+its light and its dark value in one place;
 surfaces step up by lightness (page, sunken sidebar, raised cards) rather than by shadow in dark; borders are the text
 colour at a small alpha so they sit on every surface; the text tiers are measured against every surface by a unit
 test (4.5:1 for text and its second tier, 3:1 for the muted and faint ones); the yellow is the owner's bubbles. Type:
@@ -1666,6 +1678,7 @@ things: `DOT_HOME` (the home directory) and `DOT_LOG_DIR` (the logs).
 | `api-token`                                      | the bearer token of the web UI and the API (mode 0600)               |
 | `workspace/`                                     | the working directory of the shell and the file tools                |
 | `skills/`, `plugins/`                            | skills and plugins Dot always reads (more via `[skills]`/`[plugins]` dirs) |
+| `themes/`                                        | your own themes, one T3 Code theme file each (Settings › Appearance) |
 | `browser-profile/`                               | the Chrome profile of the browser tools                              |
 | `screenshots/`, `downloads/`                     | what the tools capture and download                                  |
 | `undo/`                                          | journals of the file changes of runs, for `dotx undo`                |

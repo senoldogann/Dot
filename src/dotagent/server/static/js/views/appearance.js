@@ -2,9 +2,21 @@
 // drawn on the tokens of the scheme it names (System split down the middle), and the themes as a gallery of cards with
 // a light and a dark orb each, the card taking the theme for both schemes and an orb for its own; then the interface,
 // the motion and the type (item 127), the density, the layout and the faces among them, which General held before.
+// Themes of one's own (item 128) are made, copied, changed, exported, deleted and added from a file here; while one is
+// being made the Themes card holds its editor and the other cards step aside.
 
 import { facesMove, setFacesMove } from "../actors.js";
 import { orb } from "../appearance/orbs.js";
+import {
+  copiedRoles,
+  deleteOwnTheme,
+  exportedText,
+  freeId,
+  idFromName,
+  importedFile,
+  saveOwnTheme,
+  themeFolder,
+} from "../appearance/own.js";
 import {
   ANSWER_FONT,
   CHAT_WIDTH,
@@ -38,18 +50,25 @@ import {
 import { paneHead, rangeSetting, segmented, switchSetting } from "../panels.js";
 import {
   SCHEMES,
-  THEMES,
+  allThemes,
   chooseScheme,
   chooseTheme,
   chooseThemeFor,
   currentScheme,
+  findTheme,
   onSchemeChange,
   onThemeChange,
+  onThemesChange,
   themeInUse,
   themePicks,
 } from "../theme.js";
+import { attempt, confirmDialog, toast } from "../ui.js";
+import { themeEditor } from "./themeEditor.js";
 
 const REDUCED_MOTION = window.matchMedia("(prefers-reduced-motion: reduce)");
+const NAME_UNITS = 48;
+// A file larger than this is no theme, whatever it holds (a VS Code theme with its token colours runs to tens of KB).
+const MOST_FILE_BYTES = 2 * 1024 * 1024;
 
 function section(title, body) {
   const head = el("div", { class: "card-head" }, el("span", { class: "grow" }, title));
@@ -99,8 +118,20 @@ function schemeCards() {
   return { element, dispose: onSchemeChange(paint) };
 }
 
-/** A theme's card: a button over the whole card for both schemes, and an orb for each scheme on its own. */
-function themeCard(theme) {
+// Take a theme for every scheme it has: both, or the one it was made for.
+function pick(theme) {
+  if (theme.schemes.length === 2) {
+    chooseTheme(theme.id);
+  } else {
+    chooseThemeFor(theme.schemes[0], theme.id);
+  }
+}
+
+/**
+ * A theme's card: a button over the whole card for every scheme the theme has, an orb for each scheme on its own, and
+ * the card's own buttons (`handlers`: duplicate for every theme, edit, export and remove for one's own).
+ */
+function themeCard(theme, handlers) {
   const orbButton = (scheme) =>
     el(
       "button",
@@ -115,50 +146,266 @@ function themeCard(theme) {
       orb(theme.orb(scheme), scheme),
       el("span", { class: "theme-orb-badge", "aria-hidden": "true" }, icon(scheme === "light" ? "sun" : "moon")),
     );
-  const light = orbButton("light");
-  const dark = orbButton("dark");
+  const orbs = new Map(theme.schemes.map((scheme) => [scheme, orbButton(scheme)]));
+  const whole = theme.schemes.length === 2 ? "light and dark" : theme.schemes[0];
   const both = el("button", {
     class: "theme-card-pick",
     type: "button",
-    "aria-label": `Use ${theme.label} for light and dark`,
+    "aria-label": `Use ${theme.label} for ${whole}`,
     title: theme.hint,
-    onclick: () => chooseTheme(theme.id),
+    onclick: () => pick(theme),
   });
+  const action = (name, label, run) =>
+    el(
+      "button",
+      {
+        class: "btn ghost sm icon-only",
+        type: "button",
+        title: label,
+        "aria-label": `${label} ${theme.label}`,
+        "data-action": name,
+        onclick: () => attempt(run),
+      },
+      icon(name),
+    );
   const element = el(
     "div",
-    { class: "theme-card", "data-theme-card": theme.id },
+    { class: "theme-card", "data-theme-card": theme.id, "data-own": theme.own ? "" : null },
     both,
-    el("div", { class: "theme-orbs" }, light, dark),
+    el("div", { class: "theme-orbs" }, ...orbs.values()),
     el("div", { class: "theme-card-name" }, theme.label),
+    el(
+      "div",
+      { class: "theme-card-actions" },
+      action("copy", "Duplicate", () => handlers.duplicate(theme)),
+      theme.own ? action("pencil", "Edit", () => handlers.edit(theme)) : null,
+      theme.own ? action("download", "Export", () => handlers.exportTheme(theme)) : null,
+      theme.own ? action("trash", "Delete", () => handlers.remove(theme)) : null,
+    ),
   );
   function paint(picks) {
-    light.setAttribute("aria-pressed", String(picks.light === theme.id));
-    dark.setAttribute("aria-pressed", String(picks.dark === theme.id));
-    both.setAttribute("aria-pressed", String(picks.light === theme.id && picks.dark === theme.id));
+    for (const [scheme, button] of orbs) {
+      button.setAttribute("aria-pressed", String(picks[scheme] === theme.id));
+    }
+    both.setAttribute("aria-pressed", String(theme.schemes.every((scheme) => picks[scheme] === theme.id)));
     element.toggleAttribute("data-in-use", picks.light === theme.id || picks.dark === theme.id);
   }
   return { element, paint };
 }
 
-function themeGallery() {
-  const cards = THEMES.map(themeCard);
-  const paint = (picks) => {
+// Hand a theme's file to the browser to download as `<id>.json`.
+function download(theme) {
+  const url = URL.createObjectURL(new Blob([exportedText(theme)], { type: "application/json" }));
+  const link = el("a", { href: url, download: `${theme.id}.json`, hidden: true });
+  document.body.append(link);
+  link.click();
+  link.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+// The editor's start from the theme of each scheme (`sources`, a theme or null): its palette copied, and the action
+// colour set by hand, none for a palette the generator made alone, else the palette's own, so that a new background
+// or accent keeps it.
+function startingPoint(sources) {
+  const palettes = { light: null, dark: null };
+  const actions = { light: null, dark: null };
+  const tuned = { light: false, dark: false };
+  for (const scheme of ["light", "dark"]) {
+    const theme = sources[scheme];
+    if (theme !== null) {
+      const generated = theme.own && theme.file.managed === true;
+      palettes[scheme] = copiedRoles(theme, scheme);
+      actions[scheme] = generated ? null : palettes[scheme].messageAction;
+      tuned[scheme] = !generated;
+    }
+  }
+  return { palettes, actions, tuned };
+}
+
+// The start of a copy of `theme`: its palettes, for the schemes it has.
+function copyOf(theme) {
+  const has = (scheme) => (theme.schemes.includes(scheme) ? theme : null);
+  return startingPoint({ light: has("light"), dark: has("dark") });
+}
+
+/**
+ * The themes: the gallery of Dot's and one's own, and the making of one's own. `onEditing(editing)` is told when the
+ * editor opens and closes, so that the other cards step aside while a theme is drawn on the page.
+ */
+function themesCard(onEditing) {
+  const title = el("span", { class: "grow" }, "Themes");
+  const create = el(
+    "button",
+    { class: "btn sm", type: "button", "data-action": "create", title: "Create theme", "aria-label": "Create theme" },
+    icon("plus"),
+    el("span", { class: "label" }, "Create theme"),
+  );
+  const add = el(
+    "button",
+    { class: "btn sm", type: "button", "data-action": "add", title: "Add theme", "aria-label": "Add theme" },
+    icon("upload"),
+    el("span", { class: "label" }, "Add theme"),
+  );
+  const chooser = el("input", { type: "file", accept: ".json,application/json", hidden: true, "aria-label": "Theme file" });
+  const body = el("div", { class: "card-pad stack" });
+  const element = el(
+    "section",
+    { class: "card", "data-card": "themes" },
+    el("div", { class: "card-head" }, title, create, add, chooser),
+    body,
+  );
+  let cards = [];
+  let editor = null;
+
+  function paintPicks(picks) {
     for (const card of cards) {
       card.paint(picks);
     }
+  }
+
+  function showGallery() {
+    cards = allThemes().map((theme) => themeCard(theme, { duplicate, edit, exportTheme: download, remove }));
+    const { path, skipped } = themeFolder();
+    // replaceChildren() writes a null as the word; el() leaves it out.
+    body.replaceChildren(
+      el(
+        "div",
+        { class: "hint" },
+        "A card takes its theme for light and dark; an orb, for its own scheme only. Clean is T3 Code's own look and Rose T3 Chat's; Grove, Ocean, Ember and Iris are T3 Code's palettes.",
+      ),
+      el("div", { class: "theme-gallery" }, ...cards.map((card) => card.element)),
+      el(
+        "div",
+        { class: "hint", "data-theme-folder": "" },
+        "Themes of your own are kept by Dot in ",
+        el("code", { class: "mono theme-folder-path" }, path),
+        ", for every browser and the app; a theme file put there shows here.",
+      ),
+      ...(skipped.length === 0
+        ? []
+        : [
+            el(
+              "ul",
+              { class: "theme-skipped hint", "aria-label": "Files left out of the themes folder" },
+              ...skipped.map((entry) => el("li", null, el("code", null, entry.file), `: ${entry.reason}`)),
+            ),
+          ]),
+    );
+    paintPicks(themePicks());
+  }
+
+  function closeEditor() {
+    editor.close();
+    editor = null;
+    title.textContent = "Themes";
+    create.hidden = false;
+    add.hidden = false;
+    onEditing(false);
+    showGallery();
+  }
+
+  // `id` is the theme changed, or null for a new one, which is picked once it is saved.
+  function openEditor({ heading, id, name, start, keep }) {
+    editor = themeEditor({
+      name,
+      palettes: start.palettes,
+      actions: start.actions,
+      tuned: start.tuned,
+      async onSave({ name: named, palettes, managed }) {
+        const target = id ?? freeId(idFromName(named));
+        const base = palettes.light !== null ? "light" : "dark";
+        const other = base === "light" ? "dark" : "light";
+        const file = { version: 1, id: target, name: named, appearance: base, colors: palettes[base] };
+        if (palettes[other] !== null) {
+          file.variants = { [other]: palettes[other] };
+        }
+        await saveOwnTheme(target, { ...file, ...keep, ...(managed ? { managed: true } : {}) });
+        closeEditor();
+        if (id === null) {
+          pick(findTheme(target));
+        }
+        toast("ok", `${named} saved.`);
+      },
+      onCancel: closeEditor,
+    });
+    title.textContent = heading;
+    create.hidden = true;
+    add.hidden = true;
+    body.replaceChildren(editor.element);
+    onEditing(true);
+    element.scrollIntoView({ block: "nearest" });
+    editor.focus();
+  }
+
+  // A new theme starts as the page is drawn now, from the theme picked for each scheme, as T3 Code's does, so that
+  // tuning what is in use is a change away; a new background or accent makes it the generator's.
+  function createTheme() {
+    const picks = themePicks();
+    const start = startingPoint({ light: findTheme(picks.light), dark: findTheme(picks.dark) });
+    openEditor({ heading: "New theme", id: null, name: "", start, keep: {} });
+  }
+
+  function duplicate(theme) {
+    const name = `${theme.label} copy`.slice(0, NAME_UNITS);
+    openEditor({ heading: `Copy of ${theme.label}`, id: null, name, start: copyOf(theme), keep: {} });
+  }
+
+  function edit(theme) {
+    const keep = theme.file.collection === undefined ? {} : { collection: theme.file.collection };
+    openEditor({ heading: `Edit ${theme.label}`, id: theme.id, name: theme.label, start: copyOf(theme), keep });
+  }
+
+  async function remove(theme) {
+    const confirmed = await confirmDialog({
+      title: `Delete ${theme.label}?`,
+      message: "Its file goes from Dot's themes folder, for every browser and the app; where it is in use, Neutral takes its place.",
+      confirmLabel: "Delete",
+      danger: true,
+      focusCancel: true,
+    });
+    if (confirmed) {
+      await deleteOwnTheme(theme.id);
+      toast("ok", `${theme.label} deleted.`);
+    }
+  }
+
+  // A file the owner adds: T3 Code's theme file or its short form, or a VS Code colour theme, kept as a theme.
+  async function addFrom(file) {
+    if (file.size > MOST_FILE_BYTES) {
+      throw new Error(`${file.name} is larger than a theme file can be.`);
+    }
+    const theme = importedFile(await file.text());
+    const id = freeId(theme.id ?? idFromName(theme.name));
+    await saveOwnTheme(id, { ...theme, id });
+    toast("ok", `${theme.name} added.`);
+  }
+
+  create.addEventListener("click", createTheme);
+  add.addEventListener("click", () => chooser.click());
+  chooser.addEventListener("change", () => {
+    const [file] = chooser.files;
+    chooser.value = "";
+    if (file !== undefined) {
+      attempt(() => addFrom(file));
+    }
+  });
+  showGallery();
+  const stopPicks = onThemeChange(paintPicks);
+  const stopList = onThemesChange(() => {
+    if (editor === null) {
+      showGallery();
+    }
+  });
+  return {
+    element,
+    dispose() {
+      stopPicks();
+      stopList();
+      if (editor !== null) {
+        editor.close();
+      }
+    },
   };
-  paint(themePicks());
-  const element = el(
-    "div",
-    { class: "card-pad stack" },
-    el(
-      "div",
-      { class: "hint" },
-      "A card takes its theme for light and dark; an orb, for its own scheme only. Clean is T3 Code's own look and Rose T3 Chat's; Grove, Ocean, Ember and Iris are T3 Code's palettes.",
-    ),
-    el("div", { class: "theme-gallery" }, ...cards.map((card) => card.element)),
-  );
-  return { element, dispose: onThemeChange(paint) };
 }
 
 // The value of "Another family…" in a family's menu, which no stack has.
@@ -499,20 +746,28 @@ function typeCard() {
 /** Draw the Appearance tab into `root`. Returns the function that stops its listeners. */
 export function mount(root) {
   const schemes = schemeCards();
-  const gallery = themeGallery();
   const look = interfaceCard();
   const motion = motionCard();
-  root.append(
-    paneHead("How Dot looks in this browser: the colour scheme, a theme for light and one for dark, the interface, the motion and the type. Kept in this browser.", null),
+  const others = [
     section("Colour scheme", el("div", { class: "card-pad" }, schemes.element)),
-    section("Themes", gallery.element),
     look.element,
     motion.element,
     typeCard().element,
+  ];
+  const themes = themesCard((editing) => {
+    for (const card of others) {
+      card.hidden = editing;
+    }
+  });
+  root.append(
+    paneHead("How Dot looks in this browser: the colour scheme, a theme for light and one for dark, the interface, the motion and the type. Themes of your own are kept by Dot, for every browser.", null),
+    others[0],
+    themes.element,
+    ...others.slice(1),
   );
   return () => {
     schemes.dispose();
-    gallery.dispose();
+    themes.dispose();
     look.dispose();
     motion.dispose();
   };
