@@ -317,7 +317,7 @@ def _act_tool() -> RegisteredTool:
         contexts: tuple[StepContext, ...] = await ctx.runtime.desktop.preview(ctx.thread_id, args.app, steps)
         assessment: StepAssessment = combine_assessments(
             [
-                assess_step(step, context, ctx.workspace, ctx.runtime.protected)
+                assess_step(step, context, ctx.workspace, ctx.runtime.protected, ctx.runtime.dot_paths)
                 for step, context in zip(steps, contexts, strict=True)
             ]
         )
@@ -330,7 +330,7 @@ def _act_tool() -> RegisteredTool:
     async def run(args: ActArgs, ctx: ToolContext, authorized: ActionInfo) -> ToolResult:
         async def review(step_review: StepReview) -> None:
             live: StepAssessment = assess_step(
-                step_review.step, step_review.context, ctx.workspace, ctx.runtime.protected
+                step_review.step, step_review.context, ctx.workspace, ctx.runtime.protected, ctx.runtime.dot_paths
             )
             kind: ActionKind = _step_kind(step_review.step, step_review.context)
             reaches_shell: bool = kind == "shell" and authorized.kind != "shell"

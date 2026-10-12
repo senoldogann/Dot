@@ -23,7 +23,10 @@ from dotagent.core.paths import (
     ensure_layout,
     env_file_path,
     failsafe_path,
+    playbooks_dir,
+    plugins_data_dir,
     screenshots_dir,
+    skills_dir,
     token_path,
     undo_dir,
     vapid_path,
@@ -36,7 +39,7 @@ from dotagent.llm.router import ModelRouter
 from dotagent.mcp.hub import McpHub, open_hub
 from dotagent.memory.service import MemoryIndex, close_memory_index, open_memory_index
 from dotagent.notify.push import PushKeys, read_or_create_keys
-from dotagent.plugins.catalog import load_plugins
+from dotagent.plugins.catalog import load_plugins, plugin_roots
 from dotagent.plugins.types import PluginCatalog
 from dotagent.policy.paths import expand_protected
 from dotagent.scheduler.timing import resolve_zone
@@ -96,6 +99,8 @@ class Runtime:
     registry: ToolRegistry
     plugins: PluginCatalog
     protected: tuple[Path, ...]
+    # What the agent may read but never change (:func:`_dot_paths`).
+    dot_paths: tuple[Path, ...]
     shell_env: dict[str, str]
     # The web push key pair the daemon signs with (item 52).
     push_keys: PushKeys
@@ -151,6 +156,20 @@ def _guarded_files() -> tuple[Path, ...]:
     )
 
 
+def _dot_paths(config: AppConfig) -> tuple[Path, ...]:
+    """What Dot loads and runs, which the agent may read (a skill's files are read and run by path) but never change:
+    its plugins and their own files, whose MCP servers start with the daemon and are given keys from the key store, its
+    skills and the playbooks it learned, which shape later runs, and the file of its emergency stop."""
+    return (
+        *plugin_roots(config.plugins),
+        plugins_data_dir(),
+        skills_dir(),
+        *(Path(entry).expanduser() for entry in config.skills.dirs),
+        playbooks_dir(),
+        failsafe_path(),
+    )
+
+
 def _call_recorder(store: Store, bus: EventBus) -> CallRecorder:
     """What becomes of a measured model call: its tokens join the totals of its run, which gets a ``model_call`` event;
     a call outside any run is logged."""
@@ -192,6 +211,7 @@ async def open_runtime(config: AppConfig, login_env: dict[str, str]) -> Runtime:
     protected: tuple[Path, ...] = await asyncio.to_thread(
         expand_protected, config.policy.protected_paths, _guarded_files()
     )
+    dot_paths: tuple[Path, ...] = await asyncio.to_thread(expand_protected, [], _dot_paths(config))
     schedule_zone: ZoneInfo = await asyncio.to_thread(resolve_zone, config.scheduler.timezone)
     shell_env: dict[str, str] = child_env(login_env, config.shell.pass_env)
     ollama_key: str | None = await asyncio.to_thread(resolve_secret, config.providers.ollama.api_key_env)
@@ -215,7 +235,7 @@ async def open_runtime(config: AppConfig, login_env: dict[str, str]) -> Runtime:
             if typesafe_key is not None or config.judge.provider == "typesafe"
             else None
         )
-        browsers: BrowserPool = BrowserPool(config.browser, downloads_dir())
+        browsers: BrowserPool = BrowserPool(config.browser, config.server, downloads_dir())
         runtime: Runtime = Runtime(
             config=config,
             store=store,
@@ -236,6 +256,7 @@ async def open_runtime(config: AppConfig, login_env: dict[str, str]) -> Runtime:
             registry=registry,
             plugins=plugins,
             protected=protected,
+            dot_paths=dot_paths,
             push_keys=push_keys,
             shell_env=shell_env,
             workspace=workspace_dir(),

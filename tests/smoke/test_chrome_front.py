@@ -2,7 +2,8 @@
 drives the pages of a local fixture server while Finder is in front: a thread's tab, a second thread's tab and a quiet
 read are opened in the background and leave the front where it was; a tab the page opens itself takes the front by
 Chrome's own doing, and Dot gives it back. The front is read with ``lsappinfo``, which needs no permission; giving it
-back needs accessibility, so that test is skipped without it. macOS only."""
+back needs accessibility, so that test is skipped without it. It changes what is in front of the screen, so it is
+marked ``desktop`` as well and stays out of a run that leaves the screen alone. macOS only."""
 
 import asyncio
 import re
@@ -19,15 +20,18 @@ import pytest_asyncio
 from dotagent.browser.safety import refuse_secret_field
 from dotagent.browser.session import BrowserSession
 from dotagent.browser.types import PageView, Step
-from dotagent.config import BrowserConfig, load_config
+from dotagent.config import BrowserConfig, ServerConfig, load_config, load_default_config
 from dotagent.desktop.perms import check_permissions
 
 pytestmark = [
     pytest.mark.browser,
+    pytest.mark.desktop,
     pytest.mark.asyncio(loop_scope="module"),
     pytest.mark.skipif(sys.platform != "darwin", reason="the front of the Mac"),
 ]
 
+# Whose interface the browser never opens: the daemon's default address.
+SERVER: ServerConfig = load_default_config().server
 _PAGE: bytes = (
     b"<!doctype html><title>Front</title><h1>Front</h1><a href='/other' target='_blank'>Open the other page</a>"
 )
@@ -116,7 +120,7 @@ async def browser(
     config: BrowserConfig, tmp_path_factory: pytest.TempPathFactory, site: str
 ) -> AsyncIterator[BrowserSession]:
     session: BrowserSession = BrowserSession(
-        config, tmp_path_factory.mktemp("profile"), tmp_path_factory.mktemp("downloads")
+        config, SERVER, tmp_path_factory.mktemp("profile"), tmp_path_factory.mktemp("downloads")
     )
     # The start takes the front once (macOS starts an application in front) and gives it back; it is item 97's.
     await session.open_url("first", site)

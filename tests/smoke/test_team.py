@@ -1,7 +1,8 @@
 """The team (item 87) through the real loop and the API: a run of Dot's sends an agent a message with message_agent,
 the agent answers in a run of its own (its voice, its tools, the team source), the reply comes back as the tool's
 result, the Team page and the agent's page show the exchange, and the delegated row in Dot's chat wears the agent's
-face. No network and no model service: the scripted model plays both runs.
+face. An agent answers in the stricter of its own approvals and the sender's (item 135). No network and no model
+service: the scripted model plays both runs.
 """
 
 import asyncio
@@ -235,3 +236,37 @@ async def test_a_run_messages_an_agent_and_reads_its_reply_and_the_team_page_sho
             await context.close()
         finally:
             await browser.close()
+
+
+async def test_an_agent_that_runs_yolo_answers_a_run_that_asks_by_asking(
+    runtime: Runtime, manager: RunManager, client: httpx.AsyncClient
+) -> None:
+    made = await client.post(
+        "/api/agents",
+        json={
+            "name": "Courier",
+            "role": "Runs errands",
+            "instructions": "Be brief.",
+            "model": "",
+            "effort": None,
+            "approvals": "yolo",
+            "tools": ["shell"],
+        },
+    )
+    assert made.status_code == 201, made.text
+    for asked, answered in (("ask", "ask"), ("auto", "auto"), ("yolo", "yolo")):
+        MODEL.script = ScriptedProvider(
+            _PROVIDER,
+            [
+                _turn(MESSAGE_AGENT_TOOL, {"agent": "courier", "message": "Say done."}),
+                _turn(FINISH_TOOL, {"answer": "done", "success": True}),
+                _turn(FINISH_TOOL, {"answer": "Courier said done.", "success": True}),
+            ],
+        )
+        started = await client.post("/api/runs", json={"goal": "Ask Courier to say done", "approvals": asked})
+        assert started.status_code == 201, started.text
+        run_id: str = started.json()["id"]
+        async with asyncio.timeout(_RUN_WAIT_S):
+            await manager.wait(run_id)
+        (child,) = await runtime.store.list_child_runs(run_id)
+        assert (child.status, child.approvals) == ("done", answered), (asked, child)

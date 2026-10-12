@@ -17,7 +17,7 @@ from dotagent.cli_commands import (
     BrowserLoginCommand,
     Command,
 )
-from dotagent.config import BrowserConfig, load_user_config
+from dotagent.config import AppConfig, BrowserConfig, ServerConfig, load_user_config
 from dotagent.config_edit import set_browser_mode
 from dotagent.core.errors import BrowserError, InvalidValueError
 from dotagent.core.paths import browser_profile_dir, chrome_data_dir, config_path, downloads_dir
@@ -26,11 +26,11 @@ _MEGABYTE: int = 1_000_000
 _CHECK_THREAD: str = "attach-check"
 
 
-async def _readable_cookies(config: BrowserConfig, profile: Path) -> int:
+async def _readable_cookies(config: BrowserConfig, server: ServerConfig, profile: Path) -> int:
     """Open the profile in a hidden Chrome of its own, whatever ``[browser] mode`` says, and count the cookies that
     Chrome can read."""
     session: BrowserSession = BrowserSession(
-        config.model_copy(update={"headless": True, "mode": "own"}), profile, downloads_dir()
+        config.model_copy(update={"headless": True, "mode": "own"}), server, profile, downloads_dir()
     )
     try:
         return await session.stored_cookie_count()
@@ -55,7 +55,8 @@ async def cmd_browser_import_chrome(command: BrowserImportChromeCommand) -> int:
         'Checking that Chrome can read them. macOS may ask whether Chrome may use "Chrome Safe Storage" in your '
         "Keychain: choose Always Allow.\n"
     )
-    readable: int = await _readable_cookies(load_user_config().browser, dot_profile)
+    settings: AppConfig = load_user_config()
+    readable: int = await _readable_cookies(settings.browser, settings.server, dot_profile)
     if readable == 0:
         raise BrowserError(
             'Chrome could not read the copied cookies; allow Chrome to use "Chrome Safe Storage" in the Keychain and '
@@ -71,7 +72,8 @@ async def cmd_browser_import_chrome(command: BrowserImportChromeCommand) -> int:
 
 async def cmd_browser_attach(command: BrowserAttachCommand) -> int:
     """Check that Dot can work in a tab of the Chrome that is open, then switch ``[browser] mode`` to ``attach``."""
-    config: BrowserConfig = load_user_config().browser
+    settings: AppConfig = load_user_config()
+    config: BrowserConfig = settings.browser
     data_dir: Path = chrome_data_dir()
     endpoint: DebugEndpoint = await asyncio.to_thread(read_debug_endpoint, data_dir)
     sys.stdout.write(
@@ -80,7 +82,9 @@ async def cmd_browser_attach(command: BrowserAttachCommand) -> int:
         "Dot then opens one blank tab in your Chrome, checks that it can work in it, and closes it again. "
         "Your other tabs are not touched.\n"
     )
-    session: BrowserSession = BrowserSession(config.model_copy(update={"mode": "attach"}), data_dir, downloads_dir())
+    session: BrowserSession = BrowserSession(
+        config.model_copy(update={"mode": "attach"}), settings.server, data_dir, downloads_dir()
+    )
     try:
         attachment: Attachment = await session.attachment()
         await session.snapshot(_CHECK_THREAD)

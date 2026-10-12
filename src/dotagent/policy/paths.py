@@ -1,4 +1,5 @@
-"""Where a filesystem path sits relative to the workspace, the user's home and protected locations."""
+"""Where a filesystem path sits relative to the workspace, the user's home, Dot's own folders and protected
+locations."""
 
 import fnmatch
 import os
@@ -6,7 +7,11 @@ import tempfile
 from pathlib import Path
 from typing import Literal
 
-PathClass = Literal["workspace", "temp", "home", "system", "protected"]
+# ``dot`` is what Dot loads and runs, and its emergency stop (``Runtime.dot_paths``): a run reads it as it reads the home
+# folder, and changes it as it would a protected location.
+PathClass = Literal["workspace", "temp", "home", "system", "dot", "protected"]
+# The reason the policy gives when a run would change a ``dot`` path.
+CHANGES_DOT: str = "changes what Dot loads and runs (its plugins, skills and playbooks) or its emergency stop"
 
 _SYSTEM_PREFIXES: tuple[str, ...] = (
     "/System",
@@ -61,10 +66,12 @@ def _is_system(path: Path) -> bool:
     return any(within(path, Path(os.path.realpath(prefix))) for prefix in _SYSTEM_PREFIXES)
 
 
-def classify_path(path: Path, workspace: Path, protected: tuple[Path, ...]) -> PathClass:
+def classify_path(path: Path, workspace: Path, protected: tuple[Path, ...], dot_paths: tuple[Path, ...]) -> PathClass:
     """Classify an already resolved absolute path."""
     if any(within(path, location) for location in protected):
         return "protected"
+    if any(within(path, location) for location in dot_paths):
+        return "dot"
     if within(path, Path(os.path.realpath(workspace))):
         return "workspace"
     if _is_temp(path):

@@ -1,6 +1,7 @@
 """Skills and plugins end to end, on real folders in a throwaway Dot home: a plugin brings its MCP server and its skills,
-the prompt lists the skills, the ``skill`` tool hands over the instructions and the files, and ``dotx skills list``
-shows what was found and what was left out. Nothing is mocked."""
+the prompt lists the skills, the ``skill`` tool hands over the instructions and the files, a run reads and runs them but
+never changes what Dot loads (item 135), and ``dotx skills list`` shows what was found and what was left out. Nothing is
+mocked."""
 
 import asyncio
 import json
@@ -21,7 +22,8 @@ from dotagent.agent.verify import new_facts
 from dotagent.config import load_config
 from dotagent.core.paths import workspace_dir
 from dotagent.core.types import JsonObject
-from dotagent.policy.types import ActionInfo
+from dotagent.policy.engine import auto_review, preset_verdict
+from dotagent.policy.types import ActionInfo, Decision
 from dotagent.runtime import Runtime, build_runtime, close_runtime
 from dotagent.skills.catalog import load_skills
 from dotagent.skills.types import SkillCatalog
@@ -121,8 +123,8 @@ async def runtime(home: Path, environment: None) -> AsyncIterator[Runtime]:
         await close_runtime(built)
 
 
-async def _call(runtime: Runtime, name: str, arguments: JsonObject) -> tuple[ToolResult, ActionInfo]:
-    ctx: ToolContext = ToolContext(
+def _context(runtime: Runtime) -> ToolContext:
+    return ToolContext(
         runtime=runtime,
         browser=runtime.browser,
         run_id="skills-test",
@@ -137,8 +139,17 @@ async def _call(runtime: Runtime, name: str, arguments: JsonObject) -> tuple[Too
         output_chars=runtime.config.agent.tool_output_chars,
         facts=new_facts,
     )
+
+
+async def _call(runtime: Runtime, name: str, arguments: JsonObject) -> tuple[ToolResult, ActionInfo]:
+    ctx: ToolContext = _context(runtime)
     prepared = await runtime.registry.tools[name].prepare(arguments, ctx)
     return await prepared.run(ctx), prepared.action
+
+
+async def _action(runtime: Runtime, name: str, arguments: JsonObject) -> ActionInfo:
+    """What the policy is shown for the call; nothing runs."""
+    return (await runtime.registry.tools[name].prepare(arguments, _context(runtime))).action
 
 
 async def _dotx(home: Path, arguments: list[str]) -> CliOutcome:
@@ -224,6 +235,33 @@ async def test_the_skill_tool_hands_over_the_instructions_and_the_files(runtime:
     root: Path = home / "skills" / "release-notes"
     assert str(root) in result.text
     assert result.text.rstrip().endswith("scripts/collect.sh")
+
+
+async def test_a_run_reads_and_runs_a_skill_but_never_changes_what_dot_loads(runtime: Runtime, home: Path) -> None:
+    skill: Path = home / "skills" / "release-notes"
+    plugin: Path = home / "plugins" / "acme-tools"
+    reads: list[tuple[str, JsonObject]] = [
+        ("read_file", {"path": str(skill / "SKILL.md")}),
+        ("read_file", {"path": str(plugin / ".mcp.json")}),
+        ("shell", {"command": f"sh {skill / 'scripts' / 'collect.sh'}"}),
+    ]
+    changes: list[tuple[str, JsonObject]] = [
+        ("write_file", {"path": str(plugin / ".mcp.json"), "content": "{}"}),
+        ("write_file", {"path": str(home / "plugins" / "new" / ".mcp.json"), "content": "{}"}),
+        ("edit_file", {"path": str(skill / "SKILL.md"), "old": "# Release notes", "new": "# Notes"}),
+        ("write_file", {"path": str(home / "playbooks" / "learned-notes" / "SKILL.md"), "content": "x"}),
+        ("write_file", {"path": str(home / "plugins-data" / "acme-tools" / "state.json"), "content": "{}"}),
+        ("shell", {"command": f"rm -f {home / 'STOP'}"}),
+        ("shell", {"command": f"echo '{{}}' > {plugin / '.mcp.json'}"}),
+    ]
+    for name, arguments in reads:
+        action: ActionInfo = await _action(runtime, name, arguments)
+        assert auto_review(action) is None and preset_verdict("aggressive", action)[0] == "allow", action
+    for name, arguments in changes:
+        action = await _action(runtime, name, arguments)
+        refused: Decision | None = auto_review(action)
+        assert refused is not None and refused.verdict == "deny", action
+    assert "what Dot loads and runs" in (await _action(runtime, *changes[0])).summary
 
 
 async def test_an_unknown_skill_is_refused_with_the_installed_names(runtime: Runtime) -> None:

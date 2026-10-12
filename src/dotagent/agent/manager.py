@@ -93,6 +93,8 @@ _RESULT_CHARS: int = 20_000
 _REFUSED_RESULT_CHARS: int = 200
 # The earlier runs of a thread whose goals count as the user's instructions to a reviewer.
 _THREAD_INSTRUCTION_RUNS: int = 30
+# The approval modes from the strictest to the loosest: the user answers, the review model answers, no one is asked.
+_APPROVALS_STRICTEST_FIRST: tuple[ApprovalMode, ...] = ("ask", "auto", "yolo")
 
 
 @dataclass(frozen=True)
@@ -116,6 +118,11 @@ def thread_title(goal: str) -> str:
 def _answer_text(question: ApprovalRecord, answer: str) -> str:
     """The user's message that carries the answer to a question a run left."""
     return f"Answer to your question “{question.summary}”: {answer}"
+
+
+def stricter_approvals(first: ApprovalMode, second: ApprovalMode) -> ApprovalMode:
+    """The stricter of two approval modes."""
+    return min(first, second, key=_APPROVALS_STRICTEST_FIRST.index)
 
 
 def _goal_mode_asked(goal: str, mode: RunMode, goal_mode: bool | None) -> bool | None:
@@ -422,8 +429,9 @@ class RunManager:
         delegates research) and cannot delegate again. It answers the policy's questions the way its parent does and
         takes the parent's instructions as its own; the parent checks its result, so goal mode is not applied to it
         again. It is stopped when the waiting caller is cancelled. With ``agent_id`` (item 87, a message to an agent)
-        the run is the agent's: its source is ``team``, it carries the agent's id, and the agent's own model, effort
-        and approvals bound it where the agent names them, the parent's where it does not.
+        the run is the agent's: its source is ``team``, it carries the agent's id, the agent's own model and effort
+        bound it where the agent names them, the parent's where it does not, and it answers the policy's questions the
+        stricter way of the agent's and the parent's (item 135).
         """
         parent: RunRecord = await self._runtime.store.get_run(parent_run_id)
         agent: AgentRecord | None = None if agent_id is None else await self._runtime.store.get_agent(agent_id)
@@ -442,7 +450,9 @@ class RunManager:
             DELEGATE_SOURCE if agent is None else TEAM_SOURCE,
             parent.id,
             parent.effort if agent is None or agent.effort is None else agent.effort,
-            parent.approvals if agent is None or agent.approvals is None else agent.approvals,
+            parent.approvals
+            if agent is None or agent.approvals is None
+            else stricter_approvals(parent.approvals, agent.approvals),
             False,
             RunOpening(text=goal, files=(), resumed=None),
             None,

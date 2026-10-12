@@ -23,7 +23,7 @@ from dotagent.agent.gate import HANDBACK_EVENT, TAKEOVER_EVENT
 from dotagent.agent.manager import RunManager
 from dotagent.browser.session import BrowserSession
 from dotagent.browser.types import Frame
-from dotagent.config import BrowserConfig, load_config
+from dotagent.config import BrowserConfig, ServerConfig, load_config, load_default_config
 from dotagent.evals.runner import SCRIPTED_MODEL
 from dotagent.evals.scripted import ScriptedProvider
 from dotagent.evals.types import ScriptedCall, ScriptedTurn
@@ -38,6 +38,8 @@ from dotagent.tools.meta import FINISH_TOOL
 
 pytestmark = [pytest.mark.browser, pytest.mark.asyncio(loop_scope="module")]
 
+# Whose interface the browser never opens: the daemon's default address.
+SERVER: ServerConfig = load_default_config().server
 _PROVIDER: str = "ollama"
 TOKEN: str = "takeover-test-token"
 _FRAME_WAIT_S: float = 15.0
@@ -114,7 +116,7 @@ async def cast_browser(tmp_path_factory: pytest.TempPathFactory) -> AsyncIterato
         update={"headless": True}
     )
     session: BrowserSession = BrowserSession(
-        config, tmp_path_factory.mktemp("cast-profile"), tmp_path_factory.mktemp("cast-downloads")
+        config, SERVER, tmp_path_factory.mktemp("cast-profile"), tmp_path_factory.mktemp("cast-downloads")
     )
     try:
         yield session

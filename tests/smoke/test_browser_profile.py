@@ -19,10 +19,12 @@ from dotagent.browser.keychain import KeychainMode, read_keychain_mode
 from dotagent.browser.login import chrome_arguments
 from dotagent.browser.session import BrowserSession
 from dotagent.cli_browser import _readable_cookies
-from dotagent.config import BrowserConfig, load_config
+from dotagent.config import BrowserConfig, ServerConfig, load_config, load_default_config
 
 pytestmark = pytest.mark.browser
 
+# Whose interface the browser never opens: the daemon's default address.
+SERVER: ServerConfig = load_default_config().server
 _READY_TIMEOUT_S: float = 20.0
 _EXIT_TIMEOUT_S: float = 20.0
 _POLL_S: float = 0.2
@@ -99,7 +101,7 @@ async def test_a_cookie_saved_in_the_sign_in_window_is_read_by_the_automated_bro
     profile: Path, headless_config: BrowserConfig, tmp_path: Path
 ) -> None:
     await save_cookie_in_ordinary_chrome(profile, "http://127.0.0.1:9")
-    session: BrowserSession = BrowserSession(headless_config, profile, tmp_path / "downloads")
+    session: BrowserSession = BrowserSession(headless_config, SERVER, profile, tmp_path / "downloads")
     try:
         assert await session.stored_cookie_count() == 1
     finally:
@@ -110,7 +112,7 @@ async def test_the_check_of_an_import_runs_in_dots_own_chrome_whatever_the_brows
     profile: Path, attach_config: BrowserConfig
 ) -> None:
     await save_cookie_in_ordinary_chrome(profile, "http://127.0.0.1:9")
-    assert await _readable_cookies(attach_config, profile) == 1
+    assert await _readable_cookies(attach_config, SERVER, profile) == 1
 
 
 async def test_the_sign_ins_of_a_profile_that_a_real_chrome_wrote_are_imported(profile: Path, tmp_path: Path) -> None:

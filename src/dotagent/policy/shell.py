@@ -20,6 +20,7 @@ from pathlib import Path
 
 from dotagent.core.types import FrozenModel
 from dotagent.policy.paths import (
+    CHANGES_DOT,
     PathClass,
     classify_path,
     expand_path,
@@ -163,11 +164,49 @@ _SHELL_VALUES: frozenset[str] = frozenset({"-o", "+o", "-O", "+O", "--rcfile", "
 _INTERPRETERS: frozenset[str] = frozenset(
     {"python", "python3", "node", "ruby", "perl", "php", "swift", "deno", "bun", "lua", "Rscript", "julia"}
 )
+_INLINE_CODE: frozenset[str] = frozenset({"-c", "-e", "-E", "--eval", "-p"})
+# Code that reaches the network: a URL, or the client libraries and calls of the interpreters above.
+_NETWORK_CODE: re.Pattern[str] = re.compile(
+    r"\w+://|urllib|\brequests\b|http\.client|httpx|aiohttp|\bsocket\b|\bfetch\s*\(|XMLHttpRequest|axios|"
+    r"\bnet/http\b|Net::HTTP|LWP::|HTTP::Tiny|open-uri|URLSession|curl_exec|file_get_contents|fsockopen",
+    re.IGNORECASE,
+)
 _NETWORK_FETCHERS: frozenset[str] = frozenset({"curl", "wget", "http", "https", "xh", "aria2c"})
 _REMOTE_COPY: frozenset[str] = frozenset({"scp", "sftp", "rsync", "nc", "ncat", "socat", "telnet", "ftp", "ssh"})
+# A path of another machine as scp and rsync take one: ``host:path``, ``user@host:path``, ``host::module``, ``rsync://``.
+_REMOTE_PATH: re.Pattern[str] = re.compile(r"[^/]*:")
 _TUNNELS: frozenset[str] = frozenset({"ngrok", "cloudflared", "localtunnel", "lt", "bore", "serveo"})
 # Command lines of code hosts: what they print (issues, reviews, comments) is written by other people.
 _CODE_HOSTS: frozenset[str] = frozenset({"gh", "glab", "hub", "tea"})
+# What a code host's command line does that only reads (``gh pr view``, ``gh run list``, ``gh repo clone``).
+_CODE_HOST_READS: frozenset[str] = frozenset(
+    {"view", "list", "ls", "status", "diff", "checks", "search", "browse", "clone", "download", "checkout", "watch"}
+)
+_CODE_HOST_SENDS: frozenset[str] = frozenset({"-f", "-F", "--field", "--raw-field", "--input"})
+_GIT_CLONE_VALUES: frozenset[str] = frozenset(
+    {
+        "-b",
+        "--branch",
+        "-o",
+        "--origin",
+        "-u",
+        "--upload-pack",
+        "-c",
+        "--config",
+        "-j",
+        "--jobs",
+        "--depth",
+        "--reference",
+        "--reference-if-able",
+        "--separate-git-dir",
+        "--template",
+        "--shallow-since",
+        "--shallow-exclude",
+        "--filter",
+        "--server-option",
+        "--bundle-uri",
+    }
+)
 _GIT_REMOTE_READS: frozenset[str] = frozenset({"clone", "fetch", "pull", "ls-remote", "submodule"})
 _POWER: frozenset[str] = frozenset({"shutdown", "reboot", "halt", "poweroff", "logout"})
 _PROCESS_KILLERS: frozenset[str] = frozenset({"kill", "killall", "pkill"})
@@ -200,6 +239,11 @@ _DISK_DESTROYERS: frozenset[str] = frozenset({"mkfs", "newfs", "fdisk", "gpt", "
 _WRITERS: frozenset[str] = frozenset(
     {"mv", "cp", "ln", "install", "touch", "mkdir", "chmod", "chown", "chgrp", "tee", "truncate", "ditto", "rsync"}
 )
+# Writers that read every operand but the last one, which they write.
+_COPIES: frozenset[str] = frozenset({"cp", "ln", "install", "ditto", "rsync", "scp"})
+_TARS: frozenset[str] = frozenset({"tar", "bsdtar", "gtar"})
+# unzip's switches that list, test or print an archive instead of unpacking it.
+_UNZIP_READS: frozenset[str] = frozenset({"-l", "-t", "-v", "-p", "-z", "-Z"})
 _SAFE_COMMANDS: frozenset[str] = frozenset(
     {
         "ls",
@@ -419,6 +463,7 @@ class ShellScope:
     cwds: tuple[Path, ...]
     workspace: Path
     protected: tuple[Path, ...]
+    dot_paths: tuple[Path, ...]
     links: tuple[tuple[Path, Path], ...]
     variables: Mapping[str, tuple[str, ...]]
     depth: int
@@ -928,18 +973,20 @@ def _located(value: str, cwd: Path, scope: ShellScope) -> Path:
 
 
 def _class_of(path: Path, scope: ShellScope) -> PathClass:
-    """The class of a resolved path. A glob is protected when it can reach a protected location, and is otherwise
-    judged by the directory it starts from."""
+    """The class of a resolved path. A glob is protected when it can reach a protected location, Dot's own when it can
+    reach one of Dot's own folders, and is otherwise judged by the directory it starts from."""
     if not any(char in part for part in path.parts for char in _GLOB_CHARS):
-        return classify_path(path, scope.workspace, scope.protected)
+        return classify_path(path, scope.workspace, scope.protected, scope.dot_paths)
     if glob_reaches_protected(path, scope.protected):
         return "protected"
+    if glob_reaches_protected(path, scope.dot_paths):
+        return "dot"
     static: list[str] = []
     for part in path.parts:
         if any(char in part for char in _GLOB_CHARS):
             break
         static.append(part)
-    return classify_path(Path(*static), scope.workspace, scope.protected)
+    return classify_path(Path(*static), scope.workspace, scope.protected, scope.dot_paths)
 
 
 def _path_classes(raw: str, scope: ShellScope) -> list[PathClass] | None:
@@ -979,12 +1026,12 @@ def _with_places(scope: ShellScope, places: list[Path]) -> ShellScope:
 
 
 def _worst_class(classes: list[PathClass]) -> PathClass:
-    order: tuple[PathClass, ...] = ("workspace", "temp", "home", "system", "protected")
+    order: tuple[PathClass, ...] = ("workspace", "temp", "home", "system", "dot", "protected")
     return max(classes, key=order.index) if classes else "workspace"
 
 
 def _cwd_class(scope: ShellScope) -> PathClass:
-    return _worst_class([classify_path(cwd, scope.workspace, scope.protected) for cwd in scope.cwds])
+    return _worst_class([classify_path(cwd, scope.workspace, scope.protected, scope.dot_paths) for cwd in scope.cwds])
 
 
 # ---------- what the line sets up ----------
@@ -1088,20 +1135,37 @@ def _assess_delete(args: list[str], scope: ShellScope) -> Finding:
         return _finding("low", (), "removes files inside the workspace or temp")
     if worst == "protected":
         return _finding("high", ("destructive", "secret_access"), "removes a protected location")
+    if worst == "dot":
+        return _finding("high", ("destructive", "secret_access"), CHANGES_DOT)
     return _finding("high", ("destructive", "outside_workspace"), "removes files outside the workspace")
+
+
+def _read_as(path_class: PathClass) -> PathClass:
+    """The class of a path a command only reads: Dot's own folders are read as the home folder is."""
+    return "home" if path_class == "dot" else path_class
 
 
 def _assess_writes(command: str, args: list[str], scope: ShellScope) -> Finding:
     targets: list[str] = [target for target in _positional(args) if not target.isdigit()]
     if command == "chmod" or command == "chown" or command == "chgrp":
         targets = targets[1:]
-    worst: PathClass = _worst_class([_path_class(target, scope) for target in targets])
+    classes: list[PathClass] = [_path_class(target, scope) for target in targets]
+    if command in _COPIES:
+        classes = [*(_read_as(path_class) for path_class in classes[:-1]), *classes[-1:]]
+    worst: PathClass = _worst_class(classes)
     if worst in ("workspace", "temp"):
         return _finding("low", (), f"{command} inside the workspace or temp")
     if worst == "protected":
         return _finding("high", ("secret_access",), f"{command} touches a protected location")
+    if worst == "dot":
+        return _finding("high", ("secret_access",), f"{command} {CHANGES_DOT}")
+    settings: tuple[Flag, ...] = ("system_settings",) if worst == "system" else ()
+    if command == "truncate":
+        return _finding(
+            "high", ("destructive", *settings, "outside_workspace"), "truncate cuts files outside the workspace"
+        )
     if worst == "system":
-        return _finding("high", ("system_settings", "outside_workspace"), f"{command} modifies a system location")
+        return _finding("high", (*settings, "outside_workspace"), f"{command} modifies a system location")
     return _finding("medium", ("outside_workspace",), f"{command} modifies files outside the workspace")
 
 
@@ -1117,6 +1181,8 @@ def _assess_redirects(targets: list[str], scope: ShellScope) -> list[Finding]:
         path_class: PathClass = _path_class(target, scope)
         if path_class == "protected":
             findings.append(_finding("high", ("secret_access",), "redirects output into a protected location"))
+        elif path_class == "dot":
+            findings.append(_finding("high", ("secret_access",), f"redirects output: {CHANGES_DOT}"))
         elif path_class == "system":
             findings.append(_finding("high", ("system_settings", "outside_workspace"), "redirects output into system"))
         elif path_class == "home":
@@ -1169,18 +1235,24 @@ def _git_subcommand(args: list[str]) -> tuple[str, list[str]]:
     return args[index], args[index + 1 :]
 
 
-def _assess_git(args: list[str], scope: ShellScope) -> Finding:
-    sub, rest = _git_subcommand(args)
+def _git_scope(args: list[str], rest: list[str], scope: ShellScope) -> ShellScope:
+    """``scope`` in the directories git's ``-C`` options move it to (``rest`` follows the subcommand)."""
     where: ShellScope = scope
     for index, arg in enumerate(args[: len(args) - len(rest)]):
         if arg == "-C" and index + 1 < len(args):
             where = _with_places(where, _places(args[index + 1], where))
+    return where
+
+
+def _assess_git(args: list[str], scope: ShellScope) -> Finding:
+    sub, rest = _git_subcommand(args)
+    where: ShellScope = _git_scope(args, rest, scope)
     outside: tuple[Flag, ...] = () if _cwd_class(where) in ("workspace", "temp") else ("outside_workspace",)
     destructive_args: set[str] = {"--hard", "--force", "-f", "-fd", "-fdx", "-df", "-D", "--delete", "drop", "clear"}
     if sub == "push":
         if any(arg in ("--force", "-f", "--force-with-lease", "--delete", "--mirror") for arg in rest):
             return _finding("high", ("destructive", "external_send", *outside), "force-pushes or deletes remote refs")
-        return _finding("medium", (), "pushes commits to a remote")
+        return _finding("medium", ("upload",), "pushes commits to a remote")
     if sub in ("reset", "clean", "checkout", "restore", "rebase", "filter-branch", "gc", "reflog", "switch"):
         if sub in ("reset", "clean", "filter-branch") and destructive_args.intersection(rest):
             return _finding("medium", ("destructive", *outside), f"git {sub} discards work")
@@ -1196,14 +1268,104 @@ def _assess_git(args: list[str], scope: ShellScope) -> Finding:
     return _finding("low", (), f"git {sub or 'command'}")
 
 
+def _cloned_into(args: list[str], scope: ShellScope) -> list[Finding]:
+    """What ``git clone`` writes: the folder it is given, else a folder in the directory the line is in."""
+    sub, rest = _git_subcommand(args)
+    if sub != "clone":
+        return []
+    operands: list[str] = []
+    index: int = 0
+    while index < len(rest):
+        if rest[index] in _GIT_CLONE_VALUES:
+            index += 2
+            continue
+        if not rest[index].startswith("-"):
+            operands.append(rest[index])
+        index += 1
+    return _writes_to("git clone", operands[1:2] or ["."], _git_scope(args, rest, scope))
+
+
 def _assess_network_fetcher(command: str, args: list[str]) -> Finding:
     uploads: bool = any(arg in _UPLOAD_FLAGS or arg.startswith("--data") for arg in args)
     method: bool = any(
         arg.upper() in ("POST", "PUT", "DELETE", "PATCH") for arg in args if not arg.startswith("-") and arg.isalpha()
     )
     if uploads or method:
-        return _fetching("medium", (), f"{command} sends data to a remote server")
+        return _fetching("medium", ("upload",), f"{command} sends data to a remote server")
     return _fetching("low", (), f"{command} fetches from a remote server")
+
+
+def _fetched_files(command: str, args: list[str]) -> list[str]:
+    """Where a fetcher saves what it fetched: the ``-o`` files of curl and the others, the folder of curl's ``-O`` (its
+    ``--output-dir``, else the directory the line is in), and wget's ``-O`` file or else its ``-P`` folder or the
+    directory the line is in (wget's ``-o`` is its log); ``-`` is the standard output."""
+    files: list[str] = _option_values(args, "-o", "--output")
+    if command == "curl" and any(
+        arg in ("--remote-name", "--remote-name-all") or re.fullmatch(r"-[A-Za-z#]*O[A-Za-z#]*", arg) for arg in args
+    ):
+        files.extend(_option_values(args, "", "--output-dir") or ["."])
+    if command == "wget":
+        documents: list[str] = _option_values(args, "-O", "--output-document")
+        files.extend(documents or _option_values(args, "-P", "--directory-prefix") or ["."])
+    return [path for path in files if path != "-"]
+
+
+def _remote_sends(command: str, args: list[str]) -> bool:
+    """Whether a remote command may send this machine's data out: scp and rsync when they copy to another machine
+    (their last operand is remote), the shells and sockets always."""
+    if command not in ("scp", "rsync"):
+        return True
+    operands: list[str] = _positional(args)
+    return bool(operands) and _REMOTE_PATH.match(operands[-1]) is not None
+
+
+def _assess_code_host(command: str, args: list[str]) -> Finding:
+    """A code host's command line reads unless it creates, comments, edits, merges or deletes there (``gh api`` with
+    fields or a method other than GET)."""
+    words: list[str] = _positional(args)
+    if words[:1] == ["api"]:
+        methods: list[str] = [value.upper() for value in _option_values(args, "-X", "--method")]
+        sends: bool = any(arg in _CODE_HOST_SENDS or arg.startswith("--field=") for arg in args) or any(
+            method != "GET" for method in methods
+        )
+    else:
+        sends = bool(words) and not _CODE_HOST_READS.intersection(words[:2])
+    if sends:
+        return _fetching("medium", ("upload",), f"{command} changes something on a code host")
+    return _fetching("low", (), f"{command} reads from a code host")
+
+
+def _unpacked_into(command: str, args: list[str]) -> list[str]:
+    """Where an archive is unpacked: tar's ``-C`` folder when it extracts, unzip's ``-d`` folder, else the directory
+    the line is in; nothing when the command lists, tests or creates an archive."""
+    if command in _TARS:
+        first: str = args[0] if args else ""
+        extracts: bool = any(
+            arg in ("--extract", "--get") or re.fullmatch(r"-[A-Za-z]*x[A-Za-z]*", arg) for arg in args
+        ) or (not first.startswith("-") and "x" in first)
+        return (_option_values(args, "-C", "--directory") or ["."]) if extracts else []
+    if any(arg in _UNZIP_READS for arg in args):
+        return []
+    return _option_values(args, "-d", "") or ["."]
+
+
+def _assess_interpreter(command: str, args: list[str], scope: ShellScope, given: _Input) -> list[Finding]:
+    """An interpreter runs code the guard does not read. Its inline code (``-c``, ``-e``, a here-document or a pipe it
+    reads as its program) that names the network counts as fetching and sending, and code that names one of Dot's own
+    folders as changing it."""
+    operands: list[str] = _positional(args)
+    inline: list[str] = [args[index + 1] for index, arg in enumerate(args[:-1]) if arg in _INLINE_CODE]
+    if given.text is not None and (not operands or operands[0] == "-") and not inline:
+        inline.append(given.text)
+    code: str = "\n".join(inline)
+    findings: list[Finding] = [
+        _finding("medium" if inline else "low", (), f"{command} runs {'inline code' if inline else 'a script'}")
+    ]
+    if _NETWORK_CODE.search(code):
+        findings.append(_fetching("medium", ("upload",), f"{command} runs code that reaches the network"))
+    if mentions_protected(code, scope.dot_paths):
+        findings.append(_finding("high", ("secret_access",), f"{command} runs code that {CHANGES_DOT}"))
+    return findings
 
 
 def _assess_installer(command: str, args: list[str]) -> Finding | None:
@@ -1559,13 +1721,16 @@ def _assess_command(command: str, args: list[str], scope: ShellScope, given: _In
     if reader is not None:
         return reader
     if command == "git":
-        return [_assess_git(args, scope)]
+        return [_assess_git(args, scope), *_cloned_into(args, scope)]
     if command in _NETWORK_FETCHERS:
-        return [_assess_network_fetcher(command, args)]
+        return [_assess_network_fetcher(command, args), *_writes_to(command, _fetched_files(command, args), scope)]
     if command in _REMOTE_COPY:
-        return [_fetching("medium", (), f"{command} talks to a remote machine")]
+        talks: Finding = _fetching(
+            "medium", ("upload",) if _remote_sends(command, args) else (), f"{command} talks to a remote machine"
+        )
+        return [talks, _assess_writes(command, args, scope)] if command in _COPIES else [talks]
     if command in _CODE_HOSTS:
-        return [_fetching("low", (), f"{command} reads from a code host")]
+        return [_assess_code_host(command, args)]
     if command in _TUNNELS:
         return [_finding("high", ("external_send",), f"{command} exposes this machine to the internet")]
     if command == "osascript":
@@ -1604,12 +1769,11 @@ def _assess_command(command: str, args: list[str], scope: ShellScope, given: _In
     if installer is not None:
         return [installer]
     if command in _INTERPRETERS:
-        inline: bool = any(arg in ("-c", "-e", "-E", "--eval", "-p") for arg in args)
-        return [
-            _finding("medium" if inline else "low", (), f"{command} runs {'inline code' if inline else 'a script'}")
-        ]
+        return _assess_interpreter(command, args, scope, given)
     if command in _WRITERS:
         return [_assess_writes(command, args, scope)]
+    if command in _TARS or command == "unzip":
+        return [_finding("low", (), f"runs {command}"), *_writes_to(command, _unpacked_into(command, args), scope)]
     if command in _SAFE_COMMANDS:
         return [_finding("safe", (), command)]
     return [_finding("low", (), f"runs {command}")]
@@ -1740,13 +1904,17 @@ def _merge(findings: list[Finding]) -> ShellAssessment:
     )
 
 
-def _scope(cwd: Path, workspace: Path, protected: tuple[Path, ...]) -> ShellScope:
-    return ShellScope(cwds=(cwd,), workspace=workspace, protected=protected, links=(), variables={}, depth=0)
+def _scope(cwd: Path, workspace: Path, protected: tuple[Path, ...], dot_paths: tuple[Path, ...]) -> ShellScope:
+    return ShellScope(
+        cwds=(cwd,), workspace=workspace, protected=protected, dot_paths=dot_paths, links=(), variables={}, depth=0
+    )
 
 
-def assess_shell(command: str, cwd: Path, workspace: Path, protected: tuple[Path, ...]) -> ShellAssessment:
+def assess_shell(
+    command: str, cwd: Path, workspace: Path, protected: tuple[Path, ...], dot_paths: tuple[Path, ...]
+) -> ShellAssessment:
     """Classify ``command`` (a full shell line) as it would run in ``cwd``."""
-    return _merge(_assess_all(command, _scope(cwd, workspace, protected)))
+    return _merge(_assess_all(command, _scope(cwd, workspace, protected, dot_paths)))
 
 
 def typed_lines(pending: str | None, text: str) -> tuple[tuple[str | None, ...], str | None]:
@@ -1779,12 +1947,12 @@ def typed_lines(pending: str | None, text: str) -> tuple[tuple[str | None, ...],
 
 
 def assess_typed(
-    lines: Sequence[str | None], cwd: Path, workspace: Path, protected: tuple[Path, ...]
+    lines: Sequence[str | None], cwd: Path, workspace: Path, protected: tuple[Path, ...], dot_paths: tuple[Path, ...]
 ) -> ShellAssessment:
     """``lines`` submitted at a terminal (as :func:`typed_lines` gives them), judged as one script run in ``cwd``; a
     line that cannot be told runs code that cannot be judged."""
     findings: list[Finding] = _assess_all(
-        "\n".join(line for line in lines if line is not None), _scope(cwd, workspace, protected)
+        "\n".join(line for line in lines if line is not None), _scope(cwd, workspace, protected, dot_paths)
     )
     if None in lines:
         findings.append(
@@ -1793,9 +1961,11 @@ def assess_typed(
     return _merge(findings)
 
 
-def assess_applescript(script: str, cwd: Path, workspace: Path, protected: tuple[Path, ...]) -> ShellAssessment:
+def assess_applescript(
+    script: str, cwd: Path, workspace: Path, protected: tuple[Path, ...], dot_paths: tuple[Path, ...]
+) -> ShellAssessment:
     """Classify an AppleScript or JXA ``script``; the shell commands it spells out are judged like shell lines."""
-    return _merge(_applescript_findings(script, _scope(cwd, workspace, protected)))
+    return _merge(_applescript_findings(script, _scope(cwd, workspace, protected, dot_paths)))
 
 
 def script_reaches_shell(script: str) -> bool:

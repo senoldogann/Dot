@@ -167,11 +167,13 @@ class ShellArgs(ToolArgs):
     timeout_s: int | None = Field(default=None, ge=1, description="Seconds before the command is killed.")
 
 
-def _classify_shell(args: ShellArgs, workspace: Path, protected: tuple[Path, ...]) -> ActionInfo:
+def _classify_shell(
+    args: ShellArgs, workspace: Path, protected: tuple[Path, ...], dot_paths: tuple[Path, ...]
+) -> ActionInfo:
     cwd: Path = expand_path(args.cwd, workspace) if args.cwd else workspace
-    assessment: ShellAssessment = assess_shell(args.command, cwd, workspace, protected)
+    assessment: ShellAssessment = assess_shell(args.command, cwd, workspace, protected, dot_paths)
     flags: tuple[Flag, ...] = assessment.flags
-    if classify_path(cwd, workspace, protected) == "protected":
+    if classify_path(cwd, workspace, protected, dot_paths) == "protected":
         flags = (*flags, "secret_access")
     preview: str = truncate_middle(" ".join(args.command.split()), 200)
     return ActionInfo(
@@ -186,7 +188,7 @@ def _classify_shell(args: ShellArgs, workspace: Path, protected: tuple[Path, ...
 
 def build_shell_tool() -> RegisteredTool:
     def classify(args: ShellArgs, ctx: ToolContext) -> ActionInfo:
-        return _classify_shell(args, ctx.workspace, ctx.runtime.protected)
+        return _classify_shell(args, ctx.workspace, ctx.runtime.protected, ctx.runtime.dot_paths)
 
     async def run(args: ShellArgs, ctx: ToolContext) -> ToolResult:
         shell_config: ShellConfig = ctx.runtime.config.shell
@@ -201,7 +203,9 @@ def build_shell_tool() -> RegisteredTool:
         body: str = output.strip()
         text: str = f"{header}\n{body}" if body else header
         # What a line that reached the network printed was written by other people: the run reads it as untrusted.
-        fetched: bool = assess_shell(args.command, cwd, ctx.workspace, ctx.runtime.protected).fetches
+        fetched: bool = assess_shell(
+            args.command, cwd, ctx.workspace, ctx.runtime.protected, ctx.runtime.dot_paths
+        ).fetches
         return ToolResult(text=text, images=(), is_error=timed_out or code != 0, untrusted=fetched)
 
     return make_tool(

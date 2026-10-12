@@ -24,7 +24,7 @@ from dotagent.policy.elements import (
 from dotagent.policy.shell import ShellAssessment, assess_typed, typed_lines
 from dotagent.policy.types import Flag, Risk
 
-type AppRole = Literal["terminal", "system_settings", "secrets", "messaging", "finder", "other"]
+type AppRole = Literal["terminal", "system_settings", "secrets", "dot", "messaging", "finder", "other"]
 
 DESKTOP_CLICKABLE_ROLES: frozenset[str] = frozenset(
     {
@@ -94,6 +94,10 @@ _SECRETS_NAME_PARTS: tuple[str, ...] = (
 )
 _SECRETS_NAMES: frozenset[str] = frozenset({"passwords"})
 _SETTINGS_BUNDLES: frozenset[str] = frozenset({"com.apple.systempreferences"})
+# Dot's own desktop shell (``identifier`` of desktop/src-tauri/tauri.conf.json): its window shows the approvals, the
+# rules and the settings that decide what a run may do.
+_DOT_BUNDLE: str = "dev.dot.desktop"
+_DOT_NAME: str = "dot"
 _MESSAGING_BUNDLES: frozenset[str] = frozenset(
     {
         "com.apple.mobilesms",
@@ -131,6 +135,11 @@ _SECRETS_ASSESSMENT: StepAssessment = StepAssessment(
 _SETTINGS_ASSESSMENT: StepAssessment = StepAssessment(
     risk="high", flags=("system_settings",), reasons=("changes system settings",)
 )
+_DOT_ASSESSMENT: StepAssessment = StepAssessment(
+    risk="high",
+    flags=("secret_access",),
+    reasons=("works in Dot's own window, where its approvals, rules and settings are",),
+)
 
 
 class StepContext(FrozenModel):
@@ -164,6 +173,8 @@ def app_role(name: str, bundle_id: str | None) -> AppRole:
     bundle: str = _key(bundle_id or "")
     if is_secrets_app(name, bundle_id):
         return "secrets"
+    if bundle == _DOT_BUNDLE or _key(name) == _DOT_NAME:
+        return "dot"
     if bundle in _SETTINGS_BUNDLES:
         return "system_settings"
     if bundle in _TERMINAL_BUNDLES or _key(name) in _TERMINAL_NAMES:
@@ -238,13 +249,15 @@ def exceeds(live: StepAssessment, risk: Risk, flags: Collection[Flag]) -> bool:
     return _RISK_ORDER.index(live.risk) > _RISK_ORDER.index(risk) or any(flag not in flags for flag in live.flags)
 
 
-def _terminal_input(line: str | None, sent: str, workspace: Path, protected: tuple[Path, ...]) -> StepAssessment:
+def _terminal_input(
+    line: str | None, sent: str, workspace: Path, protected: tuple[Path, ...], dot_paths: tuple[Path, ...]
+) -> StepAssessment:
     """Keys sent to a terminal after ``line``: the lines they run are shell commands, judged whole with what Dot typed
     on them before, from the home folder, since the terminal may be anywhere."""
     lines, _ = typed_lines(line, sent)
     if not lines:
         return StepAssessment(risk="low", flags=(), reasons=("types on the command line of a terminal",))
-    shell: ShellAssessment = assess_typed(lines, Path.home(), workspace, protected)
+    shell: ShellAssessment = assess_typed(lines, Path.home(), workspace, protected, dot_paths)
     risk: Risk = max((shell.risk, _SHELL_FLOOR), key=_RISK_ORDER.index)
     return StepAssessment(
         risk=risk, flags=shell.flags, reasons=tuple(f"terminal input: {reason}" for reason in shell.reasons)
@@ -252,7 +265,7 @@ def _terminal_input(line: str | None, sent: str, workspace: Path, protected: tup
 
 
 def _typing_parts(
-    step: Step, context: StepContext, workspace: Path, protected: tuple[Path, ...]
+    step: Step, context: StepContext, workspace: Path, protected: tuple[Path, ...], dot_paths: tuple[Path, ...]
 ) -> list[StepAssessment]:
     reasons: list[str] = typing_reasons(context.element, step.text)
     if context.secure and "credential" not in reasons:
@@ -260,20 +273,20 @@ def _typing_parts(
     parts: list[StepAssessment] = [assessment_for(reasons)]
     text: str = step.text or ""
     if context.role == "terminal" and step.action != "set_value":
-        parts.append(_terminal_input(context.line, text, workspace, protected))
+        parts.append(_terminal_input(context.line, text, workspace, protected, dot_paths))
     if context.role == "messaging" and step.action == "type" and "\n" in text:
         parts.append(StepAssessment(risk="medium", flags=("external_send",), reasons=("a newline sends the message",)))
     return parts
 
 
 def _chord_parts(
-    chord: Chord, context: StepContext, workspace: Path, protected: tuple[Path, ...]
+    chord: Chord, context: StepContext, workspace: Path, protected: tuple[Path, ...], dot_paths: tuple[Path, ...]
 ) -> list[StepAssessment]:
     modifiers: frozenset[str] = frozenset(chord.modifiers)
     parts: list[StepAssessment] = []
     sent: str | None = _keys_sent(chord) if context.role == "terminal" else None
     if sent is not None:
-        parts.append(_terminal_input(context.line, sent, workspace, protected))
+        parts.append(_terminal_input(context.line, sent, workspace, protected, dot_paths))
     if enters_text(chord):
         parts.append(assessment_for(typing_reasons(context.element, None) + (["credential"] if context.secure else [])))
     if chord.key == "q" and modifiers == {"cmd"}:
@@ -309,19 +322,23 @@ def _menu_parts(path: Sequence[str]) -> list[StepAssessment]:
     return parts
 
 
-def assess_step(step: Step, context: StepContext, workspace: Path, protected: tuple[Path, ...]) -> StepAssessment:
+def assess_step(
+    step: Step, context: StepContext, workspace: Path, protected: tuple[Path, ...], dot_paths: tuple[Path, ...]
+) -> StepAssessment:
     """Risk and flags of one step, judged from the action, the kind of application and the control it targets."""
     if context.role == "secrets" and step.action != "wait":
         return _SECRETS_ASSESSMENT
+    if context.role == "dot" and step.action != "wait":
+        return _DOT_ASSESSMENT
     parts: list[StepAssessment] = [quiet_assessment() if step.action in _QUIET_ACTIONS else assessment_for([])]
     if context.role == "system_settings" and step.has_side_effects():
         parts.append(_SETTINGS_ASSESSMENT)
     if step.action in _TEXT_ACTIONS:
-        parts.extend(_typing_parts(step, context, workspace, protected))
+        parts.extend(_typing_parts(step, context, workspace, protected, dot_paths))
     if step.action in _CLICK_ACTIONS:
         parts.append(assessment_for(clicking_reasons(context.element, DESKTOP_CLICKABLE_ROLES)))
     if step.action == "key" and step.key is not None:
-        parts.extend(_chord_parts(parse_chord(step.key), context, workspace, protected))
+        parts.extend(_chord_parts(parse_chord(step.key), context, workspace, protected, dot_paths))
     if step.action == "menu" and step.path:
         parts.extend(_menu_parts(step.path))
     return combine_assessments(parts)

@@ -24,7 +24,7 @@ from dotagent.browser.render import (
 )
 from dotagent.browser.safety import (
     assess_step,
-    check_url,
+    check_browser_url,
     normalize_url,
     parse_element,
     refuse_secret_field,
@@ -44,7 +44,7 @@ from dotagent.browser.types import (
     TextView,
     TextWait,
 )
-from dotagent.config import BrowserConfig
+from dotagent.config import AppConfig, BrowserConfig
 from dotagent.core.errors import ToolInputError
 from dotagent.llm.types import ImageData
 from dotagent.policy.elements import Element, StepAssessment, assessment_for, combine_assessments
@@ -100,10 +100,10 @@ def _clip(text: str, limit: int) -> str:
     return flat if len(flat) <= limit else f"{flat[: limit - 1]}…"
 
 
-def checked_url(raw: str, config: BrowserConfig) -> str:
+def checked_url(raw: str, config: AppConfig) -> str:
     """The absolute URL the browser may open for ``raw``; anything else is an error the model can act on."""
     url: str = normalize_url(raw)
-    verdict = check_url(url, config.allowed_hosts, config.blocked_hosts)
+    verdict = check_browser_url(url, config.browser.allowed_hosts, config.browser.blocked_hosts, config.server)
     if not verdict.allowed:
         raise ToolInputError(f"{_clip(url, 200)!r} is not an address Dot may open: {verdict.reason}.", {"url": url})
     return url
@@ -138,10 +138,10 @@ class OpenArgs(ToolArgs):
 
 def _open_tool() -> RegisteredTool:
     def classify(args: OpenArgs, ctx: ToolContext) -> ActionInfo:
-        return _navigate_action("browser_open", checked_url(args.url, ctx.runtime.config.browser))
+        return _navigate_action("browser_open", checked_url(args.url, ctx.runtime.config))
 
     async def run(args: OpenArgs, ctx: ToolContext) -> ToolResult:
-        url: str = checked_url(args.url, ctx.runtime.config.browser)
+        url: str = checked_url(args.url, ctx.runtime.config)
         return _page_result(await ctx.browser.open_url(ctx.thread_id, url), ctx)
 
     return make_tool(
@@ -161,10 +161,10 @@ def _open_tool() -> RegisteredTool:
 
 def _new_tab_tool() -> RegisteredTool:
     def classify(args: OpenArgs, ctx: ToolContext) -> ActionInfo:
-        return _navigate_action("browser_new_tab", checked_url(args.url, ctx.runtime.config.browser))
+        return _navigate_action("browser_new_tab", checked_url(args.url, ctx.runtime.config))
 
     async def run(args: OpenArgs, ctx: ToolContext) -> ToolResult:
-        url: str = checked_url(args.url, ctx.runtime.config.browser)
+        url: str = checked_url(args.url, ctx.runtime.config)
         return _page_result(await ctx.browser.new_tab(ctx.thread_id, url), ctx)
 
     return make_tool(
@@ -633,7 +633,7 @@ def _upload_flags(path_classes: list[PathClass]) -> tuple[Flag, ...]:
     flags: list[Flag] = []
     if "protected" in path_classes:
         flags.append("secret_access")
-    if any(path_class in ("home", "system") for path_class in path_classes):
+    if any(path_class in ("home", "system", "dot") for path_class in path_classes):
         flags.append("exfiltration")
     return tuple(flags)
 
@@ -641,7 +641,9 @@ def _upload_flags(path_classes: list[PathClass]) -> tuple[Flag, ...]:
 def _upload_tool() -> RegisteredTool:
     def classify(args: UploadArgs, ctx: ToolContext) -> ActionInfo:
         resolved = [expand_path(raw, ctx.workspace) for raw in args.paths]
-        classes: list[PathClass] = [classify_path(path, ctx.workspace, ctx.runtime.protected) for path in resolved]
+        classes: list[PathClass] = [
+            classify_path(path, ctx.workspace, ctx.runtime.protected, ctx.runtime.dot_paths) for path in resolved
+        ]
         flags: tuple[Flag, ...] = _upload_flags(classes)
         risk: Risk = "high" if flags else "medium"
         names: str = ", ".join(path.name for path in resolved)

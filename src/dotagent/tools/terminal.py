@@ -68,7 +68,7 @@ def _command_action(
 ) -> ActionInfo:
     """``command`` as ``assessment`` judged it, run in ``cwd``."""
     flags: tuple[Flag, ...] = assessment.flags
-    if classify_path(cwd, ctx.workspace, ctx.runtime.protected) == "protected":
+    if classify_path(cwd, ctx.workspace, ctx.runtime.protected, ctx.runtime.dot_paths) == "protected":
         flags = (*flags, "secret_access")
     preview: str = truncate_middle(" ".join(command.split()), _PREVIEW_CHARS)
     return _action(
@@ -120,7 +120,9 @@ async def _read(session: TerminalSession, wait_s: float, ctx: ToolContext) -> st
 def build_terminal_tools() -> tuple[RegisteredTool, ...]:
     def classify_open(args: OpenArgs, ctx: ToolContext) -> ActionInfo:
         cwd: Path = expand_path(args.cwd, ctx.workspace) if args.cwd else ctx.workspace
-        assessment: ShellAssessment = assess_shell(args.command, cwd, ctx.workspace, ctx.runtime.protected)
+        assessment: ShellAssessment = assess_shell(
+            args.command, cwd, ctx.workspace, ctx.runtime.protected, ctx.runtime.dot_paths
+        )
         return _command_action("terminal_open", "Open a terminal for", args.command, cwd, assessment, ctx)
 
     async def run_open(args: OpenArgs, ctx: ToolContext) -> ToolResult:
@@ -137,7 +139,9 @@ def build_terminal_tools() -> tuple[RegisteredTool, ...]:
             preview: str = truncate_middle(rest if rest is not None else repr(args.text), _PREVIEW_CHARS)
             return _action("terminal_send", "shell", "low", f"Type into {session.id}: {preview}", session.command, ())
         cwd: Path = session.cwd if session.cwd_known else Path.home()
-        assessment: ShellAssessment = assess_typed(lines, cwd, ctx.workspace, ctx.runtime.protected)
+        assessment: ShellAssessment = assess_typed(
+            lines, cwd, ctx.workspace, ctx.runtime.protected, ctx.runtime.dot_paths
+        )
         known: list[str] = [line for line in lines if line is not None]
         shown: str = "\n".join(known) if len(known) == len(lines) else repr(args.text)
         return _command_action("terminal_send", f"Type into {session.id}", shown, cwd, assessment, ctx)

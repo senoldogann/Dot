@@ -333,12 +333,12 @@ def _browser_problem(error: BrowserError) -> str:
 
 def _fetch_tool() -> RegisteredTool:
     def classify(args: FetchArgs, ctx: ToolContext) -> ActionInfo:
-        url: str = checked_url(args.url, ctx.runtime.config.browser)
+        url: str = checked_url(args.url, ctx.runtime.config)
         return _action("web_fetch", f"Read {url}", url, url_flags(url))
 
     async def run(args: FetchArgs, ctx: ToolContext) -> ToolResult:
         config: AppConfig = ctx.runtime.config
-        url: str = checked_url(args.url, config.browser)
+        url: str = checked_url(args.url, config)
         shown_url: str = _clip(url, _SHOWN_URL_CHARS)
         # Why the run's browser could not read the page when it was asked to (item 98); empty until it was.
         browser_problem: str = ""
@@ -654,14 +654,14 @@ class CrawlArgs(ToolArgs):
 
 def _crawl_tool() -> RegisteredTool:
     def classify(args: CrawlArgs, ctx: ToolContext) -> ActionInfo:
-        url: str = checked_url(args.url, ctx.runtime.config.browser)
+        url: str = checked_url(args.url, ctx.runtime.config)
         return _action(
             "web_crawl", f"Crawl {url} ({args.scope} scope, up to {args.max_pages} pages)", url, url_flags(url)
         )
 
     async def run(args: CrawlArgs, ctx: ToolContext) -> ToolResult:
         config: AppConfig = ctx.runtime.config
-        url: str = checked_url(args.url, config.browser)
+        url: str = checked_url(args.url, config)
         scope: Scope = scope_of(args.scope, url)
         max_pages: int = min(args.max_pages, config.web.crawl.max_pages)
         max_depth: int = min(args.max_depth, config.web.crawl.max_depth)
@@ -720,7 +720,7 @@ async def _source_text(source: str, ctx: ToolContext) -> str:
     """The text of a source: a page, PDF or text file fetched from the web, or a file of the workspace."""
     config: AppConfig = ctx.runtime.config
     if source.startswith(("http://", "https://")) or "/" not in source.split(".", 1)[0]:
-        url: str = checked_url(source, config.browser)
+        url: str = checked_url(source, config)
         document: FetchedDocument = await ctx.runtime.web.get(
             url, max(config.web.fetch_max_bytes, config.web.pdf_max_bytes)
         )

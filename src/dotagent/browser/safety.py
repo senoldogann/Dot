@@ -4,13 +4,16 @@ The page is untrusted: an element's name decides how a click or a keystroke is c
 then decides whether the user must be asked, whether the step is refused, or whether it is handed to the user.
 """
 
+import ipaddress
 import re
+import socket
 from collections.abc import Sequence
 from typing import get_args
 from urllib.parse import urlsplit
 
 from dotagent.browser.snapshot import SnapshotLine, parse_snapshot
 from dotagent.browser.types import SecretField, SecretKind, Step, StepAction
+from dotagent.config import ServerConfig
 from dotagent.core.errors import BrowserError
 from dotagent.core.types import FrozenModel
 from dotagent.policy.elements import (
@@ -27,6 +30,8 @@ from dotagent.policy.elements import (
 from dotagent.policy.types import Flag
 
 _ALLOWED_SCHEMES: frozenset[str] = frozenset({"http", "https"})
+_DEFAULT_PORTS: dict[str, int] = {"http": 80, "https": 443}
+_LOOPBACK_NAME: str = "localhost"
 _MAX_URL_CHARS: int = 2000
 _SCHEME: re.Pattern[str] = re.compile(r"^[A-Za-z][A-Za-z0-9+.-]*:")
 _HOST_LIKE: re.Pattern[str] = re.compile(r"^(localhost|[\w-]+(\.[\w-]+)+|\d{1,3}(\.\d{1,3}){3})(:\d+)?([/?#].*)?$")
@@ -112,6 +117,44 @@ def check_url(url: str, allowed_hosts: Sequence[str], blocked_hosts: Sequence[st
     if allowed_hosts and not host_matches(host, allowed_hosts):
         return UrlVerdict(allowed=False, reason=f"host {host!r} is not in browser.allowed_hosts")
     return UrlVerdict(allowed=True, reason="allowed")
+
+
+def _is_loopback(host: str) -> bool:
+    """Whether ``host`` names this Mac: ``localhost`` or a name under it, or a loopback or unspecified address in any
+    spelling a browser reads (``127.1``, ``2130706433``, ``0x7f.0.0.1``, ``::1``, ``::ffff:127.0.0.1``)."""
+    if host_matches(host, (_LOOPBACK_NAME,)):
+        return True
+    address: ipaddress.IPv4Address | ipaddress.IPv6Address
+    try:
+        address = ipaddress.ip_address(host)
+    except ValueError:
+        try:
+            address = ipaddress.IPv4Address(socket.inet_aton(host))
+        except OSError:
+            return False
+    if isinstance(address, ipaddress.IPv6Address) and address.ipv4_mapped is not None:
+        return address.ipv4_mapped.is_loopback or address.ipv4_mapped.is_unspecified
+    return address.is_loopback or address.is_unspecified
+
+
+def check_browser_url(
+    url: str, allowed_hosts: Sequence[str], blocked_hosts: Sequence[str], server: ServerConfig
+) -> UrlVerdict:
+    """What :func:`check_url` allows, save Dot's own interface: this Mac on the daemon's port, or a name of ``[server]
+    reach``. The owner's Chrome may be signed in there, and a run that opened it could answer its own questions."""
+    verdict: UrlVerdict = check_url(url, allowed_hosts, blocked_hosts)
+    if not verdict.allowed or url == "about:blank":
+        return verdict
+    parts = urlsplit(url)
+    try:
+        port: int | None = parts.port
+    except ValueError as exc:
+        return UrlVerdict(allowed=False, reason=f"malformed URL ({exc})")
+    host: str = parts.hostname or ""
+    reached: int = port if port is not None else _DEFAULT_PORTS[parts.scheme]
+    if host_matches(host, server.reach) or (reached == server.port and _is_loopback(host)):
+        return UrlVerdict(allowed=False, reason="it is Dot's own interface, which a run never opens")
+    return verdict
 
 
 def url_flags(url: str) -> tuple[Flag, ...]:

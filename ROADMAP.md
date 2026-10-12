@@ -5055,6 +5055,11 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 132 | Runs that keep going on every model when asked to                                    | done        | 002575b |
 | 133 | The composer's choices on a chat's page                                              | done        | bf11312 |
 | 134 | The traffic lights on the line of the top bars                                       | done        | a5b0220 |
+| 135 | What a run may change, send and open                                                 | in progress |         |
+| 136 | Spending, pacing and stops when two things happen at once                            | planned     |         |
+| 137 | A reply cut off is not an answer                                                     | planned     |         |
+| 138 | The store and the daemon's plumbing                                                  | planned     |         |
+| 139 | The web UI and the desktop shell                                                     | planned     |         |
 
 ### 77. The type system: Inter and Geist Mono, seven sizes, three weights
 
@@ -7656,6 +7661,111 @@ buttons do while the sidebar is closed or a drawer, and the page's room for the 
 test reads the centres of those buttons in the desktop shell's layout, with the sidebar open and closed and at a phone's
 width; the app is built; the owner reads the window by eye once the app is rebuilt.
 
+## Part 22: what a check of the whole found (planned 2026-10-12)
+
+The owner's twenty-second word, on 2026-10-12: that much code has been written, as professionally as could be, but like
+any professional work it may hold mistakes, wrong choices or gaps; a comprehensive check of everything, then the
+problems found fixed from the most important to the least.
+
+**Status (2026-10-12): planned.** How the check was made. Four reviews read the code by area: the policy and what a run
+may reach; the run's own machinery (the loop, the models, memory, the scheduler, undo); the store, the API and the
+daemon's plumbing; the web UI and the desktop shell. Each finding came with the lines it rests on and a case that shows
+it, and was read again in the code before it was ranked by weight: what lets a run do what the owner did not allow, or
+loses data, first; a bug on a common path or a race next; an edge or a missing timeout after; the rest last. Beside the
+reviews: the offline smoke suite on main (289 passed, one skipped), the history searched for keys (none but the fake
+ones of the redaction tests), and the dependencies checked against the advisories (`pip-audit` over 79 packages and
+`npm audit`: none; the Rust crates were not checked, `cargo audit` is not installed).
+
+**The shape of this part (the decisions).** Five items in the order of weight, each a pull request of its own: what a
+run may change, send and open (135); spending, pacing and stops when two things happen at once (136); a reply cut off
+taken for an answer (137); the store and the daemon's plumbing (138); the web UI and the desktop shell (139). What would
+change the design, or needs another account of the Mac to show, is left to the owner, not built. A finding that a second
+reading does not bear out is not fixed.
+
+### How to start part 22 (the handoff prompt)
+
+> Read ROADMAP.md part 22 and the status table of part 9 (rows 135 to 139). One item at a time, in order; the protocol
+> of part 5 (branch, gate, PR, Linear MYP issue, squash merge, hash in the table, log line) is unchanged. Read each
+> finding again in the code before fixing it, and give each fix a test that fails on the code of before. Never touch the
+> owner's data directory except to read it, by the kinds and numbers of what is stored, and to restart the daemon when
+> `/api/status` shows no active run; PLAN.md stays untracked. The owner reads Turkish; everything written is English.
+
+### 135. What a run may change, send and open
+
+**Status: in progress.**
+
+**As built (2026-10-12).** `dotagent.policy.paths` gains the path class `dot`: what Dot loads and runs, and its
+emergency stop (`Runtime.dot_paths`: the plugin folders with `[plugins] dirs`, `plugins-data`, the skill folders with
+`[skills] dirs`, `playbooks` and `STOP`). A run reads it as it reads the home folder; the file tools and the shell guard
+judge a change there as they judge one of a protected location (`secret_access`, refused outside `yolo`), with the
+reason "changes what Dot loads and runs". The shell guard also learns where more commands write: a copy (`cp`, `ln`,
+`install`, `ditto`, `rsync`, `scp`) reads its sources and writes its last operand, so a skill's template copied into the
+workspace stays allowed; `rsync` and `scp` are judged on what they write on this Mac as well as for the other machine;
+`git clone` on its folder, `curl` and `wget` on the files they save, `tar` and `unzip` on the folder they unpack into,
+and an interpreter's inline code on the places of Dot's it names. A browser upload of a file from those folders keeps
+the `exfiltration` flag it had. A new flag, `upload`, marks a shell line that sends data out: `curl` with a body or a
+method, `git push`, `scp` and `rsync` to another machine, `ssh`, `sftp` and the sockets, a code host's command line that
+creates, comments, edits, merges or deletes (`gh api` with fields or a method), and inline code that names the network,
+which now counts as fetching too; it changes nothing in a run that read no untrusted content and asks in one that did.
+`truncate` outside the workspace is destructive, so the default preset asks. `RunManager.delegate` gives an agent's run
+the stricter of the agent's approvals and the sender's (`ask`, then `auto`, then `yolo`). `check_browser_url` refuses
+this Mac on the daemon's port in any spelling a browser reads (`localhost` and the names under it, `127.1`,
+`2130706433`, `[::1]`, an IPv4 address written as IPv6) and the names of `[server] reach`; the browser session, the
+browser tools and the web tools use it, and a server of this Mac on another port still opens. The desktop's app role
+`dot` (the shell's bundle, `dev.dot.desktop`) refuses a step in Dot's own window outside `yolo`.
+`tests/smoke/test_chrome_front.py`, which changes the Mac's front application, is marked `desktop` as well. Tests: unit
+tests for the shell guard (Dot's folders changed and read, sends with and without untrusted content, `truncate`), the
+browser's refusal and the desktop role; smoke tests through a real runtime (the file and shell tools on a plugin's and a
+skill's files), through the team (an agent set to `yolo` answering runs that ask, review and go without asking) and in
+a browser (a session whose daemon listens on the test site's port); each fails on the code of before.
+
+**What.** Dot's own folders, the ones it loads and runs, are read but never changed by a run outside `yolo`; a shell
+line that sends data out asks once the run has read untrusted content; an agent answers a message in the stricter of its
+approvals and the sender's; the browser never opens Dot's own interface, and the desktop tools never act in Dot's own
+window outside `yolo`; truncating a file outside the workspace counts as destructive.
+
+### 136. Spending, pacing and stops when two things happen at once
+
+**Status: planned.**
+
+**What.** The spending cap and the pace of public actions are read, decided and recorded under one lock per host that
+every run shares, so two runs that pay or post at the same moment cannot pass the cap or the pace together. The
+emergency stop ends the runs it stops as stopped by it, and campaigns and schedules wait while it is engaged. A run
+stopped before its first step is cleaned up like any other; a takeover acts on the browser its run uses and lets the run
+go on when it fails; a schedule or a campaign changed while its run was being started is read again first; a run whose
+end cannot be recorded says so; a message sent while a run shuts down is not lost.
+
+### 137. A reply cut off is not an answer
+
+**Status: planned.**
+
+**What.** A model's reply that ended because it ran out of room, or for any reason other than its end, is not taken as
+the run's last answer: the loop asks the model to go on, or ends the run saying why.
+
+### 138. The store and the daemon's plumbing
+
+**Status: planned.**
+
+**What.** A write of several statements that is cancelled midway leaves no transaction open; a Chrome started for a run
+that is cancelled meanwhile is closed, not lost; the configuration's numbers are held to sensible bounds when it is
+read; a screenshot is written whole before it is kept under its hash; a subscription that cannot keep up logs what it
+drops; a reaper that dies says so, and closing the runtime goes on past a part that fails; an attachment's name never
+collides with the files Dot keeps beside it. And the smaller ones: pruning that a restart could undo, indexes for the
+commonest queries, a backfill that a crash could skip, a failed start that leaves a run behind, a request to start a run
+whose fields contradict each other.
+
+### 139. The web UI and the desktop shell
+
+**Status: planned.**
+
+**What.** In the desktop app a link that opens a new window opens in the browser; the shell's watcher neither reloads
+the page at its first look nor sends it to the down page after one slow answer, and a shortcut it cannot register no
+longer stops it; the sidebar reads the chats again after the stream reconnects; an error in handling one event is shown,
+not taken for a lost connection; the home's box keeps the reasoning level chosen before the models load; a note, a rule
+or a key is never added twice by a key pressed twice. And the smaller ones: answers that arrive out of order, an
+approval card left after a failed refresh, the shell's New chat, an answer that is not JSON, and the rights of the CI's
+token.
+
 ## Log
 
 - 2026-10-08: roadmap written from the owner's go-ahead for all eight items, in this order. Nothing implemented yet.
@@ -8223,3 +8333,4 @@ width; the app is built; the owner reads the window by eye once the app is rebui
 - 2026-10-12 (Opus 5.5): item 131 merged as `34e1fe1` (PR #165, MYP-272 Done): a chat whose latest run ended after it was last seen shows its dot in the accent and says unread, as T3 Code marks a thread with a turn not yet seen; the daemon keeps `threads.seen_at` (the chats of an older store taken as seen), `GET /api/threads` carries `unread` and `PATCH /api/threads/{id}` takes `seen`; the open chat is seen while the page is in view, and its menu offers Mark read and Mark unread. A review against the done criteria found them met and one regression, fixed before the merge: a chat opened by a key lost the focus when its dot went.
 - 2026-10-12 (Opus 5.5): item 133 merged as `bf11312` (PR #166, MYP-274 Done): the dock of a chat's page wears the home's pills, after T3 Code's composer: the mode, the model with its reasoning and the Options, set at first to the open run's and held by the page, and a follow-up starts its run with them; while a run works the pills wait for the next follow-up and say so. The pickers are one module that both boxes use. A review against the done criteria found them met and the smoke test short of their negative cases, which it now reads.
 - 2026-10-12 (Opus 5.5): item 134 merged as `a5b0220` (PR #167, MYP-275 Done): the desktop window puts its traffic lights 26 px under the top, on the centre line of the top bars' 52 px rows (`traffic_light_position` 20, 28), and the sidebar's head grows to the bars' height, so the lights, the button that folds the sidebar and the top bar's opener and emergency stop stand on one line with room above and below; the page keeps 96 px for the lights. Part 21 is done; the window is the owner's to read once the app is rebuilt.
+- 2026-10-12 (Opus 5.5): part 22 planned, items 135 to 139, from the owner's word asking for a check of everything written so far: four reviews of the code by area, each finding read again in the code and ranked by weight, the offline smoke suite on main and the dependencies against the advisories; the fixes follow in that order, one pull request each.

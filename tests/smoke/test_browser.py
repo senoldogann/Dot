@@ -16,6 +16,7 @@ import time
 from collections.abc import AsyncIterator, Iterator
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+from urllib.parse import urlsplit
 
 import pytest
 import pytest_asyncio
@@ -26,7 +27,7 @@ from dotagent.browser.safety import parse_element, refuse_secret_field
 from dotagent.browser.session import BrowserSession
 from dotagent.browser.types import ActOutcome, PageView, Step, TextWait
 from dotagent.browser.upstream import ignore_repeated_frame_detach
-from dotagent.config import BrowserConfig, load_config
+from dotagent.config import BrowserConfig, ServerConfig, load_config, load_default_config
 from dotagent.core.errors import BrowserError
 from dotagent.policy.elements import Element
 from dotagent.tools.base import ToolResult
@@ -34,6 +35,8 @@ from dotagent.tools.browser import wait_text_result
 
 pytestmark = [pytest.mark.browser, pytest.mark.asyncio(loop_scope="module")]
 
+# Whose interface the browser never opens: the daemon's default address.
+SERVER: ServerConfig = load_default_config().server
 _SLOW_REST_S: float = 8.0
 _LATE_HEADERS_S: float = 3.0
 
@@ -235,7 +238,7 @@ def browser_config(tmp_path_factory: pytest.TempPathFactory) -> BrowserConfig:
 async def browser(
     browser_config: BrowserConfig, tmp_path_factory: pytest.TempPathFactory, downloads: Path
 ) -> AsyncIterator[BrowserSession]:
-    session: BrowserSession = BrowserSession(browser_config, tmp_path_factory.mktemp("profile"), downloads)
+    session: BrowserSession = BrowserSession(browser_config, SERVER, tmp_path_factory.mktemp("profile"), downloads)
     yield session
     await session.aclose()
 
@@ -405,6 +408,21 @@ async def test_urls_outside_the_rules_are_refused(browser: BrowserSession, site:
             await browser.open_url("rules", url)
 
 
+async def test_the_interface_of_dot_is_never_opened(browser_config: BrowserConfig, site: str, tmp_path: Path) -> None:
+    """The test site stands in for Dot's interface: a session whose daemon listens on the site's port refuses it."""
+    port: int | None = urlsplit(site).port
+    assert port is not None
+    session: BrowserSession = BrowserSession(
+        browser_config, SERVER.model_copy(update={"port": port}), tmp_path / "profile", tmp_path / "downloads"
+    )
+    try:
+        with pytest.raises(BrowserError) as refused:
+            await session.open_url("own", f"{site}/")
+        assert "Dot's own interface" in str(refused.value.context["reason"]), refused.value.context
+    finally:
+        await session.aclose()
+
+
 async def test_threads_keep_separate_tabs(browser: BrowserSession, site: str) -> None:
     first, second = await asyncio.gather(
         browser.open_url("thread-a", f"{site}/popup"), browser.open_url("thread-b", f"{site}/form")
@@ -500,7 +518,7 @@ async def test_a_wait_that_times_out_checks_where_a_pending_navigation_went_befo
     config: BrowserConfig = browser_config.model_copy(update={"blocked_hosts": ["localhost"]})
     (tmp_path / "profile").mkdir()
     (tmp_path / "downloads").mkdir()
-    session: BrowserSession = BrowserSession(config, tmp_path / "profile", tmp_path / "downloads")
+    session: BrowserSession = BrowserSession(config, SERVER, tmp_path / "profile", tmp_path / "downloads")
     try:
         view: PageView = await session.open_url("blocked", f"{site}/to-blocked")
         await act(session, "blocked", [Step(action="click", ref=ref_of(view.body, 'button "Leave"'))], False)
@@ -776,7 +794,7 @@ async def test_a_click_and_a_batch_of_five_clicks_stay_fast(
     config: BrowserConfig = browser_config.model_copy(update={"settle_quiet_ms": quiet_ms})
     (tmp_path / "profile").mkdir()
     (tmp_path / "downloads").mkdir()
-    session: BrowserSession = BrowserSession(config, tmp_path / "profile", tmp_path / "downloads")
+    session: BrowserSession = BrowserSession(config, SERVER, tmp_path / "profile", tmp_path / "downloads")
     try:
         view: PageView = await session.open_url("timing", f"{site}/")
         click: Step = Step(action="click", ref=ref_of(view.body, 'button "Increment"'))

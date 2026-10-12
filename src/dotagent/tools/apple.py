@@ -33,7 +33,9 @@ def _targets_secrets(script: str) -> bool:
 
 
 def _classify(args: AppleScriptArgs, ctx: ToolContext) -> ActionInfo:
-    assessment: ShellAssessment = assess_applescript(args.script, ctx.workspace, ctx.workspace, ctx.runtime.protected)
+    assessment: ShellAssessment = assess_applescript(
+        args.script, ctx.workspace, ctx.workspace, ctx.runtime.protected, ctx.runtime.dot_paths
+    )
     risk: Risk = assessment.risk
     flags: tuple[Flag, ...] = assessment.flags
     if _targets_secrets(args.script):

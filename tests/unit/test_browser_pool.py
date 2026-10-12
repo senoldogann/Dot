@@ -8,7 +8,7 @@ from dotagent.config import load_default_config
 
 
 def test_the_pool_keeps_one_session_per_mode_and_starts_none(tmp_path: Path) -> None:
-    pool: BrowserPool = BrowserPool(load_default_config().browser, tmp_path)
+    pool: BrowserPool = BrowserPool(load_default_config().browser, load_default_config().server, tmp_path)
     assert pool.main.config.mode == "own"
     assert pool.session_for(None) is pool.main
     assert pool.session_for("own") is pool.main
