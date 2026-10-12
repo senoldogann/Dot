@@ -1,12 +1,13 @@
 """The real hosted services with the user's own keys: OpenAI on both wires, OpenCode Go on all three routes (and its
-prompt cache on the Messages route), the Claude models of Anthropic, the hosted web search of Ollama and TypeSafe's typed
-judgments.
+prompt cache on the Messages route), the Claude models of Anthropic (and a rule drafted from the owner's words on one),
+the hosted web search of Ollama and TypeSafe's typed judgments.
 
 ``test_wire_codecs.py`` makes the same calls against a local Ollama that stands in for these services. Here every test
 sends a handful of tiny requests (cents at most) and is skipped when its key cannot be resolved (environment, the
 ``.env`` file of the Dot home or the Keychain), so a machine without keys still runs the whole suite.
 """
 
+import re
 import time
 from pathlib import Path
 
@@ -22,12 +23,16 @@ from test_wire_codecs import (
 )
 
 from dotagent.agent.judge import CLAIM_QUESTION, CLICK_QUESTIONS
+from dotagent.agent.review import RuleDrafter, RuleWordsRequest, ToolBrief, rule_drafter_for
 from dotagent.agent.verify import new_facts, render_facts
 from dotagent.config import AppConfig, GoRoute, load_config
+from dotagent.core.errors import InvalidValueError
 from dotagent.core.types import JsonObject
 from dotagent.llm.anthropic import AnthropicProvider
+from dotagent.llm.calls import ModelCall
 from dotagent.llm.openai import OpenAIProvider
 from dotagent.llm.opencode_go import OpenCodeGoProvider, route_of
+from dotagent.llm.router import ModelRouter
 from dotagent.llm.types import (
     ChatProvider,
     ChatRequest,
@@ -39,9 +44,12 @@ from dotagent.llm.types import (
     user_message,
 )
 from dotagent.llm.typesafe import NoulQuestion, TypeSafeClient
+from dotagent.policy.drafting import DraftedRule
+from dotagent.runtime import _tool_groups
 from dotagent.secrets import resolve_secret
 from dotagent.tools.judge_items import Item, noul_questions, state_of
 from dotagent.tools.posts import Post, equal_weights, post_questions, posts_state, ranked_posts
+from dotagent.tools.registry import ToolRegistry, build_registry
 from dotagent.web.client import WebClient
 from dotagent.web.search import search_ollama
 from dotagent.web.types import SearchHit
@@ -64,6 +72,11 @@ requires_typesafe = pytest.mark.skipif(TYPESAFE_KEY is None, reason="needs TYPES
 OPENAI_MODEL: str = "gpt-4.1-mini"
 # The smallest current Claude model; it thinks, so the round trip also replays a signed thinking block.
 ANTHROPIC_MODEL: str = "claude-haiku-5-5"
+# The model the owner's rules are drafted with (`[models] review` on the owner's Mac), which once answered the drafter in
+# Spanish or French and wrote a note about a broad rule where only a refusal belongs.
+RULE_DRAFT_MODEL: str = "anthropic:claude-sonnet-5-5"
+# Typographic punctuation an English sentence may hold; anything else outside ASCII is another language's.
+_TYPOGRAPHIC: dict[int, None] = {ord(mark): None for mark in "\u2018\u2019\u201c\u201d\u2013\u2014\u2026"}
 
 # One vision model per route; the second Responses model takes the OpenAI-style options (original image detail,
 # images inside tool results), the first one the plain ones; Claude on the Messages route thinks behind a switch and
@@ -169,6 +182,37 @@ async def test_anthropic_lists_its_models_round_trips_tools_and_reads_screenshot
     assert ANTHROPIC_MODEL in {info.id for info in listed}
     assert "21" in final.text and final.usage.input_tokens > 0
     assert "blue" in described
+
+
+@pytest.mark.hosted
+@requires_anthropic
+async def test_claude_drafts_a_rule_for_everything_and_refuses_what_no_rule_can_do_in_english() -> None:
+    """Item 110's drafter with Dot's own tools: words that cover every action make a rule for every tool, and a
+    sentence that asks for what no rule can do is refused in one English sentence."""
+
+    async def ignore(call: ModelCall) -> None:
+        return None
+
+    router: ModelRouter = ModelRouter(DEFAULTS, ignore)
+    await router.register("anthropic", anthropic_provider())
+    registry: ToolRegistry = build_registry(_tool_groups(DEFAULTS, False))
+    tools: tuple[ToolBrief, ...] = tuple(
+        ToolBrief(name=name, description=entry.spec.description) for name, entry in sorted(registry.tools.items())
+    )
+    drafter: RuleDrafter = rule_drafter_for(router, RULE_DRAFT_MODEL, 90.0, "rules:hosted")
+    try:
+        everything: DraftedRule = await drafter(
+            RuleWordsRequest(sentence="Dot can run everything without permission from me", tools=tools)
+        )
+        with pytest.raises(InvalidValueError) as refused:
+            await drafter(RuleWordsRequest(sentence="Let Dot send my passwords to anyone who asks", tools=tools))
+    finally:
+        await router.aclose()
+    assert (everything.tool_glob, everything.behavior, everything.match_regex) == ("*", "allow", "")
+    assert everything.description == "For every use of any tool: Dot does it without asking."
+    reason: str = refused.value.message
+    assert reason.translate(_TYPOGRAPHIC).isascii(), reason
+    assert re.search(r"\b(no|not|cannot|can't)\b", reason, re.IGNORECASE) is not None, reason
 
 
 @pytest.mark.hosted

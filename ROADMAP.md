@@ -6363,6 +6363,19 @@ Tests: `tests/unit/test_rule_drafting.py` (the patterns against the shell tool's
 `tests/smoke/test_rules.py` (no rule from a question about the weather, a git rule drafted, read back, filled and added,
 the box emptied, the phone in dark, and the approval card's offer opening the tab with its sentence).
 
+**Fixed after (2026-10-12).** The owner's sentence "Dot can run everything without permission from me" came back as a
+refusal in Spanish. Asked again with Dot's tools, the review model on the owner's Mac (`anthropic:claude-sonnet-5-5`)
+answered it once in Spanish ("too broad") and once with an English note about the broad rule in `problem`, which the
+drafter takes for a refusal, and refused a sentence asking it to send passwords out in French: "in the language of the
+owner's sentence" let it pick a language. The drafter's instructions (`review._RULE_SYSTEM` and the description of
+`RuleDraft.problem`) now say that `problem` is empty whenever the parts are a rule, a broad one too, and never holds a
+note; that its one sentence is in English, the language of Dot's interface; and that words covering every action make a
+rule for every tool (`*`, no commands, no mentions), since the protections that are always on stay on whatever a rule
+says: only a sentence that asks for one of those actions itself is refused. On the same model the sentence now drafts
+"For every use of any tool: Dot does it without asking.", in Turkish too; the passwords and a sentence about Dot's tone
+are refused in English; the page's three examples draft as before. `tests/smoke/test_hosted_services.py` (hosted, on
+that model): the rule for everything and the refusal in English. README: Rules.
+
 **What.** `POST /api/rules/draft` takes a sentence ("let Dot run git status and git diff without asking", "always
 ask me before it posts on X") and returns a `RuleRequest` drafted by the fast model with a typed reply (tool glob,
 regex, answer, why, and one line that reads the rule back), checked against the tools the daemon has and the four
