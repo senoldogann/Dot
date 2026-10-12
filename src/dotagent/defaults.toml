@@ -205,7 +205,9 @@ stall_limit = 4
 failure_streak = 6
 revisit_window = 8
 # A reply without a tool call is nudged towards finish; the finish_nudges + 1st such reply in a row ends a task run with
-# that reply as its result (a step with tool calls starts the count again).
+# that reply as its result (a step with tool calls starts the count again). A reply the model service cut short (its
+# output limit, or an abnormal end such as a content filter) is never a result, in any mode: it is nudged too, and the
+# finish_nudges + 1st in a row fails the run.
 finish_nudges = 2
 # What ask_user does in a run nobody can answer during the run (yolo, scheduled and eval runs): "leave" stores the
 # question for you (the run's page lists it, your answer goes on with the work in the run's thread) and the run goes on

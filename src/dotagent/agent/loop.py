@@ -162,6 +162,7 @@ from dotagent.llm.types import (
     ChatRequest,
     DeltaSink,
     Effort,
+    FinishReason,
     Message,
     ModelInfo,
     ModelReply,
@@ -180,7 +181,7 @@ from dotagent.policy.types import QuestionMode
 from dotagent.runtime import Runtime
 from dotagent.skills.catalog import load_skills, playbook_root
 from dotagent.skills.types import Skill, SkillCatalog
-from dotagent.store.endings import GOAL_CHECK_MARK, RESULT_EMPTY_REPLIES
+from dotagent.store.endings import GOAL_CHECK_MARK, PREFIX_CUT_SHORT, RESULT_EMPTY_REPLIES
 from dotagent.store.models import AgentRecord, CampaignRecord, EventRecord, MemoryRecord, RunMode, RunRecord
 from dotagent.store.stats import ACT_TOOLS
 from dotagent.tools.campaign import CAMPAIGN_TOOLS
@@ -246,6 +247,13 @@ _NO_TOOL_NOTE: str = (
     "complete final answer. Otherwise continue by calling the tools you need."
 )
 _EMPTY_NOTE: str = "[system note] Your last reply was empty. Continue with the task using tools, or call finish."
+# How a reply ends that the model service stopped before it was complete: at its output limit, or for an abnormal
+# reason it gave (a content filter, a refusal, a reason the codecs do not know).
+_CUT_SHORT: frozenset[FinishReason] = frozenset({"length", "other"})
+_CUT_SHORT_NOTE: str = (
+    "[system note] Your last reply was cut short before its end (it ended with '{reason}'). Continue with the tools "
+    "you need, or give your complete answer again in fewer words."
+)
 _PLAN_NOTE: str = (
     "[system note] Your plan still shows step(s) {steps} as not closed. Mark each of them done, failed or skipped "
     "with mark_plan_step (several calls in one reply), then end the run again with your complete final answer."
@@ -737,6 +745,20 @@ async def _close_delegated_steps(agent: AgentRun, outcomes: Sequence[ToolOutcome
     return (
         "[system note] The delegated runs ended, but their plan steps could not be closed, so mark them yourself: "
         + ("; ".join(problems))
+    )
+
+
+def _ended_with(reply: ModelReply) -> str:
+    """How the model service said a reply ended, in its own words where it gave them."""
+    return reply.raw_finish or reply.finish
+
+
+def _cut_short_end(reply: ModelReply) -> RunOutcome:
+    """The end of a run whose replies the model service kept cutting short: failed, with the last one's reason."""
+    return RunOutcome(
+        status="failed",
+        result=f"{PREFIX_CUT_SHORT} and the run did not finish (the last one ended with '{_ended_with(reply)}').",
+        needs="",
     )
 
 
@@ -1669,6 +1691,12 @@ async def run_agent(agent: AgentRun) -> RunEnd:
             answered: bool = bool(reply.text.strip())
             if past_limit is not None:
                 return _run_end(agent, history, goal, await _limit_end(agent, past_limit, ledger, reply.text), facts)
+            elif reply.finish in _CUT_SHORT and nudges >= config.finish_nudges:
+                return _run_end(agent, history, goal, _cut_short_end(reply), facts)
+            elif reply.finish in _CUT_SHORT:
+                nudges += 1
+                history.append(await _stored_note(agent, _CUT_SHORT_NOTE.format(reason=_ended_with(reply))))
+                continue
             elif answered and (run.mode == "chat" or not used_tools or nudges >= config.finish_nudges):
                 ended = RunOutcome(status="done", result=reply.text, needs="")
             elif nudges >= config.finish_nudges:

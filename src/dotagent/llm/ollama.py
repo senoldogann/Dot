@@ -271,7 +271,7 @@ def apply_chunk(
 def finish_reason(state: StreamState) -> FinishReason:
     if state.tool_calls:
         return "tool_calls"
-    if state.done_reason == "stop":
+    if state.done_reason in ("", "stop"):
         return "stop"
     if state.done_reason == "length":
         return "length"

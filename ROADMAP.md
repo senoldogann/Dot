@@ -5056,8 +5056,8 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 133 | The composer's choices on a chat's page                                              | done        | bf11312 |
 | 134 | The traffic lights on the line of the top bars                                       | done        | a5b0220 |
 | 135 | What a run may change, send and open                                                 | done        | cb76e7d |
-| 136 | Spending, pacing and stops when two things happen at once                            | in progress |         |
-| 137 | A reply cut off is not an answer                                                     | planned     |         |
+| 136 | Spending, pacing and stops when two things happen at once                            | done        | bb18c32 |
+| 137 | A reply cut off is not an answer                                                     | in progress |         |
 | 138 | The store and the daemon's plumbing                                                  | planned     |         |
 | 139 | The web UI and the desktop shell                                                     | planned     |         |
 
@@ -7726,28 +7726,29 @@ window outside `yolo`; truncating a file outside the workspace counts as destruc
 
 ### 136. Spending, pacing and stops when two things happen at once
 
-**Status: in progress.**
+**Status: done.** Merged as `bb18c32` (PR #170, MYP-277 Done).
 
 **As built (2026-10-12).** `dotagent.agent.gate.SiteLocks`, one per runtime (`Runtime.site_locks`) and shared by the
-gates of all its runs, holds a lock per site for its pace and one for its spending: a public or social action is
-checked against the pace, decided, spaced and recorded under the first; a payment with an amount on a site with caps
-reads what was spent, is decided and is recorded under the second. A second run's payment or post on the same site
-waits for the first, the owner's answer included, and is judged from what the first did. `RunManager.emergency_stop`,
-which `POST /api/failsafe` calls, ends every active run with the result "Emergency stop: every active run was stopped."
-(the ending `emergency_stop`), so the campaign of a session it ends stops instead of planning the next one; while the
-`STOP` file exists the scheduler fires no schedule (a due firing is skipped to its next time with the status "skipped:
-the emergency stop is engaged") and starts no campaign session. A run's task starts eagerly, so a stop that comes
-before its first step lands inside it and ends it as any stop does (before, the run stayed queued, its thread refused
-new runs and the daemon's shutdown waited for it forever). A takeover brings up the tab in the browser the run works
-in (`loop.browser_of`: a campaign's for its sessions) and frees the run again when the tab cannot be brought up. The
-scheduler reads each due schedule again just before it fires it, so one switched off or deleted meanwhile does not
-fire, and a campaign stopped or marked achieved while its session was being started (the owner's Stop found no session
-to stop) ends that session at once. A run whose end cannot be recorded is logged with the traceback (`run_end_not_recorded`), its handle is freed and
-its waiters wake. The inbox of a run is shut the moment the run ends, before anything awaits, so a message sent then is
-refused instead of being accepted and dropped. Tests: two runs paying, and two posting, on one site at once; a session
-the emergency stop ends and its campaign held; a schedule skipped under the stop; a schedule switched off during a
-tick; a campaign stopped while its session starts; a takeover of a campaign's session and one whose tab cannot be brought up; a run stopped before its first step,
-a message sent while its end is recorded, a store that fails to record it. Each fails on the code of before.
+gates of all its runs, holds a lock per site for its pace and one for its spending: a public or social action is checked
+against the pace, decided, spaced and recorded under the first; a payment with an amount on a site with caps reads what
+was spent, is decided and is recorded under the second. A second run's payment or post on the same site waits for the
+first, the owner's answer included, and is judged from what the first did. `RunManager.emergency_stop`, which
+`POST /api/failsafe` calls, ends every active run with the result "Emergency stop: every active run was stopped." (the
+ending `emergency_stop`), so the campaign of a session it ends stops instead of planning the next one; while the `STOP`
+file exists the scheduler fires no schedule (a due firing is skipped to its next time with the status "skipped: the
+emergency stop is engaged") and starts no campaign session. A run's task starts eagerly, so a stop that comes before its
+first step lands inside it and ends it as any stop does (before, the run stayed queued, its thread refused new runs and
+the daemon's shutdown waited for it forever). A takeover brings up the tab in the browser the run works in
+(`loop.browser_of`: a campaign's for its sessions) and frees the run again when the tab cannot be brought up. The
+scheduler reads each due schedule again just before it fires it, so one switched off or deleted meanwhile does not fire,
+and a campaign stopped or marked achieved while its session was being started (the owner's Stop found no session to
+stop) ends that session at once. A run whose end cannot be recorded is logged with the traceback
+(`run_end_not_recorded`), its handle is freed and its waiters wake. The inbox of a run is shut the moment the run ends,
+before anything awaits, so a message sent then is refused instead of being accepted and dropped. Tests: two runs paying,
+and two posting, on one site at once; a session the emergency stop ends and its campaign held; a schedule skipped under
+the stop; a schedule switched off during a tick; a campaign stopped while its session starts; a takeover of a campaign's
+session and one whose tab cannot be brought up; a run stopped before its first step, a message sent while its end is
+recorded, a store that fails to record it. Each fails on the code of before.
 
 **What.** The spending cap and the pace of public actions are read, decided and recorded under one lock per host that
 every run shares, so two runs that pay or post at the same moment cannot pass the cap or the pace together. The
@@ -7758,7 +7759,19 @@ end cannot be recorded says so; a message sent while a run shuts down is not los
 
 ### 137. A reply cut off is not an answer
 
-**Status: planned.**
+**Status: in progress.**
+
+**As built (2026-10-12).** A reply without tool calls that the model service ended before it was complete, at its output
+limit (the finish `length`: the service's own `length`, `max_tokens`, `max_output_tokens` or
+`model_context_window_exceeded`) or for an abnormal reason (the finish `other`: a content filter, a refusal, a reason
+the codecs do not know), is not taken as the run's answer in any mode. The loop stores a note that says how the reply
+ended, in the service's own words, and asks the model to go on with its tools or to give the complete answer again in
+fewer words. The note counts as a nudge: after `[agent] finish_nudges` of them in a row the run fails with "The model's
+replies were cut short and the run did not finish (the last one ended with '…')." (the ending `cut_short`, "replies from
+the model cut short"). An Ollama reply whose `done_reason` is empty is a normal stop, as the chat and messages codecs
+already took an empty reason. Tests: a chat whose first reply is cut short ends with the complete second one; a task run
+whose replies keep being cut short fails saying so; the reasons Ollama gives for a reply's end. Each fails on the code
+of before.
 
 **What.** A model's reply that ended because it ran out of room, or for any reason other than its end, is not taken as
 the run's last answer: the loop asks the model to go on, or ends the run saying why.
@@ -8356,3 +8369,4 @@ token.
 - 2026-10-12 (Opus 5.5): item 134 merged as `a5b0220` (PR #167, MYP-275 Done): the desktop window puts its traffic lights 26 px under the top, on the centre line of the top bars' 52 px rows (`traffic_light_position` 20, 28), and the sidebar's head grows to the bars' height, so the lights, the button that folds the sidebar and the top bar's opener and emergency stop stand on one line with room above and below; the page keeps 96 px for the lights. Part 21 is done; the window is the owner's to read once the app is rebuilt.
 - 2026-10-12 (Opus 5.5): part 22 planned, items 135 to 139, from the owner's word asking for a check of everything written so far: four reviews of the code by area, each finding read again in the code and ranked by weight, the offline smoke suite on main and the dependencies against the advisories; the fixes follow in that order, one pull request each.
 - 2026-10-12 (Opus 5.5): item 135 merged as `cb76e7d` (PR #169, MYP-276 Done): Dot's own folders (what it loads and runs, and the emergency stop's file) are a path class of their own, read like the home folder and changed like a protected location; the shell guard learns more write targets; a new flag, `upload`, asks before a shell line sends data out once the run has read untrusted content; an agent answers a message in the stricter of its approvals and the sender's; the browser never opens Dot's own interface and the desktop tools never act in Dot's own window outside `yolo`; `truncate` outside the workspace is destructive.
+- 2026-10-12 (Opus 5.5): item 136 merged as `bb18c32` (PR #170, MYP-277 Done): the gates of all runs share one lock per site for its pace and one for its spending, so two runs that pay or post on one site at once are judged one after the other; the emergency stop ends every active run as an emergency stop, and while it is engaged no schedule fires and no campaign session starts; a run stopped before its first step ends as any stop does; a takeover brings up the run's own browser and frees the run when that fails; a schedule or a campaign changed while its run was being started is read again first; a run whose end cannot be recorded is logged and freed, and a message sent as a run ends is refused instead of dropped.
