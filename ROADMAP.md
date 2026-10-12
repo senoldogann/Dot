@@ -5051,8 +5051,8 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 128 | Your own themes, kept by the daemon                                                  | done        | 30b2434 |
 | 129 | The composer at the foot of the window                                               | done        | 048f3aa |
 | 130 | A chat's menu: pin, rename, copy the link, select, delete                            | done        | d7e7d5e |
-| 131 | Unread chats                                                                         | planned     |         |
-| 132 | Runs that keep going on every model when asked to                                    | in progress |         |
+| 131 | Unread chats                                                                         | in progress |         |
+| 132 | Runs that keep going on every model when asked to                                    | done        | 002575b |
 | 133 | The composer's choices on a chat's page                                              | planned     |         |
 | 134 | The traffic lights on the line of the top bars                                       | planned     |         |
 
@@ -7477,7 +7477,28 @@ the key, pins, renames, copies and deletes; the tour is read by eye.
 
 ### 131. Unread chats
 
-**Status: planned.**
+**Status: in progress.**
+
+**As built (2026-10-12).** The daemon keeps when each chat was last seen in `threads.seen_at`; added to a store made
+before it, the column is filled with the time it was added, so the chats there are taken as seen and none turns up
+unread at once, while a new chat starts unseen. A chat is unread when its latest run a person started has ended
+after it was last seen, or has ended and the chat was marked unseen: `GET /api/threads` carries `unread`, and
+`PATCH /api/threads/{id}` takes `seen` (true marks it seen now, false unseen; 404 for no chat, 422 for a value that
+is not a boolean). The sidebar paints an unread chat's dot in the accent, where a run that ended well shows none and
+a failed one keeps its red, and its row says "unread" to a screen reader. Rather than tracking which run ended where,
+the open chat is seen whenever the page is in view, shown and in a window that has the focus, so a window behind
+others shows nothing new: on opening, on every repaint of the list (a run that ends there, whichever run the page
+shows) and when the page comes back into view; Mark unread on the open chat holds until it is opened again or the
+page comes back into view. The menu offers Mark read on an unread chat and Mark unread on a read one whose run is
+over, after Pin; a daemon from before item 131 sends no `unread`, and the page shows no dot and offers neither.
+Tests: `tests/unit/test_store_threads.py` (a store from before the mark takes its chats as seen, over two openings;
+a chat is unread once its run ends until seen, unseen again, read while a run is under way, unread when that run
+ends; 404), `tests/smoke/test_server.py` (the route: unread after a run ends, seen, unseen, 404, 422) and
+`tests/smoke/test_unread_chats.py` (a run that ended before the page opened leaves an accent dot that says unread;
+opening the chat clears it, and a run that ends in the open chat leaves none; a run that ends in another chat
+leaves that one unread; Mark unread on the open chat brings the dot back, kept while another chat is opened and
+over a reload, in the light and the dark scheme; Mark read clears it); `tests/smoke/test_chat_menu.py` knows the
+new item; the screenshots read by eye.
 
 **What.** A chat whose latest run ended after the chat was last seen shows a dot in the accent colour and says unread
 to a screen reader, as T3 Code marks a thread with a turn not yet seen; opening the chat, or having it open in view when
@@ -7532,7 +7553,7 @@ height so that its button stands there too.
 
 ### 132. Runs that keep going on every model when asked to
 
-**Status: in progress.**
+**Status: done.** Merged as `002575b` (PR #164, MYP-273 Done).
 
 **As built (2026-10-12).** `agent/keep_going.py` finds the ask in whole words, in English and in Turkish, with the
 Turkish letters or without them and with the typed apostrophe or the curly one that a phone's keyboard puts; the capital
@@ -8160,3 +8181,4 @@ width; the app is built; the owner reads the window by eye once the app is rebui
 - 2026-10-12 (Opus 5.5): item 129 merged as `048f3aa` (PR #161, MYP-270 Done): the run page's column is at least as tall as the window and the conversation grows into the room a short one leaves, so the composer stands at the window's foot from the first message, on a desktop with the details panel open or closed and on a phone; a long run scrolls under it as before; a smoke test reads the composer's foot at the window's.
 - 2026-10-12 (Opus 5.5): item 130 merged as `d7e7d5e` (PR #162, MYP-271 Done): a chat's menu after T3 Code's thread menu, from a "…" button, a right-click or the context-menu key: Pin (a Pinned group above the days, kept by the daemon in `threads.pinned_at`), Rename in the row, Copy link, Select and Delete; `PATCH /api/threads/{id}`; a review against the done criteria found them met and five edges, fixed before the merge; 930 unit tests and a smoke test in a browser on a desktop and a phone.
 - 2026-10-12 (Opus 5.5): part 21 planned, items 132 to 134, from the owner's word with a screenshot of a run on a hosted model that ended with a report and suggestions and one of the desktop window's top left, and a reading of the store by kinds and numbers: runs that keep going on every model when asked to, the composer's choices on a chat's page and the traffic lights on the line of the top bars; no code changed.
+- 2026-10-12 (Opus 5.5): item 132 merged as `002575b` (PR #164, MYP-273 Done): words that ask a run not to stop, in English or in Turkish, put a task or research run a person starts in goal mode whatever the switch says, the goal checker is told and accepts a finish only when every part of the goal is done and shown, every goal check sends back an answer that offers to do a part of the goal not done yet, and every model is told to keep acting and to take the ask at its word; the Details card reads "On, asked not to stop". A review against the done criteria found two blockers, fixed before the merge: a phone's curly apostrophe, and an offer rule that reached past the goal.

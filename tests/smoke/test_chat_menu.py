@@ -230,8 +230,8 @@ async def test_a_chats_menu_pins_names_copies_chooses_and_deletes_it(
         await page.keyboard.press("Shift+F10")
         menu = page.get_by_role("menu", name="Trip notes")
         await expect(menu.get_by_role("menuitem", name="Pin")).to_be_focused()
-        await page.keyboard.press("ArrowDown")
-        await page.keyboard.press("ArrowDown")
+        for _ in ("Mark read", "Rename", "Copy link"):
+            await page.keyboard.press("ArrowDown")
         await expect(menu.get_by_role("menuitem", name="Copy link")).to_be_focused()
         await page.keyboard.press("Enter")
         await expect(page.locator(".toast", has_text="Link copied.")).to_be_visible()

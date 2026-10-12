@@ -41,7 +41,9 @@ _MARK_WAIT_S: float = 10.0
 
 
 def _finish() -> ScriptedTurn:
-    return ScriptedTurn(text="", calls=(ScriptedCall(tool=FINISH_TOOL, arguments={"answer": "Done.", "success": True}),))
+    return ScriptedTurn(
+        text="", calls=(ScriptedCall(tool=FINISH_TOOL, arguments={"answer": "Done.", "success": True}),)
+    )
 
 
 @pytest_asyncio.fixture(scope="module", loop_scope="module")
