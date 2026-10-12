@@ -18,7 +18,7 @@ from dotagent.desktop import apps, ax, screen
 from dotagent.desktop import input as hid
 from dotagent.desktop.ax import ElementState
 from dotagent.desktop.input import EventSource, parse_chord
-from dotagent.desktop.safety import DESKTOP_CLICKABLE_ROLES, AppRole, StepContext, app_role, enters_text
+from dotagent.desktop.safety import DESKTOP_CLICKABLE_ROLES, AppRole, StepContext, enters_text, window_role
 from dotagent.desktop.types import (
     DEFAULT_SCROLL_PX,
     AppInfo,
@@ -107,12 +107,14 @@ class StepEnv:
 
 @dataclass(frozen=True, slots=True)
 class Target:
-    """What a step acts upon: the control (if one was found) and the application it belongs to."""
+    """What a step acts upon: the control (if one was found), the application it belongs to and the title of the
+    window it is in (``None`` when there is none)."""
 
     ref: int | None
     state: ElementState | None
     owner: AppInfo
     point: Point | None
+    window: str | None
 
 
 @dataclass(frozen=True, slots=True)
@@ -235,9 +237,34 @@ def _state_of(env: StepEnv, number: int, element: AXElement) -> ElementState:
         ) from error
 
 
+def _window_title(element: AXElement | None, app: AXElement, pid: int) -> str | None:
+    """The title of the window a step acts in: the one ``element`` is in, else the focused window of the application;
+    ``None`` when the application has no window."""
+    window: AXElement | None = None if element is None else ax.window_of(element, pid)
+    if window is None:
+        window = ax.focused_window(app, pid)
+    return None if window is None else ax.title_of(window, pid)
+
+
+def _app_window_title(env: StepEnv, owner: AppInfo) -> str | None:
+    """The title of the focused window of ``owner``; ``None`` for the desktop itself."""
+    if owner.pid == _NO_APP.pid:
+        return None
+    root: AXElement = (
+        env.app_element if owner.pid == env.app.pid else ax.app_element(owner.pid, env.config.ax_timeout_s)
+    )
+    return _window_title(None, root, owner.pid)
+
+
 def _peek_ref(env: StepEnv, raw: str) -> Target:
     number, element = _element_for(env, raw)
-    return Target(ref=number, state=_state_of(env, number, element), owner=env.app, point=None)
+    return Target(
+        ref=number,
+        state=_state_of(env, number, element),
+        owner=env.app,
+        point=None,
+        window=_window_title(element, env.app_element, env.app.pid),
+    )
 
 
 def _to_points(env: StepEnv, x: float, y: float) -> Point:
@@ -276,7 +303,15 @@ def _peek_point(env: StepEnv, x: float, y: float) -> Target:
         owner = _app_for(env, window.pid, window.owner)
     else:
         owner = _NO_APP
-    return Target(ref=None, state=state, owner=owner, point=point)
+    # The window under the point, as the window server names it, when it is the owner's; else its focused one.
+    title: str | None = window.title if window is not None and window.pid == owner.pid and window.title else None
+    return Target(
+        ref=None,
+        state=state,
+        owner=owner,
+        point=point,
+        window=title if title is not None else _app_window_title(env, owner),
+    )
 
 
 def _window_frame(env: StepEnv) -> Rect:
@@ -292,12 +327,18 @@ def _peek(env: StepEnv, ref: str | None, x: float | None, y: float | None) -> Ta
         return _peek_ref(env, ref)
     if x is not None and y is not None:
         return _peek_point(env, x, y)
-    return Target(ref=None, state=None, owner=env.app, point=_window_frame(env).center())
+    return Target(
+        ref=None,
+        state=None,
+        owner=env.app,
+        point=_window_frame(env).center(),
+        window=_app_window_title(env, env.app),
+    )
 
 
 def _context(target: Target, lines: Mapping[str, str]) -> StepContext:
     state: ElementState | None = target.state
-    role: AppRole = app_role(target.owner.name, target.owner.bundle_id)
+    role: AppRole = window_role(target.owner.name, target.owner.bundle_id, target.window)
     return StepContext(
         role=role,
         app=target.owner.name,
@@ -327,7 +368,7 @@ def _keyboard_target(env: StepEnv) -> Target:
     root: AXElement = env.app_element if pid == env.app.pid else ax.app_element(pid, env.config.ax_timeout_s)
     focused: AXElement | None = ax.focused_element(root, pid)
     state: ElementState | None = None if focused is None else ax.read_state(focused, pid)
-    return Target(ref=None, state=state, owner=owner, point=None)
+    return Target(ref=None, state=state, owner=owner, point=None, window=_window_title(focused, root, pid))
 
 
 def refuse_secrets(context: StepContext) -> None:
@@ -354,10 +395,17 @@ def inspect_step(env: StepEnv, step: Step, lines: Mapping[str, str]) -> Inspecti
         case "key":
             return _inspection(env, lines, _keyboard_target(env))
         case "menu" | "wait":
-            return _inspection(env, lines, Target(ref=None, state=None, owner=env.app, point=None))
+            return _inspection(
+                env,
+                lines,
+                Target(ref=None, state=None, owner=env.app, point=None, window=_app_window_title(env, env.app)),
+            )
         case "activate":
             named: AppInfo | None = apps.find_app(_required(step.text, "application"), env.running)
-            return _inspection(env, lines, Target(ref=None, state=None, owner=named or env.app, point=None))
+            owner: AppInfo = named or env.app
+            return _inspection(
+                env, lines, Target(ref=None, state=None, owner=owner, point=None, window=_app_window_title(env, owner))
+            )
 
 
 def _window_frame_of(env: StepEnv, element: AXElement) -> Rect | None:

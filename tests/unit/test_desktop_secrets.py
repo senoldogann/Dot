@@ -9,7 +9,7 @@ import pytest
 from dotagent.core.errors import DesktopError
 from dotagent.desktop.actions import _pastes, refuse_secrets
 from dotagent.desktop.input import parse_chord
-from dotagent.desktop.safety import StepContext, app_role, assess_step, enters_text
+from dotagent.desktop.safety import AppRole, StepContext, app_role, assess_step, enters_text, window_role
 from dotagent.desktop.types import Step
 from dotagent.policy.elements import Element, StepAssessment
 from dotagent.policy.engine import auto_review
@@ -64,3 +64,23 @@ def test_a_step_in_dots_own_window_is_refused_and_one_elsewhere_is_not(tmp_path:
             flags=assessment.flags,
         )
         assert (auto_review(info) is not None) is refused, (name, assessment)
+
+
+@pytest.mark.parametrize(
+    ("name", "bundle", "title", "role"),
+    [
+        ("Google Chrome", "com.google.Chrome", "Dot", "dot"),
+        ("Google Chrome", "com.google.Chrome", "Dot - Google Chrome - Work", "dot"),
+        ("Google Chrome", "com.google.Chrome", "(2) Plan the trip · Dot", "dot"),
+        ("Safari", "com.apple.Safari", "Settings · Dot", "dot"),
+        ("Firefox", "org.mozilla.firefox", "(1) Dot — Mozilla Firefox", "dot"),
+        ("Helium", "net.imput.helium", "Approvals · Dot - Helium", "dot"),
+        ("Google Chrome", "com.google.Chrome", "Dotfiles - GitHub", "other"),
+        ("Google Chrome", "com.google.Chrome", "Polka dot - Wikipedia", "other"),
+        ("Google Chrome", "com.google.Chrome", None, "other"),
+        ("Terminal", "com.apple.Terminal", "Dot — zsh — 80×24", "terminal"),
+        ("Finder", "com.apple.finder", "Dot", "finder"),
+    ],
+)
+def test_a_window_that_shows_dots_web_ui_is_dots_own(name: str, bundle: str, title: str | None, role: AppRole) -> None:
+    assert window_role(name, bundle, title) == role

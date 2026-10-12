@@ -251,6 +251,11 @@ _COPIES: frozenset[str] = frozenset({"cp", "ln", "install", "ditto", "rsync", "s
 # Copies and moves that can be given the folder they write into by an option (GNU's -t and --target-directory).
 _TARGET_FOLDER_COMMANDS: frozenset[str] = frozenset({"cp", "mv", "ln", "install"})
 _TARGET_FOLDER_OPTION: str = "--target-directory"
+# The redirects that empty the file they name before they write (``>|`` writes past zsh's noclobber); ``>>`` appends.
+_REPLACING_REDIRECTS: frozenset[str] = frozenset({">", ">|", "&>", ">&"})
+# Copies and moves that put a file in the place of one that is there, unless told to keep it.
+_REPLACING_COPIES: frozenset[str] = frozenset({"cp", "mv", "install", "ditto"})
+_REPLACED: str = "replaces a file that is there outside the workspace"
 _TARS: frozenset[str] = frozenset({"tar", "bsdtar", "gtar"})
 # unzip's switches that list, test or print an archive instead of unpacking it.
 _UNZIP_READS: frozenset[str] = frozenset({"-l", "-t", "-v", "-p", "-z", "-Z"})
@@ -859,12 +864,15 @@ def _is_redirect(token: str) -> bool:
     return token != "" and all(char in "<>&|" for char in token) and token not in _OPERATORS
 
 
-def _split_redirects(words: list[str], documents: tuple[str, ...]) -> tuple[list[str], list[str], str | None]:
-    """Separate ``(words, output redirect targets, the text given on standard input)``: the body of a here-document
-    (named by the ``_DOCUMENT`` word :func:`_read` put after its ``<<``) or the word of a here-string. Descriptor
-    targets such as ``&1`` are ignored."""
+def _split_redirects(
+    words: list[str], documents: tuple[str, ...]
+) -> tuple[list[str], list[str], list[str], str | None]:
+    """Separate ``(words, output redirect targets, those of them a redirect empties first, the text given on standard
+    input)``: the body of a here-document (named by the ``_DOCUMENT`` word :func:`_read` put after its ``<<``) or the
+    word of a here-string. Descriptor targets such as ``&1`` are ignored."""
     plain: list[str] = []
     targets: list[str] = []
+    emptied: list[str] = []
     text: str | None = None
     index: int = 0
     while index < len(words):
@@ -878,6 +886,8 @@ def _split_redirects(words: list[str], documents: tuple[str, ...]) -> tuple[list
                 text = operand
             elif ">" in token and not operand.isdigit() and operand not in ("-", ""):
                 targets.append(operand)
+                if token in _REPLACING_REDIRECTS:
+                    emptied.append(operand)
             index += 2
             continue
         if token.isdigit() and index + 1 < len(words) and _is_redirect(words[index + 1]):
@@ -885,7 +895,7 @@ def _split_redirects(words: list[str], documents: tuple[str, ...]) -> tuple[list
             continue
         plain.append(token)
         index += 1
-    return plain, targets, text
+    return plain, targets, emptied, text
 
 
 def _plain(words: list[str]) -> list[str]:
@@ -1266,6 +1276,53 @@ def _assess_writes(command: str, args: list[str], scope: ShellScope) -> Finding:
     if worst == "system":
         return _finding("high", (*settings, "outside_workspace"), f"{command} modifies a system location")
     return _finding("medium", ("outside_workspace",), f"{command} modifies files outside the workspace")
+
+
+def _replaces_a_file(raw: str, names: list[str], scope: ShellScope) -> bool:
+    """Whether writing ``raw`` whole replaces a file that is there outside the workspace and the temporary folders:
+    ``raw`` itself, or the file of each of ``names`` in it when it is a folder. What the file held is lost then, as when
+    it is removed (the file tools keep a copy for ``dotx undo``, the shell does not); a file made anew loses nothing."""
+    for place in _places(raw, scope):
+        if _class_of(place, scope) not in ("home", "system"):
+            continue
+        landing: list[Path] = [place / name for name in names] if place.is_dir() else [place]
+        if any(path.is_file() for path in landing):
+            return True
+    return False
+
+
+def _replacing(targets: list[str], names: list[str], scope: ShellScope) -> list[Finding]:
+    if any(_replaces_a_file(target, names, scope) for target in targets):
+        return [_finding("high", ("destructive", "outside_workspace"), _REPLACED)]
+    return []
+
+
+def _has_switch(args: list[str], letter: str, long: str) -> bool:
+    """Whether ``args`` turn on ``-<letter>`` (alone or in a word of switches) or ``long`` before ``--``."""
+    for arg in args:
+        if arg == "--":
+            return False
+        if arg == long or (arg.startswith("-") and not arg.startswith("--") and letter in arg[1:]):
+            return True
+    return False
+
+
+def _replaced_by(command: str, args: list[str], scope: ShellScope) -> list[Finding]:
+    """A writer that puts a file in the place of one that is there outside the workspace: a copy or a move onto it, or
+    into a folder that holds one of its name (``cp`` and ``mv`` told to keep it with ``-n`` aside), ``ln -f`` onto
+    it, ``tee`` without ``-a``."""
+    if command == "tee":
+        return [] if _has_switch(args, "a", "--append") else _replacing(_positional(args), [], scope)
+    if command == "ln" and not _has_switch(args, "f", "--force"):
+        return []
+    if command not in _REPLACING_COPIES and command != "ln":
+        return []
+    if command in ("cp", "mv") and _has_switch(args, "n", "--no-clobber"):
+        return []
+    words, folders = _target_folders(args) if command in _TARGET_FOLDER_COMMANDS else (args, [])
+    operands: list[str] = _positional(words)
+    sources, destinations = (operands, folders) if folders else (operands[:-1], operands[-1:])
+    return _replacing(destinations, [Path(source).name for source in sources], scope)
 
 
 def _writes_to(command: str, targets: list[str], scope: ShellScope) -> list[Finding]:
@@ -1780,9 +1837,14 @@ def _assess_awk(command: str, args: list[str], scope: ShellScope) -> list[Findin
 
 
 def _assess_dd(args: list[str], scope: ShellScope) -> list[Finding]:
-    """dd judged on the file it writes (``of=``) and on a protected one it reads (``if=``)."""
-    written: list[str] = [word.removeprefix("of=") for word in args if word.startswith("of=")]
-    findings: list[Finding] = _writes_to("dd", [target for target in written if target not in _QUIET_TARGETS], scope)
+    """dd judged on the file it writes (``of=``), which it empties first unless told ``conv=notrunc``, and on a
+    protected one it reads (``if=``)."""
+    written: list[str] = [
+        word.removeprefix("of=") for word in args if word.startswith("of=") and word[3:] not in _QUIET_TARGETS
+    ]
+    findings: list[Finding] = _writes_to("dd", written, scope)
+    if not any(word.startswith("conv=") and "notrunc" in word.removeprefix("conv=").split(",") for word in args):
+        findings.extend(_replacing(written, [], scope))
     if any(word.startswith("if=") and _reaches_protected(word.removeprefix("if="), scope) for word in args):
         findings.append(_finding("high", ("secret_access",), "dd reads a protected location"))
     return findings
@@ -1997,7 +2059,7 @@ def _assess_command(command: str, args: list[str], scope: ShellScope, given: _In
     if command in _INTERPRETERS:
         return _assess_interpreter(command, args, scope, given)
     if command in _WRITERS:
-        return [_assess_writes(command, args, scope)]
+        return [_assess_writes(command, args, scope), *_replaced_by(command, args, scope)]
     if command in _TARS or command == "unzip":
         return [_finding("low", (), f"runs {command}"), *_writes_to(command, _unpacked_into(command, args), scope)]
     if command in _SAFE_COMMANDS:
@@ -2065,12 +2127,13 @@ def _assess_segment(
     segment: list[str], scope: ShellScope, piped: _Input, documents: tuple[str, ...]
 ) -> tuple[list[Finding], ShellScope]:
     """Judge one simple command of the line as written (redirects included), and the scope it leaves."""
-    words, targets, text = _split_redirects(segment, documents)
+    words, targets, emptied, text = _split_redirects(segment, documents)
     given: _Input = piped if text is None else _given_text(text)
     findings: list[Finding] = [
         *_protected_words([word for word in segment if not _is_redirect(word)], scope),
         *_assess_simple(words, scope, given),
         *_assess_redirects(targets, scope),
+        *_replacing(emptied, [], scope),
     ]
     return findings, _next_scope(words, scope)
 
