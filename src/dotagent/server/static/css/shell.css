@@ -581,17 +581,22 @@
   font-size: var(--text-sm);
 }
 
-/* Inside the desktop shell (item 88) the system draws the traffic lights over the top left of the page: the sidebar's
-   head keeps room for them, and so does the top bar when the sidebar is away (closed, or a drawer). The lights' centre
-   is 15 px under the top edge, and the head's row is centred on that line (item 107): 30 px of row, no padding above. */
+/* Inside the desktop shell (item 88) the system draws the traffic lights over the top left of the page, where the
+   window puts them (item 134, desktop/src-tauri/src/lib.rs): centred 26 px under the top edge, the centre line of the
+   top bars' 52 px rows, and ending 80 px from the left. The sidebar's head keeps 96 px of room for them, and so does
+   the top bar when the sidebar is away (closed, or a drawer); the head is as tall as the bar, so the button that folds
+   the sidebar stands on the lights' line, as the bar's buttons do. */
 :root[data-shell="desktop"] .side-head {
   box-sizing: border-box;
-  height: 38px;
+  height: 52px;
   min-height: 0;
-  padding: 0 8px 8px 84px;
+  padding: 0 8px 0 96px;
+}
+
+:root[data-shell="desktop"] .stagebar-row {
+  min-height: 52px;
 }
 
 :root[data-shell="desktop"] .shell:not([data-nav="docked"][data-sidebar="open"]) .stagebar-row {
-  padding-left: 84px;
-  min-height: 52px;
+  padding-left: 96px;
 }

@@ -5053,8 +5053,8 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 130 | A chat's menu: pin, rename, copy the link, select, delete                            | done        | d7e7d5e |
 | 131 | Unread chats                                                                         | done        | 34e1fe1 |
 | 132 | Runs that keep going on every model when asked to                                    | done        | 002575b |
-| 133 | The composer's choices on a chat's page                                              | in progress |         |
-| 134 | The traffic lights on the line of the top bars                                       | planned     |         |
+| 133 | The composer's choices on a chat's page                                              | done        | bf11312 |
+| 134 | The traffic lights on the line of the top bars                                       | in progress |         |
 
 ### 77. The type system: Inter and Geist Mono, seven sizes, three weights
 
@@ -7598,7 +7598,7 @@ back and its second accepted.
 
 ### 133. The composer's choices on a chat's page
 
-**Status: in progress.**
+**Status: done.** Merged as `bf11312` (PR #166, MYP-274 Done).
 
 **As built (2026-10-12).** The home's pickers are one module, `static/js/choices.js`: `runChoices` makes the pills of a
 run's choices besides its goal, the mode, the model with its reasoning and the Options (approvals and goal mode), each
@@ -7631,7 +7631,22 @@ eye.
 
 ### 134. The traffic lights on the line of the top bars
 
-**Status: planned.**
+**Status: in progress.**
+
+**As built (2026-10-12).** `desktop/src-tauri/src/lib.rs` gives the window `traffic_light_position` (`TRAFFIC_LIGHTS`,
+20 and 28 logical pixels). Tauri hands it to wry, whose `inset_traffic_lights` is tao's code line for line and runs
+again on every redraw: it moves the close button 20 px from the left and, on macOS 26, its centre 2 px above the inset's
+y, so the lights are centred 26 px under the top edge and end 80 px from the left (measured offscreen; by default they
+were centred 16 px under the top, from 9 to 69 px). In the desktop shell every top bar's row is 52 px tall, with the
+sidebar docked as well, and the sidebar's head grows from 38 to 52 px, so the button that folds the sidebar, the top
+bar's opener and the emergency stop beside it stand on the lights' line, with 19 px above and below the lights; the room
+kept for them grows from 84 to 96 px, 16 px after the last light. A browser's page keeps its own bars. Tests:
+`tests/smoke/test_desktop_lights.py` (in the desktop shell as its page sees it, a `__TAURI__` global: the sidebar's
+button and the top bar's row on the line with the sidebar docked; the opener in the button's place and the emergency
+stop on the line once it is closed; the opener and the drawer's button at a phone's width; a browser's bars as before;
+the shell's test fails on the CSS of before), and the tour reads its constants; `cargo fmt --check` and `cargo clippy
+--all-targets -D warnings` pass; the screenshots read by eye. The window itself is the owner's to read once the app is
+rebuilt (`npm run build` in `desktop/`).
 
 **What.** In the desktop app the window puts its traffic lights on the centre line of the top bars, with room above and
 below them: Tauri's `traffic_light_position` sets them 20 px from the left and centres them 26 px under the top (the
@@ -8206,3 +8221,4 @@ width; the app is built; the owner reads the window by eye once the app is rebui
 - 2026-10-12 (Opus 5.5): part 21 planned, items 132 to 134, from the owner's word with a screenshot of a run on a hosted model that ended with a report and suggestions and one of the desktop window's top left, and a reading of the store by kinds and numbers: runs that keep going on every model when asked to, the composer's choices on a chat's page and the traffic lights on the line of the top bars; no code changed.
 - 2026-10-12 (Opus 5.5): item 132 merged as `002575b` (PR #164, MYP-273 Done): words that ask a run not to stop, in English or in Turkish, put a task or research run a person starts in goal mode whatever the switch says, the goal checker is told and accepts a finish only when every part of the goal is done and shown, every goal check sends back an answer that offers to do a part of the goal not done yet, and every model is told to keep acting and to take the ask at its word; the Details card reads "On, asked not to stop". A review against the done criteria found two blockers, fixed before the merge: a phone's curly apostrophe, and an offer rule that reached past the goal.
 - 2026-10-12 (Opus 5.5): item 131 merged as `34e1fe1` (PR #165, MYP-272 Done): a chat whose latest run ended after it was last seen shows its dot in the accent and says unread, as T3 Code marks a thread with a turn not yet seen; the daemon keeps `threads.seen_at` (the chats of an older store taken as seen), `GET /api/threads` carries `unread` and `PATCH /api/threads/{id}` takes `seen`; the open chat is seen while the page is in view, and its menu offers Mark read and Mark unread. A review against the done criteria found them met and one regression, fixed before the merge: a chat opened by a key lost the focus when its dot went.
+- 2026-10-12 (Opus 5.5): item 133 merged as `bf11312` (PR #166, MYP-274 Done): the dock of a chat's page wears the home's pills, after T3 Code's composer: the mode, the model with its reasoning and the Options, set at first to the open run's and held by the page, and a follow-up starts its run with them; while a run works the pills wait for the next follow-up and say so. The pickers are one module that both boxes use. A review against the done criteria found them met and the smoke test short of their negative cases, which it now reads.
