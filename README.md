@@ -904,8 +904,10 @@ start, agent, model, approval mode, goal mode and campaign) are in the panel's D
 message, in the bubble
 of your messages on the raised surface. A delegated run is a row: the face with its state at the corner (turning while it works, amber while it
 waits for you, green with a check when it is done, red when it failed), its goal over the last thing it did, the
-time it has taken, the way to its own page and a chevron that opens its steps; rows that follow each other share one
-card. Its own page names the parent in the top bar as a breadcrumb (the parent's goal, a link, then its own) and
+time it has taken (counting on every second while it works), the way to its own page and a chevron that opens its
+steps; rows that follow each other share one card. The row is closed from the start, as T3 Code draws a subagent: an
+approval the run asks for opens it until you have decided, and a row you never opened or closed yourself closes again.
+Its own page names the parent in the top bar as a breadcrumb (the parent's goal, a link, then its own) and
 closes the conversation with a pill: the model, how long it took ("Completed in 1m 46s", "Working for 2m"), whether
 its parent still works ("Runs on its own" once not), "Open parent" and, while it works, **Stop**. The tool calls of one
 stretch of work fold into a single
@@ -1611,7 +1613,8 @@ its result, so a long investigation does not fill the parent's context. The run 
 helper model that `model` names when that one can answer (see [Helpers and standby](#models-and-providers)). Several
 calls in one turn run side by side (up to `parallel_tools`), which is how a plan's independent steps run at the same
 time; `step` names the plan step the part is, and the report closes it (see the plan above). A
-delegated run cannot delegate again (the depth is one) or consult a helper, does not take one of the
+delegated run cannot delegate again (the depth is one), ask you a question (its approvals still come to you) or
+consult a helper, does not take one of the
 `max_concurrent_runs` slots, starts as untrusted as its parent, and ends when the parent is cancelled. The parent's
 result names the model the delegated run ended on. The delegated run takes its parent's mode, which the model
 cannot choose: a task run's helper can do what the task run can, a research run's helper only reads.

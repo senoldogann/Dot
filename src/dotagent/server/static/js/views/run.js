@@ -556,7 +556,11 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
     input.placeholder = active ? "Steer this run, or /btw to ask on the side" : "Follow up, or /btw to ask on the side";
     frame.setSendLabel(active ? "Steer" : "Follow up");
     if (active && ticker === null) {
-      ticker = setInterval(paintStats, 1000);
+      // The run's figures, and the time of every delegated run that works, count on every second.
+      ticker = setInterval(() => {
+        paintStats();
+        timeline.tick(Date.now() / 1000);
+      }, 1000);
       costTicker = setInterval(paintCost, COST_REFRESH_MS);
     } else if (!active && ticker !== null) {
       clearInterval(ticker);
@@ -892,6 +896,10 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
         messageRead(message.data.data.text);
       }
       timeline.push(message.data);
+      // A delegated run's row says how long it has worked as soon as its events are in, not at the next second.
+      if (active) {
+        timeline.tick(Date.now() / 1000);
+      }
     },
   }).catch((error) => {
     if (signal.aborted) {

@@ -5042,8 +5042,8 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 119 | The models: the prompt cache on OpenCode Go's Messages route, the free ones marked   | done        | acfc56a |
 | 120 | The run page's head: Stop in the send button's place, the emergency stop in the sidebar | done        | 6c1a7b3 |
 | 121 | The calm look, after T3 Code: the sidebar, the chat, the composer and the panel     | done        | 4f2b0cd |
-| 122 | The sidebar says what works: Working and its time on a chat's row and a working run's | in progress |         |
-| 123 | A helper folded in the chat: its row until the owner opens it                       | planned     |         |
+| 122 | The sidebar says what works: Working and its time on a chat's row and a working run's | done        | 10fd83f |
+| 123 | A helper folded in the chat: its row until the owner opens it                       | in progress |         |
 
 ### 77. The type system: Inter and Geist Mono, seven sizes, three weights
 
@@ -6931,7 +6931,7 @@ not built.
 
 ### 122. The sidebar says what works: Working and its time on a chat's row and a working run's
 
-**Status: in progress.**
+**Status: done.** Merged as `10fd83f` (PR #147, MYP-262 Done).
 
 **As built (2026-10-12).** Where a row's age sits at rest, `sidebar.js workingSlot` shows Lucide's dashed circle
 (`icons.js circleDashed`, the paths of Lucide 1.8.0), the word Working and `workingFor` (`dom.js`: "12s", "4m", "1h 5m",
@@ -6958,7 +6958,28 @@ not move. A smoke test reads the rows at both widths in both schemes and sees th
 
 ### 123. A helper folded in the chat: its row until the owner opens it
 
-**Status: planned.**
+**Status: in progress.**
+
+**As built (2026-10-12).** A delegated run's row in the parent's conversation (`timeline.js childScope`) is a `details`
+that starts closed: its face and state, its goal over its last line, its time and the way to its page show, and its
+steps, messages and answer wait behind the chevron. While the parent works, the run page (`run.js`) calls the timeline's
+new `tick(now)` every second and after each event it hands the timeline, so a page opened later shows the time at once;
+`tick` writes into the row of each delegated run that has not ended the time since it began, as T3 Code counts a working
+subagent's. Before, the time stood at the run's last event, a few milliseconds for a helper that waits in a long shell
+command. `reveal` opens the row of a run that asks the reader for an approval (an `approval_requested` in its scope) and
+the rows it sits in, each counting what waits inside it; `unreveal`, on the decision, closes each that has nothing left
+waiting and that the reader never opened or closed by hand (the row's `touched`, set by a click on its summary). At its
+end such a row closes again whatever the outcome; before, a run that failed stayed open. A decision already handled
+leaves the cards, so an echo of it cannot count twice. The plan's question that opens a row does not exist: a delegated
+run is not offered `ask_user` (`loop._NOT_FOR_DELEGATED_RUNS`; nobody waits in its conversation), so only its approvals
+reach the reader, and the README's Delegation passage now says so beside the chat passage's fold.
+`tests/smoke/test_helper_fold.py`: under the cautious preset a parent in ask mode waits in a shell command while two
+runs it delegated work, one asking to write a file, the other waiting in a shell command; at both widths in both schemes
+the waiting helper's row is closed, its last line in sight, its time counting on (in seconds at once on a page opened
+later) and its steps hidden, and the asking helper's row is open on the approval's card; denied, that helper finishes
+and its row closes; opened by hand, the waiting helper's row shows its steps and stays open after it is cancelled. 906
+unit tests and 30 smoke tests pass (the new one, the run page's, the activity sections, agents, the team, delegation,
+the working rows and the tour among them); the shots were read by eye.
 
 **What.** In a run's chat a delegated run (a helper, or the run of an agent the run wrote to) is its row, closed from
 the moment it starts: its face and state, its goal over the last thing it did, the time it has taken and the way to its
@@ -7516,3 +7537,4 @@ read by eye.
 - 2026-10-12 (Opus 5.5): item 120 merged as `6c1a7b3` (PR #143, MYP-260 Done): the run page's top bar keeps the face, the name and the panel's switch (its facts in Details, which gained the agent and the campaign), the composer's send is the run's Stop while the run works and the box is empty (Steer once a word is typed), a delegated run's pill ends with a Stop, Continue is a line above the composer, the top bar's right keeps the approvals waiting and the connection while it is not live, and the emergency stop sits in the sidebar's foot (beside the sidebar's opener while the sidebar is closed); 906 unit tests, 14 smoke tests and the tour.
 - 2026-10-12 (Opus 5.5): item 121 merged as `4f2b0cd` (PR #144, MYP-261 Done): the look after T3 Code's, through Dot's tokens and in both schemes: the sidebar a tone darker than the page with no line between them and a chat's last activity at the right of its row, a tool step one quiet line with its body on a hairline, the composer on a corner of its own (24 px) with a soft shadow on every page, the run's panel one card with its sections on hairlines, and the answer's time and length on a second look where a pointer can hover; 906 unit tests, 117 smoke tests and the tour read by eye at both widths in both schemes; the daemon restarted on it with no run active.
 - 2026-10-12 (Opus 5.5): part 17 planned, items 122 and 123, from the owner's word after part 16 and a reading of T3 Code's sidebar and chat in its repository; no code changed.
+- 2026-10-12 (Opus 5.5): item 122 merged as `10fd83f` (PR #147, MYP-262 Done): where a row's age sits at rest, a chat whose latest run works and every run of the Working section, delegated runs included, show a dashed circle, Working and the time since the run was asked for in T3 Code's units, read every second; `ThreadSummary.latest_created_at` is new; 906 unit tests, 27 smoke tests and the tour.
