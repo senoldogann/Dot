@@ -418,6 +418,9 @@ currency. Empty by default.
    `|` or `>`), and a rule that stops Dot fits the command or the word wherever the action mentions it, as a whole
    word (`x.com` does not fit `netflix.com`). The draft fills the form, its description the sentence the rule reads
    back as ("For “git status” run alone in the shell, …: Dot does it without asking."), and applies once you add it.
+   Words that cover every action ("Dot can run everything without asking me") draft a rule for every tool ("For every
+   use of any tool: Dot does it without asking."), which the protections that are always on still bound; words that
+   make no rule are answered with the reason, in English.
    An approval card offers *Make a rule of this*, which opens the tab with a sentence about the action in the box.
 5. *The preset* decides everything that is left:
 

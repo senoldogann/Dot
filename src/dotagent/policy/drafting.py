@@ -77,8 +77,8 @@ class RuleDraft(FrozenModel):
     )
     problem: Annotated[str, StringConstraints(strip_whitespace=True, max_length=300)] = Field(
         description=(
-            "Empty when the parts above are the rule the owner means. Otherwise one sentence, in the language of the "
-            "owner's sentence, saying why no rule can be made of it."
+            "Empty when the parts above are a rule for the owner's words, a broad one too. Otherwise one sentence in "
+            "English saying why no rule can be made of them; never a note or a warning about a rule that can be made."
         )
     )
 
