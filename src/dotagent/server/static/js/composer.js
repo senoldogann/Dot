@@ -158,7 +158,8 @@ export function wireComposer(textarea, { maxPx, send, commands, edited }) {
   }
 
   function onKeydown(event) {
-    if (event.isComposing) {
+    // WebKit ends the composition before the key that commits it, so that key shows only as keyCode 229 (item 116).
+    if (event.isComposing || event.keyCode === 229) {
       return;
     }
     if (!menu.hidden) {

@@ -194,3 +194,16 @@ def test_a_playbook_that_two_runs_read_and_failed_is_retired_and_no_longer_loade
     assert drop_playbook(tmp_path, name) == tmp_path / RETIRED_DIR / name
     with pytest.raises(NotFoundError):
         drop_playbook(tmp_path, name)
+
+
+@pytest.mark.parametrize("name", ["..", ".", RETIRED_DIR, "learned-x/../..", "learned-x/../../home", ""])
+def test_a_name_that_is_not_one_playbook_folder_is_not_found_and_nothing_is_removed(name: str, tmp_path: Path) -> None:
+    playbooks: Path = tmp_path / "home" / "playbooks"
+    write_playbook(playbooks, _playbook())
+    (playbooks / RETIRED_DIR).mkdir()
+    with pytest.raises(NotFoundError):
+        drop_playbook(playbooks, name)
+    with pytest.raises(NotFoundError):
+        record_use(playbooks, name, False)
+    assert (playbooks / playbook_name(KIND) / SKILL_FILE).is_file()
+    assert (playbooks / RETIRED_DIR).is_dir()

@@ -4,6 +4,7 @@ so the comments and the other settings stay as written."""
 import os
 import re
 import tempfile
+import threading
 import tomllib
 from pathlib import Path
 from typing import Literal
@@ -15,6 +16,9 @@ from dotagent.store.models import BrowserMode
 _TABLE_HEADER: re.Pattern[str] = re.compile(r"^\s*\[")
 _BROWSER_HEADER: re.Pattern[str] = re.compile(r"^\s*\[\s*browser\s*\]\s*(#.*)?$")
 _FILE_MODE: int = 0o600
+# One edit at a time in this process: each reads the file, edits it and replaces it, so two at once (the browser mode
+# and raise_window changed together from the web UI) would keep only the later one.
+_EDITING: threading.Lock = threading.Lock()
 
 # The [browser] settings this module changes, and the TOML literal of each value.
 type BrowserSetting = Literal["mode", "raise_window"]
@@ -97,25 +101,26 @@ def set_browser_setting(path: Path, key: BrowserSetting, value: SettingValue) ->
     """Write ``[browser] key = value`` into the config file at ``path`` (created when missing). The result is parsed
     again before it replaces the file: it must hold the new value and every other setting unchanged, or nothing is
     written."""
-    before: str = path.read_text(encoding="utf-8") if path.exists() else ""
-    old_settings: JsonObject = _parse(before, path)
-    after: str = with_browser_setting(before, key, value)
-    try:
-        new_settings: JsonObject = tomllib.loads(after)
-    except tomllib.TOMLDecodeError as error:
-        raise _by_hand(key, value, path, f"the edited file is not valid TOML: {error}") from error
-    browser: object = new_settings.get("browser")
-    if not isinstance(browser, dict) or browser.get(key) != value:
-        raise _by_hand(key, value, path, "the edited file does not hold the new value")
-    if _without_setting(new_settings, key) != _without_setting(old_settings, key):
-        raise _by_hand(key, value, path, "the edit changed another setting")
-    path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
-    descriptor, temporary = tempfile.mkstemp(dir=path.parent, prefix=f".{path.name}.", suffix=".tmp")
-    try:
-        with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
-            handle.write(after)
-        os.chmod(temporary, path.stat().st_mode & 0o777 if path.exists() else _FILE_MODE)
-        os.replace(temporary, path)
-    except OSError:
-        Path(temporary).unlink(missing_ok=True)
-        raise
+    with _EDITING:
+        before: str = path.read_text(encoding="utf-8") if path.exists() else ""
+        old_settings: JsonObject = _parse(before, path)
+        after: str = with_browser_setting(before, key, value)
+        try:
+            new_settings: JsonObject = tomllib.loads(after)
+        except tomllib.TOMLDecodeError as error:
+            raise _by_hand(key, value, path, f"the edited file is not valid TOML: {error}") from error
+        browser: object = new_settings.get("browser")
+        if not isinstance(browser, dict) or browser.get(key) != value:
+            raise _by_hand(key, value, path, "the edited file does not hold the new value")
+        if _without_setting(new_settings, key) != _without_setting(old_settings, key):
+            raise _by_hand(key, value, path, "the edit changed another setting")
+        path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+        descriptor, temporary = tempfile.mkstemp(dir=path.parent, prefix=f".{path.name}.", suffix=".tmp")
+        try:
+            with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
+                handle.write(after)
+            os.chmod(temporary, path.stat().st_mode & 0o777 if path.exists() else _FILE_MODE)
+            os.replace(temporary, path)
+        except OSError:
+            Path(temporary).unlink(missing_ok=True)
+            raise

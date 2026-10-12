@@ -241,6 +241,10 @@ function mountPage(root, ctx, campaignId) {
   const rest = el("div", { class: "stack" });
   const page = el("div", { class: "stack" }, top, waiting, rest);
   const questionCards = new Map();
+  // The detail last painted, as JSON: one that did not change is not painted again. The head keeps its buttons until
+  // the title or the status changes, so a press on Stop while a session works is not lost to a repaint.
+  let painted = "";
+  let head = null;
 
   async function act(path, done) {
     await api.post(`/campaigns/${campaignId}/${path}`, null);
@@ -332,17 +336,33 @@ function mountPage(root, ctx, campaignId) {
     waiting.hidden = questionCards.size === 0;
   }
 
+  function paintTop(detail) {
+    const { record } = detail;
+    const meta = el("div", { class: "row-meta" }, campaignBadge(record.status), el("span", null, plural(detail.sessions.length, "session", "sessions")), nextStep(record, detail.working, detail.next_local));
+    const key = `${record.status}\n${record.title}`;
+    if (head === null || head.key !== key) {
+      head = { key, node: pageHead(record.title, "", controls(record)) };
+      top.replaceChildren(head.node, meta, outline(detail));
+      return;
+    }
+    while (head.node.nextSibling !== null) {
+      head.node.nextSibling.remove();
+    }
+    head.node.after(meta, outline(detail));
+  }
+
   function paint(detail) {
+    const shape = JSON.stringify(detail);
+    if (shape === painted) {
+      return;
+    }
+    painted = shape;
     const { record } = detail;
     ctx.setTitle(clip(record.title, TITLE_CHARS));
     working = detail.working !== null;
     const decided = detail.questions.filter((question) => !WAITING_STATUSES.has(question.status));
     const numbers = new Map(detail.sessions.map((session, index) => [session.id, index + 1]));
-    top.replaceChildren(
-      pageHead(record.title, "", controls(record)),
-      el("div", { class: "row-meta" }, campaignBadge(record.status), el("span", null, plural(detail.sessions.length, "session", "sessions")), nextStep(record, detail.working, detail.next_local)),
-      outline(detail),
-    );
+    paintTop(detail);
     paintQuestions(detail.questions.filter((question) => WAITING_STATUSES.has(question.status)));
     rest.replaceChildren(
       section(
@@ -371,6 +391,7 @@ function mountPage(root, ctx, campaignId) {
       }
     } catch (error) {
       if (!disposed && mine === ticket) {
+        painted = "";
         holder.replaceChildren(errorPanel(error, () => attempt(reload)));
       }
     }

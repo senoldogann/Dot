@@ -139,6 +139,11 @@ class _CheckedBackend(httpcore.AsyncNetworkBackend):
             infos = await asyncio.get_running_loop().getaddrinfo(host, port, type=socket.SOCK_STREAM)
         except socket.gaierror as exc:
             raise WebError("the host name could not be resolved", {"host": _shown(host), "error": str(exc)}) from exc
+        except UnicodeError as exc:
+            # The IDNA codec refuses a label over 63 characters or an empty one (``a..b``) before any lookup (item 116).
+            raise WebError(
+                "the host name is not a valid domain name", {"host": _shown(host), "error": str(exc)}
+            ) from exc
         found: tuple[str, ...] = order_addresses([str(info[4][0]) for info in infos])
         private: tuple[str, ...] = tuple(address for address in found if not is_public_address(address))
         if private and not self._allow_private_hosts:

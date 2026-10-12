@@ -133,12 +133,14 @@ class _Checked:
 async def _run_checked(call: ToolCall, tool: RegisteredTool, ctx: ToolContext, gate: RunGate) -> _Checked:
     action: ActionInfo | None = None
     at_gate: _GateTime = _GateTime()
+    # What the user wrote when approving the call: the model reads it with the result, a failed one's too.
+    note: str = ""
     try:
         prepared: PreparedCall = await tool.prepare(call.arguments, ctx)
         action = prepared.action
         asked_at: float = time.monotonic()
         try:
-            note: str = await gate.authorize(action)
+            note = await gate.authorize(action)
             # The user may hold the run (a takeover of the browser): the call waits here, not on its own clock.
             held_s: float = await gate.wait_free()
         finally:
@@ -152,7 +154,8 @@ async def _run_checked(call: ToolCall, tool: RegisteredTool, ctx: ToolContext, g
         if text is None:
             raise
         handed_off: bool = isinstance(exc, HandedOff)
-        return _Checked(result=ok(text) if handed_off else fail(text), action=action, waited_s=at_gate.seconds)
+        failed: ToolResult = _with_approval_note(ok(text) if handed_off else fail(text), note)
+        return _Checked(result=failed, action=action, waited_s=at_gate.seconds)
     if action is not None and not result.is_error:
         gate.observe(action)
     if result.untrusted:

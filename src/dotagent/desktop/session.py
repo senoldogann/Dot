@@ -203,12 +203,14 @@ def _open_job(config: DesktopConfig, query: str) -> tuple[AppInfo, bool]:
     return running, False
 
 
-def _context_of(app: AppInfo, node: Node | None) -> StepContext:
+def _context_of(app: AppInfo, node: Node | None, lines: Mapping[str, str]) -> StepContext:
+    role: safety.AppRole = safety.app_role(app.name, app.bundle_id)
     return StepContext(
-        role=safety.app_role(app.name, app.bundle_id),
+        role=role,
         app=app.name,
         element=None if node is None else Element(role=node.role, name=node.label),
         secure=node is not None and node.secure(),
+        line=lines.get(app.name) if role == "terminal" else None,
     )
 
 
@@ -222,21 +224,27 @@ def _node_for(known: Mapping[int, Node], raw_ref: str | None) -> Node | None:
     return known.get(number)
 
 
-def _preview_job(state: ThreadDesktop, name: str | None, steps: Sequence[Step]) -> tuple[StepContext, ...]:
-    """The context of each step as far as it can be told without touching the screen (worker thread)."""
+def _preview_job(
+    state: ThreadDesktop, name: str | None, steps: Sequence[Step], lines: Mapping[str, str]
+) -> tuple[StepContext, ...]:
+    """The context of each step as far as it can be told without touching the screen (worker thread), each with the
+    terminal lines the steps before it typed."""
     running: tuple[AppInfo, ...] = apps.list_apps()
     current: AppInfo = _pick_app(state, name, running)
     known: Mapping[int, Node] = memory.known_nodes(memory.memory_of(state, current.pid))
     contexts: list[StepContext] = []
+    typed: Mapping[str, str] = lines
     for step in steps:
         if step.action == "activate":
             named: AppInfo | None = apps.find_app(step.text or "", running)
             if named is not None:
                 current = named
                 known = memory.known_nodes(memory.memory_of(state, current.pid))
-            contexts.append(_context_of(current, None))
+            context: StepContext = _context_of(current, None, typed)
         else:
-            contexts.append(_context_of(current, _node_for(known, step.ref)))
+            context = _context_of(current, _node_for(known, step.ref), typed)
+        contexts.append(context)
+        typed = safety.lines_after(typed, step, context)
     return tuple(contexts)
 
 
@@ -290,6 +298,9 @@ class DesktopSession:
         self._woken: dict[int, AXElement] = {}
         self._wake_tried: set[int] = set()
         self._hold: _Hold | None = None
+        # The command line of each terminal application, by name, as far as Dot typed it since the line was last
+        # empty; a terminal whose line cannot be told is not in it, so Return there runs code that is not judged.
+        self._lines: dict[str, str] = {}
 
     async def _call[T](self, work: Callable[[], T]) -> T:
         return await asyncio.get_running_loop().run_in_executor(self._pool, work)
@@ -574,8 +585,12 @@ class DesktopSession:
             seconds: float = _seconds_of(step)
             await asyncio.sleep(seconds)
             return Effect(detail=f"waited {seconds:g} s", pointer=None, opens_ui=False, switched_to=None)
-        inspection: Inspection = await self._call(partial(actions.inspect_step, env, step))
+        typed: dict[str, str] = self._lines
+        inspection: Inspection = await self._call(partial(actions.inspect_step, env, step, typed))
         actions.refuse_secrets(inspection.context)
+        # No terminal line is known while the step is reviewed and runs: one that is refused, taken over or fails
+        # halfway may leave any text behind.
+        self._lines = {}
         await reviewer(
             StepReview(
                 index=index,
@@ -585,7 +600,9 @@ class DesktopSession:
                 target=inspection.target,
             )
         )
-        return await self._call(partial(actions.execute_step, env, step))
+        effect: Effect = await self._call(partial(actions.execute_step, env, step))
+        self._lines = safety.lines_after(typed, step, inspection.context)
+        return effect
 
     async def _run_steps(
         self, state: ThreadDesktop, env: StepEnv, steps: Sequence[Step], reviewer: StepReviewer
@@ -659,7 +676,7 @@ class DesktopSession:
         """The context of each step as far as it is known before anything runs: used to judge a batch up front."""
         async with self._lock:
             await self._prepare(self._prepare_listing)
-            return await self._call(partial(_preview_job, self._thread(thread_id), app, steps))
+            return await self._call(partial(_preview_job, self._thread(thread_id), app, steps, self._lines))
 
     # -- closing ---------------------------------------------------------------------------------------------------
 

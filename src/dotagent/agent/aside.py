@@ -12,7 +12,7 @@ from collections.abc import Sequence
 from dotagent.agent.compact import render_transcript
 from dotagent.agent.continuity import summary_part
 from dotagent.agent.plan import EMPTY_PLAN, PLAN_EVENT, PlanPayload, plan_from_event, plan_lines
-from dotagent.core.errors import ProviderError
+from dotagent.core.errors import MissingSecretError, ProviderError
 from dotagent.core.ids import new_id
 from dotagent.core.logs import get_logger
 from dotagent.core.text import truncate_middle
@@ -117,7 +117,7 @@ async def answer_aside(runtime: Runtime, run_id: str, question: str) -> AsideAns
     record: str = _record(run, await _plan_of(runtime, run.id), await runtime.store.load_messages(run.thread_id, 0))
     try:
         answer, attempts = await _ask(runtime, ref, run, record, question)
-    except ProviderError as error:
+    except (ProviderError, MissingSecretError) as error:
         await runtime.bus.emit(
             run.id, ASIDE_FAILED_EVENT, {"id": aside_id, "error": error.message, "model": ref.label}, True
         )

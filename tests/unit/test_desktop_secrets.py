@@ -20,13 +20,13 @@ def test_a_paste_puts_text_in_like_a_character(chord: str, enters: bool) -> None
 
 def test_a_step_at_a_password_manager_is_refused_and_one_elsewhere_is_not() -> None:
     with pytest.raises(DesktopError, match="never controlled"):
-        refuse_secrets(StepContext(role="secrets", app="1Password", element=None, secure=False))
-    refuse_secrets(StepContext(role="other", app="TextEdit", element=None, secure=True))
+        refuse_secrets(StepContext(role="secrets", app="1Password", element=None, secure=False, line=None))
+    refuse_secrets(StepContext(role="other", app="TextEdit", element=None, secure=True, line=None))
 
 
 def test_a_long_typed_text_is_pasted_only_into_a_known_ordinary_field_and_never_a_key() -> None:
     field: StepContext = StepContext(
-        role="other", app="TextEdit", element=Element(role="AXTextField", name="Name"), secure=False
+        role="other", app="TextEdit", element=Element(role="AXTextField", name="Name"), secure=False, line=None
     )
     long_text: str = "x" * 41
     assert _pastes(long_text, field, 40)

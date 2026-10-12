@@ -78,7 +78,7 @@ function toolPicks(names, chosen) {
       el(
         "label",
         { class: "tool-pick" },
-        el("input", { type: "checkbox", value: name, checked: picked.has(name) ? "" : null }),
+        el("input", { type: "checkbox", value: name, checked: picked.has(name) }),
         el("span", null, name),
       ),
     ),
@@ -493,52 +493,76 @@ function mountPage(root, ctx, agentId) {
     if (confirmed) {
       await api.del(`/memories/${record.id}`);
       toast("ok", "Lesson forgotten.");
-      await reload();
+      await refresh();
     }
   }
 
-  async function reload() {
+  // The agent as the daemon has it now; null when the page went or a later load overtook this one. A failure takes
+  // the place of the page, with a way to try again.
+  async function load() {
     const mine = ++ticket;
     try {
       const detail = await api.get(`/agents/${agentId}`);
-      if (disposed || mine !== ticket) {
-        return;
-      }
-      greet(detail.record);
-      learned.replaceChildren(
-        ...learnedSection(detail.record, detail.learned, {
-          forget: (record) => attempt(() => forget(record)),
-          skillsChanged: (list) => {
-            if (list !== null) {
-              attempt(reload);
-            }
-          },
-        }),
-      );
-      runs.replaceChildren(
-        el("div", { class: "section-label" }, "Chats"),
-        detail.runs.length === 0
-          ? emptyPanel("No chats yet", `Send ${detail.record.name} a message above.`)
-          : el("div", { class: "card" }, detail.runs.map(runRow)),
-      );
-      messages.replaceChildren(
-        ...(detail.messages.length === 0
-          ? []
-          : [el("div", { class: "section-label" }, "Messages"), el("div", { class: "card" }, detail.messages.map(messageRow))]),
-      );
-      page.replaceChildren(top, runs, learned, messages);
-      composer.focus();
+      return disposed || mine !== ticket ? null : detail;
     } catch (error) {
       if (!disposed && mine === ticket) {
         page.replaceChildren(errorPanel(error, () => attempt(reload)));
       }
+      return null;
+    }
+  }
+
+  // The lists under the top: chats, lessons and skills, messages. The top stays where it is, so the focus and what is
+  // typed in it stay too.
+  function paintLists(detail) {
+    learned.replaceChildren(
+      ...learnedSection(detail.record, detail.learned, {
+        forget: (record) => attempt(() => forget(record)),
+        skillsChanged: (list) => {
+          if (list !== null) {
+            attempt(refresh);
+          }
+        },
+      }),
+    );
+    runs.replaceChildren(
+      el("div", { class: "section-label" }, "Chats"),
+      detail.runs.length === 0
+        ? emptyPanel("No chats yet", `Send ${detail.record.name} a message above.`)
+        : el("div", { class: "card" }, detail.runs.map(runRow)),
+    );
+    messages.replaceChildren(
+      ...(detail.messages.length === 0
+        ? []
+        : [el("div", { class: "section-label" }, "Messages"), el("div", { class: "card" }, detail.messages.map(messageRow))]),
+    );
+    if (top.parentNode !== page) {
+      page.replaceChildren(top, runs, learned, messages);
+    }
+  }
+
+  // The whole page: the top built again (the composer, after a save) and the lists.
+  async function reload() {
+    const detail = await load();
+    if (detail !== null) {
+      greet(detail.record);
+      paintLists(detail);
+      composer.focus();
+    }
+  }
+
+  // Only the lists, when a run starts or ends or a lesson goes: a message being typed or an open form stays (item 116).
+  async function refresh() {
+    const detail = await load();
+    if (detail !== null) {
+      paintLists(detail);
     }
   }
 
   root.append(el("div", { class: "agent-page" }, el("a", { class: "back", href: "#/agents" }, icon("arrowLeft"), "All agents"), page));
   const stopLifecycle = onLifecycle((event) => {
     if (event.kind === "run_started" || event.kind === "run_finished") {
-      attempt(reload);
+      attempt(refresh);
     }
   });
   attempt(reload);

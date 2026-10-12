@@ -111,6 +111,13 @@ def _end_with_scheduler(server: DotServer, scheduler_loop: asyncio.Task[None]) -
     server.should_exit = True
 
 
+def _log_push_end(pusher: asyncio.Task[None]) -> None:
+    """Pushes that stop before the daemon does are logged, so the phone's silence has a cause on record."""
+    if pusher.cancelled() or pusher.exception() is None:
+        return
+    log.error("push_watch_ended", error=repr(pusher.exception()))
+
+
 async def _stop_server_on(stop: asyncio.Event, server: DotServer) -> None:
     """The first stop request ends the server gracefully, a second one forces it."""
     await stop.wait()
@@ -179,6 +186,7 @@ async def run_daemon(config: AppConfig) -> None:
             pusher: asyncio.Task[None] = asyncio.create_task(
                 watch_pushes(runtime.store, runtime.bus, runtime.push_keys, stopping), name="push"
             )
+            pusher.add_done_callback(_log_push_end)
             cleanup.push_async_callback(_cancelled, pusher)
             log.info(
                 "daemon_started",

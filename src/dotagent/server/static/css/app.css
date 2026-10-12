@@ -2848,6 +2848,11 @@ details[open] > summary .chev {
   color: var(--text);
 }
 
+/* The slash menu opens over the place of the arrow; the arrow steps aside while it is open (item 116). */
+.dock:has(.slash-menu:not([hidden])) .jump {
+  visibility: hidden;
+}
+
 /* ---------- overlays ---------- */
 
 .toast-region {

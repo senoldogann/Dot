@@ -18,7 +18,7 @@ from dotagent.desktop import apps, ax, screen
 from dotagent.desktop import input as hid
 from dotagent.desktop.ax import ElementState
 from dotagent.desktop.input import EventSource, parse_chord
-from dotagent.desktop.safety import DESKTOP_CLICKABLE_ROLES, StepContext, app_role, enters_text
+from dotagent.desktop.safety import DESKTOP_CLICKABLE_ROLES, AppRole, StepContext, app_role, enters_text
 from dotagent.desktop.types import (
     DEFAULT_SCROLL_PX,
     AppInfo,
@@ -295,18 +295,20 @@ def _peek(env: StepEnv, ref: str | None, x: float | None, y: float | None) -> Ta
     return Target(ref=None, state=None, owner=env.app, point=_window_frame(env).center())
 
 
-def _context(target: Target) -> StepContext:
+def _context(target: Target, lines: Mapping[str, str]) -> StepContext:
     state: ElementState | None = target.state
+    role: AppRole = app_role(target.owner.name, target.owner.bundle_id)
     return StepContext(
-        role=app_role(target.owner.name, target.owner.bundle_id),
+        role=role,
         app=target.owner.name,
         element=None if state is None else Element(role=state.role, name=state.label),
         secure=state is not None and state.secure(),
+        line=lines.get(target.owner.name) if role == "terminal" else None,
     )
 
 
-def _inspection(env: StepEnv, target: Target) -> Inspection:
-    return Inspection(context=_context(target), target=_where(target, env.scale))
+def _inspection(env: StepEnv, lines: Mapping[str, str], target: Target) -> Inspection:
+    return Inspection(context=_context(target, lines), target=_where(target, env.scale))
 
 
 def _keyboard_target(env: StepEnv) -> Target:
@@ -335,26 +337,27 @@ def refuse_secrets(context: StepContext) -> None:
         raise DesktopError(f"{context.app} holds passwords or keys; it is never controlled", {"app": context.app})
 
 
-def inspect_step(env: StepEnv, step: Step) -> Inspection:
-    """What the step touches, read from the machine right now: the application, the control and whether it is secret."""
+def inspect_step(env: StepEnv, step: Step, lines: Mapping[str, str]) -> Inspection:
+    """What the step touches, read from the machine right now: the application, the control and whether it is secret;
+    ``lines`` holds the command line of each terminal application as far as Dot typed it."""
     match step.action:
         case "click" | "double_click" | "right_click" | "hover" | "scroll":
-            return _inspection(env, _peek(env, step.ref, step.x, step.y))
+            return _inspection(env, lines, _peek(env, step.ref, step.x, step.y))
         case "drag":
-            return _inspection(env, _peek(env, step.ref, step.x, step.y))
+            return _inspection(env, lines, _peek(env, step.ref, step.x, step.y))
         case "press" | "focus" | "set_value":
-            return _inspection(env, _peek_ref(env, _required(step.ref, "ref")))
+            return _inspection(env, lines, _peek_ref(env, _required(step.ref, "ref")))
         case "type" | "paste":
             if step.ref is not None:
-                return _inspection(env, _peek_ref(env, step.ref))
-            return _inspection(env, _keyboard_target(env))
+                return _inspection(env, lines, _peek_ref(env, step.ref))
+            return _inspection(env, lines, _keyboard_target(env))
         case "key":
-            return _inspection(env, _keyboard_target(env))
+            return _inspection(env, lines, _keyboard_target(env))
         case "menu" | "wait":
-            return _inspection(env, Target(ref=None, state=None, owner=env.app, point=None))
+            return _inspection(env, lines, Target(ref=None, state=None, owner=env.app, point=None))
         case "activate":
             named: AppInfo | None = apps.find_app(_required(step.text, "application"), env.running)
-            return _inspection(env, Target(ref=None, state=None, owner=named or env.app, point=None))
+            return _inspection(env, lines, Target(ref=None, state=None, owner=named or env.app, point=None))
 
 
 def _window_frame_of(env: StepEnv, element: AXElement) -> Rect | None:
@@ -608,7 +611,8 @@ def _activate(env: StepEnv, step: Step) -> Effect:
 def execute_step(env: StepEnv, step: Step) -> Effect:
     """Perform one step. The failsafe is checked first and the context re-read, since time passed after the review."""
     check_failsafe(env)
-    inspection: Inspection = inspect_step(env, step)
+    # Performing a step does not depend on what Dot typed on a terminal's line, only judging it does.
+    inspection: Inspection = inspect_step(env, step, {})
     refuse_secrets(inspection.context)
     match step.action:
         case "click":

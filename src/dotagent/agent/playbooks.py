@@ -53,6 +53,7 @@ log = get_logger(__name__)
 PLAYBOOK_PREFIX: str = "learned-"
 # The prefix of the folders written before item 92, which a run may still read.
 _OLD_PREFIX: str = "playbook-"
+_FOLDER_NAME: re.Pattern[str] = re.compile(r"(?:learned|playbook)-[a-z0-9-]*")
 META_FILE: str = "playbook.json"
 RETIRED_DIR: str = ".retired"
 PLAYBOOK_WRITTEN: str = "playbook_written"
@@ -309,6 +310,11 @@ def offered_skills(
 
 
 def playbook_folder(root: Path, name: str) -> Path:
+    """The folder of the playbook ``name`` under ``root``. A name is one folder of the playbooks, a learned skill's
+    prefix and a slug; anything else (``..``, ``.retired``, ``learned-x/../..``) is not found, so a name that comes
+    from a request or a run never reaches a folder outside them (item 116)."""
+    if _FOLDER_NAME.fullmatch(name) is None:
+        raise NotFoundError("there is no such learned skill", {"name": name})
     return root / name
 
 

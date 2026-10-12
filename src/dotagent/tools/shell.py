@@ -200,7 +200,9 @@ def build_shell_tool() -> RegisteredTool:
         )
         body: str = output.strip()
         text: str = f"{header}\n{body}" if body else header
-        return ToolResult(text=text, images=(), is_error=timed_out or code != 0)
+        # What a line that reached the network printed was written by other people: the run reads it as untrusted.
+        fetched: bool = assess_shell(args.command, cwd, ctx.workspace, ctx.runtime.protected).fetches
+        return ToolResult(text=text, images=(), is_error=timed_out or code != 0, untrusted=fetched)
 
     return make_tool(
         name="shell",

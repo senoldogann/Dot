@@ -15,6 +15,7 @@ from dotagent.config import OllamaConfig
 from dotagent.core.errors import ProviderHttpError, ProviderProtocolError, ProviderTransportError
 from dotagent.core.ids import new_id
 from dotagent.core.retry import RetryPolicy
+from dotagent.core.text import redact_secrets
 from dotagent.core.types import FrozenModel, JsonObject
 from dotagent.llm.connector import get_json, post_json, retry_with_reset
 from dotagent.llm.http import (
@@ -227,7 +228,7 @@ def apply_chunk(
         raise ProviderHttpError(
             "provider reported an error inside the stream",
             502,
-            {**context, "stream_error": str(error)[:1000]},
+            {**context, "stream_error": redact_secrets(str(error))[:1000]},
         )
     deltas: list[StreamDelta] = []
     text: str = state.text

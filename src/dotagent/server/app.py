@@ -21,6 +21,7 @@ from dotagent.core.errors import (
     RunConflict,
     ToolExecutionError,
     ToolInputError,
+    UndoError,
 )
 from dotagent.core.logs import get_logger
 from dotagent.server.context import ServerContext
@@ -41,11 +42,13 @@ STATIC_DIR: Path = Path(__file__).parent / "static"
 _JSON_LIST: TypeAdapter[list[JsonValue]] = TypeAdapter(list[JsonValue])
 _SERVER_FAULT: int = 500
 
-# Errors the caller can fix or must wait out map to 4xx, a failing model service to 502; every other error is a fault
-# of Dot itself: it is answered with 500 and logged.
+# Errors the caller can fix or must wait out map to 4xx (a change that cannot be taken back, as the files stand now, is
+# a conflict), a failing model service to 502; every other error is a fault of Dot itself: it is answered with 500 and
+# logged.
 _STATUS_BY_ERROR: tuple[tuple[type[DotError], int], ...] = (
     (NotFoundError, 404),
     (RunConflict, 409),
+    (UndoError, 409),
     (InvalidValueError, 422),
     (ConfigError, 422),
     (ToolInputError, 422),

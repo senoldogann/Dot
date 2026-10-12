@@ -9,7 +9,7 @@ import { createCostCard } from "../cost.js";
 import { createDetails } from "../details.js";
 import { composerFrame } from "../composer.js";
 import { clip, dateTime, dateTimeFull, debounce, duration, el, modelName } from "../dom.js";
-import { levelLabel } from "../efforts.js";
+import { allModels, levelLabel, offersChoice } from "../efforts.js";
 import { continuedIn, earlierTurns, loadHistory, RESUME_SOURCE } from "../history.js";
 import { dotName, faceState, faceStateAtEnd } from "../face.js";
 import { icon } from "../icons.js";
@@ -18,7 +18,7 @@ import { userMessage } from "../messages.js";
 import { emptyPanel, errorPanel, foldCard, loadingPanel, statusBadge } from "../panels.js";
 import { setStageTitle, setStageTools } from "../stage.js";
 import { createStageSize } from "../stagesize.js";
-import { onLifecycle } from "../state.js";
+import { loadModels, onLifecycle } from "../state.js";
 import { createTimeline } from "../timeline.js";
 import { attempt, confirmDialog, toast } from "../ui.js";
 
@@ -419,7 +419,7 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
   // command here asks on the side; what is typed and not sent is kept for this run.
   const frame = composerFrame({
     label: "Message",
-    boxLabel: "Message for Dot",
+    boxLabel: `Message for ${agent !== null ? agent.name : dotName()}`,
     placeholder: "",
     maxPx: MAX_INPUT_PX,
     commands: [{ label: "/btw", hint: "Ask on the side: the run never sees the question.", insert: "/btw " }],
@@ -483,12 +483,23 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
   // The tokens of the answer count in the run's totals, read again once it is in (a finished run streams nothing more).
   function askAside(question) {
     input.value = "";
+    input.dispatchEvent(new Event("input"));
     frame.autosize();
     const done = holdAside(question);
     attempt(() => api.post(`/runs/${runId}/btw`, { text: question })).finally(() => {
       done();
       reconcile();
     });
+  }
+
+  // The reasoning level a follow-up keeps: the run's own while its model offers a choice that includes it, otherwise
+  // the daemon's default, since a level given for a model without a choice is refused (item 116).
+  async function followUpEffort() {
+    if (run.model === "") {
+      return null;
+    }
+    const info = allModels(await loadModels()).find((candidate) => candidate.ref === run.model) ?? null;
+    return info !== null && offersChoice(info) && info.efforts.includes(run.effort) ? run.effort : null;
   }
 
   // True from the moment a message is on its way until the answer is in: Enter does not look at the disabled button,
@@ -537,10 +548,11 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
           goal: text,
           mode: run.mode,
           model: run.model === "" ? null : run.model,
-          effort: run.effort,
+          effort: await followUpEffort(),
           approvals: run.approvals,
           goal_mode: run.goal_mode,
           thread_id: run.thread_id,
+          agent_id: run.agent_id,
           attachments: files,
         });
         frame.clear();
@@ -551,8 +563,6 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
       send.disabled = false;
     }
   }
-
-  send.addEventListener("click", submit);
 
   function syncControls() {
     cancelButton.hidden = !active;
