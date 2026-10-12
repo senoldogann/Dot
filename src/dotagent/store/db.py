@@ -59,7 +59,7 @@ from dotagent.tools.team import TEAM_SOURCE
 _SCHEMA: str = """
 CREATE TABLE IF NOT EXISTS threads (
     id TEXT PRIMARY KEY, title TEXT NOT NULL, source TEXT NOT NULL,
-    created_at REAL NOT NULL, updated_at REAL NOT NULL
+    created_at REAL NOT NULL, updated_at REAL NOT NULL, pinned_at REAL
 );
 CREATE TABLE IF NOT EXISTS messages (
     thread_id TEXT NOT NULL, seq INTEGER NOT NULL, body TEXT NOT NULL,
@@ -283,6 +283,7 @@ def _summary(row: aiosqlite.Row) -> ThreadSummary:
         source=row["source"],
         created_at=row["created_at"],
         updated_at=row["updated_at"],
+        pinned_at=row["pinned_at"],
         run_count=row["run_count"],
         latest_run_id=row["latest_run_id"],
         latest_status=row["latest_status"],
@@ -496,6 +497,8 @@ _ADDED_SCHEDULE_COLUMNS: tuple[tuple[str, str], ...] = (
 
 # Columns of ``campaigns`` added later: NULL means the daemon's browser, which is where an older campaign's sessions ran.
 _ADDED_CAMPAIGN_COLUMNS: tuple[tuple[str, str], ...] = (("browser", "TEXT"),)
+# Columns of ``threads`` added later: NULL means a chat the owner has not pinned (item 130).
+_ADDED_THREAD_COLUMNS: tuple[tuple[str, str], ...] = (("pinned_at", "REAL"),)
 # Columns of ``agents`` added later: NULL means the owner made the agent (item 99).
 _ADDED_AGENT_COLUMNS: tuple[tuple[str, str], ...] = (
     ("made_by", "TEXT"),
@@ -523,6 +526,7 @@ async def _add_missing_columns(connection: aiosqlite.Connection) -> None:
     await _add_columns(connection, "schedules", _ADDED_SCHEDULE_COLUMNS)
     await _add_columns(connection, "campaigns", _ADDED_CAMPAIGN_COLUMNS)
     await _add_columns(connection, "agents", _ADDED_AGENT_COLUMNS)
+    await _add_columns(connection, "threads", _ADDED_THREAD_COLUMNS)
     await connection.execute("CREATE INDEX IF NOT EXISTS runs_campaign ON runs(campaign_id, created_at)")
 
 
@@ -667,8 +671,22 @@ class Store:
 
     @_writing
     async def rename_thread(self, thread_id: str, title: str) -> None:
-        await self._db.execute("UPDATE threads SET title = ? WHERE id = ?", (title, thread_id))
+        cursor: aiosqlite.Cursor = await self._db.execute(
+            "UPDATE threads SET title = ? WHERE id = ?", (title, thread_id)
+        )
         await self._db.commit()
+        if cursor.rowcount == 0:
+            raise NotFoundError("thread not found", {"thread_id": thread_id})
+
+    @_writing
+    async def pin_thread(self, thread_id: str, pinned: bool) -> None:
+        """Pin the chat now, which puts it first among the pinned ones, or unpin it (item 130)."""
+        cursor: aiosqlite.Cursor = await self._db.execute(
+            "UPDATE threads SET pinned_at = ? WHERE id = ?", (time.time() if pinned else None, thread_id)
+        )
+        await self._db.commit()
+        if cursor.rowcount == 0:
+            raise NotFoundError("thread not found", {"thread_id": thread_id})
 
     @_writing
     async def delete_thread(self, thread_id: str) -> None:
@@ -677,10 +695,10 @@ class Store:
         await self._db.commit()
 
     async def list_thread_summaries(self, limit: int) -> list[ThreadSummary]:
-        """The chats, latest activity first: every thread with a run a person started on it, with the latest of those
-        runs. Threads holding only delegated runs are left out, and so are the threads of a campaign's sessions after the
-        first, which start in threads of their own: the campaign's page lists them, and the campaign's conversation
-        stays a chat."""
+        """The chats, the pinned ones first (the last pinned first, so they are listed however old), then the latest
+        activity first: every thread with a run a person started on it, with the latest of those runs. Threads holding
+        only delegated runs are left out, and so are the threads of a campaign's sessions after the first, which start
+        in threads of their own: the campaign's page lists them, and the campaign's conversation stays a chat."""
         rows: list[aiosqlite.Row] = await self._all(
             "WITH ranked AS ("
             " SELECT thread_id, id, status, mode, created_at,"
@@ -689,10 +707,10 @@ class Store:
             " FROM runs WHERE parent_run_id IS NULL"
             " AND (campaign_id IS NULL OR thread_id IN (SELECT thread_id FROM campaigns)))"
             " SELECT t.id, t.title, t.source, t.created_at, MAX(t.updated_at, r.created_at) AS updated_at,"
-            "  r.run_count, r.id AS latest_run_id, r.status AS latest_status, r.mode AS latest_mode,"
+            "  t.pinned_at, r.run_count, r.id AS latest_run_id, r.status AS latest_status, r.mode AS latest_mode,"
             "  r.created_at AS latest_created_at"
             " FROM threads AS t JOIN ranked AS r ON r.thread_id = t.id AND r.place = 1"
-            " ORDER BY updated_at DESC LIMIT ?",
+            " ORDER BY t.pinned_at IS NULL, t.pinned_at DESC, updated_at DESC LIMIT ?",
             (limit,),
         )
         return [_summary(row) for row in rows]

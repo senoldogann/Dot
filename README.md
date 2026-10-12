@@ -845,19 +845,29 @@ dotx url        # print its address with the sign-in token
 The web UI is laid out like a chat app: the chats in a sidebar on the left, one page on the right, and the settings on a
 page of their own.
 
-The sidebar lists your chats (the conversation threads) grouped by day, newest activity first; a live dot marks those
-with a run going on, waiting for you or failed, and a chat opens at its latest run. While a chat's latest run works, the
-time at the right of its row gives way to a dashed circle, **Working** and how long since the run was asked for ("12s",
-"4m", "1h 5m", read again every second), as T3 Code's sidebar has it; every run of the Working section says the same, a
-delegated run under its parent too, and a run that waits for you keeps its amber dot and its time. Above the list: a search over the titles
-(⌘K or `/`), **New chat** (⇧⌘O) and the ways to **Agents**, **Activity** and **Campaigns**; in the foot,
-**Settings** and the red square of the **Emergency stop** (which comes along beside the button that shows the sidebar
-while the sidebar is closed). The top bar shows only what needs you: the approvals waiting, and the connection to the
-daemon while it is being made or lost; the runs that work are counted in the Working section. The sections (Waiting for you, Working, Chats) fold on a click of their label, and the folds are kept
-between visits. The sidebar's head holds only the button that folds it away. **Select** turns the list into checkboxes: tick chats
-(or Select all) and **Delete** asks once, then removes them with every run, step, event and approval of theirs. A chat
-with a run under way is refused: wait for the run to end, or cancel it. Escape leaves the selection. Under 860 px the
-sidebar becomes a drawer.
+The sidebar lists your chats (the conversation threads) grouped by day, newest activity first, the pinned ones above the
+days; a live dot marks those with a run going on, waiting for you or failed, and a chat opens at its latest run. While a
+chat's latest run works, the time at the right of its row gives way to a dashed circle, **Working** and how long since
+the run was asked for ("12s", "4m", "1h 5m", read again every second), as T3 Code's sidebar has it; every run of the
+Working section says the same, a delegated run under its parent too, and a run that waits for you keeps its amber dot
+and its time. Above the list: a search over the titles (⌘K or `/`), **New chat** (⇧⌘O) and the ways to **Agents**,
+**Activity** and **Campaigns**; in the foot, **Settings** and the red square of the **Emergency stop** (which comes
+along beside the button that shows the sidebar while the sidebar is closed). The top bar shows only what needs you: the
+approvals waiting, and the connection to the daemon while it is being made or lost; the runs that work are counted in
+the Working section. The sections (Waiting for you, Working, Chats) fold on a click of their label, and the folds are
+kept between visits. The sidebar's head holds only the button that folds it away. **Select** turns the list into
+checkboxes: tick chats (or Select all) and **Delete** asks once, then removes them with every run, step, event and
+approval of theirs. A chat with a run under way is refused: wait for the run to end, or cancel it. Escape leaves the
+selection. Under 860 px the sidebar becomes a drawer.
+
+A chat's menu, after T3 Code's thread menu, opens from the **…** button at the right of its row (shown where the pointer
+rests or the focus is, over the time, and always on a touch screen), from a right-click on the row, or from the
+context-menu key (Shift+F10); the arrow keys walk it and Escape closes it. **Pin** keeps the chat under **Pinned**,
+above the days, the last pinned first, however old it grows; **Unpin** puts it back among the days. **Rename** makes its
+name a field in the row: Enter or leaving the field keeps a new name, Escape leaves the old one. **Copy link** puts the
+chat's address (its latest run) on the clipboard, for this browser or another one signed in to this Dot. **Select**
+starts choosing chats with this one ticked, and **Delete** asks first, as Select's does. The daemon keeps the pin and
+the name, so every browser shows them.
 
 Above the chats, two sections appear while they have rows: **Waiting for you** (the approvals and questions runs wait
 for, and a run whose browser you took over) and **Working** (the runs going on, a session of a campaign, a run
@@ -1146,7 +1156,8 @@ The REST API (all under `/api`; bodies and replies are JSON, event streams are s
 | `POST /runs/{id}/steer`, `POST /runs/{id}/cancel`                               | message a running run; stop it                               |
 | `POST /runs/{id}/btw` (`{"text": …}`)                                           | a side question, answered without the run seeing it          |
 | `POST /attachments` (`{"name", "media_type", "data_b64"}`)                      | keep a file for a message; `POST /runs` and `steer` name it in `attachments` |
-| `GET /threads?limit=N`, `DELETE /threads` (`{"ids": […]}`)                      | the chats, newest activity first; delete some with their runs (409 with the ids while one has a run under way) |
+| `GET /threads?limit=N`, `DELETE /threads` (`{"ids": […]}`)                      | the chats, the pinned first, then newest activity first; delete some with their runs (409 with the ids while one has a run under way) |
+| `PATCH /threads/{id}` (`{"title": …, "pinned": …}`, one or both)                | name a chat or pin it (204; 404 for no chat) |
 | `GET /approvals`, `POST /approvals/{id}/decision`                               | pending approvals; answer one                                |
 | `GET\|POST /rules`, `PATCH\|DELETE /rules/{id}`                                 | custom policy rules                                          |
 | `POST /rules/draft` (`{"sentence": …}`)                                         | a rule drafted from your words, not kept (422 with the model's reason when the words make no rule) |

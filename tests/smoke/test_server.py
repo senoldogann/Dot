@@ -1130,6 +1130,29 @@ async def test_deleting_chats_takes_their_runs_delegations_events_and_approvals_
     assert (await client.request("DELETE", "/api/threads", json={})).status_code == 422
 
 
+async def test_a_chat_is_named_and_pinned_from_its_menu(client: httpx.AsyncClient, runtime: Runtime) -> None:
+    older, _ = await _chat(runtime, "older chat", 1)
+    newer, _ = await _chat(runtime, "newer chat", 1)
+    assert (await client.patch(f"/api/threads/{older.id}", json={"pinned": True})).status_code == 204
+    assert (await client.patch(f"/api/threads/{older.id}", json={"title": "  Trip notes  "})).status_code == 204
+    listed: dict[str, ThreadSummary] = {
+        item["id"]: ThreadSummary.model_validate(item)
+        for item in (await client.get("/api/threads", params={"limit": 500})).json()
+    }
+    assert (listed[older.id].title, listed[newer.id].pinned_at) == ("Trip notes", None)
+    assert listed[older.id].pinned_at is not None
+    order: list[str] = await _chat_ids(client)
+    assert order.index(older.id) < order.index(newer.id), "a pinned chat comes before the latest activity"
+    one: httpx.Response = await client.get("/api/threads", params={"limit": 1})
+    assert [item["id"] for item in one.json()] == [older.id], "a pinned chat is listed however old"
+    assert (await client.patch(f"/api/threads/{older.id}", json={"pinned": False})).status_code == 204
+    order = await _chat_ids(client)
+    assert order.index(newer.id) < order.index(older.id), "unpinned, it goes back to its activity's place"
+    assert (await client.patch("/api/threads/thr_nothing", json={"pinned": True})).status_code == 404
+    for wrong in ({}, {"title": "   "}, {"title": "x" * 121}, {"pinned": "soon"}, {"pinned": "yes"}, {"pinned": 1}):
+        assert (await client.patch(f"/api/threads/{older.id}", json=wrong)).status_code == 422, wrong
+
+
 @requires_model
 async def test_a_chat_with_a_run_under_way_is_kept_until_the_run_is_over(
     client: httpx.AsyncClient, runtime: Runtime

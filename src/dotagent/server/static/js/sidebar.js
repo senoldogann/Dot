@@ -1,13 +1,15 @@
 // The sidebar: a new chat, a search over the chats, the ways to the agents, the activity and the campaigns, what waits
 // and what works (folded or not, as the owner left them), the chats themselves (several of them can be deleted at once)
 // and, in the foot, the way to the settings and the emergency stop (item 120). A row whose run works says Working and
-// for how long (item 122).
+// for how long (item 122). A chat's menu (item 130), after T3 Code's thread menu, pins it, names it, copies its link,
+// starts choosing chats with it and deletes it; the pinned chats come first, under Pinned.
 
 import { ApiError, api, request } from "./api.js";
-import { age, clip, clipWords, dateTime, debounce, el, foldSearch, plural, workingFor } from "./dom.js";
+import { age, clip, clipWords, copyText, dateTime, debounce, el, foldSearch, plural, workingFor } from "./dom.js";
 import { failsafeButton } from "./failsafe.js";
 import { icon } from "./icons.js";
 import { actorFace } from "./actors.js";
+import { closeMenu, menuOpenedBy, openMenu } from "./menu.js";
 import { nestRows, progressFacts } from "./nesting.js";
 import { readFolds, writePref } from "./prefs.js";
 import { requestCompose } from "./shortcuts.js";
@@ -60,6 +62,16 @@ function groupByDay(chats, now) {
   return DAY_LABELS.map((label) => ({ label, chats: latestFirst.filter((chat) => dayLabel(chat.updated_at, now) === label) })).filter(
     (group) => group.chats.length > 0,
   );
+}
+
+/** The pinned chats under "Pinned", the last pinned first, then the others by day (item 130). */
+function groupChats(chats, now) {
+  const pinned = chats.filter((chat) => chat.pinned_at !== null).sort((a, b) => b.pinned_at - a.pinned_at);
+  const days = groupByDay(
+    chats.filter((chat) => chat.pinned_at === null),
+    now,
+  );
+  return pinned.length === 0 ? days : [{ label: "Pinned", chats: pinned }, ...days];
 }
 
 function matchesQuery(chat, needle) {
@@ -189,6 +201,8 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
   let routeThreadId = null;
   let resolveTicket = 0;
   let selecting = false;
+  // The chat whose name is being typed in its row (item 130): the list is painted again once the name is kept or left.
+  let renaming = null;
   let disposed = false;
   const selected = new Set();
   const rowNodes = new Map();
@@ -304,6 +318,11 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
   }
 
   function paintChats() {
+    if (renaming !== null) {
+      return;
+    }
+    // A chat's menu acts on the rows it was opened from, which go now.
+    closeMenu();
     rowNodes.clear();
     selectButton.hidden = selecting || chats === null || chats.length === 0;
     head.hidden = selecting;
@@ -347,21 +366,144 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
       return;
     }
     list.replaceChildren(
-      ...groupByDay(shown, new Date()).map((group) =>
+      ...groupChats(shown, new Date()).map((group) =>
         el(
           "section",
           { class: "side-group" },
           el("h3", { class: "side-label" }, group.label),
           group.chats.map((chat) => {
-            const node = selecting ? chatPick(chat, selected.has(chat.id), toggle) : chatLink(chat, onNavigate);
-            rowNodes.set(chat.id, node);
-            return node;
+            if (selecting) {
+              const pick = chatPick(chat, selected.has(chat.id), toggle);
+              rowNodes.set(chat.id, pick);
+              return pick;
+            }
+            const link = chatLink(chat, onNavigate);
+            rowNodes.set(chat.id, link);
+            return chatRow(chat, link);
           }),
         ),
       ),
       ...olderNote(),
     );
     markCurrent();
+  }
+
+  // A chat's row: its link and the button of its menu, which a right-click on the row and the context-menu key open
+  // too (item 130).
+  function chatRow(chat, link) {
+    const more = el(
+      "button",
+      {
+        class: "side-more",
+        type: "button",
+        title: "More",
+        "aria-label": `More for ${clip(chat.title, 120)}`,
+        "aria-haspopup": "menu",
+        "aria-expanded": "false",
+      },
+      icon("ellipsis"),
+    );
+    more.addEventListener("click", () => {
+      if (menuOpenedBy(more)) {
+        closeMenu();
+        return;
+      }
+      const box = more.getBoundingClientRect();
+      openMenu({ label: chat.title, items: chatActions(chat), at: { x: box.left, y: box.bottom + 4 }, back: more, button: more });
+    });
+    link.addEventListener("keydown", (event) => {
+      if (event.key === "ContextMenu" || (event.key === "F10" && event.shiftKey)) {
+        event.preventDefault();
+        const box = link.getBoundingClientRect();
+        openMenu({ label: chat.title, items: chatActions(chat), at: { x: box.left + 16, y: box.bottom }, back: link });
+      }
+    });
+    const row = el("div", { class: "side-chat", "data-chat": chat.id }, link, more);
+    // While the row holds the name's field, a right-click is the field's own.
+    row.addEventListener("contextmenu", (event) => {
+      if (renaming !== null) {
+        return;
+      }
+      event.preventDefault();
+      openMenu({ label: chat.title, items: chatActions(chat), at: { x: event.clientX, y: event.clientY }, back: link });
+    });
+    return row;
+  }
+
+  function chatActions(chat) {
+    return [
+      chat.pinned_at === null
+        ? { label: "Pin", icon: "pin", run: () => attempt(() => pinChat(chat, true)) }
+        : { label: "Unpin", icon: "pinOff", run: () => attempt(() => pinChat(chat, false)) },
+      { label: "Rename", icon: "pencil", run: () => renameChat(chat) },
+      { label: "Copy link", icon: "link", run: () => attempt(() => copyLink(chat)) },
+      "separator",
+      { label: "Select", icon: "squareCheck", run: () => enterSelectMode(chat.id) },
+      { label: "Delete", icon: "trash", danger: true, run: () => attempt(() => deleteChats([chat.id])) },
+    ];
+  }
+
+  async function pinChat(chat, pinned) {
+    await api.patch(`/threads/${chat.id}`, { pinned });
+    await load();
+    rowNodes.get(chat.id)?.focus();
+  }
+
+  // The chat's name becomes a field in its row: Enter or leaving it keeps a name that changed, Escape leaves the old
+  // one, and an empty name is not kept. A key gives the focus back to the row; leaving the field leaves it where it went.
+  function renameChat(chat) {
+    const link = rowNodes.get(chat.id);
+    if (link === undefined) {
+      return;
+    }
+    const field = el("input", {
+      class: "input side-rename",
+      type: "text",
+      value: chat.title,
+      maxlength: "120",
+      spellcheck: "false",
+      autocomplete: "off",
+      "aria-label": "Chat name",
+    });
+    let ended = false;
+    // The row comes back at once, under the new name while the daemon keeps it.
+    async function end(keep) {
+      if (ended) {
+        return;
+      }
+      ended = true;
+      renaming = null;
+      const title = field.value.trim();
+      if (!keep || title === "" || title === chat.title) {
+        paintChats();
+        return;
+      }
+      chats = chats.map((one) => (one.id === chat.id ? { ...one, title } : one));
+      paintChats();
+      await attempt(() => api.patch(`/threads/${chat.id}`, { title }));
+      await load();
+    }
+    field.addEventListener("keydown", (event) => {
+      // WebKit ends the composition before the key that commits it, so that key shows only as keyCode 229 (item 116).
+      if (event.isComposing || event.keyCode === 229) {
+        return;
+      }
+      if (event.key === "Enter" || event.key === "Escape") {
+        event.preventDefault();
+        end(event.key === "Enter").then(() => rowNodes.get(chat.id)?.focus());
+      }
+    });
+    field.addEventListener("blur", () => end(true));
+    renaming = chat.id;
+    link.parentElement.replaceChildren(field);
+    field.focus();
+    field.select();
+  }
+
+  // The chat's address, which opens it in this browser or another one signed in to this Dot.
+  async function copyLink(chat) {
+    await copyText(`${location.origin}${location.pathname}#/runs/${chat.latest_run_id}`);
+    toast("ok", "Link copied.");
   }
 
   function toggle(id, checked) {
@@ -388,12 +530,16 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
     paintBar();
   }
 
-  function enterSelectMode() {
+  // `chosen` is a chat ticked at the start, when its menu began the choosing; the focus goes to its box then.
+  function enterSelectMode(chosen) {
     selecting = true;
     selected.clear();
+    if (chosen !== undefined) {
+      selected.add(chosen);
+    }
     paintChats();
     paintBar();
-    const first = rows()[0];
+    const first = chosen === undefined ? rows()[0] : rowNodes.get(chosen)?.querySelector("input.side-check");
     (first === undefined ? cancelButton : first).focus();
   }
 
@@ -408,13 +554,20 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
   }
 
   async function deleteSelected() {
-    const ids = [...selected];
+    await deleteChats([...selected]);
+  }
+
+  // Delete the chats `ids`, asked first: the ones chosen under Select, or the one of a chat's menu.
+  async function deleteChats(ids) {
     if (ids.length === 0) {
       return;
     }
     const confirmed = await confirmDialog({
-      title: `Delete ${plural(ids.length, "chat", "chats")}?`,
-      message: "Their runs go with them, with every step, event and approval of those. This cannot be undone.",
+      title: ids.length === 1 && !selecting ? "Delete this chat?" : `Delete ${plural(ids.length, "chat", "chats")}?`,
+      message:
+        ids.length === 1
+          ? "Its runs go with it, with every step, event and approval of those. This cannot be undone."
+          : "Their runs go with them, with every step, event and approval of those. This cannot be undone.",
       confirmLabel: "Delete",
       danger: true,
       focusCancel: true,
@@ -438,7 +591,11 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
     const gone = new Set(outcome.deleted);
     toast("ok", `Deleted ${plural(gone.size, "chat", "chats")}.`);
     chats = chats.filter((chat) => !gone.has(chat.id));
-    leaveSelectMode();
+    if (selecting) {
+      leaveSelectMode();
+    } else {
+      paintChats();
+    }
     if (routeThreadId !== null && gone.has(routeThreadId)) {
       location.hash = homeHref;
     }
@@ -669,6 +826,7 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
     },
     dispose() {
       disposed = true;
+      closeMenu();
       clearInterval(ageTicker);
       clearInterval(workTicker);
       stopLifecycle();

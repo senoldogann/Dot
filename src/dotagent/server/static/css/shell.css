@@ -207,7 +207,8 @@
 
 .side-btn:hover,
 .side-link:hover,
-.side-run:hover {
+.side-run:hover,
+:where(.side-chat:hover) > .side-run {
   background: color-mix(in srgb, var(--text) 4%, transparent);
   color: var(--text);
   text-decoration: none;
@@ -269,6 +270,64 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-half);
+}
+
+/* A chat's row (item 130): its link, and the button of its menu at its right, shown where the pointer rests or the
+   focus is, over the age or the working time it hides; on a touch screen it always shows, beside them. */
+.side-chat {
+  position: relative;
+}
+
+.side-more {
+  position: absolute;
+  top: 50%;
+  right: 4px;
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-2);
+  opacity: 0;
+  translate: 0 -50%;
+  cursor: pointer;
+}
+
+.side-more:hover,
+.side-more[aria-expanded="true"] {
+  background: color-mix(in srgb, var(--text) 8%, transparent);
+  color: var(--text);
+  opacity: 1;
+}
+
+@media (hover: hover) {
+  .side-chat:hover .side-more,
+  .side-chat:focus-within .side-more {
+    opacity: 1;
+  }
+
+  .side-chat:is(:hover, :focus-within) :is(.side-age, .side-working),
+  .side-chat:has(.side-more[aria-expanded="true"]) :is(.side-age, .side-working) {
+    visibility: hidden;
+  }
+}
+
+@media (hover: none) {
+  .side-more {
+    opacity: 1;
+  }
+
+  .side-chat > .side-run {
+    padding-right: 32px;
+  }
+}
+
+/* The name being typed in a chat's row, as tall as the row. */
+.side-rename {
+  width: 100%;
 }
 
 .side-recent {

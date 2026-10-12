@@ -1,8 +1,8 @@
 """The shapes the HTTP interface takes and gives. Records of the store are returned as they are."""
 
-from typing import Annotated, Literal
+from typing import Annotated, Literal, Self
 
-from pydantic import Field, JsonValue, StringConstraints
+from pydantic import Field, JsonValue, StrictBool, StringConstraints, model_validator
 
 from dotagent.agent.attachments import MAX_ATTACHMENT_BYTES, MAX_ATTACHMENTS
 from dotagent.agent.lessons import RunLessons
@@ -111,6 +111,19 @@ class DeleteThreadsRequest(FrozenModel):
     """The chats to delete, by thread id."""
 
     ids: list[str] = Field(min_length=1, max_length=500)
+
+
+class ThreadChange(FrozenModel):
+    """What the owner changes on a chat from its menu (item 130): its name, or its pin; one of them at least."""
+
+    title: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=_NAME_CHARS)] | None = None
+    pinned: StrictBool | None = None
+
+    @model_validator(mode="after")
+    def _something(self) -> Self:
+        if self.title is None and self.pinned is None:
+            raise ValueError("a change of a chat names its title or its pin")
+        return self
 
 
 class SteerRequest(FrozenModel):
