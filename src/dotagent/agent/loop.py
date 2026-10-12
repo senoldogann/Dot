@@ -810,7 +810,7 @@ def _after_limit_verdict(verdict: GoalVerdict, ended: RunOutcome) -> RunOutcome:
     )
 
 
-async def _browser_of(runtime: Runtime, run: RunRecord) -> BrowserSession:
+async def browser_of(runtime: Runtime, run: RunRecord) -> BrowserSession:
     """The browser session the run works in: the one its campaign asked for (a delegated run follows its parent's
     campaign), else the daemon's."""
     campaign_id: str | None = run.campaign_id
@@ -1394,7 +1394,7 @@ async def run_agent(agent: AgentRun) -> RunEnd:
     facts: RunFacts = new_facts()
     context: ToolContext = ToolContext(
         runtime=runtime,
-        browser=await _browser_of(runtime, run),
+        browser=await browser_of(runtime, run),
         run_id=run.id,
         agent_id=run.agent_id,
         thread_id=run.thread_id,

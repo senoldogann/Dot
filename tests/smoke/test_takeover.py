@@ -21,9 +21,11 @@ from playwright.async_api import Browser, Locator, Page, async_playwright, expec
 
 from dotagent.agent.gate import HANDBACK_EVENT, TAKEOVER_EVENT
 from dotagent.agent.manager import RunManager
+from dotagent.browser.attach import DebugEndpoint
 from dotagent.browser.session import BrowserSession
 from dotagent.browser.types import Frame
 from dotagent.config import BrowserConfig, ServerConfig, load_config, load_default_config
+from dotagent.core.errors import BrowserError
 from dotagent.evals.runner import SCRIPTED_MODEL
 from dotagent.evals.scripted import ScriptedProvider
 from dotagent.evals.types import ScriptedCall, ScriptedTurn
@@ -281,6 +283,51 @@ async def test_a_takeover_holds_the_run_until_the_handback_and_the_waiting_call_
     assert late.status_code == 409, late.text
     final: httpx.Response = await client.get(f"/api/runs/{run.id}")
     assert final.json()["held"] is False
+
+
+async def test_a_takeover_brings_up_the_tab_in_the_browser_the_run_works_in_and_a_failed_one_lets_it_go_on(
+    runtime: Runtime, manager: RunManager, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Item 136: a session of a campaign works in the campaign's Chrome, so its takeover brings the tab up there; a tab
+    that cannot be brought up leaves the run free. The sessions' tabs are stood in for: no Chrome is started."""
+    asked: list[str] = []
+
+    async def in_dots_chrome(thread_id: str) -> str | None:
+        asked.append("own")
+        raise BrowserError("the tab could not be brought to the front", {"thread_id": thread_id})
+
+    async def in_the_owners_chrome(thread_id: str) -> str | None:
+        asked.append("attach")
+        return "https://example.test/"
+
+    def chrome_is_open(data_dir: Path) -> DebugEndpoint:
+        return DebugEndpoint(port=9222, path="/devtools/browser/test")
+
+    monkeypatch.setattr(runtime.browser, "focus", in_dots_chrome)
+    monkeypatch.setattr(runtime.browsers.session_for("attach"), "focus", in_the_owners_chrome)
+    monkeypatch.setattr("dotagent.agent.manager.read_debug_endpoint", chrome_is_open)
+    MODEL.script = ScriptedProvider(_PROVIDER, [_shell("sleep 5"), _FINISH, _FINISH])
+    session: RunRecord = await manager.start_campaign(
+        "Echo once", "task", SCRIPTED_MODEL, None, "test", None, "yolo", None, (), "attach"
+    )
+    assert await manager.take_over(session.id, "test") == "https://example.test/"
+    assert asked == ["attach"]
+    await manager.hand_back(session.id, "test")
+    manager.cancel(session.id)
+    async with asyncio.timeout(_RUN_WAIT_S):
+        await manager.wait(session.id)
+
+    MODEL.script = ScriptedProvider(_PROVIDER, [_shell("sleep 5"), _FINISH])
+    run: RunRecord = await manager.start(
+        "Echo once", "task", SCRIPTED_MODEL, None, "test", None, None, "yolo", False, ()
+    )
+    with pytest.raises(BrowserError):
+        await manager.take_over(run.id, "test")
+    assert asked == ["attach", "own"]
+    assert not manager.held(run.id)
+    manager.cancel(run.id)
+    async with asyncio.timeout(_RUN_WAIT_S):
+        await manager.wait(run.id)
 
 
 _BOX_WIDTH: str = "(node) => node.getBoundingClientRect().width"

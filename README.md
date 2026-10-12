@@ -393,9 +393,10 @@ into the field is still what the approval mode allows (only `yolo` types one-tim
 per_day = 50 }`. Dot reads the amount of a payment step from the control's label ("Pay €19.90") or from the total on the
 page; under both caps the step is a question instead of a hand-off (a `yolo` run goes on, `auto` lets the review model
 answer, `ask` asks you once), it is recorded with its amount, shown in the timeline, and counts against the site's day.
-Over a cap, on a site not listed, or when the page does not show the amount, the money hand-off holds as before. The
-caps are plain numbers compared with the number on the page, whatever its currency, so list sites that bill in one
-currency. Empty by default.
+The payments of a site are decided one at a time, each from what the ones before it spent, so two runs paying at once
+cannot both take what is left of the day. Over a cap, on a site not listed, or when the page does not show the amount,
+the money hand-off holds as before. The caps are plain numbers compared with the number on the page, whatever its
+currency, so list sites that bill in one currency. Empty by default.
 
 **Decision order**, strictest first:
 
@@ -525,7 +526,8 @@ content. Both are counted on their site (the page's host, without `www.`), acros
 and day, and nothing limits them by default: Dot posts, follows and likes as often as its task needs. `[policy.pace]`
 sets limits (`public_per_hour`, `public_per_day`, `social_per_hour`, `social_per_day`, and `public_spacing_s` between
 public actions, which the browser waits out; 0 removes a limit). An action past a limit that is set is refused in every
-approval mode, `yolo` too, with the time the next one is allowed, and the timeline shows the refusal. A `browser_act`
+approval mode, `yolo` too, with the time the next one is allowed, and the timeline shows the refusal. The actions of
+two runs on one site are judged one after the other, so the second counts the first. A `browser_act`
 call takes one public or social click at most, so that each one counts. Only the clicks the policy recognises are
 counted: a post sent with a keyboard shortcut or through an API from the shell is not. X publishes limits of its own (an
 unverified account: 50 posts and 200 replies a day, 400 follows, 500 messages), and its automation rules forbid
@@ -542,8 +544,12 @@ the same way, except in a run nobody can answer during it (see
 
 - the **Emergency stop** button of the web UI (the red square in the sidebar's foot beside Settings, or beside the
   button that shows the sidebar while it is closed; or `POST /api/failsafe`) creates the `STOP` file in the home
-  directory and cancels every run; the page shows a banner with a button that releases it
-- `touch ~/Library/Application\ Support/Dot/STOP` blocks desktop control the same way; delete the file to allow it again
+  directory and ends every run as an emergency stop (a campaign whose session it ends stops too); the page shows a
+  banner with a button that releases it
+- `touch ~/Library/Application\ Support/Dot/STOP` blocks desktop control the same way, without ending a run; delete the
+  file to allow it again
+- while the `STOP` file exists, no schedule fires (a firing due then is skipped to its next time, saying why) and no
+  campaign starts a session (it starts once the stop is released)
 - with `[desktop] failsafe_corner = true` (the default), moving the pointer into the top-left corner of the screen
   aborts the desktop step in progress, and Dot never clicks that corner
 - before each step of a desktop batch Dot checks that the pointer is where the previous step left it; if someone else is
@@ -1013,7 +1019,9 @@ in the background while a run works (`[browser] raise_window`, off by default, i
 are opened behind, the app you were in gets the focus back right after Chrome starts and after a page opens a tab of its
 own, and switching tabs does not raise the window; Settings › Browser has the switch
 "Bring Chrome to the front while working" for the other way round. **Take over**
-holds the run at its next tool call, brings the tab to the front either way and the pill reads "You have control": the Chrome
+holds the run at its next tool call, brings its tab to the front either way, in the Chrome the run works in (a
+campaign's session, in the campaign's), and the pill reads "You have control" (when the tab cannot be brought up, the
+run is not held): the Chrome
 window is on your Mac, so sign in, pass a CAPTCHA or do a step yourself; **Return control** lets the run go on, and the
 result of the tool call that waited tells the model how long you had the browser and that the page may have changed,
 so it takes a snapshot first. The timeline keeps both moments (`takeover`, `handback`), and `dotx run` prints them. A
@@ -1600,10 +1608,10 @@ your conversation; the daemon runs the sessions after it, each a run in a thread
   notification.
 - **Only you stop it.** Campaigns, in the sidebar, lists them; a campaign's page shows its targets, the questions
   waiting for you, its ledger and its sessions, with Stop (which also stops a session working then), Go on and Mark
-  achieved. The emergency stop of desktop control (the pointer in the top-left corner) stops the campaign of the session
-  it ends. `dotx campaign` changes the campaign without the daemon, so a session working then goes on until it ends
-  (Stop on its run page ends it). `campaign_max_sessions` (0: no limit) stops a campaign after that many sessions; Go on
-  gives it one more.
+  achieved. The emergency stop (its button, or the pointer in the top-left corner during a desktop step) stops the
+  campaign of the session it ends, and while the stop is engaged no session starts. `dotx campaign` changes the
+  campaign without the daemon, so a session working then goes on until it ends (Stop on its run page ends it).
+  `campaign_max_sessions` (0: no limit) stops a campaign after that many sessions; Go on gives it one more.
 - **Posts, judged before they are answered.** With `TYPESAFE_API_KEY` saved, a session also has three tools on TypeSafe's
   typed judgments for a campaign on X or another feed. `rank_posts` asks three yes/no questions about every post it
   could answer, in one request (on the account's topic; written by a person, not a bot, a brand or spam; worth a reply

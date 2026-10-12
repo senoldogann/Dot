@@ -106,6 +106,7 @@ async def _yolo_context(runtime: Runtime) -> ToolContext:
             "yolo",
             _nobody,
             (GOAL,),
+            runtime.site_locks,
         ),
         cancel=asyncio.Event(),
         output_chars=runtime.config.agent.tool_output_chars,

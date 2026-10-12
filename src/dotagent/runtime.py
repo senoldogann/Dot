@@ -7,6 +7,7 @@ from pathlib import Path
 from zoneinfo import ZoneInfo
 
 from dotagent.agent.approvals import ApprovalBroker
+from dotagent.agent.gate import SiteLocks
 from dotagent.agent.judge import Judge, TypeSafeService, judge_for
 from dotagent.browser.pool import BrowserPool
 from dotagent.browser.session import BrowserSession
@@ -79,6 +80,8 @@ class Runtime:
     store: Store
     bus: EventBus
     approvals: ApprovalBroker
+    # The gates' locks per site (pace and spending), shared by every run of this process.
+    site_locks: SiteLocks
     router: ModelRouter
     judge: Judge
     # TypeSafe's service, shared by the judge and judge_items; ``None`` when neither is on.
@@ -241,6 +244,7 @@ async def open_runtime(config: AppConfig, login_env: dict[str, str]) -> Runtime:
             store=store,
             bus=bus,
             approvals=ApprovalBroker(store, bus, config.policy.approval_timeout_s),
+            site_locks=SiteLocks(),
             router=ModelRouter(config, _call_recorder(store, bus)),
             judge=judge_for(config, typesafe),
             typesafe=typesafe,

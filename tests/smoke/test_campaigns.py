@@ -20,6 +20,8 @@ import httpx
 import pytest
 import pytest_asyncio
 
+from dotagent.agent.campaign import Brief
+from dotagent.agent.campaign_control import stop_campaign
 from dotagent.agent.loop import CAMPAIGN_TARGETS_EVENT
 from dotagent.agent.manager import RunManager, thread_title
 from dotagent.agent.review import GOAL_TOOL
@@ -38,6 +40,7 @@ from dotagent.scheduler.runner import Scheduler
 from dotagent.server import UI_SOURCE
 from dotagent.server.app import create_app
 from dotagent.server.context import ServerContext
+from dotagent.store.endings import RESULT_EMERGENCY_STOPPED
 from dotagent.store.models import (
     WORKING_STATUSES,
     ApprovalRecord,
@@ -612,3 +615,93 @@ async def test_a_campaign_that_asks_for_the_owners_chrome_is_refused_while_that_
         assert (await runtime.store.get_campaign(opening.campaign_id)).browser == "own"
         async with asyncio.timeout(_TIME_LIMIT_S):
             await manager.wait(opening.id)
+
+
+async def _called(runtime: Runtime, run_id: str, tool: str) -> None:
+    """Return once the run has called ``tool``."""
+    while True:
+        if any(event.data["tool"] == tool for event in await _events(runtime, run_id, "tool_call")):
+            return
+        await asyncio.sleep(_POLL_S)
+
+
+async def test_the_emergency_stop_ends_a_session_as_one_and_holds_the_campaign_while_it_is_engaged(
+    login_env: dict[str, str],
+) -> None:
+    """Item 136: the emergency stop of the API ends a working session as an emergency stop, so its campaign stops
+    instead of planning the next session; resumed while the stop is engaged, the campaign is due, and the scheduler
+    starts no session of it until the stop is released."""
+    model: RecordingProvider = RecordingProvider(
+        ScriptedProvider(_PROVIDER, [_turn(_targets(), _call("shell", {"command": "sleep 30"})), _finish("Done.")])
+    )
+    async with (
+        _session(_config(60), login_env, model, Notices()) as (runtime, manager),
+        httpx.AsyncClient(
+            transport=httpx.ASGITransport(app=create_app(_context(runtime, manager))),
+            base_url=BASE,
+            headers={"Authorization": f"Bearer {TOKEN}"},
+        ) as client,
+    ):
+        session: RunRecord = await manager.start_campaign(
+            GOAL, "task", SCRIPTED_MODEL, None, EVAL_SOURCE, None, "yolo", None, (), None
+        )
+        assert session.campaign_id is not None
+        async with asyncio.timeout(_TIME_LIMIT_S):
+            await _called(runtime, session.id, "shell")
+        engaged: httpx.Response = await _post(client, "/failsafe", None)
+        try:
+            assert engaged.status_code == 200, engaged.text
+            assert engaged.json()["cancelled_runs"] == [session.id]
+            async with asyncio.timeout(_TIME_LIMIT_S):
+                ended: RunRecord = await manager.wait(session.id)
+            assert (ended.status, ended.result) == ("cancelled", RESULT_EMERGENCY_STOPPED)
+            stopped: CampaignRecord = await runtime.store.get_campaign(session.campaign_id)
+            assert (stopped.status, stopped.next_session_at) == ("stopped", None)
+            resumed: httpx.Response = await _post(client, f"/campaigns/{session.campaign_id}/resume", None)
+            assert resumed.status_code == 200, resumed.text
+            await Scheduler(runtime, manager).tick(time.time())
+            assert [run.id for run in await runtime.store.campaign_sessions(session.campaign_id)] == [session.id]
+        finally:
+            released: httpx.Response = await client.delete("/api/failsafe")
+            assert released.status_code == 200, released.text
+
+
+class _StoppedWhileStarting(RunManager):
+    """The owner stops the campaign while the brief of its next session is being written, before the session exists."""
+
+    async def _brief(self, campaign: CampaignRecord, sessions: list[RunRecord], number: int, now: float) -> Brief:
+        brief: Brief = await super()._brief(campaign, sessions, number, now)
+        await stop_campaign(self._runtime.store, campaign.id)
+        return brief
+
+
+async def test_a_campaign_stopped_while_its_session_starts_ends_that_session(login_env: dict[str, str]) -> None:
+    """Item 136: the owner's Stop finds no session to stop while one is being started; the session ends as soon as it
+    is, instead of running its whole course on a stopped campaign."""
+    model: RecordingProvider = RecordingProvider(
+        ScriptedProvider(
+            _PROVIDER,
+            [
+                _turn(_targets()),
+                _finish("Targets set."),
+                _turn(_call("shell", {"command": "sleep 5"})),
+                _finish("Done."),
+            ],
+        )
+    )
+    async with _session(_config(60), login_env, model, Notices()) as (runtime, _):
+        manager: _StoppedWhileStarting = _StoppedWhileStarting(runtime)
+        try:
+            opening: RunRecord = await manager.start_campaign(
+                GOAL, "task", SCRIPTED_MODEL, None, EVAL_SOURCE, None, "yolo", None, (), None
+            )
+            assert opening.campaign_id is not None
+            async with asyncio.timeout(_TIME_LIMIT_S):
+                await manager.wait(opening.id)
+            session: RunRecord = await manager.start_session(opening.campaign_id)
+            async with asyncio.timeout(_TIME_LIMIT_S):
+                ended: RunRecord = await manager.wait(session.id)
+            assert ended.status == "cancelled"
+            assert (await runtime.store.get_campaign(opening.campaign_id)).status == "stopped"
+        finally:
+            await manager.shutdown()
