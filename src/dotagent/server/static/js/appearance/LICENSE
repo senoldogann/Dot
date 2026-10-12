@@ -1,9 +1,11 @@
 Parts of the modules of this folder are a port of T3 Code (https://github.com/pingdotgg/t3code, version 0.0.45 of its
 web app) to plain ES modules, under its licence below: the colour arithmetic of colour.js (apps/web/src/themePalette.ts),
-the palettes of palettes.js (packages/shared/src/themePalettes.ts) and the drawing of a theme's orb in orbs.js
-(apps/web/src/components/settings/ThemePreviewCircles.tsx, packages/shared/src/themePreview.ts). Dot is not affiliated
-with, endorsed by or connected to T3 Tools Inc.; "T3 Code" and "T3 Chat" belong to their owner, and Dot names the two
-palettes that carry those names Clean and Rose.
+the palettes of palettes.js (packages/shared/src/themePalettes.ts), the drawing of a theme's orb in orbs.js
+(apps/web/src/components/settings/ThemePreviewCircles.tsx, packages/shared/src/themePreview.ts), and the contrast and
+the families typed of settings.js (apps/web/src/appearanceContrast.ts, apps/web/src/appearanceFonts.ts) with the mixing
+of the contrast in ../../css/themes.css (apps/web/src/index.css). Dot is not affiliated with, endorsed by or connected
+to T3 Tools Inc.; "T3 Code" and "T3 Chat" belong to their owner, and Dot names the two palettes that carry those names
+Clean and Rose.
 
 MIT License
 

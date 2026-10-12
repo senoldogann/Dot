@@ -5046,8 +5046,8 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 123 | A helper folded in the chat: its row until the owner opens it                       | done        | a2de64d |
 | 124 | The home's first screen: the composer in the middle, the day folded under it         | done        | 41ec542 |
 | 125 | What the failed runs showed: the journal's day, the snapshot's arguments             | done        | 36c0eeb |
-| 126 | Themes, after T3 Code: a page for the look, a theme for light and one for dark       | in progress |         |
-| 127 | The interface, the motion and the type                                               | planned     |         |
+| 126 | Themes, after T3 Code: a page for the look, a theme for light and one for dark       | done        | c5dfc76 |
+| 127 | The interface, the motion and the type                                               | in progress |         |
 | 128 | Your own themes, kept by the daemon                                                  | planned     |         |
 
 ### 77. The type system: Inter and Geist Mono, seven sizes, three weights
@@ -7194,7 +7194,7 @@ today.
 
 ### 126. Themes, after T3 Code: a page for the look, a theme for light and one for dark
 
-**Status: in progress.**
+**Status: done.** Merged as `c5dfc76` (PR #157, MYP-267 Done).
 
 **As built (2026-10-12).** Settings › Appearance (`views/appearance.js`, after General in `views/settings.js`) holds
 four cards: Colour scheme, Themes, Layout and Motion. General lost the look's card, and the card's density, its two
@@ -7248,7 +7248,34 @@ theme; the tour is read by eye.
 
 ### 127. The interface, the motion and the type
 
-**Status: planned.**
+**Status: in progress.**
+
+**As built (2026-10-12).** The tab's Layout card became **Interface** (the contrast, the chat's width, the density, the
+two layout switches and their note), **Motion** gained the panels' slide, and **Type** follows them. Each setting is one
+object of `appearance/settings.js` (its key, its default, the values it takes and what it puts on the page element), and
+`boot.js` writes the same for every key before the first paint, the default being no key and nothing on the page. The
+contrast is T3 Code's arithmetic (`appearanceContrast.ts`): the share of a tier kept below 100 (`--contrast-base`), the
+push toward black or white above it (`--contrast-boost`) and a quarter of that for the lines. `themes.css` names the
+theme's text tiers, `--control` and the two line colours again on the page element under `data-contrast` and mixes them
+on the body, since a token cannot be worked out from itself; at 100 nothing is written, so the colours a probe reads are
+the ones item 126 measured. The chat's width is a token, `--lane-w` (768 px, 1152 px or none), on the home and the run
+page's column. The panels' slide is `--motion-panel`, on the docked sidebar's column, the drawer, the details panel and
+its scrim, still none under reduced motion. The seven sizes of the type and their line-heights are `calc()` of
+`--type-scale`, the interface's size over 14; the composer (`--composer-size`, `--composer-font`) and an answer's code
+blocks (`--code-size` on `.prose pre`) have their own. A family is a stack `app.css` names (`--family-<id>`: Inter, the
+system's, a serif, Geist Mono, SF Mono, Menlo) or families typed, quoted as T3 Code quotes them (`appearanceFonts.ts`,
+with the typed quotes dropped and CSS's keywords quoted) and put before the stack they replace; letters, digits, spaces,
+commas, quotes, dots, dashes and underscores may be typed, up to 200, and anything else is refused under the field and
+not kept. Paper's voice is `var(--family-serif)`. Font smoothing off and code wrapped are attributes the stylesheets
+read. A range control (`panels.js rangeSetting`; `.range` in `app.css`, a hairline track filled with the accent up to
+the value under the switch's knob) draws the contrast, the slide and the sizes, and stands on `#/controls`.
+`tests/smoke/test_interface_settings.py` sets every setting through its control and reads it on the page, the colours
+through a canvas since a mixed colour is computed as `oklab()`: over 100 the text and the muted tier read further from
+the page and under it nearer; the sidebar's transition takes 0 s and then 0.4 s; the body's family and size follow the
+interface's; the previews follow the answers', the composer's and the code's; a family with a semicolon and braces is
+refused and the one kept stays. With `main.js` aborted, so that only `boot.js` runs, a reload puts the same attributes
+and tokens on the page; with it, the controls show the values kept; the home reads 1152 px wide, its composer in the
+code's family at 18 px; set back to the defaults, nothing is left on the page element and no key is kept.
 
 **What.** The tab's other sections, as T3 Code has them where Dot has a use for them. Interface: the contrast, 50 to 200
 % with 100 as today (below 100 the text tiers and the borders are mixed toward the ground, above it toward black in
@@ -7834,3 +7861,4 @@ smoke test creates, picks, reloads, exports, imports a VS Code theme and deletes
 - 2026-10-12 (Opus 5.5): item 125 merged as `36c0eeb` (PR #152, MYP-265 Done): the journal names the day it tells, the date of the middle of the time the reflection read, or its first and last day when that time is longer than a day and a quarter; `browser_snapshot`'s description says it takes no arguments; 907 unit tests and the reflection's smoke test; the daemon restarted on it with no run active.
 - 2026-10-12 (Opus 5.5): the rule drafter's fix merged as `8090ebc` (PR #154, under item 110, MYP-266 Done): the owner's sentence "Dot can run everything without permission from me" drafts a rule for every tool instead of a refusal in Spanish, and a sentence no rule can be made of is answered in English, with no note about a broad rule taken for a refusal; a hosted test on the owner's review model, 907 unit tests and the Rules page's smoke tests.
 - 2026-10-12 (Opus 5.5): part 19 planned, items 126 to 128, from the owner's word with three screenshots of T3 Code's Settings › Appearance and a reading of T3 Code's source (MIT): the page, its themes with a theme per scheme, its interface, motion and type settings, and themes of one's own kept by the daemon; no code changed.
+- 2026-10-12 (Opus 5.5): item 126 merged as `c5dfc76` (PR #157, MYP-267 Done): Settings › Appearance holds the colour scheme as three miniatures of the window and the themes as a gallery with a light and a dark orb each, after T3 Code's page; T3 Code's six palettes are ported and mapped onto Dot's tokens, every theme held to Dot's contrast rule in both schemes as the browser paints it (a dark card a palette draws on the page is lifted a step above it); a theme per scheme rides on the page element as `light-dark()` pairs and is there before the first paint; ⌥⌘A opens the tab and ⇧⌥⌘A steps through the schemes.

@@ -11,7 +11,16 @@ import { SEQUENCE } from "../character/states.js";
 import { createCostCard } from "../cost.js";
 import { el } from "../dom.js";
 import { icon } from "../icons.js";
-import { emptyPanel, errorPanel, field, loadingPanel, pageHead, segmented, statusBadge } from "../panels.js";
+import {
+  emptyPanel,
+  errorPanel,
+  field,
+  loadingPanel,
+  pageHead,
+  rangeSetting,
+  segmented,
+  statusBadge,
+} from "../panels.js";
 
 const FACE_STATES = ["idle", "working", "waiting", "done", "failed"];
 const RUN_STATUSES = ["queued", "running", "blocked", "done", "failed", "cancelled"];
@@ -120,6 +129,20 @@ export function mount(root, ctx) {
   );
   const yolo = segmented([{ id: "ask", label: "Ask", hint: "" }, { id: "auto", label: "Auto", hint: "" }, { id: "yolo", label: "YOLO", hint: "" }], "yolo", () => {});
   yolo.element.dataset.mode = "yolo";
+  // The range (item 127), as Settings › Appearance draws its contrast, its slide and its sizes.
+  let ranged = 40;
+  const range = rangeSetting({
+    label: "Range",
+    hint: "A number on a scale, its value beside its label.",
+    min: 0,
+    max: 100,
+    step: 5,
+    format: (value) => `${value}%`,
+    read: () => ranged,
+    write: (value) => {
+      ranged = value;
+    },
+  });
   const inputs = el(
     "div",
     { class: "form-grid" },
@@ -130,6 +153,7 @@ export function mount(root, ctx) {
     field("Textarea", el("textarea", { class: "textarea", rows: "2", placeholder: "A longer text", "aria-label": "Textarea" }), ""),
     el("div", { class: "field" }, el("span", { class: "field-label" }, "Switches"), row(el("button", { class: "switch", type: "button", role: "switch", "aria-checked": "true", "aria-label": "On" }), el("button", { class: "switch", type: "button", role: "switch", "aria-checked": "false", "aria-label": "Off" }))),
     el("div", { class: "field wide" }, el("span", { class: "field-label" }, "Segmented"), row(segmented([{ id: "a", label: "One", hint: "" }, { id: "b", label: "Two", hint: "" }, { id: "c", label: "Three", hint: "" }], "a", () => {}).element, yolo.element)),
+    el("div", { class: "field wide", "data-control": "range" }, range.element),
   );
   const notes = el(
     "div",

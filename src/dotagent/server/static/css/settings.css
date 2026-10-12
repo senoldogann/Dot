@@ -766,3 +766,52 @@
     grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
   }
 }
+
+/* ---------- the interface, the motion and the type (item 127) ---------- */
+
+.range-value {
+  color: var(--muted);
+}
+
+/* A family typed that cannot be kept: the field and the line under it say so. */
+.input[aria-invalid="true"] {
+  border-color: var(--bad);
+}
+
+.family-note[data-invalid] {
+  color: var(--bad);
+}
+
+/* A line of type on the tokens a setting writes, so that it follows the setting as it moves. */
+.type-preview {
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+
+.type-preview[data-preview="interface"] {
+  font: var(--text-ui) / var(--leading-ui) var(--font);
+}
+
+.type-preview[data-preview="answers"] {
+  font: var(--text-md) / var(--leading-md) var(--voice);
+}
+
+.type-preview[data-preview="composer"] {
+  font: var(--composer-size) / var(--composer-leading) var(--composer-font);
+}
+
+.type-preview[data-preview="code"] {
+  overflow-x: auto;
+  white-space: pre;
+  overflow-wrap: normal;
+  font: var(--code-size) / var(--code-leading) var(--mono);
+}
+
+:root[data-wrap-code] .type-preview[data-preview="code"] {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}

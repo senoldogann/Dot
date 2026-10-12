@@ -1003,12 +1003,23 @@ T3 Code paints its solid controls with, is Dot's accent) and held to the rule of
 that would read under its ratio is moved in lightness until it reads, and in dark a card lies a step above the page; a
 browser test measures every theme in both schemes as the page paints it. The two picks are written on the page as
 `light-dark()` pairs (nothing when one look is picked for both) and kept with the picks, so the first paint after a
-reload already wears them. **Layout**: **Density** sets how close the rows, cards and lists sit (comfortable or
-compact), and two switches follow the theme picked for light until you set them yourself: fold the tool steps (on in
-all but Paper) and the Details panel (off in all). **Motion**: "Faces that move" (below). The choices are kept in the
-browser only. The palettes, the colour arithmetic and the orbs are a port of T3 Code (github.com/pingdotgg/t3code, MIT,
-T3 Tools Inc.) to plain ES modules (`static/js/appearance/LICENSE`); Dot is not affiliated with T3 Tools Inc. The looks
-are one visual system. Colour: every colour is a token of `themes.css` naming its light and its dark value in one place;
+reload already wears them. **Interface**: **Contrast**, 50 to 200 % (100, the theme's own, by default): under 100 the
+text tiers and the lines fade toward the page, over it they move toward black in light and white in dark, the lines a
+quarter as far, as T3 Code mixes them; **Chat width**, how wide the home and a conversation read (Comfortable, 768 px,
+the default; Wide, 1152 px; Full); **Density**, how close the rows, cards and lists sit (comfortable or compact); and
+two switches that follow the theme picked for light until you set them yourself: fold the tool steps (on in all but
+Paper) and the Details panel (off in all). **Motion**: **Panel animation**, how long the sidebar and the details panel
+take to slide (0 to 400 ms, 200 by default; while the system reduces motion they never slide), and "Faces that move"
+(below). **Type**: the interface's font (Inter, the system's, or families typed, which go before Inter so that no glyph
+goes missing) and its size (13 to 17 px around 14, every text size scaled with it); the answers' font (the theme's,
+which is a serif in Paper, the interface's, or a serif); the composer's font (the interface's, a serif, the code's, or
+families typed) and size (12 to 20 px, 15 by default); the code's font (Geist Mono, SF Mono, Menlo, or families typed)
+and the size of an answer's code blocks (10 to 18 px, 13 by default), each with a line of preview; font smoothing (on)
+and long lines of code wrapped (off). The choices are kept in the browser only, and `boot.js` puts each of them on the
+page before the first paint. The palettes, the colour arithmetic, the orbs, the contrast's mixing and the families typed
+are a port of T3 Code (github.com/pingdotgg/t3code, MIT, T3 Tools Inc.) to plain ES modules
+(`static/js/appearance/LICENSE`); Dot is not affiliated with T3 Tools Inc. The looks are one visual system. Colour:
+every colour is a token of `themes.css` naming its light and its dark value in one place;
 surfaces step up by lightness (page, sunken sidebar, raised cards) rather than by shadow in dark; borders are the text
 colour at a small alpha so they sit on every surface; the text tiers are measured against every surface by a unit
 test (4.5:1 for text and its second tier, 3:1 for the muted and faint ones); the yellow is the owner's bubbles. Type:
@@ -1021,7 +1032,8 @@ a surface with a hairline and a 12 px radius and no shadow (shadows stay on what
 focus); section labels are sentence case; the facts of a row are spans a gap apart rather than one dotted string; an
 empty list is one line that says so and what to do; your messages sit on the raised surface. Controls: buttons, inputs
 and selects 36 px tall on an 8 px corner with a hairline (32 for the small ones), the same 2 px focus ring on each, a
-select with its own drawn chevron, field labels on the interface line and hints on the small one, the composer's menus
+select with its own drawn chevron, a range on a hairline track filled with the accent up to its value under the
+switch's knob, field labels on the interface line and hints on the small one, the composer's menus
 as round pills of 32 px (an icon of 16 px, the value, a chevron of 12; no ground at rest, a tint under the pointer) that
 open a panel above them, the providers' marks served from `static/icons/providers/` with their licences, table rows 40
 px with their content on the middle; `#/controls` shows every control on one page for checking a look.
