@@ -23,7 +23,7 @@ from dotagent.agent.campaign import (
 from dotagent.agent.gate import HANDBACK_EVENT, TAKEOVER_EVENT, RunGate
 from dotagent.agent.keep_going import keep_going_ask
 from dotagent.agent.lessons import LessonCase, dismiss_lesson, learn, save_lesson
-from dotagent.agent.loop import AgentRun, RunEnd, RunOpening, run_agent
+from dotagent.agent.loop import AgentRun, RunEnd, RunOpening, browser_of, run_agent
 from dotagent.agent.plan import EMPTY_PLAN, PLAN_EVENT, plan_from_event
 from dotagent.agent.playbooks import learn_playbook, playbook_case
 from dotagent.agent.reflection import Reflection, reflect
@@ -40,6 +40,7 @@ from dotagent.agent.resume import (
 )
 from dotagent.agent.review import reviewer_for
 from dotagent.browser.attach import read_debug_endpoint
+from dotagent.browser.session import BrowserSession
 from dotagent.core.errors import (
     ConfigError,
     DotError,
@@ -62,6 +63,7 @@ from dotagent.store.db import Store
 from dotagent.store.endings import (
     PREFIX_EMERGENCY_STOP,
     PREFIX_INTERNAL_ERROR,
+    RESULT_EMERGENCY_STOPPED,
     RESULT_SHUTDOWN,
     RESULT_STOPPED,
     Ending,
@@ -162,6 +164,8 @@ class RunManager:
         # Threads that a run is being launched on and whose handle is not registered yet.
         self._claimed: set[str] = set()
         self._stopping: bool = False
+        # Active runs the owner's emergency stop is ending (:meth:`emergency_stop`).
+        self._emergency: set[str] = set()
         # Runs that ended and whose lessons are being drawn (:mod:`dotagent.agent.lessons`), by run id.
         self._learning: dict[str, asyncio.Task[None]] = {}
         # Runs that ended whose playbook is being written or whose use of playbooks is being recorded, by run id.
@@ -396,6 +400,11 @@ class RunManager:
             await runtime.store.set_next_session(campaign.id, now + runtime.config.agent.campaign_gap_minutes * 60)
             raise
         log.info("campaign_session_started", campaign_id=campaign.id, run_id=run.id, session=number)
+        # The owner's Stop (or Mark achieved) while this session was being started found no session to stop: it ends
+        # here, as a session that Stop finds working does.
+        if (await runtime.store.get_campaign(campaign.id)).status != "active" and run.id in self._handles:
+            log.info("campaign_session_stopped_at_its_start", campaign_id=campaign.id, run_id=run.id)
+            self.cancel(run.id)
         return run
 
     async def resume_campaigns(self) -> int:
@@ -560,23 +569,39 @@ class RunManager:
         self._runtime.approvals.release_run(run_id)
         handle.task.cancel()
 
+    def emergency_stop(self) -> list[str]:
+        """Stop every active run as the owner's emergency stop: each ends with :data:`RESULT_EMERGENCY_STOPPED`, so
+        the campaign of a session stops instead of planning the next one. Returns the ids of the runs stopped."""
+        active: list[str] = self.active_run_ids()
+        for run_id in active:
+            self._emergency.add(run_id)
+            self.cancel(run_id)
+        return active
+
     def held(self, run_id: str) -> bool:
         """Whether the user holds the run (took its browser over); false for a run that is not active."""
         handle: RunHandle | None = self._handles.get(run_id)
         return handle is not None and handle.gate.held
 
     async def take_over(self, run_id: str, source: str) -> str | None:
-        """Hold the run at its next tool call and bring its tab to the front, for the user to use the browser
-        themselves; returns the tab's address, ``None`` when the run has no tab. Refused when the browser has no
-        window (``[browser] headless``), when the run is not active or when it is held already."""
+        """Hold the run at its next tool call and bring its tab to the front, in the browser the run works in
+        (:func:`browser_of`), for the user to use the browser themselves; returns the tab's address, ``None`` when the
+        run has no tab. Refused when the browser has no window (``[browser] headless``), when the run is not active or
+        when it is held already."""
         if self._runtime.config.browser.headless:
             raise RunConflict(
                 "the browser is headless, so there is no window to take over; set [browser] headless = false",
                 {"run_id": run_id},
             )
         handle: RunHandle = self._handle(run_id)
+        browser: BrowserSession = await browser_of(self._runtime, await self._runtime.store.get_run(run_id))
         handle.gate.hold()
-        url: str | None = await self._runtime.browser.focus(handle.thread_id)
+        try:
+            url: str | None = await browser.focus(handle.thread_id)
+        except BaseException:
+            # No tab came to the front for the user: the run goes on.
+            handle.gate.release()
+            raise
         await self._runtime.bus.emit(run_id, TAKEOVER_EVENT, {"source": source, "url": url}, True)
         return url
 
@@ -953,14 +978,21 @@ class RunManager:
                     run.id,
                 ),
                 instructions,
+                runtime.site_locks,
             )
             if parent is not None and parent.gate.tainted:
                 gate.taint()
             cancel: asyncio.Event = asyncio.Event()
             inbox: asyncio.Queue[UserInput] = asyncio.Queue()
             finished: asyncio.Event = asyncio.Event()
-            task: asyncio.Task[None] = asyncio.create_task(
-                self._drive(run, gate, cancel, inbox, opening, finished), name=run.id
+            # Started eagerly: the body runs up to its first wait before this returns, so a stop that comes before the
+            # run's first step lands inside it and ends it as any stop does (a task cancelled before it started never
+            # runs its body).
+            task: asyncio.Task[None] = asyncio.Task(
+                self._drive(run, gate, cancel, inbox, opening, finished),
+                loop=asyncio.get_running_loop(),
+                name=run.id,
+                eager_start=True,
             )
             handle: RunHandle = RunHandle(run.id, thread_id, parent_run_id, task, gate, cancel, inbox, finished)
             self._handles[run.id] = handle
@@ -1019,9 +1051,10 @@ class RunManager:
 
         Every way a run can end is turned into a stored status plus an event. Unexpected exceptions are logged with
         their traceback and recorded as a failed run; they are not hidden, because nothing awaits this task. The inbox
-        is shut before anything awaits, so that what is sent from then on is refused, and answers the run got too late
-        to read are kept in its thread (:meth:`_keep_answers`). The handle is released and ``finished`` is set even when
-        recording the end fails, so a waiter and the thread never hang. What follows a session of a campaign is planned
+        is shut as the run ends, before anything awaits, so that what is sent from then on is refused, and answers the
+        run got too late to read are kept in its thread (:meth:`_keep_answers`). The handle is released and ``finished``
+        is set even when recording the end fails (:meth:`_close`), so a waiter and the thread never hang; the lessons
+        and playbooks of a run whose end was not recorded are not drawn. What follows a session of a campaign is planned
         once its end is recorded and before ``finished`` is set, so a waiter finds it planned. The lessons of a run that
         may hold some are drawn after that, in a task of its own, so that they hold up nothing.
         """
@@ -1044,7 +1077,7 @@ class RunManager:
                     ended.lessons,
                 )
         except (RunCancelled, asyncio.CancelledError):
-            status, result = "cancelled", RESULT_SHUTDOWN if self._stopping else RESULT_STOPPED
+            status, result = "cancelled", self._stop_result(run.id)
         except FailSafeTriggered as exc:
             status, result = "cancelled", f"{PREFIX_EMERGENCY_STOP}{exc.message}"
         except DotError as exc:
@@ -1054,26 +1087,54 @@ class RunManager:
             status, result = "failed", f"{PREFIX_INTERNAL_ERROR}{type(exc).__name__}: {exc}"
             log.exception("run crashed", run_id=run.id)
         finally:
-            try:
-                await _uncancelled(self._record_end(run, status, result, needs, inbox))
-            finally:
-                self._handles.pop(run.id, None)
-                finished.set()
+            inbox.shutdown()
+            recorded: bool = await self._close(run, status, result, needs, inbox, finished)
         # Registered before anything awaits, so that a waiter that ``finished`` wakes finds it.
-        if lessons is not None and not self._stopping:
+        if recorded and lessons is not None and not self._stopping:
             self._learning[run.id] = asyncio.create_task(self._learn(lessons))
-        if not self._stopping and playbook_case(runtime.config, run, status) is not None:
+        if recorded and not self._stopping and playbook_case(runtime.config, run, status) is not None:
             self._distilling[run.id] = asyncio.create_task(self._distil(run, status))
+
+    def _stop_result(self, run_id: str) -> str:
+        """Why a run that was cancelled ended: the daemon stopped, the owner's emergency stop, or a plain stop."""
+        if self._stopping:
+            return RESULT_SHUTDOWN
+        if run_id in self._emergency:
+            return RESULT_EMERGENCY_STOPPED
+        return RESULT_STOPPED
+
+    async def _close(
+        self,
+        run: RunRecord,
+        status: RunStatus,
+        result: str,
+        needs: str,
+        inbox: asyncio.Queue[UserInput],
+        finished: asyncio.Event,
+    ) -> bool:
+        """Record the end of the run (:meth:`_record_end`), then release its handle and set ``finished`` whatever
+        happens; returns whether the end was recorded. Nothing awaits a run's task, so a failure to record it is
+        logged here with its traceback, and the run stays as the store has it until the daemon's next start closes
+        it."""
+        try:
+            await _uncancelled(self._record_end(run, status, result, needs, inbox))
+            return True
+        except Exception:
+            log.exception("run_end_not_recorded", run_id=run.id, status=status)
+            return False
+        finally:
+            self._handles.pop(run.id, None)
+            self._emergency.discard(run.id)
+            finished.set()
 
     async def _record_end(
         self, run: RunRecord, status: RunStatus, result: str, needs: str, inbox: asyncio.Queue[UserInput]
     ) -> None:
-        """Store how the run ended and tell about it: its waiters are released and its inbox shut, the answers it got
-        too late are kept, the status and result are stored and sent, and what follows a campaign's session is
-        planned."""
+        """Store how the run ended and tell about it: its waiters are released, the answers that reached its inbox
+        (shut by :meth:`_drive`) too late are kept, the status and result are stored and sent, and what follows a
+        campaign's session is planned."""
         runtime: Runtime = self._runtime
         runtime.approvals.release_run(run.id)
-        inbox.shutdown()
         await self._keep_answers(run, [inbox.get_nowait() for _ in range(inbox.qsize())])
         clean: str = truncate_tail(redact_secrets(result), _RESULT_CHARS)
         await runtime.store.finish_run(run.id, status, clean)

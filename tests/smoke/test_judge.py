@@ -349,6 +349,7 @@ async def _context_in(runtime: Runtime, campaign_id: str | None, approvals: Appr
             approvals,
             _nobody,
             (GOAL,),
+            runtime.site_locks,
         ),
         cancel=asyncio.Event(),
         output_chars=runtime.config.agent.tool_output_chars,

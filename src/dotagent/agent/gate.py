@@ -59,6 +59,22 @@ def _rejection(outcome: ApprovalOutcome) -> str:
     return f"the user did not approve this action ({outcome.status}, with the note “{note}”)"
 
 
+class SiteLocks:
+    """The locks the gates of all runs share, per site: one for its pace and one for its spending. Whether a public
+    action or a payment may go ahead depends on what the other runs did on the site, so the gates read that, decide
+    and record the action one at a time; a decision that waits for the user holds the next one on the same site."""
+
+    def __init__(self) -> None:
+        self._pace: dict[str, asyncio.Lock] = {}
+        self._spend: dict[str, asyncio.Lock] = {}
+
+    def pace(self, host: str) -> asyncio.Lock:
+        return self._pace.setdefault(host, asyncio.Lock())
+
+    def spend(self, host: str) -> asyncio.Lock:
+        return self._spend.setdefault(host, asyncio.Lock())
+
+
 class RunGate:
     """Authorises the actions of one run and remembers whether untrusted content has been seen.
 
@@ -66,7 +82,8 @@ class RunGate:
     nobody (``yolo``: the action runs and only a record is kept). Yolo also lets through what the other modes refuse
     (secrets, exfiltration) or hand to the user (money, credentials); a research run stays read-only and a hand-off
     rule of the user still stops it. ``instructions`` are the user's own words so far, which is all the reviewer takes
-    as authority. ``pace`` bounds the public and social actions of the browser on each site, in every mode.
+    as authority. ``pace`` bounds the public and social actions of the browser on each site, in every mode. ``locks``
+    are the runtime's :class:`SiteLocks`, shared with the gates of the other runs.
     """
 
     def __init__(
@@ -82,6 +99,7 @@ class RunGate:
         approval_mode: ApprovalMode,
         reviewer: Reviewer,
         instructions: tuple[str, ...],
+        locks: SiteLocks,
     ) -> None:
         self._store: Store = store
         self._bus: EventBus = bus
@@ -94,6 +112,7 @@ class RunGate:
         self._approval_mode: ApprovalMode = approval_mode
         self._reviewer: Reviewer = reviewer
         self._instructions: tuple[str, ...] = instructions
+        self._locks: SiteLocks = locks
         self.tainted: bool = False
         # Whether the run read such content at any point: a fresh instruction clears ``tainted``, never this.
         self.ever_tainted: bool = False
@@ -156,12 +175,13 @@ class RunGate:
     async def authorize(self, info: ActionInfo) -> str:
         """Let the action through or raise. Returns the note the user wrote when approving it, or an empty string. A
         public or social browser action keeps the pace of its site first, whatever the approval mode, and counts once
-        it is let through (:mod:`dotagent.policy.pace`)."""
+        it is let through (:mod:`dotagent.policy.pace`), all under the site's pace lock."""
         paced: PacedAction | None = paced_action(info)
-        if paced is not None:
+        if paced is None:
+            return await self._decide(info)
+        async with self._locks.pace(paced.host):
             await self._keep_pace(info, paced)
-        note: str = await self._decide(info)
-        if paced is not None:
+            note: str = await self._decide(info)
             await self._space(paced)
             await self._store.record_paced_action(paced.host, paced.pace, time.time(), self._run_id)
         return note
@@ -187,9 +207,17 @@ class RunGate:
             await asyncio.sleep(wait)
 
     async def _decide(self, info: ActionInfo) -> str:
-        """What the policy says and who answers its question: the action goes through, or the call raises."""
+        """What the policy says and who answers its question: the action goes through, or the call raises. A payment
+        on a site with caps is decided under the site's spend lock, from what was spent there until then."""
+        site: str | None = self._capped_site(info)
+        if site is None:
+            return await self._decide_spent(info, None)
+        async with self._locks.spend(site):
+            return await self._decide_spent(info, site)
+
+    async def _decide_spent(self, info: ActionInfo, site: str | None) -> str:
         rules: list[RuleRecord] = await self._store.list_rules()
-        state: SpendState | None = await self._spend_state(info)
+        state: SpendState | None = None if site is None else await self._spend_state(info, site)
         allowance: Decision | None = None if state is None else spend_allowance(state)
         decision: Decision = decide(info, self._mode, self.tainted, self._preset, rules, allowance)
         if decision.verdict == "allow":
@@ -203,14 +231,16 @@ class RunGate:
             return note
         return await self._authorize_decision(info, decision, rules)
 
-    async def _spend_state(self, info: ActionInfo) -> SpendState | None:
-        """The pre-approved caps' view of a payment step with an amount on a listed site; ``None`` otherwise."""
+    def _capped_site(self, info: ActionInfo) -> str | None:
+        """The site of a payment step with an amount on a site with pre-approved caps; ``None`` for any other action."""
         if "financial" not in info.flags or info.amount is None:
             return None
         host: str | None = spend_host(info.target)
-        if host is None or host not in self._spend:
-            return None
-        spent: float = await self._store.spent_since(host, time.time() - DAY_S)
+        return host if host is not None and host in self._spend else None
+
+    async def _spend_state(self, info: ActionInfo, site: str) -> SpendState | None:
+        """The pre-approved caps' view of a payment step on ``site``, from what was spent there in the last day."""
+        spent: float = await self._store.spent_since(site, time.time() - DAY_S)
         return spend_state(self._spend, info.target, info.amount, spent)
 
     async def _authorize_decision(self, info: ActionInfo, decision: Decision, rules: list[RuleRecord]) -> str:

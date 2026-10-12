@@ -16,7 +16,7 @@ from pathlib import Path
 import pytest
 import pytest_asyncio
 
-from dotagent.agent.gate import YOLO_DECIDER, RunGate
+from dotagent.agent.gate import YOLO_DECIDER, RunGate, SiteLocks
 from dotagent.agent.review import ReviewRequest, ReviewVerdict
 from dotagent.agent.verify import new_facts
 from dotagent.config import load_config
@@ -131,6 +131,7 @@ async def _context(runtime: Runtime, approvals: ApprovalMode) -> tuple[ToolConte
         approvals,
         _nobody,
         (GOAL,),
+        SiteLocks(),
     )
     ctx: ToolContext = ToolContext(
         runtime=runtime,

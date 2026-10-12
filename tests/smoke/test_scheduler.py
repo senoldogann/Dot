@@ -17,19 +17,21 @@ import httpx
 import pytest
 import pytest_asyncio
 
+from dotagent.agent.attachments import StoredAttachment
 from dotagent.agent.manager import RunManager
 from dotagent.agent.verify import new_facts
 from dotagent.config import ModelsConfig, load_config
 from dotagent.core.errors import ConfigError, StoreError, ToolExecutionError, ToolInputError
-from dotagent.core.paths import workspace_dir
+from dotagent.core.paths import failsafe_path, workspace_dir
 from dotagent.core.types import JsonObject
-from dotagent.policy.types import ActionInfo
+from dotagent.llm.types import Effort
+from dotagent.policy.types import ActionInfo, ApprovalMode
 from dotagent.runtime import Runtime, build_runtime, close_runtime
 from dotagent.scheduler import SCHEDULE_SOURCE
 from dotagent.scheduler.plans import UNSET_OPTIONS, ScheduleRequest, create_schedule, edit_schedule
 from dotagent.scheduler.runner import Scheduler
 from dotagent.scheduler.timing import format_local, named_zone, next_firing
-from dotagent.store.models import EventRecord, RunRecord, ScheduleOptions, ScheduleRecord, ThreadRecord
+from dotagent.store.models import EventRecord, RunMode, RunRecord, ScheduleOptions, ScheduleRecord, ThreadRecord
 from dotagent.tools.base import PreparedCall, ToolResult
 from dotagent.tools.context import ToolContext
 from dotagent.tools.registry import tools_for_mode
@@ -269,6 +271,74 @@ async def test_a_firing_that_cannot_start_leaves_no_thread_behind(runtime: Runti
     failed: ScheduleRecord = await runtime.store.get_schedule(recurring.id)
     assert failed.last_status.startswith("failed to start: a model reference must look like")
     assert failed.next_run_at == next_firing("0 9 * * *", now, runtime.schedule_zone)
+    assert len(await runtime.store.list_threads(1000)) == threads_before
+
+
+class _OwnerSwitchesTheOtherOff(RunManager):
+    """While the tick fires the first of two schedules, the owner switches the other off; no run starts here."""
+
+    def __init__(self, runtime: Runtime, schedule_of: dict[str, str]) -> None:
+        super().__init__(runtime)
+        self._schedule_of: dict[str, str] = schedule_of
+        self.started: list[str] = []
+
+    async def start(
+        self,
+        goal: str,
+        mode: RunMode,
+        model: str | None,
+        thread_id: str | None,
+        source: str,
+        parent_run_id: str | None,
+        effort: Effort | None,
+        approvals: ApprovalMode | None,
+        goal_mode: bool | None,
+        files: tuple[StoredAttachment, ...],
+    ) -> RunRecord:
+        self.started.append(goal)
+        for other, schedule_id in self._schedule_of.items():
+            if other != goal:
+                await self._runtime.store.set_schedule_enabled(schedule_id, False, None)
+        raise ConfigError("no run starts in this test", {"goal": goal})
+
+
+async def test_a_schedule_switched_off_while_the_tick_fires_another_does_not_fire(runtime: Runtime) -> None:
+    """Item 136: each schedule is read again just before it fires, so the tick does not act on what it listed."""
+    goals: tuple[str, str] = ("Say ping.", "Say pong.")
+    schedules: list[ScheduleRecord] = [
+        await _schedule(
+            runtime,
+            ScheduleRequest(name=goal, goal=goal, cron="0 9 * * *", at=None, mode="research", options=UNSET_OPTIONS),
+        )
+        for goal in goals
+    ]
+    manager: _OwnerSwitchesTheOtherOff = _OwnerSwitchesTheOtherOff(
+        runtime, {record.goal: record.id for record in schedules}
+    )
+    await Scheduler(runtime, manager).tick(max(_planned(record) for record in schedules) + 5)
+    assert len(manager.started) == 1
+
+
+async def test_while_the_emergency_stop_is_engaged_a_due_schedule_is_skipped_to_its_next_time(
+    runtime: Runtime,
+) -> None:
+    """Item 136: no schedule fires while the owner's emergency stop is engaged; the firing is skipped, saying why. The
+    runtime's model cannot start a run, so a firing would show as a failed start."""
+    broken_models: ModelsConfig = runtime.config.models.model_copy(update={"main": "nonsense"})
+    broken: Runtime = dataclasses.replace(runtime, config=runtime.config.model_copy(update={"models": broken_models}))
+    threads_before: int = len(await runtime.store.list_threads(1000))
+    recurring: ScheduleRecord = await _schedule(runtime, _cron("Held", "0 9 * * *"))
+    now: float = _planned(recurring) + 5
+    stop: Path = failsafe_path()
+    await asyncio.to_thread(stop.touch)
+    try:
+        await Scheduler(broken, RunManager(broken)).tick(now)
+    finally:
+        await asyncio.to_thread(stop.unlink)
+    held: ScheduleRecord = await runtime.store.get_schedule(recurring.id)
+    assert held.last_status == "skipped: the emergency stop is engaged"
+    assert held.next_run_at == next_firing("0 9 * * *", now, runtime.schedule_zone)
+    assert (held.last_run_at, held.thread_id) == (None, None)
     assert len(await runtime.store.list_threads(1000)) == threads_before
 
 

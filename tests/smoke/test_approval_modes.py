@@ -14,7 +14,7 @@ import pytest
 import pytest_asyncio
 
 from dotagent.agent.approvals import ApprovalBroker
-from dotagent.agent.gate import REVIEWER_DECIDER, YOLO_DECIDER, RunGate
+from dotagent.agent.gate import REVIEWER_DECIDER, YOLO_DECIDER, RunGate, SiteLocks
 from dotagent.agent.review import Reviewer, ReviewRequest, ReviewVerdict
 from dotagent.config import PaceConfig, SpendCap
 from dotagent.core.errors import ApprovalRejected, HandedOff, PolicyDenied
@@ -47,6 +47,18 @@ PAYMENT: ActionInfo = ActionInfo(
 CAPS: dict[str, SpendCap] = {"shop.example": SpendCap(per_purchase=20.0, per_day=30.0)}
 PAID: ActionInfo = PAYMENT.model_copy(
     update={"target": "https://shop.example/checkout", "amount": Amount(value=12.0, currency="EUR")}
+)
+# A public post on a site whose pace allows one a day.
+ONE_POST_A_DAY: PaceConfig = PaceConfig(
+    public_per_hour=0, public_per_day=1, social_per_hour=0, social_per_day=0, public_spacing_s=0.0
+)
+POST: ActionInfo = ActionInfo(
+    tool="browser_act",
+    kind="browser_click",
+    risk="medium",
+    summary="Post the reply",
+    target="https://social.example/thread",
+    flags=("public_post",),
 )
 SECRET: ActionInfo = ActionInfo(
     tool="read_file",
@@ -121,6 +133,7 @@ def _gate(room: Room, run_mode: RunMode, preset: Preset, approvals: ApprovalMode
         approvals,
         reviewer,
         (INSTRUCTION,),
+        SiteLocks(),
     )
 
 
@@ -223,6 +236,7 @@ async def test_a_payment_under_its_pre_approved_caps_is_a_question_and_counts_ag
         "ask",
         _nobody,
         (INSTRUCTION,),
+        SiteLocks(),
     )
     question: Question = await _ask(room, gate, PAID)
     assert question.record.severity == "high"
@@ -238,7 +252,18 @@ async def test_a_payment_under_its_pre_approved_caps_is_a_question_and_counts_ag
         await asyncio.wait_for(over.answer, WAIT_S)
     # A yolo run spends within the caps without a question; an unlisted site or no amount keeps the hand-off's waiver.
     yolo: RunGate = RunGate(
-        room.store, room.bus, room.broker, room.run.id, "task", "aggressive", NO_PACE, CAPS, "yolo", _nobody, ()
+        room.store,
+        room.bus,
+        room.broker,
+        room.run.id,
+        "task",
+        "aggressive",
+        NO_PACE,
+        CAPS,
+        "yolo",
+        _nobody,
+        (),
+        SiteLocks(),
     )
     assert (
         await asyncio.wait_for(
@@ -249,6 +274,75 @@ async def test_a_payment_under_its_pre_approved_caps_is_a_question_and_counts_ag
     assert await room.store.spent_since("shop.example", 0.0) == 17.0
     assert await asyncio.wait_for(yolo.authorize(PAYMENT), WAIT_S) == ""
     assert await room.store.spent_since("shop.example", 0.0) == 17.0
+
+
+async def test_a_second_payment_on_the_site_waits_for_the_first_and_counts_what_it_spent(room: Room) -> None:
+    """Two runs pay on one site at once (item 136): the second is decided once the first is, from what it spent, so the
+    two cannot both take what is left of the day."""
+    locks: SiteLocks = SiteLocks()
+    first, second = (
+        RunGate(
+            room.store,
+            room.bus,
+            room.broker,
+            room.run.id,
+            "task",
+            "aggressive",
+            NO_PACE,
+            CAPS,
+            "ask",
+            _nobody,
+            (INSTRUCTION,),
+            locks,
+        )
+        for _ in range(2)
+    )
+    asked: Question = await _ask(room, first, PAID)
+    later: asyncio.Task[str] = asyncio.create_task(
+        second.authorize(PAID.model_copy(update={"amount": Amount(value=19.0, currency="EUR")}))
+    )
+    async with room.bus.subscribe(room.run.id) as events, asyncio.timeout(WAIT_S):
+        await room.broker.resolve(asked.record.id, True, "user", "fine")
+        event: EventRecord = await events.queue.get()
+        while event.kind != "approval_requested":
+            event = await events.queue.get()
+    assert await asyncio.wait_for(asked.answer, WAIT_S) == "fine"
+    approval_id: object = event.data["approval_id"]
+    assert isinstance(approval_id, str)
+    # 12 of the day's 30 are spent: 19 more would go over, so the money hand-off holds for the second.
+    assert (await room.store.get_approval(approval_id)).severity == "handoff"
+    await room.broker.resolve(approval_id, False, "user", "")
+    with pytest.raises(ApprovalRejected):
+        await asyncio.wait_for(later, WAIT_S)
+    assert await room.store.spent_since("shop.example", 0.0) == 12.0
+
+
+async def test_two_runs_cannot_both_take_the_last_public_action_of_the_day_on_a_site(room: Room) -> None:
+    """The pace of a site counts a public action of another run that is being decided at the same time (item 136)."""
+    locks: SiteLocks = SiteLocks()
+    gates: list[RunGate] = [
+        RunGate(
+            room.store,
+            room.bus,
+            room.broker,
+            room.run.id,
+            "task",
+            "aggressive",
+            ONE_POST_A_DAY,
+            {},
+            "yolo",
+            _nobody,
+            (INSTRUCTION,),
+            locks,
+        )
+        for _ in range(2)
+    ]
+    outcomes: list[str | BaseException] = await asyncio.wait_for(
+        asyncio.gather(*(gate.authorize(POST) for gate in gates), return_exceptions=True), WAIT_S
+    )
+    assert outcomes[0] == ""
+    assert isinstance(outcomes[1], PolicyDenied)
+    assert len(await room.store.paced_times("social.example", "public", 0.0)) == 1
 
 
 async def test_yolo_still_keeps_a_research_run_read_only(room: Room) -> None:

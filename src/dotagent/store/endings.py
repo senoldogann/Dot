@@ -19,6 +19,8 @@ PREFIX_STALLED: str = "Stopped: the agent was not making progress"
 PREFIX_LIMIT: str = "Stopped: the run reached its limit"
 RESULT_EMPTY_REPLIES: str = "The model returned empty replies and did not finish."
 PREFIX_EMERGENCY_STOP: str = "Emergency stop: "
+# The result of a run the emergency stop of the web UI or the API ended (``RunManager.emergency_stop``).
+RESULT_EMERGENCY_STOPPED: str = f"{PREFIX_EMERGENCY_STOP}every active run was stopped."
 PREFIX_INTERNAL_ERROR: str = "Internal error: "
 # Between the answer of a run and what the goal check made of it, when the check does not accept the end.
 GOAL_CHECK_MARK: str = "\n\n---\nGoal check: "
