@@ -31,6 +31,7 @@ from dotagent.server.routes_browser import browser_router
 from dotagent.server.routes_campaigns import campaigns_router
 from dotagent.server.routes_data import memories_router, rules_router, schedules_router
 from dotagent.server.routes_keys import keys_router
+from dotagent.server.routes_queue import queue_router
 from dotagent.server.routes_runs import runs_router
 from dotagent.server.routes_system import health_router, proof_router, system_router
 from dotagent.server.routes_themes import themes_router
@@ -77,6 +78,7 @@ def create_app(ctx: ServerContext) -> FastAPI:
     app.include_router(proof_router(ctx.token))
     app.include_router(system_router(ctx))
     app.include_router(runs_router(ctx))
+    app.include_router(queue_router(ctx))
     app.include_router(threads_router(ctx))
     app.include_router(rules_router(ctx))
     app.include_router(memories_router(ctx))

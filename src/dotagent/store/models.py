@@ -188,6 +188,27 @@ class RuleRecord(FrozenModel):
     created_at: float
 
 
+class QueuedMessage(FrozenModel):
+    """A message sent to a chat while a run worked there: it waits in the chat's queue, in ``position`` order, and
+    starts as the chat's next run, with the choices it was sent with, once the run before it has ended done (see
+    ``RunManager.queue``). ``attachments`` are the ids of its uploaded files; ``source`` is where it was sent from,
+    and the source of the run it starts."""
+
+    id: str
+    thread_id: str
+    position: int
+    text: str
+    attachments: tuple[str, ...]
+    mode: RunMode
+    model: str | None
+    effort: Effort | None
+    approvals: ApprovalMode | None
+    goal_mode: bool | None
+    agent_id: str | None
+    source: str
+    created_at: float
+
+
 class MemoryRecord(FrozenModel):
     """One note. ``source_run`` is the run that saved it, ``None`` for a note the user wrote; ``agent_id`` is the
     agent whose lesson it is (item 94), ``None`` for Dot's, which every run may be handed; ``used_count`` and

@@ -23,6 +23,7 @@ from dotagent.store.models import (
     CampaignRecord,
     MemoryRecord,
     MemoryScore,
+    QueuedMessage,
     RunMode,
     RunRecord,
     RunStatus,
@@ -151,6 +152,37 @@ class ThreadChange(FrozenModel):
 class SteerRequest(FrozenModel):
     text: str = Field(min_length=1, max_length=_TEXT_CHARS)
     attachments: list[str] = Field(default_factory=list, max_length=MAX_ATTACHMENTS)
+
+
+class QueueMessageRequest(FrozenModel):
+    """Put a message in a chat's queue (item 148), with the choices of the run it starts; those left out take the
+    configured ones then, as for ``StartRunRequest``."""
+
+    text: str = Field(min_length=1, max_length=_GOAL_CHARS)
+    mode: RunMode = "task"
+    model: str | None = None
+    effort: Effort | None = None
+    approvals: ApprovalMode | None = None
+    goal_mode: bool | None = None
+    agent_id: str | None = None
+    attachments: list[str] = Field(default_factory=list, max_length=MAX_ATTACHMENTS)
+
+
+class QueueEditRequest(FrozenModel):
+    text: str = Field(min_length=1, max_length=_GOAL_CHARS)
+
+
+class QueueOrderRequest(FrozenModel):
+    """The messages of a chat's queue in their new order, each once."""
+
+    ids: list[str] = Field(min_length=1, max_length=500)
+
+
+class QueueView(FrozenModel):
+    """A chat's queue: its messages, the next one first, and whether it waits for the owner to resume it."""
+
+    held: bool
+    messages: list[QueuedMessage]
 
 
 class AttachmentUpload(FrozenModel):

@@ -9,7 +9,7 @@ from pathlib import Path
 
 from pydantic import JsonValue
 
-from dotagent.agent.attachments import StoredAttachment, UserInput, attachment_summary
+from dotagent.agent.attachments import StoredAttachment, UserInput, attachment_summary, load_attachments
 from dotagent.agent.campaign import (
     BRIEF_ENTRIES,
     BRIEF_QUESTIONS,
@@ -79,6 +79,7 @@ from dotagent.store.models import (
     CampaignEntry,
     CampaignRecord,
     EventRecord,
+    QueuedMessage,
     RunMode,
     RunRecord,
     RunStatus,
@@ -91,6 +92,8 @@ from dotagent.tools.team import TEAM_SOURCE
 
 log = get_logger(__name__)
 
+# The live event that tells the pages a chat's queue changed (item 148); it carries the chat's id.
+QUEUE_CHANGED_EVENT: str = "queue_changed"
 _TITLE_CHARS: int = 60
 _RESULT_CHARS: int = 20_000
 # How much of a run's result a refusal to resume it shows.
@@ -180,11 +183,14 @@ class RunManager:
         self._deciding: asyncio.Lock = asyncio.Lock()
         # Held while an approval or a question is decided, so that the answer to a question a run left goes on once.
         self._answering: asyncio.Lock = asyncio.Lock()
+        # Held while the next message of a chat's queue is started, so that each starts once (:meth:`_drain`).
+        self._draining: asyncio.Lock = asyncio.Lock()
 
     async def recover(self) -> int:
         """Close out what processes that are gone left behind: the runs they left active, the approvals of runs no
-        longer active, and their lock files. The runs of a process that lives (``dotx run`` in a terminal) go on, with
-        the approvals they wait on. Returns the number of runs closed."""
+        longer active, and their lock files, and hold the queue of every chat (:meth:`queue`). The runs of a process
+        that lives (``dotx run`` in a terminal) go on, with the approvals they wait on. Returns the number of runs
+        closed."""
         store: Store = self._runtime.store
         directory: Path = run_owners_dir()
         gone: list[str] = []
@@ -193,6 +199,8 @@ class RunManager:
                 gone.append(owner)
         interrupted: int = await store.mark_interrupted_runs(gone)
         await store.expire_pending_approvals()
+        # The run each queue waited for went with the process before: the owner says when the queues go on.
+        await store.hold_every_queue()
         await asyncio.to_thread(clear_gone_owners, directory)
         return interrupted
 
@@ -507,6 +515,77 @@ class RunManager:
             handle.inbox.put_nowait(UserInput(text=text, files=files, question_id=None))
         except asyncio.QueueShutDown as exc:
             raise RunConflict("the run is not active", {"run_id": run_id}) from exc
+
+    async def queue(
+        self,
+        thread_id: str,
+        text: str,
+        files: tuple[StoredAttachment, ...],
+        mode: RunMode,
+        model: str | None,
+        effort: Effort | None,
+        approvals: ApprovalMode | None,
+        goal_mode: bool | None,
+        agent_id: str | None,
+        source: str,
+    ) -> QueuedMessage:
+        """Put a message at the end of a chat's queue (item 148): it starts as the chat's next run, with these choices,
+        once the run at work there has ended done (:meth:`_follow_queue`), one message after the other. A chat where no
+        run works starts it at once, unless its queue is held. The chat of a campaign takes no queue: the campaign
+        plans what follows its sessions."""
+        store: Store = self._runtime.store
+        await store.get_thread(thread_id)
+        newest: list[RunRecord] = await store.list_runs(1, thread_id)
+        if not newest:
+            raise RunConflict("a chat takes a queue once a run has started there", {"thread_id": thread_id})
+        if newest[0].campaign_id is not None:
+            raise RunConflict("the chat of a campaign takes no queue: steer its session", {"thread_id": thread_id})
+        message: QueuedMessage = await store.add_queued(
+            thread_id, text, [file.id for file in files], mode, model, effort, approvals, goal_mode, agent_id, source
+        )
+        await self._queue_changed(thread_id, None, None, None)
+        await self._drain(thread_id, newest[0].id)
+        return message
+
+    async def edit_queued(self, message_id: str, text: str) -> str:
+        """Change the text of a queued message; returns its chat."""
+        store: Store = self._runtime.store
+        await store.edit_queued(message_id, text)
+        thread_id: str = (await store.get_queued(message_id)).thread_id
+        await self._queue_changed(thread_id, None, None, None)
+        return thread_id
+
+    async def remove_queued(self, message_id: str) -> str:
+        """Take a message out of its chat's queue; returns its chat."""
+        store: Store = self._runtime.store
+        thread_id: str = (await store.get_queued(message_id)).thread_id
+        await store.delete_queued(message_id)
+        await self._queue_changed(thread_id, None, None, None)
+        return thread_id
+
+    async def order_queue(self, thread_id: str, message_ids: Sequence[str]) -> None:
+        await self._runtime.store.order_queue(thread_id, message_ids)
+        await self._queue_changed(thread_id, None, None, None)
+
+    async def steer_queued(self, message_id: str) -> str:
+        """Send a queued message, with its files, to the run at work on its chat now (:meth:`steer`) and take it out of
+        the queue; returns its chat. A chat where no run of this process works has none to steer."""
+        store: Store = self._runtime.store
+        message: QueuedMessage = await store.get_queued(message_id)
+        handle: RunHandle | None = self._active_on(message.thread_id)
+        if handle is None:
+            raise RunConflict("no run works on the chat to steer", {"thread_id": message.thread_id})
+        files: tuple[StoredAttachment, ...] = await load_attachments(self._runtime.workspace, message.attachments)
+        self.steer(handle.run_id, message.text, files)
+        await store.delete_queued(message_id)
+        await self._queue_changed(message.thread_id, None, None, None)
+        return message.thread_id
+
+    async def resume_queue(self, thread_id: str) -> None:
+        """Let a held queue go on: its next message starts now when no run works on the chat, else after that run."""
+        await self._runtime.store.release_queue(thread_id)
+        await self._queue_changed(thread_id, None, None, None)
+        await self._drain(thread_id, await self._newest_run_id(thread_id))
 
     async def decide(self, approval_id: str, approve: bool, source: str, note: str) -> ApprovalRecord:
         """Record the user's decision on an approval or a question (``ApprovalBroker.resolve``); ``source`` is where it
@@ -1134,7 +1213,8 @@ class RunManager:
         is set even when recording the end fails (:meth:`_close`), so a waiter and the thread never hang; the lessons
         and playbooks of a run whose end was not recorded are not drawn. What follows a session of a campaign is planned
         once its end is recorded and before ``finished`` is set, so a waiter finds it planned. The lessons of a run that
-        may hold some are drawn after that, in a task of its own, so that they hold up nothing.
+        may hold some are drawn after that, in a task of its own, so that they hold up nothing. Last, the run's chat
+        moves its queue on (:meth:`_follow_queue`), once the run no longer holds the chat.
         """
         runtime: Runtime = self._runtime
         status: RunStatus = "failed"
@@ -1172,6 +1252,12 @@ class RunManager:
             self._learning[run.id] = asyncio.create_task(self._learn(lessons))
         if recorded and not self._stopping and playbook_case(runtime.config, run, status) is not None:
             self._distilling[run.id] = asyncio.create_task(self._distil(run, status))
+        if recorded and not self._stopping:
+            # Nothing awaits a run's task: a queue that cannot be moved on is logged here and stays as it was.
+            try:
+                await self._follow_queue(run, status)
+            except Exception:
+                log.exception("queue_not_followed", run_id=run.id, thread_id=run.thread_id)
 
     def _stop_result(self, run_id: str) -> str:
         """Why a run that was cancelled ended: the daemon stopped, the owner's emergency stop, or a plain stop."""
@@ -1222,6 +1308,91 @@ class RunManager:
         )
         if run.campaign_id is not None and not self._stopping:
             await self._follow_session(run, run.campaign_id, classify_ending(status, clean), needs)
+
+    async def _follow_queue(self, run: RunRecord, status: RunStatus) -> None:
+        """Move the queue of a run's chat on as the run ends: an end done starts its next message (:meth:`_drain`);
+        any other end holds it until the owner resumes it, since what failed would likely fail the next message too
+        and a stop stops the chat. A delegated run and a campaign's session leave it alone."""
+        if run.parent_run_id is not None or run.campaign_id is not None:
+            return
+        store: Store = self._runtime.store
+        if status == "done":
+            await self._drain(run.thread_id, run.id)
+        elif await store.list_queued(run.thread_id):
+            await store.hold_queue(run.thread_id)
+            await self._queue_changed(run.thread_id, None, None, None)
+
+    async def _drain(self, thread_id: str, after_run_id: str) -> None:
+        """Start the first message of a chat's queue as the chat's next run, unless the queue is held or a run of this
+        process works on the chat; ``after_run_id`` is the run it follows, the chat's newest, so that a page showing
+        that run follows the chat to the new one. A message that cannot start holds the queue, and the pages are told
+        why."""
+        store: Store = self._runtime.store
+        async with self._draining:
+            if self._stopping or thread_id in self._claimed or self._active_on(thread_id) is not None:
+                return
+            if await store.queue_held(thread_id):
+                return
+            queued: list[QueuedMessage] = await store.list_queued(thread_id)
+            if not queued:
+                return
+            try:
+                run: RunRecord = await self._start_queued(queued[0])
+            except DotError as exc:
+                log.warning(
+                    "queued_message_not_started",
+                    thread_id=thread_id,
+                    message_id=queued[0].id,
+                    error=exc.message,
+                    context=exc.context,
+                )
+                await store.hold_queue(thread_id)
+                await self._queue_changed(thread_id, None, None, exc.message)
+                return
+            await store.delete_queued(queued[0].id)
+        await self._queue_changed(thread_id, run.id, after_run_id, None)
+
+    async def _start_queued(self, message: QueuedMessage) -> RunRecord:
+        """Start a queued message as its chat's next run, with the choices and the files it was sent with."""
+        files: tuple[StoredAttachment, ...] = await load_attachments(self._runtime.workspace, message.attachments)
+        if message.agent_id is not None:
+            agent: AgentRecord = await self._runtime.store.get_agent(message.agent_id)
+            return await self.start_for_agent(
+                agent,
+                message.text,
+                message.mode,
+                message.model,
+                message.thread_id,
+                message.source,
+                message.effort,
+                message.approvals,
+                message.goal_mode,
+                files,
+            )
+        return await self.start(
+            message.text,
+            message.mode,
+            message.model,
+            message.thread_id,
+            message.source,
+            None,
+            message.effort,
+            message.approvals,
+            message.goal_mode,
+            files,
+        )
+
+    async def _queue_changed(
+        self, thread_id: str, started_run_id: str | None, after_run_id: str | None, error: str | None
+    ) -> None:
+        """Tell the pages that a chat's queue changed, as a live event of its newest run: the run its next message
+        started and the run that ended before it, or why that message could not start."""
+        await self._runtime.bus.emit(
+            await self._newest_run_id(thread_id),
+            QUEUE_CHANGED_EVENT,
+            {"thread_id": thread_id, "started_run_id": started_run_id, "after_run_id": after_run_id, "error": error},
+            False,
+        )
 
     async def _follow_session(self, run: RunRecord, campaign_id: str, ending: Ending, needs: str) -> None:
         """Plan what follows a session of a campaign that ended as ``ending`` (one the daemon stopped is planned by

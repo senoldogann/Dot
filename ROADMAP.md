@@ -5067,7 +5067,8 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 144 | The records of a run and the emergency stop                                          | done        | c17da1a |
 | 145 | The CI and the desktop shell                                                         | done        | 969d5f0 |
 | 146 | The gaps the final review of part 23 found                                           | done        | e558f21 |
-| 147 | A folder whose reading macOS broke off does not fail a search                        | in progress |         |
+| 147 | A folder whose reading macOS broke off does not fail a search                        | done        | ca16c37 |
+| 148 | The queue of a chat, after T3 Code                                                   | in progress |         |
 
 ### 77. The type system: Inter and Geist Mono, seven sizes, three weights
 
@@ -8093,7 +8094,7 @@ the sandbox does not cover, said in the README.
 
 ### 147. A folder whose reading macOS broke off does not fail a search
 
-**Status: in progress.**
+**Status: done.** Merged as `ca16c37` (PR #183; no Linear issue, the Linear connector was signed out).
 
 **As built (2026-10-13).** A search (`search_files`, `find_files`) that meets a folder whose reading macOS broke off
 shows what it found elsewhere and names that folder in its note of what it did not read, as item 146 made it do for the
@@ -8108,6 +8109,60 @@ ripgrep cannot read, still failing the search. The first failed on the code of b
 **What.** A search that macOS broke off in a folder shows what it found, as one that meets a place it may not read does
 since item 146; found when the owner asked, after part 23, whether the guards of parts 22 and 23 took the agent's
 freedom.
+
+## Part 24: the queue of a chat, after T3 Code (planned 2026-10-13)
+
+The owner's twenty-fourth word, on 2026-10-13, after part 23: add T3 Code's queued messages to Dot, as T3 Code has them.
+
+**Status (2026-10-13): planned.** T3 Code's queue was read in its source (the banner above its composer, and the
+server's rules for when a queued message starts and when it waits), then Dot's run page, run manager and store for where
+a queue fits.
+
+**The shape of this part (the decisions).** One item (148). The queue is the daemon's, kept per chat in the store, so it
+goes on with no page open, and a queued message is not a run until it starts: a run in the `queued` status would count
+as working, be closed at a restart and keep the daemon from being idle. It starts when the chat's run ends done and
+waits on any other end, as in T3 Code: a stop, a failure or a restart holds the queue until the owner resumes it.
+
+### How to start part 24 (the handoff prompt)
+
+> Read ROADMAP.md part 24 and the status table of part 9 (row 148). The protocol of part 5 (branch, gate, PR, Linear MYP
+> issue when the connector is signed in, squash merge, hash in the table, log line) is unchanged. Give the change tests
+> that fail on the code of before, and check the page in a browser, wide and on a phone, light and dark. Never touch the
+> owner's data directory except to read it, by the kinds and numbers of what is stored, and to restart the daemon when
+> `/api/status` shows no active run; PLAN.md stays untracked. The owner reads Turkish; everything written is English.
+
+### 148. The queue of a chat, after T3 Code
+
+**Status: in progress.**
+
+**As built (2026-10-13).** A message sent on a chat's page while its run works waits in the chat's queue, which the
+daemon keeps (`queued_messages` in the store, a row per message in its place, with the mode, model, reasoning,
+approvals, goal mode, agent and files it was sent with; `queue_holds` for a held queue). When a run of the chat ends
+done, the run manager starts the queue's first message as the chat's next run, with those choices, and takes it out; the
+next one waits for that run, and so on. Any other end, a stop, a failure or a start of the daemon, holds the queue until
+the owner resumes it: what failed would likely fail the next message too, and a stop stops the chat. Nothing starts
+while a run of the chat works, a delegated run or a campaign's session leaves the queue alone, and a campaign's chat
+takes no queue, so a message there steers the session as before. The page shows the queue above the composer as T3 Code
+does (`static/js/queue.js`): a sheet whose head (an ordered list, Queued, the count, a chevron) folds it, and a row per
+message: a handle that drags it to another place or moves it with the arrow keys, its text on one line with all of it in
+the tooltip, a pencil that edits it in the composer (the send says Save; Escape or Cancel gives the box its draft back),
+Steer, which sends it to the run at work now, and × to take it out. While the run works the send says Queue; ⌘⇧Enter
+steers the run with what the box holds, past the queue, or with the queue's next message when the box is empty. A held
+queue says it is paused, with Resume. Each change is a `queue_changed` event of the lifecycle stream, so every open page
+shows the queue as it is, and the page of the run that ended follows the chat to the run its queue started. The API:
+`GET|POST|PUT /api/threads/{id}/queue`, `POST /api/threads/{id}/queue/resume`, `PATCH|DELETE /api/queue/{id}` and
+`POST /api/queue/{id}/steer`. Found by the browser test and fixed before the merge: the rows were drawn anew on every
+change, which took the focus from a handle moved with the arrow keys and broke a drag as it began, and on a phone Cancel
+was cut to the width of an icon. Tests: messages queued while a run works start one after the other once the run before
+has ended done, with their choices; a stopped run and a failed run hold the queue, which Resume starts; a queued message
+steered reaches the run and leaves the queue; the order and the text the owner gives are kept, an order that does not
+name each message once is refused, and a start of the daemon holds the queue; the page, wide and on a phone, light and
+dark: three messages queued, one moved with the keys and one by a drag, one edited, the sheet folded, one steered with
+its button and one with the key, the chat followed to the next run, which is stopped, and the paused queue resumed. They
+failed on the code of before, where the run manager has no queue and the send says Steer.
+
+**What.** T3 Code's queued messages in Dot: a message sent while a run works waits and starts after it, instead of
+steering the run at once, and the queue can be reordered, edited, sent into the run and resumed, from any open page.
 
 ## Log
 
@@ -8690,3 +8745,4 @@ freedom.
 - 2026-10-12 (Opus 5.5): item 144 merged as `c17da1a` (PR #179, MYP-285 Done): every process that drives runs holds an owner lock, and a daemon that starts closes only the runs whose owner is gone; the emergency stop ends a run launched while it came and what the scheduler started meanwhile; and the smaller findings of part 22 (the playbooks, a note saved twice, read-only call groups, the notes' index, screenshots, the log's size, a Chrome launch given up, the browser's bounds, a stream's live state); the daemon restarted with it.
 - 2026-10-12 (Opus 5.5): item 145 merged as `969d5f0` (PR #180, MYP-286 Done): the CI's actions are pinned by commit; only the shell's own pages and those of the daemon's address may call the desktop shell; the Rust crates were checked against the advisories (two, both in the GTK stack built only on Linux); and the two tests part 22 left are in. The shell's part reaches the owner's Mac when the owner rebuilds the desktop app. The final review of the five found every criterion met and five gaps, which item 146 takes.
 - 2026-10-12 (Opus 5.5): item 146 merged as `e558f21` (PR #181, MYP-287 Done): Dot's own code is among what it loads and runs, the daemon's job starts Python with `-P`, the login shell Dot reads at its start runs in the sandbox, a search shows what it found beside the places it may not read, the shell guard reads zsh's redirects past noclobber, and a playbook retired while a run ended is not counted; the daemon restarted with it, its job rewritten. Part 23 is done.
+- 2026-10-13 (Opus 5.5): item 147 merged as `ca16c37` (PR #183; no Linear issue, the connector was signed out): a search shows what it found where macOS broke off the reading of a folder, as it does beside the places it may not read; found in the records of a run while answering the owner's question whether the guards of parts 22 and 23 took the agent's freedom. The daemon restarted with it. Part 23 is done.
