@@ -86,6 +86,20 @@ def test_a_file_the_page_could_not_draw_is_refused_with_what_is_wrong(change: di
     assert reason in refused.value.message
 
 
+@pytest.mark.parametrize(
+    ("change", "reason"),
+    [
+        ({"managed": None}, "left out, not null: managed"),
+        ({"variants": {"dark": None}}, "variants: a key without a value is left out, not null: dark"),
+        ({"managed": "yes"}, "managed: Input should be a valid boolean"),
+    ],
+)
+def test_the_daemon_refuses_a_null_or_a_loose_flag_as_the_page_does(change: dict[str, object], reason: str) -> None:
+    with pytest.raises(InvalidValueError) as refused:
+        parse_theme_file(_bytes({**_EXPORTED, **change}))
+    assert reason in refused.value.message
+
+
 def test_a_theme_is_saved_as_t3_codes_file_whole_and_under_its_own_id(tmp_path: Path) -> None:
     folder: Path = tmp_path / "themes"
     theme: ThemeFile = parse_theme_file(_with({"id": None}))

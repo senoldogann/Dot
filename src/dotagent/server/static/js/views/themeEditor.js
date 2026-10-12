@@ -192,7 +192,9 @@ export function themeEditor({ name, palettes, actions, tuned, onSave, onCancel }
       nameField.focus();
       return;
     }
+    // Cancel waits as Save does: the theme is being kept, and the editor closes once it is.
     save.disabled = true;
+    cancel.disabled = true;
     try {
       const managed = schemes.every((scheme) => !state.tuned[scheme] && state.actions[scheme] === null);
       await onSave({ name: named, palettes: state.palettes, managed });
@@ -202,6 +204,7 @@ export function themeEditor({ name, palettes, actions, tuned, onSave, onCancel }
       alert.hidden = false;
     } finally {
       save.disabled = false;
+      cancel.disabled = false;
     }
   });
 

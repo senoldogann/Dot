@@ -16,7 +16,7 @@ import tempfile
 from pathlib import Path
 from typing import Annotated, Literal, Self
 
-from pydantic import AfterValidator, StringConstraints, ValidationError, model_validator
+from pydantic import AfterValidator, StrictBool, StringConstraints, ValidationError, model_validator
 from pydantic_core import ErrorDetails
 
 from dotagent.core.errors import InvalidValueError, NotFoundError
@@ -56,7 +56,7 @@ RESERVED_THEME_IDS: frozenset[str] = frozenset(
     }
 )
 # T3 Code's colour roles (packages/shared/src/themePalettes.ts THEME_COLOR_ROLES); appearance/generator.js names the
-# same, and tests/unit/test_themes.py holds the two lists together.
+# same, and tests/unit/test_theme_folder.py holds the two lists together.
 THEME_ROLES: frozenset[str] = frozenset(
     {
         "canvas",
@@ -174,6 +174,15 @@ def _name(value: str) -> str:
     return value
 
 
+def _no_nulls(value: object) -> object:
+    # A key without a value is left out of a theme file: the page and T3 Code refuse a null where a value goes.
+    if isinstance(value, dict):
+        empty: list[str] = sorted(str(key) for key, item in value.items() if item is None)
+        if empty:
+            raise ValueError(f"a key without a value is left out, not null: {', '.join(empty[:3])}")
+    return value
+
+
 ThemeName = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1), AfterValidator(_name)]
 ThemeColour = Annotated[
     str, StringConstraints(strip_whitespace=True, min_length=1, max_length=64), AfterValidator(_colour)
@@ -189,6 +198,11 @@ class ThemeVariants(FrozenModel):
 
     light: Palette | None = None
     dark: Palette | None = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def _keys_with_values(cls, data: object) -> object:
+        return _no_nulls(data)
 
 
 class ThemeCollection(FrozenModel):
@@ -211,7 +225,12 @@ class ThemeFile(FrozenModel):
     colors: Palette | None = None
     variants: ThemeVariants | None = None
     collection: ThemeCollection | None = None
-    managed: bool | None = None
+    managed: StrictBool | None = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def _keys_with_values(cls, data: object) -> object:
+        return _no_nulls(data)
 
     @model_validator(mode="after")
     def _drawable(self) -> Self:

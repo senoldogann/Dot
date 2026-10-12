@@ -7300,37 +7300,43 @@ Code's `themePalette.ts` and `environmentTheme.ts` do: version 1 or T3 Code's sh
 canvas and an accent in hex), a name of 1 to 48 UTF-16 units, T3 Code's 61 roles and no other key, colours in the
 grammar of `colour.js parseColour` (hex of 3, 4, 6 or 8 digits, `rgb()`, `oklch()`, `transparent`), a variant only for
 the other appearance, and an id, the file's name, of lowercase letters, digits and dashes that no theme of Dot's or T3
-Code's has. A file is opened with `O_NOFOLLOW | O_NONBLOCK` and weighed with `fstat`, so a link, a pipe or a folder is
-skipped, as are a file over 32 KB, the files past the 32nd and the ones past 192 KB in all; each is listed with its
-reason and logged as `theme_skipped`. A theme is written whole, through a temporary file and `os.replace`, one change of
-the folder at a time so that the caps are weighed against what is there. `server/routes_themes.py` serves `GET
-/api/themes` (the folder, its themes and the files skipped), `PUT` and `DELETE /api/themes/{id}`; a theme goes out with
-the keys it has only, since FastAPI wrote the missing ones as `null` and the page refused the themes it had just saved
-(the smoke test found it). On the page, `appearance/generator.js` ports T3 Code's generator: the 61 roles from a canvas
-and an accent, and a family of colours changed with the ones made with it (`withFamily`). `appearance/own.js` reads a
-theme file as the daemon does, fills the roles a theme leaves out from T3 Chat's palette as T3 Code does, lays an alpha
-over the canvas and maps the roles onto Dot's tokens through item 126's `paletteTokens`, so a theme of one's own holds
-Dot's rule as the built-ins do; `appearance/vscode.js` maps a VS Code colour theme's workbench colours as T3 Code's
-`vscodeThemeImport.ts` does. `theme.js` holds the themes of one's own beside the built-ins: until the daemon's list
-arrives a pick it does not know is pending and the values `boot.js` wrote stay; a theme deleted gives its schemes back
-to Neutral; and while the editor is open the page wears the palette being changed (`previewTokens`,
-`data-theme="draft"`) and the scheme's controls wait. The editor (`views/themeEditor.js`) has T3 Code's Background and
-Accent, an **Action** field of Dot's and, in a fold, the families (Sidebar, Surface, Highlight surface, Border, Input
-border, Text, Muted text, Message surface, Error and Warning), beside a sample of the chat. T3 Code's generator turns
-the action colour 50° of hue away from the accent, which painted Dot's buttons purple under a blue accent, so the action
-is set on its own and kept when the palette is made again. Create starts from the palettes of the themes in use, as T3
-Code's does; `managed` (the generator's alone, as T3 Code marks it) is written only when no palette was changed by hand;
-Duplicate reads a look's colours back from its tokens; Export downloads `<id>.json` with the derived colours written
-out; Add theme takes a file of 2 MB at most and gives the theme a free id. A card carries Duplicate, and on a theme of
-one's own Edit, Export and Delete, shown on hover where there is one; the folder's path and the files skipped sit under
-the gallery, the path broken anywhere, since on a phone it pushed the page 530 px wide. `static/js/appearance/LICENSE`
-names the new ports. `tests/unit/test_theme_folder.py` (19 tests) reads both forms, refuses fourteen kinds of file,
-saves, replaces and deletes, holds the three caps, lists a folder with a link, a folder, a broken file and a note in it,
-and checks that `generator.js` and `themes.py` name the same 61 roles. `tests/smoke/test_own_themes.py` makes a theme in
-both schemes in the editor, saves it and reads the file the daemon wrote, holds it to Dot's rule in both schemes,
-reloads with only `boot.js`, exports it, adds a VS Code theme, a short form and a file of another version, duplicates
-Grove and deletes the copy, reads a file put in the folder by hand and one that does not parse, and checks a phone's
-width. Export in the desktop app is not tried: its web view has no handler for a download.
+Code's has; a key without a value is left out rather than null, and `managed` is true or false, as the page reads them.
+A file is opened with `O_NOFOLLOW | O_NONBLOCK` and weighed with `fstat`, so a link, a pipe or a folder is skipped, as
+are a file over 32 KB, the files past the 32nd and the ones past 192 KB in all; each is listed with its reason and
+logged as `theme_skipped`. A theme is written whole, through a temporary file and `os.replace`, one change of the folder
+at a time so that the caps are weighed against what is there. `server/routes_themes.py` serves `GET /api/themes` (the
+folder, its themes and the files skipped), `PUT` and `DELETE /api/themes/{id}`; a theme goes out with the keys it has
+only, since FastAPI wrote the missing ones as `null` and the page refused the themes it had just saved (the smoke test
+found it). On the page, `appearance/generator.js` ports T3 Code's generator: the 61 roles from a canvas and an accent,
+and a family of colours changed with the ones made with it (`withFamily`). `appearance/own.js` reads a theme file as the
+daemon does, fills the roles a theme leaves out from T3 Chat's palette as T3 Code does, lays an alpha over the canvas
+and maps the roles onto Dot's tokens through item 126's `paletteTokens`, so a theme of one's own holds Dot's rule as the
+built-ins do; `appearance/vscode.js` maps a VS Code colour theme's workbench colours as T3 Code's `vscodeThemeImport.ts`
+does. `theme.js` holds the themes of one's own beside the built-ins: until the daemon's list arrives a pick it does not
+know is pending and the values `boot.js` wrote stay; a theme deleted gives its schemes back to Neutral; and while the
+editor is open the page wears the palette being changed (`previewTokens`, `data-theme="draft"`) and the scheme's
+controls wait. The editor (`views/themeEditor.js`) has T3 Code's Background and Accent, an **Action** field of Dot's
+and, in a fold, the families (Sidebar, Surface, Highlight surface, Border, Input border, Text, Muted text, Message
+surface, Error and Warning), beside a sample of the chat. T3 Code's generator turns the action colour 50° of hue away
+from the accent, which painted Dot's buttons purple under a blue accent, so the action is set on its own and kept when
+the palette is made again. Create starts from the palettes of the themes in use, as T3 Code's does; `managed` (the
+generator's alone, as T3 Code marks it) is written only when no palette was changed by hand; Duplicate reads a look's
+colours back from its tokens; Export downloads `<id>.json` with the derived colours written out; Add theme takes a file
+of 2 MB at most. A new theme's id is one that no theme and no file left out of the folder has, matched without case as a
+Mac's disk matches names, so a file put there by hand is not written over; Cancel waits while a theme is saved, since a
+Cancel then closed the editor twice and left the new theme unpicked (a review found both). A card carries Duplicate, and
+on a theme of one's own Edit, Export and Delete, shown on hover where there is one; the folder's path and the files
+skipped sit under the gallery, the path broken anywhere, since on a phone it pushed the page 530 px wide.
+`static/js/appearance/LICENSE` names the new ports. `tests/unit/test_theme_folder.py` (22 tests) reads both forms,
+refuses fourteen kinds of file and a null or a loose flag, saves, replaces and deletes, holds the three caps, lists a
+folder with a link, a folder, a broken file and a note in it, and checks that `generator.js` and `themes.py` name the
+same 61 roles. `tests/smoke/test_own_themes.py` makes a theme in both schemes in the editor, saves it and reads the file
+the daemon wrote, holds it to Dot's rule in both schemes, reloads with only `boot.js`, exports it, adds a VS Code theme,
+a short form and a file of another version, duplicates Grove and deletes the copy, reads a file put in the folder by
+hand and one that does not parse, checks that a new theme does not take the name of the second, and checks a phone's
+width, waited for with a function, since Playwright evals an expression again on every frame it polls and the page's
+Content-Security-Policy refuses that. Export in the desktop app is not tried: its web view has no handler for a
+download.
 
 **What.** **Create theme** makes a theme from a background and an accent, the rest derived by T3 Code's generator,
 ported and held to Dot's thresholds, with an advanced view for the families of colours; **Duplicate** copies any theme

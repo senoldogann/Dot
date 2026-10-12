@@ -102,7 +102,8 @@ export function themeFileOf(value) {
     throw new ThemeFileError("A theme's id is lowercase letters, digits and dashes.");
   }
   const seeded = value.canvas !== undefined || value.accent !== undefined;
-  if (seeded && !(SEED.test(String(value.canvas)) && SEED.test(String(value.accent)))) {
+  const seed = (colour) => typeof colour === "string" && SEED.test(colour);
+  if (seeded && !(seed(value.canvas) && seed(value.accent))) {
     throw new ThemeFileError("A theme derived from two colours names both, the canvas and the accent, in hex.");
   }
   const colors = value.colors === undefined ? undefined : checkedPalette(value.colors, "colours");
@@ -112,7 +113,12 @@ export function themeFileOf(value) {
   const collection = value.collection;
   if (
     collection !== undefined &&
-    !(isRecord(collection) && COLLECTION_ID.test(String(collection.id)) && typeof collection.label === "string")
+    !(
+      isRecord(collection) &&
+      typeof collection.id === "string" &&
+      COLLECTION_ID.test(collection.id) &&
+      typeof collection.label === "string"
+    )
   ) {
     throw new ThemeFileError("The theme's collection needs an id and a label.");
   }
@@ -278,10 +284,15 @@ export function idFromName(name) {
   return id === "" ? "custom-theme" : id;
 }
 
-/** `id`, or the first of `id-2`, `id-3` and on that no theme has and no theme may have, kept to 48 characters. */
+/**
+ * `id`, or the first of `id-2`, `id-3` and on that no theme has, no theme may have and no file the daemon left out of
+ * the folder is named for, kept to 48 characters; a Mac's disk does not tell `Dune.json` from `dune.json`.
+ */
 export function freeId(id) {
+  const files = new Set(folder.skipped.map((entry) => entry.file.toLowerCase()));
   const taken = (candidate) =>
     findTheme(candidate) !== undefined ||
+    files.has(`${candidate}.json`) ||
     T3_RESERVED.includes(candidate) ||
     THEMES.some((theme) => theme.id === candidate);
   let candidate = id;

@@ -287,8 +287,12 @@ async def test_a_theme_of_ones_own_is_made_kept_picked_exported_copied_and_delet
     await page.reload()
     await expect(page.locator("[data-theme-card='dune'] [data-orb]")).to_have_count(1)
     await expect(page.locator(".theme-skipped")).to_contain_text("broken.json: Invalid JSON")
+    # A new theme does not take the name of a file left out, so the file put there by hand is not written over.
+    assert await page.evaluate("import('/js/appearance/own.js').then((own) => own.freeId('broken'))") == "broken-2"
     # On a phone nothing pushes the page wider than the window, the folder's path included.
-    narrow: str = "document.documentElement.scrollWidth <= window.innerWidth"
+    # A function, not an expression: Playwright evals an expression again on every frame it polls, which the page's
+    # Content-Security-Policy refuses once the first look comes out false.
+    narrow: str = "() => document.documentElement.scrollWidth <= window.innerWidth"
     await page.set_viewport_size({"width": 390, "height": 844})
     await page.wait_for_function(narrow)
     await page.screenshot(path=str(tmp_path / "appearance-own-390.png"), full_page=True)
