@@ -5067,6 +5067,7 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 144 | The records of a run and the emergency stop                                          | done        | c17da1a |
 | 145 | The CI and the desktop shell                                                         | done        | 969d5f0 |
 | 146 | The gaps the final review of part 23 found                                           | done        | e558f21 |
+| 147 | A folder whose reading macOS broke off does not fail a search                        | in progress |         |
 
 ### 77. The type system: Inter and Geist Mono, seven sizes, three weights
 
@@ -7897,11 +7898,13 @@ processes of a run kept out of Dot's own files by macOS (141); what the guards o
 of part 22 that a second reading bears out (144); the CI and the desktop shell (145). A finding that a second reading
 does not bear out is not fixed; what only the owner can do (rebuilding the desktop app) is said, not done. A sixth item
 (146) came from the final review of the five: what Dot runs at its start, a search that meets a place it may not read,
-zsh's spellings of a redirect past noclobber, and a playbook retired while a run ended.
+zsh's spellings of a redirect past noclobber, and a playbook retired while a run ended. A seventh (147) came from the
+records of a run after the part was done: a listing of the home folder that failed where macOS broke off the reading of
+a folder.
 
 ### How to start part 23 (the handoff prompt)
 
-> Read ROADMAP.md part 23 and the status table of part 9 (rows 141 to 146). One item at a time, in order; the protocol
+> Read ROADMAP.md part 23 and the status table of part 9 (rows 141 to 147). One item at a time, in order; the protocol
 > of part 5 (branch, gate, PR, Linear MYP issue, squash merge, hash in the table, log line) is unchanged. Read each
 > finding again in the code before fixing it, and give each fix a test that fails on the code of before. Never touch the
 > owner's data directory except to read it, by the kinds and numbers of what is stored, and to restart the daemon when
@@ -8087,6 +8090,24 @@ retired. Each failed on the code of before (fifteen unit tests and three smoke t
 (its own code, the login shell, and the working directory of the launchd job, found on the way), a search that meets a
 place it may not read, zsh's spellings of a redirect past noclobber, and a playbook retired while a run ended; and what
 the sandbox does not cover, said in the README.
+
+### 147. A folder whose reading macOS broke off does not fail a search
+
+**Status: in progress.**
+
+**As built (2026-10-13).** A search (`search_files`, `find_files`) that meets a folder whose reading macOS broke off
+shows what it found elsewhere and names that folder in its note of what it did not read, as item 146 made it do for the
+places it may not read: ripgrep says `Interrupted system call (os error 4)` of such a folder and ends with 2, which made
+the whole search fail. A run met it after part 23, in a listing of the home folder: in each listing on this Mac macOS
+broke off the reading of three to eight folders under `~/Library/Containers`, a different few each time, beside some
+hundred and fifty it refused; they are ordinary folders (not placeholders of a cloud drive), and each reads at once on
+its own. Any other error of ripgrep (a path that does not exist, a pattern it cannot read) still fails the search with
+ripgrep's words. Tests: the lines of such a listing, named in the note; one more line of another error, or a pattern
+ripgrep cannot read, still failing the search. The first failed on the code of before.
+
+**What.** A search that macOS broke off in a folder shows what it found, as one that meets a place it may not read does
+since item 146; found when the owner asked, after part 23, whether the guards of parts 22 and 23 took the agent's
+freedom.
 
 ## Log
 
