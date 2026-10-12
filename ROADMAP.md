@@ -5050,8 +5050,11 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 127 | The interface, the motion and the type                                               | done        | 9c73d80 |
 | 128 | Your own themes, kept by the daemon                                                  | done        | 30b2434 |
 | 129 | The composer at the foot of the window                                               | done        | 048f3aa |
-| 130 | A chat's menu: pin, rename, copy the link, select, delete                            | in progress |         |
+| 130 | A chat's menu: pin, rename, copy the link, select, delete                            | done        | d7e7d5e |
 | 131 | Unread chats                                                                         | planned     |         |
+| 132 | Runs that keep going on every model when asked to                                    | planned     |         |
+| 133 | The composer's choices on a chat's page                                              | planned     |         |
+| 134 | The traffic lights on the line of the top bars                                       | planned     |         |
 
 ### 77. The type system: Inter and Geist Mono, seven sizes, three weights
 
@@ -7436,7 +7439,7 @@ under it; the tour is read by eye.
 
 ### 130. A chat's menu: pin, rename, copy the link, select, delete
 
-**Status: in progress.**
+**Status: done.** Merged as `d7e7d5e` (PR #162, MYP-271 Done).
 
 **As built (2026-10-12).** The daemon keeps the pin in `threads.pinned_at`, a column added to a store made before it
 with its chats unpinned, and lists the pinned chats first, the last pinned first, then the latest activity first, so a
@@ -7483,6 +7486,89 @@ read** clears one. The daemon keeps when each chat was last seen (`threads.seen_
 agree; the chats there when the column is added are taken as seen, and a scheduled run that ends leaves its chat unread.
 The README follows; unit tests for the store; a smoke test ends a run while another chat is open, reads the dot, opens
 the chat and marks it unread from its menu; the tour is read by eye.
+
+## Part 21: runs that keep going on every model, the composer's choices on a chat's page, and the window's lights in line (planned 2026-10-12)
+
+The owner's twenty-first word, on 2026-10-12, with two screenshots: that a run on Ollama keeps going when told not to
+stop, or not to stop until something is done, while runs on OpenCode Go and on Anthropic's models stop when they see fit
+(the first screenshot: a run on a hosted model that made two changes and ended with a report and suggestions); that once
+a chat has started, its composer no longer offers the model, the reasoning and the rest, and whether that is how it
+should be; and, in the second screenshot, that the desktop window's three traffic lights stand above the line of the two
+buttons beside them, and could stand on it with room above and below.
+
+**Status (2026-10-12): planned.** What is built today, and what a reading of the store found (the kinds and the numbers
+of the latest runs; of a goal, only whether it holds words that ask to keep going). A run ends when its model calls
+finish, or, in a chat, with a reply that calls no tool; a task's reply without a tool call is first sent back twice
+(`finish_nudges`). None of this depends on the provider: no provider is made to call a tool, and the prompt is the same
+for all. Goal mode, a switch under the composer's Options, has the review model check a finish against the goal and send
+the run back up to four times (`goal_patience`). Of the owner's runs, one goal asked to keep going: on Ollama, it went
+260 steps; no run on Anthropic or OpenCode Go was asked in those words, so the store holds no like for like. In goal
+mode a Claude run went 97 steps and two Ollama runs 94 and 96, and the checker accepted every finish at its first look,
+five of five. The run of the screenshot, with goal mode off, kept no plan and no targets for a goal that names an
+outcome, which the prompt's rule for open-ended goals asks for, and finished after 22 steps. A run stops where its model
+decides that it is done; the owner finds that Claude and the models of OpenCode Go decide so sooner than the models run
+on Ollama, and nothing in Dot holds a model to the owner's words. On a chat's page the composer is the dock: a follow-up
+repeats the open run's mode, model, reasoning, approvals and goal mode (`views/run.js`), and the dock shows none of
+them; the home's box has them as pills (`views/runs.js`). In the desktop app macOS draws the traffic lights where it
+puts them by default, their centre 16 px under the top on macOS 26 (measured offscreen with tao's own code); the
+sidebar's head is centred on that line (item 107), and the top bar, while the sidebar is away, centres its buttons on
+its own middle, lower.
+
+**The shape of this part (the decisions).** The owner's words decide how long a run goes, on every model: words that ask
+a run to keep going turn goal mode on for it, and the checker, told so, accepts a finish only when the goal is done,
+blocked or impossible; every model is told plainly not to stop to report or to offer work it can do itself, and every
+goal check sends back an answer that offers work within the goal instead of doing it. The dock of a chat's page offers
+what the home's box offers, for the next message, as T3 Code's composer keeps its model and reasoning on every turn of a
+thread. The window puts its traffic lights on the top bars' centre line, and the sidebar's head grows to the top bar's
+height so that its button stands there too.
+
+### How to start part 21 (the handoff prompt)
+
+> Read ROADMAP.md part 21 and the status table of part 9 (rows 132 to 134). One item at a time; the protocol of part 5
+> (branch, gate, PR, Linear MYP issue, squash merge, hash in the table, log line) is unchanged. Never touch the owner's
+> data directory except to read it, by the kinds and numbers of what is stored, and to restart the daemon when
+> `/api/status` shows no active run; the owner's goals stay out of this file; PLAN.md stays untracked. The owner reads
+> Turkish; everything written is English. Every UI item ends with the screenshot tour read by eye.
+
+### 132. Runs that keep going on every model when asked to
+
+**Status: planned.**
+
+**What.** A goal that asks the run to keep going, in English or in Turkish (don't stop, keep going, never stop, until it
+is done; durma, hiç durma, durmadan, bitene kadar, bitirene kadar, tamamlanana kadar), turns goal mode on for a task or
+research run, whatever the switch says, and the run's page says why. The goal checker is told that the owner asked to
+keep going: it accepts a finish only when every part of the goal is done and shown, or blocked by what only the owner
+can give, or impossible. Every goal check sends back an answer that ends with suggestions or offers within the goal that
+need nothing from the owner, so that they are done instead of offered. The prompt tells every model to keep acting while
+the goal leaves work it can do, not to stop to report or to offer more, and to take an ask to keep going at its word.
+The README follows; unit tests for the words (both languages, with lookalikes that are not asks), the prompt's rules and
+the checker's question; a smoke test runs a scripted task asked not to stop, reads goal mode on, its first finish sent
+back and its second accepted.
+
+### 133. The composer's choices on a chat's page
+
+**Status: planned.**
+
+**What.** On a chat's page the dock offers what the home's box offers for the next message, after T3 Code's composer,
+which keeps its model and reasoning on every turn of a thread: the mode, the model with its reasoning, and the Options
+(approvals and goal mode), set at first to the open run's. A follow-up starts its run with them. While a run works, a
+message steers that run, which keeps its own model and options; the choices then wait for the next follow-up, and their
+pills say so. The agent stays the chat's, and Keep going stays a choice of a new chat (a campaign starts from a goal of
+its own). The home's pickers become one module that both boxes use. The README follows; a smoke test changes the model,
+the reasoning and the approvals on a finished run's page, follows up and reads them on the new run; the tour is read by
+eye.
+
+### 134. The traffic lights on the line of the top bars
+
+**Status: planned.**
+
+**What.** In the desktop app the window puts its traffic lights on the centre line of the top bars, with room above and
+below them: Tauri's `traffic_light_position` sets them 20 px from the left and centres them 26 px under the top (the
+close button's centre is the inset's y less 2 px, measured offscreen with tao's own code on macOS 26). The sidebar's
+head grows to the top bar's height, so that the button that folds the sidebar stands on that line, as the top bar's
+buttons do while the sidebar is closed or a drawer, and the page's room for the lights follows their new place. A smoke
+test reads the centres of those buttons in the desktop shell's layout, with the sidebar open and closed and at a phone's
+width; the app is built; the owner reads the window by eye once the app is rebuilt.
 
 ## Log
 
@@ -8045,3 +8131,5 @@ the chat and marks it unread from its menu; the tour is read by eye.
 - 2026-10-12 (Opus 5.5): item 128 merged as `30b2434` (PR #159, MYP-269 Done): themes of one's own, made in an editor from a background, an accent and an action colour (T3 Code's generator, ported), duplicated, edited, exported and added from T3 Code's theme file, its short form or a VS Code colour theme, kept by the daemon in its home's `themes` folder (checked as T3 Code checks a file, capped, written whole, read without following links) and held to Dot's contrast rule; a review against the done criteria found two faults, fixed before the merge; 929 unit tests and a smoke test in a browser; the daemon restarted on it with no run active; part 19 built.
 - 2026-10-12 (Opus 5.5): part 20 planned, items 129 to 131, from the owner's word with a screenshot of T3 Code's thread menu and one of a run page whose composer stood near the top, and a reading of T3 Code's source (MIT): the composer at the foot of the window, a chat's menu (pin, rename, copy the link, select, delete) and unread chats, the pin, the name and what was seen kept by the daemon; Settle, Snooze, Regenerate title and Archive stay out; no code changed.
 - 2026-10-12 (Opus 5.5): item 129 merged as `048f3aa` (PR #161, MYP-270 Done): the run page's column is at least as tall as the window and the conversation grows into the room a short one leaves, so the composer stands at the window's foot from the first message, on a desktop with the details panel open or closed and on a phone; a long run scrolls under it as before; a smoke test reads the composer's foot at the window's.
+- 2026-10-12 (Opus 5.5): item 130 merged as `d7e7d5e` (PR #162, MYP-271 Done): a chat's menu after T3 Code's thread menu, from a "…" button, a right-click or the context-menu key: Pin (a Pinned group above the days, kept by the daemon in `threads.pinned_at`), Rename in the row, Copy link, Select and Delete; `PATCH /api/threads/{id}`; a review against the done criteria found them met and five edges, fixed before the merge; 930 unit tests and a smoke test in a browser on a desktop and a phone.
+- 2026-10-12 (Opus 5.5): part 21 planned, items 132 to 134, from the owner's word with a screenshot of a run on a hosted model that ended with a report and suggestions and one of the desktop window's top left, and a reading of the store by kinds and numbers: runs that keep going on every model when asked to, the composer's choices on a chat's page and the traffic lights on the line of the top bars; no code changed.
