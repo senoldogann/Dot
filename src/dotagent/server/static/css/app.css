@@ -229,20 +229,6 @@ textarea {
 
 /* ---------- shell (the frame itself is in shell.css) ---------- */
 
-.brand {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-weight: var(--weight-title);
-  font-size: var(--text-lg);
-  letter-spacing: var(--tracking-title);
-  color: var(--text);
-}
-
-.brand:hover {
-  text-decoration: none;
-}
-
 .brand-mark {
   width: 24px;
   height: 24px;
@@ -327,31 +313,6 @@ textarea {
 
 .character-notif {
   fill: var(--character-notify);
-}
-
-/* The character beside the chat (charactercard.js, item 103) at the head of the side panel, and the face that opens a
-   turn of the agent in the conversation. */
-.character-card .character-stage {
-  display: flex;
-  justify-content: center;
-  padding: var(--space-2);
-}
-
-/* The character's name and the word of its state (item 109), under it in the panel. */
-.character-caption {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  padding: 0 16px 16px;
-}
-
-.character-name {
-  font-weight: var(--weight-label);
-}
-
-.character-word {
-  color: var(--muted);
-  font-size: var(--text-sm);
 }
 
 .bubble[role="article"] {

@@ -37,9 +37,9 @@ export function savedStageSize() {
 /**
  * The size control of a run page whose frame is `layout`. Returns `chooser` (the three buttons, for Dot's computer),
  * `handle` (the separator between the conversation and the panel), `paint()` (puts the kept size on the frame) and
- * `dispose()`. `onChange()` runs after every change of the size.
+ * `dispose()`.
  */
-export function createStageSize({ layout, onChange }) {
+export function createStageSize({ layout }) {
   let current = savedStageSize();
   let dragging = false;
   const buttons = STAGE_SIZES.map((option) =>
@@ -103,7 +103,6 @@ export function createStageSize({ layout, onChange }) {
     current = next;
     writePref(SIZE_KEY, next.size === "custom" ? String(next.px) : next.size);
     paint();
-    onChange();
   }
 
   // The panel's left edge follows the pointer, half a handle to its right.
@@ -127,7 +126,6 @@ export function createStageSize({ layout, onChange }) {
     }
     current = { size: "custom", px: widthAt(event.clientX) };
     paint();
-    onChange();
   }
 
   function onPointerUp(event) {

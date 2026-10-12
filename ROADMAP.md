@@ -5033,7 +5033,7 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 110 | Rules in plain words: the model writes the rule, an approval card offers one        | done        | 6da73c4 |
 | 111 | The review: part 14 read once more                                                  | done        | 5d96935 |
 | 112 | Both eyes move: one key per eye in the character's drawing                          | done        | 392132c |
-| 113 | The quiet head: no character card at the head of the chat, no brand in the sidebar  | planned     |         |
+| 113 | The quiet head: no character card at the head of the chat, no brand in the sidebar  | in progress |         |
 | 114 | Dot's mark and its opening: a dot that looks, the wordmark, the icons, a bounce at launch | planned     |         |
 | 115 | The composer once more: one bar that never wraps, labels that fold, a quiet warning | planned     |         |
 | 116 | The deep review: every part of the code read once more, and fixed                   | planned     |         |
@@ -6479,7 +6479,20 @@ it Dot is finished as a product to test: no new feature until the owner's testin
 
 ### 113. The quiet head: no character card at the head of the chat, no brand in the sidebar
 
-**Status: planned.**
+**Status: in progress.**
+
+**Design, as built (2026-10-12).** The run page has no character card: `charactercard.js` and `mood.js` are gone with
+their CSS (the card in the panel and the band at the head of the conversation), and so are the two callbacks that placed
+the card (`createStageSize`'s `onChange`, `createInspector`'s `onArrange`). The panel holds Dot's computer, Details,
+Cost, Plan and Actions; the run's state is the top bar's face and its badge; each turn and the answer still open with
+the actor's still face, and the home's face still moves. The sidebar's head holds its button alone, at the left, where
+the top bar's opener stands while the sidebar is away, so the button keeps its place in both states (84 px from the left
+in the desktop shell, after the lights). The brand, the ring-and-core glyph with the name, is gone from both bars; the
+glyph stays on the sign-in card until item 114 replaces it. README: the run page's passage, the moving characters (two
+now), the sidebar's head. Tests: `test_face.py`'s card test becomes one that finds no card at the head of the
+conversation or of the panel at the Wide size, and the answer's still face; `test_takeover.py`'s sizes lose the card's
+checks; the tour checks the sidebar's button on the lights' line and the opener at the same x (in the desktop shell the opener still sits 11 px lower than
+the lights' line, item 111's (a)).
 
 **What.** The run page loses the character card (`charactercard.js`, and `mood.js` if nothing else reads it, with their
 CSS and their tests): the run's state stays in the top bar's face and badge, the timeline keeps its turn faces, the home

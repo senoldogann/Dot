@@ -4,7 +4,7 @@
 
 import { ApiError, api, request } from "./api.js";
 import { clip, clipWords, debounce, el, foldSearch, plural } from "./dom.js";
-import { brandMark, icon } from "./icons.js";
+import { icon } from "./icons.js";
 import { actorFace } from "./actors.js";
 import { nestRows, progressFacts } from "./nesting.js";
 import { readPref, writePref } from "./prefs.js";
@@ -595,7 +595,6 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
     el(
       "div",
       { class: "side-head", "data-tauri-drag-region": "" },
-      el("a", { class: "brand", href: homeHref, "aria-label": "Dot", onclick: onNavigate }, brandMark(), el("span", { class: "brand-name" }, "Dot")),
       close,
     ),
     el(

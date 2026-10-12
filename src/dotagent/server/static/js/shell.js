@@ -3,7 +3,7 @@
 
 import { el } from "./dom.js";
 import { engageFailsafe, releaseFailsafe } from "./failsafe.js";
-import { brandMark, icon } from "./icons.js";
+import { icon } from "./icons.js";
 import { setSidebarOpen, sidebarOpen, trackStagebar } from "./layout.js";
 import { installShortcuts, requestCompose } from "./shortcuts.js";
 import { buildSidebar } from "./sidebar.js";
@@ -105,12 +105,7 @@ export function buildShell({ homeRoute }) {
     },
     icon("panelLeft"),
   );
-  const opener = el(
-    "div",
-    { class: "stagebar-left" },
-    menu,
-    el("a", { class: "brand", href: homeHref, "aria-label": "Dot" }, brandMark(), el("span", { class: "brand-name" }, "Dot")),
-  );
+  const opener = el("div", { class: "stagebar-left" }, menu);
   const main = el("main", { class: "page", tabindex: "-1" });
   const stagebar = el(
     "header",

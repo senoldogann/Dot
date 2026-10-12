@@ -294,22 +294,18 @@ async def _width(page: Page, selector: str) -> float:
 
 async def _the_sizes_set_the_panel(page: Page, tmp_path: Path) -> None:
     """Item 109: the sizes on Dot's computer set the panel's width, the handle drags it and the arrow keys step it, the
-    width is kept over a reload, a double click gives the panel back its own width, and a panel wider than its own
-    puts the run's character at the head of the conversation."""
+    width is kept over a reload, and a double click gives the panel back its own width. No character card stands at the
+    head of the conversation or of the panel (item 113)."""
     layout: Locator = page.locator(".run-layout")
     sizes: Locator = page.locator("section.computer .stage-sizes")
     await expect(sizes.get_by_role("button", name="Compact")).to_have_attribute("aria-pressed", "true")
     assert abs(await _width(page, ".inspector") - _COMPACT_PX) <= 1
-    await expect(page.locator(".inspector .character-card .character-name")).to_have_text("Dot")
     await sizes.get_by_role("button", name="Wide").click()
     await expect(layout).to_have_attribute("data-stage", "wide")
     await expect(sizes.get_by_role("button", name="Wide")).to_have_attribute("aria-pressed", "true")
     half: float = (await _width(page, ".run-layout") - _HANDLE_PX) / 2
     assert abs(await _width(page, ".inspector") - half) <= 2, half
-    head: Locator = page.locator(".run-chat-head .character-card")
-    await expect(head).to_be_visible()
-    await expect(head.locator(".character-name")).to_have_text("Dot")
-    await expect(head.locator(".character-word")).not_to_be_empty()
+    assert await page.locator(".character-card, .run-chat-head").count() == 0
     await page.screenshot(path=str(tmp_path / "computer-1280-wide.png"), animations="disabled")
     await sizes.get_by_role("button", name="Full").click()
     await expect(layout).to_have_attribute("data-stage", "full")
@@ -333,15 +329,13 @@ async def _the_sizes_set_the_panel(page: Page, tmp_path: Path) -> None:
     await page.reload()
     await expect(layout).to_have_attribute("data-stage", "custom")
     assert abs(await _width(page, ".inspector") - dragged) <= 2
-    # The left arrow widens the panel a step; a double click gives it back its own width and the character its place.
+    # The left arrow widens the panel a step; a double click gives it back its own width.
     await handle.focus()
     await page.keyboard.press("ArrowLeft")
     assert abs(await _width(page, ".inspector") - (dragged + 32)) <= 2
     await handle.dblclick()
     await expect(layout).to_have_attribute("data-stage", "compact")
     assert abs(await _width(page, ".inspector") - _COMPACT_PX) <= 1
-    await expect(page.locator(".run-chat-head")).to_be_hidden()
-    await expect(page.locator(".inspector .character-card")).to_be_visible()
 
 
 async def test_the_run_page_shows_the_computer_card_with_the_pill_wide_and_on_a_phone_in_both_looks(

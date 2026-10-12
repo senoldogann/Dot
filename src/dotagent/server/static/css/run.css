@@ -87,39 +87,6 @@
   background: var(--accent);
 }
 
-/* At the head of the conversation while the panel is wider than its own width: the run's character at 64 px beside
-   its name and the word of its state, in a card that stays under the top bar as the conversation scrolls, on a band of
-   the page's ground that fades out below it, so the turns pass under the band instead of around the card. */
-.run-chat-head {
-  position: sticky;
-  top: var(--stagebar-h);
-  z-index: 3;
-  padding: 8px 0 16px;
-  background: linear-gradient(var(--bg) 70%, transparent);
-}
-
-.run-chat-head .character-card {
-  display: inline-flex;
-  align-items: center;
-  gap: 12px;
-  padding: 4px 20px 4px 4px;
-  box-shadow: var(--shadow-raised);
-}
-
-.run-chat-head .character-card .character-stage {
-  padding: 0;
-}
-
-.run-chat-head .character-card .character {
-  width: 64px;
-  height: 64px;
-}
-
-.run-chat-head .character-card .character-caption {
-  align-items: flex-start;
-  padding: 0;
-}
-
 /* The conversation keeps one reading width, centred in the room the panel leaves it. */
 .run-main {
   width: 100%;

@@ -59,6 +59,8 @@ _PAGES: tuple[tuple[str, str], ...] = (
 _SIZES: tuple[tuple[str, int, int], ...] = (("desk", 1280, 860), ("phone", 390, 844))
 # Where macOS centres the traffic lights of an overlay title bar, from the window's top edge.
 _LIGHTS_Y: float = 15.0
+# The room the traffic lights take at the left of the desktop shell's bars.
+_LIGHTS_RIGHT: float = 84.0
 _SCHEMES: tuple[Literal["light", "dark"], ...] = ("light", "dark")
 # The steps before the answer, each a line of text and a shell call (the commands vary, so no step repeats enough to
 # be called a loop), so the conversation is taller than a window and the way down (the jump arrow) has something to
@@ -222,16 +224,21 @@ async def _shoot(context: BrowserContext, base: str, pages: tuple[tuple[str, str
             await page.evaluate("document.documentElement.dataset.shell = 'desktop'")
             await page.wait_for_timeout(_SETTLE_MS)
             await page.screenshot(path=str(out / f"{tag}-home-desktop.png"), full_page=False)
-            # The brand's centre on the traffic lights' line, 15 px under the top edge (item 107).
-            brand = await page.locator(".side-head .brand").bounding_box()
-            assert brand is not None and abs(brand["y"] + brand["height"] / 2 - _LIGHTS_Y) <= 2, brand
             # The sidebar goes and comes back through its own buttons (item 100: setting the state on the element had
             # hidden the sidebar and its opener from every later desk shot).
             hide = page.get_by_role("button", name="Hide sidebar")
             docked: bool = await hide.is_visible()
             if docked:
+                # The docked sidebar's head holds its button alone (item 113), right of the lights and centred on their
+                # line, 15 px under the top edge (item 107).
+                hide_box = await hide.bounding_box()
+                assert hide_box is not None and abs(hide_box["y"] + hide_box["height"] / 2 - _LIGHTS_Y) <= 2, hide_box
+                assert hide_box["x"] >= _LIGHTS_RIGHT, hide_box
                 await hide.click()
                 await page.wait_for_timeout(_SETTLE_MS)
+                # The top bar's opener takes the place the button had, so it does not move under the pointer.
+                show_box = await page.get_by_role("button", name="Show sidebar").bounding_box()
+                assert show_box is not None and abs(show_box["x"] - hide_box["x"]) <= 2, (hide_box, show_box)
             await page.screenshot(path=str(out / f"{tag}-home-desktop-closed.png"), full_page=False)
             if docked:
                 await page.get_by_role("button", name="Show sidebar").click()
