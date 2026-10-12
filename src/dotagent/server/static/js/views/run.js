@@ -421,7 +421,6 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
     label: "Message",
     boxLabel: "Message for Dot",
     placeholder: "",
-    rows: 1,
     maxPx: MAX_INPUT_PX,
     commands: [{ label: "/btw", hint: "Ask on the side: the run never sees the question.", insert: "/btw " }],
     send: () => submit(),

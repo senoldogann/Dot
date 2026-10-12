@@ -846,32 +846,35 @@ page, with its steps so far and its channel; the parent's row says how many runs
 delegated run's card carries a chip with its progress ("step 3 · web_fetch", then "done · 12 steps") and an **open**
 link to the run's own page.
 
-**New chat** is Dot's presence and one composer, centred in the window. The face is Dot's character, moving (idle with
-a wink now and then; a still frame with "Faces that move" off), and shows the state of the whole of Dot
-(waiting when something waits for you, working while a run is active, else idle) under Dot's name (yours to give in
-Settings › General; Dot until then, and kept in this browser only); a greeting by the hour says your name when you gave
-one there ("Good morning, Ada. What should I work on?"; "Something waits for you." when it does) and one line says what
-is going on ("Working on 2 runs · 1 waits for you · 3 ended today · 1 lesson · 2 things due today"; a quiet day says
-so). Under the composer, the **Today** strip lists it: what waits for you, what works, what is due later today (the
-schedules that fire and the campaigns whose next session starts), what was learned today (the lessons and the day's
-journal) and what ended, each row as on the Activity page and each opening what it is about; five rows a section,
-then "and N more in Activity". The line and the strip follow the lifecycle stream, so an answer or a run's end moves
-them at once; `GET /api/activity` carries the two new lists as `learned_today` and `due`. The composer is one frame: the goal, the
-files attached under it, then a bar of pills, each an icon and its value with a hairline between two: the mode (Task,
-Chat or Research; its menu says what each does), the agent with its face once an agent exists, **Model** (the mark of
-its provider and its name: the daemon's default or one picked, by provider), **Reasoning** (a brain and the level, only
-for a model that offers a choice; kept in the browser per model) and **Options** (a lock, closed for Ask, a shield for
-Auto, open for YOLO: the approval mode, which the pill always shows, the Goal mode switch and Keep going, see
-[Autonomy](#autonomy-approvals-goal-mode-and-the-end-of-a-run)); the attach button and the send sit at the right end.
-On a phone the pills wrap over as many lines as they need, without the hairlines.
-Each pill opens its menu above it, and a pick or Escape or a click outside closes it. What you typed and attached and did not send is kept in this browser and is there again when you
-come back (so is the box of each run). Dot's face looks down at the box while you write and brightens when you send.
-Enter starts the run, Shift+Enter adds a line. `/` at
-the start of a word opens the slash menu over the box: the commands of the composer (`/task`, `/chat`, `/research`
-here; `/btw` in the box of a run), the skills by name with their description, and each MCP server with its tools, read
-from the daemon as a run reads them (`GET /api/palette`); letters filter, the arrows move, Enter or Tab picks and
-Escape closes. A skill picked reads "use the skill NAME: " in the box, a tool its name, a command does its work. A run
-that waits for your approval shows above the composer.
+**New chat** is Dot's presence and one composer, centred in the window. The face is Dot's character, moving (idle with a
+wink now and then; a still frame with "Faces that move" off), and shows the state of the whole of Dot (waiting when
+something waits for you, working while a run is active, else idle) under Dot's name (yours to give in Settings ›
+General; Dot until then, and kept in this browser only); a greeting by the hour says your name when you gave one there
+("Good morning, Ada. What should I work on?"; "Something waits for you." when it does) and one line says what is going
+on ("Working on 2 runs · 1 waits for you · 3 ended today · 1 lesson · 2 things due today"; a quiet day says so). Under
+the composer, the **Today** strip lists it: what waits for you, what works, what is due later today (the schedules that
+fire and the campaigns whose next session starts), what was learned today (the lessons and the day's journal) and what
+ended, each row as on the Activity page and each opening what it is about; five rows a section, then "and N more in
+Activity". The line and the strip follow the lifecycle stream, so an answer or a run's end moves them at once; `GET
+/api/activity` carries the two new lists as `learned_today` and `due`. The composer is one frame on a 20 px corner: the
+goal in a box of one line that grows with it, the files attached under it, then one bar that never wraps: the attach
+button and the mode (Task, Chat or Research; its menu says what each does) at the left; at the right the agent with its
+face and name once an agent exists (its menu lists the agents with their roles), **Model** (the mark of its provider and
+its name: the daemon's default or one picked, by provider), **Reasoning** (a brain and the level, only for a model that
+offers a choice; kept in the browser per model) and **Options** (a lock, closed for Ask, a shield for Auto, open for
+YOLO: the approval mode, which the pill always shows, the Goal mode switch and Keep going, see
+[Autonomy](#autonomy-approvals-goal-mode-and-the-end-of-a-run); YOLO in the warn ink, on no fill) and the round send,
+quiet while the box is empty. Each pill is an icon and its value, on no ground until the pointer is over it; as the
+frame narrows the names of the mode and of the reasoning fold to their icons, then the chevrons and the agent's name go
+and the model's name gives way with an ellipsis, so on a phone the bar is still one line. While Keep going is on, one
+line under the frame says so. Each pill opens its menu above it, and a pick or Escape or a click outside closes it. What
+you typed and attached and did not send is kept in this browser and is there again when you come back (so is the box of
+each run). Dot's face looks down at the box while you write and brightens when you send. Enter starts the run,
+Shift+Enter adds a line. `/` at the start of a word opens the slash menu over the box: the commands of the composer
+(`/task`, `/chat`, `/research` here; `/btw` in the box of a run), the skills by name with their description, and each
+MCP server with its tools, read from the daemon as a run reads them (`GET /api/palette`); letters filter, the arrows
+move, Enter or Tab picks and Escape closes. A skill picked reads "use the skill NAME: " in the box, a tool its name, a
+command does its work. A run that waits for your approval shows above the composer.
 
 A run opens as a conversation under Dot's face and name, with the state of the run and when it started. The face is the
 state: still when the run rests, a slow breath while it works, an amber ring while it waits for you, a green tick for
@@ -963,16 +966,15 @@ Inter for the interface and the answers, Geist Mono for code and identifiers, bo
 (`static/fonts`, SIL Open Font License); seven sizes each with its line-height (12/16 badges and chips, 13/18 meta
 and hints, 14/20 the interface, 15/24 prose and the composer, 17/24 section titles, 20/28 page titles, 24/32 the
 greeting), three weights (400 text, 500 labels and names, 600 titles), tabular numerals throughout; a unit test
-refuses any size, weight, line-height or family in the sheets that is not one of these tokens. Surfaces: cards are
-flat, a surface with a hairline and a 12 px radius and no shadow (shadows stay on what floats: menus, dialogs, the
-composer in focus); section labels are sentence case; the facts of a row are spans a gap apart rather than one dotted
-string; an empty list is one line that says so and what to do; your messages sit on the raised surface. Controls:
-buttons, inputs and selects 36 px tall on an 8 px corner with a hairline (32 for the small ones), the same 2 px focus
-ring on each, a select with its own drawn chevron, field labels on the interface line and hints on the small one, the composer's
-menus as pills of 32 px (an icon of 16 px, the value, a chevron; borderless at rest, a hairline under the pointer and one
-between two pills) that open a panel above them, the providers' marks served from `static/icons/providers/` with their
-licences,
-table rows 40 px with their content on the middle; `#/controls` shows every control on one page for checking a look.
+refuses any size, weight, line-height or family in the sheets that is not one of these tokens. Surfaces: cards are flat,
+a surface with a hairline and a 12 px radius and no shadow (shadows stay on what floats: menus, dialogs, the composer in
+focus); section labels are sentence case; the facts of a row are spans a gap apart rather than one dotted string; an
+empty list is one line that says so and what to do; your messages sit on the raised surface. Controls: buttons, inputs
+and selects 36 px tall on an 8 px corner with a hairline (32 for the small ones), the same 2 px focus ring on each, a
+select with its own drawn chevron, field labels on the interface line and hints on the small one, the composer's menus
+as round pills of 32 px (an icon of 16 px, the value, a chevron of 12; no ground at rest, a tint under the pointer) that
+open a panel above them, the providers' marks served from `static/icons/providers/` with their licences, table rows 40
+px with their content on the middle; `#/controls` shows every control on one page for checking a look.
 Faces: every actor is a character (below); an agent wears the look you choose, Dot its own (Settings › General), and an
 actor without one (a delegated run, a campaign, a schedule) the shape and colour its id's hue gives it, one of eight, so
 it keeps its face in the sidebar, the lists, the rows of a chat and the bar of its own page. Characters: the animated

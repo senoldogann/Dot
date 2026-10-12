@@ -5034,8 +5034,8 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 111 | The review: part 14 read once more                                                  | done        | 5d96935 |
 | 112 | Both eyes move: one key per eye in the character's drawing                          | done        | 392132c |
 | 113 | The quiet head: no character card at the head of the chat, no brand in the sidebar  | done        | ea21f27 |
-| 114 | Dot's mark and its opening: a dot that looks, the wordmark, the icons, a bounce at launch | in progress |         |
-| 115 | The composer once more: one bar that never wraps, labels that fold, a quiet warning | planned     |         |
+| 114 | Dot's mark and its opening: a dot that looks, the wordmark, the icons, a bounce at launch | done        | ea014d5 |
+| 115 | The composer once more: one bar that never wraps, labels that fold, a quiet warning | in progress |         |
 | 116 | The deep review: every part of the code read once more, and fixed                   | planned     |         |
 
 ### 77. The type system: Inter and Geist Mono, seven sizes, three weights
@@ -6501,7 +6501,7 @@ top bar with the sidebar away drops the brand too. README where a line changes. 
 
 ### 114. Dot's mark and its opening: a dot that looks, the wordmark, the icons, a bounce at launch
 
-**Status: in progress.**
+**Status: done.** Merged as `ea014d5` (PR #136, MYP-254 Done).
 
 **Design, as built (2026-10-12).** The mark is a yellow disc (`--brand`, the same in every look and scheme) with the two
 capsule eyes of the character's attentive rest pose in `--on-brand`, drawn 1.12 times the engine's size so they hold at
@@ -6537,7 +6537,28 @@ that sees the opening play and leave, and not play under reduced motion or a sec
 
 ### 115. The composer once more: one bar that never wraps, labels that fold, a quiet warning
 
-**Status: planned.**
+**Status: in progress.**
+
+**Design, as built (2026-10-12).** One frame for the three composers (`composer.js composerFrame`, the new chat's, the
+run's dock and the agent page's): a 20 px corner (`--radius-lg`) with its hairline, 8 px inside; the box is one line at
+first (the `rows` option is gone) and grows with its text, its words on the left edge of the attach button's icon; then
+one bar, the attach button at the left (a round ghost button now), the pills, the round send of 32 px at the right,
+quiet in the third surface and the muted ink while the box holds no text (`data-empty` on the frame, repainted on every
+change of the text, a pick of the slash menu included: `wireComposer` takes an `edited()` that also keeps the draft
+after a pick, which it did not). On the new chat's bar the mode stays at the left by the attach button and the agent,
+the model, the reasoning and the approvals go to the right. The pills are round (`--radius-pill`) and on no ground at
+rest, a tint under the pointer or while open, no hairlines between them, an icon of 16 px, the value a breath away, a
+chevron of 12. The bar is a size container (`container: composer-bar`): at 600 px and less the mode's and the
+reasoning's names fold to their icons, at 440 and less the chevrons go and the agent's name with them, and the model's
+pill is the one that shrinks, its name giving way with an ellipsis; so at a phone's 390 the bar holds the attach button,
+the mode, the agent, the model, the reasoning, the approvals and the send on one line. YOLO is the warn ink on the
+Options pill's open lock and word, no fill and no border (a warn tint only under the pointer). The agent pick, a native
+select whose width followed its longest option (the wide gap before its chevron), is a pill like the others: the agent's
+still face and name, a menu of Dot and the agents with their roles. Keep going's note moved out of the frame to one line
+under it (`.composer-stack`, `.composer-note`), in fewer words. README: the New chat passage, the controls. Tests:
+`test_composer.py` measures the bar with every pill out (an agent, a model with levels, YOLO) at 1280, 800, 560 and 390
+px: one line 32 px high, every control on one middle, nothing past the right edge, the mode's name folded below 600,
+YOLO without a fill; `test_agents.py` reads the agents from the pill's menu.
 
 **What.** On the research of 2026-10-12 (Vercel's chatbot `multimodal-input.tsx`, Open WebUI's `MessageInput.svelte`,
 assistant-ui's Composer: radii of 16 to 24 px, a one-line box that grows, controls of 28 to 32 px, a round send in the
@@ -7099,3 +7120,4 @@ restarted. Findings as built.
 - 2026-10-12 (Opus 5.5): item 112 merged as `392132c` (PR #132, MYP-252 Done): both eyes of every face move again (`sync` hands the key its index, a repeated key is an error), a test that reads each eye on its own, the gallery test waiting for the orbit's first ring. Part 14 built: items 107 to 112. The daemon waits for a restart on `392132c`.
 - 2026-10-12 (Opus 5.5): part 15 planned, items 113 to 116, from the owner's word with two screenshots, the daemon's log (the SSL crash ran before the restart) and a research of open composers; no code changed.
 - 2026-10-12 (Opus 5.5): item 113 merged as `ea21f27` (PR #135, MYP-253 Done): the run page without its character card (`charactercard.js` and `mood.js` gone, the state in the top bar's face and badge), the sidebar's head with its button alone at the left where the top bar's opener stands, the brand gone from both bars; the tour checks the button on the lights' line.
+- 2026-10-12 (Opus 5.5): item 114 merged as `ea014d5` (PR #136, MYP-254 Done): Dot's mark (a yellow dot with the character's eyes) as the favicon, the app's, the menu bar's and the web app's icons from `desktop/icons/render.py`; the wordmark “dot” on the sign-in card and the desktop shell's down page; the opening, once per window session, never under reduced motion, cut short by a click or a key.

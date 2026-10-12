@@ -45,9 +45,10 @@ function loadPalette() {
 }
 
 /** Wire `textarea`: `send()` on Enter, autosize up to `maxPx`, and the slash menu with `commands`
- * (`{ label: "/btw", hint, insert }`, or `run()` for one that acts on the composer). Returns the menu element to place
- * in the composer's frame, `autosize()` and `dispose()`. */
-export function wireComposer(textarea, { maxPx, send, commands }) {
+ * (`{ label: "/btw", hint, insert }`, or `run()` for one that acts on the composer); `edited()` runs after a pick of
+ * the menu changed the text, as the input event does after typing. Returns the menu element to place in the
+ * composer's frame, `autosize()` and `dispose()`. */
+export function wireComposer(textarea, { maxPx, send, commands, edited }) {
   const menu = el("div", { class: "slash-menu", role: "listbox", id: `slash-${Math.random().toString(36).slice(2, 8)}`, hidden: true });
   textarea.setAttribute("aria-controls", menu.id);
   textarea.setAttribute("aria-expanded", "false");
@@ -118,6 +119,7 @@ export function wireComposer(textarea, { maxPx, send, commands }) {
     textarea.setSelectionRange(replaced.caret, replaced.caret);
     close();
     autosize();
+    edited();
     textarea.focus();
     if (typeof item.run === "function") {
       item.run();
@@ -206,16 +208,17 @@ export function wireComposer(textarea, { maxPx, send, commands }) {
 }
 
 /**
- * The frame the composers share: the slash menu over it, the box (`rows` high, `boxLabel` its name, growing with its
- * text up to `maxPx`), the attached files in a row under the box, then the bar with the `options` row on the left and
- * the attach button and the round send button on the right (`sendLabel` its words). `commands` are the slash menu's own; `send()` runs on
- * Enter and on the button. `draftKey` (or null) keeps the text and the ready files under `dot.draft.<key>` until
- * `clear()` after a send. `listener` (`{ focus(on), typing() }`, or null) hears the box, for a face that listens.
- * Returns `element`, `textarea`, `attachments`, `options`, `sendButton`, `setSendLabel(text)`, `autosize()`, `clear()`
- * and `dispose()`.
+ * The frame the composers share (item 115): the slash menu over it, the box (one line, `boxLabel` its name, growing
+ * with its text up to `maxPx`), the attached files in a row under the box, then one bar: the attach button, the
+ * `options` row for the pills (app.css keeps the mode at the left and sends the rest to the right) and the round send
+ * button (`sendLabel` its words). `commands` are the slash menu's own; `send()` runs on Enter and on the button.
+ * `draftKey` (or null) keeps the text and the ready files under `dot.draft.<key>` until `clear()` after a send.
+ * `listener` (`{ focus(on), typing() }`, or null) hears the box, for a face that listens. The frame carries
+ * `data-empty` while the box holds no text, so the send rests quiet. Returns `element`, `textarea`, `attachments`,
+ * `options`, `sendButton`, `setSendLabel(text)`, `autosize()`, `clear()` and `dispose()`.
  */
-export function composerFrame({ label, boxLabel, placeholder, rows, maxPx, commands, send, sendLabel, draftKey, listener }) {
-  const textarea = el("textarea", { class: "textarea", rows: String(rows), placeholder, "aria-label": boxLabel });
+export function composerFrame({ label, boxLabel, placeholder, maxPx, commands, send, sendLabel, draftKey, listener }) {
+  const textarea = el("textarea", { class: "textarea", rows: "1", placeholder, "aria-label": boxLabel });
   const element = el("section", { class: "card composer", "aria-label": label });
   const key = draftKey === null ? null : `${DRAFT_PREFIX}${draftKey}`;
 
@@ -235,12 +238,23 @@ export function composerFrame({ label, boxLabel, placeholder, rows, maxPx, comma
   const sendText = el("span", { class: "label" }, sendLabel);
   const sendButton = el("button", { class: "btn primary send", type: "button", title: sendLabel, "aria-label": sendLabel }, icon("arrowUp"), sendText);
   const options = el("div", { class: "composer-options" });
-  const wired = wireComposer(textarea, { maxPx, send, commands });
-  element.append(wired.menu, textarea, attachments.list, attachments.picker, el("div", { class: "composer-bar" }, options, attachments.button, sendButton));
+
+  function paintEmpty() {
+    element.toggleAttribute("data-empty", textarea.value.trim() === "");
+  }
+
+  // Every change of the text, typed or put there by the slash menu, keeps the draft and repaints the send.
+  function edited() {
+    keep();
+    paintEmpty();
+  }
+
+  const wired = wireComposer(textarea, { maxPx, send, commands, edited });
+  element.append(wired.menu, textarea, attachments.list, attachments.picker, el("div", { class: "composer-bar" }, attachments.button, options, sendButton));
   sendButton.addEventListener("click", send);
 
   function onInput() {
-    keep();
+    edited();
     listener?.typing();
   }
   const onFocus = () => listener?.focus(true);
@@ -256,6 +270,7 @@ export function composerFrame({ label, boxLabel, placeholder, rows, maxPx, comma
     // The box measures its text once it is on the page.
     requestAnimationFrame(wired.autosize);
   }
+  paintEmpty();
 
   return {
     element,
@@ -271,6 +286,7 @@ export function composerFrame({ label, boxLabel, placeholder, rows, maxPx, comma
     autosize: wired.autosize,
     clear: () => {
       textarea.value = "";
+      paintEmpty();
       wired.autosize();
       attachments.clear();
       if (key !== null) {

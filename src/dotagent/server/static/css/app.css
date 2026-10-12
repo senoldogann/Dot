@@ -1417,15 +1417,17 @@ a.pill:hover {
   font-size: var(--text-sm);
 }
 
-/* One frame for the three composers (item 104): the box, the attached files under it, then the bar of pills and the
-   round send. A hairline at rest, a stronger one under the pointer, the 10 % ring in focus (the accent is ink in the
-   Neutral look, so a 1 px ink border with a ring read as a heavy frame, item 100); the shadow is the dock's alone. */
+/* One frame for the three composers (items 104 and 115): the box of one line that grows with its text, the attached
+   files under it, then one bar: the attach button and the mode at the left; the agent, the model, the reasoning, the
+   approvals and the round send at the right. A hairline at rest, a stronger one under the pointer, the 10 % ring in
+   focus; the shadow is the dock's alone. */
 .composer {
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  padding: 12px 12px 8px;
+  gap: var(--space-1);
+  padding: var(--space-2);
   border-color: var(--border);
+  border-radius: var(--radius-lg);
   background: var(--surface);
   transition:
     border-color var(--motion-quick) var(--ease),
@@ -1449,13 +1451,15 @@ a.pill:hover {
   background: color-mix(in srgb, var(--accent) 6%, var(--surface));
 }
 
+/* The box starts one line high, its text on the left edge of the attach button's icon. */
 .composer .textarea {
+  min-height: 0;
+  max-height: 320px;
+  padding: var(--space-2) var(--space-2) var(--space-1);
   border: 0;
-  padding: 4px 8px;
   box-shadow: none;
   font-size: var(--text-md);
-  min-height: 84px;
-  max-height: 320px;
+  line-height: var(--leading-md);
   resize: none;
   background: transparent;
 }
@@ -1474,64 +1478,66 @@ a.pill:hover {
   height: 40px;
 }
 
-/* The pills on the left, wrapping when the window is narrow; the send stays at the right end. */
-/* The bar (item 108): the pills on the left, the attach button and the send at the right end. */
+/* The bar never wraps. It is a size container: as it narrows, the mode's and the reasoning's names fold to their
+   icons, then the chevrons go and the agent's name and the model's give way with an ellipsis; the approvals and the
+   send never move. */
 .composer-bar {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto auto;
-  align-items: end;
-  gap: 8px;
+  container: composer-bar / inline-size;
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
 }
 
 .composer-options {
   display: flex;
-  flex-wrap: wrap;
+  flex: 1;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-1);
   min-width: 0;
 }
 
-/* A pill reads an icon and its value (the mark of a provider and "Muse Spark 1.3"), soft at rest: the secondary ink,
-   no border; a hairline under the pointer and while its menu is open. Its name is for screen readers only. */
+/* The mode stays at the left by the attach button; the pills after it go to the right, by the send. */
+.composer-pill[data-pill="mode"] {
+  margin-inline-end: auto;
+}
+
+.composer .attach-button {
+  width: 32px;
+  padding: 0;
+  border-radius: var(--radius-pill);
+  color: var(--text-2);
+}
+
+/* A pill reads an icon and its value (the mark of a provider and "Muse Spark 1.3"), soft at rest: the secondary ink
+   on no ground; a tint under the pointer and while its menu is open. Its name is for screen readers only. */
 .composer-pill {
-  position: relative;
   display: inline-flex;
+  flex: none;
   align-items: center;
-  gap: 8px;
-  max-width: 100%;
+  gap: var(--space-1);
   min-width: 0;
   height: 32px;
-  padding: 0 8px;
-  border: 1px solid transparent;
-  border-radius: var(--radius-control);
+  padding: 0 var(--space-2);
+  border: 0;
+  border-radius: var(--radius-pill);
   background: transparent;
   color: var(--text-2);
   font-size: var(--text-sm);
   cursor: pointer;
   transition:
-    border-color var(--motion-quick) var(--ease),
     background-color var(--motion-quick) var(--ease),
     color var(--motion-quick) var(--ease);
 }
 
 .composer-pill:hover,
 .composer-pill[aria-expanded="true"] {
-  border-color: var(--border);
   background: var(--surface-2);
   color: var(--text);
 }
 
-/* A hairline between two pills shown side by side, in the middle of the gap and outside the pill, so the pill's tint
-   under the pointer does not take it. */
-.composer-options > :not([hidden]) ~ .composer-pill:not([hidden])::before {
-  content: "";
-  position: absolute;
-  top: 7px;
-  bottom: 7px;
-  left: -5px;
-  width: 1px;
-  background: var(--border);
-  pointer-events: none;
+/* The model's pill is the one that gives way when the bar is short. */
+.composer-pill[data-pill="model"] {
+  flex: 0 1 auto;
 }
 
 /* The pill's icon, 16 px: a line icon, the mark of a provider, or a face. */
@@ -1556,9 +1562,11 @@ a.pill:hover {
   animation: none;
 }
 
-/* A long model name gives way with an ellipsis, so the bar keeps its one line at the desk width. */
+/* The value sits a breath from the icon and the chevron; a long model name gives way with an ellipsis. */
 .composer-pill-value {
+  min-width: 0;
   max-width: 200px;
+  padding-inline: var(--space-half);
   overflow: hidden;
   font-weight: var(--weight-label);
   text-overflow: ellipsis;
@@ -1571,31 +1579,70 @@ a.pill:hover {
 
 .composer-pill > .icon {
   flex: none;
-  width: 14px;
-  height: 14px;
+  width: 12px;
+  height: 12px;
   color: var(--muted);
   transform: rotate(90deg);
 }
 
-/* The Options pill wears the warn tint while the approvals are YOLO, so a run that asks nothing is never started by
-   accident. */
-.composer-pill[data-tone="warn"] {
-  border-color: var(--warn-border);
+/* YOLO, quietly: the Options pill's icon and word in the warn ink, on no ground, so a run that asks nothing is never
+   started by accident and the bar does not shout. */
+.composer-pill[data-tone="warn"],
+.composer-pill[data-tone="warn"] > .icon {
+  color: var(--warn);
+}
+
+.composer-pill[data-tone="warn"]:hover,
+.composer-pill[data-tone="warn"][aria-expanded="true"] {
   background: var(--warn-weak);
   color: var(--warn);
 }
 
-/* The Agent pick stays a native select in the pill's clothes. */
-.composer-pill-select {
-  padding-right: 0;
+/* The send: round and in ink, quiet while the box holds no text (pressed then, it puts the caret in the box). */
+.composer .btn.send {
+  width: 32px;
+  height: 32px;
+  min-height: 32px;
 }
 
-.composer-pill-select .select {
-  height: 28px;
-  padding-left: 0;
-  border: 0;
-  background-color: transparent;
-  font-weight: var(--weight-label);
+.composer[data-empty] .btn.send {
+  border-color: transparent;
+  background: var(--surface-3);
+  color: var(--muted);
+}
+
+/* A composer and the one line under it while Keep going is on (runmodes.js): what the switch does, in a breath. */
+.composer-stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.composer-note {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 0 var(--space-4);
+  color: var(--muted);
+  font-size: var(--text-sm);
+}
+
+.composer-note .icon {
+  flex: none;
+}
+
+@container composer-bar (max-width: 600px) {
+  .composer-pill[data-pill="mode"] .composer-pill-value,
+  .composer-pill[data-pill="reasoning"] .composer-pill-value {
+    display: none;
+  }
+}
+
+@container composer-bar (max-width: 440px) {
+  .composer-pill > .icon,
+  .composer-pill[data-pill="agent"] .composer-pill-value {
+    display: none;
+  }
 }
 
 /* A menu of the bar: a panel above its pill, inside the frame, which places it. */
@@ -1639,11 +1686,17 @@ a.pill:hover {
   background: var(--surface-3);
 }
 
-/* A row: its mark or icon, the label with a hint under it, and the tick, shown on the row chosen. */
+/* A row: its mark, icon or face, the label with a hint under it, and the tick, shown on the row chosen. */
 .pop-option > .icon,
 .pop-option > .provider-mark {
   flex: none;
   color: var(--text-2);
+}
+
+.pop-option > .avatar {
+  width: 20px;
+  height: 20px;
+  animation: none;
 }
 
 .pop-option > .icon:last-child {
