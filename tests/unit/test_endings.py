@@ -4,6 +4,7 @@ import pytest
 
 from dotagent.store.endings import (
     GOAL_CHECK_MARK,
+    PREFIX_CUT_SHORT,
     PREFIX_EMERGENCY_STOP,
     PREFIX_INTERNAL_ERROR,
     PREFIX_LIMIT,
@@ -27,6 +28,7 @@ from dotagent.store.models import RunStatus
         ("failed", RESULT_STALLED, "stalled"),
         ("failed", f"{PREFIX_LIMIT} (61.2 of 60 minutes) and did not finish when it was told to.", "limit"),
         ("failed", RESULT_EMPTY_REPLIES, "empty_replies"),
+        ("failed", f"{PREFIX_CUT_SHORT} and the run did not finish (the last one ended with 'length').", "cut_short"),
         ("failed", RESULT_RESTARTED, "daemon_restarted"),
         ("failed", f"{PREFIX_INTERNAL_ERROR}KeyError: 'x'", "internal_error"),
         ("failed", f"the answer{GOAL_CHECK_MARK}the goal is still not reached", "goal_check_refused"),

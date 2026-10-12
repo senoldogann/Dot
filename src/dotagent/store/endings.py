@@ -18,6 +18,9 @@ PREFIX_STALLED: str = "Stopped: the agent was not making progress"
 # A run that reached a limit of [agent] run_max_minutes or run_max_tokens and did not finish when it was told to.
 PREFIX_LIMIT: str = "Stopped: the run reached its limit"
 RESULT_EMPTY_REPLIES: str = "The model returned empty replies and did not finish."
+# A run whose replies the model service kept ending before they were complete (its output limit, or a reason such
+# as a content filter), followed by the reason the last one ended with.
+PREFIX_CUT_SHORT: str = "The model's replies were cut short"
 PREFIX_EMERGENCY_STOP: str = "Emergency stop: "
 # The result of a run the emergency stop of the web UI or the API ended (``RunManager.emergency_stop``).
 RESULT_EMERGENCY_STOPPED: str = f"{PREFIX_EMERGENCY_STOP}every active run was stopped."
@@ -33,6 +36,7 @@ type Ending = Literal[
     "stalled",
     "limit",
     "empty_replies",
+    "cut_short",
     "internal_error",
     "daemon_restarted",
     "stopped",
@@ -49,6 +53,7 @@ ENDING_LABELS: dict[Ending, str] = {
     "stalled": "stopped by the progress watchdog",
     "limit": "stopped at its limit of minutes or tokens",
     "empty_replies": "empty replies from the model",
+    "cut_short": "replies from the model cut short",
     "internal_error": "internal error",
     "daemon_restarted": "cut off when the daemon died",
     "stopped": "stopped (by the user; older runs may be restarts, which were not told apart)",
@@ -64,6 +69,8 @@ def _failed_ending(result: str) -> Ending:
         return "limit"
     if result == RESULT_EMPTY_REPLIES:
         return "empty_replies"
+    if result.startswith(PREFIX_CUT_SHORT):
+        return "cut_short"
     if result == RESULT_RESTARTED:
         return "daemon_restarted"
     if result.startswith(PREFIX_INTERNAL_ERROR):
