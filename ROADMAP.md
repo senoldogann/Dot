@@ -5048,7 +5048,10 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 125 | What the failed runs showed: the journal's day, the snapshot's arguments             | done        | 36c0eeb |
 | 126 | Themes, after T3 Code: a page for the look, a theme for light and one for dark       | done        | c5dfc76 |
 | 127 | The interface, the motion and the type                                               | done        | 9c73d80 |
-| 128 | Your own themes, kept by the daemon                                                  | in progress |         |
+| 128 | Your own themes, kept by the daemon                                                  | done        | 30b2434 |
+| 129 | The composer at the foot of the window                                               | planned     |         |
+| 130 | A chat's menu: pin, rename, copy the link, select, delete                            | planned     |         |
+| 131 | Unread chats                                                                         | planned     |         |
 
 ### 77. The type system: Inter and Geist Mono, seven sizes, three weights
 
@@ -7140,6 +7143,17 @@ before it, the same day, asked whether Dot's home had caught the plainness of T3
 palette and a busier middle) left six choices with the owner, of which this part offers the first, neutral whites, as a
 theme to pick, and leaves the default as it is.
 
+**Status (2026-10-12): built.** Items 126 to 128 merged in a day (`c5dfc76`, `9c73d80`, `30b2434`), each behind the gate
+and its tests, the Appearance tab's screenshots read on a desktop and a phone in both schemes. Settings › Appearance
+holds the colour scheme as three miniatures of the window, the themes as a gallery of orbs with a theme for light and
+one for dark, and the interface, the motion and the type, every setting on the page before the first paint. Themes of
+one's own are made from a background, an accent and an action colour, duplicated, edited, exported, added from T3 Code's
+files or VS Code's, and kept by the daemon in its home's `themes` folder for every browser. A review of item 128 against
+its done criteria found a Cancel during a save that left the new theme unpicked and the daemon reading a null where the
+page refuses one; both were fixed before the merge. The daemon was restarted on `30b2434` with no run active; the
+desktop app takes its pages from the daemon, so part 19 reaches it without a rebuild. Export in the desktop app is not
+tried: its web view has no handler for a download.
+
 **Status (2026-10-12): planned.** What is built today. Settings › General holds the look of the browser in one card
 (`views/system.js buildAppearance`): two looks (`theme.js THEMES`: Neutral, warm grey and ink, the default, and Paper,
 warm paper with a serif voice and a terracotta accent), each a block of colour tokens in `themes.css` that names its
@@ -7292,7 +7306,7 @@ read by eye.
 
 ### 128. Your own themes, kept by the daemon
 
-**Status: in progress.**
+**Status: done.** Merged as `30b2434` (PR #159, MYP-269 Done).
 
 **As built (2026-10-12).** The daemon keeps the themes in `<home>/themes` (`core/paths.py themes_dir`), which
 `ensure_layout` leaves alone: the first theme saved makes it, mode 0700. `dotagent/themes.py` checks a theme file as T3
@@ -7348,6 +7362,92 @@ on the page while it is drawn. Themes of one's own are kept by the daemon as fil
 has, colours that parse, a size cap) and written whole or not at all; the desktop app, the browser and the phone share
 them, and a valid file put in the folder shows in the gallery. The README follows; unit tests for the daemon's checks; a
 smoke test creates, picks, reloads, exports, imports a VS Code theme and deletes; the tour is read by eye.
+
+## Part 20: a chat's menu and the composer at the foot, after T3 Code (planned 2026-10-12)
+
+The owner's twentieth word, on 2026-10-12, with a screenshot of T3 Code's sidebar, where a right-click on a thread
+opens its menu: that Dot take the actions on a chat it needs, from T3 Code or of its own design, as long as they work
+for Dot. With it, a screenshot of a run page: after the first message the composer stands right under it, near the top
+of the window, and belongs at the bottom.
+
+**Status (2026-10-12): planned.** What is built today. A chat of the sidebar (`sidebar.js chatLink`) is a link to the
+latest run a person started on it: the state dot (none when the run is done or cancelled), the title (the first message
+cut short, `thread_title`) and the age, or Working and its time (item 122). The chats are grouped by day (Today,
+Yesterday, Previous 7 days, Older), searched by title, and deleted several at a time under Select (`DELETE
+/api/threads`, refused with 409 while a run of one works). A thread (`threads`: id, title, source, created_at,
+updated_at) holds nothing else: no pin, no name the owner gave it, no mark of what was seen. A run that ends while the
+owner looks elsewhere is told by a desktop notification when those are on (`attention.js`); the sidebar shows it only by
+its dot going away. On the run page the composer is the dock (`.dock`, sticky at the bottom of the window): it stays
+there once the conversation is taller than the window, and stands right under a short one, so the first message has it
+near the top.
+
+What T3 Code does, read from its repository (MIT, © 2026 T3 Tools Inc.; a checkout outside this repository, read and
+never run). A right-click on a thread's row opens its menu (`threadActionMenu.logic.ts`, run by `Sidebar.tsx`), the
+desktop app's own menu or, in a browser, a menu of the page; the row has no button for it. Pin puts the thread in a
+Pinned group at the top. Settle moves it to a folded "Settled (n)" shelf at the foot of the list, by hand, or by itself
+once its pull request is merged or after days without activity. Snooze hides it for an hour, three hours, until the
+evening, tomorrow, next week or a time of one's own, and it wakes early when it needs an answer. Rename turns the title
+into a field in the row (Enter keeps, Escape leaves; a double click starts it). Regenerate title asks a model for a new
+one. Mark unread winds back the time the thread was last seen, so its last finished turn shows as new until the thread
+is opened. Copy gives the thread's path, branch or id. Archive hides it until it is brought back from Settings. Delete
+asks first. Several threads chosen at once get Unpin, Settle, Snooze, Regenerate titles, Mark unread and Delete.
+
+**The shape of this part (the decisions).** Dot takes the actions a chat of Dot has a use for: Pin, Rename, Mark unread
+(with the unread dot it needs), Copy link and Delete, and Select, to start choosing several from a chat. What stays out:
+Settle, Snooze and Auto-settle (an inbox for many threads of code; Dot's chats fold by day, and a schedule brings work
+back at a time), a new thread on a branch and the project's filter and settings (Dot has no projects), Regenerate title
+(Dot names a chat by its first message and makes no model call for it; Rename names it) and Archive (a second place for
+a chat to be, beside Delete). The menu opens from a "…" button at the row's right, shown on hover and on focus and
+always on a touch screen, from a right-click on the row and from the context-menu key; since a row is a link and the
+browser's own menu gives way to Dot's, Dot's menu copies the link. The pin, the name and what was seen are kept by the
+daemon, so the desktop app, the browser and the phone agree. The composer stands at the foot of the window from the
+first message.
+
+### How to start part 20 (the handoff prompt)
+
+> Read ROADMAP.md part 20 and the status table of part 9 (rows 129 to 131). One item at a time, in order; the protocol
+> of part 5 (branch, gate, PR, Linear MYP issue, squash merge, hash in the table, log line) is unchanged. T3 Code's
+> source is read, never run, from a checkout outside this repository, and what is ported carries its MIT notice. Never
+> touch the owner's data directory except to read it and to restart the daemon when `/api/status` shows no active run;
+> the owner's goals stay out of this file; PLAN.md stays untracked. The owner reads Turkish; everything written is
+> English. Every UI item ends with the screenshot tour read by eye.
+
+### 129. The composer at the foot of the window
+
+**Status: planned.**
+
+**What.** On a run page the composer stands at the foot of the window from the first message: the conversation starts
+at the top and fills the space above it, and once it is taller than the window the page scrolls under the composer as
+it does today. The arrow down, the line of Continue and a delegated run's foot keep their places by it, and the spacing
+of the conversation does not change. A smoke test opens a run of one message and reads the composer's foot at the
+window's, on a desktop with the details panel open and closed and on a phone, and reads that a long run still scrolls
+under it; the tour is read by eye.
+
+### 130. A chat's menu: pin, rename, copy the link, select, delete
+
+**Status: planned.**
+
+**What.** A chat's row gets a menu, after T3 Code's: a "…" button at its right (on hover and on focus, always on a touch
+screen), a right-click on the row and the context-menu key open it; the arrow keys move through it, Escape closes it
+and gives the focus back. **Pin** / **Unpin**: pinned chats sit in a Pinned group above Today, the last pinned first, and
+are listed however old they are. **Rename**: the title becomes a field in the row; Enter or leaving the field keeps the
+name, Escape leaves the old one, and an empty name is not kept. **Copy link**: the chat's address. **Select**: Select's
+mode, with this chat ticked. **Delete**: asked first, as Select's Delete is, and refused while a run of the chat works.
+The daemon keeps the pin and the name (`threads.pinned_at`, `PATCH /api/threads/{id}`), so every browser shows them.
+The README follows; unit tests for the store and the route; a smoke test opens the menu by the button, a right-click and
+the key, pins, renames, copies and deletes; the tour is read by eye.
+
+### 131. Unread chats
+
+**Status: planned.**
+
+**What.** A chat whose latest run ended after the chat was last seen shows a dot in the accent colour and says unread
+to a screen reader, as T3 Code marks a thread with a turn not yet seen; opening the chat, or having it open in view when
+the run ends, marks it seen. **Mark unread** in a chat's menu makes it unread until it is opened again, and **Mark
+read** clears one. The daemon keeps when each chat was last seen (`threads.seen_at`), so the phone and the desktop
+agree; the chats there when the column is added are taken as seen, and a scheduled run that ends leaves its chat unread.
+The README follows; unit tests for the store; a smoke test ends a run while another chat is open, reads the dot, opens
+the chat and marks it unread from its menu; the tour is read by eye.
 
 ## Log
 
@@ -7907,3 +8007,5 @@ smoke test creates, picks, reloads, exports, imports a VS Code theme and deletes
 - 2026-10-12 (Opus 5.5): part 19 planned, items 126 to 128, from the owner's word with three screenshots of T3 Code's Settings › Appearance and a reading of T3 Code's source (MIT): the page, its themes with a theme per scheme, its interface, motion and type settings, and themes of one's own kept by the daemon; no code changed.
 - 2026-10-12 (Opus 5.5): item 126 merged as `c5dfc76` (PR #157, MYP-267 Done): Settings › Appearance holds the colour scheme as three miniatures of the window and the themes as a gallery with a light and a dark orb each, after T3 Code's page; T3 Code's six palettes are ported and mapped onto Dot's tokens, every theme held to Dot's contrast rule in both schemes as the browser paints it (a dark card a palette draws on the page is lifted a step above it); a theme per scheme rides on the page element as `light-dark()` pairs and is there before the first paint; ⌥⌘A opens the tab and ⇧⌥⌘A steps through the schemes.
 - 2026-10-12 (Opus 5.5): item 127 merged as `9c73d80` (PR #158, MYP-268 Done): Settings › Appearance gains Interface (the contrast, 50 to 200 %, mixed as T3 Code mixes it; the chat's width; the density and the two layout switches), Motion (the panels' slide, 0 to 400 ms, and the faces that move) and Type (the interface's font and size, the answers', the composer's and the code's fonts and sizes with a preview each, font smoothing and wrapped code); every setting is kept in the browser and put on the page by `boot.js` before the first paint, nothing when it is the default; a range control joins `#/controls`; 907 unit tests and a smoke test that sets each one and reads it on the page and after a reload.
+- 2026-10-12 (Opus 5.5): item 128 merged as `30b2434` (PR #159, MYP-269 Done): themes of one's own, made in an editor from a background, an accent and an action colour (T3 Code's generator, ported), duplicated, edited, exported and added from T3 Code's theme file, its short form or a VS Code colour theme, kept by the daemon in its home's `themes` folder (checked as T3 Code checks a file, capped, written whole, read without following links) and held to Dot's contrast rule; a review against the done criteria found two faults, fixed before the merge; 929 unit tests and a smoke test in a browser; the daemon restarted on it with no run active; part 19 built.
+- 2026-10-12 (Opus 5.5): part 20 planned, items 129 to 131, from the owner's word with a screenshot of T3 Code's thread menu and one of a run page whose composer stood near the top, and a reading of T3 Code's source (MIT): the composer at the foot of the window, a chat's menu (pin, rename, copy the link, select, delete) and unread chats, the pin, the name and what was seen kept by the daemon; Settle, Snooze, Regenerate title and Archive stay out; no code changed.
