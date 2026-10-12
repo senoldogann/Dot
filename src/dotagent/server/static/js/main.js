@@ -4,7 +4,7 @@ import { loadLooks } from "./actors.js";
 import { ApiError, clearToken, hasToken, loadToken, onAuthLost, setToken } from "./api.js";
 import { setPageTitle, watchAttention } from "./attention.js";
 import { el } from "./dom.js";
-import { brandMark, icon } from "./icons.js";
+import { icon, wordmark } from "./icons.js";
 import { buildShell } from "./shell.js";
 import { clearStage } from "./stage.js";
 import { getSnapshot, onChange, refresh, runLifecycle } from "./state.js";
@@ -79,7 +79,7 @@ function screen(...children) {
     el(
       "div",
       { class: "signin" },
-      el("div", { class: "card" }, el("div", { class: "stack" }, el("div", { class: "row" }, brandMark(), el("h1", { class: "page-title" }, "Dot")), ...children)),
+      el("div", { class: "card" }, el("div", { class: "stack" }, el("h1", { class: "signin-mark" }, wordmark()), ...children)),
     ),
   );
 }

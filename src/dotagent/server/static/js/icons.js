@@ -200,14 +200,16 @@ const SHAPES = {
   lockOpen: [["rect", { width: 18, height: 11, x: 3, y: 11, rx: 2 }], ["path", { d: "M7 11V7a5 5 0 0 1 9.9-1" }]],
 };
 
-/** The mark of Dot: a ring around a solid core, coloured by the accent of the theme. */
-export function brandMark() {
-  return svg(
-    "svg",
-    { class: "brand-mark", viewBox: "0 0 24 24", "aria-hidden": "true" },
-    svg("circle", { class: "ring", cx: 12, cy: 12, r: 10 }),
-    svg("circle", { class: "core", cx: 12, cy: 12, r: 4.5 }),
-  );
+/** Dot's wordmark (item 114), named "Dot": a copy of its one drawing, the opening's in index.html. */
+export function wordmark() {
+  const drawing = document.querySelector(".opening .wordmark");
+  if (drawing === null) {
+    throw new Error("the page has no wordmark to copy: index.html's opening is missing");
+  }
+  const copy = drawing.cloneNode(true);
+  copy.setAttribute("role", "img");
+  copy.setAttribute("aria-label", "Dot");
+  return copy;
 }
 
 /** An inline SVG icon; its size follows the font size of the surrounding text. */

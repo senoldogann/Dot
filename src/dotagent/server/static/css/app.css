@@ -90,6 +90,9 @@
   --motion-spin: 0.8s;
   --motion-moment: 3s;
   --motion-shimmer: 1.8s;
+  /* The opening (item 114): one timeline that every part of it shares, and the fall of a dot, quicker as it drops. */
+  --motion-opening: 1.3s;
+  --ease-fall: cubic-bezier(0.55, 0, 1, 0.45);
 }
 
 /* Compact density (Settings › Appearance): the rows, cards and stacks sit closer. */
@@ -229,21 +232,81 @@ textarea {
 
 /* ---------- shell (the frame itself is in shell.css) ---------- */
 
-.brand-mark {
-  width: 24px;
-  height: 24px;
-  flex: none;
+/* Dot's wordmark (item 114): "dot" with the mark as its o, a yellow disc with the character's eyes, between a d and a
+   t drawn in one line with round ends, in ink. index.html holds its one drawing, in the opening; the sign-in card
+   shows a copy (icons.js wordmark). */
+.wordmark {
+  display: block;
+  overflow: visible;
 }
 
-.brand-mark .ring {
+.wordmark-letter {
   fill: none;
-  stroke: var(--accent);
-  stroke-opacity: 0.35;
-  stroke-width: 2;
+  stroke: var(--text);
+  stroke-width: 34;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 
-.brand-mark .core {
-  fill: var(--accent);
+.mark-disc {
+  fill: var(--brand);
+}
+
+.mark-eye {
+  fill: var(--on-brand);
+}
+
+/* The opening (item 114): the wordmark in the middle of the window, over the page's ground, while the app comes up
+   under it. On one timeline (--motion-opening) the d and the t hop up, the dot drops in with its eyes shut, squashes
+   on two bounces, opens its eyes and blinks, and the ground fades into the app. boot.js plays it once per window
+   session and never when the system reduces motion; the ground's last frame ends it, a click or a key makes it a quick
+   fade. It takes no pointer, so it never holds the app back. */
+.opening {
+  display: none;
+}
+
+:root[data-opening] .opening {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: grid;
+  place-items: center;
+  background: var(--bg);
+  pointer-events: none;
+  animation: opening-out var(--motion-opening) linear both;
+}
+
+:root[data-opening="skip"] .opening {
+  animation: opening-skip var(--motion-quick) var(--ease) both;
+}
+
+.opening .wordmark {
+  width: min(240px, 60vw);
+}
+
+.opening .wordmark-d,
+.opening .wordmark-t,
+.opening .wordmark-dot {
+  transform-box: fill-box;
+  transform-origin: 50% 100%;
+}
+
+.opening .wordmark-d {
+  animation: opening-hop var(--motion-opening) linear both;
+}
+
+.opening .wordmark-t {
+  animation: opening-hop-late var(--motion-opening) linear both;
+}
+
+.opening .wordmark-dot {
+  animation: opening-drop var(--motion-opening) linear both;
+}
+
+.opening .mark-eye {
+  transform-box: fill-box;
+  transform-origin: 50% 50%;
+  animation: opening-look var(--motion-opening) linear both;
 }
 
 /* A character (character/character.js, item 101): one filled shape in a colour of the theme's character palette, with
@@ -2829,6 +2892,14 @@ dialog.lightbox img {
   padding: 24px;
 }
 
+.signin-mark {
+  padding-bottom: var(--space-1);
+}
+
+.signin-mark .wordmark {
+  width: 88px;
+}
+
 .code-line {
   display: block;
   padding: 8px 8px;
@@ -2949,6 +3020,152 @@ dialog.lightbox img {
   from {
     opacity: 0;
     translate: 0 4px;
+  }
+}
+
+/* The opening's timeline (item 114), in fractions of --motion-opening: the d hops up from 0 and the t from 6 %, each
+   past its line and back; the dot falls stretched from 12 %, touches down at 34 % and squashes, leaves the ground
+   stretched, peaks at 48 %, lands again at 56 % and is still from 70 %; its eyes open after the first landing and
+   blink at 79 %; the ground fades from 84 %. */
+@keyframes opening-hop {
+  0% {
+    opacity: 0;
+    transform: translateY(40%);
+    animation-timing-function: var(--ease-emphasis);
+  }
+
+  18% {
+    opacity: 1;
+    transform: translateY(-6%);
+    animation-timing-function: var(--ease);
+  }
+
+  28%,
+  100% {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes opening-hop-late {
+  0%,
+  6% {
+    opacity: 0;
+    transform: translateY(40%);
+    animation-timing-function: var(--ease-emphasis);
+  }
+
+  24% {
+    opacity: 1;
+    transform: translateY(-6%);
+    animation-timing-function: var(--ease);
+  }
+
+  34%,
+  100% {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes opening-drop {
+  0%,
+  12% {
+    opacity: 0;
+    transform: translateY(-170%) scale(0.92, 1.08);
+    animation-timing-function: var(--ease-fall);
+  }
+
+  18% {
+    opacity: 1;
+  }
+
+  34% {
+    transform: scale(0.92, 1.08);
+    animation-timing-function: var(--ease);
+  }
+
+  37% {
+    transform: scale(1.16, 0.84);
+    animation-timing-function: var(--ease-emphasis);
+  }
+
+  42% {
+    transform: translateY(-12%) scale(0.95, 1.05);
+    animation-timing-function: var(--ease);
+  }
+
+  48% {
+    transform: translateY(-18%);
+    animation-timing-function: var(--ease-fall);
+  }
+
+  56% {
+    transform: none;
+    animation-timing-function: var(--ease);
+  }
+
+  58% {
+    transform: scale(1.07, 0.93);
+    animation-timing-function: var(--ease-emphasis);
+  }
+
+  64% {
+    transform: scale(0.98, 1.02);
+    animation-timing-function: var(--ease);
+  }
+
+  70%,
+  100% {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes opening-look {
+  0%,
+  37% {
+    transform: scaleY(0.1);
+    animation-timing-function: var(--ease-emphasis);
+  }
+
+  44% {
+    transform: scaleY(1.08);
+    animation-timing-function: var(--ease);
+  }
+
+  50%,
+  76% {
+    transform: none;
+    animation-timing-function: var(--ease);
+  }
+
+  79% {
+    transform: scaleY(0.1);
+    animation-timing-function: var(--ease);
+  }
+
+  83%,
+  100% {
+    transform: none;
+  }
+}
+
+@keyframes opening-out {
+  0%,
+  84% {
+    opacity: 1;
+    animation-timing-function: var(--ease);
+  }
+
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes opening-skip {
+  to {
+    opacity: 0;
   }
 }
 

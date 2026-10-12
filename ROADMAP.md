@@ -5033,8 +5033,8 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 110 | Rules in plain words: the model writes the rule, an approval card offers one        | done        | 6da73c4 |
 | 111 | The review: part 14 read once more                                                  | done        | 5d96935 |
 | 112 | Both eyes move: one key per eye in the character's drawing                          | done        | 392132c |
-| 113 | The quiet head: no character card at the head of the chat, no brand in the sidebar  | in progress |         |
-| 114 | Dot's mark and its opening: a dot that looks, the wordmark, the icons, a bounce at launch | planned     |         |
+| 113 | The quiet head: no character card at the head of the chat, no brand in the sidebar  | done        | ea21f27 |
+| 114 | Dot's mark and its opening: a dot that looks, the wordmark, the icons, a bounce at launch | in progress |         |
 | 115 | The composer once more: one bar that never wraps, labels that fold, a quiet warning | planned     |         |
 | 116 | The deep review: every part of the code read once more, and fixed                   | planned     |         |
 
@@ -6479,7 +6479,7 @@ it Dot is finished as a product to test: no new feature until the owner's testin
 
 ### 113. The quiet head: no character card at the head of the chat, no brand in the sidebar
 
-**Status: in progress.**
+**Status: done.** Merged as `ea21f27` (PR #135, MYP-253 Done).
 
 **Design, as built (2026-10-12).** The run page has no character card: `charactercard.js` and `mood.js` are gone with
 their CSS (the card in the panel and the band at the head of the conversation), and so are the two callbacks that placed
@@ -6501,7 +6501,28 @@ top bar with the sidebar away drops the brand too. README where a line changes. 
 
 ### 114. Dot's mark and its opening: a dot that looks, the wordmark, the icons, a bounce at launch
 
-**Status: planned.**
+**Status: in progress.**
+
+**Design, as built (2026-10-12).** The mark is a yellow disc (`--brand`, the same in every look and scheme) with the two
+capsule eyes of the character's attentive rest pose in `--on-brand`, drawn 1.12 times the engine's size so they hold at
+16 px. `desktop/icons/render.py` writes it as the favicon and renders from it the app's icon (the mark lit as a ball
+over its shadow on a charcoal tile, inset on the 1024 grid), the web app's icons (the same tile, square and full bleed)
+and the three menu bar icons (attentive at rest, the character's upward glance while a run works, the attentive mark
+with the notification blue's pastille while something waits); `npm run icons` builds the bundle's set in a scratch
+folder and copies the five files the bundle lists. The wordmark is “dot” with the mark as its o, between a d (a ring and
+a stem) and a t (a bar and a stem with a hooked foot) drawn in one stroke with round ends in `--text`. Its one drawing
+is the opening's in `index.html`; the sign-in card shows a copy (`icons.js wordmark`, named “Dot”) and
+`desktop/ui/down.html` repeats it in the neutral look's colours; `tests/unit/test_mark.py` keeps the favicon's eyes, the
+page's and the down page's alike and their colours the tokens'. The ring-and-core glyph is gone (`brandMark` and its
+CSS). The opening: `boot.js` sets `data-opening` on the page element before the first paint, once per window session
+(`sessionStorage`), never under reduced motion and not at all when the storage is blocked. The overlay (the page's
+ground over everything, no pointer, hidden from screen readers) and its parts share one timeline (`--motion-opening`,
+1.3 s, with `--ease-fall` for the drops): the d and then the t hop up past their line and back, the dot falls stretched
+with its eyes shut, squashes as it lands, bounces once more, opens its eyes and blinks, and the ground fades from 84 %.
+The overlay's own `animationend` takes the attribute away; a click or a key first turns it into a quick fade. Tests:
+`tests/smoke/test_opening.py` (it plays without taking the pointer and leaves, not again on a reload, a key cuts it
+short, never under reduced motion; two frames kept for the eye), and the tour waits it out. The Dock and menu bar icons
+change with the next build of the desktop app.
 
 **What.** The mark: a yellow disc with two capsule eyes looking up and to the right, after the character's rest pose,
 drawn on a grid that holds at 16 px. The wordmark: “dot” with the mark as its o, between a d and a t drawn in one line
@@ -7077,3 +7098,4 @@ restarted. Findings as built.
 - 2026-10-12 (Opus 5.5): item 111 merged as `5d96935` (PR #131, MYP-251 Done): the tour read by eye by two readers and checked wherever they doubted, the offline smoke suite in full (324 passed, two failures that pass alone), the owner's daemon through the API and its two SSL crashes identified; the panel's fold facts wrap under the title at its compact width, an ended run's computer card says why it is empty, the run composer's placeholder follows the run's state.
 - 2026-10-12 (Opus 5.5): item 112 merged as `392132c` (PR #132, MYP-252 Done): both eyes of every face move again (`sync` hands the key its index, a repeated key is an error), a test that reads each eye on its own, the gallery test waiting for the orbit's first ring. Part 14 built: items 107 to 112. The daemon waits for a restart on `392132c`.
 - 2026-10-12 (Opus 5.5): part 15 planned, items 113 to 116, from the owner's word with two screenshots, the daemon's log (the SSL crash ran before the restart) and a research of open composers; no code changed.
+- 2026-10-12 (Opus 5.5): item 113 merged as `ea21f27` (PR #135, MYP-253 Done): the run page without its character card (`charactercard.js` and `mood.js` gone, the state in the top bar's face and badge), the sidebar's head with its button alone at the left where the top bar's opener stands, the brand gone from both bars; the tour checks the button on the lights' line.

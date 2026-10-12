@@ -8,10 +8,14 @@
 </head>
 <body>
   <main data-tauri-drag-region>
-    <svg viewBox="0 0 32 32" width="56" height="56" aria-hidden="true">
-      <circle cx="16" cy="16" r="16" fill="#ffcd3c"/>
-      <circle cx="16" cy="16" r="9" fill="none" stroke="#1a1a1a" stroke-opacity="0.35" stroke-width="2"/>
-      <circle cx="16" cy="16" r="4.5" fill="#1a1a1a"/>
+    <svg class="wordmark" viewBox="-104 -184 600 288" width="132" role="img" aria-label="Dot">
+      <path class="letter" d="M83 -163V83M83 0A83 83 0 1 1 -83 0A83 83 0 1 1 83 0"/>
+      <g transform="translate(244 0)">
+        <circle class="disc" r="100"/>
+        <path class="eye" d="M-10.5 -11.5a10.5 10.5 0 0 1 21 0v23a10.5 10.5 0 0 1 -21 0z" transform="matrix(1.098 -0.112 0.101 1.109 -17.3 -9.14)"/>
+        <path class="eye" d="M-10.5 -11.5a10.5 10.5 0 0 1 21 0v23a10.5 10.5 0 0 1 -21 0z" transform="matrix(1.030 -0.045 0.101 1.109 37.32 -13.26)"/>
+      </g>
+      <path class="letter" d="M413 -133V36A47 47 0 0 0 460 83H476M383 -83H469"/>
     </svg>
     <h1>Dot is not running</h1>
     <p>The daemon that does the work is off. Start it once and it stays on, at every login and after a crash:</p>

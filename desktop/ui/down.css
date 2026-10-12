@@ -1,12 +1,17 @@
-/* The page the shell shows while the daemon is down: the same face, the one command that starts it. */
-html, body { margin: 0; height: 100%; font: 15px/1.5 -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif; color: #0d0d0d; background: #ffffff; }
+/* The page the shell shows while the daemon is down: Dot's wordmark (item 114, static/index.html holds the same
+   drawing), the one command that starts it, in the colours of the web UI's neutral look. */
+html, body { margin: 0; height: 100%; font: 15px/1.5 -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif; color: #1c1b19; background: #f8f7f4; }
 main { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; height: 100%; padding: 24px; text-align: center; }
-h1 { margin: 8px 0 0; font-size: 22px; font-weight: 650; letter-spacing: -0.015em; }
+h1 { margin: 12px 0 0; font-size: 22px; font-weight: 650; letter-spacing: -0.015em; }
 p { max-width: 420px; margin: 0; }
-pre { margin: 4px 0; padding: 10px 14px; border-radius: 10px; background: #f5f5f5; font: 13px ui-monospace, "SF Mono", Menlo, monospace; }
-.muted { color: #6a6a6a; font-size: 13px; }
+pre { margin: 4px 0; padding: 10px 14px; border-radius: 10px; background: #f3f2ee; font: 13px ui-monospace, "SF Mono", Menlo, monospace; }
+.muted { color: #6a6965; font-size: 13px; }
+.wordmark { display: block; overflow: visible; }
+.letter { fill: none; stroke: currentColor; stroke-width: 34; stroke-linecap: round; stroke-linejoin: round; }
+.disc { fill: #ffcd3c; }
+.eye { fill: #1c1b19; }
 @media (prefers-color-scheme: dark) {
-  html, body { color: #ececec; background: #212121; }
-  pre { background: #2f2f2f; }
-  .muted { color: #a6a6a6; }
+  html, body { color: #ecebe6; background: #1b1a18; }
+  pre { background: #2a2927; }
+  .muted { color: #a19f98; }
 }
