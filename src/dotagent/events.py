@@ -6,6 +6,7 @@ import time
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
+from dotagent.core.logs import get_logger
 from dotagent.core.types import JsonObject
 from dotagent.store.db import Store
 from dotagent.store.models import EventRecord
@@ -13,19 +14,34 @@ from dotagent.store.models import EventRecord
 SYSTEM_RUN_ID: str = "_system"
 _QUEUE_SIZE: int = 2000
 
+log = get_logger(__name__)
+
 
 class Subscription:
-    """A bounded queue of events for one listener (a single run, or all runs when ``run_id`` is None)."""
+    """A bounded queue of events for one listener: those of a single run, or of all runs when ``run_id`` is None, and
+    of the kinds in ``kinds``, or of every kind when it is None. A listener that falls behind loses its oldest events
+    first; the first loss is logged."""
 
-    def __init__(self, run_id: str | None) -> None:
+    def __init__(self, run_id: str | None, kinds: frozenset[str] | None) -> None:
         self.run_id: str | None = run_id
+        self.kinds: frozenset[str] | None = kinds
         self.queue: asyncio.Queue[EventRecord] = asyncio.Queue(maxsize=_QUEUE_SIZE)
         self.dropped: int = 0
+
+    def wants(self, event: EventRecord) -> bool:
+        return (self.run_id is None or self.run_id == event.run_id) and (self.kinds is None or event.kind in self.kinds)
 
     def offer(self, event: EventRecord) -> None:
         if self.queue.full():
             with contextlib.suppress(asyncio.QueueEmpty):
                 self.queue.get_nowait()
+            if self.dropped == 0:
+                log.warning(
+                    "event_listener_fell_behind",
+                    run_id=self.run_id,
+                    kinds=None if self.kinds is None else sorted(self.kinds),
+                    queue_size=_QUEUE_SIZE,
+                )
             self.dropped += 1
         self.queue.put_nowait(event)
 
@@ -44,13 +60,25 @@ class EventBus:
         else:
             record = EventRecord(id=0, run_id=run_id, ts=time.time(), kind=kind, data=data)
         for subscription in tuple(self._subscriptions):
-            if subscription.run_id is None or subscription.run_id == run_id:
+            if subscription.wants(record):
                 subscription.offer(record)
         return record
 
     @asynccontextmanager
     async def subscribe(self, run_id: str | None) -> AsyncIterator[Subscription]:
-        subscription: Subscription = Subscription(run_id)
+        """Every event of ``run_id``, or of all runs when it is None."""
+        async with self._listening(Subscription(run_id, None)) as subscription:
+            yield subscription
+
+    @asynccontextmanager
+    async def subscribe_kinds(self, kinds: frozenset[str]) -> AsyncIterator[Subscription]:
+        """The events of all runs whose kind is in ``kinds``: a listener that wants a few kinds is not crowded out of
+        its queue by the live text of busy runs."""
+        async with self._listening(Subscription(None, kinds)) as subscription:
+            yield subscription
+
+    @asynccontextmanager
+    async def _listening(self, subscription: Subscription) -> AsyncIterator[Subscription]:
         self._subscriptions.add(subscription)
         try:
             yield subscription

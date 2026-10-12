@@ -7,10 +7,13 @@ coroutine at once, so a unit cut off after its first statement would be committe
 
 import asyncio
 import base64
+import contextlib
 import hashlib
+import os
 import re
 import sqlite3
 import struct
+import tempfile
 import time
 from collections.abc import Awaitable, Callable, Coroutine, Iterable, Sequence
 from pathlib import Path
@@ -188,13 +191,25 @@ def image_file_name(image: ImageData) -> str:
 
 
 def _write_image(directory: Path, image: ImageData) -> str:
-    """Store the image under its content name. A file that is already there is touched: its last change then tells when
-    some message last wanted it, which is what keeps a delete or a sweep from removing it just as it is named again."""
+    """Store the image under its content name. A file that is already there whole is touched: its last change then
+    tells when some message last wanted it, which is what keeps a delete or a sweep from removing it just as it is named
+    again. Otherwise the bytes go to a file of their own that then takes the name, so a write cut short never leaves a
+    part of an image under it, and a part left there before (its size is not the image's) is written again."""
     path: Path = directory / image_file_name(image)
-    if path.exists():
-        path.touch()
-    else:
-        path.write_bytes(base64.b64decode(image.data_b64))
+    data: bytes = base64.b64decode(image.data_b64)
+    with contextlib.suppress(FileNotFoundError):
+        if path.stat().st_size == len(data):
+            os.utime(path)
+            return path.name
+    handle, partial = tempfile.mkstemp(dir=directory, prefix=".", suffix=".part")
+    try:
+        with os.fdopen(handle, "wb") as file:
+            file.write(data)
+        os.replace(partial, path)
+    except BaseException:
+        with contextlib.suppress(FileNotFoundError):
+            os.unlink(partial)
+        raise
     return path.name
 
 
@@ -527,7 +542,9 @@ async def _add_columns(
 
 
 async def _add_missing_columns(connection: aiosqlite.Connection) -> None:
-    """Give a database created by an older version the columns added since, and the indexes on them."""
+    """Give a database created by an older version the columns added since, and the indexes on them, in one
+    transaction: a process that dies part way leaves the database as it was, and the next start does it all."""
+    await connection.execute("BEGIN")
     await _add_columns(connection, "runs", _ADDED_RUN_COLUMNS)
     await _add_columns(connection, "memories", _ADDED_MEMORY_COLUMNS)
     await _add_columns(connection, "schedules", _ADDED_SCHEDULE_COLUMNS)
@@ -536,8 +553,13 @@ async def _add_missing_columns(connection: aiosqlite.Connection) -> None:
     if "seen_at" in await _add_columns(connection, "threads", _ADDED_THREAD_COLUMNS):
         # The chats of a store from before item 131 are taken as seen, so that none of them shows up unread at once.
         await connection.execute("UPDATE threads SET seen_at = ?", (time.time(),))
-        await connection.commit()
     await connection.execute("CREATE INDEX IF NOT EXISTS runs_campaign ON runs(campaign_id, created_at)")
+    # The runs of a chat, of a run that delegated, of an agent; the approvals waiting, newest first.
+    await connection.execute("CREATE INDEX IF NOT EXISTS runs_thread ON runs(thread_id, created_at)")
+    await connection.execute("CREATE INDEX IF NOT EXISTS runs_parent ON runs(parent_run_id, created_at)")
+    await connection.execute("CREATE INDEX IF NOT EXISTS runs_agent ON runs(agent_id, created_at)")
+    await connection.execute("CREATE INDEX IF NOT EXISTS approvals_status ON approvals(status, created_at)")
+    await connection.commit()
 
 
 async def _refresh_memory_index(connection: aiosqlite.Connection) -> None:
@@ -572,31 +594,40 @@ def _is_locked(error: sqlite3.OperationalError) -> bool:
     return "locked" in text or "busy" in text
 
 
+async def _whole[R](store: "Store", write: Awaitable[R]) -> R:
+    """What ``write`` returns. A write that fails or is cancelled part way is rolled back before its error goes on, so
+    no part of it waits in an open transaction for the next writer's commit."""
+    try:
+        return await write
+    except BaseException:
+        await store._db.rollback()
+        raise
+
+
 def _writing[**P, R](
     method: Callable[Concatenate["Store", P], Awaitable[R]],
 ) -> Callable[Concatenate["Store", P], Coroutine[object, object, R]]:
     """A method that writes: it runs alone on the connection, so a unit of several statements is committed whole and
-    never shares a transaction with another writer; a lock held by another process is waited out with retries."""
+    never shares a transaction with another writer, and one that fails or is cancelled part way is rolled back; a lock
+    held by another process is waited out with retries."""
 
     async def run(self: "Store", /, *args: P.args, **kwargs: P.kwargs) -> R:
         async with self._write_lock:
             for attempt, delay in enumerate(_LOCKED_RETRY_DELAYS_S, start=1):
                 try:
-                    return await method(self, *args, **kwargs)
+                    return await _whole(self, method(self, *args, **kwargs))
                 except sqlite3.OperationalError as error:
                     if not _is_locked(error):
                         raise
-                    await self._db.rollback()
                     log.warning(
                         "store_locked_retry", method=method.__name__, attempt=attempt, delay_s=delay, error=str(error)
                     )
                     await asyncio.sleep(delay)
             try:
-                return await method(self, *args, **kwargs)
+                return await _whole(self, method(self, *args, **kwargs))
             except sqlite3.OperationalError as error:
                 if not _is_locked(error):
                     raise
-                await self._db.rollback()
                 raise StoreError(
                     "the database stayed locked by another process",
                     {"method": method.__name__, "tries": len(_LOCKED_RETRY_DELAYS_S) + 1, "error": str(error)},
@@ -707,12 +738,6 @@ class Store:
         await self._db.commit()
         if cursor.rowcount == 0:
             raise NotFoundError("thread not found", {"thread_id": thread_id})
-
-    @_writing
-    async def delete_thread(self, thread_id: str) -> None:
-        await self._db.execute("DELETE FROM messages WHERE thread_id = ?", (thread_id,))
-        await self._db.execute("DELETE FROM threads WHERE id = ?", (thread_id,))
-        await self._db.commit()
 
     async def list_thread_summaries(self, limit: int) -> list[ThreadSummary]:
         """The chats, the pinned ones first (the last pinned first, so they are listed however old), then the latest
@@ -1064,22 +1089,25 @@ class Store:
         """Runs left active by a crashed daemon (queued, running, or blocked on a question) become 'failed', finished
         at their last sign of life: their newest event, else the time they were created. Each one also gets, at that
         time, the ``run_finished`` event that every other end of a run stores, and that ends the stream of its events;
-        so does a run closed this way before that event was stored. Returns how many runs changed."""
-        cursor: aiosqlite.Cursor = await self._db.execute(
+        so does a run closed this way before that event was stored, unless its events were pruned since (the run keeps
+        none, and gets none back). Returns how many runs changed."""
+        async with self._db.execute(
             "UPDATE runs SET status = 'failed', result = ?,"
             " finished_at = COALESCE((SELECT MAX(ts) FROM events WHERE events.run_id = runs.id), created_at)"
-            " WHERE status IN ('running', 'queued', 'blocked')",
+            " WHERE status IN ('running', 'queued', 'blocked') RETURNING id",
             (RESULT_RESTARTED,),
-        )
-        changed: int = cursor.rowcount
+        ) as cursor:
+            closed: list[str] = [str(row["id"]) for row in await cursor.fetchall()]
         await self._db.execute(
             "INSERT INTO events(run_id, ts, kind, data) SELECT id, finished_at, 'run_finished', ? FROM runs"
             " WHERE status = 'failed' AND result = ?"
+            f" AND (id IN ({','.join('?' * len(closed))})"
+            " OR EXISTS (SELECT 1 FROM events WHERE events.run_id = runs.id))"
             " AND NOT EXISTS (SELECT 1 FROM events WHERE events.run_id = runs.id AND events.kind = 'run_finished')",
-            (dumps_compact({"status": "failed", "result": RESULT_RESTARTED}), RESULT_RESTARTED),
+            (dumps_compact({"status": "failed", "result": RESULT_RESTARTED}), RESULT_RESTARTED, *closed),
         )
         await self._db.commit()
-        return changed
+        return len(closed)
 
     async def runs_finished_since(self, since: float) -> list[RunRecord]:
         """The runs that finished at or after ``since``, oldest first."""

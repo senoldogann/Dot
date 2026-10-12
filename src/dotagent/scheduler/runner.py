@@ -204,7 +204,7 @@ class Scheduler:
         except DotError as exc:
             log.error("schedule_start_failed", schedule_id=record.id, error=exc.message, context=exc.context)
             await store.set_schedule_status(record.id, f"failed to start: {exc.message}")
-            await store.delete_thread(thread.id)
+            await store.delete_threads([thread.id])
             return
         self._in_flight[record.id] = run.id
         await store.set_schedule_status(record.id, "running")

@@ -349,7 +349,7 @@ class RunManager:
             # A campaign whose opening session never started was never under way, nor was a thread made for it.
             await runtime.store.delete_campaign(campaign.id)
             if thread_id is None:
-                await runtime.store.delete_thread(thread.id)
+                await runtime.store.delete_threads([thread.id])
             raise
         log.info("campaign_started", campaign_id=campaign.id, run_id=run.id)
         return run
@@ -396,7 +396,7 @@ class RunManager:
                 None,
             )
         except DotError:
-            await runtime.store.delete_thread(thread.id)
+            await runtime.store.delete_threads([thread.id])
             await runtime.store.set_next_session(campaign.id, now + runtime.config.agent.campaign_gap_minutes * 60)
             raise
         log.info("campaign_session_started", campaign_id=campaign.id, run_id=run.id, session=number)

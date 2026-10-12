@@ -168,10 +168,10 @@ async def push_event(store: Store, keys: PushKeys, event: EventRecord) -> None:
 async def watch_pushes(store: Store, bus: EventBus, keys: PushKeys, stopping: asyncio.Event) -> None:
     """Send every subscription what the lifecycle events say, until the daemon starts to stop. An event that cannot
     be pushed (its run was deleted, the store failed) is logged and the next one still goes."""
-    async with bus.subscribe(None) as feed:
+    async with bus.subscribe_kinds(PUSH_KINDS) as feed:
         while not stopping.is_set():
             event: EventRecord | None = await _next_event(feed.queue, stopping)
-            if event is None or event.kind not in PUSH_KINDS:
+            if event is None:
                 continue
             try:
                 await push_event(store, keys, event)

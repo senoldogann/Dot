@@ -112,3 +112,18 @@ async def test_compact_gives_free_pages_back_and_later_deletes_keep_doing_so(tmp
         assert _free_pages(database) == 0
     finally:
         await store.close()
+
+
+async def test_a_screenshot_left_cut_short_under_its_name_is_written_again_whole(tmp_path: Path) -> None:
+    folder: Path = tmp_path / "screenshots"
+    store: Store = await Store.open(tmp_path / "dot.sqlite3", folder)
+    try:
+        image: ImageData = _image(b"the whole screenshot")
+        # What a write stopped part way left under the image's name.
+        (folder / image_file_name(image)).write_bytes(b"the whole")
+        thread: ThreadRecord = await store.create_thread("t", "test")
+        await store.append_messages(thread.id, [user_message("look", (image,))])
+        assert (folder / image_file_name(image)).read_bytes() == b"the whole screenshot"
+        assert _names(folder) == {image_file_name(image)}
+    finally:
+        await store.close()

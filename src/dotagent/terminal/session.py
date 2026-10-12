@@ -226,14 +226,19 @@ class Terminals:
         log.info("terminal_closed", thread_id=thread_id, session=session_id)
 
     async def _reap(self) -> None:
-        """Close the sessions that were not used for ``idle_s``, as long as the daemon runs."""
+        """Close the sessions that were not used for ``idle_s``, as long as the daemon runs. A session that fails to
+        close is logged, and the others are still closed."""
         while True:
             await asyncio.sleep(min(_REAP_EVERY_S, self._idle_s / 2))
             now: float = time.monotonic()
             for thread_id, mine in list(self._sessions.items()):
                 for session in [session for session in mine.values() if now - session.used_at > self._idle_s]:
                     del mine[session.id]
-                    await session.close()
+                    try:
+                        await session.close()
+                    except Exception:
+                        log.exception("terminal_idle_close_failed", thread_id=thread_id, session=session.id)
+                        continue
                     log.info("terminal_idle_closed", thread_id=thread_id, session=session.id, command=session.command)
 
     async def aclose(self) -> None:
@@ -243,5 +248,7 @@ class Terminals:
                 await self._reaper
         sessions: list[TerminalSession] = [session for mine in self._sessions.values() for session in mine.values()]
         self._sessions.clear()
-        for session in sessions:
-            await session.close()
+        # Every session is closed even when one fails to; the error is raised once all were tried.
+        async with contextlib.AsyncExitStack() as closing:
+            for session in sessions:
+                closing.push_async_callback(session.close)
