@@ -91,14 +91,19 @@ export function setSidebarOpen(value) {
 
 const STAGEBAR_PROPERTY = "--stagebar-h";
 
+/** Keep `element`'s height in the CSS property `property` on `holder` as it changes. Returns the function that stops it. */
+export function trackHeight(element, holder, property) {
+  function measure() {
+    holder.style.setProperty(property, `${element.offsetHeight}px`);
+  }
+  const observer = new ResizeObserver(measure);
+  observer.observe(element);
+  measure();
+  return () => observer.disconnect();
+}
+
 /** Keep the stage bar's height in `--stagebar-h` on the page element, so the run's head and side panel can stay under
  * it: the banner, the density and the window's width all change that height. Returns the function that stops it. */
 export function trackStagebar(stagebar) {
-  function measure() {
-    document.documentElement.style.setProperty(STAGEBAR_PROPERTY, `${stagebar.offsetHeight}px`);
-  }
-  const observer = new ResizeObserver(measure);
-  observer.observe(stagebar);
-  measure();
-  return () => observer.disconnect();
+  return trackHeight(stagebar, document.documentElement, STAGEBAR_PROPERTY);
 }

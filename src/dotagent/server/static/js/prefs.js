@@ -26,6 +26,17 @@ export function writePref(key, value) {
   }
 }
 
+/** The sections folded under the preference `key` (`{ [section]: true }`), as saved; anything unreadable counts as nothing
+ * folded. */
+export function readFolds(key) {
+  try {
+    const folds = JSON.parse(readPref(key) ?? "{}");
+    return folds !== null && typeof folds === "object" ? folds : {};
+  } catch {
+    return {};
+  }
+}
+
 /** Forget a preference. */
 export function clearPref(key) {
   setHere.delete(key);

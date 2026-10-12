@@ -5044,7 +5044,7 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 121 | The calm look, after T3 Code: the sidebar, the chat, the composer and the panel     | done        | 4f2b0cd |
 | 122 | The sidebar says what works: Working and its time on a chat's row and a working run's | done        | 10fd83f |
 | 123 | A helper folded in the chat: its row until the owner opens it                       | done        | a2de64d |
-| 124 | The home's first screen: the composer in the middle, the day folded under it         | planned     |         |
+| 124 | The home's first screen: the composer in the middle, the day folded under it         | in progress |         |
 | 125 | What the failed runs showed: the journal's day, the snapshot's arguments             | planned     |         |
 
 ### 77. The type system: Inter and Geist Mono, seven sizes, three weights
@@ -7047,7 +7047,30 @@ nothing new, and Chrome's Allow in attach mode is the owner's to give.
 
 ### 124. The home's first screen: the composer in the middle, the day folded under it
 
-**Status: planned.**
+**Status: in progress.**
+
+**As built (2026-10-12).** The home's grid (`app.css .home`) has the rows `minmax(L, auto) auto auto`, L being half of
+what Dot's greeting and the composer (`.home-start`) leave of the space under the top bar, less the gap: the window's
+height (`100dvh`) less the top bar's (`--stagebar-h`), the page's padding and their own height, which `views/runs.js
+mount` keeps in `--home-start-h` on the grid as it changes (`layout.js trackHeight`, a `ResizeObserver` that
+`trackStagebar` now uses too). So their middle is the middle of that space, across and down, however long the day is;
+the cards of what waits for an answer sit in the upper row and move them down only once taller than it; the Today strip
+follows them in the page's flow, and the window scrolls to it. The plan's grid of equal outer rows with a strip of no
+height, built first, stood the composer in the middle, but the page then ended at the window's foot, so the sidebar and
+the top bar, sticky inside it, scrolled away with the strip (the sidebar by 157 px at 1280 by 800, measured); the strip
+now counts in the page's height. A section of the strip (`presence.js todaySections`) shows its first two rows, a run
+without the runs it delegated, then "and N more in Activity", N counting every row not shown, delegated runs among them;
+its title is an `h2` holding the button that folds it, with a chevron, the title and the count of its rows; the folds
+are kept in `dot.homeFolds` (`prefs.js readFolds`, which the sidebar's folds now read too), and the focus stays on the
+title through the repaint. The README's home passage and its line on the approvals above the composer follow.
+`tests/smoke/test_home_first_screen.py`: nine runs ended, a journal note and a lesson; at 1280 by 800 and 390 by 844 in
+both schemes and 1700 by 1000 in light, the middle of the greeting and the composer is within 2 px of the middle of the
+space under the top bar, across and down; scrolled to the end, the top bar is at the top and the docked sidebar fills
+the window; the section of the ended runs shows two rows and "and 7 more in Activity"; its title folds it, the fold
+stays across a reload, and a click opens it again. `tests/smoke/test_home.py` takes its screenshots with the motion
+reduced, so the opening no longer covers them. 906 unit tests; the new smoke test and 14 more around the home, the tour,
+the Activity page, the working rows, the face, the run page, the agents and the helper fold passed, and the shots were
+read by eye.
 
 **What.** The home's grid gets the height of the space under the top bar and rows of equal share above and below the
 greeting and the composer, which stand in its middle across and down; the Today strip takes no height in that grid, so

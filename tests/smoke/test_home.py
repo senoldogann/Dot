@@ -224,7 +224,9 @@ async def test_the_home_greets_says_what_is_going_on_and_follows_the_day(
             browser: Browser = await playwright.chromium.launch(channel=runtime.config.browser.channel, headless=True)
             try:
                 for width, scheme in shots:
-                    page: Page = await browser.new_page(viewport={"width": width, "height": 900}, color_scheme=scheme)
+                    page: Page = await browser.new_page(
+                        viewport={"width": width, "height": 900}, color_scheme=scheme, reduced_motion="reduce"
+                    )
                     await page.goto(ui_url(host, port, TOKEN))
                     await page.goto(f"{base}/#/runs")
                     await expect(page.locator(".home-who .avatar")).to_have_attribute("data-state", "waiting")
@@ -232,7 +234,9 @@ async def test_the_home_greets_says_what_is_going_on_and_follows_the_day(
                     await page.screenshot(path=str(tmp_path / f"home-{width}-{scheme}.png"), full_page=True)
                     await page.close()
 
-                page = await browser.new_page(viewport={"width": 1280, "height": 900}, color_scheme="light")
+                page = await browser.new_page(
+                    viewport={"width": 1280, "height": 900}, color_scheme="light", reduced_motion="reduce"
+                )
                 await page.goto(ui_url(host, port, TOKEN))
                 await page.goto(f"{base}/#/settings/general")
                 owner = page.get_by_label("Your name")
