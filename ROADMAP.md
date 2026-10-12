@@ -5060,7 +5060,7 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 137 | A reply cut off is not an answer                                                     | done        | 43cf3f9 |
 | 138 | The store and the daemon's plumbing                                                  | done        | 3f64036 |
 | 139 | The web UI and the desktop shell                                                     | done        | fcd052b |
-| 140 | The gaps the final review found in the guards                                        | in progress |         |
+| 140 | The gaps the final review found in the guards                                        | done        | 25da5f2 |
 
 ### 77. The type system: Inter and Geist Mono, seven sizes, three weights
 
@@ -7850,7 +7850,7 @@ token.
 
 ### 140. The gaps the final review found in the guards
 
-**Status: in progress.**
+**Status: done.** Merged as `25da5f2` (PR #174, MYP-281 Done).
 
 **As built (2026-10-12).** The shell guard reads more of a line. A copy or a move given the folder it writes into by an
 option (`-t`, `--target-directory`, GNU's spellings) writes that folder, so one into Dot's own folders is refused
@@ -8449,3 +8449,4 @@ inline code send data out, and a loopback address with a dot at its end.
 - 2026-10-12 (Opus 5.5): item 137 merged as `43cf3f9` (PR #171, MYP-278 Done): a reply without tool calls that the model service cut short, at its output limit or for an abnormal reason such as a content filter, is no longer taken as the run's answer in any mode: the model is told how the reply ended and asked to go on or answer again in fewer words, each such reply counts as a nudge, and a run whose replies keep being cut short fails saying so (the ending `cut_short`); an empty reason of Ollama is a normal stop.
 - 2026-10-12 (Opus 5.5): item 138 merged as `3f64036` (PR #172, MYP-279 Done): a write of the store that fails or is cancelled part way is rolled back before its error goes on; Dot's own Chrome is closed when a step after its start fails; the numbers of the configuration that would stop the daemon are refused when it is read; a screenshot is written whole before it takes its name; the push sender and the lifecycle stream listen to their own kinds, and a listener that falls behind logs it; the reapers go on past a failing item and closing tries every part; a restart no longer undoes a prune; four indexes; a failed start deletes its run with the thread; `POST /api/runs` refuses fields that contradict each other; an upload never takes the name of a file Dot keeps beside it.
 - 2026-10-12 (Opus 5.5): item 139 merged as `fcd052b` (PR #173, MYP-280 Done): in the desktop shell a link that opens a new window goes to the default browser, the watcher neither reloads the UI at its first look nor leaves it after one slow answer, a shortcut another app holds no longer stops it, and New chat puts the cursor in the box; in the web UI the sidebar reads its lists again after a reconnect, a fault in showing one event is told and the stream goes on, the home's box waits for the models before it reads its choices, Enter pressed twice saves once, the newest load answers, an approval card settles at once, and an answer that is not JSON names its path; the CI's token only reads; item 140 added from the final review of the five.
+- 2026-10-12 (Opus 5.5): item 140 merged as `25da5f2` (PR #174, MYP-281 Done): the shell guard reads a copy's target folder option, `dd`, git in Dot's own folders, the files perl and ruby edit in place and the code in a word of switches, so a change of what Dot loads and runs is refused there too; more ways of curl, wget, httpie and inline code to send data out carry the upload flag, and two old false alarms are gone; the browser reads a dot at the end of a host as none. Part 22 is done.
