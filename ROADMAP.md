@@ -5044,8 +5044,8 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 121 | The calm look, after T3 Code: the sidebar, the chat, the composer and the panel     | done        | 4f2b0cd |
 | 122 | The sidebar says what works: Working and its time on a chat's row and a working run's | done        | 10fd83f |
 | 123 | A helper folded in the chat: its row until the owner opens it                       | done        | a2de64d |
-| 124 | The home's first screen: the composer in the middle, the day folded under it         | in progress |         |
-| 125 | What the failed runs showed: the journal's day, the snapshot's arguments             | planned     |         |
+| 124 | The home's first screen: the composer in the middle, the day folded under it         | done        | 41ec542 |
+| 125 | What the failed runs showed: the journal's day, the snapshot's arguments             | in progress |         |
 
 ### 77. The type system: Inter and Geist Mono, seven sizes, three weights
 
@@ -7047,7 +7047,7 @@ nothing new, and Chrome's Allow in attach mode is the owner's to give.
 
 ### 124. The home's first screen: the composer in the middle, the day folded under it
 
-**Status: in progress.**
+**Status: done.** Merged as `41ec542` (PR #151, MYP-264 Done).
 
 **As built (2026-10-12).** The home's grid (`app.css .home`) has the rows `minmax(L, auto) auto auto`, L being half of
 what Dot's greeting and the composer (`.home-start`) leave of the space under the top bar, less the gap: the window's
@@ -7084,7 +7084,19 @@ tour is read by eye.
 
 ### 125. What the failed runs showed: the journal's day, the snapshot's arguments
 
-**Status: planned.**
+**Status: in progress.**
+
+**As built (2026-10-12).** The journal note names the days it tells (`reflection.journal_span(since, now, zone)`): the
+date of the middle of the time the reflection read, in the scheduler's zone, when that time is at most a day and a
+quarter (30 hours), so the reflection at 03:30 on the 12th, which reads from 03:30 on the 11th, writes "On 2026-10-11",
+one that fired late names the same day and one run by hand in the afternoon names that day; a longer time, after a
+daemon that was off, is told by its first and last day, "From 2026-10-08 to 2026-10-12". `journal_text` takes that span
+where it took the day the note was written. `browser_snapshot`'s description says it shows the tab again, every element
+in and around the viewport with refs, and that it takes no arguments; "in full", which the refused calls answered with a
+`full`, is gone. Whether the models stop giving it arguments shows in the next reading of the refused calls; no live
+model was asked here. A unit test reads the span of the nightly reflection, of a late one, of one by hand and of four
+days; the three calls of `journal_text` in the unit tests give it the span. The README's reflection passage says which
+day the note names. 907 unit tests and the reflection's smoke test.
 
 **What.** The journal says the day it tells: the date of the middle of the time it reads, "On 2026-10-11" for the
 night's reflection at 03:30, or "From 2026-10-08 to 2026-10-12" when it reads more than a day and a quarter (a daemon
@@ -7643,3 +7655,4 @@ with refs, and that it takes no arguments. Unit tests for the journal's day; the
 - 2026-10-12 (Opus 5.5): item 122 merged as `10fd83f` (PR #147, MYP-262 Done): where a row's age sits at rest, a chat whose latest run works and every run of the Working section, delegated runs included, show a dashed circle, Working and the time since the run was asked for in T3 Code's units, read every second; `ThreadSummary.latest_created_at` is new; 906 unit tests, 27 smoke tests and the tour.
 - 2026-10-12 (Opus 5.5): item 123 merged as `a2de64d` (PR #148, MYP-263 Done): in a run's chat a delegated run's row starts closed, its time counting on every second and at once on a page opened later; an approval it asks for opens it and the rows it sits in until the owner has decided, and a row the owner never touched folds again then and at the run's end; a delegated run has no `ask_user`, which the README's Delegation passage now says; 906 unit tests, 30 smoke tests and the tour; the daemon restarted on it with no run active.
 - 2026-10-12 (Opus 5.5): part 18 planned, items 124 and 125, from the owner's word after part 17, a measurement of the home and a reading of the last two days' failed runs (counts and kinds only); no code changed.
+- 2026-10-12 (Opus 5.5): item 124 merged as `41ec542` (PR #151, MYP-264 Done): the home's greeting and composer stand in the middle of the space under the top bar however long the day is, the upper row of the grid being half of what their measured height leaves; the Today strip follows in the page's flow, so the sidebar and the top bar stay as the window scrolls, shows two rows a section and folds at its title, kept per browser; 906 unit tests, 15 smoke tests and the tour.

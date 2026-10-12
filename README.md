@@ -719,13 +719,15 @@ the embeddings when both have one, by the words otherwise); it rests a lesson th
 `lesson_rest_days` (60), or whose score says it did not help (handed to `[memory] score_min_uses` runs in the last
 `score_days`, more of which failed than ended done; a lesson you saved yourself is never retired this way), by tagging
 it `rest`, after which searches skip it while `dotx memory list` and the Memory page still show it, and the log line
-`lesson_retired` says which reason with the numbers; and when anything happened it writes the day's journal note, tagged `journal` ("On 2026-10-11 I worked
-on 4 runs (2 done, 1 failed, 1 cancelled). Learned: … Tidied the lessons: 1 merged, 1 retired."). The reflection
-touches only the notes Dot wrote, never yours. It also keeps what Dot knows about you (see Memory): after a day with
-runs, one call of the review model rewrites Dot's lines of that section from the section as it stands, your own lines,
-your notes and the day's goals, at most `[memory] owner_chars` (1500) characters. A night the daemon slept through is
-caught up once at its start.
-Activity lists the reflection among what ended today; `dotx reflect` runs one now.
+`lesson_retired` says which reason with the numbers; and when anything happened it writes a journal note, tagged
+`journal`, of the day it read: the day of the middle of that time, so the reflection at 03:30 names the day before ("On
+2026-10-11 I worked on 4 runs (2 done, 1 failed, 1 cancelled). Learned: … Tidied the lessons: 1 merged, 1 retired."), or
+its first and last day when it read more than a day and a quarter, after a daemon that was off ("From 2026-10-08 to
+2026-10-12 I worked on …"). The reflection touches only the notes Dot wrote, never yours. It also keeps what Dot knows
+about you (see Memory): after a day with runs, one call of the review model rewrites Dot's lines of that section from
+the section as it stands, your own lines, your notes and the day's goals, at most `[memory] owner_chars` (1500)
+characters. A night the daemon slept through is caught up once at its start. Activity lists the reflection among what
+ended today; `dotx reflect` runs one now.
 
 **Taking back the file changes of a run.** Before `write_file` or `edit_file` changes a file, the run notes the change
 in its journal (`undo/` in the home directory), and its first change to a file keeps a copy of the file as it was. When
