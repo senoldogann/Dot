@@ -5041,7 +5041,7 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 118 | Chrome behind: every tab opened in the background, the front given back             | done        | 6dfbf07 |
 | 119 | The models: the prompt cache on OpenCode Go's Messages route, the free ones marked   | done        | acfc56a |
 | 120 | The run page's head: Stop in the send button's place, the emergency stop in the sidebar | done        | 6c1a7b3 |
-| 121 | The calm look, after T3 Code: the sidebar, the chat, the composer and the panel     | in progress |         |
+| 121 | The calm look, after T3 Code: the sidebar, the chat, the composer and the panel     | done        | 4f2b0cd |
 
 ### 77. The type system: Inter and Geist Mono, seven sizes, three weights
 
@@ -6662,6 +6662,21 @@ bar's area is not needed: Cancel takes the send button's place while a session w
 message is typed, the emergency stop moves to a better place, the top is cleared; and the look of T3 Code, its chat, its
 sidebar and its panel, clean and simple, adapted to Dot, from its repository if need be.
 
+**Status (2026-10-12): built.** Items 117 to 121 merged in a day (`e51f9c1`, `6dfbf07`, `acfc56a`, `6c1a7b3`,
+`4f2b0cd`), each behind the gate and its smoke tests, and those that changed the pages with their screenshot tour read.
+The "read-only mode" the owner saw was a yolo task run that had started its helper as research; a helper takes its
+parent's mode now, so it clicks, types and runs as its parent may. Every tab Dot opens in Chrome is a background target,
+and a tab a page opens itself gives the front back to the application that had it (with Accessibility). OpenCode Go's
+Messages route sends the cache mark (Claude Haiku 5.5 read 10,383 tokens of a repeated prompt from the cache with it),
+Claude on Go reaches that route instead of a refusal, and the models Go serves free say Free in the picker; Zen's free
+models stay out of the list, because OpenCode serves them only to its own client (every call from another answers 403
+`FreeTierError`) and Dot does not pose as it. The run page's head keeps the face, the name and the panel's switch, the
+composer's send is the run's Stop while it works, and the emergency stop sits in the sidebar's foot. The look follows T3
+Code's: a sidebar a tone darker without a line, a chat's age at the right of its row, tool steps as quiet lines, the
+composer on a corner of its own with a soft shadow, the panel one card. The daemon was restarted on `4f2b0cd` with no
+run active. What waits: the desktop app rebuilt by the owner, as after part 15 (`cd desktop && npm run build`); its
+pages come from the daemon, so part 16 reaches it without a rebuild.
+
 **Status (2026-10-12): planned.** What is built today, and what the readings found. (117) `delegate` takes a `mode`
 (`tools/delegate.py`): "task lets it act like you; research keeps it read-only". A task run in yolo started its helper
 as research; a research run has no `browser_act` (`tools_for_mode`, `ACTING_MODES`) and the policy refuses every kind
@@ -6843,7 +6858,7 @@ run page's smoke tests follow the controls; the tour is read by eye.
 
 ### 121. The calm look, after T3 Code: the sidebar, the chat, the composer and the panel
 
-**Status: in progress.**
+**Status: done.** Merged as `4f2b0cd` (PR #144, MYP-261 Done).
 
 **As built (2026-10-12).** Read from T3 Code's repository (MIT) and the owner's screenshot of it, through Dot's tokens
 and in both schemes. The sidebar is a tone darker than the page with no line between them; a chat's row carries its last
@@ -7415,3 +7430,4 @@ states. The tour is read by eye at both widths and in both schemes.
 - 2026-10-12 (Opus 5.5): item 118 merged as `6dfbf07` (PR #141, MYP-258 Done): every tab Dot opens is a background CDP target with a mark of its own (tabs made at the same time no longer share a page, a race the user's Chrome had since item 98), a tab a page opens itself gives the front back to the application that had it (with Accessibility), and `raise_window` keeps the tabs in front as before; 906 unit tests, 71 browser smoke tests.
 - 2026-10-12 (Opus 5.5): item 119 merged as `acfc56a` (PR #142, MYP-259 Done): OpenCode Go's Messages route sends the automatic cache mark (Claude Haiku 5.5 read 10,383 tokens of a repeated prompt from the cache with it, none without), Claude on Go goes to the Messages route (Claude Haiku 5.5 was sent to Chat Completions and refused), the catalog follows Go's list, the models Go serves free say Free in the picker, and Zen's free models stay out (OpenCode serves them only to its own client); 906 unit tests, 38 smoke tests and the live Go tests with the key.
 - 2026-10-12 (Opus 5.5): item 120 merged as `6c1a7b3` (PR #143, MYP-260 Done): the run page's top bar keeps the face, the name and the panel's switch (its facts in Details, which gained the agent and the campaign), the composer's send is the run's Stop while the run works and the box is empty (Steer once a word is typed), a delegated run's pill ends with a Stop, Continue is a line above the composer, the top bar's right keeps the approvals waiting and the connection while it is not live, and the emergency stop sits in the sidebar's foot (beside the sidebar's opener while the sidebar is closed); 906 unit tests, 14 smoke tests and the tour.
+- 2026-10-12 (Opus 5.5): item 121 merged as `4f2b0cd` (PR #144, MYP-261 Done): the look after T3 Code's, through Dot's tokens and in both schemes: the sidebar a tone darker than the page with no line between them and a chat's last activity at the right of its row, a tool step one quiet line with its body on a hairline, the composer on a corner of its own (24 px) with a soft shadow on every page, the run's panel one card with its sections on hairlines, and the answer's time and length on a second look where a pointer can hover; 906 unit tests, 117 smoke tests and the tour read by eye at both widths in both schemes; the daemon restarted on it with no run active.
