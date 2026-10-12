@@ -30,9 +30,10 @@ from dotagent.tools.shell import read_login_env
 pytestmark = [pytest.mark.browser, pytest.mark.asyncio(loop_scope="module")]
 
 TOKEN: str = "chrome-test-token"
-GOAL: str = "Count to thirty, one line at a time."
+GOAL: str = "Count to sixty, one line at a time."
 _PROVIDER: str = parse_model_ref(SCRIPTED_MODEL).provider
-_STEPS: int = 30
+# Each step is one quiet line (item 121), so it takes sixty to make the page twice the window's height.
+_STEPS: int = 60
 _TIME_LIMIT_S: float = 120.0
 # Where the box of an element is, as the viewport sees it.
 _BOX: str = (
@@ -60,7 +61,7 @@ def _script() -> list[ScriptedTurn]:
 
 @pytest_asyncio.fixture(loop_scope="module")
 async def served(login_env: dict[str, str]) -> AsyncIterator[tuple[Runtime, RunRecord, str]]:
-    """A runtime in a throw-away home whose scripted run of thirty steps has ended, served by a real server."""
+    """A runtime in a throw-away home whose scripted run of sixty steps has ended, served by a real server."""
     with scratch_home() as home, eval_environment(home, {}):
         runtime: Runtime = await open_runtime(eval_config(load_default_config()), login_env)
         try:

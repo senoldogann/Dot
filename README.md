@@ -873,7 +873,8 @@ the composer, the **Today** strip lists it: what waits for you, what works, what
 fire and the campaigns whose next session starts), what was learned today (the lessons and the day's journal) and what
 ended, each row as on the Activity page and each opening what it is about; five rows a section, then "and N more in
 Activity". The line and the strip follow the lifecycle stream, so an answer or a run's end moves them at once; `GET
-/api/activity` carries the two new lists as `learned_today` and `due`. The composer is one frame on a 20 px corner: the
+/api/activity` carries the two new lists as `learned_today` and `due`. The composer is one frame on a 24 px corner with a
+soft shadow under it: the
 goal in a box of one line that grows with it, the files attached under it, then one bar that never wraps: the attach
 button and the mode (Task, Chat or Research; its menu says what each does) at the left; at the right the agent with its
 face and name once an agent exists (its menu lists the agents with their roles), **Model** (the mark of its provider and
@@ -906,8 +907,10 @@ closes the conversation with a pill: the model, how long it took ("Completed in 
 its parent still works ("Runs on its own" once not), "Open parent" and, while it works, **Stop**. The tool calls of one
 stretch of work fold into a single
 "Worked for 12 s (model 8 s) · 5 tool calls" line, where the part in brackets is how much of that time the model's turns
-took (open it for every call, result and screenshot), while approvals, questions and policy notes stay in the open. The
-answer of the run is the last message, with a Copy button and when it finished and how long the run took. The box at the bottom is the same frame as the home's, with the attach button and the send in its bar; what you
+took (open it for every call, result and screenshot: each call one quiet line with its icon, its result on a hairline
+under it once opened), while approvals, questions and policy notes stay in the open. The answer of the run is the last
+message, with a Copy button and how the run ended under it; when it finished and how long the run took show where the
+pointer rests on it (on a touch screen they always show). The box at the bottom is the same frame as the home's, with the attach button and the send in its bar; what you
 typed there and did not send waits for you. While the
 end of the conversation, or its answer, is below the window, a round arrow just above the composer leads there. In the
 side panel (Run details), after Details, a folded **Cost** card carries the bill of the run in one line (its minutes,
@@ -932,8 +935,8 @@ Every other page names itself in the same bar
 
 In the conversation each turn of the actor (Dot, or the agent the run belongs to, in its look), and the answer at the
 end, opens with its still face; the run's state is the top bar's face and the first fact of Details, with no card for
-it at the head of the conversation. The panel's cards (Dot's computer, Details, Plan,
-Actions, Screen) arrive folded, each with a one-line summary, and
+it at the head of the conversation. The panel is one card on the composer's corner, its sections (Dot's computer,
+Details, Plan, Actions, Screen) on hairlines; they arrive folded, each with a one-line summary, and
 open at a click; the choice is kept per card. Beside the conversation the panel has a size: three buttons above Dot's
 computer make it **Compact** (its own 320 px), **Wide** (half of the page) or **Full** (the conversation at its narrowest,
 360 px, the rest for the panel), and the handle between the conversation and the panel drags it to any width between
@@ -1010,8 +1013,9 @@ expression at once. Two characters move: the home's face and the look editor's p
 frame. One moving face costs about a millisecond of main-thread time a frame (`tests/smoke/test_character_cost.py` reads
 it from Chrome's performance metrics and caps it). `#/controls` shows every shape, expression, colour and animation.
 Space: every gap, padding and margin sits on one rhythm of 8 px (4 for the smallest, a 2 px hairline token for what
-sits a breath apart; a unit test checks it); the sidebar has no dividers between its groups, its labels are the
-lightest ink that reads and its open row is a surface step rather than a tint; the top bar's pills show a border only
+sits a breath apart; a unit test checks it); the sidebar is a tone darker than the page with no line between them,
+has no dividers between its groups, its labels are the lightest ink that reads, a chat's last activity sits at the
+right of its row in figures of one width ("5m", "3h", "2d") and its open row is a surface step rather than a tint; the top bar's pills show a border only
 when they count something; a card's head is lighter than its body; a folded step of the timeline is one line whose
 duration shows on hover. Motion: three durations (120, 200 and 320 ms) and two easings for what changes, and the
 rhythms of what repeats (the face's breath and pulse, a blink, a spin); a unit test holds every transition and
