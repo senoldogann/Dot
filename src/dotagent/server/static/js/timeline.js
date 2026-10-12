@@ -1,6 +1,7 @@
 // The conversation of one run, built from its events as they arrive: what the agent said, which tools it used, what it
 // asked, what the delegated runs did and, at the end, the answer. Events of a delegated run land in a panel nested in the
-// tool call that started it. The tool calls between two messages sit in one group, "Worked for 12 s" with "5 tool calls" beside it, that the
+// tool call that started it, closed until the reader opens it or the run asks the reader something (item 123). The
+// tool calls between two messages sit in one group, "Worked for 12 s" with "5 tool calls" beside it, that the
 // reader can fold away. A group is timed from the moment the work began (the start of the run or the last message) to the
 // moment it ended, so the groups of a run add up to the time the run took; the part of that time the model's turns took is
 // in brackets, "Worked for 12 s (model 8 s)".
@@ -118,6 +119,8 @@ export function createTimeline({ rootRunId, actorId, startedAt, onGrow, onPlan, 
   const element = el("div", { class: "timeline" });
   const scopes = new Map();
   const cards = new Map();
+  // The scopes of the delegated runs that have not ended: their rows count their time on (`tick`).
+  const liveChildren = new Set();
   let browserSeen = false;
   const totals = { calls: 0, failed: 0 };
 
@@ -139,6 +142,8 @@ export function createTimeline({ rootRunId, actorId, startedAt, onGrow, onPlan, 
       thinking: null,
       reply: null,
       touched: false,
+      // The cards that wait for the reader's answer in this scope and the delegated runs inside it.
+      asking: 0,
     };
   }
 
@@ -197,6 +202,26 @@ export function createTimeline({ rootRunId, actorId, startedAt, onGrow, onPlan, 
     return scope.group;
   }
 
+  /** A delegated run asks the reader something (item 123): its row opens, and so do the rows it sits in, so the card
+   * is in sight. */
+  function reveal(scope) {
+    for (let at = scope; at.panel !== null; at = at.parent) {
+      at.asking += 1;
+      at.panel.node.open = true;
+    }
+  }
+
+  /** The reader answered: a row with nothing left inside it that waits for them folds again, unless they opened or
+   * closed it by hand. */
+  function unreveal(scope) {
+    for (let at = scope; at.panel !== null; at = at.parent) {
+      at.asking -= 1;
+      if (at.asking === 0 && !at.touched) {
+        at.panel.node.open = false;
+      }
+    }
+  }
+
   function note(scope, ts, iconName, text, tone) {
     place(scope, el("div", { class: tone === "" ? "note" : `note ${tone}` }, icon(iconName), el("span", null, text)), ts);
   }
@@ -220,7 +245,7 @@ export function createTimeline({ rootRunId, actorId, startedAt, onGrow, onPlan, 
     open.addEventListener("click", (event) => event.stopPropagation());
     const inner = el("div", { class: "timeline" });
     // One row (item 82): the face with its state at the corner, the goal over the last line, the time it has taken,
-    // the way to its page and the chevron; opened, the run's steps hang under it.
+    // the way to its page and the chevron; opened, the run's steps hang under it. It starts closed (item 123).
     const summary = el(
       "summary",
       { class: "child-row" },
@@ -232,13 +257,14 @@ export function createTimeline({ rootRunId, actorId, startedAt, onGrow, onPlan, 
       open,
       el("span", { class: "chev" }, icon("chevron")),
     );
-    const node = el("details", { class: "child", open: true }, summary, inner);
+    const node = el("details", { class: "child" }, summary, inner);
     summary.addEventListener("click", () => {
       scope.touched = true;
     });
     place(parent, node, ts);
     const scope = makeScope({ runId, actorId: data.agent_id ?? runId, container: inner, panel: { node, face, status, meta, progress, time, steps: 0 }, parent, began: ts });
     scopes.set(runId, scope);
+    liveChildren.add(scope);
     return scope;
   }
 
@@ -246,6 +272,15 @@ export function createTimeline({ rootRunId, actorId, startedAt, onGrow, onPlan, 
   function paintChild(scope, ts, facts) {
     scope.panel.progress.replaceChildren(...facts.map((fact) => el("span", null, fact)));
     scope.panel.time.textContent = duration(Math.max(ts - scope.began, 0));
+  }
+
+  /** The row of every delegated run that has not ended says how long it has worked at `now` (seconds): the page calls
+   * this every second while the run works, so a folded row's time counts on between the events of its run, as T3 Code
+   * counts a working subagent's (item 123). */
+  function tick(now) {
+    for (const scope of liveChildren) {
+      scope.panel.time.textContent = duration(Math.max(now - scope.began, 0));
+    }
   }
 
   /**
@@ -347,9 +382,11 @@ export function createTimeline({ rootRunId, actorId, startedAt, onGrow, onPlan, 
       scope.panel.face.setAttribute("data-state", faceState(status));
       scope.panel.face.classList.add("ended");
       paintChild(scope, record.ts, [status, plural(scope.panel.steps, "step", "steps")]);
+      liveChildren.delete(scope);
       // The parent resumes when the delegated run is over; the time in between was spent on the delegation.
       scope.parent.boundary = record.ts;
-      if (status === "done" && !scope.touched) {
+      // Whatever it asked is moot now: a row the reader never opened or closed by hand is closed again.
+      if (!scope.touched) {
         scope.panel.node.open = false;
       }
     },
@@ -480,6 +517,7 @@ export function createTimeline({ rootRunId, actorId, startedAt, onGrow, onPlan, 
       const card = approvalCard({ approval: fromEvent(record.run_id, record.data), heading: null, onSettled: () => undefined, leftNote: LEFT_IN_RUN });
       cards.set(record.data.approval_id, { card, scope });
       place(scope, card.node, record.ts);
+      reveal(scope);
       markWaiting(scope, true);
     },
 
@@ -496,9 +534,11 @@ export function createTimeline({ rootRunId, actorId, startedAt, onGrow, onPlan, 
     approval_decided(scope, record) {
       const entry = cards.get(record.data.approval_id);
       if (entry !== undefined) {
+        cards.delete(record.data.approval_id);
         entry.card.settle(record.data.status, record.data.note);
         // The time spent waiting for the decision was not spent working.
         entry.scope.boundary = record.ts;
+        unreveal(entry.scope);
         markWaiting(entry.scope, false);
       }
     },
@@ -782,5 +822,5 @@ export function createTimeline({ rootRunId, actorId, startedAt, onGrow, onPlan, 
     onGrow();
   }
 
-  return { element, push };
+  return { element, push, tick };
 }
