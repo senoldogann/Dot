@@ -5054,7 +5054,7 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 131 | Unread chats                                                                         | done        | 34e1fe1 |
 | 132 | Runs that keep going on every model when asked to                                    | done        | 002575b |
 | 133 | The composer's choices on a chat's page                                              | done        | bf11312 |
-| 134 | The traffic lights on the line of the top bars                                       | in progress |         |
+| 134 | The traffic lights on the line of the top bars                                       | done        | a5b0220 |
 
 ### 77. The type system: Inter and Geist Mono, seven sizes, three weights
 
@@ -7631,7 +7631,7 @@ eye.
 
 ### 134. The traffic lights on the line of the top bars
 
-**Status: in progress.**
+**Status: done.** Merged as `a5b0220` (PR #167, MYP-275 Done).
 
 **As built (2026-10-12).** `desktop/src-tauri/src/lib.rs` gives the window `traffic_light_position` (`TRAFFIC_LIGHTS`,
 20 and 28 logical pixels). Tauri hands it to wry, whose `inset_traffic_lights` is tao's code line for line and runs
@@ -8222,3 +8222,4 @@ width; the app is built; the owner reads the window by eye once the app is rebui
 - 2026-10-12 (Opus 5.5): item 132 merged as `002575b` (PR #164, MYP-273 Done): words that ask a run not to stop, in English or in Turkish, put a task or research run a person starts in goal mode whatever the switch says, the goal checker is told and accepts a finish only when every part of the goal is done and shown, every goal check sends back an answer that offers to do a part of the goal not done yet, and every model is told to keep acting and to take the ask at its word; the Details card reads "On, asked not to stop". A review against the done criteria found two blockers, fixed before the merge: a phone's curly apostrophe, and an offer rule that reached past the goal.
 - 2026-10-12 (Opus 5.5): item 131 merged as `34e1fe1` (PR #165, MYP-272 Done): a chat whose latest run ended after it was last seen shows its dot in the accent and says unread, as T3 Code marks a thread with a turn not yet seen; the daemon keeps `threads.seen_at` (the chats of an older store taken as seen), `GET /api/threads` carries `unread` and `PATCH /api/threads/{id}` takes `seen`; the open chat is seen while the page is in view, and its menu offers Mark read and Mark unread. A review against the done criteria found them met and one regression, fixed before the merge: a chat opened by a key lost the focus when its dot went.
 - 2026-10-12 (Opus 5.5): item 133 merged as `bf11312` (PR #166, MYP-274 Done): the dock of a chat's page wears the home's pills, after T3 Code's composer: the mode, the model with its reasoning and the Options, set at first to the open run's and held by the page, and a follow-up starts its run with them; while a run works the pills wait for the next follow-up and say so. The pickers are one module that both boxes use. A review against the done criteria found them met and the smoke test short of their negative cases, which it now reads.
+- 2026-10-12 (Opus 5.5): item 134 merged as `a5b0220` (PR #167, MYP-275 Done): the desktop window puts its traffic lights 26 px under the top, on the centre line of the top bars' 52 px rows (`traffic_light_position` 20, 28), and the sidebar's head grows to the bars' height, so the lights, the button that folds the sidebar and the top bar's opener and emergency stop stand on one line with room above and below; the page keeps 96 px for the lights. Part 21 is done; the window is the owner's to read once the app is rebuilt.
