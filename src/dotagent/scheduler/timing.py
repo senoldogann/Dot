@@ -129,8 +129,15 @@ def local_moment(at: str, zone: ZoneInfo) -> float:
             "'at' is not an ISO 8601 date and time such as 2026-10-06T09:30", {"at": at, "error": str(exc)}
         ) from exc
     local: datetime = parsed if parsed.tzinfo is not None else parsed.replace(tzinfo=zone)
-    moment: float = local.timestamp()
-    if parsed.tzinfo is None and datetime.fromtimestamp(moment, tz=zone).replace(tzinfo=None) != parsed:
+    try:
+        moment: float = local.timestamp()
+        shown: datetime = datetime.fromtimestamp(moment, tz=zone)
+    except (ValueError, OverflowError, OSError) as exc:
+        # A moment that cannot be shown in the zone (the first or the last day of the calendar) could never be listed.
+        raise ToolInputError(
+            "'at' is too far from now to be a time Dot can keep", {"at": at, "timezone": zone.key, "error": str(exc)}
+        ) from exc
+    if parsed.tzinfo is None and shown.replace(tzinfo=None) != parsed:
         raise ToolInputError(
             "that local time does not exist: the clocks jump over it", {"at": at, "timezone": zone.key}
         )

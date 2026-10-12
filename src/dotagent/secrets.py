@@ -6,6 +6,7 @@ Keychain items are read from service ``dot-agent`` (account = variable name); ad
 
 import os
 import subprocess
+import tempfile
 from pathlib import Path
 from typing import Literal
 
@@ -54,13 +55,24 @@ def render_env_file(values: dict[str, str]) -> str:
     return "".join(f'{key}="{value}"\n' for key, value in sorted(values.items()))
 
 
-def write_env_value(path: Path, name: str, value: str) -> None:
-    """Set ``name`` in the env file (created with mode 0600) keeping every other entry."""
-    current: dict[str, str] = parse_env_file(path.read_text(encoding="utf-8")) if path.exists() else {}
-    updated: dict[str, str] = {**current, name: value}
+def _write_env_file(path: Path, text: str) -> None:
+    """Write the env file whole or not at all, readable by the owner alone from its first byte: into a new file that
+    ``mkstemp`` makes with mode 0600 beside it, then moved over it (item 116)."""
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(render_env_file(updated), encoding="utf-8")
-    os.chmod(path, 0o600)
+    descriptor, temporary = tempfile.mkstemp(dir=path.parent, prefix=f".{path.name}.", suffix=".tmp")
+    try:
+        with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
+            handle.write(text)
+        os.replace(temporary, path)
+    except OSError:
+        Path(temporary).unlink(missing_ok=True)
+        raise
+
+
+def write_env_value(path: Path, name: str, value: str) -> None:
+    """Set ``name`` in the env file (mode 0600) keeping every other entry."""
+    current: dict[str, str] = parse_env_file(path.read_text(encoding="utf-8")) if path.exists() else {}
+    _write_env_file(path, render_env_file({**current, name: value}))
 
 
 def remove_env_value(path: Path, name: str) -> bool:
@@ -68,8 +80,7 @@ def remove_env_value(path: Path, name: str) -> bool:
     current: dict[str, str] = parse_env_file(path.read_text(encoding="utf-8")) if path.exists() else {}
     if name not in current:
         return False
-    path.write_text(render_env_file({key: value for key, value in current.items() if key != name}), encoding="utf-8")
-    os.chmod(path, 0o600)
+    _write_env_file(path, render_env_file({key: value for key, value in current.items() if key != name}))
     return True
 
 

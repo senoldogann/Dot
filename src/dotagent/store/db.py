@@ -1813,9 +1813,9 @@ class Store:
         )
         return [_campaign(row) for row in rows]
 
-    @_writing
     # ---------------------------------------------------------------------------------------------------- agents
 
+    @_writing
     async def create_agent(
         self,
         name: str,
@@ -1868,6 +1868,7 @@ class Store:
         await self._db.commit()
         return record
 
+    @_writing
     async def update_agent(
         self,
         agent_id: str,
@@ -1903,6 +1904,7 @@ class Store:
         await self._db.commit()
         return await self.get_agent(agent_id)
 
+    @_writing
     async def set_agent_look(self, agent_id: str, look: AgentLook) -> AgentRecord:
         """Give the agent a look (item 102) and nothing else."""
         await self.get_agent(agent_id)
@@ -1932,6 +1934,7 @@ class Store:
         rows = await self._all("SELECT * FROM agents ORDER BY created_at", ())
         return [_agent(row) for row in rows]
 
+    @_writing
     async def delete_agent(self, agent_id: str) -> None:
         """Forget the agent; its runs and its lessons stay, as Dot's (their ``agent_id`` is cleared)."""
         await self.get_agent(agent_id)
@@ -1973,6 +1976,7 @@ class Store:
         )
         return {row["agent_id"]: _run(row) for row in rows}
 
+    @_writing
     async def delete_campaign(self, campaign_id: str) -> None:
         """Delete a campaign and its ledger; its sessions stay as runs of their threads."""
         await self._db.execute("DELETE FROM campaign_entries WHERE campaign_id = ?", (campaign_id,))

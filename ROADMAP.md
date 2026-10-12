@@ -5035,8 +5035,8 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 112 | Both eyes move: one key per eye in the character's drawing                          | done        | 392132c |
 | 113 | The quiet head: no character card at the head of the chat, no brand in the sidebar  | done        | ea21f27 |
 | 114 | Dot's mark and its opening: a dot that looks, the wordmark, the icons, a bounce at launch | done        | ea014d5 |
-| 115 | The composer once more: one bar that never wraps, labels that fold, a quiet warning | in progress |         |
-| 116 | The deep review: every part of the code read once more, and fixed                   | planned     |         |
+| 115 | The composer once more: one bar that never wraps, labels that fold, a quiet warning | done        | a667d39 |
+| 116 | The deep review: every part of the code read once more, and fixed                   | in progress |         |
 
 ### 77. The type system: Inter and Geist Mono, seven sizes, three weights
 
@@ -6537,7 +6537,7 @@ that sees the opening play and leave, and not play under reduced motion or a sec
 
 ### 115. The composer once more: one bar that never wraps, labels that fold, a quiet warning
 
-**Status: in progress.**
+**Status: done.** Merged as `a667d39` (PR #137, MYP-255 Done).
 
 **Design, as built (2026-10-12).** One frame for the three composers (`composer.js composerFrame`, the new chat's, the
 run's dock and the agent page's): a 20 px corner (`--radius-lg`) with its hairline, 8 px inside; the box is one line at
@@ -6571,7 +6571,7 @@ page take the same frame. Tests: `test_composer.py` measures the bar on one line
 
 ### 116. The deep review: every part of the code read once more, and fixed
 
-**Status: planned.**
+**Status: in progress.**
 
 **What.** Four readers, each on a part of the code, asked for real defects only (wrong behaviour, crashes, races,
 swallowed errors, leaks, holes in the policy or the auth): the agent and the model calls; the tools, the policy, the
@@ -6579,6 +6579,62 @@ browser, the desktop and the web; the server, the store, the scheduler and the d
 items 113 to 115. Every finding is checked by hand against the code before it is fixed here; what cannot be fixed here
 is written down. Then the whole: the gate, the offline smoke suite, the eval check, the tour read by eye, the daemon
 restarted. Findings as built.
+
+**Findings, as built (2026-10-12).** Four readings, every finding checked against the code by hand before it was
+changed. (1) The tools and the policy. The shell guard judged a line by its words, so a step could hide from it: in a
+substitution inside quotes (`echo "$(rm -rf ~/Documents)"`), behind a `cd`, a variable, a comment with an apostrophe, a
+here-document or an `echo` fed to a shell, a wrapper with option values (`bash -lc`, `env -S`, `timeout -s KILL 9`), a
+link the line made, a second root of `find`, `xargs -I`, `fd -x`, `rg --pre`, `awk`'s `system()` or a zsh glob
+qualifier; commands it took as reading wrote or ran code (`sort -o`, `sed w`, `sysctl -w`, `yq -i`, `xxd -r`, `open` of
+a script); and a protected location in another spelling (`~/.SSH`, `~/.s?h`, `"$HOME"/.ssh`, `~/.{ssh,aws}`) was not
+one. `policy/shell.py` is written again: it reads the line as the shell does (comments, `$'…'`, here-documents,
+arithmetic, the commands substituted into it, each judged as a command of its own), then judges its simple commands in
+order with what the line set up before them (the directories a `cd` may have moved it to, its variables, the links it
+made); code it cannot read (a command named by a substitution, `eval` of one, a line it cannot parse) is a destructive
+step outside the workspace, which every preset asks about, and paths are compared without case, as the Mac's disk does.
+`tests/unit/test_shell_policy.py` holds the attacks (each asks, or is refused at a protected location) and the everyday
+lines (each stays allowed). Typing into a terminal is judged by the line it runs: the terminal tools and the desktop
+share one model of the line editor (Enter, Ctrl-C, Ctrl-U and Delete; any other control key leaves a line Dot cannot
+tell, and running that asks); the desktop keeps what it typed into each terminal application, so a command typed in
+parts is judged whole when Return goes in, and a Return on a line Dot cannot tell (one it has not typed since the line
+was empty, or after a click, a shortcut or a drag) asks; a terminal session's later lines are judged from the home
+folder, since its shell may have moved. A JXA script that types into a terminal (`doScript`, `writeText`) is judged by
+its line. What a shell command printed after it reached the network (`curl`, `ssh`, `git clone`, `gh`) and what a
+terminal program prints mark the run untrusted. A host name with a label over 63 characters ended a fetch as an internal
+error. (2) The agent and the model calls. A step that ran past `model_call_timeout_s`, an SSL record error, a body that
+is not JSON and a missing API key in a side call (the summary, the goal check, vision, an aside) ended the run as an
+internal error; each is a provider failure now. A run of a team waited for a slot its parent held, so with every slot
+taken parent and child waited for each other for good; it runs outside the limit, as a delegated run does. A second stop
+while a run's end was being recorded skipped the record. An approval stayed pending when its run was stopped between the
+request and the wait; two decisions at once both succeeded, and an approval that met its deadline acted expired while
+approved was stored; the second decision is a conflict now and the run acts on what is stored. A run that failed between
+its record and its task stayed queued for good; it ends failed. The note written with an approval reached the model only
+when the approved call succeeded, which is why the approval smoke test failed once in item 115's run (the call failed
+under load, the model called again and that approval had no note); a failed call carries it too. An Ollama error inside
+a stream is masked like any provider body. (3) The server, the store and the scheduler. `DELETE
+/api/skills/learned/%2E%2E` removed Dot's home folder: a learned skill's name has to be one folder of its own. The push
+watcher recursed once per idle second and died, unnoticed, after about 16 minutes; it loops, outlives a push that fails,
+and its end is logged. Four writes of the store (changing an agent or its look, deleting an agent or a campaign) did not
+take the write lock and could fail with "database is locked". One schedule's unexpected error ended the scheduler and
+the daemon with it; that schedule is marked as failing to fire now. An `UndoError` answered 500 (409 now); an `at` in
+year 1 answered 500; the secrets' `.env` was rewritten in place (now through a temporary file); two browser settings
+changed at once kept one; deleting chats raced a run starting on one of them; the desktop shell wrote `http://::1:8765`
+for an IPv6 host. (4) The interface after items 113 to 115. Enter in the note of an approval approved it (only a
+question's now); editing an agent dropped its tools; a follow-up of an agent's run lost the agent, and sent a reasoning
+level the model does not offer (422); any run's event wiped what was typed on an agent's page; `/btw` emptied the field
+without telling the composer; the send button ran its handler twice per click; a switch of the System page could stay
+out of step after a failure; an input method's Enter sent the message; the jump-to-latest button covered the slash menu;
+a click during the opening's fade flashed it; the composer's panels took neither the focus nor the arrow keys; a
+campaign's page built its buttons again at every event while a session worked, so a press on Stop could be lost; and
+every screenshot shown stayed in memory while the window was open (a page change lets them go). Written down, not
+changed: the guard follows neither what a recursive command does inside the folders it walks nor the code of a script,
+nor `CDPATH` or GNU sed's `e`; a quoted glob such as `'.*'` run from the home folder is refused as a protected location
+(a false alarm on the safe side); a schedule without its own time zone keeps the zone the daemon started in, and the
+next firing worked out in it, when the Mac's zone changes, until a restart and one firing; a payment's cap reads the
+amount the page labels; a page fetches its screenshots as it opens, not as they come into view; the web UI needs Safari
+17.5 (`light-dark()`), as the README says now. (5) The whole: the gate (903 unit tests), the offline smoke suite of the
+interface with the campaign and terminal tests (84 passed, none failed), `dotx eval check`, `cargo check` of the desktop
+shell, and the tour's 90 shots read by eye, which show nothing changed where nothing was meant to change.
 
 ## Log
 
@@ -7121,3 +7177,4 @@ restarted. Findings as built.
 - 2026-10-12 (Opus 5.5): part 15 planned, items 113 to 116, from the owner's word with two screenshots, the daemon's log (the SSL crash ran before the restart) and a research of open composers; no code changed.
 - 2026-10-12 (Opus 5.5): item 113 merged as `ea21f27` (PR #135, MYP-253 Done): the run page without its character card (`charactercard.js` and `mood.js` gone, the state in the top bar's face and badge), the sidebar's head with its button alone at the left where the top bar's opener stands, the brand gone from both bars; the tour checks the button on the lights' line.
 - 2026-10-12 (Opus 5.5): item 114 merged as `ea014d5` (PR #136, MYP-254 Done): Dot's mark (a yellow dot with the character's eyes) as the favicon, the app's, the menu bar's and the web app's icons from `desktop/icons/render.py`; the wordmark “dot” on the sign-in card and the desktop shell's down page; the opening, once per window session, never under reduced motion, cut short by a click or a key.
+- 2026-10-12 (Opus 5.5): item 115 merged as `a667d39` (PR #137, MYP-255 Done): one composer frame on a 20 px corner with a box of one line, one bar that never wraps (its labels fold by container queries), round pills on no ground, YOLO in the warn ink without a fill, the agent pick a pill with a menu, a quiet send while the box is empty, Keep going's note under the frame.

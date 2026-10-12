@@ -93,7 +93,7 @@ class Scheduler:
         that is, and start the reflection when its time has come. A campaign's session is never skipped as overdue:
         the campaign goes on where it stopped."""
         for record in await self._runtime.store.due_schedules(now):
-            await self._fire(record, now)
+            await self._fire_alone(record, now)
         for campaign in await self._runtime.store.due_campaigns(now):
             await self._start_session(campaign.id)
         await self._reflect_if_due(now)
@@ -126,6 +126,19 @@ class Scheduler:
         while True:
             await self.tick(time.time())
             await asyncio.sleep(tick_s)
+
+    async def _fire_alone(self, record: ScheduleRecord, now: float) -> None:
+        """Fire one schedule; one that cannot fire (its time zone or its times cannot be read, the store failed for it)
+        keeps the reason as its status and is tried again at the next tick, and the other schedules and the daemon go on
+        (item 116)."""
+        try:
+            await self._fire(record, now)
+        except DotError as exc:
+            log.error("schedule_fire_failed", schedule_id=record.id, error=exc.message, context=exc.context)
+            await self._runtime.store.set_schedule_status(record.id, f"failed to fire: {exc.message}")
+        except Exception as exc:
+            log.exception("schedule_fire_crashed", schedule_id=record.id)
+            await self._runtime.store.set_schedule_status(record.id, f"failed to fire: {type(exc).__name__}")
 
     async def _fire(self, record: ScheduleRecord, now: float) -> None:
         store: Store = self._runtime.store

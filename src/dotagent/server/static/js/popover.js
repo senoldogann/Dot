@@ -1,5 +1,7 @@
 // A panel that opens above a control of a frame (the composer's pills): built when it opens, closed by Escape, by a
-// click outside it, or by whoever opened it. The control says aria-expanded.
+// click outside it, or by whoever opened it. The control says aria-expanded. The focus moves into the panel when it
+// opens (to the chosen option, or the first control), the arrow keys move it between the panel's controls, and it goes
+// back to the control when the panel closes around it.
 
 import { el } from "./dom.js";
 
@@ -23,14 +25,28 @@ export function anchoredPopover({ anchor, frame, label, build }) {
     panel.style.bottom = `${frame.clientHeight - anchor.offsetTop + EDGE_PX}px`;
   }
 
+  function focusChoice() {
+    (panel.querySelector("[aria-selected='true']") ?? panel.querySelector("button, [tabindex]"))?.focus();
+  }
+
   // A repaint replaces the panel's children, so the focus goes back to the one chosen, or the first control.
   function repaint() {
     const hadFocus = panel.contains(document.activeElement);
     panel.replaceChildren(...build());
     place();
     if (hadFocus || document.activeElement === document.body) {
-      (panel.querySelector("[aria-selected='true']") ?? panel.querySelector("button, [tabindex]"))?.focus();
+      focusChoice();
     }
+  }
+
+  function moveFocus(step) {
+    const controls = [...panel.querySelectorAll("button:not(:disabled), [tabindex]:not([tabindex='-1'])")];
+    if (controls.length === 0) {
+      return;
+    }
+    const at = controls.indexOf(document.activeElement);
+    const next = at === -1 ? (step > 0 ? 0 : controls.length - 1) : (at + step + controls.length) % controls.length;
+    controls[next].focus();
   }
 
   function onPointerDown(event) {
@@ -44,6 +60,9 @@ export function anchoredPopover({ anchor, frame, label, build }) {
       event.preventDefault();
       close();
       anchor.focus();
+    } else if ((event.key === "ArrowDown" || event.key === "ArrowUp") && panel.contains(document.activeElement)) {
+      event.preventDefault();
+      moveFocus(event.key === "ArrowDown" ? 1 : -1);
     }
   }
 
@@ -56,14 +75,19 @@ export function anchoredPopover({ anchor, frame, label, build }) {
     document.addEventListener("pointerdown", onPointerDown, true);
     document.addEventListener("keydown", onKeydown);
     repaint();
+    focusChoice();
   }
 
   function close() {
     if (panel.hidden) {
       return;
     }
+    const hadFocus = panel.contains(document.activeElement);
     panel.hidden = true;
     panel.replaceChildren();
+    if (hadFocus) {
+      anchor.focus();
+    }
     anchor.setAttribute("aria-expanded", "false");
     document.removeEventListener("pointerdown", onPointerDown, true);
     document.removeEventListener("keydown", onKeydown);

@@ -22,19 +22,11 @@ from dotagent.llm.provider_errors import StatusClassifier, parse_retry_after, pa
 _RETRYABLE_STATUS: frozenset[int] = frozenset({408, 409, 425, 429, 500, 502, 503, 504, 520, 521, 522, 524, 529})
 # A server asking for a longer pause than this is reported instead of silently stalling the agent.
 _MAX_AUTOMATIC_WAIT_S: float = 120.0
-_TRANSPORT_ERRORS: tuple[type[Exception], ...] = (
-    httpx.ConnectError,
-    httpx.ConnectTimeout,
-    httpx.ReadTimeout,
-    httpx.WriteTimeout,
-    httpx.PoolTimeout,
-    httpx.RemoteProtocolError,
-    httpx.ReadError,
-    httpx.WriteError,
-    # A TLS read that fails on the wire ("bad record mac") reaches the caller as the raw ssl error, not as a ReadError
-    # (item 107): the network path corrupted a record, the call is as retryable as any other transport failure.
-    ssl.SSLError,
-)
+# Every failure on the way to the provider and back: httpx's transport errors (connect, timeouts, a proxy, a protocol
+# broken on either side, a connection that fails to close) and a body that cannot be decoded (item 116), and a TLS read
+# that fails on the wire ("bad record mac"), which reaches the caller as the raw ssl error, not as a ReadError (item
+# 107): the network path corrupted a record, the call is as retryable as any other transport failure.
+_TRANSPORT_ERRORS: tuple[type[Exception], ...] = (httpx.TransportError, httpx.DecodingError, ssl.SSLError)
 
 
 class SseEvent(FrozenModel):

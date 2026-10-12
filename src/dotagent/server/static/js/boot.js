@@ -36,8 +36,10 @@
   }
   if (opening) {
     var root = document.documentElement;
+    // Once the overlay has begun to fade, the quick fade would only start again from full and flash (item 116).
     var skip = function () {
-      if (root.dataset.opening === "on") {
+      var overlay = document.querySelector(".opening");
+      if (root.dataset.opening === "on" && overlay !== null && getComputedStyle(overlay).opacity === "1") {
         root.dataset.opening = "skip";
       }
     };

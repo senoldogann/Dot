@@ -93,10 +93,14 @@ function switchSetting({ label, hint, read, write, onToggled }) {
     role: "switch",
     "aria-checked": "false",
     "aria-label": label,
+    // Repainted from what was stored even when the switch failed half way (notifications on, push refused).
     onclick: () =>
       attempt(async () => {
-        await write(!read());
-        onToggled();
+        try {
+          await write(!read());
+        } finally {
+          onToggled();
+        }
       }),
   });
   const note = el("div", { class: "hint" }, hint);

@@ -359,9 +359,11 @@ A terminal session is for a program that does not run to its end by itself: one 
 first output; `terminal_send` types into it and returns the answer, `terminal_read` waits for more (a server's log),
 `terminal_close` ends it and everything it started. The output is read as plain text, without a terminal emulator, so
 full-screen programs such as vim or htop show as garbled text. The command and every line typed into it are judged as
-a `shell` command is. A chat keeps at most `[shell] terminal_sessions` sessions open (3; 0 removes the tools), each
-closed after `terminal_idle_s` without use (30 minutes) and all of them when the daemon stops; the end of a run closes
-none, so a server it started stays up for the next message.
+a `shell` command is, a line typed in parts as a whole. A key a line editor acts upon (Tab, an arrow, a Ctrl- shortcut
+other than Ctrl-C, Ctrl-U) leaves a line Dot cannot tell, and running it asks; once a line has run, the program may be
+in another directory, so later lines are judged from the home folder. A chat keeps at most `[shell] terminal_sessions`
+sessions open (3; 0 removes the tools), each closed after `terminal_idle_s` without use (30 minutes) and all of them
+when the daemon stops; the end of a run closes none, so a server it started stays up for the next message.
 
 ## Safety
 
@@ -423,7 +425,9 @@ Who answers what the policy asks depends on the approval mode of the run: you, a
 
 **Untrusted content.** Web pages, screens and MCP results can be written by third parties. Dot wraps them in a fence
 with a random marker per call (`<web_content …>`, `<screen_content …>`) and tells the model that what is inside is data,
-never instructions. A run that has seen such content is marked untrusted, and from then on outward-facing or lasting
+never instructions. What a shell command printed after it reached the network (`curl`, `ssh`, `git clone`, `gh`, a line
+the guard cannot read) and what a terminal program prints count the same way, unfenced. A run that has seen such
+content is marked untrusted, and from then on outward-facing or lasting
 actions (messages, posts, follows and likes, privilege, system settings, saving a schedule or a note) ask even when the
 preset or an `allow` rule would let them through; only a `preapproved` rule skips the question. A message you send to
 the run clears the mark. A delegated run starts as untrusted as its parent.
@@ -527,9 +531,13 @@ the same way, except in a run nobody can answer during it (see
   moving the mouse, the rest of the batch is not run
 
 > **The shell guardrail is best-effort, not a sandbox.** Dot reads a shell command before it runs it and judges what it
-> would touch, but a shell can do more than any analysis can foresee. Treat Dot as a user of your account with the
-> rights of your account: keep backups, keep the workspace for scratch work, and use `balanced` or `cautious` on a
-> machine where a mistake would be expensive.
+> would touch: it reads the line as the shell does (quotes, comments, here-documents, the commands substituted into
+> it, a `cd`, a variable, a link it makes, a wrapper such as `bash -c`, `env` or `xargs`), compares paths without case,
+> and treats what it cannot read (a command named by a substitution, `eval` of one, a line it cannot parse) as a
+> destructive step outside the workspace, which every preset asks about. It does not follow what a recursive command
+> does inside the folders it walks, nor the code of a script it runs, and a shell can do more than any analysis can
+> foresee. Treat Dot as a user of your account with the rights of your account: keep backups, keep the workspace for
+> scratch work, and use `balanced` or `cautious` on a machine where a mistake would be expensive.
 
 ## Autonomy: approvals, goal mode and the end of a run
 
@@ -1122,8 +1130,9 @@ three menu bar icons and the web app's icons, and `npm run icons` makes the bund
 ## Dot on the phone
 
 The web UI is a progressive web app: open it on the phone, add it to the home screen, and it opens on Activity with
-the sidebar's sections, the chats and the run pages at a phone width. It needs to reach the Mac, and a push needs a
-secure address, so the way there is your own network:
+the sidebar's sections, the chats and the run pages at a phone width. Its colours follow the light or dark appearance
+through CSS `light-dark()`, so it needs iOS 17.5 or later (Safari 17.5; Chrome 123 and Firefox 120 on a computer). It
+needs to reach the Mac, and a push needs a secure address, so the way there is your own network:
 
 1. The daemon stays on the loopback address. With Tailscale on the Mac and the phone, `tailscale serve --bg 8765`
    presents it as `https://<mac>.<tailnet>.ts.net`, with a certificate of its own, to your tailnet only.
@@ -1269,6 +1278,11 @@ missing ones and opens their Settings panes.
   read, or the text looks like a key. After steps that changed something, the window is read once the application has
   announced no change for `settle_quiet_ms` (120 ms), at most after `settle_ms` (350 ms); a change it makes later
   without announcing anything in between shows in the next view.
+- In a terminal application (Terminal, iTerm2, Ghostty and the like) text and keys are shell input. Dot keeps the
+  command line it typed there since the line was last empty and judges it whole, as a `shell` command, when Return or
+  a Ctrl- key that may run it goes in, so a command typed in parts is judged as one, from the home folder. After a
+  click, a focus, a menu, a drag, a Cmd shortcut or an arrow key the line cannot be told, and the next Return asks, as
+  the first one in a terminal Dot has not typed into does; Ctrl-C starts a line Dot knows again.
 - `desktop_screenshot` captures the screen with ScreenCaptureKit as a JPEG of at most `screenshot_max_edge` pixels
   (1366 by default: about 1 600 tokens on the hosted providers, against about 2 500 at 1920).
 - `desktop.keep_awake` keeps the display awake while Dot works. Password managers are refused in every mode, and so

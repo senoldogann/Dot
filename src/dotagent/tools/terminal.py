@@ -3,7 +3,11 @@
 run goes on; ``shell`` stays the tool for a command that runs to its end.
 
 Opening a session is classified like ``shell`` on its command, and typing like ``shell`` on every line the text
-completes, with what was typed before on that line, so that a command typed in parts is judged whole. Text typed while
+completes, with what was typed before on that line, so that a command typed in parts is judged whole. Keys a line editor
+acts upon (Tab, the arrows, a Ctrl- shortcut) leave a line that cannot be told, which is judged as code that cannot be
+read, and once a line has run the program may be in another directory, so later lines are judged from the home folder,
+as a line typed into a terminal application is. What the program prints is untrusted: an installer, a remote shell
+or a REPL prints what other people wrote. Text typed while
 the program's last line asks for a password is a ``credential``: a ``yolo`` run types it, alone so that no command goes
 with it unjudged, and the policy records it; in ``ask`` and ``auto`` the tool refuses, as the browser refuses a password
 field, since nobody else can type into the session.
@@ -16,10 +20,10 @@ from pydantic import Field
 from dotagent.core.errors import ToolInputError
 from dotagent.core.text import truncate_middle
 from dotagent.policy.paths import classify_path, expand_path
-from dotagent.policy.shell import ShellAssessment, assess_shell
+from dotagent.policy.shell import ShellAssessment, assess_shell, assess_typed, typed_lines
 from dotagent.policy.types import ActionInfo, ActionKind, Flag, Risk
-from dotagent.terminal.session import TerminalSession, typed_lines
-from dotagent.tools.base import ACTING_MODES, RegisteredTool, ToolArgs, ToolResult, make_tool, ok
+from dotagent.terminal.session import TerminalSession
+from dotagent.tools.base import ACTING_MODES, RegisteredTool, ToolArgs, ToolResult, make_tool, mark_untrusted, ok
 from dotagent.tools.context import ToolContext
 
 # How long terminal_open waits for the first output of the program.
@@ -59,9 +63,10 @@ def _action(tool: str, kind: ActionKind, risk: Risk, summary: str, target: str, 
     return ActionInfo(tool=tool, kind=kind, risk=risk, summary=summary, target=target, flags=flags)
 
 
-def _command_action(tool: str, verb: str, command: str, cwd: Path, ctx: ToolContext) -> ActionInfo:
-    """``command`` judged as ``shell`` judges it, run in ``cwd``."""
-    assessment: ShellAssessment = assess_shell(command, cwd, ctx.workspace, ctx.runtime.protected)
+def _command_action(
+    tool: str, verb: str, command: str, cwd: Path, assessment: ShellAssessment, ctx: ToolContext
+) -> ActionInfo:
+    """``command`` as ``assessment`` judged it, run in ``cwd``."""
     flags: tuple[Flag, ...] = assessment.flags
     if classify_path(cwd, ctx.workspace, ctx.runtime.protected) == "protected":
         flags = (*flags, "secret_access")
@@ -76,7 +81,9 @@ def _output(session: TerminalSession, text: str, wait_s: float) -> str:
     return body if body else f"[no new output from {session.id} in {wait_s:g} s]"
 
 
-def _secret_action(session: TerminalSession, lines: tuple[str, ...], rest: str, ctx: ToolContext) -> ActionInfo:
+def _secret_action(
+    session: TerminalSession, lines: tuple[str | None, ...], rest: str | None, ctx: ToolContext
+) -> ActionInfo:
     """Typing at a password prompt: ``lines`` and ``rest`` are what the text completes and leaves on the line."""
     if ctx.approvals != "yolo":
         raise ToolInputError(
@@ -113,12 +120,13 @@ async def _read(session: TerminalSession, wait_s: float, ctx: ToolContext) -> st
 def build_terminal_tools() -> tuple[RegisteredTool, ...]:
     def classify_open(args: OpenArgs, ctx: ToolContext) -> ActionInfo:
         cwd: Path = expand_path(args.cwd, ctx.workspace) if args.cwd else ctx.workspace
-        return _command_action("terminal_open", "Open a terminal for", args.command, cwd, ctx)
+        assessment: ShellAssessment = assess_shell(args.command, cwd, ctx.workspace, ctx.runtime.protected)
+        return _command_action("terminal_open", "Open a terminal for", args.command, cwd, assessment, ctx)
 
     async def run_open(args: OpenArgs, ctx: ToolContext) -> ToolResult:
         cwd: Path = expand_path(args.cwd, ctx.workspace) if args.cwd else ctx.workspace
         session: TerminalSession = await ctx.runtime.terminals.open(ctx.thread_id, args.command, cwd)
-        return ok(f"[session {session.id}: {args.command}]\n{await _read(session, _OPEN_WAIT_S, ctx)}")
+        return mark_untrusted(ok(f"[session {session.id}: {args.command}]\n{await _read(session, _OPEN_WAIT_S, ctx)}"))
 
     def classify_send(args: SendArgs, ctx: ToolContext) -> ActionInfo:
         session: TerminalSession = ctx.runtime.terminals.get(ctx.thread_id, args.session)
@@ -126,20 +134,24 @@ def build_terminal_tools() -> tuple[RegisteredTool, ...]:
         if session.awaiting_secret:
             return _secret_action(session, lines, rest, ctx)
         if not lines:
-            preview: str = truncate_middle(rest, _PREVIEW_CHARS)
+            preview: str = truncate_middle(rest if rest is not None else repr(args.text), _PREVIEW_CHARS)
             return _action("terminal_send", "shell", "low", f"Type into {session.id}: {preview}", session.command, ())
-        return _command_action("terminal_send", f"Type into {session.id}", "\n".join(lines), session.cwd, ctx)
+        cwd: Path = session.cwd if session.cwd_known else Path.home()
+        assessment: ShellAssessment = assess_typed(lines, cwd, ctx.workspace, ctx.runtime.protected)
+        known: list[str] = [line for line in lines if line is not None]
+        shown: str = "\n".join(known) if len(known) == len(lines) else repr(args.text)
+        return _command_action("terminal_send", f"Type into {session.id}", shown, cwd, assessment, ctx)
 
     async def run_send(args: SendArgs, ctx: ToolContext) -> ToolResult:
         session: TerminalSession = ctx.runtime.terminals.get(ctx.thread_id, args.session)
         session.send(args.text)
-        return ok(await _read(session, args.wait_s, ctx))
+        return mark_untrusted(ok(await _read(session, args.wait_s, ctx)))
 
     def classify_read(args: ReadArgs, ctx: ToolContext) -> ActionInfo:
         return _action("terminal_read", "read", "safe", f"Read the terminal {args.session}", args.session, ())
 
     async def run_read(args: ReadArgs, ctx: ToolContext) -> ToolResult:
-        return ok(await _read(ctx.runtime.terminals.get(ctx.thread_id, args.session), args.wait_s, ctx))
+        return mark_untrusted(ok(await _read(ctx.runtime.terminals.get(ctx.thread_id, args.session), args.wait_s, ctx)))
 
     def classify_close(args: CloseArgs, ctx: ToolContext) -> ActionInfo:
         return _action("terminal_close", "shell", "low", f"Close the terminal {args.session}", args.session, ())

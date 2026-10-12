@@ -9,7 +9,7 @@ from dataclasses import dataclass
 import httpx
 from pydantic import JsonValue
 
-from dotagent.core.errors import ProviderProtocolError, ProviderTransportError
+from dotagent.core.errors import JsonParseError, ProviderProtocolError, ProviderTransportError
 from dotagent.core.jsonutil import parse_json_object
 from dotagent.core.logs import get_logger
 from dotagent.core.retry import RetryPolicy, retry_async
@@ -121,7 +121,13 @@ async def _json_attempt(
     except transport_error_types() as exc:
         raise wrap_transport_error(exc, context) from exc
     await raise_for_provider_status(response, context, classify)
-    return parse_json_object(response.text, label)
+    try:
+        return parse_json_object(response.text, label)
+    except JsonParseError as exc:
+        # A success whose body is not JSON (a proxy's page, a cut body) breaks the wire format like any other (item 116).
+        raise ProviderProtocolError(
+            "the provider answered with a body that is not a JSON object", {**context, "error": exc.message}
+        ) from exc
 
 
 async def post_json(

@@ -23,6 +23,7 @@ from pathlib import Path
 
 from dotagent.core.errors import ToolExecutionError, ToolInputError
 from dotagent.core.logs import get_logger
+from dotagent.policy.shell import typed_lines
 from dotagent.tools.shell import kill_group
 
 log = get_logger(__name__)
@@ -51,13 +52,6 @@ def asks_for_secret(recent: str) -> bool:
     return _SECRET_PROMPT.search(plain_text(recent)) is not None
 
 
-def typed_lines(pending: str, text: str) -> tuple[tuple[str, ...], str]:
-    """The lines that typing ``text`` completes, the first one starting with ``pending`` (what was typed since the last
-    Enter), and what is left on the line after it."""
-    *lines, rest = (pending + text).replace("\r\n", "\n").replace("\r", "\n").split("\n")
-    return tuple(lines), rest
-
-
 def _controlling_terminal() -> None:
     """In the child, before the command starts: the pseudo-terminal on its stdin becomes its controlling terminal, so
     that programs that ask through /dev/tty (ssh, sudo) reach it."""
@@ -79,8 +73,11 @@ class TerminalSession:
         self._unread: str = ""
         self._dropped: int = 0
         self._recent: str = ""
-        # What was typed since the last Enter: the start of the line the next text completes.
-        self.pending_line: str = ""
+        # What was typed since the line was last empty: the start of the line the next text completes, or None once keys
+        # a line editor acts upon (an arrow, Tab, a Ctrl- shortcut) made it unknown.
+        self.pending_line: str | None = ""
+        # Whether the program is still where it started: once a line went in, a shell may have changed directory.
+        self.cwd_known: bool = True
         self.used_at: float = time.monotonic()
         self.ended: bool = False
         self._arrived: asyncio.Event = asyncio.Event()
@@ -121,7 +118,8 @@ class TerminalSession:
             )
         self.used_at = time.monotonic()
         os.write(self._master, text.encode())
-        _, self.pending_line = typed_lines(self.pending_line, text)
+        lines, self.pending_line = typed_lines(self.pending_line, text)
+        self.cwd_known = self.cwd_known and not lines
 
     async def read(self, wait_s: float) -> str:
         """What the program printed since the last read, as plain text: after waiting up to ``wait_s`` for something

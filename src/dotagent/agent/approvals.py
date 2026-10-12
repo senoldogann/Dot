@@ -51,16 +51,17 @@ class ApprovalBroker:
         future: asyncio.Future[ApprovalOutcome] = asyncio.get_running_loop().create_future()
         self._waiting[record.id] = future
         self._run_of[record.id] = run_id
-        await self._store.set_run_status(run_id, "blocked")
-        await self._bus.emit(
-            run_id,
-            "approval_requested",
-            {"approval_id": record.id, "tool": tool, "summary": summary, "severity": severity, "args": args},
-            True,
-        )
-        # What the question comes to when the wait is cut short from outside, which only a cancellation does.
+        # What the question comes to when the wait is cut short from outside, which only a cancellation does; one that
+        # comes while the run is being marked blocked is decided too, so the record never stays open (item 116).
         outcome: ApprovalOutcome = _abandoned(record.id, run_id)
         try:
+            await self._store.set_run_status(run_id, "blocked")
+            await self._bus.emit(
+                run_id,
+                "approval_requested",
+                {"approval_id": record.id, "tool": tool, "summary": summary, "severity": severity, "args": args},
+                True,
+            )
             outcome = await asyncio.wait_for(future, timeout=self._timeout_s)
         except TimeoutError:
             outcome = ApprovalOutcome(
@@ -70,7 +71,17 @@ class ApprovalBroker:
             self._waiting.pop(record.id, None)
             self._run_of.pop(record.id, None)
             # A decision made through ``resolve`` is stored already and stays as it is; the other endings are stored here.
-            await self._store.decide_approval(record.id, outcome.status, outcome.decided_by, outcome.note)
+            # The run acts on what is stored, also when the deadline passed while a person's decision was being stored.
+            stored: ApprovalRecord = await self._store.decide_approval(
+                record.id, outcome.status, outcome.decided_by, outcome.note
+            )
+            if stored.status in ("approved", "denied") and stored.status != outcome.status:
+                outcome = ApprovalOutcome(
+                    approval_id=record.id,
+                    status="approved" if stored.status == "approved" else "denied",
+                    decided_by=stored.decided_by or "",
+                    note=stored.note,
+                )
             await self._store.set_run_status(run_id, "running")
             await self._bus.emit(
                 run_id,
@@ -136,6 +147,9 @@ class ApprovalBroker:
             raise RunConflict("approval is not open", {"approval_id": approval_id, "status": record.status})
         status: Literal["approved", "denied"] = "approved" if approve else "denied"
         decided: ApprovalRecord = await self._store.decide_approval(approval_id, status, decided_by, note)
+        if (decided.status, decided.decided_by, decided.note) != (status, decided_by, note):
+            # Another decision was stored between the check above and this one (two tabs, the deadline, the run).
+            raise RunConflict("approval was decided meanwhile", {"approval_id": approval_id, "status": decided.status})
         future: asyncio.Future[ApprovalOutcome] | None = self._waiting.get(approval_id)
         if future is not None and not future.done():
             future.set_result(ApprovalOutcome(approval_id=approval_id, status=status, decided_by=decided_by, note=note))

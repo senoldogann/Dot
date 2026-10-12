@@ -3,7 +3,7 @@
 import asyncio
 
 from dotagent.config import AgentConfig
-from dotagent.core.errors import ProviderError
+from dotagent.core.errors import MissingSecretError, ProviderError
 from dotagent.core.logs import get_logger
 from dotagent.core.text import truncate_middle
 from dotagent.llm.calls import CallOrigin
@@ -69,7 +69,7 @@ async def text_for_blind_images(
     try:
         async with asyncio.timeout(config.model_call_timeout_s):
             description: str = await _describe(router, ref, caption, images, session_key, origin)
-    except (ProviderError, TimeoutError) as error:
+    except (ProviderError, MissingSecretError, TimeoutError) as error:
         log.warning("vision_relay_failed", model=ref.label, caption=truncate_middle(caption, 120), error=str(error))
         return (
             f"[You cannot see images and the vision model {ref.label} failed to describe this one: "

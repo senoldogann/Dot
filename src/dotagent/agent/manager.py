@@ -2,9 +2,11 @@
 
 import asyncio
 import time
-from collections.abc import Sequence
-from contextlib import AbstractAsyncContextManager, nullcontext
+from collections.abc import Collection, Coroutine, Iterator, Sequence
+from contextlib import AbstractAsyncContextManager, contextmanager, nullcontext
 from dataclasses import dataclass
+
+from pydantic import JsonValue
 
 from dotagent.agent.attachments import StoredAttachment, UserInput, attachment_summary
 from dotagent.agent.campaign import (
@@ -115,11 +117,27 @@ def _answer_text(question: ApprovalRecord, answer: str) -> str:
     return f"Answer to your question “{question.summary}”: {answer}"
 
 
+async def _uncancelled(work: Coroutine[object, object, None]) -> None:
+    """Run ``work`` to its end even when the caller is cancelled meanwhile (a second stop of a run while its end is
+    being recorded), then raise the cancellation (item 116)."""
+    task: asyncio.Task[None] = asyncio.ensure_future(work)
+    cancelled: bool = False
+    while not task.done():
+        try:
+            await asyncio.shield(task)
+        except asyncio.CancelledError:
+            cancelled = True
+    if cancelled:
+        raise asyncio.CancelledError
+    task.result()
+
+
 class RunManager:
     """Owns the live runs of one process. At most ``max_concurrent_runs`` execute at the same time.
 
-    Runs that other runs delegate work to do not count against that limit: their parent holds a place while it waits
-    for them, so a full set of waiting parents would otherwise keep every delegated run from ever starting.
+    Runs that other runs wait for (a delegated run, a message to an agent) do not count against that limit: their parent
+    holds a place while it waits for them, so a full set of waiting parents would otherwise keep every one of them from
+    ever starting.
     """
 
     def __init__(self, runtime: Runtime) -> None:
@@ -146,6 +164,26 @@ class RunManager:
 
     def active_run_ids(self) -> list[str]:
         return list(self._handles)
+
+    @contextmanager
+    def deleting_threads(self, thread_ids: Collection[str]) -> Iterator[None]:
+        """Keep new runs off ``thread_ids`` while they are deleted. A thread with a run under way or about to start
+        stops it: ``RunConflict`` names them, and nothing is held. The check and the claim have no await between
+        them, as in :meth:`_claim_thread`."""
+        wanted: set[str] = set(thread_ids)
+        busy: list[str] = sorted(
+            thread_id
+            for thread_id in wanted
+            if thread_id in self._claimed or any(handle.thread_id == thread_id for handle in self._handles.values())
+        )
+        if busy:
+            named: list[JsonValue] = list(busy)
+            raise RunConflict("chats with a run under way cannot be deleted", {"thread_ids": named})
+        self._claimed.update(wanted)
+        try:
+            yield
+        finally:
+            self._claimed.difference_update(wanted)
 
     async def start(
         self,
@@ -852,57 +890,65 @@ class RunManager:
             campaign_id,
             agent_id,
         )
-        await runtime.bus.emit(
-            run.id,
-            "run_queued",
-            {
-                "goal": goal,
-                "mode": mode,
-                "model": model_ref,
-                "effort": level,
-                "approvals": approval_mode,
-                "goal_mode": with_goal_mode,
-                "parent_run_id": parent_run_id,
-                "agent_id": agent_id,
-                "models": {
-                    "steps": model_ref,
-                    "compaction": model_ref,
-                    "review": runtime.config.models.review,
-                    "vision": runtime.config.models.vision,
-                },
-            },
-            True,
-        )
-        gate: RunGate = RunGate(
-            runtime.store,
-            runtime.bus,
-            runtime.approvals,
-            run.id,
-            run.mode,
-            runtime.config.policy.preset,
-            runtime.config.policy.pace,
-            runtime.config.policy.spend,
-            approval_mode,
-            reviewer_for(
-                runtime.router,
-                runtime.config.models.review,
-                runtime.config.agent.model_call_timeout_s,
-                f"{thread_id}:review",
+        # Until the handle is registered no task will end the stored run: one that fails or is cancelled before
+        # that ends here, failed, instead of staying queued.
+        registered: bool = False
+        try:
+            await runtime.bus.emit(
                 run.id,
-            ),
-            instructions,
-        )
-        if parent is not None and parent.gate.tainted:
-            gate.taint()
-        cancel: asyncio.Event = asyncio.Event()
-        inbox: asyncio.Queue[UserInput] = asyncio.Queue()
-        finished: asyncio.Event = asyncio.Event()
-        task: asyncio.Task[None] = asyncio.create_task(
-            self._drive(run, gate, cancel, inbox, opening, finished), name=run.id
-        )
-        handle: RunHandle = RunHandle(run.id, thread_id, parent_run_id, task, gate, cancel, inbox, finished)
-        self._handles[run.id] = handle
-        return run, handle
+                "run_queued",
+                {
+                    "goal": goal,
+                    "mode": mode,
+                    "model": model_ref,
+                    "effort": level,
+                    "approvals": approval_mode,
+                    "goal_mode": with_goal_mode,
+                    "parent_run_id": parent_run_id,
+                    "agent_id": agent_id,
+                    "models": {
+                        "steps": model_ref,
+                        "compaction": model_ref,
+                        "review": runtime.config.models.review,
+                        "vision": runtime.config.models.vision,
+                    },
+                },
+                True,
+            )
+            gate: RunGate = RunGate(
+                runtime.store,
+                runtime.bus,
+                runtime.approvals,
+                run.id,
+                run.mode,
+                runtime.config.policy.preset,
+                runtime.config.policy.pace,
+                runtime.config.policy.spend,
+                approval_mode,
+                reviewer_for(
+                    runtime.router,
+                    runtime.config.models.review,
+                    runtime.config.agent.model_call_timeout_s,
+                    f"{thread_id}:review",
+                    run.id,
+                ),
+                instructions,
+            )
+            if parent is not None and parent.gate.tainted:
+                gate.taint()
+            cancel: asyncio.Event = asyncio.Event()
+            inbox: asyncio.Queue[UserInput] = asyncio.Queue()
+            finished: asyncio.Event = asyncio.Event()
+            task: asyncio.Task[None] = asyncio.create_task(
+                self._drive(run, gate, cancel, inbox, opening, finished), name=run.id
+            )
+            handle: RunHandle = RunHandle(run.id, thread_id, parent_run_id, task, gate, cancel, inbox, finished)
+            self._handles[run.id] = handle
+            registered = True
+            return run, handle
+        finally:
+            if not registered:
+                await _uncancelled(runtime.store.finish_run(run.id, "failed", "the run could not be started"))
 
     async def _instructions_for(
         self, goal: str, thread_id: str, parent_run_id: str | None, parent: RunHandle | None
@@ -938,7 +984,7 @@ class RunManager:
             )
 
     def _place_for(self, run: RunRecord) -> AbstractAsyncContextManager[None]:
-        return nullcontext() if run.source == DELEGATE_SOURCE else self._slots
+        return nullcontext() if run.source in (DELEGATE_SOURCE, TEAM_SOURCE) else self._slots
 
     async def _drive(
         self,
@@ -989,17 +1035,7 @@ class RunManager:
             log.exception("run crashed", run_id=run.id)
         finally:
             try:
-                runtime.approvals.release_run(run.id)
-                inbox.shutdown()
-                await self._keep_answers(run, [inbox.get_nowait() for _ in range(inbox.qsize())])
-                clean: str = truncate_tail(redact_secrets(result), _RESULT_CHARS)
-                await runtime.store.finish_run(run.id, status, clean)
-                await runtime.store.close_memory_uses(run.id, status)
-                await runtime.bus.emit(
-                    run.id, "run_finished", {"status": status, "result": clean, "needs": redact_secrets(needs)}, True
-                )
-                if run.campaign_id is not None and not self._stopping:
-                    await self._follow_session(run, run.campaign_id, classify_ending(status, clean), needs)
+                await _uncancelled(self._record_end(run, status, result, needs, inbox))
             finally:
                 self._handles.pop(run.id, None)
                 finished.set()
@@ -1008,6 +1044,25 @@ class RunManager:
             self._learning[run.id] = asyncio.create_task(self._learn(lessons))
         if not self._stopping and playbook_case(runtime.config, run, status) is not None:
             self._distilling[run.id] = asyncio.create_task(self._distil(run, status))
+
+    async def _record_end(
+        self, run: RunRecord, status: RunStatus, result: str, needs: str, inbox: asyncio.Queue[UserInput]
+    ) -> None:
+        """Store how the run ended and tell about it: its waiters are released and its inbox shut, the answers it got
+        too late are kept, the status and result are stored and sent, and what follows a campaign's session is
+        planned."""
+        runtime: Runtime = self._runtime
+        runtime.approvals.release_run(run.id)
+        inbox.shutdown()
+        await self._keep_answers(run, [inbox.get_nowait() for _ in range(inbox.qsize())])
+        clean: str = truncate_tail(redact_secrets(result), _RESULT_CHARS)
+        await runtime.store.finish_run(run.id, status, clean)
+        await runtime.store.close_memory_uses(run.id, status)
+        await runtime.bus.emit(
+            run.id, "run_finished", {"status": status, "result": clean, "needs": redact_secrets(needs)}, True
+        )
+        if run.campaign_id is not None and not self._stopping:
+            await self._follow_session(run, run.campaign_id, classify_ending(status, clean), needs)
 
     async def _follow_session(self, run: RunRecord, campaign_id: str, ending: Ending, needs: str) -> None:
         """Plan what follows a session of a campaign that ended as ``ending`` (one the daemon stopped is planned by

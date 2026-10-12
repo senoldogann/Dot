@@ -117,6 +117,12 @@ def _send(keys: PushKeys, subscription: PushSubscription, message: PushMessage) 
             "the push service did not take the message",
             {"endpoint": subscription.endpoint, "status": status, "detail": str(exc)},
         ) from exc
+    except OSError as exc:
+        # The network failed on the way (requests raises its errors as OSError): the service never answered.
+        raise PushError(
+            "the push service could not be reached",
+            {"endpoint": subscription.endpoint, "status": None, "detail": str(exc)},
+        ) from exc
 
 
 async def send_push(keys: PushKeys, subscription: PushSubscription, message: PushMessage) -> None:
@@ -130,10 +136,15 @@ def gone(error: PushError) -> bool:
 
 
 async def _next_event(queue: asyncio.Queue[EventRecord], stopping: asyncio.Event) -> EventRecord | None:
-    try:
-        return await asyncio.wait_for(queue.get(), _WAIT_S)
-    except TimeoutError:
-        return None if stopping.is_set() else await _next_event(queue, stopping)
+    """The next event of ``queue``, or None once the daemon starts to stop. It waits a second at a time so that a stop
+    is seen while nothing happens, in a loop: a call per quiet second would run out of stack in a quarter of an hour
+    (item 116)."""
+    while not stopping.is_set():
+        try:
+            return await asyncio.wait_for(queue.get(), _WAIT_S)
+        except TimeoutError:
+            continue
+    return None
 
 
 async def push_event(store: Store, keys: PushKeys, event: EventRecord) -> None:
@@ -155,9 +166,14 @@ async def push_event(store: Store, keys: PushKeys, event: EventRecord) -> None:
 
 
 async def watch_pushes(store: Store, bus: EventBus, keys: PushKeys, stopping: asyncio.Event) -> None:
-    """Send every subscription what the lifecycle events say, until the daemon starts to stop."""
+    """Send every subscription what the lifecycle events say, until the daemon starts to stop. An event that cannot
+    be pushed (its run was deleted, the store failed) is logged and the next one still goes."""
     async with bus.subscribe(None) as feed:
         while not stopping.is_set():
             event: EventRecord | None = await _next_event(feed.queue, stopping)
-            if event is not None and event.kind in PUSH_KINDS:
+            if event is None or event.kind not in PUSH_KINDS:
+                continue
+            try:
                 await push_event(store, keys, event)
+            except DotError as error:
+                log.warning("push_event_failed", run_id=event.run_id, kind=event.kind, error=str(error))

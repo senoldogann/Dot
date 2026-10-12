@@ -5,7 +5,7 @@ riskier than the action alone, never safer. The policy engine decides what the r
 """
 
 import re
-from collections.abc import Collection, Sequence
+from collections.abc import Collection, Mapping, Sequence
 from pathlib import Path
 from typing import Literal
 
@@ -21,7 +21,7 @@ from dotagent.policy.elements import (
     quiet_assessment,
     typing_reasons,
 )
-from dotagent.policy.shell import ShellAssessment, assess_shell
+from dotagent.policy.shell import ShellAssessment, assess_typed, typed_lines
 from dotagent.policy.types import Flag, Risk
 
 type AppRole = Literal["terminal", "system_settings", "secrets", "messaging", "finder", "other"]
@@ -120,6 +120,10 @@ _QUIT_ITEM: re.Pattern[str] = re.compile(r"(?i)\bquit\b|\b[çc][ıi]k(?:\s|$)")
 _SEND_KEYS: frozenset[frozenset[str]] = frozenset({frozenset(), frozenset({"cmd"})})
 _MAIL_SEND_MODIFIERS: frozenset[str] = frozenset({"cmd", "shift"})
 _SHELL_FLOOR: Risk = "medium"
+# What a key sends to the program in a terminal, as text; Escape stands for any other key a line editor acts upon.
+_SENT_KEYS: dict[str, str] = {"return": "\n", "delete": "\x7f", "space": " ", "tab": "\t"}
+_ESCAPE: str = "\x1b"
+_LINE_KEEPING_ACTIONS: frozenset[str] = frozenset({"hover", "scroll", "wait", "activate"})
 
 _SECRETS_ASSESSMENT: StepAssessment = StepAssessment(
     risk="high", flags=("secret_access",), reasons=("works inside a password manager or the keychain",)
@@ -130,12 +134,15 @@ _SETTINGS_ASSESSMENT: StepAssessment = StepAssessment(
 
 
 class StepContext(FrozenModel):
-    """What a step acts upon, read from the machine right before the step: the application, the control, its secrecy."""
+    """What a step acts upon, read from the machine right before the step: the application, the control, its secrecy,
+    and in a terminal the command line as far as Dot typed it since the line was last empty (``None`` when that cannot
+    be told, and outside a terminal)."""
 
     role: AppRole
     app: str
     element: Element | None
     secure: bool
+    line: str | None
 
 
 def _key(text: str) -> str:
@@ -181,12 +188,49 @@ def enters_text(chord: Chord) -> bool:
 
 
 def reaches_a_shell(step: Step, context: StepContext) -> bool:
-    """Whether a step puts text or Return into a terminal, which makes it a shell command."""
-    if context.role != "terminal":
-        return False
+    """Whether a step puts text or keys into a terminal, where Return or a Ctrl- shortcut runs the line."""
+    return context.role == "terminal" and step.action in ("type", "paste", "key")
+
+
+def _keys_sent(chord: Chord) -> str | None:
+    """What a chord sends to the program in a terminal: Return, Delete, Space and Tab as their characters, a Ctrl-
+    letter as its control character, Escape for any other key a line editor acts upon (an arrow, a function key, an
+    Option or Shift combination, Cmd-V and its clipboard). ``None`` for a chord whose text depends on the keyboard
+    layout or that the terminal application keeps (another Cmd shortcut may open or switch a tab): the line is then
+    unknown, and nothing ran."""
+    modifiers: frozenset[str] = frozenset(chord.modifiers)
+    if "cmd" in modifiers:
+        return _ESCAPE if chord.key == "v" else None
+    if modifiers == {"ctrl"} and len(chord.key) == 1 and chord.key.isalpha():
+        return chr(ord(chord.key) & 0x1F)
+    if not modifiers and chord.key in _SENT_KEYS:
+        return _SENT_KEYS[chord.key]
+    if not modifiers and len(chord.key) == 1:
+        return None
+    return _ESCAPE
+
+
+def _line_after(line: str | None, step: Step) -> str | None:
+    """A terminal's command line after ``step`` in it; ``None`` once a click, focus, menu, drag or set_value may have
+    switched tabs, pasted or replaced text."""
+    if step.action in _LINE_KEEPING_ACTIONS:
+        return line
     if step.action in ("type", "paste"):
-        return True
-    return step.action == "key" and step.key is not None and parse_chord(step.key).key == "return"
+        return typed_lines(line, step.text or "")[1]
+    sent: str | None = _keys_sent(parse_chord(step.key)) if step.action == "key" and step.key is not None else None
+    return None if sent is None else typed_lines(line, sent)[1]
+
+
+def lines_after(lines: Mapping[str, str], step: Step, context: StepContext) -> dict[str, str]:
+    """The command line of each terminal application, by name, as far as Dot typed it, after ``step``: one that cannot
+    be told is left out. A drag may drop a path into any terminal."""
+    if step.action == "drag":
+        return {}
+    if context.role != "terminal":
+        return dict(lines)
+    others: dict[str, str] = {app: line for app, line in lines.items() if app != context.app}
+    after: str | None = _line_after(context.line, step)
+    return others if after is None else {**others, context.app: after}
 
 
 def exceeds(live: StepAssessment, risk: Risk, flags: Collection[Flag]) -> bool:
@@ -194,9 +238,13 @@ def exceeds(live: StepAssessment, risk: Risk, flags: Collection[Flag]) -> bool:
     return _RISK_ORDER.index(live.risk) > _RISK_ORDER.index(risk) or any(flag not in flags for flag in live.flags)
 
 
-def _terminal_text(text: str, workspace: Path, protected: tuple[Path, ...]) -> StepAssessment:
-    """Text typed into a terminal is a shell command the moment Return follows, so it is judged like one."""
-    shell: ShellAssessment = assess_shell(text, Path.home(), workspace, protected)
+def _terminal_input(line: str | None, sent: str, workspace: Path, protected: tuple[Path, ...]) -> StepAssessment:
+    """Keys sent to a terminal after ``line``: the lines they run are shell commands, judged whole with what Dot typed
+    on them before, from the home folder, since the terminal may be anywhere."""
+    lines, _ = typed_lines(line, sent)
+    if not lines:
+        return StepAssessment(risk="low", flags=(), reasons=("types on the command line of a terminal",))
+    shell: ShellAssessment = assess_typed(lines, Path.home(), workspace, protected)
     risk: Risk = max((shell.risk, _SHELL_FLOOR), key=_RISK_ORDER.index)
     return StepAssessment(
         risk=risk, flags=shell.flags, reasons=tuple(f"terminal input: {reason}" for reason in shell.reasons)
@@ -212,15 +260,20 @@ def _typing_parts(
     parts: list[StepAssessment] = [assessment_for(reasons)]
     text: str = step.text or ""
     if context.role == "terminal" and step.action != "set_value":
-        parts.append(_terminal_text(text, workspace, protected))
+        parts.append(_terminal_input(context.line, text, workspace, protected))
     if context.role == "messaging" and step.action == "type" and "\n" in text:
         parts.append(StepAssessment(risk="medium", flags=("external_send",), reasons=("a newline sends the message",)))
     return parts
 
 
-def _chord_parts(chord: Chord, context: StepContext) -> list[StepAssessment]:
+def _chord_parts(
+    chord: Chord, context: StepContext, workspace: Path, protected: tuple[Path, ...]
+) -> list[StepAssessment]:
     modifiers: frozenset[str] = frozenset(chord.modifiers)
     parts: list[StepAssessment] = []
+    sent: str | None = _keys_sent(chord) if context.role == "terminal" else None
+    if sent is not None:
+        parts.append(_terminal_input(context.line, sent, workspace, protected))
     if enters_text(chord):
         parts.append(assessment_for(typing_reasons(context.element, None) + (["credential"] if context.secure else [])))
     if chord.key == "q" and modifiers == {"cmd"}:
@@ -238,8 +291,6 @@ def _chord_parts(chord: Chord, context: StepContext) -> list[StepAssessment]:
                 reasons=("empties the Trash" if empties else "moves the selection to the Trash or deletes it",),
             )
         )
-    if chord.key == "return" and context.role == "terminal" and not modifiers:
-        parts.append(StepAssessment(risk="medium", flags=(), reasons=("runs the command line in a terminal",)))
     sends_with_return: bool = chord.key == "return" and modifiers in _SEND_KEYS
     sends_mail: bool = chord.key == "d" and modifiers == _MAIL_SEND_MODIFIERS
     if context.role == "messaging" and (sends_with_return or sends_mail):
@@ -270,7 +321,7 @@ def assess_step(step: Step, context: StepContext, workspace: Path, protected: tu
     if step.action in _CLICK_ACTIONS:
         parts.append(assessment_for(clicking_reasons(context.element, DESKTOP_CLICKABLE_ROLES)))
     if step.action == "key" and step.key is not None:
-        parts.extend(_chord_parts(parse_chord(step.key), context))
+        parts.extend(_chord_parts(parse_chord(step.key), context, workspace, protected))
     if step.action == "menu" and step.path:
         parts.extend(_menu_parts(step.path))
     return combine_assessments(parts)

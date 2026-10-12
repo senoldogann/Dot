@@ -229,7 +229,18 @@ export async function follow({ path, after, signal, onMessage, onState, isFinish
   }
 }
 
+// The screenshots of the page on screen, by name: a page change lets them go (`forgetImages`), so a window kept open
+// for days does not keep every screenshot it ever showed.
 const images = new Map();
+
+/** Let go of the screenshots' `blob:` URLs: the page that showed them has closed. */
+export function forgetImages() {
+  for (const pending of images.values()) {
+    // A screenshot that failed was reported where it was shown; there is no URL to let go of.
+    pending.then((url) => URL.revokeObjectURL(url), () => undefined);
+  }
+  images.clear();
+}
 
 /** A `blob:` URL for a stored screenshot; images need the token, so they cannot be plain `<img src>` links. */
 export function imageUrl(name) {

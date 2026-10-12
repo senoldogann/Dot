@@ -180,8 +180,10 @@ export function approvalCard({ approval, heading, onSettled, leftNote }) {
       }
       decide(approve, note.value.trim());
     };
+    // Enter sends an answer to a question; on any other card it does nothing, so a note that says "no" never
+    // approves the action (item 116).
     note.addEventListener("keydown", (event) => {
-      if (event.key === "Enter") {
+      if (event.key === "Enter" && isQuestion) {
         event.preventDefault();
         submit(true);
       }

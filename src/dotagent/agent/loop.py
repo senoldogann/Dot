@@ -146,6 +146,7 @@ from dotagent.core.errors import (
     MissingSecretError,
     NotFoundError,
     ProviderError,
+    ProviderTransportError,
     RunCancelled,
     ToolInputError,
 )
@@ -158,6 +159,7 @@ from dotagent.llm.router import ModelRef, parse_model_ref, unavailable_reason
 from dotagent.llm.traits import effective_effort
 from dotagent.llm.types import (
     ChatRequest,
+    DeltaSink,
     Effort,
     Message,
     ModelInfo,
@@ -386,8 +388,8 @@ async def _model_summary(
                 reply: ModelReply = await agent.runtime.router.complete(
                     ref, request, _discard, CallOrigin(run_id=agent.run.id, purpose="compaction")
                 )
-        except (ProviderError, TimeoutError) as error:
-            problem = error.message if isinstance(error, ProviderError) else "the summary request timed out"
+        except (ProviderError, MissingSecretError, TimeoutError) as error:
+            problem = "the summary request timed out" if isinstance(error, TimeoutError) else error.message
             log.warning("summary_failed", run_id=agent.run.id, model=ref.label, attempt=attempt, error=problem)
             return None, attempt, problem
         text: str = reply.text.strip()
@@ -880,7 +882,7 @@ async def _ask_checker(
             )
     try:
         return await checker(request)
-    except ProviderError as error:
+    except (ProviderError, MissingSecretError) as error:
         log.error("goal_check_failed", run_id=run.id, error=error.message, context=error.context)
         await agent.runtime.bus.emit(
             run.id,
@@ -1118,6 +1120,21 @@ async def _fitted(
     except ConfigError as error:
         return error.message
     return info, scaffold
+
+
+async def _complete_in_time(
+    runtime: Runtime, ref: ModelRef, request: ChatRequest, sink: DeltaSink, origin: CallOrigin, timeout_s: float
+) -> ModelReply:
+    """One step's model call, given ``timeout_s`` to answer. A model that does not answer in time fails like one whose
+    connection broke (``ProviderTransportError``), so a routed step goes back to the run's own model and the run ends
+    with what happened rather than an internal error (item 116)."""
+    try:
+        async with asyncio.timeout(timeout_s):
+            return await runtime.router.complete(ref, request, sink, origin)
+    except TimeoutError as exc:
+        raise ProviderTransportError(
+            "the model did not answer in time", {"model": ref.label, "timeout_s": timeout_s}
+        ) from exc
 
 
 async def _to_standby(
@@ -1511,8 +1528,9 @@ async def run_agent(agent: AgentRun) -> RunEnd:
         steps += 1
         asked_at: float = time.monotonic()
         try:
-            async with asyncio.timeout(config.model_call_timeout_s):
-                reply: ModelReply = await runtime.router.complete(step_ref, request, sink, step_origin)
+            reply: ModelReply = await _complete_in_time(
+                runtime, step_ref, request, sink, step_origin, config.model_call_timeout_s
+            )
         except (ProviderError, MissingSecretError) as error:
             if routed is not None:
                 # The routed model could not answer: the step is asked again on the run's own model.

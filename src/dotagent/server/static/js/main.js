@@ -1,7 +1,7 @@
 // The entry point: sign-in, the frame with its sidebar and live indicators, and routing between the pages.
 
 import { loadLooks } from "./actors.js";
-import { ApiError, clearToken, hasToken, loadToken, onAuthLost, setToken } from "./api.js";
+import { ApiError, clearToken, forgetImages, hasToken, loadToken, onAuthLost, setToken } from "./api.js";
 import { setPageTitle, watchAttention } from "./attention.js";
 import { el } from "./dom.js";
 import { icon, wordmark } from "./icons.js";
@@ -160,6 +160,7 @@ function beginSession() {
     disposeView = () => undefined;
     shell.main.replaceChildren();
     clearStage();
+    forgetImages();
     const path = currentPath();
     const moved = MOVED.get(path);
     if (moved !== undefined) {
