@@ -43,6 +43,7 @@ from dotagent.notify.push import PushKeys, read_or_create_keys
 from dotagent.plugins.catalog import load_plugins, plugin_roots
 from dotagent.plugins.types import PluginCatalog
 from dotagent.policy.paths import expand_protected
+from dotagent.policy.sandbox import UNSANDBOXED, Sandbox, build_sandbox, check_sandbox
 from dotagent.scheduler.timing import resolve_zone
 from dotagent.secrets import resolve_secret
 from dotagent.store.db import Store
@@ -104,6 +105,9 @@ class Runtime:
     protected: tuple[Path, ...]
     # What the agent may read but never change (:func:`_dot_paths`).
     dot_paths: tuple[Path, ...]
+    # Where the processes of a run start outside yolo (:mod:`dotagent.policy.sandbox`); UNSANDBOXED when [shell] sandbox
+    # is off.
+    sandbox: Sandbox
     shell_env: dict[str, str]
     # The web push key pair the daemon signs with (item 52).
     push_keys: PushKeys
@@ -173,6 +177,18 @@ def _dot_paths(config: AppConfig) -> tuple[Path, ...]:
     )
 
 
+async def _run_sandbox(config: AppConfig, protected: tuple[Path, ...], dot_paths: tuple[Path, ...]) -> Sandbox:
+    """The sandbox the processes of a run start in outside yolo, checked to start: a command kept out of Dot's guarded
+    files and from changing ``dot_paths``, a search out of every ``protected`` location too; ``UNSANDBOXED`` when
+    [shell] sandbox is off."""
+    if not config.shell.sandbox:
+        return UNSANDBOXED
+    sealed: tuple[Path, ...] = await asyncio.to_thread(expand_protected, [], _guarded_files())
+    sandbox: Sandbox = build_sandbox(sealed, protected, dot_paths)
+    await check_sandbox(sandbox)
+    return sandbox
+
+
 def _call_recorder(store: Store, bus: EventBus) -> CallRecorder:
     """What becomes of a measured model call: its tokens join the totals of its run, which gets a ``model_call`` event;
     a call outside any run is logged."""
@@ -215,6 +231,7 @@ async def open_runtime(config: AppConfig, login_env: dict[str, str]) -> Runtime:
         expand_protected, config.policy.protected_paths, _guarded_files()
     )
     dot_paths: tuple[Path, ...] = await asyncio.to_thread(expand_protected, [], _dot_paths(config))
+    sandbox: Sandbox = await _run_sandbox(config, protected, dot_paths)
     schedule_zone: ZoneInfo = await asyncio.to_thread(resolve_zone, config.scheduler.timezone)
     shell_env: dict[str, str] = child_env(login_env, config.shell.pass_env)
     ollama_key: str | None = await asyncio.to_thread(resolve_secret, config.providers.ollama.api_key_env)
@@ -261,6 +278,7 @@ async def open_runtime(config: AppConfig, login_env: dict[str, str]) -> Runtime:
             plugins=plugins,
             protected=protected,
             dot_paths=dot_paths,
+            sandbox=sandbox,
             push_keys=push_keys,
             shell_env=shell_env,
             workspace=workspace_dir(),

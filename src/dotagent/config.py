@@ -289,6 +289,7 @@ class ShellConfig(FrozenModel):
     terminal_sessions: int = Field(ge=0, le=10)
     # At least the longest wait of a terminal read, so that no session is closed while it is read.
     terminal_idle_s: float = Field(ge=60)
+    sandbox: bool
 
 
 class CrawlConfig(FrozenModel):

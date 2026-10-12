@@ -472,8 +472,18 @@ untrusted as its parent.
   line that writes there by a copy or a move (its target folder option too), `dd`, a redirect, a download, a clone, an
   unpacked archive, git run in one of those folders, a file edited in place (`sed -i`, `perl -i`, `ruby -i`) or inline
   code that names the place (in a word of switches such as `-pe` too). The guard reads the line, not what a program
-  does: a script the run writes and then runs is judged as running a script. A plugin's MCP servers start with the
-  daemon and are given keys from the key store: put a plugin or a skill in place yourself.
+  does; the sandbox below holds what it cannot read. A plugin's MCP servers start with the daemon and are given keys
+  from the key store: put a plugin or a skill in place yourself.
+- Outside a `yolo` run the processes of a run start in a macOS sandbox (`sandbox-exec`; `[shell] sandbox`, on by
+  default): a shell command, a terminal session, an AppleScript and what it runs can neither read nor change Dot's own
+  files above (its key file, token, push key, browser profile, configuration, database and journals, and the data
+  directory of your Chrome), nor change what Dot loads and runs, nor rename a folder above any of them, whatever program
+  does it: a script the run wrote, code that builds the path, a link, another letter case. macOS answers
+  `Operation not permitted`. The search tools may not read your protected locations either; a command still may (ssh and
+  git read their keys there), and for those the guard reads its line. macOS starts no program that runs as root inside
+  the sandbox (`ps`, `top`, `sudo`, `crontab`): `pgrep -lf` and `lsof` work, a `yolo` run runs them,
+  `[shell] sandbox = false` turns the sandbox off. A program a command has act for it (Terminal through `open`, a
+  launchd job, an application driven by Apple Events) acts outside the sandbox.
 
 **Typed judgments (optional, off by default).** The policy reads what a click does from the control's label, with
 patterns in English and Turkish, and a few in Finnish ("Post", "Send", "Delete", "Pay now", "Paylaş", "Lähetä"…); a
@@ -562,14 +572,15 @@ the same way, except in a run nobody can answer during it (see
 - before each step of a desktop batch Dot checks that the pointer is where the previous step left it; if someone else is
   moving the mouse, the rest of the batch is not run
 
-> **The shell guardrail is best-effort, not a sandbox.** Dot reads a shell command before it runs it and judges what it
-> would touch: it reads the line as the shell does (quotes, comments, here-documents, the commands substituted into
-> it, a `cd`, a variable, a link it makes, a wrapper such as `bash -c`, `env` or `xargs`), compares paths without case,
-> and treats what it cannot read (a command named by a substitution, `eval` of one, a line it cannot parse) as a
-> destructive step outside the workspace, which every preset asks about. It does not follow what a recursive command
-> does inside the folders it walks, nor the code of a script it runs, and a shell can do more than any analysis can
-> foresee. Treat Dot as a user of your account with the rights of your account: keep backups, keep the workspace for
-> scratch work, and use `balanced` or `cautious` on a machine where a mistake would be expensive.
+> **The shell guardrail is best-effort; the sandbox holds only Dot's own files.** Dot reads a shell command before it
+> runs it and judges what it would touch: it reads the line as the shell does (quotes, comments, here-documents, the
+> commands substituted into it, a `cd`, a variable, a link it makes, a wrapper such as `bash -c`, `env` or `xargs`),
+> compares paths without case, and treats what it cannot read (a command named by a substitution, `eval` of one, a line
+> it cannot parse) as a destructive step outside the workspace, which every preset asks about. It does not follow what a
+> recursive command does inside the folders it walks, nor the code of a script it runs; the sandbox keeps those out of
+> Dot's own files, not out of yours, and a shell can do more than any analysis can foresee. Treat Dot as a user of your
+> account with the rights of your account: keep backups, keep the workspace for scratch work, and use `balanced` or
+> `cautious` on a machine where a mistake would be expensive.
 
 ## Autonomy: approvals, goal mode and the end of a run
 
@@ -1855,7 +1866,8 @@ src/dotagent/
   the static files and a mocked API, and the API itself in the server smoke tests; the two were not run together against a
   live daemon. No model worked from a real skill or plugin folder (discovery, `dotx skills list` and the `skill` tool ran
   on real folders).
-- The shell guardrail is best-effort and not a sandbox (see [Safety](#safety)).
+- The shell guardrail is best-effort, and the sandbox of a run's processes keeps them out of Dot's own files only (see
+  [Safety](#safety)).
 - DuckDuckGo answers a burst of searches with its bot check (HTTP 202) and Brave Search with a rate limit (HTTP 429)
   after a handful in quick succession. Dot spaces its searches (`search_spacing_s`), benches an engine that limits it
   and moves to the next rung, so a search fails outright only when every engine does (`dotx stats` counts these under

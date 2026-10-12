@@ -349,6 +349,11 @@ max_timeout_s = 1800
 # without a read or a send, and all of them when the daemon stops. The end of a run closes none.
 terminal_sessions = 3
 terminal_idle_s = 1800.0
+# Outside yolo, the processes of a run (shell commands, terminal sessions, AppleScript, the search tools) start in a
+# macOS sandbox that keeps them out of Dot's own files: its keys, token, settings, database, browser profiles and
+# journals, and what it loads and runs (plugins, skills, playbooks, the emergency stop). macOS starts no program that
+# runs as root inside it (ps, top, sudo). false starts them without it; the shell guard still reads every line.
+sandbox = true
 
 [web]
 # "auto" climbs a ladder of engines until one answers: the hosted web_search API of Ollama when OLLAMA_API_KEY is set

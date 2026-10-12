@@ -12,9 +12,11 @@ _SCRIPT_CONTEXT_CHARS: int = 600
 _REAP_TIMEOUT_S: float = 5.0
 
 
-async def run_osascript(language: ScriptLanguage, script: str, timeout_s: float) -> str:
-    """The script's result as text. A script that waits for an Automation approval the user never sees times out."""
+async def run_osascript(language: ScriptLanguage, script: str, confinement: tuple[str, ...], timeout_s: float) -> str:
+    """The script's result as text, ``osascript`` started by ``confinement`` (the words of a run's sandbox, or
+    none). A script that waits for an Automation approval the user never sees times out."""
     process: asyncio.subprocess.Process = await asyncio.create_subprocess_exec(
+        *confinement,
         "osascript",
         "-l",
         language,
