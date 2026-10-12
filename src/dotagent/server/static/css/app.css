@@ -1305,9 +1305,11 @@ a.pill:hover {
 
 /* ---------- composer ---------- */
 
-/* The home page holds a single composer, centred in both directions in the space under the top bar. The two outer rows of the
-   grid are equal, so the composer stays exactly in the middle; a run that waits for an answer sits in the upper row, just above
-   it, and only moves the composer once it no longer fits there. */
+/* The home page (item 124): Dot's greeting and the composer (`.home-start`) stand in the middle of the space under the top
+   bar, across and down, however long the day is. The upper row of the grid takes half of what their height
+   (`--home-start-h`, kept by runs.js) leaves of that space, less the gap; a run that waits for an answer sits there as
+   cards, just above them, and moves them down only once it no longer fits. The Today strip follows under the composer,
+   and the window scrolls to what does not fit. */
 .page[data-layout="home"] {
   display: flex;
   flex-direction: column;
@@ -1315,15 +1317,15 @@ a.pill:hover {
 }
 
 .home {
-  flex: 1;
   width: 100%;
   max-width: 768px;
   margin-inline: auto;
   display: grid;
   /* minmax(0, 1fr): a wide child (a long command in an approval) must shrink with the window, not stretch the column */
   grid-template-columns: minmax(0, 1fr);
-  /* The presence and the composer sit in the upper third; the Today strip (item 72) takes the room below them. */
-  grid-template-rows: minmax(0, 1fr) auto minmax(0, 3fr);
+  /* The space under the top bar is the window's height less the bar's and the page's padding above and below. */
+  grid-template-rows: minmax(max(0px, calc((100vh - var(--stagebar-h) - 48px - var(--home-start-h, 0px)) / 2 - 16px)), auto) auto auto;
+  grid-template-rows: minmax(max(0px, calc((100dvh - var(--stagebar-h) - 48px - var(--home-start-h, 0px)) / 2 - 16px)), auto) auto auto;
   row-gap: 16px;
 }
 
@@ -1381,6 +1383,41 @@ a.pill:hover {
   flex-direction: column;
   gap: var(--space-4);
   width: 100%;
+}
+
+/* A section's title is the button that folds it (item 124), as in the sidebar: the chevron points down while the
+   section is open, right while it is folded, and the count says how many rows the section holds. */
+.home-today-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.home-today-title .icon {
+  width: 14px;
+  height: 14px;
+  flex: none;
+  transform: rotate(90deg);
+  transition: transform var(--motion-quick) var(--ease);
+}
+
+.home-today-title[aria-expanded="false"] .icon {
+  transform: rotate(0deg);
+}
+
+.home-today-title:hover {
+  color: var(--text);
+}
+
+.home-today-count {
+  color: var(--muted);
+  font-weight: var(--weight-text);
 }
 
 .home-today-list .activity-row:first-child {
@@ -3278,6 +3315,7 @@ dialog.lightbox img {
 
   .switch::after,
   .chev,
+  .home-today-title .icon,
   .fold-body,
   .steps-body,
   .child > .timeline {

@@ -7,14 +7,18 @@ import { api } from "./api.js";
 import { el } from "./dom.js";
 import { liveFace, setActorState } from "./actors.js";
 import { dotName, overallState } from "./face.js";
+import { icon } from "./icons.js";
 import { nestRows } from "./nesting.js";
-import { readPref, writePref } from "./prefs.js";
+import { readFolds, readPref, writePref } from "./prefs.js";
 import { getSnapshot, onChange, onLifecycle } from "./state.js";
 
 const OWNER_KEY = "dot.owner";
 export const OWNER_CHARS = 40;
-// How many rows a section of the strip shows before "and N more" points at the Activity page.
-const ROWS_SHOWN = 5;
+// How many rows a section of the strip shows before "and N more" points at the Activity page: two, so the strip stays
+// short under the composer (item 124).
+const ROWS_SHOWN = 2;
+// Which sections of the strip the owner folded, kept between visits.
+const FOLDS_KEY = "dot.homeFolds";
 const SECTIONS = [
   { key: "waiting", title: "Waits for you" },
   { key: "working", title: "Working" },
@@ -84,11 +88,16 @@ function stripRows(activity, key) {
   return key === "working" ? activity.working.filter((row) => row.run_id !== null) : activity[key];
 }
 
-/** The sections of the Today strip that have rows: `{ key, title, rows, more }`, `more` the rows past the first five. */
+/** The sections of the Today strip that have rows: `{ key, title, count, rows, more }`. `rows` are the section's first
+ * two, a run without the runs it delegated (the Activity page nests those under it); `count` is every row the section
+ * holds and `more` the ones not shown. */
 export function todaySections(activity) {
-  return SECTIONS.map(({ key, title }) => ({ key, title, nested: nestRows(stripRows(activity, key)) }))
-    .filter(({ nested }) => nested.length > 0)
-    .map(({ key, title, nested }) => ({ key, title, rows: nested.slice(0, ROWS_SHOWN), more: Math.max(0, nested.length - ROWS_SHOWN) }));
+  return SECTIONS.map(({ key, title }) => ({ key, title, all: stripRows(activity, key) }))
+    .filter(({ all }) => all.length > 0)
+    .map(({ key, title, all }) => {
+      const rows = nestRows(all).slice(0, ROWS_SHOWN).map(({ row }) => row);
+      return { key, title, count: all.length, rows, more: all.length - rows.length };
+    });
 }
 
 // Where the face looks while the composer has the focus (down at it), and for how long it stays attentive after a
@@ -112,6 +121,7 @@ export function buildPresence() {
   let activity = null;
   let disposed = false;
   let moodTimer = 0;
+  let folds = readFolds(FOLDS_KEY);
 
   function expressFor(expression, ms) {
     clearTimeout(moodTimer);
@@ -130,6 +140,14 @@ export function buildPresence() {
     hello.textContent = greeting(new Date().getHours(), ownerName(), state);
   }
 
+  function toggleFold(key) {
+    folds = { ...folds, [key]: folds[key] !== true };
+    writePref(FOLDS_KEY, JSON.stringify(folds));
+    paintStrip();
+    // The paint replaced the title that had the focus: the new one takes it, so the keyboard stays where it was.
+    strip.querySelector(`[data-section="${key}"] .home-today-title`)?.focus();
+  }
+
   function paintStrip() {
     if (activity === null) {
       return;
@@ -138,22 +156,32 @@ export function buildPresence() {
     const sections = todaySections(activity);
     strip.hidden = sections.length === 0;
     strip.replaceChildren(
-      ...sections.map(({ key, title, rows, more }) =>
-        el(
+      ...sections.map(({ key, title, count, rows, more }) => {
+        const folded = folds[key] === true;
+        return el(
           "div",
           { class: "home-today-section", "data-section": key },
-          el("div", { class: "section-label" }, title),
           el(
-            "div",
-            { class: "home-today-list" },
-            ...rows.map(({ row, children }) => [
-              activityRow(row, false),
-              children.length === 0 ? null : el("div", { class: "activity-children" }, children.map((kid) => activityRow(kid, true))),
-            ]),
-            more === 0 ? null : el("a", { class: "activity-row home-today-more", href: "#/activity" }, `and ${more} more in Activity`),
+            "h2",
+            { class: "section-label" },
+            el(
+              "button",
+              { class: "home-today-title", type: "button", "aria-expanded": folded ? "false" : "true", onclick: () => toggleFold(key) },
+              icon("chevron"),
+              `${title} `,
+              el("span", { class: "home-today-count" }, String(count)),
+            ),
           ),
-        ),
-      ),
+          folded
+            ? null
+            : el(
+                "div",
+                { class: "home-today-list" },
+                ...rows.map((row) => activityRow(row, false)),
+                more === 0 ? null : el("a", { class: "activity-row home-today-more", href: "#/activity" }, `and ${more} more in Activity`),
+              ),
+        );
+      }),
     );
   }
 

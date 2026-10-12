@@ -9,7 +9,7 @@ import { failsafeButton } from "./failsafe.js";
 import { icon } from "./icons.js";
 import { actorFace } from "./actors.js";
 import { nestRows, progressFacts } from "./nesting.js";
-import { readPref, writePref } from "./prefs.js";
+import { readFolds, writePref } from "./prefs.js";
 import { requestCompose } from "./shortcuts.js";
 import { onLifecycle } from "./state.js";
 import { attempt, confirmDialog, toast } from "./ui.js";
@@ -64,16 +64,6 @@ function groupByDay(chats, now) {
 
 function matchesQuery(chat, needle) {
   return needle === "" || foldSearch(chat.title).includes(needle);
-}
-
-/** The folded sections, as saved; anything unreadable counts as nothing folded. */
-function readFolds() {
-  try {
-    const folds = JSON.parse(readPref(FOLDS_KEY) ?? "{}");
-    return folds !== null && typeof folds === "object" ? folds : {};
-  } catch {
-    return {};
-  }
 }
 
 /** A section's label as the button that folds it: a chevron that turns, the words, a count. */
@@ -222,7 +212,7 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
     icon("panelLeft"),
   );
   const selectButton = el("button", { class: "btn ghost sm", type: "button", hidden: true, onclick: () => enterSelectMode() }, "Select");
-  let folds = readFolds();
+  let folds = readFolds(FOLDS_KEY);
   function toggleFold(key) {
     folds = { ...folds, [key]: folds[key] !== true };
     writePref(FOLDS_KEY, JSON.stringify(folds));

@@ -866,7 +866,8 @@ page, with its steps so far and its channel; the parent's row says how many runs
 delegated run's card carries a chip with its progress ("step 3 · web_fetch", then "done · 12 steps") and an **open**
 link to the run's own page.
 
-**New chat** is Dot's presence and one composer, centred in the window. The face is Dot's character, moving (idle with a
+**New chat** is Dot's presence and one composer, standing in the middle of the space under the top bar, across and down,
+however long the day under them is. The face is Dot's character, moving (idle with a
 wink now and then; a still frame with "Faces that move" off), and shows the state of the whole of Dot (waiting when
 something waits for you, working while a run is active, else idle) under Dot's name (yours to give in Settings ›
 General; Dot until then, and kept in this browser only); a greeting by the hour says your name when you gave one there
@@ -874,8 +875,10 @@ General; Dot until then, and kept in this browser only); a greeting by the hour 
 on ("Working on 2 runs · 1 waits for you · 3 ended today · 1 lesson · 2 things due today"; a quiet day says so). Under
 the composer, the **Today** strip lists it: what waits for you, what works, what is due later today (the schedules that
 fire and the campaigns whose next session starts), what was learned today (the lessons and the day's journal) and what
-ended, each row as on the Activity page and each opening what it is about; five rows a section, then "and N more in
-Activity". The line and the strip follow the lifecycle stream, so an answer or a run's end moves them at once; `GET
+ended, each row as on the Activity page and each opening what it is about; two rows a section (a run without the runs it
+delegated, which the Activity page nests under it), then "and N more in Activity", and the page scrolls to what does not
+fit. A section folds on a click of its title, which counts its rows, and the folds are kept in that browser. The line
+and the strip follow the lifecycle stream, so an answer or a run's end moves them at once; `GET
 /api/activity` carries the two new lists as `learned_today` and `due`. The composer is one frame on a 24 px corner with a
 soft shadow under it: the
 goal in a box of one line that grows with it, the files attached under it, then one bar that never wraps: the attach
@@ -895,7 +898,8 @@ Shift+Enter adds a line. `/` at the start of a word opens the slash menu over th
 (`/task`, `/chat`, `/research` here; `/btw` in the box of a run), the skills by name with their description, and each
 MCP server with its tools, read from the daemon as a run reads them (`GET /api/palette`); letters filter, the arrows
 move, Enter or Tab picks and Escape closes. A skill picked reads "use the skill NAME: " in the box, a tool its name, a
-command does its work. A run that waits for your approval shows above the composer.
+command does its work. A run that waits for your approval shows above the composer, as a card, and moves it down only
+when the cards do not fit there.
 
 A run opens as a conversation under Dot's face and name. The face is the state: still when the run rests, a slow
 breath while it works, an amber ring while it waits for you, a green tick for a moment when the run ends done, red when

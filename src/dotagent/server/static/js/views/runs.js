@@ -10,6 +10,7 @@ import { composerFrame, composerPill } from "../composer.js";
 import { el, modelName } from "../dom.js";
 import { allModels, forgetLevel, levelLabel, offersChoice, savedLevel, saveLevel } from "../efforts.js";
 import { icon } from "../icons.js";
+import { trackHeight } from "../layout.js";
 import { anchoredPopover } from "../popover.js";
 import { buildPresence } from "../presence.js";
 import { providerLabel, providerMark, providerOf } from "../providers.js";
@@ -410,21 +411,18 @@ export function mount(root, ctx) {
   const presence = buildPresence();
   const composer = buildComposer(ctx, presence.listen);
   const approvals = buildApprovals();
-  root.append(
-    el(
-      "div",
-      { class: "home" },
-      el("h1", { class: "visually-hidden" }, "New chat"),
-      approvals.element,
-      el("div", { class: "home-start" }, presence.element, composer.element),
-      presence.strip,
-    ),
-  );
+  const start = el("div", { class: "home-start" }, presence.element, composer.element);
+  const home = el("div", { class: "home" }, el("h1", { class: "visually-hidden" }, "New chat"), approvals.element, start, presence.strip);
+  root.append(home);
+  // The greeting and the composer stand in the middle of the space under the top bar (item 124): the row above them
+  // takes half of what their height leaves of it (app.css), so the page keeps that height as it changes.
+  const stopCentring = trackHeight(start, home, "--home-start-h");
   approvals.sync(getSnapshot());
   const stopApprovals = onChange(approvals.sync);
   const stopCompose = onCompose(composer.focus);
   composer.focus();
   return () => {
+    stopCentring();
     stopApprovals();
     stopCompose();
     composer.dispose();
