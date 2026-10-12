@@ -5044,6 +5044,8 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 121 | The calm look, after T3 Code: the sidebar, the chat, the composer and the panel     | done        | 4f2b0cd |
 | 122 | The sidebar says what works: Working and its time on a chat's row and a working run's | done        | 10fd83f |
 | 123 | A helper folded in the chat: its row until the owner opens it                       | done        | a2de64d |
+| 124 | The home's first screen: the composer in the middle, the day folded under it         | planned     |         |
+| 125 | What the failed runs showed: the journal's day, the snapshot's arguments             | planned     |         |
 
 ### 77. The type system: Inter and Geist Mono, seven sizes, three weights
 
@@ -7001,6 +7003,71 @@ row and the rows it sits in, so the card is in sight; when the helper ends, a ro
 hand folds again. The README's chat passage follows, a smoke test opens and answers a helper's question, and the tour is
 read by eye.
 
+## Part 18: the home's first screen, and what the failed runs showed (planned 2026-10-12)
+
+The owner's eighteenth word, on 2026-10-12, after part 17, with a screenshot of the home: at the first opening the place
+to write could stand exactly in the middle, across and down; the old chats under it could fold, or show one or two; and
+any other problem found is to be fixed.
+
+**Status (2026-10-12): planned.** What is built today, and what the readings found. The home (`views/runs.js mount`,
+`presence.js`) is a grid whose rows are `1fr auto 3fr` (`app.css`): what waits for an answer as cards in the first,
+Dot's face, greeting and line of now with the composer (`.home-start`) in the second, the Today strip in the third. The
+grid has no height of its own (the stage only has a least height), so its rows take their content's: the space above the
+composer is a third of the strip's height, and a day with many rows pushes the composer down the window. Measured on the
+scripted model at 1280 by 800 with nine runs ended, a journal and a lesson, the middle of the greeting and the composer
+stood 17 px above the middle of the space under the top bar; on the owner's screenshot, with two dozen runs ended and
+their helpers, it stood near the window's foot. The strip shows five rows a section, each run with its delegated runs
+nested, then "and N more in Activity", and nothing of it folds. The readings of the runs of the last two days, from the
+store and the log (counts, kinds and the store's own words only): 3 runs ended as internal errors with `ssl.SSLError`
+(`SSLV3_ALERT_BAD_RECORD_MAC`) on a model call through OpenCode Go, each in a daemon started before item 107 counted
+that error as a transport error to retry; 5 runs ended at once with `sqlite3.OperationalError: database is locked`,
+eighteen minutes before item 66 gave the store's writes their retries; since those daemons neither came back (no
+`store_locked_retry` in the log, no crash). The hourly sessions of a campaign in attach mode failed at `browser_open`
+because Chrome asked for its Allow while nobody was there, until the owner stopped the campaign. Twelve tool calls of
+two models were refused because they gave `browser_snapshot`, which takes no arguments, a `full` or a `ref`; its
+description says it shows the tab "again in full". The day's journal is written at the reflection time (03:30 by
+default) of the runs that ended since the last reflection, nearly all of them the day before, and names the day it is
+written: "On 2026-10-12 I worked on 22 runs" told of the 11th's.
+
+**The shape of this part (the decisions).** First the home: the greeting and the composer stand in the middle of the
+space under the top bar, across and down, however long the day is; the strip hangs under them without moving them, shows
+two rows a section with "and N more in Activity" (a run without the delegated runs nested under it: the Activity page
+and the sidebar keep those), and folds a section at its title, remembered by that browser. What waits for an answer
+stays as cards just above the composer, as before. Then the faults the readings found: the journal names the day it
+tells, and `browser_snapshot`'s description no longer offers an argument the tool does not take. The two crashes need
+nothing new, and Chrome's Allow in attach mode is the owner's to give.
+
+### How to start part 18 (the handoff prompt)
+
+> Read ROADMAP.md part 18 and the status table of part 9 (rows 124 and 125). One item at a time, in order; the protocol
+> of part 5 (branch, gate, PR, Linear MYP issue, squash merge, hash in the table, log line) is unchanged. Never touch
+> the owner's data directory except to read it and to restart the daemon when `/api/status` shows no active run; the
+> owner's goals stay out of this file; PLAN.md stays untracked. The owner reads Turkish; everything written is English.
+> Every UI item ends with the screenshot tour read by eye.
+
+### 124. The home's first screen: the composer in the middle, the day folded under it
+
+**Status: planned.**
+
+**What.** The home's grid gets the height of the space under the top bar and rows of equal share above and below the
+greeting and the composer, which stand in its middle across and down; the Today strip takes no height in that grid, so
+it hangs under the composer, and the page scrolls to what does not fit. A section of the strip shows its first two rows,
+a run without its delegated runs, then "and N more in Activity"; its title is a button that folds it, with a chevron and
+the count of its rows, remembered by that browser (`dot.homeFolds`). The cards of what waits for an answer stay just
+above the composer and move it only when they do not fit there. The README's home passage follows; a smoke test measures
+the middle at three sizes in both schemes with a long day, reads two rows a section and a fold that stays across a
+reload; the home's smoke test takes its screenshots with the motion reduced, so the opening no longer covers them; the
+tour is read by eye.
+
+### 125. What the failed runs showed: the journal's day, the snapshot's arguments
+
+**Status: planned.**
+
+**What.** The journal says the day it tells: the date of the middle of the time it reads, "On 2026-10-11" for the
+night's reflection at 03:30, or "From 2026-10-08 to 2026-10-12" when it reads more than a day and a quarter (a daemon
+that was off). `browser_snapshot`'s description says it shows the tab again, every element in and around the viewport
+with refs, and that it takes no arguments. Unit tests for the journal's day; the README's reflection passage follows.
+
 ## Log
 
 - 2026-10-08: roadmap written from the owner's go-ahead for all eight items, in this order. Nothing implemented yet.
@@ -7552,3 +7619,4 @@ read by eye.
 - 2026-10-12 (Opus 5.5): part 17 planned, items 122 and 123, from the owner's word after part 16 and a reading of T3 Code's sidebar and chat in its repository; no code changed.
 - 2026-10-12 (Opus 5.5): item 122 merged as `10fd83f` (PR #147, MYP-262 Done): where a row's age sits at rest, a chat whose latest run works and every run of the Working section, delegated runs included, show a dashed circle, Working and the time since the run was asked for in T3 Code's units, read every second; `ThreadSummary.latest_created_at` is new; 906 unit tests, 27 smoke tests and the tour.
 - 2026-10-12 (Opus 5.5): item 123 merged as `a2de64d` (PR #148, MYP-263 Done): in a run's chat a delegated run's row starts closed, its time counting on every second and at once on a page opened later; an approval it asks for opens it and the rows it sits in until the owner has decided, and a row the owner never touched folds again then and at the run's end; a delegated run has no `ask_user`, which the README's Delegation passage now says; 906 unit tests, 30 smoke tests and the tour; the daemon restarted on it with no run active.
+- 2026-10-12 (Opus 5.5): part 18 planned, items 124 and 125, from the owner's word after part 17, a measurement of the home and a reading of the last two days' failed runs (counts and kinds only); no code changed.
