@@ -192,27 +192,43 @@
 .steps-body {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: var(--space-half);
   margin: 4px 0 var(--space-half) 12px;
-  padding-left: 16px;
-  border-left: 2px solid var(--border);
+  padding-left: 12px;
+  border-left: 1px solid var(--border);
 }
 
 /* ---------- inspector ---------- */
 
 /* The panel stays beside the conversation under the stage bar, whose height layout.js measures into --stagebar-h (the
-   banner and the density change it), to its full height with its own scroll. */
+   banner and the density change it), to its full height with its own scroll. It is one card on the composer's corner
+   whose sections sit on hairlines (item 121, after T3 Code); as a drawer it is the drawer itself. */
 .inspector {
   container: inspector / inline-size;
   position: sticky;
   top: calc(var(--stagebar-h) + 12px);
   display: flex;
   flex-direction: column;
-  gap: 16px;
   max-height: calc(100vh - var(--stagebar-h) - 24px);
   max-height: calc(100dvh - var(--stagebar-h) - 24px);
   overflow-y: auto;
-  padding: var(--space-half);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-composer);
+  background: var(--surface);
+}
+
+.inspector > .card {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+.inspector > .card:not([hidden]) ~ .card:not([hidden]) {
+  border-top: 1px solid var(--border);
+}
+
+.inspector .fold > .card-head {
+  border-bottom-color: transparent;
 }
 
 /* At the panel's compact width the facts beside a fold's title (the cost's "123 ms · 13 steps · 13k in · 650 out")
@@ -245,9 +261,10 @@
   z-index: 40;
   width: min(360px, 92vw);
   max-height: none;
-  padding: 16px 16px 24px;
+  padding: 16px 0 24px;
+  border: 0;
   border-left: 1px solid var(--border);
-  background: var(--bg);
+  border-radius: 0;
   box-shadow: var(--shadow-overlay);
   transform: translateX(100%);
   transition: transform var(--motion-base) var(--ease);
@@ -275,6 +292,7 @@
 
 .inspector[data-mode="drawer"] .inspector-head {
   display: flex;
+  padding: 0 16px 8px;
 }
 
 .inspector-scrim {

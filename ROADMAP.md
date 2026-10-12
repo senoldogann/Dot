@@ -5040,8 +5040,8 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 117 | The helper keeps its parent's rights: a delegated run takes its parent's mode       | done        | e51f9c1 |
 | 118 | Chrome behind: every tab opened in the background, the front given back             | done        | 6dfbf07 |
 | 119 | The models: the prompt cache on OpenCode Go's Messages route, the free ones marked   | done        | acfc56a |
-| 120 | The run page's head: Stop in the send button's place, the emergency stop in the sidebar | in progress |         |
-| 121 | The calm look, after T3 Code: the sidebar, the chat, the composer and the panel     | planned     |         |
+| 120 | The run page's head: Stop in the send button's place, the emergency stop in the sidebar | done        | 6c1a7b3 |
+| 121 | The calm look, after T3 Code: the sidebar, the chat, the composer and the panel     | in progress |         |
 
 ### 77. The type system: Inter and Geist Mono, seven sizes, three weights
 
@@ -6808,7 +6808,7 @@ a second call on Go's Messages route.
 
 ### 120. The run page's head: Stop in the send button's place, the emergency stop in the sidebar
 
-**Status: in progress.**
+**Status: done.** Merged as `6c1a7b3` (PR #143, MYP-260 Done).
 
 **As built (2026-10-12).** The run page's top bar holds Dot's face and name (or a delegated run's breadcrumb) and the
 panel's switch, nothing else: the state badge and the start, the chips of the agent, the model, the approvals, Goal mode
@@ -6843,7 +6843,22 @@ run page's smoke tests follow the controls; the tour is read by eye.
 
 ### 121. The calm look, after T3 Code: the sidebar, the chat, the composer and the panel
 
-**Status: planned.**
+**Status: in progress.**
+
+**As built (2026-10-12).** Read from T3 Code's repository (MIT) and the owner's screenshot of it, through Dot's tokens
+and in both schemes. The sidebar is a tone darker than the page with no line between them; a chat's row carries its last
+activity at the right in figures of one width (`age` in `dom.js`: "now", "5m", "3h", "2d", "3w", then the day; read
+again every minute while the page rests, the date in its tooltip). A tool step is one quiet line with its icon instead
+of a box, its body hanging under it on a hairline once opened, and the steps of a group sit on a line of 1 px instead of
+2. The composer has a corner of its own, 24 px (`--radius-composer`), and a soft shadow that falls below it
+(`--shadow-composer`) on every page, not only in the run's dock. The run's panel is one card on that corner whose
+sections (Dot's computer, Details, Cost, Plan, Actions, Screen) sit on hairlines, the head of an open section without a
+line under it; as a drawer it is the drawer itself. Where a pointer can hover, when the answer came and how long the run
+took wait for a second look; the Copy button and the outcome stay in sight (with Copy hidden too, the outcome sat adrift
+after the button's empty place). Dot keeps its faces, its mark, its type and the colours of its states. The run chrome's
+smoke test scripts sixty steps instead of thirty, since thirty quiet lines no longer make a page twice the window's
+height. The README's look passages follow. 117 smoke tests that read these parts of the page pass, the tour passes and
+was read by eye at both widths in both schemes, and so do the 906 unit tests.
 
 **What.** T3 Code's look, read from its repository (MIT) and adapted to Dot's tokens and both schemes, through the
 tokens first: the sidebar a tone darker than the page with no border and quiet rows (the title in the body size, the
@@ -7399,3 +7414,4 @@ states. The tour is read by eye at both widths and in both schemes.
 - 2026-10-12 (Opus 5.5): item 117 merged as `e51f9c1` (PR #140, MYP-257 Done): `delegate` has no `mode` and its run takes its parent's (a research run's helper is research, every other run's a task), so a yolo task run's helper has every right its parent has; `web_extract` keeps a field answered without a quote as an unverified value instead of failing the extraction; plan step evidence is cut at 400 characters instead of refused; 906 unit tests, 18 smoke tests, the eval check.
 - 2026-10-12 (Opus 5.5): item 118 merged as `6dfbf07` (PR #141, MYP-258 Done): every tab Dot opens is a background CDP target with a mark of its own (tabs made at the same time no longer share a page, a race the user's Chrome had since item 98), a tab a page opens itself gives the front back to the application that had it (with Accessibility), and `raise_window` keeps the tabs in front as before; 906 unit tests, 71 browser smoke tests.
 - 2026-10-12 (Opus 5.5): item 119 merged as `acfc56a` (PR #142, MYP-259 Done): OpenCode Go's Messages route sends the automatic cache mark (Claude Haiku 5.5 read 10,383 tokens of a repeated prompt from the cache with it, none without), Claude on Go goes to the Messages route (Claude Haiku 5.5 was sent to Chat Completions and refused), the catalog follows Go's list, the models Go serves free say Free in the picker, and Zen's free models stay out (OpenCode serves them only to its own client); 906 unit tests, 38 smoke tests and the live Go tests with the key.
+- 2026-10-12 (Opus 5.5): item 120 merged as `6c1a7b3` (PR #143, MYP-260 Done): the run page's top bar keeps the face, the name and the panel's switch (its facts in Details, which gained the agent and the campaign), the composer's send is the run's Stop while the run works and the box is empty (Steer once a word is typed), a delegated run's pill ends with a Stop, Continue is a line above the composer, the top bar's right keeps the approvals waiting and the connection while it is not live, and the emergency stop sits in the sidebar's foot (beside the sidebar's opener while the sidebar is closed); 906 unit tests, 14 smoke tests and the tour.

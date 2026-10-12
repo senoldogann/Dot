@@ -122,6 +122,8 @@ const DATE_TIME_FULL = new Intl.DateTimeFormat("en-GB", {
   hour12: false,
 });
 const CLOCK = new Intl.DateTimeFormat("en-GB", { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false });
+const DAY = new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short" });
+const WEEK_S = 7 * 86400;
 
 /** "5 Oct, 14:03" */
 export function dateTime(ts) {
@@ -153,6 +155,28 @@ export function ago(ts) {
     return "yesterday";
   }
   return dateTime(ts);
+}
+
+/** The time since `ts` in the fewest characters, for the right edge of a row (item 121): "now", "5m", "3h", "2d", "3w",
+ * then the day ("5 Oct"). */
+export function age(ts) {
+  const seconds = Math.max(0, Date.now() / 1000 - ts);
+  if (seconds < 60) {
+    return "now";
+  }
+  if (seconds < 3600) {
+    return `${Math.floor(seconds / 60)}m`;
+  }
+  if (seconds < 86400) {
+    return `${Math.floor(seconds / 3600)}h`;
+  }
+  if (seconds < WEEK_S) {
+    return `${Math.floor(seconds / 86400)}d`;
+  }
+  if (seconds < 8 * WEEK_S) {
+    return `${Math.floor(seconds / WEEK_S)}w`;
+  }
+  return DAY.format(new Date(ts * 1000));
 }
 
 /** "850 ms", "12.4 s", "3m 05s", "2h 10m" */

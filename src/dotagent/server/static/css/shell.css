@@ -90,14 +90,13 @@
   flex-direction: column;
   height: 100vh;
   height: 100dvh;
+  /* A tone darker than the page and no line between them (item 121). */
   background: var(--sidebar);
-  border-right: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
 }
 
 /* Closed, the sidebar is out of reach (shell.js makes it inert) and out of sight once the slide has ended. */
 .shell[data-nav="docked"][data-sidebar="closed"] .sidebar {
   visibility: hidden;
-  border-right-color: transparent;
   transition: visibility 0s linear var(--motion-base);
 }
 
@@ -340,6 +339,15 @@
   white-space: nowrap;
 }
 
+/* A chat's last activity at the right of its row, in figures of one width (item 121). */
+.side-age {
+  flex: none;
+  color: var(--muted);
+  font-size: var(--text-xs);
+  line-height: var(--leading-xs);
+  font-variant-numeric: tabular-nums;
+}
+
 /* The head of the chat list: its label and the button that starts choosing chats to delete. */
 .side-list-head {
   display: flex;
@@ -409,8 +417,8 @@
   font-size: var(--text-sm);
 }
 
-/* The foot holds the way to the settings; the look itself is chosen there. */
-/* Settings, and the emergency stop at the right of its row (item 120). */
+/* The foot holds the way to the settings (the look itself is chosen there) and, at the right of its row, the emergency
+   stop (item 120). */
 .side-foot {
   flex: none;
   display: flex;

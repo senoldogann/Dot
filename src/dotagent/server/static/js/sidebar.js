@@ -3,7 +3,7 @@
 // and, in the foot, the way to the settings and the emergency stop (item 120).
 
 import { ApiError, api, request } from "./api.js";
-import { clip, clipWords, debounce, el, foldSearch, plural } from "./dom.js";
+import { age, clip, clipWords, dateTime, debounce, el, foldSearch, plural } from "./dom.js";
 import { failsafeButton } from "./failsafe.js";
 import { icon } from "./icons.js";
 import { actorFace } from "./actors.js";
@@ -32,6 +32,8 @@ const FOLDS_KEY = "dot.sideFolds";
 // What a status dot means, for screen readers; a chat whose latest run is done or cancelled shows no dot and needs no word.
 const STATUS_WORD = { queued: "queued", running: "running", blocked: "waiting for you", failed: "failed" };
 const BUSY_MESSAGE = "A chat with a run under way cannot be deleted. Wait for the run to end, or cancel it, and try again.";
+// How often the ages at the right of the chats are read again, so a "5m" does not stay while the page rests.
+const AGE_REFRESH_MS = 60_000;
 
 function startOfDay(now, daysBack) {
   return new Date(now.getFullYear(), now.getMonth(), now.getDate() - daysBack).getTime() / 1000;
@@ -86,7 +88,8 @@ function mark(node, current) {
   }
 }
 
-/** A chat as a link: it opens on the latest run a person started on it. */
+/** A chat as a link: it opens on the latest run a person started on it. Its last activity is at the right, in the
+ * fewest characters (item 121). */
 function chatLink(chat, onNavigate) {
   const word = STATUS_WORD[chat.latest_status];
   const title = clip(chat.title, 120);
@@ -101,6 +104,7 @@ function chatLink(chat, onNavigate) {
     },
     el("span", { class: `status-dot s-${chat.latest_status}` }),
     el("span", { class: "side-run-goal" }, title),
+    el("span", { class: "side-age", "data-ts": String(chat.updated_at), title: dateTime(chat.updated_at) }, age(chat.updated_at)),
   );
 }
 
@@ -178,6 +182,11 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
   const selected = new Set();
   const rowNodes = new Map();
   const list = el("div", { class: "side-runs" });
+  const ageTicker = setInterval(() => {
+    for (const node of list.querySelectorAll(".side-age")) {
+      node.textContent = age(Number(node.dataset.ts));
+    }
+  }, AGE_REFRESH_MS);
   const search = el("input", {
     class: "side-search-input",
     type: "search",
@@ -644,6 +653,7 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
     },
     dispose() {
       disposed = true;
+      clearInterval(ageTicker);
       stopLifecycle();
       window.removeEventListener("keydown", onEscape);
     },

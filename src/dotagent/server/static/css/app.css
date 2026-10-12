@@ -63,7 +63,10 @@
   --radius-control: 8px;
   --radius: 12px;
   --radius-lg: 20px;
+  --radius-composer: 24px;
   --radius-pill: 999px;
+  /* The composer's lift (item 121, after T3 Code): a hairline of shadow and a soft one that falls below it. */
+  --shadow-composer: 0 1px 2px var(--shadow-ink), 0 12px 28px -18px var(--shadow-ink-deep);
   /* Spacing (item 74): one rhythm of 8 px, 4 for the smallest, and the hairline for what sits a breath apart; every
      gap, padding and margin is a token or on the 4 px grid (tests/unit/test_css_tokens.py). */
   --space-half: 2px;
@@ -1010,7 +1013,7 @@ a.pill:hover {
 /* The side panel's cards (item 84): every body sits inside the card's padding, so no text hugs the edge; the actions
    list draws its own rows edge to edge with their own padding. */
 .inspector .fold > .fold-body {
-  padding: 12px 16px 16px;
+  padding: 4px 16px 16px;
 }
 
 .inspector .fold > .fold-body:has(> .actions-list) {
@@ -1394,14 +1397,16 @@ a.pill:hover {
    files under it, then one bar: the attach button and the mode at the left; the agent, the model, the reasoning, the
    approvals and the round send at the right. A hairline at rest, a stronger one under the pointer, the 10 % ring in
    focus; the shadow is the dock's alone. */
+/* The composer is a card on the larger corner with a soft shadow under it (item 121). */
 .composer {
   display: flex;
   flex-direction: column;
   gap: var(--space-1);
   padding: var(--space-2);
   border-color: var(--border);
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius-composer);
   background: var(--surface);
+  box-shadow: var(--shadow-composer);
   transition:
     border-color var(--motion-quick) var(--ease),
     box-shadow var(--motion-quick) var(--ease),
@@ -1414,7 +1419,9 @@ a.pill:hover {
 }
 
 .composer:focus-within {
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 10%, transparent);
+  box-shadow:
+    var(--shadow-composer),
+    0 0 0 3px color-mix(in srgb, var(--accent) 10%, transparent);
 }
 
 /* Files dragged over the frame tint it. */
@@ -2208,10 +2215,8 @@ a.pill:hover {
   font-weight: var(--weight-title);
 }
 
+/* A tool step is one quiet line with its icon, not a box (item 121); open, its body hangs under it on a hairline. */
 .tool {
-  border: 1px solid var(--border);
-  border-radius: var(--radius-control);
-  background: var(--surface);
   min-width: 0;
 }
 
@@ -2219,7 +2224,8 @@ a.pill:hover {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 8px 12px;
+  padding: 4px 8px;
+  border-radius: var(--radius-control);
   cursor: pointer;
   list-style: none;
   user-select: none;
@@ -2230,13 +2236,7 @@ a.pill:hover {
 }
 
 .tool-head:hover {
-  background: var(--surface-2);
-  border-radius: var(--radius-control);
-}
-
-.tool[open] > .tool-head {
-  border-bottom: 1px solid var(--border);
-  border-radius: var(--radius-control) var(--radius-control) 0 0;
+  background: color-mix(in srgb, var(--text) 4%, transparent);
 }
 
 .tool-state {
@@ -2312,10 +2312,12 @@ details[open] > summary .chev {
 }
 
 .tool-body {
-  padding: 12px;
   display: flex;
   flex-direction: column;
   gap: 12px;
+  margin: 4px 0 8px 16px;
+  padding: 4px 0 4px 16px;
+  border-left: 1px solid var(--border);
 }
 
 .tool-body h4 {
@@ -2749,6 +2751,20 @@ details[open] > summary .chev {
   margin-left: -8px;
 }
 
+/* Where a pointer can hover, when the answer came and how long the run took wait for a second look (item 121); the copy
+   button and the outcome stay in sight. */
+@media (hover: hover) {
+  .answer-facts > :not(:first-child) {
+    opacity: 0;
+    transition: opacity var(--motion-quick) var(--ease);
+  }
+
+  .answer:hover .answer-facts > *,
+  .answer:focus-within .answer-facts > * {
+    opacity: 1;
+  }
+}
+
 .answer-foot a {
   margin-left: auto;
 }
@@ -2820,16 +2836,6 @@ details[open] > summary .chev {
 }
 
 /* The dock's frame floats over the conversation: the one composer with a shadow; its box is one line high when empty. */
-.dock .composer {
-  box-shadow: var(--shadow);
-}
-
-.dock .composer:focus-within {
-  box-shadow:
-    var(--shadow),
-    0 0 0 3px color-mix(in srgb, var(--accent) 10%, transparent);
-}
-
 .dock .composer .textarea {
   min-height: 0;
   max-height: 160px;
