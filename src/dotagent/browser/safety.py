@@ -150,7 +150,8 @@ def check_browser_url(
         port: int | None = parts.port
     except ValueError as exc:
         return UrlVerdict(allowed=False, reason=f"malformed URL ({exc})")
-    host: str = parts.hostname or ""
+    # A browser reads one dot at the end of a host as none: 127.0.0.1. is 127.0.0.1, the address the token lives at.
+    host: str = (parts.hostname or "").removesuffix(".")
     reached: int = port if port is not None else _DEFAULT_PORTS[parts.scheme]
     if host_matches(host, server.reach) or (reached == server.port and _is_loopback(host)):
         return UrlVerdict(allowed=False, reason="it is Dot's own interface, which a run never opens")

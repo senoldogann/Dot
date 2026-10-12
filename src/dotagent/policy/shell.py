@@ -165,11 +165,18 @@ _INTERPRETERS: frozenset[str] = frozenset(
     {"python", "python3", "node", "ruby", "perl", "php", "swift", "deno", "bun", "lua", "Rscript", "julia"}
 )
 _INLINE_CODE: frozenset[str] = frozenset({"-c", "-e", "-E", "--eval", "-p"})
+# node's long spellings of its inline code, as the word before the code or with "=code" attached.
+_LONG_INLINE_CODE: tuple[str, ...] = ("--eval", "--print")
 # Code that reaches the network: a URL, or the client libraries and calls of the interpreters above.
 _NETWORK_CODE: re.Pattern[str] = re.compile(
     r"\w+://|urllib|\brequests\b|http\.client|httpx|aiohttp|\bsocket\b|\bfetch\s*\(|XMLHttpRequest|axios|"
-    r"\bnet/http\b|Net::HTTP|LWP::|HTTP::Tiny|open-uri|URLSession|curl_exec|file_get_contents|fsockopen",
+    r"\bnet/http\b|Net::HTTP|LWP::|HTTP::Tiny|open-uri|URLSession|curl_exec|file_get_contents|fsockopen|"
+    r"smtplib|ftplib|imaplib|paramiko|Net::SMTP|Net::FTP",
     re.IGNORECASE,
+)
+# Code that runs a command of the network (os.system("scp ..."), `ssh ...`, system("curl ...")).
+_NETWORK_COMMAND_CODE: re.Pattern[str] = re.compile(
+    r"\b(?:curl|wget|scp|sftp|rsync|ssh|ncat|socat|telnet)\b|\bnc\s+-?[\w.]"
 )
 _NETWORK_FETCHERS: frozenset[str] = frozenset({"curl", "wget", "http", "https", "xh", "aria2c"})
 _REMOTE_COPY: frozenset[str] = frozenset({"scp", "sftp", "rsync", "nc", "ncat", "socat", "telnet", "ftp", "ssh"})
@@ -241,6 +248,9 @@ _WRITERS: frozenset[str] = frozenset(
 )
 # Writers that read every operand but the last one, which they write.
 _COPIES: frozenset[str] = frozenset({"cp", "ln", "install", "ditto", "rsync", "scp"})
+# Copies and moves that can be given the folder they write into by an option (GNU's -t and --target-directory).
+_TARGET_FOLDER_COMMANDS: frozenset[str] = frozenset({"cp", "mv", "ln", "install"})
+_TARGET_FOLDER_OPTION: str = "--target-directory"
 _TARS: frozenset[str] = frozenset({"tar", "bsdtar", "gtar"})
 # unzip's switches that list, test or print an archive instead of unpacking it.
 _UNZIP_READS: frozenset[str] = frozenset({"-l", "-t", "-v", "-p", "-z", "-Z"})
@@ -411,9 +421,27 @@ _PIPE_TO_SHELL: re.Pattern[str] = re.compile(
 )
 _FORK_BOMB: re.Pattern[str] = re.compile(r":\(\)\s*\{")
 _DEVICE_WRITE: re.Pattern[str] = re.compile(r"(>\s*|of=)/dev/(r?disk|sd|nvme)")
-_UPLOAD_FLAGS: frozenset[str] = frozenset(
-    {"-d", "--data", "--data-raw", "--data-binary", "--data-urlencode", "-F", "--form", "-T", "--upload-file"}
+# The long options of curl and wget that send a body, a form or a file, as the word or with "=value" attached
+# (--data-raw, --form-string and --post-file among them).
+_SEND_OPTIONS: tuple[str, ...] = (
+    "--data",
+    "--form",
+    "--json",
+    "--upload-file",
+    "--post-data",
+    "--post-file",
+    "--body-data",
+    "--body-file",
 )
+_SEND_METHODS: frozenset[str] = frozenset({"POST", "PUT", "DELETE", "PATCH"})
+_METHODS: frozenset[str] = frozenset({*_SEND_METHODS, "GET", "HEAD", "OPTIONS"})
+# curl's short switches that send (a body, a form, a file) and those that take a value: in a word of switches such as
+# -sSd@notes.txt, what follows one that takes a value is that value.
+_CURL_SENDS: str = "dFT"
+_CURL_VALUES: str = "AbcCdDeEFHKmoPQrtTuUwxXyYz"
+# A data item of httpie and xh after the URL: name=value, name:=json, field@file (name==value is a query parameter
+# and Name:value a header).
+_HTTPIE_DATA: re.Pattern[str] = re.compile(r"^[^=:@\s]+(?:=@|:=@|:=|=(?!=)|@)")
 _AS_ADMIN: re.Pattern[str] = re.compile(r"administrator privileges", re.IGNORECASE)
 _AS_SEND: re.Pattern[str] = re.compile(r"\bsend\b|\bmake new outgoing message\b", re.IGNORECASE)
 _AS_POWER: re.Pattern[str] = re.compile(r"\b(shut down|restart|log out|sleep)\b", re.IGNORECASE)
@@ -492,6 +520,45 @@ class _Input:
 
 
 _NO_INPUT: _Input = _Input(text=None, paths=(_SUBSTITUTED,))
+
+
+@dataclass(frozen=True)
+class _Switches:
+    """How an interpreter reads a word of switches such as ``-pi``, ``-lne`` or ``-Bc``, letter by letter: the letters
+    whose value is the code it runs, the letters whose value is something else (each takes the rest of the word when
+    ``joined``, else or when the rest is empty the next word), the letters whose value can only be attached (the rest
+    of the word), the letters followed by digits alone, the attached letter that edits the file operands in place, and
+    the letters after whose value the rest of the line is the program's own arguments."""
+
+    code: str
+    values: str
+    joined: bool
+    attached: str
+    digits: str
+    in_place: str
+    ends: str
+
+
+# The interpreters whose words of switches are read letter by letter; the others by their inline code switches alone.
+# node takes no value in the word of its switch: -pe is --print with the code in the next word.
+_SWITCHES: Mapping[str, _Switches] = {
+    "perl": _Switches(code="eE", values="I", joined=True, attached="CDFMdimx", digits="0l", in_place="i", ends=""),
+    "ruby": _Switches(code="e", values="rICE", joined=True, attached="FKWix", digits="0T", in_place="i", ends=""),
+    "python": _Switches(code="c", values="WXm", joined=True, attached="", digits="", in_place="", ends="cm"),
+    "python3": _Switches(code="c", values="WXm", joined=True, attached="", digits="", in_place="", ends="cm"),
+    "node": _Switches(code="ep", values="rC", joined=False, attached="", digits="", in_place="", ends=""),
+    "php": _Switches(code="rBRE", values="cdfzt", joined=True, attached="", digits="", in_place="", ends=""),
+}
+
+
+@dataclass(frozen=True)
+class _InterpreterLine:
+    """An interpreter's words as it reads them: its inline code, its operands (the script first when there is no inline
+    code) and whether it edits the files among them in place."""
+
+    code: tuple[str, ...]
+    operands: tuple[str, ...]
+    in_place: bool
 
 
 def _finding(risk: Risk, flags: tuple[Flag, ...], reason: str) -> Finding:
@@ -1145,8 +1212,40 @@ def _read_as(path_class: PathClass) -> PathClass:
     return "home" if path_class == "dot" else path_class
 
 
+def _target_folders(args: list[str]) -> tuple[list[str], list[str]]:
+    """The words of a copy or a move without the option that names the folder it writes into (``-t dir``, ``-tdir``,
+    ``-rt dir``, ``--target-directory dir``, ``--target-directory=dir``), and the folders that option names."""
+    words: list[str] = []
+    folders: list[str] = []
+    index: int = 0
+    while index < len(args):
+        word: str = args[index]
+        following: list[str] = args[index + 1 : index + 2]
+        index += 1
+        if word == "--":
+            words.extend(args[index - 1 :])
+            break
+        if word == _TARGET_FOLDER_OPTION:
+            folders.extend(following)
+            index += len(following)
+        elif word.startswith(f"{_TARGET_FOLDER_OPTION}="):
+            folders.append(word.removeprefix(f"{_TARGET_FOLDER_OPTION}="))
+        elif word.startswith("-") and not word.startswith("--") and "t" in word[1:]:
+            attached: str = word[word.index("t", 1) + 1 :]
+            if attached:
+                folders.append(attached)
+            else:
+                folders.extend(following)
+                index += len(following)
+        else:
+            words.append(word)
+    return words, folders
+
+
 def _assess_writes(command: str, args: list[str], scope: ShellScope) -> Finding:
-    targets: list[str] = [target for target in _positional(args) if not target.isdigit()]
+    words, folders = _target_folders(args) if command in _TARGET_FOLDER_COMMANDS else (args, [])
+    # The folder an option names is where the command writes: it comes last, as the operand a copy writes.
+    targets: list[str] = [*(target for target in _positional(words) if not target.isdigit()), *folders]
     if command == "chmod" or command == "chown" or command == "chgrp":
         targets = targets[1:]
     classes: list[PathClass] = [_path_class(target, scope) for target in targets]
@@ -1224,6 +1323,8 @@ _GIT_READ_ONLY: frozenset[str] = frozenset(
         "stash",
     }
 )
+# What git may do in one of Dot's own folders: read. The others above can also write (a config, a stash, a ref).
+_GIT_READS_IN_DOT: frozenset[str] = _GIT_READ_ONLY - {"fetch", "remote", "config", "tag", "branch", "stash"}
 
 
 def _git_subcommand(args: list[str]) -> tuple[str, list[str]]:
@@ -1253,6 +1354,8 @@ def _assess_git(args: list[str], scope: ShellScope) -> Finding:
         if any(arg in ("--force", "-f", "--force-with-lease", "--delete", "--mirror") for arg in rest):
             return _finding("high", ("destructive", "external_send", *outside), "force-pushes or deletes remote refs")
         return _finding("medium", ("upload",), "pushes commits to a remote")
+    if sub and sub not in _GIT_READS_IN_DOT and _cwd_class(where) == "dot":
+        return _finding("high", ("secret_access",), f"git {sub} {CHANGES_DOT}")
     if sub in ("reset", "clean", "checkout", "restore", "rebase", "filter-branch", "gc", "reflog", "switch"):
         if sub in ("reset", "clean", "filter-branch") and destructive_args.intersection(rest):
             return _finding("medium", ("destructive", *outside), f"git {sub} discards work")
@@ -1286,13 +1389,63 @@ def _cloned_into(args: list[str], scope: ShellScope) -> list[Finding]:
 
 
 def _assess_network_fetcher(command: str, args: list[str]) -> Finding:
-    uploads: bool = any(arg in _UPLOAD_FLAGS or arg.startswith("--data") for arg in args)
-    method: bool = any(
-        arg.upper() in ("POST", "PUT", "DELETE", "PATCH") for arg in args if not arg.startswith("-") and arg.isalpha()
-    )
-    if uploads or method:
+    if _fetcher_sends(command, args):
         return _fetching("medium", ("upload",), f"{command} sends data to a remote server")
     return _fetching("low", (), f"{command} fetches from a remote server")
+
+
+def _fetcher_sends(command: str, args: list[str]) -> bool:
+    """Whether a fetcher sends a body, a form or a file, or asks for a method that changes something, each read by its
+    own options: curl's and wget's long options of ``_SEND_OPTIONS`` and their method options, curl's switches, and
+    httpie's forms, methods and data items."""
+    if command in ("http", "https", "xh"):
+        return _httpie_sends(args)
+    if any(word.startswith(_SEND_OPTIONS) for word in args):
+        return True
+    if command == "wget":
+        return _names_a_sending_method(args, "--method")
+    return command == "curl" and (_names_a_sending_method(args, "--request") or _curl_switches_send(args))
+
+
+def _names_a_sending_method(args: list[str], option: str) -> bool:
+    """Whether ``option`` (curl's ``--request``, wget's ``--method``) names POST, PUT, DELETE or PATCH, as the word
+    after it or attached with "="."""
+    for index, word in enumerate(args):
+        named: str = args[index + 1] if word == option and index + 1 < len(args) else ""
+        if word.startswith(f"{option}="):
+            named = word.removeprefix(f"{option}=")
+        if named.upper() in _SEND_METHODS:
+            return True
+    return False
+
+
+def _curl_switches_send(args: list[str]) -> bool:
+    """Whether a word of curl's short switches sends: ``-d``, ``-F`` or ``-T`` anywhere before a switch that takes a
+    value (``-sSd@notes.txt``), or ``-X`` with a method that changes something (``-XPOST``, ``-X POST``)."""
+    for index, word in enumerate(args):
+        if not word.startswith("-") or word.startswith("--"):
+            continue
+        for position, letter in enumerate(word[1:], start=1):
+            if letter in _CURL_SENDS:
+                return True
+            if letter in _CURL_VALUES:
+                method: str = word[position + 1 :] or (args[index + 1] if index + 1 < len(args) else "")
+                if letter == "X" and method.upper() in _SEND_METHODS:
+                    return True
+                break
+    return False
+
+
+def _httpie_sends(args: list[str]) -> bool:
+    """Whether httpie or xh send a body: a form (``-f``, ``--form``, ``--multipart``) or a raw body (``--raw``), a
+    method that changes something before the URL, or a data item after it."""
+    if any(word in ("-f", "--form", "--multipart") or word.startswith("--raw") for word in args):
+        return True
+    words: list[str] = _positional(args)
+    named: bool = bool(words) and words[0].upper() in _METHODS
+    if named and words[0].upper() in _SEND_METHODS:
+        return True
+    return any(_HTTPIE_DATA.match(item) for item in words[2 if named else 1 :])
 
 
 def _fetched_files(command: str, args: list[str]) -> list[str]:
@@ -1349,22 +1502,86 @@ def _unpacked_into(command: str, args: list[str]) -> list[str]:
     return _option_values(args, "-d", "") or ["."]
 
 
+def _read_switches(switches: _Switches, args: list[str]) -> _InterpreterLine:
+    """``args`` read as an interpreter with ``switches`` reads them: its words of switches letter by letter (the code of
+    ``-pe 'code'`` or ``-cCODE``, the values its other switches take), until the first operand or ``--``."""
+    code: list[str] = []
+    in_place: bool = False
+    index: int = 0
+    while index < len(args):
+        word: str = args[index]
+        index += 1
+        if word == "--":
+            return _InterpreterLine(code=tuple(code), operands=tuple(args[index:]), in_place=in_place)
+        if word in _LONG_INLINE_CODE:
+            code.extend(args[index : index + 1])
+            index += 1
+            continue
+        if word.startswith(tuple(f"{option}=" for option in _LONG_INLINE_CODE)):
+            code.append(word.split("=", 1)[1])
+            continue
+        if word == "-" or not word.startswith("-"):
+            return _InterpreterLine(code=tuple(code), operands=tuple(args[index - 1 :]), in_place=in_place)
+        if word.startswith("--"):
+            continue
+        position: int = 1
+        while position < len(word):
+            letter: str = word[position]
+            position += 1
+            if letter in switches.code or letter in switches.values:
+                value: str = word[position:] if switches.joined else ""
+                if not value and index < len(args):
+                    value = args[index]
+                    index += 1
+                if letter in switches.code:
+                    code.append(value)
+                if letter in switches.ends:
+                    # The rest of the line is the program's own arguments; a module's name stands as its script.
+                    rest: tuple[str, ...] = tuple(args[index:]) if letter in switches.code else (value, *args[index:])
+                    return _InterpreterLine(code=tuple(code), operands=rest, in_place=in_place)
+                break
+            if letter in switches.attached:
+                in_place = in_place or letter in switches.in_place
+                break
+            if letter in switches.digits:
+                while position < len(word) and word[position] in "01234567":
+                    position += 1
+    return _InterpreterLine(code=tuple(code), operands=(), in_place=in_place)
+
+
+def _interpreter_line(command: str, args: list[str]) -> _InterpreterLine:
+    """``args`` read as ``command`` reads them: by its words of switches when the guard knows how it reads them
+    (``_SWITCHES``), else by the switches that take inline code (``-c``, ``-e``, ``--eval``) alone."""
+    switches: _Switches | None = _SWITCHES.get(command)
+    if switches is not None:
+        return _read_switches(switches, args)
+    return _InterpreterLine(
+        code=tuple(args[index + 1] for index, arg in enumerate(args[:-1]) if arg in _INLINE_CODE),
+        operands=tuple(_positional(args)),
+        in_place=False,
+    )
+
+
 def _assess_interpreter(command: str, args: list[str], scope: ShellScope, given: _Input) -> list[Finding]:
-    """An interpreter runs code the guard does not read. Its inline code (``-c``, ``-e``, a here-document or a pipe it
-    reads as its program) that names the network counts as fetching and sending, and code that names one of Dot's own
-    folders as changing it."""
-    operands: list[str] = _positional(args)
-    inline: list[str] = [args[index + 1] for index, arg in enumerate(args[:-1]) if arg in _INLINE_CODE]
-    if given.text is not None and (not operands or operands[0] == "-") and not inline:
+    """An interpreter runs code the guard does not read. Its inline code (``-c``, ``-e``, in a word of switches such as
+    ``-pe``, a here-document or a pipe it reads as its program) that names the network, or runs a command of the
+    network, counts as fetching and sending, and code that names one of Dot's own folders as changing it. The files perl
+    and ruby edit in place (``-i``) are judged as written."""
+    line: _InterpreterLine = _interpreter_line(command, args)
+    inline: list[str] = list(line.code)
+    if given.text is not None and (not line.operands or line.operands[0] == "-") and not inline:
         inline.append(given.text)
     code: str = "\n".join(inline)
     findings: list[Finding] = [
         _finding("medium" if inline else "low", (), f"{command} runs {'inline code' if inline else 'a script'}")
     ]
-    if _NETWORK_CODE.search(code):
+    if _NETWORK_CODE.search(code) or _NETWORK_COMMAND_CODE.search(code):
         findings.append(_fetching("medium", ("upload",), f"{command} runs code that reaches the network"))
     if mentions_protected(code, scope.dot_paths):
         findings.append(_finding("high", ("secret_access",), f"{command} runs code that {CHANGES_DOT}"))
+    if line.in_place:
+        # Without inline code, the first operand is the script; the files after it are the ones edited.
+        findings.extend(_writes_to(command, list(line.operands if line.code else line.operands[1:]), scope))
     return findings
 
 
@@ -1562,6 +1779,15 @@ def _assess_awk(command: str, args: list[str], scope: ShellScope) -> list[Findin
     return findings or [_finding("safe", (), command)]
 
 
+def _assess_dd(args: list[str], scope: ShellScope) -> list[Finding]:
+    """dd judged on the file it writes (``of=``) and on a protected one it reads (``if=``)."""
+    written: list[str] = [word.removeprefix("of=") for word in args if word.startswith("of=")]
+    findings: list[Finding] = _writes_to("dd", [target for target in written if target not in _QUIET_TARGETS], scope)
+    if any(word.startswith("if=") and _reaches_protected(word.removeprefix("if="), scope) for word in args):
+        findings.append(_finding("high", ("secret_access",), "dd reads a protected location"))
+    return findings
+
+
 def _assess_sed(args: list[str], scope: ShellScope) -> list[Finding]:
     """sed judged on the files it writes: in place (``-i``), or with its ``w`` command or flag; and on the protected
     files its ``r`` command reads."""
@@ -1747,7 +1973,7 @@ def _assess_command(command: str, args: list[str], scope: ShellScope, given: _In
             return [_finding("high", ("destructive", "system_settings"), "diskutil erases or repartitions disks")]
         return [_finding("safe", (), "diskutil query")]
     if command == "dd":
-        return [_finding("medium", (), "dd copies raw data")]
+        return [_finding("medium", (), "dd copies raw data"), *_assess_dd(args, scope)]
     if command == "defaults":
         verb: str = args[0] if args else ""
         if verb in ("write", "delete", "import", "rename"):
