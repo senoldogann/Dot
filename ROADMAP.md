@@ -5036,7 +5036,12 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 113 | The quiet head: no character card at the head of the chat, no brand in the sidebar  | done        | ea21f27 |
 | 114 | Dot's mark and its opening: a dot that looks, the wordmark, the icons, a bounce at launch | done        | ea014d5 |
 | 115 | The composer once more: one bar that never wraps, labels that fold, a quiet warning | done        | a667d39 |
-| 116 | The deep review: every part of the code read once more, and fixed                   | in progress |         |
+| 116 | The deep review: every part of the code read once more, and fixed                   | done        | 0304257 |
+| 117 | The helper keeps its parent's rights: a delegated run takes its parent's mode       | planned     |         |
+| 118 | Chrome behind: every tab opened in the background, the front given back             | planned     |         |
+| 119 | The models: the prompt cache on OpenCode Go's Messages route, the free ones marked   | planned     |         |
+| 120 | The run page's head: Stop in the send button's place, the emergency stop in the sidebar | planned     |         |
+| 121 | The calm look, after T3 Code: the sidebar, the chat, the composer and the panel     | planned     |         |
 
 ### 77. The type system: Inter and Geist Mono, seven sizes, three weights
 
@@ -6442,6 +6447,15 @@ needed; a short opening when the app starts, the icons coming in with a bounce; 
 research the best structure on the web if need be; then a deep code review that fixes what it finds, and the project is
 finished: the owner starts testing, new features come later. Design matters, in every part.
 
+**Status (2026-10-12): built.** Items 113 to 116 merged in a day (`ea21f27`, `ea014d5`, `a667d39`, `0304257`), each
+behind the gate, its smoke tests and its screenshot tour read. The SSL crash the owner saw ran on a daemon from before
+item 107's retry, so only the answer changed. The run page lost its character card and the sidebar its brand; Dot has
+its own mark, a yellow dot with the character's eyes, on the favicon, the app's icons and a wordmark that opens the app;
+the composer is one bar that never wraps; the deep review rewrote the shell guard to read a line as the shell does and
+fixed what four readers found in the agent, the tools, the server and the interface. The daemon was restarted on
+`0304257` with no run active. What waits: the desktop app rebuilt by the owner (`cd desktop && npm run build`), and part
+16, from the owner's word during the review.
+
 **Status (2026-10-12): planned.** What is built today, and what the readings found: the SSL crash the owner saw (run
 `run_mv4gcno3_2ef1f7`, 02:28:55) ran on the daemon of part 13 (`f48e2b5`), thirteen minutes before the restart at 02:41
 put item 107's retry in place; its traceback is the one item 107 caught (a TLS read of the response's head in
@@ -6571,7 +6585,7 @@ page take the same frame. Tests: `test_composer.py` measures the bar on one line
 
 ### 116. The deep review: every part of the code read once more, and fixed
 
-**Status: in progress.**
+**Status: done.** Merged as `0304257` (PR #138, MYP-256 Done).
 
 **What.** Four readers, each on a part of the code, asked for real defects only (wrong behaviour, crashes, races,
 swallowed errors, leaks, holes in the policy or the auth): the agent and the model calls; the tools, the policy, the
@@ -6635,6 +6649,139 @@ amount the page labels; a page fetches its screenshots as it opens, not as they 
 17.5 (`light-dark()`), as the README says now. (5) The whole: the gate (903 unit tests), the offline smoke suite of the
 interface with the campaign and terminal tests (84 passed, none failed), `dotx eval check`, `cargo check` of the desktop
 shell, and the tour's 90 shots read by eye, which show nothing changed where nothing was meant to change.
+
+## Part 16: helpers with their parent's rights, Chrome behind, faster models, a calm run page (planned 2026-10-12)
+
+The owner's sixteenth word, on 2026-10-12, during part 15's review, with three screenshots (a delegated run saying that
+clicks in the browser were restricted, "read-only mode"; the run page's top bar: the state, the start, the model and its
+reasoning, YOLO, Goal mode, the panel's switch, Cancel, the running count, the connection's dot and the emergency stop;
+T3 Code's window with its sidebar, its chat and its panel): why read-only, a yolo run should have every right, find the
+problems and fix them; Chrome keeps bouncing in the Dock and coming to the front, do it in the background if it can be
+done; OpenCode Zen's free models should be in the list; whatever makes the OpenCode models faster, and Claude's; the top
+bar's area is not needed: Cancel takes the send button's place while a session works and becomes send again when a new
+message is typed, the emergency stop moves to a better place, the top is cleared; and the look of T3 Code, its chat, its
+sidebar and its panel, clean and simple, adapted to Dot, from its repository if need be.
+
+**Status (2026-10-12): planned.** What is built today, and what the readings found. (117) `delegate` takes a `mode`
+(`tools/delegate.py`): "task lets it act like you; research keeps it read-only". A task run in yolo started its helper
+as research; a research run has no `browser_act` (`tools_for_mode`, `ACTING_MODES`) and the policy refuses every kind
+outside `RESEARCH_KINDS` (`policy/engine.py mode_gate`), so the helper could open and read pages but not click them, and
+said so. The same run met two more failures: `web_extract` ended with a protocol error when the fast model answered a
+field with a plain value instead of a value and a quote (`web/extract.py checked_extraction`), and `mark_plan_step`
+refused evidence over 400 characters (`agent/plan.py EVIDENCE_MAX_CHARS`), a step lost each time. (118) Dot's own Chrome
+is headed (a headless Chrome meets bot walls) and comes to the front when it starts; with `raise_window` off, the
+default, the application that had the front gets it back once (item 97). Measured today on Chrome 154 with probes on
+throwaway profiles: `context.new_page()` takes the front, and Dot's own Chrome opens every thread's tab and every quiet
+read's scratch tab with it; a target created through CDP with `background: true` does not, nor do `goto`, closing a tab,
+a screencast or a dialog; a tab opened in the background is `visible` to its page, paints its screencast at the visible
+tab's rate and gives a screenshot in 0.04 s; a tab the page opens itself (a `target=_blank` link clicked, `window.open`)
+takes the front. The owner's log counts 42 starts of Chrome. A headless Chrome is a background-only process on macOS,
+with no Dock tile, so the test suites' Chromes are not what bounces. (119) OpenCode Zen's list
+(`https://opencode.ai/zen/v1/models`) has 45 models, 10 of them free (`big-pickle`, `jev-1.13-free`,
+`ling-3.1-flash-free`, `longcat-2.5-preview-free`, `mimo-v2.6-flash-free`, `muse-spark-1.2-contributor-free`,
+`muse-spark-1.3-contributor-free`, `nemotron-3.5-lightning-free`, `space-bunny-free`, `step-5-preview-free`); each
+answers a call from outside OpenCode's own client with 403 `FreeTierError` ("OpenCode's free tier can only be used from
+within OpenCode"), with the key or without. OpenCode Go's list, the one Dot shows, holds two free models that answer Dot
+(`longcat-2.5-preview-free`, `step-5-preview-free`), unmarked among 38. Go's Messages route (Claude Haiku 5.5, Qwen,
+MiniMax) takes cache marks now: of two calls with the same 10k-token prompt to Haiku 5.5, the second read 10,383 tokens
+from the cache when marked and none when not, and Dot sends no mark there (`llm/opencode_go.py _MESSAGES_OPTIONS`,
+written when the gateway took none); Qwen caches by itself and with the mark, MiniMax takes the mark; the Chat route
+caches on its own (DeepSeek: 7,552 of 7,614 prompt tokens on the second call). Anthropic's own API is called with the
+automatic cache mark already, and one client per provider keeps its connections for 60 s. (120) The run page's top bar
+holds the face, the title, the state and the start; then the agent, the model and its reasoning, the approvals (YOLO),
+Goal mode, the campaign, the panel's switch, Continue and Cancel (`views/run.js` into `stage.js`'s slots); the frame's
+right holds the approvals waiting, the runs in progress, the connection's dot and the emergency stop, a red square on
+every page (`shell.js buildIndicators`). The sidebar's Waiting and Working sections count the same runs, and the panel's
+details list the mode, the model, the reasoning, the approvals and Goal mode. While a run works, a message typed is sent
+as a steer under the label Steer. (121) T3 Code's look, read from its repository (MIT, `apps/web/src`): a sidebar of 256
+px a tone darker than the page, its rows quiet (the project small, the title in the body size, the state or the time on
+the right in tabular figures); one chat lane of 46 rem; the user's messages in a soft bubble, the agent's without one; a
+turn's tools as one line with an icon ("Ran 3 commands"); hairlines rather than boxes; the composer a white card on a 24
+px corner with a soft shadow, whose round send button becomes a red Stop while the agent works with an empty box; the
+panel a floating card of 280 px with hairline sections; the details revealed on hover.
+
+**The shape of this part (the decisions).** First the helper's rights: a delegated run takes its parent's mode, which
+the model can no longer narrow; a research run the owner starts stays read-only, as its name says. The two other
+failures of that run are fixed with it. Then Chrome behind: every tab Dot opens in its own Chrome is created in the
+background, and when a page opens a tab of its own, the front goes back to the application that had it. Then the models:
+the cache mark on Go's Messages route, which makes Claude on Go faster and cheaper from a run's second step, and the
+free models marked in the picker; Zen's free models stay out of the list, because OpenCode refuses them to any client
+but its own and Dot does not pretend to be OpenCode. Then the run page's head: Stop in the send button's place, the
+emergency stop at the sidebar's foot, and nothing at the top but the title and the panel's switch. Last, the calm look
+of T3 Code adapted to Dot's tokens, faces and mark.
+
+### How to start part 16 (the handoff prompt)
+
+> Read ROADMAP.md part 16 and the status table of part 9 (rows 117 to 121). One item at a time, in order; the protocol
+> of part 5 (branch, gate, PR, Linear MYP issue, squash merge, hash in the table, log line) is unchanged. Never touch
+> the owner's data directory except to read it and to restart the daemon when `/api/status` shows no active run; the
+> owner's goals stay out of this file; PLAN.md stays untracked. The owner reads Turkish; everything written is English.
+> Every UI item ends with the screenshot tour read by eye.
+
+### 117. The helper keeps its parent's rights: a delegated run takes its parent's mode
+
+**Status: planned.**
+
+**What.** `delegate` loses its `mode`: a delegated run takes its parent's (a task run's helper is a task run, a research
+run's helper research, and the run manager still refuses a research run a wider helper), so a model can no longer start
+its helper read-only in a run the owner gave every right; `message_agent` does the same already. The tool's description
+and the system prompt's delegation section say that the agent uses your tools, your mode and your model. A research run
+the owner starts stays read-only. `web_extract` takes a field the fast model answered with a plain value as that value,
+unverified and without a quote, and an object sent as a JSON string as the object, instead of failing the whole
+extraction; the evidence of `mark_plan_step` and `update_plan` is clipped at 400 characters with an ellipsis instead of
+refusing the call. Unit tests hold the three.
+
+### 118. Chrome behind: every tab opened in the background, the front given back
+
+**Status: planned.**
+
+**What.** In Dot's own Chrome every new tab, a thread's and a quiet read's, is a target created in the background
+through CDP, as the user's Chrome has it already, unless `raise_window` is on; Playwright hands the browser of a
+persistent context too. A tab a page opens itself takes the front by Chrome's own doing: when that happens during an
+action, and another application had the front before it, the front goes back to that application (item 97's give-back,
+kept to Dot's own Chrome by its process, so a switch the owner makes is not undone). The start of Chrome still takes the
+front once, since macOS starts an application in front (a start without a window, `--no-startup-window`, makes
+Playwright wait for a first page that never comes), and gives it back as before. A smoke test on a throwaway profile
+holds that opening tabs, reading pages and a page's own tab leave the front where it was.
+
+### 119. The models: the prompt cache on OpenCode Go's Messages route, the free ones marked
+
+**Status: planned.**
+
+**What.** OpenCode Go's Messages route sends the automatic cache mark (`_MESSAGES_OPTIONS`), so Claude Haiku 5.5, Qwen
+and MiniMax on Go read a run's prompt from the cache from its second step: a faster first token on a long prompt and a
+tenth of the input's price. The model picker marks the models a provider serves free (Go's ids that end in `-free`) with
+the word Free. Zen's free models stay out of the list, with the reason in the README's provider passage: OpenCode serves
+them only to its own client. Claude on Anthropic's own API caches already; its fast mode (Opus only, a research preview
+at a higher price) waits for the owner's word. A live smoke test, run when the key is there, reads the cached tokens of
+a second call on Go's Messages route.
+
+### 120. The run page's head: Stop in the send button's place, the emergency stop in the sidebar
+
+**Status: planned.**
+
+**What.** The run page's top bar keeps the face, the title (with the parent's crumb for a delegated run) and the panel's
+switch; the state, the start, the agent, the model and its reasoning, the approvals, Goal mode and the campaign live in
+the panel's details, which list most of them already. Cancel leaves the bar: while the run works and the box is empty,
+the composer's send button is a Stop, a round button in the danger colour with a square, that cancels the run; once a
+word is typed it is the send button again and the message goes as a steer; a run that has ended is followed up as
+before. Continue, for a run the daemon cut off, is a line above the composer. A delegated run, which has no composer,
+has its Stop in its closing pill. The frame's right keeps only what needs the owner: the approvals waiting and the
+connection while it is not live; the running count goes (the sidebar's Working section counts the runs), and the
+emergency stop moves to the sidebar's foot beside Settings, a red square with its words in its tooltip as before. The
+run page's smoke tests follow the controls; the tour is read by eye.
+
+### 121. The calm look, after T3 Code: the sidebar, the chat, the composer and the panel
+
+**Status: planned.**
+
+**What.** T3 Code's look, read from its repository (MIT) and adapted to Dot's tokens and both schemes, through the
+tokens first: the sidebar a tone darker than the page with no border and quiet rows (the title in the body size, the
+time or the state on the right in tabular figures, a hover a step lighter); the chat in one lane; the owner's messages
+in a soft bubble and Dot's without one; a step's tools as one quiet line with an icon; hairlines rather than boxes; the
+composer a card on a larger corner with a soft shadow; the panel's sections on hairlines; the details that only matter
+on a second look revealed on hover. Dot keeps its own: the faces, the mark, the type system and the colours of its
+states. The tour is read by eye at both widths and in both schemes.
 
 ## Log
 
@@ -7178,3 +7325,4 @@ shell, and the tour's 90 shots read by eye, which show nothing changed where not
 - 2026-10-12 (Opus 5.5): item 113 merged as `ea21f27` (PR #135, MYP-253 Done): the run page without its character card (`charactercard.js` and `mood.js` gone, the state in the top bar's face and badge), the sidebar's head with its button alone at the left where the top bar's opener stands, the brand gone from both bars; the tour checks the button on the lights' line.
 - 2026-10-12 (Opus 5.5): item 114 merged as `ea014d5` (PR #136, MYP-254 Done): Dot's mark (a yellow dot with the character's eyes) as the favicon, the app's, the menu bar's and the web app's icons from `desktop/icons/render.py`; the wordmark “dot” on the sign-in card and the desktop shell's down page; the opening, once per window session, never under reduced motion, cut short by a click or a key.
 - 2026-10-12 (Opus 5.5): item 115 merged as `a667d39` (PR #137, MYP-255 Done): one composer frame on a 20 px corner with a box of one line, one bar that never wraps (its labels fold by container queries), round pills on no ground, YOLO in the warn ink without a fill, the agent pick a pill with a menu, a quiet send while the box is empty, Keep going's note under the frame.
+- 2026-10-12 (Opus 5.5): item 116 merged as `0304257` (PR #138, MYP-256 Done): the shell guard reads a line as the shell does (comments, `$'…'`, here-documents, arithmetic, each substituted command judged on its own, the directories, variables and links a line sets up, paths without regard to case, unreadable code asked about), the terminal's and the desktop's typing judged by the line it runs, a network fetch marks the run untrusted, and what four readers found in the agent, the tools, the server and the interface fixed; 903 unit tests, 84 smoke tests, the eval check and the tour read by eye; the daemon restarted on it with no run active.
