@@ -5037,7 +5037,7 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 114 | Dot's mark and its opening: a dot that looks, the wordmark, the icons, a bounce at launch | done        | ea014d5 |
 | 115 | The composer once more: one bar that never wraps, labels that fold, a quiet warning | done        | a667d39 |
 | 116 | The deep review: every part of the code read once more, and fixed                   | done        | 0304257 |
-| 117 | The helper keeps its parent's rights: a delegated run takes its parent's mode       | planned     |         |
+| 117 | The helper keeps its parent's rights: a delegated run takes its parent's mode       | in progress |         |
 | 118 | Chrome behind: every tab opened in the background, the front given back             | planned     |         |
 | 119 | The models: the prompt cache on OpenCode Go's Messages route, the free ones marked   | planned     |         |
 | 120 | The run page's head: Stop in the send button's place, the emergency stop in the sidebar | planned     |         |
@@ -6720,7 +6720,20 @@ of T3 Code adapted to Dot's tokens, faces and mark.
 
 ### 117. The helper keeps its parent's rights: a delegated run takes its parent's mode
 
-**Status: planned.**
+**Status: in progress.**
+
+**As built (2026-10-12).** `DelegateArgs` has no `mode` now: `delegate` starts its run in `default_child_mode(ctx.mode)`
+(a research run's helper is research, every other run's a task), as `message_agent` did already, and the run carries its
+parent's approvals as before, so a helper of a task run in yolo has every right its parent has; the run manager still
+refuses a research run a wider helper. The tool's description and the system prompt's delegation section say that the
+agent uses your tools, your mode and your model. `web_extract` reads a field's answer through `pair_of`: a value and a
+quote as before; a plain value (a number too) as the value without a quote; the pair sent as JSON text as the pair; a
+field left out as empty. A value without a quote is unverified, so the result marks it as a claim to treat as one, where
+the whole extraction used to end on a protocol error. The evidence of `update_plan` and `mark_plan_step` is cut at 400
+characters with an ellipsis (`clipped_evidence`) and the field's description says so. The README's delegation,
+extraction and plan passages follow. Tests: `test_delegate.py` (the mode follows the parent's and cannot be named),
+`test_crawl.py` (the tolerant reading), `test_plan_evidence.py` (the cut); 906 unit tests; the delegate, team, helpers,
+plan-branches and undo smoke tests (18 passed, the three that call a live model left out); the eval check.
 
 **What.** `delegate` loses its `mode`: a delegated run takes its parent's (a task run's helper is a task run, a research
 run's helper research, and the run manager still refuses a research run a wider helper), so a model can no longer start

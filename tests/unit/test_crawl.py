@@ -1,9 +1,6 @@
 """The pure parts of the crawler and of typed extraction: scopes, links, the frontier, the shell rule, robots rules,
 the extraction tool and the check of its answer."""
 
-import pytest
-
-from dotagent.core.errors import ProviderProtocolError
 from dotagent.web.crawl import (
     Scope,
     in_scope,
@@ -91,5 +88,26 @@ def test_a_quote_that_is_in_the_source_verifies_the_value_and_one_that_is_not_do
     assert not extraction.fields["weight"].verified
     empty = checked_extraction("page", TEXT, FIELDS[:1], {"price": {"value": "", "quote": ""}})
     assert (empty.fields["price"].value, empty.fields["price"].verified) == ("", False)
-    with pytest.raises(ProviderProtocolError):
-        checked_extraction("page", TEXT, FIELDS, {"price": {"value": "x"}, "weight": "none"})
+
+
+def test_an_answer_that_is_not_a_value_and_a_quote_keeps_its_value_unverified() -> None:
+    extraction = checked_extraction(
+        "page",
+        TEXT,
+        [*FIELDS, FieldSpec(name="stock", description="How many are left.")],
+        {"price": {"value": "x"}, "weight": "900 g", "stock": 3},
+    )
+    fields = extraction.fields
+    assert [
+        (fields[name].value, fields[name].quote, fields[name].verified) for name in ("price", "weight", "stock")
+    ] == [
+        ("x", "", False),
+        ("900 g", "", False),
+        ("3", "", False),
+    ]
+    as_text = checked_extraction(
+        "page", TEXT, FIELDS[:1], {"price": '{"value": "24,90 EUR", "quote": "costs 24,90 eur"}'}
+    )
+    assert (as_text.fields["price"].value, as_text.fields["price"].verified) == ("24,90 EUR", True)
+    missing = checked_extraction("page", TEXT, FIELDS, {"price": {"value": "24,90 EUR", "quote": "costs 24,90 eur"}})
+    assert (missing.fields["weight"].value, missing.fields["weight"].verified) == ("", False)

@@ -196,7 +196,7 @@ answer (a small model that is offered both writes the call out as text).
   how the summary came about, the attempts it took and what the check found.
 - The plan has steps that are `pending`, `in_progress`, `done`, `failed` or `skipped`; `update_plan` writes it and
   `mark_plan_step` changes one step, so the plan in the web UI moves as the work does. A step is marked `done` only
-  with evidence (`evidence`, at most 400 characters): what the run observed that shows it, such as the path and what it
+  with evidence (`evidence`, cut at 400 characters): what the run observed that shows it, such as the path and what it
   read back, the count or the line of output, or what the page showed. A mark without it is refused with what counts
   as evidence, and a rewritten plan that keeps a done step keeps its evidence; a failed or skipped step may carry what
   happened. The evidence stands under the step in the web UI, in every note that carries the plan and in the goal
@@ -350,7 +350,8 @@ under `<workspace>/crawl/<host>-<time>/` with an `index.md`, and the result says
 model's context: for every source (an address, or a file in the workspace such as the Markdown files a crawl wrote) the
 fast model (`[models] fast`) is asked once for every field's value and the exact words of the source it comes from, and
 each quote is checked against the source, so the result says per field whether the value is `verified`; a value whose
-quote the source does not hold is kept and marked `verified: false`, a claim to treat as one. A source that cannot be
+quote the source does not hold is kept and marked `verified: false`, a claim to treat as one, and so is a value the
+fast model gave without a quote. A source that cannot be
 read or extracted is listed under "Not extracted" with the reason. At most 20 sources and 20 fields per call.
 
 A terminal session is for a program that does not run to its end by itself: one that asks questions (an installer,
@@ -1582,14 +1583,15 @@ the runs that read a skill with the runs on that host that did not (act calls an
 
 ## Delegation
 
-`delegate(goal, mode?, model?, step?)` hands a sub-goal to a separate run with a conversation of its own and returns
+`delegate(goal, model?, step?)` hands a sub-goal to a separate run with a conversation of its own and returns
 its result, so a long investigation does not fill the parent's context. The run works on the parent's model, or on the
 helper model that `model` names when that one can answer (see [Helpers and standby](#models-and-providers)). Several
 calls in one turn run side by side (up to `parallel_tools`), which is how a plan's independent steps run at the same
 time; `step` names the plan step the part is, and the report closes it (see the plan above). A
 delegated run cannot delegate again (the depth is one) or consult a helper, does not take one of the
 `max_concurrent_runs` slots, starts as untrusted as its parent, and ends when the parent is cancelled. The parent's
-result names the model the delegated run ended on. A research run can only delegate to research.
+result names the model the delegated run ended on. The delegated run takes its parent's mode, which the model
+cannot choose: a task run's helper can do what the task run can, a research run's helper only reads.
 
 ## Configuration
 

@@ -7,11 +7,13 @@ that the main model sees what was claimed and whether the source bears it out. :
 """
 
 import asyncio
+import json
 from collections.abc import Sequence
 
-from pydantic import JsonValue, ValidationError
+from pydantic import JsonValue
 
 from dotagent.core.errors import ProviderProtocolError, ProviderTransportError
+from dotagent.core.jsonutil import dumps_compact
 from dotagent.core.text import truncate_middle
 from dotagent.core.types import FrozenModel, JsonObject
 from dotagent.llm.calls import CallOrigin
@@ -101,20 +103,38 @@ def _normalized(text: str) -> str:
     return " ".join(text.split()).casefold()
 
 
+def _text_of(raw: JsonValue) -> str:
+    """A part of a field's answer as text: a string as it is, nothing as empty, anything else as compact JSON."""
+    if raw is None:
+        return ""
+    if isinstance(raw, str):
+        return raw
+    return dumps_compact(raw)
+
+
+def pair_of(raw: JsonValue) -> _Pair:
+    """A field's answer as a value and a quote. The fast model is asked for both, but some answer a plain value, or the
+    pair as JSON text, or leave a field out: the value is kept without a quote, so it counts as unverified instead of
+    failing the whole extraction."""
+    if isinstance(raw, dict):
+        return _Pair(value=_text_of(raw.get("value")), quote=_text_of(raw.get("quote")))
+    if isinstance(raw, str) and raw.strip().startswith("{"):
+        try:
+            decoded: JsonValue = json.loads(raw)
+        except json.JSONDecodeError:
+            return _Pair(value=raw, quote="")
+        if isinstance(decoded, dict):
+            return pair_of(decoded)
+    return _Pair(value=_text_of(raw), quote="")
+
+
 def checked_extraction(source: str, text: str, fields: Sequence[FieldSpec], arguments: JsonObject) -> Extraction:
-    """The extraction the fast model's call holds, each quote checked against ``text``. A field the call lacks, or
-    one that is not a value and a quote, is a protocol error."""
+    """The extraction the fast model's call holds, each quote checked against ``text`` (:func:`pair_of` reads an answer
+    that is not a value and a quote)."""
     checked: dict[str, ExtractedField] = {}
     plain: str = _normalized(text)
     for field in fields:
-        raw: JsonValue = arguments.get(field.name)
-        try:
-            pair: _Pair = _Pair.model_validate(raw)
-        except ValidationError as exc:
-            raise ProviderProtocolError(
-                f"the extraction of {field.name} is not a value and a quote",
-                {"field": field.name, "errors": exc.json(include_url=False, include_context=False)},
-            ) from exc
+        pair: _Pair = pair_of(arguments.get(field.name))
         quote: str = pair.quote.strip()
         verified: bool = quote != "" and _normalized(quote) in plain
         checked[field.name] = ExtractedField(value=pair.value.strip(), quote=quote, verified=verified)
