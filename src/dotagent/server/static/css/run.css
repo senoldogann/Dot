@@ -87,16 +87,35 @@
   background: var(--accent);
 }
 
-/* The conversation keeps one reading width, centred in the room the panel leaves it. */
+/* The conversation keeps one reading width, centred in the room the panel leaves it. Its column is at least as tall as
+   the window under the top bar and the page's padding above it, and the conversation grows into what a short one leaves,
+   so the dock under it stands at the window's foot from the first message (item 129); a long one scrolls under the
+   dock as before. */
 .run-main {
   width: 100%;
   min-width: 0;
   max-width: var(--lane-w);
   margin-inline: auto;
+  display: flex;
+  flex-direction: column;
+  min-height: calc(100vh - var(--stagebar-h) - 24px);
+  min-height: calc(100dvh - var(--stagebar-h) - 24px);
 }
 
-.run-main > * + * {
+.run-thread {
+  flex: 1 0 auto;
+}
+
+.run-main > * + *,
+.run-thread > * + * {
   margin-top: 16px;
+}
+
+@media (max-width: 720px) {
+  .run-main {
+    min-height: calc(100vh - var(--stagebar-h) - 16px);
+    min-height: calc(100dvh - var(--stagebar-h) - 16px);
+  }
 }
 
 /* ---------- lessons drawn from a run ---------- */
