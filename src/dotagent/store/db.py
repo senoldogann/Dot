@@ -22,7 +22,7 @@ from typing import Concatenate, Literal
 
 import aiosqlite
 
-from dotagent.core.errors import NotFoundError, StoreError
+from dotagent.core.errors import InvalidValueError, NotFoundError, StoreError
 from dotagent.core.ids import new_id
 from dotagent.core.jsonutil import dumps_compact, parse_json_object, parse_json_value
 from dotagent.core.logs import get_logger
@@ -48,6 +48,7 @@ from dotagent.store.models import (
     MemoryScore,
     MemoryUseHow,
     PushSubscription,
+    QueuedMessage,
     RuleRecord,
     RunMode,
     RunRecord,
@@ -92,6 +93,13 @@ CREATE TABLE IF NOT EXISTS rules (
     id TEXT PRIMARY KEY, position INTEGER NOT NULL, enabled INTEGER NOT NULL, behavior TEXT NOT NULL,
     tool_glob TEXT NOT NULL, match_regex TEXT NOT NULL, description TEXT NOT NULL, created_at REAL NOT NULL
 );
+CREATE TABLE IF NOT EXISTS queued_messages (
+    id TEXT PRIMARY KEY, thread_id TEXT NOT NULL, position INTEGER NOT NULL, text TEXT NOT NULL,
+    attachments TEXT NOT NULL, mode TEXT NOT NULL, model TEXT, effort TEXT, approvals TEXT, goal_mode INTEGER,
+    agent_id TEXT, source TEXT NOT NULL, created_at REAL NOT NULL
+);
+CREATE INDEX IF NOT EXISTS queued_messages_thread ON queued_messages(thread_id, position);
+CREATE TABLE IF NOT EXISTS queue_holds (thread_id TEXT PRIMARY KEY, held_at REAL NOT NULL);
 CREATE TABLE IF NOT EXISTS push_subscriptions (
     endpoint TEXT PRIMARY KEY, p256dh TEXT NOT NULL, auth TEXT NOT NULL, created_at REAL NOT NULL
 );
@@ -453,6 +461,26 @@ def _rule(row: aiosqlite.Row) -> RuleRecord:
     )
 
 
+def _queued(row: aiosqlite.Row) -> QueuedMessage:
+    attachments: str = row["attachments"]
+    goal_mode: int | None = row["goal_mode"]
+    return QueuedMessage(
+        id=row["id"],
+        thread_id=row["thread_id"],
+        position=row["position"],
+        text=row["text"],
+        attachments=tuple(item for item in attachments.split(",") if item),
+        mode=row["mode"],
+        model=row["model"],
+        effort=row["effort"],
+        approvals=row["approvals"],
+        goal_mode=None if goal_mode is None else bool(goal_mode),
+        agent_id=row["agent_id"],
+        source=row["source"],
+        created_at=row["created_at"],
+    )
+
+
 def _memory(row: aiosqlite.Row) -> MemoryRecord:
     tags: str = row["tags"]
     return MemoryRecord(
@@ -784,11 +812,11 @@ class Store:
 
     @_writing
     async def delete_threads(self, thread_ids: Sequence[str]) -> list[str]:
-        """Delete chats with everything they hold, in one transaction: their messages, their runs, the runs those
-        delegated to (recursively) with the events and approvals of all of them, and the threads of the delegated runs
-        unless a run of their own remains there. Returns the ids that named a thread, in the order given; the others
-        are skipped. A schedule keeps the id of the thread it last fired into and makes a new one per firing, so it is
-        left alone."""
+        """Delete chats with everything they hold, in one transaction: their messages and queue, their runs, the runs
+        those delegated to (recursively) with the events and approvals of all of them, and the threads of the delegated
+        runs unless a run of their own remains there. Returns the ids that named a thread, in the order given; the
+        others are skipped. A schedule keeps the id of the thread it last fired into and makes a new one per firing, so
+        it is left alone."""
         named: tuple[str, ...] = tuple(thread_ids)
         marks: str = ",".join("?" * len(named))
         doomed: str = (
@@ -809,6 +837,8 @@ class Store:
         await self._db.execute(f"{doomed} DELETE FROM approvals WHERE run_id IN (SELECT id FROM doomed)", named)
         await self._db.execute(f"{doomed} DELETE FROM runs WHERE id IN (SELECT id FROM doomed)", named)
         await self._db.execute(f"DELETE FROM messages WHERE thread_id IN ({marks})", named)
+        await self._db.execute(f"DELETE FROM queued_messages WHERE thread_id IN ({marks})", named)
+        await self._db.execute(f"DELETE FROM queue_holds WHERE thread_id IN ({marks})", named)
         await self._db.execute(f"DELETE FROM threads WHERE id IN ({marks})", named)
         if delegated:
             host_marks: str = ",".join("?" * len(delegated))
@@ -1387,6 +1417,134 @@ class Store:
     async def delete_rule(self, rule_id: str) -> None:
         await self._db.execute("DELETE FROM rules WHERE id = ?", (rule_id,))
         await self._db.commit()
+
+    # ----- queued messages ---------------------------------------------------------------------
+
+    async def list_queued(self, thread_id: str) -> list[QueuedMessage]:
+        """The messages waiting in a chat's queue, the next one first."""
+        rows = await self._all("SELECT * FROM queued_messages WHERE thread_id = ? ORDER BY position", (thread_id,))
+        return [_queued(row) for row in rows]
+
+    async def get_queued(self, message_id: str) -> QueuedMessage:
+        row = await self._one("SELECT * FROM queued_messages WHERE id = ?", (message_id,))
+        if row is None:
+            raise NotFoundError("queued message not found", {"message_id": message_id})
+        return _queued(row)
+
+    async def queue_held(self, thread_id: str) -> bool:
+        """Whether a chat's queue waits for the owner to resume it (see :meth:`hold_queue`)."""
+        return await self._one("SELECT 1 FROM queue_holds WHERE thread_id = ?", (thread_id,)) is not None
+
+    @_writing
+    async def add_queued(
+        self,
+        thread_id: str,
+        text: str,
+        attachments: Sequence[str],
+        mode: RunMode,
+        model: str | None,
+        effort: Effort | None,
+        approvals: ApprovalMode | None,
+        goal_mode: bool | None,
+        agent_id: str | None,
+        source: str,
+    ) -> QueuedMessage:
+        """Put a message at the end of a chat's queue."""
+        row = await self._one(
+            "SELECT COALESCE(MAX(position), 0) AS top FROM queued_messages WHERE thread_id = ?", (thread_id,)
+        )
+        record: QueuedMessage = QueuedMessage(
+            id=new_id("que"),
+            thread_id=thread_id,
+            position=(0 if row is None else int(row["top"])) + 1,
+            text=text,
+            attachments=tuple(attachments),
+            mode=mode,
+            model=model,
+            effort=effort,
+            approvals=approvals,
+            goal_mode=goal_mode,
+            agent_id=agent_id,
+            source=source,
+            created_at=time.time(),
+        )
+        await self._db.execute(
+            "INSERT INTO queued_messages(id, thread_id, position, text, attachments, mode, model, effort, approvals,"
+            " goal_mode, agent_id, source, created_at) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (
+                record.id,
+                record.thread_id,
+                record.position,
+                record.text,
+                ",".join(record.attachments),
+                record.mode,
+                record.model,
+                record.effort,
+                record.approvals,
+                None if record.goal_mode is None else int(record.goal_mode),
+                record.agent_id,
+                record.source,
+                record.created_at,
+            ),
+        )
+        await self._db.commit()
+        return record
+
+    @_writing
+    async def edit_queued(self, message_id: str, text: str) -> None:
+        cursor = await self._db.execute("UPDATE queued_messages SET text = ? WHERE id = ?", (text, message_id))
+        await self._db.commit()
+        if cursor.rowcount == 0:
+            raise NotFoundError("queued message not found", {"message_id": message_id})
+
+    @_writing
+    async def delete_queued(self, message_id: str) -> None:
+        cursor = await self._db.execute("DELETE FROM queued_messages WHERE id = ?", (message_id,))
+        await self._db.commit()
+        if cursor.rowcount == 0:
+            raise NotFoundError("queued message not found", {"message_id": message_id})
+
+    @_writing
+    async def order_queue(self, thread_id: str, message_ids: Sequence[str]) -> None:
+        """Put a chat's queue in the order of ``message_ids``, which must name each of its messages once."""
+        rows = await self._all("SELECT id FROM queued_messages WHERE thread_id = ?", (thread_id,))
+        queued: list[str] = sorted(str(row["id"]) for row in rows)
+        if sorted(message_ids) != queued:
+            given: JsonArray = list(message_ids)
+            known: JsonArray = list(queued)
+            raise InvalidValueError(
+                "the order must name each message of the queue once",
+                {"thread_id": thread_id, "given": given, "queued": known},
+            )
+        await self._db.executemany(
+            "UPDATE queued_messages SET position = ? WHERE id = ?",
+            [(position, message_id) for position, message_id in enumerate(message_ids, start=1)],
+        )
+        await self._db.commit()
+
+    @_writing
+    async def hold_queue(self, thread_id: str) -> None:
+        """Keep a chat's queue from starting its next message until :meth:`release_queue`."""
+        await self._db.execute(
+            "INSERT OR IGNORE INTO queue_holds(thread_id, held_at) VALUES(?, ?)", (thread_id, time.time())
+        )
+        await self._db.commit()
+
+    @_writing
+    async def release_queue(self, thread_id: str) -> None:
+        await self._db.execute("DELETE FROM queue_holds WHERE thread_id = ?", (thread_id,))
+        await self._db.commit()
+
+    @_writing
+    async def hold_every_queue(self) -> int:
+        """Hold the queue of every chat that has one, as the daemon starts: the run each waited for is gone, so the
+        owner says when they go on. Returns the number of chats held."""
+        cursor = await self._db.execute(
+            "INSERT OR IGNORE INTO queue_holds(thread_id, held_at) SELECT DISTINCT thread_id, ? FROM queued_messages",
+            (time.time(),),
+        )
+        await self._db.commit()
+        return cursor.rowcount
 
     # ----- push subscriptions ------------------------------------------------------------------
 

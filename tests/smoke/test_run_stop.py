@@ -1,7 +1,8 @@
 """Stop in the send button's place (item 120): while a run works and the box is empty, the run page's send is a Stop in
-the danger colour; a typed word brings the send back as Steer, and pressed, the Stop cancels the run, after which the
-send follows up. The top bar keeps the face, the name and the panel's switch; the emergency stop is in the sidebar's
-foot. A scripted run waits in a shell command, served by a real server, wide and on a phone, light and dark."""
+the danger colour; a typed word brings the send back, as Queue (item 148), and pressed, the Stop cancels the run, after
+which the send follows up. The top bar keeps the face, the name and the panel's switch; the emergency stop is in the
+sidebar's foot. A scripted run waits in a shell command, served by a real server, wide and on a phone, light and
+dark."""
 
 import asyncio
 import time
@@ -137,10 +138,10 @@ async def test_the_send_is_the_runs_stop_while_the_box_is_empty_and_the_top_bar_
                 await page.wait_for_timeout(_SETTLE_MS)
                 await page.screenshot(path=str(tmp_path / f"stop-{width}-{scheme}.png"))
                 await box.fill("Look at the other file too")
-                await expect(send).to_have_attribute("aria-label", "Steer")
+                await expect(send).to_have_attribute("aria-label", "Queue")
                 await expect(page.locator(".dock .composer[data-stop]")).to_have_count(0)
                 await page.wait_for_timeout(_SETTLE_MS)
-                await page.screenshot(path=str(tmp_path / f"steer-{width}-{scheme}.png"))
+                await page.screenshot(path=str(tmp_path / f"queue-{width}-{scheme}.png"))
                 await box.fill("")
                 await expect(send).to_have_attribute("aria-label", "Stop")
                 await send.click()

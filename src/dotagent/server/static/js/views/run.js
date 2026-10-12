@@ -1,4 +1,5 @@
-// One run as a conversation: the question, what Dot did about it, its answer, and the box to steer the run or to follow up on it.
+// One run as a conversation: the question, what Dot did about it, its answer, and the box to queue a message for after
+// the run, steer it or follow up on it.
 
 import { actorFace, dotFace, setActorState } from "../actors.js";
 import { api, follow } from "../api.js";
@@ -15,6 +16,7 @@ import { continuedIn, earlierTurns, loadHistory, RESUME_SOURCE } from "../histor
 import { dotName, faceState, faceStateAtEnd } from "../face.js";
 import { icon } from "../icons.js";
 import { createInspector } from "../inspector.js";
+import { createQueue } from "../queue.js";
 import { userMessage } from "../messages.js";
 import { emptyPanel, errorPanel, foldCard, loadingPanel } from "../panels.js";
 import { heldChoice } from "../runmodes.js";
@@ -411,6 +413,40 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
     listener: null,
   });
   const { textarea: input, attachments, sendButton: send } = frame;
+  // The chat's queue (item 148), right above the composer: a message sent while the run works waits there and starts
+  // as the chat's next run once this one has ended done; the page follows it there. A campaign's chat takes no queue:
+  // a message steers its session, as before.
+  const queueing = run.campaign_id === null;
+  const queue = createQueue({
+    threadId: run.thread_id,
+    frame,
+    onSteered: (text) => holdMessage(text),
+    onStarted: (startedRunId, afterRunId) => {
+      if (afterRunId === runId) {
+        ctx.navigate(`/runs/${startedRunId}`);
+      }
+    },
+    onEdit: () => syncControls(),
+  });
+  // ⌘⇧Enter sends what the box holds to the run now, past the queue, or the queue's next message when the box is
+  // empty (T3 Code's key); Escape ends the edit of a queued message. A key the box already took (a pick of the slash
+  // menu, or of an input method's composition) is left to it.
+  input.addEventListener("keydown", (event) => {
+    if (event.defaultPrevented || event.isComposing || event.keyCode === 229) {
+      return;
+    }
+    if (event.key === "Enter" && event.shiftKey && (event.metaKey || event.ctrlKey) && active && queue.editing() === null) {
+      event.preventDefault();
+      if (input.value.trim() === "") {
+        queue.steerFirst();
+      } else {
+        submit(true);
+      }
+    } else if (event.key === "Escape" && queue.editing() !== null) {
+      event.preventDefault();
+      queue.cancelEdit();
+    }
+  });
   // The choices of the next follow-up (item 133), after T3 Code's composer: the open run's mode, model with its
   // reasoning, approvals and goal mode at first, held by the page. The agent stays the chat's, and Keep going is a
   // new chat's, since a campaign starts from a goal of its own.
@@ -443,7 +479,7 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
   });
   frame.options.append(choices.pills.mode, choices.pills.model, choices.pills.reasoning, choices.pills.options);
   const stopStatus = onChange(choices.sync);
-  const dock = el("div", { class: "dock" }, resumeLine, frame.element);
+  const dock = el("div", { class: "dock" }, resumeLine, queue.element, frame.element);
 
   // Steer messages that are sent but not read yet; each one leaves when the run reports reading it.
   const waitingMessages = [];
@@ -510,13 +546,25 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
   // so a second press must be refused here, or a follow-up would start two runs on one thread.
   let sending = false;
 
-  async function submit() {
+  // `steerNow` sends the message to the run under way past the queue (⌘⇧Enter).
+  async function submit(steerNow) {
     if (sending) {
       return;
     }
     const text = input.value.trim();
     if (text === "") {
       input.focus();
+      return;
+    }
+    if (queue.editing() !== null) {
+      sending = true;
+      send.disabled = true;
+      try {
+        await attempt(() => queue.saveEdit(text));
+      } finally {
+        sending = false;
+        send.disabled = false;
+      }
       return;
     }
     const aside = BTW_PATTERN.exec(text);
@@ -537,6 +585,23 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
     send.disabled = true;
     try {
       await attempt(async () => {
+        if (active && queueing && steerNow !== true) {
+          // The level is checked against the model's own, so the models are known first.
+          await choices.ready();
+          const chosen = choices.value();
+          await queue.add({
+            text,
+            mode: chosen.mode,
+            model: chosen.model,
+            effort: chosen.effort,
+            approvals: chosen.approvals,
+            goal_mode: chosen.goal_mode,
+            agent_id: run.agent_id,
+            attachments: files,
+          });
+          frame.clear();
+          return;
+        }
         if (active) {
           const entry = holdMessage(text);
           try {
@@ -577,13 +642,19 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
     const delegated = run.parent_run_id !== null;
     frame.element.hidden = delegated;
     dock.classList.toggle("dock-bare", delegated);
-    frame.setStop(active && !delegated ? stopRun : null);
-    // A message steers the run under way, which keeps its own choices: the pills are the next follow-up's.
+    // While a queued message is edited, the send saves it, and an emptied box stops nothing.
+    const editing = queue.editing() !== null;
+    frame.setStop(active && !delegated && !editing ? stopRun : null);
+    // A message waits in the queue with the pills' choices as the next follow-up (a campaign's steers its session); the
+    // run under way keeps its own.
     choices.setWaiting(active);
     footStop.hidden = !active;
     // Short enough for one line of a phone's composer (item 111).
-    input.placeholder = active ? "Steer this run, or /btw to ask on the side" : "Follow up, or /btw to ask on the side";
-    frame.setSendLabel(active ? "Steer" : "Follow up");
+    const working = queueing ? "Queue a message, or /btw to ask on the side" : "Steer this run, or /btw to ask on the side";
+    input.placeholder = active ? working : "Follow up, or /btw to ask on the side";
+    const sendWord = active ? (queueing ? "Queue" : "Steer") : "Follow up";
+    frame.setSendLabel(editing ? "Save" : sendWord);
+    queue.setActive(active);
     if (active && ticker === null) {
       // The run's figures, and the time of every delegated run that works, count on every second.
       ticker = setInterval(() => {
@@ -965,6 +1036,7 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
     stage.dispose();
     stopStatus();
     choices.dispose();
+    queue.dispose();
     frame.dispose();
     if (ticker !== null) {
       clearInterval(ticker);

@@ -21,7 +21,8 @@ export const MODES = [
 const APPROVAL_ICONS = { ask: "lock", auto: "shield", yolo: "lockOpen" };
 // Never a real value of a status, so the first synchronisation always paints.
 const NOTHING_SHOWN = false;
-// What the pills add to their tooltips while a run works on a chat's page: a message steers that run, which keeps its own.
+// What the pills add to their tooltips while a run works on a chat's page: a message waits in the queue and starts
+// with them once that run, which keeps its own, has ended (item 148).
 const WAITING_NOTE = "For the next follow-up: the run under way keeps its own";
 
 function defaultRefOf(snapshot) {

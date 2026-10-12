@@ -2981,6 +2981,239 @@ details[open] > summary .chev {
   display: inline;
 }
 
+/* The queue of a chat (item 148), after T3 Code's: a sheet that rises from behind the top of the composer, its lower
+   edge under the frame's round corners; the frame is drawn over it. */
+.queue {
+  position: relative;
+  margin: 0 var(--space-4) calc(-1 * var(--radius-composer));
+  padding: var(--space-1) var(--space-1) calc(var(--radius-composer) + var(--space-1));
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  background: var(--surface-2);
+}
+
+.queue + .composer {
+  position: relative;
+  z-index: 1;
+}
+
+.queue-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+  min-height: 30px;
+  padding: 0 var(--space-2);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: var(--text-sm);
+  cursor: pointer;
+}
+
+.queue-head:hover {
+  color: var(--text-2);
+}
+
+.queue-count {
+  margin-left: auto;
+  font-variant-numeric: tabular-nums;
+}
+
+/* The chevron points down while the list shows, to the right while it is folded. */
+.queue-chevron {
+  transform: rotate(90deg);
+  transition: transform var(--motion-quick) var(--ease);
+}
+
+.queue[data-collapsed] .queue-chevron {
+  transform: none;
+}
+
+.queue-paused {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 0 var(--space-1) 0 var(--space-2);
+  color: var(--warn);
+  font-size: var(--text-xs);
+}
+
+.queue-paused[hidden] {
+  display: none;
+}
+
+.queue-paused .btn {
+  margin-left: auto;
+}
+
+.queue-list {
+  max-height: 8rem;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+}
+
+.queue-list[hidden] {
+  display: none;
+}
+
+.queue-row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-height: 32px;
+  padding: 0 var(--space-1);
+  border-radius: var(--radius-sm);
+  color: var(--text-2);
+  font-size: var(--text-sm);
+}
+
+.queue-row[aria-current="true"] {
+  background: var(--accent-weak);
+  color: var(--text);
+}
+
+.queue-row.dragging {
+  opacity: 0.5;
+}
+
+/* Where a dragged message would land: a line above the row, or below the last. */
+.queue-row.drop-before::before,
+.queue-row.drop-after::after {
+  content: "";
+  position: absolute;
+  right: var(--space-1);
+  left: var(--space-1);
+  height: 2px;
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--accent) 70%, transparent);
+}
+
+.queue-row.drop-before::before {
+  top: 0;
+}
+
+.queue-row.drop-after::after {
+  bottom: 0;
+}
+
+.queue-text {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.queue-files {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-half);
+  color: var(--faint);
+  font-size: var(--text-xs);
+}
+
+.queue-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-half);
+}
+
+.queue-grip,
+.queue-icon,
+.queue-steer,
+.queue-cancel {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 26px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-xs);
+  background: transparent;
+  color: var(--faint);
+  font: inherit;
+  font-size: var(--text-sm);
+  cursor: pointer;
+}
+
+.queue-grip,
+.queue-icon {
+  width: 26px;
+}
+
+.queue-grip {
+  cursor: grab;
+}
+
+.queue-grip:active {
+  cursor: grabbing;
+}
+
+.queue-steer,
+.queue-cancel {
+  gap: var(--space-1);
+  padding: 0 var(--space-2);
+  color: var(--text-2);
+}
+
+.queue-grip:hover:not(:disabled),
+.queue-icon:hover:not(:disabled),
+.queue-steer:hover:not(:disabled),
+.queue-cancel:hover {
+  background: var(--surface-3);
+  color: var(--text);
+}
+
+.queue-grip:disabled,
+.queue-icon:disabled,
+.queue-steer:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.queue .icon {
+  width: 15px;
+  height: 15px;
+}
+
+.queue button:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 1px;
+}
+
+/* On a phone, Steer keeps its arrow and its name for a screen reader; Cancel keeps its word. */
+@media (max-width: 480px) {
+  .queue {
+    margin-inline: var(--space-2);
+  }
+
+  .queue-steer .label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  .queue-steer {
+    width: 26px;
+    padding: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .queue-chevron {
+    transition: none;
+  }
+}
+
 /* The dock's frame floats over the conversation: the one composer with a shadow; its box is one line high when empty. */
 .dock .composer .textarea {
   min-height: 0;

@@ -284,6 +284,11 @@ answer (a small model that is offered both writes the call out as text).
   mark (see [Safety](#safety)).
 - A run belongs to the daemon, not to the page that started it: leave the chat and it goes on, its status stays live in
   the sidebar, and you can steer it when you come back.
+- A message sent to a chat while its run works waits in the chat's queue, after T3 Code's: it starts as the chat's next
+  run, with the mode, model, reasoning, approvals and goal mode it was sent with, once the run before it has ended done,
+  one message after the other. A stop, a failed run or a start of the daemon holds the queue until you resume it. The
+  daemon keeps the queue, so it goes on with no page open, and a queued message can be sent to the run at work
+  (steered) instead. A campaign's chat has no queue: a message there steers its session.
 - `/btw <question>` in the box of a run (the slash menu offers it) asks on the side: the run's model answers from what
   the run has done so far,
   without tools, and the run neither sees the question nor stops for it. Several can be asked at once. The question and
@@ -1019,14 +1024,22 @@ the minutes went (the model, the summaries, the tools, the time spent waiting fo
 the provider served from its cache, the output tokens, the compactions (with their rate per 100 steps) and the runs it
 delegated. It is `GET /api/runs/{id}/stats` (the same numbers as `dotx stats --run ID`), read again every ten seconds
 while the run works and once at its end. A strip under
-the head links the other runs of the same thread, and the box at the bottom steers a run that is going on or follows up
-on a finished one. While the run works and the box is empty, the box's send is the run's **Stop** (a round button in
-the danger colour with a square) and cancels it; a word typed turns it back into the send, and the message steers the
-run. The box wears the home's pills too, after T3 Code's composer: the mode, the model with its reasoning and the
-Options (approvals and goal mode), set at first to the open run's, and a follow-up starts its run with them on the same
-thread, for the same agent; they are the page's, not kept in the browser as the home's are, and Keep going stays a new
-chat's choice. While a run works the message steers it, and it keeps its own: the pills step back and say that they wait
-for the next follow-up. A run the daemon cut off offers **Continue** on a line above the box. A Details panel shows the
+the head links the other runs of the same thread, and the box at the bottom queues a message for after a run that is
+going on, or follows up on a finished one. While the run works and the box is empty, the box's send is the run's
+**Stop** (a round button in the danger colour with a square) and cancels it; a word typed turns it back into the send,
+**Queue**, and the message waits in the chat's queue (see [How a run works](#how-a-run-works)), shown above the box as
+T3 Code shows it: a sheet whose head (Queued and the count) folds it, with a row per message: a handle to drag it to
+another place or move it with the arrow keys, its text on one line (all of it in the tooltip), a pencil that edits it
+in the box (the send says Save; Escape or Cancel gives the box its draft back), **Steer**, which sends it to the run
+now, and × to take it out. ⌘⇧Enter steers the run with what the box holds, past the queue, or with the queue's next
+message when the box is empty. A held queue says it is paused, with **Resume**. When the run ends done, the next
+message starts and the page follows it; every open page shows the queue as it changes. In a campaign's chat the
+message steers the session. The box wears the home's pills too, after T3 Code's composer: the mode, the model with its
+reasoning and the Options (approvals and goal mode), set at first to the open run's, and a follow-up or a queued
+message starts its run with them on the same thread, for the same agent; they are the page's, not kept in the browser
+as the home's are, and Keep going stays a new chat's choice. The run under way keeps its own: while it works, the pills
+step back and say that they wait for the next follow-up. A run the daemon cut off offers **Continue** on a line above
+the box. A Details panel shows the
 status, the agent
 of a chat with one, the model and its reasoning level, the approval mode and goal mode, the campaign of a session, the
 model turns, the tool calls (with the failed ones), the tokens (of every model call of the run: its steps and its
@@ -1246,6 +1259,8 @@ The REST API (all under `/api`; bodies and replies are JSON, event streams are s
 | `GET /runs/{id}/stream?after=N`, `GET /stream`                                  | live events of a run with its sub-runs; lifecycle of all runs |
 | `POST /runs/{id}/steer`, `POST /runs/{id}/cancel`                               | message a running run; stop it                               |
 | `POST /runs/{id}/btw` (`{"text": …}`)                                           | a side question, answered without the run seeing it          |
+| `GET\|POST\|PUT /threads/{id}/queue`, `POST /threads/{id}/queue/resume`         | a chat's queue (`held`, `messages`); queue a message (`text` and the choices of `POST /runs`; 409 for a chat with no run yet or a campaign's); reorder it (`{"ids": […]}`, each once); resume a held one |
+| `PATCH\|DELETE /queue/{id}` (`{"text": …}`), `POST /queue/{id}/steer`            | edit or take out a queued message; send it to the run at work now (409 with none); each answers with the queue |
 | `POST /attachments` (`{"name", "media_type", "data_b64"}`)                      | keep a file for a message; `POST /runs` and `steer` name it in `attachments` |
 | `GET /threads?limit=N`, `DELETE /threads` (`{"ids": […]}`)                      | the chats, the pinned first, then newest activity first; delete some with their runs (409 with the ids while one has a run under way) |
 | `PATCH /threads/{id}` (`{"title": …, "pinned": …, "seen": …}`, one at least)   | name a chat, pin it, or mark it seen or unseen (204; 404 for no chat); a chat's `unread` is in the list |

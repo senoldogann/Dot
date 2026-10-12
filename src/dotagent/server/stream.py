@@ -11,6 +11,7 @@ from collections.abc import AsyncIterator, Iterable
 
 from dotagent.agent.gate import HANDBACK_EVENT, TAKEOVER_EVENT
 from dotagent.agent.lessons import LESSON_EVENTS
+from dotagent.agent.manager import QUEUE_CHANGED_EVENT
 from dotagent.browser.types import Frame
 from dotagent.events import EventBus
 from dotagent.server.context import ServerContext
@@ -24,8 +25,8 @@ KEEPALIVE: bytes = b": keepalive\n\n"
 FRAME_EVENT: str = "frame"
 
 # What the lifecycle stream carries: the moments a client must refetch its lists for (the Activity sections among
-# them: a takeover moves a run between them), and what becomes of the lessons of a run, which are drawn once its own
-# stream has ended.
+# them: a takeover moves a run between them; a chat's queue), and what becomes of the lessons of a run, which are drawn
+# once its own stream has ended.
 LIFECYCLE_KINDS: frozenset[str] = frozenset(
     {
         "run_queued",
@@ -35,6 +36,7 @@ LIFECYCLE_KINDS: frozenset[str] = frozenset(
         "approval_decided",
         TAKEOVER_EVENT,
         HANDBACK_EVENT,
+        QUEUE_CHANGED_EVENT,
         *LESSON_EVENTS,
     }
 )

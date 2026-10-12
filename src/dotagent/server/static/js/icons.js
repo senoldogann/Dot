@@ -6,6 +6,23 @@ const SHAPES = {
   paperclip: [["path", { d: "m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48" }]],
   check: [["path", { d: "M20 6 9 17l-5-5" }]],
   x: [["path", { d: "M18 6 6 18" }], ["path", { d: "m6 6 12 12" }]],
+  // For the queue of a chat (item 148): a handle to drag, a numbered list, a turn up and on.
+  grip: [
+    ["circle", { cx: "9", cy: "6", r: "1.2" }],
+    ["circle", { cx: "9", cy: "12", r: "1.2" }],
+    ["circle", { cx: "9", cy: "18", r: "1.2" }],
+    ["circle", { cx: "15", cy: "6", r: "1.2" }],
+    ["circle", { cx: "15", cy: "12", r: "1.2" }],
+    ["circle", { cx: "15", cy: "18", r: "1.2" }],
+  ],
+  listOrdered: [
+    ["path", { d: "M10 6h10" }],
+    ["path", { d: "M10 12h10" }],
+    ["path", { d: "M10 18h10" }],
+    ["path", { d: "M4 5h1.5v4" }],
+    ["path", { d: "M4 15h3l-3 4h3" }],
+  ],
+  cornerUpRight: [["path", { d: "m15 5 4 4-4 4" }], ["path", { d: "M5 19v-6a4 4 0 0 1 4-4h10" }]],
   bolt: [
     [
       "path",
