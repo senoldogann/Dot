@@ -410,11 +410,18 @@
 }
 
 /* The foot holds the way to the settings; the look itself is chosen there. */
+/* Settings, and the emergency stop at the right of its row (item 120). */
 .side-foot {
   flex: none;
   display: flex;
-  flex-direction: column;
+  align-items: center;
+  gap: 4px;
   padding: 8px;
+}
+
+.side-foot > .side-link {
+  flex: 1;
+  min-width: 0;
 }
 
 /* With the sidebar next to the page, the way back to the list is always in sight. */

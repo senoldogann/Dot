@@ -253,6 +253,8 @@ async def test_the_sections_show_what_waits_what_works_and_a_campaign_session_wi
                     await page.screenshot(path=str(tmp_path / f"activity-{width}-{scheme}.png"))
                     # In the parent's chat, the delegated run's card shows its progress and opens its own page.
                     await page.goto(f"http://{host}:{port}/#/runs/{working.id}")
+                    # While the parent works, its send is its Stop as long as the box is empty (item 120).
+                    await expect(page.locator(".dock .btn.send")).to_have_attribute("aria-label", "Stop")
                     child_card = page.locator("details.child")
                     await expect(child_card).to_have_count(1)
                     await expect(child_card.locator(".child-progress")).to_contain_text("step")
@@ -263,6 +265,8 @@ async def test_the_sections_show_what_waits_what_works_and_a_campaign_session_wi
                     await expect(page.locator(".stage-crumb")).to_have_attribute("href", f"#/runs/{working.id}")
                     await expect(page.locator(".stage-crumb")).to_contain_text(working.goal[:24])
                     await expect(page.locator(".child-foot")).to_contain_text("Open parent")
+                    # A delegated run has no composer: its Stop is the last word of its pill while it works.
+                    await expect(page.locator(".child-foot .child-stop")).to_be_visible()
                     await page.screenshot(path=str(tmp_path / f"child-{width}-{scheme}.png"))
                     await page.close()
             finally:

@@ -1,9 +1,10 @@
 // The emergency stop: cancels every run and blocks desktop control until it is released.
 
 import { api } from "./api.js";
-import { plural } from "./dom.js";
+import { el, plural } from "./dom.js";
+import { icon } from "./icons.js";
 import { refresh } from "./state.js";
-import { confirmDialog, toast } from "./ui.js";
+import { attempt, confirmDialog, toast } from "./ui.js";
 
 /** Ask for confirmation, then stop everything. */
 export async function engageFailsafe() {
@@ -20,6 +21,23 @@ export async function engageFailsafe() {
   const result = await api.post("/failsafe", null);
   toast("ok", `Emergency stop engaged; ${plural(result.cancelled_runs.length, "run", "runs")} cancelled.`);
   await refresh();
+}
+
+/** The emergency stop's button, a red square whose words are in its tooltip: in the sidebar's foot beside Settings, and
+ * beside the button that shows the sidebar while it is closed, so it is never out of reach (item 120). */
+export function failsafeButton() {
+  return el(
+    "button",
+    {
+      class: "btn danger sm failsafe",
+      type: "button",
+      title: "Emergency stop: cancel every run and block desktop control",
+      "aria-label": "Emergency stop",
+      onclick: () => attempt(engageFailsafe),
+    },
+    icon("stop"),
+    el("span", { class: "label" }, "Emergency stop"),
+  );
 }
 
 export async function releaseFailsafe() {
