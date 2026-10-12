@@ -119,7 +119,7 @@ class Notices:
 
 @pytest_asyncio.fixture(scope="module", loop_scope="module")
 async def login_env() -> dict[str, str]:
-    return await read_login_env(load_default_config().shell.login_env_timeout_s)
+    return await read_login_env(load_default_config().shell.login_env_timeout_s, ())
 
 
 def _config(gap_minutes: float) -> AppConfig:

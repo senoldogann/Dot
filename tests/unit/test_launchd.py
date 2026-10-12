@@ -13,6 +13,7 @@ from dotagent.launchd import (
     SERVICE_PATH,
     JobState,
     LaunchAgent,
+    agent_plist,
     build_launch_agent,
     launch_agent_path,
     parse_job,
@@ -67,7 +68,7 @@ def test_the_property_list_starts_the_daemon_at_login_and_after_a_crash_only() -
     agent: LaunchAgent = build_launch_agent("/opt/dot/bin/python", Path("/h/Dot"), Path("/h/Logs"), {})
     parsed: dict[str, object] = plistlib.loads(render_launch_agent(agent))
     assert parsed["Label"] == LABEL
-    assert parsed["ProgramArguments"] == ["/opt/dot/bin/python", "-m", "dotagent", "daemon"]
+    assert parsed["ProgramArguments"] == ["/opt/dot/bin/python", "-P", "-m", "dotagent", "daemon"]
     assert parsed["RunAtLoad"] is True
     assert parsed["KeepAlive"] == {"SuccessfulExit": False}
     assert parsed["LimitLoadToSessionType"] == "Aqua"
@@ -87,6 +88,25 @@ def test_the_home_and_the_log_directory_are_handed_on_only_when_the_environment_
 def test_the_names_launchd_knows_the_job_by() -> None:
     assert launch_agent_path(Path("/Users/someone")) == Path(f"/Users/someone/Library/LaunchAgents/{LABEL}.plist")
     assert service_target(501) == f"gui/501/{LABEL}"
+
+
+def test_the_job_runs_the_dot_that_is_installed_not_a_package_left_in_its_working_directory(tmp_path: Path) -> None:
+    """Item 146: the job's working directory is Dot's home, where a run's commands may make files; a package named
+    ``dotagent`` left there is not what the job's Python imports."""
+    planted: Path = tmp_path / "dotagent"
+    planted.mkdir()
+    (planted / "__init__.py").write_text("", encoding="utf-8")
+    (planted / "__main__.py").write_text("print('planted')\n", encoding="utf-8")
+    words: list[str] = agent_plist(build_launch_agent(sys.executable, tmp_path, tmp_path / "logs", {}))[
+        "ProgramArguments"
+    ]
+    # The job's own words, with the help of the command line in place of the daemon.
+    started: subprocess.CompletedProcess[str] = subprocess.run(
+        [*words[:-1], "--help"], cwd=tmp_path, capture_output=True, text=True, check=False
+    )
+    assert started.returncode == 0, started.stderr
+    assert "planted" not in started.stdout
+    assert "daemon" in started.stdout
 
 
 def test_macos_accepts_the_property_list(tmp_path: Path) -> None:

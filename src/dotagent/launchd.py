@@ -137,11 +137,12 @@ def agent_plist(agent: LaunchAgent) -> AgentPlist:
     """The property list of the job.
 
     ``Interactive`` keeps the browser and the desktop actions the daemon starts at full speed; ``Aqua`` keeps the job out
-    of sessions that have no screen.
+    of sessions that have no screen. ``-P`` keeps the working directory, Dot's home, where a run's commands may make
+    files, off the path Python imports from: the job runs the Dot that is installed.
     """
     return AgentPlist(
         Label=LABEL,
-        ProgramArguments=[agent.python, "-m", "dotagent", "daemon"],
+        ProgramArguments=[agent.python, "-P", "-m", "dotagent", "daemon"],
         RunAtLoad=True,
         KeepAlive=KeepAlive(SuccessfulExit=False),
         ThrottleInterval=_THROTTLE_S,

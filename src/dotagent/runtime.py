@@ -1,6 +1,7 @@
 """The shared runtime: the configuration plus every long-lived service a run needs."""
 
 import asyncio
+import sys
 from contextlib import AsyncExitStack
 from dataclasses import dataclass
 from pathlib import Path
@@ -36,6 +37,7 @@ from dotagent.core.paths import (
 )
 from dotagent.desktop.session import DesktopSession
 from dotagent.events import EventBus
+from dotagent.launchd import launch_agent_path
 from dotagent.llm.calls import CALL_EVENT, CallRecorder, ModelCall, call_event_data, log_model_call
 from dotagent.llm.router import ModelRouter
 from dotagent.mcp.hub import McpHub, open_hub
@@ -165,11 +167,24 @@ def _guarded_files() -> tuple[Path, ...]:
     )
 
 
+def _own_code() -> tuple[Path, ...]:
+    """The code Dot itself runs: the folder its package is imported from, the Python environment it runs in and the
+    Python under that, and the file of the launchd job that starts the daemon."""
+    return (
+        Path(__file__).resolve().parent.parent,
+        Path(sys.prefix),
+        Path(sys.base_prefix),
+        launch_agent_path(Path.home()),
+    )
+
+
 def _dot_paths(config: AppConfig) -> tuple[Path, ...]:
     """What Dot loads and runs, which the agent may read (a skill's files are read and run by path) but never change:
-    its plugins and their own files, whose MCP servers start with the daemon and are given keys from the key store, its
-    skills and the playbooks it learned, which shape later runs, and the file of its emergency stop."""
+    its own code, which the daemon runs at its next start, its plugins and their own files, whose MCP servers start
+    with the daemon and are given keys from the key store, its skills and the playbooks it learned, which shape later
+    runs, and the file of its emergency stop."""
     return (
+        *_own_code(),
         *plugin_roots(config.plugins),
         plugins_data_dir(),
         skills_dir(),
@@ -177,6 +192,16 @@ def _dot_paths(config: AppConfig) -> tuple[Path, ...]:
         playbooks_dir(),
         failsafe_path(),
     )
+
+
+async def _confined_paths(config: AppConfig) -> tuple[tuple[Path, ...], tuple[Path, ...]]:
+    """``(the locations a run may not read, what Dot loads and runs)``, resolved: ``[policy] protected_paths`` with
+    Dot's own files, and :func:`_dot_paths`."""
+    protected: tuple[Path, ...] = await asyncio.to_thread(
+        expand_protected, config.policy.protected_paths, _guarded_files()
+    )
+    dot_paths: tuple[Path, ...] = await asyncio.to_thread(expand_protected, [], _dot_paths(config))
+    return protected, dot_paths
 
 
 async def _run_sandbox(config: AppConfig, protected: tuple[Path, ...], dot_paths: tuple[Path, ...]) -> Sandbox:
@@ -217,8 +242,13 @@ def _call_recorder(store: Store, bus: EventBus) -> CallRecorder:
 
 
 async def build_runtime(config: AppConfig) -> Runtime:
-    """Read the environment of the login shell, then open every service (:func:`open_runtime`)."""
-    login_env: dict[str, str] = await read_login_env(config.shell.login_env_timeout_s)
+    """Read the environment of the login shell, then open every service (:func:`open_runtime`). The login shell runs
+    its startup files, which a run's commands may change, so it starts in the sandbox of a run's commands: what a run
+    put there reaches no further at Dot's start than the run could."""
+    await asyncio.to_thread(ensure_layout)
+    protected, dot_paths = await _confined_paths(config)
+    sandbox: Sandbox = await _run_sandbox(config, protected, dot_paths)
+    login_env: dict[str, str] = await read_login_env(config.shell.login_env_timeout_s, sandbox.commands)
     return await open_runtime(config, login_env)
 
 
@@ -229,10 +259,7 @@ async def open_runtime(config: AppConfig, login_env: dict[str, str]) -> Runtime:
     When a service fails to open, the ones opened before it are closed again before the error is raised.
     """
     await asyncio.to_thread(ensure_layout)
-    protected: tuple[Path, ...] = await asyncio.to_thread(
-        expand_protected, config.policy.protected_paths, _guarded_files()
-    )
-    dot_paths: tuple[Path, ...] = await asyncio.to_thread(expand_protected, [], _dot_paths(config))
+    protected, dot_paths = await _confined_paths(config)
     sandbox: Sandbox = await _run_sandbox(config, protected, dot_paths)
     schedule_zone: ZoneInfo = await asyncio.to_thread(resolve_zone, config.scheduler.timezone)
     shell_env: dict[str, str] = child_env(login_env, config.shell.pass_env)

@@ -93,7 +93,7 @@ async def _task_problems(
 async def cmd_eval_check(command: EvalCheckCommand) -> int:
     config: AppConfig = eval_config(load_default_config())
     tasks: tuple[EvalTask, ...] = all_tasks()
-    login_env: dict[str, str] = await read_login_env(config.shell.login_env_timeout_s)
+    login_env: dict[str, str] = await read_login_env(config.shell.login_env_timeout_s, ())
     env: dict[str, str] = child_env(login_env, config.shell.pass_env)
     broken: list[str] = list(catalog_problems(tasks))
     sys.stdout.write(f"Checking {len(tasks)} tasks against their reference solutions. No model is called.\n")
@@ -156,7 +156,7 @@ async def cmd_eval_run(command: EvalRunCommand) -> int:
                 "hint": "export it, add it to the .env file of the Dot home, or run: dotx auth set NAME",
             },
         )
-    login_env: dict[str, str] = await read_login_env(config.shell.login_env_timeout_s)
+    login_env: dict[str, str] = await read_login_env(config.shell.login_env_timeout_s, ())
     run_config: AppConfig = eval_config(config)
     ceiling: int = command.repeat * sum(task.token_budget for task in tasks)
     longest: float = max(task.time_limit_s for task in tasks)

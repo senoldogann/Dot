@@ -522,7 +522,7 @@ async def mcp_checks(servers: list[McpServerConfig], login_env_timeout_s: float)
     login_path: str | None = None
     if any(server.enabled and server.command is not None for server in servers):
         try:
-            login_env: dict[str, str] = await read_login_env(login_env_timeout_s)
+            login_env: dict[str, str] = await read_login_env(login_env_timeout_s, ())
         except ToolExecutionError as exc:
             return [
                 _result(

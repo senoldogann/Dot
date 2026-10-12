@@ -45,9 +45,11 @@ def child_env(login_env: dict[str, str], pass_env: list[str]) -> dict[str, str]:
     return {**kept, **_FIXED_ENV}
 
 
-async def read_login_env(timeout_s: float) -> dict[str, str]:
-    """Capture the environment a login zsh would have (PATH from Homebrew, uv, ...), once."""
+async def read_login_env(timeout_s: float, confinement: tuple[str, ...]) -> dict[str, str]:
+    """Capture the environment a login zsh would have (PATH from Homebrew, uv, ...), once, with zsh started by
+    ``confinement`` (the words of a sandbox, or none)."""
     process: asyncio.subprocess.Process = await asyncio.create_subprocess_exec(
+        *confinement,
         "/bin/zsh",
         "-lc",
         "env -0",

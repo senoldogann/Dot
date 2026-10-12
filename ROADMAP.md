@@ -5065,7 +5065,8 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 142 | What the guards of the desktop and of the shell see                                  | done        | d765da9 |
 | 143 | The token goes only to the daemon                                                    | done        | 57180ea |
 | 144 | The records of a run and the emergency stop                                          | done        | c17da1a |
-| 145 | The CI and the desktop shell                                                         | in progress |         |
+| 145 | The CI and the desktop shell                                                         | done        | 969d5f0 |
+| 146 | The gaps the final review of part 23 found                                           | in progress |         |
 
 ### 77. The type system: Inter and Geist Mono, seven sizes, three weights
 
@@ -7894,11 +7895,13 @@ Dot's own files when they search its data folder, which 141 closes.
 processes of a run kept out of Dot's own files by macOS (141); what the guards of the desktop and of the shell see
 (142); the token sent only to the daemon (143); the records of a run and the emergency stop, with the smaller findings
 of part 22 that a second reading bears out (144); the CI and the desktop shell (145). A finding that a second reading
-does not bear out is not fixed; what only the owner can do (rebuilding the desktop app) is said, not done.
+does not bear out is not fixed; what only the owner can do (rebuilding the desktop app) is said, not done. A sixth item
+(146) came from the final review of the five: what Dot runs at its start, a search that meets a place it may not read,
+zsh's spellings of a redirect past noclobber, and a playbook retired while a run ended.
 
 ### How to start part 23 (the handoff prompt)
 
-> Read ROADMAP.md part 23 and the status table of part 9 (rows 141 to 145). One item at a time, in order; the protocol
+> Read ROADMAP.md part 23 and the status table of part 9 (rows 141 to 146). One item at a time, in order; the protocol
 > of part 5 (branch, gate, PR, Linear MYP issue, squash merge, hash in the table, log line) is unchanged. Read each
 > finding again in the code before fixing it, and give each fix a test that fails on the code of before. Never touch the
 > owner's data directory except to read it, by the kinds and numbers of what is stored, and to restart the daemon when
@@ -8028,7 +8031,7 @@ bears out are fixed.
 
 ### 145. The CI and the desktop shell
 
-**Status: in progress.**
+**Status: done.** Merged as `969d5f0` (PR #180, MYP-286 Done).
 
 **As built (2026-10-12).** Every action of the CI's two jobs is pinned by the commit its tag named when it was pinned,
 with the tag in a comment: `actions/checkout` v4.4.0, `astral-sh/setup-uv` v6.8.0, `Swatinem/rust-cache` v2.9.2, and
@@ -8051,6 +8054,39 @@ opening showed the old chat unread.
 **What.** The actions of the CI pinned by their commit; the desktop shell's window allowed to talk to the app only from
 the daemon's own address and port; the Rust crates checked against the advisories; and two tests part 22 left: the
 spending lock through the run manager, and a migration cut off between its steps.
+
+### 146. The gaps the final review of part 23 found
+
+**Status: in progress.**
+
+**As built (2026-10-12).** What Dot runs at its start is kept from a run's commands. Dot's own code joins what it loads
+and runs (`_own_code` in `runtime.py`): the folder its package is imported from, the Python environment it runs in
+(`sys.prefix`), the Python under that (`sys.base_prefix`) and the file of the launchd job, so outside `yolo` the file
+tools, the shell guard and the sandbox keep a run from changing them, as they keep it from its plugins and skills. The
+launchd job starts Python with `-P`: its working directory is Dot's home, where a command of a run may make files, and
+`python -m` put that directory first on the path Python imports from. The login shell whose environment Dot reads at its
+start runs its startup files in the sandbox of a run's commands (`read_login_env` takes the words of a sandbox), so what
+a command put in them reaches no further at Dot's start than the command could. A search that meets places it may not
+read (the sandbox's, or a file's permissions) shows what it found elsewhere and names those places, where ripgrep's
+error made the whole search fail before; any other error of ripgrep still fails it. The shell guard reads zsh's
+redirects past noclobber, spelt with `!` or `|` (`>!`, `>>!`, `&>!`, `&>|`, `>&!`, `>&|`, `&>>|`, `>>&`, `>>&!`):
+before, the `!` was taken for the file and the `|` for a pipe, so the file the line writes went unseen. A run that read
+a playbook another run has just retired, or the owner deleted, counts nothing and goes on to distil its own (the check
+is made under the lock). Said in the README, not built: a key kept in the keychain is read by a command through
+`security`, in the sandbox too (the key file is sealed; keeping `security` out of the sandbox would break the
+command-line tools that keep their own tokens in the keychain), and the programs Dot starts itself (its browser, the MCP
+servers) and the owner's shell run from where they are installed, which a command may change under the owner's account.
+Tests: a command that writes into Dot's package and into its environment, refused; the base Python and the job's file
+among what Dot loads and runs; a search and a file listing over Dot's home that show a match beside its sealed files
+with a note of what they did not read; a startup file of the login shell that reads Dot's token, refused at Dot's start;
+the job's words, run in a folder holding a package named `dotagent`, which run the installed Dot; eleven zsh spellings
+that change Dot's folders and three that replace a file outside the workspace; a use counted after the playbook was
+retired. Each failed on the code of before (fifteen unit tests and three smoke tests).
+
+**What.** The gaps the final review of the five items found, each read again in the code: what Dot runs at its start
+(its own code, the login shell, and the working directory of the launchd job, found on the way), a search that meets a
+place it may not read, zsh's spellings of a redirect past noclobber, and a playbook retired while a run ended; and what
+the sandbox does not cover, said in the README.
 
 ## Log
 
@@ -8631,3 +8667,4 @@ spending lock through the run manager, and a migration cut off between its steps
 - 2026-10-12 (Opus 5.5): item 142 merged as `d765da9` (PR #177, MYP-283 Done): a window of another application that shows Dot's web UI, known by its title at each step, is Dot's own for the desktop's review outside yolo; a shell line that replaces a file that is there outside the workspace (a redirect onto it, a copy or a move onto it, ln -f, tee without -a, dd without conv=notrunc) is destructive, so the default preset asks; the daemon restarted with it.
 - 2026-10-12 (Opus 5.5): item 143 merged as `57180ea` (PR #178, MYP-284 Done): the clients send the token only to a daemon that proves it holds it (`GET /api/proof`): the command line, the desktop shell at each poll and the web UI before each request; CI's desktop job runs `cargo test`; the daemon restarted with it. The shell's part reaches the owner's Mac when the owner rebuilds the desktop app.
 - 2026-10-12 (Opus 5.5): item 144 merged as `c17da1a` (PR #179, MYP-285 Done): every process that drives runs holds an owner lock, and a daemon that starts closes only the runs whose owner is gone; the emergency stop ends a run launched while it came and what the scheduler started meanwhile; and the smaller findings of part 22 (the playbooks, a note saved twice, read-only call groups, the notes' index, screenshots, the log's size, a Chrome launch given up, the browser's bounds, a stream's live state); the daemon restarted with it.
+- 2026-10-12 (Opus 5.5): item 145 merged as `969d5f0` (PR #180, MYP-286 Done): the CI's actions are pinned by commit; only the shell's own pages and those of the daemon's address may call the desktop shell; the Rust crates were checked against the advisories (two, both in the GTK stack built only on Linux); and the two tests part 22 left are in. The shell's part reaches the owner's Mac when the owner rebuilds the desktop app. The final review of the five found every criterion met and five gaps, which item 146 takes.

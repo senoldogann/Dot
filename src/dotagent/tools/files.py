@@ -4,6 +4,7 @@ import asyncio
 import contextlib
 import difflib
 import os
+import re
 import shutil
 import tempfile
 from itertools import islice
@@ -40,6 +41,12 @@ _SKIPPED_DIRS: frozenset[str] = frozenset(
     {".git", "node_modules", "__pycache__", ".venv", ".mypy_cache", ".ruff_cache"}
 )
 _SEARCH_LINE_LIMIT: int = 300
+# ripgrep ends with 2 when it met an error, also after the matches it found.
+_RG_ERROR: int = 2
+# Its line for a path it was not allowed to read: "rg: <path>: [IO error for operation on <path>: ]<reason> (os error
+# <n>)", with EPERM (1, the sandbox) or EACCES (13, the permissions of the file).
+_REFUSED_PATH: re.Pattern[str] = re.compile(r"rg: (.+ \(os error (?:1|13)\))")
+_REFUSED_SHOWN: int = 10
 
 
 def resolve_path(raw: str, ctx: ToolContext) -> Path:
@@ -372,6 +379,23 @@ def _capped(lines: list[str], noun: str) -> str:
     return "\n".join(shown) + suffix
 
 
+def _refused(stderr: str) -> list[str] | None:
+    """What ripgrep said of the paths it was not allowed to read (the sandbox of a run refuses Dot's own files and the
+    protected locations, macOS the folders it guards), when that is all it said; None when it said anything else, such
+    as a pattern it cannot read or a path that does not exist."""
+    lines: list[str] = [line for line in stderr.splitlines() if line.strip() != ""]
+    said: list[str] = [found.group(1) for line in lines if (found := _REFUSED_PATH.fullmatch(line)) is not None]
+    return said if lines and len(said) == len(lines) else None
+
+
+def _with_refused(found: str, refused: list[str]) -> str:
+    """``found``, with a note of the paths that were not read, so that what they hold is known to be left out."""
+    shown: list[str] = refused[:_REFUSED_SHOWN]
+    more: str = f"\n[{len(refused) - len(shown)} more not shown]" if len(refused) > len(shown) else ""
+    listed: str = "\n".join(shown)
+    return f"{found}\n[Not read, so not in this answer ({len(refused)}):\n{listed}{more}]"
+
+
 class SearchFilesArgs(ToolArgs):
     pattern: str = Field(description="Regular expression to search for in file contents.")
     path: str | None = Field(default=None, description="Directory or file to search. Defaults to the workspace.")
@@ -400,6 +424,10 @@ def _search_files_tool() -> RegisteredTool:
         )
         if code == 1:
             return ok("No matches.")
+        refused: list[str] | None = _refused(stderr) if code == _RG_ERROR else None
+        if refused is not None:
+            found: str = _capped(stdout.splitlines(), "matches") if stdout.strip() != "" else "No matches."
+            return ok(_with_refused(found, refused))
         if code != 0:
             raise ToolExecutionError("ripgrep failed", {"exit": code, "stderr": stderr[:500], "pattern": args.pattern})
         return ok(_capped(stdout.splitlines(), "matches"))
@@ -437,6 +465,10 @@ def _find_files_tool() -> RegisteredTool:
         )
         if code == 1:
             return ok("No files matched.")
+        refused: list[str] | None = _refused(stderr) if code == _RG_ERROR else None
+        if refused is not None:
+            found: str = _capped(sorted(stdout.splitlines()), "files") if stdout.strip() != "" else "No files matched."
+            return ok(_with_refused(found, refused))
         if code != 0:
             raise ToolExecutionError("ripgrep failed", {"exit": code, "stderr": stderr[:500], "glob": args.glob})
         return ok(_capped(sorted(stdout.splitlines()), "files"))
