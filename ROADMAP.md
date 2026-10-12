@@ -5049,8 +5049,8 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 126 | Themes, after T3 Code: a page for the look, a theme for light and one for dark       | done        | c5dfc76 |
 | 127 | The interface, the motion and the type                                               | done        | 9c73d80 |
 | 128 | Your own themes, kept by the daemon                                                  | done        | 30b2434 |
-| 129 | The composer at the foot of the window                                               | in progress |         |
-| 130 | A chat's menu: pin, rename, copy the link, select, delete                            | planned     |         |
+| 129 | The composer at the foot of the window                                               | done        | 048f3aa |
+| 130 | A chat's menu: pin, rename, copy the link, select, delete                            | in progress |         |
 | 131 | Unread chats                                                                         | planned     |         |
 
 ### 77. The type system: Inter and Geist Mono, seven sizes, three weights
@@ -7414,7 +7414,7 @@ first message.
 
 ### 129. The composer at the foot of the window
 
-**Status: in progress.**
+**Status: done.** Merged as `048f3aa` (PR #161, MYP-270 Done).
 
 **As built (2026-10-12).** The run page's column (`.run-main`, `run.css`) is a flex column at least as tall as the
 window less the top bar (`--stagebar-h`) and the page's padding above it (24 px, 16 px on a phone), and the conversation
@@ -7436,7 +7436,27 @@ under it; the tour is read by eye.
 
 ### 130. A chat's menu: pin, rename, copy the link, select, delete
 
-**Status: planned.**
+**Status: in progress.**
+
+**As built (2026-10-12).** The daemon keeps the pin in `threads.pinned_at`, a column added to a store made before it
+with its chats unpinned, and lists the pinned chats first, the last pinned first, then the latest activity first, so a
+pinned chat is listed however old. `PATCH /api/threads/{id}` takes a title (stripped, 1 to 120 characters), a pin or
+both: 204, 404 for no chat, 422 for neither, an empty or a long title or a pin that is not a boolean. The menu is
+`menu.js`, at the page's level above the drawer and under the toasts: its items are buttons with the menu item's role,
+which the arrow keys, Home and End walk round; Escape and Tab close it and give the focus back, as a chosen item does
+before it runs; a click outside it, a scroll, a resize or a change of page close it, and it keeps 8 px inside the
+window. A chat's row (`sidebar.js`) is its link and the "…" button beside it, since a button cannot sit in a link: the
+button shows over the time where the pointer rests or the focus is, and always on a touch screen, where the time steps
+aside for it. A right-click on the row, its button too, opens the menu at the pointer, Shift+F10 and the context-menu
+key under the row. Rename holds the list's repaint while its field is in the row, and a key gives the focus back to the
+row while leaving the field leaves it where it went; Delete is Select's delete for one chat, asked as "Delete this
+chat?", and goes home when the chat was open. The menu's items are as tall as the sidebar's rows in either density,
+after the 4 px grid's unit test refused a 6 px padding. Tests: `tests/unit/test_store_threads.py` (a store from before
+the pins gains them; the order; 404), `tests/smoke/test_server.py` (the route through the API) and
+`tests/smoke/test_chat_menu.py` (the button, the right-click and the key; the keys in the menu; Pin, kept after a
+reload; Rename by Enter, by Escape and by leaving the field; the link read back from the clipboard; Select; Delete
+cancelled, then done on the open chat; Unpin in the dark scheme; on a phone the button beside the time and the menu
+inside the window); the screenshots read by eye.
 
 **What.** A chat's row gets a menu, after T3 Code's: a "…" button at its right (on hover and on focus, always on a touch
 screen), a right-click on the row and the context-menu key open it; the arrow keys move through it, Escape closes it
@@ -8020,3 +8040,4 @@ the chat and marks it unread from its menu; the tour is read by eye.
 - 2026-10-12 (Opus 5.5): item 127 merged as `9c73d80` (PR #158, MYP-268 Done): Settings › Appearance gains Interface (the contrast, 50 to 200 %, mixed as T3 Code mixes it; the chat's width; the density and the two layout switches), Motion (the panels' slide, 0 to 400 ms, and the faces that move) and Type (the interface's font and size, the answers', the composer's and the code's fonts and sizes with a preview each, font smoothing and wrapped code); every setting is kept in the browser and put on the page by `boot.js` before the first paint, nothing when it is the default; a range control joins `#/controls`; 907 unit tests and a smoke test that sets each one and reads it on the page and after a reload.
 - 2026-10-12 (Opus 5.5): item 128 merged as `30b2434` (PR #159, MYP-269 Done): themes of one's own, made in an editor from a background, an accent and an action colour (T3 Code's generator, ported), duplicated, edited, exported and added from T3 Code's theme file, its short form or a VS Code colour theme, kept by the daemon in its home's `themes` folder (checked as T3 Code checks a file, capped, written whole, read without following links) and held to Dot's contrast rule; a review against the done criteria found two faults, fixed before the merge; 929 unit tests and a smoke test in a browser; the daemon restarted on it with no run active; part 19 built.
 - 2026-10-12 (Opus 5.5): part 20 planned, items 129 to 131, from the owner's word with a screenshot of T3 Code's thread menu and one of a run page whose composer stood near the top, and a reading of T3 Code's source (MIT): the composer at the foot of the window, a chat's menu (pin, rename, copy the link, select, delete) and unread chats, the pin, the name and what was seen kept by the daemon; Settle, Snooze, Regenerate title and Archive stay out; no code changed.
+- 2026-10-12 (Opus 5.5): item 129 merged as `048f3aa` (PR #161, MYP-270 Done): the run page's column is at least as tall as the window and the conversation grows into the room a short one leaves, so the composer stands at the window's foot from the first message, on a desktop with the details panel open or closed and on a phone; a long run scrolls under it as before; a smoke test reads the composer's foot at the window's.

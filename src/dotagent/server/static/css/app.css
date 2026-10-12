@@ -3009,6 +3009,60 @@ details[open] > summary .chev {
 
 /* ---------- overlays ---------- */
 
+/* A menu of actions (menu.js, item 130): a raised surface by the pointer or the button that opened it, above the
+   drawer and under the toasts. Its items are as tall as the sidebar's rows in either density; the item with the focus
+   of a key is the one tinted, as the one under the pointer is. */
+.menu {
+  position: fixed;
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  min-width: 180px;
+  max-width: calc(100vw - 16px);
+  padding: 4px;
+  border-radius: var(--radius);
+  border: 1px solid var(--border-strong);
+  background: var(--surface);
+  box-shadow: var(--shadow-float);
+  animation: fade-in var(--motion-quick) var(--ease);
+}
+
+.menu-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: var(--pad-side);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.menu-item > .icon {
+  color: var(--text-2);
+}
+
+.menu-item:hover,
+.menu-item:focus-visible {
+  background: var(--surface-2);
+  outline: none;
+}
+
+.menu-item.danger,
+.menu-item.danger > .icon {
+  color: var(--bad);
+}
+
+.menu-separator {
+  height: 1px;
+  margin: 4px 0;
+  background: var(--border);
+}
+
 .toast-region {
   position: fixed;
   right: 18px;

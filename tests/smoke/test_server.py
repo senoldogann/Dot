@@ -1149,7 +1149,7 @@ async def test_a_chat_is_named_and_pinned_from_its_menu(client: httpx.AsyncClien
     order = await _chat_ids(client)
     assert order.index(newer.id) < order.index(older.id), "unpinned, it goes back to its activity's place"
     assert (await client.patch("/api/threads/thr_nothing", json={"pinned": True})).status_code == 404
-    for wrong in ({}, {"title": "   "}, {"title": "x" * 121}, {"pinned": "soon"}):
+    for wrong in ({}, {"title": "   "}, {"title": "x" * 121}, {"pinned": "soon"}, {"pinned": "yes"}, {"pinned": 1}):
         assert (await client.patch(f"/api/threads/{older.id}", json=wrong)).status_code == 422, wrong
 
 

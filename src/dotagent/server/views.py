@@ -2,7 +2,7 @@
 
 from typing import Annotated, Literal, Self
 
-from pydantic import Field, JsonValue, StringConstraints, model_validator
+from pydantic import Field, JsonValue, StrictBool, StringConstraints, model_validator
 
 from dotagent.agent.attachments import MAX_ATTACHMENT_BYTES, MAX_ATTACHMENTS
 from dotagent.agent.lessons import RunLessons
@@ -117,7 +117,7 @@ class ThreadChange(FrozenModel):
     """What the owner changes on a chat from its menu (item 130): its name, or its pin; one of them at least."""
 
     title: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=_NAME_CHARS)] | None = None
-    pinned: bool | None = None
+    pinned: StrictBool | None = None
 
     @model_validator(mode="after")
     def _something(self) -> Self:
