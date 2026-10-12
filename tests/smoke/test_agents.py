@@ -337,8 +337,12 @@ async def test_an_agent_is_made_runs_in_its_own_voice_and_bounds_and_leaves_its_
             # The composer offers the agent, and the Agents page lists Dot and the agent with its newest chat.
             await page_ui.goto(f"http://{host}:{port}/#/runs")
             await page_ui.wait_for_timeout(_SETTLE_MS)
-            options: list[str] = await page_ui.locator("select[aria-label='Agent'] option").all_inner_texts()
+            await page_ui.locator(".composer-pill[data-pill='agent']").click()
+            options: list[str] = await page_ui.locator(
+                ".composer-popover [role=listbox][aria-label='Agent'] .pop-option-text > span:first-child"
+            ).all_inner_texts()
             assert options == ["Dot", "Scout"], options
+            await page_ui.keyboard.press("Escape")
             await page_ui.goto(f"http://{host}:{port}/#/agents")
             await page_ui.wait_for_timeout(_SETTLE_MS)
             rows_text: list[str] = await page_ui.locator(".agent-row").all_inner_texts()

@@ -21,7 +21,7 @@ export const APPROVAL_OPTIONS = [
 const YOLO_NOTE = "YOLO: nothing asks for confirmation, so this run acts without waiting for you. It also reads secrets, sends files out, pays and signs in by itself.";
 const GOAL_MODE_HINT = "A checker compares the answer with the goal and sends the run back to work until the goal is really reached";
 const STANDING_HINT = "Keep going until done: Dot works on the goal in sessions until a check confirms the outcome or you stop it";
-const STANDING_NOTE = "Keep going: Dot works on this goal in sessions, also while you are away and after restarts, until a check confirms the outcome. Campaigns in the sidebar shows its progress; stop it there.";
+const STANDING_NOTE = "Keep going is on: Dot works on this goal in sessions until a check confirms it; Campaigns shows it.";
 
 /** The words for an approval mode, for chips and facts. */
 export function approvalLabel(id) {
@@ -86,15 +86,15 @@ export function approvalsPicker(onPaint) {
 /**
  * The switch that makes a new task a campaign: Dot keeps going on its goal in sessions until the outcome is verified. It
  * starts off on every page. `value()` is whether it is on; `setAvailable(false)` hides it and turns it off, for the kinds of
- * run that cannot be a campaign (a chat, research); `onToggle(on)` runs after every change; `note` is the line to show under
- * the composer while it is on.
+ * run that cannot be a campaign (a chat, research); `onToggle(on)` runs after every change; `note` is the one line to show
+ * under the composer while it is on.
  */
 export function standingPicker(onToggle) {
   let on = false;
   const toggle = el("button", { class: "switch", type: "button", role: "switch", "aria-checked": "false", "aria-label": "Keep going until done" });
   const element = pick("Keep going", toggle);
   element.title = STANDING_HINT;
-  const note = el("div", { class: "note", hidden: true }, icon("target"), el("span", null, STANDING_NOTE));
+  const note = el("div", { class: "composer-note", hidden: true }, icon("target"), el("span", null, STANDING_NOTE));
 
   function set(value) {
     on = value;

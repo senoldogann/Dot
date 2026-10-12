@@ -314,7 +314,6 @@ function agentComposer(record, ctx) {
     label: `Message ${record.name}`,
     boxLabel: "Message",
     placeholder: `Message ${record.name}`,
-    rows: 3,
     maxPx: MAX_GOAL_PX,
     commands: [],
     send: submit,

@@ -63,7 +63,6 @@ function buildComposer(ctx, listener) {
     label: "New chat",
     boxLabel: "Goal",
     placeholder: "Message Dot",
-    rows: 3,
     maxPx: MAX_GOAL_PX,
     commands: MODES.map((option) => ({
       label: `/${option.id}`,
@@ -94,7 +93,7 @@ function buildComposer(ctx, listener) {
   const standing = standingPicker((on) => goalMode.setAvailable(!on));
   // A chat has no goal to check, so the goal switch only belongs to the other two kinds of run; only a task keeps going.
   function modePicked(id) {
-    standing.setAvailable(id === "task" && agent.value === "");
+    standing.setAvailable(id === "task" && agentId === "");
     goalMode.setAvailable(id !== "chat" && !standing.value());
     goal.focus();
   }
@@ -142,26 +141,52 @@ function buildComposer(ctx, listener) {
     label: "Options",
     build: () => [approvals.element, goalMode.element, standing.element, approvals.warning],
   });
-  // The agent the run is for (item 86): Dot, or one the owner made, its still face on the pill (item 108); the menu only
-  // shows once an agent exists. A campaign is Dot's own work, so Keep going hides while an agent is picked.
-  const agentOption = el("option", { value: "" }, "Dot");
-  const agent = el("select", { class: "select sm", "aria-label": "Agent" }, agentOption);
-  const agentFace = el("span", { class: "composer-pill-icon" }, actorFace(DOT_ID, "idle", null));
-  const agentPill = el("label", { class: "composer-pill composer-pill-select", "data-pill": "agent", title: "The agent the run is for", hidden: true }, agentFace, agent);
+  // The agent the run is for (item 86): Dot, or one the owner made, with its still face and name on the pill and the
+  // agents with their roles in its menu (item 115); the pill only shows once an agent exists. A campaign is Dot's own
+  // work, so Keep going hides while an agent is picked.
+  const agentPill = composerPill({ id: "agent", caption: "Agent", value: "Dot", icon: actorFace(DOT_ID, "idle", null) });
+  agentPill.element.title = "The agent the run is for";
+  agentPill.element.hidden = true;
   let agents = [];
-  function agentPicked() {
-    const chosen = agents.find((candidate) => candidate.id === agent.value) ?? null;
-    goal.placeholder = chosen === null ? "Message Dot" : `Message ${chosen.name}`;
-    agentFace.replaceChildren(chosen === null ? actorFace(DOT_ID, "idle", null) : actorFace(chosen.id, "idle", chosen.look));
-    standing.setAvailable(chosen === null && mode.value() === "task");
+  let agentId = "";
+  function chosenAgent() {
+    return agents.find((candidate) => candidate.id === agentId) ?? null;
   }
-  agent.addEventListener("change", agentPicked);
+  function paintAgent() {
+    const chosen = chosenAgent();
+    goal.placeholder = chosen === null ? "Message Dot" : `Message ${chosen.name}`;
+    agentPill.setValue(chosen === null ? "Dot" : chosen.name, "");
+    agentPill.setIcon(chosen === null ? actorFace(DOT_ID, "idle", null) : actorFace(chosen.id, "idle", chosen.look));
+    standing.setAvailable(chosen === null && mode.value() === "task");
+    agentMenu.repaint();
+  }
+  function pickAgent(id) {
+    agentId = id;
+    agentMenu.close();
+    paintAgent();
+    goal.focus();
+  }
+  const agentMenu = anchoredPopover({
+    anchor: agentPill.element,
+    frame: frame.element,
+    label: "Agent",
+    build: () => [
+      el(
+        "div",
+        { role: "listbox", "aria-label": "Agent" },
+        optionRow({ lead: actorFace(DOT_ID, "idle", null), label: "Dot", hint: "", selected: agentId === "", onPick: () => pickAgent("") }),
+        ...agents.map((record) =>
+          optionRow({ lead: actorFace(record.id, "idle", record.look), label: record.name, hint: record.role, selected: agentId === record.id, onPick: () => pickAgent(record.id) }),
+        ),
+      ),
+    ],
+  });
   api
     .get("/agents")
     .then((summaries) => {
       agents = summaries.map((summary) => summary.record).filter((record) => record.id !== "dot");
-      agent.append(...agents.map((record) => el("option", { value: record.id }, record.name)));
-      agentPill.hidden = agents.length === 0;
+      agentPill.element.hidden = agents.length === 0;
+      agentMenu.repaint();
     })
     .catch((error) => {
       console.warn("the agents could not be listed", error);
@@ -300,7 +325,7 @@ function buildComposer(ctx, listener) {
           standing: standing.value(),
           thread_id: null,
           attachments: attachments.ids(),
-          agent_id: agent.value === "" ? null : agent.value,
+          agent_id: agentId === "" ? null : agentId,
         });
         frame.clear();
         ctx.navigate(`/runs/${created.id}`);
@@ -330,16 +355,17 @@ function buildComposer(ctx, listener) {
     goalMode.sync();
   }
 
-  frame.options.append(modePill.element, agentPill, modelPill.element, reasoningPill.element, optionsPill.element);
-  frame.element.append(standing.note);
+  frame.options.append(modePill.element, agentPill.element, modelPill.element, reasoningPill.element, optionsPill.element);
   const stopStatus = onChange(syncStatus);
   return {
-    element: frame.element,
+    // Keep going's line sits under the frame, not in it.
+    element: el("div", { class: "composer-stack" }, frame.element, standing.note),
     focus: () => goal.focus(),
     dispose: () => {
       stopStatus();
       optionsMenu.dispose();
       modeMenu.dispose();
+      agentMenu.dispose();
       modelMenu.dispose();
       reasoningMenu.dispose();
       frame.dispose();

@@ -1,6 +1,7 @@
-"""The composer (items 64 and 104): typing ``/`` on the new chat page opens the menu of commands and skills, letters
-filter it, the arrows move, Enter picks without sending, Escape closes; Shift+Enter breaks a line. The bar's pills
-open the Model and the Options menus; a draft survives a navigation. Wide and on a phone."""
+"""The composer (items 64, 104 and 115): typing ``/`` on the new chat page opens the menu of commands and skills,
+letters filter it, the arrows move, Enter picks without sending, Escape closes; Shift+Enter breaks a line. The bar's
+pills open the Model and the Options menus; a draft survives a navigation; the bar keeps one line from the desk to the
+phone. Wide and on a phone."""
 
 import asyncio
 import time
@@ -291,6 +292,84 @@ async def test_the_pills_open_their_menus_and_a_draft_survives_a_navigation(
                 await page.goto(f"http://{host}:{port}/#/runs")
                 await expect(page.locator(GOAL)).to_have_value("")
                 assert refused == [], refused
+                await page.close()
+        finally:
+            await browser.close()
+
+
+# The bar's own box, and the middle and the right edge of every control on it that shows (item 115).
+_BAR: str = """(() => {
+  const bar = document.querySelector('.composer-bar').getBoundingClientRect();
+  const parts = [...document.querySelectorAll('.composer-bar > button, .composer-options > :not([hidden])')]
+    .filter((node) => node.getClientRects().length > 0)
+    .map((node) => {
+      const box = node.getBoundingClientRect();
+      return [node.dataset.pill ?? node.className, box.top + box.height / 2, box.right];
+    });
+  return { top: bar.top, bottom: bar.bottom, right: bar.right, parts };
+})()"""
+
+
+async def test_the_bar_keeps_one_line_from_the_desk_to_the_phone(
+    runtime: Runtime, client: httpx.AsyncClient, tmp_path: Path
+) -> None:
+    """Item 115: with every pill out (an agent, a model with reasoning levels, YOLO), the bar is one line 32 px high at
+    1280, 800, 560 and 390 px, nothing past its right edge; the mode's name folds to its icon on a short bar, and YOLO
+    wears no fill."""
+    made: httpx.Response = await client.post(
+        "/api/agents",
+        json={
+            "name": "Scout",
+            "role": "Finds and checks sources",
+            "instructions": "Prefer primary sources.",
+            "model": "",
+            "effort": None,
+            "approvals": None,
+            "tools": [],
+        },
+    )
+    assert made.status_code == 201, made.text
+    host: str = client.base_url.host
+    port: int | None = client.base_url.port
+    assert port is not None
+    async with async_playwright() as playwright:
+        browser: Browser = await playwright.chromium.launch(channel=runtime.config.browser.channel, headless=True)
+        try:
+            for width in (1280, 800, 560, 390):
+                page: Page = await browser.new_page(viewport={"width": width, "height": 900})
+                await page.route("**/api/models", _with_a_thinking_model)
+                await page.goto(ui_url(host, port, TOKEN))
+                await expect(page.locator(".composer-pill[data-pill='agent']")).to_be_visible()
+                await page.locator(".composer-pill[data-pill='model']").click()
+                await (
+                    page.locator(".composer-popover[aria-label='Model']").get_by_role("option", name="thinker").click()
+                )
+                await expect(page.locator(".composer-pill[data-pill='reasoning']")).to_be_visible()
+                options_pill = page.locator(".composer-pill[data-pill='options']")
+                await options_pill.click()
+                await page.locator(".composer-popover[aria-label='Options']").get_by_role("button", name="YOLO").click()
+                await page.mouse.click(width - 20, 880)
+                await expect(page.locator(".composer-popover[aria-label='Options']")).to_be_hidden()
+                await page.mouse.move(0, 0)
+                bar: dict[str, float | list[list[str | float]]] = await page.evaluate(_BAR)
+                top, bottom, right, parts = bar["top"], bar["bottom"], bar["right"], bar["parts"]
+                assert (
+                    isinstance(top, float | int) and isinstance(bottom, float | int) and isinstance(right, float | int)
+                )
+                assert isinstance(parts, list) and len(parts) == 7, (width, bar)
+                assert round(bottom - top) == 32, (width, bar)
+                middles: list[float] = [float(part[1]) for part in parts]
+                assert max(middles) - min(middles) <= 1, (width, bar)
+                assert all(float(part[2]) <= right + 0.5 for part in parts), (width, bar)
+                mode_name = page.locator(".composer-pill[data-pill='mode'] .composer-pill-value")
+                if width <= 560:
+                    await expect(mode_name).to_be_hidden()
+                else:
+                    await expect(mode_name).to_be_visible()
+                await expect(options_pill).to_have_attribute("data-tone", "warn")
+                fill: str = await options_pill.evaluate("(node) => getComputedStyle(node).backgroundColor")
+                assert fill == "rgba(0, 0, 0, 0)", fill
+                await page.locator(".composer-stack").screenshot(path=str(tmp_path / f"bar-{width}.png"))
                 await page.close()
         finally:
             await browser.close()
