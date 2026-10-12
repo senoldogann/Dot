@@ -15,8 +15,8 @@ use tauri::image::Image;
 use tauri::menu::{Menu, MenuItem, PredefinedMenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
 use tauri::{
-    AppHandle, Manager, RunEvent, TitleBarStyle, WebviewUrl, WebviewWindow, WebviewWindowBuilder,
-    WindowEvent,
+    AppHandle, LogicalPosition, Manager, RunEvent, TitleBarStyle, WebviewUrl, WebviewWindow,
+    WebviewWindowBuilder, WindowEvent,
 };
 use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut, ShortcutState};
 
@@ -30,6 +30,10 @@ const DEFAULT_PORT: u16 = 8765;
 const ICON_IDLE: &[u8] = include_bytes!("../icons/tray-idle.png");
 const ICON_WORKING: &[u8] = include_bytes!("../icons/tray-working.png");
 const ICON_WAITING: &[u8] = include_bytes!("../icons/tray-waiting.png");
+/// Where the window puts its traffic lights (item 134): the close button 20 px from the left and its centre 26 px under
+/// the top, the centre line of the web UI's top bars (52 px rows; shell.css keeps 96 px of room for the lights). On
+/// macOS 26 the close button's centre is the inset's y less 2 px, as measured offscreen with tao's own code.
+const TRAFFIC_LIGHTS: LogicalPosition<f64> = LogicalPosition::new(20.0, 28.0);
 
 /// `[server]` of the daemon's config.toml; what is not set keeps the daemon's default.
 #[derive(Deserialize, Default)]
@@ -124,9 +128,9 @@ fn tray_icon(state: &str) -> Image<'static> {
 }
 
 /// The one window, made on first use, at the size the web UI's screenshot tour reviews (item 88). The title bar is
-/// the web UI's own top bars: the system draws only the traffic lights over the page, the page keeps room for them
-/// (`data-shell="desktop"`, set by the UI when it runs in the shell) and drags the window by its bars. The shell's
-/// own drag-and-drop handler is off so the composer's HTML drop works.
+/// the web UI's own top bars: the system draws only the traffic lights over the page, on the bars' centre line
+/// (`TRAFFIC_LIGHTS`), the page keeps room for them (`data-shell="desktop"`, set by the UI when it runs in the shell)
+/// and drags the window by its bars. The shell's own drag-and-drop handler is off so the composer's HTML drop works.
 fn window(app: &AppHandle, url: WebviewUrl) -> tauri::Result<WebviewWindow> {
     if let Some(existing) = app.get_webview_window(WINDOW) {
         return Ok(existing);
@@ -135,6 +139,7 @@ fn window(app: &AppHandle, url: WebviewUrl) -> tauri::Result<WebviewWindow> {
         .title("Dot")
         .title_bar_style(TitleBarStyle::Overlay)
         .hidden_title(true)
+        .traffic_light_position(TRAFFIC_LIGHTS)
         .inner_size(1280.0, 860.0)
         .min_inner_size(390.0, 600.0)
         .disable_drag_drop_handler()

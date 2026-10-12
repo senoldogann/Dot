@@ -1198,9 +1198,10 @@ menu bar item. The daemon stays owned by launchd (`dotx service install`); the s
 the agent itself.
 
 - **One interface.** The window is the web UI at the size the screenshot tour reviews (1280 × 860, down to a
-  phone's 390 wide). The system draws only the traffic lights over the page; the page keeps room for them in the
-  sidebar's head, or in the top bar while the sidebar is away, and the window drags by those bars. The themes, the
-  colour scheme and the density are the web UI's own settings.
+  phone's 390 wide). The system draws only the traffic lights over the page, on the centre line of the top bars with
+  room above and below them; the page keeps room for them in the sidebar's head, as tall as the top bar so that its
+  button stands on the same line, or in the top bar while the sidebar is away, and the window drags by those bars.
+  The themes, the colour scheme and the density are the web UI's own settings.
 - **Signed in by itself.** The shell reads the daemon's address from `config.toml` (`[server]`, or the defaults) and
   the token from the token file under the home directory, and opens the UI with the token in the fragment, never
   typed. While the daemon is down, the window shows Dot's wordmark and the one command that starts it, and opens

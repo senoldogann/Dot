@@ -14,6 +14,7 @@ import httpx
 import pytest
 import pytest_asyncio
 from playwright.async_api import Browser, BrowserContext, Page, async_playwright, expect
+from test_desktop_lights import LIGHTS_ROOM, LIGHTS_Y
 
 from dotagent.agent.manager import RunManager
 from dotagent.agent.playbooks import META_FILE, PlaybookMeta
@@ -58,10 +59,6 @@ _PAGES: tuple[tuple[str, str], ...] = (
     ("settings-system", "#/settings/system"),
 )
 _SIZES: tuple[tuple[str, int, int], ...] = (("desk", 1280, 860), ("phone", 390, 844))
-# Where macOS centres the traffic lights of an overlay title bar, from the window's top edge.
-_LIGHTS_Y: float = 15.0
-# The room the traffic lights take at the left of the desktop shell's bars.
-_LIGHTS_RIGHT: float = 84.0
 _SCHEMES: tuple[Literal["light", "dark"], ...] = ("light", "dark")
 # The steps before the answer, each a line of text and a shell call (the commands vary, so no step repeats enough to
 # be called a loop), so the conversation is taller than a window and the way down (the jump arrow) has something to
@@ -237,10 +234,10 @@ async def _shoot(context: BrowserContext, base: str, pages: tuple[tuple[str, str
             docked: bool = await hide.is_visible()
             if docked:
                 # The docked sidebar's head holds its button alone (item 113), right of the lights and centred on their
-                # line, 15 px under the top edge (item 107).
+                # line, the top bar's centre line (item 134).
                 hide_box = await hide.bounding_box()
-                assert hide_box is not None and abs(hide_box["y"] + hide_box["height"] / 2 - _LIGHTS_Y) <= 2, hide_box
-                assert hide_box["x"] >= _LIGHTS_RIGHT, hide_box
+                assert hide_box is not None and abs(hide_box["y"] + hide_box["height"] / 2 - LIGHTS_Y) <= 2, hide_box
+                assert hide_box["x"] >= LIGHTS_ROOM, hide_box
                 await hide.click()
                 await page.wait_for_timeout(_SETTLE_MS)
                 # The top bar's opener takes the place the button had, so it does not move under the pointer.
