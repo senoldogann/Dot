@@ -23,10 +23,12 @@ import pytest_asyncio
 from dotagent.agent.campaign import Brief
 from dotagent.agent.campaign_control import stop_campaign
 from dotagent.agent.loop import CAMPAIGN_TARGETS_EVENT
-from dotagent.agent.manager import RunManager, thread_title
+from dotagent.agent.manager import RunHandle, RunManager, thread_title
+from dotagent.agent.reflection import REFLECTION_OFF
 from dotagent.agent.review import GOAL_TOOL
 from dotagent.config import AppConfig, load_default_config
 from dotagent.core.errors import BrowserError
+from dotagent.core.paths import failsafe_path
 from dotagent.core.types import JsonObject
 from dotagent.evals import EVAL_SOURCE
 from dotagent.evals.runner import SCRIPTED_MODEL, eval_config, eval_environment, scratch_home
@@ -36,6 +38,7 @@ from dotagent.llm.router import parse_model_ref
 from dotagent.llm.types import ChatRequest, DeltaSink, ModelInfo, ModelReply
 from dotagent.runtime import Runtime, close_runtime, open_runtime
 from dotagent.scheduler import SCHEDULE_SOURCE
+from dotagent.scheduler.plans import ScheduleRequest, create_schedule
 from dotagent.scheduler.runner import Scheduler
 from dotagent.server import UI_SOURCE
 from dotagent.server.app import create_app
@@ -48,6 +51,8 @@ from dotagent.store.models import (
     CampaignRecord,
     EventRecord,
     RunRecord,
+    ScheduleOptions,
+    ScheduleRecord,
     ThreadRecord,
 )
 from dotagent.tools.campaign import (
@@ -415,6 +420,7 @@ async def test_a_session_the_daemon_cut_off_is_not_resumed_and_the_next_session_
             False,
             campaign.id,
             None,
+            None,
         )
         await store.set_run_status(cut.id, "running")
         # What the daemon does when it starts again after it died while the session ran.
@@ -704,4 +710,146 @@ async def test_a_campaign_stopped_while_its_session_starts_ends_that_session(log
             assert ended.status == "cancelled"
             assert (await runtime.store.get_campaign(opening.campaign_id)).status == "stopped"
         finally:
+            await manager.shutdown()
+
+
+class _EmergencyWhileBriefing(RunManager):
+    """The owner engages the emergency stop, unless it is engaged already, while the brief of a campaign's next session
+    is being written: its STOP file is made, and the stop finds no session to end, since the session does not exist
+    yet."""
+
+    async def _brief(self, campaign: CampaignRecord, sessions: list[RunRecord], number: int, now: float) -> Brief:
+        brief: Brief = await super()._brief(campaign, sessions, number, now)
+        if not await asyncio.to_thread(failsafe_path().exists):
+            await asyncio.to_thread(failsafe_path().touch)
+            self.emergency_stop()
+        return brief
+
+
+async def test_an_emergency_stop_while_a_session_starts_ends_it_and_the_scheduler_starts_no_other(
+    login_env: dict[str, str],
+) -> None:
+    """Item 144: an emergency stop engaged while the scheduler starts a campaign's session ends that session as one as
+    soon as it exists, so its campaign stops, and the scheduler starts no session of the next due campaign."""
+    model: RecordingProvider = RecordingProvider(
+        ScriptedProvider(
+            _PROVIDER,
+            [
+                _turn(_targets()),
+                _finish("Targets set."),
+                _turn(_targets()),
+                _finish("Targets set."),
+                _turn(_call("shell", {"command": "sleep 5"})),
+                _finish("Done."),
+            ],
+        )
+    )
+    async with _session(_config(60), login_env, model, Notices()) as (runtime, _):
+        manager: _EmergencyWhileBriefing = _EmergencyWhileBriefing(runtime)
+        try:
+            campaigns: list[str] = []
+            for _ in range(2):
+                opening: RunRecord = await manager.start_campaign(
+                    GOAL, "task", SCRIPTED_MODEL, None, EVAL_SOURCE, None, "yolo", None, (), None
+                )
+                assert opening.campaign_id is not None
+                async with asyncio.timeout(_TIME_LIMIT_S):
+                    await manager.wait(opening.id)
+                campaigns.append(opening.campaign_id)
+            first, second = campaigns
+            now: float = time.time()
+            # Both are due, the first one first.
+            await runtime.store.set_next_session(first, now - 1)
+            await runtime.store.set_next_session(second, now)
+            await Scheduler(runtime, manager).tick(now)
+            sessions: list[RunRecord] = await runtime.store.campaign_sessions(first)
+            assert len(sessions) == 2
+            async with asyncio.timeout(_TIME_LIMIT_S):
+                ended: RunRecord = await manager.wait(sessions[-1].id)
+            assert (ended.status, ended.result) == ("cancelled", RESULT_EMERGENCY_STOPPED)
+            assert (await runtime.store.get_campaign(first)).status == "stopped"
+            assert len(await runtime.store.campaign_sessions(second)) == 1
+            assert (await runtime.store.get_campaign(second)).status == "active"
+        finally:
+            await asyncio.to_thread(failsafe_path().unlink, True)
+            await manager.shutdown()
+
+
+class _EmergencyWhileLaunching(RunManager):
+    """The owner's emergency stop comes while a run is being launched, before it is registered: the stop finds no run
+    to end."""
+
+    async def _instructions_for(
+        self, goal: str, thread_id: str, parent_run_id: str | None, parent: RunHandle | None
+    ) -> tuple[str, ...]:
+        self.emergency_stop()
+        return await super()._instructions_for(goal, thread_id, parent_run_id, parent)
+
+
+async def test_an_emergency_stop_while_a_run_is_launched_ends_that_run_as_one(login_env: dict[str, str]) -> None:
+    """Item 144: the emergency stop ends the runs it finds; one being launched at that moment is not among them, and
+    ends as an emergency stop once it is registered instead of working under the stop."""
+    model: RecordingProvider = RecordingProvider(
+        ScriptedProvider(_PROVIDER, [_turn(_call("shell", {"command": "sleep 5"})), _finish("Done.")])
+    )
+    async with _session(_config(60), login_env, model, Notices()) as (runtime, _):
+        manager: _EmergencyWhileLaunching = _EmergencyWhileLaunching(runtime)
+        try:
+            run: RunRecord = await manager.start(
+                GOAL, "task", SCRIPTED_MODEL, None, EVAL_SOURCE, None, None, "yolo", False, ()
+            )
+            async with asyncio.timeout(_TIME_LIMIT_S):
+                ended: RunRecord = await manager.wait(run.id)
+            assert (ended.status, ended.result) == ("cancelled", RESULT_EMERGENCY_STOPPED)
+        finally:
+            await manager.shutdown()
+
+
+class _StopMadeWhileLaunching(RunManager):
+    """The emergency stop's STOP file is made while a run is being launched, after the scheduler looked for it."""
+
+    async def _instructions_for(
+        self, goal: str, thread_id: str, parent_run_id: str | None, parent: RunHandle | None
+    ) -> tuple[str, ...]:
+        await asyncio.to_thread(failsafe_path().touch)
+        return await super()._instructions_for(goal, thread_id, parent_run_id, parent)
+
+
+async def test_an_emergency_stop_engaged_while_a_schedule_starts_its_run_ends_that_run(
+    login_env: dict[str, str],
+) -> None:
+    """Item 144: the scheduler fires no schedule under the emergency stop; one engaged while the run of a firing is
+    being started ends that run as an emergency stop as soon as it exists."""
+    model: RecordingProvider = RecordingProvider(
+        ScriptedProvider(_PROVIDER, [_turn(_call("shell", {"command": "sleep 5"})), _finish("Done.")])
+    )
+    config: AppConfig = _config(60)
+    # The tick is at the schedule's time, hours ahead maybe: no reflection is due by then.
+    quiet: AppConfig = config.model_copy(
+        update={"agent": config.agent.model_copy(update={"reflection_time": REFLECTION_OFF})}
+    )
+    async with _session(quiet, login_env, model, Notices()) as (runtime, _):
+        manager: _StopMadeWhileLaunching = _StopMadeWhileLaunching(runtime)
+        scheduler: Scheduler = Scheduler(runtime, manager)
+        try:
+            options: ScheduleOptions = ScheduleOptions(
+                model=SCRIPTED_MODEL, effort=None, approvals="yolo", goal_mode=False, timezone=None
+            )
+            request: ScheduleRequest = ScheduleRequest(
+                name="Leads", goal=GOAL, cron="0 9 * * *", at=None, mode="task", options=options
+            )
+            record: ScheduleRecord = await create_schedule(
+                runtime.store, runtime.config.scheduler, runtime.schedule_zone, request, time.time()
+            )
+            assert record.next_run_at is not None
+            await scheduler.tick(record.next_run_at + 5)
+            fired: ScheduleRecord = await runtime.store.get_schedule(record.id)
+            assert fired.thread_id is not None
+            (run,) = await runtime.store.list_runs(5, fired.thread_id)
+            async with asyncio.timeout(_TIME_LIMIT_S):
+                ended: RunRecord = await manager.wait(run.id)
+                await scheduler.drain()
+            assert (ended.status, ended.result) == ("cancelled", RESULT_EMERGENCY_STOPPED)
+        finally:
+            await asyncio.to_thread(failsafe_path().unlink, True)
             await manager.shutdown()

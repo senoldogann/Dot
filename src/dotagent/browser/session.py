@@ -238,6 +238,17 @@ def _note_main_status(page: Page, response: Response, statuses: list[int]) -> No
         statuses.append(response.status)
 
 
+async def _close_given_up(launching: asyncio.Task[BrowserContext]) -> None:
+    """Close the Chrome of a launch that was given up, once the launch is over; a launch that failed started none."""
+    try:
+        context: BrowserContext = await launching
+    except PlaywrightError as error:
+        _log.info("browser_launch_given_up_failed", error=truncate_middle(str(error), _LAUNCH_ERROR_CHARS))
+        return
+    await context.close()
+    _log.info("browser_launch_given_up_closed")
+
+
 class BrowserSession:
     """Owns the connection to Chrome. Every public method takes the id of the thread whose tabs it works on.
 
@@ -314,8 +325,8 @@ class BrowserSession:
         earlier: AppInfo | None = (
             None if config.headless or config.raise_window else await asyncio.to_thread(focused_app)
         )
-        try:
-            context: BrowserContext = await playwright.chromium.launch_persistent_context(
+        launching: asyncio.Task[BrowserContext] = asyncio.create_task(
+            playwright.chromium.launch_persistent_context(
                 user_data_dir=str(self._profile),
                 channel=config.channel,
                 headless=config.headless,
@@ -327,6 +338,14 @@ class BrowserSession:
                 ignore_default_args=["--enable-automation", *playwright_defaults_to_drop(keychain)],
                 args=[*_LAUNCH_ARGS, *keychain_switches(keychain)],
             )
+        )
+        try:
+            context: BrowserContext = await asyncio.shield(launching)
+        except asyncio.CancelledError:
+            # Given up while Chrome starts (its run stopped): the launch goes on in the driver, and the Chrome it starts
+            # would keep the profile locked with nothing to close it.
+            await _close_given_up(launching)
+            raise
         except PlaywrightError as error:
             raise BrowserError(
                 "Chrome could not be started; install Google Chrome or change browser.channel",

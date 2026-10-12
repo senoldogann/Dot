@@ -86,7 +86,8 @@ export function createComputer({ runId, active, held, name, sizes }) {
     paint();
     (async () => {
       try {
-        for await (const message of sse(`/runs/${encodeURIComponent(runId)}/screencast`, signal)) {
+        const frames = sse(`/runs/${encodeURIComponent(runId)}/screencast`, signal, () => undefined);
+        for await (const message of frames) {
           if (message.event === "frame") {
             show(message.data);
           }

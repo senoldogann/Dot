@@ -7,7 +7,7 @@ import sqlite3
 import time
 from pathlib import Path
 
-from dotagent.llm.types import ImageData, user_message
+from dotagent.llm.types import ImageData, Message, ToolCall, assistant_message, user_message
 from dotagent.store.db import Store, image_file_name
 from dotagent.store.models import RunRecord, ThreadRecord
 
@@ -46,7 +46,7 @@ async def test_deleting_a_thread_removes_its_screenshots_but_keeps_shared_ones(t
         await store.append_messages(first.id, [user_message("a", (own, shared))])
         await store.append_messages(second.id, [user_message("b", (shared,))])
         run: RunRecord = await store.create_run(
-            first.id, "goal", "task", "ollama:x", None, "test", "medium", "ask", False, None, None
+            first.id, "goal", "task", "ollama:x", None, "test", "medium", "ask", False, None, None, None
         )
         await store.add_event(run.id, "tool_result", {"images": await store.save_images([from_event])})
         assert _names(images) == {image_file_name(image) for image in (own, shared, from_event)}
@@ -127,3 +127,18 @@ async def test_a_screenshot_left_cut_short_under_its_name_is_written_again_whole
         assert _names(folder) == {image_file_name(image)}
     finally:
         await store.close()
+
+
+async def test_only_messages_with_screenshots_take_the_places_of_the_screenshots_read_back(tmp_path: Path) -> None:
+    """Item 144: a call whose arguments name a ``file`` has no screenshot, and does not keep the newest one from being
+    read back."""
+    store: Store = await Store.open(tmp_path / "dot.db", tmp_path / "images")
+    try:
+        thread: ThreadRecord = await store.create_thread("chat", "test")
+        shot: ImageData = _image(b"the page")
+        read: ToolCall = ToolCall(id="call_1", name="read_file", arguments={"file": "notes.txt"})
+        await store.append_messages(thread.id, [user_message("look", (shot,)), assistant_message("", None, (read,))])
+        history: list[Message] = await store.load_messages(thread.id, 1)
+    finally:
+        await store.close()
+    assert [message.images for message in history] == [(shot,), ()]

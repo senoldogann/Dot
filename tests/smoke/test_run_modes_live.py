@@ -289,7 +289,7 @@ async def test_a_delegated_run_inherits_the_approval_mode_but_not_goal_mode(
 ) -> None:
     thread: ThreadRecord = await runtime.store.create_thread("modes test", "test")
     parent: RunRecord = await runtime.store.create_run(
-        thread.id, "goal", "task", MODEL_REF, None, "test", "medium", "auto", True, None, None
+        thread.id, "goal", "task", MODEL_REF, None, "test", "medium", "auto", True, None, None, None
     )
     outcome: DelegateOutcome = await asyncio.wait_for(
         manager.delegate(parent.id, "Call finish with the answer ok.", "task", None, None), RUN_TIMEOUT_S

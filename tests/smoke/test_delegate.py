@@ -80,7 +80,7 @@ async def _stored_run(runtime: Runtime, mode: RunMode, parent_run_id: str | None
     """A run that only exists in the store: enough for the checks that happen before any model is involved."""
     thread: ThreadRecord = await runtime.store.create_thread("delegation test", source)
     return await runtime.store.create_run(
-        thread.id, "goal", mode, MODEL_REF, parent_run_id, source, "medium", "ask", False, None, None
+        thread.id, "goal", mode, MODEL_REF, parent_run_id, source, "medium", "ask", False, None, None, None
     )
 
 

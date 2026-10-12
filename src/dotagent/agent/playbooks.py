@@ -18,14 +18,21 @@ Every run that ended done or failed records its use of learned skills (the ``ski
 read by :data:`MAX_FAILURES` runs that then failed is retired, moved under ``.retired`` where the catalog does not
 look, and no longer offered. Every function here is pure except :func:`learn_playbook`, which reads the store, the
 embedder and the review model and writes the folder, and the small file helpers it calls.
+
+The files are written whole, and every change of the playbooks holds their lock (``.lock`` in the folder), so runs
+that end at once, the API and another process (``dotx run`` beside the daemon) lose none of each other's changes, and
+a listing never meets a record half written.
 """
 
 import asyncio
+import fcntl
 import json
+import os
 import re
 import shutil
 import time
-from collections.abc import Sequence
+from collections.abc import Iterator, Sequence
+from contextlib import contextmanager
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -34,6 +41,7 @@ from pydantic import JsonValue, ValidationError
 from dotagent.agent.review import PlaybookDraft, PlaybookRequest, PlaybookWriter, playbook_writer_for, shorten_reason
 from dotagent.config import AppConfig
 from dotagent.core.errors import DotError, InvalidValueError, NotFoundError
+from dotagent.core.files import write_whole
 from dotagent.core.jsonutil import dumps_compact
 from dotagent.core.logs import get_logger
 from dotagent.core.paths import playbooks_dir
@@ -56,6 +64,8 @@ _OLD_PREFIX: str = "playbook-"
 _FOLDER_NAME: re.Pattern[str] = re.compile(r"(?:learned|playbook)-[a-z0-9-]*")
 META_FILE: str = "playbook.json"
 RETIRED_DIR: str = ".retired"
+_LOCK_FILE: str = ".lock"
+_PRIVATE_FILE_MODE: int = 0o600
 PLAYBOOK_WRITTEN: str = "playbook_written"
 PLAYBOOK_FAILED: str = "playbook_failed"
 PLAYBOOK_RETIRED: str = "playbook_retired"
@@ -318,13 +328,28 @@ def playbook_folder(root: Path, name: str) -> Path:
     return root / name
 
 
+@contextmanager
+def _changing(root: Path) -> Iterator[None]:
+    """Hold the lock of the playbooks under ``root`` until the block ends: the threads of this process and other
+    processes wait for it in turn."""
+    root.mkdir(parents=True, exist_ok=True)
+    descriptor: int = os.open(root / _LOCK_FILE, os.O_RDWR | os.O_CREAT, _PRIVATE_FILE_MODE)
+    try:
+        fcntl.flock(descriptor, fcntl.LOCK_EX)
+        yield
+    finally:
+        os.close(descriptor)
+
+
 def write_playbook(root: Path, playbook: Playbook) -> Path:
-    """Write the skill's folder under ``root`` and return its SKILL.md. The folder must not exist."""
+    """Write the skill's folder under ``root`` and return its SKILL.md. The folder must not exist. The record is
+    written before the skill, so a listing never meets the skill without it."""
     folder: Path = playbook_folder(root, playbook.name)
-    folder.mkdir(parents=True, exist_ok=False)
     file: Path = folder / SKILL_FILE
-    file.write_text(render_playbook(playbook, None), encoding="utf-8")
-    (folder / META_FILE).write_text(meta_of(playbook, None).model_dump_json(indent=2) + "\n", encoding="utf-8")
+    with _changing(root):
+        folder.mkdir(exist_ok=False)
+        _save_meta(folder, meta_of(playbook, None))
+        write_whole(file, render_playbook(playbook, None))
     return file
 
 
@@ -332,11 +357,12 @@ def update_playbook(root: Path, name: str, playbook: Playbook) -> Path:
     """Rewrite the active skill ``name`` from ``playbook`` (a later run of the same kind): the steps are the new
     run's, the evidence keeps every run. Returns its SKILL.md."""
     folder: Path = playbook_folder(root, name)
-    earlier: PlaybookMeta = read_meta(folder)
     renamed: Playbook = playbook.model_copy(update={"name": name})
     file: Path = folder / SKILL_FILE
-    file.write_text(render_playbook(renamed, earlier), encoding="utf-8")
-    (folder / META_FILE).write_text(meta_of(renamed, earlier).model_dump_json(indent=2) + "\n", encoding="utf-8")
+    with _changing(root):
+        earlier: PlaybookMeta = read_meta(folder)
+        write_whole(file, render_playbook(renamed, earlier))
+        _save_meta(folder, meta_of(renamed, earlier))
     return file
 
 
@@ -353,14 +379,15 @@ def record_use(root: Path, name: str, succeeded: bool) -> PlaybookMeta:
     """Count a run that read the playbook ``name`` and ended; a playbook that :func:`retires` is moved under
     ``.retired``. Returns the record after the count."""
     folder: Path = playbook_folder(root, name)
-    meta: PlaybookMeta = recorded(read_meta(folder), succeeded)
-    (folder / META_FILE).write_text(meta.model_dump_json(indent=2) + "\n", encoding="utf-8")
-    if retires(meta):
-        retired: Path = root / RETIRED_DIR / name
-        if retired.exists():
-            shutil.rmtree(retired)
-        retired.parent.mkdir(parents=True, exist_ok=True)
-        shutil.move(str(folder), str(retired))
+    with _changing(root):
+        meta: PlaybookMeta = recorded(read_meta(folder), succeeded)
+        _save_meta(folder, meta)
+        if retires(meta):
+            retired: Path = root / RETIRED_DIR / name
+            if retired.exists():
+                shutil.rmtree(retired)
+            retired.parent.mkdir(parents=True, exist_ok=True)
+            shutil.move(str(folder), str(retired))
     return meta
 
 
@@ -373,33 +400,36 @@ def _folder_of(root: Path, name: str) -> Path:
 
 
 def _save_meta(folder: Path, meta: PlaybookMeta) -> None:
-    (folder / META_FILE).write_text(meta.model_dump_json(indent=2) + "\n", encoding="utf-8")
+    write_whole(folder / META_FILE, meta.model_dump_json(indent=2) + "\n")
 
 
 def drop_playbook(root: Path, name: str) -> Path:
     """Remove the playbook ``name``, active or retired; one that does not exist is not found."""
-    folder: Path = _folder_of(root, name)
-    shutil.rmtree(folder)
+    with _changing(root):
+        folder: Path = _folder_of(root, name)
+        shutil.rmtree(folder)
     return folder
 
 
 def share_playbook(root: Path, name: str, shared: bool) -> PlaybookMeta:
     """Mark the playbook ``name`` (active or retired) as offered to every run, or to its agent's alone again; Dot's
     own is offered to every run either way. Returns the record after it."""
-    folder: Path = _folder_of(root, name)
-    meta: PlaybookMeta = read_meta(folder).model_copy(update={"shared": shared})
-    _save_meta(folder, meta)
+    with _changing(root):
+        folder: Path = _folder_of(root, name)
+        meta: PlaybookMeta = read_meta(folder).model_copy(update={"shared": shared})
+        _save_meta(folder, meta)
     return meta
 
 
 def release_playbooks(root: Path, agent_id: str) -> int:
     """Make the playbooks of the agent ``agent_id`` Dot's (an agent that was deleted); how many there were."""
     released: int = 0
-    for entry in list_playbooks(root):
-        if entry.meta.agent_id != agent_id:
-            continue
-        _save_meta(_folder_of(root, entry.meta.name), entry.meta.model_copy(update={"agent_id": None}))
-        released += 1
+    with _changing(root):
+        for entry in list_playbooks(root):
+            if entry.meta.agent_id != agent_id:
+                continue
+            _save_meta(_folder_of(root, entry.meta.name), entry.meta.model_copy(update={"agent_id": None}))
+            released += 1
     return released
 
 

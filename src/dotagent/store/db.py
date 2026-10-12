@@ -1,8 +1,9 @@
 """SQLite persistence (aiosqlite). One shared connection, WAL mode, FTS5 for memory search.
 
-Single statements share the connection. A unit of several statements that must be stored whole (a thread's messages)
-runs in a worker thread on a connection of its own, in one transaction: the shared connection commits for every
-coroutine at once, so a unit cut off after its first statement would be committed half done by the next write.
+Reads share the connection. Every write runs alone on it (:func:`_writing`): writes wait for one another, and one that
+fails or is cancelled part way is rolled back, so the next write never commits it half done. A unit of several
+statements that must be stored whole, or that reads what it then writes (a thread's messages, a note added once), is one
+``BEGIN IMMEDIATE`` transaction (:meth:`Store._unit`), which keeps the writes of other processes out of it too.
 """
 
 import asyncio
@@ -270,15 +271,27 @@ def encode_message(message: Message, image_dir: Path) -> str:
 
 
 def decode_message(body: str, image_dir: Path, load_images: bool) -> Message:
-    parsed: JsonObject = parse_json_object(body, "stored message")
+    return _decoded(parse_json_object(body, "stored message"), image_dir, load_images)
+
+
+def _image_refs(parsed: JsonObject) -> list[tuple[str, str]]:
+    """The screenshots a stored message names: the media type and the file name of each."""
     refs: object = parsed.get("images")
-    images: list[ImageData] = []
-    if isinstance(refs, list) and load_images:
-        for ref in refs:
-            if isinstance(ref, dict) and isinstance(ref.get("file"), str) and isinstance(ref.get("media_type"), str):
-                images.append(_read_image(image_dir, str(ref["media_type"]), str(ref["file"])))
-    parsed["images"] = [image.model_dump(mode="json") for image in images]
-    return Message.model_validate(parsed)
+    if not isinstance(refs, list):
+        return []
+    return [
+        (str(ref["media_type"]), str(ref["file"]))
+        for ref in refs
+        if isinstance(ref, dict) and isinstance(ref.get("file"), str) and isinstance(ref.get("media_type"), str)
+    ]
+
+
+def _decoded(parsed: JsonObject, image_dir: Path, load_images: bool) -> Message:
+    """The stored message ``parsed``, with its screenshots read back when ``load_images``, and without them else."""
+    images: list[ImageData] = (
+        [_read_image(image_dir, media_type, file) for media_type, file in _image_refs(parsed)] if load_images else []
+    )
+    return Message.model_validate({**parsed, "images": [image.model_dump(mode="json") for image in images]})
 
 
 def _thread(row: aiosqlite.Row) -> ThreadRecord:
@@ -486,13 +499,15 @@ def _option_values(options: ScheduleOptions) -> tuple[str | None, str | None, st
 
 
 # Columns of ``runs`` added after the first version, with the definition that gives the rows of an older database the
-# value those runs had in effect: no reasoning level kept, ``ask``, no goal mode, no campaign.
+# value those runs had in effect: no reasoning level kept, ``ask``, no goal mode, no campaign, no owner (a run of a
+# process of before owners, which a daemon that starts takes for gone, as it took every run then).
 _ADDED_RUN_COLUMNS: tuple[tuple[str, str], ...] = (
     ("effort", "TEXT"),
     ("approvals", "TEXT NOT NULL DEFAULT 'ask'"),
     ("goal_mode", "INTEGER NOT NULL DEFAULT 0"),
     ("campaign_id", "TEXT"),
     ("agent_id", "TEXT"),
+    ("owner", "TEXT"),
 )
 # Columns of ``memories`` added later: notes of an older database were never counted as used, and are Dot's.
 _ADDED_MEMORY_COLUMNS: tuple[tuple[str, str], ...] = (
@@ -565,20 +580,27 @@ async def _add_missing_columns(connection: aiosqlite.Connection) -> None:
 async def _refresh_memory_index(connection: aiosqlite.Connection) -> None:
     """Make the search index of the notes say what the notes say, in the folded form the queries use, and write it
     again whole when it does not (an index made by an older version, or by a process that did not fold yet). The index
-    only holds a copy of the notes, so nothing a person wrote is touched."""
-    async with connection.execute("SELECT id, content, tags FROM memories") as cursor:
-        wanted: list[tuple[str, str, str]] = sorted(
-            (str(note["id"]), fold_search(str(note["content"])), fold_search(str(note["tags"])))
-            for note in await cursor.fetchall()
-        )
-    async with connection.execute("SELECT id, content, tags FROM memories_fts") as cursor:
-        indexed: list[tuple[str, str, str]] = sorted(
-            (str(row["id"]), str(row["content"]), str(row["tags"])) for row in await cursor.fetchall()
-        )
-    if indexed == wanted:
-        return
-    await connection.execute("DELETE FROM memories_fts")
-    await connection.executemany("INSERT INTO memories_fts(id, content, tags) VALUES(?, ?, ?)", wanted)
+    only holds a copy of the notes, so nothing a person wrote is touched. One transaction that holds the write lock
+    from its start: a note another process (the daemon, ``dotx run``) adds meanwhile is in what is read, or is added
+    after the index is written, never dropped from it."""
+    await connection.execute("BEGIN IMMEDIATE")
+    try:
+        async with connection.execute("SELECT id, content, tags FROM memories") as cursor:
+            wanted: list[tuple[str, str, str]] = sorted(
+                (str(note["id"]), fold_search(str(note["content"])), fold_search(str(note["tags"])))
+                for note in await cursor.fetchall()
+            )
+        async with connection.execute("SELECT id, content, tags FROM memories_fts") as cursor:
+            indexed: list[tuple[str, str, str]] = sorted(
+                (str(row["id"]), str(row["content"]), str(row["tags"])) for row in await cursor.fetchall()
+            )
+        if indexed != wanted:
+            await connection.execute("DELETE FROM memories_fts")
+            await connection.executemany("INSERT INTO memories_fts(id, content, tags) VALUES(?, ?, ?)", wanted)
+    except BaseException:
+        await connection.rollback()
+        raise
+    await connection.commit()
 
 
 log = get_logger(__name__)
@@ -657,7 +679,6 @@ class Store:
         await connection.executescript(_SCHEMA)
         await _add_missing_columns(connection)
         await _refresh_memory_index(connection)
-        await connection.commit()
         return cls(connection, path, image_dir)
 
     async def close(self) -> None:
@@ -943,11 +964,14 @@ class Store:
         bodies: list[str] = [str(row["body"]) for row in rows]
 
         def decode_all() -> list[Message]:
-            with_images: list[int] = [index for index, body in enumerate(bodies) if '"file"' in body]
+            parsed: list[JsonObject] = [parse_json_object(body, "stored message") for body in bodies]
+            # The messages that name screenshots; a message that merely mentions a file (a call's ``file`` argument)
+            # takes none of the places.
+            with_images: list[int] = [index for index, message in enumerate(parsed) if _image_refs(message)]
             allowed: set[int] = (
                 set(with_images[len(with_images) - keep_recent_images :]) if keep_recent_images > 0 else set()
             )
-            return [decode_message(body, self._image_dir, index in allowed) for index, body in enumerate(bodies)]
+            return [_decoded(message, self._image_dir, index in allowed) for index, message in enumerate(parsed)]
 
         return await asyncio.to_thread(decode_all)
 
@@ -971,7 +995,9 @@ class Store:
         goal_mode: bool,
         campaign_id: str | None,
         agent_id: str | None,
+        owner: str | None,
     ) -> RunRecord:
+        """A new queued run; ``owner`` is the process that drives it (:mod:`dotagent.agent.owners`)."""
         record: RunRecord = RunRecord(
             id=new_id("run"),
             thread_id=thread_id,
@@ -995,8 +1021,8 @@ class Store:
         )
         await self._db.execute(
             "INSERT INTO runs(id, thread_id, goal, mode, model, status, created_at, finished_at, result, steps,"
-            " input_tokens, output_tokens, parent_run_id, source, effort, approvals, goal_mode, campaign_id, agent_id)"
-            " VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            " input_tokens, output_tokens, parent_run_id, source, effort, approvals, goal_mode, campaign_id, agent_id,"
+            " owner) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (
                 record.id,
                 record.thread_id,
@@ -1017,6 +1043,7 @@ class Store:
                 int(record.goal_mode),
                 record.campaign_id,
                 record.agent_id,
+                owner,
             ),
         )
         await self._db.commit()
@@ -1084,18 +1111,27 @@ class Store:
         )
         return 0 if row is None else int(row["n"])
 
+    async def active_run_owners(self) -> list[str | None]:
+        """The owners of the runs that are active (queued, running, or blocked on a question), each once; ``None`` for
+        runs made before owners were kept."""
+        rows = await self._all(
+            "SELECT DISTINCT owner FROM runs WHERE status IN ('running', 'queued', 'blocked') ORDER BY owner", ()
+        )
+        return [None if row["owner"] is None else str(row["owner"]) for row in rows]
+
     @_writing
-    async def mark_interrupted_runs(self) -> int:
-        """Runs left active by a crashed daemon (queued, running, or blocked on a question) become 'failed', finished
-        at their last sign of life: their newest event, else the time they were created. Each one also gets, at that
-        time, the ``run_finished`` event that every other end of a run stores, and that ends the stream of its events;
-        so does a run closed this way before that event was stored, unless its events were pruned since (the run keeps
-        none, and gets none back). Returns how many runs changed."""
+    async def mark_interrupted_runs(self, gone: Sequence[str]) -> int:
+        """Runs left active by processes that are gone (the owners of ``gone``, and every run made before owners were
+        kept) become 'failed', finished at their last sign of life: their newest event, else the time they were created.
+        Each one also gets, at that time, the ``run_finished`` event that every other end of a run stores, and that ends
+        the stream of its events; so does a run closed this way before that event was stored, unless its events were
+        pruned since (the run keeps none, and gets none back). Returns how many runs changed."""
         async with self._db.execute(
             "UPDATE runs SET status = 'failed', result = ?,"
             " finished_at = COALESCE((SELECT MAX(ts) FROM events WHERE events.run_id = runs.id), created_at)"
-            " WHERE status IN ('running', 'queued', 'blocked') RETURNING id",
-            (RESULT_RESTARTED,),
+            " WHERE status IN ('running', 'queued', 'blocked')"
+            f" AND (owner IS NULL OR owner IN ({','.join('?' * len(gone))})) RETURNING id",
+            (RESULT_RESTARTED, *gone),
         ) as cursor:
             closed: list[str] = [str(row["id"]) for row in await cursor.fetchall()]
         await self._db.execute(
@@ -1294,9 +1330,12 @@ class Store:
 
     @_writing
     async def expire_pending_approvals(self) -> int:
+        """The approvals still pending for runs that are no longer active expire; those of an active run (one that a
+        process that lives drives) wait on."""
         cursor = await self._db.execute(
             "UPDATE approvals SET status = 'expired', decided_at = ?, decided_by = 'system', note = 'daemon restarted'"
-            " WHERE status = 'pending'",
+            " WHERE status = 'pending' AND run_id NOT IN"
+            " (SELECT id FROM runs WHERE status IN ('running', 'queued', 'blocked'))",
             (time.time(),),
         )
         await self._db.commit()
@@ -1391,6 +1430,41 @@ class Store:
         agent_id: str | None,
         vector: Sequence[float] | None,
     ) -> MemoryRecord:
+        record: MemoryRecord = await self._insert_memory(content, tags, source_run, agent_id, vector)
+        await self._db.commit()
+        return record
+
+    async def add_memory_once(
+        self,
+        content: str,
+        tags: Sequence[str],
+        source_run: str | None,
+        agent_id: str | None,
+        vector: Sequence[float] | None,
+    ) -> tuple[MemoryRecord, bool]:
+        """Add a note unless one has this text already (saved meanwhile, in this process or another): the look and the
+        add are one transaction. Returns the note with the text and whether it was added."""
+        outcome: list[tuple[MemoryRecord, bool]] = []
+
+        async def statements() -> None:
+            row: aiosqlite.Row | None = await self._one("SELECT * FROM memories WHERE content = ? LIMIT 1", (content,))
+            if row is not None:
+                outcome.append((_memory(row), False))
+            else:
+                outcome.append((await self._insert_memory(content, tags, source_run, agent_id, vector), True))
+
+        await self._unit(statements)
+        return outcome[0]
+
+    async def _insert_memory(
+        self,
+        content: str,
+        tags: Sequence[str],
+        source_run: str | None,
+        agent_id: str | None,
+        vector: Sequence[float] | None,
+    ) -> MemoryRecord:
+        """The statements that add a note, in the caller's transaction."""
         now: float = time.time()
         record: MemoryRecord = MemoryRecord(
             id=new_id("mem"),
@@ -1418,7 +1492,6 @@ class Store:
                 "INSERT INTO memory_vectors(id, dim, vec) VALUES(?, ?, ?)",
                 (record.id, len(vector), pack_vector(vector)),
             )
-        await self._db.commit()
         return record
 
     @_writing

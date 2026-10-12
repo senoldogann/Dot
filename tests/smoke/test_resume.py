@@ -31,7 +31,7 @@ from dotagent.llm.types import Message
 from dotagent.runtime import Runtime, close_runtime, open_runtime
 from dotagent.server import UI_SOURCE
 from dotagent.store.endings import RESULT_RESTARTED, RESULT_SHUTDOWN
-from dotagent.store.models import EventRecord, RunRecord
+from dotagent.store.models import ApprovalRecord, EventRecord, RunRecord
 from dotagent.tools.meta import ASK_USER_TOOL, FINISH_TOOL, MARK_PLAN_STEP_TOOL, UPDATE_PLAN_TOOL
 from dotagent.tools.shell import read_login_env
 
@@ -201,6 +201,55 @@ async def test_a_run_a_shutdown_cut_off_while_it_asked_goes_on_by_itself_with_it
         "2. [in_progress] Write report.md\n"
         "Targets: report.md sums every row of data.csv\n"
     ) in note
+
+
+async def test_a_daemon_that_starts_leaves_the_run_of_a_process_that_lives(login_env: dict[str, str]) -> None:
+    """Item 144: ``dotx run`` drives its run in a process of its own. A daemon that starts meanwhile leaves the run, and
+    the approval it waits on, to that process; once the process is gone, the next start closes both."""
+    shell: ScriptedCall = ScriptedCall(tool="shell", arguments={"command": _WAIT_COMMAND})
+    with scratch_home() as home, eval_environment(home, {}):
+        workspace: Path = workspace_dir()
+        child: asyncio.subprocess.Process = await asyncio.create_subprocess_exec(
+            sys.executable,
+            str(CRASHING_RUN),
+            GOAL,
+            _turn((shell,)).model_dump_json(),
+            stdout=asyncio.subprocess.PIPE,
+            env={**os.environ, "DOT_LOG_DIR": str(home / "logs")},
+        )
+        try:
+            async with asyncio.timeout(_TIME_LIMIT_S):
+                run_id: str = await _cut_in(child, "shell")
+            runtime: Runtime = await open_runtime(_config(), login_env)
+            try:
+                waiting: ApprovalRecord = await runtime.store.create_approval(run_id, "shell", "Run: ls", "high", {})
+                manager: RunManager = RunManager(runtime)
+                try:
+                    assert await manager.recover() == 0
+                finally:
+                    await manager.shutdown()
+                assert (await runtime.store.get_run(run_id)).status == "running"
+                assert (await runtime.store.get_approval(waiting.id)).status == "pending"
+            finally:
+                await close_runtime(runtime)
+        finally:
+            if child.returncode is None:
+                child.kill()
+            await child.wait()
+            await asyncio.to_thread(_let_the_command_end, workspace)
+        runtime = await open_runtime(_config(), login_env)
+        try:
+            manager = RunManager(runtime)
+            try:
+                assert await manager.recover() == 1
+            finally:
+                await manager.shutdown()
+            closed: RunRecord = await runtime.store.get_run(run_id)
+            expired: ApprovalRecord = await runtime.store.get_approval(waiting.id)
+        finally:
+            await close_runtime(runtime)
+    assert (closed.status, closed.result) == ("failed", RESULT_RESTARTED)
+    assert expired.status == "expired"
 
 
 async def test_a_run_a_crash_cut_off_in_a_command_waits_for_the_owner_and_is_resumed_by_hand(

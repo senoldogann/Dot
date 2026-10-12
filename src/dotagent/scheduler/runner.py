@@ -98,12 +98,14 @@ class Scheduler:
         """Fire every switched-on schedule that is due at ``now``, start the next session of every active campaign
         that is, and start the reflection when its time has come. A campaign's session is never skipped as overdue:
         the campaign goes on where it stopped. While the owner's emergency stop is engaged, no campaign starts a
-        session (each waits for the release) and no schedule fires (:meth:`_fire`)."""
+        session (each waits for the release; the stop is looked at before each one) and no schedule fires
+        (:meth:`_fire`)."""
         for record in await self._runtime.store.due_schedules(now):
             await self._fire_alone(record, now)
-        if not await _emergency_stop_engaged():
-            for campaign in await self._runtime.store.due_campaigns(now):
-                await self._start_session(campaign.id)
+        for campaign in await self._runtime.store.due_campaigns(now):
+            if await _emergency_stop_engaged():
+                break
+            await self._start_session(campaign.id)
         await self._reflect_if_due(now)
 
     async def _reflect_if_due(self, now: float) -> None:
@@ -164,7 +166,8 @@ class Scheduler:
 
     async def _fire(self, record: ScheduleRecord, now: float) -> None:
         """Start the run of a due schedule; a firing the emergency stop, a run still going or a long absence of the
-        daemon keeps from starting is skipped to the schedule's next time, with the reason as its status."""
+        daemon keeps from starting is skipped to the schedule's next time, with the reason as its status. An emergency
+        stop engaged while the run was being started ends it as one."""
         store: Store = self._runtime.store
         if record.next_run_at is None:
             raise StoreError("a due schedule has no next run", {"schedule_id": record.id})
@@ -206,6 +209,9 @@ class Scheduler:
             await store.set_schedule_status(record.id, f"failed to start: {exc.message}")
             await store.delete_threads([thread.id])
             return
+        if await _emergency_stop_engaged():
+            log.warning("schedule_run_stopped_emergency_stop", schedule_id=record.id, run_id=run.id)
+            self._manager.end_by_emergency_stop(run.id)
         self._in_flight[record.id] = run.id
         await store.set_schedule_status(record.id, "running")
         log.info(

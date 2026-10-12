@@ -106,7 +106,7 @@ def test_an_agents_skill_is_offered_to_its_runs_alone_until_shared_and_is_dots_o
 
 async def _run(store: Store, thread: ThreadRecord, agent_id: str | None, status: str) -> RunRecord:
     run: RunRecord = await store.create_run(
-        thread.id, "goal", "task", "ollama:m", None, "test", None, "ask", False, None, agent_id
+        thread.id, "goal", "task", "ollama:m", None, "test", None, "ask", False, None, agent_id, None
     )
     await store.finish_run(run.id, status, "")  # type: ignore[arg-type]
     return await store.get_run(run.id)
