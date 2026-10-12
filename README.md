@@ -1232,12 +1232,16 @@ the agent itself.
 - **Signed in by itself.** The shell reads the daemon's address from `config.toml` (`[server]`, or the defaults) and
   the token from the token file under the home directory, and opens the UI with the token in the fragment, never
   typed. While the daemon is down, the window shows Dot's wordmark and the one command that starts it, and opens
-  the UI by itself when the daemon answers.
+  the UI by itself when the daemon answers. The window leaves the UI for that page only after three polls in a row go
+  unanswered, so one slow answer of a busy daemon does not throw the open page away.
 - **The menu bar item** is Dot's mark in the state of the whole of Dot (looking at you at rest, glancing up while a
   run works, a blue pastille while something waits for you) with the count of what waits for you beside it, read from `GET /api/activity/count`
   every second. A click opens the window; the menu has Open Dot, New chat and Quit. Closing the window keeps the
   shell in the menu bar.
-- **⌘⇧Space** anywhere brings the window up on New chat.
+- **⌘⇧Space** anywhere brings the window up on New chat, with the cursor in the box. When another app holds the
+  shortcut, the shell starts without it and its menu says so; New chat stays in the menu.
+- **Links** that a page opens in a new window, such as the links of a model's answer, open in the default browser;
+  the shell opens no window of its own for them, and only web addresses (`http`, `https`).
 - **Notifications** are the system's: the web UI sends them through the shell (Settings › General › Notifications,
   the same switch). A click brings Dot to the front, where Waiting for you leads to the run.
 - **Files** drop into the composer as in the browser.

@@ -5058,8 +5058,8 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 135 | What a run may change, send and open                                                 | done        | cb76e7d |
 | 136 | Spending, pacing and stops when two things happen at once                            | done        | bb18c32 |
 | 137 | A reply cut off is not an answer                                                     | done        | 43cf3f9 |
-| 138 | The store and the daemon's plumbing                                                  | in progress |         |
-| 139 | The web UI and the desktop shell                                                     | planned     |         |
+| 138 | The store and the daemon's plumbing                                                  | done        | 3f64036 |
+| 139 | The web UI and the desktop shell                                                     | in progress |         |
 
 ### 77. The type system: Inter and Geist Mono, seven sizes, three weights
 
@@ -7778,7 +7778,7 @@ the run's last answer: the loop asks the model to go on, or ends the run saying 
 
 ### 138. The store and the daemon's plumbing
 
-**Status: in progress.**
+**Status: done.** Merged as `3f64036` (PR #172, MYP-279 Done).
 
 **As built (2026-10-12).** Every write of the store that fails or is cancelled part way is rolled back before its error
 goes on (`_writing`), so no part of it waits in an open transaction for the next writer's commit; the waits for a lock
@@ -7812,7 +7812,31 @@ whose fields contradict each other.
 
 ### 139. The web UI and the desktop shell
 
-**Status: planned.**
+**Status: in progress.**
+
+**As built (2026-10-12).** In the desktop shell, a link that the page opens in a new window (every link of a model's
+answer does) goes to the default browser through `open`, and the shell opens no window for it; an address other than
+`http` or `https` is refused, and no address is logged (a refused one only by its scheme), since a link can carry what
+its page put in it. The shell's watcher starts from the page the shell opened, so its first look no longer loads the UI
+again, and it leaves the UI for the down page after three polls in a row that the daemon left unanswered
+(`MISSES_BEFORE_DOWN`) instead of after one slow answer; the first answer after that brings the UI back. A ⇧⌘Space that
+another app holds no longer stops the shell: it starts without the shortcut, and the menu says so and keeps New chat.
+The shell's New chat puts the cursor in the home's box again (`window.focusComposer`, which the shell calls, was never
+set). In the web UI, the sidebar reads its chats and its activity again when the event stream is back after a break,
+since the stream replays nothing; a fault of the page in showing one event is logged with the stream and the event and
+told in a toast, at most one every ten seconds, and the stream goes on with the next event, every listener of the
+lifecycle getting each one (before, the event was lost and the connection taken for broken); the home's box waits for
+the models before it reads what it starts with (the list is asked once per page, as the box of a follow-up already did),
+so a reasoning level kept from before is checked against the model's levels instead of being dropped; a note, a rule to
+draft or a key is refused while the one before is being saved, so Enter pressed twice keeps one; the newest load of the
+sidebar and of Activity answers for what they show, and Activity makes one load of an event and the refresh it starts;
+an approval card on the home shows the decision at once, and a refresh that fails after it is told; an answer that is
+not JSON (a proxy's page at the daemon's address) is an `ApiError` naming the path, the status and the start of the
+answer. The CI's jobs get a token that can only read the repository (`permissions: contents: read`). Tests: in a
+browser, a note sent twice from the keyboard before the first save is answered is sent once and kept once, and an answer
+that is not JSON is an error naming its path; each fails on the code of before. The shell's changes are checked by
+`cargo fmt --check` and `cargo clippy -D warnings`; the app is rebuilt by the owner. Left to the owner: the CI's actions
+pinned by commit rather than by tag, and the shell's capability narrowed to the daemon's port.
 
 **What.** In the desktop app a link that opens a new window opens in the browser; the shell's watcher neither reloads
 the page at its first look nor sends it to the down page after one slow answer, and a shortcut it cannot register no
@@ -8393,3 +8417,4 @@ token.
 - 2026-10-12 (Opus 5.5): item 135 merged as `cb76e7d` (PR #169, MYP-276 Done): Dot's own folders (what it loads and runs, and the emergency stop's file) are a path class of their own, read like the home folder and changed like a protected location; the shell guard learns more write targets; a new flag, `upload`, asks before a shell line sends data out once the run has read untrusted content; an agent answers a message in the stricter of its approvals and the sender's; the browser never opens Dot's own interface and the desktop tools never act in Dot's own window outside `yolo`; `truncate` outside the workspace is destructive.
 - 2026-10-12 (Opus 5.5): item 136 merged as `bb18c32` (PR #170, MYP-277 Done): the gates of all runs share one lock per site for its pace and one for its spending, so two runs that pay or post on one site at once are judged one after the other; the emergency stop ends every active run as an emergency stop, and while it is engaged no schedule fires and no campaign session starts; a run stopped before its first step ends as any stop does; a takeover brings up the run's own browser and frees the run when that fails; a schedule or a campaign changed while its run was being started is read again first; a run whose end cannot be recorded is logged and freed, and a message sent as a run ends is refused instead of dropped.
 - 2026-10-12 (Opus 5.5): item 137 merged as `43cf3f9` (PR #171, MYP-278 Done): a reply without tool calls that the model service cut short, at its output limit or for an abnormal reason such as a content filter, is no longer taken as the run's answer in any mode: the model is told how the reply ended and asked to go on or answer again in fewer words, each such reply counts as a nudge, and a run whose replies keep being cut short fails saying so (the ending `cut_short`); an empty reason of Ollama is a normal stop.
+- 2026-10-12 (Opus 5.5): item 138 merged as `3f64036` (PR #172, MYP-279 Done): a write of the store that fails or is cancelled part way is rolled back before its error goes on; Dot's own Chrome is closed when a step after its start fails; the numbers of the configuration that would stop the daemon are refused when it is read; a screenshot is written whole before it takes its name; the push sender and the lifecycle stream listen to their own kinds, and a listener that falls behind logs it; the reapers go on past a failing item and closing tries every part; a restart no longer undoes a prune; four indexes; a failed start deletes its run with the thread; `POST /api/runs` refuses fields that contradict each other; an upload never takes the name of a file Dot keeps beside it.

@@ -1,6 +1,6 @@
 // What every page shares: the daemon status, the approvals that wait for an answer, and the live event stream.
 
-import { api, follow } from "./api.js";
+import { api, eventNotShown, follow } from "./api.js";
 import { debounce } from "./dom.js";
 
 const REFRESH_EVERY_MS = 15000;
@@ -89,8 +89,13 @@ export async function runLifecycle(signal, onAuthRejected) {
         }
       },
       onMessage: (message) => {
+        // Each listener gets the event even when one before it fails to show it.
         for (const listener of lifecycleListeners) {
-          listener(message.data);
+          try {
+            listener(message.data);
+          } catch (error) {
+            eventNotShown("/stream", message, error);
+          }
         }
         refreshSoon();
       },

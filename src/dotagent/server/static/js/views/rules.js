@@ -246,12 +246,20 @@ function buildWords(onDrafted, isDisposed) {
     outcome.hidden = false;
   }
 
+  // True while a rule is being drafted: ⌘Enter does not look at the disabled button, so a second press is refused
+  // here, or one sentence would cost two model calls.
+  let drafting = false;
+
   async function run() {
+    if (drafting) {
+      return;
+    }
     const text = words.value.trim();
     if (text === "") {
       words.focus();
       return;
     }
+    drafting = true;
     draft.disabled = true;
     show("busy", el("span", { class: "spinner" }), el("span", null, "Drafting the rule…"));
     let drafted;
@@ -264,6 +272,7 @@ function buildWords(onDrafted, isDisposed) {
       }
       return;
     } finally {
+      drafting = false;
       draft.disabled = false;
     }
     if (isDisposed()) {

@@ -323,12 +323,20 @@ export function mount(root, ctx) {
     edit: (record, text, tagList) => attempt(() => editNote(record, text, tagList)),
   };
 
+  // True while a note is being saved: Enter does not look at the disabled button, so a second press is refused here,
+  // or one note would be kept twice.
+  let saving = false;
+
   async function save() {
+    if (saving) {
+      return;
+    }
     const text = content.value.trim();
     if (text === "") {
       content.focus();
       return;
     }
+    saving = true;
     add.disabled = true;
     try {
       const saved = await api.post("/memories", { content: text, tags: parseTags(tags.value) });
@@ -341,6 +349,7 @@ export function mount(root, ctx) {
       outcome.hidden = false;
       await reload();
     } finally {
+      saving = false;
       add.disabled = false;
     }
   }

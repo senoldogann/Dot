@@ -14,7 +14,7 @@ import { closeMenu, menuOpenedBy, openMenu } from "./menu.js";
 import { nestRows, progressFacts } from "./nesting.js";
 import { readFolds, writePref } from "./prefs.js";
 import { requestCompose } from "./shortcuts.js";
-import { onLifecycle } from "./state.js";
+import { getSnapshot, onChange, onLifecycle } from "./state.js";
 import { attempt, confirmDialog, toast } from "./ui.js";
 
 // The chats listed at first, the step by which "Show older chats" lists more, and the most the API lists at once.
@@ -714,10 +714,15 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
     );
   }
 
+  // The newest load answers for what is shown: an older answer that comes after it is dropped, not painted over it.
+  let activityTicket = 0;
+  let chatsTicket = 0;
+
   async function loadActivity() {
+    const mine = ++activityTicket;
     try {
       const view = await api.get("/activity");
-      if (disposed) {
+      if (disposed || mine !== activityTicket) {
         return;
       }
       activity = view;
@@ -730,9 +735,10 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
 
   async function load() {
     loadActivity();
+    const mine = ++chatsTicket;
     try {
       const all = await api.get(`/threads?limit=${listLimit}`);
-      if (disposed) {
+      if (disposed || mine !== chatsTicket) {
         return;
       }
       chats = all;
@@ -744,7 +750,7 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
         }
       }
     } catch (error) {
-      if (disposed) {
+      if (disposed || mine !== chatsTicket) {
         return;
       }
       if (chats !== null) {
@@ -764,6 +770,16 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
   }, 250);
   const stopLifecycle = onLifecycle((event) => {
     if (RELOAD_KINDS.has(event.kind)) {
+      reloadSoon();
+    }
+  });
+  // The stream replays nothing after a break, and what changed meanwhile may have sent no event at all (a restart
+  // closes the runs it finds active): the sidebar reads its lists again when the stream comes back.
+  let stream = getSnapshot().stream;
+  const stopStream = onChange((snapshot) => {
+    const back = snapshot.stream === "live" && stream === "reconnecting";
+    stream = snapshot.stream;
+    if (back) {
       reloadSoon();
     }
   });
@@ -899,6 +915,7 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
       clearInterval(ageTicker);
       clearInterval(workTicker);
       stopLifecycle();
+      stopStream();
       document.removeEventListener("visibilitychange", onBackInView);
       window.removeEventListener("focus", onBackInView);
       window.removeEventListener("keydown", onEscape);
