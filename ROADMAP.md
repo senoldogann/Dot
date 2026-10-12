@@ -5059,7 +5059,8 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 136 | Spending, pacing and stops when two things happen at once                            | done        | bb18c32 |
 | 137 | A reply cut off is not an answer                                                     | done        | 43cf3f9 |
 | 138 | The store and the daemon's plumbing                                                  | done        | 3f64036 |
-| 139 | The web UI and the desktop shell                                                     | in progress |         |
+| 139 | The web UI and the desktop shell                                                     | done        | fcd052b |
+| 140 | The gaps the final review found in the guards                                        | in progress |         |
 
 ### 77. The type system: Inter and Geist Mono, seven sizes, three weights
 
@@ -7680,11 +7681,12 @@ ones of the redaction tests), and the dependencies checked against the advisorie
 run may change, send and open (135); spending, pacing and stops when two things happen at once (136); a reply cut off
 taken for an answer (137); the store and the daemon's plumbing (138); the web UI and the desktop shell (139). What would
 change the design, or needs another account of the Mac to show, is left to the owner, not built. A finding that a second
-reading does not bear out is not fixed.
+reading does not bear out is not fixed. A sixth item (140) came from the final review of the five: spellings of a line
+that the guards of 135 did not read.
 
 ### How to start part 22 (the handoff prompt)
 
-> Read ROADMAP.md part 22 and the status table of part 9 (rows 135 to 139). One item at a time, in order; the protocol
+> Read ROADMAP.md part 22 and the status table of part 9 (rows 135 to 140). One item at a time, in order; the protocol
 > of part 5 (branch, gate, PR, Linear MYP issue, squash merge, hash in the table, log line) is unchanged. Read each
 > finding again in the code before fixing it, and give each fix a test that fails on the code of before. Never touch the
 > owner's data directory except to read it, by the kinds and numbers of what is stored, and to restart the daemon when
@@ -7812,7 +7814,7 @@ whose fields contradict each other.
 
 ### 139. The web UI and the desktop shell
 
-**Status: in progress.**
+**Status: done.** Merged as `fcd052b` (PR #173, MYP-280 Done).
 
 **As built (2026-10-12).** In the desktop shell, a link that the page opens in a new window (every link of a model's
 answer does) goes to the default browser through `open`, and the shell opens no window for it; an address other than
@@ -7845,6 +7847,34 @@ not taken for a lost connection; the home's box keeps the reasoning level chosen
 or a key is never added twice by a key pressed twice. And the smaller ones: answers that arrive out of order, an
 approval card left after a failed refresh, the shell's New chat, an answer that is not JSON, and the rights of the CI's
 token.
+
+### 140. The gaps the final review found in the guards
+
+**Status: in progress.**
+
+**As built (2026-10-12).** The shell guard reads more of a line. A copy or a move given the folder it writes into by an
+option (`-t`, `--target-directory`, GNU's spellings) writes that folder, so one into Dot's own folders is refused
+outside `yolo` and one out of them into the workspace is allowed (before, the first was judged a change of the home
+folder and the second was refused). `dd` is judged on the file it writes (`of=`) and on a protected one it reads
+(`if=`). A git command other than a read, run in one of Dot's own folders (by `cd` or `-C`), changes what Dot loads and
+runs. perl and ruby with `-i` write the files they are given, and the words of switches of perl, ruby, python, node and
+php are read letter by letter (`_Switches`), so the code of `-pe 'code'`, `-ne`, `-Bc` or `--eval=` is inline code that
+the checks for the network and for Dot's folders read. A line sends data out also when curl has `-d`, `-F` or `-T` in a
+word of switches, `-XPOST`, `--request=PUT`, `--json` or `--form-string`, wget `--post-data`, `--post-file`,
+`--body-data`, `--body-file` or a method that changes something, httpie and xh a form, such a method or a data item, and
+when inline code runs a command of the network or uses a mail or file transfer library; curl's `-sSfL` and `-X GET`,
+wget's `-T` (a timeout, which counted as an upload before) and httpie's query and header items do not. The browser reads
+a dot at the end of a host as none, so `127.0.0.1.` on the daemon's port is Dot's own interface. Tests: the new
+spellings in the unit tests of the shell guard (Dot's folders changed and read, sends and reads after untrusted content,
+a protected read, everyday lines) and of the browser's refusal; thirty fail on the code of before. Left as they are, and
+said in the README: the guard reads the line, not what a program does, so a script a run writes and then runs, or code
+that builds the path it writes, is judged as running a script; a name that resolves to this Mac is another origin, where
+the page has no token. Keeping those folders out of the shell's reach would need a sandbox for the shell's commands,
+left to the owner.
+
+**What.** The spellings the final review of the five items found in the guards of 135: a copy's target folder option,
+`dd`, git in Dot's own folders, files edited in place and code in a word of switches, more ways curl, wget, httpie and
+inline code send data out, and a loopback address with a dot at its end.
 
 ## Log
 
@@ -8418,3 +8448,4 @@ token.
 - 2026-10-12 (Opus 5.5): item 136 merged as `bb18c32` (PR #170, MYP-277 Done): the gates of all runs share one lock per site for its pace and one for its spending, so two runs that pay or post on one site at once are judged one after the other; the emergency stop ends every active run as an emergency stop, and while it is engaged no schedule fires and no campaign session starts; a run stopped before its first step ends as any stop does; a takeover brings up the run's own browser and frees the run when that fails; a schedule or a campaign changed while its run was being started is read again first; a run whose end cannot be recorded is logged and freed, and a message sent as a run ends is refused instead of dropped.
 - 2026-10-12 (Opus 5.5): item 137 merged as `43cf3f9` (PR #171, MYP-278 Done): a reply without tool calls that the model service cut short, at its output limit or for an abnormal reason such as a content filter, is no longer taken as the run's answer in any mode: the model is told how the reply ended and asked to go on or answer again in fewer words, each such reply counts as a nudge, and a run whose replies keep being cut short fails saying so (the ending `cut_short`); an empty reason of Ollama is a normal stop.
 - 2026-10-12 (Opus 5.5): item 138 merged as `3f64036` (PR #172, MYP-279 Done): a write of the store that fails or is cancelled part way is rolled back before its error goes on; Dot's own Chrome is closed when a step after its start fails; the numbers of the configuration that would stop the daemon are refused when it is read; a screenshot is written whole before it takes its name; the push sender and the lifecycle stream listen to their own kinds, and a listener that falls behind logs it; the reapers go on past a failing item and closing tries every part; a restart no longer undoes a prune; four indexes; a failed start deletes its run with the thread; `POST /api/runs` refuses fields that contradict each other; an upload never takes the name of a file Dot keeps beside it.
+- 2026-10-12 (Opus 5.5): item 139 merged as `fcd052b` (PR #173, MYP-280 Done): in the desktop shell a link that opens a new window goes to the default browser, the watcher neither reloads the UI at its first look nor leaves it after one slow answer, a shortcut another app holds no longer stops it, and New chat puts the cursor in the box; in the web UI the sidebar reads its lists again after a reconnect, a fault in showing one event is told and the stream goes on, the home's box waits for the models before it reads its choices, Enter pressed twice saves once, the newest load answers, an approval card settles at once, and an answer that is not JSON names its path; the CI's token only reads; item 140 added from the final review of the five.

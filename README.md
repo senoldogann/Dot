@@ -446,9 +446,9 @@ the guard cannot read) and what a terminal program prints count the same way, un
 content is marked untrusted, and from then on outward-facing or lasting
 actions (messages, posts, follows and likes, privilege, system settings, saving a schedule or a note, and a shell line
 that sends data out: an upload or a form, a push, a copy to another machine, a change on a code host, inline code that
-reaches the network) ask even when the preset or an `allow` rule would let them through; only a `preapproved` rule skips
-the question. A message you send to
-the run clears the mark. A delegated run starts as untrusted as its parent.
+reaches the network or runs a command of it) ask even when the preset or an `allow` rule would let them through; only a
+`preapproved` rule skips the question. A message you send to the run clears the mark. A delegated run starts as
+untrusted as its parent.
 
 **Secrets.**
 
@@ -469,9 +469,11 @@ the run clears the mark. A delegated run starts as untrusted as its parent.
 - Outside a `yolo` run the agent reads what Dot loads and runs, and runs a skill's files, but never changes them: its
   plugins and their own files, its skills (with the `[skills] dirs` and `[plugins] dirs` folders), the playbooks it
   learned and the file of its emergency stop. The file tools refuse to write there, and so does the shell guard for a
-  line that writes there by a copy, a redirect, a download, a clone, an unpacked archive or inline code that names the
-  place. A plugin's MCP servers start with the daemon and are given keys from the key store: put a plugin or a skill in
-  place yourself.
+  line that writes there by a copy or a move (its target folder option too), `dd`, a redirect, a download, a clone, an
+  unpacked archive, git run in one of those folders, a file edited in place (`sed -i`, `perl -i`, `ruby -i`) or inline
+  code that names the place (in a word of switches such as `-pe` too). The guard reads the line, not what a program
+  does: a script the run writes and then runs is judged as running a script. A plugin's MCP servers start with the
+  daemon and are given keys from the key store: put a plugin or a skill in place yourself.
 
 **Typed judgments (optional, off by default).** The policy reads what a click does from the control's label, with
 patterns in English and Turkish, and a few in Finnish ("Post", "Send", "Delete", "Pay now", "Paylaş", "Lähetä"…); a

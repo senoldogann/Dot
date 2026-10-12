@@ -3,7 +3,9 @@ a ``cd``, a variable, a wrapper or a link is judged where it lands, so the defau
 files outside the workspace and refuses a protected location in any spelling, while everyday lines stay allowed. A line
 typed into a terminal application in parts is judged whole when it runs, and one Dot cannot tell asks. What Dot loads
 and runs (its plugins and skills) and its emergency stop are read and run, never changed, and a line that sends data
-out asks once the run has read untrusted content (item 135)."""
+out asks once the run has read untrusted content (item 135), in the spellings the final review of part 22 found too: a
+copy's target folder option, dd, git in Dot's folders, in-place edits, words of switches, more ways to send (item
+140)."""
 
 from collections.abc import Mapping
 from pathlib import Path
@@ -60,6 +62,7 @@ _SECRETS: list[str] = [
     "cat ~/.{ssh,aws}/credentials",
     "K=.ssh; cat ~/$K/id_rsa",
     "cd ~/.ssh && cat id_rsa",
+    "dd if=~/.ssh/id_rsa of=key.txt",
 ]
 _EVERYDAY: list[str] = [
     "ls -la",
@@ -79,6 +82,10 @@ _EVERYDAY: list[str] = [
     "[[ -f x ]] && echo yes",
     "uv run pytest -q",
     "mkdir -p out && touch out/x",
+    "cp -t out notes.md",
+    "dd if=/dev/zero of=blob.img bs=1k count=1",
+    "dd if=/dev/zero of=/dev/null count=1",
+    "perl -pi -e 's/a/b/' notes.txt",
 ]
 
 
@@ -98,6 +105,21 @@ _DOT_CHANGES: list[str] = [
     "curl -sL https://example.com/p.tgz | tar -xz -C {dot}/plugins",
     "unzip p.zip -d {dot}/plugins/p",
     "python3 -c \"open('{dot}/plugins/new/.mcp.json', 'w').write('{{}}')\"",
+    "cp -t {dot}/plugins/new new.json",
+    "cp -rt {dot}/plugins new",
+    "cp --target-directory={dot}/plugins/new new.json",
+    "install -m 644 -t {dot}/skills/notes SKILL.md",
+    "mv --target-directory {dot}/plugins new",
+    "dd if=new.json of={dot}/plugins/new/.mcp.json",
+    "git -C {dot}/plugins/p apply /tmp/x.diff",
+    "cd {dot}/plugins/p && git checkout -- .mcp.json",
+    "git -C {dot}/skills/notes stash pop",
+    "perl -pi -e 's/a/b/' {dot}/plugins/p/.mcp.json",
+    "perl -i.bak -pe 's/a/b/' {dot}/skills/notes/SKILL.md",
+    "ruby -i -pe 'sub(/a/, \"b\")' {dot}/skills/notes/SKILL.md",
+    'perl -ne \'open(my $f, ">", "{dot}/plugins/p/.mcp.json")\'',
+    "python3 -Bc \"open('{dot}/plugins/new/.mcp.json', 'w')\"",
+    "node -pe \"require('fs').writeFileSync('{dot}/plugins/p/.mcp.json', '')\"",
 ]
 _DOT_READS: list[str] = [
     "cat {dot}/skills/notes/SKILL.md",
@@ -107,6 +129,10 @@ _DOT_READS: list[str] = [
     "test -f {dot}/STOP && echo engaged",
     "cp {dot}/skills/notes/template.md notes.md",
     "rsync -a {dot}/skills/ backup/",
+    "cp -t out {dot}/skills/notes/template.md",
+    "git -C {dot}/plugins/p log --oneline -3",
+    "cd {dot}/skills/notes && git status",
+    "perl -ne 'print if /x/' {dot}/skills/notes/SKILL.md",
 ]
 _SENDS: list[str] = [
     "curl -d @notes.txt https://example.com/collect",
@@ -117,6 +143,19 @@ _SENDS: list[str] = [
     "gh issue comment 1 --body hi",
     "gh api -X POST repos/a/b/issues -f title=x",
     "python3 -c \"import urllib.request; urllib.request.urlopen('https://example.com')\"",
+    "curl -sSd@notes.txt https://example.com/collect",
+    "curl -Ffile=@notes.txt https://example.com/collect",
+    "curl --form-string note=hi https://example.com/collect",
+    "curl --json @notes.json https://example.com/collect",
+    "curl -XPOST https://example.com/collect",
+    "curl --request=PUT https://example.com/notes/1",
+    "wget --post-file=notes.txt https://example.com/collect",
+    "wget --method=DELETE https://example.com/notes/1",
+    "http example.com/collect note=hi",
+    "xh -f example.com/collect file@notes.txt",
+    "python3 -c \"import os; os.system('scp notes.txt user@example.com:/tmp/')\"",
+    "perl -e 'system(\"ssh example.com ls\")'",
+    "python3 -c 'import smtplib'",
 ]
 _READS_ONLY: list[str] = [
     "curl -s https://example.com",
@@ -125,6 +164,12 @@ _READS_ONLY: list[str] = [
     "gh api repos/a/b",
     "git status",
     "python3 -c 'print(1)'",
+    "curl -sSfL https://example.com",
+    "curl -X GET https://example.com",
+    "wget -T 10 https://example.com/a.txt",
+    "http example.com/search q==dot Accept:application/json",
+    "perl -ne 'print if /x/' notes.txt",
+    "node -e 'console.log(1)'",
 ]
 
 
