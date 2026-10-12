@@ -5045,7 +5045,7 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 122 | The sidebar says what works: Working and its time on a chat's row and a working run's | done        | 10fd83f |
 | 123 | A helper folded in the chat: its row until the owner opens it                       | done        | a2de64d |
 | 124 | The home's first screen: the composer in the middle, the day folded under it         | done        | 41ec542 |
-| 125 | What the failed runs showed: the journal's day, the snapshot's arguments             | in progress |         |
+| 125 | What the failed runs showed: the journal's day, the snapshot's arguments             | done        | 36c0eeb |
 
 ### 77. The type system: Inter and Geist Mono, seven sizes, three weights
 
@@ -7009,6 +7009,19 @@ The owner's eighteenth word, on 2026-10-12, after part 17, with a screenshot of 
 to write could stand exactly in the middle, across and down; the old chats under it could fold, or show one or two; and
 any other problem found is to be fixed.
 
+**Status (2026-10-12): built.** Items 124 and 125 merged in a day (`41ec542`, `36c0eeb`), each behind the gate and its
+tests, the home's screenshots read at three sizes in both schemes. At the first opening Dot's greeting and the composer
+stand in the middle of the space under the top bar, across and down, however long the day is: the upper row of the
+home's grid is half of what they leave of that space, their height measured as it changes. The Today strip follows under
+them in the page, two rows a section with how many more the Activity page holds, and each section folds at its title,
+kept by that browser. The plan's strip of no height, built first, let the sidebar and the top bar scroll away with it,
+which the new test caught; the strip now counts in the page's height. The journal names the day it tells, or the days
+after a daemon that was off, and `browser_snapshot`'s description says it takes no arguments; whether the models stop
+giving it some shows in the next reading of the refused calls. From the readings, nothing new for the two crashes, met
+by daemons started before items 107 and 66 and not come back since, nor for the campaign in attach mode, whose sessions
+need Chrome's Allow while the owner is there. The daemon was restarted on `36c0eeb` with no run active; the desktop app
+takes its pages from the daemon, so part 18 reaches it without a rebuild.
+
 **Status (2026-10-12): planned.** What is built today, and what the readings found. The home (`views/runs.js mount`,
 `presence.js`) is a grid whose rows are `1fr auto 3fr` (`app.css`): what waits for an answer as cards in the first,
 Dot's face, greeting and line of now with the composer (`.home-start`) in the second, the Today strip in the third. The
@@ -7084,7 +7097,7 @@ tour is read by eye.
 
 ### 125. What the failed runs showed: the journal's day, the snapshot's arguments
 
-**Status: in progress.**
+**Status: done.** Merged as `36c0eeb` (PR #152, MYP-265 Done).
 
 **As built (2026-10-12).** The journal note names the days it tells (`reflection.journal_span(since, now, zone)`): the
 date of the middle of the time the reflection read, in the scheduler's zone, when that time is at most a day and a
@@ -7656,3 +7669,4 @@ with refs, and that it takes no arguments. Unit tests for the journal's day; the
 - 2026-10-12 (Opus 5.5): item 123 merged as `a2de64d` (PR #148, MYP-263 Done): in a run's chat a delegated run's row starts closed, its time counting on every second and at once on a page opened later; an approval it asks for opens it and the rows it sits in until the owner has decided, and a row the owner never touched folds again then and at the run's end; a delegated run has no `ask_user`, which the README's Delegation passage now says; 906 unit tests, 30 smoke tests and the tour; the daemon restarted on it with no run active.
 - 2026-10-12 (Opus 5.5): part 18 planned, items 124 and 125, from the owner's word after part 17, a measurement of the home and a reading of the last two days' failed runs (counts and kinds only); no code changed.
 - 2026-10-12 (Opus 5.5): item 124 merged as `41ec542` (PR #151, MYP-264 Done): the home's greeting and composer stand in the middle of the space under the top bar however long the day is, the upper row of the grid being half of what their measured height leaves; the Today strip follows in the page's flow, so the sidebar and the top bar stay as the window scrolls, shows two rows a section and folds at its title, kept per browser; 906 unit tests, 15 smoke tests and the tour.
+- 2026-10-12 (Opus 5.5): item 125 merged as `36c0eeb` (PR #152, MYP-265 Done): the journal names the day it tells, the date of the middle of the time the reflection read, or its first and last day when that time is longer than a day and a quarter; `browser_snapshot`'s description says it takes no arguments; 907 unit tests and the reflection's smoke test; the daemon restarted on it with no run active.
