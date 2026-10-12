@@ -1,5 +1,6 @@
 """The chrome that stays (item 65): on a long run's page the head and the side panel stay in sight under the stage bar
-while the conversation scrolls, and the box stays at the bottom; wide and on a phone, light and dark."""
+while the conversation scrolls, and the box stays at the bottom; wide and on a phone, light and dark. Under a short
+conversation the box stands at the window's foot too, and the conversation at the top (item 129)."""
 
 import asyncio
 import time
@@ -155,6 +156,37 @@ async def test_the_head_and_the_panel_stay_in_sight_while_a_long_run_scrolls(
                 dock_top, dock_bottom = await page.evaluate(_BOX, ".dock")
                 assert dock_top > head_bottom and dock_bottom <= 800 + 1
                 await page.screenshot(path=str(tmp_path / f"chrome-{width}-{scheme}.png"))
+                await page.close()
+        finally:
+            await browser.close()
+
+
+async def test_the_box_stands_at_the_windows_foot_under_a_short_conversation(
+    served: tuple[Runtime, RunRecord, str], tmp_path: Path
+) -> None:
+    runtime, run, address = served
+    host, port = "127.0.0.1", int(address.rpartition(":")[2])
+    async with async_playwright() as playwright:
+        browser: Browser = await playwright.chromium.launch(channel=runtime.config.browser.channel, headless=True)
+        try:
+            for width, inspector in ((1280, "on"), (1280, "off"), (390, "off")):
+                page: Page = await browser.new_page(viewport={"width": width, "height": 800}, reduced_motion="reduce")
+                await page.goto(ui_url(host, port, TOKEN))
+                await expect(page.locator(".shell")).to_be_visible()
+                # The tool steps folded, so the question, a line of steps and the answer fill a third of the window.
+                await page.evaluate(
+                    f"localStorage.setItem('dot.foldSteps', 'on'); localStorage.setItem('dot.inspector', '{inspector}')"
+                )
+                await page.goto(f"{address}/#/runs/{run.id}")
+                await page.reload()
+                await expect(page.locator(".dock .composer")).to_be_visible()
+                await expect(page.locator("main.page")).to_have_css("opacity", "1")
+                assert await page.evaluate("document.documentElement.scrollHeight") <= 800, (width, inspector)
+                dock_bottom: float = (await page.evaluate(_BOX, ".dock"))[1]
+                assert abs(dock_bottom - 800) <= 1, (width, inspector, dock_bottom)
+                question_top: float = (await page.evaluate(_BOX, ".bubble.user"))[0]
+                assert question_top < 160, (width, inspector, question_top)
+                await page.screenshot(path=str(tmp_path / f"foot-{width}-inspector-{inspector}.png"))
                 await page.close()
         finally:
             await browser.close()

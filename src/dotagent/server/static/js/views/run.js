@@ -848,17 +848,23 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
     el(
       "div",
       { class: "run-main" },
-      el("h1", { class: "visually-hidden" }, run.goal),
-      connectionNote,
-      problem,
-      earlierTurns(history.earlier),
-      // A resumed run's goal is the one of the run above it; its timeline opens with how it resumed that run.
-      run.source === RESUME_SOURCE ? null : userMessage(run.goal, dateTimeFull(run.created_at)),
-      timeline.element,
-      waitingList,
-      questionsList,
-      lessonsCard,
-      continuedIn(history.later),
+      // The conversation grows into the room a short one leaves, so the dock under it stands at the window's foot from
+      // the first message (item 129).
+      el(
+        "div",
+        { class: "run-thread" },
+        el("h1", { class: "visually-hidden" }, run.goal),
+        connectionNote,
+        problem,
+        earlierTurns(history.earlier),
+        // A resumed run's goal is the one of the run above it; its timeline opens with how it resumed that run.
+        run.source === RESUME_SOURCE ? null : userMessage(run.goal, dateTimeFull(run.created_at)),
+        timeline.element,
+        waitingList,
+        questionsList,
+        lessonsCard,
+        continuedIn(history.later),
+      ),
       dock,
       foot,
     ),

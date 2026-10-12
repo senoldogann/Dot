@@ -924,8 +924,9 @@ stretch of work fold into a single
 took (open it for every call, result and screenshot: each call one quiet line with its icon, its result on a hairline
 under it once opened), while approvals, questions and policy notes stay in the open. The answer of the run is the last
 message, with a Copy button and how the run ended under it; when it finished and how long the run took show where the
-pointer rests on it (on a touch screen they always show). The box at the bottom is the same frame as the home's, with the attach button and the send in its bar; what you
-typed there and did not send waits for you. While the
+pointer rests on it (on a touch screen they always show). The box stands at the foot of the window from the first
+message, the conversation filling the space above it from the top, and is the same frame as the home's, with the attach
+button and the send in its bar; what you typed there and did not send waits for you. While the
 end of the conversation, or its answer, is below the window, a round arrow just above the composer leads there. In the
 side panel (Run details), after Details, a folded **Cost** card carries the bill of the run in one line (its minutes,
 steps and tokens); open, it says where

@@ -5049,7 +5049,7 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 126 | Themes, after T3 Code: a page for the look, a theme for light and one for dark       | done        | c5dfc76 |
 | 127 | The interface, the motion and the type                                               | done        | 9c73d80 |
 | 128 | Your own themes, kept by the daemon                                                  | done        | 30b2434 |
-| 129 | The composer at the foot of the window                                               | planned     |         |
+| 129 | The composer at the foot of the window                                               | in progress |         |
 | 130 | A chat's menu: pin, rename, copy the link, select, delete                            | planned     |         |
 | 131 | Unread chats                                                                         | planned     |         |
 
@@ -7414,7 +7414,18 @@ first message.
 
 ### 129. The composer at the foot of the window
 
-**Status: planned.**
+**Status: in progress.**
+
+**As built (2026-10-12).** The run page's column (`.run-main`, `run.css`) is a flex column at least as tall as the
+window less the top bar (`--stagebar-h`) and the page's padding above it (24 px, 16 px on a phone), and the conversation
+is a block of its own in it (`.run-thread`, `views/run.js`) that grows into the room a short one leaves, so the dock,
+sticky at the bottom as before, stands at the window's foot from the first message. The hidden heading moved into the
+conversation's block, so its `> * + *` spacing is the one `.run-main` had: a flex item lays out its own children, whose
+margins no longer fold into the column's. A long run scrolls under the dock as before, with the arrow down above it.
+`tests/smoke/test_run_chrome.py` gains a test: a finished run with its steps folded fills a third of the window, and at
+1280 px with the details panel open and closed and at 390 px the page does not scroll, the dock's foot is the window's
+and the question is at the top; the long run's test still finds the dock in the window, and the run page's other smoke
+tests (stop, takeover, team, activity) pass.
 
 **What.** On a run page the composer stands at the foot of the window from the first message: the conversation starts
 at the top and fills the space above it, and once it is taller than the window the page scrolls under the composer as
