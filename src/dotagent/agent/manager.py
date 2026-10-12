@@ -118,6 +118,13 @@ def _answer_text(question: ApprovalRecord, answer: str) -> str:
     return f"Answer to your question “{question.summary}”: {answer}"
 
 
+def _goal_mode_asked(goal: str, mode: RunMode, goal_mode: bool | None) -> bool | None:
+    """The goal mode of a run a person starts: on for a task or research run whose goal asks it to keep going until it
+    is done (item 132), on every model, whatever was chosen; otherwise as chosen. A delegated run, a campaign's session,
+    a resumed run and one that an answer starts do not come here: they keep the goal mode they are given."""
+    return True if mode != "chat" and keep_going_ask(goal) is not None else goal_mode
+
+
 async def _uncancelled(work: Coroutine[object, object, None]) -> None:
     """Run ``work`` to its end even when the caller is cancelled meanwhile (a second stop of a run while its end is
     being recorded), then raise the cancellation (item 116)."""
@@ -203,7 +210,9 @@ class RunManager:
         ``None``; ``files`` are the attachments that come with the goal.
 
         An ``effort`` that is given has to be one of the levels the model offers. ``goal_mode`` is for task and research
-        runs: asking for it on a chat is refused, and the configured default does not apply to a chat.
+        runs: asking for it on a chat is refused, and the configured default does not apply to a chat. A task or
+        research run whose goal asks it to keep going until it is done runs in goal mode whatever was chosen (see
+        :func:`_goal_mode_asked`).
         """
         if effort is not None:
             await self._check_effort(
@@ -218,7 +227,7 @@ class RunManager:
             parent_run_id,
             effort,
             approvals,
-            goal_mode,
+            _goal_mode_asked(goal, mode, goal_mode),
             RunOpening(text=goal, files=files, resumed=None),
             None,
             None,
@@ -240,7 +249,7 @@ class RunManager:
     ) -> RunRecord:
         """Queue a run of ``agent`` (item 86): what the request leaves out, the agent's own bounds fill in (its model,
         effort and approvals), and what the agent leaves out, the configured ones; the run carries the agent's id and
-        the loop adds its instructions to the prompt and keeps its tools."""
+        the loop adds its instructions to the prompt and keeps its tools. Goal mode is as for :meth:`start`."""
         model_ref: str | None = model if model is not None else (agent.model if agent.model != "" else None)
         level: Effort | None = effort if effort is not None else agent.effort
         approval_mode: ApprovalMode | None = approvals if approvals is not None else agent.approvals
@@ -257,7 +266,7 @@ class RunManager:
             None,
             level,
             approval_mode,
-            goal_mode,
+            _goal_mode_asked(goal, mode, goal_mode),
             RunOpening(text=goal, files=files, resumed=None),
             None,
             agent.id,
@@ -799,9 +808,7 @@ class RunManager:
         agent_id: str | None,
     ) -> tuple[RunRecord, RunHandle]:
         """Create the run, register it and start its task. A run launched by an active, untrusted parent is untrusted;
-        ``campaign_id`` makes it a session of that campaign. A person's task or research run whose goal asks it to keep
-        going until it is done runs in goal mode whatever was chosen (item 132); a delegated run and a campaign's
-        session keep theirs."""
+        ``campaign_id`` makes it a session of that campaign."""
         runtime: Runtime = self._runtime
         model_ref: str = model if model is not None else runtime.config.models.main
         parse_model_ref(model_ref)
@@ -809,10 +816,7 @@ class RunManager:
         approval_mode: ApprovalMode = runtime.config.policy.approvals if approvals is None else approvals
         if goal_mode is True and mode == "chat":
             raise ConfigError("goal mode is for task and research runs, not for a chat", {"mode": mode})
-        asked: bool = parent_run_id is None and campaign_id is None and keep_going_ask(goal) is not None
-        with_goal_mode: bool = mode != "chat" and (
-            asked or (runtime.config.agent.goal_mode if goal_mode is None else goal_mode)
-        )
+        with_goal_mode: bool = mode != "chat" and (runtime.config.agent.goal_mode if goal_mode is None else goal_mode)
         if thread_id is None:
             thread: ThreadRecord = await runtime.store.create_thread(thread_title(goal), source)
             return await self._register_run(

@@ -616,18 +616,20 @@ Its verdict is one of:
 
 A check can only ask for the original goal to be finished: it adds no work and does not clear the untrusted mark. If the
 check itself fails, the run fails and keeps its answer. Each check is a `goal_check` event and a line in the timeline.
-An answer that ends by offering work within the goal that the run could do with its own tools is `continue`, so that the
-work is done instead of offered; what needs you (a decision, a credential, a step the goal did not ask for that cannot be
-undone) may stay an offer.
+An answer that ends by offering to do a part of the goal that is not done yet, which the run could do with its own tools,
+is `continue`, so that the part is done instead of offered; an offer of work the goal did not ask for (a fix when only a
+diagnosis was asked) changes nothing, and what needs you (a decision, a credential) may stay an offer.
 
-**Asked not to stop.** When the message that starts a `task` or `research` run asks it not to stop until the work is
+**Asked not to stop.** When the message you start a `task` or `research` run with asks it not to stop until the work is
 done (whole words such as "don't stop", "keep going", "never stop", "until it is done", "durma", "hiç durma", "bitene
-kadar", "tamamlanana kadar"), the run is in goal mode whatever the switch says, and the Details card shows "On, asked
-not to stop". Its goal check is told that you asked: it accepts a finish only when every part of the goal is done and
-the evidence shows it, and a stop to report progress is `continue`. A delegated run and a campaign's session keep their
-own setting. Whatever the model, every task and research run is told to keep acting while the goal leaves work it can
-do, not to stop to report progress or to offer more, and to take an ask to keep going at its word. This is not **Keep
-going** in the composer's Options, which makes the goal a campaign worked on in sessions (see [Campaigns](#campaigns)).
+kadar", "tamamlanana kadar"; not "don't stop the server", "wait until it is done" or "bitene kadar bekle"), the run is
+in goal mode whatever the switch says, and the Details card shows "On, asked not to stop". Its goal check is told that
+you asked: it accepts a finish only when every part of the goal is done and the evidence shows it, and a stop to report
+progress is `continue`. A delegated run and a campaign's session keep their own setting, and a resumed run, one that an
+answer starts and a follow-up on the run's page keep the run's. Whatever the model, every task and research run outside
+a campaign is told to keep acting while the goal leaves work it can do, not to stop to report progress or to offer what
+the goal asks for, and to take an ask to keep going at its word. This is not **Keep going** in the composer's Options,
+which makes the goal a campaign worked on in sessions (see [Campaigns](#campaigns)).
 
 A delegated run takes the approval mode of the run that started it and has no goal mode of its own. A scheduled run uses
 the model, reasoning level, approval mode and goal mode of its schedule, and the configured defaults for those the

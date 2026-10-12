@@ -145,8 +145,8 @@ writing it down."""
 # Task and research runs only (item 132): a chat turn ends with its reply, and a campaign's session with its own part.
 # Models differ in when they wrap up; these hold every one of them to the work and to the user's words.
 _KEEP_ACTING: str = """- Keep acting while the goal leaves work you can do yourself. Do not stop to report progress or to offer \
-more: an answer that ends with suggestions you could carry out is work left undone, so do it first. Leave as an offer \
-only what needs the user: a decision, a credential, or a step the goal did not ask for that cannot be undone.
+what the goal asks for: an answer that ends by offering a part of the goal you could carry out is work left undone, so \
+do it first. Work the goal did not ask for stays an offer, and so does what needs the user: a decision or a credential.
 - When the user asks you to keep going, not to stop, or to work until something is done, take it at its word: finish \
 only when it is done, when the next step needs something only the user can give, or when it is impossible."""
 
