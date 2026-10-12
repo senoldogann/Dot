@@ -62,11 +62,19 @@ class TerminalSession:
     """One program on a pseudo-terminal, from ``terminal_open`` to its close."""
 
     def __init__(
-        self, session_id: str, command: str, cwd: Path, process: asyncio.subprocess.Process, master: int
+        self,
+        session_id: str,
+        command: str,
+        cwd: Path,
+        sandboxed: bool,
+        process: asyncio.subprocess.Process,
+        master: int,
     ) -> None:
         self.id: str = session_id
         self.command: str = command
         self.cwd: Path = cwd
+        # Whether the program started in the sandbox of a run (:mod:`dotagent.policy.sandbox`).
+        self.sandboxed: bool = sandboxed
         self._process: asyncio.subprocess.Process = process
         self._master: int = master
         self._decoder: codecs.IncrementalDecoder = codecs.getincrementaldecoder("utf-8")(errors="replace")
@@ -172,7 +180,9 @@ class Terminals:
         self._opened: int = 0
         self._reaper: asyncio.Task[None] | None = None
 
-    async def open(self, thread_id: str, command: str, cwd: Path) -> TerminalSession:
+    async def open(self, thread_id: str, command: str, confinement: tuple[str, ...], cwd: Path) -> TerminalSession:
+        """Start ``command`` in zsh on a terminal of its own, started by ``confinement`` (the words of the run's
+        sandbox, or none)."""
         mine: dict[str, TerminalSession] = self._sessions.setdefault(thread_id, {})
         if len(mine) >= self._limit:
             raise ToolInputError(
@@ -183,6 +193,7 @@ class Terminals:
         master, slave = pty.openpty()
         try:
             process: asyncio.subprocess.Process = await asyncio.create_subprocess_exec(
+                *confinement,
                 "/bin/zsh",
                 "-c",
                 command,
@@ -202,7 +213,7 @@ class Terminals:
         finally:
             os.close(slave)
         self._opened += 1
-        session: TerminalSession = TerminalSession(f"t{self._opened}", command, cwd, process, master)
+        session: TerminalSession = TerminalSession(f"t{self._opened}", command, cwd, bool(confinement), process, master)
         mine[session.id] = session
         if self._reaper is None:
             self._reaper = asyncio.create_task(self._reap())

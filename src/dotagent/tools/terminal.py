@@ -24,7 +24,7 @@ from dotagent.policy.shell import ShellAssessment, assess_shell, assess_typed, t
 from dotagent.policy.types import ActionInfo, ActionKind, Flag, Risk
 from dotagent.terminal.session import TerminalSession
 from dotagent.tools.base import ACTING_MODES, RegisteredTool, ToolArgs, ToolResult, make_tool, mark_untrusted, ok
-from dotagent.tools.context import ToolContext
+from dotagent.tools.context import ToolContext, run_sandbox
 
 # How long terminal_open waits for the first output of the program.
 _OPEN_WAIT_S: float = 2.0
@@ -127,7 +127,9 @@ def build_terminal_tools() -> tuple[RegisteredTool, ...]:
 
     async def run_open(args: OpenArgs, ctx: ToolContext) -> ToolResult:
         cwd: Path = expand_path(args.cwd, ctx.workspace) if args.cwd else ctx.workspace
-        session: TerminalSession = await ctx.runtime.terminals.open(ctx.thread_id, args.command, cwd)
+        session: TerminalSession = await ctx.runtime.terminals.open(
+            ctx.thread_id, args.command, run_sandbox(ctx).commands, cwd
+        )
         return mark_untrusted(ok(f"[session {session.id}: {args.command}]\n{await _read(session, _OPEN_WAIT_S, ctx)}"))
 
     def classify_send(args: SendArgs, ctx: ToolContext) -> ActionInfo:
@@ -135,6 +137,12 @@ def build_terminal_tools() -> tuple[RegisteredTool, ...]:
         lines, rest = typed_lines(session.pending_line, args.text)
         if session.awaiting_secret:
             return _secret_action(session, lines, rest, ctx)
+        if run_sandbox(ctx).commands and not session.sandboxed:
+            raise ToolInputError(
+                f"{session.id} was opened by a yolo run, outside the sandbox the commands of this run start in: "
+                "open a terminal of this run with terminal_open.",
+                {"session": session.id, "command": session.command},
+            )
         if not lines:
             preview: str = truncate_middle(rest if rest is not None else repr(args.text), _PREVIEW_CHARS)
             return _action("terminal_send", "shell", "low", f"Type into {session.id}: {preview}", session.command, ())

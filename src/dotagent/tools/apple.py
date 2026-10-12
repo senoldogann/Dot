@@ -13,7 +13,7 @@ from dotagent.desktop.script import ScriptLanguage, run_osascript
 from dotagent.policy.shell import ShellAssessment, assess_applescript, script_reaches_shell
 from dotagent.policy.types import ActionInfo, ActionKind, Flag, Risk
 from dotagent.tools.base import ACTING_MODES, RegisteredTool, ToolArgs, ToolResult, make_tool, mark_untrusted, ok
-from dotagent.tools.context import ToolContext
+from dotagent.tools.context import ToolContext, run_sandbox
 
 _NONCE_BYTES: int = 8
 _PREVIEW_CHARS: int = 200
@@ -60,7 +60,7 @@ def build_apple_tool() -> RegisteredTool:
     async def run(args: AppleScriptArgs, ctx: ToolContext) -> ToolResult:
         language: ScriptLanguage = args.language
         timeout_s: float = ctx.runtime.config.desktop.osascript_timeout_s
-        result: str = await run_osascript(language, args.script, timeout_s)
+        result: str = await run_osascript(language, args.script, run_sandbox(ctx).commands, timeout_s)
         header: str = f"Script result · {len(result)} characters"
         body: str = result if result else "(the script returned nothing)"
         return mark_untrusted(

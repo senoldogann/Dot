@@ -28,7 +28,7 @@ from dotagent.tools.base import (
     ok,
     ok_with_images,
 )
-from dotagent.tools.context import ToolContext
+from dotagent.tools.context import ToolContext, run_sandbox
 from dotagent.undo.journal import JournalTarget, note_change, run_journal
 
 _IMAGE_SUFFIXES: frozenset[str] = frozenset({".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp", ".tiff", ".heic"})
@@ -338,12 +338,16 @@ def _list_dir_tool() -> RegisteredTool:
     )
 
 
-async def run_rg(arguments: list[str], workspace: Path, env: dict[str, str]) -> tuple[int | None, str, str]:
-    """Run ripgrep in ``workspace``; returns ``(exit code, stdout, stderr)``."""
+async def run_rg(
+    arguments: list[str], confinement: tuple[str, ...], workspace: Path, env: dict[str, str]
+) -> tuple[int | None, str, str]:
+    """Run ripgrep in ``workspace``, started by ``confinement`` (the words of the run's sandbox, or none); returns
+    ``(exit code, stdout, stderr)``."""
     executable: str | None = shutil.which("rg", path=env.get("PATH"))
     if executable is None:
         raise ToolExecutionError("ripgrep (rg) is not installed or not on PATH", {"hint": "brew install ripgrep"})
     process: asyncio.subprocess.Process = await asyncio.create_subprocess_exec(
+        *confinement,
         executable,
         *arguments,
         cwd=str(workspace),
@@ -389,7 +393,10 @@ def _search_files_tool() -> RegisteredTool:
         if args.glob:
             options.extend(["-g", args.glob])
         code, stdout, stderr = await run_rg(
-            [*options, "-e", args.pattern, "--", str(target_of(args, ctx))], ctx.workspace, ctx.runtime.shell_env
+            [*options, "-e", args.pattern, "--", str(target_of(args, ctx))],
+            run_sandbox(ctx).search,
+            ctx.workspace,
+            ctx.runtime.shell_env,
         )
         if code == 1:
             return ok("No matches.")
@@ -424,6 +431,7 @@ def _find_files_tool() -> RegisteredTool:
     async def run(args: FindFilesArgs, ctx: ToolContext) -> ToolResult:
         code, stdout, stderr = await run_rg(
             ["--files", "--hidden", "-g", args.glob, "--", str(target_of(args, ctx))],
+            run_sandbox(ctx).search,
             ctx.workspace,
             ctx.runtime.shell_env,
         )

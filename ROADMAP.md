@@ -5061,6 +5061,11 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 138 | The store and the daemon's plumbing                                                  | done        | 3f64036 |
 | 139 | The web UI and the desktop shell                                                     | done        | fcd052b |
 | 140 | The gaps the final review found in the guards                                        | done        | 25da5f2 |
+| 141 | The commands of a run are kept out of Dot's own files by macOS                       | in progress |         |
+| 142 | What the guards of the desktop and of the shell see                                  | planned     |         |
+| 143 | The token goes only to the daemon                                                    | planned     |         |
+| 144 | The records of a run and the emergency stop                                          | planned     |         |
+| 145 | The CI and the desktop shell                                                         | planned     |         |
 
 ### 77. The type system: Inter and Geist Mono, seven sizes, three weights
 
@@ -7876,6 +7881,90 @@ left to the owner.
 `dd`, git in Dot's own folders, files edited in place and code in a word of switches, more ways curl, wget, httpie and
 inline code send data out, and a loopback address with a dot at its end.
 
+## Part 23: what part 22 left (planned 2026-10-12)
+
+The owner's twenty-third word, on 2026-10-12, after part 22: finish the remaining problems too, that is what the check
+of the whole left to the owner or only reported, from the most important to the least.
+
+**Status (2026-10-12): planned.** Each finding was read again in the code before it was ranked, as in part 22, and the
+sandbox of 141 was probed on this Mac before it was built. One more finding came up on the way: the search tools read
+Dot's own files when they search its data folder, which 141 closes.
+
+**The shape of this part (the decisions).** Five items in the order of weight, each a pull request of its own: the
+processes of a run kept out of Dot's own files by macOS (141); what the guards of the desktop and of the shell see
+(142); the token sent only to the daemon (143); the records of a run and the emergency stop, with the smaller findings
+of part 22 that a second reading bears out (144); the CI and the desktop shell (145). A finding that a second reading
+does not bear out is not fixed; what only the owner can do (rebuilding the desktop app) is said, not done.
+
+### How to start part 23 (the handoff prompt)
+
+> Read ROADMAP.md part 23 and the status table of part 9 (rows 141 to 145). One item at a time, in order; the protocol
+> of part 5 (branch, gate, PR, Linear MYP issue, squash merge, hash in the table, log line) is unchanged. Read each
+> finding again in the code before fixing it, and give each fix a test that fails on the code of before. Never touch the
+> owner's data directory except to read it, by the kinds and numbers of what is stored, and to restart the daemon when
+> `/api/status` shows no active run; PLAN.md stays untracked. The owner reads Turkish; everything written is English.
+
+### 141. The commands of a run are kept out of Dot's own files by macOS
+
+**Status: in progress.**
+
+**As built (2026-10-12).** `dotagent.policy.sandbox` builds two profiles of the macOS sandbox (`sandbox-exec`):
+everything is allowed but reading or changing Dot's guarded files (its key file, token, push key, configuration,
+database, browser profile, the data directory of the owner's Chrome and the journals of `dotx undo`), changing what it
+loads and runs (`Runtime.dot_paths`), and renaming or removing a folder above any of them; the profile of the search
+tools refuses reading the owner's protected locations as well. Outside `yolo` (`run_sandbox`), the shell tool, a
+terminal session, the AppleScript tool (with what it runs by `do shell script`) and the search tools' ripgrep start in
+it; the processes of a yolo run start as before, since the guard lets such a run change Dot's own files too, and a
+terminal session a yolo run opened takes no line from a run that is not one. The daemon checks at its start that
+`sandbox-exec` runs both profiles and stops with a configuration error when it does not; `[shell] sandbox = false` turns
+the sandbox off. Probed on macOS 26.6 before it was built: the sandbox refuses a read or a write through a script, a
+symbolic link, a hard link, a rename out, another letter case and the firmlink of the data volume, and the rename of a
+folder above, while a file can still be made inside that folder; starting in it costs no measurable time. What it costs:
+macOS starts no program that runs as root inside a sandbox (`ps`, `top`, `sudo`, `crontab`), which the description of
+the shell tool tells the model (`pgrep -lf`, `lsof`). What it does not cover, said in the README: a program a command
+has act for it (Terminal through `open`, a launchd job, an application driven by Apple Events). Tests: smoke tests
+through a real runtime (a script that reads the token, a skill planted, the settings changed, the emergency stop's file
+made, a hard link, the data folder moved; a search of the data folder and of a protected location; a terminal session;
+an AppleScript), the four of which fail on the code of before; unit tests for the text of a profile and for a process
+held to it.
+
+**What.** The processes a run starts outside `yolo` (shell commands, terminal sessions, AppleScript, the search tools)
+run in a macOS sandbox that keeps them out of Dot's own files, whatever program does it, so what the shell guard cannot
+read (a script the run wrote, code that builds a path) no longer reaches them.
+
+### 142. What the guards of the desktop and of the shell see
+
+**Status: planned.**
+
+**What.** The desktop tools take a window of a browser that shows Dot's own interface for Dot's own window, so a step
+there is refused outside `yolo` as one in the desktop app is. A line that replaces a file that exists outside the
+workspace (a redirect that does not append, a copy or a move onto it, `tee` without `-a`, `dd`) is destructive, as
+removing it is, so the presets that ask before destroying something outside the workspace ask.
+
+### 143. The token goes only to the daemon
+
+**Status: planned.**
+
+**What.** Before the command line, the desktop shell and the web UI's reconnection send the API token, the daemon proves
+that it holds it (a keyed hash of a fresh nonce), so a program that holds the daemon's port while the daemon is down is
+not given the token.
+
+### 144. The records of a run and the emergency stop
+
+**Status: planned.**
+
+**What.** A daemon that starts does not close the records of a run that `dotx run` drives in a process of its own; a run
+that starts as the emergency stop is engaged ends at once; and the smaller findings of part 22 that a second reading
+bears out are fixed.
+
+### 145. The CI and the desktop shell
+
+**Status: planned.**
+
+**What.** The actions of the CI pinned by their commit; the desktop shell's window allowed to talk to the app only from
+the daemon's own address and port; the Rust crates checked against the advisories; and two tests part 22 left: the
+spending lock through the run manager, and a migration cut off between its steps.
+
 ## Log
 
 - 2026-10-08: roadmap written from the owner's go-ahead for all eight items, in this order. Nothing implemented yet.
@@ -8450,3 +8539,4 @@ inline code send data out, and a loopback address with a dot at its end.
 - 2026-10-12 (Opus 5.5): item 138 merged as `3f64036` (PR #172, MYP-279 Done): a write of the store that fails or is cancelled part way is rolled back before its error goes on; Dot's own Chrome is closed when a step after its start fails; the numbers of the configuration that would stop the daemon are refused when it is read; a screenshot is written whole before it takes its name; the push sender and the lifecycle stream listen to their own kinds, and a listener that falls behind logs it; the reapers go on past a failing item and closing tries every part; a restart no longer undoes a prune; four indexes; a failed start deletes its run with the thread; `POST /api/runs` refuses fields that contradict each other; an upload never takes the name of a file Dot keeps beside it.
 - 2026-10-12 (Opus 5.5): item 139 merged as `fcd052b` (PR #173, MYP-280 Done): in the desktop shell a link that opens a new window goes to the default browser, the watcher neither reloads the UI at its first look nor leaves it after one slow answer, a shortcut another app holds no longer stops it, and New chat puts the cursor in the box; in the web UI the sidebar reads its lists again after a reconnect, a fault in showing one event is told and the stream goes on, the home's box waits for the models before it reads its choices, Enter pressed twice saves once, the newest load answers, an approval card settles at once, and an answer that is not JSON names its path; the CI's token only reads; item 140 added from the final review of the five.
 - 2026-10-12 (Opus 5.5): item 140 merged as `25da5f2` (PR #174, MYP-281 Done): the shell guard reads a copy's target folder option, `dd`, git in Dot's own folders, the files perl and ruby edit in place and the code in a word of switches, so a change of what Dot loads and runs is refused there too; more ways of curl, wget, httpie and inline code to send data out carry the upload flag, and two old false alarms are gone; the browser reads a dot at the end of a host as none. Part 22 is done.
+- 2026-10-12 (Opus 5.5): part 23 planned, items 141 to 145, from the owner's word asking to finish the remaining problems too: what part 22 left to the owner or reported, each read again in the code; the search tools reading Dot's own data folder found on the way.

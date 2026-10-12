@@ -90,7 +90,7 @@ async def test_the_tool_reads_only_the_listed_applications_and_is_a_high_risk_ac
 )
 async def test_a_code_mailed_to_the_owner_is_read_back(runtime: Runtime) -> None:
     address: str = await run_osascript(
-        "AppleScript", 'tell application "Mail" to get email addresses of account 1', 30.0
+        "AppleScript", 'tell application "Mail" to get email addresses of account 1', (), 30.0
     )
     own: str = address.split(",")[0].strip()
     await run_osascript(
@@ -104,6 +104,7 @@ async def test_a_code_mailed_to_the_owner_is_read_back(runtime: Runtime) -> None
                 "end tell",
             )
         ),
+        (),
         30.0,
     )
     deadline: float = asyncio.get_running_loop().time() + 120.0

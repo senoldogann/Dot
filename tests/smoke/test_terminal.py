@@ -154,10 +154,10 @@ async def test_a_server_stays_up_between_calls_and_stops_with_its_session(runtim
 async def test_a_chat_keeps_its_limit_of_sessions_and_an_idle_session_is_closed(runtime: Runtime) -> None:
     terminals: Terminals = Terminals(1, 1.0, runtime.shell_env)
     try:
-        first: str = (await terminals.open("chat", "sleep 30", workspace_dir())).id
+        first: str = (await terminals.open("chat", "sleep 30", (), workspace_dir())).id
         with pytest.raises(ToolInputError, match="the most it may have"):
-            await terminals.open("chat", "sleep 30", workspace_dir())
-        await terminals.open("another chat", "sleep 30", workspace_dir())
+            await terminals.open("chat", "sleep 30", (), workspace_dir())
+        await terminals.open("another chat", "sleep 30", (), workspace_dir())
         # The reaper looks every half of the idle time.
         await asyncio.sleep(2.5)
         with pytest.raises(ToolInputError, match=f"no terminal session {first}"):

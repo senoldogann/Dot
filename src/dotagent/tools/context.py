@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Protocol
 
 from dotagent.browser.session import BrowserSession
+from dotagent.policy.sandbox import UNSANDBOXED, Sandbox
 from dotagent.policy.types import ActionInfo, ApprovalMode, QuestionMode
 from dotagent.store.models import RunMode, RunRecord
 from dotagent.web.refused import RefusedHosts
@@ -50,7 +51,8 @@ class Spawner(Protocol):
 class ToolContext:
     """``output_chars`` is the most one tool result of the run may carry; a tool that pages its output sizes each page
     to fit it, so nothing is cut from the middle of a page. ``approvals`` is the run's approval mode, which decides
-    what happens at a field that takes a secret; ``questions`` is what ``ask_user`` does in the run. ``facts``
+    what happens at a field that takes a secret and where the run's processes start (:func:`run_sandbox`);
+    ``questions`` is what ``ask_user`` does in the run. ``facts``
     gives what the run's calls did so far, as the harness measured it, for a tool that has a claim checked."""
 
     runtime: "Runtime"
@@ -71,3 +73,9 @@ class ToolContext:
     spawner: Spawner | None = None
     # The hosts that refused this run's plain requests (item 98); the next fetch of one goes to the browser first.
     refused_hosts: RefusedHosts = field(default_factory=RefusedHosts)
+
+
+def run_sandbox(ctx: ToolContext) -> Sandbox:
+    """Where the processes of the run start: in the sandbox of the runtime, or as they are in a yolo run, whose lines
+    the guard lets change Dot's own files as well."""
+    return UNSANDBOXED if ctx.approvals == "yolo" else ctx.runtime.sandbox

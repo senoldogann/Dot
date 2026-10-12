@@ -17,7 +17,7 @@ from dotagent.policy.paths import classify_path, expand_path
 from dotagent.policy.shell import ShellAssessment, assess_shell
 from dotagent.policy.types import ActionInfo, Flag
 from dotagent.tools.base import ACTING_MODES, RegisteredTool, ToolArgs, ToolResult, make_tool
-from dotagent.tools.context import ToolContext
+from dotagent.tools.context import ToolContext, run_sandbox
 
 _HEAD_BYTES: int = 64 * 1024
 _TAIL_BYTES: int = 192 * 1024
@@ -121,11 +121,13 @@ def kill_group(pid: int) -> None:
 
 
 async def run_command(
-    command: str, cwd: Path, env: dict[str, str], timeout_s: float
+    command: str, confinement: tuple[str, ...], cwd: Path, env: dict[str, str], timeout_s: float
 ) -> tuple[int | None, str, float, bool]:
-    """Run ``command``; returns ``(exit code or None if killed, output, seconds, timed out)``."""
+    """Run ``command`` in zsh, started by ``confinement`` (the words of the run's sandbox, or none); returns ``(exit
+    code or None if killed, output, seconds, timed out)``."""
     started: float = time.monotonic()
     process: asyncio.subprocess.Process = await asyncio.create_subprocess_exec(
+        *confinement,
         "/bin/zsh",
         "-c",
         command,
@@ -196,7 +198,9 @@ def build_shell_tool() -> RegisteredTool:
         if not await asyncio.to_thread(cwd.is_dir):
             raise ToolExecutionError("working directory does not exist", {"cwd": str(cwd)})
         timeout_s: int = min(args.timeout_s or shell_config.default_timeout_s, shell_config.max_timeout_s)
-        code, output, seconds, timed_out = await run_command(args.command, cwd, ctx.runtime.shell_env, timeout_s)
+        code, output, seconds, timed_out = await run_command(
+            args.command, run_sandbox(ctx).commands, cwd, ctx.runtime.shell_env, timeout_s
+        )
         header: str = (
             f"[timed out after {timeout_s}s and was killed]" if timed_out else f"[exit {code} in {seconds:.1f}s]"
         )
@@ -214,7 +218,9 @@ def build_shell_tool() -> RegisteredTool:
             "Run a shell command on the user's Mac (zsh, non-interactive, no stdin). Prefer this over the GUI whenever a "
             "command, script or CLI can do the job: it is the fastest and most reliable tool. Output is capped, so filter "
             "with grep/head/tail/jq. Long-running servers must be started in the background "
-            "(nohup cmd > log 2>&1 &) and polled later."
+            "(nohup cmd > log 2>&1 &) and polled later. Outside yolo the command runs in a macOS sandbox that keeps "
+            "it out of Dot's own files, and macOS starts no program that runs as root there (ps, top, sudo): use "
+            "pgrep -lf and lsof instead of ps."
         ),
         args_model=ShellArgs,
         modes=ACTING_MODES,
