@@ -5043,7 +5043,7 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 120 | The run page's head: Stop in the send button's place, the emergency stop in the sidebar | done        | 6c1a7b3 |
 | 121 | The calm look, after T3 Code: the sidebar, the chat, the composer and the panel     | done        | 4f2b0cd |
 | 122 | The sidebar says what works: Working and its time on a chat's row and a working run's | done        | 10fd83f |
-| 123 | A helper folded in the chat: its row until the owner opens it                       | in progress |         |
+| 123 | A helper folded in the chat: its row until the owner opens it                       | done        | a2de64d |
 
 ### 77. The type system: Inter and Geist Mono, seven sizes, three weights
 
@@ -6891,6 +6891,19 @@ The owner's seventeenth word, on 2026-10-12, after part 16: while helpers work, 
 menu could say something like "working …m", as T3 Code does; and by default a helper's content should be folded in the
 chat. Every word of it researched as written, and applied as exactly as it can be.
 
+**Status (2026-10-12): built.** Items 122 and 123 merged in a day (`10fd83f`, `a2de64d`), each behind the gate and its
+smoke tests, their screenshots read at both widths in both schemes. The sidebar says what works as T3 Code's does: where
+a row's age sits at rest, a chat whose latest run works and every run of the Working section, a delegated run under its
+parent included, show a dashed circle, Working and the time since the run was asked for ("12s", "4m", "1h 5m"), read
+every second; a run that waits for the owner keeps its amber dot and its age. In a run's chat a helper is its row,
+closed from its start, its last line and its time in sight, the time counting on every second; an approval it asks for
+opens the row until the owner has decided, and a row the owner never opened or closed by hand folds again then and at
+the helper's end. A helper cannot ask the owner a question (`ask_user` is not offered to a delegated run), so the
+question the plan counted on to open a row does not exist. Not built, from the readings of T3 Code: the other labels of
+its sidebar's status slot (Approval, Input, Done) and the closed group that gathers two subagents or more ("3
+subagents", "1 working · 2 done"). The daemon was restarted on `a2de64d` with no run active; the desktop app takes its
+pages from the daemon, so part 17 reaches it without a rebuild.
+
 **Status (2026-10-12): planned.** What is built today, and what the readings found. Dot's sidebar lists the chats under
 the days, each with a live dot (pulsing while its latest run works, amber while it waits for the owner, red when it
 failed) and, at the right, its last activity in the fewest characters (item 121, read again every minute). Above them
@@ -6958,7 +6971,7 @@ not move. A smoke test reads the rows at both widths in both schemes and sees th
 
 ### 123. A helper folded in the chat: its row until the owner opens it
 
-**Status: in progress.**
+**Status: done.** Merged as `a2de64d` (PR #148, MYP-263 Done).
 
 **As built (2026-10-12).** A delegated run's row in the parent's conversation (`timeline.js childScope`) is a `details`
 that starts closed: its face and state, its goal over its last line, its time and the way to its page show, and its
@@ -7538,3 +7551,4 @@ read by eye.
 - 2026-10-12 (Opus 5.5): item 121 merged as `4f2b0cd` (PR #144, MYP-261 Done): the look after T3 Code's, through Dot's tokens and in both schemes: the sidebar a tone darker than the page with no line between them and a chat's last activity at the right of its row, a tool step one quiet line with its body on a hairline, the composer on a corner of its own (24 px) with a soft shadow on every page, the run's panel one card with its sections on hairlines, and the answer's time and length on a second look where a pointer can hover; 906 unit tests, 117 smoke tests and the tour read by eye at both widths in both schemes; the daemon restarted on it with no run active.
 - 2026-10-12 (Opus 5.5): part 17 planned, items 122 and 123, from the owner's word after part 16 and a reading of T3 Code's sidebar and chat in its repository; no code changed.
 - 2026-10-12 (Opus 5.5): item 122 merged as `10fd83f` (PR #147, MYP-262 Done): where a row's age sits at rest, a chat whose latest run works and every run of the Working section, delegated runs included, show a dashed circle, Working and the time since the run was asked for in T3 Code's units, read every second; `ThreadSummary.latest_created_at` is new; 906 unit tests, 27 smoke tests and the tour.
+- 2026-10-12 (Opus 5.5): item 123 merged as `a2de64d` (PR #148, MYP-263 Done): in a run's chat a delegated run's row starts closed, its time counting on every second and at once on a page opened later; an approval it asks for opens it and the rows it sits in until the owner has decided, and a row the owner never touched folds again then and at the run's end; a delegated run has no `ask_user`, which the README's Delegation passage now says; 906 unit tests, 30 smoke tests and the tour; the daemon restarted on it with no run active.
