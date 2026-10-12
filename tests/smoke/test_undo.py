@@ -55,7 +55,7 @@ def _script(workspace: Path) -> list[ScriptedTurn]:
             )
         ),
         _turn(ScriptedCall(tool="write_file", arguments={"path": str(workspace / "made/new.txt"), "content": "new\n"})),
-        _turn(ScriptedCall(tool=DELEGATE_TOOL, arguments={"goal": f"Write {workspace}/child.txt.", "mode": "task"})),
+        _turn(ScriptedCall(tool=DELEGATE_TOOL, arguments={"goal": f"Write {workspace}/child.txt."})),
         _turn(ScriptedCall(tool="write_file", arguments={"path": str(workspace / "child.txt"), "content": "child\n"})),
         _finish("child.txt is written."),
         _finish("All three changes are made."),

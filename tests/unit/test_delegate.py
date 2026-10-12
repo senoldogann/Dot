@@ -1,10 +1,21 @@
-"""The delegate tool's result: a step the plan does not have is a note, not a refusal, and closes nothing."""
+"""The delegate tool: its run takes the parent's mode, which the model cannot choose (item 117), and in its result a step
+the plan does not have is a note, not a refusal, and closes nothing."""
+
+import pytest
+from pydantic import ValidationError
 
 from dotagent.agent.plan import PlanItem
 from dotagent.store.models import RunRecord, RunStatus
 from dotagent.tools.base import ToolResult
 from dotagent.tools.context import DelegateOutcome
-from dotagent.tools.delegate import closing_step, delegated_evidence, render_outcome, unplanned_step_note
+from dotagent.tools.delegate import (
+    DelegateArgs,
+    closing_step,
+    default_child_mode,
+    delegated_evidence,
+    render_outcome,
+    unplanned_step_note,
+)
 
 STEPS: tuple[PlanItem, ...] = (
     PlanItem(text="Read the catalogue", status="pending", evidence="", depends_on=()),
@@ -58,3 +69,10 @@ def test_a_step_the_plan_has_closes_and_one_it_does_not_have_is_a_note_that_clos
     # The loop closes no step for it, and none for a call that named no step.
     assert closing_step(3, unplanned) is None
     assert closing_step(None, planned) is None
+
+
+def test_a_delegated_run_takes_its_parents_mode_and_the_model_cannot_name_another() -> None:
+    assert [default_child_mode(mode) for mode in ("task", "chat", "research")] == ["task", "task", "research"]
+    assert "mode" not in DelegateArgs.model_json_schema()["properties"]
+    with pytest.raises(ValidationError):
+        DelegateArgs.model_validate({"goal": "Read the page", "mode": "research"})

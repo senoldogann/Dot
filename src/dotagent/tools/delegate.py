@@ -3,7 +3,6 @@
 import secrets
 import time
 from collections.abc import Sequence
-from typing import Literal
 
 from pydantic import Field, JsonValue
 
@@ -34,13 +33,6 @@ class DelegateArgs(ToolArgs):
             "values) and what its final answer must contain. It cannot see this conversation."
         ),
     )
-    mode: Literal["task", "research"] | None = Field(
-        default=None,
-        description=(
-            "task lets it act like you; research keeps it read-only. Defaults to your own mode; a research run can "
-            "only delegate research."
-        ),
-    )
     model: str | None = Field(
         default=None,
         description=(
@@ -62,7 +54,8 @@ class DelegateArgs(ToolArgs):
 
 
 def default_child_mode(parent: RunMode) -> RunMode:
-    """A research run hands research on; every other run hands a task."""
+    """The mode of a run another run starts: a research run hands research on, every other run a task. The model does
+    not choose it, so a helper can do neither less nor more than the run the owner started."""
     return "research" if parent == "research" else "task"
 
 
@@ -169,7 +162,7 @@ def _delegate_tool() -> RegisteredTool:
         spawner: Spawner | None = ctx.spawner
         if spawner is None:
             raise ToolExecutionError("this run cannot start other runs", {"run_id": ctx.run_id})
-        mode: RunMode = args.mode if args.mode is not None else default_child_mode(ctx.mode)
+        mode: RunMode = default_child_mode(ctx.mode)
         unplanned: str | None = await _unplanned(args.step, ctx)
         outcome: DelegateOutcome = await spawner.delegate(
             ctx.run_id, args.goal, mode, await _model_for(args.model, ctx), None
@@ -183,10 +176,10 @@ def _delegate_tool() -> RegisteredTool:
             "Run one self-contained part of the work in a separate agent with a clean context and get its final "
             "report back. Use it to keep your own context small when a part is bulky (reading many pages or files, a "
             "deep research question) and to do independent parts at the same time: call it several times in one "
-            "turn. The agent uses your tools and your model, or the helper model you name; it cannot ask the user "
-            "questions, consult a helper or delegate again. Do not delegate what one or two tool calls can do. Name "
-            "the plan step the part is (step) and its report closes that step; a step the plan does not have runs "
-            "all the same and closes nothing."
+            "turn. The agent uses your tools, your mode and your model, or the helper model you name; it cannot ask "
+            "the user questions, consult a helper or delegate again. Do not delegate what one or two tool calls can "
+            "do. Name the plan step the part is (step) and its report closes that step; a step the plan does not have "
+            "runs all the same and closes nothing."
         ),
         args_model=DelegateArgs,
         modes=ALL_MODES,

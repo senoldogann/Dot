@@ -2,7 +2,7 @@
 
 from typing import Annotated
 
-from pydantic import Field, StringConstraints
+from pydantic import AfterValidator, Field, StringConstraints
 
 from dotagent.agent.approvals import ApprovalOutcome
 from dotagent.agent.plan import (
@@ -154,12 +154,20 @@ def _notify_tool() -> RegisteredTool:
     )
 
 
+def clipped_evidence(text: str) -> str:
+    """The evidence of a step as it is kept: stripped, and cut with an ellipsis at :data:`EVIDENCE_MAX_CHARS` rather
+    than refused, since a call refused for a long quote loses a step and the start of the quote says what it showed."""
+    stripped: str = text.strip()
+    return stripped if len(stripped) <= EVIDENCE_MAX_CHARS else f"{stripped[: EVIDENCE_MAX_CHARS - 1].rstrip()}…"
+
+
 # The evidence of a step. A provider sees an optional text; empty means none was given.
-type Evidence = Annotated[str, StringConstraints(strip_whitespace=True, max_length=EVIDENCE_MAX_CHARS)]
+type Evidence = Annotated[str, AfterValidator(clipped_evidence)]
 _EVIDENCE_DESCRIPTION: str = (
     "What you observed that shows the step done: the tool result, quoted or named (the path and what you read back, "
-    "the count or the line of output, what the page or the window showed). Required for done; for failed or skipped, "
-    "what happened or why it is no longer needed."
+    f"the count or the line of output, what the page or the window showed), in at most {EVIDENCE_MAX_CHARS} "
+    "characters (a longer one is cut). Required for done; for failed or skipped, what happened or why it is no longer "
+    "needed."
 )
 
 

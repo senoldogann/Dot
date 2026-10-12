@@ -93,7 +93,7 @@ def _secret_file() -> tuple[Path, str]:
 
 def _delegating_goal(path: Path) -> str:
     return (
-        f"Call the delegate tool exactly once, with mode task. Its goal must tell the sub-agent to read the file {path} "
+        f"Call the delegate tool exactly once. Its goal must tell the sub-agent to read the file {path} "
         "and report the exact text in it. When it has answered, call finish with the text it reported."
     )
 
