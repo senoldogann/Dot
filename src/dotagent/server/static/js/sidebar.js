@@ -321,6 +321,8 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
     if (renaming !== null) {
       return;
     }
+    // A chat's menu acts on the rows it was opened from, which go now.
+    closeMenu();
     rowNodes.clear();
     selectButton.hidden = selecting || chats === null || chats.length === 0;
     head.hidden = selecting;
@@ -417,7 +419,11 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
       }
     });
     const row = el("div", { class: "side-chat", "data-chat": chat.id }, link, more);
+    // While the row holds the name's field, a right-click is the field's own.
     row.addEventListener("contextmenu", (event) => {
+      if (renaming !== null) {
+        return;
+      }
       event.preventDefault();
       openMenu({ label: chat.title, items: chatActions(chat), at: { x: event.clientX, y: event.clientY }, back: link });
     });
@@ -460,19 +466,28 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
       "aria-label": "Chat name",
     });
     let ended = false;
+    // The row comes back at once, under the new name while the daemon keeps it.
     async function end(keep) {
       if (ended) {
         return;
       }
       ended = true;
-      const title = field.value.trim();
-      if (keep && title !== "" && title !== chat.title) {
-        await attempt(() => api.patch(`/threads/${chat.id}`, { title }));
-      }
       renaming = null;
+      const title = field.value.trim();
+      if (!keep || title === "" || title === chat.title) {
+        paintChats();
+        return;
+      }
+      chats = chats.map((one) => (one.id === chat.id ? { ...one, title } : one));
+      paintChats();
+      await attempt(() => api.patch(`/threads/${chat.id}`, { title }));
       await load();
     }
     field.addEventListener("keydown", (event) => {
+      // WebKit ends the composition before the key that commits it, so that key shows only as keyCode 229 (item 116).
+      if (event.isComposing || event.keyCode === 229) {
+        return;
+      }
       if (event.key === "Enter" || event.key === "Escape") {
         event.preventDefault();
         end(event.key === "Enter").then(() => rowNodes.get(chat.id)?.focus());

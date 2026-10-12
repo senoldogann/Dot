@@ -7444,19 +7444,23 @@ pinned chat is listed however old. `PATCH /api/threads/{id}` takes a title (stri
 both: 204, 404 for no chat, 422 for neither, an empty or a long title or a pin that is not a boolean. The menu is
 `menu.js`, at the page's level above the drawer and under the toasts: its items are buttons with the menu item's role,
 which the arrow keys, Home and End walk round; Escape and Tab close it and give the focus back, as a chosen item does
-before it runs; a click outside it, a scroll, a resize or a change of page close it, and it keeps 8 px inside the
-window. A chat's row (`sidebar.js`) is its link and the "…" button beside it, since a button cannot sit in a link: the
-button shows over the time where the pointer rests or the focus is, and always on a touch screen, where the time steps
-aside for it. A right-click on the row, its button too, opens the menu at the pointer, Shift+F10 and the context-menu
-key under the row. Rename holds the list's repaint while its field is in the row, and a key gives the focus back to the
-row while leaving the field leaves it where it went; Delete is Select's delete for one chat, asked as "Delete this
-chat?", and goes home when the chat was open. The menu's items are as tall as the sidebar's rows in either density,
-after the 4 px grid's unit test refused a 6 px padding. Tests: `tests/unit/test_store_threads.py` (a store from before
-the pins gains them; the order; 404), `tests/smoke/test_server.py` (the route through the API) and
-`tests/smoke/test_chat_menu.py` (the button, the right-click and the key; the keys in the menu; Pin, kept after a
-reload; Rename by Enter, by Escape and by leaving the field; the link read back from the clipboard; Select; Delete
-cancelled, then done on the open chat; Unpin in the dark scheme; on a phone the button beside the time and the menu
-inside the window); the screenshots read by eye.
+before it runs; a click outside it, a scroll, a resize, a change of page or a repaint of the list close it; it takes the
+focus itself, so a click between its items keeps the keys with it, and it keeps 8 px inside the window. A chat's row
+(`sidebar.js`) is its link and the "…" button beside it, since a button cannot sit in a link: the button shows over the
+time where the pointer rests or the focus is, and always on a touch screen, where the time steps aside for it. A
+right-click on the row, its button too, opens the menu at the pointer, Shift+F10 and the context-menu key under the row.
+Rename holds the list's repaint while its field is in the row, where a right-click is the field's own; the row comes
+back at once, under the new name while the daemon keeps it, and a key gives the focus back to the row while leaving the
+field leaves it where it went; Delete is Select's delete for one chat, asked as "Delete this chat?", and goes home when
+the chat was open. The menu's items are as tall as the sidebar's rows in either density, after the 4 px grid's unit test
+refused a 6 px padding. Tests: `tests/unit/test_store_threads.py` (a store from before the pins gains them; the order;
+404), `tests/smoke/test_server.py` (the route through the API) and `tests/smoke/test_chat_menu.py` (the button, the
+right-click and the key; the keys in the menu; Pin, kept after a reload; Rename by Enter, by Escape and by leaving the
+field; the link read back from the clipboard; Select; Delete cancelled, then done on the open chat; Unpin in the dark
+scheme; on a phone the button beside the time and the menu inside the window); the screenshots read by eye. A review
+against the done criteria found them met and five edges, fixed before the merge: a repaint now closes an open menu, a
+right-click in the name's field is the field's, the row comes back without waiting for the list, Enter while an input
+method composes is left to it, and the menu holds the keys after a click between its items.
 
 **What.** A chat's row gets a menu, after T3 Code's: a "…" button at its right (on hover and on focus, always on a touch
 screen), a right-click on the row and the context-menu key open it; the arrow keys move through it, Escape closes it

@@ -161,6 +161,10 @@ async def test_a_chats_menu_pins_names_copies_chooses_and_deletes_it(
         for key, item in (("ArrowDown", "Rename"), ("End", "Delete"), ("ArrowDown", "Pin"), ("ArrowUp", "Delete")):
             await page.keyboard.press(key)
             await expect(menu.get_by_role("menuitem", name=item)).to_be_focused()
+        # A click between the items keeps the keys with the menu.
+        await menu.locator(".menu-separator").click()
+        await page.keyboard.press("ArrowDown")
+        await expect(menu.get_by_role("menuitem", name="Pin")).to_be_focused()
         await page.keyboard.press("Escape")
         await expect(menu).to_have_count(0)
         await expect(more).to_be_focused()
@@ -206,9 +210,12 @@ async def test_a_chats_menu_pins_names_copies_chooses_and_deletes_it(
         await expect(books.locator("a.side-run")).to_be_focused()
         assert [chat.title for chat in await _chats(client)] == ["Garden plan", "Books to read", "Trip notes"]
 
-        # Escape leaves the old name, whatever was typed.
+        # Escape leaves the old name, whatever was typed; a right-click in the field is the field's own.
         await books.locator("a.side-run").click(button="right")
         await page.get_by_role("menu", name="Books to read").get_by_role("menuitem", name="Rename").click()
+        await field.click(button="right")
+        await expect(page.get_by_role("menu")).to_have_count(0)
+        await expect(field).to_be_focused()
         await field.fill("Something else")
         await field.press("Escape")
         await expect(field).to_have_count(0)

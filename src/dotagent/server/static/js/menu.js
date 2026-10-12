@@ -35,7 +35,8 @@ export function openMenu({ label, items, at, back, button }) {
   const choices = [];
   const element = el(
     "div",
-    { class: "menu", role: "menu", "aria-label": label },
+    // Focusable, so that a click between its items keeps the keys with it.
+    { class: "menu", role: "menu", "aria-label": label, tabindex: "-1" },
     items.map((item) => {
       if (item === "separator") {
         return el("div", { class: "menu-separator", role: "separator" });
