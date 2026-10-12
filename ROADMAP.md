@@ -5037,8 +5037,8 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 114 | Dot's mark and its opening: a dot that looks, the wordmark, the icons, a bounce at launch | done        | ea014d5 |
 | 115 | The composer once more: one bar that never wraps, labels that fold, a quiet warning | done        | a667d39 |
 | 116 | The deep review: every part of the code read once more, and fixed                   | done        | 0304257 |
-| 117 | The helper keeps its parent's rights: a delegated run takes its parent's mode       | in progress |         |
-| 118 | Chrome behind: every tab opened in the background, the front given back             | planned     |         |
+| 117 | The helper keeps its parent's rights: a delegated run takes its parent's mode       | done        | e51f9c1 |
+| 118 | Chrome behind: every tab opened in the background, the front given back             | in progress |         |
 | 119 | The models: the prompt cache on OpenCode Go's Messages route, the free ones marked   | planned     |         |
 | 120 | The run page's head: Stop in the send button's place, the emergency stop in the sidebar | planned     |         |
 | 121 | The calm look, after T3 Code: the sidebar, the chat, the composer and the panel     | planned     |         |
@@ -6720,7 +6720,7 @@ of T3 Code adapted to Dot's tokens, faces and mark.
 
 ### 117. The helper keeps its parent's rights: a delegated run takes its parent's mode
 
-**Status: in progress.**
+**Status: done.** Merged as `e51f9c1` (PR #140, MYP-257 Done).
 
 **As built (2026-10-12).** `DelegateArgs` has no `mode` now: `delegate` starts its run in `default_child_mode(ctx.mode)`
 (a research run's helper is research, every other run's a task), as `message_agent` did already, and the run carries its
@@ -6746,7 +6746,25 @@ refusing the call. Unit tests hold the three.
 
 ### 118. Chrome behind: every tab opened in the background, the front given back
 
-**Status: planned.**
+**Status: in progress.**
+
+**As built (2026-10-12).** Every tab Dot opens is made by `_background_tab`: a target created through a browser CDP
+session with `background: true` (Playwright 1.63 hands the browser of a persistent context too). A quiet read's scratch
+tab is always made so, and a thread's tab (`_new_tab`) too unless `raise_window` is on, in Dot's own Chrome and in the
+user's alike, so the tab the user works in keeps its place as well. Each such tab is first addressed `about:blank#dot-`
+and a random mark, waited for by that address and then sent to a plain blank page: tabs made at the same time (a crawl
+reads pages side by side) were otherwise all handed the first new page, which hung the crawl's smoke test until the mark
+was in (the quiet reads in the user's Chrome, made so since item 98, had the same race, and could even be handed a tab
+the user opened at that moment). A tab the page opens itself still takes the front: each thread's step notes the
+application in front as it begins (`_note_front`, one accessibility call), and when a popup of ours is adopted,
+`return_front` waits up to two seconds for Dot's own Chrome (its process, from the profile's lock) to take the front and
+gives the front back to that application; a front that went anywhere else, or that was Dot's Chrome already, stays where
+it is. That needs Accessibility, which the program that runs Dot has when desktop control works; without it the log says
+so once and nothing is watched. The start still takes the front once and gives it back (item 97). The README's browser
+passages follow. Measured before and after on a visible Chrome with Finder in front: with the tabs opened as before, a
+new tab and a quiet read each brought Chrome to the front; with the change neither does, and a link to a new tab gives
+the front back. `tests/smoke/test_chrome_front.py` holds both on a throwaway profile (the give-back skipped without
+Accessibility); with it the browser smoke set passes (71 tests), and so do the 906 unit tests.
 
 **What.** In Dot's own Chrome every new tab, a thread's and a quiet read's, is a target created in the background
 through CDP, as the user's Chrome has it already, unless `raise_window` is on; Playwright hands the browser of a
@@ -7339,3 +7357,4 @@ states. The tour is read by eye at both widths and in both schemes.
 - 2026-10-12 (Opus 5.5): item 114 merged as `ea014d5` (PR #136, MYP-254 Done): Dot's mark (a yellow dot with the character's eyes) as the favicon, the app's, the menu bar's and the web app's icons from `desktop/icons/render.py`; the wordmark “dot” on the sign-in card and the desktop shell's down page; the opening, once per window session, never under reduced motion, cut short by a click or a key.
 - 2026-10-12 (Opus 5.5): item 115 merged as `a667d39` (PR #137, MYP-255 Done): one composer frame on a 20 px corner with a box of one line, one bar that never wraps (its labels fold by container queries), round pills on no ground, YOLO in the warn ink without a fill, the agent pick a pill with a menu, a quiet send while the box is empty, Keep going's note under the frame.
 - 2026-10-12 (Opus 5.5): item 116 merged as `0304257` (PR #138, MYP-256 Done): the shell guard reads a line as the shell does (comments, `$'…'`, here-documents, arithmetic, each substituted command judged on its own, the directories, variables and links a line sets up, paths without regard to case, unreadable code asked about), the terminal's and the desktop's typing judged by the line it runs, a network fetch marks the run untrusted, and what four readers found in the agent, the tools, the server and the interface fixed; 903 unit tests, 84 smoke tests, the eval check and the tour read by eye; the daemon restarted on it with no run active.
+- 2026-10-12 (Opus 5.5): item 117 merged as `e51f9c1` (PR #140, MYP-257 Done): `delegate` has no `mode` and its run takes its parent's (a research run's helper is research, every other run's a task), so a yolo task run's helper has every right its parent has; `web_extract` keeps a field answered without a quote as an unverified value instead of failing the extraction; plan step evidence is cut at 400 characters instead of refused; 906 unit tests, 18 smoke tests, the eval check.
