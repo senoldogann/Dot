@@ -981,22 +981,34 @@ decision, who decided and the note; and every file the run, or a run it delegate
 taken back, as before the run). A file as the run left it has a button, Restore or Delete, that takes that one change
 back once the run has ended (`POST /api/runs/{id}/undo`); the card itself is `GET /api/runs/{id}/actions`.
 
-**Settings** (`#/settings`) is one page with tabs: **General** (the look of this browser, Dot's own look, the two
-switches below, desktop notifications and the token this browser is signed in with), **Models** (one fold per provider, with the reasoning levels
-of each model and a menu to choose one; a provider without a key, or whose key was refused, says so and links to API
-keys), **API keys** (the key of each provider; see
-[Models and providers](#models-and-providers)), **Browser** (which Chrome Dot browses with and what Chrome has to allow
-first; see [Browser use](#browser-use)), **Rules**, **Memory**, **Skills**, **Schedules** and **System** (the daemon, the emergency
+**Settings** (`#/settings`) is one page with tabs: **General** (Dot's name and yours, Dot's own look, desktop
+notifications and the token this browser is signed in with), **Appearance** (the look of this browser, below),
+**Models** (one fold per provider, with the reasoning levels of each model and a menu to choose one; a provider without
+a key, or whose key was refused, says so and links to API keys), **API keys** (the key of each provider; see [Models and
+providers](#models-and-providers)), **Browser** (which Chrome Dot browses with and what Chrome has to allow first; see
+[Browser use](#browser-use)), **Rules**, **Memory**, **Skills**, **Schedules** and **System** (the daemon, the emergency
 stop and the health checks in a fold, closed, with the number of failures on its line). Which folds are open is kept in
 the browser. The tabs sit beside their content when the window has the room and above it otherwise; the earlier
 addresses of the memory, schedules, rules and system pages lead to their tabs.
 
-Settings › General › Appearance switches between two looks on the same layout: **Neutral** (warm grey and ink, round
-and quiet; the default) and **Paper** (warm paper tones with a serif heading and a terracotta accent). **Colour
-scheme** follows the system (the default) or holds light or dark. **Density** sets how close the rows, cards and
-lists sit (comfortable or compact). Two switches follow the look until you set them yourself: fold the tool steps
-(on in Neutral) and the Details panel (off in both). The choices are kept in the browser only. The looks are one
-visual system. Colour: every colour is a token of `themes.css` naming its light and its dark value in one place;
+Settings › Appearance (⌥⌘A), after T3 Code's page, holds the look of this browser. **Colour scheme** is three cards,
+each a miniature of Dot's window drawn in the scheme it names: System (the default, split down the middle), Light and
+Dark; ⇧⌥⌘A steps through them. **Themes** is a gallery of cards with a light and a dark orb each: the card takes its
+theme for both schemes, an orb for its own scheme only (a sun or a moon marks the picks), so light can wear one theme
+and dark another. Dot's two looks are **Neutral** (warm grey and ink, round and quiet; the default) and **Paper**
+(warm paper tones with a serif heading and a terracotta accent), whose serif voice follows the scheme it is picked for;
+T3 Code's six palettes are **Clean** (T3 Code's own look: near-white, grey and a blue accent), **Rose** (T3 Chat's),
+**Grove**, **Ocean**, **Ember** and **Iris**. A palette's colours are mapped onto Dot's tokens (its action colour, which
+T3 Code paints its solid controls with, is Dot's accent) and held to the rule of the looks below: a text tier or an ink
+that would read under its ratio is moved in lightness until it reads, and in dark a card lies a step above the page; a
+browser test measures every theme in both schemes as the page paints it. The two picks are written on the page as
+`light-dark()` pairs (nothing when one look is picked for both) and kept with the picks, so the first paint after a
+reload already wears them. **Layout**: **Density** sets how close the rows, cards and lists sit (comfortable or
+compact), and two switches follow the theme picked for light until you set them yourself: fold the tool steps (on in
+all but Paper) and the Details panel (off in all). **Motion**: "Faces that move" (below). The choices are kept in the
+browser only. The palettes, the colour arithmetic and the orbs are a port of T3 Code (github.com/pingdotgg/t3code, MIT,
+T3 Tools Inc.) to plain ES modules (`static/js/appearance/LICENSE`); Dot is not affiliated with T3 Tools Inc. The looks
+are one visual system. Colour: every colour is a token of `themes.css` naming its light and its dark value in one place;
 surfaces step up by lightness (page, sunken sidebar, raised cards) rather than by shadow in dark; borders are the text
 colour at a small alpha so they sit on every surface; the text tiers are measured against every surface by a unit
 test (4.5:1 for text and its second tier, 3:1 for the muted and faint ones); the yellow is the owner's bubbles. Type:
@@ -1021,7 +1033,7 @@ modules, one filled shape with two eyes that are holes in it, in eight shapes, s
 theme's `--character-*` tokens) and fourteen animations; bloub recreates the behaviour of x.ai's bot avatar as an
 exercise and is affiliated with nobody, and neither is Dot: the licence covers the code, not the design it imitates
 (`static/js/character/LICENSE`). One loop drives every moving character on the page and stops while the tab is hidden;
-under reduced motion, or with "Faces that move" off in Settings › General, each shows one still frame (while the system
+under reduced motion, or with "Faces that move" off in Settings › Appearance, each shows one still frame (while the system
 reduces motion the switch says so, and where that is turned off). A still character follows a change of its shape or
 expression at once. Two characters move: the home's face and the look editor's preview; every other face is a still
 frame. One moving face costs about a millisecond of main-thread time a frame (`tests/smoke/test_character_cost.py` reads
@@ -1129,7 +1141,7 @@ the agent itself.
 
 - **One interface.** The window is the web UI at the size the screenshot tour reviews (1280 × 860, down to a
   phone's 390 wide). The system draws only the traffic lights over the page; the page keeps room for them in the
-  sidebar's head, or in the top bar while the sidebar is away, and the window drags by those bars. The look, the
+  sidebar's head, or in the top bar while the sidebar is away, and the window drags by those bars. The themes, the
   colour scheme and the density are the web UI's own settings.
 - **Signed in by itself.** The shell reads the daemon's address from `config.toml` (`[server]`, or the defaults) and
   the token from the token file under the home directory, and opens the UI with the token in the fragment, never

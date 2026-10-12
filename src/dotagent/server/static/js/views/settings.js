@@ -3,6 +3,7 @@
 import { el } from "../dom.js";
 import { setStageTitle } from "../stage.js";
 import { icon } from "../icons.js";
+import * as appearance from "./appearance.js";
 import * as keys from "./keys.js";
 import * as memory from "./memory.js";
 import * as rules from "./rules.js";
@@ -13,6 +14,7 @@ import { mountBrowser, mountGeneral, mountModels, mountSystem } from "./system.j
 const DEFAULT_TAB = "general";
 const TABS = [
   { id: "general", label: "General", icon: "sliders", mount: mountGeneral },
+  { id: "appearance", label: "Appearance", icon: "palette", mount: appearance.mount },
   { id: "models", label: "Models", icon: "layers", mount: mountModels },
   { id: "keys", label: "API keys", icon: "key", mount: keys.mount },
   { id: "browser", label: "Browser", icon: "globe", mount: mountBrowser },

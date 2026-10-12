@@ -5046,7 +5046,7 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 123 | A helper folded in the chat: its row until the owner opens it                       | done        | a2de64d |
 | 124 | The home's first screen: the composer in the middle, the day folded under it         | done        | 41ec542 |
 | 125 | What the failed runs showed: the journal's day, the snapshot's arguments             | done        | 36c0eeb |
-| 126 | Themes, after T3 Code: a page for the look, a theme for light and one for dark       | planned     |         |
+| 126 | Themes, after T3 Code: a page for the look, a theme for light and one for dark       | in progress |         |
 | 127 | The interface, the motion and the type                                               | planned     |         |
 | 128 | Your own themes, kept by the daemon                                                  | planned     |         |
 
@@ -7194,7 +7194,39 @@ today.
 
 ### 126. Themes, after T3 Code: a page for the look, a theme for light and one for dark
 
-**Status: planned.**
+**Status: in progress.**
+
+**As built (2026-10-12).** Settings › Appearance (`views/appearance.js`, after General in `views/settings.js`) holds
+four cards: Colour scheme, Themes, Layout and Motion. General lost the look's card, and the card's density, its two
+layout switches and the faces' switch came along as Layout and Motion, which item 127 folds into its sections. A scheme
+card is a miniature of the window made of spans on the tokens (`.wire-*` in `settings.css`); each pane holds its scheme
+with `color-scheme`, so every `light-dark()` token inside it resolves to that side, and System clips a light and a dark
+pane at the middle. A theme (`theme.js THEMES`) is a look of `themes.css` or a palette. A look's tokens are read from
+the stylesheet's own rule through the CSSOM (`appearance/tokens.js lookTokens`), so `themes.css` stays the one place
+they live; the palettes (`appearance/palettes.js`) are 23 of the 61 roles of T3 Code's six built-ins, taken verbatim,
+which `paletteTokens` maps onto Dot's 28 colour tokens. T3 Code's action colour is Dot's accent, since T3 Code paints
+its solid controls with it (its `index.css` says so): Grove's controls are ochre, Ocean's teal, Ember's rust and Iris's
+magenta, as in T3 Code, and the hints say so. Each text tier is solved against the surface it reads worst on by moving
+its OKLCH lightness away from it (`appearance/colour.js readableOn`, after T3 Code's solver), to 4.6:1 or 3.1:1, a tenth
+above Dot's rule so that the browser's rounding never lands under it; the status inks are solved on their grounds the
+same way, success taking T3 Code's emerald. The surfaces step from the card: T3 Code's accent surface where it lies
+further from the page, else a step of 0.035 in OKLCH lightness. T3 Code's vivid palettes draw their cards on the page
+itself, which broke Dot's rule that a dark card lies above the page (the smoke test found it in Grove, Ocean, Ember and
+Iris); a dark card no lighter than the page is now a step above it. The picks (`dot.theme`, which kept its name, and
+`dot.themeDark`) write the 28 tokens as `light-dark()` pairs on the page element and keep them in `dot.themeTokens`;
+Neutral or Paper for both write nothing and drop the kept values. `data-theme` names the pick of the scheme on screen
+and follows the system's changes, so Paper's serif voice and shapes are Paper's only while it is shown. `boot.js` checks
+every kept pair against a pattern of plain colours before it sets it. The orbs (`appearance/orbs.js`) are T3 Code's: a
+ball of the canvas mixed toward white or near-black, lit by two radial gradients in oklab, blurred 3 px and spread to
+1.1 inside a 56 px rim whose edge is a token of each scheme in `themes.css`; a click between the orbs falls through to
+the card. ⌥⌘A opens the tab and ⇧⌥⌘A steps System, Light and Dark with a toast (`shortcuts.js`, which reads the key by
+`event.code`, since ⌥A types "å" on a Mac). `static/js/appearance/LICENSE` carries T3 Code's MIT licence, names the
+modules ported and says Dot is not affiliated with T3 Tools Inc. `tests/smoke/test_themes.py` picks each of the eight
+themes in each scheme and reads the colours the page paints through a probe, held to the rule of `test_css_tokens.py`;
+picks Paper for light and Ember for dark, checks the orbs, the cards in use, the layout's note and the switch that
+follows Paper, then aborts `main.js` and reloads, so that only `boot.js` runs, and reads the same colours in each
+scheme; and presses the two keys. `test_controls.py` and `test_character.py` follow the settings to the new tab, and the
+tour has it.
 
 **What.** Settings gets an **Appearance** tab after General, and the look's card leaves General for it. The colour
 scheme is three cards, System, Light and Dark, each a miniature of Dot's window (the sidebar and its rows, a message,

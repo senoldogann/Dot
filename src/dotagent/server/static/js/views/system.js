@@ -1,6 +1,6 @@
 // The system page: how the daemon is doing, the emergency stop, the health checks and the models each provider offers.
 
-import { DOT_ID, facesMove, lookOf, rememberLook, setFacesMove } from "../actors.js";
+import { DOT_ID, lookOf, rememberLook } from "../actors.js";
 import { api, clearToken } from "../api.js";
 import {
   notificationsAvailable,
@@ -17,17 +17,13 @@ import { dotName, NAME_CHARS, setDotName } from "../face.js";
 import { OWNER_CHARS, ownerName, setOwnerName } from "../presence.js";
 import { icon } from "../icons.js";
 import { lookPicker } from "../lookpicker.js";
-import { chooseDensity, currentDensity, DENSITIES, followTheme, foldSteps, hasOwnLayout, setFoldSteps, setShowInspector, showInspector } from "../layout.js";
-import { foldCard, foldGroup, inlineError, inlineLoading, paneHead, segmented } from "../panels.js";
+import { foldCard, foldGroup, inlineError, inlineLoading, paneHead, segmented, switchSetting } from "../panels.js";
 import { providerLabel, providerOf } from "../providers.js";
 import { reasoningSelect } from "../reasoning.js";
 import { approvalLabel } from "../runmodes.js";
 import { scrollCue } from "../scrollcue.js";
 import { forgetModels, getSnapshot, loadModels, onChange, refresh } from "../state.js";
-import { SCHEMES, THEMES, chooseScheme, chooseTheme, currentScheme, currentTheme, onThemeChange, themeInUse } from "../theme.js";
 import { attempt, confirmDialog, toast } from "../ui.js";
-
-const REDUCED_MOTION = window.matchMedia("(prefers-reduced-motion: reduce)");
 
 const NOT_SET = "—";
 // The roles a model is configured for, and the tab where a missing or refused key is put right.
@@ -80,160 +76,6 @@ function statusEntries(status) {
     entry("Reasoning effort", orDash(status.models.effort)),
     wideEntry("Home", el("span", { class: "mono" }, status.home)),
   ];
-}
-
-/**
- * A labelled on/off switch; `write` may be asynchronous. `paint()` shows the current `read()` again after something else
- * changed it; `toggle` and `note` are the button and the hint line, for settings that depend on more than their value.
- */
-function switchSetting({ label, hint, read, write, onToggled }) {
-  const toggle = el("button", {
-    class: "switch",
-    type: "button",
-    role: "switch",
-    "aria-checked": "false",
-    "aria-label": label,
-    // Repainted from what was stored even when the switch failed half way (notifications on, push refused).
-    onclick: () =>
-      attempt(async () => {
-        try {
-          await write(!read());
-        } finally {
-          onToggled();
-        }
-      }),
-  });
-  const note = el("div", { class: "hint" }, hint);
-  const element = el("div", { class: "setting" }, el("div", { class: "row" }, el("span", { class: "grow" }, label), toggle), note);
-  return {
-    element,
-    toggle,
-    note,
-    paint: () => toggle.setAttribute("aria-checked", String(read())),
-  };
-}
-
-/** The look and the layout choices. Returns the card and the function that stops it listening for theme changes. */
-function buildAppearance() {
-  const detail = el("div", { class: "hint" });
-  const layoutNote = el("div", { class: "hint grow" });
-
-  function describe(id) {
-    const theme = THEMES.find((candidate) => candidate.id === id);
-    detail.textContent = `${theme.hint} The choice is kept in this browser.`;
-  }
-
-  const fold = switchSetting({
-    label: "Fold tool steps",
-    hint: "The tool calls of a turn collapse into one “Worked for…” line; open it to see every step.",
-    read: foldSteps,
-    write: setFoldSteps,
-    onToggled: paintLayout,
-  });
-  const inspector = switchSetting({
-    label: "Details panel",
-    hint: "On wide windows the run page shows its details, plan and screenshots in a panel beside the conversation.",
-    read: showInspector,
-    write: setShowInspector,
-    onToggled: paintLayout,
-  });
-  // The faces that move (item 103): the home's, the run page's and the previews; off leaves every face still.
-  const faces = switchSetting({
-    label: "Faces that move",
-    hint: "Dot's face on the home and the face beside a chat move while they work and rest; off, every face is a still frame.",
-    read: facesMove,
-    write: setFacesMove,
-    onToggled: () => faces.paint(),
-  });
-  // While the system asks for less motion every face holds still whatever the switch says (item 107); the note says
-  // so, and where the system's own switch is.
-  const motionNote = el(
-    "div",
-    { class: "hint", "data-reduced-motion": "" },
-    "Your system reduces motion, so every face holds still whatever this says. On a Mac: System Settings › Accessibility › Display › Reduce motion.",
-  );
-  faces.element.append(motionNote);
-  const paintMotion = () => {
-    motionNote.hidden = !REDUCED_MOTION.matches;
-  };
-  REDUCED_MOTION.addEventListener("change", paintMotion);
-  paintMotion();
-  const reset = el(
-    "button",
-    {
-      class: "btn sm",
-      type: "button",
-      onclick: () => {
-        followTheme();
-        paintLayout();
-      },
-    },
-    "Follow the look",
-  );
-
-  function paintLayout() {
-    fold.paint();
-    inspector.paint();
-    faces.paint();
-    reset.disabled = !hasOwnLayout();
-    layoutNote.textContent = hasOwnLayout()
-      ? "You set these two yourself; they stay as they are when you change the look."
-      : `These two follow the ${themeInUse().label} look until you change one of them.`;
-  }
-
-  const options = THEMES.map((theme) => ({ id: theme.id, label: theme.label, hint: theme.hint }));
-  const choice = segmented(options, currentTheme(), chooseTheme);
-  const scheme = segmented(
-    SCHEMES.map((option) => ({ id: option.id, label: option.label, hint: option.hint })),
-    currentScheme(),
-    chooseScheme,
-  );
-  scheme.element.setAttribute("aria-label", "Colour scheme");
-  const density = segmented(
-    DENSITIES.map((option) => ({ id: option.id, label: option.label, hint: option.hint })),
-    currentDensity(),
-    chooseDensity,
-  );
-  density.element.setAttribute("aria-label", "Density");
-  const stopListening = onThemeChange((id) => {
-    choice.set(id);
-    describe(id);
-    paintLayout();
-  });
-  describe(currentTheme());
-  paintLayout();
-  const element = section(
-    "Appearance",
-    null,
-    el(
-      "div",
-      { class: "card-pad stack" },
-      el("div", { class: "setting" }, el("div", { class: "row" }, el("span", { class: "grow" }, "Look"), choice.element), detail),
-      el(
-        "div",
-        { class: "setting" },
-        el("div", { class: "row" }, el("span", { class: "grow" }, "Colour scheme"), scheme.element),
-        el("div", { class: "hint" }, "System follows light and dark as your system is; Light or Dark holds one. Kept in this browser."),
-      ),
-      el(
-        "div",
-        { class: "setting" },
-        el("div", { class: "row" }, el("span", { class: "grow" }, "Density"), density.element),
-        el("div", { class: "hint" }, "How close the rows, cards and lists sit. Kept in this browser."),
-      ),
-      fold.element,
-      inspector.element,
-      el("div", { class: "setting" }, el("div", { class: "row" }, layoutNote, reset)),
-      faces.element,
-    ),
-  );
-  return {
-    element,
-    dispose: () => {
-      stopListening();
-      REDUCED_MOTION.removeEventListener("change", paintMotion);
-    },
-  };
 }
 
 /** Desktop notifications: the one setting that also depends on what the browser allows. */
@@ -847,20 +689,15 @@ function buildDotLookCard() {
 }
 
 export function mountGeneral(root, ctx) {
-  const appearance = buildAppearance();
   const look = buildDotLookCard();
   root.append(
-    paneHead("The look of this browser, Dot's own face, how it draws your attention, and the token it is signed in with.", null),
-    appearance.element,
+    paneHead("What Dot is called and calls you, its own face, how it draws your attention, and the token this browser is signed in with.", null),
     buildNameCard(),
     look.element,
     buildNotifications(),
     buildTokenCard(),
   );
-  return () => {
-    appearance.dispose();
-    look.dispose();
-  };
+  return look.dispose;
 }
 
 /** The providers Dot can reach and the models each of them offers. */

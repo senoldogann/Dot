@@ -21,15 +21,30 @@ function isTyping(target) {
 }
 
 /**
- * Install the shortcuts: ⌘K or Ctrl+K and "/" search the runs, ⇧⌘O or Ctrl+Shift+O starts a new run. The browser keeps
- * ⌘N and ⌘T for itself, which is why a new run is not on those. Returns the function that removes them.
+ * Install the shortcuts: ⌘K or Ctrl+K and "/" search the runs, ⇧⌘O or Ctrl+Shift+O starts a new run, ⌥⌘A or
+ * Ctrl+Alt+A opens the Appearance settings and ⇧⌥⌘A or Ctrl+Alt+Shift+A moves to the next colour scheme (item 126,
+ * T3 Code's keys). The browser keeps ⌘N and ⌘T for itself, which is why a new run is not on those. Returns the function
+ * that removes them.
  */
-export function installShortcuts({ search, newRun }) {
+export function installShortcuts({ search, newRun, appearance, nextScheme }) {
   function onKeydown(event) {
-    if (event.isComposing || event.altKey) {
+    if (event.isComposing) {
       return;
     }
     const command = event.metaKey || event.ctrlKey;
+    // The Option key changes the character a key types on a Mac (⌥A is "å"), so the key is read by where it sits.
+    if (event.altKey && command && event.code === "KeyA") {
+      event.preventDefault();
+      if (event.shiftKey) {
+        nextScheme();
+      } else {
+        appearance();
+      }
+      return;
+    }
+    if (event.altKey) {
+      return;
+    }
     const key = event.key.toLowerCase();
     if (command && !event.shiftKey && key === "k") {
       event.preventDefault();
