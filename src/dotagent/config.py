@@ -211,12 +211,13 @@ class BrowserConfig(FrozenModel):
     headless: bool
     # Whether Dot's Chrome is brought to the front while a run works (item 97); Take over brings it either way.
     raise_window: bool
-    viewport_width: int
-    viewport_height: int
+    # A page Chrome can open: from a small phone's to a 4K screen's.
+    viewport_width: int = Field(ge=320, le=3840)
+    viewport_height: int = Field(ge=240, le=2160)
     navigation_timeout_s: float = Field(gt=0, allow_inf_nan=False)
     action_timeout_s: float = Field(gt=0, allow_inf_nan=False)
     snapshot_max_chars: int
-    viewport_margin_px: int
+    viewport_margin_px: int = Field(ge=0)
     settle_quiet_ms: int
     settle_max_ms: int
     side_effect_grace_ms: int
@@ -224,7 +225,8 @@ class BrowserConfig(FrozenModel):
     navigation_backoff_ms: int
     max_tabs: int = Field(ge=1)
     tab_idle_s: float = Field(gt=0, allow_inf_nan=False)
-    screenshot_quality: int
+    # The JPEG quality Chrome takes a screenshot with.
+    screenshot_quality: int = Field(ge=1, le=100)
     max_batch_steps: int
     read_text_chars: int
     allowed_hosts: list[str]

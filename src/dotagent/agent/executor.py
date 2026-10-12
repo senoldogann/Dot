@@ -2,7 +2,7 @@
 
 import asyncio
 import time
-from collections.abc import Mapping, Sequence
+from collections.abc import Coroutine, Mapping, Sequence
 from dataclasses import dataclass, replace
 from urllib.parse import urlsplit
 
@@ -275,5 +275,19 @@ async def execute_calls(
         if len(group) == 1:
             outcomes.append(await _execute_one(group[0], registry, hidden, ctx, gate))
         else:
-            outcomes.extend(await asyncio.gather(*(bounded(call) for call in group)))
+            outcomes.extend(await _together([bounded(call) for call in group]))
     return [*outcomes, *skipped]
+
+
+async def _together(calls: Sequence[Coroutine[object, object, ToolOutcome]]) -> list[ToolOutcome]:
+    """Run ``calls`` at once and return their outcomes in their order. When one fails outside its tool (a stop of the
+    run, an error no result tells) or the step is cancelled, the others are cancelled and awaited before the failure
+    goes on, so no call of the group outlives it."""
+    tasks: list[asyncio.Task[ToolOutcome]] = [asyncio.create_task(call) for call in calls]
+    try:
+        return await asyncio.gather(*tasks)
+    except BaseException:
+        for task in tasks:
+            task.cancel()
+        await asyncio.gather(*tasks, return_exceptions=True)
+        raise

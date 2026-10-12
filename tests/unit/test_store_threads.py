@@ -18,7 +18,7 @@ async def _chat(store: Store, title: str) -> ThreadRecord:
     """A chat a person started, with one run that is over."""
     thread: ThreadRecord = await store.create_thread(title, "test")
     run: RunRecord = await store.create_run(
-        thread.id, f"{title} goal", "chat", "ollama:m", None, "test", "medium", "ask", False, None, None
+        thread.id, f"{title} goal", "chat", "ollama:m", None, "test", "medium", "ask", False, None, None, None
     )
     await store.finish_run(run.id, "done", "Done.")
     return thread
@@ -112,7 +112,7 @@ async def test_a_chat_is_unread_once_its_latest_run_ends_until_it_is_seen(tmp_pa
         await store.see_thread(chat.id, True)
         # A run under way leaves the chat read; its end, after the chat was seen, makes it unread.
         run: RunRecord = await store.create_run(
-            chat.id, "Chat again", "chat", "ollama:m", None, "test", "medium", "ask", False, None, None
+            chat.id, "Chat again", "chat", "ollama:m", None, "test", "medium", "ask", False, None, None, None
         )
         assert await _unread(store) == [("Chat", False)]
         await store.finish_run(run.id, "failed", "It broke.")

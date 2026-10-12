@@ -568,12 +568,13 @@ the same way, except in a run nobody can answer during it (see
 
 - the **Emergency stop** button of the web UI (the red square in the sidebar's foot beside Settings, or beside the
   button that shows the sidebar while it is closed; or `POST /api/failsafe`) creates the `STOP` file in the home
-  directory and ends every run as an emergency stop (a campaign whose session it ends stops too); the page shows a
-  banner with a button that releases it
+  directory and ends every run as an emergency stop, a run that was starting at that moment too (a campaign whose
+  session it ends stops too); the page shows a banner with a button that releases it
 - `touch ~/Library/Application\ Support/Dot/STOP` blocks desktop control the same way, without ending a run; delete the
   file to allow it again
 - while the `STOP` file exists, no schedule fires (a firing due then is skipped to its next time, saying why) and no
-  campaign starts a session (it starts once the stop is released)
+  campaign starts a session (it starts once the stop is released); a run that a schedule or a campaign was starting
+  when the file appeared ends as an emergency stop as soon as it exists
 - with `[desktop] failsafe_corner = true` (the default), moving the pointer into the top-left corner of the screen
   aborts the desktop step in progress, and Dot never clicks that corner
 - before each step of a desktop batch Dot checks that the pointer is where the previous step left it; if someone else is
@@ -1770,7 +1771,8 @@ cannot choose: a task run's helper can do what the task run can, a research run'
 `config.toml` in the home directory is merged over the packaged `src/dotagent/defaults.toml`, which lists every key with
 a comment and is the reference. A key that does not exist is an error, and so is a number that would stop Dot from
 working: a count of runs, tools, tabs, tries or calls at once below 1, a timeout or the scheduler's tick of 0 or less,
-a port outside 1 to 65535. Two environment variables of the process move things: `DOT_HOME` (the home directory) and
+a port outside 1 to 65535, a browser page smaller than 320 by 240 or larger than 3840 by 2160, a screenshot quality
+outside 1 to 100. Two environment variables of the process move things: `DOT_HOME` (the home directory) and
 `DOT_LOG_DIR` (the logs).
 
 | Path (under `~/Library/Application Support/Dot`) | Content                                                              |
@@ -1787,6 +1789,7 @@ a port outside 1 to 65535. Two environment variables of the process move things:
 | `undo/`                                          | journals of the file changes of runs, for `dotx undo`                |
 | `daemon.pid`                                     | held while a daemon runs; a second daemon is refused                 |
 | `STOP`                                           | exists while the emergency stop is engaged                           |
+| `run-owners/`                                    | one lock per process that drives runs (the daemon, `dotx run`)       |
 
 Deleting a chat deletes the screenshot files that only it named. Nothing else is removed by itself: old runs and their
 events stay until their chats are deleted or `dotx prune --apply` finds them old, and the journals of file changes
@@ -1798,8 +1801,9 @@ space inside the database file and the journals of file changes (`dotx undo`) wh
 those files and journals, and gives the space back to the disk, after which a delete returns its space by itself. The
 database is locked for a moment while it compacts, so run it when no run is active.
 
-Logs are structured and go to `~/Library/Logs/Dot/dotx.log`. The output of the launchd job goes to `daemon.out.log`
-and `daemon.err.log` in the same directory, and the stderr of each MCP server to `mcp-<name>.log`.
+Logs are structured and go to `~/Library/Logs/Dot/dotx.log`; at 10 MB it is moved to `dotx.log.1` (the one before is
+dropped) and a new one is started. The output of the launchd job goes to `daemon.out.log` and `daemon.err.log` in the
+same directory, and the stderr of each MCP server to `mcp-<name>.log`.
 
 ## Development
 
@@ -1913,9 +1917,9 @@ src/dotagent/
   model here.
 - Resuming: in goal mode, the goal check of a resumed run judges from what the resumed run did, not from the steps of
   the run it resumes. The conversation shows every call of the step that was cut off as interrupted, also the ones that
-  finished; the first message of the resumed run says which finished. A run of `dotx run` works in its own process, but
-  a daemon that starts while it works marks it as cut off all the same: do not resume it by hand while `dotx run` still
-  shows it (the daemon never resumes such a run on its own).
+  finished; the first message of the resumed run says which finished. A run of `dotx run` works in its own process: a
+  daemon that starts while it works leaves it, and the approvals it waits on, to that process, and marks it as cut off
+  only once the process has ended (the daemon never resumes such a run on its own).
 - Undo: only `write_file` and `edit_file` are in the journal, not shell commands, the browser or the desktop. A run
   keeps a copy of a file at its first change to it only, within `undo_max_file_bytes` and `undo_max_run_bytes`. Runs
   that change the same file are taken back in the order their changes were noted. The web UI has no undo button: use

@@ -82,7 +82,7 @@ async def _nobody(request: ReviewRequest) -> ReviewVerdict:
 async def _yolo_context(runtime: Runtime) -> ToolContext:
     thread: ThreadRecord = await runtime.store.create_thread("pace", "test")
     run: RunRecord = await runtime.store.create_run(
-        thread.id, GOAL, "task", "ollama:none", None, "test", "medium", "yolo", False, None, None
+        thread.id, GOAL, "task", "ollama:none", None, "test", "medium", "yolo", False, None, None, None
     )
     return ToolContext(
         runtime=runtime,

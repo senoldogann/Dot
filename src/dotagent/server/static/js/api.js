@@ -238,8 +238,11 @@ function parseBlock(block) {
   return data.length === 0 ? null : { id, event, data: JSON.parse(data.join("\n")) };
 }
 
-/** Read a server-sent event stream with fetch, so the bearer token travels in a header and not in the URL. */
-export async function* sse(path, signal) {
+/**
+ * Read a server-sent event stream with fetch, so the bearer token travels in a header and not in the URL. `onOpen` is
+ * called once the server has taken the stream, before its first event.
+ */
+export async function* sse(path, signal, onOpen) {
   await proven();
   const response = await fetch(`/api${path}`, {
     headers: { ...authHeaders(), Accept: "text/event-stream" },
@@ -249,6 +252,7 @@ export async function* sse(path, signal) {
   if (!response.ok) {
     throw await errorOf(response, path);
   }
+  onOpen();
   const reader = response.body.getReader();
   const decoder = new TextDecoder();
   let buffer = "";
@@ -293,6 +297,7 @@ export function eventNotShown(path, message, error) {
 /**
  * Follow a stream until `isFinished(message)` says so or `signal` aborts, reconnecting from the last event seen.
  * A rejected token or a missing resource ends the loop with the error; anything else is retried with a growing pause.
+ * The stream is said to be live once the server has taken it, and reconnecting when it broke or could not be made.
  * A fault of the page in showing one event is not a break of the stream: it is told, and the next event comes.
  */
 export async function follow({ path, after, signal, onMessage, onState, isFinished }) {
@@ -300,8 +305,7 @@ export async function follow({ path, after, signal, onMessage, onState, isFinish
   let pause = RECONNECT_MIN_MS;
   while (!signal.aborted) {
     try {
-      onState("live");
-      for await (const message of sse(withAfter(path, lastId), signal)) {
+      for await (const message of sse(withAfter(path, lastId), signal, () => onState("live"))) {
         pause = RECONNECT_MIN_MS;
         lastId = Math.max(lastId, message.id);
         try {

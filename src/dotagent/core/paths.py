@@ -79,6 +79,12 @@ def pid_path() -> Path:
     return dot_home() / "daemon.pid"
 
 
+def run_owners_dir() -> Path:
+    """The lock files of the processes that drive runs (the daemon, ``dotx run``), one per process, each held while its
+    process lives (:mod:`dotagent.agent.owners`)."""
+    return dot_home() / "run-owners"
+
+
 def failsafe_path() -> Path:
     """Touching this file aborts every running desktop action (the emergency stop)."""
     return dot_home() / "STOP"

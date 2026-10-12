@@ -12,7 +12,6 @@ import math
 import os
 import re
 import stat
-import tempfile
 from pathlib import Path
 from typing import Annotated, Literal, Self
 
@@ -20,6 +19,7 @@ from pydantic import AfterValidator, StrictBool, StringConstraints, ValidationEr
 from pydantic_core import ErrorDetails
 
 from dotagent.core.errors import InvalidValueError, NotFoundError
+from dotagent.core.files import write_whole
 from dotagent.core.logs import get_logger
 from dotagent.core.types import FrozenModel
 
@@ -363,18 +363,6 @@ def theme_text(theme: ThemeFile) -> str:
     return theme.model_dump_json(indent=2, exclude_none=True) + "\n"
 
 
-def _write_whole(path: Path, text: str) -> None:
-    """Write the file whole or not at all: into a new file ``mkstemp`` makes beside it, then moved over it."""
-    descriptor, temporary = tempfile.mkstemp(dir=path.parent, prefix=f".{path.name}.", suffix=".tmp")
-    try:
-        with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
-            handle.write(text)
-        os.replace(temporary, path)
-    except OSError:
-        Path(temporary).unlink(missing_ok=True)
-        raise
-
-
 def save_theme(folder: Path, theme_id: str, theme: ThemeFile) -> StoredTheme:
     """Keep ``theme`` as ``<theme_id>.json`` in ``folder``, a new theme or over the one of that id, within the caps of
     the folder. Blocking."""
@@ -402,7 +390,7 @@ def save_theme(folder: Path, theme_id: str, theme: ThemeFile) -> StoredTheme:
             {"theme": theme_id, "bytes": total},
         )
     folder.mkdir(mode=0o700, parents=True, exist_ok=True)
-    _write_whole(path, text)
+    write_whole(path, text)
     return StoredTheme(id=theme_id, file=stored)
 
 

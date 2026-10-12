@@ -281,7 +281,7 @@ async def test_an_answer_waits_while_a_run_of_another_process_works_on_the_threa
     async with _session(login_env, ScriptedProvider(_PROVIDER, [])) as (runtime, manager):
         thread: ThreadRecord = await runtime.store.create_thread("a run of dotx run", "cli")
         elsewhere: RunRecord = await runtime.store.create_run(
-            thread.id, GOAL, "task", SCRIPTED_MODEL, None, "cli", "medium", "yolo", False, None, None
+            thread.id, GOAL, "task", SCRIPTED_MODEL, None, "cli", "medium", "yolo", False, None, None, None
         )
         await runtime.store.set_run_status(elsewhere.id, "running")
         left: ApprovalRecord = await runtime.approvals.leave(

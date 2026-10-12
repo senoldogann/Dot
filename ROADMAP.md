@@ -5063,8 +5063,8 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 140 | The gaps the final review found in the guards                                        | done        | 25da5f2 |
 | 141 | The commands of a run are kept out of Dot's own files by macOS                       | done        | 6fe0263 |
 | 142 | What the guards of the desktop and of the shell see                                  | done        | d765da9 |
-| 143 | The token goes only to the daemon                                                    | in progress |         |
-| 144 | The records of a run and the emergency stop                                          | planned     |         |
+| 143 | The token goes only to the daemon                                                    | done        | 57180ea |
+| 144 | The records of a run and the emergency stop                                          | in progress |         |
 | 145 | The CI and the desktop shell                                                         | planned     |         |
 
 ### 77. The type system: Inter and Geist Mono, seven sizes, three weights
@@ -7961,7 +7961,7 @@ removing it is, so the presets that ask before destroying something outside the 
 
 ### 143. The token goes only to the daemon
 
-**Status: in progress.**
+**Status: done.** Merged as `57180ea` (PR #178, MYP-284 Done).
 
 **As built (2026-10-12).** The daemon answers `GET /api/proof?nonce=<32 to 128 hex digits>` without the token with
 `daemon_proof`: an HMAC-SHA256 keyed with the token over a fixed label and the nonce, in hex, which only a holder of the
@@ -7990,7 +7990,37 @@ not given the token.
 
 ### 144. The records of a run and the emergency stop
 
-**Status: planned.**
+**Status: in progress.**
+
+**As built (2026-10-12).** Every process that drives runs (the daemon, `dotx run`) takes an owner with its first run: a
+lock file under `run-owners/` that it holds with `flock` while it lives and that no program it starts inherits, so the
+system lets go of it when the process ends, however it ends (`agent/owners.py`). A run records its owner (a new `owner`
+column). A daemon that starts closes as cut off only the active runs whose owner no process holds any more, and those of
+before the column; it expires only the approvals of runs no longer active, and deletes the lock files nobody holds. The
+sandbox of a run's commands keeps them out of `run-owners/`. The emergency stop counts its stops: a run being launched
+when one comes, which it could not find, ends as an emergency stop once it is registered; a campaign's session that
+started while the `STOP` file appeared ends so, and its campaign stops; the scheduler looks for the file again after it
+started the run of a schedule, and before each campaign whose session is due. The smaller findings: the record of a
+learned skill (`playbook.json`) and its `SKILL.md` are written whole (`core/files.py`, shared with the themes), and
+every change of the playbooks holds a lock file in their folder, so runs that end at once lose no count; a note saved
+twice at once stays one (`add_memory_once`, one `BEGIN IMMEDIATE` transaction); a call of a group of read-only calls
+that fails outside its tool cancels the others and waits for them; the store's docstring says how its writes take turns;
+the refresh of the notes' search index when a store opens is one `BEGIN IMMEDIATE` transaction, so a note another
+process adds meanwhile stays in the index; only the messages that name screenshots take the places of the screenshots
+read back; `dotx.log` is moved to `dotx.log.1` at 10 MB, and a process whose file was moved or deleted writes its next
+line to the new one; a launch of Dot's own Chrome given up while Chrome starts closes that Chrome once it is up, so the
+profile stays free; the browser's page size (320 by 240 to 3840 by 2160), its screenshot quality (1 to 100) and its
+viewport margin (0 or more) are checked when the configuration is read; and the page says a stream is live only once the
+server has taken it. Tests: owners held by real child processes, one killed and one that left a program running; the
+store closing only the runs of owners that are gone, with their approvals; a child process driving a run that a starting
+daemon leaves while the child lives and closes once it is killed; the emergency stop while a session's brief is written
+(of two due campaigns the second starts no session), while a run is launched, and while the run of a schedule is
+started; eight threads counting uses of one playbook beside a listing; two saves of one note at once with a slow
+embedder; a group whose first call fails while the second waits; a second connection that holds a note while a store
+opens; a call whose arguments name a `file`; the log rotated by its size and by another process; a launch of a real
+headless Chrome given up once Chrome holds its profile; the new bounds; and a page following a stream that is not
+answered and one that is. Each failed on the code of before; the scheduler's part of the emergency stop also failed with
+the manager's part in place but not its own.
 
 **What.** A daemon that starts does not close the records of a run that `dotx run` drives in a process of its own; a run
 that starts as the emergency stop is engaged ends at once; and the smaller findings of part 22 that a second reading
@@ -8581,3 +8611,4 @@ spending lock through the run manager, and a migration cut off between its steps
 - 2026-10-12 (Opus 5.5): part 23 planned, items 141 to 145, from the owner's word asking to finish the remaining problems too: what part 22 left to the owner or reported, each read again in the code; the search tools reading Dot's own data folder found on the way.
 - 2026-10-12 (Opus 5.5): item 141 merged as `6fe0263` (PR #176, MYP-282 Done): outside yolo the shell tool, a terminal session, the AppleScript tool and the search tools start their processes in a macOS sandbox that keeps them out of Dot's own files and from changing what it loads and runs, whatever program does it; the search tools may not read the protected locations either; programs that run as root do not start in it; [shell] sandbox turns it off; the daemon restarted with it.
 - 2026-10-12 (Opus 5.5): item 142 merged as `d765da9` (PR #177, MYP-283 Done): a window of another application that shows Dot's web UI, known by its title at each step, is Dot's own for the desktop's review outside yolo; a shell line that replaces a file that is there outside the workspace (a redirect onto it, a copy or a move onto it, ln -f, tee without -a, dd without conv=notrunc) is destructive, so the default preset asks; the daemon restarted with it.
+- 2026-10-12 (Opus 5.5): item 143 merged as `57180ea` (PR #178, MYP-284 Done): the clients send the token only to a daemon that proves it holds it (`GET /api/proof`): the command line, the desktop shell at each poll and the web UI before each request; CI's desktop job runs `cargo test`; the daemon restarted with it. The shell's part reaches the owner's Mac when the owner rebuilds the desktop app.

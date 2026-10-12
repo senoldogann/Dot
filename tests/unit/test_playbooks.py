@@ -1,6 +1,7 @@
 """Playbooks: the site a run acted on, the digest the writer reads, the skill folder a playbook becomes, and the record
 that retires one after two failed runs."""
 
+from concurrent.futures import Future, ThreadPoolExecutor
 from pathlib import Path
 
 import pytest
@@ -35,6 +36,9 @@ from dotagent.skills.types import SKILL_FILE, Skill, SkillCatalog
 from dotagent.store.models import EventRecord
 
 HOST: str = "shop.example.com"
+# Runs that end at once and count their use of one playbook, and how many uses each counts.
+_COUNTERS: int = 8
+_COUNTS: int = 25
 
 
 def _event(index: int, kind: str, data: JsonObject) -> EventRecord:
@@ -207,3 +211,24 @@ def test_a_name_that_is_not_one_playbook_folder_is_not_found_and_nothing_is_remo
         record_use(playbooks, name, False)
     assert (playbooks / playbook_name(KIND) / SKILL_FILE).is_file()
     assert (playbooks / RETIRED_DIR).is_dir()
+
+
+def test_uses_counted_at_once_are_all_kept_and_a_listing_meanwhile_reads_whole_records(tmp_path: Path) -> None:
+    """Item 144: runs that end at once each count their use of a playbook, and a listing made meanwhile reads every
+    record whole."""
+    name: str = _playbook().name
+    write_playbook(tmp_path, _playbook())
+
+    def count() -> None:
+        for _ in range(_COUNTS):
+            record_use(tmp_path, name, True)
+
+    def listing() -> None:
+        for _ in range(_COUNTS * _COUNTERS):
+            list_playbooks(tmp_path)
+
+    with ThreadPoolExecutor(max_workers=_COUNTERS + 1) as pool:
+        done: list[Future[None]] = [pool.submit(count) for _ in range(_COUNTERS)] + [pool.submit(listing)]
+    for future in done:
+        future.result()
+    assert read_meta(tmp_path / name).uses == _COUNTERS * _COUNTS

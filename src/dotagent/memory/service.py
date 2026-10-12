@@ -168,25 +168,31 @@ async def save_memory(
     index: MemoryIndex, content: str, tags: Sequence[str], run_id: str | None, agent_id: str | None
 ) -> SavedMemory:
     """Save a note, Dot's or, with ``agent_id``, an agent's own (:func:`visible_to`). The same text twice stays one
-    note (the tags are merged, the owner kept); a new note comes back with the existing notes that are nearly the
-    same, so the caller can retire the ones that are outdated."""
+    note (the tags are merged, the owner kept), saved one after the other or at once; a new note comes back with the
+    existing notes that are nearly the same, so the caller can retire the ones that are outdated."""
     text: str = _checked_text(content, index.config.max_chars)
     clean_tags: tuple[str, ...] = normalize_tags(tags)
     existing: MemoryRecord | None = await index.store.find_memory_by_content(text)
     if existing is not None:
-        merged: tuple[str, ...] = normalize_tags([*existing.tags, *clean_tags])
-        record: MemoryRecord = (
-            existing if merged == existing.tags else await index.store.set_memory_tags(existing.id, merged)
-        )
-        return SavedMemory(record=record, created=False, similar=())
+        return await _saved_again(index.store, existing, clean_tags)
     vector: Vector | None = None
     similar: tuple[MemoryHit, ...] = ()
     if index.embedder is not None:
         await backfill(index)
         vector = (await index.embedder.embed([text]))[0]
         similar = await _similar_notes(index, vector)
-    created: MemoryRecord = await index.store.add_memory(text, clean_tags, run_id, agent_id, vector)
-    return SavedMemory(record=created, created=True, similar=similar)
+    record, created = await index.store.add_memory_once(text, clean_tags, run_id, agent_id, vector)
+    if not created:
+        # Another save of the text, by another run or process, added it meanwhile.
+        return await _saved_again(index.store, record, clean_tags)
+    return SavedMemory(record=record, created=True, similar=similar)
+
+
+async def _saved_again(store: Store, existing: MemoryRecord, tags: tuple[str, ...]) -> SavedMemory:
+    """The note ``existing``, whose text was saved again with ``tags``: the tags are merged into its own."""
+    merged: tuple[str, ...] = normalize_tags([*existing.tags, *tags])
+    record: MemoryRecord = existing if merged == existing.tags else await store.set_memory_tags(existing.id, merged)
+    return SavedMemory(record=record, created=False, similar=())
 
 
 async def _distinctive_terms(store: Store, terms: tuple[str, ...], total: int) -> tuple[str, ...]:

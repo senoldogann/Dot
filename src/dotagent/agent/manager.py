@@ -5,6 +5,7 @@ import time
 from collections.abc import Collection, Coroutine, Iterator, Sequence
 from contextlib import AbstractAsyncContextManager, contextmanager, nullcontext
 from dataclasses import dataclass
+from pathlib import Path
 
 from pydantic import JsonValue
 
@@ -24,6 +25,7 @@ from dotagent.agent.gate import HANDBACK_EVENT, TAKEOVER_EVENT, RunGate
 from dotagent.agent.keep_going import keep_going_ask
 from dotagent.agent.lessons import LessonCase, dismiss_lesson, learn, save_lesson
 from dotagent.agent.loop import AgentRun, RunEnd, RunOpening, browser_of, run_agent
+from dotagent.agent.owners import RunOwner, clear_gone_owners, owner_alive
 from dotagent.agent.plan import EMPTY_PLAN, PLAN_EVENT, plan_from_event
 from dotagent.agent.playbooks import learn_playbook, playbook_case
 from dotagent.agent.reflection import Reflection, reflect
@@ -50,7 +52,7 @@ from dotagent.core.errors import (
     RunConflict,
 )
 from dotagent.core.logs import get_logger
-from dotagent.core.paths import chrome_data_dir
+from dotagent.core.paths import chrome_data_dir, failsafe_path, run_owners_dir
 from dotagent.core.text import redact_secrets, truncate_tail
 from dotagent.llm.router import ModelRef, parse_model_ref
 from dotagent.llm.types import Effort, ModelInfo, user_message
@@ -166,6 +168,10 @@ class RunManager:
         self._stopping: bool = False
         # Active runs the owner's emergency stop is ending (:meth:`emergency_stop`).
         self._emergency: set[str] = set()
+        # How many emergency stops there were: a run being launched as one comes ends as one too (:meth:`_launch`).
+        self._stops: int = 0
+        # This process's hold on the runs it drives, taken with its first run (:mod:`dotagent.agent.owners`).
+        self._owner: RunOwner | None = None
         # Runs that ended and whose lessons are being drawn (:mod:`dotagent.agent.lessons`), by run id.
         self._learning: dict[str, asyncio.Task[None]] = {}
         # Runs that ended whose playbook is being written or whose use of playbooks is being recorded, by run id.
@@ -176,9 +182,18 @@ class RunManager:
         self._answering: asyncio.Lock = asyncio.Lock()
 
     async def recover(self) -> int:
-        """Close out what a previous process left behind. Returns the number of interrupted runs."""
-        interrupted: int = await self._runtime.store.mark_interrupted_runs()
-        await self._runtime.store.expire_pending_approvals()
+        """Close out what processes that are gone left behind: the runs they left active, the approvals of runs no
+        longer active, and their lock files. The runs of a process that lives (``dotx run`` in a terminal) go on, with
+        the approvals they wait on. Returns the number of runs closed."""
+        store: Store = self._runtime.store
+        directory: Path = run_owners_dir()
+        gone: list[str] = []
+        for owner in await store.active_run_owners():
+            if owner is not None and not await asyncio.to_thread(owner_alive, directory, owner):
+                gone.append(owner)
+        interrupted: int = await store.mark_interrupted_runs(gone)
+        await store.expire_pending_approvals()
+        await asyncio.to_thread(clear_gone_owners, directory)
         return interrupted
 
     def active_run_ids(self) -> list[str]:
@@ -405,6 +420,13 @@ class RunManager:
         if (await runtime.store.get_campaign(campaign.id)).status != "active" and run.id in self._handles:
             log.info("campaign_session_stopped_at_its_start", campaign_id=campaign.id, run_id=run.id)
             self.cancel(run.id)
+        # So does the owner's emergency stop, under which no session starts: the session ends as one, and its campaign
+        # stops with it.
+        elif await asyncio.to_thread(failsafe_path().exists):
+            log.info(
+                "campaign_session_stopped_by_an_emergency_stop_at_its_start", campaign_id=campaign.id, run_id=run.id
+            )
+            self.end_by_emergency_stop(run.id)
         return run
 
     async def resume_campaigns(self) -> int:
@@ -571,12 +593,19 @@ class RunManager:
 
     def emergency_stop(self) -> list[str]:
         """Stop every active run as the owner's emergency stop: each ends with :data:`RESULT_EMERGENCY_STOPPED`, so
-        the campaign of a session stops instead of planning the next one. Returns the ids of the runs stopped."""
+        the campaign of a session stops instead of planning the next one; a run being launched meanwhile ends so once it
+        is registered (:meth:`_launch`). Returns the ids of the runs stopped."""
+        self._stops += 1
         active: list[str] = self.active_run_ids()
         for run_id in active:
+            self.end_by_emergency_stop(run_id)
+        return active
+
+    def end_by_emergency_stop(self, run_id: str) -> None:
+        """End the run ``run_id`` as the owner's emergency stop, when it is still active."""
+        if run_id in self._handles:
             self._emergency.add(run_id)
             self.cancel(run_id)
-        return active
 
     def held(self, run_id: str) -> bool:
         """Whether the user holds the run (took its browser over); false for a run that is not active."""
@@ -657,6 +686,10 @@ class RunManager:
             task.cancel()
         if learning:
             await asyncio.wait(learning)
+        if self._owner is not None:
+            # Its runs have ended: this process lets go of them.
+            await asyncio.to_thread(self._owner.release)
+            self._owner = None
 
     def _handle(self, run_id: str) -> RunHandle:
         handle: RunHandle | None = self._handles.get(run_id)
@@ -842,6 +875,43 @@ class RunManager:
         campaign_id: str | None,
         agent_id: str | None,
     ) -> tuple[RunRecord, RunHandle]:
+        """Create the run, register it and start its task (:meth:`_launch_run`). An emergency stop that comes while it
+        is being launched found it not registered yet: the run ends as one once it is."""
+        stops: int = self._stops
+        run, handle = await self._launch_run(
+            goal,
+            mode,
+            model,
+            thread_id,
+            source,
+            parent_run_id,
+            effort,
+            approvals,
+            goal_mode,
+            opening,
+            campaign_id,
+            agent_id,
+        )
+        if self._stops != stops:
+            log.info("run_stopped_by_an_emergency_stop_at_its_start", run_id=run.id)
+            self.end_by_emergency_stop(run.id)
+        return run, handle
+
+    async def _launch_run(
+        self,
+        goal: str,
+        mode: RunMode,
+        model: str | None,
+        thread_id: str | None,
+        source: str,
+        parent_run_id: str | None,
+        effort: Effort | None,
+        approvals: ApprovalMode | None,
+        goal_mode: bool | None,
+        opening: RunOpening,
+        campaign_id: str | None,
+        agent_id: str | None,
+    ) -> tuple[RunRecord, RunHandle]:
         """Create the run, register it and start its task. A run launched by an active, untrusted parent is untrusted;
         ``campaign_id`` makes it a session of that campaign."""
         runtime: Runtime = self._runtime
@@ -892,6 +962,13 @@ class RunManager:
         finally:
             self._claimed.discard(thread_id)
 
+    def _owner_id(self) -> str:
+        """The owner of this process's runs, taken with the first of them; nothing awaits between the check and the
+        take, so two runs that start at once share it."""
+        if self._owner is None:
+            self._owner = RunOwner(run_owners_dir())
+        return self._owner.id
+
     def _claim_thread(self, thread_id: str) -> None:
         """Reserve a thread for a run that is about to be registered. The check and the claim have no await between
         them, so two sends to one thread cannot both pass: the second meets the claim of the first, or its handle."""
@@ -934,6 +1011,7 @@ class RunManager:
             with_goal_mode,
             campaign_id,
             agent_id,
+            self._owner_id(),
         )
         # Until the handle is registered no task will end the stored run: one that fails or is cancelled before
         # that ends here, failed, instead of staying queued.

@@ -325,7 +325,7 @@ async def _context(runtime: Runtime, campaign_id: str | None) -> ToolContext:
 async def _context_in(runtime: Runtime, campaign_id: str | None, approvals: ApprovalMode) -> ToolContext:
     thread: ThreadRecord = await runtime.store.create_thread("typed judge", "test")
     run: RunRecord = await runtime.store.create_run(
-        thread.id, GOAL, "task", "ollama:none", None, "test", "medium", approvals, False, campaign_id, None
+        thread.id, GOAL, "task", "ollama:none", None, "test", "medium", approvals, False, campaign_id, None, None
     )
     return ToolContext(
         runtime=runtime,

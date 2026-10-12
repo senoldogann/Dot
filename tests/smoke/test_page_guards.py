@@ -1,6 +1,7 @@
 """Guards of the web UI (item 139): a note sent twice from the keyboard before the first save is answered is kept once,
 and an answer of the daemon's address that is not JSON (a proxy's page) is an error that names the path and the status,
-not a bare parse error. The page sends its token only to a daemon that has proven it holds it (item 143)."""
+not a bare parse error. The page sends its token only to a daemon that has proven it holds it (item 143), and says a
+stream is live only once the server has taken it (item 144)."""
 
 import asyncio
 import json
@@ -31,6 +32,8 @@ NOTE: str = "I prefer short answers."
 # Long enough for a second save, sent with the first, to be sent and stored too.
 _SETTLE_S: float = 0.5
 _PROOF: re.Pattern[str] = re.compile(r"/api/proof\?")
+# Long enough for the page to try a stream that is not answered twice (it waits 0.5 s, then 1 s).
+_RETRIES_MS: int = 1200
 
 
 @pytest_asyncio.fixture(scope="module", loop_scope="module")
@@ -181,3 +184,39 @@ async def test_the_page_sends_its_token_only_to_a_daemon_that_proves_it_holds_it
             assert "/api/status" in carried
         finally:
             await browser.close()
+
+
+async def test_a_stream_is_said_to_be_live_only_once_the_server_has_taken_it(page: Page) -> None:
+    """Item 144: a stream the server does not take is never said to be live, however often the page tries it again;
+    one it takes is, once it is connected."""
+
+    async def unavailable(route: Route) -> None:
+        await route.fulfill(
+            status=503, content_type="application/json", body='{"message": "unavailable", "context": {}}'
+        )
+
+    await page.route("**/api/unavailable-stream*", unavailable)
+    told: JsonValue = await page.evaluate(
+        """async (waitMs) => {
+            const { follow } = await import("/js/api.js");
+            const statesOf = async (path) => {
+                const states = [];
+                const controller = new AbortController();
+                const following = follow({
+                    path,
+                    after: 0,
+                    signal: controller.signal,
+                    onMessage: () => undefined,
+                    onState: (state) => states.push(state),
+                    isFinished: () => false,
+                });
+                await new Promise((resolve) => setTimeout(resolve, waitMs));
+                controller.abort();
+                await following;
+                return states;
+            };
+            return [await statesOf("/unavailable-stream"), await statesOf("/stream")];
+        }""",
+        _RETRIES_MS,
+    )
+    assert told == [["reconnecting", "reconnecting"], ["live"]]

@@ -142,7 +142,7 @@ def _reply(text: str, tools: list[str]) -> tuple[str, JsonObject]:
 
 async def _run(store: Store, thread_id: str, model: str, events: list[tuple[str, JsonObject]]) -> RunRecord:
     run: RunRecord = await store.create_run(
-        thread_id, "goal", "task", model, None, "test", "medium", "ask", False, None, None
+        thread_id, "goal", "task", model, None, "test", "medium", "ask", False, None, None, None
     )
     for kind, data in events:
         await store.add_event(run.id, kind, data)

@@ -26,6 +26,7 @@ from dotagent.core.paths import (
     failsafe_path,
     playbooks_dir,
     plugins_data_dir,
+    run_owners_dir,
     screenshots_dir,
     skills_dir,
     token_path,
@@ -146,8 +147,8 @@ def _tool_groups(config: AppConfig, judge_items: bool) -> tuple[tuple[Registered
 
 def _guarded_files() -> tuple[Path, ...]:
     """What the agent must neither read nor change: secrets, the browser profiles (Dot's own and the Chrome of the
-    user), the settings that decide what it may do (policy, rules, MCP servers), its own database and the journals of
-    file changes (``dotx undo`` writes back what a journal says)."""
+    user), the settings that decide what it may do (policy, rules, MCP servers), its own database, the journals of
+    file changes (``dotx undo`` writes back what a journal says) and the locks that tell which process drives a run."""
     database: Path = db_path()
     return (
         env_file_path(),
@@ -160,6 +161,7 @@ def _guarded_files() -> tuple[Path, ...]:
         database.with_name(f"{database.name}-wal"),
         database.with_name(f"{database.name}-shm"),
         undo_dir(),
+        run_owners_dir(),
     )
 
 

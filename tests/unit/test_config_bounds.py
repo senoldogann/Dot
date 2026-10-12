@@ -1,5 +1,6 @@
 """The numbers of the configuration that would stop the daemon from working are refused when it is read: no run could
-start, the scheduler would spin, every call would time out at once, or a browser wait would never end."""
+start, the scheduler would spin, every call would time out at once, a browser wait would never end, or every look at a
+page would fail."""
 
 import pytest
 from pydantic import ValidationError
@@ -39,6 +40,25 @@ def _with(path: tuple[str, ...], value: float) -> JsonObject:
 def test_a_number_that_would_stop_the_daemon_is_refused(path: tuple[str, ...]) -> None:
     with pytest.raises(ValidationError) as refused:
         AppConfig.model_validate(_with(path, 0))
+    assert [error["loc"] for error in refused.value.errors()] == [path]
+
+
+@pytest.mark.parametrize(
+    ("path", "value"),
+    [
+        (("browser", "viewport_width"), 0),
+        (("browser", "viewport_width"), 100_000),
+        (("browser", "viewport_height"), 0),
+        (("browser", "viewport_height"), 100_000),
+        (("browser", "screenshot_quality"), 0),
+        (("browser", "screenshot_quality"), 101),
+        (("browser", "viewport_margin_px"), -1),
+    ],
+)
+def test_a_page_size_or_a_screenshot_quality_chrome_cannot_take_is_refused(path: tuple[str, ...], value: int) -> None:
+    """Item 144: a page Chrome cannot open, or a screenshot it cannot take, would fail every run's first look."""
+    with pytest.raises(ValidationError) as refused:
+        AppConfig.model_validate(_with(path, value))
     assert [error["loc"] for error in refused.value.errors()] == [path]
 
 

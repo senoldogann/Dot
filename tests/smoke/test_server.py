@@ -703,7 +703,7 @@ async def _stored_run(runtime: Runtime, parent_run_id: str | None) -> RunRecord:
     """A run that only exists in the store, in a thread of its own."""
     thread: ThreadRecord = await runtime.store.create_thread("stream test", "test")
     return await runtime.store.create_run(
-        thread.id, "goal", "task", MODEL_REF, parent_run_id, "test", "medium", "ask", False, None, None
+        thread.id, "goal", "task", MODEL_REF, parent_run_id, "test", "medium", "ask", False, None, None, None
     )
 
 
@@ -1055,7 +1055,7 @@ async def _chat(runtime: Runtime, title: str, runs: int) -> tuple[ThreadRecord, 
     for _ in range(runs):
         made.append(
             await runtime.store.create_run(
-                thread.id, f"{title} goal", "chat", MODEL_REF, None, "test", "medium", "ask", False, None, None
+                thread.id, f"{title} goal", "chat", MODEL_REF, None, "test", "medium", "ask", False, None, None, None
             )
         )
     return thread, made
@@ -1114,7 +1114,7 @@ async def test_deleting_chats_takes_their_runs_delegations_events_and_approvals_
     grandchild: RunRecord = await _stored_run(runtime, child.id)
     # The thread of the grandchild also holds a run of its own, so it stays; the thread of the child does not.
     own: RunRecord = await runtime.store.create_run(
-        grandchild.thread_id, "own goal", "task", MODEL_REF, None, "test", "medium", "ask", False, None, None
+        grandchild.thread_id, "own goal", "task", MODEL_REF, None, "test", "medium", "ask", False, None, None, None
     )
     kept_chat, (kept,) = await _chat(runtime, "kept chat", 1)
     await runtime.store.append_messages(doomed.id, [_said("hello")])

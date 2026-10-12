@@ -17,6 +17,7 @@ from playwright.async_api import async_playwright
 from dotagent.browser.chrome_import import ImportReport, has_stored_cookies, import_chrome_profile
 from dotagent.browser.keychain import KeychainMode, read_keychain_mode
 from dotagent.browser.login import chrome_arguments
+from dotagent.browser.profile_lock import profile_holder_pid
 from dotagent.browser.session import BrowserSession
 from dotagent.cli_browser import _readable_cookies
 from dotagent.config import BrowserConfig, ServerConfig, load_config, load_default_config
@@ -28,6 +29,8 @@ SERVER: ServerConfig = load_default_config().server
 _READY_TIMEOUT_S: float = 20.0
 _EXIT_TIMEOUT_S: float = 20.0
 _POLL_S: float = 0.2
+# How often a test looks for the lock Chrome takes on its profile as it starts.
+_LOCK_POLL_S: float = 0.005
 
 
 def free_port() -> int:
@@ -122,3 +125,31 @@ async def test_the_sign_ins_of_a_profile_that_a_real_chrome_wrote_are_imported(p
     assert report.cookies == 1
     assert has_stored_cookies(dot_profile)
     assert read_keychain_mode(dot_profile) == "system"
+
+
+async def _chrome_starting(profile: Path) -> None:
+    """Return once a Chrome has taken the lock on ``profile``: it is starting."""
+    while True:
+        if (profile / "SingletonLock").is_symlink():
+            return
+        await asyncio.sleep(_LOCK_POLL_S)
+
+
+async def test_a_launch_given_up_while_chrome_starts_leaves_the_profile_free(
+    profile: Path, headless_config: BrowserConfig, tmp_path: Path
+) -> None:
+    """Item 144: a call given up while Dot's own Chrome starts (its run stopped) leaves no Chrome holding the profile:
+    the one the launch started is closed once it is up, and the next call starts Chrome again."""
+    session: BrowserSession = BrowserSession(headless_config, SERVER, profile, tmp_path / "downloads")
+    try:
+        opening: asyncio.Task[int] = asyncio.create_task(session.stored_cookie_count())
+        async with asyncio.timeout(_READY_TIMEOUT_S):
+            await _chrome_starting(profile)
+        opening.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await opening
+        assert profile_holder_pid(profile) is None
+        async with asyncio.timeout(_READY_TIMEOUT_S):
+            assert await session.stored_cookie_count() == 0
+    finally:
+        await session.aclose()

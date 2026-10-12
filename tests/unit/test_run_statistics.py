@@ -51,7 +51,7 @@ async def _run(
     store: Store, thread_id: str, model: str, status: RunStatus, result: str, steps: int, tokens: int
 ) -> RunRecord:
     run: RunRecord = await store.create_run(
-        thread_id, "goal", "task", model, None, "test", "medium", "ask", False, None, None
+        thread_id, "goal", "task", model, None, "test", "medium", "ask", False, None, None, None
     )
     await store.set_run_steps(run.id, steps)
     await store.add_run_tokens(run.id, tokens, tokens // 10)
@@ -454,7 +454,7 @@ async def test_a_note_is_scored_by_how_the_runs_handed_it_ended(tmp_path: Path) 
     await store.mark_memories_used(done.id, [note.id], time.time(), "live")
     await store.close_memory_uses(done.id, "done")
     working: RunRecord = await store.create_run(
-        thread.id, "goal", "task", "ollama:a", None, "test", "medium", "ask", False, None, None
+        thread.id, "goal", "task", "ollama:a", None, "test", "medium", "ask", False, None, None, None
     )
     await store.mark_memories_used(working.id, [note.id], time.time(), "search")
     assert await store.memory_scores([note.id], 0.0) == {note.id: MemoryScore(handed=2, done=1, failed=0)}
