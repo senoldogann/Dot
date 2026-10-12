@@ -528,9 +528,9 @@ the same way, except in a run nobody can answer during it (see
 
 **Emergency stop.** Any of these stops Dot from controlling the desktop:
 
-- the **Emergency stop** button of the web UI (the red square at the top right of every page, or `POST
-  /api/failsafe`) creates the `STOP` file in the home directory and cancels every run; the page shows a banner with a
-  button that releases it
+- the **Emergency stop** button of the web UI (the red square in the sidebar's foot beside Settings, or beside the
+  button that shows the sidebar while it is closed; or `POST /api/failsafe`) creates the `STOP` file in the home
+  directory and cancels every run; the page shows a banner with a button that releases it
 - `touch ~/Library/Application\ Support/Dot/STOP` blocks desktop control the same way; delete the file to allow it again
 - with `[desktop] failsafe_corner = true` (the default), moving the pointer into the top-left corner of the screen
   aborts the desktop step in progress, and Dot never clicks that corner
@@ -843,7 +843,9 @@ page of their own.
 The sidebar lists your chats (the conversation threads) grouped by day, newest activity first; a live dot marks those
 with a run going on, waiting for you or failed, and a chat opens at its latest run. Above the list: a search over the titles
 (⌘K or `/`), **New chat** (⇧⌘O) and the ways to **Agents**, **Activity** and **Campaigns**; in the foot,
-**Settings**. The sections (Waiting for you, Working, Chats) fold on a click of their label, and the folds are kept
+**Settings** and the red square of the **Emergency stop** (which comes along beside the button that shows the sidebar
+while the sidebar is closed). The top bar shows only what needs you: the approvals waiting, and the connection to the
+daemon while it is being made or lost; the runs that work are counted in the Working section. The sections (Waiting for you, Working, Chats) fold on a click of their label, and the folds are kept
 between visits. The sidebar's head holds only the button that folds it away. **Select** turns the list into checkboxes: tick chats
 (or Select all) and **Delete** asks once, then removes them with every run, step, event and approval of theirs. A chat
 with a run under way is refused: wait for the run to end, or cancel it. Escape leaves the selection. Under 860 px the
@@ -891,16 +893,17 @@ MCP server with its tools, read from the daemon as a run reads them (`GET /api/p
 move, Enter or Tab picks and Escape closes. A skill picked reads "use the skill NAME: " in the box, a tool its name, a
 command does its work. A run that waits for your approval shows above the composer.
 
-A run opens as a conversation under Dot's face and name, with the state of the run and when it started. The face is the
-state: still when the run rests, a slow breath while it works, an amber ring while it waits for you, a green tick for
-a moment when the run ends done, red when it failed (with reduced motion the tick simply shows). Its chips (the
-model, the approval mode, goal mode) and buttons sit on the right. Your goal is the first message, in the bubble
+A run opens as a conversation under Dot's face and name. The face is the state: still when the run rests, a slow
+breath while it works, an amber ring while it waits for you, a green tick for a moment when the run ends done, red when
+it failed (with reduced motion the tick simply shows). The panel button sits on the right; the run's facts (its state,
+start, agent, model, approval mode, goal mode and campaign) are in the panel's Details card. Your goal is the first
+message, in the bubble
 of your messages on the raised surface. A delegated run is a row: the face with its state at the corner (turning while it works, amber while it
 waits for you, green with a check when it is done, red when it failed), its goal over the last thing it did, the
 time it has taken, the way to its own page and a chevron that opens its steps; rows that follow each other share one
 card. Its own page names the parent in the top bar as a breadcrumb (the parent's goal, a link, then its own) and
 closes the conversation with a pill: the model, how long it took ("Completed in 1m 46s", "Working for 2m"), whether
-its parent still works ("Runs on its own" once not) and "Open parent". The tool calls of one
+its parent still works ("Runs on its own" once not), "Open parent" and, while it works, **Stop**. The tool calls of one
 stretch of work fold into a single
 "Worked for 12 s (model 8 s) · 5 tool calls" line, where the part in brackets is how much of that time the model's turns
 took (open it for every call, result and screenshot), while approvals, questions and policy notes stay in the open. The
@@ -914,20 +917,22 @@ the provider served from its cache, the output tokens, the compactions (with the
 delegated. It is `GET /api/runs/{id}/stats` (the same numbers as `dotx stats --run ID`), read again every ten seconds
 while the run works and once at its end. A strip under
 the head links the other runs of the same thread, and the box at the bottom steers a run that is going on or follows up
-on a finished one. A Details panel shows the status, the model and its reasoning level, the approval mode and goal mode,
-the model turns, the tool calls (with the failed ones), the tokens (of every model call of the run: its steps and its
-side calls, such as compactions, reviews and the goal check), the duration and the run id, then the plan, an Actions
+on a finished one. While the run works and the box is empty, the box's send is the run's **Stop** (a round button in
+the danger colour with a square) and cancels it; a word typed turns it back into the send, and the message steers the
+run. A run the daemon cut off offers **Continue** on a line above the box. A Details panel shows the status, the agent
+of a chat with one, the model and its reasoning level, the approval mode and goal mode, the campaign of a session, the
+model turns, the tool calls (with the failed ones), the tokens (of every model call of the run: its steps and its
+side calls, such as compactions, reviews and the goal check), the duration, the start and the run id, then the plan, an Actions
 card and the latest screenshots. It stays closed until the panel button in the head of the run opens it (the choice is
 kept in the browser); open, it sits beside the conversation from 960 px and is a drawer below that. The run's head
-is the top bar itself: Dot's face, name, state and start on the left, the model and mode chips, the panel button,
-Continue and Cancel on the right before the daemon's pills; the bar is solid with a hairline under it, so nothing
-scrolls under a blur, the panel stays in place under it, and the box stays at the bottom. On a phone the bar keeps the
-face, the name and the buttons; the chips wait in the Details card. Every other page names itself in the same bar
+is the top bar itself: Dot's face and name on the left, the panel button on the right; the bar is solid with a
+hairline under it, so nothing scrolls under a blur, the panel stays in place under it, and the box stays at the bottom.
+Every other page names itself in the same bar
 (Agents, Activity, Campaigns, Settings) and opens with one line of description.
 
 In the conversation each turn of the actor (Dot, or the agent the run belongs to, in its look), and the answer at the
-end, opens with its still face; the run's state is the top bar's face and badge, with no card for it at the head of the
-conversation. The panel's cards (Dot's computer, Details, Plan,
+end, opens with its still face; the run's state is the top bar's face and the first fact of Details, with no card for
+it at the head of the conversation. The panel's cards (Dot's computer, Details, Plan,
 Actions, Screen) arrive folded, each with a one-line summary, and
 open at a click; the choice is kept per card. Beside the conversation the panel has a size: three buttons above Dot's
 computer make it **Compact** (its own 320 px), **Wide** (half of the page) or **Full** (the conversation at its narrowest,

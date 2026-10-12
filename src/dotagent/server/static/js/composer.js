@@ -215,8 +215,10 @@ export function wireComposer(textarea, { maxPx, send, commands, edited }) {
  * button (`sendLabel` its words). `commands` are the slash menu's own; `send()` runs on Enter and on the button.
  * `draftKey` (or null) keeps the text and the ready files under `dot.draft.<key>` until `clear()` after a send.
  * `listener` (`{ focus(on), typing() }`, or null) hears the box, for a face that listens. The frame carries
- * `data-empty` while the box holds no text, so the send rests quiet. Returns `element`, `textarea`, `attachments`,
- * `options`, `sendButton`, `setSendLabel(text)`, `autosize()`, `clear()` and `dispose()`.
+ * `data-empty` while the box holds no text, so the send rests quiet. `setStop(handler)` (item 120) turns the send into a
+ * Stop, a round button in the danger colour with a square, while the box holds no text: pressed, it runs `handler`; a
+ * word typed brings the send back, and `setStop(null)` ends it. Returns `element`, `textarea`, `attachments`,
+ * `options`, `sendButton`, `setSendLabel(text)`, `setStop(handler)`, `autosize()`, `clear()` and `dispose()`.
  */
 export function composerFrame({ label, boxLabel, placeholder, maxPx, commands, send, sendLabel, draftKey, listener }) {
   const textarea = el("textarea", { class: "textarea", rows: "1", placeholder, "aria-label": boxLabel });
@@ -237,11 +239,26 @@ export function composerFrame({ label, boxLabel, placeholder, maxPx, commands, s
 
   const attachments = createAttachments({ dropTarget: element, input: textarea, onChange: keep });
   const sendText = el("span", { class: "label" }, sendLabel);
-  const sendButton = el("button", { class: "btn primary send", type: "button", title: sendLabel, "aria-label": sendLabel }, icon("arrowUp"), sendText);
+  const arrow = icon("arrowUp");
+  const square = icon("stop");
+  const sendButton = el("button", { class: "btn primary send", type: "button", title: sendLabel, "aria-label": sendLabel }, arrow, sendText);
   const options = el("div", { class: "composer-options" });
+  let sendWords = sendLabel;
+  let stop = null;
+
+  function stopping() {
+    return stop !== null && textarea.value.trim() === "";
+  }
 
   function paintEmpty() {
     element.toggleAttribute("data-empty", textarea.value.trim() === "");
+    const stopShown = stopping();
+    element.toggleAttribute("data-stop", stopShown);
+    const words = stopShown ? "Stop" : sendWords;
+    sendButton.replaceChildren(stopShown ? square : arrow, sendText);
+    sendText.textContent = words;
+    sendButton.title = stopShown ? "Stop the run" : words;
+    sendButton.setAttribute("aria-label", words);
   }
 
   // Every change of the text, typed or put there by the slash menu, keeps the draft and repaints the send.
@@ -252,7 +269,7 @@ export function composerFrame({ label, boxLabel, placeholder, maxPx, commands, s
 
   const wired = wireComposer(textarea, { maxPx, send, commands, edited });
   element.append(wired.menu, textarea, attachments.list, attachments.picker, el("div", { class: "composer-bar" }, attachments.button, options, sendButton));
-  sendButton.addEventListener("click", send);
+  sendButton.addEventListener("click", () => (stopping() ? stop() : send()));
 
   function onInput() {
     edited();
@@ -280,9 +297,12 @@ export function composerFrame({ label, boxLabel, placeholder, maxPx, commands, s
     options,
     sendButton,
     setSendLabel: (text) => {
-      sendText.textContent = text;
-      sendButton.title = text;
-      sendButton.setAttribute("aria-label", text);
+      sendWords = text;
+      paintEmpty();
+    },
+    setStop: (handler) => {
+      stop = handler;
+      paintEmpty();
     },
     autosize: wired.autosize,
     clear: () => {

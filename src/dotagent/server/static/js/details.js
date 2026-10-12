@@ -1,5 +1,6 @@
-// The facts of one run for the side panel: its state, the model and the reasoning level it ran with, the work it did and how
-// long it took. The facts that never change are written once; `paint` brings the others up to date.
+// The facts of one run for the side panel: its state, the agent it is a chat with, the model and the reasoning level it ran
+// with, its approvals, the campaign it is a session of, the work it did and how long it took. The run page's top bar
+// shows none of them (item 120). The facts that never change are written once; `paint` brings the others up to date.
 
 import { compact, copyText, dateTimeFull, duration, el, modelName } from "./dom.js";
 import { levelLabel } from "./efforts.js";
@@ -13,10 +14,11 @@ function fact(label, value) {
 }
 
 /**
- * The details card of `run`. `paint(state)` takes what changes while the run goes, as
+ * The details card of `run`, of the chat with `agent` (`{ id, name, role }`, or null) and a session of `campaign`
+ * (`{ id, title, session }`, or null). `paint(state)` takes what changes while the run goes, as
  * `{ status, model, steps, calls, failed, input, output, finishedAt }`; `finishedAt` is null until the run is over.
  */
-export function createDetails(run) {
+export function createDetails(run, agent, campaign) {
   const status = el("dd");
   const model = el("dd");
   const turns = el("dd");
@@ -52,11 +54,15 @@ export function createDetails(run) {
       "dl",
       { class: "facts" },
       fact("Status", status),
+      agent === null ? null : fact("Agent", el("dd", null, el("a", { href: `#/agents/${agent.id}`, title: agent.role }, agent.name))),
       fact("Mode", el("dd", null, run.mode)),
       fact("Model", model),
       fact("Reasoning", el("dd", null, run.effort === null ? "Model default" : levelLabel(run.effort))),
       fact("Approvals", el("dd", null, approvalLabel(run.approvals))),
       fact("Goal mode", el("dd", null, run.goal_mode ? "On" : "Off")),
+      campaign === null
+        ? null
+        : fact("Campaign", el("dd", null, el("a", { href: `#/campaigns/${campaign.id}` }, campaign.title), `, session ${campaign.session}`)),
       fact("Model turns", turns),
       fact("Tool calls", calls),
       fact("Tokens", tokens),

@@ -8,14 +8,14 @@ import { createComputer } from "../computer.js";
 import { createCostCard } from "../cost.js";
 import { createDetails } from "../details.js";
 import { composerFrame } from "../composer.js";
-import { clip, dateTime, dateTimeFull, debounce, duration, el, modelName } from "../dom.js";
+import { clip, dateTimeFull, debounce, duration, el, modelName } from "../dom.js";
 import { allModels, levelLabel, offersChoice } from "../efforts.js";
 import { continuedIn, earlierTurns, loadHistory, RESUME_SOURCE } from "../history.js";
 import { dotName, faceState, faceStateAtEnd } from "../face.js";
 import { icon } from "../icons.js";
 import { createInspector } from "../inspector.js";
 import { userMessage } from "../messages.js";
-import { emptyPanel, errorPanel, foldCard, loadingPanel, statusBadge } from "../panels.js";
+import { emptyPanel, errorPanel, foldCard, loadingPanel } from "../panels.js";
 import { setStageTitle, setStageTools } from "../stage.js";
 import { createStageSize } from "../stagesize.js";
 import { loadModels, onLifecycle } from "../state.js";
@@ -26,11 +26,8 @@ const TERMINAL = new Set(["done", "failed", "cancelled"]);
 // A delegated run's goal in the bar and the words of its pill (item 82).
 const CRUMB_CHARS = 56;
 const FOOT_WORDS = { done: "Completed in", failed: "Failed after", cancelled: "Stopped after" };
-// The chips of a run that does not ask the user (the default needs none): the words and what they mean.
-const APPROVAL_CHIPS = {
-  auto: { text: "Auto-approve", hint: "A review model answered the questions of the safety policy in your place" },
-  yolo: { text: "YOLO", hint: "Nothing was asked: what the safety policy would ask ran at once and was recorded" },
-};
+// The words of a delegated run's pill for a run that does not ask the user (the default needs none).
+const APPROVAL_WORDS = { auto: "Auto-approve", yolo: "YOLO" };
 const NEAR_BOTTOM_PX = 140;
 // "/btw" followed by the side question; the question may span lines.
 const BTW_PATTERN = /^\/btw(?:\s+([\s\S]*))?$/i;
@@ -156,26 +153,17 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
   ctx.setTitle(clip(run.goal, TITLE_CHARS));
 
   // ---------------------------------------------------------------------------------------------- header
-  const statusSlot = el("span", { class: "chat-status" });
-  const modelChip = el("span", { class: "chip chat-model" });
-  const cancelButton = el(
-    "button",
-    {
-      class: "btn danger",
-      type: "button",
-      onclick: () =>
-        attempt(async () => {
-          await api.post(`/runs/${runId}/cancel`, null);
-          toast("ok", "Cancelling the run…");
-        }),
-    },
-    icon("stop"),
-    el("span", { class: "label" }, "Cancel"),
-  );
+  // The run is stopped from the composer's send while the box is empty, or from a delegated run's pill (item 120).
+  function stopRun() {
+    attempt(async () => {
+      await api.post(`/runs/${runId}/cancel`, null);
+      toast("ok", "Cancelling the run…");
+    });
+  }
   const resumeButton = el(
     "button",
     {
-      class: "btn primary",
+      class: "btn primary sm",
       type: "button",
       title: "Start a run on this conversation that goes on from where the daemon cut this one off",
       onclick: () =>
@@ -188,6 +176,14 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
     icon("arrowRight"),
     el("span", { class: "label" }, "Continue"),
   );
+  // Continue, for a run the daemon cut off, is a line above the composer (item 120).
+  const resumeLine = el(
+    "div",
+    { class: "note resume-line", hidden: true },
+    icon("alert"),
+    el("span", { class: "grow" }, "This run was cut off when the daemon stopped."),
+    resumeButton,
+  );
   // A delegated run (item 82) names its parent in the bar as a breadcrumb, the parent's goal a link before its own, and
   // closes its conversation with a pill: the model, how long it took, whether its parent still works, the way back.
   const parentId = run.parent_run_id;
@@ -196,6 +192,12 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
   const stageName = el("span", { class: "stage-name" }, parentId !== null ? clip(run.goal, CRUMB_CHARS) : agent !== null ? agent.name : dotName());
   const footTime = el("span", null);
   const footParent = el("span", null, "Part of another run");
+  const footStop = el(
+    "button",
+    { class: "child-stop", type: "button", title: "Stop this run", hidden: true, onclick: stopRun },
+    icon("stop"),
+    el("span", null, "Stop"),
+  );
   const foot =
     parentId === null
       ? null
@@ -206,10 +208,11 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
             "div",
             { class: "child-foot meta-facts" },
             el("span", null, run.effort === null ? modelName(run.model) : `${modelName(run.model)} ${levelLabel(run.effort)}`),
-            APPROVAL_CHIPS[run.approvals] === undefined ? null : el("span", null, APPROVAL_CHIPS[run.approvals].text),
+            APPROVAL_WORDS[run.approvals] === undefined ? null : el("span", null, APPROVAL_WORDS[run.approvals]),
             footTime,
             footParent,
             el("a", { href: `#/runs/${parentId}` }, "Open parent"),
+            footStop,
           ),
         );
 
@@ -235,29 +238,10 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
       })
       .catch((error) => console.warn("the parent run could not be loaded", error));
   }
-  const campaign = detail.campaign;
-  const campaignChip =
-    campaign === null
-      ? null
-      : el(
-          "a",
-          { class: "chip", href: `#/campaigns/${campaign.id}`, title: `Session ${campaign.session} of the campaign “${campaign.title}”` },
-          icon("target"),
-          `Campaign · session ${campaign.session}`,
-        );
-  const agentChip =
-    agent === null ? null : el("a", { class: "chip", href: `#/agents/${agent.id}`, title: `A chat with ${agent.name}: ${agent.role}` }, icon("user"), agent.name);
-  const approvalChip = APPROVAL_CHIPS[run.approvals];
-  const modeChips = [
-    approvalChip === undefined
-      ? null
-      : el("span", { class: `chip approvals-${run.approvals}`, title: approvalChip.hint }, icon(run.approvals === "yolo" ? "bolt" : "shield"), approvalChip.text),
-    run.goal_mode ? el("span", { class: "chip", title: "A checker keeps this run working until its goal is really reached" }, icon("target"), "Goal mode") : null,
-  ];
   const connectionNote = el("div", { class: "note warn", hidden: true }, icon("alert"), el("span", null, "Connection lost. Reconnecting…"));
 
   // ------------------------------------------------------------------------------------ details and plan
-  const details = createDetails(run);
+  const details = createDetails(run, agent, detail.campaign);
   const planBody = el("div", { class: "plan-list" });
   const plan = foldCard({ id: "run-plan", title: "Plan", actions: null, body: planBody, openByDefault: false });
   plan.element.hidden = true;
@@ -272,14 +256,10 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
 
   function paintStats() {
     paintFoot();
-    statusSlot.replaceChildren(statusBadge(status));
     // The tick of a run that just ended stays for its moment; every other state follows the status.
     if (face.getAttribute("data-state") !== "done") {
       setActorState(face, faceState(status));
     }
-    modelChip.hidden = model === "";
-    modelChip.textContent = run.effort === null ? modelName(model) : `${modelName(model)} · ${levelLabel(run.effort)}`;
-    modelChip.title = model;
     details.paint({
       status,
       model,
@@ -429,7 +409,7 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
     listener: null,
   });
   const { textarea: input, attachments, sendButton: send } = frame;
-  const dock = el("div", { class: "dock" }, frame.element);
+  const dock = el("div", { class: "dock" }, resumeLine, frame.element);
 
   // Steer messages that are sent but not read yet; each one leaves when the run reports reading it.
   const waitingMessages = [];
@@ -565,12 +545,13 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
   }
 
   function syncControls() {
-    cancelButton.hidden = !active;
-    resumeButton.hidden = active || !resumable;
-    // A delegated run is not steered: its dock keeps only the arrow down (item 96).
+    resumeLine.hidden = active || !resumable;
+    // A delegated run is not steered: its dock keeps only the arrow down (item 96), and its Stop is in its pill.
     const delegated = run.parent_run_id !== null;
     frame.element.hidden = delegated;
     dock.classList.toggle("dock-bare", delegated);
+    frame.setStop(active && !delegated ? stopRun : null);
+    footStop.hidden = !active;
     // Short enough for one line of a phone's composer (item 111).
     input.placeholder = active ? "Steer this run, or /btw to ask on the side" : "Follow up, or /btw to ask on the side";
     frame.setSendLabel(active ? "Steer" : "Follow up");
@@ -820,7 +801,7 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
   const stage = createStageSize({ layout });
   const computer = createComputer({ runId, active: detail.active, held: detail.held, name: actorName, sizes: stage.chooser });
   // The side panel (item 84): the computer, the details, the cost (item 96), the plan and the actions. The run's state
-  // is the top bar's face and badge; no card at the head of the conversation (item 113).
+  // is the top bar's face and the Details card's first fact; no card at the head of the conversation (item 113).
   const inspector = createInspector({
     layout,
     content: [computer.element, details.element, cost.element, plan.element, actionsCard.element],
@@ -853,12 +834,11 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
     historyProblem === null
       ? null
       : el("div", { class: "note warn" }, icon("alert"), el("span", null, `The earlier part of this conversation could not be loaded: ${historyProblem.message}`));
-  // Dot's face, name, the run's state and its start name the page in the top bar (item 78); the run's chips and
-  // buttons are the bar's tools, the chips waiting in the side panel's Details card on a phone. The goal, the first
-  // message, is the page's heading for a reader of the structure.
-  setStageTitle(face, crumb, crumbSep, stageName, el("span", { class: "stage-sub" }, statusSlot, el("span", { class: "stage-time" }, dateTime(run.created_at))));
-  // A delegated run's chips are in its pill and in the Details card; its bar keeps the room for the breadcrumb.
-  setStageTools(...(parentId === null ? [agentChip, modelChip, ...modeChips, campaignChip] : []), inspector.toggle, resumeButton, cancelButton);
+  // Dot's face and name, or a delegated run's breadcrumb, name the page in the top bar (item 78), and the side panel's
+  // switch is the bar's one tool (item 120): the run's state, start, agent, model, approvals and campaign are in the
+  // panel's Details card. The goal, the first message, is the page's heading for a reader of the structure.
+  setStageTitle(face, crumb, crumbSep, stageName);
+  setStageTools(inspector.toggle);
 
   layout.append(
     el(

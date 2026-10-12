@@ -533,27 +533,13 @@ a.pill:hover {
   color: var(--warn);
 }
 
-.pill.run {
-  background: var(--accent);
-  border-color: transparent;
-  color: var(--on-accent);
-}
-
-/* The stage bar's pills are quiet until they have something to say: a count that waits or runs is loud, the rest sit
-   without a border or a ground (item 74). */
-.stagebar .pill:not(.warn, .run) {
+/* The stage bar's pills are quiet until they have something to say: a count that waits is loud, the connection while it
+   is made or lost sits without a border or a ground (item 74). */
+.stagebar .pill:not(.warn) {
   border-color: transparent;
   background: transparent;
 }
 
-/* A live connection shows as its dot alone (shell.js). */
-.pill.quiet {
-  padding-inline: 8px;
-  border-color: transparent;
-  background: none;
-}
-
-.pill.quiet .label,
 .btn.failsafe .label {
   display: none;
 }
@@ -1180,19 +1166,6 @@ a.pill:hover {
   white-space: nowrap;
 }
 
-/* How a run was allowed to act: a reviewed run is marked, a run nobody was asked about is marked loudly. */
-.chip.approvals-auto {
-  background: var(--accent-weak);
-  color: var(--text);
-}
-
-.chip.approvals-yolo {
-  background: var(--warn-weak);
-  border-color: var(--warn-border);
-  color: var(--warn);
-  font-weight: var(--weight-label);
-}
-
 /* ---------- lists ---------- */
 
 .list-row {
@@ -1611,6 +1584,25 @@ a.pill:hover {
   color: var(--muted);
 }
 
+/* While the run works and the box is empty the send is its Stop (item 120): the danger colour with a filled square of
+   about a third of the button (the icon's square is 14 of its 24 units). */
+.composer[data-stop] .btn.send {
+  border-color: var(--bad);
+  background: var(--bad);
+  color: var(--on-bad);
+}
+
+.composer[data-stop] .btn.send:hover:not(:disabled) {
+  opacity: 0.9;
+}
+
+.composer[data-stop] .btn.send .icon {
+  width: 18px;
+  height: 18px;
+  fill: currentcolor;
+  stroke: none;
+}
+
 /* A composer and the one line under it while Keep going is on (runmodes.js): what the switch does, in a breath. */
 .composer-stack {
   display: flex;
@@ -1877,18 +1869,6 @@ a.pill:hover {
   min-width: 72px;
   overflow: hidden;
   text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.stage-sub {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex: none;
-  min-width: 0;
-  color: var(--muted);
-  font-size: var(--text-sm);
-  font-weight: var(--weight-text);
   white-space: nowrap;
 }
 
@@ -2646,6 +2626,30 @@ details[open] > summary .chev {
   justify-content: center;
 }
 
+/* A delegated run's Stop, the last word of its pill while it works (item 120). */
+.child-stop {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--bad);
+  font: inherit;
+  cursor: pointer;
+}
+
+.child-stop:hover {
+  text-decoration: underline;
+}
+
+.child-stop .icon {
+  width: 12px;
+  height: 12px;
+  fill: currentcolor;
+  stroke: none;
+}
+
 .child-foot {
   justify-content: center;
   padding: 8px 16px;
@@ -2803,6 +2807,16 @@ details[open] > summary .chev {
   margin-top: 0;
   padding: 0 0 44px;
   background: transparent;
+}
+
+/* Continue, for a run the daemon cut off, on a line above the composer (item 120); its word stays on a phone. */
+.resume-line {
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.resume-line .btn .label {
+  display: inline;
 }
 
 /* The dock's frame floats over the conversation: the one composer with a shadow; its box is one line high when empty. */
@@ -3271,16 +3285,11 @@ dialog.lightbox img {
 
 /* ---------- small screens ---------- */
 
-/* On a phone the bar keeps the face, the name and the run's buttons; the chips wait in the side panel's Details card. */
+/* On a phone the bar keeps the face, the name and the panel's switch. */
 @media (max-width: 720px) {
-  .stage-time {
-    display: none;
-  }
-
   /* The breadcrumb's parent waits in the pill under the conversation; the bar keeps the run's own name. */
   .stage-crumb,
-  .stage-sep,
-  .stagebar-row:has(.stage-crumb) .stage-sub {
+  .stage-sep {
     display: none;
   }
 

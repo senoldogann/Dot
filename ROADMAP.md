@@ -5039,8 +5039,8 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 116 | The deep review: every part of the code read once more, and fixed                   | done        | 0304257 |
 | 117 | The helper keeps its parent's rights: a delegated run takes its parent's mode       | done        | e51f9c1 |
 | 118 | Chrome behind: every tab opened in the background, the front given back             | done        | 6dfbf07 |
-| 119 | The models: the prompt cache on OpenCode Go's Messages route, the free ones marked   | in progress |         |
-| 120 | The run page's head: Stop in the send button's place, the emergency stop in the sidebar | planned     |         |
+| 119 | The models: the prompt cache on OpenCode Go's Messages route, the free ones marked   | done        | acfc56a |
+| 120 | The run page's head: Stop in the send button's place, the emergency stop in the sidebar | in progress |         |
 | 121 | The calm look, after T3 Code: the sidebar, the chat, the composer and the panel     | planned     |         |
 
 ### 77. The type system: Inter and Geist Mono, seven sizes, three weights
@@ -6777,7 +6777,7 @@ holds that opening tabs, reading pages and a page's own tab leave the front wher
 
 ### 119. The models: the prompt cache on OpenCode Go's Messages route, the free ones marked
 
-**Status: in progress.**
+**Status: done.** Merged as `acfc56a` (PR #142, MYP-259 Done).
 
 **As built (2026-10-12).** `_MESSAGES_OPTIONS` sends the automatic cache mark (`prompt_cache=True`). Measured on Go the
 same day: Claude Haiku 5.5 read a repeated prompt of ten thousand tokens from the cache only with the mark (10,383
@@ -6808,7 +6808,27 @@ a second call on Go's Messages route.
 
 ### 120. The run page's head: Stop in the send button's place, the emergency stop in the sidebar
 
-**Status: planned.**
+**Status: in progress.**
+
+**As built (2026-10-12).** The run page's top bar holds Dot's face and name (or a delegated run's breadcrumb) and the
+panel's switch, nothing else: the state badge and the start, the chips of the agent, the model, the approvals, Goal mode
+and the campaign, Cancel and Continue left it. The Details card gained the agent (a link to its page) and the campaign
+with its session, so every fact the bar showed is there. `composerFrame` has `setStop(handler)`: while a handler is set
+and the box holds no text, the send is a Stop (`data-stop` on the frame, the danger colour, a filled square of about a
+third of the button, its name "Stop") and pressing it runs the handler; a typed word gives the send back with its own
+words, and Enter never stops. The run page sets the handler, the run's cancel, while the run works and is not delegated;
+a delegated run, which has no composer, has a Stop as the last word of its pill while it works. Continue is a note line
+above the composer, its word kept on a phone. The frame's right keeps the approvals waiting and the connection only
+while it is not live; the running pill went, since the sidebar's Working section counts the runs. The emergency stop
+(`failsafeButton` in `failsafe.js`) sits in the sidebar's foot beside Settings and, so that it is never out of reach,
+beside the button that shows the sidebar while the sidebar is closed (on a phone, where the sidebar is a drawer, it is
+there by default). The styles nothing uses now (`.stage-sub`, `.stage-time`, `.pill.run`, `.pill.quiet`) went. The
+README's sidebar, run page and emergency stop passages follow. `tests/smoke/test_run_stop.py` holds the bar, the
+emergency stop's place, Stop and Steer on an empty and a typed box, and a Stop that cancels a scripted run waiting in
+the shell, wide and on a phone in both schemes; `test_activity.py` reads the Stop of a working parent and of its
+delegated run's pill, and `test_run_chrome.py` the bar's one tool; the smoke tests of the run page, the activity, the
+composer, the agents and the face pass (14), the tour passes and was read by eye at both widths in both schemes, and so
+do the 906 unit tests.
 
 **What.** The run page's top bar keeps the face, the title (with the parent's crumb for a delegated run) and the panel's
 switch; the state, the start, the agent, the model and its reasoning, the approvals, Goal mode and the campaign live in
@@ -7378,3 +7398,4 @@ states. The tour is read by eye at both widths and in both schemes.
 - 2026-10-12 (Opus 5.5): item 116 merged as `0304257` (PR #138, MYP-256 Done): the shell guard reads a line as the shell does (comments, `$'…'`, here-documents, arithmetic, each substituted command judged on its own, the directories, variables and links a line sets up, paths without regard to case, unreadable code asked about), the terminal's and the desktop's typing judged by the line it runs, a network fetch marks the run untrusted, and what four readers found in the agent, the tools, the server and the interface fixed; 903 unit tests, 84 smoke tests, the eval check and the tour read by eye; the daemon restarted on it with no run active.
 - 2026-10-12 (Opus 5.5): item 117 merged as `e51f9c1` (PR #140, MYP-257 Done): `delegate` has no `mode` and its run takes its parent's (a research run's helper is research, every other run's a task), so a yolo task run's helper has every right its parent has; `web_extract` keeps a field answered without a quote as an unverified value instead of failing the extraction; plan step evidence is cut at 400 characters instead of refused; 906 unit tests, 18 smoke tests, the eval check.
 - 2026-10-12 (Opus 5.5): item 118 merged as `6dfbf07` (PR #141, MYP-258 Done): every tab Dot opens is a background CDP target with a mark of its own (tabs made at the same time no longer share a page, a race the user's Chrome had since item 98), a tab a page opens itself gives the front back to the application that had it (with Accessibility), and `raise_window` keeps the tabs in front as before; 906 unit tests, 71 browser smoke tests.
+- 2026-10-12 (Opus 5.5): item 119 merged as `acfc56a` (PR #142, MYP-259 Done): OpenCode Go's Messages route sends the automatic cache mark (Claude Haiku 5.5 read 10,383 tokens of a repeated prompt from the cache with it, none without), Claude on Go goes to the Messages route (Claude Haiku 5.5 was sent to Chat Completions and refused), the catalog follows Go's list, the models Go serves free say Free in the picker, and Zen's free models stay out (OpenCode serves them only to its own client); 906 unit tests, 38 smoke tests and the live Go tests with the key.

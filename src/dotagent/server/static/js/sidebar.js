@@ -1,9 +1,10 @@
 // The sidebar: a new chat, a search over the chats, the ways to the agents, the activity and the campaigns, what waits
 // and what works (folded or not, as the owner left them), the chats themselves (several of them can be deleted at once)
-// and, in the foot, the way to the settings.
+// and, in the foot, the way to the settings and the emergency stop (item 120).
 
 import { ApiError, api, request } from "./api.js";
 import { clip, clipWords, debounce, el, foldSearch, plural } from "./dom.js";
+import { failsafeButton } from "./failsafe.js";
 import { icon } from "./icons.js";
 import { actorFace } from "./actors.js";
 import { nestRows, progressFacts } from "./nesting.js";
@@ -619,7 +620,7 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
       activityNav,
       el("nav", { class: "side-recent", "aria-label": "Chats" }, head, bar, list),
     ),
-    el("div", { class: "side-foot" }, settingsLink),
+    el("div", { class: "side-foot" }, settingsLink, failsafeButton()),
   );
 
   return {

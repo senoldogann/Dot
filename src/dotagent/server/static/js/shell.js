@@ -1,8 +1,8 @@
-// The frame around every page: the sidebar on the left (a drawer on narrow windows) and, above the page, the live
-// indicators of the daemon and the emergency stop.
+// The frame around every page: the sidebar on the left (a drawer on narrow windows) and, above the page, what needs the
+// owner: the approvals that wait, the connection while it is not live and the banner of an engaged emergency stop.
 
 import { el } from "./dom.js";
-import { engageFailsafe, releaseFailsafe } from "./failsafe.js";
+import { failsafeButton, releaseFailsafe } from "./failsafe.js";
 import { icon } from "./icons.js";
 import { setSidebarOpen, sidebarOpen, trackStagebar } from "./layout.js";
 import { installShortcuts, requestCompose } from "./shortcuts.js";
@@ -22,30 +22,9 @@ function buildIndicators() {
     waitingCount,
     el("span", { class: "label" }, "waiting"),
   );
-  const runningCount = el("span");
-  const running = el(
-    "span",
-    { class: "pill run", hidden: true, title: "Runs in progress" },
-    el("span", { class: "live-dot live" }),
-    runningCount,
-    el("span", { class: "label" }, "running"),
-  );
   const dot = el("span", { class: "live-dot connecting" });
   const connectionLabel = el("span", { class: "label" }, STREAM_LABEL.connecting);
   const connection = el("span", { class: "pill" }, dot, connectionLabel);
-  // The emergency stop is a red square at the top right of every page; its words are in its tooltip.
-  const stop = el(
-    "button",
-    {
-      class: "btn danger sm failsafe",
-      type: "button",
-      title: "Emergency stop: cancel every run and block desktop control",
-      "aria-label": "Emergency stop",
-      onclick: () => attempt(engageFailsafe),
-    },
-    icon("stop"),
-    el("span", { class: "label" }, "Emergency stop"),
-  );
   const banner = el(
     "div",
     { class: "banner", hidden: true, role: "alert" },
@@ -54,18 +33,16 @@ function buildIndicators() {
     el("button", { class: "btn sm", type: "button", onclick: () => attempt(releaseFailsafe) }, "Release"),
   );
   return {
-    pills: [waiting, running, connection, stop],
+    pills: [waiting, connection],
     banner,
     paint(snapshot) {
-      const active = snapshot.status === null ? 0 : snapshot.status.active_runs.length;
-      runningCount.textContent = String(active);
-      running.hidden = active === 0;
       waitingCount.textContent = String(snapshot.approvals.length);
       waiting.hidden = snapshot.approvals.length === 0;
       dot.className = `live-dot ${snapshot.stream}`;
       connectionLabel.textContent = STREAM_LABEL[snapshot.stream];
-      // A live connection is a green dot; the word only shows while the connection is being made or lost.
-      connection.classList.toggle("quiet", snapshot.stream === "live");
+      // The connection shows while it is being made or lost; a live one says nothing (item 120). The runs that work
+      // are counted in the sidebar's Working section.
+      connection.hidden = snapshot.stream === "live";
       connection.title = `Connection to the daemon: ${STREAM_LABEL[snapshot.stream]}`;
       banner.hidden = snapshot.status === null || !snapshot.status.failsafe_engaged;
     },
@@ -105,7 +82,8 @@ export function buildShell({ homeRoute }) {
     },
     icon("panelLeft"),
   );
-  const opener = el("div", { class: "stagebar-left" }, menu);
+  // While the sidebar is closed its opener brings the emergency stop of the sidebar's foot along.
+  const opener = el("div", { class: "stagebar-left" }, menu, failsafeButton());
   const main = el("main", { class: "page", tabindex: "-1" });
   const stagebar = el(
     "header",
