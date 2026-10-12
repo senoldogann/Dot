@@ -43,6 +43,7 @@ from dotagent.agent.executor import ToolOutcome, batch_steps, execute_calls
 from dotagent.agent.gate import RunGate
 from dotagent.agent.helpers import MODEL_SWITCHED_EVENT, Roster, current_roster
 from dotagent.agent.judge import ClaimJudgment, TypeSafeService, claim_refused, claim_state, describe_claim
+from dotagent.agent.keep_going import keep_going_ask
 from dotagent.agent.lessons import LessonCase, may_learn
 from dotagent.agent.limits import (
     LIMIT_EVENT,
@@ -856,6 +857,7 @@ async def _ask_checker(
         facts=await asyncio.to_thread(checked_facts, facts, ended.result, agent.runtime.workspace),
         answer=ended.result,
         claimed_success=ended.status == "done",
+        keep_going=keep_going_ask(run.goal) is not None,
     )
     # The typed judge, when one is on, refuses a claim it finds clearly false before the review model is called.
     if request.claimed_success:

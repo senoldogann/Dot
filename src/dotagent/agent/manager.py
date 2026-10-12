@@ -21,6 +21,7 @@ from dotagent.agent.campaign import (
     sessions_without_progress,
 )
 from dotagent.agent.gate import HANDBACK_EVENT, TAKEOVER_EVENT, RunGate
+from dotagent.agent.keep_going import keep_going_ask
 from dotagent.agent.lessons import LessonCase, dismiss_lesson, learn, save_lesson
 from dotagent.agent.loop import AgentRun, RunEnd, RunOpening, run_agent
 from dotagent.agent.plan import EMPTY_PLAN, PLAN_EVENT, plan_from_event
@@ -117,6 +118,13 @@ def _answer_text(question: ApprovalRecord, answer: str) -> str:
     return f"Answer to your question “{question.summary}”: {answer}"
 
 
+def _goal_mode_asked(goal: str, mode: RunMode, goal_mode: bool | None) -> bool | None:
+    """The goal mode of a run a person starts: on for a task or research run whose goal asks it to keep going until it
+    is done (item 132), on every model, whatever was chosen; otherwise as chosen. A delegated run, a campaign's session,
+    a resumed run and one that an answer starts do not come here: they keep the goal mode they are given."""
+    return True if mode != "chat" and keep_going_ask(goal) is not None else goal_mode
+
+
 async def _uncancelled(work: Coroutine[object, object, None]) -> None:
     """Run ``work`` to its end even when the caller is cancelled meanwhile (a second stop of a run while its end is
     being recorded), then raise the cancellation (item 116)."""
@@ -202,7 +210,9 @@ class RunManager:
         ``None``; ``files`` are the attachments that come with the goal.
 
         An ``effort`` that is given has to be one of the levels the model offers. ``goal_mode`` is for task and research
-        runs: asking for it on a chat is refused, and the configured default does not apply to a chat.
+        runs: asking for it on a chat is refused, and the configured default does not apply to a chat. A task or
+        research run whose goal asks it to keep going until it is done runs in goal mode whatever was chosen (see
+        :func:`_goal_mode_asked`).
         """
         if effort is not None:
             await self._check_effort(
@@ -217,7 +227,7 @@ class RunManager:
             parent_run_id,
             effort,
             approvals,
-            goal_mode,
+            _goal_mode_asked(goal, mode, goal_mode),
             RunOpening(text=goal, files=files, resumed=None),
             None,
             None,
@@ -239,7 +249,7 @@ class RunManager:
     ) -> RunRecord:
         """Queue a run of ``agent`` (item 86): what the request leaves out, the agent's own bounds fill in (its model,
         effort and approvals), and what the agent leaves out, the configured ones; the run carries the agent's id and
-        the loop adds its instructions to the prompt and keeps its tools."""
+        the loop adds its instructions to the prompt and keeps its tools. Goal mode is as for :meth:`start`."""
         model_ref: str | None = model if model is not None else (agent.model if agent.model != "" else None)
         level: Effort | None = effort if effort is not None else agent.effort
         approval_mode: ApprovalMode | None = approvals if approvals is not None else agent.approvals
@@ -256,7 +266,7 @@ class RunManager:
             None,
             level,
             approval_mode,
-            goal_mode,
+            _goal_mode_asked(goal, mode, goal_mode),
             RunOpening(text=goal, files=files, resumed=None),
             None,
             agent.id,

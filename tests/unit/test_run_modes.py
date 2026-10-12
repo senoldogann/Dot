@@ -212,6 +212,25 @@ def test_open_ended_goals_are_held_to_their_targets_in_task_and_research_runs_on
     assert section not in _in_mode("chat")
 
 
+def test_task_and_research_runs_keep_acting_and_take_an_ask_to_keep_going_at_its_word() -> None:
+    """Item 132: every model is held to the work and to the user's words; a chat turn ends with its reply, and a
+    campaign's session with its own part of the work."""
+    rules: tuple[str, ...] = (
+        "Do not stop to report progress or to offer what the goal asks for",
+        "take it at its word",
+    )
+    session: str = build_system_prompt(
+        collect_prompt_inputs(
+            "task", "cli", "aggressive", "ask", "wait", False, Path("/tmp/work"), [], [], [], 2, [], None, (), ()
+        )
+    )
+    for rule in rules:
+        assert rule in _in_mode("task")
+        assert rule in _in_mode("research")
+        assert rule not in _in_mode("chat")
+        assert rule not in session
+
+
 def test_a_negative_or_endless_limit_of_a_run_is_refused(tmp_path: Path) -> None:
     path: Path = tmp_path / "config.toml"
     for limit in ("run_max_tokens = -1", "run_max_minutes = -0.5", "run_max_minutes = inf", "run_max_minutes = nan"):

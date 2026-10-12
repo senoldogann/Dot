@@ -201,6 +201,7 @@ async def test_the_goal_checker_accepts_work_that_the_digest_shows(runtime: Runt
         facts=_facts("report.txt"),
         answer="I created report.txt and checked that it holds the word done.",
         claimed_success=True,
+        keep_going=False,
     )
     verdict: GoalVerdict = await _goal_checker(runtime)(request)
     assert verdict.decision == "achieved", verdict
@@ -216,6 +217,7 @@ async def test_the_goal_checker_sends_the_agent_back_for_what_the_digest_does_no
         facts=_facts("a.txt"),
         answer="Both files are created.",
         claimed_success=True,
+        keep_going=False,
     )
     verdict: GoalVerdict = await _goal_checker(runtime)(request)
     assert verdict.decision == "continue", verdict

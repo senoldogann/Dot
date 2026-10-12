@@ -241,7 +241,7 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
   const connectionNote = el("div", { class: "note warn", hidden: true }, icon("alert"), el("span", null, "Connection lost. Reconnecting…"));
 
   // ------------------------------------------------------------------------------------ details and plan
-  const details = createDetails(run, agent, detail.campaign);
+  const details = createDetails(run, agent, detail.campaign, detail.keep_going);
   const planBody = el("div", { class: "plan-list" });
   const plan = foldCard({ id: "run-plan", title: "Plan", actions: null, body: planBody, openByDefault: false });
   plan.element.hidden = true;
