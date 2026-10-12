@@ -16,7 +16,7 @@ from Quartz import PDFDocument
 from dotagent.core.errors import ToolExecutionError
 from dotagent.core.images import EncodedImage, encode_image
 from dotagent.core.text import truncate_middle
-from dotagent.policy.paths import PathClass, classify_path, expand_path
+from dotagent.policy.paths import CHANGES_DOT, PathClass, classify_path, expand_path
 from dotagent.policy.types import ActionInfo, Flag, Risk
 from dotagent.tools.base import (
     ACTING_MODES,
@@ -47,24 +47,27 @@ def resolve_path(raw: str, ctx: ToolContext) -> Path:
 
 
 def _read_action(tool: str, path: Path, ctx: ToolContext, verb: str) -> ActionInfo:
-    path_class: PathClass = classify_path(path, ctx.workspace, ctx.runtime.protected)
+    path_class: PathClass = classify_path(path, ctx.workspace, ctx.runtime.protected, ctx.runtime.dot_paths)
     flags: tuple[Flag, ...] = ("secret_access",) if path_class == "protected" else ()
     return ActionInfo(tool=tool, kind="read", risk="safe", summary=f"{verb} {path}", target=str(path), flags=flags)
 
 
 def _write_action(tool: str, path: Path, ctx: ToolContext, verb: str) -> ActionInfo:
-    path_class: PathClass = classify_path(path, ctx.workspace, ctx.runtime.protected)
+    path_class: PathClass = classify_path(path, ctx.workspace, ctx.runtime.protected, ctx.runtime.dot_paths)
     risk: Risk
     flags: tuple[Flag, ...]
+    summary: str = f"{verb} {path}"
     if path_class in ("workspace", "temp"):
         risk, flags = "low", ()
     elif path_class == "home":
         risk, flags = "medium", ("outside_workspace",)
     elif path_class == "system":
         risk, flags = "high", ("system_settings", "outside_workspace")
+    elif path_class == "dot":
+        risk, flags, summary = "high", ("secret_access",), f"{summary} ({CHANGES_DOT})"
     else:
         risk, flags = "high", ("secret_access",)
-    return ActionInfo(tool=tool, kind="write", risk=risk, summary=f"{verb} {path}", target=str(path), flags=flags)
+    return ActionInfo(tool=tool, kind="write", risk=risk, summary=summary, target=str(path), flags=flags)
 
 
 def _pdf_text(path: Path) -> str:

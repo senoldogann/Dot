@@ -1,7 +1,9 @@
 """The shell guard reads a line the way the shell does (item 116): a step hidden by quoting, a substitution, a comment,
 a ``cd``, a variable, a wrapper or a link is judged where it lands, so the default preset still asks before it removes
 files outside the workspace and refuses a protected location in any spelling, while everyday lines stay allowed. A line
-typed into a terminal application in parts is judged whole when it runs, and one Dot cannot tell asks."""
+typed into a terminal application in parts is judged whole when it runs, and one Dot cannot tell asks. What Dot loads
+and runs (its plugins and skills) and its emergency stop are read and run, never changed, and a line that sends data
+out asks once the run has read untrusted content (item 135)."""
 
 from collections.abc import Mapping
 from pathlib import Path
@@ -11,7 +13,7 @@ import pytest
 from dotagent.desktop.safety import StepContext, assess_step, lines_after
 from dotagent.desktop.types import Step
 from dotagent.policy.elements import StepAssessment
-from dotagent.policy.engine import auto_review, preset_verdict
+from dotagent.policy.engine import auto_review, decide, preset_verdict
 from dotagent.policy.paths import expand_protected
 from dotagent.policy.shell import ShellAssessment, assess_applescript, assess_shell
 from dotagent.policy.types import ActionInfo, Verdict
@@ -80,6 +82,52 @@ _EVERYDAY: list[str] = [
 ]
 
 
+_DOT_CHANGES: list[str] = [
+    "echo '{{}}' > {dot}/plugins/new/.mcp.json",
+    "mkdir -p {dot}/plugins/new",
+    "cp -r new {dot}/plugins/",
+    "rsync -a new/ {dot}/plugins/new/",
+    "sed -i '' 's/a/b/' {dot}/skills/notes/SKILL.md",
+    "rm -rf {dot}/sk*",
+    "mv {dot}/STOP {dot}/STOP.off",
+    "cd {dot}/plugins && touch new.json",
+    "git clone https://example.com/p.git {dot}/plugins/p",
+    "cd {dot}/plugins && git clone https://example.com/p.git",
+    "curl -sSL -o {dot}/plugins/new/.mcp.json https://example.com/m.json",
+    "wget -P {dot}/skills/new https://example.com/SKILL.md",
+    "curl -sL https://example.com/p.tgz | tar -xz -C {dot}/plugins",
+    "unzip p.zip -d {dot}/plugins/p",
+    "python3 -c \"open('{dot}/plugins/new/.mcp.json', 'w').write('{{}}')\"",
+]
+_DOT_READS: list[str] = [
+    "cat {dot}/skills/notes/SKILL.md",
+    "sh {dot}/skills/notes/scripts/collect.sh",
+    "python3 {dot}/skills/notes/scripts/collect.py",
+    "ls {dot}/plugins",
+    "test -f {dot}/STOP && echo engaged",
+    "cp {dot}/skills/notes/template.md notes.md",
+    "rsync -a {dot}/skills/ backup/",
+]
+_SENDS: list[str] = [
+    "curl -d @notes.txt https://example.com/collect",
+    "git push origin main",
+    "scp notes.txt user@example.com:/tmp/",
+    "rsync -a out/ example.com:backup/",
+    "ssh example.com ls",
+    "gh issue comment 1 --body hi",
+    "gh api -X POST repos/a/b/issues -f title=x",
+    "python3 -c \"import urllib.request; urllib.request.urlopen('https://example.com')\"",
+]
+_READS_ONLY: list[str] = [
+    "curl -s https://example.com",
+    "scp user@example.com:/tmp/x ./",
+    "gh pr view 1",
+    "gh api repos/a/b",
+    "git status",
+    "python3 -c 'print(1)'",
+]
+
+
 def _default_verdict(info: ActionInfo) -> Verdict:
     refused = auto_review(info)
     return refused.verdict if refused is not None else preset_verdict("aggressive", info)[0]
@@ -87,12 +135,34 @@ def _default_verdict(info: ActionInfo) -> Verdict:
 
 def _verdict(command: str, workspace: Path) -> Verdict:
     assessment: ShellAssessment = assess_shell(
-        command, workspace, workspace, expand_protected(["~/.ssh", "~/.aws"], ())
+        command, workspace, workspace, expand_protected(["~/.ssh", "~/.aws"], ()), ()
     )
     info: ActionInfo = ActionInfo(
         tool="shell", kind="shell", risk=assessment.risk, summary=command, target=command, flags=assessment.flags
     )
     return _default_verdict(info)
+
+
+def _dot_verdict(command: str, home: Path) -> Verdict:
+    """The default verdict on ``command`` (``{dot}`` standing for Dot's home ``home``), run in its workspace."""
+    workspace: Path = home / "workspace"
+    dot_paths: tuple[Path, ...] = expand_protected([], (home / "plugins", home / "skills", home / "STOP"))
+    line: str = command.format(dot=home.resolve())
+    assessment: ShellAssessment = assess_shell(line, workspace, workspace, (), dot_paths)
+    info: ActionInfo = ActionInfo(
+        tool="shell", kind="shell", risk=assessment.risk, summary=line, target=line, flags=assessment.flags
+    )
+    return _default_verdict(info)
+
+
+def _tainted_verdicts(command: str, workspace: Path) -> tuple[Verdict, Verdict]:
+    """The default verdicts on ``command`` in a run that has not read untrusted content, then in one that has."""
+    assessment: ShellAssessment = assess_shell(command, workspace, workspace, (), ())
+    info: ActionInfo = ActionInfo(
+        tool="shell", kind="shell", risk=assessment.risk, summary=command, target=command, flags=assessment.flags
+    )
+    clean: Verdict = decide(info, "task", False, "aggressive", [], None).verdict
+    return clean, decide(info, "task", True, "aggressive", [], None).verdict
 
 
 @pytest.mark.parametrize("command", _HIDDEN)
@@ -112,7 +182,7 @@ def test_an_everyday_line_stays_allowed(command: str, tmp_path: Path) -> None:
 
 def test_a_jxa_script_that_drives_a_terminal_is_judged_by_the_line_it_types(tmp_path: Path) -> None:
     script: str = 'Application("Terminal").doScript("rm -rf ~/Documents")'
-    assessment: ShellAssessment = assess_applescript(script, tmp_path, tmp_path, ())
+    assessment: ShellAssessment = assess_applescript(script, tmp_path, tmp_path, (), ())
     assert {"destructive", "outside_workspace"} <= set(assessment.flags)
 
 
@@ -157,7 +227,7 @@ def test_a_line_typed_into_a_terminal_application_is_judged_whole_when_it_runs(
         context: StepContext = StepContext(
             role="terminal", app="Terminal", element=None, secure=False, line=lines.get("Terminal")
         )
-        assessment: StepAssessment = assess_step(step, context, tmp_path, expand_protected(["~/.ssh"], ()))
+        assessment: StepAssessment = assess_step(step, context, tmp_path, expand_protected(["~/.ssh"], ()), ())
         last = _default_verdict(
             ActionInfo(
                 tool="desktop_act",
@@ -179,6 +249,31 @@ def test_a_line_that_reaches_the_network_brings_in_what_others_wrote(tmp_path: P
         "gh issue view 1",
         "ssh h ls",
     ):
-        assert assess_shell(command, tmp_path, tmp_path, ()).fetches
+        assert assess_shell(command, tmp_path, tmp_path, (), ()).fetches
     for command in ("ls -la", "git status", "cat notes.txt"):
-        assert not assess_shell(command, tmp_path, tmp_path, ()).fetches
+        assert not assess_shell(command, tmp_path, tmp_path, (), ()).fetches
+
+
+def test_truncating_a_file_outside_the_workspace_asks(tmp_path: Path) -> None:
+    assert _verdict("truncate -s 0 ~/Documents/report.txt", tmp_path) == "ask"
+    assert _verdict("truncate -s 0 notes.txt", tmp_path) == "allow"
+
+
+@pytest.mark.parametrize("command", _DOT_CHANGES)
+def test_what_dot_loads_and_runs_is_never_changed_by_a_line(command: str, tmp_path: Path) -> None:
+    assert _dot_verdict(command, tmp_path) == "deny"
+
+
+@pytest.mark.parametrize("command", _DOT_READS)
+def test_what_dot_loads_and_runs_is_read_and_run_by_a_line(command: str, tmp_path: Path) -> None:
+    assert _dot_verdict(command, tmp_path) == "allow"
+
+
+@pytest.mark.parametrize("command", _SENDS)
+def test_a_line_that_sends_data_out_asks_once_the_run_has_read_untrusted_content(command: str, tmp_path: Path) -> None:
+    assert _tainted_verdicts(command, tmp_path) == ("allow", "ask")
+
+
+@pytest.mark.parametrize("command", _READS_ONLY)
+def test_a_line_that_only_reads_stays_allowed_after_untrusted_content(command: str, tmp_path: Path) -> None:
+    assert _tainted_verdicts(command, tmp_path) == ("allow", "allow")

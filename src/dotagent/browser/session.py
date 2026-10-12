@@ -47,7 +47,7 @@ from dotagent.browser.keychain import KeychainMode, keychain_switches, playwrigh
 from dotagent.browser.pages import Tab, ThreadTabs, add_note, attach_handlers
 from dotagent.browser.profile_lock import profile_holder_pid
 from dotagent.browser.render import describe_step
-from dotagent.browser.safety import check_url
+from dotagent.browser.safety import check_browser_url
 from dotagent.browser.snapshot import (
     SnapshotLine,
     count_refs,
@@ -79,7 +79,7 @@ from dotagent.browser.types import (
 )
 from dotagent.browser.upstream import ignore_repeated_frame_detach
 from dotagent.browser.window import chrome_to_watch, focused_app, front_pid, give_focus_back, return_front
-from dotagent.config import BrowserConfig
+from dotagent.config import BrowserConfig, ServerConfig
 from dotagent.core.errors import ApprovalRejected, BrowserError, HandedOff, PolicyDenied
 from dotagent.core.logs import get_logger
 from dotagent.core.text import truncate_middle
@@ -246,8 +246,10 @@ class BrowserSession:
     fails with a ``BrowserError`` and the next call starts or connects again; nothing is retried behind the model's
     back, because a click must not repeat."""
 
-    def __init__(self, config: BrowserConfig, profile_dir: Path, downloads_dir: Path) -> None:
+    def __init__(self, config: BrowserConfig, server: ServerConfig, profile_dir: Path, downloads_dir: Path) -> None:
         self._config: BrowserConfig = config
+        # Whose interface the browser never opens (:func:`check_browser_url`).
+        self._server: ServerConfig = server
         self._profile: Path = profile_dir
         self._downloads: Path = downloads_dir
         self._playwright: Playwright | None = None
@@ -832,7 +834,7 @@ class BrowserSession:
         return await self._assemble(thread, tab, capture, capture.rendered, "full")
 
     def _require_allowed(self, url: str) -> None:
-        verdict = check_url(url, self._config.allowed_hosts, self._config.blocked_hosts)
+        verdict = check_browser_url(url, self._config.allowed_hosts, self._config.blocked_hosts, self._server)
         if not verdict.allowed:
             raise BrowserError("this URL may not be opened", {"url": url, "reason": verdict.reason})
 
@@ -842,7 +844,7 @@ class BrowserSession:
         if landed.startswith("chrome-error://"):
             add_note(tab, "the page failed to load (Chrome error page)")
             return
-        verdict = check_url(landed, self._config.allowed_hosts, self._config.blocked_hosts)
+        verdict = check_browser_url(landed, self._config.allowed_hosts, self._config.blocked_hosts, self._server)
         if verdict.allowed:
             return
         config: BrowserConfig = self._config
@@ -942,7 +944,7 @@ class BrowserSession:
                     await page.wait_for_event("load", timeout=_CHALLENGE_WAIT_MS)
             await wait_dom_quiet(page, config.settle_quiet_ms, config.settle_max_ms, _ms(config.navigation_timeout_s))
             landed: str = page.url
-            verdict = check_url(landed, config.allowed_hosts, config.blocked_hosts)
+            verdict = check_browser_url(landed, config.allowed_hosts, config.blocked_hosts, self._server)
             if not verdict.allowed:
                 raise BrowserError(
                     "the page ended up on a URL that may not be opened", {"landed": landed, "reason": verdict.reason}

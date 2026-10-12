@@ -47,7 +47,7 @@ def _fits(rule: DraftedRule, action: ActionInfo) -> bool:
 
 def _shell(command: str, workspace: Path) -> ActionInfo:
     """A shell command as the shell tool shows it to the policy: its summary, a line break, the command."""
-    return _classify_shell(ShellArgs(command=command), workspace, ())
+    return _classify_shell(ShellArgs(command=command), workspace, (), ())
 
 
 def _page(url: str) -> ActionInfo:

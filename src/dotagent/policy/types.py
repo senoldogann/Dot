@@ -43,6 +43,7 @@ Flag = Literal[
     "exfiltration",
     "outside_workspace",
     "persistence",
+    "upload",
 ]
 
 Preset = Literal["aggressive", "balanced", "cautious"]
@@ -86,10 +87,12 @@ TAINTING_KINDS: frozenset[ActionKind] = frozenset(
 )
 
 # Flags whose consequences reach beyond the machine, or beyond the run (persistence: what is remembered or scheduled
-# shapes every later run); untrusted input must never trigger them silently.
+# shapes every later run; upload: what a command sends to a server, a push, a form, a remote copy); untrusted input must
+# never trigger them silently.
 TAINT_ESCALATION_FLAGS: frozenset[Flag] = frozenset(
     {
         "external_send",
+        "upload",
         "public_post",
         "social",
         "exfiltration",

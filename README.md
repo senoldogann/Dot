@@ -438,8 +438,10 @@ with a random marker per call (`<web_content …>`, `<screen_content …>`) and 
 never instructions. What a shell command printed after it reached the network (`curl`, `ssh`, `git clone`, `gh`, a line
 the guard cannot read) and what a terminal program prints count the same way, unfenced. A run that has seen such
 content is marked untrusted, and from then on outward-facing or lasting
-actions (messages, posts, follows and likes, privilege, system settings, saving a schedule or a note) ask even when the
-preset or an `allow` rule would let them through; only a `preapproved` rule skips the question. A message you send to
+actions (messages, posts, follows and likes, privilege, system settings, saving a schedule or a note, and a shell line
+that sends data out: an upload or a form, a push, a copy to another machine, a change on a code host, inline code that
+reaches the network) ask even when the preset or an `allow` rule would let them through; only a `preapproved` rule skips
+the question. A message you send to
 the run clears the mark. A delegated run starts as untrusted as its parent.
 
 **Secrets.**
@@ -449,14 +451,21 @@ the run clears the mark. A delegated run starts as untrusted as its parent.
   `yolo` run types into them what it can read itself (see
   [Autonomy](#autonomy-approvals-goal-mode-and-the-end-of-a-run)). In the same way `terminal_send` types nothing outside
   `yolo` while the program's last line asks for a password, a passphrase or a PIN. The desktop tools never control a
-  password manager or Keychain Access, in any mode, and desktop screenshots black out their windows; secure fields and
-  web pages are not masked.
+  password manager or Keychain Access, in any mode, nor Dot's own window outside `yolo` (its approvals, rules and
+  settings decide what a run may do), and desktop screenshots black out the password managers' windows; secure fields
+  and web pages are not masked.
 - Environment variables whose names look like secrets are removed from the processes the shell tool starts
   (`[shell] pass_env` lists exceptions).
 - Outside a `yolo` run the agent can neither read nor change `~/.ssh`, `~/.gnupg`, `~/Library/Keychains`, `~/.aws`,
   `~/.config/gcloud` and the data directory of your Chrome (`[policy] protected_paths`), nor Dot's own key file, token,
   browser profile, configuration, database and journals of file changes. The configuration holds the policy and the MCP
   servers, the database the rules, the journals what `dotx undo` writes back.
+- Outside a `yolo` run the agent reads what Dot loads and runs, and runs a skill's files, but never changes them: its
+  plugins and their own files, its skills (with the `[skills] dirs` and `[plugins] dirs` folders), the playbooks it
+  learned and the file of its emergency stop. The file tools refuse to write there, and so does the shell guard for a
+  line that writes there by a copy, a redirect, a download, a clone, an unpacked archive or inline code that names the
+  place. A plugin's MCP servers start with the daemon and are given keys from the key store: put a plugin or a skill in
+  place yourself.
 
 **Typed judgments (optional, off by default).** The policy reads what a click does from the control's label, with
 patterns in English and Turkish, and a few in Finnish ("Post", "Send", "Delete", "Pay now", "Paylaş", "Lähetä"…); a
@@ -1350,7 +1359,9 @@ Both modes share what follows.
 - A conversation thread keeps at most `max_tabs` tabs open and closes idle ones after `tab_idle_s`.
 - `[browser] allowed_hosts` and `blocked_hosts` limit the sites of the browser tools and of `web_fetch`; a host also
   matches its subdomains, and an empty `allowed_hosts` means every site. The blocked list starts with the
-  cloud-metadata hosts.
+  cloud-metadata hosts. Dot's own interface is never opened, whatever the lists say: this Mac on `[server] port` in any
+  spelling (`localhost`, `127.0.0.1`, `[::1]` and the like), and the names of `[server] reach`; your Chrome may be
+  signed in there. A server of this Mac on another port opens as any site.
 - `raise_window = false` (the default) keeps the window in the background while a run works: every tab Dot opens, a
   run's or a quiet read's, is created in the background (a new tab opened the usual way brings Chrome to the front of
   the Mac), and it still paints the page under Dot's computer. macOS brings a newly started Chrome to the front, and
@@ -1535,7 +1546,8 @@ messaged at once. Every step, a run that may message the team learns of the agen
 answer a message make no agents.
 
 Agents work together through messages. A run (Dot's or an agent's) sends one with the `message_agent` tool, naming
-the agent and the message; the agent answers in a run of its own (its instructions, its tools, its model) that
+the agent and the message; the agent answers in a run of its own (its instructions, its tools, its model, and the
+stricter of its approvals and the sender's, so an agent set to `yolo` asks when a run that asks messages it) that
 cannot see the sender's conversation, and the reply comes back as the tool's result, the way a delegated run's
 report does. The prompt lists the team by name and role under "Team" whenever there is another agent to message;
 an agent does not message itself, and an answering run messages no one further. The sender's chat shows the

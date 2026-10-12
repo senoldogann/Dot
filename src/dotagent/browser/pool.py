@@ -10,14 +10,15 @@ from pathlib import Path
 
 from dotagent.browser.modes import browser_data_dir
 from dotagent.browser.session import BrowserSession
-from dotagent.config import BrowserConfig
+from dotagent.config import BrowserConfig, ServerConfig
 from dotagent.store.models import BrowserMode
 
 
 class BrowserPool:
-    def __init__(self, config: BrowserConfig, downloads_dir: Path) -> None:
+    def __init__(self, config: BrowserConfig, server: ServerConfig, downloads_dir: Path) -> None:
+        self._server: ServerConfig = server
         self._downloads: Path = downloads_dir
-        self.main: BrowserSession = BrowserSession(config, browser_data_dir(config.mode), downloads_dir)
+        self.main: BrowserSession = BrowserSession(config, server, browser_data_dir(config.mode), downloads_dir)
         self._others: dict[BrowserMode, BrowserSession] = {}
 
     def session_for(self, mode: BrowserMode | None) -> BrowserSession:
@@ -29,7 +30,10 @@ class BrowserPool:
         found: BrowserSession | None = self._others.get(mode)
         if found is None:
             found = BrowserSession(
-                self.main.config.model_copy(update={"mode": mode}), browser_data_dir(mode), self._downloads
+                self.main.config.model_copy(update={"mode": mode}),
+                self._server,
+                browser_data_dir(mode),
+                self._downloads,
             )
             self._others[mode] = found
         return found
