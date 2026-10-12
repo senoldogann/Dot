@@ -1,8 +1,10 @@
 """Guards of the web UI (item 139): a note sent twice from the keyboard before the first save is answered is kept once,
 and an answer of the daemon's address that is not JSON (a proxy's page) is an error that names the path and the status,
-not a bare parse error."""
+not a bare parse error. The page sends its token only to a daemon that has proven it holds it (item 143)."""
 
 import asyncio
+import json
+import re
 import time
 from collections.abc import AsyncIterator
 from pathlib import Path
@@ -28,6 +30,7 @@ TOKEN: str = "page-guards-token"
 NOTE: str = "I prefer short answers."
 # Long enough for a second save, sent with the first, to be sent and stored too.
 _SETTLE_S: float = 0.5
+_PROOF: re.Pattern[str] = re.compile(r"/api/proof\?")
 
 
 @pytest_asyncio.fixture(scope="module", loop_scope="module")
@@ -138,3 +141,43 @@ async def test_an_answer_that_is_not_json_is_an_error_naming_its_path(page: Page
         }"""
     )
     assert caught == ["ApiError", 200, "/not-json", "<html>a proxy's page</html>"]
+
+
+async def test_the_page_sends_its_token_only_to_a_daemon_that_proves_it_holds_it(
+    runtime: Runtime, address: str
+) -> None:
+    """A program on the daemon's port answers the page's nonce with a proof that is not the token's: the page, opened
+    with the token, sends it in no request and asks for one. The daemon, once it answers, is sent it."""
+    port: int = int(address.rpartition(":")[2])
+    carried: list[str] = []
+
+    def keep_carried(request: Request) -> None:
+        if "authorization" in request.headers:
+            carried.append(urlsplit(request.url).path)
+
+    async def stranger(route: Route) -> None:
+        await route.fulfill(status=200, content_type="application/json", body=json.dumps({"proof": "00" * 32}))
+
+    async with async_playwright() as playwright:
+        browser: Browser = await playwright.chromium.launch(channel=runtime.config.browser.channel, headless=True)
+        try:
+            opened: Page = await (await browser.new_context(service_workers="block")).new_page()
+            await opened.add_init_script("sessionStorage.setItem('dot.opened', '1')")
+            opened.on("request", keep_carried)
+            await opened.route(_PROOF, stranger)
+            await opened.goto(ui_url("127.0.0.1", port, TOKEN))
+            await expect(opened.get_by_label("Access token", exact=True)).to_be_visible()
+            assert carried == []
+            await opened.unroute(_PROOF, stranger)
+            answered: JsonValue = await opened.evaluate(
+                """async (token) => {
+                    const { api, setToken } = await import("/js/api.js");
+                    setToken(token);
+                    return (await api.get("/status")).port;
+                }""",
+                TOKEN,
+            )
+            assert answered == port
+            assert "/api/status" in carried
+        finally:
+            await browser.close()

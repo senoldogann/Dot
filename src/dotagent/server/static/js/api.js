@@ -4,6 +4,10 @@ import { sleep } from "./dom.js";
 import { toast } from "./ui.js";
 
 const TOKEN_KEY = "dot.token";
+// The daemon proves that it holds the token before a request carries it there (`GET /api/proof`, `daemon_proof` in
+// server/guard.py): a program that took the daemon's port while it was down cannot, and is sent nothing.
+const PROOF_LABEL = "dot daemon proof\n";
+const NONCE_BYTES = 32;
 const RECONNECT_MIN_MS = 500;
 const RECONNECT_MAX_MS = 8000;
 // An event the page fails to show is logged every time and told at most this often, so a fault that hits every event
@@ -12,6 +16,7 @@ const NOT_SHOWN_TOLD_EVERY_MS = 10000;
 
 let token = null;
 let authLostHandler = null;
+let proving = null;
 let notShownToldAt = 0;
 
 export class ApiError extends Error {
@@ -99,7 +104,68 @@ function authHeaders() {
   return { Authorization: `Bearer ${token}` };
 }
 
+function hexOf(buffer) {
+  return Array.from(new Uint8Array(buffer), (byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+
+/** What the daemon answers to `nonce` when it holds this page's token. */
+async function proofOf(nonce) {
+  const encoder = new TextEncoder();
+  const key = await crypto.subtle.importKey("raw", encoder.encode(token), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+  return hexOf(await crypto.subtle.sign("HMAC", key, encoder.encode(`${PROOF_LABEL}${nonce}`)));
+}
+
+/**
+ * Ask what answers at this address to prove that it holds the page's token. An answer with another proof is a token the
+ * daemon does not hold, told as a refused token is; any other answer is not the daemon's.
+ */
+async function proveDaemon() {
+  if (globalThis.crypto?.subtle === undefined) {
+    throw new ApiError(0, "This browser cannot check the Dot daemon at this address (it offers no Web Crypto here).", {
+      path: "/proof",
+    });
+  }
+  const nonce = hexOf(crypto.getRandomValues(new Uint8Array(NONCE_BYTES)));
+  let response;
+  try {
+    response = await fetch(`/api/proof?nonce=${nonce}`, { cache: "no-store" });
+  } catch (cause) {
+    throw new ApiError(0, "Cannot reach the Dot daemon. Is it running?", { path: "/proof", cause: String(cause) });
+  }
+  const text = await response.text();
+  const data = response.ok ? parseJson(text) : null;
+  if (data === null || typeof data !== "object" || typeof data.proof !== "string") {
+    throw new ApiError(0, "Something other than the Dot daemon answers at this address; it was sent no token.", {
+      path: "/proof",
+      status: response.status,
+      start: text.slice(0, 80),
+    });
+  }
+  if (data.proof !== (await proofOf(nonce))) {
+    if (authLostHandler !== null) {
+      authLostHandler();
+    }
+    throw new ApiError(401, "The daemon at this address does not hold this access token; it was sent nothing.", {
+      path: "/proof",
+    });
+  }
+}
+
+/**
+ * Settles once the daemon has proven itself for a request about to be sent. Requests made while a proof is on its way
+ * wait for that one; a proof that has settled serves no later request.
+ */
+function proven() {
+  if (proving === null) {
+    proving = proveDaemon().finally(() => {
+      proving = null;
+    });
+  }
+  return proving;
+}
+
 export async function request(method, path, body) {
+  await proven();
   const headers = authHeaders();
   let payload;
   if (body !== null) {
@@ -174,6 +240,7 @@ function parseBlock(block) {
 
 /** Read a server-sent event stream with fetch, so the bearer token travels in a header and not in the URL. */
 export async function* sse(path, signal) {
+  await proven();
   const response = await fetch(`/api${path}`, {
     headers: { ...authHeaders(), Accept: "text/event-stream" },
     signal,
@@ -281,14 +348,14 @@ export function forgetImages() {
 export function imageUrl(name) {
   let pending = images.get(name);
   if (pending === undefined) {
-    pending = fetch(`/api/images/${encodeURIComponent(name)}`, { headers: authHeaders(), cache: "force-cache" }).then(
-      async (response) => {
+    pending = proven()
+      .then(() => fetch(`/api/images/${encodeURIComponent(name)}`, { headers: authHeaders(), cache: "force-cache" }))
+      .then(async (response) => {
         if (!response.ok) {
           throw await errorOf(response, `/images/${name}`);
         }
         return URL.createObjectURL(await response.blob());
-      },
-    );
+      });
     images.set(name, pending);
     pending.catch(() => images.delete(name));
   }

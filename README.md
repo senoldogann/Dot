@@ -1175,9 +1175,18 @@ Ctrl-C stops the daemon: the runs that are going on are cancelled, and the brows
 
 The server listens on `127.0.0.1:8765` (`[server]`) and refuses to start on any other address. Every request must carry
 a `Host` of the loopback address and, when it has one, an `Origin` of the server itself; every call under `/api` except
-`/api/health` needs the bearer token in `<home>/api-token` (mode 0600). `dotx url` puts the token in the fragment of the
-address (`#token=…`), so it never reaches the server or a log; the page keeps it in the browser's local storage and
-removes it from the address bar. Pages are served with a strict content security policy and no CORS headers.
+`/api/health` and `/api/proof` needs the bearer token in `<home>/api-token` (mode 0600). `dotx url` puts the token in
+the fragment of the address (`#token=…`), so it never reaches the server or a log; the page keeps it in the browser's
+local storage and removes it from the address bar. Pages are served with a strict content security policy and no CORS
+headers.
+
+The token goes only to the daemon. Before `dotx open`, `dotx url` and `dotx service permissions` hand it over, and
+before each request of the page and each poll of the desktop shell that carries it, the client sends a fresh nonce to
+`GET /api/proof` and checks the answer: an HMAC-SHA256 of the nonce keyed with the token, which only a holder of the
+token can give. A program that took the port while the daemon was down cannot, so it is sent nothing: the command stops
+and names the one that shows what listens on the port, the page asks for the token again, and the menu bar item says
+that something else answers at the daemon's address. What the check cannot cover is a page that such a program served at
+that address: it reads what the browser keeps for the address, the token among it.
 
 ```bash
 dotx service install     # a launchd agent: starts the daemon at every login and after a crash, never after a clean stop
@@ -1249,10 +1258,11 @@ the agent itself.
   room above and below them; the page keeps room for them in the sidebar's head, as tall as the top bar so that its
   button stands on the same line, or in the top bar while the sidebar is away, and the window drags by those bars.
   The themes, the colour scheme and the density are the web UI's own settings.
-- **Signed in by itself.** The shell reads the daemon's address from `config.toml` (`[server]`, or the defaults) and
-  the token from the token file under the home directory, and opens the UI with the token in the fragment, never
-  typed. While the daemon is down, the window shows Dot's wordmark and the one command that starts it, and opens
-  the UI by itself when the daemon answers. The window leaves the UI for that page only after three polls in a row go
+- **Signed in by itself.** The shell reads the daemon's address from `config.toml` (`[server]`, or the defaults) and the
+  token from the token file under the home directory, and opens the UI with the token in the fragment, never typed, once
+  the daemon has proven that it holds that token (see the server above; each poll checks it again before it sends the
+  token). While the daemon is down, the window shows Dot's wordmark and the one command that starts it, and opens the UI
+  by itself when the daemon answers. The window leaves the UI for that page only after three polls in a row go
   unanswered, so one slow answer of a busy daemon does not throw the open page away.
 - **The menu bar item** is Dot's mark in the state of the whole of Dot (looking at you at rest, glancing up while a
   run works, a blue pastille while something waits for you) with the count of what waits for you beside it, read from `GET /api/activity/count`
@@ -1875,6 +1885,9 @@ src/dotagent/
   on real folders).
 - The shell guardrail is best-effort, and the sandbox of a run's processes keeps them out of Dot's own files only (see
   [Safety](#safety)).
+- The token goes only to a server that proves it holds it, but a page that another program served at the daemon's
+  address reads what the browser keeps for that address, the token among it (see
+  [The daemon, the web UI and the service](#the-daemon-the-web-ui-and-the-service)).
 - DuckDuckGo answers a burst of searches with its bot check (HTTP 202) and Brave Search with a rate limit (HTTP 429)
   after a handful in quick succession. Dot spaces its searches (`search_spacing_s`), benches an engine that limits it
   and moves to the next rung, so a search fails outright only when every engine does (`dotx stats` counts these under

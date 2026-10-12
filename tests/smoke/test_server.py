@@ -24,8 +24,9 @@ from playwright.async_api import Browser, FilePayload, Page, async_playwright, e
 
 from dotagent.agent.attachments import load_attachments, message_with_attachments
 from dotagent.agent.manager import RunManager
+from dotagent.cli_daemon import prove_daemon
 from dotagent.config import AppConfig, load_config
-from dotagent.core.errors import NotFoundError
+from dotagent.core.errors import NotFoundError, ServiceError
 from dotagent.core.types import JsonObject
 from dotagent.desktop.perms import check_permissions
 from dotagent.desktop.types import Permissions
@@ -34,6 +35,7 @@ from dotagent.runtime import Runtime, build_runtime, close_runtime
 from dotagent.server.app import create_app
 from dotagent.server.context import ServerContext
 from dotagent.server.daemon import DotServer, bind_listener, serving_config
+from dotagent.server.guard import daemon_proof
 from dotagent.server.links import ui_url
 from dotagent.server.views import PermissionsView
 from dotagent.store.endings import RESULT_RESTARTED, RESULT_STOPPED
@@ -248,11 +250,20 @@ async def _events(client: httpx.AsyncClient, run_id: str) -> list[EventRecord]:
 # ------------------------------------------------------------------------------------------ the guard
 
 
-async def test_only_the_health_check_is_open_and_the_rest_needs_the_token(client: httpx.AsyncClient) -> None:
+async def test_only_the_health_check_and_the_proof_are_open_and_the_rest_needs_the_token(
+    client: httpx.AsyncClient,
+) -> None:
     anonymous: dict[str, str] = {"Authorization": ""}
     health: httpx.Response = await client.get("/api/health", headers=anonymous)
     assert health.status_code == 200
     assert health.json()["ok"] is True
+    nonce: str = secrets.token_hex(32)
+    proof: httpx.Response = await client.get("/api/proof", params={"nonce": nonce}, headers=anonymous)
+    assert proof.status_code == 200
+    assert proof.json() == {"proof": daemon_proof(TOKEN, nonce)}
+    for not_a_nonce in ("", "0" * 31, "0" * 129, "AB" * 16, "g" * 32):
+        refused_nonce: httpx.Response = await client.get("/api/proof", params={"nonce": not_a_nonce}, headers=anonymous)
+        assert refused_nonce.status_code == 422, not_a_nonce
     for path in ("/api/status", "/api/runs", "/api/memories", "/api/stream"):
         refused: httpx.Response = await client.get(path, headers=anonymous)
         assert refused.status_code == 401, path
@@ -260,6 +271,21 @@ async def test_only_the_health_check_is_open_and_the_rest_needs_the_token(client
         wrong: httpx.Response = await client.get(path, headers={"Authorization": "Bearer nope"})
         assert wrong.status_code == 401, path
     assert (await client.get("/api/status")).status_code == 200
+
+
+async def test_the_daemon_passes_the_check_the_cli_makes_before_it_sends_the_token(
+    runtime: Runtime, manager: RunManager
+) -> None:
+    server, serving, address = await _start_server(runtime, manager)
+    port: int = int(address.rpartition(":")[2])
+    try:
+        async with httpx.AsyncClient(trust_env=False) as plain:
+            await prove_daemon(plain, "127.0.0.1", port, TOKEN)
+            with pytest.raises(ServiceError):
+                await prove_daemon(plain, "127.0.0.1", port, "another token")
+    finally:
+        server.should_exit = True
+        await serving
 
 
 async def test_other_hosts_and_other_origins_are_refused(client: httpx.AsyncClient) -> None:

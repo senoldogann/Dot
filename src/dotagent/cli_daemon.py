@@ -1,7 +1,9 @@
 """``dotx daemon``, ``dotx open``, ``dotx url`` and ``dotx service``: run Dot in the background and open its UI."""
 
 import asyncio
+import hmac
 import os
+import secrets
 import sys
 import time
 from pathlib import Path
@@ -37,9 +39,9 @@ from dotagent.launchd import (
     uninstall_job,
 )
 from dotagent.server.daemon import run_daemon
-from dotagent.server.guard import read_token
+from dotagent.server.guard import PROOF_PATH, daemon_proof, read_token
 from dotagent.server.links import base_url, health_url, ui_url
-from dotagent.server.views import HealthView, PermissionsView
+from dotagent.server.views import HealthView, PermissionsView, ProofView
 
 _OPEN: str = "/usr/bin/open"
 _PBCOPY: str = "/usr/bin/pbcopy"
@@ -50,6 +52,7 @@ _POLL_S: float = 0.5
 # A start can include the servers of [[mcp]], the first of which may have to fetch its package.
 _START_WAIT_S: float = 60.0
 _BODY_CHARS: int = 300
+_NONCE_BYTES: int = 32
 
 _NO_DAEMON_FIX: str = "start it with 'dotx daemon' (in the foreground) or 'dotx service install' (at every login)"
 
@@ -57,6 +60,10 @@ _NO_DAEMON_FIX: str = "start it with 'dotx daemon' (in the foreground) or 'dotx 
 def _clip(text: str, limit: int) -> str:
     flat: str = " ".join(text.split())
     return flat if len(flat) <= limit else f"{flat[: limit - 1]}…"
+
+
+def _listener_fix(port: int) -> str:
+    return f"see what listens on the port with 'lsof -nP -iTCP:{port} -sTCP:LISTEN'"
 
 
 def _plist_path() -> Path:
@@ -102,13 +109,53 @@ async def wait_for_daemon(url: str, seconds: float) -> HealthView | None:
         await asyncio.sleep(_POLL_S)
 
 
+async def prove_daemon(client: httpx.AsyncClient, host: str, port: int, token: str) -> None:
+    """Make sure that what answers at the daemon's address holds ``token`` before anything sends it there: it must
+    answer a fresh nonce with :func:`daemon_proof`, which a program that took the port cannot compute."""
+    nonce: str = secrets.token_hex(_NONCE_BYTES)
+    url: str = f"{base_url(host, port)}{PROOF_PATH}"
+    try:
+        response: httpx.Response = await client.get(url, params={"nonce": nonce})
+    except (httpx.ConnectError, httpx.ConnectTimeout) as exc:
+        raise ServiceError(
+            "the Dot daemon does not answer", {"url": base_url(host, port), "fix": _NO_DAEMON_FIX}
+        ) from exc
+    except httpx.HTTPError as exc:
+        raise ServiceError(
+            "asking the daemon for its proof failed on the way", {"url": url, "error": repr(exc)}
+        ) from exc
+    try:
+        answer: ProofView = ProofView.model_validate_json(response.content)
+    except ValidationError as exc:
+        raise ServiceError(
+            "something other than the Dot daemon answers at the address; it was sent no token",
+            {
+                "url": url,
+                "status": response.status_code,
+                "body": _clip(response.text, _BODY_CHARS),
+                "fix": f"{_listener_fix(port)}; a Dot daemon of an older version answers so too, and "
+                "'dotx service install' restarts it",
+            },
+        ) from exc
+    if not hmac.compare_digest(answer.proof.encode("utf-8"), daemon_proof(token, nonce).encode("ascii")):
+        raise ServiceError(
+            "what answers at the address does not hold the token of this installation; it was sent nothing",
+            {
+                "url": url,
+                "fix": f"{_listener_fix(port)}; a Dot daemon started with another DOT_HOME holds another token",
+            },
+        )
+
+
 async def reachable_ui_url(config: AppConfig) -> str:
-    """The address that opens the UI already signed in, once the daemon is known to answer."""
+    """The address that opens the UI already signed in, once what answers at the daemon's address has proven that it
+    holds the token (:func:`prove_daemon`): a page that another program served there would read the token in it."""
     host: str = config.server.host
     port: int = config.server.port
-    if await probe_daemon(health_url(host, port)) is None:
-        raise ServiceError("the Dot daemon does not answer", {"url": base_url(host, port), "fix": _NO_DAEMON_FIX})
-    return ui_url(host, port, await asyncio.to_thread(_token_of, token_path()))
+    token: str = await asyncio.to_thread(_token_of, token_path())
+    async with httpx.AsyncClient(timeout=_PROBE_TIMEOUT_S, trust_env=False) as client:
+        await prove_daemon(client, host, port, token)
+    return ui_url(host, port, token)
 
 
 async def open_in_browser(address: str) -> None:
@@ -278,6 +325,7 @@ async def cmd_service_permissions(command: ServicePermissionsCommand) -> int:
     url: str = f"{base_url(config.server.host, config.server.port)}/api/desktop/permissions"
     token: str = await asyncio.to_thread(_token_of, token_path())
     async with httpx.AsyncClient(timeout=_ASK_TIMEOUT_S, trust_env=False) as client:
+        await prove_daemon(client, config.server.host, config.server.port, token)
         try:
             response: httpx.Response = await client.post(url, headers={"Authorization": f"Bearer {token}"})
         except (httpx.ConnectError, httpx.ConnectTimeout) as exc:

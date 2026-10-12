@@ -1,4 +1,5 @@
-"""The rules that keep the server local: addresses, hosts, origins, tokens and the token file."""
+"""The rules that keep the server local: addresses, hosts, origins, tokens, the token file and the proof of the
+daemon."""
 
 import os
 import stat
@@ -11,6 +12,7 @@ from dotagent.server.guard import (
     Refusal,
     bearer_token,
     check_request,
+    daemon_proof,
     read_or_create_token,
     read_token,
     require_loopback,
@@ -21,6 +23,9 @@ TOKEN: str = "MARKER-0123456789abcdef"
 LOCAL_HOST: str = f"127.0.0.1:{PORT}"
 LOCAL_ORIGIN: str = f"http://127.0.0.1:{PORT}"
 GOOD_AUTH: str = f"Bearer {TOKEN}"
+NONCE: str = "0123456789abcdef" * 4
+# daemon_proof(TOKEN, NONCE); the desktop shell's tests (desktop/src-tauri/src/lib.rs) hold the same pair.
+PROOF: str = "4aea8baff569980b8b9dceb16e4d02f89d6563a252c47dcf94912b82ae440020"
 
 
 @pytest.mark.parametrize("host", ["127.0.0.1", "localhost", "::1", "127.0.0.2"])
@@ -58,12 +63,14 @@ def test_only_a_bearer_header_carries_the_token(header: str | None, expected: st
         ("/api/status", f"localhost:{PORT}", LOCAL_ORIGIN, GOOD_AUTH, None),
         ("/api/status", f"[::1]:{PORT}", None, GOOD_AUTH, None),
         ("/api/health", LOCAL_HOST, None, None, None),
+        ("/api/proof", LOCAL_HOST, None, None, None),
         ("/", LOCAL_HOST, None, None, None),
         ("/app.js", LOCAL_HOST, LOCAL_ORIGIN, None, None),
         ("/api/status", LOCAL_HOST, None, None, 401),
         ("/api/status", LOCAL_HOST, None, "Bearer wrong", 401),
         ("/api/status", LOCAL_HOST, None, f"Basic {TOKEN}", 401),
         ("/api/health/", LOCAL_HOST, None, None, 401),
+        ("/api/proof/", LOCAL_HOST, None, None, 401),
         ("/api", LOCAL_HOST, None, None, 401),
         ("/api/status", "attacker.example:8765", None, GOOD_AUTH, 421),
         ("/api/status", f"127.0.0.1:{PORT + 1}", None, GOOD_AUTH, 421),
@@ -79,6 +86,12 @@ def test_a_request_is_served_only_from_this_mac_to_pages_of_this_server_with_the
 ) -> None:
     refusal: Refusal | None = check_request(path, host, origin, authorization, TOKEN, PORT, frozenset())
     assert (None if refusal is None else refusal.status) == refused_with
+
+
+def test_the_proof_of_the_daemon_is_an_hmac_of_the_nonce_keyed_with_the_token() -> None:
+    assert daemon_proof(TOKEN, NONCE) == PROOF
+    assert daemon_proof("another token", NONCE) != PROOF
+    assert daemon_proof(TOKEN, "f" * 64) != PROOF
 
 
 REACH: frozenset[str] = frozenset({"mac.tail1234.ts.net"})

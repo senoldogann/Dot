@@ -30,6 +30,8 @@ pytestmark = [pytest.mark.browser, pytest.mark.asyncio(loop_scope="module")]
 TOKEN: str = "chat-menu-test-token"
 # The seeded chats are unread (item 131): their runs are over, and nobody opened them.
 _ITEMS: list[str] = ["Pin", "Mark read", "Rename", "Copy link", "Select", "Delete"]
+# How long the page may take to store a name it already shows (it checks the daemon's proof first, item 143).
+_STORED_WITHIN_S: float = 5.0
 
 
 @pytest_asyncio.fixture(scope="module", loop_scope="module")
@@ -108,6 +110,14 @@ async def _chats(client: httpx.AsyncClient) -> list[ThreadSummary]:
     answer: httpx.Response = await client.get("/api/threads")
     assert answer.status_code == 200, answer.text
     return [ThreadSummary.model_validate(item) for item in answer.json()]
+
+
+async def _stored_titles(client: httpx.AsyncClient, expected: list[str]) -> None:
+    """Wait until the daemon has the chats under ``expected``: the page shows a new name at once and stores it after."""
+    deadline: float = time.monotonic() + _STORED_WITHIN_S
+    while (titles := [chat.title for chat in await _chats(client)]) != expected:
+        assert time.monotonic() < deadline, titles
+        await asyncio.sleep(0.05)
 
 
 async def _signed_in(context: BrowserContext, client: httpx.AsyncClient) -> tuple[Page, list[str]]:
@@ -293,7 +303,7 @@ async def test_a_chats_menu_pins_names_copies_chooses_and_deletes_it(
         await search.click()
         await expect(titles).to_have_text(["Garden notes", "Trip notes"])
         await expect(search).to_be_focused()
-        assert [chat.title for chat in await _chats(client)] == ["Garden notes", "Trip notes"]
+        await _stored_titles(client, ["Garden notes", "Trip notes"])
         await expect(page.locator(".toast.error")).to_have_count(0)
         assert errors == []
     finally:

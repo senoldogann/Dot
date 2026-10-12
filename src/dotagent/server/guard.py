@@ -2,8 +2,11 @@
 
 Binding to a loopback address keeps other machines out. The Host check defeats DNS rebinding, the Origin check keeps
 the pages of other sites from using the API through the browser, and the token keeps other programs of this Mac out.
+The clients send the token only to a server that first proves it holds it (:func:`daemon_proof`), so a program that took
+the port while the daemon was down is sent nothing.
 """
 
+import hashlib
 import hmac
 import ipaddress
 import os
@@ -19,7 +22,8 @@ from dotagent.core.types import FrozenModel
 
 API_ROOT: str = "/api"
 API_PREFIX: str = f"{API_ROOT}/"
-PUBLIC_PATHS: frozenset[str] = frozenset({f"{API_ROOT}/health"})
+PROOF_PATH: str = f"{API_ROOT}/proof"
+PUBLIC_PATHS: frozenset[str] = frozenset({f"{API_ROOT}/health", PROOF_PATH})
 
 _PRIVATE_FILE_MODE: int = 0o600
 _PERMISSION_BITS: int = 0o777
@@ -29,6 +33,8 @@ _LOOPBACK_NAME: str = "localhost"
 _HTTP_MISDIRECTED: int = 421
 _HTTP_FORBIDDEN: int = 403
 _HTTP_UNAUTHORIZED: int = 401
+# What the proof of the daemon puts before the nonce, so that it is good for nothing else keyed with the token.
+_PROOF_LABEL: bytes = b"dot daemon proof\n"
 
 # The pages of the UI load only their own scripts and styles, and nothing can frame them.
 SECURITY_HEADERS: tuple[tuple[str, str], ...] = (
@@ -103,6 +109,13 @@ def bearer_token(authorization: str | None) -> str | None:
 
 def token_matches(expected: str, supplied: str | None) -> bool:
     return supplied is not None and hmac.compare_digest(expected.encode("utf-8"), supplied.encode("utf-8"))
+
+
+def daemon_proof(token: str, nonce: str) -> str:
+    """How the daemon answers ``nonce`` (``GET /api/proof``) to show that it holds ``token`` without sending it:
+    HMAC-SHA256 keyed with the token over a fixed label and the nonce, in hex. A client sends the token only to a
+    server that answers a fresh nonce of its own this way; a program that took the port cannot."""
+    return hmac.new(token.encode("utf-8"), _PROOF_LABEL + nonce.encode("ascii"), hashlib.sha256).hexdigest()
 
 
 def is_api_path(path: str) -> bool:
