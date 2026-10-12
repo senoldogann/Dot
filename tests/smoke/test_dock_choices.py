@@ -34,8 +34,9 @@ TOKEN: str = "dock-choices-token"
 _PROVIDER: str = parse_model_ref(SCRIPTED_MODEL).provider
 THINKER: str = f"{_PROVIDER}:thinker"
 HELD: str = f"{_PROVIDER}:held"
-# Three runs, each finished at its first step: the first, its follow-up and one that works while the page is read.
-_RUNS: int = 3
+# Five runs, each finished at its first step: a run and its follow-up, one that works while the page is read, and a
+# run on the model with levels and its follow-up on one without.
+_RUNS: int = 5
 _RUN_WAIT_S: float = 30.0
 _CONTEXT_LENGTH: int = 32768
 # Where the home keeps its choices in the browser (runmodes.js, efforts.js).
@@ -217,6 +218,18 @@ async def test_a_follow_up_starts_its_run_with_the_choices_made_on_the_chats_pag
             await expect(_pill(page, "options")).to_contain_text("Auto")
             await page.keyboard.press("Escape")
             await expect(options).to_be_hidden()
+
+            # A chat has no goal mode: chosen for one, the Options hold no switch for it, and Task brings it back.
+            await _pill(page, "mode").click()
+            await _menu(page, "Mode").get_by_role("option").filter(has_text="Chat").click()
+            await expect(_pill(page, "mode")).to_contain_text("Chat")
+            await _pill(page, "options").click()
+            await expect(options.get_by_role("switch", name="Goal mode")).to_be_hidden()
+            await page.keyboard.press("Escape")
+            await expect(options).to_be_hidden()
+            await _pill(page, "mode").click()
+            await _menu(page, "Mode").get_by_role("option").filter(has_text="Task").click()
+            await expect(_pill(page, "mode")).to_contain_text("Task")
             await page.screenshot(path=str(tmp_path / "dock-choices-1280-light.png"), animations="disabled")
 
             # The follow-up's run has them, on the same thread, and its page starts from them.
@@ -271,6 +284,42 @@ async def test_while_a_run_works_the_pills_wait_for_the_next_follow_up(
             assert ended.status == "done", ended
             await expect(_pill(page, "model")).not_to_have_attribute("data-waiting", re.compile(".*"))
             await expect(_pill(page, "model")).not_to_have_attribute("title", re.compile("For the next follow-up"))
+            assert errors == []
+        finally:
+            await browser.close()
+
+
+async def test_a_reasoning_level_is_not_carried_to_a_model_without_levels(
+    runtime: Runtime, served: tuple[RunManager, str]
+) -> None:
+    manager, address = served
+    started: RunRecord = await manager.start(
+        "Tidy the notes.", "task", THINKER, None, "test", None, "high", "ask", False, ()
+    )
+    async with asyncio.timeout(_RUN_WAIT_S):
+        first: RunRecord = await manager.wait(started.id)
+    async with async_playwright() as playwright:
+        browser: Browser = await playwright.chromium.launch(channel=runtime.config.browser.channel, headless=True)
+        try:
+            page, errors = await _page(browser, address)
+            await page.goto(f"{address}/#/runs/{first.id}")
+            await expect(_pill(page, "reasoning")).to_contain_text("High")
+
+            # The daemon refuses a level that the model does not offer: on a model with none to choose, the pill goes
+            # and the follow-up leaves the level to the daemon.
+            await _pill(page, "model").click()
+            rows: Locator = _menu(page, "Model").get_by_role("option")
+            await rows.filter(has_text="scripted").filter(has_not_text="Default").click()
+            await expect(_pill(page, "model")).to_contain_text("scripted")
+            await expect(_pill(page, "reasoning")).to_be_hidden()
+            box: Locator = page.locator(".dock textarea")
+            await box.fill("Sum them up.")
+            await box.press("Enter")
+            follow_up: RunRecord = await _follow_up_of(runtime, first)
+            async with asyncio.timeout(_RUN_WAIT_S):
+                second: RunRecord = await manager.wait(follow_up.id)
+            assert second.status == "done", second
+            assert (second.model, second.effort) == (SCRIPTED_MODEL, runtime.config.models.effort), second
             assert errors == []
         finally:
             await browser.close()

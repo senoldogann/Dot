@@ -7614,8 +7614,11 @@ to them, and their tooltips add "For the next follow-up: the run under way keeps
 `tests/smoke/test_dock_choices.py` (a finished run's page shows its mode, model and approvals, no agent pill and nothing
 waiting; another model with its High reasoning and Auto approvals, chosen there with goal mode in the Options and no
 Keep going, start the follow-up's run on the same thread, whose page shows them, while the browser keeps none of them
-and the home's box shows the daemon's own; while a run works the pills wait and say so, and stop when it ends);
-`tests/smoke/test_composer.py` and the tour for the home's box; the screenshots read by eye.
+and the home's box shows the daemon's own; while a run works the pills wait and say so, and stop when it ends; Chat
+chosen in the dock leaves no goal mode switch; a run on the model with levels, followed up on one without, leaves the
+level to the daemon); `tests/smoke/test_composer.py` and the tour for the home's box; the screenshots read by eye. A
+review against the done criteria found them met and the smoke test short of their negative cases, which it now reads; a
+follow-up now always waits for the model list, as every follow-up on a run with a model recorded did.
 
 **What.** On a chat's page the dock offers what the home's box offers for the next message, after T3 Code's composer,
 which keeps its model and reasoning on every turn of a thread: the mode, the model with its reasoning, and the Options
