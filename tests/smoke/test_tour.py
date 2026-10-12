@@ -207,10 +207,16 @@ def _turn(tool: str, arguments: dict[str, str | bool]) -> ScriptedTurn:
     return ScriptedTurn(text="", calls=(ScriptedCall(tool=tool, arguments=arguments),))
 
 
+async def _opened(page: Page) -> None:
+    """Waits out the opening (item 114), which a window plays over the page once, so a shot shows the page."""
+    await page.wait_for_selector("html:not([data-opening])", state="attached")
+
+
 async def _shoot(context: BrowserContext, base: str, pages: tuple[tuple[str, str], ...], out: Path, tag: str) -> None:
     page: Page = await context.new_page()
     for name, route in pages:
         await page.goto(f"{base}/{route}")
+        await _opened(page)
         await page.wait_for_timeout(_SETTLE_MS)
         assert "Dot" in await page.title(), route
         faces: list[str] = await page.evaluate(
@@ -354,6 +360,7 @@ async def test_every_page_in_both_schemes_at_both_widths(
                     )
                     first: Page = await context.new_page()
                     await first.goto(ui_url(host, port, TOKEN))
+                    await _opened(first)
                     await first.wait_for_timeout(_SETTLE_MS)
                     await first.screenshot(path=str(out / f"{scheme}-{size}-first.png"))
                     await first.close()
@@ -395,6 +402,7 @@ async def test_a_held_dark_scheme_is_on_the_page_before_the_first_paint(
             await context.add_init_script(_WATCH_SCHEME)
             page: Page = await context.new_page()
             await page.goto(ui_url(host, port, TOKEN))
+            await _opened(page)
             await page.wait_for_timeout(_SETTLE_MS)
             state: list[str] = await page.evaluate(
                 "[window.__schemeAt, document.documentElement.dataset.scheme, getComputedStyle(document.body).backgroundColor]"

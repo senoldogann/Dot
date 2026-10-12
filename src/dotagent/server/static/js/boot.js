@@ -20,4 +20,39 @@
   if (typeof window.__TAURI__ === "object" && window.__TAURI__ !== null) {
     document.documentElement.dataset.shell = "desktop";
   }
+  // The opening (item 114, app.css): once per window session, so at every launch of the desktop shell and once per
+  // tab, never when the system reduces motion, and not at all when the storage is blocked, since a page that cannot
+  // remember it played would play it at every reload. The overlay's own last frame ends it; a click or a key first
+  // turns it into a quick fade.
+  var opening = false;
+  try {
+    opening =
+      sessionStorage.getItem("dot.opened") === null && !window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (opening) {
+      sessionStorage.setItem("dot.opened", "1");
+    }
+  } catch (error) {
+    opening = false;
+  }
+  if (opening) {
+    var root = document.documentElement;
+    var skip = function () {
+      if (root.dataset.opening === "on") {
+        root.dataset.opening = "skip";
+      }
+    };
+    var end = function (event) {
+      if (!(event.target instanceof Element) || !event.target.classList.contains("opening")) {
+        return;
+      }
+      delete root.dataset.opening;
+      document.removeEventListener("animationend", end);
+      window.removeEventListener("pointerdown", skip, true);
+      window.removeEventListener("keydown", skip, true);
+    };
+    root.dataset.opening = "on";
+    document.addEventListener("animationend", end);
+    window.addEventListener("pointerdown", skip, true);
+    window.addEventListener("keydown", skip, true);
+  }
 })();

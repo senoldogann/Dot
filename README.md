@@ -973,21 +973,19 @@ menus as pills of 32 px (an icon of 16 px, the value, a chevron; borderless at r
 between two pills) that open a panel above them, the providers' marks served from `static/icons/providers/` with their
 licences,
 table rows 40 px with their content on the middle; `#/controls` shows every control on one page for checking a look.
-Faces: every actor is a character (below); an agent wears the look you choose, Dot its own (Settings › General), and
-an actor without one (a delegated run, a campaign, a schedule) the shape and colour its id's hue gives it, one of
-eight, so it keeps its face in the sidebar, the lists, the rows of a chat and the bar of its own page. Characters:
-the animated faces (`static/js/character/`) are a port of bloub (github.com/jeremy-prt/bloub, MIT, Jérémy
-Perret) to plain ES modules, one filled shape with two eyes that are holes in it, in eight shapes, sixteen
-expressions, twelve colours (the theme's `--character-*` tokens) and fourteen animations; bloub recreates the
-behaviour of x.ai's bot avatar as an exercise and is affiliated with nobody, and neither is Dot: the licence covers
-the code, not the design it imitates (`static/js/character/LICENSE`). One loop drives every moving character on the
-page and stops while the tab is hidden; under reduced motion, or with "Faces that move" off in Settings › General, each
-shows one still frame (while the system reduces motion the switch says so, and where that is turned off). A still
-character follows a change of its shape or expression at once. Two characters move: the home's face and the look editor's preview; every other face is a still
-frame. One moving face costs
-about a millisecond of main-thread time a frame (`tests/smoke/test_character_cost.py` reads it from Chrome's
-performance metrics and caps it). `#/controls` shows every
-shape, expression, colour and animation.
+Faces: every actor is a character (below); an agent wears the look you choose, Dot its own (Settings › General), and an
+actor without one (a delegated run, a campaign, a schedule) the shape and colour its id's hue gives it, one of eight, so
+it keeps its face in the sidebar, the lists, the rows of a chat and the bar of its own page. Characters: the animated
+faces (`static/js/character/`) are a port of bloub (github.com/jeremy-prt/bloub, MIT, Jérémy Perret) to plain ES
+modules, one filled shape with two eyes that are holes in it, in eight shapes, sixteen expressions, twelve colours (the
+theme's `--character-*` tokens) and fourteen animations; bloub recreates the behaviour of x.ai's bot avatar as an
+exercise and is affiliated with nobody, and neither is Dot: the licence covers the code, not the design it imitates
+(`static/js/character/LICENSE`). One loop drives every moving character on the page and stops while the tab is hidden;
+under reduced motion, or with "Faces that move" off in Settings › General, each shows one still frame (while the system
+reduces motion the switch says so, and where that is turned off). A still character follows a change of its shape or
+expression at once. Two characters move: the home's face and the look editor's preview; every other face is a still
+frame. One moving face costs about a millisecond of main-thread time a frame (`tests/smoke/test_character_cost.py` reads
+it from Chrome's performance metrics and caps it). `#/controls` shows every shape, expression, colour and animation.
 Space: every gap, padding and margin sits on one rhythm of 8 px (4 for the smallest, a 2 px hairline token for what
 sits a breath apart; a unit test checks it); the sidebar has no dividers between its groups, its labels are the
 lightest ink that reads and its open row is a surface step rather than a tint; the top bar's pills show a border only
@@ -996,10 +994,15 @@ duration shows on hover. Motion: three durations (120, 200 and 320 ms) and two e
 rhythms of what repeats (the face's breath and pulse, a blink, a spin); a unit test holds every transition and
 animation to them. The face breathes slowly at rest and pulses while a run works; cards, rows, the slash menu and the
 toasts fade in; a state badge cross-fades. Under the system's reduced-motion setting every transform goes (the
-breath, the pulse, the spinners, the drawer's slide) and the fades stay, so a state change is still seen. The look,
-the scheme and the density you chose are put on the page by a small script in the document's head before the first
-paint, so a held dark scheme never flashes light on the way in; a screenshot tour (`tests/smoke/test_tour.py`)
-photographs every page in both schemes at 1280 and 390 for reading by eye.
+breath, the pulse, the spinners, the drawer's slide) and the fades stay, so a state change is still seen. Dot's mark is
+a yellow dot with the character's eyes, the o of the wordmark "dot" between a d and a t drawn in one line
+(`static/index.html`); the favicon, the app's icon, the menu bar's and the web app's icons are drawn from it
+(`desktop/icons/render.py`), and the wordmark heads the sign-in card. A window that opens the UI plays the opening once:
+the d and the t hop up, the dot drops in with its eyes shut, bounces twice, opens its eyes and blinks, and the page
+shows through, 1.3 s in all; a click or a key cuts it short, it takes no pointer, and it plays neither on a reload nor
+under reduced motion. The look, the scheme and the density you chose are put on the page by a small script in the
+document's head before the first paint, so a held dark scheme never flashes light on the way in; a screenshot tour
+(`tests/smoke/test_tour.py`) photographs every page in both schemes at 1280 and 390 for reading by eye.
 
 While you are elsewhere, the tab title counts the approvals that wait: `(2) New chat · Dot`. Settings › General ›
 Notifications adds
@@ -1089,10 +1092,10 @@ the agent itself.
   colour scheme and the density are the web UI's own settings.
 - **Signed in by itself.** The shell reads the daemon's address from `config.toml` (`[server]`, or the defaults) and
   the token from the token file under the home directory, and opens the UI with the token in the fragment, never
-  typed. While the daemon is down, the window shows the one command that starts it and opens the UI by itself when
-  the daemon answers.
-- **The menu bar item** is Dot's face in the state of the whole of Dot (still, working, an amber ring while
-  something waits for you) with the count of what waits for you beside it, read from `GET /api/activity/count`
+  typed. While the daemon is down, the window shows Dot's wordmark and the one command that starts it, and opens
+  the UI by itself when the daemon answers.
+- **The menu bar item** is Dot's mark in the state of the whole of Dot (looking at you at rest, glancing up while a
+  run works, a blue pastille while something waits for you) with the count of what waits for you beside it, read from `GET /api/activity/count`
   every second. A click opens the window; the menu has Open Dot, New chat and Quit. Closing the window keeps the
   shell in the menu bar.
 - **⌘⇧Space** anywhere brings the window up on New chat.
@@ -1110,9 +1113,9 @@ npm run dev        # a debug window with live reload of the shell
 ```
 
 The build is signed ad hoc; a build other Macs open without a warning needs an Apple developer account
-(`bundle.macOS.signingIdentity` in `desktop/src-tauri/tauri.conf.json`). The icons come from the face of the web UI:
-`uv run python desktop/icons/render.py` draws the app icon and the three menu bar icons, and `npm run icons` makes
-the bundle's set from the app icon.
+(`bundle.macOS.signingIdentity` in `desktop/src-tauri/tauri.conf.json`). The icons come from Dot's mark:
+`uv run python desktop/icons/render.py` draws the favicon, the app icon (the mark lit as a ball on a dark tile), the
+three menu bar icons and the web app's icons, and `npm run icons` makes the bundle's set from the app icon.
 
 ## Dot on the phone
 
