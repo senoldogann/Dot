@@ -474,8 +474,9 @@ untrusted as its parent.
   browser profile, configuration, database and journals of file changes. The configuration holds the policy and the MCP
   servers, the database the rules, the journals what `dotx undo` writes back.
 - Outside a `yolo` run the agent reads what Dot loads and runs, and runs a skill's files, but never changes them: its
-  plugins and their own files, its skills (with the `[skills] dirs` and `[plugins] dirs` folders), the playbooks it
-  learned and the file of its emergency stop. The file tools refuse to write there, and so does the shell guard for a
+  own code (the folder its package is imported from, the Python environment it runs in and the Python under that, and
+  the file of the launchd job that starts the daemon), its plugins and their own files, its skills (with the
+  `[skills] dirs` and `[plugins] dirs` folders), the playbooks it learned and the file of its emergency stop. The file tools refuse to write there, and so does the shell guard for a
   line that writes there by a copy or a move (its target folder option too), `dd`, a redirect, a download, a clone, an
   unpacked archive, git run in one of those folders, a file edited in place (`sed -i`, `perl -i`, `ruby -i`) or inline
   code that names the place (in a word of switches such as `-pe` too). The guard reads the line, not what a program
@@ -487,10 +488,20 @@ untrusted as its parent.
   directory of your Chrome), nor change what Dot loads and runs, nor rename a folder above any of them, whatever program
   does it: a script the run wrote, code that builds the path, a link, another letter case. macOS answers
   `Operation not permitted`. The search tools may not read your protected locations either; a command still may (ssh and
-  git read their keys there), and for those the guard reads its line. macOS starts no program that runs as root inside
-  the sandbox (`ps`, `top`, `sudo`, `crontab`): `pgrep -lf` and `lsof` work, a `yolo` run runs them,
-  `[shell] sandbox = false` turns the sandbox off. A program a command has act for it (Terminal through `open`, a
-  launchd job, an application driven by Apple Events) acts outside the sandbox.
+  git read their keys there), and for those the guard reads its line. A search that meets a place it may not read shows
+  what it found elsewhere and names the places it did not read. macOS starts no program that runs as root inside the
+  sandbox (`ps`, `top`, `sudo`, `crontab`): `pgrep -lf` and `lsof` work, a `yolo` run runs them,
+  `[shell] sandbox = false` turns the sandbox off.
+- What Dot runs at its start is kept from a run's commands too: the login shell whose environment it reads runs its
+  startup files, which a command may change, in the same sandbox, and the daemon's launchd job starts Python with `-P`,
+  so a file a command left in Dot's home, the job's working directory, is never imported (run `dotx service install`
+  again after an update to rewrite the job).
+- What the sandbox does not cover: a program a command has act for it (Terminal through `open`, a launchd job, an
+  application driven by Apple Events) acts outside it, and so do the programs Dot starts itself (its browser, the MCP
+  servers), from where they are installed: a command can change the programs installed under your account (Homebrew's,
+  the caches of npm and uv) and your shell's startup files, which those programs and your own Terminal then run. And it
+  keeps files: a key saved with `dotx auth set` or in Settings is in the key file, which it seals, while a key kept in
+  the keychain (service `dot-agent`) can be read by a command through `security`, in the sandbox too.
 
 **Typed judgments (optional, off by default).** The policy reads what a click does from the control's label, with
 patterns in English and Turkish, and a few in Finnish ("Post", "Send", "Delete", "Pay now", "Paylaş", "Lähetä"…); a

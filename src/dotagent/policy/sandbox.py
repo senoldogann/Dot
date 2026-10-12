@@ -14,7 +14,8 @@ whatever path, link or letter case names the file.
 What the sandbox costs: macOS starts no program that runs as root from inside it (``ps``, ``top``, ``sudo``,
 ``crontab``). What it does not cover: a process that has another program act for it (Terminal through ``open``, a job
 of launchd, an application driven by Apple Events) acts through that program, outside it; those lines are what the guard
-reads.
+reads. The programs Dot starts itself (its browser, the MCP servers) run from where they are installed, which a process
+of a run may change when the user's account may; Dot's own code is among what it loads and runs.
 """
 
 import asyncio

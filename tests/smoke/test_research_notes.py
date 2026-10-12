@@ -43,7 +43,7 @@ def _call(tool: str, arguments: JsonObject) -> ScriptedCall:
 @pytest_asyncio.fixture(scope="module", loop_scope="module")
 async def session() -> AsyncIterator[tuple[Runtime, RunManager]]:
     config: AppConfig = eval_config(load_default_config())
-    login_env: dict[str, str] = await read_login_env(config.shell.login_env_timeout_s)
+    login_env: dict[str, str] = await read_login_env(config.shell.login_env_timeout_s, ())
     with scratch_home() as home, eval_environment(home, {}):
         runtime: Runtime = await open_runtime(config, login_env)
         try:

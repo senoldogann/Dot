@@ -132,7 +132,7 @@ async def runtime(home: Path, environment: None) -> AsyncIterator[Runtime]:
 
 @pytest_asyncio.fixture(scope="module", loop_scope="module")
 async def login_env(environment: None) -> dict[str, str]:
-    return await read_login_env(10.0)
+    return await read_login_env(10.0, ())
 
 
 async def _call(runtime: Runtime, name: str, arguments: JsonObject) -> tuple[ToolResult, ActionInfo]:

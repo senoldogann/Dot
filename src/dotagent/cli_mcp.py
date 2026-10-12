@@ -68,7 +68,7 @@ async def cmd_mcp_list(command: McpListCommand) -> int:
         return 0
     starting: int = sum(1 for server in config.mcp if server.enabled)
     sys.stderr.write(f"Starting {starting} MCP server(s); the first start of a server can take a while...\n")
-    login_env: dict[str, str] = await read_login_env(config.shell.login_env_timeout_s)
+    login_env: dict[str, str] = await read_login_env(config.shell.login_env_timeout_s, ())
     reports: tuple[ServerReport, ...] = await inspect_servers(config.mcp, login_env)
     for report in reports:
         sys.stdout.write(f"{render_report(report)}\n")

@@ -57,7 +57,7 @@ def _script() -> list[ScriptedTurn]:
 @pytest_asyncio.fixture(loop_scope="module")
 async def served() -> AsyncIterator[tuple[Runtime, RunManager, str]]:
     """A runtime in a throw-away home with the scripted provider, served by a real server."""
-    login_env: dict[str, str] = await read_login_env(load_default_config().shell.login_env_timeout_s)
+    login_env: dict[str, str] = await read_login_env(load_default_config().shell.login_env_timeout_s, ())
     with scratch_home() as home, eval_environment(home, {}):
         runtime: Runtime = await open_runtime(eval_config(load_default_config()), login_env)
         try:

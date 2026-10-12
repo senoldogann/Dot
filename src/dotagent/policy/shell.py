@@ -43,7 +43,12 @@ _COMPLETES: str = "\t"
 _OPERATORS: frozenset[str] = frozenset(
     {";", "&&", "||", "|", "&", "|&", "&|", "(", ")", ";;", ";&", ";;&", ";|", "{", "}"}
 )
-_SHELL_OPERATOR: re.Pattern[str] = re.compile(r";;&|;;|;&|;\||&&|\|\||\|&|&>>|&>|&\||>>|>&|>\||<&|<<<|<<|<>|[;&|()<>]")
+_SHELL_OPERATOR: re.Pattern[str] = re.compile(
+    r";;&|;;|;&|;\||&&|\|\||\|&|&>>\||&>>|&>\||&>|&\||>>&\||>>&|>>\||>>|>&\||>&|>\||<&|<<<|<<|<>|[;&|()<>]"
+)
+# zsh spells the redirects that write past noclobber with "!" as well as "|" (">!", ">>!", "&>!", ">&!", "&>>!",
+# ">>&!"): a "!" right after an unquoted ">" or ">&" (not "<>") is that letter, which the reader turns into "|".
+_CLOBBER_BANG: re.Pattern[str] = re.compile(r"(?:(?<=>)(?<!<>)|(?<=>&))!")
 _OPERATOR_CHARS: str = ";&|()<>"
 # A quoted or escaped operator character is a letter of its word: the reader writes it as one of these stand-ins, which
 # the tokenizer takes for a letter, and the words get the character back (:func:`_commands`).
@@ -251,8 +256,9 @@ _COPIES: frozenset[str] = frozenset({"cp", "ln", "install", "ditto", "rsync", "s
 # Copies and moves that can be given the folder they write into by an option (GNU's -t and --target-directory).
 _TARGET_FOLDER_COMMANDS: frozenset[str] = frozenset({"cp", "mv", "ln", "install"})
 _TARGET_FOLDER_OPTION: str = "--target-directory"
-# The redirects that empty the file they name before they write (``>|`` writes past zsh's noclobber); ``>>`` appends.
-_REPLACING_REDIRECTS: frozenset[str] = frozenset({">", ">|", "&>", ">&"})
+# The redirects that empty the file they name before they write (``>|``, ``&>|`` and ``>&|`` write past zsh's noclobber,
+# spelt with "!" too); ``>>`` and its kin append.
+_REPLACING_REDIRECTS: frozenset[str] = frozenset({">", ">|", "&>", ">&", "&>|", ">&|"})
 # Copies and moves that put a file in the place of one that is there, unless told to keep it.
 _REPLACING_COPIES: frozenset[str] = frozenset({"cp", "mv", "install", "ditto"})
 _REPLACED: str = "replaces a file that is there outside the workspace"
@@ -817,8 +823,8 @@ def _read(command: str) -> _Reading:
 
 def _tokenize(text: str) -> list[str] | None:
     """The words and operators of ``text`` (as :func:`_read` gives it), None when its quotes do not close. A run of
-    operator characters is split into the shell's operators (``);`` is ``)`` and ``;``)."""
-    lexer: shlex.shlex = shlex.shlex(text, posix=True, punctuation_chars=True)
+    operator characters is split into the shell's operators (``);`` is ``)`` and ``;``); zsh's ``>!`` is ``>|``."""
+    lexer: shlex.shlex = shlex.shlex(_CLOBBER_BANG.sub("|", text), posix=True, punctuation_chars=True)
     lexer.whitespace_split = True
     lexer.commenters = ""
     try:

@@ -122,6 +122,18 @@ _DOT_CHANGES: list[str] = [
     'perl -ne \'open(my $f, ">", "{dot}/plugins/p/.mcp.json")\'',
     "python3 -Bc \"open('{dot}/plugins/new/.mcp.json', 'w')\"",
     "node -pe \"require('fs').writeFileSync('{dot}/plugins/p/.mcp.json', '')\"",
+    # zsh's redirects past noclobber, spelt with "!" or "|", for one output, both, and appends (item 146).
+    "echo x >! {dot}/skills/notes/SKILL.md",
+    "echo x >!{dot}/skills/notes/SKILL.md",
+    "echo x >>! {dot}/skills/notes/SKILL.md",
+    "echo x >>| {dot}/STOP",
+    "make &>! {dot}/plugins/p/.mcp.json",
+    "make &>| {dot}/plugins/p/.mcp.json",
+    "make >&! {dot}/plugins/p/.mcp.json",
+    "make >&| {dot}/plugins/p/.mcp.json",
+    "make &>>| {dot}/plugins/p/.mcp.json",
+    "make >>& {dot}/plugins/p/.mcp.json",
+    "make >>&! {dot}/plugins/p/.mcp.json",
 ]
 _DOT_READS: list[str] = [
     "cat {dot}/skills/notes/SKILL.md",
@@ -321,7 +333,10 @@ def test_replacing_a_file_that_is_there_outside_the_workspace_asks_and_making_on
     replacing: list[str] = [
         f"echo x > {outside}/report.txt",
         f"echo x >| {outside}/report.txt",
+        f"echo x >! {outside}/report.txt",
         f"make &> {outside}/report.txt",
+        f"make &>| {outside}/report.txt",
+        f"make >&! {outside}/report.txt",
         f"cp notes.txt {outside}/report.txt",
         f"cp -p notes.txt {outside}/docs",
         f"cp -t {outside}/docs notes.txt",
@@ -333,6 +348,8 @@ def test_replacing_a_file_that_is_there_outside_the_workspace_asks_and_making_on
     ]
     keeping: list[str] = [
         f"echo x >> {outside}/report.txt",
+        f"echo x >>! {outside}/report.txt",
+        f"echo x >'!' {outside}/report.txt",
         f"echo x > {outside}/new.txt",
         f"cp -n notes.txt {outside}/report.txt",
         f"cp notes.txt {outside}/docs/other.txt",

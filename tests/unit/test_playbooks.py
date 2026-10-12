@@ -182,13 +182,18 @@ def test_a_playbook_is_a_skill_the_catalog_loads(tmp_path: Path) -> None:
     assert same_kind("price of a product", entries, [(1.0, 0.0), (0.0, 1.0)]) is None
 
 
+def _counted(meta: PlaybookMeta | None) -> PlaybookMeta:
+    assert meta is not None, "the use was not counted"
+    return meta
+
+
 def test_a_playbook_that_two_runs_read_and_failed_is_retired_and_no_longer_loaded(tmp_path: Path) -> None:
     name: str = _playbook().name
     write_playbook(tmp_path, _playbook())
-    assert record_use(tmp_path, name, True).uses == 1
-    assert record_use(tmp_path, name, False).failures == 1
+    assert _counted(record_use(tmp_path, name, True)).uses == 1
+    assert _counted(record_use(tmp_path, name, False)).failures == 1
     assert (tmp_path / name / SKILL_FILE).is_file()
-    meta: PlaybookMeta = record_use(tmp_path, name, False)
+    meta: PlaybookMeta = _counted(record_use(tmp_path, name, False))
     assert meta.failures == MAX_FAILURES
     assert not (tmp_path / name).exists()
     assert (tmp_path / RETIRED_DIR / name / SKILL_FILE).is_file()
@@ -198,6 +203,17 @@ def test_a_playbook_that_two_runs_read_and_failed_is_retired_and_no_longer_loade
     assert drop_playbook(tmp_path, name) == tmp_path / RETIRED_DIR / name
     with pytest.raises(NotFoundError):
         drop_playbook(tmp_path, name)
+
+
+def test_a_use_counted_after_another_run_retired_the_playbook_is_not_counted(tmp_path: Path) -> None:
+    """Item 146: two runs that read a playbook end at once, and the count of the first retires it; the second finds
+    it gone once it holds the lock, counts nothing and goes on."""
+    name: str = _playbook().name
+    write_playbook(tmp_path, _playbook())
+    for _ in range(MAX_FAILURES):
+        record_use(tmp_path, name, False)
+    assert record_use(tmp_path, name, False) is None
+    assert [(entry.retired, entry.meta.failures) for entry in list_playbooks(tmp_path)] == [(True, MAX_FAILURES)]
 
 
 @pytest.mark.parametrize("name", ["..", ".", RETIRED_DIR, "learned-x/../..", "learned-x/../../home", ""])

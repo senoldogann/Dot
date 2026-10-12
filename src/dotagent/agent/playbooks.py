@@ -375,11 +375,14 @@ def read_meta(folder: Path) -> PlaybookMeta:
         raise NotFoundError("the playbook has no readable record", {"path": str(file), "error": str(exc)}) from exc
 
 
-def record_use(root: Path, name: str, succeeded: bool) -> PlaybookMeta:
+def record_use(root: Path, name: str, succeeded: bool) -> PlaybookMeta | None:
     """Count a run that read the playbook ``name`` and ended; a playbook that :func:`retires` is moved under
-    ``.retired``. Returns the record after the count."""
+    ``.retired``. Returns the record after the count, or None for a playbook that is no longer active (another run
+    retired it or the owner deleted it since this run read it), which is not counted."""
     folder: Path = playbook_folder(root, name)
     with _changing(root):
+        if not folder.is_dir():
+            return None
         meta: PlaybookMeta = recorded(read_meta(folder), succeeded)
         _save_meta(folder, meta)
         if retires(meta):
@@ -454,9 +457,9 @@ def list_playbooks(root: Path) -> tuple[PlaybookEntry, ...]:
 async def _record_uses(runtime: Runtime, run: RunRecord, status: RunStatus, events: Sequence[EventRecord]) -> None:
     root: Path = playbooks_dir()
     for name in used_playbooks(events):
-        if not playbook_folder(root, name).is_dir():
+        meta: PlaybookMeta | None = await asyncio.to_thread(record_use, root, name, status == "done")
+        if meta is None:
             continue
-        meta: PlaybookMeta = await asyncio.to_thread(record_use, root, name, status == "done")
         log.info("playbook_use_recorded", run_id=run.id, playbook=name, uses=meta.uses, failures=meta.failures)
         if retires(meta):
             await runtime.bus.emit(run.id, PLAYBOOK_RETIRED, {"name": name, "failures": meta.failures}, True)

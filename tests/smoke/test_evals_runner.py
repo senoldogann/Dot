@@ -30,7 +30,7 @@ def config() -> AppConfig:
 
 @pytest_asyncio.fixture(scope="module", loop_scope="module")
 async def login_env(config: AppConfig) -> dict[str, str]:
-    return await read_login_env(config.shell.login_env_timeout_s)
+    return await read_login_env(config.shell.login_env_timeout_s, ())
 
 
 def _turn(*calls: ScriptedCall) -> ScriptedTurn:
