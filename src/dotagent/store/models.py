@@ -39,7 +39,8 @@ class ThreadSummary(FrozenModel):
     those runs, which the chat opens on. ``updated_at`` is the later of the last message and the start of the latest
     run; ``latest_created_at`` is when the latest run was created, which a message during the run does not move (the
     sidebar counts a working chat's time from it). ``pinned_at`` is when the owner pinned the chat, ``None`` for one not
-    pinned (item 130). Threads that only hold delegated runs are not chats and are never listed."""
+    pinned (item 130). ``unread`` is true when the latest run ended after the owner last saw the chat, or ended and the
+    owner marked the chat unread (item 131). Threads that only hold delegated runs are not chats and are never listed."""
 
     id: str
     title: str
@@ -52,6 +53,7 @@ class ThreadSummary(FrozenModel):
     latest_status: RunStatus
     latest_mode: RunMode
     latest_created_at: float
+    unread: bool
 
 
 class RunRecord(FrozenModel):

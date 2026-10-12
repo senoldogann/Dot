@@ -31,10 +31,13 @@ def threads_router(ctx: ServerContext) -> APIRouter:
 
     @router.patch("/threads/{thread_id}", status_code=204)
     async def change_thread(thread_id: str, change: ThreadChange) -> None:
-        """Give a chat the name the owner typed, or pin it (first among the pinned) or unpin it; 404 for no chat."""
+        """Give a chat the name the owner typed, pin it (first among the pinned) or unpin it, or mark it seen or unseen;
+        404 for no chat."""
         if change.title is not None:
             await store.rename_thread(thread_id, change.title)
         if change.pinned is not None:
             await store.pin_thread(thread_id, change.pinned)
+        if change.seen is not None:
+            await store.see_thread(thread_id, change.seen)
 
     return router

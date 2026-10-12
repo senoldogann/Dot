@@ -883,6 +883,14 @@ chat's address (its latest run) on the clipboard, for this browser or another on
 starts choosing chats with this one ticked, and **Delete** asks first, as Select's does. The daemon keeps the pin and
 the name, so every browser shows them.
 
+A chat whose latest run ended after you last saw it is **unread**: a dot in the accent colour at the left of its row
+(a failed run keeps its red dot), and "unread" for a screen reader. Opening the chat marks it seen, and so does
+having it open while the page is in view (shown, in a window that has the focus), so a run that ends in front of you
+leaves no dot. **Mark unread** in a read chat's menu (once its run is over) brings the dot back until the chat is
+opened again or the page comes back into view, and **Mark read** clears it. The daemon keeps when each chat was last
+seen, so the phone and the desktop agree; the chats there when Dot learnt this are taken as seen, and a run that ends
+while nobody watches, a scheduled one too, leaves its chat unread.
+
 Above the chats, two sections appear while they have rows: **Waiting for you** (the approvals and questions runs wait
 for, and a run whose browser you took over) and **Working** (the runs going on, a session of a campaign, a run
 delegated by another, and a schedule that fires within the hour), each row with its state dot, the first words of
@@ -1171,7 +1179,7 @@ The REST API (all under `/api`; bodies and replies are JSON, event streams are s
 | `POST /runs/{id}/btw` (`{"text": …}`)                                           | a side question, answered without the run seeing it          |
 | `POST /attachments` (`{"name", "media_type", "data_b64"}`)                      | keep a file for a message; `POST /runs` and `steer` name it in `attachments` |
 | `GET /threads?limit=N`, `DELETE /threads` (`{"ids": […]}`)                      | the chats, the pinned first, then newest activity first; delete some with their runs (409 with the ids while one has a run under way) |
-| `PATCH /threads/{id}` (`{"title": …, "pinned": …}`, one or both)                | name a chat or pin it (204; 404 for no chat) |
+| `PATCH /threads/{id}` (`{"title": …, "pinned": …, "seen": …}`, one at least)   | name a chat, pin it, or mark it seen or unseen (204; 404 for no chat); a chat's `unread` is in the list |
 | `GET /approvals`, `POST /approvals/{id}/decision`                               | pending approvals; answer one                                |
 | `GET\|POST /rules`, `PATCH\|DELETE /rules/{id}`                                 | custom policy rules                                          |
 | `POST /rules/draft` (`{"sentence": …}`)                                         | a rule drafted from your words, not kept (422 with the model's reason when the words make no rule) |
