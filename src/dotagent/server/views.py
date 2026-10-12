@@ -48,6 +48,12 @@ class HealthView(FrozenModel):
     version: str
 
 
+class ProofView(FrozenModel):
+    """The daemon's answer to a nonce (:func:`dotagent.server.guard.daemon_proof`)."""
+
+    proof: str
+
+
 # ----------------------------------------------------------------------------------------------- queries
 
 
@@ -82,6 +88,12 @@ class MemoriesQuery(FrozenModel):
 class SearchQuery(FrozenModel):
     q: str = Field(min_length=1, max_length=500)
     limit: int = Field(default=10, ge=1, le=50)
+
+
+class ProofQuery(FrozenModel):
+    """A nonce of the client, made fresh for each proof it asks for."""
+
+    nonce: str = Field(pattern=r"^[0-9a-f]{32,128}$")
 
 
 # ---------------------------------------------------------------------------------------------- requests

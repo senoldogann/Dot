@@ -5062,8 +5062,8 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 139 | The web UI and the desktop shell                                                     | done        | fcd052b |
 | 140 | The gaps the final review found in the guards                                        | done        | 25da5f2 |
 | 141 | The commands of a run are kept out of Dot's own files by macOS                       | done        | 6fe0263 |
-| 142 | What the guards of the desktop and of the shell see                                  | in progress |         |
-| 143 | The token goes only to the daemon                                                    | planned     |         |
+| 142 | What the guards of the desktop and of the shell see                                  | done        | d765da9 |
+| 143 | The token goes only to the daemon                                                    | in progress |         |
 | 144 | The records of a run and the emergency stop                                          | planned     |         |
 | 145 | The CI and the desktop shell                                                         | planned     |         |
 
@@ -7934,7 +7934,7 @@ read (a script the run wrote, code that builds a path) no longer reaches them.
 
 ### 142. What the guards of the desktop and of the shell see
 
-**Status: in progress.**
+**Status: done.** Merged as `d765da9` (PR #177, MYP-283 Done).
 
 **As built (2026-10-12).** The desktop: `window_role` takes a window of any application but the terminals, Finder,
 System Settings, the messengers and the password managers for Dot's own when its title is the one Dot's web UI gives its
@@ -7961,7 +7961,28 @@ removing it is, so the presets that ask before destroying something outside the 
 
 ### 143. The token goes only to the daemon
 
-**Status: planned.**
+**Status: in progress.**
+
+**As built (2026-10-12).** The daemon answers `GET /api/proof?nonce=<32 to 128 hex digits>` without the token with
+`daemon_proof`: an HMAC-SHA256 keyed with the token over a fixed label and the nonce, in hex, which only a holder of the
+token can give. Every client checks it with a fresh nonce of its own before it sends the token. The command line
+(`prove_daemon`), before `dotx open` and `dotx url` give the signed-in address and before `dotx service permissions`
+posts: any other answer stops it, and it names `lsof` for what listens on the port. The desktop shell (`look`), at each
+poll before it asks for the count with the token and so before it opens the UI with the token in the address; its menu
+bar item says that something else answers at the daemon's address. It uses the `hmac` crate (new to its lock) with
+`sha2`, `hex` and `getrandom`, which its lock already had. The web UI (`proven` in `api.js`), before each request,
+stream and image it sends with the token; requests made while a proof is on its way share it, and a proof that has
+settled serves no later request. In the page an answer with another proof is told as a refused token (the page asks for
+one) and any other answer as a daemon that cannot be reached; Web Crypto is there on the loopback address in WebKit and
+in Chromium (probed). Left: a page that another program served at the daemon's address reads what the browser keeps for
+that address, the token among it. Tests: the proof of a known token and nonce, held by the Python and the Rust tests
+alike; the route, open without the token, refusing what is not a nonce; the command line against a real program on a
+free port that answers the health check as the daemon does but not the proof, or asks for the token as the daemon of
+before does (no token sent, no address given), and against the real daemon; the page against such an answer (no request
+carries the token, the page asks for one) and then against the daemon; the shell over real sockets against the daemon,
+another program, a program without the proof and nothing at all. Each failed on the code of before (the shell's with its
+poll made the old way, which sent the token to the other program). CI's desktop job runs `cargo test` too. The shell's
+part reaches the owner's Mac when the owner rebuilds the desktop app.
 
 **What.** Before the command line, the desktop shell and the web UI's reconnection send the API token, the daemon proves
 that it holds it (a keyed hash of a fresh nonce), so a program that holds the daemon's port while the daemon is down is
@@ -8559,3 +8580,4 @@ spending lock through the run manager, and a migration cut off between its steps
 - 2026-10-12 (Opus 5.5): item 140 merged as `25da5f2` (PR #174, MYP-281 Done): the shell guard reads a copy's target folder option, `dd`, git in Dot's own folders, the files perl and ruby edit in place and the code in a word of switches, so a change of what Dot loads and runs is refused there too; more ways of curl, wget, httpie and inline code to send data out carry the upload flag, and two old false alarms are gone; the browser reads a dot at the end of a host as none. Part 22 is done.
 - 2026-10-12 (Opus 5.5): part 23 planned, items 141 to 145, from the owner's word asking to finish the remaining problems too: what part 22 left to the owner or reported, each read again in the code; the search tools reading Dot's own data folder found on the way.
 - 2026-10-12 (Opus 5.5): item 141 merged as `6fe0263` (PR #176, MYP-282 Done): outside yolo the shell tool, a terminal session, the AppleScript tool and the search tools start their processes in a macOS sandbox that keeps them out of Dot's own files and from changing what it loads and runs, whatever program does it; the search tools may not read the protected locations either; programs that run as root do not start in it; [shell] sandbox turns it off; the daemon restarted with it.
+- 2026-10-12 (Opus 5.5): item 142 merged as `d765da9` (PR #177, MYP-283 Done): a window of another application that shows Dot's web UI, known by its title at each step, is Dot's own for the desktop's review outside yolo; a shell line that replaces a file that is there outside the workspace (a redirect onto it, a copy or a move onto it, ln -f, tee without -a, dd without conv=notrunc) is destructive, so the default preset asks; the daemon restarted with it.

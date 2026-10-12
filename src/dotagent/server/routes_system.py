@@ -1,13 +1,14 @@
-"""Routes for the state of the installation: health, status, models, checks, desktop permissions, the emergency stop
-and screenshots."""
+"""Routes for the state of the installation: health, the proof of the daemon, status, models, checks, desktop
+permissions, the emergency stop and screenshots."""
 
 import asyncio
 import os
 import re
 import time
 from pathlib import Path
+from typing import Annotated
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Query
 from fastapi.responses import FileResponse
 
 from dotagent import __version__
@@ -22,6 +23,7 @@ from dotagent.llm.router import ModelRef, ModelRouter
 from dotagent.llm.traits import effective_effort
 from dotagent.llm.types import KNOWN_PROVIDERS, Effort, ModelInfo
 from dotagent.server.context import ServerContext
+from dotagent.server.guard import daemon_proof
 from dotagent.server.palette import palette_view
 from dotagent.server.views import (
     FailsafeView,
@@ -31,6 +33,8 @@ from dotagent.server.views import (
     ModelOption,
     PaletteView,
     PermissionsView,
+    ProofQuery,
+    ProofView,
     ProviderModels,
     ProviderProblem,
     PushKeyView,
@@ -88,6 +92,18 @@ def health_router() -> APIRouter:
     @router.get("/health")
     async def health() -> HealthView:
         return HealthView(ok=True, version=__version__)
+
+    return router
+
+
+def proof_router(token: str) -> APIRouter:
+    """The answer to a client's nonce with which the daemon shows that it holds ``token``, asked before the token is
+    sent (:func:`dotagent.server.guard.daemon_proof`)."""
+    router: APIRouter = APIRouter(prefix="/api")
+
+    @router.get("/proof")
+    async def proof(query: Annotated[ProofQuery, Query()]) -> ProofView:
+        return ProofView(proof=daemon_proof(token, query.nonce))
 
     return router
 

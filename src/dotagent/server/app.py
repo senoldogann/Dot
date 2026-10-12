@@ -32,7 +32,7 @@ from dotagent.server.routes_campaigns import campaigns_router
 from dotagent.server.routes_data import memories_router, rules_router, schedules_router
 from dotagent.server.routes_keys import keys_router
 from dotagent.server.routes_runs import runs_router
-from dotagent.server.routes_system import health_router, system_router
+from dotagent.server.routes_system import health_router, proof_router, system_router
 from dotagent.server.routes_themes import themes_router
 from dotagent.server.routes_threads import threads_router
 from dotagent.server.views import ErrorView
@@ -74,6 +74,7 @@ def create_app(ctx: ServerContext) -> FastAPI:
     """Build the application for one running Dot; the guard wraps everything, the UI files answer last."""
     app: FastAPI = FastAPI(title="Dot", version=__version__, docs_url=None, redoc_url=None, openapi_url=None)
     app.include_router(health_router())
+    app.include_router(proof_router(ctx.token))
     app.include_router(system_router(ctx))
     app.include_router(runs_router(ctx))
     app.include_router(threads_router(ctx))

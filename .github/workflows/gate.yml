@@ -71,7 +71,8 @@ jobs:
           tests/smoke/test_tool_groups.py
           tests/smoke/test_undo.py
 
-  # The desktop shell (desktop/): the Rust compiles and is clean; the bundle itself is built on the owner's Mac.
+  # The desktop shell (desktop/): the Rust compiles, is clean and passes its tests; the bundle itself is built on the
+  # owner's Mac.
   desktop:
     runs-on: macos-latest
     timeout-minutes: 30
@@ -88,4 +89,7 @@ jobs:
         working-directory: desktop/src-tauri
       - name: Clippy
         run: cargo clippy --all-targets -- -D warnings
+        working-directory: desktop/src-tauri
+      - name: Test
+        run: cargo test
         working-directory: desktop/src-tauri

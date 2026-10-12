@@ -1,8 +1,10 @@
 //! The desktop shell of Dot: a native window around the web UI the daemon serves, a menu bar item with the face of
 //! the web UI and the count of what waits for the user, a global shortcut for a new chat, and notifications sent by
 //! the web UI through the shell. The daemon stays owned by launchd (`dotx service install`): the shell connects to it
-//! with the token of the token file and never runs the agent itself. While the daemon is down the window shows the
-//! page that says how to start it, and opens the UI by itself when the daemon answers.
+//! with the token of the token file and never runs the agent itself. It sends the token only to a daemon that has
+//! just proven it holds it (`GET /api/proof`), so a program that took the daemon's port is sent nothing. While the
+//! daemon is down the window shows the page that says how to start it, and opens the UI by itself when the daemon
+//! answers.
 
 use std::env;
 use std::fs;
@@ -11,7 +13,9 @@ use std::process::Command;
 use std::thread;
 use std::time::Duration;
 
+use hmac::{Hmac, Mac};
 use serde::Deserialize;
+use sha2::Sha256;
 use tauri::image::Image;
 use tauri::menu::{Menu, MenuItem, PredefinedMenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
@@ -32,6 +36,9 @@ const REQUEST_TIMEOUT: Duration = Duration::from_millis(800);
 const MISSES_BEFORE_DOWN: u32 = 3;
 const DEFAULT_HOST: &str = "127.0.0.1";
 const DEFAULT_PORT: u16 = 8765;
+/// What the daemon's proof puts before the nonce (`daemon_proof` in `dotagent.server.guard`).
+const PROOF_LABEL: &[u8] = b"dot daemon proof\n";
+const NONCE_BYTES: usize = 32;
 const ICON_IDLE: &[u8] = include_bytes!("../icons/tray-idle.png");
 const ICON_WORKING: &[u8] = include_bytes!("../icons/tray-working.png");
 const ICON_WAITING: &[u8] = include_bytes!("../icons/tray-waiting.png");
@@ -58,6 +65,25 @@ struct Count {
     waiting: u64,
     working: u64,
     state: String,
+}
+
+/// `GET /api/proof`.
+#[derive(Deserialize)]
+struct Proof {
+    proof: String,
+}
+
+type HmacSha256 = Hmac<Sha256>;
+
+/// What a poll sees at the daemon's address.
+enum Seen {
+    /// The daemon: it proved that it holds the token, then gave the numbers of the menu bar item.
+    Counted(Count),
+    /// Nothing answers in time, or the daemon has not made the token yet.
+    Silent,
+    /// Something answers without the proof the token gives (another program on the port, a daemon of an older version
+    /// or of another home): it is sent nothing.
+    Unproven,
 }
 
 /// Where the daemon listens and the token that signs the shell in; `token` is `None` until the daemon has created it.
@@ -111,6 +137,40 @@ fn ui_url(daemon: &Daemon, token: &str) -> String {
     format!("{}/#token={token}", daemon.base)
 }
 
+/// Whether `answer` is the proof of `nonce` that only a holder of `token` gives: HMAC-SHA256 keyed with the token over
+/// `PROOF_LABEL` and the nonce, in hex.
+fn proves(token: &str, nonce: &str, answer: &str) -> bool {
+    let Ok(tag) = hex::decode(answer) else {
+        return false;
+    };
+    let mut mac =
+        HmacSha256::new_from_slice(token.as_bytes()).expect("HMAC takes a key of any length");
+    mac.update(PROOF_LABEL);
+    mac.update(nonce.as_bytes());
+    mac.verify_slice(&tag).is_ok()
+}
+
+/// Ask what answers at the daemon's address to prove that it holds `token`, with a fresh nonce: `None` when nothing
+/// answers in time, else whether the answer is the proof.
+fn proven(daemon: &Daemon, token: &str) -> Option<bool> {
+    let mut bytes = [0u8; NONCE_BYTES];
+    getrandom::fill(&mut bytes).expect("macOS gives random bytes");
+    let nonce = hex::encode(bytes);
+    match ureq::get(&format!("{}/api/proof", daemon.base))
+        .query("nonce", &nonce)
+        .timeout(REQUEST_TIMEOUT)
+        .call()
+    {
+        Ok(response) => Some(
+            response
+                .into_json::<Proof>()
+                .is_ok_and(|answer| proves(token, &nonce, &answer.proof)),
+        ),
+        Err(ureq::Error::Status(..)) => Some(false),
+        Err(ureq::Error::Transport(_)) => None,
+    }
+}
+
 /// The numbers of the menu bar item, or `None` while the daemon does not answer.
 fn count(daemon: &Daemon, token: &str) -> Option<Count> {
     ureq::get(&format!("{}/api/activity/count", daemon.base))
@@ -120,6 +180,18 @@ fn count(daemon: &Daemon, token: &str) -> Option<Count> {
         .ok()?
         .into_json()
         .ok()
+}
+
+/// One look at the daemon: the count is asked, with the token, only of a daemon that has just proven it holds it.
+fn look(daemon: &Daemon) -> Seen {
+    let Some(token) = daemon.token.as_deref() else {
+        return Seen::Silent;
+    };
+    match proven(daemon, token) {
+        None => Seen::Silent,
+        Some(false) => Seen::Unproven,
+        Some(true) => count(daemon, token).map_or(Seen::Silent, Seen::Counted),
+    }
 }
 
 fn tray_icon(state: &str) -> Image<'static> {
@@ -193,7 +265,7 @@ fn new_chat(app: &AppHandle) {
     show(app);
 }
 
-/// Where the window should be: the UI when the daemon answers, the down page otherwise.
+/// Where the window should be: the UI when the daemon has just proven itself (`look`), the down page otherwise.
 fn navigate(app: &AppHandle, up: bool, daemon: &Daemon) {
     let Some(window) = app.get_webview_window(WINDOW) else {
         return;
@@ -216,19 +288,13 @@ fn watch(app: AppHandle, showing_ui: bool) {
         let mut misses: u32 = 0;
         loop {
             let daemon = daemon();
-            let seen = daemon
-                .token
-                .as_deref()
-                .and_then(|token| count(&daemon, token));
-            misses = if seen.is_some() {
-                0
-            } else {
-                misses.saturating_add(1)
-            };
+            let seen = look(&daemon);
+            let counted = matches!(seen, Seen::Counted(_));
+            misses = if counted { 0 } else { misses.saturating_add(1) };
             if let Some(tray) = app.tray_by_id(TRAY) {
                 let (state, waiting, working) = match &seen {
-                    Some(count) => (count.state.as_str(), count.waiting, count.working),
-                    None => ("idle", 0, 0),
+                    Seen::Counted(count) => (count.state.as_str(), count.waiting, count.working),
+                    Seen::Silent | Seen::Unproven => ("idle", 0, 0),
                 };
                 let _ = tray.set_icon_with_as_template(Some(tray_icon(state)), false);
                 let _ = tray.set_title(if waiting > 0 {
@@ -237,15 +303,20 @@ fn watch(app: AppHandle, showing_ui: bool) {
                     None
                 });
                 let tip = match &seen {
-                    Some(_) => format!("Dot · {waiting} waiting for you · {working} working"),
-                    None => "Dot · the daemon is not running".to_string(),
+                    Seen::Counted(_) => {
+                        format!("Dot · {waiting} waiting for you · {working} working")
+                    }
+                    Seen::Silent => "Dot · the daemon is not running".to_string(),
+                    Seen::Unproven => {
+                        "Dot · something else answers at the daemon's address".to_string()
+                    }
                 };
                 let _ = tray.set_tooltip(Some(tip));
             }
             if showing_ui && misses >= MISSES_BEFORE_DOWN {
                 navigate(&app, false, &daemon);
                 showing_ui = false;
-            } else if !showing_ui && seen.is_some() {
+            } else if !showing_ui && counted {
                 navigate(&app, true, &daemon);
                 showing_ui = true;
             }
@@ -327,7 +398,7 @@ pub fn run() {
             let handle = app.handle().clone();
             let daemon = daemon();
             let first = match &daemon.token {
-                Some(token) if count(&daemon, token).is_some() => {
+                Some(token) if matches!(look(&daemon), Seen::Counted(_)) => {
                     WebviewUrl::External(url::Url::parse(&ui_url(&daemon, token))?)
                 }
                 _ => WebviewUrl::App(DOWN_PAGE.into()),
@@ -360,4 +431,150 @@ pub fn run() {
             show(app);
         }
     });
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::io::{Read, Write};
+    use std::net::{TcpListener, TcpStream};
+    use std::sync::mpsc::{self, Receiver};
+
+    const TOKEN: &str = "MARKER-0123456789abcdef";
+    const NONCE: &str = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
+    /// `daemon_proof(TOKEN, NONCE)` of `dotagent.server.guard`; tests/unit/test_server_guard.py holds the same pair.
+    const PROOF: &str = "4aea8baff569980b8b9dceb16e4d02f89d6563a252c47dcf94912b82ae440020";
+    const COUNT: &str = r#"{"waiting": 1, "working": 0, "state": "waiting"}"#;
+
+    /// How a program on the daemon's port answers a request: the status line's end and the body.
+    type Answer = fn(&str) -> (&'static str, String);
+
+    fn read_request(stream: &mut TcpStream) -> String {
+        let mut request = Vec::new();
+        let mut buffer = [0u8; 1024];
+        while !request.windows(4).any(|window| window == b"\r\n\r\n") {
+            match stream.read(&mut buffer) {
+                Ok(0) | Err(_) => break,
+                Ok(read) => request.extend_from_slice(&buffer[..read]),
+            }
+        }
+        String::from_utf8_lossy(&request).into_owned()
+    }
+
+    /// A program on a free port of this Mac that answers each request with `answer`, and hands each request over as
+    /// it came, before it answers.
+    fn listener(answer: Answer) -> (Daemon, Receiver<String>) {
+        let socket = TcpListener::bind("127.0.0.1:0").expect("a free port");
+        let base = format!(
+            "http://{}",
+            socket.local_addr().expect("the port's address")
+        );
+        let (hand_over, requests) = mpsc::channel();
+        thread::spawn(move || {
+            for stream in socket.incoming() {
+                let Ok(mut stream) = stream else {
+                    return;
+                };
+                let request = read_request(&mut stream);
+                let (status, body) = answer(&request);
+                let _ = hand_over.send(request);
+                let _ = write!(
+                    stream,
+                    "HTTP/1.1 {status}\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
+                    body.len()
+                );
+            }
+        });
+        let daemon = Daemon {
+            base,
+            token: Some(TOKEN.to_string()),
+        };
+        (daemon, requests)
+    }
+
+    /// The daemon: the proof of the nonce it is sent, and the count to any other request.
+    fn daemon_like(request: &str) -> (&'static str, String) {
+        let line = request.lines().next().unwrap_or_default();
+        match line
+            .strip_prefix("GET /api/proof?nonce=")
+            .and_then(|rest| rest.split(' ').next())
+        {
+            Some(nonce) => {
+                let mut mac = HmacSha256::new_from_slice(TOKEN.as_bytes())
+                    .expect("HMAC takes a key of any length");
+                mac.update(PROOF_LABEL);
+                mac.update(nonce.as_bytes());
+                let proof = hex::encode(mac.finalize().into_bytes());
+                ("200 OK", format!(r#"{{"proof": "{proof}"}}"#))
+            }
+            None => ("200 OK", COUNT.to_string()),
+        }
+    }
+
+    /// Another program on the port: every request is answered with a count and a proof that is not the token's.
+    fn stranger(_request: &str) -> (&'static str, String) {
+        let proof = "00".repeat(32);
+        let body =
+            format!(r#"{{"proof": "{proof}", "waiting": 1, "working": 0, "state": "waiting"}}"#);
+        ("200 OK", body)
+    }
+
+    /// A program that knows no `/api/proof`, as the daemon of before this check answers it.
+    fn refuser(_request: &str) -> (&'static str, String) {
+        let body = r#"{"message": "a valid bearer token is required"}"#.to_string();
+        ("401 Unauthorized", body)
+    }
+
+    fn carries_the_token(request: &str) -> bool {
+        request.contains(TOKEN) || request.to_ascii_lowercase().contains("authorization:")
+    }
+
+    #[test]
+    fn the_proof_is_the_one_the_daemon_gives() {
+        assert!(proves(TOKEN, NONCE, PROOF));
+        assert!(!proves("another token", NONCE, PROOF));
+        assert!(!proves(TOKEN, &NONCE.replace('0', "f"), PROOF));
+        assert!(!proves(TOKEN, NONCE, &PROOF[..62]));
+        assert!(!proves(TOKEN, NONCE, "not hex"));
+    }
+
+    #[test]
+    fn the_daemon_is_sent_the_token_once_it_has_proven_it_holds_it() {
+        let (daemon, requests) = listener(daemon_like);
+        assert!(matches!(
+            look(&daemon),
+            Seen::Counted(Count { waiting: 1, .. })
+        ));
+        let seen: Vec<String> = requests.try_iter().collect();
+        assert_eq!(seen.len(), 2);
+        assert!(seen[0].starts_with("GET /api/proof?nonce=") && !carries_the_token(&seen[0]));
+        assert!(seen[1].starts_with("GET /api/activity/count ") && carries_the_token(&seen[1]));
+    }
+
+    #[test]
+    fn a_program_without_the_proof_is_sent_no_token() {
+        for answer in [stranger as Answer, refuser] {
+            let (daemon, requests) = listener(answer);
+            assert!(matches!(look(&daemon), Seen::Unproven));
+            let seen: Vec<String> = requests.try_iter().collect();
+            assert_eq!(seen.len(), 1);
+            assert!(!carries_the_token(&seen[0]));
+        }
+    }
+
+    #[test]
+    fn nothing_at_the_address_is_silence() {
+        let base = {
+            let socket = TcpListener::bind("127.0.0.1:0").expect("a free port");
+            format!(
+                "http://{}",
+                socket.local_addr().expect("the port's address")
+            )
+        };
+        let daemon = Daemon {
+            base,
+            token: Some(TOKEN.to_string()),
+        };
+        assert!(matches!(look(&daemon), Seen::Silent));
+    }
 }
