@@ -390,6 +390,12 @@
   background: transparent;
 }
 
+/* An unread chat (item 131): the accent where a run that ended well shows no dot; a failed one keeps its red. */
+.side-run .status-dot.unread.s-done,
+.side-run .status-dot.unread.s-cancelled {
+  background: var(--accent);
+}
+
 .side-run-goal {
   flex: 1;
   min-width: 0;

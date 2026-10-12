@@ -209,6 +209,9 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
   // asked from the daemon.
   let routeThreadId = null;
   let resolveTicket = 0;
+  // The open chat the owner marked unread (item 131): it stays so until it is opened again or the page comes back into
+  // view. Any other open chat is seen whenever the page is in view, so a run that ends there leaves no dot.
+  let keptUnread = null;
   let selecting = false;
   // The chat whose name is being typed in its row (item 130): the list is painted again once the name is kept or left.
   let renaming = null;
@@ -286,6 +289,30 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
     if (active !== undefined) {
       active.scrollIntoView({ block: "nearest" });
     }
+  }
+
+  // The page is in view when it is shown and its window has the focus: a window behind others shows nothing new.
+  function inView() {
+    return document.visibilityState === "visible" && document.hasFocus();
+  }
+
+  /** Mark the open chat seen when the page is in view and the chat is unread: its row loses the dot at once. */
+  function seeOpenChat() {
+    if (routeThreadId === null || routeThreadId === keptUnread || chats === null || !inView()) {
+      return;
+    }
+    const open = chats.find((chat) => chat.id === routeThreadId);
+    if (open === undefined || open.unread !== true) {
+      return;
+    }
+    chats = chats.map((chat) => (chat.id === open.id ? { ...chat, unread: false } : chat));
+    paintChats();
+    api.patch(`/threads/${open.id}`, { seen: true }).catch((error) => console.warn("the open chat could not be marked seen", error));
+  }
+
+  function onBackInView() {
+    keptUnread = null;
+    seeOpenChat();
   }
 
   function paintBar() {
@@ -444,12 +471,34 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
       chat.pinned_at === null
         ? { label: "Pin", icon: "pin", run: () => attempt(() => pinChat(chat, true)) }
         : { label: "Unpin", icon: "pinOff", run: () => attempt(() => pinChat(chat, false)) },
+      readAction(chat),
       { label: "Rename", icon: "pencil", run: () => renameChat(chat) },
       { label: "Copy link", icon: "link", run: () => attempt(() => copyLink(chat)) },
       "separator",
       { label: "Select", icon: "squareCheck", run: () => enterSelectMode(chat.id) },
       { label: "Delete", icon: "trash", danger: true, run: () => attempt(() => deleteChats([chat.id])) },
-    ];
+    ].filter((item) => item !== null);
+  }
+
+  // Mark read on an unread chat, Mark unread on a read one whose latest run is over (item 131); a daemon from before
+  // item 131 sends no `unread`, and neither is offered.
+  function readAction(chat) {
+    if (chat.unread === true) {
+      return { label: "Mark read", icon: "eye", run: () => attempt(() => markChat(chat, true)) };
+    }
+    if (chat.unread === false && ENDED.has(chat.latest_status)) {
+      return { label: "Mark unread", icon: "eyeOff", run: () => attempt(() => markChat(chat, false)) };
+    }
+    return null;
+  }
+
+  async function markChat(chat, seen) {
+    if (chat.id === routeThreadId) {
+      keptUnread = seen ? null : chat.id;
+    }
+    await api.patch(`/threads/${chat.id}`, { seen });
+    await load();
+    rowNodes.get(chat.id)?.focus();
   }
 
   async function pinChat(chat, pinned) {
@@ -626,6 +675,7 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
     }
     routeThreadId = detail.run.thread_id;
     markCurrent();
+    seeOpenChat();
   }
 
   /** Find the chat of the run on the page in the list, or ask the daemon which thread it is on. */
@@ -637,6 +687,7 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
     if (owner !== undefined) {
       routeThreadId = owner.id;
       markCurrent();
+      seeOpenChat();
       return;
     }
     resolveThread(routeRunId);
@@ -700,6 +751,7 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
     paintChats();
     paintBar();
     locateRoute();
+    seeOpenChat();
   }
 
   const reloadSoon = debounce(() => {
@@ -710,6 +762,8 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
       reloadSoon();
     }
   });
+  document.addEventListener("visibilitychange", onBackInView);
+  window.addEventListener("focus", onBackInView);
 
   // Escape drops the selection, unless the search field or an open dialog took the key first.
   function onEscape(event) {
@@ -830,6 +884,7 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
       mark(settingsLink, tab === "settings");
       routeRunId = runId;
       routeThreadId = null;
+      keptUnread = null;
       markCurrent();
       locateRoute();
     },
@@ -839,6 +894,8 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
       clearInterval(ageTicker);
       clearInterval(workTicker);
       stopLifecycle();
+      document.removeEventListener("visibilitychange", onBackInView);
+      window.removeEventListener("focus", onBackInView);
       window.removeEventListener("keydown", onEscape);
     },
   };
