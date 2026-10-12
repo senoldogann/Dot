@@ -536,6 +536,7 @@ async def _add_missing_columns(connection: aiosqlite.Connection) -> None:
     if "seen_at" in await _add_columns(connection, "threads", _ADDED_THREAD_COLUMNS):
         # The chats of a store from before item 131 are taken as seen, so that none of them shows up unread at once.
         await connection.execute("UPDATE threads SET seen_at = ?", (time.time(),))
+        await connection.commit()
     await connection.execute("CREATE INDEX IF NOT EXISTS runs_campaign ON runs(campaign_id, created_at)")
 
 

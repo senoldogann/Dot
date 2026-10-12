@@ -155,10 +155,13 @@ async def test_a_chat_whose_run_ends_out_of_sight_is_unread_until_it_is_opened(
             await expect(photos_dot).not_to_have_css("background-color", "rgba(0, 0, 0, 0)")
             await expect(photos_link).to_have_attribute("aria-label", f"{PHOTOS} (unread)")
 
-            # Opened, it is read; a run that ends in it while the page is in view leaves no dot.
-            await photos_link.click()
+            # Opened by a key, it is read, and the focus stays on its row; a run that ends in it while the page is in
+            # view leaves no dot.
+            await photos_link.focus()
+            await page.keyboard.press("Enter")
             await expect(photos_link).to_have_attribute("aria-current", "page")
             await expect(photos_dot).to_have_count(0)
+            await expect(photos_link).to_be_focused()
             await expect(photos_link).not_to_have_attribute("aria-label", f"{PHOTOS} (unread)")
             await _until_unread(runtime, photos_run.thread_id, False)
             await _ended(manager, "Sort them again.", photos_run.thread_id)

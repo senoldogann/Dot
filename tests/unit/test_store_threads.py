@@ -81,17 +81,23 @@ async def test_a_store_from_before_the_unread_mark_takes_its_chats_as_seen(tmp_p
     path: Path = tmp_path / "dot.sqlite3"
     store: Store = await Store.open(path, tmp_path / "screenshots")
     try:
-        await _chat(store, "Old")
+        old: ThreadRecord = await _chat(store, "Old")
         assert await _unread(store) == [("Old", True)]
     finally:
         await store.close()
     await asyncio.to_thread(_forget_seen, path)
-    for _ in range(2):
-        store = await Store.open(path, tmp_path / "screenshots")
-        try:
-            assert await _unread(store) == [("Old", False)]
-        finally:
-            await store.close()
+    store = await Store.open(path, tmp_path / "screenshots")
+    try:
+        assert await _unread(store) == [("Old", False)]
+        await store.see_thread(old.id, False)
+    finally:
+        await store.close()
+    # The column is filled once, when it is added: a chat marked unseen since stays so when the store opens again.
+    store = await Store.open(path, tmp_path / "screenshots")
+    try:
+        assert await _unread(store) == [("Old", True)]
+    finally:
+        await store.close()
 
 
 async def test_a_chat_is_unread_once_its_latest_run_ends_until_it_is_seen(tmp_path: Path) -> None:

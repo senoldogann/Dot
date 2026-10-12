@@ -7491,14 +7491,17 @@ others shows nothing new: on opening, on every repaint of the list (a run that e
 shows) and when the page comes back into view; Mark unread on the open chat holds until it is opened again or the
 page comes back into view. The menu offers Mark read on an unread chat and Mark unread on a read one whose run is
 over, after Pin; a daemon from before item 131 sends no `unread`, and the page shows no dot and offers neither.
-Tests: `tests/unit/test_store_threads.py` (a store from before the mark takes its chats as seen, over two openings;
+Tests: `tests/unit/test_store_threads.py` (a store from before the mark takes its chats as seen, once;
 a chat is unread once its run ends until seen, unseen again, read while a run is under way, unread when that run
 ends; 404), `tests/smoke/test_server.py` (the route: unread after a run ends, seen, unseen, 404, 422) and
 `tests/smoke/test_unread_chats.py` (a run that ended before the page opened leaves an accent dot that says unread;
 opening the chat clears it, and a run that ends in the open chat leaves none; a run that ends in another chat
 leaves that one unread; Mark unread on the open chat brings the dot back, kept while another chat is opened and
 over a reload, in the light and the dark scheme; Mark read clears it); `tests/smoke/test_chat_menu.py` knows the
-new item; the screenshots read by eye.
+new item; the screenshots read by eye. A review against the done criteria found them met and one regression, fixed
+before the merge: a chat opened by a key lost the focus when its dot went, as the repaint took its row away (the
+smoke test opens the chat by Enter and fails without the fix); the backfill now commits at once, and the unit test
+proves it runs only when the column is added.
 
 **What.** A chat whose latest run ended after the chat was last seen shows a dot in the accent colour and says unread
 to a screen reader, as T3 Code marks a thread with a turn not yet seen; opening the chat, or having it open in view when

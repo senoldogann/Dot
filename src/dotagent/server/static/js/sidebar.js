@@ -306,7 +306,12 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
       return;
     }
     chats = chats.map((chat) => (chat.id === open.id ? { ...chat, unread: false } : chat));
+    // The repaint takes the rows away, so the focus goes back to the row that had it (a chat opened by a key).
+    const focused = [...rowNodes].find(([, node]) => node === document.activeElement);
     paintChats();
+    if (focused !== undefined) {
+      rowNodes.get(focused[0])?.focus();
+    }
     api.patch(`/threads/${open.id}`, { seen: true }).catch((error) => console.warn("the open chat could not be marked seen", error));
   }
 
