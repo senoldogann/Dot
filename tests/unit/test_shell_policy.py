@@ -7,6 +7,7 @@ out asks once the run has read untrusted content (item 135), in the spellings th
 copy's target folder option, dd, git in Dot's folders, in-place edits, words of switches, more ways to send (item
 140)."""
 
+import tempfile
 from collections.abc import Mapping
 from pathlib import Path
 
@@ -14,6 +15,7 @@ import pytest
 
 from dotagent.desktop.safety import StepContext, assess_step, lines_after
 from dotagent.desktop.types import Step
+from dotagent.policy import paths
 from dotagent.policy.elements import StepAssessment
 from dotagent.policy.engine import auto_review, decide, preset_verdict
 from dotagent.policy.paths import expand_protected
@@ -302,6 +304,45 @@ def test_a_line_that_reaches_the_network_brings_in_what_others_wrote(tmp_path: P
 def test_truncating_a_file_outside_the_workspace_asks(tmp_path: Path) -> None:
     assert _verdict("truncate -s 0 ~/Documents/report.txt", tmp_path) == "ask"
     assert _verdict("truncate -s 0 notes.txt", tmp_path) == "allow"
+
+
+def test_replacing_a_file_that_is_there_outside_the_workspace_asks_and_making_one_does_not(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # The folder of the test stands for one outside the workspace and the temporary folders.
+    monkeypatch.setattr(paths, "_TEMP_PREFIXES", ())
+    monkeypatch.setattr(tempfile, "tempdir", "/nonexistent-dot-temp")
+    workspace: Path = tmp_path / "workspace"
+    outside: Path = tmp_path / "outside"
+    (outside / "docs").mkdir(parents=True)
+    workspace.mkdir()
+    (outside / "report.txt").write_text("kept", encoding="utf-8")
+    (outside / "docs" / "notes.txt").write_text("kept", encoding="utf-8")
+    replacing: list[str] = [
+        f"echo x > {outside}/report.txt",
+        f"echo x >| {outside}/report.txt",
+        f"make &> {outside}/report.txt",
+        f"cp notes.txt {outside}/report.txt",
+        f"cp -p notes.txt {outside}/docs",
+        f"cp -t {outside}/docs notes.txt",
+        f"mv draft.txt {outside}/report.txt",
+        f"install -m 644 notes.txt {outside}/report.txt",
+        f"ln -sf notes.txt {outside}/report.txt",
+        f"echo x | tee {outside}/report.txt",
+        f"dd if=notes.txt of={outside}/report.txt",
+    ]
+    keeping: list[str] = [
+        f"echo x >> {outside}/report.txt",
+        f"echo x > {outside}/new.txt",
+        f"cp -n notes.txt {outside}/report.txt",
+        f"cp notes.txt {outside}/docs/other.txt",
+        f"ln -s notes.txt {outside}/report.txt",
+        f"echo x | tee -a {outside}/report.txt",
+        f"dd if=notes.txt of={outside}/report.txt conv=notrunc",
+        "echo x > notes.txt",
+    ]
+    assert {command: _verdict(command, workspace) for command in replacing} == dict.fromkeys(replacing, "ask")
+    assert {command: _verdict(command, workspace) for command in keeping} == dict.fromkeys(keeping, "allow")
 
 
 @pytest.mark.parametrize("command", _DOT_CHANGES)

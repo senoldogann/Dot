@@ -98,6 +98,9 @@ _SETTINGS_BUNDLES: frozenset[str] = frozenset({"com.apple.systempreferences"})
 # rules and the settings that decide what a run may do.
 _DOT_BUNDLE: str = "dev.dot.desktop"
 _DOT_NAME: str = "dot"
+# The title Dot's web UI gives its page ("Dot", "<page> · Dot", "(2) Dot" while two things wait for the user), as a
+# window shows it: a browser may put its own name or the profile's after a dash.
+_DOT_TITLE: re.Pattern[str] = re.compile(r"(?:\(\d+\) )?(?:.* · )?Dot(?: [-–—] .*)?")
 _MESSAGING_BUNDLES: frozenset[str] = frozenset(
     {
         "com.apple.mobilesms",
@@ -184,6 +187,17 @@ def app_role(name: str, bundle_id: str | None) -> AppRole:
     if bundle == _FINDER_BUNDLE:
         return "finder"
     return "other"
+
+
+def window_role(name: str, bundle_id: str | None, title: str | None) -> AppRole:
+    """The kind of window a step acts in: that of its application (:func:`app_role`), or Dot's own when the window of
+    any other application shows Dot's web UI (a browser, an installed web app), which holds the same approvals, rules
+    and settings as the desktop app. A page that only takes such a title is refused as well: a refusal is the safe
+    side of a guess."""
+    role: AppRole = app_role(name, bundle_id)
+    if role == "other" and title is not None and _DOT_TITLE.fullmatch(title) is not None:
+        return "dot"
+    return role
 
 
 def hidden_regions(windows: Sequence[WindowInfo]) -> tuple[Rect, ...]:

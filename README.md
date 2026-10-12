@@ -436,6 +436,11 @@ currency, so list sites that bill in one currency. Empty by default.
 | `balanced`             | all of that, plus anything destructive or installing, anything of high risk, and writing or shell commands outside the workspace |
 | `cautious`             | everything that is not read-only                                                                                            |
 
+A shell line is destructive outside the workspace when it removes or cuts a file there, and when it replaces one that is
+there: a redirect that empties it (`>`, `>|`, `&>`), a copy or a move onto it or into a folder that holds a file of its
+name (not `cp -n`), `ln -f`, `tee` without `-a`, `dd` without `conv=notrunc`. The shell keeps no copy of what it
+replaces, unlike the file tools, whose changes `dotx undo` writes back.
+
 Who answers what the policy asks depends on the approval mode of the run: you, a review model or nobody (see
 [Autonomy](#autonomy-approvals-goal-mode-and-the-end-of-a-run)). The first three steps above hold in every mode.
 
@@ -457,9 +462,11 @@ untrusted as its parent.
   `yolo` run types into them what it can read itself (see
   [Autonomy](#autonomy-approvals-goal-mode-and-the-end-of-a-run)). In the same way `terminal_send` types nothing outside
   `yolo` while the program's last line asks for a password, a passphrase or a PIN. The desktop tools never control a
-  password manager or Keychain Access, in any mode, nor Dot's own window outside `yolo` (its approvals, rules and
-  settings decide what a run may do), and desktop screenshots black out the password managers' windows; secure fields
-  and web pages are not masked.
+  password manager or Keychain Access, in any mode, nor a window of Dot's outside `yolo`: the desktop app's, or one of
+  another application (a browser, an installed web app) that shows the web UI, known at each step by the title the UI
+  gives its page (its approvals, rules and settings decide what a run may do; a page of another site that takes such a
+  title is refused as well). Desktop screenshots black out the password managers' windows; secure fields and web pages
+  are not masked.
 - Environment variables whose names look like secrets are removed from the processes the shell tool starts
   (`[shell] pass_env` lists exceptions).
 - Outside a `yolo` run the agent can neither read nor change `~/.ssh`, `~/.gnupg`, `~/Library/Keychains`, `~/.aws`,

@@ -5061,8 +5061,8 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 138 | The store and the daemon's plumbing                                                  | done        | 3f64036 |
 | 139 | The web UI and the desktop shell                                                     | done        | fcd052b |
 | 140 | The gaps the final review found in the guards                                        | done        | 25da5f2 |
-| 141 | The commands of a run are kept out of Dot's own files by macOS                       | in progress |         |
-| 142 | What the guards of the desktop and of the shell see                                  | planned     |         |
+| 141 | The commands of a run are kept out of Dot's own files by macOS                       | done        | 6fe0263 |
+| 142 | What the guards of the desktop and of the shell see                                  | in progress |         |
 | 143 | The token goes only to the daemon                                                    | planned     |         |
 | 144 | The records of a run and the emergency stop                                          | planned     |         |
 | 145 | The CI and the desktop shell                                                         | planned     |         |
@@ -7906,7 +7906,7 @@ does not bear out is not fixed; what only the owner can do (rebuilding the deskt
 
 ### 141. The commands of a run are kept out of Dot's own files by macOS
 
-**Status: in progress.**
+**Status: done.** Merged as `6fe0263` (PR #176, MYP-282 Done).
 
 **As built (2026-10-12).** `dotagent.policy.sandbox` builds two profiles of the macOS sandbox (`sandbox-exec`):
 everything is allowed but reading or changing Dot's guarded files (its key file, token, push key, configuration,
@@ -7934,7 +7934,25 @@ read (a script the run wrote, code that builds a path) no longer reaches them.
 
 ### 142. What the guards of the desktop and of the shell see
 
-**Status: planned.**
+**Status: in progress.**
+
+**As built (2026-10-12).** The desktop: `window_role` takes a window of any application but the terminals, Finder,
+System Settings, the messengers and the password managers for Dot's own when its title is the one Dot's web UI gives its
+page (`Dot`, `<page> · Dot`, with `(2) ` in front while two things wait for the owner), as a browser shows it, with its
+own name or the profile's after a dash; a page of another site that takes such a title is refused as well. The title is
+read at each step from the window it acts in: the one the control is in, the one under the point (as the window server
+names it), else the focused window of the application (`ax.window_of`, `ax.title_of`). A step there is judged as one in
+the desktop app, refused outside `yolo` by the review of each step as it runs. Probed on this Mac: Chrome's
+accessibility title is the page's title and then a dash and more, while the window server gives the page's title alone.
+The shell: a line that replaces a file that is there outside the workspace and the temporary folders is destructive
+(`_replaced_by`, `_replacing`): a redirect that empties it (`>`, `>|`, `&>`), a copy or a move onto it or into a folder
+that holds a file of its name (`cp -n` and `mv -n` keep it), `install`, `ditto`, `ln -f`, `tee` without `-a`, `dd`
+without `conv=notrunc`; so the default preset, which asks before destroying something outside the workspace, asks. A
+file made anew, an append and a change inside the workspace or the temporary folders do not ask. Tests: unit tests of
+the window's role (Dot's titles in four browsers and an unknown one; titles that only look alike; a terminal and Finder)
+and of the lines that replace a file and those that keep it; on the code of before every browser window had the role of
+its application and the lines that replace a file were allowed. Not run here: the desktop steps themselves, whose tests
+move the pointer (the owner's to run).
 
 **What.** The desktop tools take a window of a browser that shows Dot's own interface for Dot's own window, so a step
 there is refused outside `yolo` as one in the desktop app is. A line that replaces a file that exists outside the
@@ -8540,3 +8558,4 @@ spending lock through the run manager, and a migration cut off between its steps
 - 2026-10-12 (Opus 5.5): item 139 merged as `fcd052b` (PR #173, MYP-280 Done): in the desktop shell a link that opens a new window goes to the default browser, the watcher neither reloads the UI at its first look nor leaves it after one slow answer, a shortcut another app holds no longer stops it, and New chat puts the cursor in the box; in the web UI the sidebar reads its lists again after a reconnect, a fault in showing one event is told and the stream goes on, the home's box waits for the models before it reads its choices, Enter pressed twice saves once, the newest load answers, an approval card settles at once, and an answer that is not JSON names its path; the CI's token only reads; item 140 added from the final review of the five.
 - 2026-10-12 (Opus 5.5): item 140 merged as `25da5f2` (PR #174, MYP-281 Done): the shell guard reads a copy's target folder option, `dd`, git in Dot's own folders, the files perl and ruby edit in place and the code in a word of switches, so a change of what Dot loads and runs is refused there too; more ways of curl, wget, httpie and inline code to send data out carry the upload flag, and two old false alarms are gone; the browser reads a dot at the end of a host as none. Part 22 is done.
 - 2026-10-12 (Opus 5.5): part 23 planned, items 141 to 145, from the owner's word asking to finish the remaining problems too: what part 22 left to the owner or reported, each read again in the code; the search tools reading Dot's own data folder found on the way.
+- 2026-10-12 (Opus 5.5): item 141 merged as `6fe0263` (PR #176, MYP-282 Done): outside yolo the shell tool, a terminal session, the AppleScript tool and the search tools start their processes in a macOS sandbox that keeps them out of Dot's own files and from changing what it loads and runs, whatever program does it; the search tools may not read the protected locations either; programs that run as root do not start in it; [shell] sandbox turns it off; the daemon restarted with it.

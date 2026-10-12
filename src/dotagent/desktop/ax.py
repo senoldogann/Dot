@@ -481,6 +481,16 @@ def windows_of(app: AXElement, pid: int) -> tuple[AXElement, ...]:
     return _elements_of(read_optional(app, "AXWindows", pid))
 
 
+def window_of(element: AXElement, pid: int) -> AXElement | None:
+    """The window ``element`` is in; ``None`` for one outside any window (the menu bar)."""
+    return read_optional(element, "AXWindow", pid)
+
+
+def title_of(window: AXElement, pid: int) -> str:
+    """The title of a window as its application gives it; a browser's is the title of the page it shows."""
+    return _text(read_optional(window, "AXTitle", pid))
+
+
 def focused_window(app: AXElement, pid: int) -> AXElement | None:
     """The window that has the keyboard focus, else the main window, else the first one."""
     for attribute in ("AXFocusedWindow", "AXMainWindow"):
