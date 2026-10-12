@@ -5051,9 +5051,9 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 128 | Your own themes, kept by the daemon                                                  | done        | 30b2434 |
 | 129 | The composer at the foot of the window                                               | done        | 048f3aa |
 | 130 | A chat's menu: pin, rename, copy the link, select, delete                            | done        | d7e7d5e |
-| 131 | Unread chats                                                                         | in progress |         |
+| 131 | Unread chats                                                                         | done        | 34e1fe1 |
 | 132 | Runs that keep going on every model when asked to                                    | done        | 002575b |
-| 133 | The composer's choices on a chat's page                                              | planned     |         |
+| 133 | The composer's choices on a chat's page                                              | in progress |         |
 | 134 | The traffic lights on the line of the top bars                                       | planned     |         |
 
 ### 77. The type system: Inter and Geist Mono, seven sizes, three weights
@@ -7477,7 +7477,7 @@ the key, pins, renames, copies and deletes; the tour is read by eye.
 
 ### 131. Unread chats
 
-**Status: in progress.**
+**Status: done.** Merged as `34e1fe1` (PR #165, MYP-272 Done).
 
 **As built (2026-10-12).** The daemon keeps when each chat was last seen in `threads.seen_at`; added to a store made
 before it, the column is filled with the time it was added, so the chats there are taken as seen and none turns up
@@ -7598,7 +7598,24 @@ back and its second accepted.
 
 ### 133. The composer's choices on a chat's page
 
-**Status: planned.**
+**Status: in progress.**
+
+**As built (2026-10-12).** The home's pickers are one module, `static/js/choices.js`: `runChoices` makes the pills of a
+run's choices besides its goal, the mode, the model with its reasoning and the Options (approvals and goal mode), each
+with its menu, and takes from its box where they start and where a choice is kept. The home keeps them in the browser as
+before (`KEPT_APPROVALS` and `KEPT_GOAL_MODE` in `runmodes.js`, a reasoning level per model in `efforts.js`). A chat's
+page starts them from the open run's mode, model, reasoning level, approvals and goal mode and holds them in the page
+(`heldChoice`), so a choice made for a follow-up leaves the home's as they were. A follow-up starts its run with them on
+the same thread and for the same agent; it waits for the model list, so that a level the chosen model does not offer is
+not sent (the daemon refuses it, item 116). The dock has no agent pill, the agent being the chat's, and no Keep going, a
+campaign starting from a goal of its own; goal mode hides for a chat, as on the home. While a run works a message steers
+it, and the run keeps its own choices: the pills step back to half their strength until the pointer or the focus comes
+to them, and their tooltips add "For the next follow-up: the run under way keeps its own". Tests:
+`tests/smoke/test_dock_choices.py` (a finished run's page shows its mode, model and approvals, no agent pill and nothing
+waiting; another model with its High reasoning and Auto approvals, chosen there with goal mode in the Options and no
+Keep going, start the follow-up's run on the same thread, whose page shows them, while the browser keeps none of them
+and the home's box shows the daemon's own; while a run works the pills wait and say so, and stop when it ends);
+`tests/smoke/test_composer.py` and the tour for the home's box; the screenshots read by eye.
 
 **What.** On a chat's page the dock offers what the home's box offers for the next message, after T3 Code's composer,
 which keeps its model and reasoning on every turn of a thread: the mode, the model with its reasoning, and the Options
@@ -8185,3 +8202,4 @@ width; the app is built; the owner reads the window by eye once the app is rebui
 - 2026-10-12 (Opus 5.5): item 130 merged as `d7e7d5e` (PR #162, MYP-271 Done): a chat's menu after T3 Code's thread menu, from a "…" button, a right-click or the context-menu key: Pin (a Pinned group above the days, kept by the daemon in `threads.pinned_at`), Rename in the row, Copy link, Select and Delete; `PATCH /api/threads/{id}`; a review against the done criteria found them met and five edges, fixed before the merge; 930 unit tests and a smoke test in a browser on a desktop and a phone.
 - 2026-10-12 (Opus 5.5): part 21 planned, items 132 to 134, from the owner's word with a screenshot of a run on a hosted model that ended with a report and suggestions and one of the desktop window's top left, and a reading of the store by kinds and numbers: runs that keep going on every model when asked to, the composer's choices on a chat's page and the traffic lights on the line of the top bars; no code changed.
 - 2026-10-12 (Opus 5.5): item 132 merged as `002575b` (PR #164, MYP-273 Done): words that ask a run not to stop, in English or in Turkish, put a task or research run a person starts in goal mode whatever the switch says, the goal checker is told and accepts a finish only when every part of the goal is done and shown, every goal check sends back an answer that offers to do a part of the goal not done yet, and every model is told to keep acting and to take the ask at its word; the Details card reads "On, asked not to stop". A review against the done criteria found two blockers, fixed before the merge: a phone's curly apostrophe, and an offer rule that reached past the goal.
+- 2026-10-12 (Opus 5.5): item 131 merged as `34e1fe1` (PR #165, MYP-272 Done): a chat whose latest run ended after it was last seen shows its dot in the accent and says unread, as T3 Code marks a thread with a turn not yet seen; the daemon keeps `threads.seen_at` (the chats of an older store taken as seen), `GET /api/threads` carries `unread` and `PATCH /api/threads/{id}` takes `seen`; the open chat is seen while the page is in view, and its menu offers Mark read and Mark unread. A review against the done criteria found them met and one regression, fixed before the merge: a chat opened by a key lost the focus when its dot went.

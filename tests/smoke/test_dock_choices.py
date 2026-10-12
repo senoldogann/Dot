@@ -1,6 +1,7 @@
 """The composer's choices on a chat's page (item 133): the dock wears the mode, the model with its reasoning and the
 Options, set at first to the open run's; a follow-up starts its run with what was chosen there, and the new run's page
-starts from that. While a run works, a message steers it, and the pills say that they wait for the next follow-up."""
+starts from that, while the home's box keeps its own. While a run works, a message steers it, and the pills say that
+they wait for the next follow-up."""
 
 import asyncio
 import re
@@ -37,6 +38,9 @@ HELD: str = f"{_PROVIDER}:held"
 _RUNS: int = 3
 _RUN_WAIT_S: float = 30.0
 _CONTEXT_LENGTH: int = 32768
+# Where the home keeps its choices in the browser (runmodes.js, efforts.js).
+_HOME_KEYS: tuple[str, ...] = ("dot.approvals", "dot.goalMode")
+_LEVEL_KEY_PREFIX: str = "dot.effort."
 
 
 def _finish() -> ScriptedTurn:
@@ -234,6 +238,14 @@ async def test_a_follow_up_starts_its_run_with_the_choices_made_on_the_chats_pag
             await expect(_pill(page, "model")).to_contain_text("thinker")
             await expect(_pill(page, "reasoning")).to_contain_text("High")
             await expect(_pill(page, "options")).to_contain_text("Auto")
+
+            # They were the page's: this browser keeps none of them, and the home's box shows the daemon's own.
+            stored: list[str] = await page.evaluate("() => Object.keys(localStorage)")
+            assert [key for key in stored if key in _HOME_KEYS or key.startswith(_LEVEL_KEY_PREFIX)] == [], stored
+            await page.goto(f"{address}/#/runs")
+            await expect(page.locator(".composer-pill[data-pill='model']")).to_contain_text("scripted")
+            await expect(page.locator(".composer-pill[data-pill='reasoning']")).to_be_hidden()
+            await expect(page.locator(".composer-pill[data-pill='options']")).to_contain_text("Ask")
             assert errors == []
         finally:
             await browser.close()

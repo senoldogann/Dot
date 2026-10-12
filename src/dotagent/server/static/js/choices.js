@@ -238,7 +238,7 @@ export function runChoices({ frame, kept, optionsTitle, more, onMode }) {
 
   ready().catch((error) => {
     console.warn("the model list is unavailable", error);
-    modelPill.element.title = `The model list could not be loaded: ${error.message}`;
+    setTitle(modelPill.element, `The model list could not be loaded: ${error.message}`);
   });
   syncDefault();
 
