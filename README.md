@@ -934,8 +934,9 @@ sent only while the view is open; a tab that does not change sends nothing). The
 first browser step and says, until then, that the run has not opened a page; **Watch** and **Close the view** open
 and close it by hand; once the run has ended the card keeps the last screen and Watch goes. A pill under it says who has the browser ("Dot has
 control", or the agent's name). Since that view shows the page, Dot's own Chrome stays
-in the background while a run works (`[browser] raise_window`, off by default, item 97): the app you were in gets the
-focus back right after Chrome starts, and switching tabs does not raise the window; Settings › Browser has the switch
+in the background while a run works (`[browser] raise_window`, off by default, items 97 and 118): the tabs Dot opens
+are opened behind, the app you were in gets the focus back right after Chrome starts and after a page opens a tab of its
+own, and switching tabs does not raise the window; Settings › Browser has the switch
 "Bring Chrome to the front while working" for the other way round. **Take over**
 holds the run at its next tool call, brings the tab to the front either way and the pill reads "You have control": the Chrome
 window is on your Mac, so sign in, pass a CAPTCHA or do a step yourself; **Return control** lets the run go on, and the
@@ -1189,7 +1190,8 @@ Dot works with are the ones of your Chrome, so nothing is copied and nothing goe
 
 - Chrome may ask for the click again whenever Dot makes a new connection, after a restart of the service for example. A
   schedule that fires with nobody there waits `attach_timeout_s` for the click and then fails.
-- A tab that Dot opens becomes the active tab of your window, and Chrome may throttle a tab in the background.
+- A tab that Dot opens is opened behind the tab you work in (with `raise_window` on it becomes the active tab of your
+  window), and Chrome may throttle a tab in the background.
 - Downloads go to the download folder of Chrome, not to Dot's `downloads/`.
 - Dot closes the tabs it opened when they have been idle for `tab_idle_s`. If Dot itself crashes they stay open.
 - Calls that arrive while Dot waits for the click queue behind it, and each may in turn wait up to `attach_timeout_s` if
@@ -1244,10 +1246,13 @@ Both modes share what follows.
 - `[browser] allowed_hosts` and `blocked_hosts` limit the sites of the browser tools and of `web_fetch`; a host also
   matches its subdomains, and an empty `allowed_hosts` means every site. The blocked list starts with the
   cloud-metadata hosts.
-- `raise_window = false` (the default) keeps the window in the background while a run works: macOS brings a newly
-  started Chrome to the front, so the app that had the focus is brought back as soon as Chrome's window has appeared,
-  and switching tabs does not raise the window (the run's page shows the page under Dot's computer). With `true`
-  the window comes to the front at the start and on each tab switch. Take over brings the tab to the front either way.
+- `raise_window = false` (the default) keeps the window in the background while a run works: every tab Dot opens, a
+  run's or a quiet read's, is created in the background (a new tab opened the usual way brings Chrome to the front of
+  the Mac), and it still paints the page under Dot's computer. macOS brings a newly started Chrome to the front, and
+  Chrome takes the front itself when a page opens a tab of its own (a link to a new tab, `window.open`): the app that
+  had the focus is brought back right after, as long as the program that runs Dot has Accessibility. Switching tabs
+  does not raise the window. With `true` the window comes to the front at the start, with each new tab and on each tab
+  switch. Take over brings the tab to the front either way.
 - `headless = true` hides the window. Starting Chrome and loading the first page took about 2 seconds with it on an
   Apple-silicon Mac; later calls take well under a second. When Chrome crashes or the connection to it is lost, the
   next call starts it again.

@@ -11,6 +11,7 @@ produced here as value types (``PageView``, ``ActOutcome``, ``TextView``); rende
 import asyncio
 import base64
 import contextlib
+import secrets
 import time
 from collections.abc import AsyncGenerator, AsyncIterator, Sequence
 from contextlib import asynccontextmanager
@@ -77,7 +78,7 @@ from dotagent.browser.types import (
     Viewport,
 )
 from dotagent.browser.upstream import ignore_repeated_frame_detach
-from dotagent.browser.window import focused_app, give_focus_back
+from dotagent.browser.window import chrome_to_watch, focused_app, front_pid, give_focus_back, return_front
 from dotagent.config import BrowserConfig
 from dotagent.core.errors import ApprovalRejected, BrowserError, HandedOff, PolicyDenied
 from dotagent.core.logs import get_logger
@@ -100,6 +101,7 @@ _LATE_QUIET_MS: int = 300
 _LATE_MAX_MS: int = 2500
 _STILL_LOADING: str = "the page is still loading; what is shown may be incomplete"
 _BLANK_URLS: frozenset[str] = frozenset({"about:blank", "chrome://newtab/", "chrome://new-tab-page/"})
+_TAB_MARK_BYTES: int = 6
 _LAUNCH_ARGS: list[str] = [
     "--disable-blink-features=AutomationControlled",
     "--no-first-run",
@@ -258,6 +260,11 @@ class BrowserSession:
         self._adopting: set[asyncio.Task[None]] = set()
         self._reaper: asyncio.Task[None] | None = None
         self._closed: bool = False
+        # The front of the Mac around Dot's own Chrome (item 118): Chrome's process, the application that had the front
+        # when a thread last began to act, and the checks under way that give the front back after a page's own tab.
+        self._chrome_pid: int | None = None
+        self._front_before: int | None = None
+        self._front_returns: set[asyncio.Task[None]] = set()
 
     # ------------------------------------------------------------------ lifecycle
 
@@ -337,6 +344,7 @@ class BrowserSession:
             profile=str(self._profile),
             keychain=keychain,
         )
+        self._chrome_pid = None if config.headless else await asyncio.to_thread(chrome_to_watch, self._profile)
         if earlier is not None:
             await asyncio.to_thread(give_focus_back, earlier)
         return _Opened(context=context, spare_pages=tuple(context.pages))
@@ -408,6 +416,7 @@ class BrowserSession:
 
     def _forget_tabs(self) -> None:
         self._initial_pages = []
+        self._chrome_pid = None
         for thread in self._threads.values():
             thread.tabs.clear()
             thread.active = 0
@@ -485,12 +494,13 @@ class BrowserSession:
     async def _let_go(self) -> None:
         """Close Dot's own Chrome, or close the tabs Dot opened in the Chrome of the user and drop the connection; then
         stop the Playwright driver. The tabs of every thread are gone with it."""
-        for task in list(self._adopting):
+        for task in [*self._adopting, *self._front_returns]:
             task.cancel()
         context: BrowserContext | None = self._context
         browser: Browser | None = self._browser
         self._context = None
         self._browser = None
+        self._chrome_pid = None
         if browser is not None:
             await self._detach(browser)
         elif context is not None:
@@ -575,6 +585,7 @@ class BrowserSession:
         owner: tuple[ThreadTabs, Tab] | None = self._owner_of(opener)
         if owner is None:
             return
+        self._return_front()
         thread, opener_tab = owner
         try:
             tab: Tab = await self._register(page)
@@ -587,6 +598,30 @@ class BrowserSession:
         thread.tabs.append(tab)
         add_note(opener_tab, f"a new tab opened as tab {len(thread.tabs)}")
         await self._enforce_cap(thread)
+
+    def _keeps_front(self) -> bool:
+        """Whether Dot gives the front of the Mac back when its own Chrome takes it (item 118): a visible window that may
+        not be raised, whose process is known."""
+        config: BrowserConfig = self._config
+        return config.mode == "own" and not config.headless and not config.raise_window and self._chrome_pid is not None
+
+    async def _note_front(self) -> None:
+        """Remember the application that has the front as a thread begins to act, Dot's own Chrome included (the owner
+        may be looking at it), for :meth:`_return_front`."""
+        if self._keeps_front():
+            self._front_before = await asyncio.to_thread(front_pid)
+
+    def _return_front(self) -> None:
+        """A tab a page opens itself brings Chrome to the front by Chrome's own doing: the application that had the front
+        when the thread began to act gets it back, unless that was Dot's Chrome itself. The check runs beside the step,
+        which does not wait for it."""
+        before: int | None = self._front_before
+        chrome: int | None = self._chrome_pid
+        if not self._keeps_front() or before is None or chrome is None or before == chrome:
+            return
+        task: asyncio.Task[None] = asyncio.create_task(asyncio.to_thread(return_front, before, chrome))
+        self._front_returns.add(task)
+        task.add_done_callback(self._front_returns.discard)
 
     def _popup_lost(self, error: Exception, page: Page, opener_tab: Tab | None) -> None:
         """Account for a popup that could not be adopted; an error that is neither a closed page nor a gone browser is
@@ -638,7 +673,7 @@ class BrowserSession:
             page: Page | None = self._take_initial_page()
             if page is None:
                 try:
-                    page = await context.new_page()
+                    page = await self._new_tab(context)
                 except PlaywrightError as error:
                     raise BrowserError(
                         "opening a tab failed", {"error": truncate_middle(str(error), _LAUNCH_ERROR_CHARS)}
@@ -681,6 +716,7 @@ class BrowserSession:
             self._threads[thread_id] = thread
         async with thread.lock:
             await self._ensure_context()
+            await self._note_front()
             playwright: Playwright | None = self._playwright
             thread.last_used = time.monotonic()
             try:
@@ -921,19 +957,39 @@ class BrowserSession:
             await self._close_scratch(page)
         return RenderedDocument(url=landed, status=statuses[-1] if statuses else first, html=html)
 
-    async def _scratch_page(self, context: BrowserContext) -> Page:
-        """A new tab for a quiet read: in Dot's own Chrome a plain new page; in the user's Chrome a target created in
-        the background through CDP, so the tab the user works in keeps the front (Playwright's ``new_page`` opens in
-        the foreground)."""
-        if self._browser is None:
+    async def _background_tab(self, context: BrowserContext) -> Page:
+        """A new tab created in the background through CDP. Playwright's ``new_page`` opens in the foreground, which
+        brings Chrome to the front of the Mac (measured 2026-10-12, item 118) and takes the user's tab in the user's
+        Chrome; a tab made this way does neither, and it still paints, screencasts and takes screenshots as a visible tab
+        does. ``new_page`` stays for a context without a browser at hand."""
+        browser: Browser | None = context.browser
+        if browser is None:
             return await context.new_page()
-        cdp: CDPSession = await self._browser.new_browser_cdp_session()
+        # Each tab is told apart by an address of its own: tabs made at the same time (a crawl reads pages side by side)
+        # would otherwise all be handed the first new page (measured 2026-10-12: five calls, one page). It goes back to a
+        # plain blank page at once, the address the URL rules and the tab views know.
+        mark: str = f"about:blank#dot-{secrets.token_hex(_TAB_MARK_BYTES)}"
+        cdp: CDPSession = await browser.new_browser_cdp_session()
         try:
-            async with context.expect_page() as opened:
-                await cdp.send("Target.createTarget", {"url": "about:blank", "background": True})
-            return await opened.value
+            async with context.expect_page(lambda page: page.url == mark) as opened:
+                await cdp.send("Target.createTarget", {"url": mark, "background": True})
+            page: Page = await opened.value
         finally:
             await cdp.detach()
+        await page.goto("about:blank", wait_until="commit")
+        return page
+
+    async def _new_tab(self, context: BrowserContext) -> Page:
+        """A thread's new tab: in the background, unless the window may be raised (item 97), when it is the window's
+        visible tab as before."""
+        if self._config.raise_window:
+            return await context.new_page()
+        return await self._background_tab(context)
+
+    async def _scratch_page(self, context: BrowserContext) -> Page:
+        """A new tab for a quiet read, always in the background: the tab the user works in, and the application in
+        front, keep the front."""
+        return await self._background_tab(context)
 
     async def _close_scratch(self, page: Page) -> None:
         try:
