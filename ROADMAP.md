@@ -6491,8 +6491,8 @@ in the desktop shell, after the lights). The brand, the ring-and-core glyph with
 glyph stays on the sign-in card until item 114 replaces it. README: the run page's passage, the moving characters (two
 now), the sidebar's head. Tests: `test_face.py`'s card test becomes one that finds no card at the head of the
 conversation or of the panel at the Wide size, and the answer's still face; `test_takeover.py`'s sizes lose the card's
-checks; the tour checks the sidebar's button on the lights' line and the opener at the same x (in the desktop shell the opener still sits 11 px lower than
-the lights' line, item 111's (a)).
+checks; the tour checks the sidebar's button on the lights' line and the opener at the same x (in the desktop shell the
+opener still sits 11 px lower than the lights' line, item 111's (a)).
 
 **What.** The run page loses the character card (`charactercard.js`, and `mood.js` if nothing else reads it, with their
 CSS and their tests): the run's state stays in the top bar's face and badge, the timeline keeps its turn faces, the home
