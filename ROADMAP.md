@@ -5068,7 +5068,7 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 145 | The CI and the desktop shell                                                         | done        | 969d5f0 |
 | 146 | The gaps the final review of part 23 found                                           | done        | e558f21 |
 | 147 | A folder whose reading macOS broke off does not fail a search                        | done        | ca16c37 |
-| 148 | The queue of a chat, after T3 Code                                                   | in progress |         |
+| 148 | The queue of a chat, after T3 Code                                                   | done        | 5f6747b |
 
 ### 77. The type system: Inter and Geist Mono, seven sizes, three weights
 
@@ -8133,7 +8133,7 @@ waits on any other end, as in T3 Code: a stop, a failure or a restart holds the 
 
 ### 148. The queue of a chat, after T3 Code
 
-**Status: in progress.**
+**Status: done.** Merged as `5f6747b` (PR #184; no Linear issue, the Linear connector was signed out).
 
 **As built (2026-10-13).** A message sent on a chat's page while its run works waits in the chat's queue, which the
 daemon keeps (`queued_messages` in the store, a row per message in its place, with the mode, model, reasoning,
@@ -8746,3 +8746,4 @@ steering the run at once, and the queue can be reordered, edited, sent into the 
 - 2026-10-12 (Opus 5.5): item 145 merged as `969d5f0` (PR #180, MYP-286 Done): the CI's actions are pinned by commit; only the shell's own pages and those of the daemon's address may call the desktop shell; the Rust crates were checked against the advisories (two, both in the GTK stack built only on Linux); and the two tests part 22 left are in. The shell's part reaches the owner's Mac when the owner rebuilds the desktop app. The final review of the five found every criterion met and five gaps, which item 146 takes.
 - 2026-10-12 (Opus 5.5): item 146 merged as `e558f21` (PR #181, MYP-287 Done): Dot's own code is among what it loads and runs, the daemon's job starts Python with `-P`, the login shell Dot reads at its start runs in the sandbox, a search shows what it found beside the places it may not read, the shell guard reads zsh's redirects past noclobber, and a playbook retired while a run ended is not counted; the daemon restarted with it, its job rewritten. Part 23 is done.
 - 2026-10-13 (Opus 5.5): item 147 merged as `ca16c37` (PR #183; no Linear issue, the connector was signed out): a search shows what it found where macOS broke off the reading of a folder, as it does beside the places it may not read; found in the records of a run while answering the owner's question whether the guards of parts 22 and 23 took the agent's freedom. The daemon restarted with it. Part 23 is done.
+- 2026-10-13 (Opus 5.5): item 148 merged as `5f6747b` (PR #184; no Linear issue, the connector was signed out): T3 Code's queued messages in Dot: a message sent while a chat's run works waits in the chat's queue, shown above the composer, and starts as the chat's next run once that run has ended done; a stop, a failure or a restart holds the queue until Resume. The browser test found and the item fixed the focus and the drag of the rows and Cancel on a phone. Part 24 is done.
