@@ -6374,7 +6374,7 @@ rule for every tool (`*`, no commands, no mentions), since the protections that 
 says: only a sentence that asks for one of those actions itself is refused. On the same model the sentence now drafts
 "For every use of any tool: Dot does it without asking.", in Turkish too; the passwords and a sentence about Dot's tone
 are refused in English; the page's three examples draft as before. `tests/smoke/test_hosted_services.py` (hosted, on
-that model): the rule for everything and the refusal in English. README: Rules.
+that model): the rule for everything and the refusal in English. README: Rules. The fix merged as `8090ebc` (PR #154).
 
 **What.** `POST /api/rules/draft` takes a sentence ("let Dot run git status and git diff without asking", "always
 ask me before it posts on X") and returns a `RuleRequest` drafted by the fast model with a typed reply (tool glob,
@@ -7683,3 +7683,4 @@ with refs, and that it takes no arguments. Unit tests for the journal's day; the
 - 2026-10-12 (Opus 5.5): part 18 planned, items 124 and 125, from the owner's word after part 17, a measurement of the home and a reading of the last two days' failed runs (counts and kinds only); no code changed.
 - 2026-10-12 (Opus 5.5): item 124 merged as `41ec542` (PR #151, MYP-264 Done): the home's greeting and composer stand in the middle of the space under the top bar however long the day is, the upper row of the grid being half of what their measured height leaves; the Today strip follows in the page's flow, so the sidebar and the top bar stay as the window scrolls, shows two rows a section and folds at its title, kept per browser; 906 unit tests, 15 smoke tests and the tour.
 - 2026-10-12 (Opus 5.5): item 125 merged as `36c0eeb` (PR #152, MYP-265 Done): the journal names the day it tells, the date of the middle of the time the reflection read, or its first and last day when that time is longer than a day and a quarter; `browser_snapshot`'s description says it takes no arguments; 907 unit tests and the reflection's smoke test; the daemon restarted on it with no run active.
+- 2026-10-12 (Opus 5.5): the rule drafter's fix merged as `8090ebc` (PR #154, under item 110, MYP-266 Done): the owner's sentence "Dot can run everything without permission from me" drafts a rule for every tool instead of a refusal in Spanish, and a sentence no rule can be made of is answered in English, with no note about a broad rule taken for a refusal; a hosted test on the owner's review model, 907 unit tests and the Rules page's smoke tests.
