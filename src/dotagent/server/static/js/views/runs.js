@@ -16,7 +16,7 @@ import { buildPresence } from "../presence.js";
 import { KEPT_APPROVALS, KEPT_GOAL_MODE, standingPicker } from "../runmodes.js";
 import { onCompose } from "../shortcuts.js";
 import { getSnapshot, onChange, refresh } from "../state.js";
-import { attempt } from "../ui.js";
+import { attempt, toast } from "../ui.js";
 
 const MAX_GOAL_PX = 320;
 
@@ -142,12 +142,14 @@ function buildComposer(ctx, listener) {
     if (!readyToSend(attachments)) {
       return;
     }
-    const chosen = choices.value();
     starting = true;
     frame.sendButton.disabled = true;
     listener.sending();
     try {
       await attempt(async () => {
+        // A kept reasoning level is checked against the model's own, so the models are known first.
+        await choices.ready();
+        const chosen = choices.value();
         const created = await api.post("/runs", {
           goal: text,
           mode: chosen.mode,
@@ -203,8 +205,12 @@ function buildApprovals() {
         const card = approvalCard({
           approval: fromRecord(record),
           heading: el("a", { class: "small", href: `#/runs/${record.run_id}` }, "Open run"),
-          onSettled: () => {
-            refresh().catch((error) => console.warn("status refresh failed", error));
+          onSettled: (decided) => {
+            // The card shows the decision at once; the refresh then takes it away.
+            if (decided !== null) {
+              card.settle(decided.status, decided.note);
+            }
+            refresh().catch((error) => toast("error", `The approvals could not be refreshed: ${error.message}`));
           },
           leftNote: LEFT_IN_RUN,
         });

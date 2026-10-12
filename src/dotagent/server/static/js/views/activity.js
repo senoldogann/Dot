@@ -4,7 +4,7 @@
 
 import { activityRow, LIFECYCLE_KINDS } from "../activityrow.js";
 import { api } from "../api.js";
-import { el } from "../dom.js";
+import { debounce, el } from "../dom.js";
 import { nestRows } from "../nesting.js";
 import { emptyPanel, errorPanel, loadingPanel, pageHead, segmented } from "../panels.js";
 import { onChange, onLifecycle } from "../state.js";
@@ -73,16 +73,20 @@ export function mount(root, ctx) {
     );
   }
 
+  // The newest load answers for the page: an older answer that comes after it is dropped, not painted over it.
+  let ticket = 0;
+
   async function load() {
+    const mine = ++ticket;
     try {
       const fresh = await api.get("/activity");
-      if (disposed) {
+      if (disposed || mine !== ticket) {
         return;
       }
       view = fresh;
       failure = null;
     } catch (error) {
-      if (disposed) {
+      if (disposed || mine !== ticket) {
         return;
       }
       if (view === null) {
@@ -95,14 +99,20 @@ export function mount(root, ctx) {
     paint();
   }
 
+  // An event and the status refresh it starts come together: they make one load.
+  const loadSoon = debounce(() => {
+    if (!disposed) {
+      load();
+    }
+  }, 250);
   const stopLifecycle = onLifecycle((event) => {
     if (LIFECYCLE_KINDS.has(event.kind)) {
-      load();
+      loadSoon();
     }
   });
   const stopChange = onChange(() => {
     if (view !== null && view.working.length > 0) {
-      load();
+      loadSoon();
     }
   });
   paint();

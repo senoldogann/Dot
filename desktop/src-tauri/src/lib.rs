@@ -7,6 +7,7 @@
 use std::env;
 use std::fs;
 use std::path::PathBuf;
+use std::process::Command;
 use std::thread;
 use std::time::Duration;
 
@@ -14,6 +15,7 @@ use serde::Deserialize;
 use tauri::image::Image;
 use tauri::menu::{Menu, MenuItem, PredefinedMenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
+use tauri::webview::NewWindowResponse;
 use tauri::{
     AppHandle, LogicalPosition, Manager, RunEvent, TitleBarStyle, WebviewUrl, WebviewWindow,
     WebviewWindowBuilder, WindowEvent,
@@ -25,6 +27,9 @@ const TRAY: &str = "main";
 const DOWN_PAGE: &str = "down.html";
 const POLL: Duration = Duration::from_secs(1);
 const REQUEST_TIMEOUT: Duration = Duration::from_millis(800);
+/// Polls in a row the daemon may leave unanswered before the window leaves the UI for the down page: one slow answer
+/// of a busy daemon does not throw the open page away.
+const MISSES_BEFORE_DOWN: u32 = 3;
 const DEFAULT_HOST: &str = "127.0.0.1";
 const DEFAULT_PORT: u16 = 8765;
 const ICON_IDLE: &[u8] = include_bytes!("../icons/tray-idle.png");
@@ -131,6 +136,7 @@ fn tray_icon(state: &str) -> Image<'static> {
 /// the web UI's own top bars: the system draws only the traffic lights over the page, on the bars' centre line
 /// (`TRAFFIC_LIGHTS`), the page keeps room for them (`data-shell="desktop"`, set by the UI when it runs in the shell)
 /// and drags the window by its bars. The shell's own drag-and-drop handler is off so the composer's HTML drop works.
+/// A link the page opens in a new window (every link of a model's answer) goes to the default browser.
 fn window(app: &AppHandle, url: WebviewUrl) -> tauri::Result<WebviewWindow> {
     if let Some(existing) = app.get_webview_window(WINDOW) {
         return Ok(existing);
@@ -143,7 +149,30 @@ fn window(app: &AppHandle, url: WebviewUrl) -> tauri::Result<WebviewWindow> {
         .inner_size(1280.0, 860.0)
         .min_inner_size(390.0, 600.0)
         .disable_drag_drop_handler()
+        .on_new_window(|url, _features| {
+            open_outside(url);
+            NewWindowResponse::Deny
+        })
         .build()
+}
+
+/// Open a web address in the default browser; the shell opens no window of its own for it. Another kind of address
+/// is refused. The address is not logged: a link can carry what its page put in it.
+fn open_outside(url: url::Url) {
+    if !matches!(url.scheme(), "http" | "https") {
+        eprintln!(
+            "dot-shell: a new window for a {} address was refused",
+            url.scheme()
+        );
+        return;
+    }
+    thread::spawn(
+        move || match Command::new("/usr/bin/open").arg(url.as_str()).status() {
+            Ok(status) if status.success() => {}
+            Ok(status) => eprintln!("dot-shell: open could not show a link: {status}"),
+            Err(error) => eprintln!("dot-shell: open could not be started for a link: {error}"),
+        },
+    );
 }
 
 fn show(app: &AppHandle) {
@@ -178,17 +207,24 @@ fn navigate(app: &AppHandle, up: bool, daemon: &Daemon) {
     }
 }
 
-/// Every second: the count for the menu bar item, and the window's page when the daemon comes or goes.
-fn watch(app: AppHandle) {
+/// Every second: the count for the menu bar item, and the window's page when the daemon comes or goes. `showing_ui`
+/// is the page `setup` opened: the window leaves the UI after `MISSES_BEFORE_DOWN` unanswered polls in a row, and
+/// opens it again at the first answer after that.
+fn watch(app: AppHandle, showing_ui: bool) {
     thread::spawn(move || {
-        let mut was_up: Option<bool> = None;
+        let mut showing_ui = showing_ui;
+        let mut misses: u32 = 0;
         loop {
             let daemon = daemon();
             let seen = daemon
                 .token
                 .as_deref()
                 .and_then(|token| count(&daemon, token));
-            let up = seen.is_some();
+            misses = if seen.is_some() {
+                0
+            } else {
+                misses.saturating_add(1)
+            };
             if let Some(tray) = app.tray_by_id(TRAY) {
                 let (state, waiting, working) = match &seen {
                     Some(count) => (count.state.as_str(), count.waiting, count.working),
@@ -206,23 +242,43 @@ fn watch(app: AppHandle) {
                 };
                 let _ = tray.set_tooltip(Some(tip));
             }
-            if was_up != Some(up) {
-                navigate(&app, up, &daemon);
-                was_up = Some(up);
+            if showing_ui && misses >= MISSES_BEFORE_DOWN {
+                navigate(&app, false, &daemon);
+                showing_ui = false;
+            } else if !showing_ui && seen.is_some() {
+                navigate(&app, true, &daemon);
+                showing_ui = true;
             }
             thread::sleep(POLL);
         }
     });
 }
 
-fn tray(app: &AppHandle) -> tauri::Result<()> {
+/// The menu bar item. `shortcut_taken` says that ⇧⌘Space could not be had: the menu then says so, and New chat is
+/// only in the menu.
+fn tray(app: &AppHandle, shortcut_taken: bool) -> tauri::Result<()> {
     let open = MenuItem::with_id(app, "open", "Open Dot", true, None::<&str>)?;
-    let chat = MenuItem::with_id(app, "chat", "New chat", true, Some("CmdOrCtrl+Shift+Space"))?;
-    let quit = PredefinedMenuItem::quit(app, Some("Quit Dot"))?;
-    let menu = Menu::with_items(
+    let chat = MenuItem::with_id(
         app,
-        &[&open, &chat, &PredefinedMenuItem::separator(app)?, &quit],
+        "chat",
+        "New chat",
+        true,
+        (!shortcut_taken).then_some("CmdOrCtrl+Shift+Space"),
     )?;
+    let taken = MenuItem::with_id(
+        app,
+        "shortcut",
+        "⇧⌘Space is taken by another app",
+        false,
+        None::<&str>,
+    )?;
+    let separator = PredefinedMenuItem::separator(app)?;
+    let quit = PredefinedMenuItem::quit(app, Some("Quit Dot"))?;
+    let menu = if shortcut_taken {
+        Menu::with_items(app, &[&open, &chat, &taken, &separator, &quit])?
+    } else {
+        Menu::with_items(app, &[&open, &chat, &separator, &quit])?
+    };
     TrayIconBuilder::with_id(TRAY)
         .icon(tray_icon("idle"))
         .tooltip("Dot")
@@ -276,10 +332,18 @@ pub fn run() {
                 }
                 _ => WebviewUrl::App(DOWN_PAGE.into()),
             };
+            let showing_ui = matches!(first, WebviewUrl::External(_));
             window(&handle, first)?;
-            tray(&handle)?;
-            shortcut(&handle)?;
-            watch(handle);
+            // Another app may hold the shortcut: the shell then goes on without it, and its menu says so.
+            let shortcut_taken = match shortcut(&handle) {
+                Ok(()) => false,
+                Err(error) => {
+                    eprintln!("dot-shell: the shortcut ⇧⌘Space could not be registered: {error}");
+                    true
+                }
+            };
+            tray(&handle, shortcut_taken)?;
+            watch(handle, showing_ui);
             Ok(())
         })
         // Closing the window keeps the shell in the menu bar; the window hides and comes back from there.

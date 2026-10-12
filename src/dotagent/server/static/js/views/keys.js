@@ -119,7 +119,13 @@ function buildForm(label, save, cancel) {
     problem.hidden = false;
   }
 
+  // True while a key is being saved: Enter does not look at the disabled button, so a second press is refused here.
+  let saving = false;
+
   async function submitKey() {
+    if (saving) {
+      return;
+    }
     const value = input.value.trim();
     if (value === "") {
       input.focus();
@@ -130,6 +136,7 @@ function buildForm(label, save, cancel) {
       return;
     }
     problem.hidden = true;
+    saving = true;
     submit.disabled = true;
     try {
       await save(value);
@@ -137,6 +144,7 @@ function buildForm(label, save, cancel) {
       console.error("the key could not be saved", error);
       complain(error.message);
     } finally {
+      saving = false;
       submit.disabled = false;
     }
   }

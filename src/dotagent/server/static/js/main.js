@@ -8,6 +8,7 @@ import { setPageTitle, watchAttention } from "./attention.js";
 import { el } from "./dom.js";
 import { icon, wordmark } from "./icons.js";
 import { buildShell } from "./shell.js";
+import { requestCompose } from "./shortcuts.js";
 import { clearStage } from "./stage.js";
 import { getSnapshot, onChange, refresh, runLifecycle } from "./state.js";
 import { applyStoredDensity } from "./layout.js";
@@ -250,6 +251,8 @@ async function connect() {
 }
 
 async function boot() {
+  // The desktop shell's New chat (menu bar item, ⇧⌘Space) calls this after it moves to the home.
+  window.focusComposer = requestCompose;
   if (!takeFragmentToken()) {
     loadToken();
   }

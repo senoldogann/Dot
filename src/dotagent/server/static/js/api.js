@@ -1,13 +1,18 @@
 // The client of the Dot daemon API: bearer token, JSON requests, server-sent events and images.
 
 import { sleep } from "./dom.js";
+import { toast } from "./ui.js";
 
 const TOKEN_KEY = "dot.token";
 const RECONNECT_MIN_MS = 500;
 const RECONNECT_MAX_MS = 8000;
+// An event the page fails to show is logged every time and told at most this often, so a fault that hits every event
+// of a busy run does not bury the page in toasts.
+const NOT_SHOWN_TOLD_EVERY_MS = 10000;
 
 let token = null;
 let authLostHandler = null;
+let notShownToldAt = 0;
 
 export class ApiError extends Error {
   constructor(status, message, context) {
@@ -111,7 +116,18 @@ export async function request(method, path, body) {
     throw await errorOf(response, path);
   }
   const text = await response.text();
-  return text === "" ? null : JSON.parse(text);
+  if (text === "") {
+    return null;
+  }
+  try {
+    return JSON.parse(text);
+  } catch (cause) {
+    throw new ApiError(response.status, "The daemon answered with something that is not JSON.", {
+      path,
+      start: text.slice(0, 80),
+      cause: String(cause),
+    });
+  }
 }
 
 export const api = {
@@ -194,8 +210,23 @@ function withAfter(path, after) {
 }
 
 /**
+ * Tell that the page failed to show an event of a stream: logged with the stream and the event, and shown as a toast
+ * at most every few seconds. The stream goes on with the next event.
+ */
+export function eventNotShown(path, message, error) {
+  console.error("an event could not be shown", { path, id: message.id, event: message.event, error });
+  const now = Date.now();
+  if (now - notShownToldAt >= NOT_SHOWN_TOLD_EVERY_MS) {
+    notShownToldAt = now;
+    const why = error instanceof Error ? error.message : String(error);
+    toast("error", `Part of the page could not be updated (${message.event}): ${why}. Reload the page to see it.`);
+  }
+}
+
+/**
  * Follow a stream until `isFinished(message)` says so or `signal` aborts, reconnecting from the last event seen.
  * A rejected token or a missing resource ends the loop with the error; anything else is retried with a growing pause.
+ * A fault of the page in showing one event is not a break of the stream: it is told, and the next event comes.
  */
 export async function follow({ path, after, signal, onMessage, onState, isFinished }) {
   let lastId = after;
@@ -206,7 +237,11 @@ export async function follow({ path, after, signal, onMessage, onState, isFinish
       for await (const message of sse(withAfter(path, lastId), signal)) {
         pause = RECONNECT_MIN_MS;
         lastId = Math.max(lastId, message.id);
-        onMessage(message);
+        try {
+          onMessage(message);
+        } catch (error) {
+          eventNotShown(path, message, error);
+        }
         if (isFinished(message)) {
           return;
         }
