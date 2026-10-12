@@ -5046,6 +5046,9 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 123 | A helper folded in the chat: its row until the owner opens it                       | done        | a2de64d |
 | 124 | The home's first screen: the composer in the middle, the day folded under it         | done        | 41ec542 |
 | 125 | What the failed runs showed: the journal's day, the snapshot's arguments             | done        | 36c0eeb |
+| 126 | Themes, after T3 Code: a page for the look, a theme for light and one for dark       | planned     |         |
+| 127 | The interface, the motion and the type                                               | planned     |         |
+| 128 | Your own themes, kept by the daemon                                                  | planned     |         |
 
 ### 77. The type system: Inter and Geist Mono, seven sizes, three weights
 
@@ -7129,6 +7132,120 @@ night's reflection at 03:30, or "From 2026-10-08 to 2026-10-12" when it reads mo
 that was off). `browser_snapshot`'s description says it shows the tab again, every element in and around the viewport
 with refs, and that it takes no arguments. Unit tests for the journal's day; the README's reflection passage follows.
 
+## Part 19: the Appearance page, after T3 Code (planned 2026-10-12)
+
+The owner's nineteenth word, on 2026-10-12, with three screenshots of T3 Code's Settings › Appearance: whether Dot can
+have that page, since T3 Code is open source and much in it could be taken into Dot if it is done smartly. The word
+before it, the same day, asked whether Dot's home had caught the plainness of T3 Code's; the answer (partly: a warm
+palette and a busier middle) left six choices with the owner, of which this part offers the first, neutral whites, as a
+theme to pick, and leaves the default as it is.
+
+**Status (2026-10-12): planned.** What is built today. Settings › General holds the look of the browser in one card
+(`views/system.js buildAppearance`): two looks (`theme.js THEMES`: Neutral, warm grey and ink, the default, and Paper,
+warm paper with a serif voice and a terracotta accent), each a block of colour tokens in `themes.css` that names its
+light and its dark value with `light-dark()` and says how the layout starts out (the tool steps folded, the details
+panel); the colour scheme (System, Light, Dark); the density; and the switch of the faces that move. `boot.js` puts the
+look, the scheme and the density on the page element before the body is parsed. `tests/unit/test_css_tokens.py` reads
+the two blocks and holds every text tier to 4.5:1 (text, text-2) or 3:1 (muted, faint) on every surface and every ink to
+4.5:1 on its ground, in both schemes. The type is Inter and Geist Mono in seven fixed sizes (item 77), the interface at
+14 px, the composer at 15 and code at 13; the sidebar and the panel slide in 200 ms (item 85); the chat lane and the
+home are 768 px wide; code blocks scroll sideways. There is no range control, no command palette (`shortcuts.js`: ⌘K
+searches the runs, ⇧⌘O starts one), and no diff on any page.
+
+What T3 Code does, read from its repository (MIT, © 2026 T3 Tools Inc.; a checkout outside this repository, read and
+never run). Settings › Appearance holds the colour scheme as three cards, each a miniature of the window in the colours
+it would show, System split down the middle, and the themes as a gallery of cards, each with a light and a dark orb: a
+ball of the theme's canvas lit by its accent and tinted by its action colour (`ThemePreviewCircles.tsx`). A click on a
+card takes the theme for both schemes, a click on an orb for that scheme only (`t3code:theme-halves:v1`); the orbs in
+use are ringed and badged with a sun or a moon. A built-in theme is a literal map of 61 colour roles for light and for
+dark (`packages/shared/src/themePalettes.ts`). A theme of one's own is made from two colours, a canvas and an accent, by
+`createVividThemeColors` (`apps/web/src/themePalette.ts`): it steps the surfaces from the canvas in OKLCH lightness,
+tints them with the accent's hue, solves the text to 7:1 against the canvas and the muted text to the strength of the
+stock palette, and solves the status colours' lightness to 4.6:1 on their surfaces. Themes of one's own are made,
+duplicated, edited, exported and imported (T3 Code's own file, version 1, and VS Code colour themes, whose editor
+colours feed the roles), and the server can publish themes from a folder for its clients. Interface: contrast from 50 to
+200 % (text and borders mixed toward the ground below 100, toward black or white above), glass opacity, the chat's width
+(46rem, 72rem or full), diff colours and the composer's git context. Motion: the panels' animation, 0 to 400 ms.
+Typography: the interface, prompt, code and terminal fonts and sizes with previews, font smoothing and word wrap.
+Everything is kept per browser; only the theme is put on the page before the first paint.
+
+**The shape of this part (the decisions).** Dot takes the page and its mechanics, not T3 Code's look as a whole: Neutral
+stays the default, Paper stays, and so do the faces, the mark and the type system. A theme becomes what T3 Code makes of
+one, a set of colours for light and one for dark, and Dot's tokens are where they land: a theme picked for light and
+another for dark are written on the page element as `light-dark()` pairs, so the scheme switches as it does today, and
+nothing is written when Neutral or Paper is picked for both. T3 Code's built-in palettes are ported as data and mapped
+to Dot's tokens, with Dot's rule for every text tier on every surface solved the way T3 Code solves its text; its own
+look comes as Clean and T3 Chat's as Rose, since those two names are T3's. What Dot has no use for stays out: glass (Dot
+draws no translucent surface), diff colours (no page shows a diff), the environment's artwork and the composer's git
+context. A theme of one's own is kept by the daemon, in a `themes` folder in its home, rather than by one browser, so
+the desktop app, the browser and the phone share it, and a theme file put there by hand or by Dot shows in the gallery:
+T3 Code's published themes, made the one place themes are kept. T3 Code's file format (version 1) is Dot's, so a theme
+moves between the two. Every setting is kept per browser and put on the page before the first paint, as the look is
+today.
+
+### How to start part 19 (the handoff prompt)
+
+> Read ROADMAP.md part 19 and the status table of part 9 (rows 126 to 128). One item at a time, in order; the protocol
+> of part 5 (branch, gate, PR, Linear MYP issue, squash merge, hash in the table, log line) is unchanged. T3 Code's
+> source is read, never run, from a checkout outside this repository, and what is ported carries its MIT notice. Never
+> touch the owner's data directory except to read it and to restart the daemon when `/api/status` shows no active run;
+> the owner's goals stay out of this file; PLAN.md stays untracked. The owner reads Turkish; everything written is
+> English. Every UI item ends with the screenshot tour read by eye.
+
+### 126. Themes, after T3 Code: a page for the look, a theme for light and one for dark
+
+**Status: planned.**
+
+**What.** Settings gets an **Appearance** tab after General, and the look's card leaves General for it. The colour
+scheme is three cards, System, Light and Dark, each a miniature of Dot's window (the sidebar and its rows, a message,
+the composer and its send button) drawn on the tokens of the scheme it names, System split down the middle; the chosen
+one is ringed. The themes are a gallery of cards, each with a light and a dark orb drawn as T3 Code draws them and the
+theme's name: a click on the card takes the theme for both schemes, a click on an orb for that scheme only, and the orbs
+in use are ringed and carry a sun or a moon. The themes are Neutral (the default) and Paper as they are, and T3 Code's
+palettes ported (its own look as Clean, T3 Chat's as Rose, Grove, Ocean, Ember and Iris), their roles mapped to Dot's
+tokens: the surfaces, the sidebar, the borders, the text and its tiers, the accent and what is drawn on it, the owner's
+bubble and the status colours. Every text tier reads on every surface at Dot's thresholds and every ink on its ground at
+4.5:1, in both schemes, solved where the port falls short as T3 Code solves its text. A theme picked for light and
+another for dark are written on the page element as `light-dark()` pairs; Neutral or Paper for both leave the stylesheet
+alone; Paper's serif voice follows Paper while it is shown, and the layout a look starts with follows the theme picked
+for light. What is picked is kept in the browser with the values it wrote, which `boot.js` puts on the page before the
+first paint. ⌘⌥⇧A cycles System, Light and Dark, and ⌘⌥A opens the tab. T3 Code's MIT notice sits beside the ported
+code, and the README's look passage follows. A smoke test reads every theme's tiers and inks in both schemes in a
+browser, picks a mix and reloads without a flash, and clicks through the gallery; the controls page is read in a ported
+theme; the tour is read by eye.
+
+### 127. The interface, the motion and the type
+
+**Status: planned.**
+
+**What.** The tab's other sections, as T3 Code has them where Dot has a use for them. Interface: the contrast, 50 to 200
+% with 100 as today (below 100 the text tiers and the borders are mixed toward the ground, above it toward black in
+light and white in dark, as T3 Code does); the chat's width (Comfortable, 768 px as today; Wide, 1152 px; Full); and the
+density, moved here with the switches of the tool steps and the details panel. Motion: the panels' slide, 0 to 400 ms
+with 200 as today (0 is instant, and the system's reduced motion still wins), and the faces that move, moved here. Type:
+the interface's font (Inter as today, the system's, or a family typed) and its size (13 to 17 px around today's 14,
+every text token scaled with it); the answers' font (as the theme says, which is serif in Paper, the interface's, or
+serif); the composer's font and size (15 px as today); the code's font (Geist Mono as today, SF Mono, Menlo, or a family
+typed) and size (13 px as today), each with a preview; font smoothing (on, as today); and long lines of code wrapped
+(off, as today). A range control joins the controls page. Every value is kept per browser and put on the page before the
+first paint. The README follows; a smoke test sets each one and reads it on the page and after a reload; the tour is
+read by eye.
+
+### 128. Your own themes, kept by the daemon
+
+**Status: planned.**
+
+**What.** **Create theme** makes a theme from a background and an accent, the rest derived by T3 Code's generator,
+ported and held to Dot's thresholds, with an advanced view for the families of colours; **Duplicate** copies any theme
+into the editor; a theme of one's own is **edited**, **exported** as a file and **deleted**; **Add theme** imports a
+file: T3 Code's theme file (version 1), the short form T3 Code publishes (a name, light or dark, a canvas and an
+accent), or a VS Code colour theme, whose editor colours feed the roles as T3 Code maps them. The editor shows the theme
+on the page while it is drawn. Themes of one's own are kept by the daemon as files in its home's `themes` folder (`GET`,
+`PUT` and `DELETE /api/themes`), checked on the way in (the version, a name of 1 to 48 characters, an id no built-in
+has, colours that parse, a size cap) and written whole or not at all; the desktop app, the browser and the phone share
+them, and a valid file put in the folder shows in the gallery. The README follows; unit tests for the daemon's checks; a
+smoke test creates, picks, reloads, exports, imports a VS Code theme and deletes; the tour is read by eye.
+
 ## Log
 
 - 2026-10-08: roadmap written from the owner's go-ahead for all eight items, in this order. Nothing implemented yet.
@@ -7684,3 +7801,4 @@ with refs, and that it takes no arguments. Unit tests for the journal's day; the
 - 2026-10-12 (Opus 5.5): item 124 merged as `41ec542` (PR #151, MYP-264 Done): the home's greeting and composer stand in the middle of the space under the top bar however long the day is, the upper row of the grid being half of what their measured height leaves; the Today strip follows in the page's flow, so the sidebar and the top bar stay as the window scrolls, shows two rows a section and folds at its title, kept per browser; 906 unit tests, 15 smoke tests and the tour.
 - 2026-10-12 (Opus 5.5): item 125 merged as `36c0eeb` (PR #152, MYP-265 Done): the journal names the day it tells, the date of the middle of the time the reflection read, or its first and last day when that time is longer than a day and a quarter; `browser_snapshot`'s description says it takes no arguments; 907 unit tests and the reflection's smoke test; the daemon restarted on it with no run active.
 - 2026-10-12 (Opus 5.5): the rule drafter's fix merged as `8090ebc` (PR #154, under item 110, MYP-266 Done): the owner's sentence "Dot can run everything without permission from me" drafts a rule for every tool instead of a refusal in Spanish, and a sentence no rule can be made of is answered in English, with no note about a broad rule taken for a refusal; a hosted test on the owner's review model, 907 unit tests and the Rules page's smoke tests.
+- 2026-10-12 (Opus 5.5): part 19 planned, items 126 to 128, from the owner's word with three screenshots of T3 Code's Settings › Appearance and a reading of T3 Code's source (MIT): the page, its themes with a theme per scheme, its interface, motion and type settings, and themes of one's own kept by the daemon; no code changed.
