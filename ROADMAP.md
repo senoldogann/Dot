@@ -5052,7 +5052,7 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 129 | The composer at the foot of the window                                               | done        | 048f3aa |
 | 130 | A chat's menu: pin, rename, copy the link, select, delete                            | done        | d7e7d5e |
 | 131 | Unread chats                                                                         | planned     |         |
-| 132 | Runs that keep going on every model when asked to                                    | planned     |         |
+| 132 | Runs that keep going on every model when asked to                                    | in progress |         |
 | 133 | The composer's choices on a chat's page                                              | planned     |         |
 | 134 | The traffic lights on the line of the top bars                                       | planned     |         |
 
@@ -7532,7 +7532,26 @@ height so that its button stands there too.
 
 ### 132. Runs that keep going on every model when asked to
 
-**Status: planned.**
+**Status: in progress.**
+
+**As built (2026-10-12).** `agent/keep_going.py` finds the ask in whole words, in English and in Turkish, with the
+Turkish letters or without them; the capital İ is read as i first, since Python's case-insensitive match folds it to no
+single letter. A bare "durma" asks only at the end of a clause, or after "hiç" or "sakın", since it is also the noun of
+"durma noktası"; "devam et" is left out, as it is how a follow-up says "continue". The run manager puts a person's task
+or research run whose goal asks in goal mode whatever was chosen; a delegated run and a campaign's session keep theirs,
+a campaign having its own check. A follow-up on the run's page repeats the run's goal mode, as it repeats its model,
+and so does a resumed run or one that an answer starts: the chat's work goes on as asked (item 133 puts the switch
+within reach on the chat's page). The goal checker's question gains an ASKED part after the goal, and its rules gain
+two: an answer that ends with suggestions or offers within the goal that the agent could carry out is `continue`, what
+needs the owner staying an offer; and with ASKED, achieved needs every part of the goal done and shown, and a stop to
+report progress is `continue`. The prompt of every task and research run outside a campaign tells the model to keep
+acting while the goal leaves work it can do and to take an ask to keep going at its word. `GET /api/runs/{id}` carries
+`keep_going`, and the Details card reads "On, asked not to stop": "Keep going" is already the composer's switch for a
+campaign. Tests: `tests/unit/test_keep_going.py` (asks in both languages, capitals included, and lookalikes such as a
+bus stop, "durma noktası" and "durması"), `tests/unit/test_run_modes.py` (the rules in task and research runs, not in a
+chat or a campaign's session) and `tests/smoke/test_keep_going.py` (a scripted task asked not to stop and started with
+goal mode off runs in goal mode, its checker is told, its first finish is sent back and its second accepted; a task not
+asked keeps the goal mode chosen, and its checker is not told); the Details card read in Chromium on a scripted run.
 
 **What.** A goal that asks the run to keep going, in English or in Turkish (don't stop, keep going, never stop, until it
 is done; durma, hiç durma, durmadan, bitene kadar, bitirene kadar, tamamlanana kadar), turns goal mode on for a task or

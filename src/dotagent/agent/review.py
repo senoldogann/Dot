@@ -124,6 +124,12 @@ _GOAL_SYSTEM: str = (
     "facts show what it names (the call that read the file, the output with the count, the page that was opened). A "
     "step marked done whose evidence nothing in the digest or the facts bears out is not done: list its number in "
     "unproven_steps, and when the goal needs that step the goal is not reached.\n"
+    "- An answer that ends with suggestions or offers inside the goal (more of what was asked, the next part of it, a "
+    "fix it found) that the agent could carry out with its own tools leaves that work undone: continue, and name it. "
+    "What needs the user (a decision, a credential, a step the goal did not ask for that cannot be undone) may stay an "
+    "offer.\n"
+    "- When the question holds an ASKED part, the user asked the agent to keep going until the goal is done: achieved "
+    "only when every part of the goal is done and the digest shows it; a stop to report progress is continue.\n"
     "- An agent that reports a failure honestly after trying the sensible ways is blocked, not continue.\n"
     "- Give the reason in one or two sentences, in the language of the goal."
 )
@@ -277,7 +283,8 @@ class GoalRequest(FrozenModel):
     """What the goal checker is asked: the goal, the run's plan as the model reads it back (its steps with the
     evidence of each closed step; empty when the run kept none), the targets of that plan (empty when it set none), a
     digest of the run, the facts the harness measured (rendered by :func:`dotagent.agent.verify.render_facts`) and the
-    answer the run ended with."""
+    answer the run ended with. ``keep_going`` says that the goal asks the run to keep going until it is done (item
+    132)."""
 
     goal: str
     plan: str
@@ -286,6 +293,7 @@ class GoalRequest(FrozenModel):
     facts: str
     answer: str
     claimed_success: bool
+    keep_going: bool
 
 
 class GoalVerdict(FrozenModel):
@@ -513,9 +521,15 @@ def _goal_prompt(request: GoalRequest, nonce: str) -> str:
     targets: tuple[str, ...] = (
         (_fenced("TARGETS (the agent's own, from its plan)", nonce, request.targets),) if request.targets else ()
     )
+    asked: tuple[str, ...] = (
+        (_fenced("ASKED", nonce, "The goal asks the agent to keep going until it is done."),)
+        if request.keep_going
+        else ()
+    )
     return "\n\n".join(
         (
             _fenced("GOAL", nonce, request.goal),
+            *asked,
             *plan,
             *targets,
             _fenced("DIGEST", nonce, request.digest),

@@ -21,6 +21,7 @@ from dotagent.agent.campaign import (
     sessions_without_progress,
 )
 from dotagent.agent.gate import HANDBACK_EVENT, TAKEOVER_EVENT, RunGate
+from dotagent.agent.keep_going import keep_going_ask
 from dotagent.agent.lessons import LessonCase, dismiss_lesson, learn, save_lesson
 from dotagent.agent.loop import AgentRun, RunEnd, RunOpening, run_agent
 from dotagent.agent.plan import EMPTY_PLAN, PLAN_EVENT, plan_from_event
@@ -798,7 +799,9 @@ class RunManager:
         agent_id: str | None,
     ) -> tuple[RunRecord, RunHandle]:
         """Create the run, register it and start its task. A run launched by an active, untrusted parent is untrusted;
-        ``campaign_id`` makes it a session of that campaign."""
+        ``campaign_id`` makes it a session of that campaign. A person's task or research run whose goal asks it to keep
+        going until it is done runs in goal mode whatever was chosen (item 132); a delegated run and a campaign's
+        session keep theirs."""
         runtime: Runtime = self._runtime
         model_ref: str = model if model is not None else runtime.config.models.main
         parse_model_ref(model_ref)
@@ -806,7 +809,10 @@ class RunManager:
         approval_mode: ApprovalMode = runtime.config.policy.approvals if approvals is None else approvals
         if goal_mode is True and mode == "chat":
             raise ConfigError("goal mode is for task and research runs, not for a chat", {"mode": mode})
-        with_goal_mode: bool = mode != "chat" and (runtime.config.agent.goal_mode if goal_mode is None else goal_mode)
+        asked: bool = parent_run_id is None and campaign_id is None and keep_going_ask(goal) is not None
+        with_goal_mode: bool = mode != "chat" and (
+            asked or (runtime.config.agent.goal_mode if goal_mode is None else goal_mode)
+        )
         if thread_id is None:
             thread: ThreadRecord = await runtime.store.create_thread(thread_title(goal), source)
             return await self._register_run(

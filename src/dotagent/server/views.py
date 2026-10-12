@@ -343,7 +343,8 @@ class RunDetail(FrozenModel):
     ``None`` when none were (see ``agent.lessons``); ``questions`` are the questions the run left for the user that are
     still open, oldest first; ``campaign`` is the campaign the run is a session of, ``None`` for any other run;
     ``held`` is true while the user has taken the run's browser over (``POST /runs/{id}/takeover``); ``agent`` is the
-    agent the run belongs to (item 86), ``None`` for Dot."""
+    agent the run belongs to (item 86), ``None`` for Dot; ``keep_going`` is true for a run in goal mode whose goal asks
+    it to keep going until it is done, which its goal check is told (item 132)."""
 
     run: RunRecord
     children: list[RunRecord]
@@ -354,6 +355,7 @@ class RunDetail(FrozenModel):
     agent: AgentRecord | None
     campaign: CampaignChip | None
     held: bool
+    keep_going: bool
 
 
 class ActionStep(FrozenModel):

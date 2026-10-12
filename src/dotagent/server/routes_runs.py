@@ -11,6 +11,7 @@ from fastapi.responses import StreamingResponse
 from dotagent.agent.aside import AsideAnswer, answer_aside
 from dotagent.agent.attachments import StoredAttachment, load_attachments, store_attachment
 from dotagent.agent.campaign import session_number
+from dotagent.agent.keep_going import keep_going_ask
 from dotagent.agent.lessons import run_lessons
 from dotagent.core.errors import InvalidValueError
 from dotagent.llm.router import parse_model_ref
@@ -74,6 +75,7 @@ def runs_router(ctx: ServerContext) -> APIRouter:
             campaign=await campaign_of(run),
             held=ctx.manager.held(run_id),
             agent=None if run.agent_id is None else await store.get_agent(run.agent_id),
+            keep_going=run.goal_mode and keep_going_ask(run.goal) is not None,
         )
 
     @router.get("/runs")

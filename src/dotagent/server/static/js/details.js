@@ -15,10 +15,11 @@ function fact(label, value) {
 
 /**
  * The details card of `run`, of the chat with `agent` (`{ id, name, role }`, or null) and a session of `campaign`
- * (`{ id, title, session }`, or null). `paint(state)` takes what changes while the run goes, as
+ * (`{ id, title, session }`, or null); `keepGoing` says that its goal asked it not to stop until it is done, which put
+ * it in goal mode (item 132). `paint(state)` takes what changes while the run goes, as
  * `{ status, model, steps, calls, failed, input, output, finishedAt }`; `finishedAt` is null until the run is over.
  */
-export function createDetails(run, agent, campaign) {
+export function createDetails(run, agent, campaign, keepGoing) {
   const status = el("dd");
   const model = el("dd");
   const turns = el("dd");
@@ -59,7 +60,7 @@ export function createDetails(run, agent, campaign) {
       fact("Model", model),
       fact("Reasoning", el("dd", null, run.effort === null ? "Model default" : levelLabel(run.effort))),
       fact("Approvals", el("dd", null, approvalLabel(run.approvals))),
-      fact("Goal mode", el("dd", null, run.goal_mode ? "On" : "Off")),
+      fact("Goal mode", el("dd", null, run.goal_mode ? (keepGoing ? "On, asked not to stop" : "On") : "Off")),
       campaign === null
         ? null
         : fact("Campaign", el("dd", null, el("a", { href: `#/campaigns/${campaign.id}` }, campaign.title), `, session ${campaign.session}`)),

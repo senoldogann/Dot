@@ -142,6 +142,14 @@ the run they read: put the actual result in it (the findings, figures or text as
 failed and what you did not verify. A note about a result is not a result: never describe what you found without \
 writing it down."""
 
+# Task and research runs only (item 132): a chat turn ends with its reply, and a campaign's session with its own part.
+# Models differ in when they wrap up; these hold every one of them to the work and to the user's words.
+_KEEP_ACTING: str = """- Keep acting while the goal leaves work you can do yourself. Do not stop to report progress or to offer \
+more: an answer that ends with suggestions you could carry out is work left undone, so do it first. Leave as an offer \
+only what needs the user: a decision, a credential, or a step the goal did not ask for that cannot be undone.
+- When the user asks you to keep going, not to stop, or to work until something is done, take it at its word: finish \
+only when it is done, when the next step needs something only the user can give, or when it is impossible."""
+
 # Task and research runs only: a chat turn has no finish to hold back.
 _OPEN_GOALS: str = """# Open-ended goals
 - A precise request is done exactly as asked. A goal that names an outcome instead of a task (grow, improve, earn, \
@@ -453,14 +461,14 @@ def _skills_section(skills: Sequence[Skill], tool_names: Sequence[str]) -> str:
 
 
 def _ending(mode: RunMode, campaign_session: int | None) -> str:
-    """A task or research run ends with the finish tool, and an open-ended goal holds it back until its targets are
-    met; a session of a campaign ends when its own work is done, and the campaign goes on; a chat turn ends with a plain
-    reply."""
+    """A task or research run ends with the finish tool once the goal leaves no work it can do itself, and an
+    open-ended goal holds it back until its targets are met; a session of a campaign ends when its own work is done, and
+    the campaign goes on; a chat turn ends with a plain reply."""
     if mode == "chat":
         return _ENDING_REPLY
     if campaign_session is not None:
         return f"{_ENDING_TOOL}\n\n{_CAMPAIGN.format(session=campaign_session)}"
-    return f"{_ENDING_TOOL}\n\n{_OPEN_GOALS}"
+    return f"{_ENDING_TOOL}\n{_KEEP_ACTING}\n\n{_OPEN_GOALS}"
 
 
 def clock_note(now: datetime) -> str:
