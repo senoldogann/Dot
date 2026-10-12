@@ -1,10 +1,13 @@
 """A chat's pin (item 130): a store made before there were pins gains them, with its chats unpinned, and lists the
 pinned chats first, the last pinned first, however old they are. A chat's unread mark (item 131): a chat is unread once
-its latest run has ended after it was last seen, a store made before the mark takes its chats as seen, and the owner
-can mark a chat seen or unseen."""
+its latest run has ended after it was last seen, a store made before the mark takes its chats as seen, even when the
+process that first opened it died part way, and the owner can mark a chat seen or unseen."""
 
 import asyncio
+import signal
 import sqlite3
+import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -77,6 +80,29 @@ async def _unread(store: Store) -> list[tuple[str, bool]]:
     return [(chat.title, chat.unread) for chat in await store.list_thread_summaries(10)]
 
 
+# A process that opens the store and dies at the clock the backfill of `seen_at` reads, after the column was added.
+_DIES_IN_THE_BACKFILL: str = (
+    "import asyncio, os, signal, sys, time\n"
+    "from pathlib import Path\n"
+    "import dotagent.store.db as db\n"
+    "class Clock:\n"
+    "    def __getattr__(self, name):\n"
+    "        return getattr(time, name)\n"
+    "    def time(self):\n"
+    "        os.kill(os.getpid(), signal.SIGKILL)\n"
+    "db.time = Clock()\n"
+    "asyncio.run(db.Store.open(Path(sys.argv[1]), Path(sys.argv[2])))\n"
+)
+
+
+def _columns(path: Path, table: str) -> set[str]:
+    connection: sqlite3.Connection = sqlite3.connect(path)
+    try:
+        return {str(row[1]) for row in connection.execute(f"PRAGMA table_info({table})")}
+    finally:
+        connection.close()
+
+
 async def test_a_store_from_before_the_unread_mark_takes_its_chats_as_seen(tmp_path: Path) -> None:
     path: Path = tmp_path / "dot.sqlite3"
     store: Store = await Store.open(path, tmp_path / "screenshots")
@@ -96,6 +122,34 @@ async def test_a_store_from_before_the_unread_mark_takes_its_chats_as_seen(tmp_p
     store = await Store.open(path, tmp_path / "screenshots")
     try:
         assert await _unread(store) == [("Old", True)]
+    finally:
+        await store.close()
+
+
+async def test_a_store_whose_first_opening_died_in_the_backfill_takes_its_chats_as_seen_at_the_next(
+    tmp_path: Path,
+) -> None:
+    """Item 145 (C-12 of item 138): the column and its backfill are one transaction, so a process that dies between
+    them leaves the store as it was, and the next opening does both."""
+    path: Path = tmp_path / "dot.sqlite3"
+    store: Store = await Store.open(path, tmp_path / "screenshots")
+    try:
+        await _chat(store, "Old")
+    finally:
+        await store.close()
+    await asyncio.to_thread(_forget_seen, path)
+    died: subprocess.CompletedProcess[str] = await asyncio.to_thread(
+        subprocess.run,
+        [sys.executable, "-c", _DIES_IN_THE_BACKFILL, str(path), str(tmp_path / "screenshots")],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert died.returncode == -signal.SIGKILL, died.stderr
+    assert "seen_at" not in await asyncio.to_thread(_columns, path, "threads")
+    store = await Store.open(path, tmp_path / "screenshots")
+    try:
+        assert await _unread(store) == [("Old", False)]
     finally:
         await store.close()
 

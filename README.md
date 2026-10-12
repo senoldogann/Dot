@@ -1275,6 +1275,9 @@ the agent itself.
   the shell opens no window of its own for them, and only web addresses (`http`, `https`).
 - **Notifications** are the system's: the web UI sends them through the shell (Settings › General › Notifications,
   the same switch). A click brings Dot to the front, where Waiting for you leads to the run.
+- **Only Dot's pages call the shell.** The shell's own pages and the pages of the daemon's address may call the shell,
+  to send a notification or drag the window: the address it reads from `config.toml`, and any it read there before
+  since it started. A page of any other address, another port of the Mac among them, gets nothing from it.
 - **Files** drop into the composer as in the browser.
 
 Build it on your Mac with the Rust toolchain and Node installed:
@@ -1833,7 +1836,9 @@ plays the real loop, tools, policy and store.
 
 The gate runs on every pull request and every push to `main` (`.github/workflows/gate.yml`, on macOS because the
 package depends on PyObjC): the format check, the lint, mypy, the unit tests, `dotx eval check` and the smoke tests
-that need no service, which the workflow lists by file. The tests marked above stay on your Mac.
+that need no service, which the workflow lists by file, and for the desktop shell `cargo fmt --check`, clippy and
+`cargo test`. Each action the workflow uses is pinned by the commit its tag named, so a tag moved later cannot change
+what runs. The tests marked above stay on your Mac.
 
 The work on the agent's autonomy (measuring it, noticing a stuck run, adapting to the model, resuming, learning) is
 planned and tracked in [ROADMAP.md](ROADMAP.md); read it before continuing that work.

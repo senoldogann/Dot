@@ -12,6 +12,9 @@ on:
 permissions:
   contents: read
 
+# Each action is pinned by the commit its tag (or branch) named when it was pinned, given in the comment: a tag moved
+# later cannot change what runs here.
+
 concurrency:
   group: gate-${{ github.ref }}
   cancel-in-progress: true
@@ -27,8 +30,8 @@ jobs:
       # The runner's /etc/localtime is not a link into the zone database, so the zone is named here.
       TZ: UTC
     steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v6
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e # v6.8.0
         with:
           enable-cache: true
       - name: Install
@@ -68,6 +71,7 @@ jobs:
           tests/smoke/test_resume.py
           tests/smoke/test_run_limits.py
           tests/smoke/test_scaffold.py
+          tests/smoke/test_site_locks.py
           tests/smoke/test_tool_groups.py
           tests/smoke/test_undo.py
 
@@ -77,11 +81,12 @@ jobs:
     runs-on: macos-latest
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: dtolnay/rust-toolchain@686976e191b89faba57d3206551f0f330d8cb249 # stable
         with:
+          toolchain: stable
           components: rustfmt, clippy
-      - uses: Swatinem/rust-cache@v2
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
         with:
           workspaces: desktop/src-tauri
       - name: Format

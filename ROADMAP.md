@@ -5064,8 +5064,8 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 141 | The commands of a run are kept out of Dot's own files by macOS                       | done        | 6fe0263 |
 | 142 | What the guards of the desktop and of the shell see                                  | done        | d765da9 |
 | 143 | The token goes only to the daemon                                                    | done        | 57180ea |
-| 144 | The records of a run and the emergency stop                                          | in progress |         |
-| 145 | The CI and the desktop shell                                                         | planned     |         |
+| 144 | The records of a run and the emergency stop                                          | done        | c17da1a |
+| 145 | The CI and the desktop shell                                                         | in progress |         |
 
 ### 77. The type system: Inter and Geist Mono, seven sizes, three weights
 
@@ -7990,7 +7990,7 @@ not given the token.
 
 ### 144. The records of a run and the emergency stop
 
-**Status: in progress.**
+**Status: done.** Merged as `c17da1a` (PR #179, MYP-285 Done).
 
 **As built (2026-10-12).** Every process that drives runs (the daemon, `dotx run`) takes an owner with its first run: a
 lock file under `run-owners/` that it holds with `flock` while it lives and that no program it starts inherits, so the
@@ -8028,7 +8028,25 @@ bears out are fixed.
 
 ### 145. The CI and the desktop shell
 
-**Status: planned.**
+**Status: in progress.**
+
+**As built (2026-10-12).** Every action of the CI's two jobs is pinned by the commit its tag named when it was pinned,
+with the tag in a comment: `actions/checkout` v4.4.0, `astral-sh/setup-uv` v6.8.0, `Swatinem/rust-cache` v2.9.2, and
+`dtolnay/rust-toolchain` at its `stable` branch, which now names the toolchain itself. The desktop shell's capability
+file no longer lets every page of `127.0.0.1` and `localhost`, whatever its port, call the shell: it covers the shell's
+own pages, and the shell adds, when it starts and before it opens the UI at an address it read later, a capability for
+the daemon's address only, for its window, with the same three permissions (`grant` in `src/lib.rs`, once per address;
+an address the shell stopped using keeps it until the shell restarts). The 488 crates.io crates of `Cargo.lock` were
+checked against the OSV database: its two advisories, `glib` 0.18.5 (RUSTSEC-2024-0429) and `proc-macro-error` 1.0.4
+(RUSTSEC-2024-0370, unmaintained), are in the GTK stack that Tauri 2 builds only on Linux, absent from the Mac's build,
+and have no fix inside the versions Tauri 2 asks for, so nothing was updated. Tests: the capability made for a daemon,
+which names its address only and matches its pages but not another port, `localhost` or `https`; the capability file,
+which names no remote page; two runs of one run manager taking the last public action of the day on a site at once, of
+which one is refused (the gates of its runs share the runtime's site locks, which hold each site's spending lock too;
+item 136 built and tested the locks themselves); and a process killed between adding the column `seen_at` and filling
+it, after which the next opening takes the chats as seen. The test of the capability file failed on the file of before;
+the run manager's with a lock of their own for each run; the migration's with the column committed alone, where the next
+opening showed the old chat unread.
 
 **What.** The actions of the CI pinned by their commit; the desktop shell's window allowed to talk to the app only from
 the daemon's own address and port; the Rust crates checked against the advisories; and two tests part 22 left: the
@@ -8612,3 +8630,4 @@ spending lock through the run manager, and a migration cut off between its steps
 - 2026-10-12 (Opus 5.5): item 141 merged as `6fe0263` (PR #176, MYP-282 Done): outside yolo the shell tool, a terminal session, the AppleScript tool and the search tools start their processes in a macOS sandbox that keeps them out of Dot's own files and from changing what it loads and runs, whatever program does it; the search tools may not read the protected locations either; programs that run as root do not start in it; [shell] sandbox turns it off; the daemon restarted with it.
 - 2026-10-12 (Opus 5.5): item 142 merged as `d765da9` (PR #177, MYP-283 Done): a window of another application that shows Dot's web UI, known by its title at each step, is Dot's own for the desktop's review outside yolo; a shell line that replaces a file that is there outside the workspace (a redirect onto it, a copy or a move onto it, ln -f, tee without -a, dd without conv=notrunc) is destructive, so the default preset asks; the daemon restarted with it.
 - 2026-10-12 (Opus 5.5): item 143 merged as `57180ea` (PR #178, MYP-284 Done): the clients send the token only to a daemon that proves it holds it (`GET /api/proof`): the command line, the desktop shell at each poll and the web UI before each request; CI's desktop job runs `cargo test`; the daemon restarted with it. The shell's part reaches the owner's Mac when the owner rebuilds the desktop app.
+- 2026-10-12 (Opus 5.5): item 144 merged as `c17da1a` (PR #179, MYP-285 Done): every process that drives runs holds an owner lock, and a daemon that starts closes only the runs whose owner is gone; the emergency stop ends a run launched while it came and what the scheduler started meanwhile; and the smaller findings of part 22 (the playbooks, a note saved twice, read-only call groups, the notes' index, screenshots, the log's size, a Chrome launch given up, the browser's bounds, a stream's live state); the daemon restarted with it.

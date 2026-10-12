@@ -2,14 +2,16 @@
 //! the web UI and the count of what waits for the user, a global shortcut for a new chat, and notifications sent by
 //! the web UI through the shell. The daemon stays owned by launchd (`dotx service install`): the shell connects to it
 //! with the token of the token file and never runs the agent itself. It sends the token only to a daemon that has
-//! just proven it holds it (`GET /api/proof`), so a program that took the daemon's port is sent nothing. While the
-//! daemon is down the window shows the page that says how to start it, and opens the UI by itself when the daemon
-//! answers.
+//! just proven it holds it (`GET /api/proof`), so a program that took the daemon's port is sent nothing. The pages of
+//! the daemon's own address are the only remote pages that may use the shell's commands (`grant`). While the daemon is
+//! down the window shows the page that says how to start it, and opens the UI by itself when the daemon answers.
 
+use std::collections::HashSet;
 use std::env;
 use std::fs;
 use std::path::PathBuf;
 use std::process::Command;
+use std::sync::Mutex;
 use std::thread;
 use std::time::Duration;
 
@@ -17,6 +19,7 @@ use hmac::{Hmac, Mac};
 use serde::Deserialize;
 use sha2::Sha256;
 use tauri::image::Image;
+use tauri::ipc::CapabilityBuilder;
 use tauri::menu::{Menu, MenuItem, PredefinedMenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
 use tauri::webview::NewWindowResponse;
@@ -39,6 +42,13 @@ const DEFAULT_PORT: u16 = 8765;
 /// What the daemon's proof puts before the nonce (`daemon_proof` in `dotagent.server.guard`).
 const PROOF_LABEL: &[u8] = b"dot daemon proof\n";
 const NONCE_BYTES: usize = 32;
+/// What a page of the window may do through the shell: the core commands, dragging the window by its bars, and
+/// notifications. `capabilities/default.json` gives the same to the shell's own pages.
+const PAGE_PERMISSIONS: [&str; 3] = [
+    "core:default",
+    "core:window:allow-start-dragging",
+    "notification:default",
+];
 const ICON_IDLE: &[u8] = include_bytes!("../icons/tray-idle.png");
 const ICON_WORKING: &[u8] = include_bytes!("../icons/tray-working.png");
 const ICON_WAITING: &[u8] = include_bytes!("../icons/tray-waiting.png");
@@ -74,6 +84,10 @@ struct Proof {
 }
 
 type HmacSha256 = Hmac<Sha256>;
+
+/// The daemon addresses whose pages were given the shell's commands (`grant`).
+#[derive(Default)]
+struct Granted(Mutex<HashSet<String>>);
 
 /// What a poll sees at the daemon's address.
 enum Seen {
@@ -130,6 +144,33 @@ fn daemon() -> Daemon {
         base: format!("http://{bracketed}:{port}"),
         token,
     }
+}
+
+/// What the pages of the daemon's own address may do through the shell (`PAGE_PERMISSIONS`). A page that another
+/// program serves on another port of this Mac, or under another name of it, may do nothing.
+fn daemon_capability(daemon: &Daemon) -> CapabilityBuilder {
+    PAGE_PERMISSIONS.iter().fold(
+        CapabilityBuilder::new("daemon")
+            .remote(daemon.base.clone())
+            .local(false)
+            .window(WINDOW),
+        |capability, permission| capability.permission(*permission),
+    )
+}
+
+/// Give the pages of the daemon's address the shell's commands, once for each address: the one config.toml names when
+/// the shell starts, and another it names later, when the daemon moved.
+fn grant(app: &AppHandle, daemon: &Daemon) -> tauri::Result<()> {
+    let granted = app.state::<Granted>();
+    let mut addresses = granted
+        .0
+        .lock()
+        .expect("nothing panics while it holds the granted addresses");
+    if !addresses.contains(&daemon.base) {
+        app.add_capability(daemon_capability(daemon))?;
+        addresses.insert(daemon.base.clone());
+    }
+    Ok(())
 }
 
 /// The address that opens the UI signed in: the token travels in the fragment, which is never sent.
@@ -271,7 +312,12 @@ fn navigate(app: &AppHandle, up: bool, daemon: &Daemon) {
         return;
     };
     let target = match (up, &daemon.token) {
-        (true, Some(token)) => ui_url(daemon, token),
+        (true, Some(token)) => {
+            if let Err(error) = grant(app, daemon) {
+                eprintln!("dot-shell: the daemon's pages could not be given the shell's commands: {error}");
+            }
+            ui_url(daemon, token)
+        }
         _ => format!("tauri://localhost/{DOWN_PAGE}"),
     };
     if let Ok(url) = url::Url::parse(&target) {
@@ -394,9 +440,11 @@ fn shortcut(app: &AppHandle) -> tauri::Result<()> {
 pub fn run() {
     let app = tauri::Builder::default()
         .plugin(tauri_plugin_notification::init())
+        .manage(Granted::default())
         .setup(|app| {
             let handle = app.handle().clone();
             let daemon = daemon();
+            grant(&handle, &daemon)?;
             let first = match &daemon.token {
                 Some(token) if matches!(look(&daemon), Seen::Counted(_)) => {
                     WebviewUrl::External(url::Url::parse(&ui_url(&daemon, token))?)
@@ -439,6 +487,9 @@ mod tests {
     use std::io::{Read, Write};
     use std::net::{TcpListener, TcpStream};
     use std::sync::mpsc::{self, Receiver};
+    use tauri::ipc::RuntimeCapability;
+    use tauri::utils::acl::capability::{CapabilityFile, PermissionEntry};
+    use tauri::utils::acl::RemoteUrlPattern;
 
     const TOKEN: &str = "MARKER-0123456789abcdef";
     const NONCE: &str = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
@@ -576,5 +627,48 @@ mod tests {
             token: Some(TOKEN.to_string()),
         };
         assert!(matches!(look(&daemon), Seen::Silent));
+    }
+
+    #[test]
+    fn only_the_pages_of_the_daemons_own_address_may_use_the_shell() {
+        let daemon = Daemon {
+            base: "http://127.0.0.1:8765".to_string(),
+            token: None,
+        };
+        let CapabilityFile::Capability(capability) = daemon_capability(&daemon).build() else {
+            panic!("one capability");
+        };
+        let urls = capability
+            .remote
+            .expect("a capability of remote pages")
+            .urls;
+        assert_eq!(urls, vec![daemon.base.clone()]);
+        assert!(!capability.local);
+        assert_eq!(capability.windows, vec![WINDOW.to_string()]);
+        let permissions: Vec<&str> = capability
+            .permissions
+            .iter()
+            .map(|entry| match entry {
+                PermissionEntry::PermissionRef(identifier) => identifier.get(),
+                PermissionEntry::ExtendedPermission { identifier, .. } => identifier.get(),
+            })
+            .collect();
+        assert_eq!(permissions, PAGE_PERMISSIONS);
+        let pattern: RemoteUrlPattern = urls[0].parse().expect("a URL pattern");
+        let reaches = |page: &str| pattern.test(&url::Url::parse(page).expect("an address"));
+        assert!(reaches("http://127.0.0.1:8765/#token=x"));
+        assert!(reaches("http://127.0.0.1:8765/#/runs/run_1"));
+        assert!(!reaches("http://127.0.0.1:8766/"));
+        assert!(!reaches("http://localhost:8765/"));
+        assert!(!reaches("https://127.0.0.1:8765/"));
+    }
+
+    #[test]
+    fn the_shells_own_pages_are_given_the_same_and_no_remote_page_is() {
+        let file: serde_json::Value =
+            serde_json::from_str(include_str!("../capabilities/default.json"))
+                .expect("the capability file is JSON");
+        assert!(file.get("remote").is_none());
+        assert_eq!(file["permissions"], serde_json::json!(PAGE_PERMISSIONS));
     }
 }
