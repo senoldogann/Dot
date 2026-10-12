@@ -86,7 +86,11 @@ fn daemon() -> Daemon {
         .map(|text| text.trim().to_string())
         .filter(|text| !text.is_empty());
     // An IPv6 host goes in brackets, as `dotagent.server.links.base_url` writes it.
-    let bracketed = if host.contains(':') { format!("[{host}]") } else { host };
+    let bracketed = if host.contains(':') {
+        format!("[{host}]")
+    } else {
+        host
+    };
     Daemon {
         base: format!("http://{bracketed}:{port}"),
         token,
