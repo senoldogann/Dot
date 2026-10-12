@@ -829,7 +829,7 @@ The sidebar lists your chats (the conversation threads) grouped by day, newest a
 with a run going on, waiting for you or failed, and a chat opens at its latest run. Above the list: a search over the titles
 (⌘K or `/`), **New chat** (⇧⌘O) and the ways to **Agents**, **Activity** and **Campaigns**; in the foot,
 **Settings**. The sections (Waiting for you, Working, Chats) fold on a click of their label, and the folds are kept
-between visits. **Select** turns the list into checkboxes: tick chats
+between visits. The sidebar's head holds only the button that folds it away. **Select** turns the list into checkboxes: tick chats
 (or Select all) and **Delete** asks once, then removes them with every run, step, event and approval of theirs. A chat
 with a run under way is refused: wait for the run to end, or cancel it. Escape leaves the selection. Under 860 px the
 sidebar becomes a drawer.
@@ -907,20 +907,16 @@ scrolls under a blur, the panel stays in place under it, and the box stays at th
 face, the name and the buttons; the chips wait in the Details card. Every other page names itself in the same bar
 (Agents, Activity, Campaigns, Settings) and opens with one line of description.
 
-The panel opens with the run's actor as a moving character (Dot, or the agent the run belongs to, in its look), its
-name and the word of its state under it ("Thinking…", "Waiting for you", "Done", "Failed", "Stopped"): it
-hatches when a run starts under your eyes, thinks while the run works, looks aside toward the live view at each browser
-step, goes alert with a pastille while the run waits for you, laughs once when the run ends well and settles, rests sad
-after a failure and unimpressed after a cancel, and sleeps ten minutes after the end. In the conversation each turn of
-the actor, and the answer at the end, opens with its still face. The panel's cards (Dot's computer, Details, Plan,
+In the conversation each turn of the actor (Dot, or the agent the run belongs to, in its look), and the answer at the
+end, opens with its still face; the run's state is the top bar's face and badge, with no card for it at the head of the
+conversation. The panel's cards (Dot's computer, Details, Plan,
 Actions, Screen) arrive folded, each with a one-line summary, and
 open at a click; the choice is kept per card. Beside the conversation the panel has a size: three buttons above Dot's
 computer make it **Compact** (its own 320 px), **Wide** (half of the page) or **Full** (the conversation at its narrowest,
 360 px, the rest for the panel), and the handle between the conversation and the panel drags it to any width between
 (the arrow keys move it a step, a double click gives it back its own width); the size is kept in the browser
-(`dot.computer.size`). While the panel is wider than its own width, the character stands at the head of the
-conversation with its name and its state word, staying in sight as the conversation scrolls, and the computer's view
-grows with the panel in its warm frame. The drawer of a narrow page has one width. **Dot's computer**, at the top of
+(`dot.computer.size`). While the panel is wider than its own width, the computer's view grows with the panel in its
+warm frame. The drawer of a narrow page has one width. **Dot's computer**, at the top of
 that panel while a run is going on, shows the page of the run's browser as Chrome paints it (`GET /api/runs/{id}/screencast`, Chrome's own screencast,
 sent only while the view is open; a tab that does not change sends nothing). The view starts by itself at the run's
 first browser step and says, until then, that the run has not opened a page; **Watch** and **Close the view** open
@@ -987,8 +983,8 @@ behaviour of x.ai's bot avatar as an exercise and is affiliated with nobody, and
 the code, not the design it imitates (`static/js/character/LICENSE`). One loop drives every moving character on the
 page and stops while the tab is hidden; under reduced motion, or with "Faces that move" off in Settings › General, each
 shows one still frame (while the system reduces motion the switch says so, and where that is turned off). A still
-character follows a change of its shape or expression at once. Three characters move: the home's face, the run page's panel character (its moods from the run's
-status, `static/js/mood.js`) and the look editor's preview; every other face is a still frame. One moving face costs
+character follows a change of its shape or expression at once. Two characters move: the home's face and the look editor's preview; every other face is a still
+frame. One moving face costs
 about a millisecond of main-thread time a frame (`tests/smoke/test_character_cost.py` reads it from Chrome's
 performance metrics and caps it). `#/controls` shows every
 shape, expression, colour and animation.

@@ -13,7 +13,6 @@ import { levelLabel } from "../efforts.js";
 import { continuedIn, earlierTurns, loadHistory, RESUME_SOURCE } from "../history.js";
 import { dotName, faceState, faceStateAtEnd } from "../face.js";
 import { icon } from "../icons.js";
-import { createCharacterCard } from "../charactercard.js";
 import { createInspector } from "../inspector.js";
 import { userMessage } from "../messages.js";
 import { emptyPanel, errorPanel, foldCard, loadingPanel, statusBadge } from "../panels.js";
@@ -681,7 +680,6 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
       return;
     }
     status = update.status;
-    character.onStatus(status, update.endedAt);
     if (update.model !== null) {
       model = update.model;
     }
@@ -810,34 +808,13 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
 
   const actorName = agent !== null ? agent.name : dotName();
   // The width of the panel (item 109): chosen on Dot's computer or dragged on the handle beside the panel.
-  const stage = createStageSize({ layout, onChange: () => placeCharacter() });
+  const stage = createStageSize({ layout });
   const computer = createComputer({ runId, active: detail.active, held: detail.held, name: actorName, sizes: stage.chooser });
-  // The character beside the chat (item 103): the run's agent, moving with the run, with its name and the word of its
-  // state; at the head of the panel, or at the head of the conversation while the panel is wider than its own width.
-  const character = createCharacterCard({
-    id: agent !== null ? agent.id : run.parent_run_id === null ? "dot" : run.id,
-    name: actorName,
-    look: agent !== null ? agent.look : null,
-    status,
-    endedAt: run.finished_at,
-    size: 160,
-  });
-  const chatHead = el("div", { class: "run-chat-head", hidden: true });
-  function placeCharacter() {
-    const atHead = layout.dataset.inspector === "on" && layout.dataset.stage !== "compact";
-    if (atHead && character.element.parentElement !== chatHead) {
-      chatHead.append(character.element);
-    } else if (!atHead && character.element.parentElement === chatHead) {
-      computer.element.before(character.element);
-    }
-    chatHead.hidden = !atHead;
-    character.element.dataset.place = atHead ? "chat" : "panel";
-  }
-  // The side panel (item 84): the character, the computer, the details, the cost (item 96), the plan and the actions.
+  // The side panel (item 84): the computer, the details, the cost (item 96), the plan and the actions. The run's state
+  // is the top bar's face and badge; no card at the head of the conversation (item 113).
   const inspector = createInspector({
     layout,
-    content: [character.element, computer.element, details.element, cost.element, plan.element, actionsCard.element],
-    onArrange: placeCharacter,
+    content: [computer.element, details.element, cost.element, plan.element, actionsCard.element],
   });
   const timeline = createTimeline({
     rootRunId: runId,
@@ -861,10 +838,7 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
     onImage: inspector.addImage,
     onQuestionLeft: debounce(() => reconcile(), QUESTIONS_SETTLE_MS),
     onHeld: computer.setHeld,
-    onBrowserStep: (page) => {
-      computer.notePage(page);
-      character.lookAside();
-    },
+    onBrowserStep: (page) => computer.notePage(page),
   });
   const problem =
     historyProblem === null
@@ -882,7 +856,6 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
       "div",
       { class: "run-main" },
       el("h1", { class: "visually-hidden" }, run.goal),
-      chatHead,
       connectionNote,
       problem,
       earlierTurns(history.earlier),
@@ -958,7 +931,6 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
     computer.dispose();
     inspector.dispose();
     stage.dispose();
-    character.dispose();
     frame.dispose();
     if (ticker !== null) {
       clearInterval(ticker);
