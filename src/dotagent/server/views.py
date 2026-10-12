@@ -114,15 +114,17 @@ class DeleteThreadsRequest(FrozenModel):
 
 
 class ThreadChange(FrozenModel):
-    """What the owner changes on a chat from its menu (item 130): its name, or its pin; one of them at least."""
+    """What the owner changes on a chat from its menu (item 130): its name, its pin, or whether it is seen (item 131);
+    one of them at least."""
 
     title: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=_NAME_CHARS)] | None = None
     pinned: StrictBool | None = None
+    seen: StrictBool | None = None
 
     @model_validator(mode="after")
     def _something(self) -> Self:
-        if self.title is None and self.pinned is None:
-            raise ValueError("a change of a chat names its title or its pin")
+        if self.title is None and self.pinned is None and self.seen is None:
+            raise ValueError("a change of a chat names its title, its pin or whether it is seen")
         return self
 
 

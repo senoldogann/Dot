@@ -28,7 +28,8 @@ from dotagent.store.models import RunRecord, ThreadRecord, ThreadSummary
 pytestmark = [pytest.mark.browser, pytest.mark.asyncio(loop_scope="module")]
 
 TOKEN: str = "chat-menu-test-token"
-_ITEMS: list[str] = ["Pin", "Rename", "Copy link", "Select", "Delete"]
+# The seeded chats are unread (item 131): their runs are over, and nobody opened them.
+_ITEMS: list[str] = ["Pin", "Mark read", "Rename", "Copy link", "Select", "Delete"]
 
 
 @pytest_asyncio.fixture(scope="module", loop_scope="module")
@@ -158,7 +159,7 @@ async def test_a_chats_menu_pins_names_copies_chooses_and_deletes_it(
         await expect(more).to_have_attribute("aria-expanded", "true")
         await expect(menu.get_by_role("menuitem", name="Pin")).to_be_focused()
         await page.screenshot(path=str(tmp_path / "menu-1280-light.png"), animations="disabled")
-        for key, item in (("ArrowDown", "Rename"), ("End", "Delete"), ("ArrowDown", "Pin"), ("ArrowUp", "Delete")):
+        for key, item in (("ArrowDown", "Mark read"), ("End", "Delete"), ("ArrowDown", "Pin"), ("ArrowUp", "Delete")):
             await page.keyboard.press(key)
             await expect(menu.get_by_role("menuitem", name=item)).to_be_focused()
         # A click between the items keeps the keys with the menu.
@@ -229,8 +230,8 @@ async def test_a_chats_menu_pins_names_copies_chooses_and_deletes_it(
         await page.keyboard.press("Shift+F10")
         menu = page.get_by_role("menu", name="Trip notes")
         await expect(menu.get_by_role("menuitem", name="Pin")).to_be_focused()
-        await page.keyboard.press("ArrowDown")
-        await page.keyboard.press("ArrowDown")
+        for _ in ("Mark read", "Rename", "Copy link"):
+            await page.keyboard.press("ArrowDown")
         await expect(menu.get_by_role("menuitem", name="Copy link")).to_be_focused()
         await page.keyboard.press("Enter")
         await expect(page.locator(".toast", has_text="Link copied.")).to_be_visible()

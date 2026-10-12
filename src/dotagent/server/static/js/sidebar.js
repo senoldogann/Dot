@@ -2,7 +2,8 @@
 // and what works (folded or not, as the owner left them), the chats themselves (several of them can be deleted at once)
 // and, in the foot, the way to the settings and the emergency stop (item 120). A row whose run works says Working and
 // for how long (item 122). A chat's menu (item 130), after T3 Code's thread menu, pins it, names it, copies its link,
-// starts choosing chats with it and deletes it; the pinned chats come first, under Pinned.
+// starts choosing chats with it and deletes it; the pinned chats come first, under Pinned. A chat whose latest run
+// ended after it was last seen is unread (item 131): an accent dot, until it is opened, or Mark read.
 
 import { ApiError, api, request } from "./api.js";
 import { age, clip, clipWords, copyText, dateTime, debounce, el, foldSearch, plural, workingFor } from "./dom.js";
@@ -34,6 +35,8 @@ const ROW_CHARS = 56;
 const FOLDS_KEY = "dot.sideFolds";
 // What a status dot means, for screen readers; a chat whose latest run is done or cancelled shows no dot and needs no word.
 const STATUS_WORD = { queued: "queued", running: "running", blocked: "waiting for you", failed: "failed" };
+// The states of a run that is over: only such a chat can be marked unread (item 131).
+const ENDED = new Set(["done", "failed", "cancelled"]);
 const BUSY_MESSAGE = "A chat with a run under way cannot be deleted. Wait for the run to end, or cancel it, and try again.";
 // How often the ages at the right of the chats are read again, so a "5m" does not stay while the page rests.
 const AGE_REFRESH_MS = 60_000;
@@ -107,10 +110,16 @@ function workingSlot(since) {
   );
 }
 
+/** A chat's dot: the state of its latest run, in the accent while the chat is unread (item 131); a failed run keeps its
+ * red dot. A daemon from before item 131 sends no `unread`, and its chats are read. */
+function chatDot(chat) {
+  return el("span", { class: `status-dot s-${chat.latest_status}${chat.unread === true ? " unread" : ""}` });
+}
+
 /** A chat as a link: it opens on the latest run a person started on it. Its last activity is at the right, in the
  * fewest characters (item 121), or, while its latest run works, Working and for how long (item 122). */
 function chatLink(chat, onNavigate) {
-  const word = STATUS_WORD[chat.latest_status];
+  const word = [STATUS_WORD[chat.latest_status], chat.unread === true ? "unread" : undefined].filter((part) => part !== undefined).join(", ");
   const title = clip(chat.title, 120);
   return el(
     "a",
@@ -118,10 +127,10 @@ function chatLink(chat, onNavigate) {
       class: "side-run",
       href: `#/runs/${chat.latest_run_id}`,
       title: clip(chat.title, 240),
-      "aria-label": word === undefined ? null : `${title} (${word})`,
+      "aria-label": word === "" ? null : `${title} (${word})`,
       onclick: onNavigate,
     },
-    el("span", { class: `status-dot s-${chat.latest_status}` }),
+    chatDot(chat),
     el("span", { class: "side-run-goal" }, title),
     WORKING.has(chat.latest_status)
       ? workingSlot(chat.latest_created_at)
@@ -180,7 +189,7 @@ function chatPick(chat, checked, onToggle) {
     "label",
     { class: "side-run side-pick", title: clip(chat.title, 240) },
     box,
-    el("span", { class: `status-dot s-${chat.latest_status}` }),
+    chatDot(chat),
     el("span", { class: "side-run-goal" }, clip(chat.title, 120)),
   );
 }
@@ -200,6 +209,9 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
   // asked from the daemon.
   let routeThreadId = null;
   let resolveTicket = 0;
+  // The open chat the owner marked unread (item 131): it stays so until it is opened again or the page comes back into
+  // view. Any other open chat is seen whenever the page is in view, so a run that ends there leaves no dot.
+  let keptUnread = null;
   let selecting = false;
   // The chat whose name is being typed in its row (item 130): the list is painted again once the name is kept or left.
   let renaming = null;
@@ -277,6 +289,35 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
     if (active !== undefined) {
       active.scrollIntoView({ block: "nearest" });
     }
+  }
+
+  // The page is in view when it is shown and its window has the focus: a window behind others shows nothing new.
+  function inView() {
+    return document.visibilityState === "visible" && document.hasFocus();
+  }
+
+  /** Mark the open chat seen when the page is in view and the chat is unread: its row loses the dot at once. */
+  function seeOpenChat() {
+    if (routeThreadId === null || routeThreadId === keptUnread || chats === null || !inView()) {
+      return;
+    }
+    const open = chats.find((chat) => chat.id === routeThreadId);
+    if (open === undefined || open.unread !== true) {
+      return;
+    }
+    chats = chats.map((chat) => (chat.id === open.id ? { ...chat, unread: false } : chat));
+    // The repaint takes the rows away, so the focus goes back to the row that had it (a chat opened by a key).
+    const focused = [...rowNodes].find(([, node]) => node === document.activeElement);
+    paintChats();
+    if (focused !== undefined) {
+      rowNodes.get(focused[0])?.focus();
+    }
+    api.patch(`/threads/${open.id}`, { seen: true }).catch((error) => console.warn("the open chat could not be marked seen", error));
+  }
+
+  function onBackInView() {
+    keptUnread = null;
+    seeOpenChat();
   }
 
   function paintBar() {
@@ -435,12 +476,34 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
       chat.pinned_at === null
         ? { label: "Pin", icon: "pin", run: () => attempt(() => pinChat(chat, true)) }
         : { label: "Unpin", icon: "pinOff", run: () => attempt(() => pinChat(chat, false)) },
+      readAction(chat),
       { label: "Rename", icon: "pencil", run: () => renameChat(chat) },
       { label: "Copy link", icon: "link", run: () => attempt(() => copyLink(chat)) },
       "separator",
       { label: "Select", icon: "squareCheck", run: () => enterSelectMode(chat.id) },
       { label: "Delete", icon: "trash", danger: true, run: () => attempt(() => deleteChats([chat.id])) },
-    ];
+    ].filter((item) => item !== null);
+  }
+
+  // Mark read on an unread chat, Mark unread on a read one whose latest run is over (item 131); a daemon from before
+  // item 131 sends no `unread`, and neither is offered.
+  function readAction(chat) {
+    if (chat.unread === true) {
+      return { label: "Mark read", icon: "eye", run: () => attempt(() => markChat(chat, true)) };
+    }
+    if (chat.unread === false && ENDED.has(chat.latest_status)) {
+      return { label: "Mark unread", icon: "eyeOff", run: () => attempt(() => markChat(chat, false)) };
+    }
+    return null;
+  }
+
+  async function markChat(chat, seen) {
+    if (chat.id === routeThreadId) {
+      keptUnread = seen ? null : chat.id;
+    }
+    await api.patch(`/threads/${chat.id}`, { seen });
+    await load();
+    rowNodes.get(chat.id)?.focus();
   }
 
   async function pinChat(chat, pinned) {
@@ -617,6 +680,7 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
     }
     routeThreadId = detail.run.thread_id;
     markCurrent();
+    seeOpenChat();
   }
 
   /** Find the chat of the run on the page in the list, or ask the daemon which thread it is on. */
@@ -628,6 +692,7 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
     if (owner !== undefined) {
       routeThreadId = owner.id;
       markCurrent();
+      seeOpenChat();
       return;
     }
     resolveThread(routeRunId);
@@ -691,6 +756,7 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
     paintChats();
     paintBar();
     locateRoute();
+    seeOpenChat();
   }
 
   const reloadSoon = debounce(() => {
@@ -701,6 +767,8 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
       reloadSoon();
     }
   });
+  document.addEventListener("visibilitychange", onBackInView);
+  window.addEventListener("focus", onBackInView);
 
   // Escape drops the selection, unless the search field or an open dialog took the key first.
   function onEscape(event) {
@@ -821,6 +889,7 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
       mark(settingsLink, tab === "settings");
       routeRunId = runId;
       routeThreadId = null;
+      keptUnread = null;
       markCurrent();
       locateRoute();
     },
@@ -830,6 +899,8 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
       clearInterval(ageTicker);
       clearInterval(workTicker);
       stopLifecycle();
+      document.removeEventListener("visibilitychange", onBackInView);
+      window.removeEventListener("focus", onBackInView);
       window.removeEventListener("keydown", onEscape);
     },
   };
