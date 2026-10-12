@@ -236,9 +236,10 @@ async def test_dots_look_card_previews_the_pick_under_reduced_motion(
     port: int | None = client.base_url.port
     assert port is not None
     await page.goto(ui_url(host, port, TOKEN))
-    await page.goto(f"http://{host}:{port}/#/settings/general")
-    # The note under "Faces that move" says the system reduces motion (item 107).
+    # The note under "Faces that move" (Settings › Appearance) says the system reduces motion (item 107).
+    await page.goto(f"http://{host}:{port}/#/settings/appearance")
     await expect(page.locator("[data-reduced-motion]")).to_be_visible()
+    await page.goto(f"http://{host}:{port}/#/settings/general")
     card = page.locator('section[aria-label="Dot\'s look"]')
     paper = card.locator(".look-preview .character-paper")
     await expect(paper).to_have_count(1)

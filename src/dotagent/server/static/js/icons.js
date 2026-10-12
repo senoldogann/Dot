@@ -208,6 +208,17 @@ const SHAPES = {
   message: [["path", { d: "M7.9 20A9 9 0 1 0 4 16.1L2 22Z" }]],
   lock: [["rect", { width: 18, height: 11, x: 3, y: 11, rx: 2 }], ["path", { d: "M7 11V7a5 5 0 0 1 10 0v4" }]],
   lockOpen: [["rect", { width: 18, height: 11, x: 3, y: 11, rx: 2 }], ["path", { d: "M7 11V7a5 5 0 0 1 9.9-1" }]],
+  sun: [
+    ["circle", { cx: 12, cy: 12, r: 4 }],
+    ["path", { d: "M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41" }],
+  ],
+  moon: [["path", { d: "M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z" }]],
+  palette: [
+    ["path", { d: "M12 22a10 10 0 1 1 10-10c0 2.8-2.2 4-4.5 4H15a2 2 0 0 0-1.5 3.3c.6.7.2 2.7-1.5 2.7Z" }],
+    ["circle", { cx: 7.5, cy: 10.5, r: 1 }],
+    ["circle", { cx: 10.5, cy: 6.5, r: 1 }],
+    ["circle", { cx: 15.5, cy: 7.5, r: 1 }],
+  ],
 };
 
 /** Dot's wordmark (item 114), named "Dot": a copy of its one drawing, the opening's in index.html. */

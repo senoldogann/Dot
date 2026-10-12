@@ -92,6 +92,10 @@
   --shadow-float: 0 6px 18px var(--shadow-ink-deep);
   --shadow-overlay: 0 0 40px var(--shadow-ink-deep);
   --shadow-modal: 0 20px 60px var(--shadow-ink-deep);
+  /* The edge of a theme's orb (item 126, T3 Code's): a hairline of its own scheme and a breath of shadow, whatever the
+     page's scheme is. */
+  --orb-edge-light: inset 0 0 0 1px rgb(0 0 0 / 10%), 0 1px 2px rgb(0 0 0 / 8%);
+  --orb-edge-dark: inset 0 0 0 1px rgb(255 255 255 / 14%), 0 1px 2px rgb(0 0 0 / 18%);
   /* Dot's computer (run.css): the warm backdrop behind the live view, from the yellow of the bubbles. */
   --computer-backdrop: linear-gradient(160deg, color-mix(in srgb, var(--bubble) 55%, #ffffff), var(--bubble) 70%, color-mix(in srgb, var(--bubble) 80%, #000000));
 }

@@ -473,3 +473,296 @@
   font-weight: var(--weight-title);
   letter-spacing: var(--tracking-title);
 }
+
+/* ---------- Appearance (item 126, after T3 Code's page) ---------- */
+
+/* The colour scheme: three cards, each a miniature of Dot's window drawn on the tokens of the scheme it names. A pane
+   holds its scheme with color-scheme, so every light-dark() token inside it resolves to that scheme's side. */
+.scheme-cards {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-3);
+}
+
+.scheme-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--text);
+  cursor: pointer;
+  transition: background-color var(--motion-quick) var(--ease), border-color var(--motion-quick) var(--ease);
+}
+
+.scheme-card:hover {
+  background: var(--surface-2);
+}
+
+.scheme-card[aria-pressed="true"] {
+  border-color: var(--accent);
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+
+.scheme-card-label {
+  font-weight: var(--weight-label);
+}
+
+.wire {
+  position: relative;
+  display: block;
+  aspect-ratio: 16 / 10;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+
+.wire-pane {
+  position: absolute;
+  inset: 0;
+  background: var(--bg);
+}
+
+.wire-pane[data-pane="light"] {
+  color-scheme: light;
+}
+
+.wire-pane[data-pane="dark"] {
+  color-scheme: dark;
+}
+
+/* System: the light pane on the left half, the dark one on the right, a hairline of the card between them. */
+.wire[data-wire="system"] .wire-pane[data-pane="light"] {
+  clip-path: polygon(0 0, calc(50% - 1px) 0, calc(50% - 1px) 100%, 0 100%);
+}
+
+.wire[data-wire="system"] .wire-pane[data-pane="dark"] {
+  clip-path: polygon(calc(50% + 1px) 0, 100% 0, 100% 100%, calc(50% + 1px) 100%);
+}
+
+.wire-side {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 24%;
+  background: var(--sidebar);
+  box-shadow: inset -1px 0 0 var(--border);
+}
+
+.wire-search,
+.wire-row,
+.wire-bubble,
+.wire-line,
+.wire-send {
+  position: absolute;
+  border-radius: var(--radius-pill);
+}
+
+.wire-search {
+  inset: 8% 12% auto;
+  height: 8%;
+  background: var(--surface);
+  box-shadow: inset 0 0 0 1px var(--border);
+}
+
+.wire-row {
+  left: 12%;
+  right: 24%;
+  height: 5%;
+  background: var(--surface-3);
+}
+
+.wire-row:nth-child(2) {
+  top: 26%;
+}
+
+.wire-row:nth-child(3) {
+  top: 36%;
+}
+
+.wire-row:nth-child(4) {
+  top: 46%;
+}
+
+.wire-bubble {
+  top: 12%;
+  right: 10%;
+  width: 26%;
+  height: 9%;
+  background: var(--bubble);
+}
+
+.wire-line {
+  left: 34%;
+  height: 4%;
+  background: var(--faint);
+  opacity: 0.45;
+}
+
+.wire-line:nth-child(3) {
+  top: 30%;
+  width: 44%;
+}
+
+.wire-line:nth-child(4) {
+  top: 38%;
+  width: 30%;
+}
+
+.wire-composer {
+  position: absolute;
+  inset: auto 10% 8% 34%;
+  height: 16%;
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  box-shadow: inset 0 0 0 1px var(--border);
+}
+
+.wire-send {
+  top: 22%;
+  right: 4%;
+  height: 56%;
+  aspect-ratio: 1;
+  background: var(--accent);
+}
+
+/* The themes: a card each, a button over the whole card for both schemes and an orb for each scheme above it. */
+.theme-gallery {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(168px, 1fr));
+  gap: var(--space-3);
+}
+
+.theme-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-4) var(--space-3) var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+
+.theme-card[data-in-use] {
+  border-color: var(--border-strong);
+  background: var(--surface-2);
+}
+
+.theme-card-pick {
+  position: absolute;
+  inset: 0;
+  border: 0;
+  border-radius: inherit;
+  background: transparent;
+  cursor: pointer;
+}
+
+.theme-card-pick:hover {
+  background: var(--surface-2);
+}
+
+.theme-orbs,
+.theme-card-name {
+  position: relative;
+  z-index: 1;
+}
+
+/* The gap between the orbs is the card's: a click there falls through to the button under it, as on the name. */
+.theme-orbs {
+  display: flex;
+  gap: var(--space-2);
+  pointer-events: none;
+}
+
+/* The name is the card's to click: a click on it falls through to the button under it. */
+.theme-card-name {
+  pointer-events: none;
+  font-weight: var(--weight-label);
+}
+
+.theme-orb {
+  position: relative;
+  display: grid;
+  place-items: center;
+  padding: var(--space-1);
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  cursor: pointer;
+  pointer-events: auto;
+  transition: transform var(--motion-quick) var(--ease);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .theme-orb:not([aria-pressed="true"]):hover {
+    transform: scale(1.05);
+  }
+}
+
+.theme-orb[aria-pressed="true"] {
+  box-shadow: inset 0 0 0 2px var(--accent);
+}
+
+.theme-orb-badge {
+  position: absolute;
+  right: 2px;
+  bottom: 2px;
+  display: none;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  background: var(--bg);
+  color: var(--text);
+}
+
+.theme-orb[aria-pressed="true"] .theme-orb-badge {
+  display: grid;
+}
+
+.theme-orb-badge .icon {
+  width: 12px;
+  height: 12px;
+}
+
+/* An orb (appearance/orbs.js): a ball with a rim of the card and the edge of its own scheme, its light blurred and
+   spread a little past the rim. */
+.orb {
+  position: relative;
+  display: block;
+  width: 56px;
+  height: 56px;
+  overflow: hidden;
+  border: 2px solid var(--surface);
+  border-radius: var(--radius-pill);
+}
+
+.orb[data-scheme="light"] {
+  box-shadow: var(--orb-edge-light);
+}
+
+.orb[data-scheme="dark"] {
+  box-shadow: var(--orb-edge-dark);
+}
+
+.orb-light {
+  position: absolute;
+  inset: 0;
+  border-radius: var(--radius-pill);
+  filter: blur(3px);
+  transform: scale(1.1);
+}
+
+@media (max-width: 720px) {
+  .scheme-cards {
+    gap: var(--space-2);
+  }
+
+  .theme-gallery {
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  }
+}

@@ -1,21 +1,52 @@
-// The first paint (item 81): a classic script in the document's head that puts the look, the colour scheme and the
-// density this browser chose on the page element before the body is parsed, so a held dark scheme never flashes light
-// while main.js loads. It reads the same keys as theme.js and layout.js and sets only values those modules accept;
-// everything else (the defaults, the switches, the listeners) stays theirs. Storage that is blocked means the default.
+// The first paint (item 81): a classic script in the document's head that puts the theme, the colour scheme and the
+// density this browser chose on the page element before the body is parsed, so a held dark scheme or a theme never
+// flashes the default while main.js loads. It reads the same keys as theme.js and layout.js and sets only values of the
+// shapes those modules write; everything else (the defaults, the switches, the listeners) stays theirs, and theme.js
+// works the tokens out again once it runs. Storage that is blocked means the default.
 (function boot() {
-  var known = { "dot.theme": ["neutral", "paper"], "dot.scheme": ["light", "dark"], "dot.density": ["comfortable", "compact"] };
-  var names = { "dot.theme": "theme", "dot.scheme": "scheme", "dot.density": "density" };
-  Object.keys(known).forEach(function (key) {
-    var stored = null;
+  var root = document.documentElement;
+  var read = function (key) {
     try {
-      stored = localStorage.getItem(key);
+      return localStorage.getItem(key);
     } catch (error) {
-      stored = null;
+      return null;
     }
-    if (stored !== null && known[key].indexOf(stored) !== -1) {
-      document.documentElement.dataset[names[key]] = stored;
-    }
-  });
+  };
+  var scheme = read("dot.scheme");
+  if (scheme === "light" || scheme === "dark") {
+    root.dataset.scheme = scheme;
+  }
+  var density = read("dot.density");
+  if (density === "comfortable" || density === "compact") {
+    root.dataset.density = density;
+  }
+  // The theme of the scheme on screen (item 126): the pick for dark while the page is dark, else the pick for light.
+  var themeId = /^[a-z0-9][a-z0-9-]{0,47}$/;
+  var light = read("dot.theme");
+  light = light !== null && themeId.test(light) ? light : null;
+  var dark = read("dot.themeDark");
+  dark = dark !== null && themeId.test(dark) ? dark : light;
+  var shown = root.dataset.scheme || (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+  var theme = shown === "dark" ? dark : light;
+  if (theme !== null) {
+    root.dataset.theme = theme;
+  }
+  // The tokens theme.js wrote for the picks, each a light-dark() pair of two plain colours; anything else is left out.
+  var side = "(#[0-9a-f]{3,8}|(rgb|oklch)\\([0-9a-z .%/,-]*\\)|transparent)";
+  var pair = new RegExp("^light-dark\\(" + side + ", " + side + "\\)$", "i");
+  var tokens = null;
+  try {
+    tokens = JSON.parse(read("dot.themeTokens") || "null");
+  } catch (error) {
+    tokens = null;
+  }
+  if (tokens !== null && typeof tokens === "object") {
+    Object.keys(tokens).forEach(function (token) {
+      if (/^--[a-z0-9-]+$/.test(token) && typeof tokens[token] === "string" && pair.test(tokens[token])) {
+        root.style.setProperty(token, tokens[token]);
+      }
+    });
+  }
   // Inside the desktop shell (Tauri, item 88) the page keeps room for the traffic lights in its top bars.
   if (typeof window.__TAURI__ === "object" && window.__TAURI__ !== null) {
     document.documentElement.dataset.shell = "desktop";
@@ -35,7 +66,6 @@
     opening = false;
   }
   if (opening) {
-    var root = document.documentElement;
     // Once the overlay has begun to fade, the quick fade would only start again from full and flash (item 116).
     var skip = function () {
       var overlay = document.querySelector(".opening");

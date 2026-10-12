@@ -8,7 +8,8 @@ import { setSidebarOpen, sidebarOpen, trackStagebar } from "./layout.js";
 import { installShortcuts, requestCompose } from "./shortcuts.js";
 import { buildSidebar } from "./sidebar.js";
 import { stageTitleSlot, stageToolsSlot } from "./stage.js";
-import { attempt } from "./ui.js";
+import { SCHEMES, chooseScheme, nextScheme } from "./theme.js";
+import { attempt, toast } from "./ui.js";
 
 const NARROW = "(max-width: 859.98px)";
 const STREAM_LABEL = { connecting: "Connecting", live: "Live", reconnecting: "Reconnecting" };
@@ -146,6 +147,17 @@ export function buildShell({ homeRoute }) {
     requestCompose();
   }
 
+  function openAppearance() {
+    location.hash = "#/settings/appearance";
+    closeAfterNavigation();
+  }
+
+  function cycleScheme() {
+    const id = nextScheme();
+    chooseScheme(id);
+    toast("ok", `Colour scheme: ${SCHEMES.find((scheme) => scheme.id === id).label}`);
+  }
+
   function onViewportChange(event) {
     narrow = event.matches;
     drawer = false;
@@ -162,7 +174,7 @@ export function buildShell({ homeRoute }) {
 
   narrowQuery.addEventListener("change", onViewportChange);
   window.addEventListener("keydown", onEscape);
-  const removeShortcuts = installShortcuts({ search: focusSearch, newRun });
+  const removeShortcuts = installShortcuts({ search: focusSearch, newRun, appearance: openAppearance, nextScheme: cycleScheme });
   apply();
 
   return {

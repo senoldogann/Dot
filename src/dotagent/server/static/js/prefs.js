@@ -26,6 +26,16 @@ export function writePref(key, value) {
   }
 }
 
+/** Forget a preference, so that it reads as never saved. */
+export function removePref(key) {
+  setHere.delete(key);
+  try {
+    localStorage.removeItem(key);
+  } catch {
+    // Same as above: only the page's own copy is gone.
+  }
+}
+
 /** The sections folded under the preference `key` (`{ [section]: true }`), as saved; anything unreadable counts as nothing
  * folded. */
 export function readFolds(key) {

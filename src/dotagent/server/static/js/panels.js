@@ -5,6 +5,7 @@ import { setStageTitle } from "./stage.js";
 import { el } from "./dom.js";
 import { icon } from "./icons.js";
 import { readPref, writePref } from "./prefs.js";
+import { attempt } from "./ui.js";
 
 const STATUS_LABEL = { blocked: "waiting" };
 const FOLD_KEY_PREFIX = "dot.fold.";
@@ -176,4 +177,35 @@ export function field(label, control, hint) {
     control,
     hint === "" ? null : el("span", { class: "hint" }, hint),
   );
+}
+
+/**
+ * A labelled on/off switch; `write` may be asynchronous. `paint()` shows the current `read()` again after something else
+ * changed it; `toggle` and `note` are the button and the hint line, for settings that depend on more than their value.
+ */
+export function switchSetting({ label, hint, read, write, onToggled }) {
+  const toggle = el("button", {
+    class: "switch",
+    type: "button",
+    role: "switch",
+    "aria-checked": "false",
+    "aria-label": label,
+    // Repainted from what was stored even when the switch failed half way (notifications on, push refused).
+    onclick: () =>
+      attempt(async () => {
+        try {
+          await write(!read());
+        } finally {
+          onToggled();
+        }
+      }),
+  });
+  const note = el("div", { class: "hint" }, hint);
+  const element = el("div", { class: "setting" }, el("div", { class: "row" }, el("span", { class: "grow" }, label), toggle), note);
+  return {
+    element,
+    toggle,
+    note,
+    paint: () => toggle.setAttribute("aria-checked", String(read())),
+  };
 }

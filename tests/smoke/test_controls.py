@@ -117,7 +117,7 @@ async def test_every_control_draws_in_both_looks_wide_and_on_a_phone_at_both_den
 
             page = await browser.new_page(viewport={"width": 1280, "height": 900}, color_scheme="light")
             await page.goto(ui_url(host, port, TOKEN))
-            await page.goto(f"{base}/#/settings/general")
+            await page.goto(f"{base}/#/settings/appearance")
             await expect(page.locator("html")).to_have_attribute("data-density", "comfortable")
             await page.get_by_role("group", name="Density").get_by_role("button", name="Compact").click()
             await expect(page.locator("html")).to_have_attribute("data-density", "compact")
@@ -131,7 +131,7 @@ async def test_every_control_draws_in_both_looks_wide_and_on_a_phone_at_both_den
             # The owner holds a colour scheme: Dark on a light system darkens the page at once and after a reload.
             page = await browser.new_page(viewport={"width": 1280, "height": 900}, color_scheme="light")
             await page.goto(ui_url(host, port, TOKEN))
-            await page.goto(f"{base}/#/settings/general")
+            await page.goto(f"{base}/#/settings/appearance")
             await expect(page.locator("html")).not_to_have_attribute("data-scheme", re.compile(".+"))
             assert await page.evaluate(_LUMINANCE) > 0.8
             await page.get_by_role("group", name="Colour scheme").get_by_role("button", name="Dark").click()
