@@ -273,14 +273,18 @@ async def open_runtime(config: AppConfig, login_env: dict[str, str]) -> Runtime:
 
 
 async def close_runtime(runtime: Runtime) -> None:
-    await runtime.terminals.aclose()
-    await runtime.desktop.close()
-    await runtime.browsers.aclose()
-    await runtime.mcp.close()
-    await runtime.web.aclose()
-    await runtime.router.aclose()
-    await runtime.judge.aclose()
-    if runtime.typesafe is not None:
-        await runtime.typesafe.aclose()
-    await close_memory_index(runtime.memory)
-    await runtime.store.close()
+    """Close every part of the runtime: the terminals first, the store last. A part that fails to close does not keep
+    the ones after it open; the error is raised once all were tried."""
+    async with AsyncExitStack() as closing:
+        # Callbacks run last pushed first.
+        closing.push_async_callback(runtime.store.close)
+        closing.push_async_callback(close_memory_index, runtime.memory)
+        if runtime.typesafe is not None:
+            closing.push_async_callback(runtime.typesafe.aclose)
+        closing.push_async_callback(runtime.judge.aclose)
+        closing.push_async_callback(runtime.router.aclose)
+        closing.push_async_callback(runtime.web.aclose)
+        closing.push_async_callback(runtime.mcp.close)
+        closing.push_async_callback(runtime.browsers.aclose)
+        closing.push_async_callback(runtime.desktop.close)
+        closing.push_async_callback(runtime.terminals.aclose)

@@ -346,9 +346,16 @@ class BrowserSession:
             profile=str(self._profile),
             keychain=keychain,
         )
-        self._chrome_pid = None if config.headless else await asyncio.to_thread(chrome_to_watch, self._profile)
-        if earlier is not None:
-            await asyncio.to_thread(give_focus_back, earlier)
+        # Until the session holds the context, nothing else would close this Chrome: one that is left running keeps
+        # the profile locked, and every later launch is refused.
+        try:
+            self._chrome_pid = None if config.headless else await asyncio.to_thread(chrome_to_watch, self._profile)
+            if earlier is not None:
+                await asyncio.to_thread(give_focus_back, earlier)
+        except BaseException:
+            self._chrome_pid = None
+            await context.close()
+            raise
         return _Opened(context=context, spare_pages=tuple(context.pages))
 
     async def _attach(self) -> _Opened:
@@ -530,13 +537,18 @@ class BrowserSession:
             _log.warning("browser_detach_failed", error=truncate_middle(str(error), _LAUNCH_ERROR_CHARS))
 
     async def _reap_idle(self) -> None:
+        """Release the tabs of the threads not used for ``tab_idle_s``, as long as the session is open. A thread whose
+        tabs cannot be released is logged and tried again at the next round, and the others are still released."""
         while True:
             await asyncio.sleep(_REAP_INTERVAL_S)
             cutoff: float = time.monotonic() - self._config.tab_idle_s
             for thread_id, thread in list(self._threads.items()):
                 if thread.last_used < cutoff and not thread.lock.locked():
                     _log.info("browser_idle_thread_released", thread_id=thread_id)
-                    await self.release_thread(thread_id)
+                    try:
+                        await self.release_thread(thread_id)
+                    except Exception:
+                        _log.exception("browser_idle_release_failed", thread_id=thread_id)
 
     async def attachment(self) -> Attachment:
         """The Chrome of the user that this session works in; connects first when it is not connected yet."""

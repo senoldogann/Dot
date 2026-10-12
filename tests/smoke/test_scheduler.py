@@ -24,6 +24,7 @@ from dotagent.config import ModelsConfig, load_config
 from dotagent.core.errors import ConfigError, StoreError, ToolExecutionError, ToolInputError
 from dotagent.core.paths import failsafe_path, workspace_dir
 from dotagent.core.types import JsonObject
+from dotagent.events import EventBus
 from dotagent.llm.types import Effort
 from dotagent.policy.types import ActionInfo, ApprovalMode
 from dotagent.runtime import Runtime, build_runtime, close_runtime
@@ -272,6 +273,27 @@ async def test_a_firing_that_cannot_start_leaves_no_thread_behind(runtime: Runti
     assert failed.last_status.startswith("failed to start: a model reference must look like")
     assert failed.next_run_at == next_firing("0 9 * * *", now, runtime.schedule_zone)
     assert len(await runtime.store.list_threads(1000)) == threads_before
+
+
+class _QueueFails(EventBus):
+    """A bus whose store fails as a run is queued: the run's record is made, and its start fails after."""
+
+    async def emit(self, run_id: str, kind: str, data: JsonObject, persist: bool) -> EventRecord:
+        if kind == "run_queued":
+            raise StoreError("the database is locked", {"run_id": run_id})
+        return await super().emit(run_id, kind, data, persist)
+
+
+async def test_a_firing_whose_run_fails_after_it_was_made_leaves_no_run_behind(runtime: Runtime) -> None:
+    failing: Runtime = dataclasses.replace(runtime, bus=_QueueFails(runtime.store))
+    runs_before: int = len(await runtime.store.list_runs(1000, None))
+
+    recurring: ScheduleRecord = await _schedule(runtime, _cron("Queue fails", "0 9 * * *"))
+    await Scheduler(failing, RunManager(failing)).tick(_planned(recurring) + 5)
+
+    failed: ScheduleRecord = await runtime.store.get_schedule(recurring.id)
+    assert failed.last_status == "failed to start: the database is locked"
+    assert len(await runtime.store.list_runs(1000, None)) == runs_before
 
 
 class _OwnerSwitchesTheOtherOff(RunManager):

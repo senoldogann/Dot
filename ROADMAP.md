@@ -5057,8 +5057,8 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 134 | The traffic lights on the line of the top bars                                       | done        | a5b0220 |
 | 135 | What a run may change, send and open                                                 | done        | cb76e7d |
 | 136 | Spending, pacing and stops when two things happen at once                            | done        | bb18c32 |
-| 137 | A reply cut off is not an answer                                                     | in progress |         |
-| 138 | The store and the daemon's plumbing                                                  | planned     |         |
+| 137 | A reply cut off is not an answer                                                     | done        | 43cf3f9 |
+| 138 | The store and the daemon's plumbing                                                  | in progress |         |
 | 139 | The web UI and the desktop shell                                                     | planned     |         |
 
 ### 77. The type system: Inter and Geist Mono, seven sizes, three weights
@@ -7759,7 +7759,7 @@ end cannot be recorded says so; a message sent while a run shuts down is not los
 
 ### 137. A reply cut off is not an answer
 
-**Status: in progress.**
+**Status: done.** Merged as `43cf3f9` (PR #171, MYP-278 Done).
 
 **As built (2026-10-12).** A reply without tool calls that the model service ended before it was complete, at its output
 limit (the finish `length`: the service's own `length`, `max_tokens`, `max_output_tokens` or
@@ -7778,7 +7778,29 @@ the run's last answer: the loop asks the model to go on, or ends the run saying 
 
 ### 138. The store and the daemon's plumbing
 
-**Status: planned.**
+**Status: in progress.**
+
+**As built (2026-10-12).** Every write of the store that fails or is cancelled part way is rolled back before its error
+goes on (`_writing`), so no part of it waits in an open transaction for the next writer's commit; the waits for a lock
+another process holds stay as they were. Dot's own Chrome is closed when a step after its start fails or is cancelled,
+instead of being left running with its profile locked until the daemon restarts. The numbers of the configuration that
+would stop the daemon are refused when it is read: below 1 for the runs, the tools and the calls at once, the tries and
+the tabs, 0 or less for the timeouts and the scheduler's tick, a port outside 1 to 65535. A screenshot is written to a
+file of its own that then takes its name, and a file under that name whose size is not the image's is written again. The
+push sender and the stream of lifecycle events listen to their own kinds only (`EventBus.subscribe_kinds`), so the live
+text of busy runs no longer pushes a question or an end out of their queue, and a listener that falls behind logs it
+once (`event_listener_fell_behind`). The reapers of idle tabs and terminals log a failure and go on with the others;
+closing the runtime, the browser pool and the terminals tries every part and raises after (`AsyncExitStack`). A restart
+gives `run_finished` to the runs it closes and to older closed runs that still have events, so a prune is not undone;
+the runs are indexed by chat, by the run that delegated them and by agent, the approvals by status; the columns, the
+backfill and the indexes an older database gains are one transaction. A campaign, session or schedule whose start fails
+after its run was made deletes the run with the thread (`delete_threads`; `delete_thread` is gone). `POST /api/runs`
+refuses `standing` with `agent_id` and `browser` without `standing` (422). An upload named like a file Dot keeps next to
+it (`meta.json`, `text.txt`, in any case) gets an underscore before its name. Tests: a write stopped part way; a
+screenshot left cut short; a run whose events were pruned; the indexes; the bounds; a listener of a few kinds while runs
+stream; a firing whose run fails after it was made; the start requests; the upload names. Each fails on the code of
+before. Not tested: the Chrome closed after a failed step (only a visible Chrome has a step there) and the transaction
+of the migration.
 
 **What.** A write of several statements that is cancelled midway leaves no transaction open; a Chrome started for a run
 that is cancelled meanwhile is closed, not lost; the configuration's numbers are held to sensible bounds when it is
@@ -8370,3 +8392,4 @@ token.
 - 2026-10-12 (Opus 5.5): part 22 planned, items 135 to 139, from the owner's word asking for a check of everything written so far: four reviews of the code by area, each finding read again in the code and ranked by weight, the offline smoke suite on main and the dependencies against the advisories; the fixes follow in that order, one pull request each.
 - 2026-10-12 (Opus 5.5): item 135 merged as `cb76e7d` (PR #169, MYP-276 Done): Dot's own folders (what it loads and runs, and the emergency stop's file) are a path class of their own, read like the home folder and changed like a protected location; the shell guard learns more write targets; a new flag, `upload`, asks before a shell line sends data out once the run has read untrusted content; an agent answers a message in the stricter of its approvals and the sender's; the browser never opens Dot's own interface and the desktop tools never act in Dot's own window outside `yolo`; `truncate` outside the workspace is destructive.
 - 2026-10-12 (Opus 5.5): item 136 merged as `bb18c32` (PR #170, MYP-277 Done): the gates of all runs share one lock per site for its pace and one for its spending, so two runs that pay or post on one site at once are judged one after the other; the emergency stop ends every active run as an emergency stop, and while it is engaged no schedule fires and no campaign session starts; a run stopped before its first step ends as any stop does; a takeover brings up the run's own browser and frees the run when that fails; a schedule or a campaign changed while its run was being started is read again first; a run whose end cannot be recorded is logged and freed, and a message sent as a run ends is refused instead of dropped.
+- 2026-10-12 (Opus 5.5): item 137 merged as `43cf3f9` (PR #171, MYP-278 Done): a reply without tool calls that the model service cut short, at its output limit or for an abnormal reason such as a content filter, is no longer taken as the run's answer in any mode: the model is told how the reply ended and asked to go on or answer again in fewer words, each such reply counts as a nudge, and a run whose replies keep being cut short fails saying so (the ending `cut_short`); an empty reason of Ollama is a normal stop.

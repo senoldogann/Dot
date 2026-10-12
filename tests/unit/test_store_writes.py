@@ -6,9 +6,21 @@ import sqlite3
 import threading
 from pathlib import Path
 
+import pytest
+
 from dotagent.llm.types import user_message
-from dotagent.store.db import Store
-from dotagent.store.models import ThreadRecord
+from dotagent.store.db import Store, _writing
+from dotagent.store.models import RunRecord, ThreadRecord
+
+
+class _CutShort(Store):
+    """A store with a write that changes a run, then waits until it is cancelled: a write stopped part way."""
+
+    @_writing
+    async def change_then_wait(self, run_id: str, changed: asyncio.Event) -> None:
+        await self._db.execute("UPDATE runs SET steps = 99 WHERE id = ?", (run_id,))
+        changed.set()
+        await asyncio.Event().wait()
 
 
 async def _runs_and_thread(store: Store) -> tuple[ThreadRecord, str]:
@@ -62,5 +74,24 @@ async def test_a_lock_held_by_another_process_is_waited_out(tmp_path: Path) -> N
         holder.join(5.0)
         run = await store.get_run(run_id)
         assert (run.input_tokens, run.output_tokens) == (5, 1)
+    finally:
+        await store.close()
+
+
+async def test_a_write_stopped_part_way_leaves_nothing_for_the_next_commit(tmp_path: Path) -> None:
+    store: Store = await _CutShort.open(tmp_path / "dot.db", tmp_path / "images")
+    assert isinstance(store, _CutShort)
+    try:
+        _, run_id = await _runs_and_thread(store)
+        changed: asyncio.Event = asyncio.Event()
+        write: asyncio.Task[None] = asyncio.create_task(store.change_then_wait(run_id, changed))
+        await changed.wait()
+        write.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await write
+        # The next writer commits its own change, and nothing of the stopped one.
+        await store.add_run_tokens(run_id, 10, 1)
+        run: RunRecord = await store.get_run(run_id)
+        assert (run.steps, run.input_tokens) == (0, 10)
     finally:
         await store.close()

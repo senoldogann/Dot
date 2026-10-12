@@ -6,6 +6,7 @@ A session in a mode starts or connects with the first call that needs it; the po
 pool closes every session.
 """
 
+from contextlib import AsyncExitStack
 from pathlib import Path
 
 from dotagent.browser.modes import browser_data_dir
@@ -39,6 +40,9 @@ class BrowserPool:
         return found
 
     async def aclose(self) -> None:
-        await self.main.aclose()
-        for session in self._others.values():
-            await session.aclose()
+        """Close every session; one that fails to close does not keep the others open (the error is raised once all
+        were tried)."""
+        async with AsyncExitStack() as closing:
+            closing.push_async_callback(self.main.aclose)
+            for session in self._others.values():
+                closing.push_async_callback(session.aclose)

@@ -291,7 +291,8 @@ answer (a small model that is offered both writes the call out as text).
 - Files can go with a goal or a steering message (attach, drop or paste them in the web UI; at most 10 of 20 MB each).
   Text, code and PDF files are put into the message as text (a long one shortened, with its path to read the rest),
   images go to the model as images or, for a model that cannot see, as the `vision` model's description. Anything else
-  is refused at upload. The files are kept in `workspace/attachments/`, where the agent's tools can open them.
+  is refused at upload. The files are kept in `workspace/attachments/`, where the agent's tools can open them; one
+  named like a file Dot keeps next to it (`meta.json`, `text.txt`) gets an underscore before its name.
 
 ## Tools
 
@@ -1570,7 +1571,8 @@ arXiv 2609.20804: `context_elide_share` (0.6, past which older tool output is sh
 (0.85 of the configured budget, past which the older part of the run is summarised) and `plan_each_turn` (on: the open plan is appended to
 the system message of every step). The API: `GET /api/agents` (Dot first,
 each agent with its newest run), `POST /api/agents`, `GET`/`PUT`/`DELETE /api/agents/{id}` (Dot is neither changed
-nor deleted), `GET /api/tools` (the names an agent may be given), and `POST /api/runs` with `agent_id`.
+nor deleted), `GET /api/tools` (the names an agent may be given), and `POST /api/runs` with `agent_id` (not with
+`standing`: a campaign is Dot's own, and the two together are refused with a 422).
 
 ## Campaigns
 
@@ -1628,10 +1630,11 @@ your conversation; the daemon runs the sessions after it, each a run in a thread
   the model keeps the decision.
 
 **The browser of a campaign.** A campaign works in the Chrome you have open, signed in as you are (`attach`), unless you
-start it with `--browser own` (or `browser` in the API), and `[agent] campaign_browser` sets the default; runs you start
-by hand keep `[browser] mode`. A campaign that asks for your Chrome is refused at its start while that Chrome is closed
-or does not allow the connection (`dotx browser attach` sets it up), so its sessions do not fail one after the other.
-The brief of every session says which Chrome it works in, and so do `dotx campaign show` and the campaign's page.
+start it with `--browser own` (or `browser` in the API, which goes with `standing` only), and `[agent] campaign_browser`
+sets the default; runs you start by hand keep `[browser] mode`. A campaign that asks for your Chrome is refused at its
+start while that Chrome is closed or does not allow the connection (`dotx browser attach` sets it up), so its sessions
+do not fail one after the other. The brief of every session says which Chrome it works in, and so do
+`dotx campaign show` and the campaign's page.
 
 Every session runs with the model, reasoning level and approval mode the campaign started with, and without goal mode:
 the campaign's own check takes its place, so starting one with goal mode on is refused. A run's limits
@@ -1731,8 +1734,10 @@ cannot choose: a task run's helper can do what the task run can, a research run'
 ## Configuration
 
 `config.toml` in the home directory is merged over the packaged `src/dotagent/defaults.toml`, which lists every key with
-a comment and is the reference. A key that does not exist is an error. Two environment variables of the process move
-things: `DOT_HOME` (the home directory) and `DOT_LOG_DIR` (the logs).
+a comment and is the reference. A key that does not exist is an error, and so is a number that would stop Dot from
+working: a count of runs, tools, tabs, tries or calls at once below 1, a timeout or the scheduler's tick of 0 or less,
+a port outside 1 to 65535. Two environment variables of the process move things: `DOT_HOME` (the home directory) and
+`DOT_LOG_DIR` (the logs).
 
 | Path (under `~/Library/Application Support/Dot`) | Content                                                              |
 | ------------------------------------------------ | -------------------------------------------------------------------- |

@@ -22,7 +22,7 @@ class ServerConfig(FrozenModel):
     request with such a ``Host``, and an ``Origin`` of ``https://`` that host, is served like a local one."""
 
     host: str
-    port: int
+    port: int = Field(ge=1, le=65535)
     reach: list[str]
 
 
@@ -39,10 +39,10 @@ class OllamaConfig(FrozenModel):
     num_ctx: int
     num_ctx_cloud: int
     keep_alive: str
-    connect_timeout_s: float
-    read_timeout_s: float
-    attempts: int
-    max_concurrent: int
+    connect_timeout_s: float = Field(gt=0, allow_inf_nan=False)
+    read_timeout_s: float = Field(gt=0, allow_inf_nan=False)
+    attempts: int = Field(ge=1)
+    max_concurrent: int = Field(ge=1)
 
 
 type GoRoute = Literal["chat", "responses", "messages"]
@@ -54,29 +54,29 @@ class OpenAIConfig(FrozenModel):
     organization_env: str
     project_env: str
     wire: Literal["responses", "chat"]
-    connect_timeout_s: float
-    read_timeout_s: float
-    attempts: int
-    max_concurrent: int
+    connect_timeout_s: float = Field(gt=0, allow_inf_nan=False)
+    read_timeout_s: float = Field(gt=0, allow_inf_nan=False)
+    attempts: int = Field(ge=1)
+    max_concurrent: int = Field(ge=1)
 
 
 class OpenCodeGoConfig(FrozenModel):
     base_url: str
     api_key_env: str
     route_overrides: dict[str, GoRoute]
-    connect_timeout_s: float
-    read_timeout_s: float
-    attempts: int
-    max_concurrent: int
+    connect_timeout_s: float = Field(gt=0, allow_inf_nan=False)
+    read_timeout_s: float = Field(gt=0, allow_inf_nan=False)
+    attempts: int = Field(ge=1)
+    max_concurrent: int = Field(ge=1)
 
 
 class AnthropicConfig(FrozenModel):
     base_url: str
     api_key_env: str
-    connect_timeout_s: float
-    read_timeout_s: float
-    attempts: int
-    max_concurrent: int
+    connect_timeout_s: float = Field(gt=0, allow_inf_nan=False)
+    read_timeout_s: float = Field(gt=0, allow_inf_nan=False)
+    attempts: int = Field(ge=1)
+    max_concurrent: int = Field(ge=1)
 
 
 class ProvidersConfig(FrozenModel):
@@ -137,9 +137,9 @@ class AgentConfig(FrozenModel):
     revisit_window: int
     finish_nudges: int
     questions: QuestionMode
-    parallel_tools: int
-    model_call_timeout_s: float
-    max_concurrent_runs: int
+    parallel_tools: int = Field(ge=1)
+    model_call_timeout_s: float = Field(gt=0, allow_inf_nan=False)
+    max_concurrent_runs: int = Field(ge=1)
     scaffold: ScaffoldMode
     tiers: dict[str, Tier]
     profile_min_calls: int
@@ -197,7 +197,7 @@ class PolicyConfig(FrozenModel):
 
     preset: Preset
     approvals: ApprovalMode
-    approval_timeout_s: float
+    approval_timeout_s: float = Field(gt=0, allow_inf_nan=False)
     protected_paths: list[str]
     code_sources: list[Literal["mail", "messages"]]
     spend: dict[str, SpendCap]
@@ -206,15 +206,15 @@ class PolicyConfig(FrozenModel):
 
 class BrowserConfig(FrozenModel):
     mode: BrowserMode
-    attach_timeout_s: float
+    attach_timeout_s: float = Field(gt=0, allow_inf_nan=False)
     channel: str
     headless: bool
     # Whether Dot's Chrome is brought to the front while a run works (item 97); Take over brings it either way.
     raise_window: bool
     viewport_width: int
     viewport_height: int
-    navigation_timeout_s: float
-    action_timeout_s: float
+    navigation_timeout_s: float = Field(gt=0, allow_inf_nan=False)
+    action_timeout_s: float = Field(gt=0, allow_inf_nan=False)
     snapshot_max_chars: int
     viewport_margin_px: int
     settle_quiet_ms: int
@@ -222,8 +222,8 @@ class BrowserConfig(FrozenModel):
     side_effect_grace_ms: int
     navigation_attempts: int
     navigation_backoff_ms: int
-    max_tabs: int
-    tab_idle_s: float
+    max_tabs: int = Field(ge=1)
+    tab_idle_s: float = Field(gt=0, allow_inf_nan=False)
     screenshot_quality: int
     max_batch_steps: int
     read_text_chars: int
@@ -322,7 +322,7 @@ class WebConfig(FrozenModel):
 
 class SchedulerConfig(FrozenModel):
     timezone: str
-    tick_s: float
+    tick_s: float = Field(gt=0, allow_inf_nan=False)
     min_interval_s: int
     misfire_grace_s: int
     max_schedules: int

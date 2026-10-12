@@ -115,6 +115,13 @@ def _text_of(name: str, kind: AttachmentKind, data: bytes) -> str:
         raise InvalidValueError(f"the PDF cannot be read: {error.message}", {"name": name, **error.context}) from error
 
 
+def _upload_name(name: str) -> str:
+    """The name an upload is kept under in its folder: its own, made safe, with an underscore before it when it would
+    take the name of a file Dot keeps next to it (in any case: the Mac's disk does not tell case apart)."""
+    safe: str = safe_download_name(name)
+    return f"_{safe}" if safe.lower() in (_META, _TEXT) else safe
+
+
 def store_attachment(workspace: Path, name: str, media_type: str, data: bytes) -> StoredAttachment:
     """Check an upload and keep it in the workspace. Blocking file work: call it off the event loop."""
     if not data:
@@ -132,7 +139,7 @@ def store_attachment(workspace: Path, name: str, media_type: str, data: bytes) -
     attachment_id: str = new_id("att")
     folder: Path = attachments_root(workspace) / attachment_id
     folder.mkdir(parents=True)
-    path: Path = folder / safe_download_name(name)
+    path: Path = folder / _upload_name(name)
     path.write_bytes(data)
     if kind != "image":
         (folder / _TEXT).write_text(text, encoding="utf-8")

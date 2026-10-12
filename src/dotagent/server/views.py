@@ -106,6 +106,14 @@ class StartRunRequest(FrozenModel):
     agent_id: str | None = None
     attachments: list[str] = Field(default_factory=list, max_length=MAX_ATTACHMENTS)
 
+    @model_validator(mode="after")
+    def _fits_standing(self) -> Self:
+        if self.standing and self.agent_id is not None:
+            raise ValueError("a campaign (standing) is Dot's own: it cannot be started for an agent")
+        if self.browser is not None and not self.standing:
+            raise ValueError("browser chooses the Chrome of a campaign: it goes with standing only")
+        return self
+
 
 class DeleteThreadsRequest(FrozenModel):
     """The chats to delete, by thread id."""

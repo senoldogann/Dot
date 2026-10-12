@@ -171,12 +171,12 @@ async def follow_run(ctx: ServerContext, run_id: str, after: int) -> AsyncIterat
 async def follow_lifecycle(bus: EventBus, stopping: asyncio.Event) -> AsyncIterator[bytes]:
     """The moments at which the runs and approvals of any run change; clients refetch what they show. Ends when the
     daemon starts to stop."""
-    async with bus.subscribe(None) as feed:
+    async with bus.subscribe_kinds(LIFECYCLE_KINDS) as feed:
         while True:
             event: EventRecord | None = await _next_event(feed.queue, stopping)
             if event is None:
                 if stopping.is_set():
                     return
                 yield KEEPALIVE
-            elif event.kind in LIFECYCLE_KINDS:
+            else:
                 yield encode_event(event)
