@@ -5066,7 +5066,7 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 143 | The token goes only to the daemon                                                    | done        | 57180ea |
 | 144 | The records of a run and the emergency stop                                          | done        | c17da1a |
 | 145 | The CI and the desktop shell                                                         | done        | 969d5f0 |
-| 146 | The gaps the final review of part 23 found                                           | in progress |         |
+| 146 | The gaps the final review of part 23 found                                           | done        | e558f21 |
 
 ### 77. The type system: Inter and Geist Mono, seven sizes, three weights
 
@@ -8057,7 +8057,7 @@ spending lock through the run manager, and a migration cut off between its steps
 
 ### 146. The gaps the final review of part 23 found
 
-**Status: in progress.**
+**Status: done.** Merged as `e558f21` (PR #181, MYP-287 Done).
 
 **As built (2026-10-12).** What Dot runs at its start is kept from a run's commands. Dot's own code joins what it loads
 and runs (`_own_code` in `runtime.py`): the folder its package is imported from, the Python environment it runs in
@@ -8668,3 +8668,4 @@ the sandbox does not cover, said in the README.
 - 2026-10-12 (Opus 5.5): item 143 merged as `57180ea` (PR #178, MYP-284 Done): the clients send the token only to a daemon that proves it holds it (`GET /api/proof`): the command line, the desktop shell at each poll and the web UI before each request; CI's desktop job runs `cargo test`; the daemon restarted with it. The shell's part reaches the owner's Mac when the owner rebuilds the desktop app.
 - 2026-10-12 (Opus 5.5): item 144 merged as `c17da1a` (PR #179, MYP-285 Done): every process that drives runs holds an owner lock, and a daemon that starts closes only the runs whose owner is gone; the emergency stop ends a run launched while it came and what the scheduler started meanwhile; and the smaller findings of part 22 (the playbooks, a note saved twice, read-only call groups, the notes' index, screenshots, the log's size, a Chrome launch given up, the browser's bounds, a stream's live state); the daemon restarted with it.
 - 2026-10-12 (Opus 5.5): item 145 merged as `969d5f0` (PR #180, MYP-286 Done): the CI's actions are pinned by commit; only the shell's own pages and those of the daemon's address may call the desktop shell; the Rust crates were checked against the advisories (two, both in the GTK stack built only on Linux); and the two tests part 22 left are in. The shell's part reaches the owner's Mac when the owner rebuilds the desktop app. The final review of the five found every criterion met and five gaps, which item 146 takes.
+- 2026-10-12 (Opus 5.5): item 146 merged as `e558f21` (PR #181, MYP-287 Done): Dot's own code is among what it loads and runs, the daemon's job starts Python with `-P`, the login shell Dot reads at its start runs in the sandbox, a search shows what it found beside the places it may not read, the shell guard reads zsh's redirects past noclobber, and a playbook retired while a run ended is not counted; the daemon restarted with it, its job rewritten. Part 23 is done.
