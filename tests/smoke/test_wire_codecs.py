@@ -23,7 +23,7 @@ from dotagent.llm.codec_responses import ResponsesOptions, build_responses_body,
 from dotagent.llm.connector import StreamCodec
 from dotagent.llm.http import SseEvent, is_retryable_provider_error
 from dotagent.llm.openai import OpenAIProvider, is_chat_model, openai_traits
-from dotagent.llm.opencode_go import CATALOG, OpenCodeGoProvider, go_traits, route_of
+from dotagent.llm.opencode_go import CATALOG, OpenCodeGoProvider, go_free, go_traits, route_of
 from dotagent.llm.provider_errors import WireError, classify_anthropic, classify_openai, classify_opencode
 from dotagent.llm.traits import ModelTraits
 from dotagent.llm.types import (
@@ -439,6 +439,8 @@ def test_messages_body_puts_a_screenshot_inside_its_tool_result() -> None:
 def test_routes_and_traits_follow_catalog_prefix_and_override() -> None:
     assert route_of("grok-4.7", {}) == "responses"
     assert route_of("qwen9-new", {}) == "messages"
+    assert route_of("claude-sonnet-9", {}) == "messages"
+    assert go_free("step-5-preview-free") and not go_free("space-bunny")
     assert route_of("brand-new-model", {}) == "chat"
     assert route_of("brand-new-model", {"brand-new-model": "responses"}) == "responses"
     assert route_of("glm-5.3", {"glm-5.3": "messages"}) == "messages"

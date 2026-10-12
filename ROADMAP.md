@@ -5038,8 +5038,8 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 115 | The composer once more: one bar that never wraps, labels that fold, a quiet warning | done        | a667d39 |
 | 116 | The deep review: every part of the code read once more, and fixed                   | done        | 0304257 |
 | 117 | The helper keeps its parent's rights: a delegated run takes its parent's mode       | done        | e51f9c1 |
-| 118 | Chrome behind: every tab opened in the background, the front given back             | in progress |         |
-| 119 | The models: the prompt cache on OpenCode Go's Messages route, the free ones marked   | planned     |         |
+| 118 | Chrome behind: every tab opened in the background, the front given back             | done        | 6dfbf07 |
+| 119 | The models: the prompt cache on OpenCode Go's Messages route, the free ones marked   | in progress |         |
 | 120 | The run page's head: Stop in the send button's place, the emergency stop in the sidebar | planned     |         |
 | 121 | The calm look, after T3 Code: the sidebar, the chat, the composer and the panel     | planned     |         |
 
@@ -6746,7 +6746,7 @@ refusing the call. Unit tests hold the three.
 
 ### 118. Chrome behind: every tab opened in the background, the front given back
 
-**Status: in progress.**
+**Status: done.** Merged as `6dfbf07` (PR #141, MYP-258 Done).
 
 **As built (2026-10-12).** Every tab Dot opens is made by `_background_tab`: a target created through a browser CDP
 session with `background: true` (Playwright 1.63 hands the browser of a persistent context too). A quiet read's scratch
@@ -6777,7 +6777,26 @@ holds that opening tabs, reading pages and a page's own tab leave the front wher
 
 ### 119. The models: the prompt cache on OpenCode Go's Messages route, the free ones marked
 
-**Status: planned.**
+**Status: in progress.**
+
+**As built (2026-10-12).** `_MESSAGES_OPTIONS` sends the automatic cache mark (`prompt_cache=True`). Measured on Go the
+same day: Claude Haiku 5.5 read a repeated prompt of ten thousand tokens from the cache only with the mark (10,383
+tokens on the second call, none without it), Qwen 3.8 Flash caches by itself and with the mark, and MiniMax M3 takes the
+mark; the Chat Completions route caches by itself (DeepSeek V4.1 Flash read 7,552 tokens on a second call). Reading Go's
+model list for this found Claude Haiku 5.5 on it, which Dot sent to the Chat Completions route by its unknown name,
+where it answered 400 (`ModelProtocolUnsupported`). The catalog has it now on the Messages route, with the facts of
+OpenCode's own catalog on models.dev (pictures, a million tokens in, 128,000 out, thinking as a switch, no temperature),
+and a new `claude-` model goes there by its name. The catalog follows Go's list otherwise too: `space-bunny-free` is
+`space-bunny` now, and `step-5-preview-free`, `qwen3.7-max` and `qwen3.6-plus` are in it with their facts; the other new
+ids answer on the route Dot picks by name (checked one by one). `ModelInfo` and the pickers' `ModelOption` carry `free`
+(Go's ids that end in `-free`): the model picker's row says Free, and Settings › Models shows a free chip. Zen's free
+models stay out: every call to them from a client other than OpenCode's own answered 403 `FreeTierError`, with a key and
+without, and Dot does not pose as OpenCode's client. Claude on Anthropic's own API caches already, and its fast mode
+stays off until the owner asks for it. The README's OpenCode Go passage says all this.
+`tests/smoke/test_hosted_services.py` adds Claude on Go's Messages route to the round trip and a test that reads the
+cached tokens of a second call; with the key both pass, as does the route check of `test_wire_codecs.py`; the smoke
+tests of the helpers, the server and the composer pass (38, without the eleven that call a cloud model), and so do the
+906 unit tests.
 
 **What.** OpenCode Go's Messages route sends the automatic cache mark (`_MESSAGES_OPTIONS`), so Claude Haiku 5.5, Qwen
 and MiniMax on Go read a run's prompt from the cache from its second step: a faster first token on a long prompt and a
@@ -7358,3 +7377,4 @@ states. The tour is read by eye at both widths and in both schemes.
 - 2026-10-12 (Opus 5.5): item 115 merged as `a667d39` (PR #137, MYP-255 Done): one composer frame on a 20 px corner with a box of one line, one bar that never wraps (its labels fold by container queries), round pills on no ground, YOLO in the warn ink without a fill, the agent pick a pill with a menu, a quiet send while the box is empty, Keep going's note under the frame.
 - 2026-10-12 (Opus 5.5): item 116 merged as `0304257` (PR #138, MYP-256 Done): the shell guard reads a line as the shell does (comments, `$'…'`, here-documents, arithmetic, each substituted command judged on its own, the directories, variables and links a line sets up, paths without regard to case, unreadable code asked about), the terminal's and the desktop's typing judged by the line it runs, a network fetch marks the run untrusted, and what four readers found in the agent, the tools, the server and the interface fixed; 903 unit tests, 84 smoke tests, the eval check and the tour read by eye; the daemon restarted on it with no run active.
 - 2026-10-12 (Opus 5.5): item 117 merged as `e51f9c1` (PR #140, MYP-257 Done): `delegate` has no `mode` and its run takes its parent's (a research run's helper is research, every other run's a task), so a yolo task run's helper has every right its parent has; `web_extract` keeps a field answered without a quote as an unverified value instead of failing the extraction; plan step evidence is cut at 400 characters instead of refused; 906 unit tests, 18 smoke tests, the eval check.
+- 2026-10-12 (Opus 5.5): item 118 merged as `6dfbf07` (PR #141, MYP-258 Done): every tab Dot opens is a background CDP target with a mark of its own (tabs made at the same time no longer share a page, a race the user's Chrome had since item 98), a tab a page opens itself gives the front back to the application that had it (with Accessibility), and `raise_window` keeps the tabs in front as before; 906 unit tests, 71 browser smoke tests.

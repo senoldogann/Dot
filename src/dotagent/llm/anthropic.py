@@ -113,7 +113,7 @@ class AnthropicProvider:
         return traits
 
     async def model_info(self, model: str) -> ModelInfo:
-        return info_from_traits(model, await self._traits(model))
+        return info_from_traits(model, await self._traits(model), False)
 
     async def list_models(self) -> tuple[ModelInfo, ...]:
         """Every model the key can use, read page by page; their traits are kept for the requests that follow."""
@@ -133,7 +133,7 @@ class AnthropicProvider:
                 )
             after = last
         self._traits_cache |= {model: claude_traits(entry) for model, entry in entries.items()}
-        return tuple(info_from_traits(model, self._traits_cache[model]) for model in sorted(entries))
+        return tuple(info_from_traits(model, self._traits_cache[model], False) for model in sorted(entries))
 
     async def complete(self, request: ChatRequest, sink: DeltaSink) -> ModelReply:
         traits: ModelTraits = await self._traits(request.model)

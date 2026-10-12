@@ -34,7 +34,7 @@ MEASURED: AgentConfig = DEFAULTS.model_copy(update={"scaffold": "measured"})
 
 
 def _info(window: int | None) -> ModelInfo:
-    return ModelInfo(id="m", vision=False, tools=True, thinking=False, context_length=window, efforts=())
+    return ModelInfo(id="m", vision=False, tools=True, thinking=False, context_length=window, efforts=(), free=False)
 
 
 def _profile(model: str, tool_calls: int, refused_calls: int) -> ModelProfile:

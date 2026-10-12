@@ -107,7 +107,7 @@ def efforts_of(traits: ModelTraits) -> tuple[Effort, ...]:
     return effort_ladder(traits.efforts) if traits.reasoning else ()
 
 
-def info_from_traits(model: str, traits: ModelTraits) -> ModelInfo:
+def info_from_traits(model: str, traits: ModelTraits, free: bool) -> ModelInfo:
     return ModelInfo(
         id=model,
         vision=traits.vision,
@@ -115,4 +115,5 @@ def info_from_traits(model: str, traits: ModelTraits) -> ModelInfo:
         thinking=traits.reasoning,
         context_length=traits.context_length,
         efforts=efforts_of(traits),
+        free=free,
     )

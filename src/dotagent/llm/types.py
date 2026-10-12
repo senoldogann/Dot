@@ -88,7 +88,8 @@ class StreamDelta(FrozenModel):
 
 class ModelInfo(FrozenModel):
     """What a model offers. ``context_length`` is the number of tokens one request (prompt and reply) can hold, ``None``
-    when the provider does not say. ``efforts`` are its reasoning levels, lowest first; fewer than two means no choice."""
+    when the provider does not say. ``efforts`` are its reasoning levels, lowest first; fewer than two means no choice.
+    ``free``: the provider serves it at no cost."""
 
     id: str
     vision: bool
@@ -96,6 +97,7 @@ class ModelInfo(FrozenModel):
     thinking: bool
     context_length: int | None
     efforts: tuple[Effort, ...]
+    free: bool
 
 
 DeltaSink = Callable[[StreamDelta], Awaitable[None]]

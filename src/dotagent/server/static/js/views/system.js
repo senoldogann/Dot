@@ -395,6 +395,7 @@ function capabilities(model) {
     model.vision ? el("span", { class: "chip" }, "vision") : null,
     model.tools ? el("span", { class: "chip" }, "tools") : null,
     model.thinking ? el("span", { class: "chip" }, "thinking") : null,
+    model.free ? el("span", { class: "chip" }, "free") : null,
   );
 }
 

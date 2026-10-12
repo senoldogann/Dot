@@ -255,7 +255,7 @@ function buildComposer(ctx, listener) {
     for (const group of toolGroups(providers)) {
       list.append(el("div", { class: "pop-group" }, providerLabel(group.provider)));
       for (const info of group.models) {
-        const row = optionRow({ lead: providerMark(group.provider), label: modelName(info.ref), hint: "", selected: chosenRef === info.ref, onPick: () => pickModel(info.ref) });
+        const row = optionRow({ lead: providerMark(group.provider), label: modelName(info.ref), hint: info.free ? "Free" : "", selected: chosenRef === info.ref, onPick: () => pickModel(info.ref) });
         row.title = info.ref;
         list.append(row);
       }

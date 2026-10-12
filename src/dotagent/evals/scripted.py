@@ -51,7 +51,9 @@ class ScriptedProvider:
         )
 
     async def model_info(self, model: str) -> ModelInfo:
-        return ModelInfo(id=model, vision=False, tools=True, thinking=False, context_length=_CONTEXT_LENGTH, efforts=())
+        return ModelInfo(
+            id=model, vision=False, tools=True, thinking=False, context_length=_CONTEXT_LENGTH, efforts=(), free=False
+        )
 
     async def list_models(self) -> tuple[ModelInfo, ...]:
         return (await self.model_info("scripted"),)

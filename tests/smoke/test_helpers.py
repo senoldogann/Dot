@@ -100,6 +100,7 @@ class SpendingProvider:
             thinking=False,
             context_length=128_000,
             efforts=("low", "medium", "high"),
+            free=False,
         )
 
     async def list_models(self) -> tuple[ModelInfo, ...]:
