@@ -489,9 +489,10 @@ untrusted as its parent.
   does it: a script the run wrote, code that builds the path, a link, another letter case. macOS answers
   `Operation not permitted`. The search tools may not read your protected locations either; a command still may (ssh and
   git read their keys there), and for those the guard reads its line. A search that meets a place it may not read shows
-  what it found elsewhere and names the places it did not read. macOS starts no program that runs as root inside the
-  sandbox (`ps`, `top`, `sudo`, `crontab`): `pgrep -lf` and `lsof` work, a `yolo` run runs them,
-  `[shell] sandbox = false` turns the sandbox off.
+  what it found elsewhere and names the places it did not read, as a search of any run does with a folder whose reading
+  macOS broke off (it does now and then under `~/Library/Containers` when the home folder is searched). macOS starts no
+  program that runs as root inside the sandbox (`ps`, `top`, `sudo`, `crontab`): `pgrep -lf` and `lsof` work, a `yolo`
+  run runs them, `[shell] sandbox = false` turns the sandbox off.
 - What Dot runs at its start is kept from a run's commands too: the login shell whose environment it reads runs its
   startup files, which a command may change, in the same sandbox, and the daemon's launchd job starts Python with `-P`,
   so a file a command left in Dot's home, the job's working directory, is never imported (run `dotx service install`
