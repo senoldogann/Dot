@@ -287,6 +287,7 @@ def _summary(row: aiosqlite.Row) -> ThreadSummary:
         latest_run_id=row["latest_run_id"],
         latest_status=row["latest_status"],
         latest_mode=row["latest_mode"],
+        latest_created_at=row["latest_created_at"],
     )
 
 
@@ -688,7 +689,8 @@ class Store:
             " FROM runs WHERE parent_run_id IS NULL"
             " AND (campaign_id IS NULL OR thread_id IN (SELECT thread_id FROM campaigns)))"
             " SELECT t.id, t.title, t.source, t.created_at, MAX(t.updated_at, r.created_at) AS updated_at,"
-            "  r.run_count, r.id AS latest_run_id, r.status AS latest_status, r.mode AS latest_mode"
+            "  r.run_count, r.id AS latest_run_id, r.status AS latest_status, r.mode AS latest_mode,"
+            "  r.created_at AS latest_created_at"
             " FROM threads AS t JOIN ranked AS r ON r.thread_id = t.id AND r.place = 1"
             " ORDER BY updated_at DESC LIMIT ?",
             (limit,),

@@ -179,6 +179,19 @@ export function age(ts) {
   return DAY.format(new Date(ts * 1000));
 }
 
+/** How long something has worked since `ts`, in T3 Code's sidebar units (item 122): "12s", "4m", "1h 5m". */
+export function workingFor(ts) {
+  const seconds = Math.max(0, Math.floor(Date.now() / 1000 - ts));
+  if (seconds < 60) {
+    return `${seconds}s`;
+  }
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) {
+    return `${minutes}m`;
+  }
+  return `${Math.floor(minutes / 60)}h ${minutes % 60}m`;
+}
+
 /** "850 ms", "12.4 s", "3m 05s", "2h 10m" */
 /** The milliseconds of a motion token of the stylesheet ("--motion-base"), for a script that waits for a slide to end. */
 export function motionMs(token) {

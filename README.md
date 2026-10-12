@@ -841,7 +841,10 @@ The web UI is laid out like a chat app: the chats in a sidebar on the left, one 
 page of their own.
 
 The sidebar lists your chats (the conversation threads) grouped by day, newest activity first; a live dot marks those
-with a run going on, waiting for you or failed, and a chat opens at its latest run. Above the list: a search over the titles
+with a run going on, waiting for you or failed, and a chat opens at its latest run. While a chat's latest run works, the
+time at the right of its row gives way to a dashed circle, **Working** and how long since the run was asked for ("12s",
+"4m", "1h 5m", read again every second), as T3 Code's sidebar has it; every run of the Working section says the same, a
+delegated run under its parent too, and a run that waits for you keeps its amber dot and its time. Above the list: a search over the titles
 (⌘K or `/`), **New chat** (⇧⌘O) and the ways to **Agents**, **Activity** and **Campaigns**; in the foot,
 **Settings** and the red square of the **Emergency stop** (which comes along beside the button that shows the sidebar
 while the sidebar is closed). The top bar shows only what needs you: the approvals waiting, and the connection to the

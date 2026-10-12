@@ -1,9 +1,10 @@
 // The sidebar: a new chat, a search over the chats, the ways to the agents, the activity and the campaigns, what waits
 // and what works (folded or not, as the owner left them), the chats themselves (several of them can be deleted at once)
-// and, in the foot, the way to the settings and the emergency stop (item 120).
+// and, in the foot, the way to the settings and the emergency stop (item 120). A row whose run works says Working and
+// for how long (item 122).
 
 import { ApiError, api, request } from "./api.js";
-import { age, clip, clipWords, dateTime, debounce, el, foldSearch, plural } from "./dom.js";
+import { age, clip, clipWords, dateTime, debounce, el, foldSearch, plural, workingFor } from "./dom.js";
 import { failsafeButton } from "./failsafe.js";
 import { icon } from "./icons.js";
 import { actorFace } from "./actors.js";
@@ -34,6 +35,10 @@ const STATUS_WORD = { queued: "queued", running: "running", blocked: "waiting fo
 const BUSY_MESSAGE = "A chat with a run under way cannot be deleted. Wait for the run to end, or cancel it, and try again.";
 // How often the ages at the right of the chats are read again, so a "5m" does not stay while the page rests.
 const AGE_REFRESH_MS = 60_000;
+// The states of a run that works; one that waits for you is "blocked" and keeps its dot and its age.
+const WORKING = new Set(["queued", "running"]);
+// How often the time of a row that works is read again: its seconds count.
+const WORKING_REFRESH_MS = 1000;
 
 function startOfDay(now, daysBack) {
   return new Date(now.getFullYear(), now.getMonth(), now.getDate() - daysBack).getTime() / 1000;
@@ -88,8 +93,20 @@ function mark(node, current) {
   }
 }
 
+/** What a row whose run works shows at its right, where its age sits at rest, as T3 Code's sidebar does (item 122): a
+ * dashed circle, "Working" and the time since the run was asked for, at `since` (seconds). */
+function workingSlot(since) {
+  return el(
+    "span",
+    { class: "side-working", title: `Working since ${dateTime(since)}` },
+    icon("circleDashed"),
+    el("span", null, "Working"),
+    el("span", { class: "side-working-time", "data-since": String(since) }, workingFor(since)),
+  );
+}
+
 /** A chat as a link: it opens on the latest run a person started on it. Its last activity is at the right, in the
- * fewest characters (item 121). */
+ * fewest characters (item 121), or, while its latest run works, Working and for how long (item 122). */
 function chatLink(chat, onNavigate) {
   const word = STATUS_WORD[chat.latest_status];
   const title = clip(chat.title, 120);
@@ -104,12 +121,15 @@ function chatLink(chat, onNavigate) {
     },
     el("span", { class: `status-dot s-${chat.latest_status}` }),
     el("span", { class: "side-run-goal" }, title),
-    el("span", { class: "side-age", "data-ts": String(chat.updated_at), title: dateTime(chat.updated_at) }, age(chat.updated_at)),
+    WORKING.has(chat.latest_status)
+      ? workingSlot(chat.latest_created_at)
+      : el("span", { class: "side-age", "data-ts": String(chat.updated_at), title: dateTime(chat.updated_at) }, age(chat.updated_at)),
   );
 }
 
 /** One row of the activity sections: the state dot, the title and what it needs or where it works. A run that
- * delegated runs says how many; a delegated run (`child`) sits under its parent with its steps. */
+ * delegated runs says how many; a delegated run (`child`) sits under its parent with its steps. A run of the Working
+ * section says Working and for how long at its right (item 122); a schedule due there does not work yet. */
 function activityRow(row, onNavigate, children, child) {
   const detail = child ? progressFacts(row) : [row.channel, row.detail].filter((part) => part !== "");
   const delegated = children === 0 ? [] : [children === 1 ? "1 delegated run" : `${children} delegated runs`];
@@ -133,6 +153,7 @@ function activityRow(row, onNavigate, children, child) {
       el("span", { class: "side-activity-title" }, clipWords(row.title, ROW_WORDS, ROW_CHARS)),
       facts.length === 0 ? null : el("small", { class: "side-activity-detail" }, facts.join(" · ")),
     ),
+    row.section === "working" && row.run_id !== null && WORKING.has(row.status) ? workingSlot(row.since) : null,
   );
 }
 
@@ -631,6 +652,11 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
     ),
     el("div", { class: "side-foot" }, settingsLink, failsafeButton()),
   );
+  const workTicker = setInterval(() => {
+    for (const node of element.querySelectorAll(".side-working-time")) {
+      node.textContent = workingFor(Number(node.dataset.since));
+    }
+  }, WORKING_REFRESH_MS);
 
   return {
     element,
@@ -654,6 +680,7 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
     dispose() {
       disposed = true;
       clearInterval(ageTicker);
+      clearInterval(workTicker);
       stopLifecycle();
       window.removeEventListener("keydown", onEscape);
     },
