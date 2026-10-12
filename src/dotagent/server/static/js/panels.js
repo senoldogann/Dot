@@ -209,3 +209,39 @@ export function switchSetting({ label, hint, read, write, onToggled }) {
     paint: () => toggle.setAttribute("aria-checked", String(read())),
   };
 }
+
+/**
+ * A setting that is a number on a scale (item 127): its label with the value as `format` writes it ("100%", "200 ms")
+ * on one line, the range under them and the hint under that. Every step of a drag is written at once.
+ */
+export function rangeSetting({ label, hint, min, max, step, format, read, write }) {
+  const shown = el("span", { class: "range-value" });
+  const input = el("input", {
+    class: "range",
+    type: "range",
+    min: String(min),
+    max: String(max),
+    step: String(step),
+    "aria-label": label,
+  });
+  function paint() {
+    const value = read();
+    input.value = String(value);
+    input.setAttribute("aria-valuetext", format(value));
+    input.style.setProperty("--range-fill", `${((value - min) / (max - min)) * 100}%`);
+    shown.textContent = format(value);
+  }
+  input.addEventListener("input", () => {
+    write(Number(input.value));
+    paint();
+  });
+  paint();
+  const element = el(
+    "div",
+    { class: "setting" },
+    el("div", { class: "row" }, el("span", { class: "grow" }, label), shown),
+    input,
+    el("div", { class: "hint" }, hint),
+  );
+  return { element, input, paint };
+}

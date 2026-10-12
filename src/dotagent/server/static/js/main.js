@@ -2,6 +2,7 @@
 
 import { loadLooks } from "./actors.js";
 import { ApiError, clearToken, forgetImages, hasToken, loadToken, onAuthLost, setToken } from "./api.js";
+import { applyStoredSettings } from "./appearance/settings.js";
 import { setPageTitle, watchAttention } from "./attention.js";
 import { el } from "./dom.js";
 import { icon, wordmark } from "./icons.js";
@@ -261,6 +262,7 @@ async function boot() {
 applyStoredTheme();
 applyStoredScheme();
 applyStoredDensity();
+applyStoredSettings();
 // The service worker keeps the shell files for when the Mac is out of reach and shows the pushes of the daemon; a
 // browser that has none (or an insecure address) simply has neither.
 if ("serviceWorker" in navigator) {

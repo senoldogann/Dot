@@ -91,7 +91,7 @@
 .run-main {
   width: 100%;
   min-width: 0;
-  max-width: 768px;
+  max-width: var(--lane-w);
   margin-inline: auto;
 }
 
@@ -267,7 +267,7 @@
   border-radius: 0;
   box-shadow: var(--shadow-overlay);
   transform: translateX(100%);
-  transition: transform var(--motion-base) var(--ease);
+  transition: transform var(--motion-panel) var(--ease);
 }
 
 .inspector[data-mode="drawer"][data-open="true"] {
@@ -276,7 +276,7 @@
 
 .inspector-scrim {
   opacity: 0;
-  transition: opacity var(--motion-base) var(--ease);
+  transition: opacity var(--motion-panel) var(--ease);
 }
 
 .inspector-scrim[data-open="true"] {

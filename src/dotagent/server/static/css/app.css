@@ -34,24 +34,39 @@
   --stagebar-h: 56px;
   /* Type (item 77): Inter for the interface and the prose, a serif voice where a look asks for it, Geist Mono for
      code; seven sizes, each with its line-height; three weights (text, label, title); titles tracked a touch tighter.
-     Every size, weight, line-height and letter-spacing in the sheets is one of these (tests/unit/test_css_tokens.py). */
-  --font: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+     Every size, weight, line-height and letter-spacing in the sheets is one of these (tests/unit/test_css_tokens.py).
+     Settings › Appearance (item 127) picks the families from these stacks or puts one typed before them, scales the
+     seven sizes by --type-scale (the interface's size over 14 px) and sizes the composer and the code on their own. */
+  --family-inter: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --family-system: system-ui, -apple-system, "Segoe UI", sans-serif;
+  --family-serif: ui-serif, "New York", Georgia, "Times New Roman", serif;
+  --family-geist-mono: "Geist Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  --family-sf-mono: "SF Mono", ui-monospace, Menlo, monospace;
+  --family-menlo: Menlo, ui-monospace, monospace;
+  --font: var(--family-inter);
   --voice: var(--font);
-  --mono: "Geist Mono", ui-monospace, "SF Mono", Menlo, monospace;
-  --text-xs: 12px;
-  --leading-xs: 16px;
-  --text-sm: 13px;
-  --leading-sm: 18px;
-  --text-ui: 14px;
-  --leading-ui: 20px;
-  --text-md: 15px;
-  --leading-md: 24px;
-  --text-lg: 17px;
-  --leading-lg: 24px;
-  --text-xl: 20px;
-  --leading-xl: 28px;
-  --text-2xl: 24px;
-  --leading-2xl: 32px;
+  --mono: var(--family-geist-mono);
+  --family-mono: var(--mono);
+  --composer-font: var(--font);
+  --type-scale: 1;
+  --text-xs: calc(12px * var(--type-scale));
+  --leading-xs: calc(16px * var(--type-scale));
+  --text-sm: calc(13px * var(--type-scale));
+  --leading-sm: calc(18px * var(--type-scale));
+  --text-ui: calc(14px * var(--type-scale));
+  --leading-ui: calc(20px * var(--type-scale));
+  --text-md: calc(15px * var(--type-scale));
+  --leading-md: calc(24px * var(--type-scale));
+  --text-lg: calc(17px * var(--type-scale));
+  --leading-lg: calc(24px * var(--type-scale));
+  --text-xl: calc(20px * var(--type-scale));
+  --leading-xl: calc(28px * var(--type-scale));
+  --text-2xl: calc(24px * var(--type-scale));
+  --leading-2xl: calc(32px * var(--type-scale));
+  --composer-size: 15px;
+  --composer-leading: calc(var(--composer-size) * 1.6);
+  --code-size: 13px;
+  --code-leading: calc(var(--code-size) * 18 / 13);
   --weight-text: 400;
   --weight-label: 500;
   --weight-title: 600;
@@ -85,6 +100,8 @@
   --motion-quick: 120ms;
   --motion-base: 200ms;
   --motion-slow: 320ms;
+  /* The slide of the sidebar and the details panel, 0 to 400 ms in Settings › Appearance (item 127). */
+  --motion-panel: var(--motion-base);
   --ease: cubic-bezier(0.2, 0, 0, 1);
   --ease-emphasis: cubic-bezier(0.3, 0, 0, 1);
   --motion-breath: 4s;
@@ -96,6 +113,18 @@
   /* The opening (item 114): one timeline that every part of it shares, and the fall of a dot, quicker as it drops. */
   --motion-opening: 1.3s;
   --ease-fall: cubic-bezier(0.55, 0, 1, 0.45);
+  /* The reading width of the home and the conversation. */
+  --lane-w: 768px;
+}
+
+/* The chat's width (Settings › Appearance, item 127, after T3 Code's): the home and the conversation read at 768 px,
+   at 1152 when wide, or as wide as the window leaves them. */
+:root[data-chat-width="wide"] {
+  --lane-w: 1152px;
+}
+
+:root[data-chat-width="full"] {
+  --lane-w: none;
 }
 
 /* Compact density (Settings › Appearance): the rows, cards and stacks sit closer. */
@@ -125,6 +154,11 @@ body {
   font-variant-numeric: tabular-nums;
   -webkit-font-smoothing: antialiased;
   min-height: 100vh;
+}
+
+/* Font smoothing off (Settings › Appearance, item 127): the system's own, heavier strokes on a Mac. */
+:root[data-smoothing="off"] body {
+  -webkit-font-smoothing: auto;
 }
 
 h1,
@@ -923,6 +957,62 @@ a.pill:hover {
   cursor: not-allowed;
 }
 
+/* A range (item 127): a hairline track filled with the accent up to the value (--range-fill, which panels.js
+   rangeSetting keeps) and the switch's knob, ringed so that it shows on any surface. */
+.range {
+  --range-fill: 50%;
+  width: 100%;
+  height: 20px;
+  margin: 0;
+  appearance: none;
+  background: transparent;
+  cursor: pointer;
+}
+
+.range::-webkit-slider-runnable-track {
+  height: 4px;
+  border-radius: var(--radius-pill);
+  background: linear-gradient(to right, var(--accent) var(--range-fill), var(--border-strong) var(--range-fill));
+}
+
+.range::-webkit-slider-thumb {
+  width: 16px;
+  height: 16px;
+  /* The knob's middle on the track's: half of what the knob is taller by. */
+  margin-top: calc((4px - 16px) / 2);
+  appearance: none;
+  border: 1px solid var(--border-strong);
+  border-radius: 50%;
+  background: var(--knob);
+  box-shadow: var(--shadow-knob);
+}
+
+.range::-moz-range-track {
+  height: 4px;
+  border-radius: var(--radius-pill);
+  background: var(--border-strong);
+}
+
+.range::-moz-range-progress {
+  height: 4px;
+  border-radius: var(--radius-pill);
+  background: var(--accent);
+}
+
+.range::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  border: 1px solid var(--border-strong);
+  border-radius: 50%;
+  background: var(--knob);
+  box-shadow: var(--shadow-knob);
+}
+
+.range:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 /* ---------- cards and badges ---------- */
 
 /* A card is flat (item 79): a surface with a hairline, no shadow; shadows belong to what floats (menus, dialogs). */
@@ -1318,7 +1408,7 @@ a.pill:hover {
 
 .home {
   width: 100%;
-  max-width: 768px;
+  max-width: var(--lane-w);
   margin-inline: auto;
   display: grid;
   /* minmax(0, 1fr): a wide child (a long command in an approval) must shrink with the window, not stretch the column */
@@ -1475,8 +1565,9 @@ a.pill:hover {
   padding: var(--space-2) var(--space-2) var(--space-1);
   border: 0;
   box-shadow: none;
-  font-size: var(--text-md);
-  line-height: var(--leading-md);
+  font-family: var(--composer-font);
+  font-size: var(--composer-size);
+  line-height: var(--composer-leading);
   resize: none;
   background: transparent;
 }
@@ -2213,7 +2304,13 @@ a.pill:hover {
   background: var(--surface-2);
   border: 1px solid var(--border);
   overflow-x: auto;
-  font: var(--text-sm) / var(--leading-sm) var(--mono);
+  font: var(--code-size) / var(--code-leading) var(--mono);
+}
+
+/* Long lines of code wrapped (Settings › Appearance, item 127) rather than scrolled sideways. */
+:root[data-wrap-code] .prose pre {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 
 .prose pre code {

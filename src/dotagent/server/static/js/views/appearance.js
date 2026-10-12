@@ -1,10 +1,27 @@
 // Settings › Appearance (item 126), after T3 Code's page: the colour scheme as three miniatures of Dot's window, each
 // drawn on the tokens of the scheme it names (System split down the middle), and the themes as a gallery of cards with
-// a light and a dark orb each, the card taking the theme for both schemes and an orb for its own; then the layout and
-// the motion of this browser, which General held before.
+// a light and a dark orb each, the card taking the theme for both schemes and an orb for its own; then the interface,
+// the motion and the type (item 127), the density, the layout and the faces among them, which General held before.
 
 import { facesMove, setFacesMove } from "../actors.js";
 import { orb } from "../appearance/orbs.js";
+import {
+  ANSWER_FONT,
+  CHAT_WIDTH,
+  CODE_FONT,
+  CODE_SIZE,
+  COMPOSER_FONT,
+  COMPOSER_SIZE,
+  CONTRAST,
+  INTERFACE_FONT,
+  INTERFACE_SIZE,
+  PANEL_MOTION,
+  SMOOTHING,
+  WRAP_CODE,
+  accepts,
+  setValue,
+  valueOf,
+} from "../appearance/settings.js";
 import { el } from "../dom.js";
 import { icon } from "../icons.js";
 import {
@@ -18,7 +35,7 @@ import {
   setShowInspector,
   showInspector,
 } from "../layout.js";
-import { paneHead, segmented, switchSetting } from "../panels.js";
+import { paneHead, rangeSetting, segmented, switchSetting } from "../panels.js";
 import {
   SCHEMES,
   THEMES,
@@ -144,8 +161,151 @@ function themeGallery() {
   return { element, dispose: onThemeChange(paint) };
 }
 
-/** The layout this browser starts with, which follows the theme picked for light until a switch is set. */
-function layoutCard() {
+// The value of "Another family…" in a family's menu, which no stack has.
+const ANOTHER = "another";
+const TYPED_HINT = "Letters, digits, spaces, quotes, dots, dashes and underscores, with a comma between two families.";
+
+// A choice of a few, as Density is drawn: the label and the buttons on a line, the hint under them.
+function choiceSetting({ label, hint, options, selected, onSelect }) {
+  const choice = segmented(options, selected, onSelect);
+  choice.element.setAttribute("aria-label", label);
+  const element = el(
+    "div",
+    { class: "setting" },
+    el("div", { class: "row" }, el("span", { class: "grow" }, label), choice.element),
+    el("div", { class: "hint" }, hint),
+  );
+  return { element, choice };
+}
+
+// An on/off setting of appearance/settings.js, whose values are "on" and "off".
+function onOffSetting({ label, hint, setting }) {
+  const toggle = switchSetting({
+    label,
+    hint,
+    read: () => valueOf(setting) === "on",
+    write: (on) => setValue(setting, on ? "on" : "off"),
+    onToggled: () => toggle.paint(),
+  });
+  toggle.paint();
+  return toggle;
+}
+
+function rangeOf({ label, hint, setting, min, max, step, unit }) {
+  return rangeSetting({
+    label,
+    hint,
+    min,
+    max,
+    step,
+    format: (value) => `${value}${unit}`,
+    read: () => valueOf(setting),
+    write: (value) => setValue(setting, value),
+  });
+}
+
+// A family of the type (T3 Code's, with Dot's stacks to start from): the stack Dot draws with, the others it offers, or
+// "Another family…", which opens a field for families typed, a comma between two; a family typed goes before the stack
+// it replaces. What the field cannot take is said under it and not kept.
+function familySetting({ label, hint, setting, stacks }) {
+  const select = el(
+    "select",
+    { class: "select sm", "aria-label": label },
+    ...stacks.map((stack) => el("option", { value: stack.id }, stack.label)),
+    el("option", { value: ANOTHER }, "Another family…"),
+  );
+  const field = el("input", {
+    class: "input",
+    type: "text",
+    maxlength: "200",
+    placeholder: "A family, or several with commas",
+    "aria-label": `${label}: another family`,
+  });
+  const note = el("div", { class: "hint family-note" }, hint);
+  const offered = (value) => stacks.some((stack) => stack.id === value);
+  function paint() {
+    const value = valueOf(setting);
+    select.value = offered(value) ? value : ANOTHER;
+    field.hidden = offered(value);
+    field.value = offered(value) ? "" : value;
+    field.removeAttribute("aria-invalid");
+    note.removeAttribute("data-invalid");
+    note.textContent = hint;
+  }
+  select.addEventListener("change", () => {
+    if (select.value === ANOTHER) {
+      field.hidden = false;
+      field.focus();
+      return;
+    }
+    setValue(setting, select.value);
+    paint();
+  });
+  field.addEventListener("change", () => {
+    const typed = field.value.trim();
+    if (typed !== "" && !accepts(setting, typed)) {
+      field.setAttribute("aria-invalid", "true");
+      note.setAttribute("data-invalid", "");
+      note.textContent = TYPED_HINT;
+      return;
+    }
+    setValue(setting, typed);
+    paint();
+  });
+  // Left empty, "Another family…" goes back to the family in use.
+  field.addEventListener("blur", () => {
+    if (field.value.trim() === "") {
+      paint();
+    }
+  });
+  paint();
+  const element = el(
+    "div",
+    { class: "setting" },
+    el("div", { class: "row" }, el("span", { class: "grow" }, label), select),
+    field,
+    note,
+  );
+  return { element };
+}
+
+// A line of type drawn on the tokens a setting writes, so that it follows the setting as it moves.
+function preview(kind, words) {
+  return el("div", { class: "type-preview", "data-preview": kind }, words);
+}
+
+/**
+ * The interface: the contrast and the chat's width (item 127), the density, and the layout this browser starts with,
+ * which follows the theme picked for light until a switch is set.
+ */
+function interfaceCard() {
+  const contrast = rangeOf({
+    label: "Contrast",
+    hint: "How far the text and the lines stand from the page: under 100% they fade toward it, over 100% they move toward black in light and white in dark.",
+    setting: CONTRAST,
+    min: 50,
+    max: 200,
+    step: 5,
+    unit: "%",
+  });
+  const width = choiceSetting({
+    label: "Chat width",
+    hint: "How wide the home and a conversation read.",
+    options: [
+      { id: "comfortable", label: "Comfortable", hint: "768 px, Dot's own." },
+      { id: "wide", label: "Wide", hint: "1152 px." },
+      { id: "full", label: "Full", hint: "As wide as the window." },
+    ],
+    selected: valueOf(CHAT_WIDTH),
+    onSelect: (id) => setValue(CHAT_WIDTH, id),
+  });
+  const density = choiceSetting({
+    label: "Density",
+    hint: "How close the rows, cards and lists sit.",
+    options: DENSITIES.map((option) => ({ id: option.id, label: option.label, hint: option.hint })),
+    selected: currentDensity(),
+    onSelect: chooseDensity,
+  });
   const layoutNote = el("div", { class: "hint grow" });
   const fold = switchSetting({
     label: "Fold tool steps",
@@ -173,12 +333,6 @@ function layoutCard() {
     },
     "Follow the theme",
   );
-  const density = segmented(
-    DENSITIES.map((option) => ({ id: option.id, label: option.label, hint: option.hint })),
-    currentDensity(),
-    chooseDensity,
-  );
-  density.element.setAttribute("aria-label", "Density");
   function paint() {
     fold.paint();
     inspector.paint();
@@ -189,16 +343,13 @@ function layoutCard() {
   }
   paint();
   const element = section(
-    "Layout",
+    "Interface",
     el(
       "div",
       { class: "card-pad stack" },
-      el(
-        "div",
-        { class: "setting" },
-        el("div", { class: "row" }, el("span", { class: "grow" }, "Density"), density.element),
-        el("div", { class: "hint" }, "How close the rows, cards and lists sit. Kept in this browser."),
-      ),
+      contrast.element,
+      width.element,
+      density.element,
       fold.element,
       inspector.element,
       el("div", { class: "setting" }, el("div", { class: "row" }, layoutNote, reset)),
@@ -207,10 +358,19 @@ function layoutCard() {
   return { element, dispose: onThemeChange(paint) };
 }
 
-// The faces that move (item 103): the home's, the run page's and the previews; off leaves every face still. While the
-// system asks for less motion every face holds still whatever the switch says (item 107); the note says so, and where
-// the system's own switch is.
+// The slide of the panels (item 127) and the faces that move (item 103): the home's, the run page's and the previews;
+// off leaves every face still. While the system asks for less motion every face holds still and no panel slides
+// whatever the settings say (item 107); the note says so, and where the system's own switch is.
 function motionCard() {
+  const panels = rangeOf({
+    label: "Panel animation",
+    hint: "How long the sidebar and the details panel take to slide in and out; at 0 they are there at once.",
+    setting: PANEL_MOTION,
+    min: 0,
+    max: 400,
+    step: 25,
+    unit: " ms",
+  });
   const faces = switchSetting({
     label: "Faces that move",
     hint: "Dot's face on the home and the face beside a chat move while they work and rest; off, every face is a still frame.",
@@ -221,7 +381,7 @@ function motionCard() {
   const motionNote = el(
     "div",
     { class: "hint", "data-reduced-motion": "" },
-    "Your system reduces motion, so every face holds still whatever this says. On a Mac: System Settings › Accessibility › Display › Reduce motion.",
+    "Your system reduces motion, so every face holds still and the panels never slide, whatever this says. On a Mac: System Settings › Accessibility › Display › Reduce motion.",
   );
   faces.element.append(motionNote);
   const paintMotion = () => {
@@ -230,27 +390,130 @@ function motionCard() {
   REDUCED_MOTION.addEventListener("change", paintMotion);
   paintMotion();
   faces.paint();
-  const element = section("Motion", el("div", { class: "card-pad stack" }, faces.element));
+  const element = section("Motion", el("div", { class: "card-pad stack" }, panels.element, faces.element));
   return { element, dispose: () => REDUCED_MOTION.removeEventListener("change", paintMotion) };
+}
+
+/** The type (item 127): the families and sizes of the interface, the answers, the composer and the code. */
+function typeCard() {
+  const interfaceFont = familySetting({
+    label: "Interface font",
+    hint: "The menus, the lists and the pages.",
+    setting: INTERFACE_FONT,
+    stacks: [
+      { id: "", label: "Inter" },
+      { id: "system", label: "The system's" },
+    ],
+  });
+  const interfaceSize = rangeOf({
+    label: "Interface size",
+    hint: "Every text of the interface grows or shrinks with it; 14 px is Dot's own.",
+    setting: INTERFACE_SIZE,
+    min: 13,
+    max: 17,
+    step: 1,
+    unit: " px",
+  });
+  const answers = choiceSetting({
+    label: "Answers",
+    hint: "The font of Dot's answers.",
+    options: [
+      { id: "theme", label: "Theme", hint: "As the theme says: the interface's font, or a serif in Paper." },
+      { id: "interface", label: "Interface", hint: "The interface's font in every theme." },
+      { id: "serif", label: "Serif", hint: "A serif in every theme." },
+    ],
+    selected: valueOf(ANSWER_FONT),
+    onSelect: (id) => setValue(ANSWER_FONT, id),
+  });
+  const composerFont = familySetting({
+    label: "Composer font",
+    hint: "What you type for Dot.",
+    setting: COMPOSER_FONT,
+    stacks: [
+      { id: "", label: "The interface's" },
+      { id: "serif", label: "Serif" },
+      { id: "mono", label: "The code's" },
+    ],
+  });
+  const composerSize = rangeOf({
+    label: "Composer size",
+    hint: "15 px is Dot's own.",
+    setting: COMPOSER_SIZE,
+    min: 12,
+    max: 20,
+    step: 1,
+    unit: " px",
+  });
+  const codeFont = familySetting({
+    label: "Code font",
+    hint: "Code, commands and file names.",
+    setting: CODE_FONT,
+    stacks: [
+      { id: "", label: "Geist Mono" },
+      { id: "sf-mono", label: "SF Mono" },
+      { id: "menlo", label: "Menlo" },
+    ],
+  });
+  const codeSize = rangeOf({
+    label: "Code size",
+    hint: "The code blocks of an answer; 13 px is Dot's own.",
+    setting: CODE_SIZE,
+    min: 10,
+    max: 18,
+    step: 1,
+    unit: " px",
+  });
+  const smoothing = onOffSetting({
+    label: "Font smoothing",
+    hint: "Thinner strokes on a Mac; off, the system's heavier ones.",
+    setting: SMOOTHING,
+  });
+  const wrap = onOffSetting({
+    label: "Wrap long lines of code",
+    hint: "A long line of code in an answer wraps instead of scrolling sideways.",
+    setting: WRAP_CODE,
+  });
+  const element = section(
+    "Type",
+    el(
+      "div",
+      { class: "card-pad stack" },
+      interfaceFont.element,
+      interfaceSize.element,
+      preview("interface", "Dot reads the page, fills in the form and asks before it sends."),
+      answers.element,
+      preview("answers", "The report is ready: three files changed, and the tests pass."),
+      composerFont.element,
+      composerSize.element,
+      preview("composer", "Summarise the three newest files on my Desktop"),
+      codeFont.element,
+      codeSize.element,
+      preview("code", 'const files = await list("~/Desktop"); // the three newest, by the time they changed'),
+      smoothing.element,
+      wrap.element,
+    ),
+  );
+  return { element };
 }
 
 /** Draw the Appearance tab into `root`. Returns the function that stops its listeners. */
 export function mount(root) {
   const schemes = schemeCards();
   const gallery = themeGallery();
-  const layout = layoutCard();
+  const look = interfaceCard();
   const motion = motionCard();
   root.append(
-    paneHead("How Dot looks in this browser: the colour scheme, a theme for light and one for dark, the layout and the motion. Kept in this browser.", null),
+    paneHead("How Dot looks in this browser: the colour scheme, a theme for light and one for dark, the interface, the motion and the type. Kept in this browser.", null),
     section("Colour scheme", el("div", { class: "card-pad" }, schemes.element)),
     section("Themes", gallery.element),
-    layout.element,
+    look.element,
     motion.element,
+    typeCard().element,
   );
   return () => {
     schemes.dispose();
     gallery.dispose();
-    layout.dispose();
+    look.dispose();
     motion.dispose();
   };
 }

@@ -137,7 +137,7 @@
   --radius: 12px;
   --radius-control: 8px;
   --radius-lg: 20px;
-  --voice: ui-serif, "New York", Georgia, "Times New Roman", serif;
+  --voice: var(--family-serif);
 }
 
 :root[data-theme="paper"] .home-name {
@@ -148,4 +148,60 @@
 
 :root[data-theme="paper"] .btn.send {
   border-radius: 10px;
+}
+
+/* ---------- contrast (Settings › Appearance, item 127, after T3 Code's; see js/appearance/LICENSE) ---------- */
+
+/* While the contrast is not 100 %, the text tiers and the lines are mixed again: below 100 toward the page
+   (--contrast-base, the share of the tier that stays), above it toward black in light and white in dark
+   (--contrast-boost), the lines toward the text a quarter as far (--contrast-border-boost). A token cannot be worked
+   out from itself, so the theme's values are named again on the page element and the body, inside which everything
+   is drawn, takes the mixed ones. */
+:root[data-contrast] {
+  --contrast-target: light-dark(#000000, #ffffff);
+  --contrast-text: var(--text);
+  --contrast-text-2: var(--text-2);
+  --contrast-muted: var(--muted);
+  --contrast-faint: var(--faint);
+  --contrast-control: var(--control);
+  --contrast-border: var(--border);
+  --contrast-border-strong: var(--border-strong);
+}
+
+:root[data-contrast] body {
+  --text: color-mix(
+    in oklab,
+    color-mix(in oklab, var(--contrast-text) var(--contrast-base), var(--bg)),
+    var(--contrast-target) var(--contrast-boost)
+  );
+  --text-2: color-mix(
+    in oklab,
+    color-mix(in oklab, var(--contrast-text-2) var(--contrast-base), var(--bg)),
+    var(--contrast-target) var(--contrast-boost)
+  );
+  --muted: color-mix(
+    in oklab,
+    color-mix(in oklab, var(--contrast-muted) var(--contrast-base), var(--bg)),
+    var(--contrast-target) var(--contrast-boost)
+  );
+  --faint: color-mix(
+    in oklab,
+    color-mix(in oklab, var(--contrast-faint) var(--contrast-base), var(--bg)),
+    var(--contrast-target) var(--contrast-boost)
+  );
+  --control: color-mix(
+    in oklab,
+    color-mix(in oklab, var(--contrast-control) var(--contrast-base), var(--bg)),
+    var(--contrast-target) var(--contrast-boost)
+  );
+  --border: color-mix(
+    in srgb,
+    color-mix(in srgb, var(--contrast-border) var(--contrast-base), transparent),
+    var(--contrast-text) var(--contrast-border-boost)
+  );
+  --border-strong: color-mix(
+    in srgb,
+    color-mix(in srgb, var(--contrast-border-strong) var(--contrast-base), transparent),
+    var(--contrast-text) var(--contrast-border-boost)
+  );
 }

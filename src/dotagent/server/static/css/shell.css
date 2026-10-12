@@ -15,7 +15,7 @@
    follows; the sidebar keeps its own width inside the column and is clipped by it on the way. */
 .shell[data-nav="docked"] {
   grid-template-columns: 0px minmax(0, 1fr);
-  transition: grid-template-columns var(--motion-base) var(--ease);
+  transition: grid-template-columns var(--motion-panel) var(--ease);
 }
 
 .shell[data-nav="docked"][data-sidebar="open"] {
@@ -97,7 +97,7 @@
 /* Closed, the sidebar is out of reach (shell.js makes it inert) and out of sight once the slide has ended. */
 .shell[data-nav="docked"][data-sidebar="closed"] .sidebar {
   visibility: hidden;
-  transition: visibility 0s linear var(--motion-base);
+  transition: visibility 0s linear var(--motion-panel);
 }
 
 .shell[data-nav="drawer"] .sidebar {
@@ -108,15 +108,15 @@
   visibility: hidden;
   transform: translateX(-100%);
   transition:
-    transform var(--motion-base) var(--ease),
-    visibility 0s linear var(--motion-base);
+    transform var(--motion-panel) var(--ease),
+    visibility 0s linear var(--motion-panel);
 }
 
 .shell[data-nav="drawer"][data-sidebar="open"] .sidebar {
   visibility: visible;
   transform: none;
   box-shadow: var(--shadow-overlay);
-  transition: transform var(--motion-base) var(--ease);
+  transition: transform var(--motion-panel) var(--ease);
 }
 
 /* Reduced motion: the drawer appears in place rather than sliding in. */
