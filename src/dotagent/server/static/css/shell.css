@@ -348,6 +348,25 @@
   font-variant-numeric: tabular-nums;
 }
 
+/* A row whose run works says so where its age sits at rest, as T3 Code's sidebar does (item 122): a dashed circle, the
+   word and the time it has worked, in the running state's colour; only the figure changes, nothing shimmers. */
+.side-working {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--accent);
+  font-size: var(--text-xs);
+  line-height: var(--leading-xs);
+  font-weight: var(--weight-label);
+  font-variant-numeric: tabular-nums;
+}
+
+.side-working .icon {
+  width: 16px;
+  height: 16px;
+}
+
 /* The head of the chat list: its label and the button that starts choosing chats to delete. */
 .side-list-head {
   display: flex;

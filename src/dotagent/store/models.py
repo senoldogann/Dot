@@ -37,7 +37,9 @@ class ThreadRecord(FrozenModel):
 class ThreadSummary(FrozenModel):
     """One chat of the sidebar: a thread with the runs a person started on it (``run_count`` of them) and the latest of
     those runs, which the chat opens on. ``updated_at`` is the later of the last message and the start of the latest
-    run. Threads that only hold delegated runs are not chats and are never listed."""
+    run; ``latest_created_at`` is when the latest run was created, which a message during the run does not move (the
+    sidebar counts a working chat's time from it). Threads that only hold delegated runs are not chats and are never
+    listed."""
 
     id: str
     title: str
@@ -48,6 +50,7 @@ class ThreadSummary(FrozenModel):
     latest_run_id: str
     latest_status: RunStatus
     latest_mode: RunMode
+    latest_created_at: float
 
 
 class RunRecord(FrozenModel):

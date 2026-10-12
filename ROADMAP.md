@@ -5042,7 +5042,7 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 119 | The models: the prompt cache on OpenCode Go's Messages route, the free ones marked   | done        | acfc56a |
 | 120 | The run page's head: Stop in the send button's place, the emergency stop in the sidebar | done        | 6c1a7b3 |
 | 121 | The calm look, after T3 Code: the sidebar, the chat, the composer and the panel     | done        | 4f2b0cd |
-| 122 | The sidebar says what works: Working and its time on a chat's row and a working run's | planned     |         |
+| 122 | The sidebar says what works: Working and its time on a chat's row and a working run's | in progress |         |
 | 123 | A helper folded in the chat: its row until the owner opens it                       | planned     |         |
 
 ### 77. The type system: Inter and Geist Mono, seven sizes, three weights
@@ -6931,7 +6931,22 @@ not built.
 
 ### 122. The sidebar says what works: Working and its time on a chat's row and a working run's
 
-**Status: planned.**
+**Status: in progress.**
+
+**As built (2026-10-12).** Where a row's age sits at rest, `sidebar.js workingSlot` shows Lucide's dashed circle
+(`icons.js circleDashed`, the paths of Lucide 1.8.0), the word Working and `workingFor` (`dom.js`: "12s", "4m", "1h 5m",
+T3 Code's units), read again every second by one ticker over the sidebar, in figures of one width, the running state's
+colour (`--accent`) and the label's weight; the circle stands still. A chat shows it while its latest run is queued or
+running, counted from `ThreadSummary.latest_created_at`, new: the latest run's `created_at`, read by the same query. A
+run of the Working section shows it from its row's `since`, which is the run's `created_at`, the delegated runs nested
+under their parent included. A schedule due there, every row of the Waiting section and a chat whose run waits for an
+answer stay as they were (an amber dot and an age for the chat); the rows keep their dot or face at the left. The
+README's sidebar passage says it. `tests/smoke/test_working_rows.py` starts a chat that works, a run it delegates and a
+chat that asks a question, on the scripted model, and reads the sidebar at both widths in both schemes: the two runs of
+the Working section and the working chat say Working with a time in T3 Code's units, the asking chat keeps its amber dot
+and its age, the seconds move while the page rests, and once the runs are cancelled every chat shows its age again. 27
+smoke tests pass (the new one, the activity sections, the server and the tour), their shots read by eye at both widths
+in both schemes, and so do the 906 unit tests.
 
 **What.** As T3 Code's sidebar does: where a row's time sits at rest, a chat whose latest run is queued or running shows
 a dashed circle, the word Working and the time since that run was asked for ("12s", "4m", "1h 5m"), read again every
