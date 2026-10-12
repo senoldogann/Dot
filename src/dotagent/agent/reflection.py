@@ -7,9 +7,9 @@ the run's ending as one more signal, under the same ``[agent] lessons`` setting:
 page, ``auto`` saves them, ``off`` draws none); it folds the near-duplicates among the notes tagged ``lesson`` into the
 newer note (by the cosine of their embeddings when both have one, by their words otherwise); it retires the lessons
 that no run was handed for ``[agent] lesson_rest_days`` to the ``rest`` tag, after which a search no longer finds them
-and the Memory page still lists them; and it writes one journal note for the day, tagged ``journal``, when anything
-happened. The last reflection is kept in the store's key/value table, so the next one knows where to start and the
-Activity list can show it.
+and the Memory page still lists them; and it writes one journal note of the days it read (:func:`journal_span`),
+tagged ``journal``, when anything happened. The last reflection is kept in the store's key/value table, so the next
+one knows where to start and the Activity list can show it.
 
 The scheduler fires it at ``[agent] reflection_time`` (:func:`reflection_due`), ``dotx reflect`` runs it by hand. Every
 function here is pure except the ones that take the store or the runtime.
@@ -64,6 +64,8 @@ REFLECTION_KEY: str = "reflection.last"
 REFLECTION_OFF: str = "off"
 # The first reflection reads the runs of the last day.
 _FIRST_WINDOW_S: float = 86400.0
+# The longest time a journal tells as one day, a day and a quarter: a reflection that fired late still names its day.
+_ONE_DAY_S: float = 30 * 3600.0
 # How many tool results of a run make its digest, and how many of its characters each result gives.
 _RESULTS_READ: int = 60
 _RESULT_CHARS: int = 160
@@ -284,10 +286,23 @@ def summary_line(reflection: Reflection) -> str:
     return f"Reflected on {runs}: {', '.join(parts)}."
 
 
+def _date(at: float, zone: ZoneInfo) -> str:
+    return datetime.fromtimestamp(at, tz=zone).strftime("%Y-%m-%d")
+
+
+def journal_span(since: float, now: float, zone: ZoneInfo) -> str:
+    """The days the journal of the runs that ended in [``since``, ``now``) tells, in ``zone``: the day of the time's
+    middle ("On 2026-10-11" for the reflection at 03:30 on the 12th, which reads the 11th), or its first and last day
+    ("From 2026-10-08 to 2026-10-12") when it is longer than a day and a quarter, as after a daemon that was off."""
+    if now - since <= _ONE_DAY_S:
+        return f"On {_date(since + (now - since) / 2, zone)}"
+    return f"From {_date(since, zone)} to {_date(now, zone)}"
+
+
 def journal_text(
-    day: str, runs: Sequence[RunRecord], lessons: Sequence[str], merged: int, retired: int, max_chars: int
+    span: str, runs: Sequence[RunRecord], lessons: Sequence[str], merged: int, retired: int, max_chars: int
 ) -> str:
-    """The day's journal note: what Dot did and learned on ``day``, within ``max_chars``."""
+    """The journal note: what Dot did and learned in ``span`` (:func:`journal_span`), within ``max_chars``."""
     counts: dict[str, int] = {
         status: sum(1 for run in runs if run.status == status) for status in ("done", "failed", "cancelled")
     }
@@ -295,7 +310,7 @@ def journal_text(
     named: str = "; ".join(lessons[:_JOURNAL_LESSONS])
     learned: str = f" Learned: {named}" if named else ""
     tidied: str = f" Tidied the lessons: {merged} merged, {retired} retired." if merged or retired else ""
-    text: str = f"On {day} I worked on {len(runs)} {'run' if len(runs) == 1 else 'runs'} ({ended}).{learned}{tidied}"
+    text: str = f"{span} I worked on {len(runs)} {'run' if len(runs) == 1 else 'runs'} ({ended}).{learned}{tidied}"
     return text if len(text) <= max_chars else f"{text[: max_chars - 1]}…"
 
 
@@ -436,8 +451,8 @@ async def reflect(runtime: Runtime, deciding: asyncio.Lock, now: float) -> Refle
     owner_updated: bool = await _describe_owner(runtime, runs, now) if runs else False
     journal: str | None = None
     if runs or merged or retired:
-        day: str = datetime.fromtimestamp(now, tz=runtime.schedule_zone).strftime("%Y-%m-%d")
-        text: str = journal_text(day, runs, lessons, merged, retired, runtime.config.memory.max_chars)
+        span: str = journal_span(since, now, runtime.schedule_zone)
+        text: str = journal_text(span, runs, lessons, merged, retired, runtime.config.memory.max_chars)
         saved: SavedMemory = await save_memory(runtime.memory, text, (JOURNAL_TAG,), REFLECTION_SOURCE, None)
         journal = saved.record.id
     reflection: Reflection = Reflection(

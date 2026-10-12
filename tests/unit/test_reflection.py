@@ -14,6 +14,7 @@ from dotagent.agent.reflection import (
     digest_of,
     duplicate_pairs,
     ending_signal,
+    journal_span,
     journal_text,
     read_outside,
     reflection_cron,
@@ -175,16 +176,27 @@ def test_the_summary_and_the_journal_say_what_happened() -> None:
         _run("failed", "task", None, "ui"),
         _run("failed", "task", None, "ui"),
     ]
-    text: str = journal_text("2026-10-11", runs, ["Use -layout with pdftotext."], 1, 2, 600)
+    text: str = journal_text("On 2026-10-11", runs, ["Use -layout with pdftotext."], 1, 2, 600)
     assert text == (
         "On 2026-10-11 I worked on 3 runs (1 done, 2 failed). Learned: Use -layout with pdftotext. "
         "Tidied the lessons: 1 merged, 2 retired."
     )
     assert (
-        journal_text("2026-10-11", [], [], 0, 1, 600)
+        journal_text("On 2026-10-11", [], [], 0, 1, 600)
         == "On 2026-10-11 I worked on 0 runs (no run ended). Tidied the lessons: 0 merged, 1 retired."
     )
-    assert len(journal_text("2026-10-11", runs, ["x" * 700], 0, 0, 100)) == 100
+    assert len(journal_text("On 2026-10-11", runs, ["x" * 700], 0, 0, 100)) == 100
+
+
+def test_the_journal_names_the_days_it_tells() -> None:
+    """Item 125: the reflection at 03:30 tells the day before it; a longer time than a day and a quarter, its days."""
+    night: float = _at("2026-10-12T03:30:00")
+    assert journal_span(night - DAY_S, night, ZONE) == "On 2026-10-11"
+    # Late, or by hand in the afternoon, a reflection names the day it read.
+    assert journal_span(_at("2026-10-11T03:30:00"), _at("2026-10-12T09:00:00"), ZONE) == "On 2026-10-11"
+    assert journal_span(night, _at("2026-10-12T16:00:00"), ZONE) == "On 2026-10-12"
+    # The daemon was off for days.
+    assert journal_span(_at("2026-10-08T03:30:00"), night, ZONE) == "From 2026-10-08 to 2026-10-12"
 
 
 def test_the_reflection_time_is_a_time_of_day_or_off() -> None:
