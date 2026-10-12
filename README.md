@@ -119,8 +119,14 @@ the standby again when it still cannot answer.
   directly.
 - **OpenAI**: on the Responses wire Dot sends the whole conversation on every call (`store: false`) and carries the
   encrypted reasoning items from step to step, so no state lives on the server.
-- **OpenCode Go**: Dot knows the route of the models in its catalog. `route_overrides = { "<model-id>" = "chat" }` in
-  `[providers.opencode_go]` adds or corrects one (`chat`, `responses` or `messages`).
+- **OpenCode Go**: Dot knows the route of the models in its catalog, and of a new Claude, Qwen, MiniMax, Grok, GPT or
+  Muse model by the start of its name; any other new model goes to Chat Completions. `route_overrides = { "<model-id>" =
+  "chat" }` in `[providers.opencode_go]` adds or corrects one (`chat`, `responses` or `messages`). The Messages route
+  marks the prompt for caching, so Claude, Qwen and MiniMax read a run's prompt back from the cache from its second step
+  on, at a tenth of the price and with a faster first token (Claude caches only so); the Chat Completions models cache
+  it by themselves. A model Go serves at no cost (its id ends in `-free`) says Free in the model picker and in
+  Settings › Models. The free models of OpenCode Zen are not offered: OpenCode serves them only to its own programs and
+  answers any other with a 403 (checked on 2026-10-12, with and without a key).
 - **Anthropic**: what a model can do (pictures, its window and output limit, whether it thinks and at which levels) is
   read from the Models API, so a new Claude model needs no update of Dot. A model that thinks gets adaptive thinking at
   the run's reasoning level, with the summary of its thinking shown; `off` turns thinking off where the model allows it,

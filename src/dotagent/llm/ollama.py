@@ -321,6 +321,7 @@ def parse_model_details(model: str, shown: JsonObject, num_ctx: int) -> OllamaMo
         thinking=thinking,
         context_length=num_ctx if trained is None else min(trained, num_ctx),
         efforts=think_ladder(thinking, values),
+        free=False,
     )
     return OllamaModelDetails(info=info, think_values=values)
 

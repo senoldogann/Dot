@@ -1,5 +1,6 @@
-"""The real hosted services with the user's own keys: OpenAI on both wires, OpenCode Go on all three routes, the Claude
-models of Anthropic, the hosted web search of Ollama and TypeSafe's typed judgments.
+"""The real hosted services with the user's own keys: OpenAI on both wires, OpenCode Go on all three routes (and its
+prompt cache on the Messages route), the Claude models of Anthropic, the hosted web search of Ollama and TypeSafe's typed
+judgments.
 
 ``test_wire_codecs.py`` makes the same calls against a local Ollama that stands in for these services. Here every test
 sends a handful of tiny requests (cents at most) and is skipped when its key cannot be resolved (environment, the
@@ -15,6 +16,7 @@ from test_wire_codecs import (
     first_tool_call_reply,
     greedy_request_for,
     ignore_delta,
+    request_for,
     solid_image,
     tool_round_trip,
 )
@@ -28,6 +30,7 @@ from dotagent.llm.openai import OpenAIProvider
 from dotagent.llm.opencode_go import OpenCodeGoProvider, route_of
 from dotagent.llm.types import (
     ChatProvider,
+    ChatRequest,
     ModelInfo,
     ModelReply,
     assistant_from_reply,
@@ -63,13 +66,19 @@ OPENAI_MODEL: str = "gpt-4.1-mini"
 ANTHROPIC_MODEL: str = "claude-haiku-5-5"
 
 # One vision model per route; the second Responses model takes the OpenAI-style options (original image detail,
-# images inside tool results), the first one the plain ones.
+# images inside tool results), the first one the plain ones; Claude on the Messages route thinks behind a switch and
+# replays its signed thinking.
 GO_MODELS: list[tuple[GoRoute, str]] = [
     ("chat", "kimi-k3"),
     ("messages", "qwen3.8-flash"),
+    ("messages", "claude-haiku-5-5"),
     ("responses", "grok-4.6"),
     ("responses", "gpt-5.6-luna"),
 ]
+# Claude on Go reads a repeated prompt from the cache only when the prompt is marked for it (measured 2026-10-12).
+GO_CACHED_MODEL: str = "claude-haiku-5-5"
+# A system prompt above every model's least cacheable length (about ten thousand tokens).
+CACHED_PROMPT: str = " ".join(f"Rule {number}: answer in one short sentence." for number in range(1, 1000))
 
 
 def openai_provider(wire: str) -> ChatProvider:
@@ -130,6 +139,21 @@ async def test_opencode_go_round_trips_tools_and_reads_screenshots_on_each_route
         await provider.aclose()
     assert "21" in final.text and final.usage.input_tokens > 0
     assert "blue" in described
+
+
+@pytest.mark.hosted
+@requires_opencode_go
+async def test_opencode_go_reads_a_repeated_claude_prompt_from_the_cache() -> None:
+    request: ChatRequest = request_for(
+        GO_CACHED_MODEL, (system_message(CACHED_PROMPT), user_message("Say ok.", ())), ()
+    )
+    provider: ChatProvider = go_provider()
+    try:
+        await provider.complete(request, ignore_delta)
+        second: ModelReply = await provider.complete(request, ignore_delta)
+    finally:
+        await provider.aclose()
+    assert second.usage.cached_tokens > 0, second.usage
 
 
 @pytest.mark.hosted

@@ -153,7 +153,7 @@ class OpenAIProvider:
         return f"{self._config.base_url.rstrip('/')}{path}"
 
     async def model_info(self, model: str) -> ModelInfo:
-        return info_from_traits(model, openai_traits(model))
+        return info_from_traits(model, openai_traits(model), False)
 
     async def list_models(self) -> tuple[ModelInfo, ...]:
         listed: JsonObject = await get_json(
@@ -161,7 +161,7 @@ class OpenAIProvider:
         )
         identifiers: set[str] = {get_str(entry, "id") for entry in get_objects(listed, "data")}
         chat_models: list[str] = sorted(model for model in identifiers if model and is_chat_model(model))
-        return tuple(info_from_traits(model, openai_traits(model)) for model in chat_models)
+        return tuple(info_from_traits(model, openai_traits(model), False) for model in chat_models)
 
     async def _stream[S](
         self, path: str, body: JsonObject, codec: StreamCodec[S], model: str, sink: DeltaSink, label: str

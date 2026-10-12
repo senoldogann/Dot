@@ -55,6 +55,7 @@ def _option(provider: str, info: ModelInfo, default_effort: Effort) -> ModelOpti
         context_length=info.context_length,
         efforts=list(info.efforts),
         default_effort=effective_effort(info.efforts, default_effort),
+        free=info.free,
     )
 
 

@@ -442,7 +442,7 @@ class ScheduleView(FrozenModel):
 
 class ModelOption(FrozenModel):
     """A model as the pickers show it. ``efforts`` are its reasoning levels, lowest first (fewer than two: no choice);
-    ``default_effort`` is the level the configured default effort selects on it."""
+    ``default_effort`` is the level the configured default effort selects on it; ``free``: served at no cost."""
 
     ref: str
     vision: bool
@@ -451,6 +451,7 @@ class ModelOption(FrozenModel):
     context_length: int | None
     efforts: list[Effort]
     default_effort: Effort | None
+    free: bool
 
 
 type ProviderProblem = Literal["no_key", "key_refused", "failed"]

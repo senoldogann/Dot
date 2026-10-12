@@ -35,11 +35,15 @@ _CHAT_OPTIONS: ChatOptions = ChatOptions(
 # OpenAI models behind the gateway take full-size screenshots inline; the other Responses models get them hoisted.
 _OPENAI_RESPONSES: ResponsesOptions = ResponsesOptions(image_detail="original", tool_output_images=True)
 _OTHER_RESPONSES: ResponsesOptions = ResponsesOptions(image_detail="auto", tool_output_images=False)
-# The gateway's messages route takes a plain thinking switch and no cache marks; the format insists on an output limit,
-# and this one is used when the request names none.
+# The gateway's messages route takes a plain thinking switch and the automatic cache mark (measured 2026-10-12: Claude
+# Haiku 5.5 reads a repeated prompt from the cache only when it is marked, Qwen caches by itself and with the mark,
+# MiniMax takes it); the format insists on an output limit, and this one is used when the request names none.
 _MESSAGES_OPTIONS: MessagesOptions = MessagesOptions(
-    adaptive_thinking=False, prompt_cache=False, default_max_tokens=32768
+    adaptive_thinking=False, prompt_cache=True, default_max_tokens=32768
 )
+# OpenCode names the models it serves at no cost with this ending (Go's list on 2026-10-12: `longcat-2.5-preview-free`,
+# `step-5-preview-free`).
+_FREE_SUFFIX: str = "-free"
 
 
 class GoModel(FrozenModel):
@@ -100,7 +104,8 @@ CATALOG: dict[str, GoModel] = {
     "mimo-v2.5-pro": _model("chat", False, 1_048_576, 128_000, _LMH, False, True),
     "hy4-preview": _model("chat", False, 1_024_000, 64_000, ("none", "high"), False, True),
     "hy3": _model("chat", False, 256_000, 128_000, ("none", "low", "high"), False, True),
-    "space-bunny-free": _model("chat", True, 1_048_576, 524_288, _LMH, False, True),
+    "space-bunny": _model("chat", True, 1_048_576, 524_288, _LMH, False, True),
+    "step-5-preview-free": _model("chat", True, 1_000_000, 65_536, _NO_EFFORT, False, True),
     "grok-4.7": _model("responses", True, 500_000, 500_000, ("low", "medium", "high", "xhigh"), False, True),
     "grok-4.6": _model("responses", True, 500_000, 500_000, ("low", "medium", "high", "xhigh"), False, True),
     "gpt-6-luna": _model("responses", True, 1_050_000, 128_000, _GPT_LUNA, False, False),
@@ -116,6 +121,11 @@ CATALOG: dict[str, GoModel] = {
     "qwen3.8-max": _model("messages", True, 1_000_000, 131_072, _NO_EFFORT, False, True),
     "qwen3.8-flash": _model("messages", True, 1_000_000, 131_072, _NO_EFFORT, False, True),
     "qwen3.7-plus": _model("messages", True, 1_000_000, 65_536, _NO_EFFORT, False, True),
+    "qwen3.7-max": _model("messages", False, 1_000_000, 65_536, _NO_EFFORT, False, True),
+    "qwen3.6-plus": _model("messages", True, 1_000_000, 65_536, _NO_EFFORT, False, True),
+    # Claude is served on the Messages route only (the chat route answers 400, measured 2026-10-12); its thinking is a
+    # switch here, adaptive when on, and it takes no temperature.
+    "claude-haiku-5-5": _model("messages", True, 1_000_000, 128_000, _NO_EFFORT, True, False),
 }
 
 # A model the catalog does not know: assume nothing optional (no images, no effort labels, no thinking switch).
@@ -134,6 +144,7 @@ _PREFIX_ROUTES: tuple[tuple[str, GoRoute], ...] = (
     ("muse-", "responses"),
     ("minimax-", "messages"),
     ("qwen", "messages"),
+    ("claude-", "messages"),
 )
 
 
@@ -149,6 +160,11 @@ def route_of(model: str, overrides: Mapping[str, GoRoute]) -> GoRoute:
         if model.startswith(prefix):
             return route
     return "chat"
+
+
+def go_free(model: str) -> bool:
+    """Whether the gateway serves ``model`` at no cost."""
+    return model.endswith(_FREE_SUFFIX)
 
 
 def go_traits(model: str) -> ModelTraits:
@@ -228,7 +244,7 @@ class OpenCodeGoProvider:
         return route_headers("chat", self._api_key, "")
 
     async def model_info(self, model: str) -> ModelInfo:
-        return info_from_traits(model, go_traits(model))
+        return info_from_traits(model, go_traits(model), go_free(model))
 
     async def list_models(self) -> tuple[ModelInfo, ...]:
         listed: JsonObject = await get_json(
@@ -240,7 +256,7 @@ class OpenCodeGoProvider:
             "opencode_go.models",
         )
         identifiers: list[str] = sorted({get_str(entry, "id") for entry in get_objects(listed, "data")} - {""})
-        return tuple(info_from_traits(model, go_traits(model)) for model in identifiers)
+        return tuple(info_from_traits(model, go_traits(model), go_free(model)) for model in identifiers)
 
     async def usage(self) -> GoUsage:
         """The subscription's quota windows (needs an active Go subscription; otherwise a 403 is raised)."""
