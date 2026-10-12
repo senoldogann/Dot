@@ -1706,6 +1706,18 @@ a.pill:hover {
   color: var(--warn);
 }
 
+/* On a chat's page while a run works (item 133), the choices wait for the next follow-up: the pills step back until
+   the pointer or the focus comes to them, and their tooltips say so. */
+.composer-pill[data-waiting] {
+  opacity: 0.5;
+}
+
+.composer-pill[data-waiting]:hover,
+.composer-pill[data-waiting]:focus-visible,
+.composer-pill[data-waiting][aria-expanded="true"] {
+  opacity: 1;
+}
+
 /* The send: round and in ink, quiet while the box holds no text (pressed then, it puts the caret in the box). */
 .composer .btn.send {
   width: 32px;
