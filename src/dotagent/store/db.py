@@ -59,7 +59,7 @@ from dotagent.tools.team import TEAM_SOURCE
 _SCHEMA: str = """
 CREATE TABLE IF NOT EXISTS threads (
     id TEXT PRIMARY KEY, title TEXT NOT NULL, source TEXT NOT NULL,
-    created_at REAL NOT NULL, updated_at REAL NOT NULL, pinned_at REAL
+    created_at REAL NOT NULL, updated_at REAL NOT NULL, pinned_at REAL, seen_at REAL
 );
 CREATE TABLE IF NOT EXISTS messages (
     thread_id TEXT NOT NULL, seq INTEGER NOT NULL, body TEXT NOT NULL,
@@ -289,6 +289,7 @@ def _summary(row: aiosqlite.Row) -> ThreadSummary:
         latest_status=row["latest_status"],
         latest_mode=row["latest_mode"],
         latest_created_at=row["latest_created_at"],
+        unread=bool(row["unread"]),
     )
 
 
@@ -497,8 +498,9 @@ _ADDED_SCHEDULE_COLUMNS: tuple[tuple[str, str], ...] = (
 
 # Columns of ``campaigns`` added later: NULL means the daemon's browser, which is where an older campaign's sessions ran.
 _ADDED_CAMPAIGN_COLUMNS: tuple[tuple[str, str], ...] = (("browser", "TEXT"),)
-# Columns of ``threads`` added later: NULL means a chat the owner has not pinned (item 130).
-_ADDED_THREAD_COLUMNS: tuple[tuple[str, str], ...] = (("pinned_at", "REAL"),)
+# Columns of ``threads`` added later: NULL means a chat the owner has not pinned (item 130), and one the owner has not
+# seen since its runs began or since they marked it unread (item 131).
+_ADDED_THREAD_COLUMNS: tuple[tuple[str, str], ...] = (("pinned_at", "REAL"), ("seen_at", "REAL"))
 # Columns of ``agents`` added later: NULL means the owner made the agent (item 99).
 _ADDED_AGENT_COLUMNS: tuple[tuple[str, str], ...] = (
     ("made_by", "TEXT"),
@@ -511,12 +513,17 @@ _ADDED_AGENT_COLUMNS: tuple[tuple[str, str], ...] = (
 DOT_LOOK_KEY: str = "look:dot"
 
 
-async def _add_columns(connection: aiosqlite.Connection, table: str, added: Sequence[tuple[str, str]]) -> None:
+async def _add_columns(
+    connection: aiosqlite.Connection, table: str, added: Sequence[tuple[str, str]]
+) -> tuple[str, ...]:
+    """Add the columns of ``added`` that ``table`` lacks; returns the names of those it added."""
     async with connection.execute(f"PRAGMA table_info({table})") as cursor:
         columns: set[str] = {str(row["name"]) for row in await cursor.fetchall()}
+    missing: tuple[str, ...] = tuple(name for name, _ in added if name not in columns)
     for name, definition in added:
-        if name not in columns:
+        if name in missing:
             await connection.execute(f"ALTER TABLE {table} ADD COLUMN {name} {definition}")
+    return missing
 
 
 async def _add_missing_columns(connection: aiosqlite.Connection) -> None:
@@ -526,7 +533,9 @@ async def _add_missing_columns(connection: aiosqlite.Connection) -> None:
     await _add_columns(connection, "schedules", _ADDED_SCHEDULE_COLUMNS)
     await _add_columns(connection, "campaigns", _ADDED_CAMPAIGN_COLUMNS)
     await _add_columns(connection, "agents", _ADDED_AGENT_COLUMNS)
-    await _add_columns(connection, "threads", _ADDED_THREAD_COLUMNS)
+    if "seen_at" in await _add_columns(connection, "threads", _ADDED_THREAD_COLUMNS):
+        # The chats of a store from before item 131 are taken as seen, so that none of them shows up unread at once.
+        await connection.execute("UPDATE threads SET seen_at = ?", (time.time(),))
     await connection.execute("CREATE INDEX IF NOT EXISTS runs_campaign ON runs(campaign_id, created_at)")
 
 
@@ -689,6 +698,16 @@ class Store:
             raise NotFoundError("thread not found", {"thread_id": thread_id})
 
     @_writing
+    async def see_thread(self, thread_id: str, seen: bool) -> None:
+        """Mark the chat seen now, or unseen, which makes it unread once its latest run has ended (item 131)."""
+        cursor: aiosqlite.Cursor = await self._db.execute(
+            "UPDATE threads SET seen_at = ? WHERE id = ?", (time.time() if seen else None, thread_id)
+        )
+        await self._db.commit()
+        if cursor.rowcount == 0:
+            raise NotFoundError("thread not found", {"thread_id": thread_id})
+
+    @_writing
     async def delete_thread(self, thread_id: str) -> None:
         await self._db.execute("DELETE FROM messages WHERE thread_id = ?", (thread_id,))
         await self._db.execute("DELETE FROM threads WHERE id = ?", (thread_id,))
@@ -701,14 +720,15 @@ class Store:
         in threads of their own: the campaign's page lists them, and the campaign's conversation stays a chat."""
         rows: list[aiosqlite.Row] = await self._all(
             "WITH ranked AS ("
-            " SELECT thread_id, id, status, mode, created_at,"
+            " SELECT thread_id, id, status, mode, created_at, finished_at,"
             "  ROW_NUMBER() OVER (PARTITION BY thread_id ORDER BY created_at DESC, rowid DESC) AS place,"
             "  COUNT(*) OVER (PARTITION BY thread_id) AS run_count"
             " FROM runs WHERE parent_run_id IS NULL"
             " AND (campaign_id IS NULL OR thread_id IN (SELECT thread_id FROM campaigns)))"
             " SELECT t.id, t.title, t.source, t.created_at, MAX(t.updated_at, r.created_at) AS updated_at,"
             "  t.pinned_at, r.run_count, r.id AS latest_run_id, r.status AS latest_status, r.mode AS latest_mode,"
-            "  r.created_at AS latest_created_at"
+            "  r.created_at AS latest_created_at,"
+            "  r.finished_at IS NOT NULL AND (t.seen_at IS NULL OR r.finished_at > t.seen_at) AS unread"
             " FROM threads AS t JOIN ranked AS r ON r.thread_id = t.id AND r.place = 1"
             " ORDER BY t.pinned_at IS NULL, t.pinned_at DESC, updated_at DESC LIMIT ?",
             (limit,),

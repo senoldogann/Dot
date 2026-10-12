@@ -2,7 +2,8 @@
 // and what works (folded or not, as the owner left them), the chats themselves (several of them can be deleted at once)
 // and, in the foot, the way to the settings and the emergency stop (item 120). A row whose run works says Working and
 // for how long (item 122). A chat's menu (item 130), after T3 Code's thread menu, pins it, names it, copies its link,
-// starts choosing chats with it and deletes it; the pinned chats come first, under Pinned.
+// starts choosing chats with it and deletes it; the pinned chats come first, under Pinned. A chat whose latest run
+// ended after it was last seen is unread (item 131): an accent dot, until it is opened, or Mark read.
 
 import { ApiError, api, request } from "./api.js";
 import { age, clip, clipWords, copyText, dateTime, debounce, el, foldSearch, plural, workingFor } from "./dom.js";
@@ -34,6 +35,8 @@ const ROW_CHARS = 56;
 const FOLDS_KEY = "dot.sideFolds";
 // What a status dot means, for screen readers; a chat whose latest run is done or cancelled shows no dot and needs no word.
 const STATUS_WORD = { queued: "queued", running: "running", blocked: "waiting for you", failed: "failed" };
+// The states of a run that is over: only such a chat can be marked unread (item 131).
+const ENDED = new Set(["done", "failed", "cancelled"]);
 const BUSY_MESSAGE = "A chat with a run under way cannot be deleted. Wait for the run to end, or cancel it, and try again.";
 // How often the ages at the right of the chats are read again, so a "5m" does not stay while the page rests.
 const AGE_REFRESH_MS = 60_000;
@@ -107,10 +110,16 @@ function workingSlot(since) {
   );
 }
 
+/** A chat's dot: the state of its latest run, in the accent while the chat is unread (item 131); a failed run keeps its
+ * red dot. A daemon from before item 131 sends no `unread`, and its chats are read. */
+function chatDot(chat) {
+  return el("span", { class: `status-dot s-${chat.latest_status}${chat.unread === true ? " unread" : ""}` });
+}
+
 /** A chat as a link: it opens on the latest run a person started on it. Its last activity is at the right, in the
  * fewest characters (item 121), or, while its latest run works, Working and for how long (item 122). */
 function chatLink(chat, onNavigate) {
-  const word = STATUS_WORD[chat.latest_status];
+  const word = [STATUS_WORD[chat.latest_status], chat.unread === true ? "unread" : undefined].filter((part) => part !== undefined).join(", ");
   const title = clip(chat.title, 120);
   return el(
     "a",
@@ -118,10 +127,10 @@ function chatLink(chat, onNavigate) {
       class: "side-run",
       href: `#/runs/${chat.latest_run_id}`,
       title: clip(chat.title, 240),
-      "aria-label": word === undefined ? null : `${title} (${word})`,
+      "aria-label": word === "" ? null : `${title} (${word})`,
       onclick: onNavigate,
     },
-    el("span", { class: `status-dot s-${chat.latest_status}` }),
+    chatDot(chat),
     el("span", { class: "side-run-goal" }, title),
     WORKING.has(chat.latest_status)
       ? workingSlot(chat.latest_created_at)
@@ -180,7 +189,7 @@ function chatPick(chat, checked, onToggle) {
     "label",
     { class: "side-run side-pick", title: clip(chat.title, 240) },
     box,
-    el("span", { class: `status-dot s-${chat.latest_status}` }),
+    chatDot(chat),
     el("span", { class: "side-run-goal" }, clip(chat.title, 120)),
   );
 }

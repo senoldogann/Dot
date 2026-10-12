@@ -1153,6 +1153,27 @@ async def test_a_chat_is_named_and_pinned_from_its_menu(client: httpx.AsyncClien
         assert (await client.patch(f"/api/threads/{older.id}", json=wrong)).status_code == 422, wrong
 
 
+async def _unread(client: httpx.AsyncClient, thread_id: str) -> bool:
+    listed: list[ThreadSummary] = [
+        ThreadSummary.model_validate(item) for item in (await client.get("/api/threads", params={"limit": 500})).json()
+    ]
+    return next(chat.unread for chat in listed if chat.id == thread_id)
+
+
+async def test_a_chat_is_marked_read_and_unread_from_its_menu(client: httpx.AsyncClient, runtime: Runtime) -> None:
+    chat, runs = await _chat(runtime, "ended chat", 1)
+    assert not await _unread(client, chat.id), "a run under way leaves its chat read"
+    await runtime.store.finish_run(runs[0].id, "done", "Done.")
+    assert await _unread(client, chat.id), "a run that ended in a chat not seen since makes it unread"
+    assert (await client.patch(f"/api/threads/{chat.id}", json={"seen": True})).status_code == 204
+    assert not await _unread(client, chat.id)
+    assert (await client.patch(f"/api/threads/{chat.id}", json={"seen": False})).status_code == 204
+    assert await _unread(client, chat.id)
+    assert (await client.patch("/api/threads/thr_nothing", json={"seen": True})).status_code == 404
+    for wrong in ({"seen": None}, {"seen": "yes"}, {"seen": 1}):
+        assert (await client.patch(f"/api/threads/{chat.id}", json=wrong)).status_code == 422, wrong
+
+
 @requires_model
 async def test_a_chat_with_a_run_under_way_is_kept_until_the_run_is_over(
     client: httpx.AsyncClient, runtime: Runtime
