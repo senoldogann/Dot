@@ -272,6 +272,8 @@ async def _checked_request(campaign: CampaignRecord, evidence: str, ctx: ToolCon
         facts=await asyncio.to_thread(checked_facts, facts, evidence, ctx.workspace),
         answer=evidence,
         claimed_success=True,
+        # A campaign keeps going by itself: its sessions go on until this check accepts the outcome.
+        keep_going=False,
     )
 
 
