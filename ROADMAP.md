@@ -5042,6 +5042,8 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 119 | The models: the prompt cache on OpenCode Go's Messages route, the free ones marked   | done        | acfc56a |
 | 120 | The run page's head: Stop in the send button's place, the emergency stop in the sidebar | done        | 6c1a7b3 |
 | 121 | The calm look, after T3 Code: the sidebar, the chat, the composer and the panel     | done        | 4f2b0cd |
+| 122 | The sidebar says what works: Working and its time on a chat's row and a working run's | planned     |         |
+| 123 | A helper folded in the chat: its row until the owner opens it                       | planned     |         |
 
 ### 77. The type system: Inter and Geist Mono, seven sizes, three weights
 
@@ -6883,6 +6885,73 @@ composer a card on a larger corner with a soft shadow; the panel's sections on h
 on a second look revealed on hover. Dot keeps its own: the faces, the mark, the type system and the colours of its
 states. The tour is read by eye at both widths and in both schemes.
 
+## Part 17: the sidebar says what works, a helper folded in the chat (planned 2026-10-12)
+
+The owner's seventeenth word, on 2026-10-12, after part 16: while helpers work, and an ordinary session too, the left
+menu could say something like "working …m", as T3 Code does; and by default a helper's content should be folded in the
+chat. Every word of it researched as written, and applied as exactly as it can be.
+
+**Status (2026-10-12): planned.** What is built today, and what the readings found. Dot's sidebar lists the chats under
+the days, each with a live dot (pulsing while its latest run works, amber while it waits for the owner, red when it
+failed) and, at the right, its last activity in the fewest characters (item 121, read again every minute). Above them
+the Working section lists the runs that work now (`GET /activity`), a run's helpers nested under it with their steps
+(item 68); no row says how long its run has worked. The chats' list carries no start of a run:
+`ThreadSummary.updated_at` is the later of the last message and the latest run's start, and a steer moves it. In a run's
+chat a helper is a row (item 82: its face with the state at the corner, its goal over the last thing it did, the time it
+has taken, the way to its own page and a chevron), a `details` that opens as the helper starts (`timeline.js
+childScope`, `open: true`), so its every step, message and answer stand in the parent's conversation while it works; it
+folds itself when it ends done and the reader has not touched it, and stays open when it failed. A question or an
+approval a helper asks lands as a card inside that panel. T3 Code, read from its repository (MIT, `apps/web/src`): a row
+of its sidebar shows its state where the time sits at rest (`Sidebar.tsx`); while the thread works, a dashed circle
+(Lucide's `CircleDashed`), the word Working and the time since the current work was asked for, in tabular figures, read
+again every second and counted in the fewest units ("12s", "4m", "1h 5m": `formatWorkingDurationLabel` in
+`Sidebar.logic.ts`), with no shimmer ("a label that animates forever is noise in a sidebar full of them"); a pending
+approval or question wins over Working, and a thread at rest shows its time. Its chat draws a helper as one row that
+never holds the helper's work (`V2LifecycleRow.tsx`, `SubagentTimelineLink`): the helper's face with its state, its
+title, one line of its progress (its result once it ended), its elapsed time and the way into its own thread; two or
+more helpers of a turn fold into one row, "3 subagents" over a count of their states ("1 working · 2 done"), closed
+until opened (`MessagesTimeline.tsx`, `V2SubagentGroup`).
+
+**The shape of this part (the decisions).** First the sidebar: a chat whose latest run works, and every run of the
+Working section with its helpers, says Working and how long, in T3 Code's words, units and mark, where the time sits at
+rest and in the colour of Dot's running state; a run that waits for the owner keeps its amber dot and its time, since
+the Waiting section names what it waits for. The chats' list learns when its latest run was asked for. Then the chat: a
+helper's row is closed from its start, its last line and its time saying what it does; an approval or a question it asks
+opens it, and the rows it sits in, because what needs the owner never hides in a fold; at its end it folds again unless
+the owner opened or closed it by hand. Dot's helpers keep their rows one under the other: T3 Code's group of several is
+not built.
+
+### How to start part 17 (the handoff prompt)
+
+> Read ROADMAP.md part 17 and the status table of part 9 (rows 122 and 123). One item at a time, in order; the protocol
+> of part 5 (branch, gate, PR, Linear MYP issue, squash merge, hash in the table, log line) is unchanged. Never touch
+> the owner's data directory except to read it and to restart the daemon when `/api/status` shows no active run; the
+> owner's goals stay out of this file; PLAN.md stays untracked. The owner reads Turkish; everything written is English.
+> Every UI item ends with the screenshot tour read by eye.
+
+### 122. The sidebar says what works: Working and its time on a chat's row and a working run's
+
+**Status: planned.**
+
+**What.** As T3 Code's sidebar does: where a row's time sits at rest, a chat whose latest run is queued or running shows
+a dashed circle, the word Working and the time since that run was asked for ("12s", "4m", "1h 5m"), read again every
+second; so does every run of the Working section, a helper under its parent included (those rows have no time today, so
+the state takes their right edge). The colour is Dot's running state's, the figures are tabular, and nothing shimmers. A
+run that waits for the owner keeps its amber dot and its time, and a schedule due in the Working section says when it is
+due, as before. `ThreadSummary` gains `latest_created_at`, when the chat's latest run was created, which a steer does
+not move. A smoke test reads the rows at both widths in both schemes and sees the figure move; the tour is read by eye.
+
+### 123. A helper folded in the chat: its row until the owner opens it
+
+**Status: planned.**
+
+**What.** In a run's chat a delegated run (a helper, or the run of an agent the run wrote to) is its row, closed from
+the moment it starts: its face and state, its goal over the last thing it did, the time it has taken and the way to its
+own page; the chevron opens its steps, messages and answer as today. An approval or a question the helper asks opens its
+row and the rows it sits in, so the card is in sight; when the helper ends, a row the owner never opened or closed by
+hand folds again. The README's chat passage follows, a smoke test opens and answers a helper's question, and the tour is
+read by eye.
+
 ## Log
 
 - 2026-10-08: roadmap written from the owner's go-ahead for all eight items, in this order. Nothing implemented yet.
@@ -7431,3 +7500,4 @@ states. The tour is read by eye at both widths and in both schemes.
 - 2026-10-12 (Opus 5.5): item 119 merged as `acfc56a` (PR #142, MYP-259 Done): OpenCode Go's Messages route sends the automatic cache mark (Claude Haiku 5.5 read 10,383 tokens of a repeated prompt from the cache with it, none without), Claude on Go goes to the Messages route (Claude Haiku 5.5 was sent to Chat Completions and refused), the catalog follows Go's list, the models Go serves free say Free in the picker, and Zen's free models stay out (OpenCode serves them only to its own client); 906 unit tests, 38 smoke tests and the live Go tests with the key.
 - 2026-10-12 (Opus 5.5): item 120 merged as `6c1a7b3` (PR #143, MYP-260 Done): the run page's top bar keeps the face, the name and the panel's switch (its facts in Details, which gained the agent and the campaign), the composer's send is the run's Stop while the run works and the box is empty (Steer once a word is typed), a delegated run's pill ends with a Stop, Continue is a line above the composer, the top bar's right keeps the approvals waiting and the connection while it is not live, and the emergency stop sits in the sidebar's foot (beside the sidebar's opener while the sidebar is closed); 906 unit tests, 14 smoke tests and the tour.
 - 2026-10-12 (Opus 5.5): item 121 merged as `4f2b0cd` (PR #144, MYP-261 Done): the look after T3 Code's, through Dot's tokens and in both schemes: the sidebar a tone darker than the page with no line between them and a chat's last activity at the right of its row, a tool step one quiet line with its body on a hairline, the composer on a corner of its own (24 px) with a soft shadow on every page, the run's panel one card with its sections on hairlines, and the answer's time and length on a second look where a pointer can hover; 906 unit tests, 117 smoke tests and the tour read by eye at both widths in both schemes; the daemon restarted on it with no run active.
+- 2026-10-12 (Opus 5.5): part 17 planned, items 122 and 123, from the owner's word after part 16 and a reading of T3 Code's sidebar and chat in its repository; no code changed.
