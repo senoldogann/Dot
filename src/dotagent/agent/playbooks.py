@@ -4,15 +4,15 @@
 A run is distilled when ``[agent] playbooks`` is on, it is a task run of its own (a delegated run's work is its
 parent's; an eval run is not asked), it ended done (its answer was checked, or its goal check found the outcome
 achieved) and it took at least ``[agent] skill_min_steps`` acting steps (every tool call but the ones that plan, ask,
-remember, consult or finish: :func:`acting_steps`). Once the run has ended, the review model reads a digest of those
-steps (:func:`acting_digest`) and writes the skill (:func:`dotagent.agent.review.playbook_writer_for`): the kind of
-work in a few words, the steps that worked, the parameters a later run fills in, and a one-sentence description. The
-kind names the folder, ``learned-<kind>/SKILL.md`` under ``<home>/playbooks`` (:func:`render_playbook`), with the
-evidence (the runs, the goal, the date, the acting steps) and a ``playbook.json`` that keeps the kind and counts the
-use; a kind that matches an existing skill by meaning (or, without embeddings, by name) updates that skill instead of
-writing another, its runs appended to the evidence. The skills catalog reads the folder like any skills directory, so
-later runs see the description under Skills, told it is advice from Dot's own work, and read the rest with the
-``skill`` tool.
+remember, consult, read a skill, find help or finish: :func:`acting_steps`). Once the run has ended, the review model
+reads a digest of those steps (:func:`acting_digest`) and writes the skill
+(:func:`dotagent.agent.review.playbook_writer_for`): the kind of work in a few words, the steps that worked, the
+parameters a later run fills in, and a one-sentence description. The kind names the folder, ``learned-<kind>/SKILL.md``
+under ``<home>/playbooks`` (:func:`render_playbook`), with the evidence (the runs, the goal, the date, the acting steps)
+and a ``playbook.json`` that keeps the kind and counts the use; a kind that matches an existing skill by meaning (or,
+without embeddings, by name) updates that skill instead of writing another, its runs appended to the evidence. The
+skills catalog reads the folder like any skills directory, so later runs see the description under Skills, told it is
+advice from Dot's own work, and read the rest with the ``skill`` tool.
 
 Every run that ended done or failed records its use of learned skills (the ``skill`` calls that named one): a skill
 read by :data:`MAX_FAILURES` runs that then failed is retired, moved under ``.retired`` where the catalog does not
@@ -35,6 +35,7 @@ from collections.abc import Iterator, Sequence
 from contextlib import contextmanager
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from pydantic import JsonValue, ValidationError
 
@@ -49,12 +50,15 @@ from dotagent.core.text import redact_secrets, truncate_tail
 from dotagent.core.types import FrozenModel, JsonObject
 from dotagent.evals import EVAL_SOURCE
 from dotagent.memory.ranking import Similar, Vector, most_similar
-from dotagent.runtime import Runtime
-from dotagent.skills.catalog import PLAYBOOK_SOURCE
+from dotagent.skills.catalog import PLAYBOOK_SOURCE, playbook_root
 from dotagent.skills.parse import parse_skill
-from dotagent.skills.types import SKILL_FILE, Skill
+from dotagent.skills.types import SKILL_FILE, Skill, SkillCatalog
 from dotagent.store.models import EventRecord, RunRecord, RunStatus
 from dotagent.tools.skill import SKILL_TOOL
+
+if TYPE_CHECKING:
+    # Only named: the runtime's tools import this module (find_help asks it for the skills a run is offered).
+    from dotagent.runtime import Runtime
 
 log = get_logger(__name__)
 
@@ -78,13 +82,14 @@ _RESULT_CHARS: int = 160
 # The kind of work names the folder: its letters and digits with single hyphens between.
 _UNSAFE: re.Pattern[str] = re.compile(r"[^a-z0-9]+")
 _SLUG_CHARS: int = 50
-# The tool calls that are not acting: they plan, ask, remember, consult, read a skill or end the run.
+# The tool calls that are not acting: they plan, ask, remember, consult, read a skill, find help or end the run.
 _NOT_ACTING: frozenset[str] = frozenset(
     {
         "finish",
         "ask_user",
         "use_tools",
         "skill",
+        "find_help",
         "consult",
         "delegate",
         "message_agent",
@@ -454,7 +459,24 @@ def list_playbooks(root: Path) -> tuple[PlaybookEntry, ...]:
     return (*_entries(root, False), *_entries(root / RETIRED_DIR, True))
 
 
-async def _record_uses(runtime: Runtime, run: RunRecord, status: RunStatus, events: Sequence[EventRecord]) -> None:
+async def offered_to_run(
+    config: AppConfig, skills: SkillCatalog, run_id: str, agent_id: str | None
+) -> tuple[Skill, ...]:
+    """The skills of ``skills`` that the run ``run_id`` of the agent ``agent_id`` is offered: every one but the learned
+    skills of other agents (item 94, :func:`offered_skills`); with the learned skills' records unreadable, none of
+    them."""
+    root: Path | None = playbook_root(config)
+    if root is None:
+        return skills.skills
+    try:
+        entries: tuple[PlaybookEntry, ...] = await asyncio.to_thread(list_playbooks, root)
+    except NotFoundError as error:
+        log.warning("playbooks_unreadable", run_id=run_id, error=error.message, context=error.context)
+        entries = ()
+    return offered_skills(skills.skills, entries, agent_id)
+
+
+async def _record_uses(runtime: "Runtime", run: RunRecord, status: RunStatus, events: Sequence[EventRecord]) -> None:
     root: Path = playbooks_dir()
     for name in used_playbooks(events):
         meta: PlaybookMeta | None = await asyncio.to_thread(record_use, root, name, status == "done")
@@ -480,7 +502,7 @@ def same_kind(kind: str, entries: Sequence[PlaybookEntry], vectors: Sequence[Vec
 
 
 async def _matching(
-    runtime: Runtime, kind: str, entries: Sequence[PlaybookEntry], agent_id: str | None
+    runtime: "Runtime", kind: str, entries: Sequence[PlaybookEntry], agent_id: str | None
 ) -> PlaybookEntry | None:
     """The active skill of ``kind`` among the ones a run of ``agent_id`` is offered (:func:`offered_to`), if any."""
     offered: list[PlaybookEntry] = [entry for entry in entries if offered_to(entry.meta, agent_id)]
@@ -492,7 +514,7 @@ async def _matching(
 
 
 async def _write_from(
-    runtime: Runtime, run: RunRecord, steps: Sequence[ActingStep], host: str
+    runtime: "Runtime", run: RunRecord, steps: Sequence[ActingStep], host: str
 ) -> tuple[Path, str, bool]:
     """Ask the review model for the skill of ``run`` and write it: a new folder, or the folder of the skill of the
     same kind. Returns the SKILL.md, the skill's name and whether it was updated rather than written."""
@@ -530,7 +552,7 @@ async def _write_from(
     return await asyncio.to_thread(write_playbook, root, playbook), playbook.name, False
 
 
-async def learn_playbook(runtime: Runtime, run: RunRecord, status: RunStatus) -> None:
+async def learn_playbook(runtime: "Runtime", run: RunRecord, status: RunStatus) -> None:
     """The skill work of a run that ended: record its use of learned skills, then, when it may be distilled, write
     the skill of its kind or update the one that exists. A review model that fails, or a folder that cannot be
     written, ends it with a ``playbook_failed`` event; the run keeps its end either way."""

@@ -328,7 +328,7 @@ answer (a small model that is offered both writes the call out as text).
 | macOS           | `apple_script`, `notify`, `code_fetch`                                                                             |
 | Memory, time    | `memory_save`, `memory_search`, `memory_forget`, `schedule_create`, `schedule_list`, `schedule_delete`             |
 | Orchestration   | `delegate`, `consult`, `update_plan`, `ask_user`, `finish`, `use_tools`                                            |
-| Skills          | `skill`                                                                                                            |
+| Skills          | `skill`, `find_help`                                                                                               |
 | MCP             | `mcp__<server>__<tool>`                                                                                            |
 
 The shell and the file tools work in `<home>/workspace` unless a path says otherwise. Any error of a tool fails that
@@ -1818,28 +1818,41 @@ every run.
 
 `dotx skills list` shows every plugin and skill found, and anything left out and why; `dotx doctor` has a row for each.
 
+**Finding help.** Before it takes a hard way (writing a script or a program for the work, clicking through an
+application or a site, trial and error in the shell), a run is told to call `find_help` with its need in a few plain
+words, and to call it again once a way has failed twice. It searches the skills the run is offered, the tools of the MCP
+servers that the run's mode allows and, when the run can use `apple_script`, the applications that AppleScript can
+drive: those whose Info.plist names a scripting dictionary or turns AppleScript on, in `/Applications`,
+`/System/Applications` (each with its `Utilities`), `/System/Library/CoreServices` and `~/Applications`, each told by
+the commands and classes of its dictionary's own suites (the suites that many applications share are ranked, not
+listed). It ranks them by the words they share with the need (BM25; case, accents, common words and plurals do not
+matter) and lists the best eight that score at least half as well as the best one, each with how to use it: `skill` with
+its name, the MCP tool by its name, or `apple_script` with `tell application`, and `sdef` with the application's path,
+which prints its whole dictionary. With nothing found, it says what to try next. It changes nothing.
+
 **Learned skills.** With `playbooks = true` in `[agent]` (the default), a task run of its own that ended done (its
 answer checked, or its goal check found the outcome achieved) after at least `skill_min_steps` (4) acting steps (every
-tool call but the ones that plan, ask, remember, consult, read a skill or finish) is followed, once it has ended, by one
-call of the review model that distils how it got there: from the acting steps (each tool call with its arguments and
-the start of its result; failed calls marked) the model names the kind of work in a few words, writes the steps that
-worked, one sentence each, with the values that change from goal to goal as parameters in angle brackets, and a
-one-sentence description. The skill is a folder `learned-<kind>/SKILL.md` under `<home>/playbooks` with "Kind of
-work", "When", "Steps", "Parameters" and "Evidence" (the goal, every run it was learned from with its acting steps,
-the date), plus a `playbook.json` that keeps the kind and counts its use. A later run of the same kind (matched by the
+tool call but the ones that plan, ask, remember, consult, read a skill, find help or finish) is followed, once it has
+ended, by one call of the review model that distils how it got there: from the acting steps (each tool call with its
+arguments and the start of its result; failed calls marked) the model names the kind of work in a few words, writes the
+steps that worked, one sentence each, with the values that change from goal to goal as parameters in angle brackets, and
+a one-sentence description. The skill is a folder `learned-<kind>/SKILL.md` under `<home>/playbooks` with "Kind of
+work", "When", "Steps", "Parameters" and "Evidence" (the goal, every run it was learned from with its acting steps, the
+date), plus a `playbook.json` that keeps the kind and counts its use. A later run of the same kind (matched by the
 meaning of the kind when embeddings are on, by its name otherwise) updates the skill rather than writing another: the
 steps are the newer run's, the evidence keeps every run. Later runs see it under Skills like any skill (its source is
 `learned`) with a note that it is advice from Dot's own work, to follow with their own parameters and judgement, and
 read it with the `skill` tool. Every run that ended done or failed counts the learned skills it read; one read by two
 runs that then failed is retired, moved under `<home>/playbooks/.retired`, and no longer offered. A review model that
 fails, or a folder that cannot be written, leaves a `playbook_failed` event on the run; a written or updated one a
-`playbook_written` event and a retired one a `playbook_retired` event. The distillation reads pages third parties
-wrote, so the skill never takes an instruction from them as a step, and never holds a secret, a one-time code, an
-e-mail address or a home path. Settings › Skills lists the learned skills (kind, where, the runs, how they fared, the
-retired ones apart, an agent's with its name and Share) with Drop; `dotx playbooks list` shows them with their use, `dotx playbooks show NAME` prints one
-and `dotx playbooks drop NAME` removes one, active or retired. Delegated runs, chats and evals (which always run
-without learned skills) write none. `dotx stats` counts the skills written, retired and read, and compares, per host,
-the runs that read a skill with the runs on that host that did not (act calls and seconds a run).
+`playbook_written` event and a retired one a `playbook_retired` event. The distillation reads pages third parties wrote,
+so the skill never takes an instruction from them as a step, and never holds a secret, a one-time code, an e-mail
+address or a home path. Settings › Skills lists the learned skills (kind, where, the runs, how they fared, the retired
+ones apart, an agent's with its name and Share) with Drop; `dotx playbooks list` shows them with their use,
+`dotx playbooks show NAME` prints one and `dotx playbooks drop NAME` removes one, active or retired. Delegated runs,
+chats and evals (which always run without learned skills) write none. `dotx stats` counts the skills written, retired
+and read, and compares, per host, the runs that read a skill with the runs on that host that did not (act calls and
+seconds a run).
 
 ## Delegation
 

@@ -5082,7 +5082,12 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 159 | A stop of the daemon is never a crash                                                | done        | 30a4480 |
 | 160 | Pages catch up after a break                                                         | done        | 4ff0b40 |
 | 161 | A chat's queue goes on after a clean restart                                         | done        | 2ff66d6 |
-| 162 | A run whose terminal closed can be resumed                                           | in progress |         |
+| 162 | A run whose terminal closed can be resumed                                           | done        | 3e33fdd |
+| 163 | A run finds the help this Mac offers before it takes the hard way                    | in progress |         |
+| 164 | The skills and MCP servers of the Mac's other agents are found                       | planned     |         |
+| 165 | Help found elsewhere is added only with the owner's yes                              | planned     |         |
+| 166 | A run's instructions list the help that fits its goal                                | planned     |         |
+| 167 | Evals show whether a run takes the easy way                                          | planned     |         |
 
 ### 77. The type system: Inter and Geist Mono, seven sizes, three weights
 
@@ -8559,7 +8564,7 @@ the queues.
 
 ### 162. A run whose terminal closed can be resumed
 
-**Status: in progress.**
+**Status: done.** Merged as `3e33fdd` (PR #199; no Linear issue, the Linear connector was signed out).
 
 **As built (2026-10-13).** Read again in the code first: `dotx run` (and `resume`, `chat`) ended its run on a closed
 terminal (SIGHUP) or SIGTERM as Ctrl-C does, as the owner's stop (`RESULT_STOPPED`), which is never resumed, while a
@@ -8579,6 +8584,100 @@ stopped, and it cannot be resumed.
 
 **What.** A run of `dotx run` whose terminal is closed, or that gets SIGTERM, can be resumed, by `dotx resume` or from
 its page, as a run cut by a stop of the daemon can; Ctrl-C stays the owner's stop.
+
+## Part 27: find help before the hard way (planned 2026-10-13)
+
+The owner's twenty-sixth word, on 2026-10-13, the one that asked for part 26, also asked why Dot tries every way by
+itself instead of looking first at the MCP servers and skills of the Mac it works on, which could make its work easier,
+and whether that is needed at all: the aim is a smarter system.
+
+**Status (2026-10-13): planned.** Read in the code first. What exists: the instructions already tell a run to use a
+matching skill or MCP tool before it builds something itself, and to prefer the shell and command-line programs, then
+APIs and MCP tools, then the web, then AppleScript, and the windows of the desktop last; every skill installed is listed
+in the instructions by its name and description, and the `skill` tool reads one; the tools of the configured MCP servers
+are in the tool list. What is missing: a run knows only what its instructions list, and nothing tells it what the Mac
+itself offers: which applications AppleScript can drive and what their dictionaries say, the skills and MCP servers that
+the Mac's other agents have set up, or a way to search all of it for a need. Every skill is listed whatever the goal, so
+the instructions grow with each one. The evals run without MCP servers and skills, and nothing measures whether a run
+took the easy way.
+
+**The shape of this part (the decisions).** Five items, each a pull request of its own: a run finds the help this Mac
+offers before it takes the hard way, with `find_help` over the skills it is offered, the tools of its MCP servers and
+the applications that AppleScript can drive (163); the skills and MCP servers of the Mac's other agents are found,
+read-only, their secrets never read (164); help found elsewhere is added to Dot only with the owner's yes (165); a run's
+instructions list the help that fits its goal, picked by relevance when there is much of it (166); evals show whether a
+run takes the easy way (167). The search is by words (BM25) first; meaning (embeddings) can join it with 166. Nothing is
+installed or configured without the owner.
+
+### How to start part 27 (the handoff prompt)
+
+> Read ROADMAP.md part 27 and the status table of part 9 (rows 163 to 167). One item at a time, in order; the protocol
+> of part 5 (branch, gate, PR, Linear MYP issue when the connector is signed in, squash merge, hash in the table, log
+> line) is unchanged. Read each gap again in the code before closing it, give each change a test that fails on the code
+> of before, and check a page that changes in a browser, wide and on a phone, light and dark. Read the configuration of
+> other agents by names and commands only, never a secret in it (an env value, a header, a token). Never touch the
+> owner's data directory except to read it, by the kinds and numbers of what is stored, and to restart the daemon when
+> `/api/status` shows no active run; PLAN.md stays untracked. The owner reads Turkish; everything written is English.
+
+### 163. A run finds the help this Mac offers before it takes the hard way
+
+**Status: in progress.**
+
+**As built (2026-10-13).** A new tool, `find_help`, in the core group and in every mode. Given a need in a few plain
+words, it searches the skills the run is offered (the learned skills of other agents left out, as in the instructions),
+the tools of the MCP servers that the run's mode allows and, when the run can use `apple_script`, the applications that
+AppleScript can drive: those whose Info.plist names a scripting dictionary (`OSAScriptingDefinition`) or turns
+AppleScript on (`NSAppleScriptEnabled`), in `/Applications`, `/System/Applications` (each with its `Utilities`),
+`/System/Library/CoreServices` and `~/Applications`. An application is told by the commands and classes of its
+dictionary's own suites, read from its `.sdef` file (at most 2 MB; the suites that many applications share are ranked,
+not listed), or as keeping its dictionary in no file of its own, or as having one that could not be read. The items are
+ranked by Okapi BM25 over their words (the name counted twice; case, accents, common words and plurals do not matter),
+and the best eight that score at least half as well as the best one are listed with how to use each: `skill` with its
+name, the MCP tool by its name, or `apple_script` with `tell application`, and `sdef` with the application's path, which
+prints the whole dictionary. With nothing found it says what to try next; it says so when applications were not
+searched. When the tool is offered, the instructions have a section, Help on this Mac: call `find_help` before a hard
+way (writing a script or a program for the work, clicking through an application or a site, trial and error in the
+shell), and again once a way has failed twice; the description of `apple_script` points to it. The filter of the learned
+skills moved from the loop to `offered_to_run`, which both use. Tests: through the real loop, a scripted run in a
+scratch home with a skill installed calls `find_help` and is told of that skill first, with how to use it, and that
+applications were not searched (the eval configuration has no desktop); this failed on the code of before, where the
+tool was unknown. On the Mac, and on the CI's, Calendar comes first for adding an event to a calendar, with the classes
+of its own dictionary. Unit tests rank a fixed set of items and read application bundles made in a temporary folder: own
+suites listed and the standard suite not, an application without a dictionary file, one whose dictionary is not XML, one
+that is not scriptable.
+
+**What.** A run can ask what this Mac already offers for a need (the skills it is offered, the tools of its MCP servers,
+the applications that AppleScript can drive, by their own dictionaries) and is told how to use what fits; its
+instructions tell it to ask before it takes a hard way.
+
+### 164. The skills and MCP servers of the Mac's other agents are found
+
+**Status: planned.**
+
+**What.** The skills and MCP servers that the Mac's other agents have set up (the skills and plugins of Claude Code, the
+MCP servers of Claude Desktop, Claude Code and Cursor) are found and shown, read-only: their names, descriptions and
+commands, never a secret (an env value, a header, a token).
+
+### 165. Help found elsewhere is added only with the owner's yes
+
+**Status: planned.**
+
+**What.** A skill or an MCP server found elsewhere is added to Dot only when the owner says yes, in Settings or when a
+run asks; nothing is installed or configured without that yes.
+
+### 166. A run's instructions list the help that fits its goal
+
+**Status: planned.**
+
+**What.** A run's instructions list the skills and tools that fit its goal, picked by relevance when there are many,
+instead of every one; the rest stay a `find_help` call away.
+
+### 167. Evals show whether a run takes the easy way
+
+**Status: planned.**
+
+**What.** Evals measure whether a run takes the easy way: tasks that a skill, an MCP tool or a scriptable application
+makes short, scored by the steps and the channel the run took.
 
 ## Log
 
@@ -9176,3 +9275,4 @@ its page, as a run cut by a stop of the daemon can; Ctrl-C stays the owner's sto
 - 2026-10-13 (Opus 5.5): item 159 merged as `30a4480` (PR #196; no Linear issue, the connector was signed out): a stop of the daemon no longer waits for a reflection under way, and a step it cuts keeps the results of the calls that had ended.
 - 2026-10-13 (Opus 5.5): item 160 merged as `4ff0b40` (PR #197; no Linear issue, the connector was signed out): every page that follows the stream of the lifecycle reads again what it shows once the stream is back after a break, and a run's page reads its run again.
 - 2026-10-13 (Opus 5.5): item 161 merged as `2ff66d6` (PR #198; no Linear issue, the connector was signed out): a start of the daemon no longer holds the queue of a chat whose run a shutdown of the daemon cut off, so the queue goes on once that run, resumed, ends done; a crash still holds it.
+- 2026-10-13 (Opus 5.5): item 162 merged as `3e33fdd` (PR #199; no Linear issue, the connector was signed out): a run of `dotx run` whose terminal was closed, or that got SIGTERM, is cut off rather than stopped and can be resumed by hand; Ctrl-C stays the owner's stop. Part 26 is done; part 27, find help before the hard way, is planned.

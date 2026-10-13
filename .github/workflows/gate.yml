@@ -61,6 +61,7 @@ jobs:
           tests/smoke/test_cli_run_end.py
           tests/smoke/test_doctor.py
           tests/smoke/test_evals_runner.py
+          tests/smoke/test_find_help.py
           tests/smoke/test_helpers.py
           tests/smoke/test_left_questions.py
           tests/smoke/test_lessons.py

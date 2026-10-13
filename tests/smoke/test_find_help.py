@@ -1,0 +1,93 @@
+"""find_help (item 163): a run looks for the help its Mac offers before it takes the hard way. Through the real loop,
+the scripted model asks find_help for what it needs and is told first of the skill installed for it, with how to use
+it; and on this Mac, Calendar is found scriptable, with the commands and classes of its own dictionary, for adding an
+event to a calendar.
+
+No network and no model service is used: the scripted model plays the run.
+"""
+
+import asyncio
+
+import pytest
+import pytest_asyncio
+
+from dotagent.agent.manager import RunManager
+from dotagent.config import load_default_config
+from dotagent.core.paths import skills_dir
+from dotagent.evals.runner import SCRIPTED_MODEL, eval_config, eval_environment, scratch_home
+from dotagent.evals.scripted import ScriptedProvider
+from dotagent.evals.types import ScriptedCall, ScriptedTurn
+from dotagent.help.apps import APP_ROOTS, scriptable_apps
+from dotagent.help.rank import rank
+from dotagent.help.types import HelpItem
+from dotagent.llm.router import parse_model_ref
+from dotagent.llm.types import Message
+from dotagent.runtime import Runtime, close_runtime, open_runtime
+from dotagent.server import UI_SOURCE
+from dotagent.store.models import RunRecord
+from dotagent.tools.meta import FINISH_TOOL
+from dotagent.tools.shell import read_login_env
+
+pytestmark = pytest.mark.asyncio(loop_scope="module")
+
+GOAL: str = "Write this week's report."
+NEED: str = "write the weekly report from my notes"
+SKILL: str = """---
+name: weekly-report
+description: Write the weekly report from the week's notes, in the owner's format.
+---
+Read the notes of the week, then write report.md with one section per project.
+"""
+_PROVIDER: str = parse_model_ref(SCRIPTED_MODEL).provider
+_TIME_LIMIT_S: float = 60.0
+_ASK: ScriptedTurn = ScriptedTurn(text="", calls=(ScriptedCall(tool="find_help", arguments={"need": NEED}),))
+_FINISH: ScriptedTurn = ScriptedTurn(
+    text="", calls=(ScriptedCall(tool=FINISH_TOOL, arguments={"answer": "report.md is written.", "success": True}),)
+)
+
+
+@pytest_asyncio.fixture(scope="module", loop_scope="module")
+async def login_env() -> dict[str, str]:
+    return await read_login_env(load_default_config().shell.login_env_timeout_s, ())
+
+
+async def test_a_run_asks_find_help_and_is_told_first_of_the_skill_installed_for_its_need(
+    login_env: dict[str, str],
+) -> None:
+    with scratch_home() as home, eval_environment(home, {}):
+        folder = skills_dir() / "weekly-report"
+        folder.mkdir(parents=True)
+        (folder / "SKILL.md").write_text(SKILL, encoding="utf-8")
+        runtime: Runtime = await open_runtime(eval_config(load_default_config()), login_env)
+        try:
+            await runtime.router.register(_PROVIDER, ScriptedProvider(_PROVIDER, [_ASK, _FINISH]))
+            manager: RunManager = RunManager(runtime)
+            try:
+                run: RunRecord = await manager.start(
+                    GOAL, "task", SCRIPTED_MODEL, None, UI_SOURCE, None, None, "yolo", False, ()
+                )
+                async with asyncio.timeout(_TIME_LIMIT_S):
+                    done: RunRecord = await manager.wait(run.id)
+            finally:
+                await manager.shutdown()
+            messages: list[Message] = await runtime.store.load_messages(done.thread_id, 0)
+        finally:
+            await close_runtime(runtime)
+    answers: list[str] = [message.content for message in messages if message.role == "tool"]
+    assert done.status == "done", done.result
+    # The answer of find_help, then the one of finish.
+    assert len(answers) == 2, answers
+    lines: list[str] = answers[0].splitlines()
+    assert lines[0] == f"Help on this Mac for: {NEED}", answers[0]
+    assert lines[1].startswith("1. Skill weekly-report: Write the weekly report"), answers[0]
+    assert 'call skill with name "weekly-report"' in lines[1], answers[0]
+    # The eval's configuration has no desktop, so the run cannot script applications, and is told so.
+    assert "scriptable applications were not searched" in answers[0], answers[0]
+
+
+async def test_calendar_is_found_scriptable_by_its_own_dictionary_for_adding_an_event() -> None:
+    apps: list[HelpItem] = await asyncio.to_thread(scriptable_apps, APP_ROOTS)
+    best: list[HelpItem] = rank(apps, "add an event to a calendar", 3)
+    assert [item.name for item in best][:1] == ["Calendar"], [item.name for item in best]
+    assert "classes" in best[0].summary and "event" in best[0].summary, best[0].summary
+    assert 'tell application "Calendar"' in best[0].use, best[0].use

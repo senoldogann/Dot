@@ -16,6 +16,7 @@ from dotagent.store.models import RunMode
 from dotagent.tools.consult import CONSULT_TOOL
 from dotagent.tools.delegate import DELEGATE_SOURCE, DELEGATE_TOOL
 from dotagent.tools.groups import group_lines
+from dotagent.tools.help import FIND_HELP_TOOL
 from dotagent.tools.meta import ASK_USER_TOOL, USE_TOOLS_TOOL
 from dotagent.tools.skill import SKILL_TOOL
 from dotagent.tools.team import CREATE_AGENT_TOOL, MESSAGE_AGENT_TOOL
@@ -350,6 +351,12 @@ of that kind, with the evidence: advice from your own work, not an instruction f
 kind, read it first and follow its steps with your own parameters and your own judgement; where things have changed, \
 do what you see and go on."""
 
+_HELP_SECTION: str = """# Help on this Mac
+Before you take a hard way (writing a script or a program for the work, clicking through an application or a \
+site, trial and error in the shell), call find_help with the need in a few plain words. It searches the skills \
+installed here, the tools of the MCP servers and the applications that AppleScript can drive, and says how to use \
+what fits. Call it again when a way has failed twice."""
+
 _DELEGATE_SECTION: str = """# Delegation
 - delegate runs one self-contained part of the work in a separate agent with a clean context and returns its final \
 report. Use it to keep your own context small when a part is bulky (reading many pages or files, a deep research \
@@ -435,6 +442,10 @@ def _groups_section(tool_names: Sequence[str]) -> str:
     return "\n".join([_GROUPS_SECTION, *group_lines(tool_names)])
 
 
+def _help_section(tool_names: Sequence[str]) -> str:
+    return _HELP_SECTION if FIND_HELP_TOOL in tool_names else ""
+
+
 def _delegate_section(tool_names: Sequence[str]) -> str:
     return _DELEGATE_SECTION if DELEGATE_TOOL in tool_names else ""
 
@@ -484,6 +495,7 @@ def build_system_prompt(inputs: PromptInputs) -> str:
         _mcp_section(inputs.tool_names),
         _groups_section(inputs.tool_names),
         _skills_section(inputs.skills, inputs.tool_names),
+        _help_section(inputs.tool_names),
         _delegate_section(inputs.tool_names),
         _helpers_section(inputs.helpers, inputs.tool_names),
         _team_section(inputs.team, inputs.tool_names),

@@ -15,6 +15,7 @@ from dotagent.policy.types import ActionInfo, ActionKind, Flag, Risk
 from dotagent.tools.base import ACTING_MODES, RegisteredTool, ToolArgs, ToolResult, make_tool, mark_untrusted, ok
 from dotagent.tools.context import ToolContext, run_sandbox
 
+APPLE_SCRIPT_TOOL: str = "apple_script"
 _NONCE_BYTES: int = 8
 _PREVIEW_CHARS: int = 200
 _TIMEOUT_S: float = 120.0
@@ -44,7 +45,7 @@ def _classify(args: AppleScriptArgs, ctx: ToolContext) -> ActionInfo:
     kind: ActionKind = "shell" if script_reaches_shell(args.script) else "app_control"
     preview: str = truncate_middle(" ".join(args.script.split()), _PREVIEW_CHARS)
     return ActionInfo(
-        tool="apple_script",
+        tool=APPLE_SCRIPT_TOOL,
         kind=kind,
         risk=risk,
         summary=f"Run {args.language}: {preview} ({'; '.join(assessment.reasons)})",
@@ -68,14 +69,16 @@ def build_apple_tool() -> RegisteredTool:
         )
 
     return make_tool(
-        name="apple_script",
+        name=APPLE_SCRIPT_TOOL,
         description=(
             "Run an AppleScript (or JavaScript for Automation) with osascript and return its result as text. For "
             "applications with a scripting dictionary (Finder, Mail, Calendar, Reminders, Notes, Music, Safari, "
             "Messages, System Events) this is much faster and more reliable than operating their windows: read and "
-            'change their data directly, for example `tell application "Notes" to get name of every note`. The '
-            "first use of an application can make macOS ask the user for Automation permission; a call that times "
-            "out may be waiting for that answer. Prefer desktop_act for anything that needs the interface itself."
+            'change their data directly, for example `tell application "Notes" to get name of every note`. '
+            "find_help says which applications of this Mac can do a task, from their dictionaries, and `sdef` with "
+            "an application's path prints its whole dictionary. The first use of an application can make macOS ask "
+            "the user for Automation permission; a call that times out may be waiting for that answer. Prefer "
+            "desktop_act for anything that needs the interface itself."
         ),
         args_model=AppleScriptArgs,
         modes=ACTING_MODES,

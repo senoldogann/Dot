@@ -60,6 +60,7 @@ from dotagent.tools.consult import build_consult_tools
 from dotagent.tools.delegate import build_delegate_tools
 from dotagent.tools.desktop import build_desktop_tools, sized_for_agent
 from dotagent.tools.files import build_file_tools
+from dotagent.tools.help import build_find_help_tool
 from dotagent.tools.judge_items import build_judge_items_tool
 from dotagent.tools.mcp import build_mcp_tools
 from dotagent.tools.memory import build_memory_tools
@@ -137,7 +138,7 @@ def _tool_groups(config: AppConfig, judge_items: bool) -> tuple[tuple[Registered
         build_team_tools(),
         build_consult_tools(),
         build_meta_tools(),
-        (build_skill_tool(),),
+        (build_skill_tool(), build_find_help_tool()),
         *((build_terminal_tools(),) if config.shell.terminal_sessions > 0 else ()),
         *((build_code_tools(),) if config.policy.code_sources else ()),
         *(((build_judge_items_tool(),), build_post_tools()) if judge_items else ()),
