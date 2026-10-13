@@ -910,37 +910,45 @@ round trips a model spends on work that cannot be done in one. Two tasks run aga
 on a loopback port (no network, no account): a research run that reads the careers pages of ten companies, one of
 them linked to a dead address and one behind a redirect, and reports a table (a long task: it is where the compactions
 and the not-found pages of a long run are counted); and a run in goal mode that fills in and submits a form in the
-headless browser, whose end the review model checks against the goal on the confirmation page.
+headless browser, whose end the review model checks against the goal on the confirmation page. Three tasks bring help
+that makes them short, and ask whether a run takes it: a skill that states the house style a memo has to follow (the
+only way to pass), a skill whose one command totals a quarter's paid orders, and a tool of a small MCP server the evals
+ship (`python -m dotagent.evals.tool_server`) that counts working days; the last two can also be done the hard way, by
+reading the files and working it out.
 
 | Command                                                  | What it does                                                                                                                                                                                                       |
 | -------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `dotx eval list`                                         | The tasks, with their kind, mode and number of checks.                                                                                                                                                             |
-| `dotx eval check`                                        | Needs no model and costs nothing. Replays the reference solution of every task through the real loop, tools and policy, and proves that a run that touches nothing and says "done" fails every task. Run it after changing a tool, the policy or the loop. |
+| `dotx eval check`                                        | Needs no model and costs nothing. Replays the reference solution of every task through the real loop, tools and policy, and proves that a run that touches nothing and says "done" fails every task and that the reference of a task with an easy way takes it. Run it after changing a tool, the policy or the loop. |
 | `dotx eval run [--model REF] [--task ID]... [--repeat N]` | Plays the tasks against a model (the configured main model if none is given) and prints the score. It spends the tokens of that model: an attempt is cut after 300 s or 600000 tokens, and the notice before it starts states the ceiling. `--repeat` plays every task several times, which shows the tasks a model passes only now and then. |
-| `dotx eval report [FILE...]`                             | The score of saved runs, with a comparison table when there are several and, for exactly two files, a line with the second against the first (passed, steps, tokens and seconds per pass, the one-step act and cache shares in percentage points, tool errors, stalls, false claims, unproven steps); without a file, every run saved under `<home>/evals/`. |
+| `dotx eval report [FILE...]`                             | The score of saved runs, with a comparison table when there are several and, for exactly two files, a line with the second against the first (passed, steps, tokens and seconds per pass, the one-step act and cache shares in percentage points, tool errors, stalls, false claims, unproven steps, the share of the easy ways taken); without a file, every run saved under `<home>/evals/`. |
 
 Every attempt runs unattended in a throw-away Dot home (its own database and workspace, removed afterwards), with the
-Mac desktop, your MCP servers, skills, plugins and the memory embeddings switched off, and with every question of the
-policy or of the agent unanswered (one the run waits for is refused at once). Your own database, workspace and
-screenshots are never touched; the API keys the model needs are looked up first and handed over by name. The score holds
-the pass rate, per kind of task, what a pass costs in steps, tokens and seconds (split into model calls and tool calls),
-the share of the act calls that carried one step and the share of the input tokens served from the prompt cache (both
-as `dotx stats` counts them, over every attempt), how often a tool call failed, stalls, runs that were cut, runs that
-said they were done and were not, plan steps marked done without evidence (zero since the plan tools require it) and
-done steps whose evidence the goal check could not bear out (counted from the `goal_check` events, so only in goal
-mode), compactions per 100 steps and the share of the model time their summaries took, web pages not found and calls
-refused for their arguments (as `dotx stats` counts them; `-` in a report saved before they were), how many of the
-attempts at a task that hides an instruction in one of its files (a note "to the AI assistant" in an invoice, a hidden
-block in a saved page, a line in a notes file) followed it, and the tasks that passed only in some attempts. The token ceiling of an attempt
-counts every model call of the run and of the runs it delegated to, side calls included; a report saved before model
-calls were timed counted the steps' tokens only and has no seconds, and one saved before acts and cached tokens were
-counted shows `-` for their shares. `dotx eval run` saves its report after every attempt, so an interrupted run keeps
-what it measured.
+Mac desktop, your MCP servers, skills, plugins and the memory embeddings switched off (a task that brings skills or an
+MCP server has those alone), and with every question of the policy or of the agent unanswered (one the run waits for is
+refused at once). Your own database, workspace and screenshots are never touched; the API keys the model needs are
+looked up first and handed over by name. The score holds the pass rate, per kind of task, what a pass costs in steps,
+tokens and seconds (split into model calls and tool calls), the share of the act calls that carried one step and the
+share of the input tokens served from the prompt cache (both as `dotx stats` counts them, over every attempt), how often
+a tool call failed, stalls, runs that were cut, runs that said they were done and were not, plan steps marked done
+without evidence (zero since the plan tools require it) and done steps whose evidence the goal check could not bear out
+(counted from the `goal_check` events, so only in goal mode), compactions per 100 steps and the share of the model time
+their summaries took, web pages not found and calls refused for their arguments (as `dotx stats` counts them; `-` in a
+report saved before they were), how many of the attempts at a task that hides an instruction in one of its files (a note
+"to the AI assistant" in an invoice, a hidden block in a saved page, a line in a notes file) followed it, how many of
+the attempts at a task that help makes short took its easy way (a call of the skill or MCP tool it names that ran; a
+call that did not run does not count) and what a pass costs in steps when it did and when it did not, how often
+find_help was called (`-` in a report saved before these were counted), and the tasks that passed only in some attempts.
+The token ceiling of an attempt counts every model call of the run and of the runs it delegated to, side calls included;
+a report saved before model calls were timed counted the steps' tokens only and has no seconds, and one saved before
+acts and cached tokens were counted shows `-` for their shares. `dotx eval run` saves its report after every attempt, so
+an interrupted run keeps what it measured.
 
 A task is data (`src/dotagent/evals/catalog.py`): the files the workspace starts with, the goal, checks (a file exists,
-holds or equals something, a JSON file equals a value, a command exits with 0, the answer contains or does not
-contain something), the checks that hold unless the run followed an instruction hidden in a file, and a reference
-solution as a script of tool calls. To add one, write it there and run `dotx eval check`.
+holds or equals something, a JSON file equals a value, a command exits with 0, the answer contains or does not contain
+something), the checks that hold unless the run followed an instruction hidden in a file, the skills and MCP servers it
+brings and the easy way they offer, and a reference solution as a script of tool calls. To add one, write it there and
+run `dotx eval check`.
 
 ## The daemon, the web UI and the service
 

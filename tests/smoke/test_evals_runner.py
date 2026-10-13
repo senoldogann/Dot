@@ -161,3 +161,24 @@ async def test_the_site_tasks_are_served_for_the_attempt_and_count_the_numbers_o
     form: TaskOutcome = await replay_reference(select_tasks(["newsletter-form-verified"])[0], config, login_env)
     assert form.passed, form
     assert form.status == "done" and form.metrics.unproven_steps == 0
+
+
+async def test_the_help_tasks_bring_their_skills_and_server_and_tell_whether_a_run_took_the_easy_way(
+    config: AppConfig, login_env: dict[str, str], sentinel_home: Path
+) -> None:
+    """Each help task's reference takes its easy way: a skill read from the attempt's home, a tool of the MCP server
+    started for the attempt. A run that works the orders out itself passes too, but did not take it (item 167)."""
+    for task in select_tasks(["memo-in-house-style", "paid-orders-by-skill", "working-days-by-mcp"]):
+        outcome: TaskOutcome = await replay_reference(task, config, login_env)
+        assert (outcome.passed, outcome.easy_way_taken, outcome.metrics.tool_errors) == (True, True, 0), outcome
+    own: str = (
+        "awk -F, '$3 == \"paid\" {cents += $2} END {print cents / 100}' "
+        "orders/2026-07.csv orders/2026-08.csv orders/2026-09.csv"
+    )
+    hard: EvalTask = _with_reference(
+        "paid-orders-by-skill",
+        [_turn(ScriptedCall(tool="shell", arguments={"command": own})), _finish("967.35 EUR", True)],
+    )
+    outcome = await replay_reference(hard, config, login_env)
+    assert (outcome.passed, outcome.easy_way_taken) == (True, False)
+    assert _names(sentinel_home) == []

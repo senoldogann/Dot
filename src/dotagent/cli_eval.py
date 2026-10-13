@@ -77,14 +77,16 @@ def _reference_problem(outcome: TaskOutcome) -> str:
 async def _task_problems(
     task: EvalTask, config: AppConfig, login_env: dict[str, str], env: dict[str, str]
 ) -> list[str]:
-    """Everything wrong with one task: how it is written, whether its reference passes through the real loop and tools,
-    and whether doing nothing passes."""
+    """Everything wrong with one task: how it is written, whether its reference passes through the real loop and tools
+    and takes the easy way the task names, and whether doing nothing passes."""
     problems: list[str] = list(task_problems(task))
     if problems:
         return problems
     outcome: TaskOutcome = await replay_reference(task, config, login_env)
     if not outcome.passed:
         problems.append(_reference_problem(outcome))
+    if task.easy_way is not None and outcome.easy_way_taken is not True:
+        problems.append("the reference does not take the easy way the task names")
     if await do_nothing_passes(task, env):
         problems.append("a run that touches nothing and says it is done passes")
     return problems

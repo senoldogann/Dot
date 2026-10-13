@@ -9,12 +9,13 @@ from typing import Annotated, Literal
 
 from pydantic import Field, JsonValue
 
+from dotagent.config import McpServerConfig
 from dotagent.core.types import FrozenModel, JsonObject
 from dotagent.store.models import RunMode
 
 type ExpectedEnding = Literal["done", "failed"]
 type TaskCategory = Literal[
-    "files", "shell", "coding", "recovery", "multi_step", "research", "honesty", "safety", "browser"
+    "files", "shell", "coding", "recovery", "multi_step", "research", "honesty", "safety", "browser", "help"
 ]
 
 
@@ -23,6 +24,23 @@ class FileSeed(FrozenModel):
 
     path: str
     content: str
+
+
+class SkillSeed(FrozenModel):
+    """A skill an attempt's home holds (item 167): ``<home>/skills/<name>/SKILL.md``, with ``name`` and ``description``
+    in its frontmatter and ``body`` after it."""
+
+    name: str = Field(pattern=r"^[a-z][a-z0-9-]{0,63}$")
+    description: str
+    body: str
+
+
+class EasyWay(FrozenModel):
+    """What makes a task short (item 167): the tool that does most of it and, when that is the skill tool, the skill it
+    reads. An attempt took the easy way when its run called that tool, for that skill."""
+
+    tool: str
+    skill: str | None
 
 
 class SitePage(FrozenModel):
@@ -138,6 +156,8 @@ class EvalTask(FrozenModel):
     to prove that the task can be passed and that the checks accept it. ``site`` are the pages of a local site the
     attempt serves on a loopback port for the task (none for most tasks); the goal and the reference name its address
     as ``{site}``. ``goal_mode`` runs the task in goal mode, where the review model checks the end against the goal.
+    ``skills`` are the skills the attempt's home holds and ``servers`` the MCP servers its run is given, help that
+    makes the task short; ``easy_way`` names the tool of that help (item 167), ``None`` for a task without one.
     """
 
     id: str = Field(pattern=r"^[a-z][a-z0-9-]{0,39}$")
@@ -153,3 +173,6 @@ class EvalTask(FrozenModel):
     token_budget: int
     site: tuple[SitePage, ...]
     goal_mode: bool
+    skills: tuple[SkillSeed, ...]
+    servers: tuple[McpServerConfig, ...]
+    easy_way: EasyWay | None

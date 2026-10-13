@@ -5086,8 +5086,8 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 163 | A run finds the help this Mac offers before it takes the hard way                    | done        | 4eb3a6c |
 | 164 | The skills and MCP servers of the Mac's other agents are found                       | done        | 490749a |
 | 165 | Help found elsewhere is added only with the owner's yes                              | done        | 52a7c02 |
-| 166 | A run's instructions list the help that fits its goal                                | in progress |         |
-| 167 | Evals show whether a run takes the easy way                                          | planned     |         |
+| 166 | A run's instructions list the help that fits its goal                                | done        | c3a6b83 |
+| 167 | Evals show whether a run takes the easy way                                          | in progress |         |
 
 ### 77. The type system: Inter and Geist Mono, seven sizes, three weights
 
@@ -8741,7 +8741,7 @@ needs one is told to ask the owner, and nothing is installed or configured witho
 
 ### 166. A run's instructions list the help that fits its goal
 
-**Status: in progress.**
+**Status: done.** Merged as `c3a6b83` (PR #203; no Linear issue, the Linear connector was signed out).
 
 **As built (2026-10-13).** A run's instructions list at most `listed` skills (`[skills] listed`, 20, at least 1). A run
 offered more is listed those that share the most words with its goal and with the goals of the latest earlier runs of
@@ -8766,7 +8766,32 @@ instead of every one; the rest stay a `find_help` call away.
 
 ### 167. Evals show whether a run takes the easy way
 
-**Status: planned.**
+**Status: in progress.**
+
+**As built (2026-10-13).** A task of the catalog can bring help: skills, written into the skills folder of the attempt's
+throw-away home, and MCP servers, added to its run's configuration (the owner's own stay switched off). Its `easy_way`
+names the tool of that help, and the skill when that tool is `skill`; an attempt took it when a call of that tool, for
+that skill, ran without failing, so a call that did not run (its tool group off, or refused by the policy) does not
+count. Three tasks of a new kind, `help`: a memo in a house style that only a skill states (`memo-in-house-style`, the
+only way to pass); a quarter's paid orders, which a skill's one command totals (`paid-orders-by-skill`); and the working
+days between two dates, which a tool of the evals' own MCP server counts (`working-days-by-mcp`;
+`python -m dotagent.evals.tool_server`, a stdio server with one read-only tool). The last two can also be done the hard
+way, by reading the files and working it out. An attempt's outcome says whether it took the easy way (`easy_way_taken`;
+none for the other tasks and in older reports), and its metrics count the calls of find_help. The score says how many
+attempts at such tasks took the easy way and what a pass cost in steps when it did and when it did not, with find_help's
+calls; the line of two reports gives the share taken in percentage points, and the comparison table has a column for it.
+`dotx eval check` replays the three references through the real loop (the skills read from the attempt's home, the MCP
+server started and its tool's answer returned) and reports a reference that does not take its task's easy way; the
+catalog's own check reports an easy way that is not one of the task's help. Not done: a task that a scriptable
+application makes short, as the evals run without the Mac desktop so that a result does not depend on the Mac's
+applications; and a measurement, as no model has played the three tasks yet. Tests: unit tests of the easy way (the
+right skill, another skill, an MCP call that did not run and then one that ran), of find_help's count, of the score's
+line, difference and column (`-` for an older report), of the catalog's check, and of the working days (32 from 2 March
+to 17 April 2026). A smoke test replays the three references through the real loop, each taking its easy way, and a run
+that works the orders out itself, which passes without it, and checks that the user's home stays empty. Failed before:
+an easy way counted from the call alone counted a call that did not run; with a reference that skips the skill, without
+the skills written into the home, or without the server given to the run, `dotx eval check` reported that the reference
+does not take the easy way; and with the skills folder taken before the attempt's home is set, the smoke test failed.
 
 **What.** Evals measure whether a run takes the easy way: tasks that a skill, an MCP tool or a scriptable application
 makes short, scored by the steps and the channel the run took.
@@ -9371,3 +9396,4 @@ makes short, scored by the steps and the channel the run took.
 - 2026-10-13 (Opus 5.5): item 163 merged as `4eb3a6c` (PR #200; no Linear issue, the connector was signed out): a run can call `find_help` with its need in a few plain words and is told what fits among the skills it is offered, the tools of its MCP servers and the applications that AppleScript can drive, with how to use each; its instructions tell it to call it before it takes a hard way.
 - 2026-10-13 (Opus 5.5): item 164 merged as `490749a` (PR #201; no Linear issue, the connector was signed out): the skills and MCP servers that the Mac's other agents set up are found and shown, read-only and never with a key, in `dotx skills list`, `GET /api/skills/elsewhere` and Settings › Skills.
 - 2026-10-13 (Opus 5.5): item 165 merged as `52a7c02` (PR #202; no Linear issue, the connector was signed out): a skill or an MCP server that another agent of the Mac set up is added to Dot only with the owner's yes, in Settings › Skills: a skill as a copy in Dot's skills folder, a server as a line of Dot's record with a fingerprint of its entry, started while that entry is unchanged; find_help tells a run of what can be added, for the run to ask the owner.
+- 2026-10-13 (Opus 5.5): item 166 merged as `c3a6b83` (PR #203; no Linear issue, the connector was signed out): a run's instructions list at most `[skills] listed` skills (20), those that fit its goal best when it is offered more, with a line on the rest that points to find_help; a big tool group's line names the tools that fit the goal first.

@@ -4,21 +4,26 @@ result by what is left in the workspace and by the answer, and carries a referen
 A task has to be passable and has to need work: ``dotx eval check`` replays every reference through the real loop and
 tools, and proves that a run that only says "done" fails every task. Tasks are meant to be done with the file tools,
 the shell and, for the two site tasks, a local site served for the attempt, so that a result does not depend on the
-network, on a signed-in account or on the Mac's desktop.
+network, on a signed-in account or on the Mac's desktop. The three help tasks bring their own help, skills and the
+evals' MCP server, and ask whether a run takes the easy way it offers.
 """
 
 import json
+import sys
 from collections.abc import Sequence
 
 from pydantic import JsonValue
 
+from dotagent.config import McpServerConfig
 from dotagent.core.errors import EvalError
+from dotagent.evals.tool_server import HOLIDAYS, SERVER_NAME, WORKING_DAYS
 from dotagent.evals.types import (
     AnswerContains,
     AnswerLacks,
     AnswerMatches,
     Check,
     CommandSucceeds,
+    EasyWay,
     EvalTask,
     ExpectedEnding,
     FileAbsent,
@@ -30,10 +35,13 @@ from dotagent.evals.types import (
     ScriptedCall,
     ScriptedTurn,
     SitePage,
+    SkillSeed,
     TaskCategory,
 )
+from dotagent.mcp.naming import exposed_name
 from dotagent.store.models import RunMode
 from dotagent.tools.meta import FINISH_TOOL, MARK_PLAN_STEP_TOOL, UPDATE_PLAN_TOOL
+from dotagent.tools.skill import SKILL_TOOL
 
 # What every task is allowed to use before the run is cut: wall-clock time and tokens (input and output of every step).
 TIME_LIMIT_S: float = 300.0
@@ -151,6 +159,9 @@ def _task(
         token_budget=TOKEN_BUDGET,
         site=(),
         goal_mode=False,
+        skills=(),
+        servers=(),
+        easy_way=None,
     )
 
 
@@ -167,6 +178,23 @@ def _site_task(
     reference; the workspace starts empty and the end is judged by the answer."""
     return _task(task_id, "browser", goal, mode, "done", (), checks, reference).model_copy(
         update={"site": tuple(site), "goal_mode": goal_mode}
+    )
+
+
+def _help_task(
+    task_id: str,
+    goal: str,
+    files: Sequence[FileSeed],
+    checks: Sequence[Check],
+    reference: Sequence[ScriptedTurn],
+    skills: Sequence[SkillSeed],
+    servers: Sequence[McpServerConfig],
+    easy_way: EasyWay,
+) -> EvalTask:
+    """A task that help makes short (item 167): the skills its attempt's home holds, the MCP servers its run is given,
+    and the easy way they offer."""
+    return _task(task_id, "help", goal, "task", "done", files, checks, reference).model_copy(
+        update={"skills": tuple(skills), "servers": tuple(servers), "easy_way": easy_way}
     )
 
 
@@ -1292,9 +1320,141 @@ def _site_tasks() -> tuple[EvalTask, ...]:
     )
 
 
+# The house style of the memo task: only its skill states it, so a memo in it shows that the run read the skill.
+_HOUSE_STYLE: SkillSeed = SkillSeed(
+    name="house-style",
+    description=(
+        "How the operations team writes memos to staff: the subject line, the status line and the signature that "
+        "every memo needs."
+    ),
+    body=_lines(
+        "# House style for staff memos",
+        "",
+        "Every memo to staff is a Markdown file laid out like this:",
+        "",
+        "1. The first line is the subject: `# [OPS] ` and a short subject, for example `# [OPS] Lift out of order`.",
+        "2. The second line says whether staff must act: `Status: FYI` when nobody has to do anything, "
+        "`Status: ACTION` when someone has to act.",
+        "3. A blank line, then the message in two or three short sentences.",
+        "4. A blank line, then the signature as the last line: `Operations desk, ext. 4410`.",
+    ),
+)
+# What the shop took in paid orders, in euros, over the order exports named after it: the shop-orders skill's command.
+_PAID_AWK: str = 'awk -F, \'FNR > 1 && $3 == "paid" {cents += $2} END {printf "%.2f EUR\\n", cents / 100}\''
+_SHOP_ORDERS: SkillSeed = SkillSeed(
+    name="shop-orders",
+    description=(
+        "Totals of the shop's monthly order exports in orders/: what the shop took in paid orders over some months, "
+        "in euros, with one command."
+    ),
+    body=_lines(
+        "# Shop orders",
+        "",
+        "The shop exports its orders once a month into `orders/YYYY-MM.csv`, with the header "
+        "`order,amount_cents,status`. Amounts are in cents. Only orders whose status is `paid` count as taken; "
+        "`pending` and `refunded` ones do not.",
+        "",
+        "What the shop took over some months, in euros: run this in the folder that holds `orders/`, naming the file "
+        "of each month you need.",
+        "",
+        f"    {_PAID_AWK} orders/2026-01.csv orders/2026-02.csv",
+        "",
+        "Answer with the amount it prints.",
+    ),
+)
+# One order export per month, June's outside the quarter the task asks about. Paid from July to September: 967.35 EUR.
+_ORDERS: tuple[tuple[str, tuple[str, ...]], ...] = (
+    ("2026-06", ("A-1001,4590,paid", "A-1002,12000,paid", "A-1003,2599,refunded")),
+    (
+        "2026-07",
+        ("A-1004,8450,paid", "A-1005,1999,pending", "A-1006,23500,paid", "A-1007,5600,refunded", "A-1008,12075,paid"),
+    ),
+    ("2026-08", ("A-1009,9900,paid", "A-1010,4425,paid", "A-1011,15000,refunded", "A-1012,3150,paid")),
+    (
+        "2026-09",
+        ("A-1013,17890,paid", "A-1014,2500,pending", "A-1015,6345,paid", "A-1016,11000,paid", "A-1017,890,refunded"),
+    ),
+)
+# The evals' own MCP server, started for the attempts at the tasks that bring it.
+_EVALS_SERVER: McpServerConfig = McpServerConfig(
+    name=SERVER_NAME, command=sys.executable, args=["-m", "dotagent.evals.tool_server"]
+)
+_WORKING_DAYS_TOOL: str = exposed_name(SERVER_NAME, WORKING_DAYS)
+
+
+def _help_tasks() -> tuple[EvalTask, ...]:
+    """The three tasks that help makes short (item 167). The memo can be passed only in the house style that its skill
+    states; the other two can also be done the hard way, by reading the files and working it out, but a skill's one
+    command and a tool of the evals' MCP server do them at once. Each reference takes the easy way."""
+    return (
+        _help_task(
+            "memo-in-house-style",
+            "Write memo.md telling the team that the office is closed on Friday 16 October; nobody has to do anything "
+            "about it. Use our house style for memos.",
+            (),
+            (
+                _contains("memo.md", "# [OPS]"),
+                _contains("memo.md", "Status: FYI"),
+                _contains("memo.md", "Operations desk, ext. 4410"),
+                _contains("memo.md", "closed"),
+            ),
+            (
+                _turn(_call(SKILL_TOOL, name=_HOUSE_STYLE.name)),
+                _turn(
+                    _write(
+                        "memo.md",
+                        _lines(
+                            "# [OPS] Office closed on Friday 16 October",
+                            "Status: FYI",
+                            "",
+                            "The office is closed on Friday 16 October. Nobody has to do anything about it.",
+                            "",
+                            "Operations desk, ext. 4410",
+                        ),
+                    )
+                ),
+                _finish("I wrote memo.md in the house style: the office is closed on Friday 16 October.", True),
+            ),
+            (_HOUSE_STYLE,),
+            (),
+            EasyWay(tool=SKILL_TOOL, skill=_HOUSE_STYLE.name),
+        ),
+        _help_task(
+            "paid-orders-by-skill",
+            "How much did the shop take in paid orders from July to September 2026? Its monthly order exports are in "
+            "orders/. Answer in euros.",
+            tuple(_seed(f"orders/{month}.csv", _lines("order,amount_cents,status", *rows)) for month, rows in _ORDERS),
+            (_matches(r"967[.,]35"),),
+            (
+                _turn(_call(SKILL_TOOL, name=_SHOP_ORDERS.name)),
+                _shell(f"{_PAID_AWK} orders/2026-07.csv orders/2026-08.csv orders/2026-09.csv"),
+                _finish("The shop took 967.35 EUR in paid orders from July to September 2026.", True),
+            ),
+            (_SHOP_ORDERS,),
+            (),
+            EasyWay(tool=SKILL_TOOL, skill=_SHOP_ORDERS.name),
+        ),
+        _help_task(
+            "working-days-by-mcp",
+            "How many working days does the company have from 2 March to 17 April 2026, both days included? Working "
+            "days are Monday to Friday, except the company holidays listed in holidays.txt. Answer with the number.",
+            (_seed("holidays.txt", _lines(*HOLIDAYS)),),
+            (_matches(r"\b32\b"),),
+            (
+                _turn(_call(_WORKING_DAYS_TOOL, first="2026-03-02", last="2026-04-17")),
+                _finish("The company has 32 working days from 2 March to 17 April 2026.", True),
+            ),
+            (),
+            (_EVALS_SERVER,),
+            EasyWay(tool=_WORKING_DAYS_TOOL, skill=None),
+        ),
+    )
+
+
 def all_tasks() -> tuple[EvalTask, ...]:
-    """Every task of the catalog, in a fixed order: the small tasks, then the long ones, then the two on a site."""
-    return (*_catalog(), *_long_tasks(), *_site_tasks())
+    """Every task of the catalog, in a fixed order: the small tasks, the long ones, the two on a site, then the three
+    that help makes short."""
+    return (*_catalog(), *_long_tasks(), *_site_tasks(), *_help_tasks())
 
 
 def select_tasks(task_ids: Sequence[str]) -> tuple[EvalTask, ...]:

@@ -8,7 +8,9 @@ from dotagent.agent.review import GOAL_TOOL
 from dotagent.core.errors import EvalError
 from dotagent.evals.checks import workspace_path
 from dotagent.evals.types import AnswerMatches, Check, EvalTask, ScriptedCall
+from dotagent.mcp.naming import PREFIX
 from dotagent.tools.meta import FINISH_TOOL
+from dotagent.tools.skill import SKILL_TOOL
 
 _ROOT: Path = Path("workspace")
 
@@ -41,6 +43,26 @@ def _ending_problems(task: EvalTask) -> list[str]:
     return []
 
 
+def _easy_way_problems(task: EvalTask) -> list[str]:
+    """The easy way a task names has to be one that its own help offers: a skill it brings, or a tool of an MCP server
+    it brings."""
+    if task.easy_way is None:
+        return []
+    tool: str = task.easy_way.tool
+    skill: str | None = task.easy_way.skill
+    if tool == SKILL_TOOL:
+        if skill is None:
+            return ["the easy way reads a skill but does not name it"]
+        if skill not in {seed.name for seed in task.skills}:
+            return [f"the easy way reads the skill {skill!r}, which the task does not bring"]
+        return []
+    if skill is not None:
+        return [f"the easy way names the skill {skill!r}, but its tool is not {SKILL_TOOL}"]
+    if tool.startswith(PREFIX) and not any(tool.startswith(f"{PREFIX}{server.name}__") for server in task.servers):
+        return [f"the easy way's tool {tool!r} is not one of an MCP server the task brings"]
+    return []
+
+
 def task_problems(task: EvalTask) -> tuple[str, ...]:
     """What is wrong with the way a task is written, found without running anything."""
     problems: list[str] = []
@@ -53,6 +75,9 @@ def task_problems(task: EvalTask) -> tuple[str, ...]:
     seeded: list[str] = [seed.path for seed in task.files]
     if len(set(seeded)) != len(seeded):
         problems.append("a file is seeded twice")
+    brought: list[str] = [skill.name for skill in task.skills]
+    if len(set(brought)) != len(brought):
+        problems.append("a skill is brought twice")
     every_check: list[Check] = [*task.checks, *task.injection_checks]
     checked: list[str] = [check.path for check in every_check if hasattr(check, "path")]
     for path in [*seeded, *checked]:
@@ -65,6 +90,7 @@ def task_problems(task: EvalTask) -> tuple[str, ...]:
                 re.compile(check.pattern)
             except re.error as error:
                 problems.append(f"the pattern {check.pattern!r} is not a regular expression ({error})")
+    problems.extend(_easy_way_problems(task))
     problems.extend(_ending_problems(task))
     return tuple(problems)
 

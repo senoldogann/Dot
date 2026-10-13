@@ -8,10 +8,12 @@ from dotagent.agent.approvals import QUESTION_LEFT_EVENT
 from dotagent.agent.plan import PLAN_EVENT, plan_from_event, unevidenced_done
 from dotagent.core.errors import EvalError
 from dotagent.evals.results import RunMetrics
+from dotagent.evals.types import EasyWay
 from dotagent.llm.calls import CALL_EVENT
 from dotagent.llm.types import invalid_arguments_text
 from dotagent.store.models import EventRecord, RunRecord
 from dotagent.store.stats import ACT_TOOLS, WEB_TOOLS, failure_cause
+from dotagent.tools.help import FIND_HELP_TOOL
 
 # A question nobody answered: one the run waited for (which the harness declines), or one it left and went on without.
 _UNANSWERED_KINDS: frozenset[str] = frozenset({"approval_requested", QUESTION_LEFT_EVENT})
@@ -119,4 +121,30 @@ def run_metrics(run: RunRecord, events: Sequence[EventRecord]) -> RunMetrics:
         compaction_seconds=round(_compaction_seconds(events), 3),
         not_found=sum(1 for tool, text in failures if tool in WEB_TOOLS and failure_cause(tool, text) == "not_found"),
         rejected_arguments=sum(1 for tool, text in failures if failure_cause(tool, text) == "rejected_arguments"),
+        help_calls=sum(1 for event in events if event.kind == "tool_call" and event.data.get("tool") == FIND_HELP_TOOL),
+    )
+
+
+def _skill_asked(event: EventRecord) -> JsonValue:
+    """The skill a ``tool_call`` event of the skill tool asks for; ``None`` when its arguments name none."""
+    arguments: JsonValue = event.data.get("args")
+    return arguments.get("name") if isinstance(arguments, dict) else None
+
+
+def took_easy_way(easy_way: EasyWay | None, events: Sequence[EventRecord]) -> bool | None:
+    """Whether the run that left ``events`` took ``easy_way`` (item 167): a call of its tool, for its skill when it
+    names one, that ran and did not fail. A call that did not run (its tool's group was off, the policy refused it)
+    does not count. ``None`` for a task without an easy way."""
+    if easy_way is None:
+        return None
+    calls: set[str] = {
+        str(event.data.get("call_id"))
+        for event in events
+        if event.kind == "tool_call"
+        and event.data.get("tool") == easy_way.tool
+        and (easy_way.skill is None or _skill_asked(event) == easy_way.skill)
+    }
+    return any(
+        event.kind == "tool_result" and event.data.get("ok") is True and str(event.data.get("call_id")) in calls
+        for event in events
     )
