@@ -1292,7 +1292,9 @@ dotx service permissions # make macOS ask, in the name of the service, for the d
 dotx service uninstall   # stop the daemon and remove the job
 ```
 
-- Run `service install` again to restart the daemon after you changed the configuration.
+- Run `service install` again to restart the daemon after you changed the configuration. It stops the running job before
+  it writes the new job's file; when launchd does not load the new job, the file of before is put back and its job
+  started again, and the install fails with launchd's words.
 - A launchd job has no terminal, so macOS attaches Accessibility (it covers posting input events) and Screen Recording
   to the Python binary that runs the daemon, not to your terminal. Grant them to that binary; Settings › System in the
   web UI reports what the daemon itself has, and `dotx desktop check` what your terminal has. This prints the binary:
