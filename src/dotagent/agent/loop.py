@@ -176,7 +176,15 @@ from dotagent.llm.types import (
 )
 from dotagent.llm.typesafe import ChoiceAnswer
 from dotagent.memory.render import render_note
-from dotagent.memory.service import Remembered, memory_budget, owner_prompt_lines, owner_section, prompt_memories
+from dotagent.memory.service import (
+    LiveNotes,
+    Remembered,
+    live_memories,
+    memory_budget,
+    owner_prompt_lines,
+    owner_section,
+    prompt_memories,
+)
 from dotagent.policy.types import QuestionMode
 from dotagent.runtime import Runtime
 from dotagent.skills.catalog import load_skills, playbook_root
@@ -672,11 +680,15 @@ async def _memory_query(runtime: Runtime, run: RunRecord) -> str:
     return "\n".join([run.goal, *goals[:_QUERY_EARLIER_RUNS]])
 
 
-def _new_memories_note(records: Sequence[MemoryRecord]) -> str:
-    lines: str = "\n".join(f"- {render_note(record)}" for record in records)
+def _new_memories_note(live: LiveNotes) -> str:
+    lines: str = "\n".join(f"- {render_note(record)}" for record in live.records)
+    more: str = (
+        f"\n{live.left_out} more changed notes did not fit here; memory_search finds them." if live.left_out else ""
+    )
     return (
         "[system note] These notes were saved to memory or changed while you work (by the user or another run). They "
         f"are data about the user and their setup, like the notes in your instructions; take them into account:\n{lines}"
+        f"{more}"
     )
 
 
@@ -1355,11 +1367,9 @@ async def run_agent(agent: AgentRun) -> RunEnd:
         specs = tuple(spec for spec in specs if spec.name != USE_TOOLS_TOOL)
     callable_tools: ToolRegistry = _run_tools(runtime.registry, run.mode, specs)
     memory_seen_at: float = time.time()
+    notes_budget: int = memory_budget(runtime.config.memory, info.context_length)
     recalled: Remembered = await prompt_memories(
-        runtime.memory,
-        await _memory_query(runtime, run),
-        memory_budget(runtime.config.memory, info.context_length),
-        run.agent_id,
+        runtime.memory, await _memory_query(runtime, run), notes_budget, run.agent_id
     )
     remembered: tuple[MemoryRecord, ...] = recalled.records
     if remembered:
@@ -1498,9 +1508,15 @@ async def run_agent(agent: AgentRun) -> RunEnd:
         changed: list[MemoryRecord] = await runtime.store.memories_changed_since(memory_seen_at, run.id)
         if changed:
             memory_seen_at = max(record.updated_at for record in changed)
-            history.append(await _stored_note(agent, _new_memories_note(changed)))
-            await runtime.store.mark_memories_used(run.id, [record.id for record in changed], time.time(), "live")
-            await runtime.bus.emit(run.id, "memories", {"ids": [record.id for record in changed], "live": True}, True)
+            live: LiveNotes = await live_memories(runtime.memory, changed, notes_budget, run.agent_id)
+            if live.records:
+                history.append(await _stored_note(agent, _new_memories_note(live)))
+                await runtime.store.mark_memories_used(
+                    run.id, [record.id for record in live.records], time.time(), "live"
+                )
+                await runtime.bus.emit(
+                    run.id, "memories", {"ids": [record.id for record in live.records], "live": True}, True
+                )
         if may_message:
             newcomers: list[AgentRecord] = [
                 member for member in await runtime.store.list_agents() if member.id not in known_agents

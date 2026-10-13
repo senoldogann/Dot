@@ -16,8 +16,8 @@ from dotagent.memory.service import (
     SavedMemory,
     forget_memory,
     recall_for,
+    rewrite_memory_note,
     save_memory,
-    update_memory_note,
 )
 from dotagent.policy.elements import looks_like_key
 from dotagent.policy.types import ActionInfo, Flag
@@ -210,7 +210,9 @@ def _update_tool() -> RegisteredTool:
         return _write_action("memory_update", f"Change “{record.content}” to “{args.content}”", flags)
 
     async def run(args: UpdateArgs, ctx: ToolContext) -> ToolResult:
-        updated: MemoryRecord = await update_memory_note(ctx.runtime.memory, args.memory_id, args.content, args.tags)
+        updated: MemoryRecord = await rewrite_memory_note(
+            ctx.runtime.memory, args.memory_id, args.content, args.tags, ctx.run_id
+        )
         return ok(f"Updated: {render_note(updated)}")
 
     return make_live_tool(

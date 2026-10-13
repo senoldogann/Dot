@@ -346,6 +346,13 @@ class Remembered(FrozenModel):
     tokens: int
 
 
+class LiveNotes(FrozenModel):
+    """The notes changed while a run works that it is handed, and how many more it could be handed that did not fit."""
+
+    records: tuple[MemoryRecord, ...]
+    left_out: int
+
+
 # The tokens a note's rendered line adds to its text and tags: who wrote it and when.
 _NOTE_LINE_TOKENS: int = 12
 # How many standing and user notes are read before the budget picks among them.
@@ -440,14 +447,49 @@ async def prompt_memories(index: MemoryIndex, query: str, budget: int, agent_id:
     return Remembered(records=tuple(taken), tokens=spent)
 
 
+async def live_memories(
+    index: MemoryIndex, changed: Sequence[MemoryRecord], budget: int, agent_id: str | None
+) -> LiveNotes:
+    """Of the notes ``changed`` while a run of the agent ``agent_id`` works, the ones it would be handed at its start
+    (item 157): those it may be handed (:func:`visible_to`) that do not rest (:func:`resting`), in their order, as many
+    as fit ``budget`` tokens (:func:`fit_notes`)."""
+    config: MemoryConfig = index.config
+    now: float = time.time()
+    visible: list[MemoryRecord] = [record for record in changed if visible_to(record, agent_id)]
+    balances: dict[str, MemoryScore] = await recent_scores_for(index, [record.id for record in visible], now, agent_id)
+    fresh: list[MemoryRecord] = [
+        record
+        for record in visible
+        if not resting(record, now, config.rest_days, balances.get(record.id), config.score_min_uses)
+    ]
+    taken, _ = fit_notes(fresh, budget, 0)
+    return LiveNotes(records=tuple(taken), left_out=len(fresh) - len(taken))
+
+
 async def update_memory_note(index: MemoryIndex, memory_id: str, content: str, tags: Sequence[str]) -> MemoryRecord:
-    """Rewrite a note in place (text and tags); it keeps its id, its author and its use count and is embedded again."""
+    """The user's rewrite of a note in place (text and tags): it keeps its id, its author and its use count and is
+    embedded again."""
+    existing: MemoryRecord = await index.store.get_memory(memory_id)
+    return await _rewritten(index, memory_id, content, tags, existing.source_run)
+
+
+async def rewrite_memory_note(
+    index: MemoryIndex, memory_id: str, content: str, tags: Sequence[str], run_id: str
+) -> MemoryRecord:
+    """A run's rewrite of a note in place, as :func:`update_memory_note`, except that the run becomes its author: the
+    text is the model's now, so a note the user wrote no longer reads as theirs (item 157)."""
     await index.store.get_memory(memory_id)
+    return await _rewritten(index, memory_id, content, tags, run_id)
+
+
+async def _rewritten(
+    index: MemoryIndex, memory_id: str, content: str, tags: Sequence[str], source_run: str | None
+) -> MemoryRecord:
     text: str = _checked_text(content, index.config.max_chars)
     vector: Vector | None = None
     if index.embedder is not None:
         vector = (await index.embedder.embed([text]))[0]
-    return await index.store.update_memory(memory_id, text, normalize_tags(tags), vector)
+    return await index.store.update_memory(memory_id, text, normalize_tags(tags), vector, source_run)
 
 
 async def forget_memory(index: MemoryIndex, memory_id: str) -> MemoryRecord:

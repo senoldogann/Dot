@@ -60,6 +60,7 @@ DARK_MODE: str = "The user prefers dark mode in every code editor."
 TEA: str = "Kullanıcı sabahları kahve yerine çay içmeyi tercih ediyor."
 LAPTOP: str = "The user's work laptop is a MacBook Pro with an M3 chip."
 WIFI: str = "The wifi network at the user's home is called Nebula."
+DENTIST: str = "The user's dentist is Dr. Lindqvist in the old town."
 CITY: str = "Kullanıcı İstanbul'da yaşıyor."
 MEETING_NOTES: str = "Toplantı notları Notion yerine Obsidian'da tutuluyor."
 # Looks like a key to the policy; it is only classified here, never saved or sent anywhere.
@@ -517,6 +518,20 @@ async def test_the_model_can_save_search_and_forget_notes(runtime: Runtime) -> N
 
     gone, _ = await _call(runtime, "memory_search", {"query": "wifi network at home"})
     assert gone.text.startswith("No saved notes match")
+
+
+@requires_embedder
+async def test_a_note_the_owner_wrote_becomes_the_runs_once_a_run_rewrites_it(runtime: Runtime) -> None:
+    owners: SavedMemory = await save_memory(runtime.memory, DENTIST, [], None, None)
+    assert owners.record.source_run is None
+    rewritten: str = "The user's dentist is now Dr. Korhonen, near the station."
+    updated, _ = await _call(
+        runtime, "memory_update", {"memory_id": owners.record.id, "content": rewritten, "tags": []}
+    )
+    # The text is the model's now, so it no longer reads as a statement of the owner.
+    assert "(you saved it, " in updated.text, updated.text
+    record: MemoryRecord = await runtime.store.get_memory(owners.record.id)
+    assert (record.content, record.source_run, record.agent_id) == (rewritten, "memory-test", None)
 
 
 async def test_the_policy_gates_what_the_model_may_remember(runtime: Runtime) -> None:

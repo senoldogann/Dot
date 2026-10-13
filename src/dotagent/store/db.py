@@ -1654,12 +1654,18 @@ class Store:
 
     @_writing
     async def update_memory(
-        self, memory_id: str, content: str, tags: Sequence[str], vector: Sequence[float] | None
+        self,
+        memory_id: str,
+        content: str,
+        tags: Sequence[str],
+        vector: Sequence[float] | None,
+        source_run: str | None,
     ) -> MemoryRecord:
+        """Rewrite a memory's text and tags, written now by ``source_run`` (``None`` for the user)."""
         tag_text: str = ",".join(tags)
         await self._db.execute(
-            "UPDATE memories SET content = ?, tags = ?, updated_at = ? WHERE id = ?",
-            (content, tag_text, time.time(), memory_id),
+            "UPDATE memories SET content = ?, tags = ?, updated_at = ?, source_run = ? WHERE id = ?",
+            (content, tag_text, time.time(), source_run, memory_id),
         )
         await self._db.execute("DELETE FROM memories_fts WHERE id = ?", (memory_id,))
         await self._db.execute(
@@ -1677,11 +1683,11 @@ class Store:
 
     @_writing
     async def set_memory_tags(self, memory_id: str, tags: Sequence[str]) -> MemoryRecord:
-        """Replace the tags of a memory; its text and vector stay."""
+        """Replace the tags of a memory; its text, its vector and ``updated_at`` stay: what the note says did not change,
+        so a retag (the nightly ``rest``, merged tags) makes it no newer than its correction, nor a change a running run
+        is handed (item 157)."""
         tag_text: str = ",".join(tags)
-        await self._db.execute(
-            "UPDATE memories SET tags = ?, updated_at = ? WHERE id = ?", (tag_text, time.time(), memory_id)
-        )
+        await self._db.execute("UPDATE memories SET tags = ? WHERE id = ?", (tag_text, memory_id))
         await self._db.execute("UPDATE memories_fts SET tags = ? WHERE id = ?", (fold_search(tag_text), memory_id))
         await self._db.commit()
         return await self.get_memory(memory_id)

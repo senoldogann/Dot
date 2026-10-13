@@ -1545,11 +1545,16 @@ dotx memory reindex      # embed every note again, for example after changing [m
 - The score decides too: over the last `score_days` (30), a note's balance is the runs handed it that ended done less
   the ones that failed. Once `score_min_uses` (3) runs were handed it, the balance lifts or lowers the note in a search
   as much as a fresh use would, and a negative balance rests it at once, before the nightly reflection retires it.
-- A note saved or changed while a run works reaches that run at its next step.
+- A note saved or changed while a run works reaches that run at its next step, when the run would be handed it at its
+  start: not another agent's lesson, not a resting note, and only as many as fit the budget of the starting notes (the
+  run is told how many more changed; `memory_search` finds them). A change of tags alone, such as the nightly `rest` or
+  merged tags, is no change: the note keeps its date, so an old fact retagged at night does not pass for newer than its
+  correction.
 - Two tags are the nightly reflection's: `journal` on the day's note, `rest` on a lesson no run was handed for sixty
   days, which searches skip (the list and the page still show it; take the tag off to wake it).
-- `memory_update` lets the agent correct a note in place; you edit one on the Memory page or with
-  `PATCH /api/memories/{id}`. The page also shows who wrote each note and how often runs used it.
+- `memory_update` lets the agent correct a note in place, and the note is then the agent's, even one you wrote: the
+  prompt no longer shows the model's words as yours. You edit one on the Memory page or with `PATCH /api/memories/{id}`,
+  and it keeps its author. The page also shows who wrote each note and how often runs used it.
 - Search combines SQLite full-text search (BM25) with cosine similarity of embeddings and fuses both rankings.
   `embed_enabled = false` searches by words only. The word search does not mind case, accents or the Turkish dotted and
   dotless i (`toplanti` finds `Toplantı`), and a word of five letters or more also finds the words that start with its
