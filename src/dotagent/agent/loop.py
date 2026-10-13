@@ -156,7 +156,7 @@ from dotagent.core.jsonutil import dumps_compact
 from dotagent.core.logs import get_logger
 from dotagent.core.text import CHARS_PER_TOKEN, redact_secrets, truncate_middle
 from dotagent.core.types import FrozenModel, JsonObject
-from dotagent.help.listed import SkillListing, listed_skills, tools_in_order
+from dotagent.help.listed import SkillListing, listed_skills, skill_text, tools_in_order
 from dotagent.llm.calls import CallOrigin
 from dotagent.llm.http import is_retryable_provider_error
 from dotagent.llm.router import ModelRef, parse_model_ref, unavailable_reason
@@ -1424,7 +1424,14 @@ async def run_agent(agent: AgentRun) -> RunEnd:
         )
     can_ask: bool = can_ask_user(run.source, run.parent_run_id, run.approvals)
     questions: QuestionMode = question_mode(config.questions, can_ask)
-    listing: SkillListing = listed_skills(skills.skills, query, runtime.config.skills.listed)
+    # More skills than the instructions list are picked by meaning too (item 169); the embeddings fail the start as
+    # the run's notes do.
+    close: list[int] = (
+        await runtime.help_vectors.closest(query, [skill_text(skill) for skill in skills.skills])
+        if runtime.help_vectors is not None and len(skills.skills) > runtime.config.skills.listed
+        else []
+    )
+    listing: SkillListing = listed_skills(skills.skills, query, close, runtime.config.skills.listed)
     system: Message = system_message(
         build_system_prompt(
             collect_prompt_inputs(

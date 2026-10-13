@@ -5088,8 +5088,8 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 165 | Help found elsewhere is added only with the owner's yes                              | done        | 52a7c02 |
 | 166 | A run's instructions list the help that fits its goal                                | done        | c3a6b83 |
 | 167 | Evals show whether a run takes the easy way                                          | done        | 3dc670c |
-| 168 | A run reads only the skills it is offered                                            | in progress |         |
-| 169 | Help is found by meaning as well as by words                                         | planned     |         |
+| 168 | A run reads only the skills it is offered                                            | done        | f605def |
+| 169 | Help is found by meaning as well as by words                                         | in progress |         |
 | 170 | A delegated run's thread takes no queue                                              | planned     |         |
 | 171 | The text of a desktop window follows the run's model window                          | planned     |         |
 | 172 | A dotx command that dies does not leave its run at work                              | planned     |         |
@@ -8843,7 +8843,7 @@ evals run without the desktop).
 
 ### 168. A run reads only the skills it is offered
 
-**Status: in progress.**
+**Status: done.** Merged as `f605def` (PR #206; no Linear issue, the Linear connector was signed out).
 
 **As built (2026-10-13).** The `skill` tool reads a skill only from those the run is offered (`offered_to_run`, the
 filter of the instructions and of `find_help`): a learned skill of another agent that is not shared is not read by its
@@ -8859,7 +8859,29 @@ leave out, and a refusal names only the skills the run is offered.
 
 ### 169. Help is found by meaning as well as by words
 
-**Status: planned.**
+**Status: in progress.**
+
+**As built (2026-10-13).** With the memory's embeddings on (`[memory] embed_enabled`, the default; bge-m3 on the local
+Ollama server reads Turkish as well as English), `find_help` ranks the help it searches by meaning as well as by words:
+the items whose embedding is at least `[memory] min_similarity` (0.50) close to the need's, the closest first, are fused
+with those that share its words (BM25, the half-the-best floor kept) by reciprocal rank fusion, as the notes are, and
+the best eight are listed. A run offered more skills than `[skills] listed` (20) is given those that fit its goal best
+the same way. The embedding of each text that help is ranked by is made once and kept while Dot runs (`help/meaning.py`,
+`HelpVectors` on the runtime, at most 4096 texts): embedding 150 of them took bge-m3 about seven seconds on this Mac,
+one need some 30 ms. When the embedding service fails, `find_help` lists what the words found and says that finding help
+by meaning failed (as it says when what other agents set up could not be searched), and logs `help_meaning_failed`; the
+skills of a run's instructions, when they must be picked, fail the run's start instead, as its notes do. With the
+embeddings off (and in the evals), by words as before. A big tool group's line still names the tools that share the
+goal's words first. The instructions' line for a run none of whose skills fits now says that none clearly fits its goal,
+not that none shares a word with it. Tests: unit tests rank items and list skills with a ranking by meaning (a need and
+a goal in Turkish that share no word find the item close to them, and an item both rankings hold comes first), and check
+that each text is embedded once and that the texts kept are bounded. Through the real loop with bge-m3 (skipped where it
+is not installed, as in the CI), a run offered four skills with two listed and a goal in Turkish is listed the report's
+skill first, and its `find_help` call with a need in Turkish is told of that skill first; on the code of before, none
+was listed and nothing was found. With the embedding service out of reach, a run's `find_help` call is told of the skill
+its words find, and that finding help by meaning failed. Measured with bge-m3 on texts made for the test: a Turkish need
+comes 0.52 to 0.72 close to the English skill made for it, which comes first; a related one can pass 0.50 too (release
+notes, at 0.54, for a report written from notes), and a need unrelated to every skill stays below 0.40.
 
 **What.** `find_help` and the skills a run's instructions list are ranked by meaning as well as by words, with the
 embeddings the notes use (bge-m3 runs on this Mac and reads Turkish as well as English), so a goal in one language finds
@@ -9496,3 +9518,4 @@ asked for.
 - 2026-10-13 (Opus 5.5): item 166 merged as `c3a6b83` (PR #203; no Linear issue, the connector was signed out): a run's instructions list at most `[skills] listed` skills (20), those that fit its goal best when it is offered more, with a line on the rest that points to find_help; a big tool group's line names the tools that fit the goal first.
 - 2026-10-13 (Opus 5.5): item 167 merged as `3dc670c` (PR #204; no Linear issue, the connector was signed out): an eval task can bring skills and MCP servers and name the easy way they offer; three help tasks, the score's count of the easy ways taken and what a pass costs with and without, and `dotx eval check` reports a reference that does not take its easy way. Part 27 is done.
 - 2026-10-13 (Opus 5.5): part 28, what part 27's report found, is planned (items 168 to 173); item 168 is built: the `skill` tool reads only a skill the run is offered.
+- 2026-10-13 (Opus 5.5): item 168 merged as `f605def` (PR #206; no Linear issue, the connector was signed out): the `skill` tool reads only a skill the run is offered, and its refusal names only those; part 28 is planned.

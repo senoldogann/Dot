@@ -2,9 +2,11 @@
 
 It searches the skills the run is offered (:func:`dotagent.agent.playbooks.offered_to_run`), the tools of the MCP
 servers that the run's mode allows and, when the run can use apple_script, the applications that AppleScript can drive
-(:func:`dotagent.help.apps.scriptable_apps`); it ranks them for the need (:func:`dotagent.help.rank.rank`) and says how
-to use each one it lists. Like use_tools, it reads the tools of the runtime by the run's mode: a tool that an agent's
-own tool list leaves out is found all the same, and a call of it is answered as a call of an unknown tool.
+(:func:`dotagent.help.apps.scriptable_apps`); it ranks them for the need by their words and, with the memory's
+embeddings on, by their meaning (:func:`dotagent.help.rank.rank`, :mod:`dotagent.help.meaning`), and says how to use
+each one it lists. When the search by meaning fails, the answer says so and holds what the words found. Like
+use_tools, it reads the tools of the runtime by the run's mode: a tool that an agent's own tool list leaves out is found
+all the same, and a call of it is answered as a call of an unknown tool.
 
 With ``[skills] elsewhere`` on, it also searches the skills and MCP servers that the Mac's other agents set up and
 the owner can add to Dot (:mod:`dotagent.help.elsewhere`, item 165): one that fits is told with how to ask the owner to
@@ -26,11 +28,14 @@ from pydantic import Field, StringConstraints
 
 from dotagent.agent.playbooks import offered_to_run
 from dotagent.config import AppConfig
-from dotagent.core.errors import ElsewhereError
+from dotagent.core.errors import ElsewhereError, ProviderError, StoreError
+from dotagent.core.logs import get_logger
 from dotagent.core.paths import added_servers_path
 from dotagent.help.added import AddedServers, dot_has, read_added_servers
 from dotagent.help.apps import APP_ROOTS, scriptable_apps
 from dotagent.help.elsewhere import SKILL_COPY_LIMIT, FoundElsewhere, FoundServer, FoundSkill, found_elsewhere
+from dotagent.help.listed import skill_text
+from dotagent.help.meaning import HelpVectors
 from dotagent.help.rank import rank, ranked_text
 from dotagent.help.types import HelpItem, HelpKind
 from dotagent.mcp.naming import PREFIX
@@ -41,6 +46,8 @@ from dotagent.skills.types import SKILL_TOOL, Skill, SkillCatalog
 from dotagent.tools.apple import APPLE_SCRIPT_TOOL
 from dotagent.tools.base import ALL_MODES, RegisteredTool, ToolArgs, ToolResult, make_tool, mark_untrusted, ok
 from dotagent.tools.context import ToolContext
+
+log = get_logger(__name__)
 
 FIND_HELP_TOOL: str = "find_help"
 # One answer lists this many items at most, the best first.
@@ -77,7 +84,7 @@ def _skill_help(skill: Skill) -> HelpItem:
         name=skill.name,
         summary=_clip(skill.description, _SUMMARY_CHARS),
         use=f'call {SKILL_TOOL} with name "{skill.name}" and follow it',
-        text=ranked_text(skill.name, skill.description),
+        text=skill_text(skill),
     )
 
 
@@ -193,7 +200,17 @@ def build_find_help_tool() -> RegisteredTool:
                     f" Also searched {_counted(len(addable), 'skill')} and {_counted(len(servers), 'MCP server')} "
                     "that other agents of this Mac set up and the owner can add."
                 )
-        found: list[HelpItem] = rank([*map(_skill_help, skills), *tools, *apps, *elsewhere], args.need, _LISTED)
+        items: list[HelpItem] = [*map(_skill_help, skills), *tools, *apps, *elsewhere]
+        close: list[int] = []
+        vectors: HelpVectors | None = ctx.runtime.help_vectors
+        if vectors is not None:
+            try:
+                close = await vectors.closest(args.need, [item.text for item in items])
+            except (ProviderError, StoreError) as error:
+                # The embedding service failed, or answered in another dimension than the texts kept: another model.
+                log.warning("help_meaning_failed", run_id=ctx.run_id, error=error.message, context=error.context)
+                searched += f" Help was found by its words alone: finding it by meaning failed: {error.message}."
+        found: list[HelpItem] = rank(items, args.need, close, _LISTED)
         answer: ToolResult = ok(render_help(args.need, found, searched))
         others: bool = any(item.kind in ("found_skill", "found_server") for item in found)
         return mark_untrusted(answer) if others else answer

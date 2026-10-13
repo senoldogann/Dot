@@ -39,6 +39,7 @@ from dotagent.core.paths import (
 from dotagent.desktop.session import DesktopSession
 from dotagent.events import EventBus
 from dotagent.help.added import AddedServers, added_server_configs, read_added_servers
+from dotagent.help.meaning import HelpVectors
 from dotagent.launchd import launch_agent_path
 from dotagent.llm.calls import CALL_EVENT, CallRecorder, ModelCall, call_event_data, log_model_call
 from dotagent.llm.router import ModelRouter
@@ -106,6 +107,8 @@ class Runtime:
     anthropic_key_present: bool
     mcp: McpHub
     memory: MemoryIndex
+    # Help found by meaning with the memory's embeddings (item 169); ``None`` when they are off.
+    help_vectors: HelpVectors | None
     registry: ToolRegistry
     plugins: PluginCatalog
     protected: tuple[Path, ...]
@@ -325,6 +328,9 @@ async def open_runtime(config: AppConfig, login_env: dict[str, str]) -> Runtime:
             anthropic_key_present=anthropic_key is not None,
             mcp=mcp,
             memory=memory,
+            help_vectors=(
+                None if memory.embedder is None else HelpVectors(memory.embedder, config.memory.min_similarity)
+            ),
             registry=registry,
             plugins=plugins,
             protected=protected,

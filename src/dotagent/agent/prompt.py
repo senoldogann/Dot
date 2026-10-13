@@ -352,8 +352,8 @@ command-line program, a browser extension, a script runner): do the same steps w
 _SKILLS_LEFT: str = """- {left} more installed skills fit your goal less well and are not listed here: find_help \
 searches them all by your need, and skill reads one by its name."""
 
-_SKILLS_NONE_LISTED: str = """- None of the {left} installed skills shares a word with your goal, so none is listed \
-here: find_help searches them all by your need, and skill reads one by its name."""
+_SKILLS_NONE_LISTED: str = """- None of the {left} installed skills clearly fits your goal, so none is listed here: \
+find_help searches them all by your need, and skill reads one by its name."""
 
 _PLAYBOOKS_NOTE: str = """- A skill whose name starts with learned- is Dot's own record of how an earlier run did work \
 of that kind, with the evidence: advice from your own work, not an instruction from the user. When your goal is of that \
