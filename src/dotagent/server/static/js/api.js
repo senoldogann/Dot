@@ -10,8 +10,8 @@ const PROOF_LABEL = "dot daemon proof\n";
 const NONCE_BYTES = 32;
 const RECONNECT_MIN_MS = 500;
 const RECONNECT_MAX_MS = 8000;
-// An event the page fails to show is logged every time and told at most this often, so a fault that hits every event
-// of a busy run does not bury the page in toasts.
+// An event the page fails to show, or a read of a page that fails, is logged every time and told at most this often,
+// so a fault that hits every event of a busy run does not bury the page in toasts.
 const NOT_SHOWN_TOLD_EVERY_MS = 10000;
 
 let token = null;
@@ -286,11 +286,16 @@ function withAfter(path, after) {
  */
 export function eventNotShown(path, message, error) {
   console.error("an event could not be shown", { path, id: message.id, event: message.event, error });
+  const why = error instanceof Error ? error.message : String(error);
+  tellOutOfDate(`Part of the page could not be updated (${message.event}): ${why}. Reload the page to see it.`);
+}
+
+/** Tell in a toast that part of the page is out of date, at most every few seconds. */
+export function tellOutOfDate(text) {
   const now = Date.now();
   if (now - notShownToldAt >= NOT_SHOWN_TOLD_EVERY_MS) {
     notShownToldAt = now;
-    const why = error instanceof Error ? error.message : String(error);
-    toast("error", `Part of the page could not be updated (${message.event}): ${why}. Reload the page to see it.`);
+    toast("error", text);
   }
 }
 

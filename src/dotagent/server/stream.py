@@ -24,6 +24,8 @@ from dotagent.store.models import EventRecord, RunRecord
 SSE_TYPE: str = "text/event-stream"
 SSE_HEADERS: dict[str, str] = {"Cache-Control": "no-store", "X-Accel-Buffering": "no"}
 KEEPALIVE: bytes = b": keepalive\n\n"
+# Tells a page whose lifecycle stream fell so far behind that events were lost to read again what it shows.
+RESYNC: bytes = b"event: resync\ndata: {}\n\n"
 # The event of the screencast stream (``GET /runs/{id}/screencast``).
 FRAME_EVENT: str = "frame"
 
@@ -179,11 +181,16 @@ async def follow_run(ctx: ServerContext, run_id: str, after: int) -> AsyncIterat
 
 
 async def follow_lifecycle(bus: EventBus, stopping: asyncio.Event) -> AsyncIterator[bytes]:
-    """The moments at which the runs and approvals of any run change; clients refetch what they show. Ends when the
-    daemon starts to stop."""
+    """The moments at which the runs and approvals of any run change; clients refetch what they show. A client that
+    fell so far behind that events were lost is told to read everything again (``resync``), since this stream replays
+    nothing. Ends when the daemon starts to stop."""
     async with bus.subscribe_kinds(LIFECYCLE_KINDS) as feed:
+        dropped: int = 0
         while True:
             event: EventRecord | None = await _next_event(feed.queue, stopping)
+            if feed.dropped != dropped:
+                dropped = feed.dropped
+                yield RESYNC
             if event is None:
                 if stopping.is_set():
                     return

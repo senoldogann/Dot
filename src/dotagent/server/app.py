@@ -9,6 +9,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import JsonValue, TypeAdapter
+from starlette.exceptions import HTTPException
 
 from dotagent import __version__
 from dotagent.core.errors import (
@@ -25,6 +26,7 @@ from dotagent.core.errors import (
     UndoError,
 )
 from dotagent.core.logs import get_logger
+from dotagent.core.text import redact_secrets, truncate_middle
 from dotagent.server.context import ServerContext
 from dotagent.server.guard import LocalGuard
 from dotagent.server.routes_agents import agents_router
@@ -44,6 +46,8 @@ log = get_logger(__name__)
 STATIC_DIR: Path = Path(__file__).parent / "static"
 _JSON_LIST: TypeAdapter[list[JsonValue]] = TypeAdapter(list[JsonValue])
 _SERVER_FAULT: int = 500
+# The words of an error that is not one of Dot's own, as a response carries them; the log keeps them whole.
+_FAULT_CHARS: int = 500
 
 # Errors the caller can fix or must wait out map to 4xx (a change that cannot be taken back, as the files stand now, is
 # a conflict), a failing model service to 502; every other error is a fault of Dot itself: it is answered with 500 and
@@ -99,6 +103,28 @@ def create_app(ctx: ServerContext) -> FastAPI:
                 "request_failed", method=request.method, path=request.url.path, error=exc.message, context=exc.context
             )
         return _error_response(status, exc.message, exc.context)
+
+    @app.exception_handler(HTTPException)
+    async def framework_error(request: Request, exc: HTTPException) -> JSONResponse:
+        """An answer of the web framework itself (no such path, a method a path does not take) in the shape of every
+        other error of the API, with its headers."""
+        return JSONResponse(
+            ErrorView(message=str(exc.detail), context={"method": request.method, "path": request.url.path}).model_dump(
+                mode="json"
+            ),
+            status_code=exc.status_code,
+            headers=exc.headers,
+        )
+
+    @app.exception_handler(Exception)
+    async def fault(request: Request, exc: Exception) -> JSONResponse:
+        """An error that is not one of Dot's own is a fault of Dot: logged with its traceback, and answered in the shape
+        of every other error, with its kind and its words, so a page can say what failed."""
+        log.error("request_crashed", method=request.method, path=request.url.path, exc_info=exc)
+        words: str = truncate_middle(redact_secrets(str(exc)), _FAULT_CHARS)
+        return _error_response(
+            _SERVER_FAULT, "Dot failed on an error it did not expect", {"error": f"{type(exc).__name__}: {words}"}
+        )
 
     @app.exception_handler(RequestValidationError)
     async def invalid_request(request: Request, exc: RequestValidationError) -> JSONResponse:

@@ -21,12 +21,14 @@ import pytest
 import pytest_asyncio
 from PIL import Image
 from playwright.async_api import Browser, FilePayload, Page, async_playwright, expect
+from structlog.testing import capture_logs
 
 from dotagent.agent.attachments import load_attachments, message_with_attachments
 from dotagent.agent.manager import RunManager
 from dotagent.cli_daemon import prove_daemon
 from dotagent.config import AppConfig, load_config
 from dotagent.core.errors import NotFoundError, ServiceError
+from dotagent.core.paths import themes_dir
 from dotagent.core.types import JsonObject
 from dotagent.desktop.perms import check_permissions
 from dotagent.desktop.types import Permissions
@@ -1348,3 +1350,28 @@ async def test_a_file_attached_in_the_web_ui_reaches_the_model(live: httpx.Async
             await expect(page.locator("article.answer")).to_contain_text(code, timeout=RUN_TIMEOUT_S * 1000)
         finally:
             await browser.close()
+
+
+async def test_a_fault_and_a_path_that_does_not_exist_are_answered_as_json(live: httpx.AsyncClient) -> None:
+    """Item 178: an error that is not one of Dot's own (here the themes folder cannot be listed) and an answer of the web
+    framework itself (a path that does not exist) come in the shape of every other error of the API, which a page reads;
+    the fault is logged with its traceback. Before, the fault came as the plain text "Internal Server Error"."""
+    folder: Path = themes_dir()
+    await asyncio.to_thread(folder.mkdir, parents=True, exist_ok=True)
+    await asyncio.to_thread(folder.chmod, 0)
+    try:
+        with capture_logs() as logs:
+            failed: httpx.Response = await live.get("/api/themes")
+        assert failed.status_code == 500, failed.text
+        body: JsonObject = failed.json()
+        assert set(body) == {"message", "context"}, body
+        error = body["context"]
+        assert isinstance(error, dict) and str(error["error"]).startswith("PermissionError"), body
+        crashed: list[JsonObject] = [entry for entry in logs if entry["event"] == "request_crashed"]
+        assert [entry["path"] for entry in crashed] == ["/api/themes"], logs
+        assert crashed[0]["exc_info"] is not None
+    finally:
+        await asyncio.to_thread(folder.chmod, 0o755)
+    missing: httpx.Response = await live.get("/api/no-such-path-178")
+    assert missing.status_code == 404, missing.text
+    assert set(missing.json()) == {"message", "context"}, missing.text

@@ -139,6 +139,17 @@ function renderUnreachable(message) {
   );
 }
 
+/** The daemon answered, with an error: it runs, so the screen says what failed rather than to start it. */
+function renderFailed(error) {
+  const cause = error.context && typeof error.context.error === "string" ? error.context.error : null;
+  screen(
+    el("div", { class: "note bad" }, icon("alert"), el("span", null, `The daemon is running but could not answer: ${error.message}`)),
+    cause === null ? null : el("p", { class: "muted mono" }, cause),
+    el("p", { class: "muted" }, "Its log, ", el("code", { class: "mono" }, "~/Library/Logs/Dot/dotx.log"), ", has the details."),
+    el("div", { class: "cluster" }, el("button", { class: "btn primary", type: "button", onclick: () => attempt(connect) }, icon("refresh"), "Try again")),
+  );
+}
+
 function renderConnecting() {
   screen(el("div", { class: "row muted" }, el("div", { class: "spinner" }), el("span", null, "Connecting to the daemon…")));
 }
@@ -242,6 +253,10 @@ async function connect() {
     if (error instanceof ApiError && error.status === 401) {
       clearToken();
       renderSignIn("The daemon did not accept that access token.");
+      return;
+    }
+    if (error instanceof ApiError) {
+      renderFailed(error);
       return;
     }
     renderUnreachable(error.message);

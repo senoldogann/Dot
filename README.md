@@ -1012,10 +1012,12 @@ the run. **Activity** (`#/activity`) is the same in full, with the runs that end
 campaigns, schedules); it is `GET /api/activity`. A run that ended shows how long it took and what it cost in tokens.
 Both follow the lifecycle stream, so a run moves between the sections the moment it starts, waits, is taken over or
 ends. The stream replays nothing after a break of the connection (the network dropped, the daemon restarted), so once it
-is back every page that follows it, the run's page and its queue among them, reads again what it shows. A run delegated
-by another run sits under the run that delegated it, in both the sidebar and the Activity page, with its steps so far
-and its channel; the parent's row says how many runs it delegated. In the chat, the delegated run's card carries a chip
-with its progress ("step 3 · web_fetch", then "done · 12 steps") and an **open** link to the run's own page.
+is back every page that follows it, the run's page and its queue among them, reads again what it shows; so does every
+page when the stream fell so far behind that events were lost (`resync`). A page that cannot read again keeps what it
+showed and says so. A run delegated by another run sits under the run that delegated it, in both the sidebar and the
+Activity page, with its steps so far and its channel; the parent's row says how many runs it delegated. In the chat, the
+delegated run's card carries a chip with its progress ("step 3 · web_fetch", then "done · 12 steps") and an **open**
+link to the run's own page.
 
 **New chat** is Dot's presence and one composer, standing in the middle of the space under the top bar, across and down,
 however long the day under them is. The face is Dot's character, moving (idle with a wink now and then; a still frame
@@ -1254,8 +1256,9 @@ The server listens on `127.0.0.1:8765` (`[server]`) and refuses to start on any 
 a `Host` of the loopback address and, when it has one, an `Origin` of the server itself; every call under `/api` except
 `/api/health` and `/api/proof` needs the bearer token in `<home>/api-token` (mode 0600). `dotx url` puts the token in
 the fragment of the address (`#token=…`), so it never reaches the server or a log; the page keeps it in the browser's
-local storage and removes it from the address bar. Pages are served with a strict content security policy and no CORS
-headers.
+local storage and removes it from the address bar. A page that cannot sign in says why: a token the daemon does not take
+is asked for again, a daemon that does not answer is to be started, and one that answered with an error is running, and
+the page shows that error. Pages are served with a strict content security policy and no CORS headers.
 
 The token goes only to the daemon. Before `dotx open`, `dotx url` and `dotx service permissions` hand it over, and
 before each request of the page and each poll of the desktop shell that carries it, the client sends a fresh nonce to
@@ -1324,7 +1327,9 @@ The REST API (all under `/api`; bodies and replies are JSON, event streams are s
 | `GET /browser`, `POST /browser/mode` (`{"mode": "own"\|"attach"}`)              | which Chrome Dot browses with and what Chrome allows; switch it (409 while runs are active, 422 when Chrome refuses) |
 | `POST /desktop/permissions`                                                     | make macOS ask for the desktop permissions the daemon lacks  |
 
-Errors come as `{"message": …, "context": {…}}`; invalid input is a 422 with the validation errors in the context.
+Errors come as `{"message": …, "context": {…}}`, those of the web framework itself (a path that does not exist, a method
+a path does not take) included; an error Dot did not expect is a 500 whose context names its kind and its words, and the
+log keeps its traceback. Invalid input is a 422 with the validation errors in the context.
 
 ## The desktop shell
 
@@ -1384,13 +1389,14 @@ needs to reach the Mac, and a push needs a secure address, so the way there is y
 2. Put that name in `[server] reach = ["<mac>.<tailnet>.ts.net"]` and restart the daemon: a request with that
    `Host`, and a page from `https://` that name, is served like a local one. `dotx url` then prints the signed-in
    address for the phone too (the token stays in the fragment).
-3. On the phone, Settings › General › Notifications on: the browser subscribes to the daemon's web push, and from
-   then on the daemon tells the phone what the desktop notifications say, in the same words, page open or closed;
-   a tap opens what it tells of. The phone also hears what no page can, as it happens before a page is back: the
-   daemon started again after it did not stop cleanly (it was killed, crashed or ended with an error; it leaves
-   `<home>/daemon.running` while it runs), with how many runs that cut off. The daemon signs the pushes with a key
-   pair it makes on first start (`<home>/vapid-key.pem`); subscriptions live in the store and go when their push
-   service says they are gone. Settings › General › Notifications off drops the subscription.
+3. On the phone, Settings › General › Notifications on: the browser subscribes to the daemon's web push, and from then
+   on the daemon tells the phone what the desktop notifications say, in the same words, page open or closed, and while
+   you look at that run on the phone too: the rule that keeps a notification quiet while you look at its run holds for
+   the notifications of a page, not for a push; a tap opens what it tells of. The phone also hears what no page can, as
+   it happens before a page is back: the daemon started again after it did not stop cleanly (it was killed, crashed or
+   ended with an error; it leaves `<home>/daemon.running` while it runs), with how many runs that cut off. The daemon
+   signs the pushes with a key pair it makes on first start (`<home>/vapid-key.pem`); subscriptions live in the store
+   and go when their push service says they are gone. Settings › General › Notifications off drops the subscription.
 
 The service worker (`sw.js`) keeps the shell files as a fallback for when the Mac is out of reach and caches nothing
 under `/api`. Without Tailscale, the same works on the Mac itself (`localhost` counts as secure) and on nothing else.

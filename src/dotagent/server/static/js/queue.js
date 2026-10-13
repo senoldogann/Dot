@@ -8,7 +8,7 @@
 import { api } from "./api.js";
 import { el } from "./dom.js";
 import { icon } from "./icons.js";
-import { onLifecycle, onStreamBack } from "./state.js";
+import { onLifecycle, onStreamBack, readFailed } from "./state.js";
 import { attempt, toast } from "./ui.js";
 
 const QUEUE_CHANGED = "queue_changed";
@@ -302,9 +302,9 @@ export function createQueue({ threadId, frame, onSteered, onStarted, onEdit }) {
     if (event.data.started_run_id !== null) {
       onStarted(event.data.started_run_id, event.data.after_run_id);
     }
-    load().catch((error) => console.warn("the queue could not be refreshed", error));
+    load().catch((error) => readFailed("The queue", error));
   });
-  const stopBack = onStreamBack(() => load().catch((error) => console.warn("the queue could not be refreshed", error)));
+  const stopBack = onStreamBack(() => load().catch((error) => readFailed("The queue", error)));
 
   load().catch((error) => console.warn("the queue could not be read", error));
 

@@ -7,7 +7,7 @@ import { api } from "../api.js";
 import { debounce, el } from "../dom.js";
 import { nestRows } from "../nesting.js";
 import { emptyPanel, errorPanel, loadingPanel, pageHead, segmented } from "../panels.js";
-import { onChange, onLifecycle, onStreamBack } from "../state.js";
+import { onChange, onLifecycle, onStreamBack, readFailed } from "../state.js";
 
 const SECTIONS = [
   { key: "waiting", title: "Waiting for you", empty: "Nothing waits for you", hint: "A run that asks a question or an approval shows here." },
@@ -92,7 +92,7 @@ export function mount(root, ctx) {
       if (view === null) {
         failure = error;
       } else {
-        console.warn("the activity could not be refreshed", error);
+        readFailed("The activity", error);
         return;
       }
     }

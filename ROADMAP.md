@@ -5097,8 +5097,8 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 174 | Protected files stay out of web_extract, and a workspace file is read as one         | done        | 3f450ef |
 | 175 | One broken MCP server never keeps Dot from starting                                  | done        | 637e979 |
 | 176 | Long skills and PDFs are read in pages, and osascript ends with its run              | done        | 15286a3 |
-| 177 | The configuration refuses at load what would fail a run                              | in progress |         |
-| 178 | The server answers every failure as JSON, and a page says it could not read again    | planned     |         |
+| 177 | The configuration refuses at load what would fail a run                              | done        | ce5b468 |
+| 178 | The server answers every failure as JSON, and a page says it could not read again    | in progress |         |
 | 179 | A run's end is one write, and a chat a run works on is never deleted                 | planned     |         |
 | 180 | A campaign whose session's command died goes on                                      | planned     |         |
 
@@ -9092,7 +9092,7 @@ whose tool times out is killed; the browser's driver stops even when Chrome's cl
 
 ### 177. The configuration refuses at load what would fail a run
 
-**Status: in progress.**
+**Status: done.** Merged as `ce5b468` (PR #215; no Linear issue, the Linear connector was signed out).
 
 **As built (2026-10-13).** The configuration is refused when it loads, with the key named, for what would fail every run
 later. An address of a provider or of the judge has to be `http://` or `https://` with a host, read as the HTTP client
@@ -9122,7 +9122,27 @@ commands.
 
 ### 178. The server answers every failure as JSON, and a page says it could not read again
 
-**Status: planned.**
+**Status: in progress.**
+
+**As built (2026-10-13).** Every error of the API comes as `{"message": …, "context": {…}}`: those of the web framework
+itself (a path that does not exist, a method a path does not take) with their status and headers, and an error that is
+not one of Dot's own as a 500 whose context names its kind and its words (secrets redacted, cut to 500 characters),
+logged as `request_crashed` with its traceback. Before, such an error came as the plain text "Internal Server Error" and
+Dot's log did not have it. The sign-in page tells a daemon that answered with an error from one that does not answer: it
+says that the daemon runs, shows the error and where the log is, instead of asking to start the daemon. A page that
+cannot read again what it shows, after an event of the stream or once the stream is back, keeps what it showed and says
+so in a toast while the stream is live (`readFailed`, told at most every ten seconds together with the events a page
+could not show), as item 160 meant; before, the activity, the schedules, a run's page, the sidebar, the queue and the
+home wrote it to the console only. A page whose read fails later, not at once, is told too, since the pages' re-readers
+are followed to their end. The lifecycle stream tells a page whose events were lost because it fell behind to read
+everything again (`resync`), as a break of the stream does; before, the page never knew. The README says that a phone's
+push comes while one looks at its run on the phone too, as it always did. Tests: `tests/smoke/test_server.py` makes the
+themes folder unreadable and gets a 500 in the shape of every error, with the kind of the error, and the log entry; a
+path that does not exist is a 404 in that shape (the code of before answered the plain text);
+`tests/unit/test_events.py` floods the lifecycle stream and is told to read again (the code of before was not);
+`tests/smoke/test_page_guards.py` signs in to a daemon that answers an error (the code of before asked to start it) and
+makes the home's read fail after an event: the home keeps what it showed and a toast says so (the code of before said
+nothing). The pages were looked at in a browser, wide and on a phone, light and dark.
 
 **What.** Every error of the API comes as `{"message": …, "context": {…}}` and an error that is not one of Dot's own is
 logged with its traceback; sign-in says what failed when the daemon answered; a page that could not read again after the
@@ -9756,3 +9776,4 @@ not at the daemon's next start; a campaign whose start failed in any way is dele
 - 2026-10-13 (Opus 5.5): item 174 merged as `3f450ef` (PR #212; no Linear issue, the connector was signed out): `web_extract` refuses a file in a protected location as `read_file` does, a file of the workspace is read by its name even when the name looks like an address, and the README names none of the owner's own skills.
 - 2026-10-13 (Opus 5.5): item 175 merged as `637e979` (PR #213; no Linear issue, the connector was signed out): an MCP server whose tool has an input schema Dot cannot use is left out with the reason instead of keeping Dot from starting, `dotx mcp list` reports every failure of a server, and a missing working directory is named.
 - 2026-10-13 (Opus 5.5): item 176 merged as `15286a3` (PR #214; no Linear issue, the connector was signed out): the `skill` tool gives a long skill's instructions in parts, `read_file` pages a PDF's text, a cancelled `osascript` is killed, and the browser's driver stops even when the close of Chrome fails.
+- 2026-10-13 (Opus 5.5): item 177 merged as `ce5b468` (PR #215; no Linear issue, the connector was signed out): the configuration is refused when it loads for an address, a model, a spending site, a budget or a timeout that would fail every run, a Keychain that does not answer is an error that says so, and `dotx models` ends with 1 when no provider answered.

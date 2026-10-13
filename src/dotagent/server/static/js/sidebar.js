@@ -14,7 +14,7 @@ import { closeMenu, menuOpenedBy, openMenu } from "./menu.js";
 import { nestRows, progressFacts } from "./nesting.js";
 import { readFolds, writePref } from "./prefs.js";
 import { requestCompose } from "./shortcuts.js";
-import { onLifecycle, onStreamBack } from "./state.js";
+import { onLifecycle, onStreamBack, readFailed } from "./state.js";
 import { attempt, confirmDialog, toast } from "./ui.js";
 
 // The chats listed at first, the step by which "Show older chats" lists more, and the most the API lists at once.
@@ -727,7 +727,11 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
       }
       activity = view;
     } catch (error) {
-      console.warn("the activity of the sidebar could not be refreshed", error);
+      if (activity === null) {
+        console.warn("the activity of the sidebar could not be loaded", error);
+      } else {
+        readFailed("The activity of the sidebar", error);
+      }
       return;
     }
     paintActivity();
@@ -754,7 +758,7 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
         return;
       }
       if (chats !== null) {
-        console.warn("the chat list of the sidebar could not be refreshed", error);
+        readFailed("The chat list", error);
         return;
       }
       failure = error;
