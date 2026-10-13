@@ -5114,8 +5114,8 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 181 | Tools that name files work on what was approved, and a cut journal line is left out  | done        | 05185bc |
 | 182 | A failed run's result is the error's message, and its context stays in the event     | done        | d1c2a00 |
 | 183 | A run's end the store refused is stored later, and a start that failed is told       | done        | 265da7c |
-| 184 | A queued message starts once or is removed, never both                               | in progress |         |
-| 185 | A provider's 403 is not a refused key, and Ollama's stream error keeps its words     | planned     |         |
+| 184 | A queued message starts once or is removed, never both                               | done        | d462505 |
+| 185 | A provider's 403 is not a refused key, and Ollama's stream error keeps its words     | in progress |         |
 | 186 | The doctor checks each model name against the list its provider serves               | planned     |         |
 | 187 | The service install keeps the running job until the new one is in place              | planned     |         |
 | 188 | A run of a dotx command is followed live on the pages and stopped there              | planned     |         |
@@ -9326,7 +9326,7 @@ a fault of the store; the scores half of item 179's one write and a refused dele
 
 ### 184. A queued message starts once or is removed, never both
 
-**Status: in progress.**
+**Status: done.** Merged as `d462505` (PR #223; no Linear issue, the Linear connector was signed out).
 
 **As built (2026-10-13).** The first message of a chat's queue is claimed in the store for the chat's next run before
 that run starts (`Store.claim_queued`, a row of the new `queue_claims` table, one per chat), in one write, and only when
@@ -9355,7 +9355,22 @@ a `dotx` process that starts the next message of the same chat claims it the sam
 
 ### 185. A provider's 403 is not a refused key, and Ollama's stream error keeps its words
 
-**Status: planned.**
+**Status: in progress.**
+
+**As built (2026-10-13).** A provider's HTTP 403, as an answer or inside a stream (`permission_error`), is an error of
+its own, `ProviderAccessError`, rather than a refused key: the classifier every provider shares (`classify_generic`)
+gives 401 to a refused key and 403 to a refused access. A run whose model answers so still moves to its standby model,
+with `access refused` as the reason the timeline shows, and the model is paused for `helper_cooldown_s` as before;
+Settings › Models says `access refused`, with the provider's words and no link to the keys, which would not help, where
+a refused key says `key refused` and links to them. An error Ollama reports inside its stream goes through the table of
+stream errors (`error_from_stream`): its message is the provider's words
+(`provider answered HTTP 500: model requires more system memory ...`), and its status the one the table gives such an
+error, 500 for one it does not name, which is retried as before; before, it was
+`provider reported an error inside the stream` under an invented 502, and its words were only in the context. Tests:
+`tests/smoke/test_wire_codecs.py` classifies a 403 and a 401, as answers and inside a stream (the code of before called
+both a refused key); `tests/unit/test_ollama_finish.py` folds an error chunk of Ollama (before: no words, 502);
+`tests/unit/test_helpers.py` pauses a model for a refused access; `tests/smoke/test_provider_problems.py` opens Settings
+› Models with providers that refuse access, refuse the key and have none, wide and on a phone, light and dark.
 
 **What.** A provider's HTTP 403 is an error of its own (access refused) rather than a refused key, so the label in
 Settings and the reason a run moved to its standby say what the provider said; an error inside Ollama's stream keeps its
@@ -10028,3 +10043,4 @@ running" for all of them.
 - 2026-10-13 (Opus 5.5): item 181 merged as `05185bc` (PR #220; no Linear issue, the connector was signed out): the tools that name files are classified again as they start and refused when a path leads elsewhere by then, and a journal line that a full disk cut short is left out.
 - 2026-10-13 (Opus 5.5): item 182 merged as `d1c2a00` (PR #221; no Linear issue, the connector was signed out): a run that one of Dot's errors ends stores the error's message as its result, and its `run_finished` event keeps the error's context with the secrets masked.
 - 2026-10-13 (Opus 5.5): item 183 merged as `265da7c` (PR #222; no Linear issue, the connector was signed out): an end of a run that the store refused is stored by the daemon's half-minute check once the database takes it, a run whose start failed ends with its `run_finished` event, and the half-minute check outlives a fault of the store.
+- 2026-10-13 (Opus 5.5): item 184 merged as `d462505` (PR #223; no Linear issue, the connector was signed out): a queued message is claimed in the store before its run starts, so it starts once, after the run at work on the chat in any process, and is not edited, taken out or steered while it starts.

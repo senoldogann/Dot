@@ -535,13 +535,13 @@ class ModelOption(FrozenModel):
     free: bool
 
 
-type ProviderProblem = Literal["no_key", "key_refused", "failed"]
+type ProviderProblem = Literal["no_key", "key_refused", "access_refused", "failed"]
 
 
 class ProviderModels(FrozenModel):
     """The models of one provider, or why it listed none: ``error`` is the message and ``problem`` what kind of failure
-    it is (``no_key``: no key is set for it, ``key_refused``: it answered HTTP 401 or 403, ``failed``: anything else);
-    both are ``None`` when the provider answered."""
+    it is (``no_key``: no key is set for it, ``key_refused``: it answered HTTP 401, ``access_refused``: it answered
+    HTTP 403, ``failed``: anything else); both are ``None`` when the provider answered."""
 
     provider: str
     models: list[ModelOption]

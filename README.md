@@ -90,18 +90,18 @@ and the end of a long one) and the newest screenshot, which only a helper that c
 `[agent] consult_max_per_run` questions (5); `0` offers no `consult`. A delegated run asks none (its parent does), and
 the run's own model is never its helper.
 
-`standby` lists the models a run moves to when its own model answers with a quota, rate-limit or key error, or its
-provider has no key: the run goes on from the same step, with the tools that step had, on the first standby model that
-can take it over, the model is told, and the timeline shows the switch, which the model chip follows. The run's
-reasoning level becomes the nearest one the new model offers. A run takes each model once at most, in the order of the
-list, and never goes back to one it left. A standby model that cannot call tools while the run offers them, whose window
-cannot hold the instructions and the tools, or whose details cannot be read is passed over; when every one is, the run
-fails and says why for each. Without a standby model that can answer, the error ends the run, and its message is the
-run's result (what the timeline, a notification and `dotx run` show); its context, the request and the answer of the
-provider, is kept with the run's `run_finished` event and in the log. A transport error or a timeout moves nothing (the
-run waits for its own model instead, see below), and neither does a failure of the `review` or `vision` model: the
-review model has no standby, so with `review` on the same provider as `main` a goal check or an `auto` approval fails
-while that provider cannot answer.
+`standby` lists the models a run moves to when its own model answers with a quota, rate-limit or key error (HTTP 401),
+refuses access to it (HTTP 403: a model, a region or a plan the key may not use), or its provider has no key: the run
+goes on from the same step, with the tools that step had, on the first standby model that can take it over, the model is
+told, and the timeline shows the switch, which the model chip follows. The run's reasoning level becomes the nearest one
+the new model offers. A run takes each model once at most, in the order of the list, and never goes back to one it left.
+A standby model that cannot call tools while the run offers them, whose window cannot hold the instructions and the
+tools, or whose details cannot be read is passed over; when every one is, the run fails and says why for each. Without a
+standby model that can answer, the error ends the run, and its message is the run's result (what the timeline, a
+notification and `dotx run` show); its context, the request and the answer of the provider, is kept with the run's
+`run_finished` event and in the log. A transport error or a timeout moves nothing (the run waits for its own model
+instead, see below), and neither does a failure of the `review` or `vision` model: the review model has no standby, so
+with `review` on the same provider as `main` a goal check or an `auto` approval fails while that provider cannot answer.
 
 A model is left out of both lists while its provider has no key (an Ollama model needs none), and after such an error
 for the time the provider named (at most a day) or for `helper_cooldown_s` seconds, until a call to it is answered or
@@ -121,8 +121,9 @@ default; at least four times however short the wait; 0 does not wait), and goes 
 answers, so a network that drops for a while costs a pause instead of the run. The timeline shows one line for the wait,
 which each try rewrites with the error, the number of tries, the next try and the time the wait ends, and one more when
 the model answers again. A stop ends the wait at once. A model still out of reach when the wait is over fails the run,
-and the result names the wait and the error. A refused request ends the run at once; a quota, rate-limit or key error or
-a missing key moves it to a standby model or ends it at once.
+and the result names the wait and the error. A refused request ends the run at once; a quota, rate-limit, key or access
+error or a missing key moves it to a standby model or ends it at once. An error a model service reports inside its
+answer keeps its words, Ollama's too.
 
 | Provider    | Reference             | Protocol                                                                                   | Key                                                       |
 | ----------- | --------------------- | ------------------------------------------------------------------------------------------ | --------------------------------------------------------- |
@@ -1153,12 +1154,13 @@ back once the run has ended (`POST /api/runs/{id}/undo`); the card itself is `GE
 **Settings** (`#/settings`) is one page with tabs: **General** (Dot's name and yours, Dot's own look, desktop
 notifications and the token this browser is signed in with), **Appearance** (the look of this browser, below),
 **Models** (one fold per provider, with the reasoning levels of each model and a menu to choose one; a provider without
-a key, or whose key was refused, says so and links to API keys), **API keys** (the key of each provider; see [Models and
-providers](#models-and-providers)), **Browser** (which Chrome Dot browses with and what Chrome has to allow first; see
-[Browser use](#browser-use)), **Rules**, **Memory**, **Skills**, **Schedules** and **System** (the daemon, the emergency
-stop and the health checks in a fold, closed, with the number of failures on its line). Which folds are open is kept in
-the browser. The tabs sit beside their content when the window has the room and above it otherwise; the earlier
-addresses of the memory, schedules, rules and system pages lead to their tabs.
+a key, or whose key was refused (HTTP 401), says so and links to API keys, and one that refused access (HTTP 403) says
+that, with its words), **API keys** (the key of each provider; see [Models and providers](#models-and-providers)),
+**Browser** (which Chrome Dot browses with and what Chrome has to allow first; see [Browser use](#browser-use)),
+**Rules**, **Memory**, **Skills**, **Schedules** and **System** (the daemon, the emergency stop and the health checks in
+a fold, closed, with the number of failures on its line). Which folds are open is kept in the browser. The tabs sit
+beside their content when the window has the room and above it otherwise; the earlier addresses of the memory,
+schedules, rules and system pages lead to their tabs.
 
 Settings › Appearance (⌥⌘A), after T3 Code's page, holds the look of this browser. **Colour scheme** is three cards,
 each a miniature of Dot's window drawn in the scheme it names: System (the default, split down the middle), Light and

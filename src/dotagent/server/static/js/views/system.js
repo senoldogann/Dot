@@ -331,6 +331,9 @@ function providerBody(provider, mainModel, inUse) {
   return modelTable(provider, mainModel);
 }
 
+// The badge of a provider that answered with a refusal: of its key (HTTP 401) or of the access (HTTP 403).
+const PROBLEM_BADGES = { key_refused: "key refused", access_refused: "access refused" };
+
 function problemBadge(provider, inUse) {
   if (provider.error === null) {
     return null;
@@ -338,7 +341,7 @@ function problemBadge(provider, inUse) {
   if (provider.problem === "no_key") {
     return el("span", { class: inUse ? "badge b-bad" : "badge b-muted" }, "no key");
   }
-  return el("span", { class: "badge b-bad" }, provider.problem === "key_refused" ? "key refused" : "unavailable");
+  return el("span", { class: "badge b-bad" }, PROBLEM_BADGES[provider.problem] ?? "unavailable");
 }
 
 /** One provider as a fold: open when it owns the default model or fails, so the cause is in sight. */

@@ -14,7 +14,14 @@ from fastapi.responses import FileResponse
 from dotagent import __version__
 from dotagent.agent.playbooks import PlaybookEntry, drop_playbook, list_playbooks, share_playbook
 from dotagent.config import AppConfig
-from dotagent.core.errors import DotError, ElsewhereError, MissingSecretError, NotFoundError, ProviderAuthError
+from dotagent.core.errors import (
+    DotError,
+    ElsewhereError,
+    MissingSecretError,
+    NotFoundError,
+    ProviderAccessError,
+    ProviderAuthError,
+)
 from dotagent.core.logs import get_logger
 from dotagent.core.paths import (
     added_servers_path,
@@ -92,11 +99,14 @@ def _option(provider: str, info: ModelInfo, default_effort: Effort) -> ModelOpti
 
 
 def _problem(exc: DotError) -> ProviderProblem:
-    """The kind of failure of a provider: the page sends a missing or refused key to Settings › API keys."""
+    """The kind of failure of a provider: the page sends a missing or refused key to Settings › API keys, and says
+    that the provider refused access, which a key does not change."""
     if isinstance(exc, MissingSecretError):
         return "no_key"
     if isinstance(exc, ProviderAuthError):
         return "key_refused"
+    if isinstance(exc, ProviderAccessError):
+        return "access_refused"
     return "failed"
 
 

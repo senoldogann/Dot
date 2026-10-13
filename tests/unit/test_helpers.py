@@ -7,6 +7,7 @@ from dotagent.agent.helpers import Roster, Unavailable, roster_for, roster_text,
 from dotagent.config import AppConfig, ModelsConfig, load_default_config
 from dotagent.core.errors import (
     MissingSecretError,
+    ProviderAccessError,
     ProviderAuthError,
     ProviderHttpError,
     ProviderQuotaError,
@@ -74,6 +75,9 @@ def test_a_model_is_paused_for_the_time_its_provider_named_at_most_a_day_else_fo
     assert re.fullmatch(r"\d{4}-\d{2}-\d{2} \d{2}:\d{2}", until_text(NOW + MAX_PAUSE_S, NOW))
     assert pause_for(ProviderAuthError("bad key", 401, {}), COOLDOWN_S, NOW) == Pause(
         reason="key refused", until=NOW + COOLDOWN_S
+    )
+    assert pause_for(ProviderAccessError("not for this key", 403, {}), COOLDOWN_S, NOW) == Pause(
+        reason="access refused", until=NOW + COOLDOWN_S
     )
     assert pause_for(MissingSecretError("missing API key", {}), COOLDOWN_S, NOW) == Pause(
         reason="no key", until=NOW + COOLDOWN_S

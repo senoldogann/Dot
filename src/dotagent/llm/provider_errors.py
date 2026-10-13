@@ -12,6 +12,7 @@ from collections.abc import Callable, Mapping
 from pydantic import JsonValue
 
 from dotagent.core.errors import (
+    ProviderAccessError,
     ProviderAuthError,
     ProviderHttpError,
     ProviderQuotaError,
@@ -132,10 +133,13 @@ def error_message(status: int, wire: WireError | None) -> str:
 def classify_generic(
     status: int, wire: WireError | None, retry_after_s: float | None, detail: JsonObject
 ) -> ProviderHttpError:
-    """401/403 are credentials problems, 429 is a rate limit, anything else a plain HTTP failure."""
+    """401 is a refused key, 403 a refused access (the key is known, what it asked is not allowed), 429 a rate
+    limit, anything else a plain HTTP failure."""
     message: str = error_message(status, wire)
-    if status in (401, 403):
+    if status == 401:
         return ProviderAuthError(message, status, detail)
+    if status == 403:
+        return ProviderAccessError(message, status, detail)
     if status == 429:
         return ProviderRateLimitError(message, status, retry_after_s, detail)
     return ProviderHttpError(message, status, detail)

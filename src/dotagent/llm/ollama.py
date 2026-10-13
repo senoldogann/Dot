@@ -12,10 +12,9 @@ import httpx
 from pydantic import JsonValue
 
 from dotagent.config import OllamaConfig
-from dotagent.core.errors import ProviderHttpError, ProviderProtocolError, ProviderTransportError
+from dotagent.core.errors import ProviderProtocolError, ProviderTransportError
 from dotagent.core.ids import new_id
 from dotagent.core.retry import RetryPolicy
-from dotagent.core.text import redact_secrets
 from dotagent.core.types import FrozenModel, JsonObject
 from dotagent.llm.connector import get_json, post_json, retry_with_reset
 from dotagent.llm.http import (
@@ -26,7 +25,7 @@ from dotagent.llm.http import (
     transport_error_types,
     wrap_transport_error,
 )
-from dotagent.llm.provider_errors import classify_generic
+from dotagent.llm.provider_errors import WireError, classify_generic, error_from_stream, wire_error_from_object
 from dotagent.llm.traits import effort_ladder, is_known_label, label_rank
 from dotagent.llm.types import (
     ChatRequest,
@@ -222,13 +221,16 @@ def _parse_tool_calls(raw: JsonValue, context: JsonObject) -> tuple[ToolCall, ..
 def apply_chunk(
     state: StreamState, chunk: JsonObject, context: JsonObject
 ) -> tuple[StreamState, tuple[StreamDelta, ...]]:
-    """Fold one NDJSON object into the state and report the incremental text it carried."""
+    """Fold one NDJSON object into the state and report the incremental text it carried. An error Ollama reports
+    inside the stream is raised with its words, and with the status the table of stream errors gives it
+    (:func:`error_from_stream`)."""
     error: JsonValue = chunk.get("error")
     if error is not None:
-        raise ProviderHttpError(
-            "provider reported an error inside the stream",
-            502,
-            {**context, "stream_error": redact_secrets(str(error))[:1000]},
+        wire: WireError | None = wire_error_from_object(chunk)
+        raise error_from_stream(
+            wire if wire is not None else WireError(kind="", code="", message=str(error), limit_name=""),
+            context,
+            classify_generic,
         )
     deltas: list[StreamDelta] = []
     text: str = state.text
