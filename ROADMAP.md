@@ -5069,6 +5069,14 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 146 | The gaps the final review of part 23 found                                           | done        | e558f21 |
 | 147 | A folder whose reading macOS broke off does not fail a search                        | done        | ca16c37 |
 | 148 | The queue of a chat, after T3 Code                                                   | done        | 5f6747b |
+| 149 | The scheduler goes on past a failure                                                 | in progress |         |
+| 150 | A tool that raises fails its call, not its run                                       | planned     |         |
+| 151 | A question a run left reaches the owner                                              | planned     |         |
+| 152 | A late one-time schedule is never dropped unseen                                     | planned     |         |
+| 153 | A server of tools that cannot start does not stop the daemon                         | planned     |         |
+| 154 | The memory keeps what it learns                                                      | planned     |         |
+| 155 | The compaction keeps a tail measured in tokens                                       | planned     |         |
+| 156 | The page text of the browser and the desktop has a floor                             | planned     |         |
 
 ### 77. The type system: Inter and Geist Mono, seven sizes, three weights
 
@@ -8163,6 +8171,103 @@ failed on the code of before, where the run manager has no queue and the send sa
 
 **What.** T3 Code's queued messages in Dot: a message sent while a run works waits and starts after it, instead of
 steering the run at once, and the queue can be reordered, edited, sent into the run and resumed, from any open page.
+
+## Part 25: solid ground, from the deep review (planned 2026-10-13)
+
+The owner's twenty-fifth word, on 2026-10-13, after part 24: of the deep review of the whole written that day (kept by
+the owner, outside the repository), fix what needs fixing.
+
+**Status (2026-10-13): planned.** The review's first group of fixes, those of the run's machinery, the memory and the
+context, is this part. Each finding is read again in the code before it is fixed, and one that a second reading does not
+bear out is not fixed.
+
+**The shape of this part (the decisions).** Eight items in the order of weight, each a pull request of its own: the
+scheduler goes on past a failure (149); a tool that raises fails its call, not its run (150); a question a run left
+reaches the owner (151); a late one-time schedule is never dropped unseen (152); an MCP server that cannot start does
+not stop the daemon (153); the memory keeps what it learns (154); the compaction keeps a tail measured in tokens (155);
+the page text of the browser and the desktop has a floor (156).
+
+### How to start part 25 (the handoff prompt)
+
+> Read ROADMAP.md part 25 and the status table of part 9 (rows 149 to 156). One item at a time, in order; the protocol
+> of part 5 (branch, gate, PR, Linear MYP issue when the connector is signed in, squash merge, hash in the table, log
+> line) is unchanged. Read each finding again in the code before fixing it, and give each fix a test that fails on the
+> code of before. Never touch the owner's data directory except to read it, by the kinds and numbers of what is stored,
+> and to restart the daemon when `/api/status` shows no active run; PLAN.md stays untracked. The owner reads Turkish;
+> everything written is English.
+
+### 149. The scheduler goes on past a failure
+
+**Status: in progress.**
+
+**As built (2026-10-13).** `Scheduler.tick` does its three parts (the due schedules, the due sessions of campaigns, the
+reflection's check) each on its own: a part that fails is logged with its error (`scheduler_part_failed`) and holds up
+neither of the others, and the failures are raised together at the end of the tick, as an `ExceptionGroup`. The loop
+tries a failed tick again at the next one and counts the failed ticks in a row; at `FAILED_TICKS_TO_END` (20, five
+minutes at the default `tick_s` of 15 seconds) it ends with the last tick's failures, and the daemon with it, as before,
+so schedules never stop firing unseen, and the service's job starts the daemon again. Before, the first error that the
+tick did not catch (the store failing as it listed the due schedules or campaigns, a campaign's start failing with an
+error that is not Dot's own, the reflection's check) ended the loop, the daemon and every run it held. Tests: a listing
+of the due campaigns that fails once, after which the loop goes on ticking; one that fails every time, which ends the
+loop after twenty ticks with the store's error. Both failed on the code of before, where the first failure ended the
+loop.
+
+**What.** A tick of the scheduler that fails, in the store, a campaign's start or the reflection's check, is logged and
+tried again at the next tick, and the other parts of the tick go on; only a failure that lasts many ticks in a row ends
+the scheduler and the daemon. Before, one error that the tick did not catch ended the scheduler's loop, and with it the
+daemon and every run it held.
+
+### 150. A tool that raises fails its call, not its run
+
+**Status: planned.**
+
+**What.** Any error a tool raises fails that call, with the error's kind and words for the model to read, and the run
+goes on; `edit_file` edits a file that is not UTF-8, or has Windows line ends, without changing anything outside the
+edit.
+
+### 151. A question a run left reaches the owner
+
+**Status: planned.**
+
+**What.** A question a run left for the owner reaches the owner as a push, as an approval does, and so do the ends the
+owner would not otherwise see: a campaign that stopped or reached its goal, a schedule that could not fire.
+
+### 152. A late one-time schedule is never dropped unseen
+
+**Status: planned.**
+
+**What.** A one-time schedule whose moment passed while the Mac slept or the daemon was off is never switched off
+unseen: it fires late, saying so, or tells the owner.
+
+### 153. A server of tools that cannot start does not stop the daemon
+
+**Status: planned.**
+
+**What.** An MCP server that cannot start leaves the daemon starting without its tools, and shows as broken in
+`dotx doctor` and the web UI.
+
+### 154. The memory keeps what it learns
+
+**Status: planned.**
+
+**What.** The nightly merge leaves retired notes and other agents' notes alone; a lesson that says not to do something
+is not taken for a repeat of the one that says to do it; the owner's notes have a relevance bar and each group of notes
+its own share of the budget, so the agent's lessons still reach a run; a lesson of a run that failed is drawn with words
+that say it failed.
+
+### 155. The compaction keeps a tail measured in tokens
+
+**Status: planned.**
+
+**What.** A compaction keeps the newest messages up to a share of the budget measured in tokens, with a fixed number as
+the least, as the README says, not about eight messages whatever the budget.
+
+### 156. The page text of the browser and the desktop has a floor
+
+**Status: planned.**
+
+**What.** In a small model window the text of a page has a floor: a page never comes back empty because the window is
+small.
 
 ## Log
 

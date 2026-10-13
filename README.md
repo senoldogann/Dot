@@ -1586,6 +1586,10 @@ defaults: a run cannot schedule itself into another approval mode.
 - Schedules fire only while the daemon runs and the Mac is awake; `dotx service install` keeps the daemon running.
 - A firing is at most once. One that is overdue by more than `misfire_grace_s` (the daemon was off) is skipped and waits
   for the next.
+- The scheduler goes on past a failure: the schedules, the campaigns and the nightly reflection are each looked at on
+  their own at every tick, one that fails (the store, a campaign's start) is logged, and the next tick tries again. Only
+  20 failed ticks in a row (five minutes at the default `tick_s`) end the scheduler, and the daemon with it, with an
+  error, so that schedules never stop firing unseen; the service that `dotx service install` sets up starts it again.
 - A cron expression may not fire more often than every `min_interval_s`; at most `max_schedules` schedules can be on.
 
 ## Agents
