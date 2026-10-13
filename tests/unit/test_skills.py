@@ -355,9 +355,9 @@ def test_a_run_offered_many_skills_is_listed_those_that_fit_its_goal_and_told_of
         )
     ]
     # Few enough: every one, in its order, whatever the goal.
-    assert listed_skills(skills, "Plan a trip to Rome.", 4) == SkillListing(skills=tuple(skills), left=0)
+    assert listed_skills(skills, "Plan a trip to Rome.", [], 4) == SkillListing(skills=tuple(skills), left=0)
     # More: those that share words with the goal, the best fit first; a goal of two kinds of work keeps both.
-    listing: SkillListing = listed_skills(skills, "Fill in the invoice form and email it to the client.", 3)
+    listing: SkillListing = listed_skills(skills, "Fill in the invoice form and email it to the client.", [], 3)
     assert ([skill.name for skill in listing.skills], listing.left) == (["invoice-pdf", "mail-merge"], 2)
     prompt: str = _prompt(["shell", "skill"], list(listing.skills), listing.left)
     assert (
@@ -367,12 +367,18 @@ def test_a_run_offered_many_skills_is_listed_those_that_fit_its_goal_and_told_of
         "your need, and skill reads one by its name."
     ) in prompt, prompt
     assert "release-notes" not in prompt and "weekly-report" not in prompt
-    # None shares a word with the goal: none is listed, and the run is told how to find them.
-    assert listed_skills(skills, "Plan a trip to Rome.", 3) == SkillListing(skills=(), left=4)
+    # None fits the goal: none is listed, and the run is told how to find them.
+    assert listed_skills(skills, "Plan a trip to Rome.", [], 3) == SkillListing(skills=(), left=4)
     assert (
-        "\n- None of the 4 installed skills shares a word with your goal, so none is listed here: find_help searches "
-        "them all by your need, and skill reads one by its name."
+        "\n- None of the 4 installed skills clearly fits your goal, so none is listed here: find_help searches them "
+        "all by your need, and skill reads one by its name."
     ) in _prompt(["shell", "skill"], [], 4)
+    # A goal in Turkish shares no word with the skills; the one the embeddings put close to it (place 1) is listed.
+    turkish: SkillListing = listed_skills(skills, "Müşterinin fatura formunu doldur.", [1], 3)
+    assert ([skill.name for skill in turkish.skills], turkish.left) == (["invoice-pdf"], 3)
+    # A skill close in meaning joins those that share words, after them when it ranks no higher.
+    joined: SkillListing = listed_skills(skills, "Fill in the invoice form.", [2], 3)
+    assert [skill.name for skill in joined.skills] == ["invoice-pdf", "weekly-report"]
 
 
 def test_the_prompt_asks_for_the_smallest_fitting_work_and_for_looking_things_up() -> None:

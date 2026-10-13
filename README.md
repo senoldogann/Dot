@@ -1814,18 +1814,22 @@ MCP results are untrusted content, and the stderr of a stdio server goes to `<lo
 A skill is a folder of instructions for one kind of work, in the Agent Skills layout: `<name>/SKILL.md` with a YAML
 frontmatter (`name`, `description`) and optional `scripts/`, `references/` and `assets/`. Every model is given, in its
 instructions, the `name: description` line of each skill its run is offered, and reads the rest with the `skill` tool
-when a task matches. A run offered more than `listed` under `[skills]` (20) is given those that share the most words
-with its goal and with the goals of the latest earlier runs of its thread, as its notes are chosen, the best fit first
-and at most that many, and is told how many more there are: `find_help` searches them all, and `skill` reads one by its
-name. A skill that shares only some of the goal's words is kept, as a goal can ask for more than one kind of work; one
-in another language than the goal shares none. Dot always looks in `<home>/skills` and in the `skills/` folder of every
-plugin; `[skills] dirs` lists more directories (each holds skill folders; `~` expands). Skills written for Claude Code
-load unchanged: Dot reads only `name` and `description` of the frontmatter, so other keys (a date or a nested map under
-`metadata`, a list of `allowed-tools`) do not leave a skill out. To use your own, put `dirs = ["~/.claude/skills"]`
-under `[skills]` in your `config.toml`; Dot reads nothing there until you do. An entry may also be one skill folder
-(`~/.claude/skills/x-twitter-growth`), to take some skills only: `~/.claude/skills` can hold skills written for Claude
-Code's own tools, such as the superpowers bundle or the skills synced from claude.ai. The X skills of Claude Code
-(`x-twitter-growth`, `baoyu-post-to-x`) are then the playbook a campaign on X can work from.
+when a task matches. A run offered more than `listed` under `[skills]` (20) is given those that fit its goal and the
+goals of the latest earlier runs of its thread best, as its notes are chosen, the best fit first and at most that many,
+and is told how many more there are: `find_help` searches them all, and `skill` reads one by its name. A skill fits by
+the words it shares with the goal and, with the memory's embeddings on, by how close it is to the goal in meaning (at
+least `min_similarity` under `[memory]`), the two rankings fused as the notes' are; bge-m3 reads Turkish as well as
+English, so a goal in one language is given the skills described in the other, while by words alone it shares none with
+them. Each skill is embedded once and kept while Dot runs; when the skills must be picked and the embedding service
+fails, the run fails to start, as it does when its notes cannot be searched. A skill that shares only some of the goal's
+words is kept, as a goal can ask for more than one kind of work. Dot always looks in `<home>/skills` and in the
+`skills/` folder of every plugin; `[skills] dirs` lists more directories (each holds skill folders; `~` expands). Skills
+written for Claude Code load unchanged: Dot reads only `name` and `description` of the frontmatter, so other keys (a
+date or a nested map under `metadata`, a list of `allowed-tools`) do not leave a skill out. To use your own, put
+`dirs = ["~/.claude/skills"]` under `[skills]` in your `config.toml`; Dot reads nothing there until you do. An entry may
+also be one skill folder (`~/.claude/skills/x-twitter-growth`), to take some skills only: `~/.claude/skills` can hold
+skills written for Claude Code's own tools, such as the superpowers bundle or the skills synced from claude.ai. The X
+skills of Claude Code (`x-twitter-growth`, `baoyu-post-to-x`) are then the playbook a campaign on X can work from.
 
 A plugin is a folder in the Claude Code layout: `.claude-plugin/plugin.json` (its name), `skills/<name>/SKILL.md` and
 `.mcp.json` (`{"mcpServers": {...}}`; `${CLAUDE_PLUGIN_ROOT}` is the plugin folder). Their skills and MCP servers are
@@ -1883,11 +1887,13 @@ drive: those whose Info.plist names a scripting dictionary or turns AppleScript 
 `/System/Applications` (each with its `Utilities`), `/System/Library/CoreServices` and `~/Applications`, each told by
 the commands and classes of its dictionary's own suites (the suites that many applications share are ranked, not
 listed). It ranks them by the words they share with the need (BM25; case, accents, common words and plurals do not
-matter) and lists the best eight that score at least half as well as the best one, each with how to use it: `skill` with
-its name, the MCP tool by its name, or `apple_script` with `tell application`, and `sdef` with the application's path,
-which prints its whole dictionary. With `elsewhere = true` under `[skills]` (the default), it also searches the skills
-and MCP servers found on this Mac that you can add, each told with how to ask you to add it: a run never adds one
-itself. With nothing found, it says what to try next. It changes nothing.
+matter; one that scores less than half as well as the best one is left out) and, with the memory's embeddings on, by how
+close they are to the need in meaning, as the skills a run is given are, and lists the best eight, each with how to use
+it: `skill` with its name, the MCP tool by its name, or `apple_script` with `tell application`, and `sdef` with the
+application's path, which prints its whole dictionary. With `elsewhere = true` under `[skills]` (the default), it also
+searches the skills and MCP servers found on this Mac that you can add, each told with how to ask you to add it: a run
+never adds one itself. When the embedding service fails, it says so and lists what the words found. With nothing found,
+it says what to try next. It changes nothing.
 
 **Learned skills.** With `playbooks = true` in `[agent]` (the default), a task run of its own that ended done (its
 answer checked, or its goal check found the outcome achieved) after at least `skill_min_steps` (4) acting steps (every

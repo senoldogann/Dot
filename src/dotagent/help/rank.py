@@ -1,6 +1,7 @@
-"""The ranking of help for a need: Okapi BM25 (k1 1.2, b 0.75) of the need's words over the words of each item. Words
-are compared folded (case and accents do not matter), without common English words, a plural made singular. Everything
-here is pure."""
+"""The ranking of help for a need: Okapi BM25 (k1 1.2, b 0.75) of the need's words over the words of each item, fused
+with a ranking by meaning when there is one (:mod:`dotagent.help.meaning`), by reciprocal rank fusion as the notes are.
+Words are compared folded (case and accents do not matter), without common English words, a plural made singular.
+Everything here is pure."""
 
 import math
 import re
@@ -9,6 +10,7 @@ from collections.abc import Sequence
 
 from dotagent.core.text import fold_search
 from dotagent.help.types import HelpItem
+from dotagent.memory.ranking import reciprocal_rank_fusion
 
 _WORD: re.Pattern[str] = re.compile(r"[^\W_]+")
 # Words that say nothing of what a thing is for.
@@ -127,12 +129,22 @@ def _scored(texts: Sequence[str], need: str) -> list[tuple[float, int]]:
     return sorted(scored, key=lambda pair: (-pair[0], pair[1]))
 
 
-def rank(items: Sequence[HelpItem], need: str, limit: int) -> list[HelpItem]:
-    """The ``limit`` items of ``items`` that fit ``need`` best, the best first (:func:`fitting`, over the ``text`` of
-    each). One that scores less than half as well as the best one is left out: it shares only the weaker words of a
-    need of a few words."""
+def fused(by_words: Sequence[int], by_meaning: Sequence[int], limit: int) -> list[int]:
+    """At most ``limit`` places out of a ranking by words and one by meaning, the best first by reciprocal rank fusion:
+    a place both rank comes before one that only one of them ranks as high; places that score alike keep the order of
+    the words, then that of the meaning. Without a ranking by meaning, the one by words as it is."""
+    picked: list[str] = reciprocal_rank_fusion(
+        [[str(index) for index in by_words], [str(index) for index in by_meaning]], limit
+    )
+    return [int(index) for index in picked]
+
+
+def rank(items: Sequence[HelpItem], need: str, close: Sequence[int], limit: int) -> list[HelpItem]:
+    """The ``limit`` items of ``items`` that fit ``need`` best, the best first: those that share its words
+    (:func:`fitting`, over the ``text`` of each), fused with ``close``, the places of those close to it in meaning,
+    the closest first (:func:`fused`). An item that shares words but scores less than half as well as the best one
+    is left out of the words' ranking: it shares only the weaker words of a need of a few words."""
     scored: list[tuple[float, int]] = _scored([item.text for item in items], need)
-    if not scored:
-        return []
-    floor: float = scored[0][0] * _FLOOR
-    return [items[index] for score, index in scored[:limit] if score >= floor]
+    floor: float = scored[0][0] * _FLOOR if scored else 0.0
+    by_words: list[int] = [index for score, index in scored if score >= floor]
+    return [items[index] for index in fused(by_words, close, limit)]
