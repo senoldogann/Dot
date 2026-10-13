@@ -56,7 +56,8 @@ from dotagent.core.errors import (
 )
 from dotagent.core.logs import get_logger
 from dotagent.core.paths import chrome_data_dir, failsafe_path, run_owners_dir
-from dotagent.core.text import redact_secrets, truncate_tail
+from dotagent.core.text import redact_json, redact_secrets, truncate_tail
+from dotagent.core.types import JsonObject
 from dotagent.llm.router import ModelRef, parse_model_ref
 from dotagent.llm.types import Effort, ModelInfo, user_message
 from dotagent.memory.service import SavedMemory
@@ -1298,20 +1299,23 @@ class RunManager:
     ) -> None:
         """Task body and failure boundary of one run.
 
-        Every way a run can end is turned into a stored status plus an event. Unexpected exceptions are logged with
-        their traceback and recorded as a failed run; they are not hidden, because nothing awaits this task. The inbox
-        is shut as the run ends, before anything awaits, so that what is sent from then on is refused, and answers the
-        run got too late to read are kept in its thread (:meth:`_keep_answers`). The handle is released and ``finished``
-        is set even when recording the end fails (:meth:`_close`), so a waiter and the thread never hang; the lessons
-        and playbooks of a run whose end was not recorded are not drawn. What follows a session of a campaign is planned
-        once its end is recorded and before ``finished`` is set, so a waiter finds it planned. The lessons of a run that
-        may hold some are drawn after that, in a task of its own, so that they hold up nothing. Last, the run's chat
-        moves its queue on (:meth:`_follow_queue`), once the run no longer holds the chat.
+        Every way a run can end is turned into a stored status plus an event. A run that one of Dot's errors ends keeps
+        the error's message as its result, which the pages, the push and ``dotx run`` show, and the error's context (a
+        provider's request and answer) with its ``run_finished`` event and in the log. Unexpected exceptions are logged
+        with their traceback and recorded as a failed run; they are not hidden, because nothing awaits this task. The
+        inbox is shut as the run ends, before anything awaits, so that what is sent from then on is refused, and answers
+        the run got too late to read are kept in its thread (:meth:`_keep_answers`). The handle is released and
+        ``finished`` is set even when recording the end fails (:meth:`_close`), so a waiter and the thread never hang;
+        the lessons and playbooks of a run whose end was not recorded are not drawn. What follows a session of a
+        campaign is planned once its end is recorded and before ``finished`` is set, so a waiter finds it planned. The
+        lessons of a run that may hold some are drawn after that, in a task of its own, so that they hold up nothing.
+        Last, the run's chat moves its queue on (:meth:`_follow_queue`), once the run no longer holds the chat.
         """
         runtime: Runtime = self._runtime
         status: RunStatus = "failed"
         result: str = ""
         needs: str = ""
+        error: JsonObject | None = None
         lessons: LessonCase | None = None
         try:
             async with self._place_for(run):
@@ -1331,14 +1335,14 @@ class RunManager:
         except FailSafeTriggered as exc:
             status, result = "cancelled", f"{PREFIX_EMERGENCY_STOP}{exc.message}"
         except DotError as exc:
-            status, result = "failed", str(exc)
+            status, result, error = "failed", exc.message, {"message": exc.message, "context": exc.context}
             log.error("run failed", run_id=run.id, error=exc.message, context=exc.context)
         except Exception as exc:
             status, result = "failed", f"{PREFIX_INTERNAL_ERROR}{type(exc).__name__}: {exc}"
             log.exception("run crashed", run_id=run.id)
         finally:
             inbox.shutdown()
-            recorded: bool = await self._close(run, status, result, needs, inbox, finished)
+            recorded: bool = await self._close(run, status, result, needs, error, inbox, finished)
         # Registered before anything awaits, so that a waiter that ``finished`` wakes finds it.
         if recorded and lessons is not None and not self._stopping:
             self._learning[run.id] = asyncio.create_task(self._learn(lessons))
@@ -1368,6 +1372,7 @@ class RunManager:
         status: RunStatus,
         result: str,
         needs: str,
+        error: JsonObject | None,
         inbox: asyncio.Queue[UserInput],
         finished: asyncio.Event,
     ) -> bool:
@@ -1376,7 +1381,7 @@ class RunManager:
         logged here with its traceback, and the run stays as the store has it until the daemon's next start closes
         it."""
         try:
-            await _uncancelled(self._record_end(run, status, result, needs, inbox))
+            await _uncancelled(self._record_end(run, status, result, needs, error, inbox))
             return True
         except Exception:
             log.exception("run_end_not_recorded", run_id=run.id, status=status)
@@ -1388,19 +1393,27 @@ class RunManager:
             finished.set()
 
     async def _record_end(
-        self, run: RunRecord, status: RunStatus, result: str, needs: str, inbox: asyncio.Queue[UserInput]
+        self,
+        run: RunRecord,
+        status: RunStatus,
+        result: str,
+        needs: str,
+        error: JsonObject | None,
+        inbox: asyncio.Queue[UserInput],
     ) -> None:
         """Store how the run ended and tell about it: its waiters are released, the answers that reached its inbox
         (shut by :meth:`_drive`) too late are kept, the status and result are stored with the scores of the notes it
         used and its ``run_finished`` event in one write (:meth:`Store.end_run`), the event is sent, and what follows a
-        campaign's session is planned."""
+        campaign's session is planned. The event keeps ``error``, the message and the context of the error that ended
+        the run, when one did."""
         runtime: Runtime = self._runtime
         runtime.approvals.release_run(run.id)
         await self._keep_answers(run, [inbox.get_nowait() for _ in range(inbox.qsize())])
         clean: str = truncate_tail(redact_secrets(result), _RESULT_CHARS)
-        ended: EventRecord = await runtime.store.end_run(
-            run.id, status, clean, {"status": status, "result": clean, "needs": redact_secrets(needs)}
-        )
+        data: JsonObject = {"status": status, "result": clean, "needs": redact_secrets(needs)}
+        if error is not None:
+            data["error"] = redact_json(error)
+        ended: EventRecord = await runtime.store.end_run(run.id, status, clean, data)
         runtime.bus.publish(ended)
         if run.campaign_id is not None and not self._stopping:
             await self._follow_session(run, run.campaign_id, classify_ending(status, clean), needs)

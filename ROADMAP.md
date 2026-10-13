@@ -5111,8 +5111,8 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 178 | The server answers every failure as JSON, and a page says it could not read again    | done        | 401cef2 |
 | 179 | A run's end is one write, and a chat a run works on is never deleted                 | done        | be314c3 |
 | 180 | A campaign whose session's command died goes on                                      | done        | baca51a |
-| 181 | Tools that name files work on what was approved, and a cut journal line is left out  | in progress |         |
-| 182 | A failed run's result is the error's message, and its context stays in the event     | planned     |         |
+| 181 | Tools that name files work on what was approved, and a cut journal line is left out  | done        | 05185bc |
+| 182 | A failed run's result is the error's message, and its context stays in the event     | in progress |         |
 | 183 | A run's end the store refused is stored later, and a start that failed is told       | planned     |         |
 | 184 | A queued message starts once or is removed, never both                               | planned     |         |
 | 185 | A provider's 403 is not a refused key, and Ollama's stream error keeps its words     | planned     |         |
@@ -9253,7 +9253,7 @@ only reads is trusted, and the git history keeps the two names item 174 took out
 
 ### 181. Tools that name files work on what was approved, and a cut journal line is left out
 
-**Status: in progress.**
+**Status: done.** Merged as `05185bc` (PR #220; no Linear issue, the Linear connector was signed out).
 
 **As built (2026-10-13).** A tool built with `make_path_tool` (`tools/base.py`) is classified again from the files as
 they are when it starts, with no wait between that and its run, and refused when that is not the action that was
@@ -9275,7 +9275,22 @@ of the run and `dotx undo`.
 
 ### 182. A failed run's result is the error's message, and its context stays in the event
 
-**Status: planned.**
+**Status: in progress.**
+
+**As built (2026-10-13).** A run that one of Dot's errors ends stores the error's message as its result
+(`RunManager._drive`), which the timeline, the notifications, the push to the phone, `dotx run` and a run that delegated
+read; its `run_finished` event keeps the error, its message and its context with the secrets masked (`error`), and the
+log keeps the context as before. Before, the result was the error's text with its whole context on the same line
+(`message | context={...}`): for a provider's error, the first 3 000 characters of the request and the answer's body, so
+the push put the provider's address and the start of the request on the phone's lock screen. A broken connection's
+message now says what broke it (`transport failure while talking to the provider (ConnectError: ...)`), which only its
+context said, so the result of a run it ends names it too; so does the error of a run that no standby model can take
+over, for why the run's model cannot answer and why each standby model was passed over. A tool's failed call still shows
+the model the error's context, which tells it what to do next (the nearest lines of an edit that missed, say). Tests:
+`tests/smoke/test_model_wait.py` fails a run on a refused request whose error carries a request and an answer, and finds
+the message as its result and the error with its context in its `run_finished` event (the code of before stored both on
+one line as the result), and `tests/smoke/test_helpers.py` finds why the run's model cannot answer and why its standby
+model was passed over in the result of a run that fails so.
 
 **What.** A run that fails on one of Dot's errors stores the error's message as its result, which the pages, the push
 and `dotx run` show; the error's context (a provider's request and answer) goes to the `run_finished` event and the log
@@ -9971,3 +9986,4 @@ running" for all of them.
 - 2026-10-13 (Opus 5.5): item 179 merged as `be314c3` (PR #217; no Linear issue, the connector was signed out): a run's end is one write, a delegated run whose end was not recorded is an error for the run that delegated it, and a chat a run of any process works on is not deleted.
 - 2026-10-13 (Opus 5.5): item 180 merged as `baca51a` (PR #218; no Linear issue, the connector was signed out): a campaign whose session's `dotx` command died plans its next session when the daemon closes that session, and a campaign whose opening session could not start, in any way, is not kept. Part 29 is done.
 - 2026-10-13 (Opus 5.5): part 30, the remaining problems, is planned (items 181 to 191), and the owner's three decisions of the day are recorded (open owner decisions 34 to 36); item 181 is built: a tool that names files works on what was approved, and a journal line cut short is left out.
+- 2026-10-13 (Opus 5.5): item 181 merged as `05185bc` (PR #220; no Linear issue, the connector was signed out): the tools that name files are classified again as they start and refused when a path leads elsewhere by then, and a journal line that a full disk cut short is left out.

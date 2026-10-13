@@ -11,6 +11,7 @@ Ollama server; the test that needs it is skipped when it is not there.
 """
 
 import asyncio
+import re
 import socket
 
 import httpx
@@ -290,7 +291,9 @@ async def test_with_the_embedding_service_out_of_reach_find_help_answers_by_the_
     answers: list[str] = [message.content for message in messages if message.role == "tool"]
     lines: list[str] = answers[0].splitlines()
     assert lines[1].startswith("1. Skill weekly-report: Write the weekly report"), answers[0]
-    assert lines[-1].endswith(
-        " Help was found by its words alone: finding it by meaning failed: transport failure while talking to the"
-        " provider."
+    # What broke the connection is named (its words are the platform's).
+    assert re.search(
+        r" Help was found by its words alone: finding it by meaning failed: transport failure while talking to the"
+        r" provider \(ConnectError: .+\)\.$",
+        lines[-1],
     ), answers[0]

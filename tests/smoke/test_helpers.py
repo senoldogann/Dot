@@ -384,8 +384,10 @@ async def test_a_run_that_no_standby_model_can_take_over_fails_saying_why(login_
     async with _session(_config([], [BLIND], 5), login_env, {"anthropic": spent}) as (runtime, runs):
         played: Played = await _play(runtime, runs, SPENT_MAIN, None)
     assert played.record.status == "failed"
-    assert played.record.result.startswith("the run's model cannot answer and no standby model can take the run over")
-    assert f'"passed_over": {{"{BLIND}": "it cannot call tools"}}' in played.record.result
+    assert played.record.result == (
+        f"the run's model cannot answer (quota exhausted) and no standby model can take the run over: {BLIND} (it"
+        " cannot call tools)"
+    )
     assert played.data(MODEL_SWITCHED_EVENT) == ()
     assert [request.model for request in spent.requests] == ["scripted-spent"]
 

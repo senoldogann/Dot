@@ -1235,8 +1235,8 @@ async def _to_standby(
 
     ``None`` when ``error`` says nothing about the model being unable to answer, or when no standby model is left that
     is available (each one the run has not worked on lacks its key or is paused): the run then ends with ``error``. A standby model that cannot take the run over
-    (:func:`_fitted`) is passed over; when every available one is, the run fails with a :class:`ConfigError` that says
-    why for each."""
+    (:func:`_fitted`) is passed over; when every available one is, the run fails with a :class:`ConfigError` whose
+    message, the run's result, says why for each."""
     runtime: Runtime = agent.runtime
     reason: str | None = unavailable_reason(error)
     if reason is None:
@@ -1263,8 +1263,9 @@ async def _to_standby(
         log.warning("model_switched", run_id=agent.run.id, from_model=ref.label, to_model=target, reason=reason)
         run: RunRecord = agent.run.model_copy(update={"model": target, "effort": effort})
         return _Standby(agent=replace(agent, run=run), ref=moved, info=info, scaffold=scaffold, reason=reason)
+    reasons: str = "; ".join(f"{model} ({problem})" for model, problem in passed_over.items())
     raise ConfigError(
-        "the run's model cannot answer and no standby model can take the run over",
+        f"the run's model cannot answer ({reason}) and no standby model can take the run over: {reasons}",
         {"model": ref.label, "reason": reason, "passed_over": passed_over},
     ) from error
 

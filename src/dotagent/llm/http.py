@@ -76,9 +76,13 @@ def retry_after_hint(exc: Exception) -> float | None:
 
 
 def wrap_transport_error(exc: Exception, context: JsonObject) -> ProviderTransportError:
+    """The error of a connection that broke: its message says what broke it (the kind and the words of ``exc``), which
+    the context keeps too, beside the request's."""
+    words: str = str(exc)
+    reason: str = type(exc).__name__ if words == "" else f"{type(exc).__name__}: {words}"
     return ProviderTransportError(
-        "transport failure while talking to the provider",
-        {**context, "error_type": type(exc).__name__, "error": str(exc)},
+        f"transport failure while talking to the provider ({reason})",
+        {**context, "error_type": type(exc).__name__, "error": words},
     )
 
 
