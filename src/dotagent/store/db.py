@@ -634,14 +634,21 @@ async def _refresh_memory_index(connection: aiosqlite.Connection) -> None:
 log = get_logger(__name__)
 
 # A write that finds the database locked (another process writes: dotx prune, a tool of the owner's) is tried again
-# after these pauses, each try logged; then the error is raised as a StoreError. The daemon's own writes never lock
-# each other out: they all go through one connection, one at a time (``_writing``).
+# after these pauses, each try logged; then the error is raised as a StoreError, as any other refusal of a write is at
+# once. The daemon's own writes never lock each other out: they all go through one connection, one at a time
+# (``_writing``).
 _LOCKED_RETRY_DELAYS_S: tuple[float, ...] = (0.2, 0.5, 1.0, 2.0)
 
 
-def _is_locked(error: sqlite3.OperationalError) -> bool:
+def _is_locked(error: sqlite3.Error) -> bool:
     text: str = str(error).lower()
-    return "locked" in text or "busy" in text
+    return isinstance(error, sqlite3.OperationalError) and ("locked" in text or "busy" in text)
+
+
+def _refused(method: str, error: sqlite3.Error) -> StoreError:
+    """The error of a write the database refused for a reason other than a lock: a full disk, a file it cannot
+    write, a constraint."""
+    return StoreError("the database refused the write", {"method": method, "error": str(error)})
 
 
 async def _whole[R](store: "Store", write: Awaitable[R]) -> R:
@@ -659,25 +666,26 @@ def _writing[**P, R](
 ) -> Callable[Concatenate["Store", P], Coroutine[object, object, R]]:
     """A method that writes: it runs alone on the connection, so a unit of several statements is committed whole and
     never shares a transaction with another writer, and one that fails or is cancelled part way is rolled back; a lock
-    held by another process is waited out with retries."""
+    held by another process is waited out with retries. A write the database refuses is a ``StoreError``, as every
+    failure of the store is, so that what handles Dot's errors handles it."""
 
     async def run(self: "Store", /, *args: P.args, **kwargs: P.kwargs) -> R:
         async with self._write_lock:
             for attempt, delay in enumerate(_LOCKED_RETRY_DELAYS_S, start=1):
                 try:
                     return await _whole(self, method(self, *args, **kwargs))
-                except sqlite3.OperationalError as error:
+                except sqlite3.Error as error:
                     if not _is_locked(error):
-                        raise
+                        raise _refused(method.__name__, error) from error
                     log.warning(
                         "store_locked_retry", method=method.__name__, attempt=attempt, delay_s=delay, error=str(error)
                     )
                     await asyncio.sleep(delay)
             try:
                 return await _whole(self, method(self, *args, **kwargs))
-            except sqlite3.OperationalError as error:
+            except sqlite3.Error as error:
                 if not _is_locked(error):
-                    raise
+                    raise _refused(method.__name__, error) from error
                 raise StoreError(
                     "the database stayed locked by another process",
                     {"method": method.__name__, "tries": len(_LOCKED_RETRY_DELAYS_S) + 1, "error": str(error)},
