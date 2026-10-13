@@ -225,8 +225,9 @@ class RunManager:
         """Close the runs that ``dotx`` commands (``run``, ``resume``, ``chat``) left active when they died without
         recording their end (killed, or crashed): failed, with a result that names the command rather than the daemon,
         and ``run_finished`` stored with that end and told to the pages that follow them. Their pending approvals
-        expire, and the queue of their chat is held until the owner resumes it, as after any end that is not done. The
-        files of the owners that are gone go, those of commands that ended well too. For the daemon, every
+        expire, the queue of their chat is held until the owner resumes it, as after any end that is not done, and a
+        campaign whose session one was plans its next session, as after any end of a session (:meth:`_follow_session`).
+        The files of the owners that are gone go, those of commands that ended well too. For the daemon, every
         ``COMMAND_CHECK_S`` while it runs; :meth:`recover` closes, when it starts, what any process that is gone left.
         Returns the number of runs closed."""
         store: Store = self._runtime.store
@@ -242,7 +243,13 @@ class RunManager:
         if told:
             await store.expire_pending_approvals(_EXPIRED_COMMAND_DIED)
         for finished in told:
-            await self._follow_queue(await store.get_run(finished.run_id), "failed")
+            closed: RunRecord = await store.get_run(finished.run_id)
+            await self._follow_queue(closed, "failed")
+            if closed.campaign_id is not None and not self._stopping:
+                # The command recorded nothing, so the session left no word of what it needs.
+                await self._follow_session(
+                    closed, closed.campaign_id, classify_ending(closed.status, closed.result), ""
+                )
         await asyncio.to_thread(clear_gone_owners, directory)
         return len(told)
 
@@ -427,14 +434,20 @@ class RunManager:
                 campaign.id,
                 None,
             )
-        except DotError:
-            # A campaign whose opening session never started was never under way, nor was a thread made for it.
-            await runtime.store.delete_campaign(campaign.id)
-            if thread_id is None:
-                await runtime.store.delete_threads([thread.id])
+        except BaseException:
+            # A campaign whose opening session never started was never under way, nor was a thread made for it,
+            # whatever stopped the start: one of Dot's errors, a fault, the request's cancel. Kept, it would start at
+            # the daemon's next start (:meth:`resume_campaigns`) with no one having asked again.
+            await _uncancelled(self._forget_campaign(campaign.id, None if thread_id is not None else thread.id))
             raise
         log.info("campaign_started", campaign_id=campaign.id, run_id=run.id)
         return run
+
+    async def _forget_campaign(self, campaign_id: str, made_thread_id: str | None) -> None:
+        """Delete a campaign whose opening session never started, and the thread made for it when one was."""
+        await self._runtime.store.delete_campaign(campaign_id)
+        if made_thread_id is not None:
+            await self._runtime.store.delete_threads([made_thread_id])
 
     async def start_session(self, campaign_id: str) -> RunRecord:
         """Start the next session of an active campaign in a thread of its own, with the brief as its opening message
