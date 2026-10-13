@@ -4124,6 +4124,16 @@ rows carry minutes and tokens.
     `config.toml`; a local model keeps three quarters of its own window. In the instrument the wider budget took the
     compactions of a 41-step run from 2 to 0 at +25 % input tokens a step; the owner's next long run is the live
     number. The room after a compaction and the summariser's transcript were measured and left alone.
+34. Package installs after untrusted text (part 29's report), decided by the owner on 2026-10-13: no change.
+    `install` stays out of the flags that a run's untrusted input turns into a question (`TAINT_ESCALATION_FLAGS`), so
+    a run that has read what a third party wrote installs a package as its preset lets it: in the default `aggressive`
+    preset without asking, in `balanced` and `cautious` after a question, as before.
+35. An MCP server's own word that a tool only reads (item 175), decided by the owner on 2026-10-13: it is trusted, as
+    the README says. The server is a program the owner added, which could do anything without a tool call; doubting its
+    word would add questions, not protection.
+36. The git history (item 174), decided by the owner on 2026-10-13: the two names item 174 took out of the README stay
+    in it. Rewriting it would change the hash of every commit since 2026-10-09, which the status table of this file
+    records, and the merged pull requests keep the old commits on GitHub anyway.
 
 ## Part 6: the web that does not fail (planned 2026-10-11)
 
@@ -5101,6 +5111,17 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 178 | The server answers every failure as JSON, and a page says it could not read again    | done        | 401cef2 |
 | 179 | A run's end is one write, and a chat a run works on is never deleted                 | done        | be314c3 |
 | 180 | A campaign whose session's command died goes on                                      | done        | baca51a |
+| 181 | Tools that name files work on what was approved, and a cut journal line is left out  | in progress |         |
+| 182 | A failed run's result is the error's message, and its context stays in the event     | planned     |         |
+| 183 | A run's end the store refused is stored later, and a start that failed is told       | planned     |         |
+| 184 | A queued message starts once or is removed, never both                               | planned     |         |
+| 185 | A provider's 403 is not a refused key, and Ollama's stream error keeps its words     | planned     |         |
+| 186 | The doctor checks each model name against the list its provider serves               | planned     |         |
+| 187 | The service install keeps the running job until the new one is in place              | planned     |         |
+| 188 | A run of a dotx command is followed live on the pages and stopped there              | planned     |         |
+| 189 | A message sent twice starts once                                                     | planned     |         |
+| 190 | The pages say what they could not read, follow the rules and tell of an update       | planned     |         |
+| 191 | The desktop shell says what it could not read                                        | planned     |         |
 
 ### 77. The type system: Inter and Geist Mono, seven sizes, three weights
 
@@ -9194,6 +9215,144 @@ whose run cannot launch on a full disk, and no campaign and no thread are left, 
 **What.** The next session of a campaign whose session's `dotx` command died is planned when the daemon closes that run,
 not at the daemon's next start; a campaign whose start failed in any way is deleted.
 
+## Part 30: the remaining problems (planned 2026-10-13)
+
+The owner's twenty-ninth word, on 2026-10-13, once part 29 was done: do whatever is needed to solve the remaining
+problems too.
+
+**Status (2026-10-13): planned.** Three reviewers read again in the code, without running anything, what part 29 left
+for later and what its report found: twelve findings it had put off, eight it had found as it went, and the reload of
+the desktop app it asked the owner for after an update. Each reviewer was asked whether the code bears a finding out,
+with file and line, for the least change that fixes its cause and for a test that fails on the code of before. Twenty
+were borne out, three of them in part: a page never sends a message again by itself, so only a second send of a message
+whose answer was lost starts it twice; rules change only through the API, so only another window misses a change; the
+desktop shell loads its page again after a restart longer than three of its polls, so a quick restart, or a browser tab,
+keeps the old scripts. One was not worth an item: the push route takes an endpoint on any https host, but it needs the
+token, which already starts any run.
+
+**The shape of this part (the decisions).** Eleven items, each a pull request of its own, the most important first: a
+tool that names files works on what was approved, and a journal line cut short is left out (181); a failed run's result
+is the error's message, and its context stays in the event (182); a run's end the store refused is stored later, and a
+start that failed is told (183); a queued message starts once or is removed, never both (184); a provider's 403 is not a
+refused key, and Ollama's stream error keeps its words (185); the doctor checks each model name against the list its
+provider serves (186); the service install keeps the running job until the new one is in place (187); a run of a `dotx`
+command is followed live on the pages and stopped there (188); a message sent twice starts once (189); the pages say
+what they could not read, follow the rules and tell of an update (190); the desktop shell says what it could not read
+(191). The owner settled the three questions of part 29's report on 2026-10-13 (open owner decisions 34 to 36): a
+package install after a run read what a third party wrote asks no more than before, an MCP server's own word that a tool
+only reads is trusted, and the git history keeps the two names item 174 took out of the README.
+
+### How to start part 30 (the handoff prompt)
+
+> Read ROADMAP.md part 30 and the status table of part 9 (rows 181 to 191). One item at a time, in order; the protocol
+> of part 5 (branch, gate, PR, Linear MYP issue when the connector is signed in, squash merge, hash in the table, log
+> line) is unchanged. Read each finding again in the code before closing it, give each change a test that fails on the
+> code of before, and check a page that changes in a browser, wide and on a phone, light and dark. Never touch the
+> owner's data directory except to read it, by the kinds and numbers of what is stored, and to restart the daemon when
+> `/api/status` shows no active run; PLAN.md stays untracked. The owner reads Turkish; everything written is English.
+
+### 181. Tools that name files work on what was approved, and a cut journal line is left out
+
+**Status: in progress.**
+
+**As built (2026-10-13).** A tool built with `make_path_tool` (`tools/base.py`) is classified again from the files as
+they are when it starts, with no wait between that and its run, and refused when that is not the action that was
+authorised: a failed call that says what it names changed while it waited, and called again it is decided for where the
+path leads now. The file tools (`read_file`, `write_file`, `edit_file`, `list_dir`, `search_files`, `find_files`),
+`web_extract` and `browser_upload` are built so; the shell is not, since its guard reads a command's words, not the
+files a program opens (the README calls it best-effort). The undo journal is read as bytes, and what follows its last
+line break is left out: a line is written before its change is made, so a line cut short is a change never made. Writing
+a line first cuts such a rest off, so that the new line does not run into it. Tests:
+`tests/smoke/test_approved_paths.py` moves a link between the authorisation of a `write_file`, and of a `read_file`, and
+their run (the code of before wrote, and read, the other file), and `tests/unit/test_undo.py` cuts a line of the journal
+short in the middle of a letter, then notes a change and takes the run's changes back (the code of before could not read
+the journal any more).
+
+**What.** The tools that name files (the file tools, `web_extract`, `browser_upload`) are classified again as they
+start, and a call whose path leads elsewhere by then is refused, instead of reading or writing a file that was not the
+one approved; a line of the undo journal that a full disk cut short is left out, instead of failing every later change
+of the run and `dotx undo`.
+
+### 182. A failed run's result is the error's message, and its context stays in the event
+
+**Status: planned.**
+
+**What.** A run that fails on one of Dot's errors stores the error's message as its result, which the pages, the push
+and `dotx run` show; the error's context (a provider's request and answer) goes to the `run_finished` event and the log
+instead, where it no longer puts the start of a request on the phone's lock screen.
+
+### 183. A run's end the store refused is stored later, and a start that failed is told
+
+**Status: planned.**
+
+**What.** An end of a run that the store refused (a full disk) is tried again every half minute until it is stored, with
+what follows it, instead of leaving the run at work until the daemon's next start; a run that could not be started
+stores its end with its `run_finished` event and tells the pages; a cleanup after a failed start never hides the error
+of the start; the manager's refusal to delete a chat names its runs, as the store's does; the half-minute check outlives
+a fault of the store; the scores half of item 179's one write and a refused delete that removes no file are tested.
+
+### 184. A queued message starts once or is removed, never both
+
+**Status: planned.**
+
+**What.** A queued message is claimed in the store before its run starts, so a removal, an edit or a steer that comes in
+that moment is refused, the message having started, instead of answering success for a message whose run starts anyway;
+a `dotx` process that starts the next message of the same chat claims it the same way.
+
+### 185. A provider's 403 is not a refused key, and Ollama's stream error keeps its words
+
+**Status: planned.**
+
+**What.** A provider's HTTP 403 is an error of its own (access refused) rather than a refused key, so the label in
+Settings and the reason a run moved to its standby say what the provider said; an error inside Ollama's stream keeps its
+words, and its status is the one the table gives such an error instead of an invented 502.
+
+### 186. The doctor checks each model name against the list its provider serves
+
+**Status: planned.**
+
+**What.** `dotx doctor` asks the OpenAI and OpenCode Go services for the models their keys may use and fails a
+configured model that is not among them, as it does for Ollama and Anthropic, instead of calling every name ready; a
+list that cannot be read says so without failing the check twice.
+
+### 187. The service install keeps the running job until the new one is in place
+
+**Status: planned.**
+
+**What.** `dotx service install` takes the running job down before it writes the new job file, and puts the old file
+back when the new job does not load, instead of leaving a new file next to an old job, or no job, after a failed step.
+
+### 188. A run of a dotx command is followed live on the pages and stopped there
+
+**Status: planned.**
+
+**What.** A run that a `dotx` command drives is listed as working on the pages, and its page follows it live from the
+store instead of reconnecting in a loop; its Stop asks the command to stop it, instead of answering that the run is not
+active.
+
+### 189. A message sent twice starts once
+
+**Status: planned.**
+
+**What.** The pages send a key with each new message, and a message sent again with the same key (after an answer that
+was lost) gets the run or the queued message of the first, instead of a second chat or a second run.
+
+### 190. The pages say what they could not read, follow the rules and tell of an update
+
+**Status: planned.**
+
+**What.** A chat whose queue could not be read says so, with a way to read it again; the rules page follows the changes
+made in another window; the sign-in error names the log by what `dotx daemon` prints, not by a path the logs may not be
+in; a page loaded before the daemon was updated says so and offers to load again.
+
+### 191. The desktop shell says what it could not read
+
+**Status: planned.**
+
+**What.** The desktop shell says why it cannot reach Dot when it cannot read its own files: a `config.toml` that is not
+valid TOML (with its line), a token it may not read, a daemon that has not made its token yet, instead of "Dot is not
+running" for all of them.
+
 ## Log
 
 - 2026-10-08: roadmap written from the owner's go-ahead for all eight items, in this order. Nothing implemented yet.
@@ -9811,3 +9970,4 @@ not at the daemon's next start; a campaign whose start failed in any way is dele
 - 2026-10-13 (Opus 5.5): item 178 merged as `401cef2` (PR #216; no Linear issue, the connector was signed out): every error of the API is JSON and a fault is logged with its traceback, sign-in says what failed when the daemon answered with an error, a page that could not read again says so, and a stream that fell behind tells the page to read again.
 - 2026-10-13 (Opus 5.5): item 179 merged as `be314c3` (PR #217; no Linear issue, the connector was signed out): a run's end is one write, a delegated run whose end was not recorded is an error for the run that delegated it, and a chat a run of any process works on is not deleted.
 - 2026-10-13 (Opus 5.5): item 180 merged as `baca51a` (PR #218; no Linear issue, the connector was signed out): a campaign whose session's `dotx` command died plans its next session when the daemon closes that session, and a campaign whose opening session could not start, in any way, is not kept. Part 29 is done.
+- 2026-10-13 (Opus 5.5): part 30, the remaining problems, is planned (items 181 to 191), and the owner's three decisions of the day are recorded (open owner decisions 34 to 36); item 181 is built: a tool that names files works on what was approved, and a journal line cut short is left out.

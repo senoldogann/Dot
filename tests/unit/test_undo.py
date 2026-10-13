@@ -9,7 +9,7 @@ import pytest
 
 from dotagent.core.errors import UndoError
 from dotagent.tools.files import _edit_blocking, atomic_write
-from dotagent.undo.journal import JournalTarget, backup_path, read_journal, run_journal
+from dotagent.undo.journal import JOURNAL_FILE, JournalTarget, backup_path, read_journal, run_journal
 from dotagent.undo.restore import (
     RunChange,
     UndoStep,
@@ -146,6 +146,23 @@ def test_the_file_is_left_as_it_is_when_its_change_cannot_be_noted(tmp_path: Pat
     notes.write_text("one\n", encoding="utf-8")
     with pytest.raises(UndoError, match="the file was not changed"):
         atomic_write(notes, "two\n", _target(root, RUN_ID, MIB, MIB))
+    assert notes.read_text(encoding="utf-8") == "one\n"
+
+
+def test_a_journal_line_cut_short_is_left_out_and_the_next_change_is_noted_after_it(tmp_path: Path) -> None:
+    root: Path = tmp_path / "undo"
+    notes: Path = tmp_path / "notes.txt"
+    notes.write_text("one\n", encoding="utf-8")
+    target: JournalTarget = _target(root, RUN_ID, MIB, MIB)
+    atomic_write(notes, "two\n", target)
+    # The disk filled as the line of the next change was written, in the middle of a letter: that change was not made.
+    with (run_journal(root, RUN_ID) / JOURNAL_FILE).open("ab") as journal:
+        journal.write(b'{"seq": 1, "ts": 1.5, "tool": "write_file", "path": "/caf\xc3')
+    assert [entry.seq for entry in read_journal(run_journal(root, RUN_ID))] == [0]
+    atomic_write(notes, "three\n", target)
+    first, second = read_journal(run_journal(root, RUN_ID))
+    assert (first.seq, second.seq, second.backup) == (0, 1, False)
+    apply_undo(due_steps(_plan(_changes(root, (RUN_ID,)))), root)
     assert notes.read_text(encoding="utf-8") == "one\n"
 
 

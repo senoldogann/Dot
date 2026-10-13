@@ -83,16 +83,18 @@ def digest(data: bytes) -> str:
 
 def read_journal(directory: Path) -> list[JournalEntry]:
     """The changes noted in the journal folder ``directory``, in the order they were made; none when it holds no
-    journal. Blocking."""
+    journal. A last line cut short (the disk filled as it was written) is left out: its change was never made, since a
+    change is made only once its line is written whole (:func:`note_change`). Blocking."""
     journal: Path = directory / JOURNAL_FILE
     try:
-        text: str = journal.read_text(encoding="utf-8")
+        data: bytes = journal.read_bytes()
     except FileNotFoundError:
         return []
     except OSError as exc:
         raise UndoError("the journal cannot be read", {"journal": str(journal), "error": str(exc)}) from exc
     entries: list[JournalEntry] = []
-    for number, line in enumerate(text.removesuffix("\n").split("\n") if text else [], start=1):
+    # What follows the last line break is nothing, or a line cut short.
+    for number, line in enumerate(data.split(b"\n")[:-1], start=1):
         try:
             entries.append(JournalEntry.model_validate_json(line))
         except ValidationError as exc:
@@ -185,8 +187,13 @@ def _write_private(path: Path, data: bytes) -> None:
 
 
 def _append(journal: Path, entry: JournalEntry) -> None:
-    descriptor: int = os.open(journal, os.O_WRONLY | os.O_CREAT | os.O_APPEND, _PRIVATE_FILE)
-    with os.fdopen(descriptor, "ab") as stream:
+    """Add ``entry`` as the last line of ``journal``, once a last line cut short is dropped (:func:`read_journal`): the
+    entry would run into it otherwise."""
+    descriptor: int = os.open(journal, os.O_RDWR | os.O_CREAT, _PRIVATE_FILE)
+    with os.fdopen(descriptor, "r+b") as stream:
+        whole: int = stream.read().rfind(b"\n") + 1
+        stream.seek(whole)
+        stream.truncate()
         stream.write(entry.model_dump_json().encode("utf-8") + b"\n")
 
 
