@@ -129,9 +129,9 @@ a missing key moves it to a standby model or ends it at once.
 | OpenCode Go | `opencode_go:<model>` | each model is served on exactly one of Chat Completions, Responses and Messages            | `OPENCODE_API_KEY`                                        |
 | Anthropic   | `anthropic:<model>`   | Messages API                                                                               | `ANTHROPIC_API_KEY`                                       |
 
-- **Ollama**: `[providers.ollama] base_url` is `http://localhost:11434` by default. Cloud models go through the local server, so nothing else is
-  needed once you are signed in. `OLLAMA_API_KEY` is only for the hosted web search and for talking to ollama.com
-  directly.
+- **Ollama**: `[providers.ollama] base_url` is `http://localhost:11434` by default. Cloud models go through the local
+  server, so nothing else is needed once you are signed in. `OLLAMA_API_KEY` is only for the hosted web search and for
+  talking to ollama.com directly.
 - **OpenAI**: on the Responses wire Dot sends the whole conversation on every call (`store: false`) and carries the
   encrypted reasoning items from step to step, so no state lives on the server.
 - **OpenCode Go**: Dot knows the route of the models in its catalog, and of a new Claude, Qwen, MiniMax, Grok, GPT or
@@ -158,13 +158,13 @@ a missing key moves it to a standby model or ends it at once.
 each model. `dotx models profile [provider:model]` shows how reliably a model worked in its newest runs and the help its
 next run gets (see [How a run works](#how-a-run-works)); without a model it shows `[models] main`.
 
-**Reasoning level.** A model that can think offers a ladder of levels, lowest first, in the words of its provider mapped to
-one neutral scale: `off`, `on` (a plain thinking switch), `minimal`, `low`, `medium`, `high`, `xhigh`, `max`. A model that
-offers fewer than two has no choice to make, and its picker stays hidden. `models.effort` is the default; one run picks
-another with `dotx run --effort high`, with the Reasoning menu of the composer in the web UI, or with `effort` in
-`POST /api/runs`. The run keeps the level it was started with (the Details panel shows it). A level the model does not offer
-is refused (a 422 over HTTP); the configured default, which is not tied to one model, is rounded to the nearest level the
-model has (`off` to its lowest, `max` to its highest).
+**Reasoning level.** A model that can think offers a ladder of levels, lowest first, in the words of its provider mapped
+to one neutral scale: `off`, `on` (a plain thinking switch), `minimal`, `low`, `medium`, `high`, `xhigh`, `max`. A model
+that offers fewer than two has no choice to make, and its picker stays hidden. `models.effort` is the default; one run
+picks another with `dotx run --effort high`, with the Reasoning menu of the composer in the web UI, or with `effort` in
+`POST /api/runs`. The run keeps the level it was started with (the Details panel shows it). A level the model does not
+offer is refused (a 422 over HTTP); the configured default, which is not tied to one model, is rounded to the nearest
+level the model has (`off` to its lowest, `max` to its highest).
 
 **Keys** are read from the environment of the process, then from `<home>/.env`, then from the macOS Keychain (service
 `dot-agent`, account = the variable name). `dotx auth set OPENAI_API_KEY` reads the value from the terminal without
@@ -192,9 +192,9 @@ A run is a loop. The model answers with tool calls; Dot checks each call against
 that pass (up to `parallel_tools` at once) and hands the results back, until the model calls `finish`.
 
 `finish` takes the `answer` and a `success` flag. The `answer` is the complete message the user reads (the findings, the
-figures or the text that was asked for, with the links to the sources), and it is the result of the run: the web UI shows
-it as the last message of the conversation, `dotx run` prints it. A `chat` turn has no `finish`: its plain reply is the
-answer (a small model that is offered both writes the call out as text).
+figures or the text that was asked for, with the links to the sources), and it is the result of the run: the web UI
+shows it as the last message of the conversation, `dotx run` prints it. A `chat` turn has no `finish`: its plain reply
+is the answer (a small model that is offered both writes the call out as text).
 
 - Old tool results and screenshots are trimmed, and the oldest part of the conversation is summarised by the fast
   model (`[models] fast`, the side work the run's slower model need not do), so a run stays inside its context budget:
@@ -217,23 +217,23 @@ answer (a small model that is offered both writes the call out as text).
   ellipsis of a cut value, or one lengthened by a fragment counts as known). The `compacted` event names the model,
   how the summary came about, the attempts it took and what the check found.
 - The plan has steps that are `pending`, `in_progress`, `done`, `failed` or `skipped`; `update_plan` writes it and
-  `mark_plan_step` changes one step, so the plan in the web UI moves as the work does. A step is marked `done` only
-  with evidence (`evidence`, cut at 400 characters): what the run observed that shows it, such as the path and what it
-  read back, the count or the line of output, or what the page showed. A mark without it is refused with what counts
-  as evidence, and a rewritten plan that keeps a done step keeps its evidence; a failed or skipped step may carry what
-  happened. The evidence stands under the step in the web UI, in every note that carries the plan and in the goal
-  check. A step that must wait for others names them (`depends_on`, step numbers; a cycle or a number outside the plan
-  is refused), the plan reads `(after 1, 2)` and the web UI shows the same, and the result of every plan change says
-  which steps are ready now (open, waiting for nothing open or failed) and which are held by a failed step. Steps that
-  are ready together are independent, so the run can hand each to `delegate` in one turn, naming the step; the
-  delegated run's report then closes the step (done with the report's start as evidence, or failed) without a mark of
-  the run's own; a step the plan does not have (a slip, or a delegate before the plan) does not stop the delegation:
-  the run goes, the result's first line says the step was not in the plan, and nothing is marked. A run that calls `finish` with steps still open is asked once to close them. A plan can also hold the run's
-  targets (`targets` of `update_plan`, at
-  most 600 characters): for a goal that names an outcome, what the run will reach and how its own tools measure it.
-  They stay until new targets replace them (an `update_plan` without `targets`, or with an empty text, keeps them), are
-  the first line of the plan in the web UI and are printed under "plan" by `dotx run`, go into every note that carries
-  the plan (a compaction, a reminder, a resumed run) and, in goal mode, to the goal check.
+`mark_plan_step` changes one step, so the plan in the web UI moves as the work does. A step is marked `done` only with
+evidence (`evidence`, cut at 400 characters): what the run observed that shows it, such as the path and what it read
+back, the count or the line of output, or what the page showed. A mark without it is refused with what counts as
+evidence, and a rewritten plan that keeps a done step keeps its evidence; a failed or skipped step may carry what
+happened. The evidence stands under the step in the web UI, in every note that carries the plan and in the goal check. A
+step that must wait for others names them (`depends_on`, step numbers; a cycle or a number outside the plan is refused),
+the plan reads `(after 1, 2)` and the web UI shows the same, and the result of every plan change says which steps are
+ready now (open, waiting for nothing open or failed) and which are held by a failed step. Steps that are ready together
+are independent, so the run can hand each to `delegate` in one turn, naming the step; the delegated run's report then
+closes the step (done with the report's start as evidence, or failed) without a mark of the run's own; a step the plan
+does not have (a slip, or a delegate before the plan) does not stop the delegation: the run goes, the result's first
+line says the step was not in the plan, and nothing is marked. A run that calls `finish` with steps still open is asked
+once to close them. A plan can also hold the run's targets (`targets` of `update_plan`, at most 600 characters): for a
+goal that names an outcome, what the run will reach and how its own tools measure it. They stay until new targets
+replace them (an `update_plan` without `targets`, or with an empty text, keeps them), are the first line of the plan in
+the web UI and are printed under "plan" by `dotx run`, go into every note that carries the plan (a compaction, a
+reminder, a resumed run) and, in goal mode, to the goal check.
 - How much help a run gets depends on its model. The window is what one request of the model can hold; for Ollama it is
   the smaller of the model's own window and the `num_ctx` Dot sends with every request (the Models table of the System
   page shows it): `[providers.ollama] num_ctx` (65 536) for a model that runs on this Mac, where it sets the memory of
@@ -336,56 +336,57 @@ answer (a small model that is offered both writes the call out as text).
 | MCP             | `mcp__<server>__<tool>`                                                                                            |
 
 The shell and the file tools work in `<home>/workspace` unless a path says otherwise. Any error of a tool fails that
-call, not the run: the model reads what went wrong (for an error no tool expects, its kind and its words, while the
-log keeps its traceback) and goes on. `edit_file` changes the text it is given and nothing else: a file that breaks
-its lines with CRLF keeps them, in the new text too, and a file that is not UTF-8 text is refused, saying so, for the
-shell to change. A shell command runs with the
-`PATH` of your login shell, in its own process group (cancelling a run ends the whole group) and under a timeout
-(`[shell] default_timeout_s`, at most `max_timeout_s`). `web_search` climbs a ladder of engines until one answers
-(`[web] search_backend`, default `auto`; `dotx doctor` shows the ladder): the hosted search of Ollama when `OLLAMA_API_KEY`
-is set (no bot check), then the Anthropic API's own web search when `ANTHROPIC_API_KEY` is set (relayed by `[models]
-search`, Haiku 5.5 by default; the API bills $10 per 1,000 searches next to the tokens, a failed search is not billed;
-`[web] anthropic_search = "first"` puts it before Ollama, `"off"` leaves it out), then the HTML pages of DuckDuckGo and
-Brave Search (no key), then DuckDuckGo opened in Dot's own
-Chrome when the run's browser is Dot's own with a visible window (its bot check runs there and passes; a headless Chrome
-is shown a CAPTCHA, measured 2026-10-11). An engine that limits this machine is benched (DuckDuckGo 10 minutes, Brave
-90 seconds, the Anthropic rung 2 minutes) and the searches of that time skip it at once; the same query within 10 minutes is answered from memory.
-The first line of a result names the engine that answered, every rung skipped with its reason, and the age of a
-remembered answer. Bing is not a rung: without a session its page answers some queries with the results of another query.
-`web_fetch` reads HTML and PDF and refuses localhost, LAN and cloud-metadata addresses unless `[web] allow_private_hosts` is set.
-A page that turns the plain request away (HTTP 401, 403, 429, 503 or 999, LinkedIn's refusal) or shows little text
-without JavaScript is read in the run's Chrome, in a tab the owner does not work in that closes after the read: a
-scratch tab of Dot's own Chrome, or a tab opened behind the owner's in the owner's attached Chrome (item 98); the
-first line of the result says so. A host that refused a plain request once is remembered for the run, and the next
-fetch of that host goes to the browser first. The plain request itself sends the headers a browser's address bar
-sends (`Sec-Fetch-*`, `Upgrade-Insecure-Requests`) with the same user agent. A page that refuses the browser too says
-that, with both answers, and names the next rung in one line: another source, `web_search` with the address as the
-query for the hosted search's snippet, or `browser_open` and Take over for a login wall.
-A page that is not there (HTTP 404 or 410) is reported with the links of the host's front page that share a word with
-the address asked for (a dozen at most), so the next turn opens the right page instead of guessing another address;
-the system prompt says the same (find a page with `web_search` or `web_crawl`, never by trying `/careers/` on a hunch).
-`web_search` returns up to 10 results; a larger `max_results` is lowered to 10 and the result says so.
+call, not the run: the model reads what went wrong (for an error no tool expects, its kind and its words, while the log
+keeps its traceback) and goes on. `edit_file` changes the text it is given and nothing else: a file that breaks its
+lines with CRLF keeps them, in the new text too, and a file that is not UTF-8 text is refused, saying so, for the shell
+to change. A shell command runs with the `PATH` of your login shell, in its own process group (cancelling a run ends the
+whole group) and under a timeout (`[shell] default_timeout_s`, at most `max_timeout_s`). `web_search` climbs a ladder of
+engines until one answers (`[web] search_backend`, default `auto`; `dotx doctor` shows the ladder): the hosted search of
+Ollama when `OLLAMA_API_KEY` is set (no bot check), then the Anthropic API's own web search when `ANTHROPIC_API_KEY` is
+set (relayed by `[models] search`, Haiku 5.5 by default; the API bills $10 per 1,000 searches next to the tokens, a
+failed search is not billed; `[web] anthropic_search = "first"` puts it before Ollama, `"off"` leaves it out), then the
+HTML pages of DuckDuckGo and Brave Search (no key), then DuckDuckGo opened in Dot's own Chrome when the run's browser is
+Dot's own with a visible window (its bot check runs there and passes; a headless Chrome is shown a CAPTCHA, measured
+2026-10-11). An engine that limits this machine is benched (DuckDuckGo 10 minutes, Brave 90 seconds, the Anthropic rung
+2 minutes) and the searches of that time skip it at once; the same query within 10 minutes is answered from memory. The
+first line of a result names the engine that answered, every rung skipped with its reason, and the age of a remembered
+answer. Bing is not a rung: without a session its page answers some queries with the results of another query.
+`web_fetch` reads HTML and PDF and refuses localhost, LAN and cloud-metadata addresses unless
+`[web] allow_private_hosts` is set. A page that turns the plain request away (HTTP 401, 403, 429, 503 or 999, LinkedIn's
+refusal) or shows little text without JavaScript is read in the run's Chrome, in a tab the owner does not work in that
+closes after the read: a scratch tab of Dot's own Chrome, or a tab opened behind the owner's in the owner's attached
+Chrome (item 98); the first line of the result says so. A host that refused a plain request once is remembered for the
+run, and the next fetch of that host goes to the browser first. The plain request itself sends the headers a browser's
+address bar sends (`Sec-Fetch-*`, `Upgrade-Insecure-Requests`) with the same user agent. A page that refuses the browser
+too says that, with both answers, and names the next rung in one line: another source, `web_search` with the address as
+the query for the hosted search's snippet, or `browser_open` and Take over for a login wall. A page that is not there
+(HTTP 404 or 410) is reported with the links of the host's front page that share a word with the address asked for (a
+dozen at most), so the next turn opens the right page instead of guessing another address; the system prompt says the
+same (find a page with `web_search` or `web_crawl`, never by trying `/careers/` on a hunch). `web_search` returns up to
+10 results; a larger `max_results` is lowered to 10 and the result says so.
 
 **Crawling and extraction.** `web_crawl(url, scope, max_pages, max_depth)` reads many pages of one site in one call:
 breadth first from the start address, following the links within the scope (`prefix`, the pages under the start
-address's folder, or `host`, every page of its host), several fetches at once and the requests to one host spaced
-apart, within the limits of `[web.crawl]` (`max_pages` 50, `max_depth` 3, `concurrency` 4, `per_host_spacing_s` 0.5; a
-call may ask for less, never for more). Every page comes back as one clean text document (title, address, description,
-then the text as `web_fetch` renders it, at most `page_max_chars`), each in its own `<web_content>` fence, under an
-index that lists the pages with their depth, size and how they were read, the addresses left out and why, and how many
-more addresses were found within the scope but not read. A page that shows little text without JavaScript (fewer than
-400 characters and three or more script tags) is rendered once in Dot's own browser tab and read from the screen
-(`render = "auto"`; `"never"` fetches only, `"always"` renders every page); PDFs are read as `web_fetch` reads them.
-A page that turns the plain request away is read the way `web_fetch` reads one, in a tab the owner does not work in,
-and the index says so (`rendered; the plain request got HTTP 403, read in the browser`); its links are not followed.
-A page that refuses the browser too is left out with both answers.
-`robots.txt` is read once per host: with `robots = "report"` the addresses it disallows are named in the index but
-fetched, with `"obey"` they are left out. The crawl goes through the same client as `web_fetch`, so the address rules
-and the browser's host lists hold for every page. When the pages do not fit one result, each becomes a Markdown file
-under `<workspace>/crawl/<host>-<time>/` with an `index.md`, and the result says so: the run reads the ones it needs with
-`read_file` or hands them to `web_extract`.
+address's folder, or `host`, every page of its host), several fetches at once and the requests to one host spaced apart,
+within the limits of `[web.crawl]` (`max_pages` 50, `max_depth` 3, `concurrency` 4, `per_host_spacing_s` 0.5; a call may
+ask for less, never for more). Every page comes back as one clean text document (title, address, description, then the
+text as `web_fetch` renders it, at most `page_max_chars`), each in its own `<web_content>` fence, under an index that
+lists the pages with their depth, size and how they were read, the addresses left out and why, and how many more
+addresses were found within the scope but not read. A page that shows little text without JavaScript (fewer than 400
+characters and three or more script tags) is rendered once in Dot's own browser tab and read from the screen
+(`render = "auto"`; `"never"` fetches only, `"always"` renders every page); PDFs are read as `web_fetch` reads them. A
+page that turns the plain request away is read the way `web_fetch` reads one, in a tab the owner does not work in, and
+the index says so (`rendered; the plain request got HTTP 403, read in the browser`); its links are not followed. A page
+that refuses the browser too is left out with both answers. `robots.txt` is read once per host: with `robots = "report"`
+the addresses it disallows are named in the index but fetched, with `"obey"` they are left out. The crawl goes through
+the same client as `web_fetch`, so the address rules and the browser's host lists hold for every page. When the pages do
+not fit one result, each becomes a Markdown file under `<workspace>/crawl/<host>-<time>/` with an `index.md`, and the
+result says so: the run reads the ones it needs with `read_file` or hands them to `web_extract`.
 
-**Notes of a run.** `write_notes(content, append)` keeps the notes of a run in one Markdown file, `<home>/workspace/notes/<run id>.md`: a long research run writes what it found there as it goes, with sources, instead of holding it all in its context, and names the file in its answer. The file is in the undo journal like any file write. It is the only file a `research` run may write.
+**Notes of a run.** `write_notes(content, append)` keeps the notes of a run in one Markdown file,
+`<home>/workspace/notes/<run id>.md`: a long research run writes what it found there as it goes, with sources, instead
+of holding it all in its context, and names the file in its answer. The file is in the undo journal like any file write.
+It is the only file a `research` run may write.
 
 `web_extract(sources, fields)` pulls named fields out of pages or files as JSON without the pages entering the main
 model's context: for every source (an address, or a file in the workspace such as the Markdown files a crawl wrote) the
@@ -660,14 +661,14 @@ run page carries a chip for it.
   tell, and then the question comes to you as in `ask`, with the reason of the review model in it. What the agent wrote
   into the action (its summary and target) is data to the review model, never an instruction.
 - `yolo`: nobody does. The action is allowed and recorded. The question that untrusted content raises (see
-  [Safety](#safety)) is waived as well, and so are the refusals and hand-offs below: a yolo run reads secrets, uploads
-  or sends files from anywhere, and does money and credential steps itself. It types passwords, one-time codes and card
-  numbers into the fields that take them when it can read them itself (a code in a mailbox it can open, one that
-  `code_fetch` reads, a value you gave it), and a password into a terminal program that asks for one; every such field is a `credential` record in its
-  timeline (`financial` for a card field). That is the price of the mode: a run that has read a hostile page can send
-  your files out, pay or sign in without asking you. Only the desktop tools stay away from password managers and
-  Keychain Access in every mode; through the shell and the file tools a yolo run reads the keychain like any other
-  secret.
+[Safety](#safety)) is waived as well, and so are the refusals and hand-offs below: a yolo run reads secrets, uploads or
+sends files from anywhere, and does money and credential steps itself. It types passwords, one-time codes and card
+numbers into the fields that take them when it can read them itself (a code in a mailbox it can open, one that
+`code_fetch` reads, a value you gave it), and a password into a terminal program that asks for one; every such field is
+a `credential` record in its timeline (`financial` for a card field). That is the price of the mode: a run that has read
+a hostile page can send your files out, pay or sign in without asking you. Only the desktop tools stay away from
+password managers and Keychain Access in every mode; through the shell and the file tools a yolo run reads the keychain
+like any other secret.
 
 Every automatic answer is an ordinary approval record (`decided_by` is `reviewer` or `yolo`, and the note holds the
 reason), an `approval_auto` event and a line in the timeline of the run, so you can see afterwards what went through and
@@ -675,8 +676,8 @@ why.
 
 **What only yolo waives.** Secrets and exfiltration stay denied in `ask` and `auto`. Money and credentials stay yours
 there: Dot stops and asks you to do that step yourself, and the review model is never asked about them. A `yolo` run
-does all of it and keeps a record. **What no mode waives:** a `research` run changes nothing but its notes file and memory, and a rule of yours with
-the hand-off behaviour still stops a yolo run, at secrets, money and credentials too.
+does all of it and keeps a record. **What no mode waives:** a `research` run changes nothing but its notes file and
+memory, and a rule of yours with the hand-off behaviour still stops a yolo run, at secrets, money and credentials too.
 
 **If the review model fails** (the provider is down, or the model does not answer in the form asked for after two
 attempts) there is no fallback. That one tool call fails with the error as its result, the run goes on, and the
@@ -688,11 +689,11 @@ did and not from what the answer claims. When the run kept a plan, the checker r
 step: a step marked done whose evidence nothing in the digest or the facts bears out is not done, its number goes into
 the verdict's `unproven_steps` (in the `goal_check` event), and when the goal needs that step the goal is not reached.
 When the plan has targets, it judges them too: they are the run's own measurable reading of the goal, not requirements
-it added, and they make the goal reached only when they fit its words. The evidence is a digest of the run's tool calls with the start of each result, and facts that Dot measured itself: the
-files its file tools wrote, its failed calls that no later success of the same call followed, the newest result of each
-command that tests, builds or lints, and the paths and addresses the answer names that the run never touched (paths
-that do not exist, addresses no call opened). Where the facts and the answer disagree, the checker goes by the facts.
-Its verdict is one of:
+it added, and they make the goal reached only when they fit its words. The evidence is a digest of the run's tool calls
+with the start of each result, and facts that Dot measured itself: the files its file tools wrote, its failed calls that
+no later success of the same call followed, the newest result of each command that tests, builds or lints, and the paths
+and addresses the answer names that the run never touched (paths that do not exist, addresses no call opened). Where the
+facts and the answer disagree, the checker goes by the facts. Its verdict is one of:
 
 - `achieved`: the run ends as done.
 - `continue`: the goal is not reached yet, so the run is sent back to work with the instruction of the checker. A run is
@@ -702,9 +703,9 @@ Its verdict is one of:
 
 A check can only ask for the original goal to be finished: it adds no work and does not clear the untrusted mark. If the
 check itself fails, the run fails and keeps its answer. Each check is a `goal_check` event and a line in the timeline.
-An answer that ends by offering to do a part of the goal that is not done yet, which the run could do with its own tools,
-is `continue`, so that the part is done instead of offered; an offer of work the goal did not ask for (a fix when only a
-diagnosis was asked) changes nothing, and what needs you (a decision, a credential) may stay an offer.
+An answer that ends by offering to do a part of the goal that is not done yet, which the run could do with its own
+tools, is `continue`, so that the part is done instead of offered; an offer of work the goal did not ask for (a fix when
+only a diagnosis was asked) changes nothing, and what needs you (a decision, a credential) may stay an offer.
 
 **Asked not to stop.** When the message you start a `task` or `research` run with asks it not to stop until the work is
 done (whole words such as "don't stop", "keep going", "never stop", "until it is done", "durma", "hiç durma", "bitene
@@ -769,9 +770,9 @@ what it touched and where its plan stood, and how to go on in the same thread. W
 `revisit_window` steps that only repeated calls the run had already made, with the same results. It then answers with a
 ladder instead: a nudge; a re-plan, in which the next step may only plan or finish; a second opinion of the review model
 (`[models] review`), given to the model as advice (if that model cannot answer, the run stops and says so); a question
-to you (not in yolo, scheduled, delegated or eval runs, where nobody would answer); and the stop. Twelve steps without an
-alert bring the ladder one rung down again, so a long run is not stopped for hiccups that are hours apart. Every alert
-shows in the timeline with what was seen and what was done. The ladder is off by default until evals show that it
+to you (not in yolo, scheduled, delegated or eval runs, where nobody would answer); and the stop. Twelve steps without
+an alert bring the ladder one rung down again, so a long run is not stopped for hiccups that are hours apart. Every
+alert shows in the timeline with what was seen and what was done. The ladder is off by default until evals show that it
 helps; without it, a run that keeps changing its steps without getting anywhere goes on using the model until you stop
 it. Give such a run a goal that can be checked, and keep an eye on the token count of a long one (`--verbose`, or the
 Details panel).
@@ -801,24 +802,23 @@ goal after something went wrong on the way (a call failed, whether the run found
 watchdog raised an alert; the goal check sent it back; its answer named paths that did not exist) is followed, once it
 has ended, by one call of the review model (`[models] review`). It reads a digest of the run, what went wrong, the
 answer and the saved notes that fit the goal, and writes at most three lessons of one sentence: know-how that a later
-run could use from the start, such as that `pdftotext` keeps the columns of a table only with `-layout`. A lesson of more
-than one line, of fewer than 20 or more than 300 characters (or `[memory] max_chars`), with a secret, an e-mail address
-or a path in a home folder, or that says what the goal, another lesson or a saved note already says, is dropped; one
-that says not to do what a saved note says to do (or the other way round) is no repeat of it, however alike their
+run could use from the start, such as that `pdftotext` keeps the columns of a table only with `-layout`. A lesson of
+more than one line, of fewer than 20 or more than 300 characters (or `[memory] max_chars`), with a secret, an e-mail
+address or a path in a home folder, or that says what the goal, another lesson or a saved note already says, is dropped;
+one that says not to do what a saved note says to do (or the other way round) is no repeat of it, however alike their
 words and meaning are (`not`, `never`, `n't`, the Turkish `değil`, `yok`, `asla`; the suffix `-ma`/`-me` is not
-recognised). With
-`propose` the lessons wait under "Lessons from this run" on the run's page: Save to memory keeps one as a note tagged
-`lesson` whose source is the run, Dismiss drops it (`POST /api/runs/{id}/lessons/{index}/save` and `/dismiss`). A lesson
-is decided once: a second save or dismissal of it, from another page or after `auto` saved it, is refused. `dotx run`
-and `dotx resume` show the lessons after the answer; Ctrl-C skips the wait, and the exit status stays the run's. With
-`auto` they are saved at once, except after a run that read content others can write (web pages, mail, downloads),
-which could plant a lesson: those are only proposed, and the page says why. A saved lesson is a note of the agent like
-the others: a later run gets it when it fits its goal, and the Memory page edits or forgets it; a lesson of an agent's
-run is that agent's own (see Agents). Delegated runs, chats,
-runs that failed or were stopped, and evals (which always run without lessons) are not asked at their end; the nightly
-reflection asks about the failed and the stopped ones. `lessons` is `"propose"` by default; `"off"` learns nothing.
-Every note a run is handed (at its start, by `memory_search`, or changed while it ran) is recorded with how the run
-ended, so the Memory page says "Handed to 5 runs, 4 done" under a note and `dotx stats` scores the notes.
+recognised). With `propose` the lessons wait under "Lessons from this run" on the run's page: Save to memory keeps one
+as a note tagged `lesson` whose source is the run, Dismiss drops it (`POST /api/runs/{id}/lessons/{index}/save` and
+`/dismiss`). A lesson is decided once: a second save or dismissal of it, from another page or after `auto` saved it, is
+refused. `dotx run` and `dotx resume` show the lessons after the answer; Ctrl-C skips the wait, and the exit status
+stays the run's. With `auto` they are saved at once, except after a run that read content others can write (web pages,
+mail, downloads), which could plant a lesson: those are only proposed, and the page says why. A saved lesson is a note
+of the agent like the others: a later run gets it when it fits its goal, and the Memory page edits or forgets it; a
+lesson of an agent's run is that agent's own (see Agents). Delegated runs, chats, runs that failed or were stopped, and
+evals (which always run without lessons) are not asked at their end; the nightly reflection asks about the failed and
+the stopped ones. `lessons` is `"propose"` by default; `"off"` learns nothing. Every note a run is handed (at its start,
+by `memory_search`, or changed while it ran) is recorded with how the run ended, so the Memory page says "Handed to 5
+runs, 4 done" under a note and `dotx stats` scores the notes.
 
 **Reflection.** Once a day at `[agent] reflection_time` (`"03:30"` in `[scheduler] timezone`; `"off"` never), the
 daemon reflects on the runs that ended since the last reflection (the last day, the first time): it asks the review
@@ -903,20 +903,20 @@ context. **`dotx stats --run ID`** prints the same for one run: its minutes of w
 tool calls' seconds and the part spent at the gate, then the lines above and its tools. The daemon serves the same as
 `GET /api/runs/{id}/stats`.
 
-**`dotx eval`** plays a catalog of small tasks against a model and judges each by what is left in a workspace of its own:
-file edits, shell work, fixing code until its test passes, recovering from an error, multi-step work, a goal that asks
-for as much as the files give, read-only research, a task that cannot be done and has to end as an honest failure, an
-instruction hidden in a file that must not be followed, and a goal written in Turkish. Five long tasks follow, each
+**`dotx eval`** plays a catalog of small tasks against a model and judges each by what is left in a workspace of its
+own: file edits, shell work, fixing code until its test passes, recovering from an error, multi-step work, a goal that
+asks for as much as the files give, read-only research, a task that cannot be done and has to end as an honest failure,
+an instruction hidden in a file that must not be followed, and a goal written in Turkish. Five long tasks follow, each
 needing ten or more tool turns (a digest of twelve logs, a rename across ten modules, ten branch totals into JSON, a
 ten-item checklist, a nine-stage pipeline whose fifth stage fails once): on them the steps a pass costs say how many
-round trips a model spends on work that cannot be done in one. Two tasks run against a small site the attempt serves
-on a loopback port (no network, no account): a research run that reads the careers pages of ten companies, one of
-them linked to a dead address and one behind a redirect, and reports a table (a long task: it is where the compactions
-and the not-found pages of a long run are counted); and a run in goal mode that fills in and submits a form in the
-headless browser, whose end the review model checks against the goal on the confirmation page. Three tasks bring help
-that makes them short, and ask whether a run takes it: a skill that states the house style a memo has to follow (the
-only way to pass), a skill whose one command totals a quarter's paid orders, and a tool of a small MCP server the evals
-ship (`python -m dotagent.evals.tool_server`) that counts working days; the last two can also be done the hard way, by
+round trips a model spends on work that cannot be done in one. Two tasks run against a small site the attempt serves on
+a loopback port (no network, no account): a research run that reads the careers pages of ten companies, one of them
+linked to a dead address and one behind a redirect, and reports a table (a long task: it is where the compactions and
+the not-found pages of a long run are counted); and a run in goal mode that fills in and submits a form in the headless
+browser, whose end the review model checks against the goal on the confirmation page. Three tasks bring help that makes
+them short, and ask whether a run takes it: a skill that states the house style a memo has to follow (the only way to
+pass), a skill whose one command totals a quarter's paid orders, and a tool of a small MCP server the evals ship
+(`python -m dotagent.evals.tool_server`) that counts working days; the last two can also be done the hard way, by
 reading the files and working it out.
 
 | Command                                                  | What it does                                                                                                                                                                                                       |
@@ -997,39 +997,38 @@ seen, so the phone and the desktop agree; the chats there when Dot learnt this a
 while nobody watches, a scheduled one too, leaves its chat unread.
 
 Above the chats, two sections appear while they have rows: **Waiting for you** (the approvals and questions runs wait
-for, and a run whose browser you took over) and **Working** (the runs going on, a session of a campaign, a run
-delegated by another, and a schedule that fires within the hour), each row with its state dot, the first words of
-its title on one line, and under it the channel it last worked in (browser, files, shell, desktop, mail) and what it
-needs; a row opens the run. **Activity** (`#/activity`) is the same in full, with the runs that ended today and a filter by
-kind (runs, campaigns, schedules); it is `GET /api/activity`. A run that ended shows how long it took and what it cost
-in tokens. Both follow the lifecycle stream, so a run moves between the sections the moment it starts, waits, is taken
-over or ends. The stream replays nothing after a break of the connection (the network dropped, the daemon restarted), so
-once it is back every page that follows it, the run's page and its queue among them, reads again what it shows. A run
-delegated by another run sits under the run that delegated it, in both the sidebar and the Activity page, with its steps
-so far and its channel; the parent's row says how many runs it delegated. In the chat, the delegated run's card carries
-a chip with its progress ("step 3 · web_fetch", then "done · 12 steps") and an **open** link to the run's own page.
+for, and a run whose browser you took over) and **Working** (the runs going on, a session of a campaign, a run delegated
+by another, and a schedule that fires within the hour), each row with its state dot, the first words of its title on one
+line, and under it the channel it last worked in (browser, files, shell, desktop, mail) and what it needs; a row opens
+the run. **Activity** (`#/activity`) is the same in full, with the runs that ended today and a filter by kind (runs,
+campaigns, schedules); it is `GET /api/activity`. A run that ended shows how long it took and what it cost in tokens.
+Both follow the lifecycle stream, so a run moves between the sections the moment it starts, waits, is taken over or
+ends. The stream replays nothing after a break of the connection (the network dropped, the daemon restarted), so once it
+is back every page that follows it, the run's page and its queue among them, reads again what it shows. A run delegated
+by another run sits under the run that delegated it, in both the sidebar and the Activity page, with its steps so far
+and its channel; the parent's row says how many runs it delegated. In the chat, the delegated run's card carries a chip
+with its progress ("step 3 · web_fetch", then "done · 12 steps") and an **open** link to the run's own page.
 
 **New chat** is Dot's presence and one composer, standing in the middle of the space under the top bar, across and down,
-however long the day under them is. The face is Dot's character, moving (idle with a
-wink now and then; a still frame with "Faces that move" off), and shows the state of the whole of Dot (waiting when
-something waits for you, working while a run is active, else idle) under Dot's name (yours to give in Settings ›
-General; Dot until then, and kept in this browser only); a greeting by the hour says your name when you gave one there
-("Good morning, Ada. What should I work on?"; "Something waits for you." when it does) and one line says what is going
-on ("Working on 2 runs · 1 waits for you · 3 ended today · 1 lesson · 2 things due today"; a quiet day says so). Under
-the composer, the **Today** strip lists it: what waits for you, what works, what is due later today (the schedules that
-fire and the campaigns whose next session starts), what was learned today (the lessons and the day's journal) and what
-ended, each row as on the Activity page and each opening what it is about; two rows a section (a run without the runs it
-delegated, which the Activity page nests under it), then "and N more in Activity", and the page scrolls to what does not
-fit. A section folds on a click of its title, which counts its rows, and the folds are kept in that browser. The line
-and the strip follow the lifecycle stream, so an answer or a run's end moves them at once; `GET
-/api/activity` carries the two new lists as `learned_today` and `due`. The composer is one frame on a 24 px corner with a
-soft shadow under it: the
-goal in a box of one line that grows with it, the files attached under it, then one bar that never wraps: the attach
-button and the mode (Task, Chat or Research; its menu says what each does) at the left; at the right the agent with its
-face and name once an agent exists (its menu lists the agents with their roles), **Model** (the mark of its provider and
-its name: the daemon's default or one picked, by provider), **Reasoning** (a brain and the level, only for a model that
-offers a choice; kept in the browser per model) and **Options** (a lock, closed for Ask, a shield for Auto, open for
-YOLO: the approval mode, which the pill always shows, the Goal mode switch and Keep going, see
+however long the day under them is. The face is Dot's character, moving (idle with a wink now and then; a still frame
+with "Faces that move" off), and shows the state of the whole of Dot (waiting when something waits for you, working
+while a run is active, else idle) under Dot's name (yours to give in Settings › General; Dot until then, and kept in
+this browser only); a greeting by the hour says your name when you gave one there ("Good morning, Ada. What should I
+work on?"; "Something waits for you." when it does) and one line says what is going on ("Working on 2 runs · 1 waits for
+you · 3 ended today · 1 lesson · 2 things due today"; a quiet day says so). Under the composer, the **Today** strip
+lists it: what waits for you, what works, what is due later today (the schedules that fire and the campaigns whose next
+session starts), what was learned today (the lessons and the day's journal) and what ended, each row as on the Activity
+page and each opening what it is about; two rows a section (a run without the runs it delegated, which the Activity page
+nests under it), then "and N more in Activity", and the page scrolls to what does not fit. A section folds on a click of
+its title, which counts its rows, and the folds are kept in that browser. The line and the strip follow the lifecycle
+stream, so an answer or a run's end moves them at once; `GET /api/activity` carries the two new lists as `learned_today`
+and `due`. The composer is one frame on a 24 px corner with a soft shadow under it: the goal in a box of one line that
+grows with it, the files attached under it, then one bar that never wraps: the attach button and the mode (Task, Chat or
+Research; its menu says what each does) at the left; at the right the agent with its face and name once an agent exists
+(its menu lists the agents with their roles), **Model** (the mark of its provider and its name: the daemon's default or
+one picked, by provider), **Reasoning** (a brain and the level, only for a model that offers a choice; kept in the
+browser per model) and **Options** (a lock, closed for Ask, a shield for Auto, open for YOLO: the approval mode, which
+the pill always shows, the Goal mode switch and Keep going, see
 [Autonomy](#autonomy-approvals-goal-mode-and-the-end-of-a-run); YOLO in the warn ink, on no fill) and the round send,
 quiet while the box is empty. Each pill is an icon and its value, on no ground until the pointer is over it; as the
 frame narrows the names of the mode and of the reasoning fold to their icons, then the chevrons and the agent's name go
@@ -1044,88 +1043,81 @@ move, Enter or Tab picks and Escape closes. A skill picked reads "use the skill 
 command does its work. A run that waits for your approval shows above the composer, as a card, and moves it down only
 when the cards do not fit there.
 
-A run opens as a conversation under Dot's face and name. The face is the state: still when the run rests, a slow
-breath while it works, an amber ring while it waits for you, a green tick for a moment when the run ends done, red when
-it failed (with reduced motion the tick simply shows). The panel button sits on the right; the run's facts (its state,
+A run opens as a conversation under Dot's face and name. The face is the state: still when the run rests, a slow breath
+while it works, an amber ring while it waits for you, a green tick for a moment when the run ends done, red when it
+failed (with reduced motion the tick simply shows). The panel button sits on the right; the run's facts (its state,
 start, agent, model, approval mode, goal mode and campaign) are in the panel's Details card. Your goal is the first
-message, in the bubble
-of your messages on the raised surface. A delegated run is a row: the face with its state at the corner (turning while it works, amber while it
-waits for you, green with a check when it is done, red when it failed), its goal over the last thing it did, the
-time it has taken (counting on every second while it works), the way to its own page and a chevron that opens its
-steps; rows that follow each other share one card. The row is closed from the start, as T3 Code draws a subagent: an
-approval the run asks for opens it until you have decided, and a row you never opened or closed yourself closes again.
-Its own page names the parent in the top bar as a breadcrumb (the parent's goal, a link, then its own) and
-closes the conversation with a pill: the model, how long it took ("Completed in 1m 46s", "Working for 2m"), whether
-its parent still works ("Runs on its own" once not), "Open parent" and, while it works, **Stop**. The tool calls of one
-stretch of work fold into a single
-"Worked for 12 s (model 8 s) · 5 tool calls" line, where the part in brackets is how much of that time the model's turns
-took (open it for every call, result and screenshot: each call one quiet line with its icon, its result on a hairline
-under it once opened), while approvals, questions and policy notes stay in the open. The answer of the run is the last
-message, with a Copy button and how the run ended under it; when it finished and how long the run took show where the
-pointer rests on it (on a touch screen they always show). The box stands at the foot of the window from the first
-message, the conversation filling the space above it from the top, and is the same frame as the home's, with the attach
-button and the send in its bar; what you typed there and did not send waits for you. While the
-end of the conversation, or its answer, is below the window, a round arrow just above the composer leads there. In the
-side panel (Run details), after Details, a folded **Cost** card carries the bill of the run in one line (its minutes,
-steps and tokens); open, it says where
-the minutes went (the model, the summaries, the tools, the time spent waiting for you), the input tokens with the share
-the provider served from its cache, the output tokens, the compactions (with their rate per 100 steps) and the runs it
-delegated. It is `GET /api/runs/{id}/stats` (the same numbers as `dotx stats --run ID`), read again every ten seconds
-while the run works and once at its end. A strip under
+message, in the bubble of your messages on the raised surface. A delegated run is a row: the face with its state at the
+corner (turning while it works, amber while it waits for you, green with a check when it is done, red when it failed),
+its goal over the last thing it did, the time it has taken (counting on every second while it works), the way to its own
+page and a chevron that opens its steps; rows that follow each other share one card. The row is closed from the start,
+as T3 Code draws a subagent: an approval the run asks for opens it until you have decided, and a row you never opened or
+closed yourself closes again. Its own page names the parent in the top bar as a breadcrumb (the parent's goal, a link,
+then its own) and closes the conversation with a pill: the model, how long it took ("Completed in 1m 46s", "Working for
+2m"), whether its parent still works ("Runs on its own" once not), "Open parent" and, while it works, **Stop**. The tool
+calls of one stretch of work fold into a single "Worked for 12 s (model 8 s) · 5 tool calls" line, where the part in
+brackets is how much of that time the model's turns took (open it for every call, result and screenshot: each call one
+quiet line with its icon, its result on a hairline under it once opened), while approvals, questions and policy notes
+stay in the open. The answer of the run is the last message, with a Copy button and how the run ended under it; when it
+finished and how long the run took show where the pointer rests on it (on a touch screen they always show). The box
+stands at the foot of the window from the first message, the conversation filling the space above it from the top, and
+is the same frame as the home's, with the attach button and the send in its bar; what you typed there and did not send
+waits for you. While the end of the conversation, or its answer, is below the window, a round arrow just above the
+composer leads there. In the side panel (Run details), after Details, a folded **Cost** card carries the bill of the run
+in one line (its minutes, steps and tokens); open, it says where the minutes went (the model, the summaries, the tools,
+the time spent waiting for you), the input tokens with the share the provider served from its cache, the output tokens,
+the compactions (with their rate per 100 steps) and the runs it delegated. It is `GET /api/runs/{id}/stats` (the same
+numbers as `dotx stats --run ID`), read again every ten seconds while the run works and once at its end. A strip under
 the head links the other runs of the same thread, and the box at the bottom queues a message for after a run that is
 going on, or follows up on a finished one. While the run works and the box is empty, the box's send is the run's
 **Stop** (a round button in the danger colour with a square) and cancels it; a word typed turns it back into the send,
 **Queue**, and the message waits in the chat's queue (see [How a run works](#how-a-run-works)), shown above the box as
 T3 Code shows it: a sheet whose head (Queued and the count) folds it, with a row per message: a handle to drag it to
-another place or move it with the arrow keys, its text on one line (all of it in the tooltip), a pencil that edits it
-in the box (the send says Save; Escape or Cancel gives the box its draft back), **Steer**, which sends it to the run
-now, and × to take it out. ⌘⇧Enter steers the run with what the box holds, past the queue, or with the queue's next
-message when the box is empty. A held queue says it is paused, with **Resume**. When the run ends done, the next
-message starts and the page follows it; every open page shows the queue as it changes. In a campaign's chat the
-message steers the session. The box wears the home's pills too, after T3 Code's composer: the mode, the model with its
-reasoning and the Options (approvals and goal mode), set at first to the open run's, and a follow-up or a queued
-message starts its run with them on the same thread, for the same agent; they are the page's, not kept in the browser
-as the home's are, and Keep going stays a new chat's choice. The run under way keeps its own: while it works, the pills
-step back and say that they wait for the next follow-up. A run the daemon cut off offers **Continue** on a line above
-the box. A Details panel shows the
-status, the agent
-of a chat with one, the model and its reasoning level, the approval mode and goal mode, the campaign of a session, the
-model turns, the tool calls (with the failed ones), the tokens (of every model call of the run: its steps and its
-side calls, such as compactions, reviews and the goal check), the duration, the start and the run id, then the plan, an Actions
-card and the latest screenshots. It stays closed until the panel button in the head of the run opens it (the choice is
-kept in the browser); open, it sits beside the conversation from 960 px and is a drawer below that. The run's head
-is the top bar itself: Dot's face and name on the left, the panel button on the right; the bar is solid with a
-hairline under it, so nothing scrolls under a blur, the panel stays in place under it, and the box stays at the bottom.
-Every other page names itself in the same bar
-(Agents, Activity, Campaigns, Settings) and opens with one line of description.
+another place or move it with the arrow keys, its text on one line (all of it in the tooltip), a pencil that edits it in
+the box (the send says Save; Escape or Cancel gives the box its draft back), **Steer**, which sends it to the run now,
+and × to take it out. ⌘⇧Enter steers the run with what the box holds, past the queue, or with the queue's next message
+when the box is empty. A held queue says it is paused, with **Resume**. When the run ends done, the next message starts
+and the page follows it; every open page shows the queue as it changes. In a campaign's chat the message steers the
+session. The box wears the home's pills too, after T3 Code's composer: the mode, the model with its reasoning and the
+Options (approvals and goal mode), set at first to the open run's, and a follow-up or a queued message starts its run
+with them on the same thread, for the same agent; they are the page's, not kept in the browser as the home's are, and
+Keep going stays a new chat's choice. The run under way keeps its own: while it works, the pills step back and say that
+they wait for the next follow-up. A run the daemon cut off offers **Continue** on a line above the box. A Details panel
+shows the status, the agent of a chat with one, the model and its reasoning level, the approval mode and goal mode, the
+campaign of a session, the model turns, the tool calls (with the failed ones), the tokens (of every model call of the
+run: its steps and its side calls, such as compactions, reviews and the goal check), the duration, the start and the run
+id, then the plan, an Actions card and the latest screenshots. It stays closed until the panel button in the head of the
+run opens it (the choice is kept in the browser); open, it sits beside the conversation from 960 px and is a drawer
+below that. The run's head is the top bar itself: Dot's face and name on the left, the panel button on the right; the
+bar is solid with a hairline under it, so nothing scrolls under a blur, the panel stays in place under it, and the box
+stays at the bottom. Every other page names itself in the same bar (Agents, Activity, Campaigns, Settings) and opens
+with one line of description.
 
 In the conversation each turn of the actor (Dot, or the agent the run belongs to, in its look), and the answer at the
-end, opens with its still face; the run's state is the top bar's face and the first fact of Details, with no card for
-it at the head of the conversation. The panel is one card on the composer's corner, its sections (Dot's computer,
-Details, Plan, Actions, Screen) on hairlines; they arrive folded, each with a one-line summary, and
-open at a click; the choice is kept per card. Beside the conversation the panel has a size: three buttons above Dot's
-computer make it **Compact** (its own 320 px), **Wide** (half of the page) or **Full** (the conversation at its narrowest,
-360 px, the rest for the panel), and the handle between the conversation and the panel drags it to any width between
-(the arrow keys move it a step, a double click gives it back its own width); the size is kept in the browser
-(`dot.computer.size`). While the panel is wider than its own width, the computer's view grows with the panel in its
-warm frame. The drawer of a narrow page has one width. **Dot's computer**, at the top of
-that panel while a run is going on, shows the page of the run's browser as Chrome paints it (`GET /api/runs/{id}/screencast`, Chrome's own screencast,
-sent only while the view is open; a tab that does not change sends nothing). The view starts by itself at the run's
-first browser step and says, until then, that the run has not opened a page; **Watch** and **Close the view** open
-and close it by hand; once the run has ended the card keeps the last screen and Watch goes. A pill under it says who has the browser ("Dot has
-control", or the agent's name). Since that view shows the page, Dot's own Chrome stays
-in the background while a run works (`[browser] raise_window`, off by default, items 97 and 118): the tabs Dot opens
-are opened behind, the app you were in gets the focus back right after Chrome starts and after a page opens a tab of its
-own, and switching tabs does not raise the window; Settings › Browser has the switch
-"Bring Chrome to the front while working" for the other way round. **Take over**
-holds the run at its next tool call, brings its tab to the front either way, in the Chrome the run works in (a
+end, opens with its still face; the run's state is the top bar's face and the first fact of Details, with no card for it
+at the head of the conversation. The panel is one card on the composer's corner, its sections (Dot's computer, Details,
+Plan, Actions, Screen) on hairlines; they arrive folded, each with a one-line summary, and open at a click; the choice
+is kept per card. Beside the conversation the panel has a size: three buttons above Dot's computer make it **Compact**
+(its own 320 px), **Wide** (half of the page) or **Full** (the conversation at its narrowest, 360 px, the rest for the
+panel), and the handle between the conversation and the panel drags it to any width between (the arrow keys move it a
+step, a double click gives it back its own width); the size is kept in the browser (`dot.computer.size`). While the
+panel is wider than its own width, the computer's view grows with the panel in its warm frame. The drawer of a narrow
+page has one width. **Dot's computer**, at the top of that panel while a run is going on, shows the page of the run's
+browser as Chrome paints it (`GET /api/runs/{id}/screencast`, Chrome's own screencast, sent only while the view is open;
+a tab that does not change sends nothing). The view starts by itself at the run's first browser step and says, until
+then, that the run has not opened a page; **Watch** and **Close the view** open and close it by hand; once the run has
+ended the card keeps the last screen and Watch goes. A pill under it says who has the browser ("Dot has control", or the
+agent's name). Since that view shows the page, Dot's own Chrome stays in the background while a run works
+(`[browser] raise_window`, off by default, items 97 and 118): the tabs Dot opens are opened behind, the app you were in
+gets the focus back right after Chrome starts and after a page opens a tab of its own, and switching tabs does not raise
+the window; Settings › Browser has the switch "Bring Chrome to the front while working" for the other way round. **Take
+over** holds the run at its next tool call, brings its tab to the front either way, in the Chrome the run works in (a
 campaign's session, in the campaign's), and the pill reads "You have control" (when the tab cannot be brought up, the
-run is not held): the Chrome
-window is on your Mac, so sign in, pass a CAPTCHA or do a step yourself; **Return control** lets the run go on, and the
-result of the tool call that waited tells the model how long you had the browser and that the page may have changed,
-so it takes a snapshot first. The timeline keeps both moments (`takeover`, `handback`), and `dotx run` prints them. A
-takeover is refused while `[browser] headless = true` (there is no window to use), and the run page keeps the last
-frame once the run has ended.
+run is not held): the Chrome window is on your Mac, so sign in, pass a CAPTCHA or do a step yourself; **Return control**
+lets the run go on, and the result of the tool call that waited tells the model how long you had the browser and that
+the page may have changed, so it takes a snapshot first. The timeline keeps both moments (`takeover`, `handback`), and
+`dotx run` prints them. A takeover is refused while `[browser] headless = true` (there is no window to use), and the run
+page keeps the last frame once the run has ended.
 
 The Actions card is one view of what the run did and what can be undone: every acting step (a tool call that changed
 something: a file written, a command run, a click, a message sent; reads are left out) with the channel it went
@@ -1149,9 +1141,9 @@ Settings › Appearance (⌥⌘A), after T3 Code's page, holds the look of this 
 each a miniature of Dot's window drawn in the scheme it names: System (the default, split down the middle), Light and
 Dark; ⇧⌥⌘A steps through them. **Themes** is a gallery of cards with a light and a dark orb each: the card takes its
 theme for both schemes, an orb for its own scheme only (a sun or a moon marks the picks), so light can wear one theme
-and dark another. Dot's two looks are **Neutral** (warm grey and ink, round and quiet; the default) and **Paper**
-(warm paper tones with a serif heading and a terracotta accent), whose serif voice follows the scheme it is picked for;
-T3 Code's six palettes are **Clean** (T3 Code's own look: near-white, grey and a blue accent), **Rose** (T3 Chat's),
+and dark another. Dot's two looks are **Neutral** (warm grey and ink, round and quiet; the default) and **Paper** (warm
+paper tones with a serif heading and a terracotta accent), whose serif voice follows the scheme it is picked for; T3
+Code's six palettes are **Clean** (T3 Code's own look: near-white, grey and a blue accent), **Rose** (T3 Chat's),
 **Grove**, **Ocean**, **Ember** and **Iris**. A palette's colours are mapped onto Dot's tokens (its action colour, which
 T3 Code paints its solid controls with, is Dot's accent) and held to the rule of the looks below: a text tier or an ink
 that would read under its ratio is moved in lightness until it reads, and in dark a card lies a step above the page; a
@@ -1185,24 +1177,23 @@ page before the first paint. The palettes, the colour arithmetic, the orbs, the 
 the theme generator, the theme file with its checks and the VS Code import are a port of T3 Code
 (github.com/pingdotgg/t3code, MIT, T3 Tools Inc.) to plain ES modules (`static/js/appearance/LICENSE`); Dot is not
 affiliated with T3 Tools Inc. The looks are one visual system. Colour: every colour is a token of `themes.css` naming
-its light and its dark value in one place;
-surfaces step up by lightness (page, sunken sidebar, raised cards) rather than by shadow in dark; borders are the text
-colour at a small alpha so they sit on every surface; the text tiers are measured against every surface by a unit
-test (4.5:1 for text and its second tier, 3:1 for the muted and faint ones); the yellow is the owner's bubbles. Type:
-Inter for the interface and the answers, Geist Mono for code and identifiers, both served from Dot's own origin
-(`static/fonts`, SIL Open Font License); seven sizes each with its line-height (12/16 badges and chips, 13/18 meta
-and hints, 14/20 the interface, 15/24 prose and the composer, 17/24 section titles, 20/28 page titles, 24/32 the
-greeting), three weights (400 text, 500 labels and names, 600 titles), tabular numerals throughout; a unit test
-refuses any size, weight, line-height or family in the sheets that is not one of these tokens. Surfaces: cards are flat,
-a surface with a hairline and a 12 px radius and no shadow (shadows stay on what floats: menus, dialogs, the composer in
-focus); section labels are sentence case; the facts of a row are spans a gap apart rather than one dotted string; an
-empty list is one line that says so and what to do; your messages sit on the raised surface. Controls: buttons, inputs
-and selects 36 px tall on an 8 px corner with a hairline (32 for the small ones), the same 2 px focus ring on each, a
-select with its own drawn chevron, a range on a hairline track filled with the accent up to its value under the
-switch's knob, field labels on the interface line and hints on the small one, the composer's menus
-as round pills of 32 px (an icon of 16 px, the value, a chevron of 12; no ground at rest, a tint under the pointer) that
-open a panel above them, the providers' marks served from `static/icons/providers/` with their licences, table rows 40
-px with their content on the middle; `#/controls` shows every control on one page for checking a look.
+its light and its dark value in one place; surfaces step up by lightness (page, sunken sidebar, raised cards) rather
+than by shadow in dark; borders are the text colour at a small alpha so they sit on every surface; the text tiers are
+measured against every surface by a unit test (4.5:1 for text and its second tier, 3:1 for the muted and faint ones);
+the yellow is the owner's bubbles. Type: Inter for the interface and the answers, Geist Mono for code and identifiers,
+both served from Dot's own origin (`static/fonts`, SIL Open Font License); seven sizes each with its line-height (12/16
+badges and chips, 13/18 meta and hints, 14/20 the interface, 15/24 prose and the composer, 17/24 section titles, 20/28
+page titles, 24/32 the greeting), three weights (400 text, 500 labels and names, 600 titles), tabular numerals
+throughout; a unit test refuses any size, weight, line-height or family in the sheets that is not one of these tokens.
+Surfaces: cards are flat, a surface with a hairline and a 12 px radius and no shadow (shadows stay on what floats:
+menus, dialogs, the composer in focus); section labels are sentence case; the facts of a row are spans a gap apart
+rather than one dotted string; an empty list is one line that says so and what to do; your messages sit on the raised
+surface. Controls: buttons, inputs and selects 36 px tall on an 8 px corner with a hairline (32 for the small ones), the
+same 2 px focus ring on each, a select with its own drawn chevron, a range on a hairline track filled with the accent up
+to its value under the switch's knob, field labels on the interface line and hints on the small one, the composer's
+menus as round pills of 32 px (an icon of 16 px, the value, a chevron of 12; no ground at rest, a tint under the
+pointer) that open a panel above them, the providers' marks served from `static/icons/providers/` with their licences,
+table rows 40 px with their content on the middle; `#/controls` shows every control on one page for checking a look.
 Faces: every actor is a character (below); an agent wears the look you choose, Dot its own (Settings › General), and an
 actor without one (a delegated run, a campaign, a schedule) the shape and colour its id's hue gives it, one of eight, so
 it keeps its face in the sidebar, the lists, the rows of a chat and the bar of its own page. Characters: the animated
@@ -1211,22 +1202,22 @@ modules, one filled shape with two eyes that are holes in it, in eight shapes, s
 theme's `--character-*` tokens) and fourteen animations; bloub recreates the behaviour of x.ai's bot avatar as an
 exercise and is affiliated with nobody, and neither is Dot: the licence covers the code, not the design it imitates
 (`static/js/character/LICENSE`). One loop drives every moving character on the page and stops while the tab is hidden;
-under reduced motion, or with "Faces that move" off in Settings › Appearance, each shows one still frame (while the system
-reduces motion the switch says so, and where that is turned off). A still character follows a change of its shape or
-expression at once. Two characters move: the home's face and the look editor's preview; every other face is a still
+under reduced motion, or with "Faces that move" off in Settings › Appearance, each shows one still frame (while the
+system reduces motion the switch says so, and where that is turned off). A still character follows a change of its shape
+or expression at once. Two characters move: the home's face and the look editor's preview; every other face is a still
 frame. One moving face costs about a millisecond of main-thread time a frame (`tests/smoke/test_character_cost.py` reads
 it from Chrome's performance metrics and caps it). `#/controls` shows every shape, expression, colour and animation.
-Space: every gap, padding and margin sits on one rhythm of 8 px (4 for the smallest, a 2 px hairline token for what
-sits a breath apart; a unit test checks it); the sidebar is a tone darker than the page with no line between them,
-has no dividers between its groups, its labels are the lightest ink that reads, a chat's last activity sits at the
-right of its row in figures of one width ("5m", "3h", "2d") and its open row is a surface step rather than a tint; the top bar's pills show a border only
-when they count something; a card's head is lighter than its body; a folded step of the timeline is one line whose
-duration shows on hover. Motion: three durations (120, 200 and 320 ms) and two easings for what changes, and the
-rhythms of what repeats (the face's breath and pulse, a blink, a spin); a unit test holds every transition and
-animation to them. The face breathes slowly at rest and pulses while a run works; cards, rows, the slash menu and the
-toasts fade in; a state badge cross-fades. Under the system's reduced-motion setting every transform goes (the
-breath, the pulse, the spinners, the drawer's slide) and the fades stay, so a state change is still seen. Dot's mark is
-a yellow dot with the character's eyes, the o of the wordmark "dot" between a d and a t drawn in one line
+Space: every gap, padding and margin sits on one rhythm of 8 px (4 for the smallest, a 2 px hairline token for what sits
+a breath apart; a unit test checks it); the sidebar is a tone darker than the page with no line between them, has no
+dividers between its groups, its labels are the lightest ink that reads, a chat's last activity sits at the right of its
+row in figures of one width ("5m", "3h", "2d") and its open row is a surface step rather than a tint; the top bar's
+pills show a border only when they count something; a card's head is lighter than its body; a folded step of the
+timeline is one line whose duration shows on hover. Motion: three durations (120, 200 and 320 ms) and two easings for
+what changes, and the rhythms of what repeats (the face's breath and pulse, a blink, a spin); a unit test holds every
+transition and animation to them. The face breathes slowly at rest and pulses while a run works; cards, rows, the slash
+menu and the toasts fade in; a state badge cross-fades. Under the system's reduced-motion setting every transform goes
+(the breath, the pulse, the spinners, the drawer's slide) and the fades stay, so a state change is still seen. Dot's
+mark is a yellow dot with the character's eyes, the o of the wordmark "dot" between a d and a t drawn in one line
 (`static/index.html`); the favicon, the app's icon, the menu bar's and the web app's icons are drawn from it
 (`desktop/icons/render.py`), and the wordmark heads the sign-in card. A window that opens the UI plays the opening once:
 the d and the t hop up, the dot drops in with its eyes shut, bounces twice, opens its eyes and blinks, and the page
@@ -1274,9 +1265,9 @@ dotx service uninstall   # stop the daemon and remove the job
 ```
 
 - Run `service install` again to restart the daemon after you changed the configuration.
-- A launchd job has no terminal, so macOS attaches Accessibility (it covers posting input events) and Screen Recording to
-  the Python binary that runs the daemon, not to your terminal. Grant them to that binary; Settings › System in the web
-  UI reports what the daemon itself has, and `dotx desktop check` what your terminal has. This prints the binary:
+- A launchd job has no terminal, so macOS attaches Accessibility (it covers posting input events) and Screen Recording
+  to the Python binary that runs the daemon, not to your terminal. Grant them to that binary; Settings › System in the
+  web UI reports what the daemon itself has, and `dotx desktop check` what your terminal has. This prints the binary:
 
   ```bash
   .venv/bin/python -c "import os, sys; print(os.path.realpath(sys.executable))"
@@ -1345,9 +1336,9 @@ the agent itself.
   by itself when the daemon answers. The window leaves the UI for that page only after three polls in a row go
   unanswered, so one slow answer of a busy daemon does not throw the open page away.
 - **The menu bar item** is Dot's mark in the state of the whole of Dot (looking at you at rest, glancing up while a
-  run works, a blue pastille while something waits for you) with the count of what waits for you beside it, read from `GET /api/activity/count`
-  every second. A click opens the window; the menu has Open Dot, New chat and Quit. Closing the window keeps the
-  shell in the menu bar.
+run works, a blue pastille while something waits for you) with the count of what waits for you beside it, read from
+`GET /api/activity/count` every second. A click opens the window; the menu has Open Dot, New chat and Quit. Closing the
+window keeps the shell in the menu bar.
 - **⌘⇧Space** anywhere brings the window up on New chat, with the cursor in the box. When another app holds the
   shortcut, the shell starts without it and its menu says so; New chat stays in the menu.
 - **Links** that a page opens in a new window, such as the links of a model's answer, open in the default browser;
@@ -1415,13 +1406,13 @@ it runs. There are two ways to open the sites Dot should use with your accounts:
   once; choose Always Allow). The command ends by counting the cookies Chrome can read. The copy is a snapshot: a
   sign-in that expires or rotates needs a new import, and a site that keeps its sign-in in IndexedDB asks again.
 
-Cookies are encrypted with a key, and a profile cannot be read with another key than the one it was written with. A profile
-that Dot made uses Playwright's mock keychain in the sign-in window and in the automated sessions alike, so no Keychain
-item is involved; the profile of an import uses the system keychain in both (`dotx doctor` shows which). A sign-in made
-with an older version of `dotx browser login`, which used the real key, has to be made again.
+Cookies are encrypted with a key, and a profile cannot be read with another key than the one it was written with. A
+profile that Dot made uses Playwright's mock keychain in the sign-in window and in the automated sessions alike, so no
+Keychain item is involved; the profile of an import uses the system keychain in both (`dotx doctor` shows which). A
+sign-in made with an older version of `dotx browser login`, which used the real key, has to be made again.
 
-**`attach`** works in new tabs of the Chrome you already have open, signed in as you are, and starts no Chrome of its own.
-It needs Chrome 144 or later and its switch "Allow remote debugging for this browser instance" at
+**`attach`** works in new tabs of the Chrome you already have open, signed in as you are, and starts no Chrome of its
+own. It needs Chrome 144 or later and its switch "Allow remote debugging for this browser instance" at
 `chrome://inspect/#remote-debugging`, which only you can turn on.
 
 ```bash
@@ -1454,22 +1445,22 @@ effect at the next browser call, Chrome is not restarted, and the value is writt
 
 Both modes share what follows.
 
-- The page is observed as an accessibility snapshot in which every element has a ref (`e12`). It covers the viewport plus
-  `viewport_margin_px`, and `browser_find`, `browser_links` and `browser_read_text` reach what is outside.
+- The page is observed as an accessibility snapshot in which every element has a ref (`e12`). It covers the viewport
+  plus `viewport_margin_px`, and `browser_find`, `browser_links` and `browser_read_text` reach what is outside.
 - A collapsed dropdown lists its options on its own line, for example
   `combobox "Shipping" [ref=e3]: options "Standard (3-5 days)" [selected], "Express (next day)"`. `select` takes the
   label or the value of one of them, written as listed; a choice that is not there is refused at once with the options
   that are, the closest first, instead of waiting for the timeout. An option that a script adds within a second of the
   call is still found. A very long list is cut with the number of options left out and the current choice.
-- `browser_act` runs up to `max_batch_steps` steps in one call (5 by default; a longer batch is cut to the first ones and
-  the result says how many remain, so the call is not lost): `click`, `double_click`, `right_click`, `hover`, `fill`,
-  `type`, `insert`, `select`, `press`, `check`, `uncheck`, `scroll_into_view`, `drag` and `click_at`. After a step Dot
-  waits until the page has settled (no DOM change for `settle_quiet_ms`, 60 ms, at most `settle_max_ms`) and reports
-  popups, dialogs and downloads that appeared. The result is the part of the page that changed, with the refs of the
-  last snapshot still valid; a page that did not change comes back as one line that says so. A tab that closes under
-  a batch (a sign-in callback that did its job, a tab the user closed) stops the batch without a failed step: the
-  result says the page closed it and shows the tab that is now current. A popup that opens and closes itself before
-  the model could see it is a note on the page that opened it.
+- `browser_act` runs up to `max_batch_steps` steps in one call (5 by default; a longer batch is cut to the first ones
+  and the result says how many remain, so the call is not lost): `click`, `double_click`, `right_click`, `hover`,
+  `fill`, `type`, `insert`, `select`, `press`, `check`, `uncheck`, `scroll_into_view`, `drag` and `click_at`. After a
+  step Dot waits until the page has settled (no DOM change for `settle_quiet_ms`, 60 ms, at most `settle_max_ms`) and
+  reports popups, dialogs and downloads that appeared. The result is the part of the page that changed, with the refs of
+  the last snapshot still valid; a page that did not change comes back as one line that says so. A tab that closes under
+  a batch (a sign-in callback that did its job, a tab the user closed) stops the batch without a failed step: the result
+  says the page closed it and shows the tab that is now current. A popup that opens and closes itself before the model
+  could see it is a note on the page that opened it.
 - `fill` replaces a form field's value, `type` presses a key per character (autocomplete sees them), `insert` puts the
   text in at once at the caret without key events (long text, post composers, code editors) and `drag` moves an
   element onto the element `to_ref` (HTML5 drag and drop or a library driven by the mouse). `insert` goes only into a
@@ -1511,17 +1502,17 @@ Both modes share what follows.
 
 ## Computer use
 
-The desktop tools see and drive any application through the accessibility tree and, where an application has none, through
-screenshots and coordinates. macOS must grant the app that runs Dot three permissions: **Accessibility**, **Input
-events** and **Screen Recording**. `dotx desktop check` shows which it has and `dotx desktop setup` asks macOS for the
-missing ones and opens their Settings panes.
+The desktop tools see and drive any application through the accessibility tree and, where an application has none,
+through screenshots and coordinates. macOS must grant the app that runs Dot three permissions: **Accessibility**,
+**Input events** and **Screen Recording**. `dotx desktop check` shows which it has and `dotx desktop setup` asks macOS
+for the missing ones and opens their Settings panes.
 
 - `desktop_apps` lists the running applications and `desktop_open_app` brings one to the front, starting it when it is
-  not running: by name (Terminal), bundle id (com.apple.Terminal) or bundle path (/Applications/Terminal.app). A path
-  to anything else (a binary) is refused at once with those three forms, instead of being retried against Launch Services.
-- `desktop_snapshot` lists an application's window as elements with a role, a name, a value, a state, a position and a ref
-  (`a12`). A second view lists only what changed; `query` finds elements anywhere in the application and `scope =
-  menu_bar` lists the menu bar. `desktop_read` reads one element's full text.
+not running: by name (Terminal), bundle id (com.apple.Terminal) or bundle path (/Applications/Terminal.app). A path to
+anything else (a binary) is refused at once with those three forms, instead of being retried against Launch Services.
+- `desktop_snapshot` lists an application's window as elements with a role, a name, a value, a state, a position and a
+  ref (`a12`). A second view lists only what changed; `query` finds elements anywhere in the application and
+  `scope = menu_bar` lists the menu bar. `desktop_read` reads one element's full text.
 - `desktop_act` runs up to `max_batch_steps` steps in one call (25 by default; a longer batch is cut the same way):
   `click`, `double_click`, `right_click`, `hover`, `press`,
   `focus`, `set_value`, `type`, `paste`, `key`, `scroll`, `drag`, `menu`, `wait` and `activate`. A step names an element
@@ -1541,13 +1532,14 @@ missing ones and opens their Settings panes.
   (1366 by default: about 1 600 tokens on the hosted providers, against about 2 500 at 1920).
 - `desktop.keep_awake` keeps the display awake while Dot works. Password managers are refused in every mode, and so
   are secure fields except in a `yolo` run (see [Safety](#safety)).
-- `dotx desktop apps`, `dotx desktop snapshot [app] [--scope …] [--query …]` and `dotx desktop screenshot PATH` show what
-  the agent would see.
+- `dotx desktop apps`, `dotx desktop snapshot [app] [--scope …] [--query …]` and `dotx desktop screenshot PATH` show
+  what the agent would see.
 
 ## Memory
 
 Dot keeps short notes between runs: facts about you, your machine and how you like things done. `memory_save`,
-`memory_search` and `memory_forget` are tools of the agent; you manage the same notes with `dotx memory` and in the web UI.
+`memory_search` and `memory_forget` are tools of the agent; you manage the same notes with `dotx memory` and in the web
+UI.
 
 ```bash
 dotx memory add --tag core "I prefer answers in Turkish, with code and commands in English"
@@ -1614,15 +1606,15 @@ dotx memory reindex      # embed every note again, for example after changing [m
   min_similarity = 0.40
   ```
 
-  Then run `dotx memory reindex` (vectors of two models cannot be compared, so Dot also drops the old ones by itself).
-  `dotx doctor` shows whether the key and the model work. The lower `min_similarity` is needed: the scores of
-  `text-embedding-3-small` sit lower than those of `bge-m3` (a note's own question scores 0.38-0.79, other notes mostly
-  below 0.3), so the shipped `0.50` lets only part of the right notes through. Measured against the real OpenAI API on the
-  same small hand-written set (17 Turkish and 10 English questions over 37 notes; indicative, not a benchmark claim): at
-  `0.50` the right note came first for 9 of 17 Turkish questions, at `0.40` for 14 of 17 (16 of 17 within the first three,
-  English 10 of 10), where `bge-m3` gives 15 of 17. `inject_min_similarity = 0.55` and `similar_threshold = 0.85` held on
-  the measured pairs (no wrong note at 0.55; the same fact scored 0.85-0.94, different facts at most 0.66). A recall costs
-  about 0.19 s with OpenAI against 0.04 s with the local model, because every search is a network round trip.
+Then run `dotx memory reindex` (vectors of two models cannot be compared, so Dot also drops the old ones by itself).
+`dotx doctor` shows whether the key and the model work. The lower `min_similarity` is needed: the scores of
+`text-embedding-3-small` sit lower than those of `bge-m3` (a note's own question scores 0.38-0.79, other notes mostly
+below 0.3), so the shipped `0.50` lets only part of the right notes through. Measured against the real OpenAI API on the
+same small hand-written set (17 Turkish and 10 English questions over 37 notes; indicative, not a benchmark claim): at
+`0.50` the right note came first for 9 of 17 Turkish questions, at `0.40` for 14 of 17 (16 of 17 within the first three,
+English 10 of 10), where `bge-m3` gives 15 of 17. `inject_min_similarity = 0.55` and `similar_threshold = 0.85` held on
+the measured pairs (no wrong note at 0.55; the same fact scored 0.85-0.94, different facts at most 0.66). A recall costs
+about 0.19 s with OpenAI against 0.04 s with the local model, because every search is a network round trip.
 
 ## Schedules
 
@@ -1634,10 +1626,10 @@ dotx schedule disable|enable|delete ID
 ```
 
 A schedule is a complete goal that Dot runs later, once (`--at`) or on a cron rhythm (`--cron`, five fields, read in
-`[scheduler] timezone`, which defaults to the zone `TZ` names when it is set, else the zone of this Mac). Each firing starts a fresh run without any conversation,
-so the goal has to say everything. The agent can create schedules too (`schedule_create`). The scheduler also fires the
-nightly reflection at `[agent] reflection_time` (see Reflection above); it is not a schedule and does not count against
-`max_schedules`.
+`[scheduler] timezone`, which defaults to the zone `TZ` names when it is set, else the zone of this Mac). Each firing
+starts a fresh run without any conversation, so the goal has to say everything. The agent can create schedules too
+(`schedule_create`). The scheduler also fires the nightly reflection at `[agent] reflection_time` (see Reflection
+above); it is not a schedule and does not count against `max_schedules`.
 
 On Settings › Schedules a schedule is created and edited whole: its name, goal, repetition (cron or one moment), time
 zone, kind of run (task, chat, research), model, reasoning level, approval mode, goal mode and whether it is on. Options
@@ -1692,21 +1684,21 @@ messaged at once. Every step, a run that may message the team learns of the agen
 (made by it, by you or by another run) through a note with their names and roles. Delegated runs and the runs that
 answer a message make no agents.
 
-Agents work together through messages. A run (Dot's or an agent's) sends one with the `message_agent` tool, naming
-the agent and the message; the agent answers in a run of its own (its instructions, its tools, its model, and the
-stricter of its approvals and the sender's, so an agent set to `yolo` asks when a run that asks messages it) that
-cannot see the sender's conversation, and the reply comes back as the tool's result, the way a delegated run's
-report does. The prompt lists the team by name and role under "Team" whenever there is another agent to message;
-an agent does not message itself, and an answering run messages no one further. The sender's chat shows the
-exchange as a delegated row wearing the agent's face. **Team** (a button on the Agents page, `#/team`) is today's
-thread of these messages: who to whom, the message, the reply, the time and the two runs; an agent's page lists the
-messages it sent or received. `GET /api/team` gives the thread. Three `[agent]` settings follow the harness study
-arXiv 2609.20804: `context_elide_share` (0.6, past which older tool output is shortened), `context_summarise_share`
-(0.85 of the configured budget, past which the older part of the run is summarised) and `plan_each_turn` (on: the open plan is appended to
-the system message of every step). The API: `GET /api/agents` (Dot first,
-each agent with its newest run), `POST /api/agents`, `GET`/`PUT`/`DELETE /api/agents/{id}` (Dot is neither changed
-nor deleted), `GET /api/tools` (the names an agent may be given), and `POST /api/runs` with `agent_id` (not with
-`standing`: a campaign is Dot's own, and the two together are refused with a 422).
+Agents work together through messages. A run (Dot's or an agent's) sends one with the `message_agent` tool, naming the
+agent and the message; the agent answers in a run of its own (its instructions, its tools, its model, and the stricter
+of its approvals and the sender's, so an agent set to `yolo` asks when a run that asks messages it) that cannot see the
+sender's conversation, and the reply comes back as the tool's result, the way a delegated run's report does. The prompt
+lists the team by name and role under "Team" whenever there is another agent to message; an agent does not message
+itself, and an answering run messages no one further. The sender's chat shows the exchange as a delegated row wearing
+the agent's face. **Team** (a button on the Agents page, `#/team`) is today's thread of these messages: who to whom, the
+message, the reply, the time and the two runs; an agent's page lists the messages it sent or received. `GET /api/team`
+gives the thread. Three `[agent]` settings follow the harness study arXiv 2609.20804: `context_elide_share` (0.6, past
+which older tool output is shortened), `context_summarise_share` (0.85 of the configured budget, past which the older
+part of the run is summarised) and `plan_each_turn` (on: the open plan is appended to the system message of every step).
+The API: `GET /api/agents` (Dot first, each agent with its newest run), `POST /api/agents`,
+`GET`/`PUT`/`DELETE /api/agents/{id}` (Dot is neither changed nor deleted), `GET /api/tools` (the names an agent may be
+given), and `POST /api/runs` with `agent_id` (not with `standing`: a campaign is Dot's own, and the two together are
+refused with a 422).
 
 ## Campaigns
 
@@ -1742,27 +1734,27 @@ your conversation; the daemon runs the sessions after it, each a run in a thread
   channel (a site's API, a command or a skill instead of its pages), another source or another approach, written as a
   new strategy entry first. All four live in `[agent]`.
 - **Only a verified outcome ends it.** `campaign_achieved` asks the goal checker (the review model) whether the targets
-  are reached, from the targets and how they are verified, the progress in the ledger, the session's plan with the
-  evidence of its steps, what the session's own calls measured and the session's evidence. Refused, the call fails with the checker's reason and the session goes on (one
-  the checker finds out of reach asks you how to go on); accepted, the campaign is achieved and you are told (the
-  notifications under the web UI and the phone's pushes), as you are when the emergency stop or `campaign_max_sessions`
-  stops it.
+are reached, from the targets and how they are verified, the progress in the ledger, the session's plan with the
+evidence of its steps, what the session's own calls measured and the session's evidence. Refused, the call fails with
+the checker's reason and the session goes on (one the checker finds out of reach asks you how to go on); accepted, the
+campaign is achieved and you are told (the notifications under the web UI and the phone's pushes), as you are when the
+emergency stop or `campaign_max_sessions` stops it.
 - **Only you stop it.** Campaigns, in the sidebar, lists them; a campaign's page shows its targets, the questions
   waiting for you, its ledger and its sessions, with Stop (which also stops a session working then), Go on and Mark
   achieved. The emergency stop (its button, or the pointer in the top-left corner during a desktop step) stops the
   campaign of the session it ends, and while the stop is engaged no session starts. `dotx campaign` changes the
   campaign without the daemon, so a session working then goes on until it ends (Stop on its run page ends it).
   `campaign_max_sessions` (0: no limit) stops a campaign after that many sessions; Go on gives it one more.
-- **Posts, judged before they are answered.** With `TYPESAFE_API_KEY` saved, a session also has three tools on TypeSafe's
-  typed judgments for a campaign on X or another feed. `rank_posts` asks three yes/no questions about every post it
-  could answer, in one request (on the account's topic; written by a person, not a bot, a brand or spam; worth a reply
-  that adds something) and combines them with weights the ledger holds: the first ranking writes them as a note with
-  equal values, and a `campaign_note` entry with the numbers `w_topic`, `w_person` and `w_reply` changes them without
-  asking TypeSafe again; every ranking's scores are kept in the session's timeline (`posts_ranked`). `pick_draft` asks
-  one choice over two to ten drafts of a reply. `check_draft` asks whether a draft is off topic, repeats one of the
-  account's earlier posts or breaks a rule the goal names, and refuses it when one of those reaches `[judge]
-  draft_check_threshold` (0.5, provisional until it is set on a labeled sample of your own feed). None of them posts;
-  the model keeps the decision.
+- **Posts, judged before they are answered.** With `TYPESAFE_API_KEY` saved, a session also has three tools on
+  TypeSafe's typed judgments for a campaign on X or another feed. `rank_posts` asks three yes/no questions about every
+  post it could answer, in one request (on the account's topic; written by a person, not a bot, a brand or spam; worth a
+  reply that adds something) and combines them with weights the ledger holds: the first ranking writes them as a note
+  with equal values, and a `campaign_note` entry with the numbers `w_topic`, `w_person` and `w_reply` changes them
+  without asking TypeSafe again; every ranking's scores are kept in the session's timeline (`posts_ranked`).
+  `pick_draft` asks one choice over two to ten drafts of a reply. `check_draft` asks whether a draft is off topic,
+  repeats one of the account's earlier posts or breaks a rule the goal names, and refuses it when one of those reaches
+  `[judge] draft_check_threshold` (0.5, provisional until it is set on a labeled sample of your own feed). None of them
+  posts; the model keeps the decision.
 
 **The browser of a campaign.** A campaign works in the Chrome you have open, signed in as you are (`attach`), unless you
 start it with `--browser own` (or `browser` in the API, which goes with `standing` only), and `[agent] campaign_browser`
@@ -2042,23 +2034,22 @@ src/dotagent/
   formats use Ollama's compatible endpoints as a stand-in; `pytest -m hosted` repeats the calls against the real
   services with your own keys (tiny requests, skipped when a key is missing).
 - **Verified with real models:** the approval modes and goal mode. `tests/smoke/test_run_modes_live.py` puts real
-  questions to the review model and the goal check, and runs whole runs in `yolo`, `auto` and goal mode on
-  `ollama:minimax-m2.7:cloud` against a temporary home. What the gate does with each answer of the review model, and
-  what each mode waives, is tested exactly in `tests/smoke/test_approval_modes.py` with the real store and broker. Judging
-  is model work, so another review model may judge differently.
+questions to the review model and the goal check, and runs whole runs in `yolo`, `auto` and goal mode on
+`ollama:minimax-m2.7:cloud` against a temporary home. What the gate does with each answer of the review model, and what
+each mode waives, is tested exactly in `tests/smoke/test_approval_modes.py` with the real store and broker. Judging is
+model work, so another review model may judge differently.
 - **Not verified live:** MCP against third-party servers (the HTTP and SSE transports ran against a local fixture
-  server); macOS older than 15.2 (the error messages for it were run with a faked answer, the Mac they ran on has macOS
-  26); the notification banner of the web UI, which needs your permission in the browser; `dotx browser import-chrome`
-  against a real Chrome profile and the real Keychain, which only you can
-  run (its logic ran on a synthetic profile with the real file layout, and the shared key between the sign-in window and
-  the automated sessions ran with an ordinary Chrome on the mock keychain); `attach` mode against your own Chrome. Its
-  logic and its tab handling ran against a hidden scratch Chrome with a debugging port, which plays your Chrome but has
-  no Allow dialog, so what only your Chrome shows is open: the dialog itself, opening a tab in the window you work in,
-  how long a connection takes with very many tabs open, and what Chrome does to a tab in the background. The web UI
-  (chats, their selection and deletion, the settings tabs including the Browser one) ran in a headless Chromium against
-  the static files and a mocked API, and the API itself in the server smoke tests; the two were not run together against a
-  live daemon. No model worked from a real skill or plugin folder (discovery, `dotx skills list` and the `skill` tool ran
-  on real folders).
+server); macOS older than 15.2 (the error messages for it were run with a faked answer, the Mac they ran on has macOS
+26); the notification banner of the web UI, which needs your permission in the browser; `dotx browser import-chrome`
+against a real Chrome profile and the real Keychain, which only you can run (its logic ran on a synthetic profile with
+the real file layout, and the shared key between the sign-in window and the automated sessions ran with an ordinary
+Chrome on the mock keychain); `attach` mode against your own Chrome. Its logic and its tab handling ran against a hidden
+scratch Chrome with a debugging port, which plays your Chrome but has no Allow dialog, so what only your Chrome shows is
+open: the dialog itself, opening a tab in the window you work in, how long a connection takes with very many tabs open,
+and what Chrome does to a tab in the background. The web UI (chats, their selection and deletion, the settings tabs
+including the Browser one) ran in a headless Chromium against the static files and a mocked API, and the API itself in
+the server smoke tests; the two were not run together against a live daemon. No model worked from a real skill or plugin
+folder (discovery, `dotx skills list` and the `skill` tool ran on real folders).
 - The shell guardrail is best-effort, and the sandbox of a run's processes keeps them out of Dot's own files only (see
   [Safety](#safety)).
 - The token goes only to a server that proves it holds it, but a page that another program served at the daemon's
@@ -2078,9 +2069,9 @@ src/dotagent/
 - All conversation threads share one Chrome window.
 - Every model call carries the schemas of over forty tools, several thousand tokens. A model with a small context
   window or a metered key feels it; `allow` lists keep the MCP part short.
-- A run costs what its model costs: the loop makes many calls, and screenshots are expensive. A run has no step limit, so
-  what bounds the cost is the stop button, the progress watchdog, `goal_patience` for the send-backs of goal mode, the
-  concurrency limits (`max_concurrent_runs`) and, when you set them, `run_max_minutes` and `run_max_tokens`. Without
+- A run costs what its model costs: the loop makes many calls, and screenshots are expensive. A run has no step limit,
+  so what bounds the cost is the stop button, the progress watchdog, `goal_patience` for the send-backs of goal mode,
+  the concurrency limits (`max_concurrent_runs`) and, when you set them, `run_max_minutes` and `run_max_tokens`. Without
   `stall_escalation` and without those limits, a run that varies its steps without getting anywhere ends only when you
   stop it.
 - A campaign has no end but a verified outcome or you: by default a session every hour, each costing what a run
