@@ -238,10 +238,31 @@ def _closest_lines(text: str, needle: str) -> str:
     return "; ".join(repr(candidate) for candidate in candidates)
 
 
+def _crlf_only(text: str) -> bool:
+    """Whether ``text`` breaks its lines, every one of them, with CRLF."""
+    return "\r\n" in text and "\n" not in text.replace("\r\n", "")
+
+
+def _with_crlf(snippet: str) -> str:
+    """``snippet`` with its lines broken by CRLF."""
+    return snippet.replace("\r\n", "\n").replace("\n", "\r\n")
+
+
 def _edit_blocking(path: Path, old: str, new: str, replace_all: bool, journal: JournalTarget) -> str:
+    """Replace ``old`` with ``new`` in the file and leave every other byte as it was: a file that breaks its lines with
+    CRLF keeps them, and the old and the new text are taken with CRLF too (``read_file`` shows lines without it). Only
+    UTF-8 text is edited; a file in another encoding is refused, saying so, rather than guessed at."""
     if not path.is_file():
         raise ToolExecutionError("file does not exist", {"path": str(path)})
-    text: str = path.read_text(encoding="utf-8")
+    try:
+        text: str = path.read_bytes().decode("utf-8")
+    except UnicodeDecodeError as exc:
+        raise ToolExecutionError(
+            "the file is not UTF-8 text, the only kind edit_file changes; change it with the shell instead",
+            {"path": str(path), "byte_offset": exc.start},
+        ) from exc
+    if _crlf_only(text):
+        old, new = _with_crlf(old), _with_crlf(new)
     occurrences: int = text.count(old)
     if occurrences == 0:
         raise ToolExecutionError(

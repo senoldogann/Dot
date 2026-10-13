@@ -5069,8 +5069,8 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 146 | The gaps the final review of part 23 found                                           | done        | e558f21 |
 | 147 | A folder whose reading macOS broke off does not fail a search                        | done        | ca16c37 |
 | 148 | The queue of a chat, after T3 Code                                                   | done        | 5f6747b |
-| 149 | The scheduler goes on past a failure                                                 | in progress |         |
-| 150 | A tool that raises fails its call, not its run                                       | planned     |         |
+| 149 | The scheduler goes on past a failure                                                 | done        | 1ec1497 |
+| 150 | A tool that raises fails its call, not its run                                       | in progress |         |
 | 151 | A question a run left reaches the owner                                              | planned     |         |
 | 152 | A late one-time schedule is never dropped unseen                                     | planned     |         |
 | 153 | A server of tools that cannot start does not stop the daemon                         | planned     |         |
@@ -8198,7 +8198,7 @@ the page text of the browser and the desktop has a floor (156).
 
 ### 149. The scheduler goes on past a failure
 
-**Status: in progress.**
+**Status: done.** Merged as `1ec1497` (PR #186; no Linear issue, the Linear connector was signed out).
 
 **As built (2026-10-13).** `Scheduler.tick` does its three parts (the due schedules, the due sessions of campaigns, the
 reflection's check) each on its own: a part that fails is logged with its error (`scheduler_part_failed`) and holds up
@@ -8219,11 +8219,23 @@ daemon and every run it held.
 
 ### 150. A tool that raises fails its call, not its run
 
-**Status: planned.**
+**Status: in progress.**
+
+**As built (2026-10-13).** The executor turns any error of a tool into a failed result of that call (`_run_checked`): an
+error no tool expects, a fault in Dot rather than in what the call asked, is logged with its traceback (`tool_crashed`)
+and the model reads its kind and its words; a stop of the run and the emergency stop still end it. Before, only Dot's
+own errors, timeouts and the system's were caught, and any other error, such as the `UnicodeDecodeError` of `edit_file`
+on a file that is not UTF-8, ended the run as an internal error. `edit_file` reads the file's bytes and changes the text
+it is given and nothing else: a file that breaks every line with CRLF keeps them, and the old and the new text are taken
+with CRLF too (`read_file` shows the lines without it), where before the whole file was written back with LF; a file
+that is not UTF-8 text is refused, saying so, for the shell to change, rather than guessed at. Tests (scripted runs): a
+tool that raises a `ValueError`, whose call fails with its kind and words while the run ends done; an edit of a CRLF
+file that keeps every line end; an edit of a Latin-1 file that fails saying so and leaves the file as it was. Each
+failed on the code of before.
 
 **What.** Any error a tool raises fails that call, with the error's kind and words for the model to read, and the run
-goes on; `edit_file` edits a file that is not UTF-8, or has Windows line ends, without changing anything outside the
-edit.
+goes on; `edit_file` keeps a file's Windows line ends and refuses a file that is not UTF-8 text, saying so, where it
+used to end the run.
 
 ### 151. A question a run left reaches the owner
 
@@ -8852,3 +8864,4 @@ small.
 - 2026-10-12 (Opus 5.5): item 146 merged as `e558f21` (PR #181, MYP-287 Done): Dot's own code is among what it loads and runs, the daemon's job starts Python with `-P`, the login shell Dot reads at its start runs in the sandbox, a search shows what it found beside the places it may not read, the shell guard reads zsh's redirects past noclobber, and a playbook retired while a run ended is not counted; the daemon restarted with it, its job rewritten. Part 23 is done.
 - 2026-10-13 (Opus 5.5): item 147 merged as `ca16c37` (PR #183; no Linear issue, the connector was signed out): a search shows what it found where macOS broke off the reading of a folder, as it does beside the places it may not read; found in the records of a run while answering the owner's question whether the guards of parts 22 and 23 took the agent's freedom. The daemon restarted with it. Part 23 is done.
 - 2026-10-13 (Opus 5.5): item 148 merged as `5f6747b` (PR #184; no Linear issue, the connector was signed out): T3 Code's queued messages in Dot: a message sent while a chat's run works waits in the chat's queue, shown above the composer, and starts as the chat's next run once that run has ended done; a stop, a failure or a restart holds the queue until Resume. The browser test found and the item fixed the focus and the drag of the rows and Cancel on a phone. Part 24 is done.
+- 2026-10-13 (Opus 5.5): item 149 merged as `1ec1497` (PR #186; no Linear issue, the connector was signed out): a tick of the scheduler does its parts each on its own and a failed tick is tried again, so one error no longer ends the daemon with every run it holds; only twenty failed ticks in a row end it. A check of `test_composer.py` that read a colour while it faded was made to wait for it.

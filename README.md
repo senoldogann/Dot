@@ -314,7 +314,11 @@ answer (a small model that is offered both writes the call out as text).
 | Skills          | `skill`                                                                                                            |
 | MCP             | `mcp__<server>__<tool>`                                                                                            |
 
-The shell and the file tools work in `<home>/workspace` unless a path says otherwise. A shell command runs with the
+The shell and the file tools work in `<home>/workspace` unless a path says otherwise. Any error of a tool fails that
+call, not the run: the model reads what went wrong (for an error no tool expects, its kind and its words, while the
+log keeps its traceback) and goes on. `edit_file` changes the text it is given and nothing else: a file that breaks
+its lines with CRLF keeps them, in the new text too, and a file that is not UTF-8 text is refused, saying so, for the
+shell to change. A shell command runs with the
 `PATH` of your login shell, in its own process group (cancelling a run ends the whole group) and under a timeout
 (`[shell] default_timeout_s`, at most `max_timeout_s`). `web_search` climbs a ladder of engines until one answers
 (`[web] search_backend`, default `auto`; `dotx doctor` shows the ladder): the hosted search of Ollama when `OLLAMA_API_KEY`
