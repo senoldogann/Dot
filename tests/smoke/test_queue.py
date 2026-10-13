@@ -3,15 +3,19 @@ choices it was sent with, once that run has ended done, one message after the ot
 queue until the owner resumes it, as the start of the daemon does when a run works on the chat or a crash cut it; a
 queue whose run the daemon's stop cut goes on once that run, continued, ends done (item 161); a queued message steered
 reaches the run at work and leaves the queue; the queue keeps the order and the text the owner gives it; the thread of
-a delegated run takes no queue, as it is no chat (item 170). The chat's page shows it all above the composer, as T3
-Code does, served by a real server, wide and on a phone, light and dark.
+a delegated run takes no queue, as it is no chat (item 170). A message is claimed in the store before its run starts,
+so a removal or an edit in that moment is refused; it starts after the run at work on the chat in any process, two
+processes that move the queue at once start it once, the claim of a process that died holds the queue, a message
+steered as its run ends goes back and starts after it, and a claim the store refused to end is ended by the next start
+(item 184). The chat's page shows it all above the composer, as T3 Code does, served by a real server, wide and on a
+phone, light and dark.
 
 No network and no model service is used: the scripted model ends each run with its first reply, which the test lets go.
 """
 
 import asyncio
 import time
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Awaitable, Callable, Sequence
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from pathlib import Path
@@ -22,9 +26,11 @@ import pytest
 import pytest_asyncio
 from playwright.async_api import Browser, Locator, Page, async_playwright, expect
 
+from dotagent.agent import manager as manager_module
+from dotagent.agent.attachments import StoredAttachment, load_attachments
 from dotagent.agent.manager import QUEUE_CHANGED_EVENT, RunManager
 from dotagent.config import load_default_config
-from dotagent.core.errors import InvalidValueError, ProviderProtocolError, RunConflict
+from dotagent.core.errors import InvalidValueError, ProviderProtocolError, RunConflict, StoreError
 from dotagent.evals.runner import SCRIPTED_MODEL, eval_config, eval_environment, scratch_home
 from dotagent.evals.scripted import ScriptedProvider
 from dotagent.evals.types import ScriptedCall, ScriptedTurn
@@ -536,3 +542,172 @@ async def test_the_chats_page_queues_moves_edits_steers_and_resumes_messages_abo
                     await page.close()
         finally:
             await browser.close()
+
+
+def _held_back(
+    entered: asyncio.Event, go: asyncio.Event
+) -> Callable[[Path, Sequence[str]], Awaitable[tuple[StoredAttachment, ...]]]:
+    """``load_attachments`` that tells ``entered`` it was called and waits for ``go``: a queued message's start stays
+    in that moment, its files being read, until the test lets it go on."""
+
+    async def held_back(workspace: Path, attachment_ids: Sequence[str]) -> tuple[StoredAttachment, ...]:
+        entered.set()
+        await go.wait()
+        return await load_attachments(workspace, attachment_ids)
+
+    return held_back
+
+
+async def test_a_queued_message_whose_run_is_starting_is_neither_removed_nor_edited(
+    login_env: dict[str, str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Item 184: a message is claimed in the store before its run starts, so a removal or an edit in that moment is
+    refused and the run starts with the message as it was; before, the removal answered success and the run started
+    anyway."""
+    model: _GatedModel = _GatedModel()
+    entered: asyncio.Event = asyncio.Event()
+    go: asyncio.Event = asyncio.Event()
+    async with _session(login_env, model) as (runtime, manager):
+        run: RunRecord = await _start(manager)
+        message: QueuedMessage = await _queue(manager, run, SUMMARY, "yolo")
+        monkeypatch.setattr(manager_module, "load_attachments", _held_back(entered, go))
+        async with _changes(runtime) as changes:
+            await model.release()
+            async with asyncio.timeout(WAIT_S):
+                await entered.wait()
+            with pytest.raises(RunConflict, match="starting as its chat's next run"):
+                await manager.remove_queued(message.id)
+            with pytest.raises(RunConflict, match="starting as its chat's next run"):
+                await manager.edit_queued(message.id, SHORT_SUMMARY)
+            go.set()
+            started: RunRecord = await _started(changes, runtime, run)
+        assert started.goal == SUMMARY
+        assert await _queued(runtime, run) == []
+        await model.release()
+        assert (await _ended(manager, started.id)).status == "done"
+
+
+async def test_a_message_queued_through_another_process_waits_for_the_run_at_work_there(
+    login_env: dict[str, str],
+) -> None:
+    """Item 184: the claim of a message waits while a run of any process works on the chat, so a message the daemon
+    takes while a ``dotx`` command's run works there starts after that run, by the process whose run ended; before, the
+    daemon started it at once, beside the run at work."""
+    model: _GatedModel = _GatedModel()
+    async with _session(login_env, model) as (runtime, manager):
+        daemon: RunManager = RunManager(runtime)
+        try:
+            run: RunRecord = await _start(manager)
+            async with _changes(runtime) as changes:
+                await _queue(daemon, run, SUMMARY, "yolo")
+                assert [other.id for other in await runtime.store.list_runs(10, run.thread_id)] == [run.id]
+                await model.release()
+                started: RunRecord = await _started(changes, runtime, run)
+            assert started.goal == SUMMARY
+            await model.release()
+            assert (await _ended(manager, started.id)).status == "done"
+        finally:
+            await daemon.shutdown()
+
+
+async def test_two_processes_that_move_a_queue_at_once_start_its_message_once(login_env: dict[str, str]) -> None:
+    """Item 184: two processes that let a held queue go at the same moment claim its message in the store, and one run
+    starts; before, each started it."""
+    model: _GatedModel = _GatedModel()
+    async with _session(login_env, model) as (runtime, manager):
+        other: RunManager = RunManager(runtime)
+        try:
+            run: RunRecord = await _start(manager)
+            await _queue(manager, run, SUMMARY, "yolo")
+            await runtime.store.hold_queue(run.thread_id)
+            await model.release()
+            await _ended(manager, run.id)
+            outcomes: list[BaseException | None] = await asyncio.gather(
+                manager.resume_queue(run.thread_id), other.resume_queue(run.thread_id), return_exceptions=True
+            )
+            assert outcomes == [None, None]
+            runs: list[RunRecord] = await runtime.store.list_runs(10, run.thread_id)
+            assert [other_run.goal for other_run in runs] == [SUMMARY, GOAL]
+            assert await _queued(runtime, run) == []
+        finally:
+            await other.shutdown()
+
+
+async def test_the_claim_of_a_process_that_died_holds_its_chats_queue(login_env: dict[str, str]) -> None:
+    """Item 184: a process that died while it started a queued message leaves its claim; the daemon's check of dead
+    commands ends it and holds the chat's queue, with the message in it, since whether its run started is not known."""
+    model: _GatedModel = _GatedModel()
+    async with _session(login_env, model) as (runtime, manager):
+        run: RunRecord = await _start(manager)
+        message: QueuedMessage = await _queue(manager, run, SUMMARY, "yolo")
+        await runtime.store.hold_queue(run.thread_id)
+        await model.release()
+        await _ended(manager, run.id)
+        await runtime.store.release_queue(run.thread_id)
+        # The owner of a process that is gone: no file of it is left.
+        assert await runtime.store.claim_queued(run.thread_id, token_hex(16)) == message
+        await manager.close_runs_of_dead_commands()
+        assert await runtime.store.claim_owners() == []
+        assert await runtime.store.queue_held(run.thread_id)
+        assert await _queued(runtime, run) == [(message.id, SUMMARY)]
+
+
+async def test_a_message_steered_as_its_run_ends_goes_back_and_starts_after_it(
+    login_env: dict[str, str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Item 184: a message taken out of the queue to steer a run that ended in that moment goes back where it was, and
+    the queue moves on as the end of that run does: the message starts as the chat's next run."""
+    model: _GatedModel = _GatedModel()
+    async with _session(login_env, model) as (runtime, manager):
+        run: RunRecord = await _start(manager)
+        message: QueuedMessage = await _queue(manager, run, SUMMARY, "yolo")
+        take = runtime.store.take_queued
+
+        async def taken_as_the_run_ends(message_id: str) -> QueuedMessage:
+            taken: QueuedMessage = await take(message_id)
+            await model.release()
+            await _ended(manager, run.id)
+            return taken
+
+        monkeypatch.setattr(runtime.store, "take_queued", taken_as_the_run_ends)
+        async with _changes(runtime) as changes:
+            with pytest.raises(RunConflict, match="no run works on the chat to steer"):
+                await manager.steer_queued(message.id)
+            started: RunRecord = await _started(changes, runtime, run)
+        assert started.goal == SUMMARY
+        assert await _queued(runtime, run) == []
+        await model.release()
+        assert (await _ended(manager, started.id)).status == "done"
+
+
+async def test_a_claim_the_store_refused_to_end_is_ended_by_the_chats_next_start(
+    login_env: dict[str, str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Item 184: when the store refuses to take a started message out of the queue, its claim is ended by the next
+    start on the chat, so the queue goes on while the process lives instead of waiting for it to end."""
+    model: _GatedModel = _GatedModel()
+    async with _session(login_env, model) as (runtime, manager):
+        run: RunRecord = await _start(manager)
+        await _queue(manager, run, SUMMARY, "yolo")
+        await _queue(manager, run, MAIL, "yolo")
+        drop = runtime.store.drop_claimed
+        refused: list[str] = []
+
+        async def refused_once(thread_id: str) -> None:
+            if not refused:
+                refused.append(thread_id)
+                raise StoreError("the database refused the write", {"method": "drop_claimed"})
+            await drop(thread_id)
+
+        monkeypatch.setattr(runtime.store, "drop_claimed", refused_once)
+        async with _changes(runtime) as changes:
+            await model.release()
+            first: RunRecord = await _started(changes, runtime, run)
+            assert len(await runtime.store.claim_owners()) == 1
+            await model.release()
+            second: RunRecord = await _started(changes, runtime, first)
+        assert (first.goal, second.goal) == (SUMMARY, MAIL)
+        assert await _queued(runtime, run) == []
+        assert await runtime.store.claim_owners() == []
+        await model.release()
+        assert (await _ended(manager, second.id)).status == "done"

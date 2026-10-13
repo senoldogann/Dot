@@ -318,7 +318,9 @@ reminder, a resumed run) and, in goal mode, to the goal check.
   one message after the other. A stop, a failed run or a crash of the daemon holds the queue until you resume it; a
   shutdown of the daemon does not, and once the run it cut off is resumed and the new run ends done, the queue goes on.
   The daemon keeps the queue, so it goes on with no page open, and a queued message can be sent to the run at work
-  (steered) instead. A campaign's chat has no queue: a message there steers its session.
+  (steered) instead. A message starts once, and only after the run at work on the chat has ended, whichever process (the
+  daemon or a `dotx` command) moves the queue; while its run is starting, editing it, taking it out or steering it is
+  refused (409). A campaign's chat has no queue: a message there steers its session.
 - `/btw <question>` in the box of a run (the slash menu offers it) asks on the side: the run's model answers from what
   the run has done so far,
   without tools, and the run neither sees the question nor stops for it. Several can be asked at once. The question and
@@ -1325,7 +1327,7 @@ The REST API (all under `/api`; bodies and replies are JSON, event streams are s
 | `POST /runs/{id}/steer`, `POST /runs/{id}/cancel`                               | message a running run; stop it                               |
 | `POST /runs/{id}/btw` (`{"text": …}`)                                           | a side question, answered without the run seeing it          |
 | `GET\|POST\|PUT /threads/{id}/queue`, `POST /threads/{id}/queue/resume`         | a chat's queue (`held`, `messages`); queue a message (`text` and the choices of `POST /runs`; 409 for a chat with no run yet, a campaign's, or the thread of a delegated run); reorder it (`{"ids": […]}`, each once); resume a held one |
-| `PATCH\|DELETE /queue/{id}` (`{"text": …}`), `POST /queue/{id}/steer`            | edit or take out a queued message; send it to the run at work now (409 with none); each answers with the queue |
+| `PATCH\|DELETE /queue/{id}` (`{"text": …}`), `POST /queue/{id}/steer`            | edit or take out a queued message; send it to the run at work now (409 with none); 409 while its run is starting; each answers with the queue |
 | `POST /attachments` (`{"name", "media_type", "data_b64"}`)                      | keep a file for a message; `POST /runs` and `steer` name it in `attachments` |
 | `GET /threads?limit=N`, `DELETE /threads` (`{"ids": […]}`)                      | the chats, the pinned first, then newest activity first; delete some with their runs (409 with the ids while one has a run under way) |
 | `PATCH /threads/{id}` (`{"title": …, "pinned": …, "seen": …}`, one at least)   | name a chat, pin it, or mark it seen or unseen (204; 404 for no chat); a chat's `unread` is in the list |
