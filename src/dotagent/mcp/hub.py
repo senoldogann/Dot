@@ -18,6 +18,7 @@ from dotagent.mcp.connection import McpConnection
 from dotagent.mcp.launch import resolve_server_secrets, server_environment, server_headers
 from dotagent.mcp.naming import require_distinct_names
 from dotagent.mcp.types import McpFailure, McpTool
+from dotagent.tools.schema import flatten_json_schema
 
 log = get_logger(__name__)
 
@@ -69,6 +70,19 @@ def select_tools(config: McpServerConfig, listed: tuple[McpTool, ...]) -> tuple[
     return listed
 
 
+def tool_parameters(tool: McpTool) -> JsonObject:
+    """The input schema of ``tool``, flattened as every provider takes it. ``McpError`` names a tool whose schema Dot
+    cannot hand to a model: a reference that leads nowhere, or one that nests deeper than Dot follows (a tree whose
+    nodes hold nodes)."""
+    try:
+        return flatten_json_schema(tool.input_schema)
+    except ValueError as exc:
+        raise McpError(
+            "the input schema of an MCP tool cannot be used",
+            {"server": tool.server, "tool": tool.remote_name, "error": str(exc), "hint": "leave it out with `allow`"},
+        ) from exc
+
+
 async def _connect_server(config: McpServerConfig, login_env: Mapping[str, str]) -> _Connected:
     secrets: dict[str, str] = await resolve_server_secrets(config)
     env: dict[str, str] = server_environment(config, login_env, secrets)
@@ -79,6 +93,9 @@ async def _connect_server(config: McpServerConfig, login_env: Mapping[str, str])
         listed: tuple[McpTool, ...] = await connection.list_tools()
         tools: tuple[McpTool, ...] = select_tools(config, listed)
         require_distinct_names(tools)
+        # A tool that cannot be handed to a model leaves its server out, as a server that cannot start is left out.
+        for tool in tools:
+            tool_parameters(tool)
         cleanup.pop_all()
     log.info("mcp_server_ready", server=config.name, tools=len(tools), offered=len(listed))
     return _Connected(connection=connection, listed=len(listed), tools=tools)
@@ -148,15 +165,17 @@ async def _inspect(config: McpServerConfig, login_env: Mapping[str, str]) -> Ser
         return ServerReport(server=config.name, enabled=False, listed=0, tools=(), error=None, detail={}, log=log_file)
     try:
         connected: _Connected = await _connect_server(config, login_env)
-    except DotError as exc:
+    except Exception as exc:
+        # Any failure, as :func:`open_hub` leaves the server out with it.
+        failure: McpFailure = _failure(config, exc)
         return ServerReport(
             server=config.name,
             enabled=True,
             listed=0,
             tools=(),
-            error=exc.message,
-            detail=exc.context,
-            log=log_file,
+            error=failure.error,
+            detail=failure.detail,
+            log=failure.log,
         )
     await connected.connection.close()
     return ServerReport(

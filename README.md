@@ -1799,13 +1799,16 @@ headers = { Authorization = "Bearer ${DOCS_TOKEN}" }  # ${NAME} as above; header
 
 `dotx mcp list` starts every configured server and shows its tools, or why it does not start. Only tools are used (no
 resources, prompts, sampling or OAuth). The tool list is read when Dot starts; a server that dies is started again by
-the next call. A server that is enabled but cannot start (its command or a secret is missing, it quits or does not
-answer in time, its `allow` list names a tool it does not offer, or two of its tools would share a name) is left out,
-and Dot starts without its tools: Settings › System names it with the reason, `dotx run`, `dotx resume` and
-`dotx chat` say so before they begin, and `dotx doctor` warns of a missing command or secret. It is tried again when
-Dot starts again; `enabled = false` stops trying it.
-Plugins add their servers too (see [Skills and plugins](#skills-and-plugins)); their names become `<plugin>-<server>`.
-MCP results are untrusted content, and the stderr of a stdio server goes to `<logs>/mcp-<name>.log`.
+the next call. A server that is enabled but cannot start (its command, a secret or its working directory is missing, it
+quits or does not answer in time, its `allow` list names a tool it does not offer, two of its tools would share a name,
+or the input schema of one of its tools cannot be handed to a model: a reference that leads nowhere, or a tree whose
+nodes hold nodes, which `allow` can leave out) is left out, and Dot starts without its tools: Settings › System names it
+with the reason, `dotx run`, `dotx resume` and `dotx chat` say so before they begin, and `dotx doctor` warns of a
+missing command or secret. It is tried again when Dot starts again; `enabled = false` stops trying it. Plugins add their
+servers too (see [Skills and plugins](#skills-and-plugins)); their names become `<plugin>-<server>`. MCP results are
+untrusted content, and the stderr of a stdio server goes to `<logs>/mcp-<name>.log`. A tool that its server declares
+read-only (`readOnlyHint`) is taken at its word and runs as a read, with no flag; any other counts as one that may
+change things (`destructive`) and send to the world (`external_send`), unless its server says it does not.
 
 ## Skills and plugins
 
