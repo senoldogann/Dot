@@ -1,5 +1,6 @@
 // The frame around every page: the sidebar on the left (a drawer on narrow windows) and, above the page, what needs the
-// owner: the approvals that wait, the connection while it is not live and the banner of an engaged emergency stop.
+// owner: the approvals that wait, the connection while it is not live, the banner of an engaged emergency stop and the
+// one of a page that Dot's update left out of date.
 
 import { el } from "./dom.js";
 import { failsafeButton, releaseFailsafe } from "./failsafe.js";
@@ -33,9 +34,16 @@ function buildIndicators() {
     el("span", { class: "grow" }, "Emergency stop is engaged. Desktop control is blocked until you release it."),
     el("button", { class: "btn sm", type: "button", onclick: () => attempt(releaseFailsafe) }, "Release"),
   );
+  const updated = el(
+    "div",
+    { class: "banner update", hidden: true, role: "status" },
+    icon("refresh"),
+    el("span", { class: "grow" }, "Dot was updated since this page was loaded. Load it again to use the new version."),
+    el("button", { class: "btn sm", type: "button", onclick: () => location.reload() }, "Load again"),
+  );
   return {
     pills: [waiting, connection],
-    banner,
+    banners: [banner, updated],
     paint(snapshot) {
       waitingCount.textContent = String(snapshot.approvals.length);
       waiting.hidden = snapshot.approvals.length === 0;
@@ -46,6 +54,7 @@ function buildIndicators() {
       connection.hidden = snapshot.stream === "live";
       connection.title = `Connection to the daemon: ${STREAM_LABEL[snapshot.stream]}`;
       banner.hidden = snapshot.status === null || !snapshot.status.failsafe_engaged;
+      updated.hidden = !snapshot.outdated;
     },
   };
 }
@@ -91,7 +100,7 @@ export function buildShell({ homeRoute }) {
     { class: "stagebar" },
     // The bar drags the desktop shell's window (item 88); a browser ignores the attribute.
     el("div", { class: "stagebar-row", "data-tauri-drag-region": "" }, opener, stageTitleSlot(), stageToolsSlot(), el("div", { class: "stagebar-right" }, indicators.pills)),
-    indicators.banner,
+    ...indicators.banners,
   );
   const stage = el("div", { class: "stage" }, stagebar, main);
   trackStagebar(stagebar);

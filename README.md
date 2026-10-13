@@ -1038,10 +1038,12 @@ Both follow the lifecycle stream, so a run moves between the sections the moment
 ends. The stream replays nothing after a break of the connection (the network dropped, the daemon restarted), so once it
 is back every page that follows it, the run's page and its queue among them, reads again what it shows; so does every
 page when the stream fell so far behind that events were lost (`resync`). A page that cannot read again keeps what it
-showed and says so. A run delegated by another run sits under the run that delegated it, in both the sidebar and the
-Activity page, with its steps so far and its channel; the parent's row says how many runs it delegated. In the chat, the
-delegated run's card carries a chip with its progress ("step 3 · web_fetch", then "done · 12 steps") and an **open**
-link to the run's own page.
+showed and says so. The rules page reads its rules again when one is added, switched or deleted on another page. A page
+loaded before Dot was updated says so in a banner, with **Load again**: the daemon's status tells what the pages it
+serves are (`pages`, a digest of their files at its start), and the page compares it with what it was loaded from. A run
+delegated by another run sits under the run that delegated it, in both the sidebar and the Activity page, with its steps
+so far and its channel; the parent's row says how many runs it delegated. In the chat, the delegated run's card carries
+a chip with its progress ("step 3 · web_fetch", then "done · 12 steps") and an **open** link to the run's own page.
 
 **New chat** is Dot's presence and one composer, standing in the middle of the space under the top bar, across and down,
 however long the day under them is. The face is Dot's character, moving (idle with a wink now and then; a still frame
@@ -1112,22 +1114,22 @@ T3 Code shows it: a sheet whose head (Queued and the count) folds it, with a row
 another place or move it with the arrow keys, its text on one line (all of it in the tooltip), a pencil that edits it in
 the box (the send says Save; Escape or Cancel gives the box its draft back), **Steer**, which sends it to the run now,
 and × to take it out. ⌘⇧Enter steers the run with what the box holds, past the queue, or with the queue's next message
-when the box is empty. A held queue says it is paused, with **Resume**. When the run ends done, the next message starts
-and the page follows it; every open page shows the queue as it changes. In a campaign's chat the message steers the
-session. The box wears the home's pills too, after T3 Code's composer: the mode, the model with its reasoning and the
-Options (approvals and goal mode), set at first to the open run's, and a follow-up or a queued message starts its run
-with them on the same thread, for the same agent; they are the page's, not kept in the browser as the home's are, and
-Keep going stays a new chat's choice. The run under way keeps its own: while it works, the pills step back and say that
-they wait for the next follow-up. A run the daemon cut off offers **Continue** on a line above the box. A Details panel
-shows the status, the agent of a chat with one, the model and its reasoning level, the approval mode and goal mode, the
-campaign of a session, the model turns, the tool calls (with the failed ones), the tokens (of every model call of the
-run: its steps and its side calls, such as compactions, reviews and the goal check), the duration, the start and the run
-id, then the plan, an Actions card and the latest screenshots. It stays closed until the panel button in the head of the
-run opens it (the choice is kept in the browser); open, it sits beside the conversation from 960 px and is a drawer
-below that. The run's head is the top bar itself: Dot's face and name on the left, the panel button on the right; the
-bar is solid with a hairline under it, so nothing scrolls under a blur, the panel stays in place under it, and the box
-stays at the bottom. Every other page names itself in the same bar (Agents, Activity, Campaigns, Settings) and opens
-with one line of description.
+when the box is empty. A held queue says it is paused, with **Resume**, and a queue the page could not read says why,
+with **Read again**. When the run ends done, the next message starts and the page follows it; every open page shows the
+queue as it changes. In a campaign's chat the message steers the session. The box wears the home's pills too, after T3
+Code's composer: the mode, the model with its reasoning and the Options (approvals and goal mode), set at first to the
+open run's, and a follow-up or a queued message starts its run with them on the same thread, for the same agent; they
+are the page's, not kept in the browser as the home's are, and Keep going stays a new chat's choice. The run under way
+keeps its own: while it works, the pills step back and say that they wait for the next follow-up. A run the daemon cut
+off offers **Continue** on a line above the box. A Details panel shows the status, the agent of a chat with one, the
+model and its reasoning level, the approval mode and goal mode, the campaign of a session, the model turns, the tool
+calls (with the failed ones), the tokens (of every model call of the run: its steps and its side calls, such as
+compactions, reviews and the goal check), the duration, the start and the run id, then the plan, an Actions card and the
+latest screenshots. It stays closed until the panel button in the head of the run opens it (the choice is kept in the
+browser); open, it sits beside the conversation from 960 px and is a drawer below that. The run's head is the top bar
+itself: Dot's face and name on the left, the panel button on the right; the bar is solid with a hairline under it, so
+nothing scrolls under a blur, the panel stays in place under it, and the box stays at the bottom. Every other page names
+itself in the same bar (Agents, Activity, Campaigns, Settings) and opens with one line of description.
 
 In the conversation each turn of the actor (Dot, or the agent the run belongs to, in its look), and the answer at the
 end, opens with its still face; the run's state is the top bar's face and the first fact of Details, with no card for it
@@ -2021,9 +2023,10 @@ space inside the database file and the journals of file changes (`dotx undo`) wh
 those files and journals, and gives the space back to the disk, after which a delete returns its space by itself. The
 database is locked for a moment while it compacts, so run it when no run is active.
 
-Logs are structured and go to `~/Library/Logs/Dot/dotx.log`; at 10 MB it is moved to `dotx.log.1` (the one before is
-dropped) and a new one is started. The output of the launchd job goes to `daemon.out.log` and `daemon.err.log` in the
-same directory, and the stderr of each MCP server to `mcp-<name>.log`.
+Logs are structured and go to `~/Library/Logs/Dot/dotx.log` (another folder with `DOT_LOG_DIR`: `dotx service status`
+names the one in use, and the sign-in screen of a daemon that could not answer points to it); at 10 MB it is moved to
+`dotx.log.1` (the one before is dropped) and a new one is started. The output of the launchd job goes to
+`daemon.out.log` and `daemon.err.log` in the same directory, and the stderr of each MCP server to `mcp-<name>.log`.
 
 ## Development
 

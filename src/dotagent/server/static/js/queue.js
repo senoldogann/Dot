@@ -3,12 +3,12 @@
 // (its handle is dragged, or takes the arrow keys), edited in the composer, sent to the run at work now (Steer) or
 // taken out. A stop, a failure or a crash of the daemon holds the queue until Resume; a run that a stop of the daemon
 // cut leaves it to go on once the run, continued, ends done. The daemon keeps the queue, so it goes on with no page
-// open, and every open page shows it as it changes.
+// open, and every open page shows it as it changes; a queue the page could not read says so, with Read again.
 
 import { api } from "./api.js";
 import { el } from "./dom.js";
 import { icon } from "./icons.js";
-import { onLifecycle, onStreamBack, readFailed } from "./state.js";
+import { onLifecycle, onStreamBack } from "./state.js";
 import { attempt, toast } from "./ui.js";
 
 const QUEUE_CHANGED = "queue_changed";
@@ -35,6 +35,8 @@ export function createQueue({ threadId, frame, onSteered, onStarted, onEdit }) {
   let active = false;
   let expanded = true;
   let busy = false;
+  // Why the queue could not be read the last time, or null once it was.
+  let problem = null;
   // The message the composer edits, and the draft it held before.
   let editingId = null;
   let draft = "";
@@ -57,8 +59,11 @@ export function createQueue({ threadId, frame, onSteered, onStarted, onEdit }) {
   );
   const resume = el("button", { class: "btn sm ghost", type: "button" }, "Resume");
   const paused = el("div", { class: "queue-paused", hidden: true }, el("span", null, "Paused until you resume it"), resume);
+  const unreadText = el("span");
+  const readAgain = el("button", { class: "btn sm ghost", type: "button" }, "Read again");
+  const unread = el("div", { class: "queue-unread", hidden: true }, unreadText, readAgain);
   const list = el("ol", { class: "queue-list", id: listId });
-  element.append(head, paused, list);
+  element.append(head, unread, paused, list);
 
   head.addEventListener("pointerdown", (event) => event.preventDefault());
   head.addEventListener("click", () => {
@@ -66,8 +71,15 @@ export function createQueue({ threadId, frame, onSteered, onStarted, onEdit }) {
     paint();
   });
   resume.addEventListener("click", () => act(() => api.post(`/threads/${threadId}/queue/resume`, null)));
+  readAgain.addEventListener("click", async () => {
+    readAgain.disabled = true;
+    await load();
+    readAgain.disabled = false;
+  });
 
+  /** Show the queue as the daemon answered it, which was read then. */
   function show(view) {
+    problem = null;
     messages = view.messages;
     held = view.held;
     if (editingId !== null && !messages.some((message) => message.id === editingId)) {
@@ -77,8 +89,18 @@ export function createQueue({ threadId, frame, onSteered, onStarted, onEdit }) {
     paint();
   }
 
+  /** Read the chat's queue; one that cannot be read keeps what was shown and says why, with Read again. */
   async function load() {
-    show(await api.get(`/threads/${threadId}/queue`));
+    let view;
+    try {
+      view = await api.get(`/threads/${threadId}/queue`);
+    } catch (error) {
+      console.warn("the queue could not be read", error);
+      problem = error instanceof Error ? error.message : String(error);
+      paint();
+      return;
+    }
+    show(view);
   }
 
   /** Run one request of the queue at a time, the others being ignored; its answer is the queue as it then is. */
@@ -273,7 +295,10 @@ export function createQueue({ threadId, frame, onSteered, onStarted, onEdit }) {
     if (draggedId !== null) {
       return;
     }
-    element.hidden = messages.length === 0;
+    element.hidden = messages.length === 0 && problem === null;
+    head.hidden = messages.length === 0;
+    unread.hidden = problem === null;
+    unreadText.textContent = problem === null ? "" : `The queue could not be read: ${problem}`;
     element.setAttribute("aria-label", `${messages.length} queued message${messages.length === 1 ? "" : "s"}`);
     count.textContent = String(messages.length);
     head.setAttribute("aria-expanded", String(expanded));
@@ -302,11 +327,11 @@ export function createQueue({ threadId, frame, onSteered, onStarted, onEdit }) {
     if (event.data.started_run_id !== null) {
       onStarted(event.data.started_run_id, event.data.after_run_id);
     }
-    load().catch((error) => readFailed("The queue", error));
+    load();
   });
-  const stopBack = onStreamBack(() => load().catch((error) => readFailed("The queue", error)));
+  const stopBack = onStreamBack(load);
 
-  load().catch((error) => console.warn("the queue could not be read", error));
+  load();
 
   // `add` and `saveEdit` throw what fails, so that the page keeps the composer's text when its message is not kept.
   return {

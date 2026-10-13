@@ -657,6 +657,13 @@ a.pill:hover {
   max-width: 1000px;
 }
 
+/* A page that Dot's update left out of date: news, not a fault. */
+.banner.update {
+  background: var(--warn-weak);
+  color: var(--warn);
+  border-bottom-color: var(--warn-border);
+}
+
 /* A section's name in sentence case (item 79): the interface size in the label weight, a tier lighter than text. */
 .section-label {
   font-size: var(--text-ui);
@@ -3046,6 +3053,20 @@ details[open] > summary .chev {
 }
 
 .queue-paused .btn {
+  margin-left: auto;
+}
+
+/* A queue that could not be read says why, with a way to read it again. */
+.queue-unread {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 0 var(--space-1) 0 var(--space-2);
+  color: var(--bad);
+  font-size: var(--text-xs);
+}
+
+.queue-unread .btn {
   margin-left: auto;
 }
 

@@ -8,9 +8,12 @@ import { api } from "../api.js";
 import { clip, el } from "../dom.js";
 import { icon } from "../icons.js";
 import { emptyPanel, errorPanel, field, loadingPanel, paneHead, segmented } from "../panels.js";
+import { onLifecycle, onStreamBack, readFailed } from "../state.js";
 import { attempt, confirmDialog, toast } from "../ui.js";
 
 const QUOTE_CHARS = 100;
+// The live event of a rule added, switched or deleted on any page (`rules_changed`, `dotagent.server.routes_data`).
+const RULES_CHANGED = "rules_changed";
 // A pattern longer than this is cut in the sentence a rule reads as; the whole of it is its tooltip and in the form.
 const PATTERN_CHARS = 40;
 // Sentences to start from: a click puts one in the box.
@@ -346,7 +349,7 @@ export function mount(root, ctx) {
       if (rules === null) {
         holder.replaceChildren(errorPanel(error, () => attempt(retry)));
       } else {
-        console.warn("the rules could not be refreshed", error);
+        readFailed("The rules", error);
       }
     }
   }
@@ -409,8 +412,17 @@ export function mount(root, ctx) {
   if (asked !== null && asked.trim() !== "") {
     words.start(asked.trim());
   }
+  // A rule added, switched or deleted on another page is read again here, as are the rules once the stream is back.
+  const stopLifecycle = onLifecycle((event) => {
+    if (event.kind === RULES_CHANGED) {
+      reload();
+    }
+  });
+  const stopBack = onStreamBack(reload);
   attempt(reload);
   return () => {
     disposed = true;
+    stopLifecycle();
+    stopBack();
   };
 }

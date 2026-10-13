@@ -146,7 +146,8 @@ def proof_router(token: str) -> APIRouter:
     return router
 
 
-def system_router(ctx: ServerContext) -> APIRouter:
+def system_router(ctx: ServerContext, pages: str) -> APIRouter:
+    """The daemon's own routes; ``pages`` is what the pages it serves are (``dotagent.server.app.pages_build``)."""
     router: APIRouter = APIRouter(prefix="/api")
     config: AppConfig = ctx.runtime.config
 
@@ -173,6 +174,7 @@ def system_router(ctx: ServerContext) -> APIRouter:
         now: float = time.time()
         return StatusView(
             version=__version__,
+            pages=pages,
             pid=os.getpid(),
             started_at=ctx.started_at,
             uptime_s=now - ctx.started_at,
