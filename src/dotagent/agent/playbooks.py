@@ -52,9 +52,8 @@ from dotagent.evals import EVAL_SOURCE
 from dotagent.memory.ranking import Similar, Vector, most_similar
 from dotagent.skills.catalog import PLAYBOOK_SOURCE, playbook_root
 from dotagent.skills.parse import parse_skill
-from dotagent.skills.types import SKILL_FILE, Skill, SkillCatalog
+from dotagent.skills.types import SKILL_FILE, SKILL_TOOL, Skill, SkillCatalog
 from dotagent.store.models import EventRecord, RunRecord, RunStatus
-from dotagent.tools.skill import SKILL_TOOL
 
 if TYPE_CHECKING:
     # Only named: the runtime's tools import this module (find_help asks it for the skills a run is offered).

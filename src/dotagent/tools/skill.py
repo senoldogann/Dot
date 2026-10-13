@@ -1,4 +1,4 @@
-"""The ``skill`` tool: the instructions of an installed skill and the files that come with it."""
+"""The ``skill`` tool: the instructions of a skill the run is offered and the files that come with it."""
 
 import asyncio
 import secrets
@@ -7,13 +7,14 @@ from pathlib import Path
 
 from pydantic import Field
 
+from dotagent.agent.playbooks import offered_to_run
+from dotagent.config import AppConfig
 from dotagent.policy.types import ActionInfo
 from dotagent.skills.catalog import load_skills, playbook_root
-from dotagent.skills.types import SKILL_FILE, Skill, SkillCatalog
+from dotagent.skills.types import SKILL_FILE, SKILL_TOOL, Skill, SkillCatalog
 from dotagent.tools.base import ALL_MODES, RegisteredTool, ToolArgs, ToolResult, fail, make_tool, ok
 from dotagent.tools.context import ToolContext
 
-SKILL_TOOL: str = "skill"
 _NONCE_BYTES: int = 8
 _MAX_LISTED_FILES: int = 200
 _SKIPPED: frozenset[str] = frozenset({"node_modules", "__pycache__"})
@@ -66,13 +67,17 @@ def build_skill_tool() -> RegisteredTool:
         )
 
     async def run(args: SkillArgs, ctx: ToolContext) -> ToolResult:
+        # Only a skill the run is offered, as its instructions and find_help list them: the learned skills of other
+        # agents are neither read nor named (item 94).
+        config: AppConfig = ctx.runtime.config
         catalog: SkillCatalog = await asyncio.to_thread(
-            load_skills, ctx.runtime.config.skills, ctx.runtime.plugins.plugins, playbook_root(ctx.runtime.config)
+            load_skills, config.skills, ctx.runtime.plugins.plugins, playbook_root(config)
         )
-        skill: Skill | None = catalog.find(args.name)
+        offered: tuple[Skill, ...] = await offered_to_run(config, catalog, ctx.run_id, ctx.agent_id)
+        skill: Skill | None = next((entry for entry in offered if entry.name == args.name), None)
         if skill is None:
-            names: str = ", ".join(entry.name for entry in catalog.skills) or "none"
-            return fail(f"No skill is called {args.name}. Installed skills: {names}.")
+            names: str = ", ".join(entry.name for entry in offered) or "none"
+            return fail(f"No skill offered to this run is called {args.name}. The skills it is offered: {names}.")
         files: list[str] = await asyncio.to_thread(files_of_skill, skill.root)
         return ok(render_skill(skill, files, secrets.token_hex(_NONCE_BYTES)))
 

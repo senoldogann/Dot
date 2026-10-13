@@ -39,9 +39,9 @@ from dotagent.evals.types import (
     TaskCategory,
 )
 from dotagent.mcp.naming import exposed_name
+from dotagent.skills.types import SKILL_TOOL
 from dotagent.store.models import RunMode
 from dotagent.tools.meta import FINISH_TOOL, MARK_PLAN_STEP_TOOL, UPDATE_PLAN_TOOL
-from dotagent.tools.skill import SKILL_TOOL
 
 # What every task is allowed to use before the run is cut: wall-clock time and tokens (input and output of every step).
 TIME_LIMIT_S: float = 300.0

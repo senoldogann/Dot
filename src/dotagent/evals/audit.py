@@ -9,8 +9,8 @@ from dotagent.core.errors import EvalError
 from dotagent.evals.checks import workspace_path
 from dotagent.evals.types import AnswerMatches, Check, EvalTask, ScriptedCall
 from dotagent.mcp.naming import PREFIX
+from dotagent.skills.types import SKILL_TOOL
 from dotagent.tools.meta import FINISH_TOOL
-from dotagent.tools.skill import SKILL_TOOL
 
 _ROOT: Path = Path("workspace")
 

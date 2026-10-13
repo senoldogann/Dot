@@ -37,11 +37,10 @@ from dotagent.mcp.naming import PREFIX
 from dotagent.plugins.types import Plugin
 from dotagent.policy.types import ActionInfo
 from dotagent.skills.catalog import load_skills, playbook_root
-from dotagent.skills.types import Skill, SkillCatalog
+from dotagent.skills.types import SKILL_TOOL, Skill, SkillCatalog
 from dotagent.tools.apple import APPLE_SCRIPT_TOOL
 from dotagent.tools.base import ALL_MODES, RegisteredTool, ToolArgs, ToolResult, make_tool, mark_untrusted, ok
 from dotagent.tools.context import ToolContext
-from dotagent.tools.skill import SKILL_TOOL
 
 FIND_HELP_TOOL: str = "find_help"
 # One answer lists this many items at most, the best first.
