@@ -5095,8 +5095,8 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 172 | A dotx command that dies does not leave its run at work                              | done        | bbb40bc |
 | 173 | Every smoke test passes alone, and the README keeps its width                        | done        | 5a8b875 |
 | 174 | Protected files stay out of web_extract, and a workspace file is read as one         | done        | 3f450ef |
-| 175 | One broken MCP server never keeps Dot from starting                                  | in progress |         |
-| 176 | Long skills and PDFs are read in pages, and osascript ends with its run              | planned     |         |
+| 175 | One broken MCP server never keeps Dot from starting                                  | done        | 637e979 |
+| 176 | Long skills and PDFs are read in pages, and osascript ends with its run              | in progress |         |
 | 177 | The configuration refuses at load what would fail a run                              | planned     |         |
 | 178 | The server answers every failure as JSON, and a page says it could not read again    | planned     |         |
 | 179 | A run's end is one write, and a chat a run works on is never deleted                 | planned     |         |
@@ -9042,7 +9042,7 @@ of the owner's own skills.
 
 ### 175. One broken MCP server never keeps Dot from starting
 
-**Status: in progress.**
+**Status: done.** Merged as `637e979` (PR #213; no Linear issue, the Linear connector was signed out).
 
 **As built (2026-10-13).** An MCP server is checked when it starts: each tool it offers, after `allow` and `deny`, has
 an input schema Dot can hand to a model (`tool_parameters`, which the registration of the tools uses too). A tool whose
@@ -9065,7 +9065,26 @@ rather than as a missing command; the README says that a server's own word that 
 
 ### 176. Long skills and PDFs are read in pages, and osascript ends with its run
 
-**Status: planned.**
+**Status: in progress.**
+
+**As built (2026-10-13).** The `skill` tool hands a skill's instructions over in parts when they are longer than one
+tool result: each part fits the result next to the first line, the fence and, in the first part only, the list of the
+skill's files (at most a quarter of the result, the rest counted), and a part that does not reach the end says where the
+next one starts (`skill(name=…, start=…)`). A part ends at a line or word break, as a window of `web_fetch` does
+(`text_window`, which the two share now), and holds at least 1,000 characters however little room the rest leaves; a
+start past the end is refused with the length of the instructions. Before, the whole of a long skill went into one
+result, and the cut every result gets took its middle. `read_file` pages the text of a PDF by its lines with `offset`
+and `limit`, as it pages a text file, each page ending with the line to go on from; before, it ignored both and cut the
+middle out of a long PDF. `osascript` is killed when its call is cancelled, by a stopped run or by the tool's own
+timeout, as a cancelled search is; before, a script that waited went on without its run. The browser's driver stops when
+Dot lets go of Chrome even if the close of Chrome fails with an error that is not Playwright's; before, the driver
+stayed running, and so did the Chrome it started, holding the profile. Tests: `tests/smoke/test_skills_runtime.py` reads
+a skill six times as long as a result in parts, each within the result, that join to the whole instructions, the files
+in the first part only (the code of before gave one result of 74,965 characters); `tests/unit/test_read_pdf.py` reads
+lines 21 to 30 of a PDF of 60 lines (the code of before began at line 1); `tests/unit/test_osascript_cancel.py` cancels
+a script that waits and finds no `osascript` left (the code of before left it running);
+`tests/smoke/test_browser_profile.py` makes the close of Dot's own Chrome fail and finds the profile free within seconds
+(the code of before left a Chrome holding it).
 
 **What.** The `skill` tool gives a long skill's instructions in parts with the place to go on from, and `read_file`
 pages a PDF's text as it pages a text file, instead of cutting out their middle; an `osascript` whose run is stopped or
@@ -9715,3 +9734,4 @@ not at the daemon's next start; a campaign whose start failed in any way is dele
 - 2026-10-13 (Opus 5.5): item 173 merged as `5a8b875` (PR #211; no Linear issue, the connector was signed out): the smoke tests of the MCP hub pass alone, each offline smoke test was run alone and passed, and the README's prose keeps within 120 columns. Part 28 is done.
 - 2026-10-13 (Opus 5.5): part 29, what the review found, is planned (items 174 to 180); item 174 is built: protected files stay out of `web_extract`, a file of the workspace is read as one, and the README names none of the owner's own skills.
 - 2026-10-13 (Opus 5.5): item 174 merged as `3f450ef` (PR #212; no Linear issue, the connector was signed out): `web_extract` refuses a file in a protected location as `read_file` does, a file of the workspace is read by its name even when the name looks like an address, and the README names none of the owner's own skills.
+- 2026-10-13 (Opus 5.5): item 175 merged as `637e979` (PR #213; no Linear issue, the connector was signed out): an MCP server whose tool has an input schema Dot cannot use is left out with the reason instead of keeping Dot from starting, `dotx mcp list` reports every failure of a server, and a missing working directory is named.

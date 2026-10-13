@@ -6,13 +6,15 @@ the two disagree about the key, because the automated Chrome then cannot read th
 """
 
 import asyncio
+import os
+import signal
 import socket
 import time
 from pathlib import Path
 
 import httpx
 import pytest
-from playwright.async_api import async_playwright
+from playwright.async_api import BrowserContext, async_playwright
 
 from dotagent.browser.chrome_import import ImportReport, has_stored_cookies, import_chrome_profile
 from dotagent.browser.keychain import KeychainMode, read_keychain_mode
@@ -153,3 +155,33 @@ async def test_a_launch_given_up_while_chrome_starts_leaves_the_profile_free(
             assert await session.stored_cookie_count() == 0
     finally:
         await session.aclose()
+
+
+async def test_a_close_of_chrome_that_fails_still_stops_the_driver_and_frees_the_profile(
+    profile: Path, headless_config: BrowserConfig, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Item 176: when closing Dot's own Chrome fails with an error that is not Playwright's, the error is raised and the
+    Playwright driver is stopped all the same, which ends the Chrome it started, so nothing is left holding the
+    profile."""
+    session: BrowserSession = BrowserSession(headless_config, SERVER, profile, tmp_path / "downloads")
+    try:
+        assert await session.stored_cookie_count() == 0
+        assert profile_holder_pid(profile) is not None
+        context: BrowserContext | None = session._context
+        assert context is not None
+
+        async def failing_close() -> None:
+            raise RuntimeError("closing Chrome failed")
+
+        monkeypatch.setattr(context, "close", failing_close)
+        with pytest.raises(RuntimeError, match="closing Chrome failed"):
+            await session.aclose()
+        deadline: float = time.monotonic() + _EXIT_TIMEOUT_S
+        while profile_holder_pid(profile) is not None:
+            assert time.monotonic() < deadline, "a Chrome still holds the profile after the driver was to stop"
+            await asyncio.sleep(_LOCK_POLL_S)
+    finally:
+        # A failing run must not leave the Chrome behind either.
+        holder: int | None = profile_holder_pid(profile)
+        if holder is not None:
+            os.kill(holder, signal.SIGKILL)

@@ -20,6 +20,7 @@ from dotagent.browser.session import RenderedDocument
 from dotagent.browser.snapshot import fence_untrusted
 from dotagent.config import AppConfig
 from dotagent.core.errors import BrowserError, ProviderError, ToolExecutionError, ToolInputError, WebError
+from dotagent.core.text import text_window
 from dotagent.core.types import JsonObject
 from dotagent.llm.router import ModelRef, parse_model_ref
 from dotagent.policy.elements import looks_like_key
@@ -59,7 +60,6 @@ _EXTRACT_TIMEOUT_S: float = 600.0
 _CRAWL_FOLDER: str = "crawl"
 _MAX_SOURCES: int = 20
 _MAX_FIELDS: int = 20
-_WINDOW_SLACK: float = 0.8  # a window ends at a line or word break found in its last fifth
 # A plain request turned away: the page is read in the browser instead when the run may read quietly (items 59, 98).
 _UNREADABLE_STATUS: frozenset[int] = REFUSED_STATUS
 # What the result says when the browser was refused too (item 98): the next rung, in one line.
@@ -94,20 +94,6 @@ def _action(tool: str, summary: str, target: str, flags: tuple[Flag, ...]) -> Ac
     return ActionInfo(
         tool=tool, kind="network", risk="low", summary=_clip(summary, _SUMMARY_CHARS), target=target, flags=flags
     )
-
-
-def window(text: str, start: int, budget: int) -> tuple[str, int]:
-    """The part of ``text`` that starts at ``start`` and fits ``budget`` characters, ended at a line or word break when
-    one is close; returns the part and the offset where the next part starts."""
-    limit: int = min(start + budget, len(text))
-    if limit < len(text):
-        floor: int = start + int(budget * _WINDOW_SLACK)
-        for separator in ("\n", " "):
-            found: int = text.rfind(separator, floor, limit)
-            if found != -1:
-                limit = found + 1
-                break
-    return text[start:limit], limit
 
 
 @dataclass(frozen=True)
@@ -163,7 +149,7 @@ def render_document(
     nonce: str,
 ) -> str:
     """A fetched document as the model reads it: a header line from Dot, the text in a fence, then what to do next."""
-    chunk, end = window(readable.text, start, budget)
+    chunk, end = text_window(readable.text, start, budget)
     total: int = len(readable.text)
     header: str = (
         f"Fetched {shown_url}: HTTP {document.status}, {document.media_type or 'unknown type'}, {total} characters"
