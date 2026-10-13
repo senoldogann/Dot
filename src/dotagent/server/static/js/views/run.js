@@ -22,7 +22,7 @@ import { emptyPanel, errorPanel, foldCard, loadingPanel } from "../panels.js";
 import { heldChoice } from "../runmodes.js";
 import { setStageTitle, setStageTools } from "../stage.js";
 import { createStageSize } from "../stagesize.js";
-import { onChange, onLifecycle, onStreamBack } from "../state.js";
+import { onChange, onLifecycle, onStreamBack, readFailed } from "../state.js";
 import { createTimeline } from "../timeline.js";
 import { attempt, confirmDialog, toast } from "../ui.js";
 
@@ -766,7 +766,7 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
       paintLessons(fresh.lessons);
       paintQuestions(fresh.questions);
     } catch (error) {
-      console.warn("the run could not be refreshed", error);
+      readFailed("The run", error);
     }
   }
 

@@ -220,3 +220,39 @@ async def test_a_stream_is_said_to_be_live_only_once_the_server_has_taken_it(pag
         _RETRIES_MS,
     )
     assert told == [["reconnecting", "reconnecting"], ["live"]]
+
+
+async def _answer_with_an_error(route: Route) -> None:
+    """The answer of a daemon that runs and fails on an error it did not expect."""
+    body: str = json.dumps(
+        {
+            "message": "Dot failed on an error it did not expect",
+            "context": {"error": "PermissionError: [Errno 13] Permission denied: 'themes'"},
+        }
+    )
+    await route.fulfill(status=500, content_type="application/json", body=body)
+
+
+async def test_a_daemon_that_answers_with_an_error_is_not_said_to_be_down(page: Page) -> None:
+    """Item 178: when a read of the sign-in fails with an answer of the daemon, the page says that the daemon runs and
+    shows the error; before, it asked to start the daemon that had answered."""
+    await page.route("**/api/status", _answer_with_an_error)
+    await page.reload()
+    signin = page.locator(".signin")
+    await expect(signin).to_contain_text("The daemon is running but could not answer")
+    await expect(signin).to_contain_text("PermissionError: [Errno 13] Permission denied")
+    await expect(signin).not_to_contain_text("Make sure the daemon is running")
+
+
+async def test_a_page_that_cannot_read_again_keeps_what_it_showed_and_says_so(runtime: Runtime, page: Page) -> None:
+    """Item 178: the home reads what is going on again at each event of a run; a read that fails keeps what it showed
+    and says so, as item 160 meant, where before it was written to the console only."""
+    now = page.locator(".home-now")
+    await expect(now).not_to_have_text("Looking around…")
+    shown: str = await now.inner_text()
+    await page.route("**/api/activity", _answer_with_an_error)
+    await runtime.bus.emit("run-178", "run_started", {}, False)
+    await expect(page.locator(".toast.error")).to_contain_text(
+        "could not be read again: Dot failed on an error it did not expect"
+    )
+    await expect(now).to_have_text(shown)

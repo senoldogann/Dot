@@ -1,6 +1,6 @@
 // What every page shares: the daemon status, the approvals that wait for an answer, and the live event stream.
 
-import { api, eventNotShown, follow } from "./api.js";
+import { api, eventNotShown, follow, tellOutOfDate } from "./api.js";
 import { debounce } from "./dom.js";
 
 const REFRESH_EVERY_MS = 15000;
@@ -75,6 +75,31 @@ export function forgetModels() {
   modelsPending = null;
 }
 
+/**
+ * Every page that follows the stream reads again what it shows, each even when one before it fails to; a read that
+ * fails, at once or later, is told like an event the page could not show (item 160).
+ */
+function readAgain(event) {
+  for (const listener of backListeners) {
+    Promise.resolve()
+      .then(listener)
+      .catch((error) => eventNotShown("/stream", { id: 0, event }, error));
+  }
+}
+
+/**
+ * Tell that a page could not read again what it shows, after an event of the stream or once the stream is back: logged,
+ * and told in a toast while the stream is live (item 160). While the stream is down the page says so already, and it
+ * reads again once the stream is back. The page keeps what it showed.
+ */
+export function readFailed(what, error) {
+  console.warn(`${what} could not be read again`, error);
+  if (snapshot.stream === "live") {
+    const why = error instanceof Error ? error.message : String(error);
+    tellOutOfDate(`${what} could not be read again: ${why}. Reload the page to see it.`);
+  }
+}
+
 /** Follow the lifecycle stream of the daemon until `signal` aborts; also refreshes on a timer as a safety net. */
 export async function runLifecycle(signal, onAuthRejected) {
   const timer = setInterval(() => {
@@ -100,17 +125,16 @@ export async function runLifecycle(signal, onAuthRejected) {
           refreshSoon();
         }
         if (back) {
-          // Each listener reads again even when one before it fails to.
-          for (const listener of backListeners) {
-            try {
-              listener();
-            } catch (error) {
-              eventNotShown("/stream", { id: 0, event: "reconnected" }, error);
-            }
-          }
+          readAgain("reconnected");
         }
       },
       onMessage: (message) => {
+        if (message.event === "resync") {
+          // The stream fell behind and lost events: what every page shows is read again, as after a break.
+          readAgain("resync");
+          refreshSoon();
+          return;
+        }
         // Each listener gets the event even when one before it fails to show it.
         for (const listener of lifecycleListeners) {
           try {

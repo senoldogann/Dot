@@ -10,7 +10,7 @@ import { dotName, overallState } from "./face.js";
 import { icon } from "./icons.js";
 import { nestRows } from "./nesting.js";
 import { readFolds, readPref, writePref } from "./prefs.js";
-import { getSnapshot, onChange, onLifecycle, onStreamBack } from "./state.js";
+import { getSnapshot, onChange, onLifecycle, onStreamBack, readFailed } from "./state.js";
 
 const OWNER_KEY = "dot.owner";
 export const OWNER_CHARS = 40;
@@ -197,9 +197,11 @@ export function buildPresence() {
       if (disposed) {
         return;
       }
-      console.warn("the activity of the home could not be loaded", error);
       if (activity === null) {
+        console.warn("the activity of the home could not be loaded", error);
         now.textContent = "I could not read what is going on.";
+      } else {
+        readFailed("What is going on", error);
       }
     }
   }
