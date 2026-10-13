@@ -2,7 +2,7 @@
 
 import pytest
 
-from dotagent.agent.compact import split_for_summary
+from dotagent.agent.compact import estimate_tokens, split_for_summary
 from dotagent.agent.continuity import (
     CONTINUITY_MARK,
     check_continuity,
@@ -149,17 +149,20 @@ def _exchange(*paths: str) -> list[Message]:
 
 def test_a_compaction_keeps_the_newest_messages_that_fit_and_never_less_than_the_newest_exchange() -> None:
     history: list[Message] = [user_message(GOAL, ()), *_exchange("a"), *_exchange("b"), *_exchange("c")]
-    assert split_for_summary(history, 8, 10_000) == ([], history)
+    assert split_for_summary(history, 10_000) == ([], history)
     # Too large for the room left: the oldest exchanges are summarised.
-    assert split_for_summary(history, 8, 2500) == (history[:3], history[3:])
+    assert split_for_summary(history, 2500) == (history[:3], history[3:])
     # Not even the newest exchange fits: it is kept all the same.
-    assert split_for_summary(history, 8, 0) == (history[:5], history[5:])
+    assert split_for_summary(history, 0) == (history[:5], history[5:])
     parallel: list[Message] = [*history, *_exchange("d", "e")]
-    assert split_for_summary(parallel, 8, 0) == (parallel[:7], parallel[7:])
-    # The cut never falls inside a tool exchange: three messages to keep become four.
-    assert split_for_summary(history, 3, 10_000) == (history[:3], history[3:])
+    assert split_for_summary(parallel, 0) == (parallel[:7], parallel[7:])
+    # The cut never falls inside a tool exchange: room for a result but not for its call keeps neither.
+    assert split_for_summary(history, estimate_tokens(history[4:], ())) == (history[:5], history[5:])
+    # Item 155: the room decides, not a number of messages: twenty exchanges that fit are all kept.
+    long: list[Message] = [user_message(GOAL, ()), *(message for name in range(20) for message in _exchange(f"{name}"))]
+    assert split_for_summary(long, estimate_tokens(long[1:], ())) == (long[:1], long[1:])
     # Without a reply of the model there is nothing to summarise.
-    assert split_for_summary(history[:1], 8, 0) == ([], history[:1])
+    assert split_for_summary(history[:1], 0) == ([], history[:1])
 
 
 def test_a_reminder_repeats_the_task_the_plan_and_only_the_newest_actions() -> None:

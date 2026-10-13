@@ -204,7 +204,6 @@ _NOT_FOR_DELEGATED_RUNS: frozenset[str] = frozenset(
     {DELEGATE_TOOL, ASK_USER_TOOL, CONSULT_TOOL, MESSAGE_AGENT_TOOL, CREATE_AGENT_TOOL}
 )
 
-_SUMMARY_KEEP_TAIL: int = 8
 _SUMMARY_ATTEMPTS: int = 3
 _QUERY_EARLIER_RUNS: int = 3
 _SUMMARY_TRANSCRIPT_CHARS: int = 120_000
@@ -546,7 +545,7 @@ async def _fit_context(
         tail_tokens: int = round(
             summarise_at / ratio * (1 - _COMPACTION_ROOM) - 2 * _SUMMARY_SHARE * plain
         ) - estimate_tokens([system], specs)
-        head, tail = split_for_summary(current, _SUMMARY_KEEP_TAIL, tail_tokens)
+        head, tail = split_for_summary(current, tail_tokens)
         if head:
             ledger = with_compaction(ledger)
             part_chars: int = round(plain * _SUMMARY_SHARE * CHARS_PER_TOKEN)
