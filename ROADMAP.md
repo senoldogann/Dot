@@ -5083,8 +5083,8 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 160 | Pages catch up after a break                                                         | done        | 4ff0b40 |
 | 161 | A chat's queue goes on after a clean restart                                         | done        | 2ff66d6 |
 | 162 | A run whose terminal closed can be resumed                                           | done        | 3e33fdd |
-| 163 | A run finds the help this Mac offers before it takes the hard way                    | in progress |         |
-| 164 | The skills and MCP servers of the Mac's other agents are found                       | planned     |         |
+| 163 | A run finds the help this Mac offers before it takes the hard way                    | done        | 4eb3a6c |
+| 164 | The skills and MCP servers of the Mac's other agents are found                       | in progress |         |
 | 165 | Help found elsewhere is added only with the owner's yes                              | planned     |         |
 | 166 | A run's instructions list the help that fits its goal                                | planned     |         |
 | 167 | Evals show whether a run takes the easy way                                          | planned     |         |
@@ -8621,7 +8621,7 @@ installed or configured without the owner.
 
 ### 163. A run finds the help this Mac offers before it takes the hard way
 
-**Status: in progress.**
+**Status: done.** Merged as `4eb3a6c` (PR #200; no Linear issue, the Linear connector was signed out).
 
 **As built (2026-10-13).** A new tool, `find_help`, in the core group and in every mode. Given a need in a few plain
 words, it searches the skills the run is offered (the learned skills of other agents left out, as in the instructions),
@@ -8652,11 +8652,42 @@ instructions tell it to ask before it takes a hard way.
 
 ### 164. The skills and MCP servers of the Mac's other agents are found
 
-**Status: planned.**
+**Status: in progress.**
 
-**What.** The skills and MCP servers that the Mac's other agents have set up (the skills and plugins of Claude Code, the
-MCP servers of Claude Desktop, Claude Code and Cursor) are found and shown, read-only: their names, descriptions and
-commands, never a secret (an env value, a header, a token).
+**As built (2026-10-13).** A new module, `dotagent.help.elsewhere`, reads the files of the Mac's other agents without
+changing anything: the skills of Claude Code (`~/.claude/skills`), of the plugins installed in Claude Code (from
+`~/.claude/plugins/installed_plugins.json`, the `skills/` and `.mcp.json` of each one's `installPath`) and of Codex
+(`~/.codex/skills`), and the MCP servers of Claude Code (those for every project, in `~/.claude.json`), Claude Desktop,
+Cursor, VS Code (`Code/User/mcp.json`, under `servers`) and Codex (`mcp_servers` in `~/.codex/config.toml`). Only what
+names a thing is kept: a skill's name, description and folder; a server's name, its transport and what it reaches, the
+base name of the program it starts (the whole command's when it is the path of a file, else its first word's, without a
+variable such as VS Code's `${env:HOME}`) or the host of its URL, each only when it is a plain name. A server's
+arguments, environment and headers, and the rest of its URL, are never kept, logged or told, not even in the reason it
+is left out: a command that starts with a URL or with a variable set before the program, either of which can hold a key,
+leaves the server out with why, and an entry that cannot be read is told by the keys at fault. A skill is marked as used
+when Dot reads its folder, a server when Dot has one under the name it would give it (a plugin's as `<plugin>-<server>`,
+by Dot's own rule). A file that cannot be read (not UTF-8, not of its language, an integer of too many digits, brackets
+nested too deep), a skill whose `SKILL.md` Dot cannot use and a server that names no command or URL to use are listed
+apart with why, and the rest is still found. A `SKILL.md` whose frontmatter is nested too deep for the YAML reader is
+now told as such, for Dot's own skills too, where it used to escape as a RecursionError. `dotx skills list` shows them
+after Dot's own, with `?` for any character a terminal would act on; `GET /api/skills/elsewhere` returns them; and the
+Skills page of Settings has a section, Found on this Mac, read apart from the learned skills so that a failure there
+leaves them on the page: the skills folded by agent, then the MCP servers with their agent and what they reach, then
+what was left out. Runs do not see them; item 165 adds one with the owner's yes. Tests: a home made in a temporary
+folder with every source, and keys and tokens written in arguments, environments, headers and the user and query of a
+URL, gives the skills and servers expected, with the ones Dot uses, and none of the keys anywhere in the result; files
+that are not JSON, nested too deep or hold an integer of too many digits, skills without frontmatter or nested too deep,
+and servers whose arguments hold a number, whose URL leaves an IPv6 address open or whose command starts with a URL or a
+variable are left out with why while the rest is found, and none of their keys comes out. On the versions before a
+review, the open address and the deep nesting failed the whole reading and the command forms gave a piece of a key as
+the program's name; the tests fail on them. Through the API of a real in-process server whose HOME is a folder made
+there, `GET /api/skills/elsewhere` lists a Claude Code skill that Dot reads and a Claude Desktop server, never the key
+in its environment; this failed on the code of before, where the route did not exist. On this Mac the reading takes
+about a tenth of a second.
+
+**What.** The skills and MCP servers that the Mac's other agents have set up (Claude Code and its plugins, Codex, Claude
+Desktop, Cursor, VS Code) are found and shown, read-only: their names, descriptions and what they reach, never a secret
+(an argument, an env value, a header, a token).
 
 ### 165. Help found elsewhere is added only with the owner's yes
 
@@ -9276,3 +9307,4 @@ makes short, scored by the steps and the channel the run took.
 - 2026-10-13 (Opus 5.5): item 160 merged as `4ff0b40` (PR #197; no Linear issue, the connector was signed out): every page that follows the stream of the lifecycle reads again what it shows once the stream is back after a break, and a run's page reads its run again.
 - 2026-10-13 (Opus 5.5): item 161 merged as `2ff66d6` (PR #198; no Linear issue, the connector was signed out): a start of the daemon no longer holds the queue of a chat whose run a shutdown of the daemon cut off, so the queue goes on once that run, resumed, ends done; a crash still holds it.
 - 2026-10-13 (Opus 5.5): item 162 merged as `3e33fdd` (PR #199; no Linear issue, the connector was signed out): a run of `dotx run` whose terminal was closed, or that got SIGTERM, is cut off rather than stopped and can be resumed by hand; Ctrl-C stays the owner's stop. Part 26 is done; part 27, find help before the hard way, is planned.
+- 2026-10-13 (Opus 5.5): item 163 merged as `4eb3a6c` (PR #200; no Linear issue, the connector was signed out): a run can call `find_help` with its need in a few plain words and is told what fits among the skills it is offered, the tools of its MCP servers and the applications that AppleScript can drive, with how to use each; its instructions tell it to call it before it takes a hard way.

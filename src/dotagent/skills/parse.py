@@ -29,6 +29,8 @@ def parse_frontmatter(path: Path, yaml_text: str) -> SkillFrontmatter:
         raise SkillError(
             "the frontmatter of SKILL.md is not valid YAML", {"path": str(path), "error": str(exc)}
         ) from exc
+    except RecursionError as exc:
+        raise SkillError("the frontmatter of SKILL.md is nested too deeply to read", {"path": str(path)}) from exc
     if not isinstance(loaded, dict):
         raise SkillError(
             "the frontmatter of SKILL.md is not a mapping of keys to values",
