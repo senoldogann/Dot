@@ -5087,7 +5087,7 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 164 | The skills and MCP servers of the Mac's other agents are found                       | done        | 490749a |
 | 165 | Help found elsewhere is added only with the owner's yes                              | done        | 52a7c02 |
 | 166 | A run's instructions list the help that fits its goal                                | done        | c3a6b83 |
-| 167 | Evals show whether a run takes the easy way                                          | in progress |         |
+| 167 | Evals show whether a run takes the easy way                                          | done        | 3dc670c |
 
 ### 77. The type system: Inter and Geist Mono, seven sizes, three weights
 
@@ -8766,7 +8766,7 @@ instead of every one; the rest stay a `find_help` call away.
 
 ### 167. Evals show whether a run takes the easy way
 
-**Status: in progress.**
+**Status: done.** Merged as `3dc670c` (PR #204; no Linear issue, the Linear connector was signed out).
 
 **As built (2026-10-13).** A task of the catalog can bring help: skills, written into the skills folder of the attempt's
 throw-away home, and MCP servers, added to its run's configuration (the owner's own stay switched off). Its `easy_way`
@@ -9397,3 +9397,4 @@ makes short, scored by the steps and the channel the run took.
 - 2026-10-13 (Opus 5.5): item 164 merged as `490749a` (PR #201; no Linear issue, the connector was signed out): the skills and MCP servers that the Mac's other agents set up are found and shown, read-only and never with a key, in `dotx skills list`, `GET /api/skills/elsewhere` and Settings › Skills.
 - 2026-10-13 (Opus 5.5): item 165 merged as `52a7c02` (PR #202; no Linear issue, the connector was signed out): a skill or an MCP server that another agent of the Mac set up is added to Dot only with the owner's yes, in Settings › Skills: a skill as a copy in Dot's skills folder, a server as a line of Dot's record with a fingerprint of its entry, started while that entry is unchanged; find_help tells a run of what can be added, for the run to ask the owner.
 - 2026-10-13 (Opus 5.5): item 166 merged as `c3a6b83` (PR #203; no Linear issue, the connector was signed out): a run's instructions list at most `[skills] listed` skills (20), those that fit its goal best when it is offered more, with a line on the rest that points to find_help; a big tool group's line names the tools that fit the goal first.
+- 2026-10-13 (Opus 5.5): item 167 merged as `3dc670c` (PR #204; no Linear issue, the connector was signed out): an eval task can bring skills and MCP servers and name the easy way they offer; three help tasks, the score's count of the easy ways taken and what a pass costs with and without, and `dotx eval check` reports a reference that does not take its easy way. Part 27 is done.
