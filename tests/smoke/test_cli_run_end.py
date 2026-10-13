@@ -1,9 +1,10 @@
 """A ``dotx run`` that is told to end, by the closing of its terminal (SIGHUP) or by SIGTERM, cuts its run off first:
 the store records the run's end, so the daemon does not take it for a run that still works on its thread and refuse
 the answers to its questions, and the run can be resumed by hand, as a run that a stop of the daemon cut off can (item
-162). Ctrl-C is the owner's stop: the run ends stopped, and is never resumed; a second Ctrl-C, which quits at once,
-still leaves that stop recorded, as the store closes last. A ``dotx run`` that dies (SIGKILL) records nothing: the
-daemon closes its run while it runs, as cut off by the command's death, and the run can be resumed by hand (item 172).
+162). Ctrl-C is the owner's stop: the run ends stopped, and is never resumed; a second Ctrl-C quits as soon as the
+stop the first one asked for is recorded (five seconds at most). A ``dotx run`` that dies (SIGKILL) records nothing:
+the daemon closes its run while it runs, as cut off by the command's death, and the run can be resumed by hand (item
+172).
 
 No network and no model service is used: the scripted model plays the run, in a child process that goes through
 ``follow_run`` as ``dotx run`` does, and the signal is real; the run is resumed in the test's own process.
