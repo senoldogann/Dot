@@ -5080,8 +5080,8 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 157 | The changed notes a running run is handed, and their dates and authors               | done        | 3593f6a |
 | 158 | A model out of reach does not fail a run                                             | done        | 852ccc5 |
 | 159 | A stop of the daemon is never a crash                                                | done        | 30a4480 |
-| 160 | Pages catch up after a break                                                         | in progress |         |
-| 161 | A chat's queue goes on after a clean restart                                         | planned     |         |
+| 160 | Pages catch up after a break                                                         | done        | 4ff0b40 |
+| 161 | A chat's queue goes on after a clean restart                                         | in progress |         |
 | 162 | A run whose terminal closed can be resumed                                           | planned     |         |
 
 ### 77. The type system: Inter and Geist Mono, seven sizes, three weights
@@ -8513,7 +8513,7 @@ results of the calls that had ended, so that the run, resumed, does not make the
 
 ### 160. Pages catch up after a break
 
-**Status: in progress.**
+**Status: done.** Merged as `4ff0b40` (PR #197; no Linear issue, the Linear connector was signed out).
 
 **As built (2026-10-13).** Read again in the code first: every page that follows the stream of the lifecycle
 (`/api/stream`) read what it shows again only when one of its events came, and the stream replays nothing after a break,
@@ -8535,10 +8535,27 @@ run again, its lessons and its questions among it, not only its events.
 
 ### 161. A chat's queue goes on after a clean restart
 
-**Status: planned.**
+**Status: in progress.**
 
-**What.** A queue held only because the daemon stopped goes on when the daemon starts again: a stop of the daemon is not
-the owner's stop of the chat. A crash still holds the queues.
+**As built (2026-10-13).** Read again in the code first: a run that the daemon's stop cuts off leaves its chat's queue
+as it is (the queue is not followed while the daemon stops), but every start of the daemon held every queue
+(`hold_every_queue` in `RunManager.recover`), so after a restart or a log-out the owner had to resume the queue as well
+as the run: Continue went on with the run, and once the new run had ended done the queue still waited for Resume.
+`recover` now holds a chat's queue only when the chat's newest run was not cut off by a shutdown of the daemon: a crash
+or a restart that did not wait for the run (the start closes the run as cut off), a failure, the owner's stop, a run
+that a process that lives drives, and a run that ended done as the daemon stopped, before its next message could start,
+hold it as before. A queue whose run a shutdown cut off waits for that run: once it is resumed (Continue, `dotx resume`,
+or on its own with `resume = "safe"`) and the new run ends done, the next message starts. Found on the way, and left as
+it was: the API takes a queue on the thread of a delegated run, whose end does not move it on, and deleting the chat of
+the run that delegated leaves that queue behind with its hold; a queue whose chat has no run left is held at the start,
+as before. Tests: `tests/smoke/test_queue.py` cuts off, by the daemon's way out, a run at work whose chat holds a queued
+message, starts the daemon again on the same home, and continues the run: the queue is not held, and once the new run
+ends done the message starts as the chat's next run (this failed on the code of before, where the start held the queue);
+and a run that a process that is gone left active holds its chat's queue at the start.
+
+**What.** The queue of a chat whose run a shutdown of the daemon cut off is not held when the daemon starts again, so it
+goes on once that run, resumed, ends done: a stop of the daemon is not the owner's stop of the chat. A crash still holds
+the queues.
 
 ### 162. A run whose terminal closed can be resumed
 
@@ -9141,3 +9158,4 @@ by a stop of the daemon can.
 - 2026-10-13 (Opus 5.5): item 157 merged as `3593f6a` (PR #194; no Linear issue, the connector was signed out): a running run is handed only the changed notes it would be handed at its start, within their budget; a change of tags leaves a note's date; a note a run rewrites becomes the run's.
 - 2026-10-13 (Opus 5.5): item 158 merged as `852ccc5` (PR #195; no Linear issue, the connector was signed out): a run whose model cannot be reached waits for it and asks the same step again, for `model_wait_s` (900 s by default), instead of failing; part 26, continue where it left off, is planned.
 - 2026-10-13 (Opus 5.5): item 159 merged as `30a4480` (PR #196; no Linear issue, the connector was signed out): a stop of the daemon no longer waits for a reflection under way, and a step it cuts keeps the results of the calls that had ended.
+- 2026-10-13 (Opus 5.5): item 160 merged as `4ff0b40` (PR #197; no Linear issue, the connector was signed out): every page that follows the stream of the lifecycle reads again what it shows once the stream is back after a break, and a run's page reads its run again.
