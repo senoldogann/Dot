@@ -49,6 +49,7 @@ async def test_deleting_a_thread_removes_its_screenshots_but_keeps_shared_ones(t
             first.id, "goal", "task", "ollama:x", None, "test", "medium", "ask", False, None, None, None
         )
         await store.add_event(run.id, "tool_result", {"images": await store.save_images([from_event])})
+        await store.finish_run(run.id, "done", "Done.")
         assert _names(images) == {image_file_name(image) for image in (own, shared, from_event)}
         _age(images, 7200)
         assert await store.delete_threads([first.id]) == [first.id]

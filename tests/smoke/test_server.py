@@ -1136,6 +1136,15 @@ async def test_deleting_chats_takes_their_runs_delegations_events_and_approvals_
     for thread_id in (child.thread_id, grandchild.thread_id):
         await runtime.store.add_queued(thread_id, "next", [], "task", None, None, None, None, None, "test")
         await runtime.store.hold_queue(thread_id)
+    # Runs this daemon does not drive, as a dotx command's, keep their chat while they work (item 179).
+    refused: httpx.Response = await client.request("DELETE", "/api/threads", json={"ids": [doomed.id]})
+    assert refused.status_code == 409, refused.text
+    assert refused.json()["context"] == {
+        "thread_ids": [doomed.id],
+        "run_ids": sorted([top.id, child.id, grandchild.id]),
+    }
+    for over in (top, child, grandchild):
+        await runtime.store.finish_run(over.id, "done", "Done.")
 
     answer: httpx.Response = await client.request(
         "DELETE", "/api/threads", json={"ids": [doomed.id, "thr_nothing", doomed.id]}

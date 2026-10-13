@@ -22,7 +22,7 @@ from typing import Concatenate, Literal
 
 import aiosqlite
 
-from dotagent.core.errors import InvalidValueError, NotFoundError, StoreError
+from dotagent.core.errors import InvalidValueError, NotFoundError, RunConflict, StoreError
 from dotagent.core.ids import new_id
 from dotagent.core.jsonutil import dumps_compact, parse_json_object, parse_json_value
 from dotagent.core.logs import get_logger
@@ -816,7 +816,9 @@ class Store:
         those delegated to (recursively) with the events and approvals of all of them, and the threads of the delegated
         runs, with their messages and any queue, unless a run of their own remains there. Returns the ids that named a
         thread, in the order given; the others are skipped. A schedule keeps the id of the thread it last fired into and
-        makes a new one per firing, so it is left alone."""
+        makes a new one per firing, so it is left alone. Nothing is deleted while a run of any process works on one of
+        the chats, itself or through a run it delegated to: ``RunConflict`` names the chats and the runs. The check is
+        made in the transaction of the deletes, which holds the write lock from its start."""
         named: tuple[str, ...] = tuple(thread_ids)
         marks: str = ",".join("?" * len(named))
         doomed: str = (
@@ -824,6 +826,8 @@ class Store:
             f" SELECT id FROM runs WHERE thread_id IN ({marks})"
             " UNION SELECT runs.id FROM runs JOIN doomed ON runs.parent_run_id = doomed.id)"
         )
+        await self._db.execute("BEGIN IMMEDIATE")
+        await self._refuse_working_chats(named)
         found: list[aiosqlite.Row] = await self._all(f"SELECT id FROM threads WHERE id IN ({marks})", named)
         existing: set[str] = {str(row["id"]) for row in found}
         hosts: list[aiosqlite.Row] = await self._all(
@@ -862,6 +866,23 @@ class Store:
         await self._release_images(candidates)
         await self._return_free_pages()
         return [thread_id for thread_id in named if thread_id in existing]
+
+    async def _refuse_working_chats(self, named: tuple[str, ...]) -> None:
+        """Raise ``RunConflict`` when a run of any process works on one of the chats ``named``, itself or through a run
+        it delegated to; the chats it names are those given."""
+        working: tuple[RunStatus, ...] = tuple(sorted(WORKING_STATUSES))
+        rows: list[aiosqlite.Row] = await self._all(
+            "WITH RECURSIVE doomed(id, chat) AS ("
+            f" SELECT id, thread_id FROM runs WHERE thread_id IN ({','.join('?' * len(named))})"
+            " UNION SELECT runs.id, doomed.chat FROM runs JOIN doomed ON runs.parent_run_id = doomed.id)"
+            " SELECT doomed.chat AS chat, runs.id AS run FROM runs JOIN doomed ON runs.id = doomed.id"
+            f" WHERE runs.status IN ({','.join('?' * len(working))}) ORDER BY chat, run",
+            (*named, *working),
+        )
+        if rows:
+            chats: JsonArray = list(dict.fromkeys(str(row["chat"]) for row in rows))
+            runs: JsonArray = list(dict.fromkeys(str(row["run"]) for row in rows))
+            raise RunConflict("chats with a run under way cannot be deleted", {"thread_ids": chats, "run_ids": runs})
 
     async def _screenshots_of(self, doomed: str, named: tuple[str, ...], delegated: tuple[str, ...]) -> set[str]:
         """The screenshot files named by what ``delete_threads`` is about to delete: the events of the doomed runs and
@@ -947,16 +968,17 @@ class Store:
         return [encode_message(message, self._image_dir) for message in messages]
 
     @_writing
-    async def _unit(self, statements: Callable[[], Awaitable[None]]) -> None:
-        """Run ``statements`` as one transaction on the connection: all of it is stored or none of it. The write lock
-        is held throughout, so no other writer's statement or commit lands inside the unit."""
+    async def _unit[R](self, statements: Callable[[], Awaitable[R]]) -> R:
+        """Run ``statements`` as one transaction on the connection and return what they return: all of it is stored or
+        none of it. The write lock is held throughout, so no other writer's statement or commit lands inside the unit."""
         await self._db.execute("BEGIN IMMEDIATE")
         try:
-            await statements()
+            stored: R = await statements()
         except BaseException:
             await self._db.rollback()
             raise
         await self._db.commit()
+        return stored
 
     async def append_messages(self, thread_id: str, messages: Sequence[Message]) -> None:
         """Add ``messages`` after the thread's last one: all of them are stored or none, and concurrent appends to one
@@ -1113,11 +1135,27 @@ class Store:
 
     @_writing
     async def finish_run(self, run_id: str, status: RunStatus, result: str) -> None:
-        await self._db.execute(
-            "UPDATE runs SET status = ?, result = ?, finished_at = ? WHERE id = ?",
-            (status, result, time.time(), run_id),
-        )
+        await self._set_end(run_id, status, result, time.time())
         await self._db.commit()
+
+    async def end_run(self, run_id: str, status: RunStatus, result: str, data: JsonObject) -> EventRecord:
+        """Store how run ``run_id`` ended: its status and result, the scores of the notes it was handed
+        (:meth:`close_memory_uses`) and its ``run_finished`` event with ``data``, which is returned. One transaction:
+        all of it is stored or none, so an end stored here never lacks the event that tells of it. The time of the end
+        is taken once the transaction holds the write lock, as :meth:`finish_run` takes it."""
+
+        async def statements() -> EventRecord:
+            now: float = time.time()
+            await self._set_end(run_id, status, result, now)
+            await self._score_memory_uses(run_id, status)
+            return await self._insert_event(run_id, now, "run_finished", data)
+
+        return await self._unit(statements)
+
+    async def _set_end(self, run_id: str, status: RunStatus, result: str, now: float) -> None:
+        await self._db.execute(
+            "UPDATE runs SET status = ?, result = ?, finished_at = ? WHERE id = ?", (status, result, now, run_id)
+        )
 
     async def get_run(self, run_id: str) -> RunRecord:
         row: aiosqlite.Row | None = await self._one("SELECT * FROM runs WHERE id = ?", (run_id,))
@@ -1217,12 +1255,15 @@ class Store:
 
     @_writing
     async def add_event(self, run_id: str, kind: str, data: JsonObject) -> EventRecord:
-        now: float = time.time()
+        record: EventRecord = await self._insert_event(run_id, time.time(), kind, data)
+        await self._db.commit()
+        return record
+
+    async def _insert_event(self, run_id: str, now: float, kind: str, data: JsonObject) -> EventRecord:
         cursor: aiosqlite.Cursor = await self._db.execute(
             "INSERT INTO events(run_id, ts, kind, data) VALUES(?, ?, ?, ?)",
             (run_id, now, kind, dumps_compact(data)),
         )
-        await self._db.commit()
         if cursor.lastrowid is None:
             raise StoreError("event insert returned no row id", {"run_id": run_id, "kind": kind})
         return EventRecord(id=cursor.lastrowid, run_id=run_id, ts=now, kind=kind, data=data)
@@ -1839,10 +1880,13 @@ class Store:
     @_writing
     async def close_memory_uses(self, run_id: str, status: RunStatus) -> None:
         """Score the notes run ``run_id`` was handed with how it ended."""
+        await self._score_memory_uses(run_id, status)
+        await self._db.commit()
+
+    async def _score_memory_uses(self, run_id: str, status: RunStatus) -> None:
         await self._db.execute(
             "UPDATE memory_uses SET status = ? WHERE run_id = ? AND status IS NULL", (status, run_id)
         )
-        await self._db.commit()
 
     async def memory_scores(self, memory_ids: Sequence[str], since: float) -> dict[str, MemoryScore]:
         """How the runs ended that were handed each of ``memory_ids`` since ``since`` (``0.0`` for ever); a note no
