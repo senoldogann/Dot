@@ -626,12 +626,17 @@ export function createTimeline({ rootRunId, actorId, startedAt, onGrow, onPlan, 
       note(scope, record.ts, "file", `Dot's answer named ${noun} that do not exist (${listed}) and was asked to correct it`, "warn");
     },
 
-    // The run goes on from where the daemon cut the run before it off ([agent] resume, or Continue): how that run was
-    // cut off, and how each call of the step it was in ended.
+    // The run goes on from where the run before it was cut off ([agent] resume, Continue or dotx resume): how that run
+    // was cut off, and how each call of the step it was in ended.
     resumed(scope, record) {
       const data = record.data;
       const who = data.automatic ? "Resumed on its own when the daemon started" : "Resumed by hand";
-      const how = data.cut_off === "daemon_shutdown" ? "the daemon was shut down" : "the daemon stopped";
+      const hows = {
+        daemon_restarted: "the daemon stopped while the run before this one worked",
+        daemon_shutdown: "the daemon was shut down while the run before this one worked",
+        process_ended: "the dotx command that drove the run before this one was told to end while it worked",
+      };
+      const how = hows[data.cut_off];
       const calls = data.calls.length === 0 ? "" : `. Its last step: ${data.calls.map(callEnd).join(", ")}`;
       place(
         scope,
@@ -639,7 +644,7 @@ export function createTimeline({ rootRunId, actorId, startedAt, onGrow, onPlan, 
           "div",
           { class: "note" },
           icon("refresh"),
-          el("span", null, `${who}: ${how} while the run before this one worked${calls}`),
+          el("span", null, `${who}: ${how}${calls}`),
           el("a", { class: "small", href: `#/runs/${data.from_run_id}` }, "Open that run"),
         ),
         record.ts,

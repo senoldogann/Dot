@@ -62,9 +62,10 @@ async def execute_run(
 async def follow_run(
     runtime: Runtime, manager: RunManager, ui: TerminalUi, launch: Callable[[], Awaitable[RunRecord]]
 ) -> RunRecord:
-    """Start a run with ``launch``, show its events live and return the finished record. Ctrl-C stops the run, and so
-    do a closed terminal (SIGHUP) and SIGTERM, so the run's end is recorded and the daemon does not take it for a run
-    that still works. The events are followed before the run starts, so none of them is missed."""
+    """Start a run with ``launch``, show its events live and return the finished record. Ctrl-C stops the run; a closed
+    terminal (SIGHUP) and SIGTERM cut it off (:meth:`RunManager.cut_off`), so that it can be resumed. Either way the
+    run's end is recorded and the daemon does not take it for a run that still works. The events are followed before the
+    run starts, so none of them is missed."""
     loop: asyncio.AbstractEventLoop = asyncio.get_running_loop()
     main_task: asyncio.Task[object] | None = asyncio.current_task()
     async with runtime.bus.subscribe(None) as subscription:
@@ -82,8 +83,7 @@ async def follow_run(
 
         def on_end() -> None:
             # Nothing is written: after SIGHUP the terminal is gone.
-            if run.id in manager.active_run_ids():
-                manager.cancel(run.id)
+            manager.cut_off(run.id)
 
         loop.add_signal_handler(signal.SIGINT, on_interrupt)
         loop.add_signal_handler(signal.SIGHUP, on_end)
@@ -201,7 +201,7 @@ async def cmd_run(command: RunCommand) -> int:
 
 
 async def cmd_resume(command: ResumeCommand) -> int:
-    """Resume a run that the daemon cut off in this process, like ``dotx run``: see ``RunManager.resume``."""
+    """Resume a run that was cut off in this process, like ``dotx run``: see ``RunManager.resume``."""
     runtime: Runtime = await build_runtime(load_user_config())
     try:
         _say_left_out_servers(runtime)

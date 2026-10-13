@@ -194,8 +194,8 @@ def runs_router(ctx: ServerContext) -> APIRouter:
 
     @router.post("/runs/{run_id}/resume", status_code=201)
     async def resume_run(run_id: str) -> RunRecord:
-        """Resume a run that the daemon cut off: a new run on its thread goes on from where it stopped (see
-        ``agent.resume``). Returns the new run."""
+        """Resume a run that was cut off (by the daemon, or by the end of its ``dotx`` command): a new run on its
+        thread goes on from where it stopped (see ``agent.resume``). Returns the new run."""
         return await ctx.manager.resume(run_id)
 
     @router.post("/runs/{run_id}/lessons/{index}/save")

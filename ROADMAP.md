@@ -5081,8 +5081,8 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 158 | A model out of reach does not fail a run                                             | done        | 852ccc5 |
 | 159 | A stop of the daemon is never a crash                                                | done        | 30a4480 |
 | 160 | Pages catch up after a break                                                         | done        | 4ff0b40 |
-| 161 | A chat's queue goes on after a clean restart                                         | in progress |         |
-| 162 | A run whose terminal closed can be resumed                                           | planned     |         |
+| 161 | A chat's queue goes on after a clean restart                                         | done        | 2ff66d6 |
+| 162 | A run whose terminal closed can be resumed                                           | in progress |         |
 
 ### 77. The type system: Inter and Geist Mono, seven sizes, three weights
 
@@ -8535,7 +8535,7 @@ run again, its lessons and its questions among it, not only its events.
 
 ### 161. A chat's queue goes on after a clean restart
 
-**Status: in progress.**
+**Status: done.** Merged as `2ff66d6` (PR #198; no Linear issue, the Linear connector was signed out).
 
 **As built (2026-10-13).** Read again in the code first: a run that the daemon's stop cuts off leaves its chat's queue
 as it is (the queue is not followed while the daemon stops), but every start of the daemon held every queue
@@ -8559,10 +8559,26 @@ the queues.
 
 ### 162. A run whose terminal closed can be resumed
 
-**Status: planned.**
+**Status: in progress.**
 
-**What.** A run of `dotx run` whose terminal is closed can be resumed, by `dotx resume` or from its page, as a run cut
-by a stop of the daemon can.
+**As built (2026-10-13).** Read again in the code first: `dotx run` (and `resume`, `chat`) ended its run on a closed
+terminal (SIGHUP) or SIGTERM as Ctrl-C does, as the owner's stop (`RESULT_STOPPED`), which is never resumed, while a
+`dotx run` killed outright left its run active for the daemon's next start to close as cut off, which can be resumed:
+the end that kept the run's record clean was the one that lost the run. A closed terminal and SIGTERM now cut the run
+off (`RunManager.cut_off`, kept like the runs of an emergency stop): it ends cancelled with a result and an ending of
+its own (`process_ended`), `cut_off_by` takes it for cut off, and it can be resumed by hand, by `dotx resume` or
+Continue on its page, the resumed run's note telling the model that the dotx command that drove it was told to end. The
+daemon never resumes it on its own: `resume = "safe"` takes only runs of the web UI. Ctrl-C stays the owner's stop. The
+texts that said that the daemon cut a run off now say what cut it off: the resumed run's note in the timeline and in the
+terminal, the chat's history (Resumed where the run above was cut off) and the line above the composer (This run was cut
+off while it worked; the run's answer says what cut it off). Tests: `tests/smoke/test_cli_run_end.py` sends a real
+SIGHUP, and a real SIGTERM, to a `dotx run` in a child process while its command works: the run ends cut off by the end
+of its command, and, resumed by hand in the test's own process, the new run ends done and its note says why the run
+before it ended; this failed on the code of before, where the run could not be resumed. Ctrl-C still ends the run
+stopped, and it cannot be resumed.
+
+**What.** A run of `dotx run` whose terminal is closed, or that gets SIGTERM, can be resumed, by `dotx resume` or from
+its page, as a run cut by a stop of the daemon can; Ctrl-C stays the owner's stop.
 
 ## Log
 
@@ -9159,3 +9175,4 @@ by a stop of the daemon can.
 - 2026-10-13 (Opus 5.5): item 158 merged as `852ccc5` (PR #195; no Linear issue, the connector was signed out): a run whose model cannot be reached waits for it and asks the same step again, for `model_wait_s` (900 s by default), instead of failing; part 26, continue where it left off, is planned.
 - 2026-10-13 (Opus 5.5): item 159 merged as `30a4480` (PR #196; no Linear issue, the connector was signed out): a stop of the daemon no longer waits for a reflection under way, and a step it cuts keeps the results of the calls that had ended.
 - 2026-10-13 (Opus 5.5): item 160 merged as `4ff0b40` (PR #197; no Linear issue, the connector was signed out): every page that follows the stream of the lifecycle reads again what it shows once the stream is back after a break, and a run's page reads its run again.
+- 2026-10-13 (Opus 5.5): item 161 merged as `2ff66d6` (PR #198; no Linear issue, the connector was signed out): a start of the daemon no longer holds the queue of a chat whose run a shutdown of the daemon cut off, so the queue goes on once that run, resumed, ends done; a crash still holds it.

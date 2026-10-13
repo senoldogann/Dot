@@ -142,7 +142,8 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
     agent !== null ? actorFace(agent.id, faceState(status), agent.look) : run.parent_run_id === null ? dotFace(faceState(status)) : actorFace(run.id, faceState(status), null);
   let model = run.model;
   let active = detail.active;
-  // The daemon cut the run off and a new run can go on from where it stopped.
+  // The run was cut off (by the daemon, or by the end of its dotx command) and a new run can go on from where it
+  // stopped.
   let resumable = detail.resumable;
   let finishedAt = run.finished_at;
   let following = active;
@@ -169,7 +170,7 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
     {
       class: "btn primary sm",
       type: "button",
-      title: "Start a run on this conversation that goes on from where the daemon cut this one off",
+      title: "Start a run on this conversation that goes on from where this one was cut off",
       onclick: () =>
         attempt(async () => {
           const next = await api.post(`/runs/${runId}/resume`, null);
@@ -180,12 +181,13 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
     icon("arrowRight"),
     el("span", { class: "label" }, "Continue"),
   );
-  // Continue, for a run the daemon cut off, is a line above the composer (item 120).
+  // Continue, for a run that was cut off, is a line above the composer (item 120); the run's answer says what cut
+  // it off.
   const resumeLine = el(
     "div",
     { class: "note resume-line", hidden: true },
     icon("alert"),
-    el("span", { class: "grow" }, "This run was cut off when the daemon stopped."),
+    el("span", { class: "grow" }, "This run was cut off while it worked."),
     resumeButton,
   );
   // A delegated run (item 82) names its parent in the bar as a breadcrumb, the parent's goal a link before its own, and
