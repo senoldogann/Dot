@@ -71,6 +71,7 @@ from dotagent.store.endings import (
     PREFIX_INTERNAL_ERROR,
     RESULT_COMMAND_DIED,
     RESULT_EMERGENCY_STOPPED,
+    RESULT_NOT_STARTED,
     RESULT_PROCESS_ENDED,
     RESULT_SHUTDOWN,
     RESULT_STOPPED,
@@ -100,7 +101,8 @@ log = get_logger(__name__)
 
 # The live event that tells the pages a chat's queue changed (item 148); it carries the chat's id.
 QUEUE_CHANGED_EVENT: str = "queue_changed"
-# How often the daemon looks for the runs of dotx commands that died (:meth:`RunManager.watch_commands`).
+# How often the daemon stores the ends the store refused and looks for the runs of dotx commands that died
+# (:meth:`RunManager.watch_commands`).
 COMMAND_CHECK_S: float = 30.0
 # Why a pending approval expired: its run was closed when the daemon started, or when its dotx command was found dead.
 _EXPIRED_ON_START: str = "daemon restarted"
@@ -125,6 +127,18 @@ class RunHandle:
     cancel: asyncio.Event
     inbox: asyncio.Queue[UserInput]
     finished: asyncio.Event
+
+
+@dataclass(frozen=True)
+class _LeftEnd:
+    """The end of a run that the store refused when the run ended, as it is to be stored: its status, its result, what
+    it needs from the owner, and the data of its ``run_finished`` event."""
+
+    run: RunRecord
+    status: RunStatus
+    result: str
+    needs: str
+    data: JsonObject
 
 
 def thread_title(goal: str) -> str:
@@ -198,6 +212,8 @@ class RunManager:
         self._answering: asyncio.Lock = asyncio.Lock()
         # Held while the next message of a chat's queue is started, so that each starts once (:meth:`_drain`).
         self._draining: asyncio.Lock = asyncio.Lock()
+        # The ends the store refused, by run id, until they are stored (:meth:`store_left_ends`).
+        self._left_ends: dict[str, _LeftEnd] = {}
 
     async def recover(self) -> int:
         """Close out what processes that are gone left behind: the runs they left active, the approvals of runs no
@@ -255,11 +271,18 @@ class RunManager:
         return len(told)
 
     async def watch_commands(self) -> None:
-        """Close the runs of dead ``dotx`` commands every ``COMMAND_CHECK_S`` (:meth:`close_runs_of_dead_commands`)
-        until cancelled; a check that fails, on the store or on the files of the owners, is logged and the next one goes
-        on."""
+        """Every ``COMMAND_CHECK_S`` until cancelled, store the ends the store refused (:meth:`store_left_ends`) and
+        close the runs of dead ``dotx`` commands (:meth:`close_runs_of_dead_commands`); a check that fails, on the store
+        or on the files of the owners, is logged and the next one goes on."""
         while True:
             await asyncio.sleep(COMMAND_CHECK_S)
+            try:
+                stored: int = await self.store_left_ends()
+            except DotError as exc:
+                log.warning("left_ends_not_stored", runs=len(self._left_ends), error=exc.message, context=exc.context)
+            else:
+                if stored:
+                    log.info("left_ends_stored", runs=stored)
             try:
                 closed: int = await self.close_runs_of_dead_commands()
             except DotError as exc:
@@ -270,6 +293,28 @@ class RunManager:
                 continue
             if closed:
                 log.info("runs_of_dead_commands_closed", runs=closed)
+
+    async def store_left_ends(self) -> int:
+        """Store the ends that the store refused when their runs ended (:meth:`_record_end`, :meth:`_end_unstarted`),
+        each as it was to be stored then, tell the pages, and move on what follows it: the chat's queue, a campaign's
+        next session. An end the store refuses again waits for the next try; the daemon's next start closes the runs
+        whose ends are still left (:meth:`recover`). Returns the number of ends stored."""
+        stored: int = 0
+        for left in list(self._left_ends.values()):
+            ended: EventRecord = await self._runtime.store.end_run(left.run.id, left.status, left.result, left.data)
+            del self._left_ends[left.run.id]
+            self._runtime.bus.publish(ended)
+            stored += 1
+            if left.run.campaign_id is not None and not self._stopping:
+                await self._follow_session(
+                    left.run, left.run.campaign_id, classify_ending(left.status, left.result), left.needs
+                )
+            if not self._stopping:
+                try:
+                    await self._follow_queue(left.run, left.status)
+                except Exception:
+                    log.exception("queue_not_followed", run_id=left.run.id, thread_id=left.run.thread_id)
+        return stored
 
     def active_run_ids(self) -> list[str]:
         return list(self._handles)
@@ -287,7 +332,10 @@ class RunManager:
         )
         if busy:
             named: list[JsonValue] = list(busy)
-            raise RunConflict("chats with a run under way cannot be deleted", {"thread_ids": named})
+            runs: list[JsonValue] = list(
+                sorted(handle.run_id for handle in self._handles.values() if handle.thread_id in wanted)
+            )
+            raise RunConflict("chats with a run under way cannot be deleted", {"thread_ids": named, "run_ids": runs})
         self._claimed.update(wanted)
         try:
             yield
@@ -445,10 +493,15 @@ class RunManager:
         return run
 
     async def _forget_campaign(self, campaign_id: str, made_thread_id: str | None) -> None:
-        """Delete a campaign whose opening session never started, and the thread made for it when one was."""
-        await self._runtime.store.delete_campaign(campaign_id)
-        if made_thread_id is not None:
-            await self._runtime.store.delete_threads([made_thread_id])
+        """Delete a campaign whose opening session never started, and the thread made for it when one was. What cannot
+        be deleted (the store fails, or the session's failed start is not stored yet) is logged, not raised: the error
+        of the start is the one its caller raises."""
+        try:
+            await self._runtime.store.delete_campaign(campaign_id)
+            if made_thread_id is not None:
+                await self._runtime.store.delete_threads([made_thread_id])
+        except DotError as exc:
+            log.error("campaign_not_forgotten", campaign_id=campaign_id, error=exc.message, context=exc.context)
 
     async def start_session(self, campaign_id: str) -> RunRecord:
         """Start the next session of an active campaign in a thread of its own, with the brief as its opening message
@@ -492,8 +545,13 @@ class RunManager:
                 None,
             )
         except DotError:
-            await runtime.store.delete_threads([thread.id])
-            await runtime.store.set_next_session(campaign.id, now + runtime.config.agent.campaign_gap_minutes * 60)
+            # The session is tried again; what cannot be undone is logged, not raised: the error of the start is the one
+            # to raise.
+            try:
+                await runtime.store.set_next_session(campaign.id, now + runtime.config.agent.campaign_gap_minutes * 60)
+                await runtime.store.delete_threads([thread.id])
+            except DotError as exc:
+                log.error("session_start_not_undone", campaign_id=campaign.id, error=exc.message, context=exc.context)
             raise
         log.info("campaign_session_started", campaign_id=campaign.id, run_id=run.id, session=number)
         # The owner's Stop (or Mark achieved) while this session was being started found no session to stop: it ends
@@ -865,6 +923,10 @@ class RunManager:
 
     def _handle(self, run_id: str) -> RunHandle:
         handle: RunHandle | None = self._handles.get(run_id)
+        if handle is None and run_id in self._left_ends:
+            raise RunConflict(
+                "the run has ended; its end is stored as soon as the database takes it", {"run_id": run_id}
+            )
         if handle is None:
             raise RunConflict("the run is not active", {"run_id": run_id})
         return handle
@@ -1186,7 +1248,7 @@ class RunManager:
             self._owner_id(),
         )
         # Until the handle is registered no task will end the stored run: one that fails or is cancelled before
-        # that ends here, failed, instead of staying queued.
+        # that ends here, failed, instead of staying queued (:meth:`_end_unstarted`).
         registered: bool = False
         try:
             await runtime.bus.emit(
@@ -1250,7 +1312,20 @@ class RunManager:
             return run, handle
         finally:
             if not registered:
-                await _uncancelled(runtime.store.finish_run(run.id, "failed", "the run could not be started"))
+                await _uncancelled(self._end_unstarted(run))
+
+    async def _end_unstarted(self, run: RunRecord) -> None:
+        """End a run whose start failed after it was stored, before its task was registered: failed, stored as every
+        end is, with its ``run_finished`` event, and told to the pages that showed it queued. An end the store refuses is
+        logged and left to :meth:`store_left_ends`: the error of the start is the one that goes on."""
+        data: JsonObject = {"status": "failed", "result": RESULT_NOT_STARTED, "needs": ""}
+        try:
+            ended: EventRecord = await self._runtime.store.end_run(run.id, "failed", RESULT_NOT_STARTED, data)
+        except DotError as exc:
+            log.error("run_end_not_recorded", run_id=run.id, status="failed", error=exc.message, context=exc.context)
+            self._left_ends[run.id] = _LeftEnd(run=run, status="failed", result=RESULT_NOT_STARTED, needs="", data=data)
+            return
+        self._runtime.bus.publish(ended)
 
     async def _instructions_for(
         self, goal: str, thread_id: str, parent_run_id: str | None, parent: RunHandle | None
@@ -1378,8 +1453,8 @@ class RunManager:
     ) -> bool:
         """Record the end of the run (:meth:`_record_end`), then release its handle and set ``finished`` whatever
         happens; returns whether the end was recorded. Nothing awaits a run's task, so a failure to record it is
-        logged here with its traceback, and the run stays as the store has it until the daemon's next start closes
-        it."""
+        logged here with its traceback; an end the store refused is stored later (:meth:`store_left_ends`), and the
+        run stays as the store has it until then."""
         try:
             await _uncancelled(self._record_end(run, status, result, needs, error, inbox))
             return True
@@ -1405,15 +1480,19 @@ class RunManager:
         (shut by :meth:`_drive`) too late are kept, the status and result are stored with the scores of the notes it
         used and its ``run_finished`` event in one write (:meth:`Store.end_run`), the event is sent, and what follows a
         campaign's session is planned. The event keeps ``error``, the message and the context of the error that ended
-        the run, when one did."""
+        the run, when one did. An end the store refuses is kept to be stored later (:meth:`store_left_ends`)."""
         runtime: Runtime = self._runtime
         runtime.approvals.release_run(run.id)
-        await self._keep_answers(run, [inbox.get_nowait() for _ in range(inbox.qsize())])
         clean: str = truncate_tail(redact_secrets(result), _RESULT_CHARS)
         data: JsonObject = {"status": status, "result": clean, "needs": redact_secrets(needs)}
         if error is not None:
             data["error"] = redact_json(error)
-        ended: EventRecord = await runtime.store.end_run(run.id, status, clean, data)
+        try:
+            await self._keep_answers(run, [inbox.get_nowait() for _ in range(inbox.qsize())])
+            ended: EventRecord = await runtime.store.end_run(run.id, status, clean, data)
+        except DotError:
+            self._left_ends[run.id] = _LeftEnd(run=run, status=status, result=clean, needs=needs, data=data)
+            raise
         runtime.bus.publish(ended)
         if run.campaign_id is not None and not self._stopping:
             await self._follow_session(run, run.campaign_id, classify_ending(status, clean), needs)

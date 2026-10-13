@@ -5112,8 +5112,8 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 179 | A run's end is one write, and a chat a run works on is never deleted                 | done        | be314c3 |
 | 180 | A campaign whose session's command died goes on                                      | done        | baca51a |
 | 181 | Tools that name files work on what was approved, and a cut journal line is left out  | done        | 05185bc |
-| 182 | A failed run's result is the error's message, and its context stays in the event     | in progress |         |
-| 183 | A run's end the store refused is stored later, and a start that failed is told       | planned     |         |
+| 182 | A failed run's result is the error's message, and its context stays in the event     | done        | d1c2a00 |
+| 183 | A run's end the store refused is stored later, and a start that failed is told       | in progress |         |
 | 184 | A queued message starts once or is removed, never both                               | planned     |         |
 | 185 | A provider's 403 is not a refused key, and Ollama's stream error keeps its words     | planned     |         |
 | 186 | The doctor checks each model name against the list its provider serves               | planned     |         |
@@ -9275,7 +9275,7 @@ of the run and `dotx undo`.
 
 ### 182. A failed run's result is the error's message, and its context stays in the event
 
-**Status: in progress.**
+**Status: done.** Merged as `d1c2a00` (PR #221; no Linear issue, the Linear connector was signed out).
 
 **As built (2026-10-13).** A run that one of Dot's errors ends stores the error's message as its result
 (`RunManager._drive`), which the timeline, the notifications, the push to the phone, `dotx run` and a run that delegated
@@ -9298,7 +9298,25 @@ instead, where it no longer puts the start of a request on the phone's lock scre
 
 ### 183. A run's end the store refused is stored later, and a start that failed is told
 
-**Status: planned.**
+**Status: in progress.**
+
+**As built (2026-10-13).** An end of a run that the store refused (a full disk, say) is kept by the run manager and
+stored by the daemon's half-minute check (`RunManager.store_left_ends`) once the database takes it, as it was to be
+stored: its `run_finished` event is sent to the pages, a campaign's next session is planned and the chat's queue moves
+on. Until then a Stop of the run is refused (409) with the reason, and the daemon's next start closes a run whose end is
+still left, as before. A run whose start failed after the pages were told it was queued ends through `Store.end_run`, so
+its `run_finished` event is stored and sent; before, it was stored failed without one, and a page waited for it. A
+cleanup after a failed start (a campaign's opening session, a scheduled run's chat) that fails too is logged, and the
+error of the start is the one raised; before, a refused delete replaced it. The run manager's refusal to delete a chat
+names its runs (`run_ids`), as the store's does since item 179. A write the database refuses for a reason other than a
+lock is a `StoreError` ("the database refused the write", with the method and the database's words), so the half-minute
+check logs it and goes on; before, the database's own error ended the check for the daemon's life. Tests:
+`tests/smoke/test_run_ends.py` refuses a run's end, then lets the database take it (the code of before left the run at
+work until the next start), fails a run's start (no `run_finished` before), fails a campaign's start and its cleanup,
+refuses the delete of a chat with a run under way, and refuses the close of a dead command's run under the half-minute
+check (it ended before); `tests/unit/test_run_statistics.py` refuses an end and finds no note scored, then stores it and
+finds the scores (the code of before raised the database's own error); `tests/unit/test_store_images.py` refuses the
+delete of a chat a run works on and finds its screenshots kept.
 
 **What.** An end of a run that the store refused (a full disk) is tried again every half minute until it is stored, with
 what follows it, instead of leaving the run at work until the daemon's next start; a run that could not be started
@@ -9987,3 +10005,4 @@ running" for all of them.
 - 2026-10-13 (Opus 5.5): item 180 merged as `baca51a` (PR #218; no Linear issue, the connector was signed out): a campaign whose session's `dotx` command died plans its next session when the daemon closes that session, and a campaign whose opening session could not start, in any way, is not kept. Part 29 is done.
 - 2026-10-13 (Opus 5.5): part 30, the remaining problems, is planned (items 181 to 191), and the owner's three decisions of the day are recorded (open owner decisions 34 to 36); item 181 is built: a tool that names files works on what was approved, and a journal line cut short is left out.
 - 2026-10-13 (Opus 5.5): item 181 merged as `05185bc` (PR #220; no Linear issue, the connector was signed out): the tools that name files are classified again as they start and refused when a path leads elsewhere by then, and a journal line that a full disk cut short is left out.
+- 2026-10-13 (Opus 5.5): item 182 merged as `d1c2a00` (PR #221; no Linear issue, the connector was signed out): a run that one of Dot's errors ends stores the error's message as its result, and its `run_finished` event keeps the error's context with the secrets masked.

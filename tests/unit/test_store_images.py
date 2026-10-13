@@ -7,6 +7,9 @@ import sqlite3
 import time
 from pathlib import Path
 
+import pytest
+
+from dotagent.core.errors import RunConflict
 from dotagent.llm.types import ImageData, Message, ToolCall, assistant_message, user_message
 from dotagent.store.db import Store, image_file_name
 from dotagent.store.models import RunRecord, ThreadRecord
@@ -143,3 +146,24 @@ async def test_only_messages_with_screenshots_take_the_places_of_the_screenshots
     finally:
         await store.close()
     assert [message.images for message in history] == [(shot,), ()]
+
+
+async def test_a_chat_whose_delete_is_refused_keeps_its_screenshots(tmp_path: Path) -> None:
+    """Item 183: a delete refused because a run works on the chat (item 179) removes nothing, its files neither."""
+    images: Path = tmp_path / "images"
+    store: Store = await Store.open(tmp_path / "dot.db", images)
+    try:
+        thread: ThreadRecord = await store.create_thread("at work", "test")
+        await store.append_messages(thread.id, [user_message("a", (_image(b"of a chat at work"),))])
+        run: RunRecord = await store.create_run(
+            thread.id, "goal", "task", "ollama:x", None, "test", "medium", "ask", False, None, None, None
+        )
+        await store.add_event(run.id, "tool_result", {"images": await store.save_images([_image(b"of its run")])})
+        _age(images, 7200)
+        kept: set[str] = _names(images)
+        with pytest.raises(RunConflict):
+            await store.delete_threads([thread.id])
+        assert _names(images) == kept
+        assert (await store.get_thread(thread.id)).id == thread.id
+    finally:
+        await store.close()

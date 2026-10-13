@@ -266,7 +266,13 @@ class Scheduler:
             log.error("schedule_start_failed", schedule_id=record.id, error=exc.message, context=exc.context)
             failed: str = f"failed to start: {exc.message}"
             await store.set_schedule_status(record.id, failed)
-            await store.delete_threads([thread.id])
+            try:
+                await store.delete_threads([thread.id])
+            except DotError as kept:
+                # The thread of a run whose failed start the store did not take yet stays; the missed firing is told.
+                log.error(
+                    "schedule_thread_not_deleted", schedule_id=record.id, error=kept.message, context=kept.context
+                )
             await self._tell_missed(record, failed)
             return
         if await _emergency_stop_engaged():

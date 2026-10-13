@@ -460,3 +460,32 @@ async def test_a_note_is_scored_by_how_the_runs_handed_it_ended(tmp_path: Path) 
     assert await store.memory_scores([note.id], 0.0) == {note.id: MemoryScore(handed=2, done=1, failed=0)}
     assert (await store.get_memory(note.id)).used_count == 3
     await store.close()
+
+
+async def test_the_scores_of_the_notes_a_run_was_handed_are_kept_with_its_end_or_not_at_all(tmp_path: Path) -> None:
+    """Item 183: the scores of a run's notes are part of the one write of its end (item 179): an end the database
+    refuses scores nothing, and the end stored later scores them."""
+    database: Path = tmp_path / "dot.sqlite3"
+    store: Store = await Store.open(database, tmp_path / "screenshots")
+    thread = await store.create_thread("t", "test")
+    note = await store.add_memory("A note.", [], "run_earlier", None, None)
+    run: RunRecord = await store.create_run(
+        thread.id, "goal", "task", "ollama:a", None, "test", "medium", "ask", False, None, None, None
+    )
+    await store.mark_memories_used(run.id, [note.id], time.time(), "start")
+    connection: sqlite3.Connection = sqlite3.connect(database)
+    connection.execute(
+        "CREATE TRIGGER refuse_ends BEFORE INSERT ON events WHEN NEW.kind = 'run_finished'"
+        " BEGIN SELECT RAISE(ABORT, 'database or disk is full'); END"
+    )
+    connection.commit()
+    with pytest.raises(StoreError, match="the database refused the write"):
+        await store.end_run(run.id, "done", "answer", {"status": "done", "result": "answer"})
+    assert (await store.get_run(run.id)).status == "queued"
+    assert await store.memory_scores([note.id], 0.0) == {note.id: MemoryScore(handed=1, done=0, failed=0)}
+    connection.execute("DROP TRIGGER refuse_ends")
+    connection.commit()
+    connection.close()
+    await store.end_run(run.id, "done", "answer", {"status": "done", "result": "answer"})
+    assert await store.memory_scores([note.id], 0.0) == {note.id: MemoryScore(handed=1, done=1, failed=0)}
+    await store.close()
