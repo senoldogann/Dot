@@ -223,10 +223,11 @@ async def _kind_of(call: ToolCall, context: ToolContext) -> ActionKind | None:
 
 async def interrupted_calls(runtime: Runtime, run: RunRecord) -> tuple[InterruptedCall, ...]:
     """The calls of the step ``run`` was in when it was cut off, with how each ended and its policy kind; empty when the
-    run was not in a step's calls. A run stores the results of a step once the whole step is over, so the step's calls
-    are the ones without a result at the end of the thread. Its events tell which of them started and which finished:
-    the events after the step's ``assistant`` event, since a call's id is unique only within its step. When that event
-    is missing, the step's message was stored and nothing of the step ran. Reads the store."""
+    run was not in a step's calls. They are the ones without a result at the end of the thread: those that had not ended
+    when a stop cut the step, every call of the step after a crash (:func:`~dotagent.agent.compact.pending_calls`). Its
+    events tell which of them started and which finished: the events after the step's ``assistant`` event, since a
+    call's id is unique only within its step. When that event is missing, the step's message was stored and nothing of
+    the step ran. Reads the store."""
     if run.steps == 0:
         return ()
     calls: tuple[ToolCall, ...] = pending_calls(await runtime.store.load_messages(run.thread_id, 0))

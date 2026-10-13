@@ -87,7 +87,12 @@ class Scheduler:
         return self._loop is not None and not self._loop.done()
 
     async def stop(self) -> None:
-        """Stop ticking and raise whatever ended the loop. Runs that were started keep going."""
+        """Stop ticking and raise whatever ended the loop. A reflection under way is cancelled: its model calls could
+        keep the daemon past the time launchd gives it to stop, and it records nothing until its end, so the next
+        reflection reads the same runs again (item 159). Runs that were started keep going."""
+        reflecting: asyncio.Task[None] | None = self._reflecting
+        if reflecting is not None:
+            reflecting.cancel()
         loop: asyncio.Task[None] | None = self._loop
         if loop is None:
             return

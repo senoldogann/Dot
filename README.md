@@ -771,11 +771,12 @@ Details panel).
 **Resuming a run that was cut off.** A run that a crash, a restart or a shutdown of the daemon cut off can go on where
 it stopped: Continue on the run's page, `dotx resume RUN_ID` (in this terminal, like `dotx run`), or
 `POST /api/runs/{id}/resume`. A new run starts in the same chat, with the goal, model, reasoning level, approval mode
-and goal mode of the run it resumes, and the conversation so far. Its first message tells the model how that run was
-cut off and how each call of the step it was in ended: finished (with the start of its result), cut off while it ran,
-or not started. A call that was cut off may have changed something unless it only reads, and the model is told to check
-before it runs it again. The plan of that run is the plan of the new one. Only the newest run of a chat can be
-resumed, and never a run that you stopped or that another run started.
+and goal mode of the run it resumes, and the conversation so far, where a shutdown or a restart of the daemon keeps the
+results of the calls of the step it was in that had ended (a crash keeps none). Its first message tells the model how
+that run was cut off and how each call of that step without a result ended: finished (with the start of its result), cut
+off while it ran, or not started. A call that was cut off may have changed something unless it only reads, and the model
+is told to check before it runs it again. The plan of that run is the plan of the new one. Only the newest run of a chat
+can be resumed, and never a run that you stopped or that another run started.
 
 With `resume = "safe"` in `[agent]` the daemon also resumes runs on its own when it starts: runs of the web UI, cut off
 at most `resume_within_s` seconds before (30 minutes), whose calls that were cut off only read (a question to you
@@ -827,8 +828,10 @@ its first and last day when it read more than a day and a quarter, after a daemo
 2026-10-12 I worked on …"). The reflection touches only the notes Dot wrote, never yours. It also keeps what Dot knows
 about you (see Memory): after a day with runs, one call of the review model rewrites Dot's lines of that section from
 the section as it stands, your own lines, your notes and the day's goals, at most `[memory] owner_chars` (1500)
-characters. A night the daemon slept through is caught up once at its start. Activity lists the reflection among what
-ended today; `dotx reflect` runs one now.
+characters. A night the Mac slept through is caught up once when it wakes. A daemon that was off at that time, or whose
+stop cut the reflection (a stop does not wait for one, and it records nothing until its end), reflects at the next
+`reflection_time` on everything since the last reflection. Activity lists the reflection among what ended today;
+`dotx reflect` runs one now.
 
 **Taking back the file changes of a run.** Before `write_file` or `edit_file` changes a file, the run notes the change
 in its journal (`undo/` in the home directory), and its first change to a file keeps a copy of the file as it was. When
@@ -1998,10 +2001,11 @@ src/dotagent/
   its sessions. The tests play the sessions and the goal check with the scripted model: no campaign has run with a real
   model here.
 - Resuming: in goal mode, the goal check of a resumed run judges from what the resumed run did, not from the steps of
-  the run it resumes. The conversation shows every call of the step that was cut off as interrupted, also the ones that
-  finished; the first message of the resumed run says which finished. A run of `dotx run` works in its own process: a
-  daemon that starts while it works leaves it, and the approvals it waits on, to that process, and marks it as cut off
-  only once the process has ended (the daemon never resumes such a run on its own).
+  the run it resumes. After a crash the conversation shows every call of the step that was cut off as interrupted, also
+  the ones that finished (a stop keeps the results of the ones that had ended); the first message of the resumed run
+  says which finished. A run of `dotx run` works in its own process: a daemon that starts while it works leaves it, and
+  the approvals it waits on, to that process, and marks it as cut off only once the process has ended (the daemon never
+  resumes such a run on its own).
 - Undo: only `write_file` and `edit_file` are in the journal, not shell commands, the browser or the desktop. A run
   keeps a copy of a file at its first change to it only, within `undo_max_file_bytes` and `undo_max_run_bytes`. Runs
   that change the same file are taken back in the order their changes were noted. The web UI has no undo button: use

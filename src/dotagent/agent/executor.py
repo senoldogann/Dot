@@ -2,7 +2,7 @@
 
 import asyncio
 import time
-from collections.abc import Coroutine, Mapping, Sequence
+from collections.abc import Callable, Coroutine, Mapping, Sequence
 from dataclasses import dataclass, replace
 from urllib.parse import urlsplit
 
@@ -260,23 +260,31 @@ async def execute_calls(
     ctx: ToolContext,
     gate: RunGate,
     parallelism: int,
+    ended: Callable[[ToolOutcome], None],
 ) -> list[ToolOutcome]:
     """Run the calls of one model turn in order, overlapping read-only ones. Results keep the call order; the text of
     each is clipped to the run's ``ctx.output_chars``. ``hidden`` maps the tools of the tool groups that are off to
-    their group: a call of one of them does not run, and its result says to call it again now that its group is on."""
+    their group: a call of one of them does not run, and its result says to call it again now that its group is on.
+    ``ended`` is told each outcome as its call ends, so that a step cut part way still has the calls that had ended
+    (item 159)."""
     finish_index: int | None = next((index for index, call in enumerate(calls) if call.name == FINISH_TOOL), None)
     runnable: Sequence[ToolCall] = calls if finish_index is None else calls[: finish_index + 1]
     skipped: list[ToolOutcome] = [] if finish_index is None else [_skipped(call) for call in calls[finish_index + 1 :]]
     slots: asyncio.Semaphore = asyncio.Semaphore(parallelism)
 
+    async def one(call: ToolCall) -> ToolOutcome:
+        outcome: ToolOutcome = await _execute_one(call, registry, hidden, ctx, gate)
+        ended(outcome)
+        return outcome
+
     async def bounded(call: ToolCall) -> ToolOutcome:
         async with slots:
-            return await _execute_one(call, registry, hidden, ctx, gate)
+            return await one(call)
 
     outcomes: list[ToolOutcome] = []
     for group in _group_calls(runnable, registry):
         if len(group) == 1:
-            outcomes.append(await _execute_one(group[0], registry, hidden, ctx, gate))
+            outcomes.append(await one(group[0]))
         else:
             outcomes.extend(await _together([bounded(call) for call in group]))
     return [*outcomes, *skipped]

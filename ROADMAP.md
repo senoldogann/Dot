@@ -5078,8 +5078,8 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 155 | The compaction keeps a tail measured in tokens                                       | done        | 5b0b2cb |
 | 156 | The page text of the browser and the desktop has a floor                             | done        | 6ad598f |
 | 157 | The changed notes a running run is handed, and their dates and authors               | done        | 3593f6a |
-| 158 | A model out of reach does not fail a run                                             | in progress |         |
-| 159 | A stop of the daemon is never a crash                                                | planned     |         |
+| 158 | A model out of reach does not fail a run                                             | done        | 852ccc5 |
+| 159 | A stop of the daemon is never a crash                                                | in progress |         |
 | 160 | Pages catch up after a break                                                         | planned     |         |
 | 161 | A chat's queue goes on after a clean restart                                         | planned     |         |
 | 162 | A run whose terminal closed can be resumed                                           | planned     |         |
@@ -8459,7 +8459,7 @@ of `resume` stays `off` until evals show that `safe` helps, as its comment in th
 
 ### 158. A model out of reach does not fail a run
 
-**Status: in progress.**
+**Status: done.** Merged as `852ccc5` (PR #195; no Linear issue, the Linear connector was signed out).
 
 **As built (2026-10-13).** When a step's call to the run's own model fails because the model cannot be reached (the
 connection broke or timed out, the call took longer than `model_call_timeout_s`, or its server failed with a status that
@@ -8486,11 +8486,30 @@ and goes on from the same step, for a time the owner sets, instead of failing; i
 
 ### 159. A stop of the daemon is never a crash
 
-**Status: planned.**
+**Status: in progress.**
 
-**What.** A stop of the daemon (the service stopped or restarted, a log-out) ends its runs within the time launchd gives
-it, so it is never killed part way, and a step it cuts keeps the results of the calls that had ended, so that the run,
-resumed, does not make them again.
+**As built (2026-10-13).** A wait and a loss of the daemon's way out, each read again in the code first. (1) The way out
+waited for a reflection under way (`Scheduler.drain`), whose calls of the review model can take `model_call_timeout_s`
+each, past the thirty seconds launchd gives the daemon before it kills it, and the next start then takes the stop for a
+crash. `Scheduler.stop`, the first part of the way out, now cancels it: a reflection records nothing until its end, so
+the next one reads the same runs again. (2) A step stored its results only once all its calls had ended, so a stop of
+the run or of the daemon during a call lost the results of the calls of the step that had ended: the conversation showed
+them as interrupted, a resumed run was told only the start of each, and a message that went on in the chat nothing of
+them. `execute_calls` now tells the loop of each call that ends, and a step cut by a stop stores their results, in the
+order of the calls, before the run ends; a crash still keeps none. The daemon's log holds no stop that launchd had to
+kill, so the rest of the way out, where the runs end at their next wait once they are cancelled, keeps no bound of its
+own. Found on the way: the README said that a night the daemon slept through is caught up at its start, while the
+reflection catches up a night the Mac slept through when it wakes, and a daemon that was off at that time reflects at
+the next `reflection_time` on everything since the last reflection; the README says so now. Tests:
+`tests/smoke/test_clean_stop.py` cuts, by the daemon's way out, a run whose step writes a file and then runs a command
+that waits, while the command runs: the run ends cancelled by the shutdown, the thread holds the write's result and none
+for the command, and only the command is left for a resumed run to look at; and it takes the daemon's way out while a
+reflection waits for the review model: the way out takes less than ten seconds and records no reflection. Both failed on
+the code of before (the thread held no result; the way out waited past ten seconds).
+
+**What.** A stop of the daemon (the service stopped or restarted, a log-out) does not wait for a reflection under way,
+whose calls of the model could keep it past the time launchd gives it before it is killed, and a step it cuts keeps the
+results of the calls that had ended, so that the run, resumed, does not make them again.
 
 ### 160. Pages catch up after a break
 
@@ -9106,3 +9125,4 @@ by a stop of the daemon can.
 - 2026-10-13 (Opus 5.5): item 155 merged as `5b0b2cb` (PR #192; no Linear issue, the connector was signed out): a compaction keeps as many of the newest messages as fit its room in tokens, never less than the newest exchange, instead of about eight.
 - 2026-10-13 (Opus 5.5): item 156 merged as `6ad598f` (PR #193; no Linear issue, the connector was signed out): in a small model window the text of a page and of a window keeps at least half of a tool result instead of coming back empty.
 - 2026-10-13 (Opus 5.5): item 157 merged as `3593f6a` (PR #194; no Linear issue, the connector was signed out): a running run is handed only the changed notes it would be handed at its start, within their budget; a change of tags leaves a note's date; a note a run rewrites becomes the run's.
+- 2026-10-13 (Opus 5.5): item 158 merged as `852ccc5` (PR #195; no Linear issue, the connector was signed out): a run whose model cannot be reached waits for it and asks the same step again, for `model_wait_s` (900 s by default), instead of failing; part 26, continue where it left off, is planned.
