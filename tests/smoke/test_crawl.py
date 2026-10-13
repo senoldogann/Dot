@@ -4,6 +4,7 @@ JavaScript page in Dot's own headless Chrome, and the extraction pulls a typed t
 model played by a script."""
 
 import asyncio
+import dataclasses
 import json
 import re
 import threading
@@ -21,7 +22,10 @@ from dotagent.core.types import JsonObject
 from dotagent.evals.runner import SCRIPTED_MODEL
 from dotagent.evals.scripted import ScriptedProvider
 from dotagent.evals.types import ScriptedCall, ScriptedTurn
-from dotagent.policy.types import ActionInfo
+from dotagent.llm.calls import log_model_call
+from dotagent.llm.router import ModelRouter
+from dotagent.policy.engine import auto_review
+from dotagent.policy.types import ActionInfo, Decision
 from dotagent.runtime import Runtime, build_runtime, close_runtime
 from dotagent.tools.base import ToolResult
 from dotagent.tools.context import ToolContext
@@ -179,8 +183,8 @@ async def runtime(settings: Path, tmp_path_factory: pytest.TempPathFactory) -> A
         patch.undo()
 
 
-async def _call(runtime: Runtime, name: str, arguments: JsonObject, output_chars: int) -> tuple[ToolResult, ActionInfo]:
-    ctx: ToolContext = ToolContext(
+def _context(runtime: Runtime, output_chars: int) -> ToolContext:
+    return ToolContext(
         runtime=runtime,
         browser=runtime.browser,
         run_id="crawl-test",
@@ -195,6 +199,10 @@ async def _call(runtime: Runtime, name: str, arguments: JsonObject, output_chars
         output_chars=output_chars,
         facts=new_facts,
     )
+
+
+async def _call(runtime: Runtime, name: str, arguments: JsonObject, output_chars: int) -> tuple[ToolResult, ActionInfo]:
+    ctx: ToolContext = _context(runtime, output_chars)
     prepared = await runtime.registry.tools[name].prepare(arguments, ctx)
     return await prepared.run(ctx), prepared.action
 
@@ -309,3 +317,60 @@ async def test_the_extraction_returns_typed_fields_with_quotes_checked_against_t
     assert [entry["fields"]["price"]["value"] for entry in data] == ["11,50 EUR", "12,50 EUR", "13,50 EUR"]  # type: ignore[index]
     assert [entry["fields"]["price"]["verified"] for entry in data] == [True, True, False]  # type: ignore[index]
     assert all(entry["fields"]["weight"]["verified"] for entry in data)  # type: ignore[index]
+
+
+class _NoFetch:
+    """A web client that fails the test when anything is fetched."""
+
+    async def get(self, url: str, max_bytes: int) -> None:
+        raise AssertionError(f"fetched {url}")
+
+
+async def test_a_file_of_the_workspace_is_read_even_when_its_name_looks_like_a_host(runtime: Runtime) -> None:
+    name: str = "prices-174.md"
+    path: Path = workspace_dir() / name
+    await asyncio.to_thread(path.parent.mkdir, parents=True, exist_ok=True)
+    await asyncio.to_thread(path.write_text, "The jar costs 4,20 EUR.", "utf-8")
+    # A router of its own: the module's runtime has a scripted connector already.
+    router: ModelRouter = ModelRouter(runtime.config, log_model_call)
+    await router.register(
+        "ollama",
+        ScriptedProvider(
+            "ollama",
+            [
+                ScriptedTurn(
+                    text="",
+                    calls=(
+                        ScriptedCall(
+                            tool=EXTRACT_TOOL, arguments={"price": {"value": "4,20 EUR", "quote": "costs 4,20 EUR"}}
+                        ),
+                    ),
+                )
+            ],
+        ),
+    )
+    offline: Runtime = dataclasses.replace(runtime, router=router, web=_NoFetch())  # type: ignore[arg-type]
+    try:
+        result, _ = await _call(
+            offline,
+            "web_extract",
+            {"sources": [name], "fields": [{"name": "price", "description": "The price with its currency."}]},
+            200_000,
+        )
+    finally:
+        await router.aclose()
+    assert result.text.startswith("Extracted 1 of 1 sources; 0 values whose quote is not in the source"), result.text
+
+
+async def test_a_protected_file_is_refused_to_the_extraction_as_it_is_to_read_file(runtime: Runtime) -> None:
+    # Only the calls are described: nothing is read.
+    secret: str = "~/.ssh/dot-test-174-key"
+    ctx: ToolContext = _context(runtime, 200_000)
+    fields: list[JsonObject] = [{"name": "key", "description": "The key."}]
+    extraction = await runtime.registry.tools["web_extract"].prepare(
+        {"sources": ["https://example.org/notes.html", secret], "fields": fields}, ctx
+    )
+    reading = await runtime.registry.tools["read_file"].prepare({"path": secret}, ctx)
+    assert extraction.action.flags == reading.action.flags == ("secret_access",)
+    refused: Decision | None = auto_review(extraction.action)
+    assert refused is not None and refused.verdict == "deny", refused
