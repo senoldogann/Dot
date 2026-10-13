@@ -105,10 +105,11 @@ def test_the_core_group_holds_what_most_runs_need_and_is_about_a_third_of_the_to
         "mark_plan_step",
         "use_tools",
         "skill",
+        "find_help",
         "judge_items",
     }
     # web_crawl and web_extract (item 41) and write_notes (item 34) joined the core: measured share 0.412 before the
-    # notes tool, with the descriptions of the crawler's tools trimmed.
+    # notes tool, with the descriptions of the crawler's tools trimmed. find_help (item 163) joined it at 0.447.
     assert estimate_tokens([], core) < 0.45 * estimate_tokens([], TASK_SPECS)
 
 
