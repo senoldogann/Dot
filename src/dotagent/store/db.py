@@ -55,6 +55,7 @@ from dotagent.store.models import (
     RunStatus,
     ScheduleOptions,
     ScheduleRecord,
+    SentMessage,
     ThreadRecord,
     ThreadSummary,
     WorkingRun,
@@ -105,6 +106,7 @@ CREATE TABLE IF NOT EXISTS queue_claims (
     thread_id TEXT PRIMARY KEY, message_id TEXT NOT NULL, owner TEXT NOT NULL, claimed_at REAL NOT NULL
 );
 CREATE TABLE IF NOT EXISTS run_stops (run_id TEXT PRIMARY KEY, asked_at REAL NOT NULL);
+CREATE TABLE IF NOT EXISTS sent_messages (key TEXT PRIMARY KEY, sent_at REAL NOT NULL, target TEXT);
 CREATE TABLE IF NOT EXISTS push_subscriptions (
     endpoint TEXT PRIMARY KEY, p256dh TEXT NOT NULL, auth TEXT NOT NULL, created_at REAL NOT NULL
 );
@@ -1304,6 +1306,41 @@ class Store:
             f" (SELECT id FROM runs WHERE status IN ({','.join('?' * len(working))}))",
             working,
         )
+        await self._db.commit()
+
+    async def claim_sent(self, key: str, now: float, stale_before: float, forget_before: float) -> SentMessage | None:
+        """Take the key of a message the pages send for this sending, in one write: ``None`` when it is taken, else
+        the message of the key, sent before or under way. A key whose sending began before ``stale_before`` and came to
+        nothing (its process went) is taken again; the keys sent before ``forget_before`` are forgotten."""
+
+        async def statements() -> SentMessage | None:
+            await self._db.execute("DELETE FROM sent_messages WHERE sent_at < ?", (forget_before,))
+            async with self._db.execute(
+                "INSERT INTO sent_messages(key, sent_at, target) VALUES (?, ?, NULL) ON CONFLICT(key) DO UPDATE"
+                " SET sent_at = excluded.sent_at WHERE sent_messages.target IS NULL AND sent_messages.sent_at < ?"
+                " RETURNING key",
+                (key, now, stale_before),
+            ) as cursor:
+                taken: aiosqlite.Row | None = await cursor.fetchone()
+            if taken is not None:
+                return None
+            row: aiosqlite.Row | None = await self._one("SELECT * FROM sent_messages WHERE key = ?", (key,))
+            if row is None:
+                raise StoreError("a key that could not be taken is not stored", {"key": key})
+            return SentMessage(key=str(row["key"]), sent_at=float(row["sent_at"]), target=row["target"])
+
+        return await self._unit(statements)
+
+    @_writing
+    async def settle_sent(self, key: str, target: str) -> None:
+        """Keep what the message of ``key`` came to: the run it started or steered, or the queued message it became."""
+        await self._db.execute("UPDATE sent_messages SET target = ? WHERE key = ?", (target, key))
+        await self._db.commit()
+
+    @_writing
+    async def release_sent(self, key: str) -> None:
+        """Let the key of a message whose sending failed go, so that sending it again is tried anew."""
+        await self._db.execute("DELETE FROM sent_messages WHERE key = ? AND target IS NULL", (key,))
         await self._db.commit()
 
     @_writing

@@ -19,6 +19,7 @@ from dotagent.server import UI_SOURCE
 from dotagent.server.actions import action_steps, file_edits
 from dotagent.server.activity import current_activity
 from dotagent.server.context import ServerContext
+from dotagent.server.sending import send_once
 from dotagent.server.stream import SSE_HEADERS, SSE_TYPE, follow_lifecycle, follow_run, follow_screencast
 from dotagent.server.views import (
     ActivityCount,
@@ -86,49 +87,57 @@ def runs_router(ctx: ServerContext) -> APIRouter:
 
     @router.post("/runs", status_code=201)
     async def start_run(request: StartRunRequest) -> RunRecord:
-        """Start a run, or with ``standing`` a campaign whose opening session the returned run is."""
+        """Start a run, or with ``standing`` a campaign whose opening session the returned run is. The message sent
+        again with its ``key`` gets the run its first sending started (:func:`send_once`)."""
         if request.model is not None:
             parse_model_ref(request.model)
         files: tuple[StoredAttachment, ...] = await load_attachments(ctx.runtime.workspace, request.attachments)
-        if request.standing:
-            return await ctx.manager.start_campaign(
-                request.goal,
-                request.mode,
-                request.model,
-                request.thread_id,
-                UI_SOURCE,
-                request.effort,
-                request.approvals,
-                request.goal_mode,
-                files,
-                request.browser,
-            )
-        if request.agent_id is not None:
-            agent: AgentRecord = await store.get_agent(request.agent_id)
-            return await ctx.manager.start_for_agent(
-                agent,
-                request.goal,
-                request.mode,
-                request.model,
-                request.thread_id,
-                UI_SOURCE,
-                request.effort,
-                request.approvals,
-                request.goal_mode,
-                files,
-            )
-        return await ctx.manager.start(
-            request.goal,
-            request.mode,
-            request.model,
-            request.thread_id,
-            UI_SOURCE,
-            None,
-            request.effort,
-            request.approvals,
-            request.goal_mode,
-            files,
-        )
+
+        async def start() -> str:
+            run: RunRecord
+            if request.standing:
+                run = await ctx.manager.start_campaign(
+                    request.goal,
+                    request.mode,
+                    request.model,
+                    request.thread_id,
+                    UI_SOURCE,
+                    request.effort,
+                    request.approvals,
+                    request.goal_mode,
+                    files,
+                    request.browser,
+                )
+            elif request.agent_id is not None:
+                agent: AgentRecord = await store.get_agent(request.agent_id)
+                run = await ctx.manager.start_for_agent(
+                    agent,
+                    request.goal,
+                    request.mode,
+                    request.model,
+                    request.thread_id,
+                    UI_SOURCE,
+                    request.effort,
+                    request.approvals,
+                    request.goal_mode,
+                    files,
+                )
+            else:
+                run = await ctx.manager.start(
+                    request.goal,
+                    request.mode,
+                    request.model,
+                    request.thread_id,
+                    UI_SOURCE,
+                    None,
+                    request.effort,
+                    request.approvals,
+                    request.goal_mode,
+                    files,
+                )
+            return run.id
+
+        return await store.get_run(await send_once(store, "run", request.key, start))
 
     @router.get("/runs/{run_id}")
     async def get_run(run_id: str) -> RunDetail:
@@ -176,9 +185,15 @@ def runs_router(ctx: ServerContext) -> APIRouter:
 
     @router.post("/runs/{run_id}/steer", status_code=202)
     async def steer_run(run_id: str, request: SteerRequest) -> RunDetail:
+        """Send a message to the run at work; the message sent again with its ``key`` is not sent twice."""
         await store.get_run(run_id)
-        ctx.manager.steer(run_id, request.text, await load_attachments(ctx.runtime.workspace, request.attachments))
-        return await detail(run_id)
+        files: tuple[StoredAttachment, ...] = await load_attachments(ctx.runtime.workspace, request.attachments)
+
+        async def steer() -> str:
+            ctx.manager.steer(run_id, request.text, files)
+            return run_id
+
+        return await detail(await send_once(store, "steer", request.key, steer))
 
     @router.post("/attachments", status_code=201)
     async def upload_attachment(request: AttachmentUpload) -> StoredAttachment:

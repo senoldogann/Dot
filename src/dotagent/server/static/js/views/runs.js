@@ -14,6 +14,7 @@ import { trackHeight } from "../layout.js";
 import { anchoredPopover } from "../popover.js";
 import { buildPresence } from "../presence.js";
 import { KEPT_APPROVALS, KEPT_GOAL_MODE, standingPicker } from "../runmodes.js";
+import { messageKeys } from "../sending.js";
 import { onCompose } from "../shortcuts.js";
 import { getSnapshot, onChange, refresh } from "../state.js";
 import { attempt, toast } from "../ui.js";
@@ -129,6 +130,7 @@ function buildComposer(ctx, listener) {
   // True from the moment a run is being started until the answer is in: Enter does not look at the disabled button, so
   // a second press must be refused here, or one goal would start two runs.
   let starting = false;
+  const keys = messageKeys();
 
   async function submit() {
     if (starting) {
@@ -150,7 +152,7 @@ function buildComposer(ctx, listener) {
         // A kept reasoning level is checked against the model's own, so the models are known first.
         await choices.ready();
         const chosen = choices.value();
-        const created = await api.post("/runs", {
+        const body = {
           goal: text,
           mode: chosen.mode,
           model: chosen.model,
@@ -161,7 +163,9 @@ function buildComposer(ctx, listener) {
           thread_id: null,
           attachments: attachments.ids(),
           agent_id: agentId === "" ? null : agentId,
-        });
+        };
+        const created = await api.post("/runs", { ...body, key: keys.of("run", body) });
+        keys.sent();
         frame.clear();
         ctx.navigate(`/runs/${created.id}`);
       });

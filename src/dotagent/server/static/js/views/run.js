@@ -20,6 +20,7 @@ import { createQueue } from "../queue.js";
 import { userMessage } from "../messages.js";
 import { emptyPanel, errorPanel, foldCard, loadingPanel } from "../panels.js";
 import { heldChoice } from "../runmodes.js";
+import { messageKeys } from "../sending.js";
 import { setStageTitle, setStageTools } from "../stage.js";
 import { createStageSize } from "../stagesize.js";
 import { onChange, onLifecycle, onStreamBack, readFailed } from "../state.js";
@@ -550,6 +551,7 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
   // True from the moment a message is on its way until the answer is in: Enter does not look at the disabled button,
   // so a second press must be refused here, or a follow-up would start two runs on one thread.
   let sending = false;
+  const keys = messageKeys();
 
   // `steerNow` sends the message to the run under way past the queue (⌘⇧Enter).
   async function submit(steerNow) {
@@ -594,7 +596,7 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
           // The level is checked against the model's own, so the models are known first.
           await choices.ready();
           const chosen = choices.value();
-          await queue.add({
+          const body = {
             text,
             mode: chosen.mode,
             model: chosen.model,
@@ -603,25 +605,29 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
             goal_mode: chosen.goal_mode,
             agent_id: run.agent_id,
             attachments: files,
-          });
+          };
+          await queue.add({ ...body, key: keys.of("queue", run.thread_id, body) });
+          keys.sent();
           frame.clear();
           return;
         }
         if (active) {
           const entry = holdMessage(text);
+          const body = { text, attachments: files };
           try {
-            await api.post(`/runs/${runId}/steer`, { text, attachments: files });
+            await api.post(`/runs/${runId}/steer`, { ...body, key: keys.of("steer", runId, body) });
           } catch (error) {
             releaseMessage(entry);
             throw error;
           }
+          keys.sent();
           frame.clear();
           return;
         }
         // The level is checked against the model's own, so the models are known first.
         await choices.ready();
         const chosen = choices.value();
-        const next = await api.post("/runs", {
+        const body = {
           goal: text,
           mode: chosen.mode,
           model: chosen.model,
@@ -631,7 +637,9 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
           thread_id: run.thread_id,
           agent_id: run.agent_id,
           attachments: files,
-        });
+        };
+        const next = await api.post("/runs", { ...body, key: keys.of("run", body) });
+        keys.sent();
         frame.clear();
         ctx.navigate(`/runs/${next.id}`);
       });

@@ -9,8 +9,10 @@ from dotagent.agent.attachments import StoredAttachment, load_attachments
 from dotagent.llm.router import parse_model_ref
 from dotagent.server import UI_SOURCE
 from dotagent.server.context import ServerContext
+from dotagent.server.sending import send_once
 from dotagent.server.views import QueueEditRequest, QueueMessageRequest, QueueOrderRequest, QueueView
 from dotagent.store.db import Store
+from dotagent.store.models import QueuedMessage
 
 
 def queue_router(ctx: ServerContext) -> APIRouter:
@@ -29,22 +31,27 @@ def queue_router(ctx: ServerContext) -> APIRouter:
     @router.post("/threads/{thread_id}/queue", status_code=201)
     async def queue_message(thread_id: str, request: QueueMessageRequest) -> QueueView:
         """Put a message at the end of the chat's queue; with no run at work there it starts at once, unless the queue
-        is held."""
+        is held. The message sent again with its ``key`` is not queued twice (:func:`send_once`)."""
         if request.model is not None:
             parse_model_ref(request.model)
         files: tuple[StoredAttachment, ...] = await load_attachments(ctx.runtime.workspace, request.attachments)
-        await ctx.manager.queue(
-            thread_id,
-            request.text,
-            files,
-            request.mode,
-            request.model,
-            request.effort,
-            request.approvals,
-            request.goal_mode,
-            request.agent_id,
-            UI_SOURCE,
-        )
+
+        async def queue() -> str:
+            message: QueuedMessage = await ctx.manager.queue(
+                thread_id,
+                request.text,
+                files,
+                request.mode,
+                request.model,
+                request.effort,
+                request.approvals,
+                request.goal_mode,
+                request.agent_id,
+                UI_SOURCE,
+            )
+            return message.id
+
+        await send_once(store, "queue", request.key, queue)
         return await view(thread_id)
 
     @router.patch("/queue/{message_id}")

@@ -5118,8 +5118,8 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 185 | A provider's 403 is not a refused key, and Ollama's stream error keeps its words     | done        | b178796 |
 | 186 | The doctor checks each model name against the list its provider serves               | done        | 0b3702a |
 | 187 | The service install keeps the running job until the new one is in place              | done        | 2ad0df4 |
-| 188 | A run of a dotx command is followed live on the pages and stopped there              | in progress |         |
-| 189 | A message sent twice starts once                                                     | planned     |         |
+| 188 | A run of a dotx command is followed live on the pages and stopped there              | done        | 5f294aa |
+| 189 | A message sent twice starts once                                                     | in progress |         |
 | 190 | The pages say what they could not read, follow the rules and tell of an update       | planned     |         |
 | 191 | The desktop shell says what it could not read                                        | planned     |         |
 
@@ -9416,7 +9416,7 @@ back when the new job does not load, instead of leaving a new file next to an ol
 
 ### 188. A run of a dotx command is followed live on the pages and stopped there
 
-**Status: in progress.**
+**Status: done.** Merged as `5f294aa` (PR #227; no Linear issue, the Linear connector was signed out).
 
 **As built (2026-10-14).** The daemon relays what the runs of other processes store: every half second it tells its
 pages the events that the runs of `dotx` commands stored since, and keeps the runs at work of the commands that live
@@ -9446,7 +9446,22 @@ active.
 
 ### 189. A message sent twice starts once
 
-**Status: planned.**
+**Status: in progress.**
+
+**As built (2026-10-14).** The pages send each new message with a key of their own (`static/js/sending.js`): a new chat,
+a follow-up, a queued message and a steer. A message keeps its key until it is sent; one that changed (its text, its
+files, its choices, where it goes) gets a new key. The daemon keeps the keys for a day (`sent_messages`,
+`dotagent.server.sending.send_once`): the same message sent again with its key, after an answer that was lost, is
+answered with the run its first sending started or steered, or with the chat's queue, instead of a second chat, run,
+queued message or steer. A key whose first sending is under way is refused (409); one under way for two minutes is taken
+for a sending its daemon left part way. A sending that failed lets its key go. The keys of a run, a steer and a queued
+message are apart, and a message without a key (the API used directly) is done each time, as before. Before, a message
+whose answer was lost and that was sent again started a second run in a second chat, or was queued or steered a second
+time. Tests: `tests/smoke/test_sent_once.py` sends a new chat, a queued message and a steer twice with one key to a
+served daemon, a message whose sending failed and one whose sending is under way, and the page that loses the answer to
+its first sending and sends the message again, in Chrome, wide and on a phone, light and dark;
+`tests/unit/test_sent_messages.py` takes a key once, again once its sending went stale or failed, and anew once it is
+forgotten. Each fails on the code of before.
 
 **What.** The pages send a key with each new message, and a message sent again with the same key (after an answer that
 was lost) gets the run or the queued message of the first, instead of a second chat or a second run.
@@ -10092,3 +10107,4 @@ running" for all of them.
 - 2026-10-13 (Opus 5.5): item 185 merged as `b178796` (PR #224; no Linear issue, the connector was signed out): a provider's HTTP 403 is a refused access, not a refused key: a run moves to its standby model with that reason, Settings › Models says so without a link to the keys, and an error Ollama reports inside its stream keeps its words.
 - 2026-10-13 (Opus 5.5): item 186 merged as `0b3702a` (PR #225; no Linear issue, the connector was signed out): `dotx doctor` checks each model of OpenAI and OpenCode Go against the list of the models its provider serves to the key, a helper and a standby model too, and a list that could not be read is a warning.
 - 2026-10-13 (Opus 5.5): item 187 merged as `2ad0df4` (PR #226; no Linear issue, the connector was signed out): `dotx service install` stops the running job before it writes the new job's file, and puts the file and the job of before back when the new job does not load.
+- 2026-10-13 (Opus 5.5): item 188 merged as `5f294aa` (PR #227; no Linear issue, the connector was signed out): The daemon relays the runs of `dotx` commands to its pages: they work in the sidebar and in Activity, their page follows them live and stops them, a question of theirs is answered there, and the daemon moves their chat's queue once they end; the store refuses a run on a chat where another process drives one.
