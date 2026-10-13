@@ -14,7 +14,7 @@ import { closeMenu, menuOpenedBy, openMenu } from "./menu.js";
 import { nestRows, progressFacts } from "./nesting.js";
 import { readFolds, writePref } from "./prefs.js";
 import { requestCompose } from "./shortcuts.js";
-import { getSnapshot, onChange, onLifecycle } from "./state.js";
+import { onLifecycle, onStreamBack } from "./state.js";
 import { attempt, confirmDialog, toast } from "./ui.js";
 
 // The chats listed at first, the step by which "Show older chats" lists more, and the most the API lists at once.
@@ -773,16 +773,7 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
       reloadSoon();
     }
   });
-  // The stream replays nothing after a break, and what changed meanwhile may have sent no event at all (a restart
-  // closes the runs it finds active): the sidebar reads its lists again when the stream comes back.
-  let stream = getSnapshot().stream;
-  const stopStream = onChange((snapshot) => {
-    const back = snapshot.stream === "live" && stream === "reconnecting";
-    stream = snapshot.stream;
-    if (back) {
-      reloadSoon();
-    }
-  });
+  const stopStream = onStreamBack(reloadSoon);
   document.addEventListener("visibilitychange", onBackInView);
   window.addEventListener("focus", onBackInView);
 

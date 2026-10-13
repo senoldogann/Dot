@@ -10,7 +10,7 @@ import { levelLabel } from "../efforts.js";
 import { icon } from "../icons.js";
 import { emptyPanel, errorPanel, loadingPanel, pageHead, statusBadge } from "../panels.js";
 import { approvalLabel } from "../runmodes.js";
-import { onChange, onLifecycle } from "../state.js";
+import { onChange, onLifecycle, onStreamBack } from "../state.js";
 import { attempt, confirmDialog, toast } from "../ui.js";
 
 // A session starting or ending, or a question asked or decided, changes what the pages show. While a session works, they
@@ -65,6 +65,7 @@ function followUpdates(reload, isWorking) {
       reloadSoon();
     }
   });
+  const stopBack = onStreamBack(reloadSoon);
   const stopChange = onChange(() => {
     if (isWorking()) {
       reloadSoon();
@@ -73,6 +74,7 @@ function followUpdates(reload, isWorking) {
   return () => {
     stopped = true;
     stopLifecycle();
+    stopBack();
     stopChange();
   };
 }

@@ -13,6 +13,7 @@ const snapshot = {
 
 const changeListeners = new Set();
 const lifecycleListeners = new Set();
+const backListeners = new Set();
 
 export function getSnapshot() {
   return snapshot;
@@ -34,6 +35,16 @@ export function onChange(listener) {
 export function onLifecycle(listener) {
   lifecycleListeners.add(listener);
   return () => lifecycleListeners.delete(listener);
+}
+
+/**
+ * Run `listener` each time the lifecycle stream is live again after a break. The stream replays nothing, and what
+ * changed meanwhile may have sent no event at all (a restart closes the runs it finds active), so a page reads again
+ * what it shows from the stream's events (item 160). Returns the function that stops it.
+ */
+export function onStreamBack(listener) {
+  backListeners.add(listener);
+  return () => backListeners.delete(listener);
 }
 
 export async function refresh() {
@@ -82,10 +93,21 @@ export async function runLifecycle(signal, onAuthRejected) {
       signal,
       isFinished: () => false,
       onState: (state) => {
+        const back = state === "live" && snapshot.stream === "reconnecting";
         snapshot.stream = state;
         announce();
         if (state === "live") {
           refreshSoon();
+        }
+        if (back) {
+          // Each listener reads again even when one before it fails to.
+          for (const listener of backListeners) {
+            try {
+              listener();
+            } catch (error) {
+              eventNotShown("/stream", { id: 0, event: "reconnected" }, error);
+            }
+          }
         }
       },
       onMessage: (message) => {

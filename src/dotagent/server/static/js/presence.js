@@ -10,7 +10,7 @@ import { dotName, overallState } from "./face.js";
 import { icon } from "./icons.js";
 import { nestRows } from "./nesting.js";
 import { readFolds, readPref, writePref } from "./prefs.js";
-import { getSnapshot, onChange, onLifecycle } from "./state.js";
+import { getSnapshot, onChange, onLifecycle, onStreamBack } from "./state.js";
 
 const OWNER_KEY = "dot.owner";
 export const OWNER_CHARS = 40;
@@ -216,6 +216,7 @@ export function buildPresence() {
       load();
     }
   });
+  const stopBack = onStreamBack(load);
   load();
   return {
     element,
@@ -227,6 +228,7 @@ export function buildPresence() {
       live.dispose();
       stopChange();
       stopLifecycle();
+      stopBack();
     },
   };
 }

@@ -5079,8 +5079,8 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 156 | The page text of the browser and the desktop has a floor                             | done        | 6ad598f |
 | 157 | The changed notes a running run is handed, and their dates and authors               | done        | 3593f6a |
 | 158 | A model out of reach does not fail a run                                             | done        | 852ccc5 |
-| 159 | A stop of the daemon is never a crash                                                | in progress |         |
-| 160 | Pages catch up after a break                                                         | planned     |         |
+| 159 | A stop of the daemon is never a crash                                                | done        | 30a4480 |
+| 160 | Pages catch up after a break                                                         | in progress |         |
 | 161 | A chat's queue goes on after a clean restart                                         | planned     |         |
 | 162 | A run whose terminal closed can be resumed                                           | planned     |         |
 
@@ -8486,7 +8486,7 @@ and goes on from the same step, for a time the owner sets, instead of failing; i
 
 ### 159. A stop of the daemon is never a crash
 
-**Status: in progress.**
+**Status: done.** Merged as `30a4480` (PR #196; no Linear issue, the Linear connector was signed out).
 
 **As built (2026-10-13).** A wait and a loss of the daemon's way out, each read again in the code first. (1) The way out
 waited for a reflection under way (`Scheduler.drain`), whose calls of the review model can take `model_call_timeout_s`
@@ -8513,11 +8513,25 @@ results of the calls that had ended, so that the run, resumed, does not make the
 
 ### 160. Pages catch up after a break
 
-**Status: planned.**
+**Status: in progress.**
 
-**What.** A page whose connection to the daemon broke reads again what changed while it was away: the stream of the
-lifecycle goes on from the last event the page had, or the page reads its lists again, and a run's page reads its run
-again, its status and its result, not only its events.
+**As built (2026-10-13).** Read again in the code first: every page that follows the stream of the lifecycle
+(`/api/stream`) read what it shows again only when one of its events came, and the stream replays nothing after a break,
+so after the network dropped or the daemon restarted a page kept what it showed before: Activity, Campaigns, Schedules,
+the agents and an agent's page, the team, the home's Today strip, and a run's page with its queue. Only the sidebar read
+its lists again when the stream was back. `onStreamBack` in `state.js` now tells each page that follows the stream when
+the stream is live again after a break, and the page reads again what it shows, the sidebar through it too; a run's page
+reads its run again (`reconcile`), its lessons and its questions among it. A page that fails to read again is told like
+an event it could not show, and the others still read. The stream was not given a replay from the last event a page had:
+some changes send no event at all (a restart closes the runs it finds active), and reading again covers them where a
+replay would not. Tests: `tests/smoke/test_catch_up.py` serves a runtime in a throw-away home by a real server that it
+takes down and brings back up while the runtime works on, and Chrome shows the pages: the Activity page lists under
+Ended today a run that started and ended while the page was away, and a run's page shows in its queue a message queued
+while it was away. Both failed on the code of before, where the pages kept what they showed.
+
+**What.** A page whose connection to the daemon broke reads again what it shows once the connection is back, since the
+stream of the lifecycle replays nothing and what changed meanwhile may have sent no event at all; a run's page reads its
+run again, its lessons and its questions among it, not only its events.
 
 ### 161. A chat's queue goes on after a clean restart
 
@@ -9126,3 +9140,4 @@ by a stop of the daemon can.
 - 2026-10-13 (Opus 5.5): item 156 merged as `6ad598f` (PR #193; no Linear issue, the connector was signed out): in a small model window the text of a page and of a window keeps at least half of a tool result instead of coming back empty.
 - 2026-10-13 (Opus 5.5): item 157 merged as `3593f6a` (PR #194; no Linear issue, the connector was signed out): a running run is handed only the changed notes it would be handed at its start, within their budget; a change of tags leaves a note's date; a note a run rewrites becomes the run's.
 - 2026-10-13 (Opus 5.5): item 158 merged as `852ccc5` (PR #195; no Linear issue, the connector was signed out): a run whose model cannot be reached waits for it and asks the same step again, for `model_wait_s` (900 s by default), instead of failing; part 26, continue where it left off, is planned.
+- 2026-10-13 (Opus 5.5): item 159 merged as `30a4480` (PR #196; no Linear issue, the connector was signed out): a stop of the daemon no longer waits for a reflection under way, and a step it cuts keeps the results of the calls that had ended.

@@ -985,10 +985,11 @@ its title on one line, and under it the channel it last worked in (browser, file
 needs; a row opens the run. **Activity** (`#/activity`) is the same in full, with the runs that ended today and a filter by
 kind (runs, campaigns, schedules); it is `GET /api/activity`. A run that ended shows how long it took and what it cost
 in tokens. Both follow the lifecycle stream, so a run moves between the sections the moment it starts, waits, is taken
-over or ends. A run delegated by another run sits under the run that delegated it, in both the sidebar and the Activity
-page, with its steps so far and its channel; the parent's row says how many runs it delegated. In the chat, the
-delegated run's card carries a chip with its progress ("step 3 · web_fetch", then "done · 12 steps") and an **open**
-link to the run's own page.
+over or ends. The stream replays nothing after a break of the connection (the network dropped, the daemon restarted), so
+once it is back every page that follows it, the run's page and its queue among them, reads again what it shows. A run
+delegated by another run sits under the run that delegated it, in both the sidebar and the Activity page, with its steps
+so far and its channel; the parent's row says how many runs it delegated. In the chat, the delegated run's card carries
+a chip with its progress ("step 3 · web_fetch", then "done · 12 steps") and an **open** link to the run's own page.
 
 **New chat** is Dot's presence and one composer, standing in the middle of the space under the top bar, across and down,
 however long the day under them is. The face is Dot's character, moving (idle with a

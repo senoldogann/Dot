@@ -22,7 +22,7 @@ import { emptyPanel, errorPanel, foldCard, loadingPanel } from "../panels.js";
 import { heldChoice } from "../runmodes.js";
 import { setStageTitle, setStageTools } from "../stage.js";
 import { createStageSize } from "../stagesize.js";
-import { onChange, onLifecycle } from "../state.js";
+import { onChange, onLifecycle, onStreamBack } from "../state.js";
 import { createTimeline } from "../timeline.js";
 import { attempt, confirmDialog, toast } from "../ui.js";
 
@@ -988,6 +988,8 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
       reconcile();
     }
   });
+  // The run as it stands, its lessons and its questions among it, once the lifecycle stream is back after a break.
+  const stopBack = onStreamBack(reconcile);
 
   follow({
     path: `/runs/${runId}/stream`,
@@ -1031,6 +1033,7 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
   return () => {
     window.removeEventListener("scroll", onScroll);
     stopLifecycle();
+    stopBack();
     computer.dispose();
     inspector.dispose();
     stage.dispose();

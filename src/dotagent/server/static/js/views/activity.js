@@ -7,7 +7,7 @@ import { api } from "../api.js";
 import { debounce, el } from "../dom.js";
 import { nestRows } from "../nesting.js";
 import { emptyPanel, errorPanel, loadingPanel, pageHead, segmented } from "../panels.js";
-import { onChange, onLifecycle } from "../state.js";
+import { onChange, onLifecycle, onStreamBack } from "../state.js";
 
 const SECTIONS = [
   { key: "waiting", title: "Waiting for you", empty: "Nothing waits for you", hint: "A run that asks a question or an approval shows here." },
@@ -110,6 +110,7 @@ export function mount(root, ctx) {
       loadSoon();
     }
   });
+  const stopBack = onStreamBack(loadSoon);
   const stopChange = onChange(() => {
     if (view !== null && view.working.length > 0) {
       loadSoon();
@@ -120,6 +121,7 @@ export function mount(root, ctx) {
   return () => {
     disposed = true;
     stopLifecycle();
+    stopBack();
     stopChange();
   };
 }
