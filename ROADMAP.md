@@ -5075,8 +5075,8 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 152 | A late one-time schedule is never dropped unseen                                     | done        | c1ccf7e |
 | 153 | A server of tools that cannot start does not stop the daemon                         | done        | a872136 |
 | 154 | The memory keeps what it learns                                                      | done        | f53eb00 |
-| 155 | The compaction keeps a tail measured in tokens                                       | in progress |         |
-| 156 | The page text of the browser and the desktop has a floor                             | planned     |         |
+| 155 | The compaction keeps a tail measured in tokens                                       | done        | 5b0b2cb |
+| 156 | The page text of the browser and the desktop has a floor                             | in progress |         |
 
 ### 77. The type system: Inter and Geist Mono, seven sizes, three weights
 
@@ -8341,7 +8341,7 @@ words that say it failed.
 
 ### 155. The compaction keeps a tail measured in tokens
 
-**Status: in progress.**
+**Status: done.** Merged as `5b0b2cb` (PR #192; no Linear issue, the Linear connector was signed out).
 
 **As built (2026-10-13).** A compaction kept about eight messages, whatever the budget: `split_for_summary` took a count
 of messages to keep (8, from the loop; a few more when the cut fell inside a tool exchange) and the room in tokens could
@@ -8364,7 +8364,25 @@ never less than the newest exchange, as the README says, not about eight message
 
 ### 156. The page text of the browser and the desktop has a floor
 
-**Status: planned.**
+**Status: in progress.**
+
+**As built (2026-10-13).** The browser's tools gave the text of a page what one tool result of the run may carry less
+3500 characters for the rest of the result (steps, tabs, notes and the fence lines), and the desktop's snapshot the same
+of `tool_output_chars`. A run's results shrink with a small model window (never below 2000 characters), so nothing was
+left for the text: a model whose window holds 32 768 tokens gets results of 3072 characters and a page body of -428, and
+`browser_open` said "(empty page)". `browser_read_text` cut the text at a negative length, which in Python keeps all of
+it but its end, so it handed back 6459 of 6887 characters in a result of 3072, which the executor then cut in the
+middle, and it named an offset to go on from that skipped what was cut. `text_room` in `tools/base.py` now gives the
+text what is left next to the rest of the result, and never less than half the result; the page body and
+`browser_read_text` of the browser, and the snapshot and `desktop_read` of the desktop, use it. This changes only
+results under 7000 characters (a window under about 75 000 tokens); with the default budget a page body and a window
+keep 8500 characters. Tests: `tests/smoke/test_page_room.py` opens a page of eighty paragraphs on a real headless Chrome
+in a run whose results are 3072 characters: the page comes back shortened within one result, with its first paragraph
+and the note of how many lines are not shown, and its text is read in pages that fit, the second going on where the
+first stopped; in `tests/unit/test_scaffold.py`, the desktop's snapshot budget is 1500 for a `tool_output_chars` of 3000
+and stays 8500 by default. All of them failed on the code of before (the empty page, a result of 6624 characters, a
+budget of -500). The desktop's snapshot still does not follow the window: it is sized from `tool_output_chars` when Dot
+starts, and the executor cuts the middle out of a snapshot over a small window's result, as before.
 
 **What.** In a small model window the text of a page has a floor: a page never comes back empty because the window is
 small.
@@ -8958,3 +8976,4 @@ small.
 - 2026-10-13 (Opus 5.5): item 152 merged as `c1ccf7e` (PR #189; no Linear issue, the connector was signed out): a one-time schedule whose moment passed fires late, its run reading first when it was due, and one due while the emergency stop is engaged waits for the release.
 - 2026-10-13 (Opus 5.5): item 153 merged as `a872136` (PR #190; no Linear issue, the connector was signed out): an MCP server that cannot start is left out with the reason and Dot starts without its tools; Settings › System, `dotx run` and `dotx doctor` say so.
 - 2026-10-13 (Opus 5.5): item 154 merged as `f53eb00` (PR #191; no Linear issue, the connector was signed out): the nightly merge leaves resting notes and other agents' notes alone, a lesson and the one that says not to do it are told apart, each group of starting notes has its own share of the budget, and a failed run's lessons are asked for in words that say it failed.
+- 2026-10-13 (Opus 5.5): item 155 merged as `5b0b2cb` (PR #192; no Linear issue, the connector was signed out): a compaction keeps as many of the newest messages as fit its room in tokens, never less than the newest exchange, instead of about eight.

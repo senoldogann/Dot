@@ -18,7 +18,7 @@ from dotagent.agent.scaffold import (
     scaffold_for,
 )
 from dotagent.cli_profile import render_profile
-from dotagent.config import AgentConfig, OllamaConfig, load_default_config
+from dotagent.config import AgentConfig, AppConfig, OllamaConfig, load_default_config
 from dotagent.core.errors import ConfigError
 from dotagent.core.types import JsonObject
 from dotagent.llm.ollama import num_ctx_for, parse_model_details
@@ -26,6 +26,7 @@ from dotagent.llm.types import INVALID_ARGUMENTS_KEY, ModelInfo
 from dotagent.store.db import Store
 from dotagent.store.models import RunRecord
 from dotagent.store.stats import ModelProfile, read_model_profile
+from dotagent.tools.desktop import snapshot_budget
 
 # The packaged defaults: context_tokens 96 000, tool_output_chars 12 000, scaffold "fixed", profile_min_calls 50,
 # weak_refusal_share 0.1, reminder_every 6.
@@ -74,6 +75,14 @@ def test_the_budget_follows_a_small_window_and_the_tool_output_shrinks_with_it()
         "reason": '[agent] scaffold is "fixed"',
         "reminder_every": None,
     }
+
+
+def test_the_text_of_a_desktop_window_keeps_half_of_a_small_tool_result() -> None:
+    config: AppConfig = load_default_config()
+    assert snapshot_budget(config) == 8500
+    # 3000 characters leave nothing next to the 3500 kept for the rest of a result: half of the result is the floor.
+    small: AppConfig = config.model_copy(update={"agent": config.agent.model_copy(update={"tool_output_chars": 3000})})
+    assert snapshot_budget(small) == 1500
 
 
 def test_the_tier_is_measured_only_when_asked_and_a_hand_set_tier_always_wins() -> None:

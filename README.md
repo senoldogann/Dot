@@ -226,7 +226,9 @@ answer (a small model that is offered both writes the call out as text).
   the model's cache, and `num_ctx_cloud` (262 144) for a cloud model, whose name ends in `:cloud` and which runs on
   Ollama's servers. When three quarters of the window is less than `context_tokens`, the run's budget
   is that, and `tool_output_chars`, the most one tool result may carry, shrinks in the same proportion (never below 2000
-  characters). A model whose window cannot hold the system prompt and the tool definitions is refused at the start, with
+  characters). The text of a page or an application window in a browser or desktop result takes what is left next to the
+  rest of the result, and never less than half the result, so a small window shortens a page instead of leaving it out.
+  A model whose window cannot hold the system prompt and the tool definitions is refused at the start, with
   a hint. A model of the `weak` tier is reminded in task and research runs, every `reminder_every` steps, of the goal,
   your messages, the plan and its newest actions. `tiers` in `[agent]` sets a model's tier by hand; with
   `scaffold = "measured"` a model is weak when at least `profile_min_calls` tool calls of its newest 30 finished runs
