@@ -5088,6 +5088,12 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 165 | Help found elsewhere is added only with the owner's yes                              | done        | 52a7c02 |
 | 166 | A run's instructions list the help that fits its goal                                | done        | c3a6b83 |
 | 167 | Evals show whether a run takes the easy way                                          | done        | 3dc670c |
+| 168 | A run reads only the skills it is offered                                            | in progress |         |
+| 169 | Help is found by meaning as well as by words                                         | planned     |         |
+| 170 | A delegated run's thread takes no queue                                              | planned     |         |
+| 171 | The text of a desktop window follows the run's model window                          | planned     |         |
+| 172 | A dotx command that dies does not leave its run at work                              | planned     |         |
+| 173 | Every smoke test passes alone, and the README keeps its width                        | planned     |         |
 
 ### 77. The type system: Inter and Geist Mono, seven sizes, three weights
 
@@ -8796,6 +8802,97 @@ does not take the easy way; and with the skills folder taken before the attempt'
 **What.** Evals measure whether a run takes the easy way: tasks that a skill, an MCP tool or a scriptable application
 makes short, scored by the steps and the channel the run took.
 
+## Part 28: what part 27's report found (planned 2026-10-13)
+
+The owner's twenty-seventh word, on 2026-10-13, after the report of part 27: go on from where the work was left. The
+work planned was done, so going on is closing what that report found and left open.
+
+**Status (2026-10-13): planned.** Each gap was read again in the code. The `skill` tool loads every skill installed, so
+a run reads a learned skill of another agent by its name, and its refusal of a name it does not know lists every skill
+installed, while the instructions and `find_help` leave such skills out (item 94). `find_help` and the skills a run's
+instructions list (item 166) are ranked by words alone: a goal in Turkish shares no word with a skill described in
+English, so `find_help` finds nothing for it, and a run offered more than twenty skills has none of them listed; part 27
+said meaning could join the words, and it did not. A chat's queue (item 148) refuses the chat of a campaign but takes
+the thread of a delegated run through the API (its page has no composer): the delegated run's end leaves its queue
+alone, so a message queued there never starts, and with no run at work there it starts a run of its own on the helper's
+thread; deleting the chat of the run that delegated deletes the helper's thread and leaves its queue. The text of a
+desktop window is sized when Dot starts, from the setting of the tool results, while the text of a page follows the
+run's model window, so on a model with a small window the executor cuts the middle out of a window's text. Only the
+daemon closes the runs of a process that is gone, and only when it starts: a `dotx` command that is killed, or quit with
+a second Ctrl-C before its run's end is written, leaves the run at work on every page until the daemon starts again,
+which then says that the daemon stopped. A test of the MCP hub fails when it runs alone, since the workspace it needs is
+made by the fixture of another test, and some of the README's prose is wider than 120 columns.
+
+**The shape of this part (the decisions).** Six items, each a pull request of its own, the most important first: a run
+reads only the skills it is offered (168); help is found by meaning as well as by words, with the embeddings the notes
+already use (169); a delegated run's thread takes no queue (170); the text of a desktop window follows the run's model
+window (171); a `dotx` command that dies does not leave its run at work (172); every smoke test passes alone, and the
+README keeps its width (173). Not in this part: a bound on the whole of the daemon's stop (no stop has been cut short in
+the owner's logs, and item 159 bounded the part that could take minutes); versions of notes, resuming by default (an
+eval on a live model must show first that it helps) and an eval task that a scriptable application makes short (the
+evals run without the desktop).
+
+### How to start part 28 (the handoff prompt)
+
+> Read ROADMAP.md part 28 and the status table of part 9 (rows 168 to 173). One item at a time, in order; the protocol
+> of part 5 (branch, gate, PR, Linear MYP issue when the connector is signed in, squash merge, hash in the table, log
+> line) is unchanged. Read each gap again in the code before closing it, give each change a test that fails on the code
+> of before, and check a page that changes in a browser, wide and on a phone, light and dark. Never touch the owner's
+> data directory except to read it, by the kinds and numbers of what is stored, and to restart the daemon when
+> `/api/status` shows no active run; PLAN.md stays untracked. The owner reads Turkish; everything written is English.
+
+### 168. A run reads only the skills it is offered
+
+**Status: in progress.**
+
+**As built (2026-10-13).** The `skill` tool reads a skill only from those the run is offered (`offered_to_run`, the
+filter of the instructions and of `find_help`): a learned skill of another agent that is not shared is not read by its
+name, and a name the run is not offered is refused with the words that no skill offered to the run is called so, and the
+names of only those that are. The tool's name (`SKILL_TOOL`) moved next to `SKILL_FILE` in `skills/types.py`, so that
+the module of the learned skills, which counts the runs that read them, no longer imports the tool. Tests:
+`tests/smoke/test_skills_runtime.py` writes a learned skill of an agent into a scratch home; a run of that agent reads
+it, a run of Dot is refused without its steps, and the names a refusal lists leave it out. On the code of before, Dot's
+run read the agent's skill whole.
+
+**What.** A run reads only the skills it is offered: the `skill` tool leaves out what the instructions and `find_help`
+leave out, and a refusal names only the skills the run is offered.
+
+### 169. Help is found by meaning as well as by words
+
+**Status: planned.**
+
+**What.** `find_help` and the skills a run's instructions list are ranked by meaning as well as by words, with the
+embeddings the notes use (bge-m3 runs on this Mac and reads Turkish as well as English), so a goal in one language finds
+help described in another; with the embeddings off, by words as before.
+
+### 170. A delegated run's thread takes no queue
+
+**Status: planned.**
+
+**What.** The thread of a delegated run takes no queue, as the chat of a campaign takes none, and deleting a chat
+deletes the queues of the threads of the runs it delegated.
+
+### 171. The text of a desktop window follows the run's model window
+
+**Status: planned.**
+
+**What.** The text of a desktop window follows the run's model window, as the text of a page does, so the executor never
+cuts it in the middle.
+
+### 172. A dotx command that dies does not leave its run at work
+
+**Status: planned.**
+
+**What.** The run of a `dotx` command that dies is closed while the daemon runs, not at its next start, and is said to
+be cut off by its command's end rather than by the daemon; a second Ctrl-C still writes the stop that the first one
+asked for.
+
+### 173. Every smoke test passes alone, and the README keeps its width
+
+**Status: planned.**
+
+**What.** Every smoke test passes when it runs alone, and the README's prose keeps within 120 columns.
+
 ## Log
 
 - 2026-10-08: roadmap written from the owner's go-ahead for all eight items, in this order. Nothing implemented yet.
@@ -9398,3 +9495,4 @@ makes short, scored by the steps and the channel the run took.
 - 2026-10-13 (Opus 5.5): item 165 merged as `52a7c02` (PR #202; no Linear issue, the connector was signed out): a skill or an MCP server that another agent of the Mac set up is added to Dot only with the owner's yes, in Settings › Skills: a skill as a copy in Dot's skills folder, a server as a line of Dot's record with a fingerprint of its entry, started while that entry is unchanged; find_help tells a run of what can be added, for the run to ask the owner.
 - 2026-10-13 (Opus 5.5): item 166 merged as `c3a6b83` (PR #203; no Linear issue, the connector was signed out): a run's instructions list at most `[skills] listed` skills (20), those that fit its goal best when it is offered more, with a line on the rest that points to find_help; a big tool group's line names the tools that fit the goal first.
 - 2026-10-13 (Opus 5.5): item 167 merged as `3dc670c` (PR #204; no Linear issue, the connector was signed out): an eval task can bring skills and MCP servers and name the easy way they offer; three help tasks, the score's count of the easy ways taken and what a pass costs with and without, and `dotx eval check` reports a reference that does not take its easy way. Part 27 is done.
+- 2026-10-13 (Opus 5.5): part 28, what part 27's report found, is planned (items 168 to 173); item 168 is built: the `skill` tool reads only a skill the run is offered.

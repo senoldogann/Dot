@@ -1,7 +1,7 @@
 """Skills and plugins end to end, on real folders in a throwaway Dot home: a plugin brings its MCP server and its skills,
-the prompt lists the skills, the ``skill`` tool hands over the instructions and the files, a run reads and runs them but
-never changes what Dot loads (item 135), and ``dotx skills list`` shows what was found and what was left out. Nothing is
-mocked."""
+the prompt lists the skills, the ``skill`` tool hands over the instructions and the files of a skill the run is offered
+and of no other (item 168), a run reads and runs them but never changes what Dot loads (item 135), and ``dotx skills
+list`` shows what was found and what was left out. Nothing is mocked."""
 
 import asyncio
 import json
@@ -17,10 +17,12 @@ from pathlib import Path
 import pytest
 import pytest_asyncio
 
+from dotagent.agent.playbooks import Playbook, playbook_name, write_playbook
 from dotagent.agent.prompt import build_system_prompt, collect_prompt_inputs
+from dotagent.agent.review import PlaybookDraft
 from dotagent.agent.verify import new_facts
 from dotagent.config import load_config
-from dotagent.core.paths import workspace_dir
+from dotagent.core.paths import playbooks_dir, workspace_dir
 from dotagent.core.types import JsonObject
 from dotagent.policy.engine import auto_review, preset_verdict
 from dotagent.policy.types import ActionInfo, Decision
@@ -50,6 +52,10 @@ allowed-tools: shell web_fetch
 1. Run `scripts/collect.sh <version>` to list the merged pull requests.
 2. Group them by area; one line each, in the past tense.
 """
+SCOUT: str = "agent-scout"
+LEARNED_KIND: str = "Check a claim against the ministry register"
+LEARNED: str = playbook_name(LEARNED_KIND)
+LEARNED_STEP: str = "Search the register for the claim and quote its entry."
 DEPLOY_SITE: str = """---
 name: deploy-site
 description: Deploy the marketing site. Use when asked to publish or deploy the site.
@@ -123,12 +129,12 @@ async def runtime(home: Path, environment: None) -> AsyncIterator[Runtime]:
         await close_runtime(built)
 
 
-def _context(runtime: Runtime) -> ToolContext:
+def _context(runtime: Runtime, agent_id: str | None) -> ToolContext:
     return ToolContext(
         runtime=runtime,
         browser=runtime.browser,
         run_id="skills-test",
-        agent_id=None,
+        agent_id=agent_id,
         thread_id="skills-test",
         mode="task",
         approvals="ask",
@@ -142,14 +148,21 @@ def _context(runtime: Runtime) -> ToolContext:
 
 
 async def _call(runtime: Runtime, name: str, arguments: JsonObject) -> tuple[ToolResult, ActionInfo]:
-    ctx: ToolContext = _context(runtime)
+    return await _call_as(runtime, None, name, arguments)
+
+
+async def _call_as(
+    runtime: Runtime, agent_id: str | None, name: str, arguments: JsonObject
+) -> tuple[ToolResult, ActionInfo]:
+    """Call a tool in a run of the agent ``agent_id`` (``None`` for Dot)."""
+    ctx: ToolContext = _context(runtime, agent_id)
     prepared = await runtime.registry.tools[name].prepare(arguments, ctx)
     return await prepared.run(ctx), prepared.action
 
 
 async def _action(runtime: Runtime, name: str, arguments: JsonObject) -> ActionInfo:
     """What the policy is shown for the call; nothing runs."""
-    return (await runtime.registry.tools[name].prepare(arguments, _context(runtime))).action
+    return (await runtime.registry.tools[name].prepare(arguments, _context(runtime, None))).action
 
 
 async def _dotx(home: Path, arguments: list[str]) -> CliOutcome:
@@ -265,11 +278,48 @@ async def test_a_run_reads_and_runs_a_skill_but_never_changes_what_dot_loads(run
     assert "what Dot loads and runs" in (await _action(runtime, *changes[0])).summary
 
 
-async def test_an_unknown_skill_is_refused_with_the_installed_names(runtime: Runtime) -> None:
+async def test_an_unknown_skill_is_refused_with_the_names_of_the_skills_offered(runtime: Runtime) -> None:
     result, _ = await _call(runtime, "skill", {"name": "nope"})
     assert result.is_error
-    assert "No skill is called nope" in result.text
+    assert "No skill offered to this run is called nope" in result.text
     assert "release-notes" in result.text and "deploy-site" in result.text
+
+
+def _learned(agent_id: str) -> Playbook:
+    """A learned skill of the agent ``agent_id``, as a run of its would have written it."""
+    return Playbook(
+        name=LEARNED,
+        kind=LEARNED_KIND,
+        host="register.example.gov",
+        draft=PlaybookDraft(
+            kind=LEARNED_KIND,
+            description="Look a claim up in the ministry register and quote the entry.",
+            when="A goal that asks to check a claim against the register.",
+            steps=("Open the register's search.", LEARNED_STEP),
+            parameters=("<claim>: the claim to check",),
+        ),
+        run_id="run-earlier",
+        agent_id=agent_id,
+        goal="Check the claim",
+        written_at=1_760_000_000.0,
+        acting_steps=4,
+    )
+
+
+async def test_a_run_reads_only_the_skills_it_is_offered_and_hears_of_no_other(runtime: Runtime) -> None:
+    # A learned skill of an agent is offered to that agent's runs alone (item 94): another run can neither read it by
+    # its name nor find its name among the skills a refusal lists (item 168).
+    written: Path = await asyncio.to_thread(write_playbook, playbooks_dir(), _learned(SCOUT))
+    try:
+        own, _ = await _call_as(runtime, SCOUT, "skill", {"name": LEARNED})
+        assert not own.is_error and LEARNED_STEP in own.text, own.text
+        refused, _ = await _call_as(runtime, None, "skill", {"name": LEARNED})
+        assert refused.is_error and LEARNED_STEP not in refused.text, refused.text
+        assert f"No skill offered to this run is called {LEARNED}" in refused.text, refused.text
+        unknown, _ = await _call_as(runtime, None, "skill", {"name": "nope"})
+        assert "release-notes" in unknown.text and LEARNED not in unknown.text, unknown.text
+    finally:
+        await asyncio.to_thread(shutil.rmtree, written.parent)
 
 
 async def test_dotx_skills_list_shows_everything_and_what_was_left_out(home: Path) -> None:

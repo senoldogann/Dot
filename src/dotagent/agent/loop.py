@@ -191,7 +191,7 @@ from dotagent.memory.service import (
 from dotagent.policy.types import QuestionMode
 from dotagent.runtime import Runtime
 from dotagent.skills.catalog import load_skills, playbook_root
-from dotagent.skills.types import SkillCatalog
+from dotagent.skills.types import SKILL_TOOL, SkillCatalog
 from dotagent.store.endings import GOAL_CHECK_MARK, PREFIX_CUT_SHORT, RESULT_EMPTY_REPLIES
 from dotagent.store.models import AgentRecord, CampaignRecord, EventRecord, MemoryRecord, RunMode, RunRecord
 from dotagent.store.stats import ACT_TOOLS
@@ -203,7 +203,6 @@ from dotagent.tools.groups import CORE_GROUP, groups_event, groups_of, hidden_to
 from dotagent.tools.meta import ASK_USER_TOOL, FINISH_TOOL, USE_TOOLS_TOOL, FinishArgs, UseToolsArgs
 from dotagent.tools.posts import POST_TOOLS
 from dotagent.tools.registry import ToolRegistry, specs_for_mode
-from dotagent.tools.skill import SKILL_TOOL
 from dotagent.tools.team import CREATE_AGENT_TOOL, MESSAGE_AGENT_TOOL
 
 log = get_logger(__name__)

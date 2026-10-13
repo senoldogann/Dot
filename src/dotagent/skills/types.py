@@ -7,6 +7,8 @@ from pydantic import ConfigDict, Field
 from dotagent.core.types import FrozenModel
 
 SKILL_FILE: str = "SKILL.md"
+# The tool that reads a skill a run is offered.
+SKILL_TOOL: str = "skill"
 # The specification: 1-64 lower-case letters, digits and hyphens, no hyphen at either end and none doubled.
 SKILL_NAME_PATTERN: str = r"^[a-z0-9]+(-[a-z0-9]+)*$"
 

@@ -11,14 +11,13 @@ from dotagent.core.types import FrozenModel
 from dotagent.policy.types import ApprovalMode, Preset, QuestionMode
 from dotagent.scheduler import SCHEDULE_SOURCE
 from dotagent.skills.catalog import PLAYBOOK_SOURCE
-from dotagent.skills.types import Skill
+from dotagent.skills.types import SKILL_TOOL, Skill
 from dotagent.store.models import RunMode
 from dotagent.tools.consult import CONSULT_TOOL
 from dotagent.tools.delegate import DELEGATE_SOURCE, DELEGATE_TOOL
 from dotagent.tools.groups import group_lines
 from dotagent.tools.help import FIND_HELP_TOOL
 from dotagent.tools.meta import ASK_USER_TOOL, USE_TOOLS_TOOL
-from dotagent.tools.skill import SKILL_TOOL
 from dotagent.tools.team import CREATE_AGENT_TOOL, MESSAGE_AGENT_TOOL
 
 

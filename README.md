@@ -1668,14 +1668,16 @@ rules, which still hold; its tools are the ones the agent names plus finishing, 
 The run's page wears the agent's face and name in the bar with a chip to its page; its rows on the Activity page and
 in the sidebar wear the face too. Deleting an agent leaves its chats, its lessons and its learned skills to Dot.
 
-An agent learns for itself. A lesson drawn from an agent's run is the agent's own (the note carries its `agent_id`),
-and so is a skill its run was distilled into (`agent_id` in `playbook.json`); Dot's lessons and skills are everyone's.
-An agent's run is handed its own lessons first, then Dot's notes, never another agent's, at its start and through
-`memory_search` alike; it is offered its own learned skills and Dot's, and another agent's only once you mark that
-skill shared (Settings › Skills or the agent's page, `PUT /api/skills/learned/{name}` with `shared`). The scores it
-ranks its notes by, and the ones its page shows, count its own runs alone. An agent's page lists what it learned
-("What it learned": its lessons with how its runs fared after each, with Forget, and its skills with Share and Drop),
-and the Memory page marks a lesson with its agent's name. A note a run saves with `memory_save` is Dot's, for every run.
+An agent learns for itself. A lesson drawn from an agent's run is the agent's own (the note carries its `agent_id`), and
+so is a skill its run was distilled into (`agent_id` in `playbook.json`); Dot's lessons and skills are everyone's. An
+agent's run is handed its own lessons first, then Dot's notes, never another agent's, at its start and through
+`memory_search` alike; it is offered its own learned skills and Dot's, and another agent's only once you mark that skill
+shared (Settings › Skills or the agent's page, `PUT /api/skills/learned/{name}` with `shared`). A skill a run is not
+offered stays out of its reach: the `skill` tool reads only one the run is offered, and asked for another by its name,
+it says that no skill offered to the run is called so and names only those that are. The scores the agent ranks its
+notes by, and the ones its page shows, count its own runs alone. An agent's page lists what it learned ("What it
+learned": its lessons with how its runs fared after each, with Forget, and its skills with Share and Drop), and the
+Memory page marks a lesson with its agent's name. A note a run saves with `memory_save` is Dot's, for every run.
 
 A run can make a teammate itself (item 99). The `create_agent` tool (a name, a role, instructions, the tools it may
 use, a model if one is wanted) makes an agent as the Agents page does, under your approvals (the `persistence` flag,
