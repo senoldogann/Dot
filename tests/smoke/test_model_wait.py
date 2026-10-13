@@ -1,6 +1,7 @@
 """A run whose model cannot be reached for a while, on a scripted model in a throw-away home: the run waits for the
 connection and asks the same step again, a stop ends the wait at once, a model that stays out of reach fails the run once
-the wait is over, and a request the provider refuses or a rate limit fails it at once. No model is called.
+the wait is over, and a request the provider refuses or a rate limit fails it at once; a run that an error fails
+keeps the error's message as its result and the error's context with its end. No model is called.
 """
 
 import asyncio
@@ -43,6 +44,12 @@ _MAX_EVENTS: int = 1000
 BROKEN: ProviderTransportError = wrap_transport_error(httpx.ConnectError("[Errno 51] Network is unreachable"), {})
 OVERLOADED: ProviderHttpError = ProviderHttpError("the provider is overloaded", 529, {})
 REFUSED: ProviderHttpError = ProviderHttpError("the request was refused", 400, {})
+# A refusal with what a connector keeps of the request and the answer in the error's context.
+REFUSED_WITH_CONTEXT: ProviderHttpError = ProviderHttpError(
+    "provider answered HTTP 400: the request was refused",
+    400,
+    {"payload": "the request of the run", "response_body": "the answer of the provider"},
+)
 # A status the connector retries, but one that says the model cannot answer for a while, not that it is out of reach.
 RATE_LIMITED: ProviderRateLimitError = ProviderRateLimitError("the rate limit is reached", 429, 5.0, {})
 
@@ -185,3 +192,17 @@ async def test_a_refused_or_rate_limited_request_fails_the_run_at_once(
     assert error.message in played.record.result
     assert played.kind("model_waiting") == []
     assert played.seconds < 5.0
+
+
+async def test_a_run_an_error_fails_shows_its_message_and_keeps_its_context_with_its_end(
+    login_env: dict[str, str],
+) -> None:
+    model: Unreachable = Unreachable(ScriptedProvider(_PROVIDER, TURNS), 1000, REFUSED_WITH_CONTEXT)
+    played: Played = await _play(login_env, 600.0, model, False)
+    assert (played.record.status, played.record.result) == ("failed", REFUSED_WITH_CONTEXT.message)
+    [finished] = played.kind("run_finished")
+    assert finished.data["result"] == REFUSED_WITH_CONTEXT.message
+    assert finished.data["error"] == {
+        "message": REFUSED_WITH_CONTEXT.message,
+        "context": {"payload": "the request of the run", "response_body": "the answer of the provider", "status": 400},
+    }

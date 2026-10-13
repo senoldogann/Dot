@@ -94,12 +94,14 @@ the run's own model is never its helper.
 provider has no key: the run goes on from the same step, with the tools that step had, on the first standby model that
 can take it over, the model is told, and the timeline shows the switch, which the model chip follows. The run's
 reasoning level becomes the nearest one the new model offers. A run takes each model once at most, in the order of the
-list, and never goes back to one it left. A standby model that cannot call tools while the run offers them, whose
-window cannot hold the instructions and the tools, or whose details cannot be read is passed over; when every one is,
-the run fails and says why for each. Without a standby model that can answer, the error ends the run. A transport
-error or a timeout moves nothing (the run waits for its own model instead, see below), and neither does a failure of the
-`review` or `vision` model: the review model has no standby, so with `review` on the same provider as `main` a goal
-check or an `auto` approval fails while that provider cannot answer.
+list, and never goes back to one it left. A standby model that cannot call tools while the run offers them, whose window
+cannot hold the instructions and the tools, or whose details cannot be read is passed over; when every one is, the run
+fails and says why for each. Without a standby model that can answer, the error ends the run, and its message is the
+run's result (what the timeline, a notification and `dotx run` show); its context, the request and the answer of the
+provider, is kept with the run's `run_finished` event and in the log. A transport error or a timeout moves nothing (the
+run waits for its own model instead, see below), and neither does a failure of the `review` or `vision` model: the
+review model has no standby, so with `review` on the same provider as `main` a goal check or an `auto` approval fails
+while that provider cannot answer.
 
 A model is left out of both lists while its provider has no key (an Ollama model needs none), and after such an error
 for the time the provider named (at most a day) or for `helper_cooldown_s` seconds, until a call to it is answered or

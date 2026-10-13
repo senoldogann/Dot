@@ -18,6 +18,7 @@ from dotagent.agent.manager import RunManager
 from dotagent.config import AppConfig, load_default_config
 from dotagent.core.errors import RunConflict, StoreError
 from dotagent.core.paths import db_path
+from dotagent.core.types import JsonObject
 from dotagent.evals.runner import SCRIPTED_MODEL, eval_config, eval_environment, scratch_home
 from dotagent.evals.scripted import ScriptedProvider
 from dotagent.evals.types import ScriptedCall, ScriptedTurn
@@ -48,7 +49,13 @@ class _SteeredAtTheEnd(RunManager):
         self.refused: list[bool] = []
 
     async def _record_end(
-        self, run: RunRecord, status: RunStatus, result: str, needs: str, inbox: asyncio.Queue[UserInput]
+        self,
+        run: RunRecord,
+        status: RunStatus,
+        result: str,
+        needs: str,
+        error: JsonObject | None,
+        inbox: asyncio.Queue[UserInput],
     ) -> None:
         try:
             self.steer(run.id, "One more thing.", ())
@@ -56,14 +63,20 @@ class _SteeredAtTheEnd(RunManager):
             self.refused.append(True)
         else:
             self.refused.append(False)
-        await super()._record_end(run, status, result, needs, inbox)
+        await super()._record_end(run, status, result, needs, error, inbox)
 
 
 class _StoreFailsAtTheEnd(RunManager):
     """A store that fails as the end of a run is recorded."""
 
     async def _record_end(
-        self, run: RunRecord, status: RunStatus, result: str, needs: str, inbox: asyncio.Queue[UserInput]
+        self,
+        run: RunRecord,
+        status: RunStatus,
+        result: str,
+        needs: str,
+        error: JsonObject | None,
+        inbox: asyncio.Queue[UserInput],
     ) -> None:
         raise StoreError("the database is locked", {"run_id": run.id})
 
