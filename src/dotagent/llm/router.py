@@ -18,7 +18,15 @@ from dotagent.llm.calls import CANCELLED, CallOrigin, CallRecorder, ModelCall
 from dotagent.llm.ollama import OllamaProvider
 from dotagent.llm.openai import OpenAIProvider
 from dotagent.llm.opencode_go import OpenCodeGoProvider
-from dotagent.llm.types import KNOWN_PROVIDERS, ChatProvider, ChatRequest, DeltaSink, ModelInfo, ModelReply
+from dotagent.llm.types import (
+    KNOWN_PROVIDERS,
+    ChatProvider,
+    ChatRequest,
+    DeltaSink,
+    ModelInfo,
+    ModelReply,
+    split_model_ref,
+)
 from dotagent.secrets import require_secret, resolve_secret
 
 log = get_logger(__name__)
@@ -35,13 +43,13 @@ class ModelRef(FrozenModel):
 
 def parse_model_ref(text: str) -> ModelRef:
     """Split ``provider:model`` at the first colon (model names may contain colons, e.g. ``qwen3:8b``)."""
-    provider, separator, model = text.strip().partition(":")
-    if separator == "" or model == "" or provider not in KNOWN_PROVIDERS:
+    split: tuple[str, str] | None = split_model_ref(text)
+    if split is None:
         raise ConfigError(
             "a model reference must look like '<provider>:<model>'",
             {"value": text, "providers": list(KNOWN_PROVIDERS)},
         )
-    return ModelRef(provider=provider, model=model)
+    return ModelRef(provider=split[0], model=split[1])
 
 
 class Pause(FrozenModel):

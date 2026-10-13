@@ -4,16 +4,51 @@ import re
 import tomllib
 from importlib import resources
 from pathlib import Path
-from typing import Literal, Self
+from typing import Annotated, Literal, Self
+from urllib.parse import urlsplit
 
-from pydantic import Field, JsonValue, ValidationError, field_validator, model_validator
+import httpx
+from pydantic import AfterValidator, Field, JsonValue, ValidationError, field_validator, model_validator
 
 from dotagent.core.errors import ConfigError
 from dotagent.core.paths import config_path
 from dotagent.core.types import FrozenModel, JsonObject
-from dotagent.llm.types import Effort
+from dotagent.llm.types import KNOWN_PROVIDERS, Effort, split_model_ref
 from dotagent.policy.types import ApprovalMode, Preset, QuestionMode
 from dotagent.store.models import BrowserMode
+
+
+def _service_address(value: str) -> str:
+    """An address Dot sends requests to, as its HTTP client reads it: ``http://`` or ``https://`` with a host."""
+    try:
+        url: httpx.URL = httpx.URL(value)
+    except httpx.InvalidURL as exc:
+        raise ValueError(f"the address cannot be read: {exc}") from exc
+    if url.scheme not in ("http", "https") or not url.host:
+        raise ValueError("the address must start with http:// or https:// and name a host")
+    return value
+
+
+def _model_reference(value: str) -> str:
+    """A model as ``<provider>:<model>``, the provider one Dot knows (:func:`dotagent.llm.types.split_model_ref`)."""
+    if split_model_ref(value) is None:
+        raise ValueError(
+            f"a model must look like '<provider>:<model>', the provider one of {', '.join(KNOWN_PROVIDERS)}"
+        )
+    return value
+
+
+def _spend_site(value: str) -> str:
+    """A site of ``[policy.spend]`` as the address of a payment step is matched to it
+    (:func:`dotagent.policy.spend.spend_host`): a host in lower case without ``www.``, with no scheme, port or path."""
+    if value.startswith("www.") or urlsplit(f"https://{value}/").hostname != value:
+        raise ValueError("a site must be a bare host in lower case, without www., such as example.com")
+    return value
+
+
+type ServiceAddress = Annotated[str, AfterValidator(_service_address)]
+type ModelReference = Annotated[str, AfterValidator(_model_reference)]
+type SpendSite = Annotated[str, AfterValidator(_spend_site)]
 
 
 class ServerConfig(FrozenModel):
@@ -34,7 +69,7 @@ class StoreConfig(FrozenModel):
 
 
 class OllamaConfig(FrozenModel):
-    base_url: str
+    base_url: ServiceAddress
     api_key_env: str
     num_ctx: int
     num_ctx_cloud: int
@@ -49,7 +84,7 @@ type GoRoute = Literal["chat", "responses", "messages"]
 
 
 class OpenAIConfig(FrozenModel):
-    base_url: str
+    base_url: ServiceAddress
     api_key_env: str
     organization_env: str
     project_env: str
@@ -61,7 +96,7 @@ class OpenAIConfig(FrozenModel):
 
 
 class OpenCodeGoConfig(FrozenModel):
-    base_url: str
+    base_url: ServiceAddress
     api_key_env: str
     route_overrides: dict[str, GoRoute]
     connect_timeout_s: float = Field(gt=0, allow_inf_nan=False)
@@ -71,7 +106,7 @@ class OpenCodeGoConfig(FrozenModel):
 
 
 class AnthropicConfig(FrozenModel):
-    base_url: str
+    base_url: ServiceAddress
     api_key_env: str
     connect_timeout_s: float = Field(gt=0, allow_inf_nan=False)
     read_timeout_s: float = Field(gt=0, allow_inf_nan=False)
@@ -87,17 +122,25 @@ class ProvidersConfig(FrozenModel):
 
 
 class ModelsConfig(FrozenModel):
-    main: str
-    vision: str
-    fast: str
-    review: str
+    main: ModelReference
+    vision: ModelReference
+    fast: ModelReference
+    review: ModelReference
     # The Anthropic model that relays a web search through the API's own search tool (item 69); "anthropic:" only.
-    search: str
+    search: ModelReference
     effort: Effort
-    helpers: list[str]
-    standby: list[str]
+    helpers: list[ModelReference]
+    standby: list[ModelReference]
     # At most a day, the longest pause of the router (dotagent.llm.router.MAX_PAUSE_S).
     helper_cooldown_s: float = Field(gt=0, le=86_400, allow_inf_nan=False)
+
+    @field_validator("search")
+    @classmethod
+    def _an_anthropic_model(cls, value: str) -> str:
+        split: tuple[str, str] | None = split_model_ref(value)
+        if split is not None and split[0] != "anthropic":
+            raise ValueError("search must name an Anthropic model (anthropic:<model>)")
+        return value
 
 
 type Tier = Literal["standard", "weak"]
@@ -121,8 +164,9 @@ class AgentConfig(FrozenModel):
     # The Chrome a campaign's sessions work in unless its start says otherwise.
     campaign_browser: BrowserMode
     consult_max_per_run: int = Field(ge=0)
-    tool_output_chars: int
-    context_tokens: int
+    # At least the floor a run's tool output keeps however small the model's window (dotagent.agent.scaffold).
+    tool_output_chars: int = Field(ge=2000)
+    context_tokens: int = Field(gt=0)
     # The harness lessons of arXiv 2609.20804 (item 87): past context_elide_share of the budget older tool output is
     # shortened, past context_summarise_share the older part of the run is summarised; plan_each_turn puts the open
     # plan at the end of the system prompt of every step.
@@ -201,7 +245,7 @@ class PolicyConfig(FrozenModel):
     approval_timeout_s: float = Field(gt=0, allow_inf_nan=False)
     protected_paths: list[str]
     code_sources: list[Literal["mail", "messages"]]
-    spend: dict[str, SpendCap]
+    spend: dict[SpendSite, SpendCap]
     pace: PaceConfig
 
 
@@ -242,20 +286,20 @@ class DesktopConfig(FrozenModel):
     settle_quiet_ms: int
     settle_ms: int
     failsafe_corner: bool
-    ax_timeout_s: float
-    ax_budget_s: float
+    ax_timeout_s: float = Field(gt=0, allow_inf_nan=False)
+    ax_budget_s: float = Field(gt=0, allow_inf_nan=False)
     ax_max_nodes: int
     ax_max_depth: int
     snapshot_max_chars: int
-    capture_timeout_s: float
+    capture_timeout_s: float = Field(gt=0, allow_inf_nan=False)
     paste_settle_ms: int
     paste_threshold_chars: int
     keep_awake: bool
     keep_awake_s: int
     max_batch_steps: int
-    launch_timeout_s: float
-    activate_timeout_s: float
-    osascript_timeout_s: float
+    launch_timeout_s: float = Field(gt=0, allow_inf_nan=False)
+    activate_timeout_s: float = Field(gt=0, allow_inf_nan=False)
+    osascript_timeout_s: float = Field(gt=0, allow_inf_nan=False)
 
 
 type EmbedProvider = Literal["ollama", "openai"]
@@ -286,13 +330,19 @@ class MemoryConfig(FrozenModel):
 
 class ShellConfig(FrozenModel):
     pass_env: list[str]
-    login_env_timeout_s: float
-    default_timeout_s: int
-    max_timeout_s: int
+    login_env_timeout_s: float = Field(gt=0, allow_inf_nan=False)
+    default_timeout_s: int = Field(ge=1)
+    max_timeout_s: int = Field(ge=1)
     terminal_sessions: int = Field(ge=0, le=10)
     # At least the longest wait of a terminal read, so that no session is closed while it is read.
     terminal_idle_s: float = Field(ge=60)
     sandbox: bool
+
+    @model_validator(mode="after")
+    def _default_within_max(self) -> Self:
+        if self.default_timeout_s > self.max_timeout_s:
+            raise ValueError("default_timeout_s cannot be more than max_timeout_s")
+        return self
 
 
 class CrawlConfig(FrozenModel):
@@ -316,7 +366,7 @@ class WebConfig(FrozenModel):
     # (auto), before it (first), or not at all (off).
     anthropic_search: Literal["auto", "first", "off"]
     search_spacing_s: float
-    fetch_timeout_s: float
+    fetch_timeout_s: float = Field(gt=0, allow_inf_nan=False)
     fetch_max_bytes: int
     pdf_max_bytes: int
     allow_private_hosts: bool
@@ -413,7 +463,7 @@ class JudgeConfig(FrozenModel):
 
     provider: Literal["none", "typesafe"]
     api_key_env: str
-    base_url: str
+    base_url: ServiceAddress
     model: str
     timeout_s: float = Field(gt=0, le=60)
     public_action_threshold: float = Field(ge=0, le=1)

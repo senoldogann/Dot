@@ -19,6 +19,15 @@ INVALID_ARGUMENTS_KEY: str = "__invalid_arguments__"
 KNOWN_PROVIDERS: tuple[str, ...] = ("ollama", "openai", "opencode_go", "anthropic")
 
 
+def split_model_ref(text: str) -> tuple[str, str] | None:
+    """The provider and the model of ``<provider>:<model>``, split at the first colon (model names may contain colons,
+    e.g. ``qwen3:8b``), or ``None`` when ``text`` is not one or names a provider Dot does not know."""
+    provider, separator, model = text.strip().partition(":")
+    if separator == "" or model == "" or provider not in KNOWN_PROVIDERS:
+        return None
+    return provider, model
+
+
 class ImageData(FrozenModel):
     media_type: str
     data_b64: str

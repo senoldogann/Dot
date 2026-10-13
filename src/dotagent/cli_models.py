@@ -25,8 +25,9 @@ async def cmd_models(command: ModelsCommand) -> int:
     config: AppConfig = load_user_config()
     router: ModelRouter = ModelRouter(config, log_model_call)
     failures: int = 0
+    names: list[str] = [command.provider] if command.provider is not None else list(KNOWN_PROVIDERS)
     try:
-        for provider_name in [command.provider] if command.provider is not None else list(KNOWN_PROVIDERS):
+        for provider_name in names:
             try:
                 models: tuple[ModelInfo, ...] = await (await router.provider(provider_name)).list_models()
             except DotError as exc:
@@ -45,7 +46,8 @@ async def cmd_models(command: ModelsCommand) -> int:
                 sys.stdout.write(f"  {ref.label}  [{traits}]{levels}\n")
     finally:
         await router.aclose()
-    return 1 if failures and command.provider is not None else 0
+    # Some providers unavailable is the usual state (no key for one); none available is a failure.
+    return 1 if failures == len(names) else 0
 
 
 async def cmd_auth_set(command: AuthSetCommand) -> int:
