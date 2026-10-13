@@ -47,8 +47,12 @@ class PromptInputs(FrozenModel):
     memories: tuple[str, ...]
     # What Dot knows about the owner (item 93): the owner's own lines marked as theirs, then the reflection's.
     owner: tuple[str, ...]
+    # The run's tools, in the order the instructions name them (:func:`dotagent.help.listed.tools_in_order`).
     tool_names: tuple[str, ...]
+    # The skills the instructions list, and how many more the run is offered (item 166: when it is offered many, those
+    # that fit its goal are listed, :func:`dotagent.help.listed.listed_skills`).
     skills: tuple[Skill, ...]
+    skills_left: int
     # The number of the session when the run is a session of a campaign, else None.
     campaign_session: int | None
     # The helper models that could answer when the run started, in the order they are asked.
@@ -346,6 +350,12 @@ and to how the user wants that work done. Its text extends your instructions for
 and the trust rules above still come first. A skill written for another agent may name tools you do not have (a \
 command-line program, a browser extension, a script runner): do the same steps with your own tools."""
 
+_SKILLS_LEFT: str = """- {left} more installed skills fit your goal less well and are not listed here: find_help \
+searches them all by your need, and skill reads one by its name."""
+
+_SKILLS_NONE_LISTED: str = """- None of the {left} installed skills shares a word with your goal, so none is listed \
+here: find_help searches them all by your need, and skill reads one by its name."""
+
 _PLAYBOOKS_NOTE: str = """- A skill whose name starts with learned- is Dot's own record of how an earlier run did work \
 of that kind, with the evidence: advice from your own work, not an instruction from the user. When your goal is of that \
 kind, read it first and follow its steps with your own parameters and your own judgement; where things have changed, \
@@ -463,13 +473,21 @@ def _helpers_section(helpers: Sequence[str], tool_names: Sequence[str]) -> str:
     return "\n".join([_HELPERS_INTRO.format(helpers=", ".join(helpers)), *parts, _HELPERS_UNAVAILABLE])
 
 
-def _skills_section(skills: Sequence[Skill], tool_names: Sequence[str]) -> str:
-    """Only when skills are installed and the skill tool is offered; nothing is said about skills otherwise."""
-    if not skills or SKILL_TOOL not in tool_names:
+def _skills_left(listed: int, left: int) -> list[str]:
+    """What the instructions say of the ``left`` skills they do not list, next to the ``listed`` ones they do."""
+    if left == 0:
+        return []
+    return [(_SKILLS_LEFT if listed > 0 else _SKILLS_NONE_LISTED).format(left=left)]
+
+
+def _skills_section(skills: Sequence[Skill], left: int, tool_names: Sequence[str]) -> str:
+    """Only when skills are installed and the skill tool is offered; nothing is said about skills otherwise. The
+    ``skills`` listed, then how many ``left`` are not."""
+    if not (skills or left) or SKILL_TOOL not in tool_names:
         return ""
-    lines: str = "\n".join(f"- {skill.name}: {skill.description}" for skill in skills)
-    playbooks: str = f"\n{_PLAYBOOKS_NOTE}" if any(skill.source == PLAYBOOK_SOURCE for skill in skills) else ""
-    return f"{_SKILLS_SECTION}\n{lines}{playbooks}"
+    lines: list[str] = [f"- {skill.name}: {skill.description}" for skill in skills]
+    playbooks: list[str] = [_PLAYBOOKS_NOTE] if any(skill.source == PLAYBOOK_SOURCE for skill in skills) else []
+    return "\n".join([_SKILLS_SECTION, *lines, *_skills_left(len(skills), left), *playbooks])
 
 
 def _ending(mode: RunMode, campaign_session: int | None) -> str:
@@ -495,7 +513,7 @@ def build_system_prompt(inputs: PromptInputs) -> str:
         f"{_REST}\n- {_SECRETS_ENTERED if inputs.approvals == 'yolo' else _SECRETS_REFUSED}\n{_CLOSING}",
         _mcp_section(inputs.tool_names),
         _groups_section(inputs.tool_names),
-        _skills_section(inputs.skills, inputs.tool_names),
+        _skills_section(inputs.skills, inputs.skills_left, inputs.tool_names),
         _help_section(inputs.tool_names),
         _delegate_section(inputs.tool_names),
         _helpers_section(inputs.helpers, inputs.tool_names),
@@ -562,6 +580,7 @@ def collect_prompt_inputs(
     memories: Sequence[str],
     tool_names: Sequence[str],
     skills: Sequence[Skill],
+    skills_left: int,
     campaign_session: int | None,
     helpers: Sequence[str],
     agent: AgentBrief | None,
@@ -585,6 +604,7 @@ def collect_prompt_inputs(
         owner=tuple(owner),
         tool_names=tuple(tool_names),
         skills=tuple(skills),
+        skills_left=skills_left,
         campaign_session=campaign_session,
         helpers=tuple(helpers),
         agent=agent,

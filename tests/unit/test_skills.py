@@ -11,6 +11,7 @@ from pydantic import ValidationError
 from dotagent.agent.prompt import build_system_prompt, collect_prompt_inputs
 from dotagent.config import McpServerConfig, PluginsConfig
 from dotagent.core.errors import PluginError, SkillError
+from dotagent.help.listed import SkillListing, listed_skills
 from dotagent.plugins.catalog import load_plugins, read_plugin
 from dotagent.plugins.manifest import PluginVariables, parse_manifest, parse_servers_file, to_server_config
 from dotagent.plugins.types import McpServerJson, PluginCatalog
@@ -310,7 +311,7 @@ def test_a_server_table_that_mixes_the_two_ways_to_reach_it_is_refused(
 # ------------------------------------------------------------------------------------------------- the prompt
 
 
-def _prompt(tool_names: list[str], skills: list[Skill]) -> str:
+def _prompt(tool_names: list[str], skills: list[Skill], left: int) -> str:
     return build_system_prompt(
         collect_prompt_inputs(
             "task",
@@ -323,6 +324,7 @@ def _prompt(tool_names: list[str], skills: list[Skill]) -> str:
             [],
             tool_names,
             skills,
+            left,
             None,
             [],
             None,
@@ -334,16 +336,47 @@ def _prompt(tool_names: list[str], skills: list[Skill]) -> str:
 
 def test_the_prompt_lists_the_skills_only_when_there_are_some_and_the_tool_is_offered(tmp_path: Path) -> None:
     skill: Skill = Skill(name="release-notes", description="Write release notes.", root=tmp_path, body="x", source="h")
-    with_skills: str = _prompt(["shell", "skill"], [skill])
+    with_skills: str = _prompt(["shell", "skill"], [skill], 0)
     assert "# Skills" in with_skills
     assert "- release-notes: Write release notes." in with_skills
     assert "call skill with its name" in with_skills
-    assert "# Skills" not in _prompt(["shell", "skill"], [])
-    assert "# Skills" not in _prompt(["shell"], [skill])
+    assert "# Skills" not in _prompt(["shell", "skill"], [], 0)
+    assert "# Skills" not in _prompt(["shell"], [skill], 0)
+
+
+def test_a_run_offered_many_skills_is_listed_those_that_fit_its_goal_and_told_of_the_rest(tmp_path: Path) -> None:
+    skills: list[Skill] = [
+        Skill(name=name, description=description, root=tmp_path / name, body="x", source="home")
+        for name, description in (
+            ("release-notes", "Write the release notes of a version from its commits."),
+            ("invoice-pdf", "Fill in the invoice PDF form of a client."),
+            ("weekly-report", "Write the weekly report from the week's notes."),
+            ("mail-merge", "Send one email to each contact of a list."),
+        )
+    ]
+    # Few enough: every one, in its order, whatever the goal.
+    assert listed_skills(skills, "Plan a trip to Rome.", 4) == SkillListing(skills=tuple(skills), left=0)
+    # More: those that share words with the goal, the best fit first; a goal of two kinds of work keeps both.
+    listing: SkillListing = listed_skills(skills, "Fill in the invoice form and email it to the client.", 3)
+    assert ([skill.name for skill in listing.skills], listing.left) == (["invoice-pdf", "mail-merge"], 2)
+    prompt: str = _prompt(["shell", "skill"], list(listing.skills), listing.left)
+    assert (
+        "- invoice-pdf: Fill in the invoice PDF form of a client.\n"
+        "- mail-merge: Send one email to each contact of a list.\n"
+        "- 2 more installed skills fit your goal less well and are not listed here: find_help searches them all by "
+        "your need, and skill reads one by its name."
+    ) in prompt, prompt
+    assert "release-notes" not in prompt and "weekly-report" not in prompt
+    # None shares a word with the goal: none is listed, and the run is told how to find them.
+    assert listed_skills(skills, "Plan a trip to Rome.", 3) == SkillListing(skills=(), left=4)
+    assert (
+        "\n- None of the 4 installed skills shares a word with your goal, so none is listed here: find_help searches "
+        "them all by your need, and skill reads one by its name."
+    ) in _prompt(["shell", "skill"], [], 4)
 
 
 def test_the_prompt_asks_for_the_smallest_fitting_work_and_for_looking_things_up() -> None:
-    prompt: str = _prompt(["shell"], [])
+    prompt: str = _prompt(["shell"], [], 0)
     assert "simplest approach that fully does it" in prompt
     assert "look it up before acting" in prompt
     assert "use what is already installed" in prompt

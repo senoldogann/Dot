@@ -536,6 +536,9 @@ dirs = []
 # find_help also lists the skills and MCP servers that the Mac's other agents (Claude Code, Claude Desktop, Cursor,
 # VS Code, Codex) set up, for a run to ask you to add one in Settings > Skills; false leaves them out.
 elsewhere = true
+# The most skills a run's instructions list by name and description. When a run is offered more, they list those that
+# share the most words with its goal and say how many more there are, which find_help searches.
+listed = 20
 
 [plugins]
 # Plugins in the Claude Code layout: <plugin>/.claude-plugin/plugin.json (name), skills/<name>/SKILL.md and .mcp.json

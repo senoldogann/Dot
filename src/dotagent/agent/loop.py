@@ -156,6 +156,7 @@ from dotagent.core.jsonutil import dumps_compact
 from dotagent.core.logs import get_logger
 from dotagent.core.text import CHARS_PER_TOKEN, redact_secrets, truncate_middle
 from dotagent.core.types import FrozenModel, JsonObject
+from dotagent.help.listed import SkillListing, listed_skills, tools_in_order
 from dotagent.llm.calls import CallOrigin
 from dotagent.llm.http import is_retryable_provider_error
 from dotagent.llm.router import ModelRef, parse_model_ref, unavailable_reason
@@ -682,9 +683,10 @@ def _turned_on(outcomes: Sequence[ToolOutcome], hidden: Mapping[str, str], on: f
     return tuple(dict.fromkeys(group for group in named if group not in on))
 
 
-async def _memory_query(runtime: Runtime, run: RunRecord) -> str:
-    """What a run's notes are chosen by: its goal, then the goals of the latest earlier runs of its thread, so a short
-    follow-up ("go on", "now the second one") still finds the notes of the work it continues."""
+async def _goal_query(runtime: Runtime, run: RunRecord) -> str:
+    """What a run's notes, and the help its instructions list (item 166), are chosen by: its goal, then the goals of the
+    latest earlier runs of its thread, so a short follow-up ("go on", "now the second one") still finds the notes and
+    the help of the work it continues."""
     earlier: list[RunRecord] = await runtime.store.list_runs(_QUERY_EARLIER_RUNS + 1, run.thread_id)
     goals: list[str] = [record.goal for record in earlier if record.id != run.id and record.parent_run_id is None]
     return "\n".join([run.goal, *goals[:_QUERY_EARLIER_RUNS]])
@@ -1413,9 +1415,8 @@ async def run_agent(agent: AgentRun) -> RunEnd:
     callable_tools: ToolRegistry = _run_tools(runtime.registry, run.mode, specs)
     memory_seen_at: float = time.time()
     notes_budget: int = memory_budget(runtime.config.memory, info.context_length)
-    recalled: Remembered = await prompt_memories(
-        runtime.memory, await _memory_query(runtime, run), notes_budget, run.agent_id
-    )
+    query: str = await _goal_query(runtime, run)
+    recalled: Remembered = await prompt_memories(runtime.memory, query, notes_budget, run.agent_id)
     remembered: tuple[MemoryRecord, ...] = recalled.records
     if remembered:
         await runtime.store.mark_memories_used(run.id, [record.id for record in remembered], memory_seen_at, "start")
@@ -1424,6 +1425,7 @@ async def run_agent(agent: AgentRun) -> RunEnd:
         )
     can_ask: bool = can_ask_user(run.source, run.parent_run_id, run.approvals)
     questions: QuestionMode = question_mode(config.questions, can_ask)
+    listing: SkillListing = listed_skills(skills.skills, query, runtime.config.skills.listed)
     system: Message = system_message(
         build_system_prompt(
             collect_prompt_inputs(
@@ -1435,8 +1437,9 @@ async def run_agent(agent: AgentRun) -> RunEnd:
                 run.goal_mode,
                 runtime.workspace,
                 [render_note(record) for record in remembered],
-                [spec.name for spec in specs],
-                skills.skills,
+                tools_in_order(specs, query),
+                listing.skills,
+                listing.left,
                 None if run.campaign_id is None else await _session_number(agent, run.campaign_id),
                 helpers,
                 None

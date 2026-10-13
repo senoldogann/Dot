@@ -254,13 +254,14 @@ answer (a small model that is offered both writes the call out as text).
   went through a GUI: the prompt sends the agent to a command or an API first, the browser second, the desktop last.
   The timeline shows a budget cut to the window, why a model is weak, and each reminder.
 - `tool_surface` in `[agent]` decides which tools a run's model sees. `full`, the default, offers all of them at every
-  step. `grouped` starts with the core tools (files, the shell, the web, searching and saving notes, delegation,
-  skills, the plan and `finish`) and the groups the thread already used. The other groups (`browser`, `desktop`,
-  `schedule`, `memory_admin`, and `mcp__<server>` for each MCP server) are listed in the system prompt with what they are
-  for and their tools. The model turns a group on with `use_tools`. A call to a tool whose group is off does not run: it
-  turns the group on, and its result asks the model to call the tool again. A group stays on for the rest of the run.
-  `auto` is `grouped` for a model of the weak tier and for a model whose window cut the context budget, and `full` for
-  every other model. The timeline shows the groups a grouped run starts with and each group it turns on.
+  step. `grouped` starts with the core tools (files, the shell, the web, searching and saving notes, delegation, skills,
+  the plan and `finish`) and the groups the thread already used. The other groups (`browser`, `desktop`, `schedule`,
+  `memory_admin`, and `mcp__<server>` for each MCP server) are listed in the system prompt with what they are for and
+  their tools, at most 16 of a group: in a bigger group, those that share the most words with the run's goal first. The
+  model turns a group on with `use_tools`. A call to a tool whose group is off does not run: it turns the group on, and
+  its result asks the model to call the tool again. A group stays on for the rest of the run. `auto` is `grouped` for a
+  model of the weak tier and for a model whose window cut the context budget, and `full` for every other model. The
+  timeline shows the groups a grouped run starts with and each group it turns on.
 - `verify_answer_paths` in `[agent]` checks the paths a final answer names: `~` paths and absolute paths under
   `/Users`, `/tmp`, `/private`, `/var`, `/opt`, `/Applications` and `/Library`. When a task or research run ends with
   success and its answer names such paths that do not exist and that no successful call of the run named (a file the
@@ -1801,16 +1802,20 @@ MCP results are untrusted content, and the stderr of a stdio server goes to `<lo
 ## Skills and plugins
 
 A skill is a folder of instructions for one kind of work, in the Agent Skills layout: `<name>/SKILL.md` with a YAML
-frontmatter (`name`, `description`) and optional `scripts/`, `references/` and `assets/`. Every model sees the `name:
-description` line of each skill and reads the rest with the `skill` tool when a task matches. Dot always looks in
-`<home>/skills` and in the `skills/` folder of every plugin; `[skills] dirs` lists more directories (each holds skill
-folders; `~` expands). Skills written for Claude Code load unchanged: Dot reads only `name` and `description` of the
-frontmatter, so other keys (a date or a nested map under `metadata`, a list of `allowed-tools`) do not leave a skill
-out. To use your own, put `dirs = ["~/.claude/skills"]` under `[skills]` in your `config.toml`; Dot reads nothing there
-until you do. An entry may also be one skill folder (`~/.claude/skills/x-twitter-growth`), to take some skills only:
-`~/.claude/skills` can hold skills written for Claude Code's own tools, such as the superpowers bundle or the skills
-synced from claude.ai. The X skills of Claude Code (`x-twitter-growth`, `baoyu-post-to-x`) are then the playbook a
-campaign on X can work from.
+frontmatter (`name`, `description`) and optional `scripts/`, `references/` and `assets/`. Every model is given, in its
+instructions, the `name: description` line of each skill its run is offered, and reads the rest with the `skill` tool
+when a task matches. A run offered more than `listed` under `[skills]` (20) is given those that share the most words
+with its goal and with the goals of the latest earlier runs of its thread, as its notes are chosen, the best fit first
+and at most that many, and is told how many more there are: `find_help` searches them all, and `skill` reads one by its
+name. A skill that shares only some of the goal's words is kept, as a goal can ask for more than one kind of work; one
+in another language than the goal shares none. Dot always looks in `<home>/skills` and in the `skills/` folder of every
+plugin; `[skills] dirs` lists more directories (each holds skill folders; `~` expands). Skills written for Claude Code
+load unchanged: Dot reads only `name` and `description` of the frontmatter, so other keys (a date or a nested map under
+`metadata`, a list of `allowed-tools`) do not leave a skill out. To use your own, put `dirs = ["~/.claude/skills"]`
+under `[skills]` in your `config.toml`; Dot reads nothing there until you do. An entry may also be one skill folder
+(`~/.claude/skills/x-twitter-growth`), to take some skills only: `~/.claude/skills` can hold skills written for Claude
+Code's own tools, such as the superpowers bundle or the skills synced from claude.ai. The X skills of Claude Code
+(`x-twitter-growth`, `baoyu-post-to-x`) are then the playbook a campaign on X can work from.
 
 A plugin is a folder in the Claude Code layout: `.claude-plugin/plugin.json` (its name), `skills/<name>/SKILL.md` and
 `.mcp.json` (`{"mcpServers": {...}}`; `${CLAUDE_PLUGIN_ROOT}` is the plugin folder). Their skills and MCP servers are
