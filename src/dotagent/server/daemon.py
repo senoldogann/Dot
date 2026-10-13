@@ -104,7 +104,8 @@ def instance_lock(path: Path) -> Iterator[None]:
 
 
 def _end_with_scheduler(server: DotServer, scheduler_loop: asyncio.Task[None]) -> None:
-    """Schedules must not silently stop firing: when the scheduler loop ends by itself, so does the daemon."""
+    """Schedules must not silently stop firing: when the scheduler loop ends by itself (its ticks failed
+    ``FAILED_TICKS_TO_END`` times in a row, see ``scheduler/runner.py``), so does the daemon."""
     if scheduler_loop.cancelled():
         return
     log.error("scheduler_loop_ended", error=repr(scheduler_loop.exception()))

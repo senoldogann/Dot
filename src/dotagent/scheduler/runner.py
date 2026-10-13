@@ -20,6 +20,10 @@ from dotagent.store.models import RunRecord, ScheduleRecord, ThreadRecord
 log = get_logger(__name__)
 
 _UNFINISHED: frozenset[str] = frozenset({"starting", "running"})
+# How many ticks in a row may fail before the scheduler's loop ends, and the daemon with it (``server/daemon.py``):
+# five minutes at the default ``tick_s``. A failure that lasts so long is not passing, and schedules must not silently
+# stop firing; a shorter one is waited out, so that it does not end the daemon with every run it holds.
+FAILED_TICKS_TO_END: int = 20
 
 
 def _following(record: ScheduleRecord, now: float, zone: ZoneInfo) -> float | None:
@@ -99,14 +103,30 @@ class Scheduler:
         that is, and start the reflection when its time has come. A campaign's session is never skipped as overdue:
         the campaign goes on where it stopped. While the owner's emergency stop is engaged, no campaign starts a
         session (each waits for the release; the stop is looked at before each one) and no schedule fires
-        (:meth:`_fire`)."""
+        (:meth:`_fire`). The three are done each on its own: one that fails is logged where it failed and keeps the
+        others from nothing, and the failures are raised together at the end, as an ``ExceptionGroup``."""
+        failures: list[Exception] = []
+        for part in (self._fire_due, self._start_due_sessions, self._reflect_if_due):
+            try:
+                await part(now)
+            except Exception as exc:
+                log.exception("scheduler_part_failed", part=part.__name__)
+                failures.append(exc)
+        if failures:
+            raise ExceptionGroup("a part of the scheduler's tick failed", failures)
+
+    async def _fire_due(self, now: float) -> None:
+        """Fire every switched-on schedule that is due at ``now``, each on its own (:meth:`_fire_alone`)."""
         for record in await self._runtime.store.due_schedules(now):
             await self._fire_alone(record, now)
+
+    async def _start_due_sessions(self, now: float) -> None:
+        """Start the next session of every active campaign that is due at ``now``, while the emergency stop is not
+        engaged."""
         for campaign in await self._runtime.store.due_campaigns(now):
             if await _emergency_stop_engaged():
                 break
             await self._start_session(campaign.id)
-        await self._reflect_if_due(now)
 
     async def _reflect_if_due(self, now: float) -> None:
         """Start the reflection in a task when its daily time has passed since the last one (or the last attempt)."""
@@ -132,9 +152,20 @@ class Scheduler:
             log.info("reflection_fired", summary=summary_line(reflection))
 
     async def _tick_forever(self) -> None:
+        """Tick every ``tick_s`` seconds. A tick that failed is tried again at the next one; :data:`FAILED_TICKS_TO_END`
+        failed ticks in a row end the loop with the last one's failures."""
         tick_s: float = self._runtime.config.scheduler.tick_s
+        failed: int = 0
         while True:
-            await self.tick(time.time())
+            try:
+                await self.tick(time.time())
+            except ExceptionGroup:
+                failed += 1
+                if failed >= FAILED_TICKS_TO_END:
+                    raise
+                log.warning("scheduler_tick_failed", failed_in_a_row=failed, ends_at=FAILED_TICKS_TO_END)
+            else:
+                failed = 0
             await asyncio.sleep(tick_s)
 
     async def _fire_alone(self, record: ScheduleRecord, now: float) -> None:

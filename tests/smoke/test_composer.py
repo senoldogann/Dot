@@ -367,8 +367,8 @@ async def test_the_bar_keeps_one_line_from_the_desk_to_the_phone(
                 else:
                     await expect(mode_name).to_be_visible()
                 await expect(options_pill).to_have_attribute("data-tone", "warn")
-                fill: str = await options_pill.evaluate("(node) => getComputedStyle(node).backgroundColor")
-                assert fill == "rgba(0, 0, 0, 0)", fill
+                # Closed, the pill rests with no fill; its colour fades there, so the check waits for it to settle.
+                await expect(options_pill).to_have_css("background-color", "rgba(0, 0, 0, 0)")
                 await page.locator(".composer-stack").screenshot(path=str(tmp_path / f"bar-{width}.png"))
                 await page.close()
         finally:

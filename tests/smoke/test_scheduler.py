@@ -30,9 +30,17 @@ from dotagent.policy.types import ActionInfo, ApprovalMode
 from dotagent.runtime import Runtime, build_runtime, close_runtime
 from dotagent.scheduler import SCHEDULE_SOURCE
 from dotagent.scheduler.plans import UNSET_OPTIONS, ScheduleRequest, create_schedule, edit_schedule
-from dotagent.scheduler.runner import Scheduler
+from dotagent.scheduler.runner import FAILED_TICKS_TO_END, Scheduler
 from dotagent.scheduler.timing import format_local, named_zone, next_firing
-from dotagent.store.models import EventRecord, RunMode, RunRecord, ScheduleOptions, ScheduleRecord, ThreadRecord
+from dotagent.store.models import (
+    CampaignRecord,
+    EventRecord,
+    RunMode,
+    RunRecord,
+    ScheduleOptions,
+    ScheduleRecord,
+    ThreadRecord,
+)
 from dotagent.tools.base import PreparedCall, ToolResult
 from dotagent.tools.context import ToolContext
 from dotagent.tools.registry import tools_for_mode
@@ -537,3 +545,45 @@ async def test_a_schedule_starts_its_runs_with_the_mode_model_and_approvals_it_w
         "review": runtime.config.models.review,
         "vision": runtime.config.models.vision,
     }
+
+
+async def test_a_tick_that_fails_is_tried_again_and_the_loop_goes_on(
+    runtime: Runtime, scheduler: Scheduler, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    listed: list[float] = []
+    third: asyncio.Event = asyncio.Event()
+    due_campaigns = runtime.store.due_campaigns
+
+    async def fails_once(now: float) -> list[CampaignRecord]:
+        listed.append(now)
+        if len(listed) == 3:
+            third.set()
+        if len(listed) == 1:
+            raise StoreError("the database is locked", {})
+        return await due_campaigns(now)
+
+    monkeypatch.setattr(runtime.store, "due_campaigns", fails_once)
+    loop: asyncio.Task[None] = await scheduler.start()
+    async with asyncio.timeout(10):
+        await third.wait()
+    assert not loop.done()
+    assert scheduler.running()
+
+
+async def test_a_scheduler_whose_ticks_keep_failing_ends_with_their_error(
+    runtime: Runtime, scheduler: Scheduler, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    listed: list[float] = []
+
+    async def always_fails(now: float) -> list[CampaignRecord]:
+        listed.append(now)
+        raise StoreError("the database is locked", {})
+
+    monkeypatch.setattr(runtime.store, "due_campaigns", always_fails)
+    loop: asyncio.Task[None] = await scheduler.start()
+    async with asyncio.timeout(30):
+        await asyncio.wait({loop})
+    assert len(listed) == FAILED_TICKS_TO_END
+    with pytest.raises(ExceptionGroup) as ended:
+        await scheduler.stop()
+    assert [type(error) for error in ended.value.exceptions] == [StoreError]
