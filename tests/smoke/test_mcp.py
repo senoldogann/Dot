@@ -27,7 +27,7 @@ from dotagent.agent.manager import RunManager
 from dotagent.agent.verify import new_facts
 from dotagent.config import McpServerConfig, load_config
 from dotagent.core.errors import McpError
-from dotagent.core.paths import workspace_dir
+from dotagent.core.paths import ensure_layout, workspace_dir
 from dotagent.core.types import JsonObject
 from dotagent.mcp.hub import McpHub, inspect_servers, open_hub
 from dotagent.mcp.types import McpFailure
@@ -132,6 +132,8 @@ def environment(home: Path) -> Iterator[None]:
     patch.setenv("DOT_LOG_DIR", str(home / "logs"))
     patch.setenv("DOT_TEST_MCP_VALUE", SECRET_VALUE)
     patch.setenv("DOT_TEST_NOT_FORWARDED", "leak")
+    # The home is laid out as every dotx command and the daemon lay it out: a stdio server starts in its workspace.
+    ensure_layout()
     yield
     patch.undo()
 

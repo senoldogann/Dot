@@ -5092,8 +5092,8 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 169 | Help is found by meaning as well as by words                                         | done        | 5c96b14 |
 | 170 | A delegated run's thread takes no queue                                              | done        | 336e03f |
 | 171 | The text of a desktop window follows the run's model window                          | done        | 047d0e1 |
-| 172 | A dotx command that dies does not leave its run at work                              | in progress |         |
-| 173 | Every smoke test passes alone, and the README keeps its width                        | planned     |         |
+| 172 | A dotx command that dies does not leave its run at work                              | done        | bbb40bc |
+| 173 | Every smoke test passes alone, and the README keeps its width                        | in progress |         |
 
 ### 77. The type system: Inter and Geist Mono, seven sizes, three weights
 
@@ -8927,7 +8927,7 @@ cuts it in the middle.
 
 ### 172. A dotx command that dies does not leave its run at work
 
-**Status: in progress.**
+**Status: done.** Merged as `bbb40bc` (PR #210; no Linear issue, the Linear connector was signed out).
 
 **As built (2026-10-13).** Every 30 seconds while it runs, the daemon closes the runs that a `dotx` command (`run`,
 `resume`, `chat`) left active when its process ended without recording their end, killed or crashed: their owner's lock
@@ -8957,7 +8957,20 @@ asked for.
 
 ### 173. Every smoke test passes alone, and the README keeps its width
 
-**Status: planned.**
+**Status: in progress.**
+
+**As built (2026-10-13).** The smoke tests of the MCP hub that open servers by themselves (`tests/smoke/test_mcp.py`,
+those that take only the login environment) failed when run alone: a stdio server starts in the workspace, which only
+the module's runtime fixture had made. The module's environment now lays the home out first (`ensure_layout`, as every
+`dotx` command and the daemon do), and each of them passes alone. Then each offline smoke test was run alone, one
+process each: none of the 420 failed (one skips, as in every smoke run: it mails a code from the owner's Mail and runs
+only when `DOT_MAIL_TESTS=1` asks). Offline means no `live`, `internet`, `hosted` or `desktop` marker, and none that
+needs a local model: the `requires_model` tests of `test_server.py` are left out as in every smoke run, and so are the
+modules of such tests (`test_agent_browser.py`, `test_continuity_live.py`, `test_delegate.py`, `test_run_modes_live.py`,
+`test_agent_desktop.py`). The README's prose keeps within 120 columns: the 52 lines past it, tables and code blocks
+aside, were rewrapped with their paragraph or list item, without breaking inside a code span. Only the line breaks
+changed: the words, the paragraphs, the tables and the code blocks are the same, and so are the list items and the
+headings.
 
 **What.** Every smoke test passes when it runs alone, and the README's prose keeps within 120 columns.
 
@@ -9568,3 +9581,4 @@ asked for.
 - 2026-10-13 (Opus 5.5): item 169 merged as `5c96b14` (PR #207; no Linear issue, the connector was signed out): `find_help` and the skills a run is given rank help by meaning as well as by words, with the memory's embeddings, so a goal or a need in Turkish finds the skills described in English.
 - 2026-10-13 (Opus 5.5): item 170 merged as `336e03f` (PR #208; no Linear issue, the connector was signed out): the thread of a delegated run takes no queue, and deleting a chat takes the queues of the threads of the runs it delegated with them.
 - 2026-10-13 (Opus 5.5): item 171 merged as `047d0e1` (PR #209; no Linear issue, the connector was signed out): the window text of a desktop result follows the run's own tool output budget, so a model with a small window gets a shorter window instead of one cut in the middle.
+- 2026-10-13 (Opus 5.5): item 172 merged as `bbb40bc` (PR #210; no Linear issue, the connector was signed out): the daemon closes the run of a `dotx` command that died within half a minute, as cut off by the command's death, and a second Ctrl-C quits once the first one's stop is recorded.
