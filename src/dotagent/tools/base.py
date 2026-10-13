@@ -51,6 +51,13 @@ def mark_untrusted(result: ToolResult) -> ToolResult:
     return result.model_copy(update={"untrusted": True})
 
 
+def text_room(output_chars: int, headroom: int) -> int:
+    """The characters of page or window text that one result of ``output_chars`` carries next to ``headroom`` for the
+    rest of it, and never less than half the result: a small model window shortens the text instead of leaving none
+    (item 156)."""
+    return max(output_chars // 2, output_chars - headroom)
+
+
 @dataclass(frozen=True)
 class PreparedCall:
     """A call whose arguments validated: the classified action plus the coroutine that performs it."""

@@ -53,6 +53,7 @@ from dotagent.tools.base import (
     mark_untrusted,
     ok,
     ok_with_images,
+    text_room,
 )
 from dotagent.tools.batch import batch_cut_note, first_steps
 from dotagent.tools.context import ToolContext
@@ -78,8 +79,9 @@ def _nonce() -> str:
 
 
 def snapshot_budget(config: AppConfig) -> int:
-    """The most characters of window text one result may carry: what the agent allows a tool, minus the headroom."""
-    return min(config.desktop.snapshot_max_chars, config.agent.tool_output_chars - _HEADROOM_CHARS)
+    """The most characters of window text one result may carry: what the agent allows a tool, minus the headroom, and
+    never less than half of it (:func:`text_room`)."""
+    return min(config.desktop.snapshot_max_chars, text_room(config.agent.tool_output_chars, _HEADROOM_CHARS))
 
 
 def sized_for_agent(config: AppConfig) -> DesktopConfig:
@@ -395,7 +397,7 @@ def _read_tool() -> RegisteredTool:
         return _observe_action("desktop_read", f"Read the text of {args.ref}", args.app or "")
 
     async def run(args: ReadArgs, ctx: ToolContext) -> ToolResult:
-        ceiling: int = ctx.output_chars - _READ_HEADROOM_CHARS
+        ceiling: int = text_room(ctx.output_chars, _READ_HEADROOM_CHARS)
         limit: int = min(args.max_chars or _DEFAULT_READ_CHARS, ceiling)
         read: TextRead = await ctx.runtime.desktop.read(ctx.thread_id, args.app, _ref_of(args.ref), args.offset, limit)
         return _screen_result(render_text_read(read, args.app or "application", _nonce()))

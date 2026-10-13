@@ -64,6 +64,7 @@ from dotagent.tools.base import (
     mark_untrusted,
     ok,
     ok_with_images,
+    text_room,
 )
 from dotagent.tools.batch import batch_cut_note, first_steps
 from dotagent.tools.context import ToolContext
@@ -92,7 +93,7 @@ def _nonce() -> str:
 
 
 def _body_budget(ctx: ToolContext) -> int:
-    return min(ctx.runtime.config.browser.snapshot_max_chars, ctx.output_chars - _HEADROOM_CHARS)
+    return min(ctx.runtime.config.browser.snapshot_max_chars, text_room(ctx.output_chars, _HEADROOM_CHARS))
 
 
 def _clip(text: str, limit: int) -> str:
@@ -478,7 +479,7 @@ def _read_text_tool() -> RegisteredTool:
 
     async def run(args: ReadTextArgs, ctx: ToolContext) -> ToolResult:
         config: BrowserConfig = ctx.runtime.config.browser
-        limit: int = min(args.max_chars or config.read_text_chars, ctx.output_chars - _HEADROOM_CHARS)
+        limit: int = min(args.max_chars or config.read_text_chars, text_room(ctx.output_chars, _HEADROOM_CHARS))
         text: TextView = await ctx.browser.read_text(ctx.thread_id, args.ref, args.offset or 0, limit)
         return ok(render_text_view(text, _nonce()))
 
