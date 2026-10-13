@@ -54,6 +54,14 @@ function desktopText(status) {
   return status.desktop_enabled ? "enabled" : "disabled";
 }
 
+/** Item 153: the MCP servers that could not start with the daemon, one line each with the reason; Dot runs without their tools. */
+function leftOutServers(failures) {
+  return [
+    ...failures.map((failure) => el("div", null, el("span", { class: "badge b-warn" }, failure.server), ` ${failure.error}`)),
+    el("div", { class: "muted" }, "dotx mcp list shows more; Dot starts them again when it restarts."),
+  ];
+}
+
 function statusEntries(status) {
   return [
     entry("Version", status.version),
@@ -74,6 +82,8 @@ function statusEntries(status) {
     entry("Compaction model", "each run's own model"),
     entry("Review model", orDash(status.models.review)),
     entry("Reasoning effort", orDash(status.models.effort)),
+    // A whole row, so it comes after the cells, like Home: among them it would cut the row before it short.
+    status.mcp_failures.length > 0 ? wideEntry("MCP servers left out", leftOutServers(status.mcp_failures)) : null,
     wideEntry("Home", el("span", { class: "mono" }, status.home)),
   ];
 }

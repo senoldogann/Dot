@@ -10,6 +10,7 @@ from dotagent.config import ModelsConfig
 from dotagent.core.types import FrozenModel
 from dotagent.desktop.perms import Pane
 from dotagent.llm.types import Effort
+from dotagent.mcp.types import McpFailure
 from dotagent.policy.types import ApprovalMode
 from dotagent.secrets import SecretSource
 from dotagent.store.models import (
@@ -635,6 +636,8 @@ class StatusView(FrozenModel):
     browser_mode: BrowserMode
     desktop_enabled: bool
     mcp_tools: int
+    # The enabled MCP servers that could not start with the daemon, each with the reason; Dot runs without their tools.
+    mcp_failures: list[McpFailure]
     models: ModelsConfig
 
 

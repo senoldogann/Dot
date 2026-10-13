@@ -482,7 +482,8 @@ def _find_command(command: str, login_path: str | None) -> str | None:
 
 
 def _mcp_row(config: McpServerConfig, found: str | None, missing_secrets: list[str]) -> CheckResult:
-    """The row of one MCP server from what was found on this Mac. Dot does not start while an enabled one fails."""
+    """The row of one MCP server from what was found on this Mac. A server that cannot start never stops Dot, which
+    starts without its tools."""
     name: str = f"mcp {config.name}"
     if not config.enabled:
         return _result(name, True, False, "switched off ([[mcp]] enabled = false)")
@@ -495,11 +496,11 @@ def _mcp_row(config: McpServerConfig, found: str | None, missing_secrets: list[s
         return _result(
             name,
             False,
-            True,
-            f"{'; '.join(problems)}. Dot does not start while an enabled server fails; enabled = false skips it",
+            False,
+            f"{'; '.join(problems)}. Dot starts without its tools while it fails; enabled = false stops trying it",
         )
     where: str = f"{config.url} over {config.transport_kind()}" if found is None else found
-    return _result(name, True, True, f"{where}; connect for real with: dotx mcp list")
+    return _result(name, True, False, f"{where}; connect for real with: dotx mcp list")
 
 
 async def _mcp_server_row(config: McpServerConfig, login_path: str | None) -> CheckResult:

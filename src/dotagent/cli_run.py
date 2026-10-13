@@ -110,6 +110,12 @@ async def _read_goal(parts: list[str]) -> str:
     return " ".join(parts)
 
 
+def _say_left_out_servers(runtime: Runtime) -> None:
+    """Name each MCP server that could not start, with the reason: the run goes on without its tools."""
+    for failure in runtime.mcp.failures:
+        sys.stderr.write(f"MCP server {failure.server} is left out: {failure.error} (dotx mcp list shows more)\n")
+
+
 def _print_result(run: RunRecord) -> None:
     sys.stdout.write(f"{run.result}\n")
     sys.stdout.flush()
@@ -142,6 +148,7 @@ async def cmd_run(command: RunCommand) -> int:
     goal: str = await _read_goal(command.goal)
     runtime: Runtime = await build_runtime(load_user_config())
     try:
+        _say_left_out_servers(runtime)
         options: UiOptions = UiOptions(
             interactive=sys.stdin.isatty() and not command.no_input,
             stream_text=False,
@@ -197,6 +204,7 @@ async def cmd_resume(command: ResumeCommand) -> int:
     """Resume a run that the daemon cut off in this process, like ``dotx run``: see ``RunManager.resume``."""
     runtime: Runtime = await build_runtime(load_user_config())
     try:
+        _say_left_out_servers(runtime)
         options: UiOptions = UiOptions(
             interactive=sys.stdin.isatty() and not command.no_input,
             stream_text=False,
@@ -219,6 +227,7 @@ async def cmd_chat(command: ChatCommand) -> int:
         raise ConfigError("chat needs an interactive terminal; use 'dotx run' for scripts", {})
     runtime: Runtime = await build_runtime(load_user_config())
     try:
+        _say_left_out_servers(runtime)
         manager: RunManager = RunManager(runtime)
         ui: TerminalUi = TerminalUi(
             runtime,

@@ -1,4 +1,4 @@
-"""Every configured MCP server, connected: the tools they offer and the way to call them."""
+"""Every configured MCP server, connected: the tools they offer, the way to call them, and those that could not start."""
 
 import asyncio
 from collections.abc import Mapping, Sequence
@@ -17,7 +17,7 @@ from dotagent.core.types import FrozenModel, JsonObject
 from dotagent.mcp.connection import McpConnection
 from dotagent.mcp.launch import resolve_server_secrets, server_environment, server_headers
 from dotagent.mcp.naming import require_distinct_names
-from dotagent.mcp.types import McpTool
+from dotagent.mcp.types import McpFailure, McpTool
 
 log = get_logger(__name__)
 
@@ -78,17 +78,24 @@ async def _connect_server(config: McpServerConfig, login_env: Mapping[str, str])
         cleanup.push_async_callback(connection.close)
         listed: tuple[McpTool, ...] = await connection.list_tools()
         tools: tuple[McpTool, ...] = select_tools(config, listed)
+        require_distinct_names(tools)
         cleanup.pop_all()
     log.info("mcp_server_ready", server=config.name, tools=len(tools), offered=len(listed))
     return _Connected(connection=connection, listed=len(listed), tools=tools)
 
 
 class McpHub:
-    """The connected servers and the tools they offer to the model."""
+    """The connected servers and the tools they offer to the model, and the enabled servers left out at the start."""
 
-    def __init__(self, connections: Mapping[str, McpConnection], tools: tuple[McpTool, ...]) -> None:
+    def __init__(
+        self,
+        connections: Mapping[str, McpConnection],
+        tools: tuple[McpTool, ...],
+        failures: tuple[McpFailure, ...],
+    ) -> None:
         self._connections: dict[str, McpConnection] = dict(connections)
         self.tools: tuple[McpTool, ...] = tools
+        self.failures: tuple[McpFailure, ...] = failures
 
     async def call(self, tool: McpTool, arguments: JsonObject) -> CallToolResult:
         return await self._connections[tool.server].call_tool(tool.remote_name, arguments)
@@ -97,30 +104,42 @@ class McpHub:
         await asyncio.gather(*(connection.close() for connection in self._connections.values()))
 
 
+def _failure(config: McpServerConfig, error: Exception) -> McpFailure:
+    """The record of a server that could not start. An error that is not one of Dot's own is a fault in Dot or in the
+    MCP library, logged with its traceback."""
+    log_file: str = str(server_log_path(config))
+    if isinstance(error, DotError):
+        log.warning("mcp_server_left_out", server=config.name, error=error.message, context=error.context)
+        return McpFailure(server=config.name, error=error.message, detail=error.context, log=log_file)
+    log.error("mcp_server_crashed", server=config.name, exc_info=error)
+    return McpFailure(server=config.name, error=f"{type(error).__name__}: {error}", detail={}, log=log_file)
+
+
 async def open_hub(configs: Sequence[McpServerConfig], login_env: Mapping[str, str]) -> McpHub:
-    """Start every enabled server at once. When any of them fails, the others are stopped again and the error raised."""
+    """Start every enabled server at once. One that cannot start is left out with the reason, and the others serve
+    their tools, so Dot starts without the tools of a broken server. A cancellation stops every server again."""
     enabled: list[McpServerConfig] = [config for config in configs if config.enabled]
     outcomes: list[_Connected | BaseException] = list(
         await asyncio.gather(*(_connect_server(config, login_env) for config in enabled), return_exceptions=True)
     )
-    connected: list[_Connected] = [outcome for outcome in outcomes if isinstance(outcome, _Connected)]
-    failures: list[tuple[str, BaseException]] = [
-        (config.name, outcome)
+    connected: dict[str, _Connected] = {
+        config.name: outcome
         for config, outcome in zip(enabled, outcomes, strict=True)
-        if isinstance(outcome, BaseException)
+        if isinstance(outcome, _Connected)
+    }
+    interrupted: list[BaseException] = [
+        outcome for outcome in outcomes if isinstance(outcome, BaseException) and not isinstance(outcome, Exception)
     ]
-    if failures:
-        await asyncio.gather(*(done.connection.close() for done in connected))
-        unexpected: list[BaseException] = [error for _, error in failures if not isinstance(error, DotError)]
-        if unexpected:
-            raise unexpected[0]
-        if len(failures) == 1:
-            raise failures[0][1]
-        problems: JsonObject = {name: str(error) for name, error in failures}
-        raise McpError("several MCP servers failed to start", {"failures": problems})
-    tools: tuple[McpTool, ...] = tuple(tool for done in connected for tool in done.tools)
-    require_distinct_names(tools)
-    return McpHub({config.name: done.connection for config, done in zip(enabled, connected, strict=True)}, tools)
+    if interrupted:
+        await asyncio.gather(*(done.connection.close() for done in connected.values()))
+        raise interrupted[0]
+    failures: tuple[McpFailure, ...] = tuple(
+        _failure(config, outcome)
+        for config, outcome in zip(enabled, outcomes, strict=True)
+        if isinstance(outcome, Exception)
+    )
+    tools: tuple[McpTool, ...] = tuple(tool for done in connected.values() for tool in done.tools)
+    return McpHub({name: done.connection for name, done in connected.items()}, tools, failures)
 
 
 async def _inspect(config: McpServerConfig, login_env: Mapping[str, str]) -> ServerReport:
