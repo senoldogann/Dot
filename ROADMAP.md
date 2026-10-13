@@ -5100,7 +5100,7 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 177 | The configuration refuses at load what would fail a run                              | done        | ce5b468 |
 | 178 | The server answers every failure as JSON, and a page says it could not read again    | done        | 401cef2 |
 | 179 | A run's end is one write, and a chat a run works on is never deleted                 | done        | be314c3 |
-| 180 | A campaign whose session's command died goes on                                      | in progress |         |
+| 180 | A campaign whose session's command died goes on                                      | done        | baca51a |
 
 ### 77. The type system: Inter and Geist Mono, seven sizes, three weights
 
@@ -9177,7 +9177,7 @@ that delegated it; deleting a chat is refused while a run of any process works o
 
 ### 180. A campaign whose session's command died goes on
 
-**Status: in progress.**
+**Status: done.** Merged as `baca51a` (PR #218; no Linear issue, the Linear connector was signed out).
 
 **As built (2026-10-13).** The daemon plans the next session of a campaign whose session's `dotx` command died when it
 closes that session (`close_runs_of_dead_commands`, every half minute while it runs), as after any end of a session:
@@ -9810,3 +9810,4 @@ not at the daemon's next start; a campaign whose start failed in any way is dele
 - 2026-10-13 (Opus 5.5): item 177 merged as `ce5b468` (PR #215; no Linear issue, the connector was signed out): the configuration is refused when it loads for an address, a model, a spending site, a budget or a timeout that would fail every run, a Keychain that does not answer is an error that says so, and `dotx models` ends with 1 when no provider answered.
 - 2026-10-13 (Opus 5.5): item 178 merged as `401cef2` (PR #216; no Linear issue, the connector was signed out): every error of the API is JSON and a fault is logged with its traceback, sign-in says what failed when the daemon answered with an error, a page that could not read again says so, and a stream that fell behind tells the page to read again.
 - 2026-10-13 (Opus 5.5): item 179 merged as `be314c3` (PR #217; no Linear issue, the connector was signed out): a run's end is one write, a delegated run whose end was not recorded is an error for the run that delegated it, and a chat a run of any process works on is not deleted.
+- 2026-10-13 (Opus 5.5): item 180 merged as `baca51a` (PR #218; no Linear issue, the connector was signed out): a campaign whose session's `dotx` command died plans its next session when the daemon closes that session, and a campaign whose opening session could not start, in any way, is not kept. Part 29 is done.
