@@ -25,6 +25,8 @@ from dotagent.core.text import truncate_tail
 from dotagent.core.types import FrozenModel, JsonObject
 from dotagent.runtime import Runtime
 from dotagent.server import UI_SOURCE
+from dotagent.server.guard import PAGES_PREFIX
+from dotagent.server.links import base_url
 from dotagent.store.models import ApprovalRecord, EventRecord
 
 _STDIN_POLL_S: float = 0.2
@@ -220,6 +222,13 @@ class MemoriesPayload(Payload):
     ids: list[str]
 
 
+class PageShownPayload(Payload):
+    """A page the run showed in the conversation (``show_page``), which the daemon serves at an address of its own."""
+
+    page_id: str
+    title: str
+
+
 class UiOptions(FrozenModel):
     interactive: bool
     stream_text: bool
@@ -404,6 +413,11 @@ class TerminalUi:
                 self._line(self._paint(f"  ◆ {len(recalled.ids)} saved {noun} in context", "2"))
             case "stall":
                 self._on_stall(StallPayload.model_validate(data))
+            case "page_shown":
+                shown = PageShownPayload.model_validate(data)
+                server = self._runtime.config.server
+                address: str = f"{base_url(server.host, server.port)}{PAGES_PREFIX}{shown.page_id}"
+                self._line(self._paint(f"  ▣ page “{shown.title}”: {address}", "36"))
             case "compacted":
                 self._line(self._paint("  ⇲ older context summarised", "2"))
             case "steer":

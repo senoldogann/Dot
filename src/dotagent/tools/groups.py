@@ -3,8 +3,8 @@
 The core group holds what most runs need: the files, the shell, the web, searching and saving notes, delegation,
 skills, the helper models and the meta tools (the plan, questions, finish). The other groups are named after what they reach: ``browser``
 (Chrome), ``desktop`` (the Mac's applications and AppleScript), ``schedule`` (goals that run later), ``memory_admin``
-(correcting and forgetting notes) and one group per MCP server, ``mcp__<server>``. Which groups are on is up to the
-loop; everything here is pure.
+(correcting and forgetting notes), ``pages`` (pages of HTML shown in the conversation) and one group per MCP server,
+``mcp__<server>``. Which groups are on is up to the loop; everything here is pure.
 """
 
 from collections.abc import Sequence
@@ -29,6 +29,7 @@ _GROUP_OF_TOOL: dict[str, str] = {
     "memory_forget": "memory_admin",
     # Making a teammate is rare (item 99); the core group stays about a third of the tool definitions.
     "create_agent": "team",
+    "show_page": "pages",
 }
 _PURPOSES: dict[str, str] = {
     "browser": "Chrome, for pages that need JavaScript, a log-in or clicking",
@@ -37,6 +38,7 @@ _PURPOSES: dict[str, str] = {
     "terminal": "programs that ask questions, REPLs and servers that stay up, on a terminal of their own",
     "memory_admin": "correcting or forgetting saved notes",
     "team": "making a lasting teammate agent for a kind of work that recurs",
+    "pages": "showing a page you write in HTML in the conversation: charts, tables, diagrams, 3D views",
 }
 # A group's line in the prompt names this many of its tools at most and says how many more there are.
 LISTED_TOOLS: int = 16

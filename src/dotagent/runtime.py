@@ -69,6 +69,7 @@ from dotagent.tools.mcp import build_mcp_tools
 from dotagent.tools.memory import build_memory_tools
 from dotagent.tools.meta import build_meta_tools
 from dotagent.tools.notes import build_notes_tools
+from dotagent.tools.pages import build_page_tools
 from dotagent.tools.posts import build_post_tools
 from dotagent.tools.registry import ToolRegistry, build_registry
 from dotagent.tools.schedule import build_schedule_tools
@@ -143,6 +144,7 @@ def _tool_groups(config: AppConfig, judge_items: bool) -> tuple[tuple[Registered
         build_team_tools(),
         build_consult_tools(),
         build_meta_tools(),
+        build_page_tools(),
         (build_skill_tool(), build_find_help_tool()),
         *((build_terminal_tools(),) if config.shell.terminal_sessions > 0 else ()),
         *((build_code_tools(),) if config.policy.code_sources else ()),

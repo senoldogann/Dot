@@ -14,6 +14,7 @@ import { faceState } from "./face.js";
 import { icon } from "./icons.js";
 import { foldSteps } from "./layout.js";
 import { answerMessage, userMessage } from "./messages.js";
+import { pageCard } from "./pageframe.js";
 import { prose } from "./prose.js";
 import { describeArguments, toolRow } from "./tools.js";
 
@@ -587,6 +588,11 @@ export function createTimeline({ rootRunId, actorId, startedAt, onGrow, onPlan, 
     // The files that came with the goal; they sit under the goal's bubble.
     attachments(scope, record) {
       place(scope, sentFiles(record.data.files), record.ts);
+    },
+
+    // A page the run showed (`show_page`, item 193), in its frame.
+    page_shown(scope, record) {
+      place(scope, pageCard(record.data.page_id, record.data.title), record.ts);
     },
 
     plan(scope, record) {

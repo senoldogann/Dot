@@ -253,8 +253,13 @@ async def test_the_page_sends_a_message_again_with_its_key_after_an_answer_that_
             try:
                 for width, scheme in _SHOTS:
                     lost: list[str] = []
+                    # Without the service worker: once it controls the page, the page's requests pass through it and
+                    # the answer this test loses is not the one the page gets.
                     page: Page = await browser.new_page(
-                        viewport={"width": width, "height": 800}, color_scheme=scheme, reduced_motion="reduce"
+                        viewport={"width": width, "height": 800},
+                        color_scheme=scheme,
+                        reduced_motion="reduce",
+                        service_workers="block",
                     )
                     await page.goto(ui_url(host, port, TOKEN))
                     await page.goto(f"{address}/#/runs")

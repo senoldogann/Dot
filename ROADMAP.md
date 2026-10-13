@@ -5128,8 +5128,8 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 189 | A message sent twice starts once                                                     | done        | d615961 |
 | 190 | The pages say what they could not read, follow the rules and tell of an update       | done        | 8f92f36 |
 | 191 | The desktop shell says what it could not read                                        | done        | a0d5eef |
-| 192 | A question offers its options with what each leads to and the one recommended        | in progress |         |
-| 193 | The chat shows pages Dot makes: charts, 3D drawings and other visuals                | planned     |         |
+| 192 | A question offers its options with what each leads to and the one recommended        | done        | 5a41ac7 |
+| 193 | The chat shows pages Dot makes: charts, 3D drawings and other visuals                | in progress |         |
 | 194 | Dot reads Word, Excel and PowerPoint files                                           | planned     |         |
 | 195 | A file opens in a panel beside the chat: PDF, sheets, documents and more             | planned     |         |
 | 196 | Dot knows its way around Word, Excel and OneDrive on the Mac                         | planned     |         |
@@ -9557,7 +9557,7 @@ OneDrive app are installed, and whether the Microsoft account is personal or of 
 
 ### 192. A question offers its options with what each leads to and the one recommended
 
-**Status: in progress.**
+**Status: done.** Merged as `5a41ac7` (PR #232; no Linear issue, the Linear connector was signed out).
 
 **As built (2026-10-14).** `ask_user` offers its options with what each leads to (`description`) and the one the run
 recommends (`recommended`), and lets several be chosen (`multiple`); options given as words alone, as before, are
@@ -9580,7 +9580,34 @@ chosen when that fits, and always takes an answer of the user's own words.
 
 ### 193. The chat shows pages Dot makes: charts, 3D drawings and other visuals
 
-**Status: planned.**
+**Status: in progress.**
+
+**As built (2026-10-14).** `show_page(title, html)` keeps a page the run writes in HTML (up to 500,000 characters) in
+the database under an id that cannot be guessed, and the run's `page_shown` event names it; the chat shows it in a card
+under its title, with Open, which shows it full size in the browser. The daemon serves the page at `/pages/<id>` without
+the token, not signed with it as planned: the id is the page's key, so an address that opens in the browser carries
+nothing made from the token. It serves the page after a bootstrap of its own and with a policy of its own
+(`PAGE_HEADERS` of `server/guard.py`): sandboxed to its scripts, framed or full size, so its origin is opaque, it reads
+nothing of the web UI and it reaches neither the API nor the page around it; it fetches nothing but libraries from four
+CDNs (cdn.jsdelivr.net, unpkg.com, cdnjs.cloudflare.com, esm.sh), submits no form, and only the pages of the daemon
+frame it, which may now frame pages of their own server (`frame-src 'self'`). The frame and the page speak three
+messages of the MCP Apps protocol, as T3 Code's pages do: the page tells its height (80 to 2,000 pixels), the frame
+sends the colours of the theme on screen as CSS variables and sends them again when the theme or the system's scheme
+changes, and a link the user clicks in the page opens in the browser. A script of the page cannot open one by itself,
+nor with a click made elsewhere: the frame must hold the focus as well as the click. A page that loads another page in
+its frame (a script or a refresh of its own) is closed, with Show it again. A page goes with its chat and with the
+events of its run (`dotx prune`), the service worker never caches one, and `dotx run` prints a page's address. The tool
+is in a group of its own, `pages`, and the system prompt asks for a page when a chart, a table, a diagram or a 3D view
+would say more than words. The tool adds about 420 estimated tokens to the fixed part of the prompt, so the small window
+of `tests/smoke/test_scaffold.py` grows from 26,000 to 27,000 tokens, as item 34 grew it, to leave room for two pages
+after every compaction. Before, a run showed nothing but text and the screenshots of its tools. Tests:
+`tests/unit/test_pages.py` (the document served, its headers and the UI's, how long a page is kept) and
+`tests/smoke/test_shown_pages.py`, a daemon's pages in Chrome, wide and on a phone, light and dark: the page sits in its
+card in the theme on screen and as tall as it is, and takes the other scheme's colours; its scripts reach neither the
+API nor the page around it nor the UI's storage, framed or full size; a link clicked in it opens, and one it asked for
+by itself does not; once it loads another page in its frame, the card closes it and shows it again on request. The same
+test passed in WebKit, the engine of the desktop shell. With the pages of before the card never shows, and without
+`frame-src 'self'` the frame never loads.
 
 **What.** A tool keeps a page of HTML the run writes (a chart, a 3D drawing, a table, a diagram), and the chat shows it
 in a card, as T3 Code shows the pages its agents render. The daemon serves the page at an address of its own, signed
@@ -10245,3 +10272,4 @@ installed, and eval tasks check the skills.
 - 2026-10-14 (Opus 5.5): item 191 merged as `a0d5eef` (PR #230; no Linear issue, the connector was signed out): when the desktop shell could not read the daemon's files, its menu bar item's tip and the page of a daemon that is down say which file and why (a `config.toml` that is not valid TOML with the line and column of the fault, a file it may not read, no token yet) instead of "Dot is not running", and no address is guessed in place of a `config.toml` it could not read. Part 30 is done.
 - 2026-10-14 (Opus 5.5): the home's greeting test lets its working run end by a file of its own instead of after 8 s, which the pages outlasted once on a loaded machine (the smoke of item 187).
 - 2026-10-14 (Opus 5.5): part 31, Office files, previews, visuals and questions, is planned (items 192 to 196), and two questions to the owner are recorded (open owner decisions 37 and 38); item 192 is built: a question offers its options with what each leads to and the one recommended, and several may be chosen.
+- 2026-10-14 (Opus 5.5): item 192 merged as `5a41ac7` (PR #232; no Linear issue, the connector was signed out): A question of the agent offers its options with what each leads to and the one it recommends, several may be chosen, and the terminal takes an option's number.

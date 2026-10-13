@@ -196,6 +196,17 @@ class ApprovalRecord(FrozenModel):
     note: str
 
 
+class ShownPage(FrozenModel):
+    """A page of HTML that a run wrote and showed in the conversation (``show_page``). Its id is all it takes to read
+    it: the daemon serves the page to whoever names it (``GET /pages/<id>``), so the id is made to be unguessable."""
+
+    id: str
+    run_id: str
+    title: str
+    html: str
+    created_at: float
+
+
 class RuleRecord(FrozenModel):
     id: str
     position: int

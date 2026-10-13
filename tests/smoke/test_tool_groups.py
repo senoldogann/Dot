@@ -189,20 +189,20 @@ async def test_a_call_of_a_tool_whose_group_is_off_turns_the_group_on_and_the_ne
     assert "- schedule: goals that run later, once or on a cron expression (schedule_create, schedule_list, " in (
         played.steps[0].messages[0].content
     )
-    off: list[str] = ["browser", "memory_admin", "schedule", "team", "terminal"]
+    off: list[str] = ["browser", "memory_admin", "schedule", "team", "pages", "terminal"]
     assert played.groups == (
         {"step": 0, "on": ["core"], "off": off, "turned_on": [], "reason": '[agent] tool_surface is "grouped"'},
         {
             "step": 1,
             "on": ["core", "schedule"],
-            "off": ["browser", "memory_admin", "team", "terminal"],
+            "off": ["browser", "memory_admin", "team", "pages", "terminal"],
             "turned_on": ["schedule"],
             "reason": "",
         },
         {
             "step": 3,
             "on": ["core", "memory_admin", "schedule"],
-            "off": ["browser", "team", "terminal"],
+            "off": ["browser", "team", "pages", "terminal"],
             "turned_on": ["memory_admin"],
             "reason": "",
         },
@@ -222,7 +222,7 @@ async def test_the_next_run_of_a_thread_starts_with_the_groups_the_thread_used(l
         {
             "step": 0,
             "on": ["core", "schedule"],
-            "off": ["browser", "memory_admin", "team", "terminal"],
+            "off": ["browser", "memory_admin", "team", "pages", "terminal"],
             "turned_on": [],
             "reason": reason,
         },
