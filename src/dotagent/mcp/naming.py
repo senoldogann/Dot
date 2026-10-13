@@ -25,7 +25,8 @@ def exposed_name(server: str, tool: str) -> str:
 
 
 def require_distinct_names(tools: tuple[McpTool, ...]) -> None:
-    """Replacing characters can make two tools share a name; the model could not tell them apart."""
+    """Replacing characters can make two tools of one server share a name; the model could not tell them apart. Tools
+    of two servers never do: a server's name has no ``_``, so ``mcp__<server>__`` keeps them apart."""
     owners: dict[str, list[JsonValue]] = {}
     for tool in tools:
         owners.setdefault(tool.exposed_name, []).append(f"{tool.server}/{tool.remote_name}")

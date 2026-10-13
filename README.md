@@ -34,8 +34,9 @@ uv run dotx doctor
 `dotx doctor` checks the home directory, ripgrep, Chrome (with a throwaway start of it), the macOS version and the
 permissions the desktop tools need, the commands and secrets of the configured MCP servers (none is started), Ollama,
 the keys of OpenAI, OpenCode Go and Anthropic, the embedding model and the three configured models, and says how to fix
-what is missing. It warns, without failing, when the review model is also the main model. The examples below write
-`dotx`: run it as `uv run dotx`, or put `.venv/bin` on your `PATH`.
+what is missing. It warns, without failing, when the review model is also the main model, and when an MCP server's
+command or secret is missing (Dot starts without that server's tools). The examples below write `dotx`: run it as
+`uv run dotx`, or put `.venv/bin` on your `PATH`.
 
 ```bash
 dotx run "Find the opening hours of the Helsinki Central Library and save them to hours.md"
@@ -1752,7 +1753,11 @@ headers = { Authorization = "Bearer ${DOCS_TOKEN}" }  # ${NAME} as above; header
 
 `dotx mcp list` starts every configured server and shows its tools, or why it does not start. Only tools are used (no
 resources, prompts, sampling or OAuth). The tool list is read when Dot starts; a server that dies is started again by
-the next call. A server that is enabled but fails to start stops Dot from starting: set `enabled = false` to skip it.
+the next call. A server that is enabled but cannot start (its command or a secret is missing, it quits or does not
+answer in time, its `allow` list names a tool it does not offer, or two of its tools would share a name) is left out,
+and Dot starts without its tools: Settings › System names it with the reason, `dotx run`, `dotx resume` and
+`dotx chat` say so before they begin, and `dotx doctor` warns of a missing command or secret. It is tried again when
+Dot starts again; `enabled = false` stops trying it.
 Plugins add their servers too (see [Skills and plugins](#skills-and-plugins)); their names become `<plugin>-<server>`.
 MCP results are untrusted content, and the stderr of a stdio server goes to `<logs>/mcp-<name>.log`.
 

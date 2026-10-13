@@ -151,6 +151,7 @@ def system_router(ctx: ServerContext) -> APIRouter:
             browser_mode=ctx.runtime.browser.mode,
             desktop_enabled=config.desktop.enabled,
             mcp_tools=len(ctx.runtime.mcp.tools),
+            mcp_failures=list(ctx.runtime.mcp.failures),
             models=config.models,
         )
 

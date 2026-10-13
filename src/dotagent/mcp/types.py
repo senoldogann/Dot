@@ -22,3 +22,13 @@ class McpTool(FrozenModel):
     hints: ToolHints
     startup_timeout_s: float
     call_timeout_s: float
+
+
+class McpFailure(FrozenModel):
+    """An enabled server that Dot left out because it could not start: why, the error's context, and the file its
+    stderr goes to. Its tools are not offered until Dot starts again."""
+
+    server: str
+    error: str
+    detail: JsonObject
+    log: str

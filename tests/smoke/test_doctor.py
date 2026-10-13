@@ -54,20 +54,20 @@ async def test_each_server_gets_a_row_that_names_what_is_missing(
     assert [row.name for row in rows] == [f"mcp {server.name}" for server in servers]
     absolute, onpath, relative, ghost, pathghost, needy, sleeping = rows
 
-    assert (absolute.ok, absolute.required) == (True, True)
+    assert (absolute.ok, absolute.required) == (True, False)
     assert absolute.detail.startswith(sys.executable)
-    assert (onpath.ok, onpath.required) == (True, True)
+    assert (onpath.ok, onpath.required) == (True, False)
     assert onpath.detail.split(";")[0].endswith("/ls")
-    assert (relative.ok, relative.required) == (True, True)
+    assert (relative.ok, relative.required) == (True, False)
     assert relative.detail.startswith(str(local))
 
-    assert (ghost.ok, ghost.required) == (False, True)
+    assert (ghost.ok, ghost.required) == (False, False)
     assert "dot-no-such-server-binary is not installed" in ghost.detail
-    assert "Dot does not start while an enabled server fails" in ghost.detail
-    assert (pathghost.ok, pathghost.required) == (False, True)
+    assert "Dot starts without its tools while it fails" in ghost.detail
+    assert (pathghost.ok, pathghost.required) == (False, False)
     assert "/no/such/dir/server is not installed" in pathghost.detail
 
-    assert (needy.ok, needy.required) == (False, True)
+    assert (needy.ok, needy.required) == (False, False)
     assert UNSET_SECRET in needy.detail
     assert "dotx auth set" in needy.detail
     assert "not installed" not in needy.detail

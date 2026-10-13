@@ -5072,8 +5072,8 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 149 | The scheduler goes on past a failure                                                 | done        | 1ec1497 |
 | 150 | A tool that raises fails its call, not its run                                       | done        | ba4f2a6 |
 | 151 | A question a run left reaches the owner                                              | done        | 6788a66 |
-| 152 | A late one-time schedule is never dropped unseen                                     | in progress |         |
-| 153 | A server of tools that cannot start does not stop the daemon                         | planned     |         |
+| 152 | A late one-time schedule is never dropped unseen                                     | done        | c1ccf7e |
+| 153 | A server of tools that cannot start does not stop the daemon                         | in progress |         |
 | 154 | The memory keeps what it learns                                                      | planned     |         |
 | 155 | The compaction keeps a tail measured in tokens                                       | planned     |         |
 | 156 | The page text of the browser and the desktop has a floor                             | planned     |         |
@@ -8267,7 +8267,7 @@ end of a run tells the first line of its answer.
 
 ### 152. A late one-time schedule is never dropped unseen
 
-**Status: in progress.**
+**Status: done.** Merged as `c1ccf7e` (PR #189; no Linear issue, the Linear connector was signed out).
 
 **As built (2026-10-13).** A one-time schedule has no next time, so a skipped firing used to switch it off for good:
 overdue by more than `misfire_grace_s` (the daemon was off, the Mac slept) or due while the emergency stop was engaged.
@@ -8285,7 +8285,23 @@ fires late, its run reading first when it was due; one due while the emergency s
 
 ### 153. A server of tools that cannot start does not stop the daemon
 
-**Status: planned.**
+**Status: in progress.**
+
+**As built (2026-10-13).** `open_hub` used to stop every server again and raise when one enabled server could not start,
+so `open_runtime` failed and the daemon did not start at all. Now each server that cannot start is left out with the
+reason (`McpFailure`: the server, the error, its context and the server's log file; logged as `mcp_server_left_out`, or
+`mcp_server_crashed` with the traceback for an error that is not one of Dot's own), the others serve their tools, and
+`McpHub.failures` keeps the record. Only a cancellation still stops every server again. The check that two tools would
+share a name moved into the start of each server: a server's name has no `_`, so tools of two servers never share one,
+and a clash among one server's tools leaves that server out, as a wrong `allow` list does (`dotx mcp list` now shows it
+too). Where it shows: `/api/status` has `mcp_failures`, and Settings › System names each server left out with the
+reason; `dotx run`, `dotx resume` and `dotx chat` print a line per server before they begin; `dotx doctor`, which starts
+nothing, warns (no longer fails) of a missing command or secret, and none of its MCP rows is required any more. A server
+left out is tried again when Dot starts again. Tests (`tests/smoke/test_mcp.py`): the hub tests read the failure the hub
+kept instead of catching the error; one good and one broken server give the good one's tools, which answer a call; a
+server whose tools would share a name is left out and its process ends; `dotx run` with a broken server names it before
+it begins; a real daemon with a broken and a good server starts, and its status names the broken one with the reason.
+All of them failed on the code of before (the daemon ended with code 2 while it started).
 
 **What.** An MCP server that cannot start leaves the daemon starting without its tools, and shows as broken in
 `dotx doctor` and the web UI.
@@ -8899,3 +8915,4 @@ small.
 - 2026-10-13 (Opus 5.5): item 149 merged as `1ec1497` (PR #186; no Linear issue, the connector was signed out): a tick of the scheduler does its parts each on its own and a failed tick is tried again, so one error no longer ends the daemon with every run it holds; only twenty failed ticks in a row end it. A check of `test_composer.py` that read a colour while it faded was made to wait for it.
 - 2026-10-13 (Opus 5.5): item 150 merged as `ba4f2a6` (PR #187; no Linear issue, the connector was signed out): any error of a tool fails that call, not the run, and one no tool expects is logged with its traceback; `edit_file` keeps a file's CRLF line ends and refuses a file that is not UTF-8 text, saying so.
 - 2026-10-13 (Opus 5.5): item 151 merged as `6788a66` (PR #188; no Linear issue, the connector was signed out): a question a run left, a campaign that ended by itself, a firing a schedule missed and a restart after an unclean stop reach the owner, on the phone and (but the restart) in the page's notifications, and the end of a run tells the first line of its answer.
+- 2026-10-13 (Opus 5.5): item 152 merged as `c1ccf7e` (PR #189; no Linear issue, the connector was signed out): a one-time schedule whose moment passed fires late, its run reading first when it was due, and one due while the emergency stop is engaged waits for the release.
