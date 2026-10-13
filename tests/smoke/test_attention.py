@@ -1,7 +1,8 @@
 """Told only when not looking (item 75): with desktop notifications on, a run that ends on its own open page notifies
 nothing; one that ends while the home is open does, one that ends while the tab is hidden does, and with "Tell me even
-when I am looking" on, a run that ends on its open page does too. The page's Notification is a stub that records what
-it was shown; the scripted model plays the runs."""
+when I am looking" on, a run that ends on its open page does too. What happens unseen is told too (item 151): a
+question a run left, a campaign that ended by itself, a firing a schedule missed. The page's Notification is a stub
+that records what it was shown; the scripted model plays the runs."""
 
 import asyncio
 import time
@@ -13,19 +14,22 @@ import pytest
 import pytest_asyncio
 from playwright.async_api import Browser, Page, async_playwright, expect
 
+from dotagent.agent.campaign import CAMPAIGN_ENDED_EVENT, CampaignEnded
 from dotagent.agent.manager import RunManager
 from dotagent.config import load_config
 from dotagent.evals.runner import SCRIPTED_MODEL
 from dotagent.evals.scripted import ScriptedProvider
 from dotagent.evals.types import ScriptedCall, ScriptedTurn
+from dotagent.events import SYSTEM_RUN_ID
 from dotagent.llm.types import ChatRequest, DeltaSink, ModelInfo, ModelReply
 from dotagent.runtime import Runtime, build_runtime, close_runtime
+from dotagent.scheduler import SCHEDULE_MISSED_EVENT, ScheduleMissed
 from dotagent.server.app import create_app
 from dotagent.server.context import ServerContext
 from dotagent.server.daemon import DotServer, bind_listener, serving_config
 from dotagent.server.links import ui_url
 from dotagent.store.models import RunRecord
-from dotagent.tools.meta import FINISH_TOOL
+from dotagent.tools.meta import ASK_USER_TOOL, FINISH_TOOL
 
 pytestmark = [pytest.mark.browser, pytest.mark.asyncio(loop_scope="module")]
 
@@ -181,7 +185,7 @@ async def test_a_run_tells_only_when_you_are_not_looking_at_it(
         _PROVIDER,
         [
             *_working_then_done("One."),
-            *_working_then_done("Two."),
+            *_working_then_done("Two.\n\nCounted one, then two."),
             *_working_then_done("Three."),
             *_working_then_done("Four."),
         ],
@@ -213,8 +217,9 @@ async def test_a_run_tells_only_when_you_are_not_looking_at_it(
             elsewhere: RunRecord = await _start(manager, "Count to two")
             await _ended(manager, elsewhere)
             notes: list[dict[str, str]] = await _told(page, 1)
+            # Item 151: the end tells the first line of what the run answered.
             assert [(note["title"], note["body"], note["tag"]) for note in notes] == [
-                ("A run is done", "Count to two", f"run-{elsewhere.id}")
+                ("A run is done", "Two.", f"run-{elsewhere.id}")
             ]
 
             # The run's page open but the tab hidden: told.
@@ -223,7 +228,7 @@ async def test_a_run_tells_only_when_you_are_not_looking_at_it(
             await page.evaluate(_HIDE)
             await _ended(manager, hidden)
             notes = await _told(page, 2)
-            assert [note["body"] for note in notes] == ["Count to two", "Count to three"]
+            assert [note["body"] for note in notes] == ["Two.", "Three."]
             await page.evaluate(_SHOW)
 
             # "Tell me even when I am looking": the run's page open and visible, told anyway.
@@ -236,7 +241,73 @@ async def test_a_run_tells_only_when_you_are_not_looking_at_it(
             await expect(page.locator(".stage-title .avatar")).to_have_attribute("data-state", "working")
             await _ended(manager, watched)
             notes = await _told(page, 3)
-            assert [note["body"] for note in notes] == ["Count to two", "Count to three", "Count to four"]
+            assert [note["body"] for note in notes] == ["Two.", "Three.", "Four."]
+            await page.close()
+        finally:
+            await browser.close()
+
+
+async def test_a_question_left_a_campaign_ended_and_a_missed_firing_are_told(
+    runtime: Runtime, manager: RunManager, client: httpx.AsyncClient
+) -> None:
+    """Item 151: a yolo run asks nobody and goes on; the question it leaves is told as one asked is. A campaign that
+    ended by itself and a firing a schedule missed are told in the words of the phone's pushes."""
+    host: str = client.base_url.host
+    port: int | None = client.base_url.port
+    assert port is not None
+    base: str = f"http://{host}:{port}"
+    MODEL.script = ScriptedProvider(
+        _PROVIDER,
+        [_turn(ASK_USER_TOOL, {"question": "Which colour?"}), _turn(FINISH_TOOL, {"answer": "Blue.", "success": True})],
+    )
+    async with async_playwright() as playwright:
+        browser: Browser = await playwright.chromium.launch(channel=runtime.config.browser.channel, headless=True)
+        try:
+            page: Page = await browser.new_page(viewport={"width": 1280, "height": 900})
+            await page.add_init_script(_STUB)
+            await page.goto(ui_url(host, port, TOKEN))
+            await page.goto(f"{base}/#/settings/general")
+            switch = page.get_by_role("switch", name="Desktop notifications")
+            await switch.click()
+            await expect(switch).to_have_attribute("aria-checked", "true")
+            await page.goto(f"{base}/#/runs")
+
+            asking: RunRecord = await _start(manager, "Pick a colour")
+            assert (await _ended(manager, asking)).status == "done"
+            left = await runtime.store.run_questions(asking.id, ASK_USER_TOOL)
+            assert [question.status for question in left] == ["left"]
+            notes: list[dict[str, str]] = await _told(page, 2)
+            assert [(note["title"], note["body"], note["tag"]) for note in notes] == [
+                ("Dot has a question", "Which colour?", f"approval-{left[0].id}"),
+                ("A run is done", "Blue.", f"run-{asking.id}"),
+            ]
+
+            stopped: CampaignEnded = CampaignEnded(
+                campaign_id="cmp-1",
+                title="Fifty leads",
+                status="stopped",
+                note="Stopped after 30 sessions: [agent] campaign_max_sessions is 30.",
+            )
+            await runtime.bus.emit(asking.id, CAMPAIGN_ENDED_EVENT, stopped.model_dump(), False)
+            missed: ScheduleMissed = ScheduleMissed(
+                schedule_id="sch-1",
+                name="Morning digest",
+                status="skipped: 125 minutes overdue (the daemon was not running)",
+            )
+            await runtime.bus.emit(SYSTEM_RUN_ID, SCHEDULE_MISSED_EVENT, missed.model_dump(), False)
+            notes = await _told(page, 4)
+            assert [(note["title"], note["body"], note["tag"]) for note in notes[2:]] == [
+                (
+                    "A campaign stopped",
+                    "Fifty leads: Stopped after 30 sessions: [agent] campaign_max_sessions is 30.",
+                    "campaign-cmp-1",
+                ),
+                (
+                    "A schedule did not run",
+                    "Morning digest: skipped: 125 minutes overdue (the daemon was not running)",
+                    "schedule-sch-1",
+                ),
+            ]
             await page.close()
         finally:
             await browser.close()

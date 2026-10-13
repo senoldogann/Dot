@@ -6,6 +6,10 @@ the owner's own check (ROADMAP item 52)."""
 
 import asyncio
 import base64
+import os
+import signal
+import socket
+import sys
 import threading
 import time
 from collections.abc import AsyncIterator, Iterator
@@ -25,12 +29,13 @@ from dotagent.evals.runner import SCRIPTED_MODEL
 from dotagent.evals.scripted import ScriptedProvider
 from dotagent.evals.types import ScriptedCall, ScriptedTurn
 from dotagent.llm.types import ChatRequest, DeltaSink, ModelInfo, ModelReply
-from dotagent.notify.push import watch_pushes
+from dotagent.notify.push import PUSH_KINDS, watch_pushes
 from dotagent.runtime import Runtime, build_runtime, close_runtime
 from dotagent.server.app import create_app
 from dotagent.server.context import ServerContext
 from dotagent.server.daemon import DotServer, bind_listener, serving_config
 from dotagent.server.links import ui_url
+from dotagent.store.db import Store
 from dotagent.store.models import ApprovalRecord, RunRecord
 from dotagent.tools.meta import ASK_USER_TOOL, FINISH_TOOL
 
@@ -122,7 +127,7 @@ def push_service() -> Iterator[_PushService]:
 async def runtime(tmp_path_factory: pytest.TempPathFactory) -> AsyncIterator[Runtime]:
     home: Path = tmp_path_factory.mktemp("home")
     (home / "config.toml").write_text(
-        f'[browser]\nheadless = true\n\n[models]\nmain = "{SCRIPTED_MODEL}"\n\n[agent]\nquestions = "wait"\n',
+        f'[browser]\nheadless = true\n\n[models]\nmain = "{SCRIPTED_MODEL}"\n',
         encoding="utf-8",
     )
     patch: pytest.MonkeyPatch = pytest.MonkeyPatch()
@@ -164,22 +169,21 @@ async def client(runtime: Runtime, manager: RunManager) -> AsyncIterator[httpx.A
     )
     server: DotServer = DotServer(serving_config(create_app(context)), stopping)
     serving: asyncio.Task[None] = asyncio.create_task(server.serve(sockets=[listener]))
-    pusher: asyncio.Task[None] = asyncio.create_task(
-        watch_pushes(runtime.store, runtime.bus, runtime.push_keys, stopping)
-    )
-    while not server.started:
-        assert not serving.done(), "the server stopped while starting"
-        await asyncio.sleep(0.05)
-    try:
-        async with httpx.AsyncClient(
-            base_url=f"http://127.0.0.1:{port}", headers={"Authorization": f"Bearer {TOKEN}"}, timeout=_RUN_WAIT_S
-        ) as http:
-            yield http
-    finally:
-        server.should_exit = True
-        stopping.set()
-        await serving
-        await pusher
+    async with runtime.bus.subscribe_kinds(PUSH_KINDS) as feed:
+        pusher: asyncio.Task[None] = asyncio.create_task(watch_pushes(runtime.store, feed, runtime.push_keys, stopping))
+        while not server.started:
+            assert not serving.done(), "the server stopped while starting"
+            await asyncio.sleep(0.05)
+        try:
+            async with httpx.AsyncClient(
+                base_url=f"http://127.0.0.1:{port}", headers={"Authorization": f"Bearer {TOKEN}"}, timeout=_RUN_WAIT_S
+            ) as http:
+                yield http
+        finally:
+            server.should_exit = True
+            stopping.set()
+            await serving
+            await pusher
 
 
 def _turn(tool: str, arguments: dict[str, str | bool]) -> ScriptedTurn:
@@ -265,6 +269,90 @@ async def test_a_subscription_gets_the_question_and_the_end_and_goes_when_its_se
             break
         await asyncio.sleep(0.1)
     assert await runtime.store.list_push_subscriptions() == [], "a subscription its service calls gone is deleted"
+
+
+async def test_a_question_a_yolo_run_leaves_reaches_the_phone_and_the_run_goes_on(
+    runtime: Runtime, manager: RunManager, client: httpx.AsyncClient, push_service: _PushService
+) -> None:
+    """Item 151: a yolo run asks nobody and waits for no answer; the question it leaves reaches the phone all the
+    same, and so does its end."""
+    push_service.status = 201
+    keys: dict[str, str] = _browser_keys()
+    await runtime.store.add_push_subscription(push_service.plain_endpoint, keys["p256dh"], keys["auth"])
+    sent: int = len(push_service.posts)
+    MODEL.script = ScriptedProvider(
+        _PROVIDER,
+        [
+            _turn(ASK_USER_TOOL, {"question": "Which colour?"}),
+            _turn(FINISH_TOOL, {"answer": "Blue, as nobody said otherwise.", "success": True}),
+        ],
+    )
+    run: RunRecord = await manager.start(
+        "Pick a colour", "task", SCRIPTED_MODEL, None, "test", None, None, "yolo", False, ()
+    )
+    async with asyncio.timeout(_RUN_WAIT_S):
+        ended: RunRecord = await manager.wait(run.id)
+    assert ended.status == "done", ended
+    assert [question.status for question in await runtime.store.run_questions(run.id, ASK_USER_TOOL)] == ["left"]
+    posts = await asyncio.to_thread(push_service.wait_posts, sent + 2)
+    assert len(posts) == sent + 2, "the question the run left and the end of the run reached the push service"
+
+
+def _free_port() -> int:
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as probe:
+        probe.bind(("127.0.0.1", 0))
+        return int(probe.getsockname()[1])
+
+
+def _home_left_by_an_unclean_end(home: Path) -> Path:
+    """Make ``home`` a Dot home whose daemon listens on a free port, with the mark of a daemon that did not end cleanly
+    in it; returns the mark."""
+    home.mkdir()
+    (home / "config.toml").write_text(f"[server]\nport = {_free_port()}\n", encoding="utf-8")
+    mark: Path = home / "daemon.running"
+    mark.touch()
+    return mark
+
+
+async def test_a_daemon_that_starts_after_an_unclean_end_tells_the_phone(
+    push_service: _PushService, tmp_path: Path
+) -> None:
+    """Item 151: a daemon that was killed, or ended with an error, leaves its mark behind; a real daemon that starts and
+    finds it tells the phone so, and one that stops cleanly takes its own mark away."""
+    home: Path = tmp_path / "home"
+    mark: Path = _home_left_by_an_unclean_end(home)
+    keys: dict[str, str] = _browser_keys()
+    store: Store = await Store.open(home / "dot.sqlite3", home / "screenshots")
+    try:
+        await store.add_push_subscription(push_service.plain_endpoint, keys["p256dh"], keys["auth"])
+    finally:
+        await store.close()
+    push_service.status = 201
+    sent: int = len(push_service.posts)
+    daemon: asyncio.subprocess.Process = await asyncio.create_subprocess_exec(
+        sys.executable,
+        "-m",
+        "dotagent",
+        "daemon",
+        stdout=asyncio.subprocess.DEVNULL,
+        stderr=asyncio.subprocess.DEVNULL,
+        env={
+            **os.environ,
+            "DOT_HOME": str(home),
+            "DOT_LOG_DIR": str(tmp_path / "logs"),
+            "DOT_CHROME_DIR": str(tmp_path / "chrome"),
+        },
+    )
+    try:
+        posts = await asyncio.to_thread(push_service.wait_posts, sent + 1)
+        assert len(posts) == sent + 1, "the restart reached the push service"
+        assert await asyncio.to_thread(mark.exists), "a running daemon keeps its mark"
+    finally:
+        daemon.send_signal(signal.SIGTERM)
+        async with asyncio.timeout(_RUN_WAIT_S):
+            ended: int = await daemon.wait()
+    assert ended == 0
+    assert not await asyncio.to_thread(mark.exists), "a daemon that stops cleanly takes its mark away"
 
 
 async def test_the_shell_of_the_web_app_is_served_and_the_service_worker_registers(

@@ -1194,10 +1194,14 @@ document's head before the first paint, so a held dark scheme never flashes ligh
 While you are elsewhere, the tab title counts the approvals that wait: `(2) New chat · Dot`. Settings › General ›
 Notifications adds
 desktop notifications (off until you switch them on; the browser asks for its permission on that click): Dot says
-when it asks for an approval, a question or your help, and when a run ends (done, failed or stopped; the sub-runs of a
-run stay quiet), unless you are looking at that run: its page open, the tab visible and the window active. On another
+when it asks for an approval, a question or your help, and when it leaves you a question that a run could not wait for
+(a `yolo`, scheduled or campaign run goes on without the answer); when a run ends (done, failed or stopped, with the
+first line of its answer; the sub-runs of a run stay quiet); when a campaign ends by itself (achieved, or stopped by
+the emergency stop or by `campaign_max_sessions`); and when a schedule misses a firing that nobody saw (overdue, or
+its run could not start; told once while the reason stays the same). It says nothing while you are looking at that
+run: its page open, the tab visible and the window active. On another
 page, in a background tab or in an inactive window you are told; "Tell me even when I am looking" under the same
-setting turns the rule off. Clicking a notification opens the run. The tab's
+setting turns the rule off. Clicking a notification opens what it tells of. The tab's
 icon is the same face in the state of the whole of Dot (amber ring while something waits for you, working while a run
 is active, still otherwise), and a notification carries the face in the state it tells of.
 
@@ -1338,10 +1342,12 @@ needs to reach the Mac, and a push needs a secure address, so the way there is y
    `Host`, and a page from `https://` that name, is served like a local one. `dotx url` then prints the signed-in
    address for the phone too (the token stays in the fragment).
 3. On the phone, Settings › General › Notifications on: the browser subscribes to the daemon's web push, and from
-   then on the daemon tells the phone what the desktop notifications say (an approval or a question asked, a run of
-   its own ended), page open or closed; a tap opens the run. The daemon signs the pushes with a key pair it makes
-   on first start (`<home>/vapid-key.pem`); subscriptions live in the store and go when their push service says they
-   are gone. Settings › General › Notifications off drops the subscription.
+   then on the daemon tells the phone what the desktop notifications say, in the same words, page open or closed;
+   a tap opens what it tells of. The phone also hears what no page can, as it happens before a page is back: the
+   daemon started again after it did not stop cleanly (it was killed, crashed or ended with an error; it leaves
+   `<home>/daemon.running` while it runs), with how many runs that cut off. The daemon signs the pushes with a key
+   pair it makes on first start (`<home>/vapid-key.pem`); subscriptions live in the store and go when their push
+   service says they are gone. Settings › General › Notifications off drops the subscription.
 
 The service worker (`sw.js`) keeps the shell files as a fallback for when the Mac is out of reach and caches nothing
 under `/api`. Without Tailscale, the same works on the Mac itself (`localhost` counts as secure) and on nothing else.
@@ -1589,7 +1595,7 @@ defaults: a run cannot schedule itself into another approval mode.
 
 - Schedules fire only while the daemon runs and the Mac is awake; `dotx service install` keeps the daemon running.
 - A firing is at most once. One that is overdue by more than `misfire_grace_s` (the daemon was off) is skipped and waits
-  for the next.
+  for the next; you are told, as you are when a firing's run cannot start (see the notifications under the web UI).
 - The scheduler goes on past a failure: the schedules, the campaigns and the nightly reflection are each looked at on
   their own at every tick, one that fails (the store, a campaign's start) is logged, and the next tick tries again. Only
   20 failed ticks in a row (five minutes at the default `tick_s`) end the scheduler, and the daemon with it, with an
@@ -1683,8 +1689,9 @@ your conversation; the daemon runs the sessions after it, each a run in a thread
 - **Only a verified outcome ends it.** `campaign_achieved` asks the goal checker (the review model) whether the targets
   are reached, from the targets and how they are verified, the progress in the ledger, the session's plan with the
   evidence of its steps, what the session's own calls measured and the session's evidence. Refused, the call fails with the checker's reason and the session goes on (one
-  the checker finds out of reach asks you how to go on); accepted, the campaign is achieved and you get a
-  notification.
+  the checker finds out of reach asks you how to go on); accepted, the campaign is achieved and you are told (the
+  notifications under the web UI and the phone's pushes), as you are when the emergency stop or `campaign_max_sessions`
+  stops it.
 - **Only you stop it.** Campaigns, in the sidebar, lists them; a campaign's page shows its targets, the questions
   waiting for you, its ledger and its sessions, with Stop (which also stops a session working then), Go on and Mark
   achieved. The emergency stop (its button, or the pointer in the top-left corner during a desktop step) stops the

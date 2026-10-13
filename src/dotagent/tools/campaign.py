@@ -13,7 +13,14 @@ from typing import Annotated
 
 from pydantic import Field, StringConstraints
 
-from dotagent.agent.campaign import entry_line, route_refused, routes_without_progress, sessions_without_progress
+from dotagent.agent.campaign import (
+    CAMPAIGN_ENDED_EVENT,
+    CampaignEnded,
+    entry_line,
+    route_refused,
+    routes_without_progress,
+    sessions_without_progress,
+)
 from dotagent.agent.judge import ClaimJudgment, claim_refused, claim_state, describe_claim
 from dotagent.agent.plan import EMPTY_PLAN, PLAN_EVENT, PlanPayload, plan_from_event, render_plan
 from dotagent.agent.review import GoalChecker, GoalRequest, GoalVerdict, goal_checker_for, goal_digest, shorten_reason
@@ -329,19 +336,15 @@ def _achieved_tool() -> RegisteredTool:
             )
         if verdict.decision == "continue":
             return fail(f"Not accepted: {reason} The campaign goes on: work on what is missing.")
+        accepted: str = f"The goal checker accepted the outcome: {reason}"
         await ctx.runtime.store.achieve_campaign(campaign.id, args.evidence)
-        await ctx.runtime.store.add_campaign_entry(
-            campaign.id, ctx.run_id, "note", f"The goal checker accepted the outcome: {reason}", {}
-        )
+        await ctx.runtime.store.add_campaign_entry(campaign.id, ctx.run_id, "note", accepted, {})
         log.info("campaign_achieved", campaign_id=campaign.id, run_id=ctx.run_id)
-        try:
-            await ctx.runtime.notify("Campaign achieved", campaign.title)
-        except ToolExecutionError as error:
-            log.warning(
-                "campaign_notification_failed", campaign_id=campaign.id, error=error.message, context=error.context
-            )
-            return ok(f"Accepted: {reason} The campaign is achieved; the owner could not be notified.")
-        return ok(f"Accepted: {reason} The campaign is achieved and the owner is notified.")
+        ended: CampaignEnded = CampaignEnded(
+            campaign_id=campaign.id, title=campaign.title, status="achieved", note=accepted
+        )
+        await ctx.runtime.bus.emit(ctx.run_id, CAMPAIGN_ENDED_EVENT, ended.model_dump(), False)
+        return ok(f"Accepted: {reason} The campaign is achieved, and the owner is told.")
 
     return make_tool(
         name=CAMPAIGN_ACHIEVED_TOOL,

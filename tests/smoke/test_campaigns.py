@@ -20,7 +20,7 @@ import httpx
 import pytest
 import pytest_asyncio
 
-from dotagent.agent.campaign import Brief
+from dotagent.agent.campaign import CAMPAIGN_ENDED_EVENT, Brief
 from dotagent.agent.campaign_control import stop_campaign
 from dotagent.agent.loop import CAMPAIGN_TARGETS_EVENT
 from dotagent.agent.manager import RunHandle, RunManager, thread_title
@@ -293,7 +293,10 @@ async def test_a_session_started_by_the_scheduler_reads_the_brief_and_only_an_ac
     )
     notices: Notices = Notices()
     # A gap of a tenth of a second: the scheduler starts the second session at its next tick.
-    async with _session(_config(0.1 / 60), login_env, model, notices) as (runtime, manager):
+    async with (
+        _session(_config(0.1 / 60), login_env, model, notices) as (runtime, manager),
+        runtime.bus.subscribe_kinds(frozenset({CAMPAIGN_ENDED_EVENT})) as ending,
+    ):
         scheduler: Scheduler = Scheduler(runtime, manager)
         await scheduler.start()
         try:
@@ -303,6 +306,7 @@ async def test_a_session_started_by_the_scheduler_reads_the_brief_and_only_an_ac
                 sessions: list[RunRecord] = await _ended_sessions(runtime, opening.campaign_id, 2)
         finally:
             await scheduler.stop()
+        told: list[EventRecord] = [ending.queue.get_nowait() for _ in range(ending.queue.qsize())]
         campaign: CampaignRecord = await runtime.store.get_campaign(opening.campaign_id)
         entries: list[CampaignEntry] = await runtime.store.campaign_entries(campaign.id, 10)
         second: RunRecord = sessions[1]
@@ -337,7 +341,14 @@ async def test_a_session_started_by_the_scheduler_reads_the_brief_and_only_an_ac
     assert (campaign.status, campaign.evidence, campaign.next_session_at) == ("achieved", claim, None)
     assert [entry.kind for entry in entries] == ["progress", "progress", "note"]
     assert entries[-1].text.startswith("The goal checker accepted the outcome: The newest progress entry")
-    assert notices.shown == [("Campaign achieved", campaign.title)]
+    # Item 151: the owner is told as the page's notifications and the phone tell, not with a banner of its own.
+    assert notices.shown == []
+    assert [(event.run_id, event.data) for event in told] == [
+        (
+            second.id,
+            {"campaign_id": campaign.id, "title": campaign.title, "status": "achieved", "note": entries[-1].text},
+        )
+    ]
 
 
 async def test_a_stuck_campaign_refuses_the_route_it_tried_and_reaches_its_outcome_by_another(
@@ -647,6 +658,7 @@ async def test_the_emergency_stop_ends_a_session_as_one_and_holds_the_campaign_w
             base_url=BASE,
             headers={"Authorization": f"Bearer {TOKEN}"},
         ) as client,
+        runtime.bus.subscribe_kinds(frozenset({CAMPAIGN_ENDED_EVENT})) as ending,
     ):
         session: RunRecord = await manager.start_campaign(
             GOAL, "task", SCRIPTED_MODEL, None, EVAL_SOURCE, None, "yolo", None, (), None
@@ -667,6 +679,11 @@ async def test_the_emergency_stop_ends_a_session_as_one_and_holds_the_campaign_w
             assert resumed.status_code == 200, resumed.text
             await Scheduler(runtime, manager).tick(time.time())
             assert [run.id for run in await runtime.store.campaign_sessions(session.campaign_id)] == [session.id]
+            # Item 151: the owner is told the campaign stopped; their own resume tells nothing.
+            told: list[EventRecord] = [ending.queue.get_nowait() for _ in range(ending.queue.qsize())]
+            assert [(event.run_id, event.data["status"], event.data["note"]) for event in told] == [
+                (session.id, "stopped", "Stopped: the owner's emergency stop ended this session.")
+            ]
         finally:
             released: httpx.Response = await client.delete("/api/failsafe")
             assert released.status_code == 200, released.text

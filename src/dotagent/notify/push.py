@@ -1,7 +1,9 @@
-"""Web push to the owner's phone (item 52): the VAPID key pair the daemon signs with, the message a lifecycle event
-turns into, the send to a subscription's push service, and the watcher that sends every subscription what the web
-UI's desktop notifications say (an approval or a question asked, a run ended). The subscriptions come from the web
-UI (``POST /api/push/subscriptions``) and live in the store; one whose push service says it is gone is deleted."""
+"""Web push to the owner's phone (item 52): the VAPID key pair the daemon signs with, the message an event turns into,
+the send to a subscription's push service, and the watcher that sends every subscription what the web UI's desktop
+notifications say: an approval or a question a run asked or left, the end of a run, a campaign that ended by itself, a
+firing a schedule missed, a start of the daemon after the one before it did not end cleanly. The subscriptions come
+from the web UI (``POST /api/push/subscriptions``) and live in the store; one whose push service says it is gone is
+deleted."""
 
 import asyncio
 import json
@@ -15,9 +17,12 @@ from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
 from py_vapid import Vapid, b64urlencode
 from pywebpush import WebPushException, webpush
 
+from dotagent.agent.approvals import QUESTION_LEFT_EVENT
+from dotagent.agent.campaign import CAMPAIGN_ENDED_EVENT, CampaignEnded
 from dotagent.core.errors import DotError
 from dotagent.core.types import FrozenModel
-from dotagent.events import EventBus
+from dotagent.events import DAEMON_RESTARTED_EVENT, SYSTEM_RUN_ID, DaemonRestarted, Subscription
+from dotagent.scheduler import SCHEDULE_MISSED_EVENT, ScheduleMissed
 from dotagent.store.db import Store
 from dotagent.store.models import EventRecord, PushSubscription, RunRecord
 
@@ -31,11 +36,14 @@ _WAIT_S: float = 1.0
 _BODY_CHARS: int = 140
 _PRIVATE_MODE: int = stat.S_IRUSR | stat.S_IWUSR
 _GONE: frozenset[int] = frozenset({404, 410})
+_ASKED_KINDS: frozenset[str] = frozenset({"approval_requested", QUESTION_LEFT_EVENT})
 _ASKING_TITLE: dict[str, str] = {"question": "Dot has a question", "handoff": "Dot needs your help"}
 _FINISHED_TITLE: dict[str, str] = {"done": "A run is done", "failed": "A run failed", "cancelled": "A run was stopped"}
 type PushState = Literal["idle", "waiting", "done", "failed"]
 _FINISHED_STATE: dict[str, PushState] = {"done": "done", "failed": "failed"}
-PUSH_KINDS: frozenset[str] = frozenset({"approval_requested", "run_finished"})
+PUSH_KINDS: frozenset[str] = frozenset(
+    {*_ASKED_KINDS, "run_finished", CAMPAIGN_ENDED_EVENT, SCHEDULE_MISSED_EVENT, DAEMON_RESTARTED_EVENT}
+)
 
 
 class PushError(DotError):
@@ -76,10 +84,22 @@ def _shorten(text: str) -> str:
     return flat if len(flat) <= _BODY_CHARS else f"{flat[: _BODY_CHARS - 1]}…"
 
 
+def _first_line(text: str) -> str:
+    """The first line of ``text`` that is not blank; nothing when there is none."""
+    return next((line for line in text.splitlines() if line.strip()), "")
+
+
+def _cut_off(runs: int) -> str:
+    if runs == 0:
+        return "No run was cut off."
+    return "1 run was cut off." if runs == 1 else f"{runs} runs were cut off."
+
+
 def push_message(event: EventRecord, run: RunRecord) -> PushMessage | None:
-    """The message an event is worth, or ``None``: an approval or a question asked, and the end of a run of its own
-    (the sub-runs of a run stay quiet, as in the web UI)."""
-    if event.kind == "approval_requested":
+    """The message an event of a run is worth, or ``None``: an approval or a question asked or left; the end of a run of
+    its own (the sub-runs of a run stay quiet, as in the web UI), with the first line of its result; the end of a
+    campaign by itself."""
+    if event.kind in _ASKED_KINDS:
         severity: object = event.data.get("severity")
         args: object = event.data.get("args")
         question: object = args.get("question") if isinstance(args, dict) else None
@@ -89,11 +109,43 @@ def push_message(event: EventRecord, run: RunRecord) -> PushMessage | None:
         return PushMessage(title=title, body=_shorten(text), route=f"#/runs/{run.id}", state="waiting")
     if event.kind == "run_finished" and run.parent_run_id is None:
         status: str = str(event.data.get("status", ""))
+        result: object = event.data.get("result")
         return PushMessage(
             title=_FINISHED_TITLE.get(status, "A run has ended"),
-            body=_shorten(run.goal),
+            body=_shorten(_first_line(result if isinstance(result, str) else "")),
             route=f"#/runs/{run.id}",
             state=_FINISHED_STATE.get(status, "idle"),
+        )
+    if event.kind == CAMPAIGN_ENDED_EVENT:
+        ended: CampaignEnded = CampaignEnded.model_validate(event.data)
+        achieved: bool = ended.status == "achieved"
+        return PushMessage(
+            title="A campaign is achieved" if achieved else "A campaign stopped",
+            body=_shorten(f"{ended.title}: {ended.note}"),
+            route=f"#/campaigns/{ended.campaign_id}",
+            state="done" if achieved else "idle",
+        )
+    return None
+
+
+def notice_message(event: EventRecord) -> PushMessage | None:
+    """The message an event of Dot itself (``SYSTEM_RUN_ID``) is worth, or ``None``: a firing a schedule missed, and a
+    start of the daemon after the one before it did not end cleanly."""
+    if event.kind == SCHEDULE_MISSED_EVENT:
+        missed: ScheduleMissed = ScheduleMissed.model_validate(event.data)
+        return PushMessage(
+            title="A schedule did not run",
+            body=_shorten(f"{missed.name}: {missed.status}"),
+            route="#/settings/schedules",
+            state="failed",
+        )
+    if event.kind == DAEMON_RESTARTED_EVENT:
+        restarted: DaemonRestarted = DaemonRestarted.model_validate(event.data)
+        return PushMessage(
+            title="Dot restarted after an unexpected stop",
+            body=_cut_off(restarted.runs_cut_off),
+            route="#/activity",
+            state="failed",
         )
     return None
 
@@ -150,8 +202,11 @@ async def _next_event(queue: asyncio.Queue[EventRecord], stopping: asyncio.Event
 async def push_event(store: Store, keys: PushKeys, event: EventRecord) -> None:
     """Send one event to every subscription; a subscription its push service calls gone is deleted, any other
     refusal is logged and the rest still get theirs."""
-    run: RunRecord = await store.get_run(event.run_id)
-    message: PushMessage | None = push_message(event, run)
+    message: PushMessage | None = (
+        notice_message(event)
+        if event.run_id == SYSTEM_RUN_ID
+        else push_message(event, await store.get_run(event.run_id))
+    )
     if message is None:
         return
     for subscription in await store.list_push_subscriptions():
@@ -165,15 +220,15 @@ async def push_event(store: Store, keys: PushKeys, event: EventRecord) -> None:
                 log.warning("push_failed", endpoint=subscription.endpoint, status=error.context.get("status"))
 
 
-async def watch_pushes(store: Store, bus: EventBus, keys: PushKeys, stopping: asyncio.Event) -> None:
-    """Send every subscription what the lifecycle events say, until the daemon starts to stop. An event that cannot
-    be pushed (its run was deleted, the store failed) is logged and the next one still goes."""
-    async with bus.subscribe_kinds(PUSH_KINDS) as feed:
-        while not stopping.is_set():
-            event: EventRecord | None = await _next_event(feed.queue, stopping)
-            if event is None:
-                continue
-            try:
-                await push_event(store, keys, event)
-            except DotError as error:
-                log.warning("push_event_failed", run_id=event.run_id, kind=event.kind, error=str(error))
+async def watch_pushes(store: Store, feed: Subscription, keys: PushKeys, stopping: asyncio.Event) -> None:
+    """Send every subscription what the events of ``feed`` say, until the daemon starts to stop. ``feed`` takes the
+    kinds of ``PUSH_KINDS``, and its caller opens it, so that what happens before this task first runs is sent too. An
+    event that cannot be pushed (its run was deleted, the store failed) is logged and the next one still goes."""
+    while not stopping.is_set():
+        event: EventRecord | None = await _next_event(feed.queue, stopping)
+        if event is None:
+            continue
+        try:
+            await push_event(store, keys, event)
+        except DotError as error:
+            log.warning("push_event_failed", run_id=event.run_id, kind=event.kind, error=str(error))

@@ -7,14 +7,24 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
 from dotagent.core.logs import get_logger
-from dotagent.core.types import JsonObject
+from dotagent.core.types import FrozenModel, JsonObject
 from dotagent.store.db import Store
 from dotagent.store.models import EventRecord
 
+# The run id of the events of Dot itself rather than of a run; they are live only.
 SYSTEM_RUN_ID: str = "_system"
+# The event of Dot itself at a start after the daemon before it did not end cleanly (it was killed, crashed, or ended
+# with an error).
+DAEMON_RESTARTED_EVENT: str = "daemon_restarted"
 _QUEUE_SIZE: int = 2000
 
 log = get_logger(__name__)
+
+
+class DaemonRestarted(FrozenModel):
+    """What ``daemon_restarted`` carries: how many runs the daemon before left active, which this start closed."""
+
+    runs_cut_off: int
 
 
 class Subscription:

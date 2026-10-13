@@ -1,6 +1,8 @@
 // How Dot gets your attention when you are not looking: the tab title counts the approvals that wait, and desktop
-// notifications (off until you switch them on) say when Dot needs an answer or a run has ended, unless you are looking
-// at that run (its page open, the tab visible, the window active; item 75), or you asked to be told even then.
+// notifications (off until you switch them on) say when Dot needs an answer or left you a question, a run has ended, a
+// campaign ended by itself or a schedule missed a firing, unless you are looking at that run (its page open, the tab
+// visible, the window active; item 75), or you asked to be told even then. They say what the daemon's pushes say
+// (notify/push.py), word for word.
 
 import { api } from "./api.js";
 import { faceDataUrl, overallState } from "./face.js";
@@ -17,6 +19,8 @@ const FINISHED_TITLE = { done: "A run is done", failed: "A run failed", cancelle
 const ASKING_TITLE = { question: "Dot has a question", handoff: "Dot needs your help" };
 
 const FINISHED_FACE = { done: "done", failed: "failed" };
+// The line breaks of Python's str.splitlines, so that the first line of a result is the one the push shows.
+const LINE_BREAK = /\r\n|[\n\v\f\r\x1c-\x1e\x85\u2028\u2029]/;
 
 let pageTitle = "Dot";
 
@@ -154,6 +158,11 @@ function tellAboutApproval(event) {
   tell({ title: ASKING_TITLE[severity] ?? "Dot asks for approval", body: shorten(text), tag: `approval-${id}`, route: `#/runs/${event.run_id}`, state: "waiting" });
 }
 
+/** The first line of `text` that is not blank; nothing when there is none. */
+function firstLine(text) {
+  return text.split(LINE_BREAK).find((line) => line.trim() !== "") ?? "";
+}
+
 async function tellAboutEnd(event) {
   const { run } = await api.get(`/runs/${event.run_id}`);
   if (run.parent_run_id !== null || !worthATell(run.id)) {
@@ -161,11 +170,28 @@ async function tellAboutEnd(event) {
   }
   tell({
     title: FINISHED_TITLE[event.data.status] ?? "A run has ended",
-    body: shorten(run.goal),
+    body: shorten(firstLine(typeof event.data.result === "string" ? event.data.result : "")),
     tag: `run-${run.id}`,
     route: `#/runs/${run.id}`,
     state: FINISHED_FACE[event.data.status] ?? "idle",
   });
+}
+
+function tellAboutCampaign(event) {
+  const { campaign_id: id, title, status, note } = event.data;
+  const achieved = status === "achieved";
+  tell({
+    title: achieved ? "A campaign is achieved" : "A campaign stopped",
+    body: shorten(`${title}: ${note}`),
+    tag: `campaign-${id}`,
+    route: `#/campaigns/${id}`,
+    state: achieved ? "done" : "idle",
+  });
+}
+
+function tellAboutMissedFiring(event) {
+  const { schedule_id: id, name, status } = event.data;
+  tell({ title: "A schedule did not run", body: shorten(`${name}: ${status}`), tag: `schedule-${id}`, route: "#/settings/schedules", state: "failed" });
 }
 
 /** What a failure to notify costs: nothing but a line in the console, so it never stops the page from updating. */
@@ -174,10 +200,14 @@ function onLifecycleEvent(event) {
     if (!worthATell(event.run_id)) {
       return;
     }
-    if (event.kind === "approval_requested") {
+    if (event.kind === "approval_requested" || event.kind === "question_left") {
       tellAboutApproval(event);
     } else if (event.kind === "run_finished") {
       tellAboutEnd(event).catch((error) => console.warn("could not tell about a finished run", error));
+    } else if (event.kind === "campaign_ended") {
+      tellAboutCampaign(event);
+    } else if (event.kind === "schedule_missed") {
+      tellAboutMissedFiring(event);
     }
   } catch (error) {
     console.warn("could not notify", error);
