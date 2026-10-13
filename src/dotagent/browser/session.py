@@ -521,7 +521,8 @@ class BrowserSession:
 
     async def _let_go(self) -> None:
         """Close Dot's own Chrome, or close the tabs Dot opened in the Chrome of the user and drop the connection; then
-        stop the Playwright driver. The tabs of every thread are gone with it."""
+        stop the Playwright driver, also when the close failed, so no driver (and no Chrome it started) is left running.
+        The tabs of every thread are gone with it."""
         for task in [*self._adopting, *self._front_returns]:
             task.cancel()
         context: BrowserContext | None = self._context
@@ -529,20 +530,22 @@ class BrowserSession:
         self._context = None
         self._browser = None
         self._chrome_pid = None
-        if browser is not None:
-            await self._detach(browser)
-        elif context is not None:
-            try:
-                await context.close()
-            except Exception as error:
-                if not browser_gone(error):
-                    raise
-                _log.warning("browser_close_failed", error=truncate_middle(str(error), _LAUNCH_ERROR_CHARS))
-        if self._playwright is not None:
-            await self._playwright.stop()
-            self._playwright = None
-        self._threads.clear()
-        self._initial_pages = []
+        try:
+            if browser is not None:
+                await self._detach(browser)
+            elif context is not None:
+                try:
+                    await context.close()
+                except Exception as error:
+                    if not browser_gone(error):
+                        raise
+                    _log.warning("browser_close_failed", error=truncate_middle(str(error), _LAUNCH_ERROR_CHARS))
+        finally:
+            if self._playwright is not None:
+                await self._playwright.stop()
+                self._playwright = None
+            self._threads.clear()
+            self._initial_pages = []
 
     async def _detach(self, browser: Browser) -> None:
         """Close the tabs Dot opened in the Chrome of the user, then drop the connection (Chrome keeps running)."""

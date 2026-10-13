@@ -285,6 +285,45 @@ async def test_an_unknown_skill_is_refused_with_the_names_of_the_skills_offered(
     assert "release-notes" in result.text and "deploy-site" in result.text
 
 
+async def test_a_long_skill_is_read_in_parts_that_each_fit_a_result(runtime: Runtime, home: Path) -> None:
+    # Instructions longer than a tool result come in parts, each within the result, so the cut every result gets never
+    # takes their middle (item 176); the files come with the first part.
+    steps: str = "\n".join(
+        f"{number}. Check line {number} of the ledger against the bank statement." for number in range(1, 1200)
+    )
+    root: Path = home / "skills" / "long-ledger"
+    _write(
+        root / "SKILL.md", f"---\nname: long-ledger\ndescription: Reconcile the ledger line by line.\n---\n{steps}\n"
+    )
+    _write(root / "scripts" / "fetch.sh", "#!/bin/sh\necho fetched\n")
+    room: int = runtime.config.agent.tool_output_chars
+    try:
+        catalog: SkillCatalog = load_skills(runtime.config.skills, runtime.plugins.plugins, None)
+        (skill,) = [entry for entry in catalog.skills if entry.name == "long-ledger"]
+        assert len(skill.body) > 3 * room
+        parts: list[str] = []
+        texts: list[str] = []
+        arguments: JsonObject = {"name": "long-ledger"}
+        while True:
+            result, _ = await _call(runtime, "skill", arguments)
+            assert not result.is_error, result.text
+            assert len(result.text) <= room, len(result.text)
+            found: re.Match[str] | None = FENCE.search(result.text)
+            assert found is not None, result.text
+            parts.append(found["body"])
+            texts.append(result.text)
+            going_on: re.Match[str] | None = re.search(r"skill\(name='long-ledger', start=(\d+)\)", result.text)
+            if going_on is None:
+                break
+            arguments = {"name": "long-ledger", "start": int(going_on[1])}
+        assert "".join(parts) == skill.body
+        assert "scripts/fetch.sh" in texts[0] and not any("scripts/fetch.sh" in text for text in texts[1:])
+        past, _ = await _call(runtime, "skill", {"name": "long-ledger", "start": len(skill.body)})
+        assert past.is_error and f"end at character {len(skill.body)}" in past.text, past.text
+    finally:
+        await asyncio.to_thread(shutil.rmtree, root)
+
+
 def _learned(agent_id: str) -> Playbook:
     """A learned skill of the agent ``agent_id``, as a run of its would have written it."""
     return Playbook(

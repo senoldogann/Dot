@@ -13,6 +13,7 @@ _SECRET_PATTERNS: tuple[re.Pattern[str], ...] = (
 )
 
 _BLOB_THRESHOLD: int = 400
+_WINDOW_SLACK: float = 0.8  # a window ends at a line or word break found in its last fifth
 # A cheap overestimate of how many characters one token holds, for budgets estimated before a provider counts.
 CHARS_PER_TOKEN: float = 3.2
 
@@ -31,6 +32,20 @@ def truncate_middle(text: str, max_chars: int) -> str:
     tail: int = max_chars - head
     omitted: int = len(text) - head - tail
     return f"{text[:head]}\n...[{omitted} chars omitted]...\n{text[len(text) - tail :]}"
+
+
+def text_window(text: str, start: int, budget: int) -> tuple[str, int]:
+    """The part of ``text`` that starts at ``start`` and fits ``budget`` characters, ended at a line or word break when
+    one is close; returns the part and the offset where the next part starts."""
+    limit: int = min(start + budget, len(text))
+    if limit < len(text):
+        floor: int = start + int(budget * _WINDOW_SLACK)
+        for separator in ("\n", " "):
+            found: int = text.rfind(separator, floor, limit)
+            if found != -1:
+                limit = found + 1
+                break
+    return text[start:limit], limit
 
 
 def truncate_tail(text: str, max_chars: int) -> str:

@@ -1,6 +1,7 @@
 """AppleScript and JavaScript for Automation, run by ``osascript`` in a child process that can be timed out and killed."""
 
 import asyncio
+import contextlib
 from typing import Literal
 
 from dotagent.core.errors import DesktopError
@@ -14,7 +15,8 @@ _REAP_TIMEOUT_S: float = 5.0
 
 async def run_osascript(language: ScriptLanguage, script: str, confinement: tuple[str, ...], timeout_s: float) -> str:
     """The script's result as text, ``osascript`` started by ``confinement`` (the words of a run's sandbox, or
-    none). A script that waits for an Automation approval the user never sees times out."""
+    none). A script that waits for an Automation approval the user never sees times out; one whose wait is cancelled (a
+    stopped run, the tool's own timeout) is killed, so it never goes on acting on the Mac without its run."""
     process: asyncio.subprocess.Process = await asyncio.create_subprocess_exec(
         *confinement,
         "osascript",
@@ -35,6 +37,10 @@ async def run_osascript(language: ScriptLanguage, script: str, confinement: tupl
             "that has to be answered, or the script waits for something",
             {"language": language, "script": truncate_middle(script, _SCRIPT_CONTEXT_CHARS)},
         ) from error
+    finally:
+        if process.returncode is None:
+            with contextlib.suppress(ProcessLookupError):
+                process.kill()
     if process.returncode != 0:
         raise DesktopError(
             "osascript failed",

@@ -7,6 +7,7 @@ import os
 import re
 import shutil
 import tempfile
+from collections.abc import Iterator
 from itertools import islice
 from pathlib import Path
 
@@ -96,14 +97,14 @@ def _is_binary(path: Path) -> bool:
         return b"\0" in handle.read(8192)
 
 
-def _numbered_window(path: Path, offset: int, limit: int, budget: int) -> str:
-    """Numbered lines starting at ``offset`` (1-based), cut by line count and by character budget."""
+def _numbered(lines: Iterator[str], path: Path, offset: int, limit: int, budget: int) -> str:
+    """The lines of ``path`` from ``offset`` (1-based), numbered, cut by line count and by character budget, with the
+    offset to go on from."""
+    window: list[str] = list(islice(lines, offset - 1, offset - 1 + limit))
+    more: bool = next(lines, None) is not None
     shown: list[str] = []
     used: int = 0
     truncated: bool = False
-    with path.open("r", encoding="utf-8", errors="replace") as handle:
-        window: list[str] = list(islice(handle, offset - 1, offset - 1 + limit))
-        more: bool = next(handle, None) is not None
     for index, line in enumerate(window):
         rendered: str = f"{offset + index:>6}\t{truncate_middle(line.rstrip(chr(10)), _MAX_LINE_CHARS)}"
         if used + len(rendered) > budget and shown:
@@ -119,6 +120,12 @@ def _numbered_window(path: Path, offset: int, limit: int, budget: int) -> str:
     return "\n".join(shown) + f"\n[lines {offset}-{last}; end of file]"
 
 
+def _numbered_window(path: Path, offset: int, limit: int, budget: int) -> str:
+    """Numbered lines of a text file starting at ``offset`` (1-based), cut by line count and by character budget."""
+    with path.open("r", encoding="utf-8", errors="replace") as handle:
+        return _numbered(handle, path, offset, limit, budget)
+
+
 def _read_blocking(path: Path, offset: int, limit: int, budget: int, max_edge: int, quality: int) -> ToolResult:
     if not path.exists():
         raise ToolExecutionError("file does not exist", {"path": str(path)})
@@ -129,8 +136,11 @@ def _read_blocking(path: Path, offset: int, limit: int, budget: int, max_edge: i
         encoded: EncodedImage = encode_image(path.read_bytes(), max_edge, quality)
         return ok_with_images(f"Image {path.name}: {encoded.source_width}x{encoded.source_height}px", (encoded.image,))
     if suffix == ".pdf":
+        # The text of a PDF is paged by its lines like a text file's, so no part of a long one is out of reach.
         text: str = _pdf_text(path)
-        return ok(truncate_middle(text, budget) if text else "(the PDF contains no extractable text)")
+        if not text:
+            return ok("(the PDF contains no extractable text)")
+        return ok(_numbered(iter(text.splitlines()), path, offset, limit, budget))
     if _is_binary(path):
         return ok(f"Binary file ({path.stat().st_size} bytes): {path}")
     return ok(_numbered_window(path, offset, limit, budget))
