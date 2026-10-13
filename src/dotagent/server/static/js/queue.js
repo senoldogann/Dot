@@ -7,7 +7,7 @@
 import { api } from "./api.js";
 import { el } from "./dom.js";
 import { icon } from "./icons.js";
-import { onLifecycle } from "./state.js";
+import { onLifecycle, onStreamBack } from "./state.js";
 import { attempt, toast } from "./ui.js";
 
 const QUEUE_CHANGED = "queue_changed";
@@ -303,6 +303,7 @@ export function createQueue({ threadId, frame, onSteered, onStarted, onEdit }) {
     }
     load().catch((error) => console.warn("the queue could not be refreshed", error));
   });
+  const stopBack = onStreamBack(() => load().catch((error) => console.warn("the queue could not be refreshed", error)));
 
   load().catch((error) => console.warn("the queue could not be read", error));
 
@@ -327,6 +328,9 @@ export function createQueue({ threadId, frame, onSteered, onStarted, onEdit }) {
       endEdit();
       paint();
     },
-    dispose: () => stopLifecycle(),
+    dispose: () => {
+      stopLifecycle();
+      stopBack();
+    },
   };
 }

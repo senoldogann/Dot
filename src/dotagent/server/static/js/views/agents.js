@@ -17,7 +17,7 @@ import { setStageTitle, setStageTools } from "../stage.js";
 import { scoreLine } from "./memory.js";
 import { skillRow } from "./skills.js";
 import { messageRow } from "./team.js";
-import { getSnapshot, loadModels, onLifecycle } from "../state.js";
+import { getSnapshot, loadModels, onLifecycle, onStreamBack } from "../state.js";
 import { attempt, confirmDialog, toast } from "../ui.js";
 
 const DOT_ID = "dot";
@@ -285,10 +285,12 @@ function mountList(root, ctx) {
       attempt(reload);
     }
   });
+  const stopBack = onStreamBack(() => attempt(reload));
   attempt(reload);
   return () => {
     disposed = true;
     stopLifecycle();
+    stopBack();
     closeEditor();
   };
 }
@@ -565,10 +567,12 @@ function mountPage(root, ctx, agentId) {
       attempt(refresh);
     }
   });
+  const stopBack = onStreamBack(() => attempt(refresh));
   attempt(reload);
   return () => {
     disposed = true;
     stopLifecycle();
+    stopBack();
     if (composer !== null) {
       composer.dispose();
     }

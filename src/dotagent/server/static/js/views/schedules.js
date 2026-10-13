@@ -8,7 +8,7 @@ import { allModels, levelLabel } from "../efforts.js";
 import { icon } from "../icons.js";
 import { emptyPanel, errorPanel, field, loadingPanel, paneHead, segmented } from "../panels.js";
 import { APPROVAL_OPTIONS, approvalLabel } from "../runmodes.js";
-import { getSnapshot, loadModels, onLifecycle } from "../state.js";
+import { getSnapshot, loadModels, onLifecycle, onStreamBack } from "../state.js";
 import { attempt, confirmDialog, toast } from "../ui.js";
 
 const LIFECYCLE_KINDS = new Set(["run_started", "run_finished"]);
@@ -519,9 +519,11 @@ export function mount(root, ctx) {
       reloadSoon();
     }
   });
+  const stopBack = onStreamBack(reloadSoon);
   attempt(reload);
   return () => {
     disposed = true;
     stopLifecycle();
+    stopBack();
   };
 }

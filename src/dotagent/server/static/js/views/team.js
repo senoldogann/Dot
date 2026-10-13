@@ -7,7 +7,7 @@ import { api } from "../api.js";
 import { ago, clip, el } from "../dom.js";
 import { icon } from "../icons.js";
 import { emptyPanel, errorPanel, loadingPanel, pageHead, statusBadge } from "../panels.js";
-import { onLifecycle } from "../state.js";
+import { onLifecycle, onStreamBack } from "../state.js";
 import { attempt } from "../ui.js";
 
 const DOT_ID = "dot";
@@ -91,9 +91,11 @@ export function mount(root) {
       attempt(reload);
     }
   });
+  const stopBack = onStreamBack(() => attempt(reload));
   attempt(reload);
   return () => {
     disposed = true;
     stopLifecycle();
+    stopBack();
   };
 }
