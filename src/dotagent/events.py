@@ -69,10 +69,14 @@ class EventBus:
             record: EventRecord = await self._store.add_event(run_id, kind, data)
         else:
             record = EventRecord(id=0, run_id=run_id, ts=time.time(), kind=kind, data=data)
+        self.publish(record)
+        return record
+
+    def publish(self, record: EventRecord) -> None:
+        """Offer an event the store already holds, or one only shown live, to those who follow it."""
         for subscription in tuple(self._subscriptions):
             if subscription.wants(record):
                 subscription.offer(record)
-        return record
 
     @asynccontextmanager
     async def subscribe(self, run_id: str | None) -> AsyncIterator[Subscription]:

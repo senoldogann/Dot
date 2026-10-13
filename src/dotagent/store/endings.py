@@ -13,6 +13,9 @@ RESULT_STOPPED: str = "The run was stopped."
 RESULT_SHUTDOWN: str = "The daemon was shut down while this run was active."
 # A run of ``dotx run`` (``resume``, ``chat``) whose terminal was closed, or whose process got SIGTERM.
 RESULT_PROCESS_ENDED: str = "The dotx command that drove this run was told to end while the run was active."
+# A run of ``dotx run`` whose process ended without recording the run's end (it was killed, or it crashed), as the
+# daemon finds while it runs (:meth:`dotagent.agent.manager.RunManager.close_runs_of_dead_commands`).
+RESULT_COMMAND_DIED: str = "The dotx command that drove this run ended without recording the run's end."
 RESULT_RESTARTED: str = "daemon stopped while the run was active"
 # A stop for lack of progress: the bare text of older runs, and the start of the text that says what was tried.
 RESULT_STALLED: str = "Stopped: the agent kept repeating the same failing actions."
@@ -44,6 +47,7 @@ type Ending = Literal[
     "stopped",
     "daemon_shutdown",
     "process_ended",
+    "process_died",
     "emergency_stop",
 ]
 
@@ -62,6 +66,7 @@ ENDING_LABELS: dict[Ending, str] = {
     "stopped": "stopped (by the user; older runs may be restarts, which were not told apart)",
     "daemon_shutdown": "cut off when the daemon shut down",
     "process_ended": "cut off when its dotx command was told to end (a closed terminal, SIGTERM)",
+    "process_died": "cut off when its dotx command died (it was killed, or it crashed)",
     "emergency_stop": "emergency stop",
 }
 
@@ -77,6 +82,8 @@ def _failed_ending(result: str) -> Ending:
         return "cut_short"
     if result == RESULT_RESTARTED:
         return "daemon_restarted"
+    if result == RESULT_COMMAND_DIED:
+        return "process_died"
     if result.startswith(PREFIX_INTERNAL_ERROR):
         return "internal_error"
     if GOAL_CHECK_MARK in result:

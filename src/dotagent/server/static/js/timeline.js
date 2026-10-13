@@ -635,6 +635,7 @@ export function createTimeline({ rootRunId, actorId, startedAt, onGrow, onPlan, 
         daemon_restarted: "the daemon stopped while the run before this one worked",
         daemon_shutdown: "the daemon was shut down while the run before this one worked",
         process_ended: "the dotx command that drove the run before this one was told to end while it worked",
+        process_died: "the dotx command that drove the run before this one died while it worked",
       };
       const how = hows[data.cut_off];
       const calls = data.calls.length === 0 ? "" : `. Its last step: ${data.calls.map(callEnd).join(", ")}`;

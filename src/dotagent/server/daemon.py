@@ -131,6 +131,14 @@ def _log_push_end(pusher: asyncio.Task[None]) -> None:
     log.error("push_watch_ended", error=repr(pusher.exception()))
 
 
+def _log_watch_end(watcher: asyncio.Task[None]) -> None:
+    """A watch of dead dotx commands that stops before the daemon does is logged: their runs stay active until the
+    daemon starts again."""
+    if watcher.cancelled() or watcher.exception() is None:
+        return
+    log.error("command_watch_ended", error=repr(watcher.exception()))
+
+
 async def _stop_server_on(stop: asyncio.Event, server: DotServer) -> None:
     """The first stop request ends the server gracefully, a second one forces it."""
     await stop.wait()
@@ -190,6 +198,10 @@ async def run_daemon(config: AppConfig) -> None:
                 await runtime.bus.emit(
                     SYSTEM_RUN_ID, DAEMON_RESTARTED_EVENT, DaemonRestarted(runs_cut_off=recovered).model_dump(), False
                 )
+            # A dotx command that dies leaves its run active: that run is closed while the daemon runs.
+            watcher: asyncio.Task[None] = asyncio.create_task(manager.watch_commands(), name="dead-commands")
+            watcher.add_done_callback(_log_watch_end)
+            cleanup.push_async_callback(_cancelled, watcher)
             # Before the scheduler and the server start: a resumed run takes its place before any new run, and no new
             # message reaches its thread before it.
             resumed: tuple[RunRecord, ...] = await manager.resume_safe() if config.agent.resume == "safe" else ()

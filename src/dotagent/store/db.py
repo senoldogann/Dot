@@ -1181,6 +1181,33 @@ class Store:
         await self._db.commit()
         return len(closed)
 
+    @_writing
+    async def close_runs_of(self, owners: Sequence[str], result: str) -> list[EventRecord]:
+        """The active runs of ``owners``, processes that are gone, become 'failed' with ``result``, finished at their
+        last sign of life: their newest event, else the time they were created. In the same write each gets, at that
+        time, the ``run_finished`` event that every other end of a run stores; returns those events, for the pages that
+        follow the runs. Unlike :meth:`mark_interrupted_runs`, a run without an owner stays as it is."""
+        async with self._db.execute(
+            "UPDATE runs SET status = 'failed', result = ?,"
+            " finished_at = COALESCE((SELECT MAX(ts) FROM events WHERE events.run_id = runs.id), created_at)"
+            f" WHERE status IN ('running', 'queued', 'blocked') AND owner IN ({','.join('?' * len(owners))})"
+            " RETURNING id, finished_at",
+            (result, *owners),
+        ) as cursor:
+            closed: list[tuple[str, float]] = [
+                (str(row["id"]), float(row["finished_at"])) for row in await cursor.fetchall()
+            ]
+        data: JsonObject = {"status": "failed", "result": result}
+        told: list[EventRecord] = []
+        for run_id, finished_at in closed:
+            async with self._db.execute(
+                "INSERT INTO events(run_id, ts, kind, data) VALUES(?, ?, 'run_finished', ?) RETURNING *",
+                (run_id, finished_at, dumps_compact(data)),
+            ) as cursor:
+                told.extend(_event(row) for row in await cursor.fetchall())
+        await self._db.commit()
+        return told
+
     async def runs_finished_since(self, since: float) -> list[RunRecord]:
         """The runs that finished at or after ``since``, oldest first."""
         rows = await self._all("SELECT * FROM runs WHERE finished_at >= ? ORDER BY created_at", (since,))
@@ -1365,14 +1392,14 @@ class Store:
         return [_approval(row) for row in rows]
 
     @_writing
-    async def expire_pending_approvals(self) -> int:
-        """The approvals still pending for runs that are no longer active expire; those of an active run (one that a
-        process that lives drives) wait on."""
+    async def expire_pending_approvals(self, note: str) -> int:
+        """The approvals still pending for runs that are no longer active expire, with ``note`` for why; those of an
+        active run (one that a process that lives drives) wait on."""
         cursor = await self._db.execute(
-            "UPDATE approvals SET status = 'expired', decided_at = ?, decided_by = 'system', note = 'daemon restarted'"
+            "UPDATE approvals SET status = 'expired', decided_at = ?, decided_by = 'system', note = ?"
             " WHERE status = 'pending' AND run_id NOT IN"
             " (SELECT id FROM runs WHERE status IN ('running', 'queued', 'blocked'))",
-            (time.time(),),
+            (time.time(), note),
         )
         await self._db.commit()
         return cursor.rowcount
