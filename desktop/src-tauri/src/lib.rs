@@ -4,12 +4,14 @@
 //! with the token of the token file and never runs the agent itself. It sends the token only to a daemon that has
 //! just proven it holds it (`GET /api/proof`), so a program that took the daemon's port is sent nothing. The pages of
 //! the daemon's own address are the only remote pages that may use the shell's commands (`grant`). While the daemon is
-//! down the window shows the page that says how to start it, and opens the UI by itself when the daemon answers.
+//! down the window shows the page that says how to start it, or which of the daemon's files the shell could not read
+//! and why (`Unread`), and opens the UI by itself when the daemon answers.
 
 use std::collections::HashSet;
 use std::env;
 use std::fs;
-use std::path::PathBuf;
+use std::io;
+use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::sync::Mutex;
 use std::thread;
@@ -39,6 +41,10 @@ const REQUEST_TIMEOUT: Duration = Duration::from_millis(800);
 const MISSES_BEFORE_DOWN: u32 = 3;
 const DEFAULT_HOST: &str = "127.0.0.1";
 const DEFAULT_PORT: u16 = 8765;
+const CONFIG_FILE: &str = "config.toml";
+const TOKEN_FILE: &str = "api-token";
+/// What the down page says of a token file that is there but empty, which the daemon refuses too.
+const EMPTY_TOKEN: &str = "it is empty; delete it and the daemon makes a new one when it starts";
 /// What the daemon's proof puts before the nonce (`daemon_proof` in `dotagent.server.guard`).
 const PROOF_LABEL: &[u8] = b"dot daemon proof\n";
 const NONCE_BYTES: usize = 32;
@@ -93,18 +99,73 @@ struct Granted(Mutex<HashSet<String>>);
 enum Seen {
     /// The daemon: it proved that it holds the token, then gave the numbers of the menu bar item.
     Counted(Count),
-    /// Nothing answers in time, or the daemon has not made the token yet.
+    /// Nothing answers in time.
     Silent,
     /// Something answers without the proof the token gives (another program on the port, a daemon of an older version
     /// or of another home): it is sent nothing.
     Unproven,
+    /// The shell could not read where the daemon listens or its token, so it asked nothing.
+    Unread(Unread),
 }
 
-/// Where the daemon listens and the token that signs the shell in; `token` is `None` until the daemon has created it.
+/// What kept the shell from reading the daemon's files (item 191): the menu bar item's tip and the down page say it,
+/// instead of "Dot is not running".
+#[derive(Debug, PartialEq, Eq)]
+enum Unread {
+    /// config.toml could not be read, or is not valid TOML, or is not the shape of a config: the system's or the
+    /// parser's words, with the line and column of what the parser found.
+    Config { path: PathBuf, error: String },
+    /// The token file is there but could not be read, or is empty.
+    Token { path: PathBuf, error: String },
+    /// There is no token file: the daemon makes it the first time it starts with this home.
+    NoToken { path: PathBuf },
+}
+
+impl Unread {
+    /// What the menu bar item's tip says after "Dot · ".
+    fn tip(&self) -> &'static str {
+        match self {
+            Unread::Config { .. } => "its config.toml could not be read",
+            Unread::Token { .. } => "its token could not be read",
+            Unread::NoToken { .. } => "the daemon has not made its token yet",
+        }
+    }
+
+    /// What the down page says instead of "Dot is not running" and the advice to start it: with a file the shell could
+    /// not read the daemon may well run. A home without a token is one where the daemon has never started.
+    fn title(&self) -> Option<&'static str> {
+        match self {
+            Unread::Config { .. } => Some("Dot could not read its config.toml"),
+            Unread::Token { .. } => Some("Dot could not read its token"),
+            Unread::NoToken { .. } => None,
+        }
+    }
+
+    /// The file and what is wrong with it, as the down page shows it.
+    fn detail(&self) -> String {
+        match self {
+            Unread::Config { path, error } | Unread::Token { path, error } => {
+                format!("{}: {error}", path.display())
+            }
+            Unread::NoToken { path } => format!(
+                "{}: there is none yet; the daemon makes it the first time it starts",
+                path.display()
+            ),
+        }
+    }
+}
+
+/// Where the daemon listens and the token that signs the shell in.
 #[derive(Clone)]
 struct Daemon {
     base: String,
-    token: Option<String>,
+    token: String,
+}
+
+/// The page the window shows (`watch`): the UI, or the down page at the address that says why (`down_url`).
+enum Shown {
+    Ui,
+    Down(String),
 }
 
 /// The daemon's home: `DOT_HOME`, else `~/Library/Application Support/Dot` (`dotagent.core.paths`).
@@ -121,29 +182,87 @@ fn dot_home() -> PathBuf {
     }
 }
 
-fn daemon() -> Daemon {
-    let home = dot_home();
-    let config: ConfigFile = fs::read_to_string(home.join("config.toml"))
-        .ok()
-        .and_then(|text| toml::from_str(&text).ok())
-        .unwrap_or_default();
+/// The text of the file at `path`, `None` when there is none, else the system's words for why it could not be read.
+fn read_file(path: &Path) -> Result<Option<String>, String> {
+    match fs::read_to_string(path) {
+        Ok(text) => Ok(Some(text)),
+        Err(error) if error.kind() == io::ErrorKind::NotFound => Ok(None),
+        Err(error) => Err(error.to_string()),
+    }
+}
+
+/// What the TOML parser found wrong in `text`, after its line and column as an editor counts them when it says where.
+fn toml_error(text: &str, error: &toml::de::Error) -> String {
+    let what = error
+        .message()
+        .lines()
+        .map(str::trim)
+        .filter(|line| !line.is_empty())
+        .collect::<Vec<_>>()
+        .join("; ");
+    match error.span().and_then(|span| text.get(..span.start)) {
+        Some(before) => {
+            let line = before.matches('\n').count() + 1;
+            let column = before
+                .rsplit('\n')
+                .next()
+                .unwrap_or_default()
+                .chars()
+                .count()
+                + 1;
+            format!("line {line}, column {column}: {what}")
+        }
+        None => what,
+    }
+}
+
+/// Where the daemon of `home` listens and its token, read as the daemon reads them: without a config.toml it keeps
+/// its defaults. What the shell could not read is told (`Unread`), and no address is guessed in its place.
+fn read_daemon(home: &Path) -> Result<Daemon, Unread> {
+    let config_path = home.join(CONFIG_FILE);
+    let config: ConfigFile = match read_file(&config_path) {
+        Ok(None) => ConfigFile::default(),
+        Ok(Some(text)) => toml::from_str(&text).map_err(|error| Unread::Config {
+            path: config_path.clone(),
+            error: toml_error(&text, &error),
+        })?,
+        Err(error) => {
+            return Err(Unread::Config {
+                path: config_path,
+                error,
+            })
+        }
+    };
     let server = config.server.unwrap_or_default();
     let host = server.host.unwrap_or_else(|| DEFAULT_HOST.to_string());
     let port = server.port.unwrap_or(DEFAULT_PORT);
-    let token = fs::read_to_string(home.join("api-token"))
-        .ok()
-        .map(|text| text.trim().to_string())
-        .filter(|text| !text.is_empty());
+    let token_path = home.join(TOKEN_FILE);
+    let token = match read_file(&token_path) {
+        Ok(None) => return Err(Unread::NoToken { path: token_path }),
+        Ok(Some(text)) => text.trim().to_string(),
+        Err(error) => {
+            return Err(Unread::Token {
+                path: token_path,
+                error,
+            })
+        }
+    };
+    if token.is_empty() {
+        return Err(Unread::Token {
+            path: token_path,
+            error: EMPTY_TOKEN.to_string(),
+        });
+    }
     // An IPv6 host goes in brackets, as `dotagent.server.links.base_url` writes it.
     let bracketed = if host.contains(':') {
         format!("[{host}]")
     } else {
         host
     };
-    Daemon {
+    Ok(Daemon {
         base: format!("http://{bracketed}:{port}"),
         token,
-    }
+    })
 }
 
 /// What the pages of the daemon's own address may do through the shell (`PAGE_PERMISSIONS`). A page that another
@@ -174,8 +293,24 @@ fn grant(app: &AppHandle, daemon: &Daemon) -> tauri::Result<()> {
 }
 
 /// The address that opens the UI signed in: the token travels in the fragment, which is never sent.
-fn ui_url(daemon: &Daemon, token: &str) -> String {
-    format!("{}/#token={token}", daemon.base)
+fn ui_url(daemon: &Daemon) -> String {
+    format!("{}/#token={}", daemon.base, daemon.token)
+}
+
+/// The down page, told in its fragment what kept the shell from the daemon (`down.js`): `title` stands for "Dot is
+/// not running" and the advice to start it, `detail` says which file and what is wrong with it. A daemon that does not
+/// answer, or not with the proof, gets the page as it is.
+fn down_url(seen: &Seen) -> String {
+    let page = format!("tauri://localhost/{DOWN_PAGE}");
+    let Seen::Unread(unread) = seen else {
+        return page;
+    };
+    let mut told = url::form_urlencoded::Serializer::new(String::new());
+    if let Some(title) = unread.title() {
+        told.append_pair("title", title);
+    }
+    told.append_pair("detail", &unread.detail());
+    format!("{page}#{}", told.finish())
 }
 
 /// Whether `answer` is the proof of `nonce` that only a holder of `token` gives: HMAC-SHA256 keyed with the token over
@@ -225,13 +360,18 @@ fn count(daemon: &Daemon, token: &str) -> Option<Count> {
 
 /// One look at the daemon: the count is asked, with the token, only of a daemon that has just proven it holds it.
 fn look(daemon: &Daemon) -> Seen {
-    let Some(token) = daemon.token.as_deref() else {
-        return Seen::Silent;
-    };
-    match proven(daemon, token) {
+    match proven(daemon, &daemon.token) {
         None => Seen::Silent,
         Some(false) => Seen::Unproven,
-        Some(true) => count(daemon, token).map_or(Seen::Silent, Seen::Counted),
+        Some(true) => count(daemon, &daemon.token).map_or(Seen::Silent, Seen::Counted),
+    }
+}
+
+/// One poll: what the shell reads of the daemon's `home`, then, when it could read it, what answers at its address.
+fn poll(home: &Path) -> (Seen, Option<Daemon>) {
+    match read_daemon(home) {
+        Ok(daemon) => (look(&daemon), Some(daemon)),
+        Err(unread) => (Seen::Unread(unread), None),
     }
 }
 
@@ -306,41 +446,39 @@ fn new_chat(app: &AppHandle) {
     show(app);
 }
 
-/// Where the window should be: the UI when the daemon has just proven itself (`look`), the down page otherwise.
-fn navigate(app: &AppHandle, up: bool, daemon: &Daemon) {
+/// Open `target` in the window.
+fn open(app: &AppHandle, target: &str) {
     let Some(window) = app.get_webview_window(WINDOW) else {
         return;
     };
-    let target = match (up, &daemon.token) {
-        (true, Some(token)) => {
-            if let Err(error) = grant(app, daemon) {
-                eprintln!("dot-shell: the daemon's pages could not be given the shell's commands: {error}");
-            }
-            ui_url(daemon, token)
-        }
-        _ => format!("tauri://localhost/{DOWN_PAGE}"),
-    };
-    if let Ok(url) = url::Url::parse(&target) {
+    if let Ok(url) = url::Url::parse(target) {
         let _ = window.navigate(url);
     }
 }
 
-/// Every second: the count for the menu bar item, and the window's page when the daemon comes or goes. `showing_ui`
-/// is the page `setup` opened: the window leaves the UI after `MISSES_BEFORE_DOWN` unanswered polls in a row, and
-/// opens it again at the first answer after that.
-fn watch(app: AppHandle, showing_ui: bool) {
+/// Open the UI of a daemon that has just proven itself (`look`), once its pages have the shell's commands.
+fn open_ui(app: &AppHandle, daemon: &Daemon) {
+    if let Err(error) = grant(app, daemon) {
+        eprintln!("dot-shell: the daemon's pages could not be given the shell's commands: {error}");
+    }
+    open(app, &ui_url(daemon));
+}
+
+/// Every second: the count for the menu bar item, and the window's page when the daemon comes or goes or what keeps
+/// the shell from it changes. `shown` is the page `setup` opened: the window leaves the UI after `MISSES_BEFORE_DOWN`
+/// polls in a row that did not count, and opens it again at the first that does.
+fn watch(app: AppHandle, shown: Shown) {
     thread::spawn(move || {
-        let mut showing_ui = showing_ui;
+        let mut shown = shown;
         let mut misses: u32 = 0;
         loop {
-            let daemon = daemon();
-            let seen = look(&daemon);
+            let (seen, daemon) = poll(&dot_home());
             let counted = matches!(seen, Seen::Counted(_));
             misses = if counted { 0 } else { misses.saturating_add(1) };
             if let Some(tray) = app.tray_by_id(TRAY) {
                 let (state, waiting, working) = match &seen {
                     Seen::Counted(count) => (count.state.as_str(), count.waiting, count.working),
-                    Seen::Silent | Seen::Unproven => ("idle", 0, 0),
+                    Seen::Silent | Seen::Unproven | Seen::Unread(_) => ("idle", 0, 0),
                 };
                 let _ = tray.set_icon_with_as_template(Some(tray_icon(state)), false);
                 let _ = tray.set_title(if waiting > 0 {
@@ -356,16 +494,24 @@ fn watch(app: AppHandle, showing_ui: bool) {
                     Seen::Unproven => {
                         "Dot · something else answers at the daemon's address".to_string()
                     }
+                    Seen::Unread(unread) => format!("Dot · {}", unread.tip()),
                 };
                 let _ = tray.set_tooltip(Some(tip));
             }
-            if showing_ui && misses >= MISSES_BEFORE_DOWN {
-                navigate(&app, false, &daemon);
-                showing_ui = false;
-            } else if !showing_ui && counted {
-                navigate(&app, true, &daemon);
-                showing_ui = true;
-            }
+            shown = match (shown, daemon) {
+                (Shown::Ui, _) if misses < MISSES_BEFORE_DOWN => Shown::Ui,
+                (Shown::Down(_), Some(daemon)) if counted => {
+                    open_ui(&app, &daemon);
+                    Shown::Ui
+                }
+                (shown, _) => {
+                    let page = down_url(&seen);
+                    if !matches!(&shown, Shown::Down(old) if *old == page) {
+                        open(&app, &page);
+                    }
+                    Shown::Down(page)
+                }
+            };
             thread::sleep(POLL);
         }
     });
@@ -443,16 +589,22 @@ pub fn run() {
         .manage(Granted::default())
         .setup(|app| {
             let handle = app.handle().clone();
-            let daemon = daemon();
-            grant(&handle, &daemon)?;
-            let first = match &daemon.token {
-                Some(token) if matches!(look(&daemon), Seen::Counted(_)) => {
-                    WebviewUrl::External(url::Url::parse(&ui_url(&daemon, token))?)
+            let (seen, daemon) = poll(&dot_home());
+            let shown = match daemon {
+                Some(daemon) if matches!(seen, Seen::Counted(_)) => {
+                    grant(&handle, &daemon)?;
+                    window(
+                        &handle,
+                        WebviewUrl::External(url::Url::parse(&ui_url(&daemon))?),
+                    )?;
+                    Shown::Ui
                 }
-                _ => WebviewUrl::App(DOWN_PAGE.into()),
+                _ => {
+                    let page = down_url(&seen);
+                    window(&handle, WebviewUrl::External(url::Url::parse(&page)?))?;
+                    Shown::Down(page)
+                }
             };
-            let showing_ui = matches!(first, WebviewUrl::External(_));
-            window(&handle, first)?;
             // Another app may hold the shortcut: the shell then goes on without it, and its menu says so.
             let shortcut_taken = match shortcut(&handle) {
                 Ok(()) => false,
@@ -462,7 +614,7 @@ pub fn run() {
                 }
             };
             tray(&handle, shortcut_taken)?;
-            watch(handle, showing_ui);
+            watch(handle, shown);
             Ok(())
         })
         // Closing the window keeps the shell in the menu bar; the window hides and comes back from there.
@@ -486,6 +638,7 @@ mod tests {
     use super::*;
     use std::io::{Read, Write};
     use std::net::{TcpListener, TcpStream};
+    use std::os::unix::fs::PermissionsExt;
     use std::sync::mpsc::{self, Receiver};
     use tauri::ipc::RuntimeCapability;
     use tauri::utils::acl::capability::{CapabilityFile, PermissionEntry};
@@ -496,6 +649,8 @@ mod tests {
     /// `daemon_proof(TOKEN, NONCE)` of `dotagent.server.guard`; tests/unit/test_server_guard.py holds the same pair.
     const PROOF: &str = "4aea8baff569980b8b9dceb16e4d02f89d6563a252c47dcf94912b82ae440020";
     const COUNT: &str = r#"{"waiting": 1, "working": 0, "state": "waiting"}"#;
+    /// What macOS says of a file its owner may not read.
+    const DENIED: &str = "Permission denied (os error 13)";
 
     /// How a program on the daemon's port answers a request: the status line's end and the body.
     type Answer = fn(&str) -> (&'static str, String);
@@ -538,7 +693,7 @@ mod tests {
         });
         let daemon = Daemon {
             base,
-            token: Some(TOKEN.to_string()),
+            token: TOKEN.to_string(),
         };
         (daemon, requests)
     }
@@ -578,6 +733,36 @@ mod tests {
 
     fn carries_the_token(request: &str) -> bool {
         request.contains(TOKEN) || request.to_ascii_lowercase().contains("authorization:")
+    }
+
+    /// The home of one test in the system's temporary folder, removed with what it holds when the test ends.
+    struct Home(PathBuf);
+
+    impl Home {
+        fn new(test: &str) -> Home {
+            let path = env::temp_dir().join(format!("dot-shell-{}-{test}", std::process::id()));
+            if let Err(error) = fs::remove_dir_all(&path) {
+                assert_eq!(error.kind(), io::ErrorKind::NotFound, "{error}");
+            }
+            fs::create_dir_all(&path).expect("a folder in the temporary folder");
+            Home(path)
+        }
+
+        fn write(&self, name: &str, text: &str) {
+            fs::write(self.0.join(name), text).expect("a file of the home");
+        }
+
+        /// Make the file `name` one that nobody may read.
+        fn refuse(&self, name: &str) {
+            fs::set_permissions(self.0.join(name), fs::Permissions::from_mode(0o000))
+                .expect("the file's permissions");
+        }
+    }
+
+    impl Drop for Home {
+        fn drop(&mut self) {
+            let _ = fs::remove_dir_all(&self.0);
+        }
     }
 
     #[test]
@@ -624,16 +809,126 @@ mod tests {
         };
         let daemon = Daemon {
             base,
-            token: Some(TOKEN.to_string()),
+            token: TOKEN.to_string(),
         };
         assert!(matches!(look(&daemon), Seen::Silent));
+    }
+
+    #[test]
+    fn the_daemon_is_looked_for_where_its_files_say() {
+        let home = Home::new("found");
+        home.write(TOKEN_FILE, &format!("{TOKEN}\n"));
+        let found = read_daemon(&home.0).expect("the daemon's files are read");
+        assert_eq!(found.base, format!("http://{DEFAULT_HOST}:{DEFAULT_PORT}"));
+        assert_eq!(found.token, TOKEN);
+        home.write(CONFIG_FILE, "[server]\nhost = \"::1\"\nport = 9001\n");
+        let moved = read_daemon(&home.0).expect("the daemon's files are read");
+        assert_eq!(moved.base, "http://[::1]:9001");
+    }
+
+    #[test]
+    fn a_config_that_is_not_toml_is_told_with_its_line_and_no_address_is_guessed() {
+        let home = Home::new("config");
+        home.write(TOKEN_FILE, TOKEN);
+        let config = home.0.join(CONFIG_FILE);
+        for (text, place) in [
+            ("[server]\nport = 8765\nhost = \n", "line 3, column 8: "),
+            ("[server]\nport = \"8765\"\n", "line 2, column 8: "),
+        ] {
+            home.write(CONFIG_FILE, text);
+            let Err(Unread::Config { path, error }) = read_daemon(&home.0) else {
+                panic!("{text:?} is read");
+            };
+            assert_eq!(path, config);
+            assert!(error.starts_with(place) && !error.contains('\n'), "{error}");
+        }
+    }
+
+    #[test]
+    fn a_file_the_shell_may_not_read_is_told_in_the_systems_words() {
+        let home = Home::new("refused");
+        home.write(CONFIG_FILE, "[server]\nport = 8765\n");
+        home.write(TOKEN_FILE, TOKEN);
+        home.refuse(TOKEN_FILE);
+        let Err(Unread::Token { path, error }) = read_daemon(&home.0) else {
+            panic!("a token it may not read is read");
+        };
+        assert_eq!((path, error.as_str()), (home.0.join(TOKEN_FILE), DENIED));
+        home.refuse(CONFIG_FILE);
+        let Err(Unread::Config { path, error }) = read_daemon(&home.0) else {
+            panic!("a config it may not read is read");
+        };
+        assert_eq!((path, error.as_str()), (home.0.join(CONFIG_FILE), DENIED));
+    }
+
+    #[test]
+    fn a_home_without_a_token_or_with_an_empty_one_is_told() {
+        let home = Home::new("token");
+        let token = home.0.join(TOKEN_FILE);
+        assert_eq!(
+            read_daemon(&home.0).err(),
+            Some(Unread::NoToken {
+                path: token.clone()
+            })
+        );
+        home.write(TOKEN_FILE, " \n");
+        assert_eq!(
+            read_daemon(&home.0).err(),
+            Some(Unread::Token {
+                path: token,
+                error: EMPTY_TOKEN.to_string()
+            })
+        );
+    }
+
+    #[test]
+    fn the_down_page_is_told_what_kept_the_shell_from_the_daemon() {
+        assert_eq!(down_url(&Seen::Silent), "tauri://localhost/down.html");
+        assert_eq!(down_url(&Seen::Unproven), "tauri://localhost/down.html");
+        let told = |unread: Unread| -> Vec<(String, String)> {
+            let page = url::Url::parse(&down_url(&Seen::Unread(unread))).expect("an address");
+            assert_eq!(
+                page.as_str().split('#').next(),
+                Some("tauri://localhost/down.html")
+            );
+            let fragment = page.fragment().expect("what the page is told");
+            url::form_urlencoded::parse(fragment.as_bytes())
+                .into_owned()
+                .collect()
+        };
+        let pair = |name: &str, value: &str| (name.to_string(), value.to_string());
+        let config = PathBuf::from("/Users/someone/Library/Application Support/Dot/config.toml");
+        let error = "line 3, column 8: invalid string; expected `\"`, `'` & #more";
+        assert_eq!(
+            told(Unread::Config {
+                path: config.clone(),
+                error: error.to_string()
+            }),
+            vec![
+                pair("title", "Dot could not read its config.toml"),
+                pair("detail", &format!("{}: {error}", config.display())),
+            ]
+        );
+        let token = PathBuf::from("/Users/someone/Library/Application Support/Dot/api-token");
+        assert_eq!(
+            told(Unread::NoToken {
+                path: token.clone()
+            }),
+            vec![pair(
+                "detail",
+                &format!(
+                    "{}: there is none yet; the daemon makes it the first time it starts",
+                    token.display()
+                )
+            )]
+        );
     }
 
     #[test]
     fn only_the_pages_of_the_daemons_own_address_may_use_the_shell() {
         let daemon = Daemon {
             base: "http://127.0.0.1:8765".to_string(),
-            token: None,
+            token: TOKEN.to_string(),
         };
         let CapabilityFile::Capability(capability) = daemon_capability(&daemon).build() else {
             panic!("one capability");

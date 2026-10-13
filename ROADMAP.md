@@ -5120,8 +5120,8 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 187 | The service install keeps the running job until the new one is in place              | done        | 2ad0df4 |
 | 188 | A run of a dotx command is followed live on the pages and stopped there              | done        | 5f294aa |
 | 189 | A message sent twice starts once                                                     | done        | d615961 |
-| 190 | The pages say what they could not read, follow the rules and tell of an update       | in progress |         |
-| 191 | The desktop shell says what it could not read                                        | planned     |         |
+| 190 | The pages say what they could not read, follow the rules and tell of an update       | done        | 8f92f36 |
+| 191 | The desktop shell says what it could not read                                        | in progress |         |
 
 ### 77. The type system: Inter and Geist Mono, seven sizes, three weights
 
@@ -9468,7 +9468,7 @@ was lost) gets the run or the queued message of the first, instead of a second c
 
 ### 190. The pages say what they could not read, follow the rules and tell of an update
 
-**Status: in progress.**
+**Status: done.** Merged as `8f92f36` (PR #229; no Linear issue, the Linear connector was signed out).
 
 **As built (2026-10-14).** A chat whose queue could not be read says why in the queue's place, with **Read again**, and
 keeps what the queue showed before (`static/js/queue.js`). The rules page reads its rules again when one is added,
@@ -9492,7 +9492,20 @@ in; a page loaded before the daemon was updated says so and offers to load again
 
 ### 191. The desktop shell says what it could not read
 
-**Status: planned.**
+**Status: in progress.**
+
+**As built (2026-10-14).** When the desktop shell could not read the daemon's files, the menu bar item's tip and the
+page the window shows while the daemon is down say which file and why, instead of "Dot is not running": a `config.toml`
+that is not valid TOML or not the shape of a config, with the line and column of the fault as the parser names them; a
+`config.toml` or token file it may not read, in the system's words; an empty token file; and a home without a token file
+yet, which the daemon makes the first time it starts (the page then keeps the advice to start Dot). The shell guesses no
+address in place of a `config.toml` it could not read; without the file it keeps the daemon's defaults, as the daemon
+does. The page reads what the shell tells it in its fragment (`down_url`, `desktop/ui/down.js`), and the shell sends it
+again when that changes. Before, the shell took such a file for a missing one, a config for the defaults and a token for
+none, and said that Dot was not running. Tests: the shell's own (`cargo test`) read a home with each of these files, and
+the address of the page; `tests/smoke/test_down_page.py` opens the page in Chrome, wide and on a phone, light and dark,
+told of a config it could not read, then of a home without a token, then of nothing. The page's test fails on the page
+of before; the shell's tests do not build on the code of before, which had nothing to tell.
 
 **What.** The desktop shell says why it cannot reach Dot when it cannot read its own files: a `config.toml` that is not
 valid TOML (with its line), a token it may not read, a daemon that has not made its token yet, instead of "Dot is not
@@ -10123,5 +10136,6 @@ running" for all of them.
 - 2026-10-13 (Opus 5.5): item 185 merged as `b178796` (PR #224; no Linear issue, the connector was signed out): a provider's HTTP 403 is a refused access, not a refused key: a run moves to its standby model with that reason, Settings › Models says so without a link to the keys, and an error Ollama reports inside its stream keeps its words.
 - 2026-10-13 (Opus 5.5): item 186 merged as `0b3702a` (PR #225; no Linear issue, the connector was signed out): `dotx doctor` checks each model of OpenAI and OpenCode Go against the list of the models its provider serves to the key, a helper and a standby model too, and a list that could not be read is a warning.
 - 2026-10-13 (Opus 5.5): item 187 merged as `2ad0df4` (PR #226; no Linear issue, the connector was signed out): `dotx service install` stops the running job before it writes the new job's file, and puts the file and the job of before back when the new job does not load.
-- 2026-10-13 (Opus 5.5): item 188 merged as `5f294aa` (PR #227; no Linear issue, the connector was signed out): The daemon relays the runs of `dotx` commands to its pages: they work in the sidebar and in Activity, their page follows them live and stops them, a question of theirs is answered there, and the daemon moves their chat's queue once they end; the store refuses a run on a chat where another process drives one.
-- 2026-10-13 (Opus 5.5): item 189 merged as `d615961` (PR #228; no Linear issue, the connector was signed out): A message the pages send again with its key, after an answer that was lost, gets what its first sending made (its run, its place in the queue, its steer) instead of a second one.
+- 2026-10-14 (Opus 5.5): item 188 merged as `5f294aa` (PR #227; no Linear issue, the connector was signed out): The daemon relays the runs of `dotx` commands to its pages: they work in the sidebar and in Activity, their page follows them live and stops them, a question of theirs is answered there, and the daemon moves their chat's queue once they end; the store refuses a run on a chat where another process drives one.
+- 2026-10-14 (Opus 5.5): item 189 merged as `d615961` (PR #228; no Linear issue, the connector was signed out): A message the pages send again with its key, after an answer that was lost, gets what its first sending made (its run, its place in the queue, its steer) instead of a second one.
+- 2026-10-14 (Opus 5.5): item 190 merged as `8f92f36` (PR #229; no Linear issue, the connector was signed out): A chat whose queue could not be read says why in its place, with Read again; the rules page follows the rules changed on another page; the sign-in screen names the folder of the log by `dotx service status`; and a page loaded before an update says so in a banner, with Load again.
