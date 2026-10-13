@@ -4134,6 +4134,12 @@ rows carry minutes and tokens.
 36. The git history (item 174), decided by the owner on 2026-10-13: the two names item 174 took out of the README stay
     in it. Rewriting it would change the hash of every commit since 2026-10-09, which the status table of this file
     records, and the merged pull requests keep the old commits on GitHub anyway.
+37. Excel and the OneDrive app (part 31), asked of the owner on 2026-10-14: neither is installed on this Mac, where
+    Word, PowerPoint and LibreOffice are. Item 196 checks its skills for Excel and OneDrive on them once they are; until
+    then a workbook is read and written with the libraries and recalculated with LibreOffice.
+38. The kind of Microsoft account (part 31), asked of the owner on 2026-10-14: Microsoft's own MCP servers for Word and
+    OneDrive serve only a work or school account (Microsoft Entra). With a personal account, Dot reaches OneDrive
+    through the folder the OneDrive app syncs.
 
 ## Part 6: the web that does not fail (planned 2026-10-11)
 
@@ -5122,6 +5128,11 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 189 | A message sent twice starts once                                                     | done        | d615961 |
 | 190 | The pages say what they could not read, follow the rules and tell of an update       | done        | 8f92f36 |
 | 191 | The desktop shell says what it could not read                                        | done        | a0d5eef |
+| 192 | A question offers its options with what each leads to and the one recommended        | in progress |         |
+| 193 | The chat shows pages Dot makes: charts, 3D drawings and other visuals                | planned     |         |
+| 194 | Dot reads Word, Excel and PowerPoint files                                           | planned     |         |
+| 195 | A file opens in a panel beside the chat: PDF, sheets, documents and more             | planned     |         |
+| 196 | Dot knows its way around Word, Excel and OneDrive on the Mac                         | planned     |         |
 
 ### 77. The type system: Inter and Geist Mono, seven sizes, three weights
 
@@ -9511,6 +9522,98 @@ of before; the shell's tests do not build on the code of before, which had nothi
 valid TOML (with its line), a token it may not read, a daemon that has not made its token yet, instead of "Dot is not
 running" for all of them.
 
+## Part 31: Office files, previews, visuals and questions (planned 2026-10-14)
+
+The owner's thirtieth word, on 2026-10-14: Dot should master Excel, Word and OneDrive, which matter a great deal to the
+owner; the Excel, Word and PDF files sent to a chat, or picked from the side menu, should open in a panel beside it; the
+chat should show charts, 3D drawings and other visuals, as T3 Code has begun to; and the agent should ask questions in
+the middle of its work, with its recommendation, and take a typed answer. Research carefully, and build it the cleanest
+way.
+
+**Status (2026-10-14): planned.** What exists was read in the code. `ask_user` offers options as words alone
+(`tools/meta.py`); attachments take images, PDF and text and refuse Word, Excel and PowerPoint files
+(`agent/attachments.py`), and the page shows only the images among them; nothing of Dot's own making is shown as a page,
+and the pages' policy frames nothing (`server/guard.py`); Dot drives applications with AppleScript and the accessibility
+tools, with nothing of its own about Office. T3 Code's pages (`html_render`) were read for the frame: a page kept as a
+file, served in a sandbox without its origin, sized by a message from inside it and given the theme's colours.
+Microsoft's own MCP servers for Word and OneDrive need a work or school account (Microsoft Entra); Excel and Word for
+Mac still take AppleScript, which macOS asks the owner to allow once.
+
+**The shape of this part (the decisions).** Five items, each a pull request of its own: a question offers its options
+with what each leads to and the one recommended (192); the chat shows pages Dot makes (193); Dot reads Word, Excel and
+PowerPoint files (194); a file opens in a panel beside the chat (195); Dot knows its way around Word, Excel and OneDrive
+on the Mac (196). Two answers of the owner shape item 196 (open owner decisions 37 and 38): whether Excel and the
+OneDrive app are installed, and whether the Microsoft account is personal or of work or school.
+
+### How to start part 31 (the handoff prompt)
+
+> Read ROADMAP.md part 31 and the status table of part 9 (rows 192 to 196). One item at a time, in order; the protocol
+> of part 5 (branch, gate, PR, Linear MYP issue when the connector is signed in, squash merge, hash in the table, log
+> line) is unchanged. Give each change a test that fails on the code of before, and check a page that changes in a
+> browser, wide and on a phone, light and dark. A page Dot makes runs in a frame that cannot reach the daemon or the
+> page around it. Never touch the owner's data directory except to read it, by the kinds and numbers of what is
+> stored, and to restart the daemon when `/api/status` shows no active run; PLAN.md stays untracked. The owner reads
+> Turkish; everything written is English.
+
+### 192. A question offers its options with what each leads to and the one recommended
+
+**Status: in progress.**
+
+**As built (2026-10-14).** `ask_user` offers its options with what each leads to (`description`) and the one the run
+recommends (`recommended`), and lets several be chosen (`multiple`); options given as words alone, as before, are
+options without a description (`dotagent.agent.questions`). The answer stays one text: the labels chosen, joined, then
+what the user wrote on a line of its own. The card shows a row for each option, its label over what it leads to and the
+one recommended marked: a row sends its option, and when several may be chosen they are ticked and sent with Send
+answer, which sends nothing while nothing is ticked or written. The terminal numbers the options, and a number typed
+(several, separated by commas) stands for its option. The run reads which option was chosen alone, and whether it was
+the one it recommended; the system prompt asks for options and a recommendation when the agent asks. The core tools'
+share of the task tools' schemas grows from 0.449 to 0.454 for it (the bound of `tests/unit/test_tool_groups.py` moves
+from 0.45 to 0.46). Before, options were words on small buttons, without what each leads to or a recommendation, and
+only one could be chosen. Tests: `tests/unit/test_questions.py` (the options as given and as stored, the answer, a typed
+number, what the run reads) and `tests/smoke/test_question_choices.py`, a daemon's pages in Chrome, wide and on a phone,
+light and dark: a row sends the recommended option, and several ticked are sent with what was written, after a Send
+answer with nothing that sent nothing. On the code of before the run could not ask that question at all: `ask_user`
+refused described options.
+
+**What.** A question of the agent offers its options with what each leads to and the one it recommends, lets several be
+chosen when that fits, and always takes an answer of the user's own words.
+
+### 193. The chat shows pages Dot makes: charts, 3D drawings and other visuals
+
+**Status: planned.**
+
+**What.** A tool keeps a page of HTML the run writes (a chart, a 3D drawing, a table, a diagram), and the chat shows it
+in a card, as T3 Code shows the pages its agents render. The daemon serves the page at an address of its own, signed
+with the token, in a frame that gives it no way to the daemon or to the page around it (a sandbox without the same
+origin) and no network but scripts and styles from a few package CDNs; the card sizes the frame to the page and hands it
+the colours of the theme in use.
+
+### 194. Dot reads Word, Excel and PowerPoint files
+
+**Status: planned.**
+
+**What.** A Word, Excel or PowerPoint file attached to a chat reaches the model as text: a document's paragraphs and
+tables, a sheet's cells with their addresses and formulas, a presentation's slides and notes. A tool reads such a file
+on disk the same way, a part at a time (`openpyxl`, `python-docx`, `python-pptx`). Before, attachments refused them.
+
+### 195. A file opens in a panel beside the chat: PDF, sheets, documents and more
+
+**Status: planned.**
+
+**What.** A file of the chat opens in a panel beside it: an attachment, or a file a run wrote, from its chip or from a
+list of the chat's files in the side menu. A PDF shows as it is, a sheet as a grid, a document as its text with its
+headings and tables, an image and plain text as they are; on a phone the panel takes the screen. Open in app opens the
+file in its application on the Mac.
+
+### 196. Dot knows its way around Word, Excel and OneDrive on the Mac
+
+**Status: planned.**
+
+**What.** Dot knows the ways to Word, Excel and OneDrive on the Mac. Built-in skills say when to edit a file with the
+libraries (and recalculate a workbook through Excel or LibreOffice), when to drive the application with AppleScript, and
+where OneDrive keeps the files it syncs (`~/Library/CloudStorage/OneDrive-*`); `dotx doctor` says which of them are
+installed, and eval tasks check the skills.
+
 ## Log
 
 - 2026-10-08: roadmap written from the owner's go-ahead for all eight items, in this order. Nothing implemented yet.
@@ -10141,3 +10244,4 @@ running" for all of them.
 - 2026-10-14 (Opus 5.5): item 190 merged as `8f92f36` (PR #229; no Linear issue, the connector was signed out): A chat whose queue could not be read says why in its place, with Read again; the rules page follows the rules changed on another page; the sign-in screen names the folder of the log by `dotx service status`; and a page loaded before an update says so in a banner, with Load again.
 - 2026-10-14 (Opus 5.5): item 191 merged as `a0d5eef` (PR #230; no Linear issue, the connector was signed out): when the desktop shell could not read the daemon's files, its menu bar item's tip and the page of a daemon that is down say which file and why (a `config.toml` that is not valid TOML with the line and column of the fault, a file it may not read, no token yet) instead of "Dot is not running", and no address is guessed in place of a `config.toml` it could not read. Part 30 is done.
 - 2026-10-14 (Opus 5.5): the home's greeting test lets its working run end by a file of its own instead of after 8 s, which the pages outlasted once on a loaded machine (the smoke of item 187).
+- 2026-10-14 (Opus 5.5): part 31, Office files, previews, visuals and questions, is planned (items 192 to 196), and two questions to the owner are recorded (open owner decisions 37 and 38); item 192 is built: a question offers its options with what each leads to and the one recommended, and several may be chosen.

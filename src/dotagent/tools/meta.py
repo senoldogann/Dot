@@ -1,8 +1,8 @@
 """Meta tools: finishing a run, asking the user, notifying them, keeping a visible plan and turning on a tool group."""
 
-from typing import Annotated
+from typing import Annotated, Self
 
-from pydantic import AfterValidator, Field, StringConstraints
+from pydantic import AfterValidator, Field, StringConstraints, model_validator
 
 from dotagent.agent.approvals import ApprovalOutcome
 from dotagent.agent.plan import (
@@ -21,6 +21,7 @@ from dotagent.agent.plan import (
     rewritten_steps,
     with_step_status,
 )
+from dotagent.agent.questions import Option, QuestionOption, answered
 from dotagent.core.types import JsonObject
 from dotagent.policy.types import ActionInfo
 from dotagent.store.models import EventRecord, RunMode
@@ -91,7 +92,20 @@ def _finish_tool() -> RegisteredTool:
 
 class AskUserArgs(ToolArgs):
     question: str = Field(description="One precise question. Only ask what you cannot find out or decide yourself.")
-    options: list[str] | None = Field(default=None, description="Optional short answers the user can pick from.")
+    options: list[Option] | None = Field(
+        default=None, description="Answers to pick from; the user may also write their own."
+    )
+    multiple: bool = Field(default=False, description="True if several may be chosen.")
+
+    @model_validator(mode="after")
+    def _check_options(self) -> Self:
+        options: list[QuestionOption] = self.options or []
+        labels: set[str] = {option.label for option in options}
+        if len(labels) != len(options):
+            raise ValueError("each option needs a label of its own")
+        if not self.multiple and sum(option.recommended for option in options) > 1:
+            raise ValueError("recommend one option at most, or set multiple when the user may choose several")
+        return self
 
 
 def _ask_user_tool() -> RegisteredTool:
@@ -99,7 +113,12 @@ def _ask_user_tool() -> RegisteredTool:
         return _meta_action(ASK_USER_TOOL, f"Ask the user: {args.question}")
 
     async def run(args: AskUserArgs, ctx: ToolContext) -> ToolResult:
-        details: JsonObject = {"question": args.question, "options": list(args.options or [])}
+        options: list[QuestionOption] = args.options or []
+        details: JsonObject = {
+            "question": args.question,
+            "options": [option.model_dump() for option in options],
+            "multiple": args.multiple,
+        }
         if ctx.questions == "leave":
             await ctx.runtime.approvals.leave(ctx.run_id, ASK_USER_TOOL, args.question, "question", details)
             return ok(_LEFT_RESULT)
@@ -108,7 +127,7 @@ def _ask_user_tool() -> RegisteredTool:
         )
         if outcome.status == "approved":
             ctx.gate.add_instruction(f"Answer to the agent's question “{args.question}”: {outcome.note}")
-            return ok(f"The user answered: {outcome.note}")
+            return ok(answered(options, outcome.note))
         return ok(
             f"The user did not answer ({outcome.status}). Decide with your best judgement, or call finish and "
             "explain what you need."

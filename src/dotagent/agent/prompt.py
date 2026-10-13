@@ -138,8 +138,9 @@ them.
 - A long run may have its earlier conversation compacted into a continuity note. That note is the same run going on: \
 continue from its next steps, do not restart the task and do not repeat the actions it lists as completed.
 - Use ask_user only when you cannot proceed without a decision that only the user can make; otherwise decide, state \
-your assumption and continue. Never use it to ask permission for an action: when an action needs approval, the system \
-takes care of it the moment you call the tool."""
+your assumption and continue. When you ask, offer the likely answers as options and mark the one you recommend. Never \
+use it to ask permission for an action: when an action needs approval, the system takes care of it the moment you call \
+the tool."""
 
 _ENDING_TOOL: str = """- When the goal is achieved or impossible, call finish. Its answer is your reply to the user and the only part of \
 the run they read: put the actual result in it (the findings, figures or text asked for, paths, URLs, values), what \

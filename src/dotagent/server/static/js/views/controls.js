@@ -65,6 +65,11 @@ function fakeApproval(severity, tool, summary) {
   return { id: `demo-${severity}`, runId: "demo", tool, summary, severity, args: { kind: "write", target: "~/notes.txt", question: summary, options: ["Blue", "Green"] }, status: "pending", note: "" };
 }
 
+// A question with options as ask_user offers them (item 192): described, one recommended, one or several to choose.
+function fakeQuestion(id, question, options, multiple) {
+  return { id: `demo-${id}`, runId: "demo", tool: "ask_user", summary: question, severity: "question", args: { question, options, multiple }, status: "pending", note: "" };
+}
+
 // The characters (item 101): every shape, expression and colour as a still frame, and every animation moving.
 function characterRow(ids, size, make) {
   const handles = [];
@@ -166,6 +171,35 @@ export function mount(root, ctx) {
     "div",
     { class: "stack" },
     approvalCard({ approval: fakeApproval("question", "ask_user", "Which colour?"), heading: null, onSettled: () => {}, leftNote: "" }).node,
+    approvalCard({
+      approval: fakeQuestion(
+        "choice",
+        "Which colour should the buttons be?",
+        [
+          { label: "Blue", description: "The colour of the rest of the site.", recommended: true },
+          { label: "Green", description: "Stands out more, and matches the logo.", recommended: false },
+        ],
+        false,
+      ),
+      heading: null,
+      onSettled: () => {},
+      leftNote: "",
+    }).node,
+    approvalCard({
+      approval: fakeQuestion(
+        "choices",
+        "Which pages should get the new buttons?",
+        [
+          { label: "Home", description: "", recommended: true },
+          { label: "Settings", description: "", recommended: true },
+          { label: "Runs", description: "Its buttons sit close together; they may need more room.", recommended: false },
+        ],
+        true,
+      ),
+      heading: null,
+      onSettled: () => {},
+      leftNote: "",
+    }).node,
     approvalCard({ approval: fakeApproval("handoff", "browser_open", "Open https://example.com/ — rule"), heading: null, onSettled: () => {}, leftNote: "" }).node,
     approvalCard({ approval: fakeApproval("high", "shell", "rm -rf build — aggressive preset still asks for: destructive"), heading: null, onSettled: () => {}, leftNote: "" }).node,
   );

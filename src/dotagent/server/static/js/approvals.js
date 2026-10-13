@@ -41,6 +41,46 @@ export function fromEvent(runId, data) {
   };
 }
 
+// What joins the labels of the options chosen in one answer (`CHOICES_JOIN` of dotagent.agent.questions).
+const CHOICES_JOIN = "; ";
+
+/**
+ * The options a question offers (item 192): each with its label, what choosing it leads to (empty when the label says
+ * it), and whether Dot recommends it. A question asked before then stored its options as words alone.
+ */
+function questionOptions(args) {
+  if (!Array.isArray(args.options)) {
+    return [];
+  }
+  return args.options.map((option) =>
+    typeof option === "string"
+      ? { label: option, description: "", recommended: false }
+      : {
+          label: String(option.label),
+          description: typeof option.description === "string" ? option.description : "",
+          recommended: option.recommended === true,
+        },
+  );
+}
+
+/**
+ * The one text that answers a question when the user chose the options labelled `chosen` and wrote `written`: the
+ * labels joined, then what was written on a line of its own (`chosen_answer` of dotagent.agent.questions).
+ */
+function chosenAnswer(chosen, written) {
+  return [chosen.join(CHOICES_JOIN), written.trim()].filter((part) => part !== "").join("\n");
+}
+
+/** An option's words: its label, marked when Dot recommends it, over what choosing it leads to. */
+function choiceText(option) {
+  return el(
+    "span",
+    { class: "choice-text" },
+    el("span", { class: "choice-label" }, option.label, option.recommended ? el("span", { class: "badge b-info" }, "Recommended") : null),
+    option.description === "" ? null : el("span", { class: "choice-description" }, option.description),
+  );
+}
+
 function titleOf(severity) {
   if (severity === "question") {
     return "Dot is asking you";
@@ -166,19 +206,25 @@ export function approvalCard({ approval, heading, onSettled, leftNote }) {
   function renderPending() {
     node.className = `approval${approval.severity === "high" ? " high" : ""}${isQuestion ? " question" : ""}${isHandoff ? " handoff" : ""}`;
     const text = isQuestion && typeof approval.args.question === "string" ? approval.args.question : approval.summary;
+    const choices = isQuestion ? questionOptions(approval.args) : [];
+    // Several options may be chosen: each is ticked, and Send answer sends them with what was written.
+    const several = choices.length > 0 && approval.args.multiple === true;
     const note = el("input", {
       class: "input",
       type: "text",
       maxlength: "2000",
-      placeholder: isQuestion ? "Your answer" : "Note for Dot (optional)",
+      placeholder: !isQuestion ? "Note for Dot (optional)" : choices.length > 0 ? "Or write your own answer" : "Your answer",
       "aria-label": isQuestion ? "Your answer" : "Note for Dot",
     });
+    const ticks = several ? choices.map((option) => el("input", { type: "checkbox", value: option.label })) : [];
+    // An answer to a question is the options ticked and what was written; it is never empty.
     const submit = (approve) => {
-      if (isLeft && approve && note.value.trim() === "") {
+      const answer = isQuestion && approve ? chosenAnswer(ticks.filter((tick) => tick.checked).map((tick) => tick.value), note.value) : note.value.trim();
+      if (isQuestion && approve && answer === "") {
         note.focus();
         return;
       }
-      decide(approve, note.value.trim());
+      decide(approve, answer);
     };
     // Enter sends an answer to a question; on any other card it does nothing, so a note that says "no" never
     // approves the action (item 116).
@@ -188,27 +234,30 @@ export function approvalCard({ approval, heading, onSettled, leftNote }) {
         submit(true);
       }
     });
+    // One option chosen alone is the answer: its row sends it.
     const options =
-      isQuestion && Array.isArray(approval.args.options) && approval.args.options.length > 0
-        ? el(
+      choices.length === 0
+        ? null
+        : el(
             "div",
-            { class: "options" },
-            approval.args.options.map((option) =>
-              el(
-                "button",
-                {
-                  class: "btn sm",
-                  type: "button",
-                  onclick: () => {
-                    note.value = String(option);
-                    submit(true);
-                  },
-                },
-                String(option),
-              ),
-            ),
-          )
-        : null;
+            { class: "choices" },
+            several
+              ? choices.map((option, index) => el("label", { class: "choice" }, ticks[index], choiceText(option)))
+              : choices.map((option) =>
+                  el(
+                    "button",
+                    {
+                      class: "choice",
+                      type: "button",
+                      onclick: () => {
+                        note.value = option.label;
+                        submit(true);
+                      },
+                    },
+                    choiceText(option),
+                  ),
+                ),
+          );
     const yes = isQuestion ? "Send answer" : isHandoff ? "I did it" : "Approve";
     const no = isQuestion ? "Skip" : isHandoff ? "Skip this step" : "Deny";
     node.replaceChildren(
@@ -223,6 +272,7 @@ export function approvalCard({ approval, heading, onSettled, leftNote }) {
           heading,
         ),
         el("div", { class: "approval-text" }, text),
+        several ? el("div", { class: "small muted" }, "Choose one or more, then send them.") : null,
         isLeft ? el("div", { class: "small muted" }, leftNote) : null,
         isQuestion ? options : technicalDetails(approval.args),
         isQuestion || isHandoff ? null : ruleOffer(approval),
@@ -253,7 +303,7 @@ export function approvalCard({ approval, heading, onSettled, leftNote }) {
           heading,
         ),
         el("div", { class: "approval-text muted" }, clip(text, 400)),
-        note === "" ? null : el("div", { class: "small" }, el("span", { class: "muted" }, isQuestion ? "Answer: " : "Note: "), note),
+        note === "" ? null : el("div", { class: "small approval-note" }, el("span", { class: "muted" }, isQuestion ? "Answer: " : "Note: "), note),
       ),
     );
   }
