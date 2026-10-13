@@ -95,8 +95,19 @@ def _leaf_errors(error: BaseException) -> list[BaseException]:
     return [error]
 
 
-def _startup_message(leaves: list[BaseException]) -> str:
-    """Why a server Dot starts itself did not come up."""
+def _missing_directory(leaves: list[BaseException], cwd: Path) -> bool:
+    """Whether the server did not start because its working directory is not there: the error of the change into the
+    directory names the directory, that of a command not found names the command."""
+    return any(
+        isinstance(leaf, FileNotFoundError) and leaf.filename is not None and Path(os.fsdecode(leaf.filename)) == cwd
+        for leaf in leaves
+    )
+
+
+def _startup_message(leaves: list[BaseException], cwd: Path) -> str:
+    """Why a server Dot starts itself in ``cwd`` did not come up."""
+    if _missing_directory(leaves, cwd):
+        return "the working directory of the MCP server does not exist"
     if any(isinstance(leaf, FileNotFoundError) for leaf in leaves):
         return "the command of the MCP server was not found"
     if any(isinstance(leaf, PermissionError) for leaf in leaves):
@@ -273,9 +284,13 @@ class McpConnection:
                 truncate_middle(f"{type(leaf).__name__}: {leaf}", _SHOWN_CAUSE_CHARS) for leaf in leaves
             ]
             context: JsonObject = {**self._context(), "causes": causes, **await self._tail_since(offset)}
-            if any(isinstance(leaf, FileNotFoundError) for leaf in leaves):
+            if _missing_directory(leaves, self._cwd):
+                context["cwd"] = str(self._cwd)
+            elif any(isinstance(leaf, FileNotFoundError) for leaf in leaves):
                 context["searched_path"] = self._env.get("PATH")
-            message: str = _startup_message(leaves) if self._config.command is not None else _connect_message(leaves)
+            message: str = (
+                _startup_message(leaves, self._cwd) if self._config.command is not None else _connect_message(leaves)
+            )
             raise McpError(message, context) from exc
         raise McpError("the MCP server task ended before it connected", self._context())
 

@@ -5094,8 +5094,8 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 171 | The text of a desktop window follows the run's model window                          | done        | 047d0e1 |
 | 172 | A dotx command that dies does not leave its run at work                              | done        | bbb40bc |
 | 173 | Every smoke test passes alone, and the README keeps its width                        | done        | 5a8b875 |
-| 174 | Protected files stay out of web_extract, and a workspace file is read as one         | in progress |         |
-| 175 | One broken MCP server never keeps Dot from starting                                  | planned     |         |
+| 174 | Protected files stay out of web_extract, and a workspace file is read as one         | done        | 3f450ef |
+| 175 | One broken MCP server never keeps Dot from starting                                  | in progress |         |
 | 176 | Long skills and PDFs are read in pages, and osascript ends with its run              | planned     |         |
 | 177 | The configuration refuses at load what would fail a run                              | planned     |         |
 | 178 | The server answers every failure as JSON, and a page says it could not read again    | planned     |         |
@@ -9022,7 +9022,7 @@ say so).
 
 ### 174. Protected files stay out of web_extract, and a workspace file is read as one
 
-**Status: in progress.**
+**Status: done.** Merged as `3f450ef` (PR #212; no Linear issue, the Linear connector was signed out).
 
 **As built (2026-10-13).** `web_extract` reads a file only after the check `read_file` makes. A file's text goes to the
 fast model, so a source in a protected location gives the call the `secret_access` flag (`read_flags`, which the file
@@ -9042,7 +9042,21 @@ of the owner's own skills.
 
 ### 175. One broken MCP server never keeps Dot from starting
 
-**Status: planned.**
+**Status: in progress.**
+
+**As built (2026-10-13).** An MCP server is checked when it starts: each tool it offers, after `allow` and `deny`, has
+an input schema Dot can hand to a model (`tool_parameters`, which the registration of the tools uses too). A tool whose
+schema has a reference that leads nowhere, or nests deeper than Dot follows, leaves its server out with the reason, the
+server and the tool named and the hint to leave the tool out with `allow`, as a server that cannot start is left out;
+before, the server came up, the registration of its tools failed, and Dot did not start. `dotx mcp list` reports any
+failure of a server as the hub does, one that is not Dot's own with its type, and goes on to the next server; before,
+such a failure ended the command. A server whose working directory is missing is reported as such, with the directory,
+rather than as a command that was not found. The README names these reasons among those a server is left out for, and
+says that a server's own word that a tool only reads is trusted. Tests: `tests/smoke/test_mcp.py` starts a server whose
+tool takes a tree (a node that holds nodes) next to a good one: the tree's server is left out with the reason and the
+good one serves (the code of before connected both); the report of `dotx mcp list` goes on past a fault of the MCP
+library (the code of before let it out); a missing working directory is named (the code of before said the command was
+not found).
 
 **What.** An MCP server whose tool has an input schema Dot cannot use is left out with the reason when it starts, as a
 server that cannot start is, instead of keeping Dot from starting; `dotx mcp list` reports every failure of a server
@@ -9700,3 +9714,4 @@ not at the daemon's next start; a campaign whose start failed in any way is dele
 - 2026-10-13 (Opus 5.5): item 172 merged as `bbb40bc` (PR #210; no Linear issue, the connector was signed out): the daemon closes the run of a `dotx` command that died within half a minute, as cut off by the command's death, and a second Ctrl-C quits once the first one's stop is recorded.
 - 2026-10-13 (Opus 5.5): item 173 merged as `5a8b875` (PR #211; no Linear issue, the connector was signed out): the smoke tests of the MCP hub pass alone, each offline smoke test was run alone and passed, and the README's prose keeps within 120 columns. Part 28 is done.
 - 2026-10-13 (Opus 5.5): part 29, what the review found, is planned (items 174 to 180); item 174 is built: protected files stay out of `web_extract`, a file of the workspace is read as one, and the README names none of the owner's own skills.
+- 2026-10-13 (Opus 5.5): item 174 merged as `3f450ef` (PR #212; no Linear issue, the connector was signed out): `web_extract` refuses a file in a protected location as `read_file` does, a file of the workspace is read by its name even when the name looks like an address, and the README names none of the owner's own skills.

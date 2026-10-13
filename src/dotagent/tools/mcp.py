@@ -3,18 +3,16 @@
 import secrets
 
 from dotagent.config import AppConfig
-from dotagent.core.errors import McpError
 from dotagent.core.jsonutil import dumps_compact
 from dotagent.core.text import redact_secrets
 from dotagent.core.types import JsonObject
 from dotagent.llm.types import ToolSpec
-from dotagent.mcp.hub import McpHub
+from dotagent.mcp.hub import McpHub, tool_parameters
 from dotagent.mcp.types import McpTool
 from dotagent.policy.types import ActionInfo, Flag
 from dotagent.tools.base import ACTING_MODES, ALL_MODES, PreparedCall, RegisteredTool, ToolResult
 from dotagent.tools.context import ToolContext
 from dotagent.tools.mcp_result import FENCE_OVERHEAD_CHARS, render_call_result
-from dotagent.tools.schema import flatten_json_schema
 
 _NONCE_BYTES: int = 8
 _DESCRIPTION_CHARS: int = 1200
@@ -53,13 +51,7 @@ def _text_budget(output_chars: int) -> int:
 
 def _register(hub: McpHub, tool: McpTool) -> RegisteredTool:
     read_only: bool = tool.hints.read_only is True
-    try:
-        parameters: JsonObject = flatten_json_schema(tool.input_schema)
-    except ValueError as exc:
-        raise McpError(
-            "the input schema of an MCP tool cannot be used",
-            {"server": tool.server, "tool": tool.remote_name, "error": str(exc), "hint": "leave it out with `allow`"},
-        ) from exc
+    parameters: JsonObject = tool_parameters(tool)
 
     async def prepare(raw: JsonObject, ctx: ToolContext) -> PreparedCall:
         action: ActionInfo = classify_mcp_call(tool, raw)

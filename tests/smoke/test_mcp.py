@@ -15,7 +15,7 @@ import subprocess
 import sys
 import time
 import uuid
-from collections.abc import AsyncIterator, Iterator
+from collections.abc import AsyncIterator, Iterator, Mapping
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -29,13 +29,16 @@ from dotagent.config import McpServerConfig, load_config
 from dotagent.core.errors import McpError
 from dotagent.core.paths import ensure_layout, workspace_dir
 from dotagent.core.types import JsonObject
-from dotagent.mcp.hub import McpHub, inspect_servers, open_hub
+from dotagent.mcp import hub as mcp_hub
+from dotagent.mcp.connection import McpConnection
+from dotagent.mcp.hub import McpHub, ServerReport, inspect_servers, open_hub
 from dotagent.mcp.types import McpFailure
 from dotagent.policy.types import ActionInfo
 from dotagent.runtime import Runtime, build_runtime, close_runtime
 from dotagent.store.models import EventRecord, RunRecord
 from dotagent.tools.base import ACTING_MODES, ALL_MODES, RegisteredTool, ToolResult
 from dotagent.tools.context import ToolContext
+from dotagent.tools.mcp import build_mcp_tools
 from dotagent.tools.shell import read_login_env
 
 pytestmark = [pytest.mark.asyncio(loop_scope="module"), pytest.mark.usefixtures("environment")]
@@ -512,6 +515,87 @@ async def test_two_servers_with_the_same_tool_names_stay_apart(login_env: dict[s
         assert "mcp__one__add" in names and "mcp__two__add" in names
     finally:
         await hub.close()
+
+
+# A server whose one tool takes a tree: its input schema refers to itself, which Dot cannot flatten for a model.
+_TREE_SERVER: str = """
+from pydantic import BaseModel
+from mcp.server.mcpserver import MCPServer
+
+
+class Node(BaseModel):
+    name: str
+    children: list["Node"] = []
+
+
+server = MCPServer("dot-tree")
+
+
+@server.tool()
+def count(root: Node) -> int:
+    \"\"\"How many children the root has.\"\"\"
+    return len(root.children)
+
+
+server.run("stdio")
+"""
+
+
+async def test_a_server_whose_tool_has_a_schema_dot_cannot_use_is_left_out_and_the_others_serve(
+    login_env: dict[str, str],
+) -> None:
+    """Item 175: the schema is checked when the server starts, so the server is left out with the reason, and the tools
+    of the others are registered; before, registering them failed and Dot did not start."""
+    marker: str = f"dot-kept-{uuid.uuid4().hex}"
+    good: McpServerConfig = McpServerConfig(name="good", command=sys.executable, args=[str(FIXTURE), marker])
+    hub: McpHub = await open_hub([good, _python_server("tree", _TREE_SERVER, 30.0)], login_env)
+    try:
+        assert {tool.server for tool in hub.tools} == {"good"}
+        (failure,) = hub.failures
+        assert failure.server == "tree"
+        assert failure.error == "the input schema of an MCP tool cannot be used"
+        assert (failure.detail["tool"], failure.detail["hint"]) == ("count", "leave it out with `allow`")
+        assert len(build_mcp_tools(hub)) == len(hub.tools)
+    finally:
+        await hub.close()
+    await _assert_gone(marker)
+
+
+async def test_mcp_list_reports_a_failure_that_is_not_one_of_dots_own_and_the_other_servers(
+    login_env: dict[str, str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    connect = mcp_hub._connect_server
+
+    async def crashing(config: McpServerConfig, env: Mapping[str, str]) -> object:
+        if config.name == "crashing":
+            raise RuntimeError("a fault in the MCP library")
+        return await connect(config, env)
+
+    monkeypatch.setattr(mcp_hub, "_connect_server", crashing)
+    reports: tuple[ServerReport, ...] = await inspect_servers(
+        [_fixture_server("fine"), _fixture_server("crashing")], login_env
+    )
+    assert [(report.server, report.error) for report in reports] == [
+        ("fine", None),
+        ("crashing", "RuntimeError: a fault in the MCP library"),
+    ]
+
+
+async def test_a_missing_working_directory_is_named_rather_than_the_command(
+    login_env: dict[str, str], tmp_path: Path
+) -> None:
+    missing: Path = tmp_path / "gone"
+    connection: McpConnection = McpConnection(
+        _fixture_server("homeless"), dict(login_env), {}, missing, tmp_path / "mcp-homeless.log"
+    )
+    try:
+        with pytest.raises(McpError) as raised:
+            await connection.list_tools()
+    finally:
+        await connection.close()
+    assert raised.value.message == "the working directory of the MCP server does not exist"
+    assert raised.value.context["cwd"] == str(missing)
+    assert "searched_path" not in raised.value.context
 
 
 # ------------------------------------------------------------------------------------------------- the command line
