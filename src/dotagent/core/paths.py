@@ -117,6 +117,12 @@ def plugins_dir() -> Path:
     return dot_home() / "plugins"
 
 
+def added_servers_path() -> Path:
+    """Dot's record of the MCP servers of other agents that the owner added to it (item 165): each by its agent and its
+    name, never what it is started with, which Dot reads from the agent's own file when it starts."""
+    return dot_home() / "added-servers.json"
+
+
 def plugins_data_dir() -> Path:
     """Where a plugin keeps its own files: ``<name>`` below here is its ``${CLAUDE_PLUGIN_DATA}``."""
     return dot_home() / "plugins-data"

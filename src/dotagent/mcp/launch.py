@@ -11,17 +11,18 @@ from dotagent.core.errors import ConfigError
 from dotagent.core.paths import env_file_path
 from dotagent.secrets import resolve_secret
 
-_REFERENCE: re.Pattern[str] = re.compile(r"\$\{([A-Za-z_][A-Za-z0-9_]*)\}")
+# A secret written in a value of ``env`` or ``headers``; any other ``${...}`` is left as it is.
+SECRET_REFERENCE: re.Pattern[str] = re.compile(r"\$\{([A-Za-z_][A-Za-z0-9_]*)\}")
 
 
 def referenced_secrets(config: McpServerConfig) -> list[str]:
     """The names written as ``${NAME}`` in the values of ``env`` and ``headers``, each once."""
     values: tuple[str, ...] = (*config.env.values(), *config.headers.values())
-    return sorted({name for value in values for name in _REFERENCE.findall(value)})
+    return sorted({name for value in values for name in SECRET_REFERENCE.findall(value)})
 
 
 def expand_references(value: str, secrets: Mapping[str, str]) -> str:
-    return _REFERENCE.sub(lambda match: secrets[match.group(1)], value)
+    return SECRET_REFERENCE.sub(lambda match: secrets[match.group(1)], value)
 
 
 async def resolve_server_secrets(config: McpServerConfig) -> dict[str, str]:

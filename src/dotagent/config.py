@@ -384,9 +384,12 @@ class McpServerConfig(FrozenModel):
 
 class SkillsConfig(FrozenModel):
     """Where skills are looked for besides ``<home>/skills`` and the ``skills/`` folder of each plugin (``[skills]``).
-    Each entry is a directory whose children are skill folders (``<name>/SKILL.md``); ``~`` expands."""
+    Each entry is a directory whose children are skill folders (``<name>/SKILL.md``); ``~`` expands. ``elsewhere``:
+    whether ``find_help`` also lists the skills and MCP servers that the Mac's other agents set up and the owner can
+    add (item 165); the evals turn it off, as they run without the user's skills."""
 
     dirs: list[str] = Field(default_factory=list)
+    elsewhere: bool = True
 
 
 class PluginsConfig(FrozenModel):

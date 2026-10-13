@@ -533,6 +533,9 @@ max_schedules = 50
 # each and reads the rest with the skill tool when a task matches. Dot always looks in <home>/skills and in the skills/
 # folder of every plugin; list more directories here (each holds skill folders; ~ expands), such as "~/.claude/skills".
 dirs = []
+# find_help also lists the skills and MCP servers that the Mac's other agents (Claude Code, Claude Desktop, Cursor,
+# VS Code, Codex) set up, for a run to ask you to add one in Settings > Skills; false leaves them out.
+elsewhere = true
 
 [plugins]
 # Plugins in the Claude Code layout: <plugin>/.claude-plugin/plugin.json (name), skills/<name>/SKILL.md and .mcp.json

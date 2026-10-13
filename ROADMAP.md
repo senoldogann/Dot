@@ -5084,8 +5084,8 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 161 | A chat's queue goes on after a clean restart                                         | done        | 2ff66d6 |
 | 162 | A run whose terminal closed can be resumed                                           | done        | 3e33fdd |
 | 163 | A run finds the help this Mac offers before it takes the hard way                    | done        | 4eb3a6c |
-| 164 | The skills and MCP servers of the Mac's other agents are found                       | in progress |         |
-| 165 | Help found elsewhere is added only with the owner's yes                              | planned     |         |
+| 164 | The skills and MCP servers of the Mac's other agents are found                       | done        | 490749a |
+| 165 | Help found elsewhere is added only with the owner's yes                              | in progress |         |
 | 166 | A run's instructions list the help that fits its goal                                | planned     |         |
 | 167 | Evals show whether a run takes the easy way                                          | planned     |         |
 
@@ -8652,7 +8652,7 @@ instructions tell it to ask before it takes a hard way.
 
 ### 164. The skills and MCP servers of the Mac's other agents are found
 
-**Status: in progress.**
+**Status: done.** Merged as `490749a` (PR #201; no Linear issue, the Linear connector was signed out).
 
 **As built (2026-10-13).** A new module, `dotagent.help.elsewhere`, reads the files of the Mac's other agents without
 changing anything: the skills of Claude Code (`~/.claude/skills`), of the plugins installed in Claude Code (from
@@ -8691,10 +8691,53 @@ Desktop, Cursor, VS Code) are found and shown, read-only: their names, descripti
 
 ### 165. Help found elsewhere is added only with the owner's yes
 
-**Status: planned.**
+**Status: in progress.**
 
-**What.** A skill or an MCP server found elsewhere is added to Dot only when the owner says yes, in Settings or when a
-run asks; nothing is installed or configured without that yes.
+**As built (2026-10-13).** Settings › Skills, under Found on this Mac, gives each skill and MCP server that Dot can take
+an Add to Dot button and each one added a Remove button; both ask first, in Dot's confirm dialog, and
+`PUT /api/skills/elsewhere` (`kind`, `agent`, `name`, `added`) makes the change and returns what is found after it, or a
+409 with why. A skill is copied into Dot's skills folder (`<home>/skills/<name>`), its hidden entries left out, with a
+hidden marker (`.added-elsewhere.json`) of where it came from, which neither the catalog nor the skill tool counts among
+its files; runs are offered it at once. The copy is made in a hidden folder beside the skills, its folders made writable
+for the owner (some installers leave theirs read-only), and moved into place once checked again. A copy rather than a
+link: what a run may not change is fixed when Dot starts, so a link would have let a run outside `yolo` change a skill
+that later runs read, while a copy is inside the protected skills folder at once and keeps to what the owner said yes
+to. An MCP server is added as a line of `<home>/added-servers.json`: its agent, its name and a SHA-256 fingerprint of
+its entry (command, arguments, environment, URL, headers and transport), nothing it is started with; a run outside
+`yolo` may read the record but never change it. At each start the daemon reads the entry from the agent's file and,
+while its fingerprint is the recorded one, names it by Dot's rule (lower case, `-` for `_` and spaces, then the rule for
+server names) and starts it with the others, its tools offered and approved as an `[[mcp]]` server's. An entry changed
+since is left out until the owner removes the server and adds it again: a change to the agent's file never starts on the
+owner's earlier yes, and the agents' own files stay theirs to write. Remove works by agent and name, and what was added
+that its agent no longer has is listed apart (Added, no longer set up) with Remove. What Dot cannot take says why
+instead of a button, already in the list: a skill whose name Dot has or that its skills folder holds, or whose folder
+holds a link, something that is neither a file nor a folder, or more than 2000 files or 50 MB; a plugin's server, which
+comes with its plugin; a server whose name does not fit Dot's rule or is taken (by `[[mcp]]`, a plugin or another added
+server), or that uses a variable its agent fills in (any `${...}` in its command, arguments or URL, or one other than
+`${NAME}` in its environment or headers); an added server whose entry changed, or uses such a variable by now, is shown
+with why Dot leaves it out when it starts. find_help ranks the skills and servers that can be added with the rest, as
+Skill found elsewhere or MCP server found elsewhere, with how to ask the owner to add one (`[skills] elsewhere`, on by
+default, off in evals); an answer that lists one counts as untrusted content, since others wrote it, and the run's
+instructions say a run asks the owner rather than adding one. `dotx skills list` marks what was added and lists what is
+no longer set up. The found list now reads the skills of each agent as Dot reads its own folders, the skill folders of
+container folders a few levels down included, where it read one level before. Tests: units add a skill from read-only
+folders (the copy without the hidden entries and with the marker, read by the catalog, untouched by a later change of
+the original), refuse a name Dot has, a folder holding a link (already in the list) and one over a small limit, remove
+the copy alone, and keep, tell apart and remove a copy whose original is gone; a server is recorded with a fingerprint
+and none of the keys of its entry, makes another agent's server of the same name refused, is resolved at start with its
+arguments and environment, is left out at start and told why in the list once its entry changed, and is told apart and
+removed once it is gone. Through the API of a real in-process server, a Codex skill and a Claude Desktop server (the
+test's MCP fixture, a key in its environment) are added, the skill is offered at once, a second add is a 409, and a
+runtime opened next starts the server under Dot's name for it with the key in its environment, while the copy and the
+record are among what a run may not change; once its entry changes in Claude Desktop's file, the next start leaves it
+out and the list says why, and once it is gone it is still removed. A run through the real loop calls find_help and is
+told of a Claude Code skill to ask the owner for, and the answer counts as untrusted. Each failed on the code before:
+without the route (405), without find_help's search of what other agents set up (nothing found), without the record
+among what a run may not change (it was a temporary file a run could write), without the fingerprint check (the changed
+server started) and without the untrusted mark.
+
+**What.** A skill or an MCP server found elsewhere is added to Dot only when the owner says yes, in Settings; a run that
+needs one is told to ask the owner, and nothing is installed or configured without that yes.
 
 ### 166. A run's instructions list the help that fits its goal
 
@@ -9308,3 +9351,4 @@ makes short, scored by the steps and the channel the run took.
 - 2026-10-13 (Opus 5.5): item 161 merged as `2ff66d6` (PR #198; no Linear issue, the connector was signed out): a start of the daemon no longer holds the queue of a chat whose run a shutdown of the daemon cut off, so the queue goes on once that run, resumed, ends done; a crash still holds it.
 - 2026-10-13 (Opus 5.5): item 162 merged as `3e33fdd` (PR #199; no Linear issue, the connector was signed out): a run of `dotx run` whose terminal was closed, or that got SIGTERM, is cut off rather than stopped and can be resumed by hand; Ctrl-C stays the owner's stop. Part 26 is done; part 27, find help before the hard way, is planned.
 - 2026-10-13 (Opus 5.5): item 163 merged as `4eb3a6c` (PR #200; no Linear issue, the connector was signed out): a run can call `find_help` with its need in a few plain words and is told what fits among the skills it is offered, the tools of its MCP servers and the applications that AppleScript can drive, with how to use each; its instructions tell it to call it before it takes a hard way.
+- 2026-10-13 (Opus 5.5): item 164 merged as `490749a` (PR #201; no Linear issue, the connector was signed out): the skills and MCP servers that the Mac's other agents set up are found and shown, read-only and never with a key, in `dotx skills list`, `GET /api/skills/elsewhere` and Settings › Skills.

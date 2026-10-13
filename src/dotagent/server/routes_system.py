@@ -14,12 +14,36 @@ from fastapi.responses import FileResponse
 from dotagent import __version__
 from dotagent.agent.playbooks import PlaybookEntry, drop_playbook, list_playbooks, share_playbook
 from dotagent.config import AppConfig
-from dotagent.core.errors import DotError, MissingSecretError, NotFoundError, ProviderAuthError
-from dotagent.core.paths import dot_home, failsafe_path, playbooks_dir, screenshots_dir
+from dotagent.core.errors import DotError, ElsewhereError, MissingSecretError, NotFoundError, ProviderAuthError
+from dotagent.core.logs import get_logger
+from dotagent.core.paths import (
+    added_servers_path,
+    dot_home,
+    failsafe_path,
+    playbooks_dir,
+    screenshots_dir,
+    skills_dir,
+)
 from dotagent.desktop.perms import missing_panes, program_of_this_process, request_permissions
 from dotagent.desktop.types import Permissions
 from dotagent.doctor import CheckResult, run_quick_checks
-from dotagent.help.elsewhere import FoundElsewhere, found_elsewhere
+from dotagent.help.added import (
+    AddedServers,
+    add_server,
+    add_skill,
+    dot_has,
+    read_added_servers,
+    remove_server,
+    remove_skill,
+)
+from dotagent.help.elsewhere import (
+    SKILL_COPY_LIMIT,
+    DotHas,
+    FoundElsewhere,
+    FoundServer,
+    FoundSkill,
+    found_elsewhere,
+)
 from dotagent.llm.router import ModelRef, ModelRouter
 from dotagent.llm.traits import effective_effort
 from dotagent.llm.types import KNOWN_PROVIDERS, Effort, ModelInfo
@@ -27,6 +51,7 @@ from dotagent.server.context import ServerContext
 from dotagent.server.guard import daemon_proof
 from dotagent.server.palette import palette_view
 from dotagent.server.views import (
+    ElsewhereChange,
     FailsafeView,
     HealthView,
     LearnedSkillsView,
@@ -46,6 +71,8 @@ from dotagent.server.views import (
 from dotagent.skills.catalog import load_skills, playbook_root
 from dotagent.skills.types import SkillCatalog
 from dotagent.store.models import ApprovalRecord, PushSubscription
+
+log = get_logger(__name__)
 
 _IMAGE_NAME: re.Pattern[str] = re.compile(r"^[0-9a-f]{24}\.(png|jpg|webp|gif)$")
 _PENDING_LIMIT: int = 500
@@ -185,23 +212,54 @@ def system_router(ctx: ServerContext) -> APIRouter:
         entries: tuple[PlaybookEntry, ...] = await asyncio.to_thread(list_playbooks, playbooks_dir())
         return LearnedSkillsView(items=tuple(learned_skill_view(entry) for entry in entries))
 
-    @router.get("/skills/elsewhere")
-    async def skills_elsewhere() -> FoundElsewhere:
-        """The skills and MCP servers of the Mac's other agents (item 164), read from their files; Dot does not use
-        them until the owner adds them. Each says whether Dot already reads its folder, or has a server under the name
-        it would give it."""
+    async def found_now() -> FoundElsewhere:
         catalog: SkillCatalog = await asyncio.to_thread(
             load_skills, config.skills, ctx.runtime.plugins.plugins, playbook_root(config)
         )
-        servers: frozenset[str] = frozenset(
-            [
-                *(server.name for server in config.mcp),
-                *(server.name for plugin in ctx.runtime.plugins.plugins for server in plugin.servers),
-            ]
+        added: AddedServers = await asyncio.to_thread(read_added_servers, added_servers_path())
+        has: DotHas = dot_has(config, catalog, ctx.runtime.plugins.plugins, added)
+        return await asyncio.to_thread(found_elsewhere, Path.home(), has, SKILL_COPY_LIMIT)
+
+    async def add_found(change: ElsewhereChange) -> None:
+        """Add the skill or the MCP server ``change`` names, as it is found now."""
+        found: FoundElsewhere = await found_now()
+        context: dict[str, str] = {"kind": change.kind, "agent": change.agent, "name": change.name}
+        if change.kind == "skill":
+            skill: FoundSkill | None = next(
+                (item for item in found.skills if (item.agent, item.name) == (change.agent, change.name)), None
+            )
+            if skill is None:
+                raise ElsewhereError(f"no skill {change.name} of {change.agent} is found on this Mac", context)
+            await asyncio.to_thread(add_skill, skills_dir(), skill, SKILL_COPY_LIMIT)
+            return
+        server: FoundServer | None = next(
+            (item for item in found.servers if (item.agent, item.name) == (change.agent, change.name)), None
         )
-        return await asyncio.to_thread(
-            found_elsewhere, Path.home(), frozenset(skill.root for skill in catalog.skills), servers
-        )
+        if server is None:
+            raise ElsewhereError(f"no MCP server {change.name} of {change.agent} is found on this Mac", context)
+        await asyncio.to_thread(add_server, added_servers_path(), Path.home(), server)
+
+    @router.get("/skills/elsewhere")
+    async def skills_elsewhere() -> FoundElsewhere:
+        """The skills and MCP servers of the Mac's other agents (item 164), read from their files; Dot does not use
+        them until the owner adds them (item 165). Each says whether Dot has it already, whether the owner added it
+        from here, or why it cannot be added."""
+        return await found_now()
+
+    @router.put("/skills/elsewhere")
+    async def change_elsewhere(change: ElsewhereChange) -> FoundElsewhere:
+        """Add a skill or an MCP server found elsewhere to Dot, or take it back: the owner's yes (item 165). A skill is
+        copied into Dot's skills folder, offered to runs from their next look at the skills; a server is started from
+        Dot's next start. One is taken back by its agent and its name, whether or not the agent still has it. What is
+        found after it."""
+        if change.added:
+            await add_found(change)
+        elif change.kind == "skill":
+            await asyncio.to_thread(remove_skill, skills_dir(), change.agent, change.name)
+        else:
+            await asyncio.to_thread(remove_server, added_servers_path(), change.agent, change.name)
+        log.info("elsewhere_changed", kind=change.kind, agent=change.agent, name=change.name, added=change.added)
+        return await found_now()
 
     @router.get("/palette")
     async def palette() -> PaletteView:

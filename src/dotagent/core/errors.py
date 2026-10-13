@@ -141,6 +141,11 @@ class PluginError(DotError):
     """A plugin folder does not follow the Claude Code plugin layout, so it is left out."""
 
 
+class ElsewhereError(DotError):
+    """A skill or an MCP server that another agent of the Mac set up cannot be added to Dot, or removed from it, as
+    asked: it is not there, Dot has it already, its name is taken, or Dot cannot use it as it is written."""
+
+
 class StoreError(DotError):
     """The persistent store rejected an operation."""
 

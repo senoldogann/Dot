@@ -1,11 +1,12 @@
 """What the Mac's other agents have set up (item 164), read from a home made here: the skills of Claude Code, of its
 plugins and of Codex, and the MCP servers of Claude Code, its plugins, Claude Desktop, Cursor, VS Code and Codex. Only
-names are kept: no key or token written in a server's arguments, environment, headers or URL ever comes out."""
+names are kept: no key or token written in a server's arguments, environment, headers or URL ever comes out. Each says
+whether Dot has it, and why the owner cannot add it when they cannot (item 165)."""
 
 import json
 from pathlib import Path
 
-from dotagent.help.elsewhere import FoundElsewhere, found_elsewhere
+from dotagent.help.elsewhere import SKILL_COPY_LIMIT, AddedServer, DotHas, FoundElsewhere, found_elsewhere
 
 SECRETS: tuple[str, ...] = tuple(f"secret-{index}-7f3a9c" for index in range(8))
 
@@ -20,8 +21,21 @@ def _json(path: Path, value: object) -> None:
     path.write_text(json.dumps(value), encoding="utf-8")
 
 
+def _has(home: Path, folders: frozenset[Path], servers: frozenset[str], added: tuple[AddedServer, ...]) -> DotHas:
+    """What Dot has: the skill folders it reads, the servers of its own, and the servers added from elsewhere."""
+    return DotHas(
+        skill_folders=frozenset(folder.resolve() for folder in folders),
+        skill_names=frozenset(folder.name for folder in folders),
+        servers=servers,
+        skills_dir=home / "dot" / "skills",
+        added_servers=added,
+    )
+
+
 def _home(home: Path) -> None:
     _skill(home / ".claude" / "skills" / "pdf-tools", "pdf-tools", "Fill and merge PDF forms.")
+    # Dot finds skills as it finds its own: in container folders a few levels down too.
+    _skill(home / ".claude" / "skills" / "bundle" / "skills" / "csv-clean", "csv-clean", "Clean a CSV file.")
     _json(
         home / ".claude.json",
         {
@@ -90,8 +104,11 @@ def test_the_skills_and_servers_of_other_agents_are_found_by_their_names_alone(t
     used_folder: Path = tmp_path / ".claude" / "skills" / "pdf-tools"
     # Dot names a plugin's server <plugin>-<server>, in lower case with "-" for "_".
     used_servers: frozenset[str] = frozenset({"filesystem", "notes-notes-db"})
-    found: FoundElsewhere = found_elsewhere(tmp_path, frozenset({used_folder}), used_servers)
+    found: FoundElsewhere = found_elsewhere(
+        tmp_path, _has(tmp_path, frozenset({used_folder}), used_servers, ()), SKILL_COPY_LIMIT
+    )
     assert [(skill.agent, skill.name, skill.used) for skill in found.skills] == [
+        ("Claude Code", "csv-clean", False),
         ("Claude Code", "pdf-tools", True),
         ("Claude Code plugin notes", "notes-search", False),
         ("Codex", "release-notes", False),
@@ -105,6 +122,19 @@ def test_the_skills_and_servers_of_other_agents_are_found_by_their_names_alone(t
         ("Codex", "search", "stdio", "search-mcp", False),
     ]
     assert found.problems == ()
+    assert [(skill.name, skill.added, skill.refusal) for skill in found.skills if not skill.used] == [
+        ("csv-clean", False, None),
+        ("notes-search", False, None),
+        ("release-notes", False, None),
+    ]
+    # What Dot has needs no adding; a plugin's server comes with its plugin, and Dot does not fill in VS Code's
+    # variables.
+    assert [(server.name, server.refusal) for server in found.servers if not server.used] == [
+        ("github", None),
+        ("docs", None),
+        ("playwright", "it uses a variable that VS Code fills in and Dot does not"),
+        ("search", None),
+    ]
     # Nothing that a key or a token could be written in comes out: not the arguments, the environment, the headers,
     # nor the user, path or query of a URL.
     written: str = found.model_dump_json()
@@ -134,7 +164,7 @@ def test_what_cannot_be_read_is_told_without_its_keys_and_the_rest_is_still_foun
             }
         },
     )
-    found: FoundElsewhere = found_elsewhere(tmp_path, frozenset(), frozenset())
+    found: FoundElsewhere = found_elsewhere(tmp_path, _has(tmp_path, frozenset(), frozenset(), ()), SKILL_COPY_LIMIT)
     assert sorted((problem.path.name, problem.reason) for problem in found.problems) == [
         ("SKILL.md", "SKILL.md does not start with the --- line that opens the frontmatter"),
         ("SKILL.md", "the frontmatter of SKILL.md is nested too deeply to read"),
@@ -159,4 +189,4 @@ def test_what_cannot_be_read_is_told_without_its_keys_and_the_rest_is_still_foun
         ("Claude Code plugin notes", "Notes_DB"),
         ("Claude Desktop", "filesystem"),
     ]
-    assert [skill.name for skill in found.skills] == ["pdf-tools", "notes-search", "release-notes"]
+    assert [skill.name for skill in found.skills] == ["csv-clean", "pdf-tools", "notes-search", "release-notes"]
