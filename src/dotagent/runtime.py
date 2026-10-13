@@ -12,11 +12,12 @@ from dotagent.agent.gate import SiteLocks
 from dotagent.agent.judge import Judge, TypeSafeService, judge_for
 from dotagent.browser.pool import BrowserPool
 from dotagent.browser.session import BrowserSession
-from dotagent.config import AppConfig
-from dotagent.core.errors import StoreError
+from dotagent.config import AppConfig, McpServerConfig
+from dotagent.core.errors import ElsewhereError, StoreError
 from dotagent.core.logs import get_logger
 from dotagent.core.notify import Notifier, show_notification
 from dotagent.core.paths import (
+    added_servers_path,
     browser_profile_dir,
     chrome_data_dir,
     config_path,
@@ -37,6 +38,7 @@ from dotagent.core.paths import (
 )
 from dotagent.desktop.session import DesktopSession
 from dotagent.events import EventBus
+from dotagent.help.added import AddedServers, added_server_configs, read_added_servers
 from dotagent.launchd import launch_agent_path
 from dotagent.llm.calls import CALL_EVENT, CallRecorder, ModelCall, call_event_data, log_model_call
 from dotagent.llm.router import ModelRouter
@@ -182,12 +184,14 @@ def _own_code() -> tuple[Path, ...]:
 def _dot_paths(config: AppConfig) -> tuple[Path, ...]:
     """What Dot loads and runs, which the agent may read (a skill's files are read and run by path) but never change:
     its own code, which the daemon runs at its next start, its plugins and their own files, whose MCP servers start
-    with the daemon and are given keys from the key store, its skills and the playbooks it learned, which shape later
-    runs, and the file of its emergency stop."""
+    with the daemon and are given keys from the key store, and so does each server of its record of those added from
+    other agents (item 165), its skills (the copies of those added from other agents too) and the playbooks it
+    learned, which shape later runs, and the file of its emergency stop."""
     return (
         *_own_code(),
         *plugin_roots(config.plugins),
         plugins_data_dir(),
+        added_servers_path(),
         skills_dir(),
         *(Path(entry).expanduser() for entry in config.skills.dirs),
         playbooks_dir(),
@@ -253,6 +257,22 @@ async def build_runtime(config: AppConfig) -> Runtime:
     return await open_runtime(config, login_env)
 
 
+def _added_servers(config: AppConfig, plugins: PluginCatalog) -> tuple[McpServerConfig, ...]:
+    """The MCP servers that the owner added from other agents (item 165), read now from their agents' files. One that
+    cannot be used is logged and left out, as a plugin's is, and so are all of them when Dot's record cannot be read."""
+    path: Path = added_servers_path()
+    try:
+        record: AddedServers = read_added_servers(path)
+    except ElsewhereError as error:
+        log.warning("added_servers_unreadable", path=str(path), reason=error.message)
+        return ()
+    taken: frozenset[str] = frozenset([*(server.name for server in config.mcp), *(s.name for s in plugins.servers())])
+    configs, problems = added_server_configs(Path.home(), record, taken)
+    for problem in problems:
+        log.warning("added_server_left_out", path=str(problem.path), reason=problem.reason)
+    return configs
+
+
 async def open_runtime(config: AppConfig, login_env: dict[str, str]) -> Runtime:
     """Create the on-disk layout and open every service, with the environment of the login shell already read. Pair
     with :func:`close_runtime`.
@@ -274,7 +294,8 @@ async def open_runtime(config: AppConfig, login_env: dict[str, str]) -> Runtime:
     async with AsyncExitStack() as cleanup:
         store: Store = await Store.open(db_path(), screenshots_dir())
         cleanup.push_async_callback(store.close)
-        mcp: McpHub = await open_hub([*config.mcp, *plugins.servers()], login_env)
+        added: tuple[McpServerConfig, ...] = await asyncio.to_thread(_added_servers, config, plugins)
+        mcp: McpHub = await open_hub([*config.mcp, *plugins.servers(), *added], login_env)
         cleanup.push_async_callback(mcp.close)
         memory: MemoryIndex = await open_memory_index(store, config)
         cleanup.push_async_callback(close_memory_index, memory)

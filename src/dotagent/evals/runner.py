@@ -71,7 +71,7 @@ def eval_config(config: AppConfig) -> AppConfig:
                 }
             ),
             "mcp": [],
-            "skills": SkillsConfig(dirs=[]),
+            "skills": SkillsConfig(dirs=[], elsewhere=False),
             "plugins": PluginsConfig(dirs=[]),
             "desktop": config.desktop.model_copy(update={"enabled": False, "keep_awake": False}),
             "memory": config.memory.model_copy(update={"embed_enabled": False}),

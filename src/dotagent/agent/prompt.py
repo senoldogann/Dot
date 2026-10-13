@@ -355,7 +355,8 @@ _HELP_SECTION: str = """# Help on this Mac
 Before you take a hard way (writing a script or a program for the work, clicking through an application or a \
 site, trial and error in the shell), call find_help with the need in a few plain words. It searches the skills \
 installed here, the tools of the MCP servers and the applications that AppleScript can drive, and says how to use \
-what fits. Call it again when a way has failed twice."""
+what fits. Call it again when a way has failed twice. What it finds that another agent of this Mac set up is used \
+only once the owner adds it: when one would spare you a hard way, ask the owner to add it."""
 
 _DELEGATE_SECTION: str = """# Delegation
 - delegate runs one self-contained part of the work in a separate agent with a clean context and returns its final \

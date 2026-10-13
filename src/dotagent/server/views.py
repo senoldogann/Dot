@@ -364,6 +364,16 @@ class SkillShareRequest(FrozenModel):
     shared: bool
 
 
+class ElsewhereChange(FrozenModel):
+    """The owner's yes to a skill or an MCP server that another agent of the Mac set up (item 165), or taking it back:
+    the item as found, by its kind, its agent and its name."""
+
+    kind: Literal["skill", "server"]
+    agent: str = Field(min_length=1, max_length=200)
+    name: str = Field(min_length=1, max_length=200)
+    added: bool
+
+
 class AgentLearning(FrozenModel):
     """What an agent learned for itself (item 94): its lessons (newest first) with how its own runs ended after
     being handed each (``scores``, per lesson some run was handed), and its learned skills, active and retired."""

@@ -473,13 +473,13 @@ Who answers what the policy asks depends on the approval mode of the run: you, a
 **Untrusted content.** Web pages, screens and MCP results can be written by third parties. Dot wraps them in a fence
 with a random marker per call (`<web_content …>`, `<screen_content …>`) and tells the model that what is inside is data,
 never instructions. What a shell command printed after it reached the network (`curl`, `ssh`, `git clone`, `gh`, a line
-the guard cannot read) and what a terminal program prints count the same way, unfenced. A run that has seen such
-content is marked untrusted, and from then on outward-facing or lasting
-actions (messages, posts, follows and likes, privilege, system settings, saving a schedule or a note, and a shell line
-that sends data out: an upload or a form, a push, a copy to another machine, a change on a code host, inline code that
-reaches the network or runs a command of it) ask even when the preset or an `allow` rule would let them through; only a
-`preapproved` rule skips the question. A message you send to the run clears the mark. A delegated run starts as
-untrusted as its parent.
+the guard cannot read), what a terminal program prints, and a find_help answer that lists skills or MCP servers that
+other agents of the Mac set up count the same way, unfenced. A run that has seen such content is marked untrusted, and
+from then on outward-facing or lasting actions (messages, posts, follows and likes, privilege, system settings, saving a
+schedule or a note, and a shell line that sends data out: an upload or a form, a push, a copy to another machine, a
+change on a code host, inline code that reaches the network or runs a command of it) ask even when the preset or an
+`allow` rule would let them through; only a `preapproved` rule skips the question. A message you send to the run clears
+the mark. A delegated run starts as untrusted as its parent.
 
 **Secrets.**
 
@@ -502,12 +502,14 @@ untrusted as its parent.
 - Outside a `yolo` run the agent reads what Dot loads and runs, and runs a skill's files, but never changes them: its
   own code (the folder its package is imported from, the Python environment it runs in and the Python under that, and
   the file of the launchd job that starts the daemon), its plugins and their own files, its skills (with the
-  `[skills] dirs` and `[plugins] dirs` folders), the playbooks it learned and the file of its emergency stop. The file tools refuse to write there, and so does the shell guard for a
-  line that writes there by a copy or a move (its target folder option too), `dd`, a redirect, a download, a clone, an
-  unpacked archive, git run in one of those folders, a file edited in place (`sed -i`, `perl -i`, `ruby -i`) or inline
-  code that names the place (in a word of switches such as `-pe` too). The guard reads the line, not what a program
-  does; the sandbox below holds what it cannot read. A plugin's MCP servers start with the daemon and are given keys
-  from the key store: put a plugin or a skill in place yourself.
+  `[skills] dirs` and `[plugins] dirs` folders, and the copies of the skills you added from other agents), Dot's record
+  of the MCP servers you added from other agents, the playbooks it learned and the file of its emergency stop. The file
+  tools refuse to write there, and so does the shell guard for a line that writes there by a copy or a move (its target
+  folder option too), `dd`, a redirect, a download, a clone, an unpacked archive, git run in one of those folders, a
+  file edited in place (`sed -i`, `perl -i`, `ruby -i`) or inline code that names the place (in a word of switches such
+  as `-pe` too). The guard reads the line, not what a program does; the sandbox below holds what it cannot read. A
+  plugin's MCP servers, and those you added, start with the daemon and are given keys from the key store: put a plugin
+  or a skill in place yourself.
 - Outside a `yolo` run the processes of a run start in a macOS sandbox (`sandbox-exec`; `[shell] sandbox`, on by
   default): a shell command, a terminal session, an AppleScript and what it runs can neither read nor change Dot's own
   files above (its key file, token, push key, browser profile, configuration, database and journals, and the data
@@ -1823,9 +1825,10 @@ the skills of Claude Code (`~/.claude/skills`), of the plugins installed in Clau
 `~/.claude/plugins/installed_plugins.json`, with its `skills/` and `.mcp.json`) and of Codex (`~/.codex/skills`), and
 the MCP servers of Claude Code (those for every project, `mcpServers` in `~/.claude.json`; a project's own are not
 read), Claude Desktop (`claude_desktop_config.json`), Cursor (`~/.cursor/mcp.json`), VS Code (`Code/User/mcp.json`) and
-Codex (`mcp_servers` in `~/.codex/config.toml`). Only what names a thing is kept: a skill's name, description and
-folder, and a server's name, its transport and what it reaches, the base name of the program it starts or the host of
-its URL, when that is a plain name. A server's arguments, environment and headers, and the rest of its URL, can hold
+Codex (`mcp_servers` in `~/.codex/config.toml`). Their skills are found as Dot finds its own: the skill folders of a
+folder, and those of the folders in it a few levels down. Only what names a thing is kept: a skill's name, description
+and folder, and a server's name, its transport and what it reaches, the base name of the program it starts or the host
+of its URL, when that is a plain name. A server's arguments, environment and headers, and the rest of its URL, can hold
 keys and tokens: they are never kept, logged or shown, not even in the reason a server is left out. A skill is marked
 when Dot reads its folder, a server when Dot has one under the name it would give it (`<plugin>-<server>` for a
 plugin's). What cannot be read is listed apart with why: a file, a skill whose `SKILL.md` Dot cannot use, a server that
@@ -1833,7 +1836,29 @@ names no command or URL to use, whose command does not start with the name of a 
 it), whose URL names no host, or whose entry holds values of the wrong kind (told by their keys). `dotx skills list`
 shows them after Dot's own, with `?` for any character a terminal would act on; Settings › Skills shows them under
 "Found on this Mac", read apart from the learned skills; and `GET /api/skills/elsewhere` returns them. Runs do not see
-them: Dot uses one only once you add it to its configuration (`[skills] dirs`, `[plugins] dirs` or an `[[mcp]]` table).
+them: Dot uses one only once you add it (below), or name its folder in `[skills] dirs` or `[plugins] dirs`.
+
+**Adding what is found.** Under Found on this Mac, Add to Dot asks first, then adds a skill or an MCP server to Dot;
+Remove asks, then takes it back (`PUT /api/skills/elsewhere` with `kind`, `agent`, `name` and `added`;
+`dotx skills list` marks what you added). A skill is copied into `<home>/skills/<name>`, without its hidden files and
+with a hidden marker of where it came from, and every run is offered it at once. The copy is what you said yes to: it
+does not follow the agent's later changes (remove it and add it again to take them), and a run outside `yolo` may read
+it but never change it. Remove deletes that copy and nothing else. A server is added as a line of
+`<home>/added-servers.json` that names its agent and its name, with a fingerprint of its entry (a SHA-256 hash) and
+nothing it is started with; a run outside `yolo` may read that record but never change it. From Dot's next start
+(`dotx service install` restarts the daemon), Dot reads the entry from that agent's file each time it starts and starts
+the server as the agent does, with its command, arguments and environment, or its URL and headers, under the name Dot
+gives it (lower case, `-` for `_` and spaces); its tools are offered and approved as those of an `[[mcp]]` server. An
+entry that changed after you added it is not started, and the page says so until you remove the server and add it again:
+a change made in the agent's file, by a run or by anyone else, never starts on your earlier yes. One that is gone from
+its agent's file, or that Dot cannot start as it is written by then, is left out and logged too. What you added that its
+agent no longer has is listed apart, under Added, no longer set up, with Remove; Dot keeps such a skill's copy until you
+remove it. What cannot be added says why instead of offering the button: a skill whose name Dot has already, or that
+Dot's skills folder holds; a skill folder that holds a link, something that is neither a file nor a folder, or more than
+2000 files or 50 MB; a server of a plugin, which comes with its plugin (name the plugin's folder in `[plugins] dirs`); a
+server whose name does not fit Dot's rule for server names (a lower-case letter, then lower-case letters, digits and
+hyphens, at most 24 characters) or is taken, or that uses a variable its agent fills in: any `${...}` in its command,
+arguments or URL, or one in its environment or headers other than `${NAME}`, which Dot looks up like an API key.
 
 **Finding help.** Before it takes a hard way (writing a script or a program for the work, clicking through an
 application or a site, trial and error in the shell), a run is told to call `find_help` with its need in a few plain
@@ -1845,7 +1870,9 @@ the commands and classes of its dictionary's own suites (the suites that many ap
 listed). It ranks them by the words they share with the need (BM25; case, accents, common words and plurals do not
 matter) and lists the best eight that score at least half as well as the best one, each with how to use it: `skill` with
 its name, the MCP tool by its name, or `apple_script` with `tell application`, and `sdef` with the application's path,
-which prints its whole dictionary. With nothing found, it says what to try next. It changes nothing.
+which prints its whole dictionary. With `elsewhere = true` under `[skills]` (the default), it also searches the skills
+and MCP servers found on this Mac that you can add, each told with how to ask you to add it: a run never adds one
+itself. With nothing found, it says what to try next. It changes nothing.
 
 **Learned skills.** With `playbooks = true` in `[agent]` (the default), a task run of its own that ended done (its
 answer checked, or its goal check found the outcome achieved) after at least `skill_min_steps` (4) acting steps (every
@@ -1901,6 +1928,7 @@ outside 1 to 100. Two environment variables of the process move things: `DOT_HOM
 | `api-token`                                      | the bearer token of the web UI and the API (mode 0600)               |
 | `workspace/`                                     | the working directory of the shell and the file tools                |
 | `skills/`, `plugins/`                            | skills and plugins Dot always reads (more via `[skills]`/`[plugins]` dirs) |
+| `added-servers.json`                             | the MCP servers you added from other agents, by name and fingerprint |
 | `themes/`                                        | your own themes, one T3 Code theme file each (Settings › Appearance) |
 | `browser-profile/`                               | the Chrome profile of the browser tools                              |
 | `screenshots/`, `downloads/`                     | what the tools capture and download                                  |
