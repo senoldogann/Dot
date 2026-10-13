@@ -5076,7 +5076,8 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 153 | A server of tools that cannot start does not stop the daemon                         | done        | a872136 |
 | 154 | The memory keeps what it learns                                                      | done        | f53eb00 |
 | 155 | The compaction keeps a tail measured in tokens                                       | done        | 5b0b2cb |
-| 156 | The page text of the browser and the desktop has a floor                             | in progress |         |
+| 156 | The page text of the browser and the desktop has a floor                             | done        | 6ad598f |
+| 157 | The changed notes a running run is handed, and their dates and authors               | in progress |         |
 
 ### 77. The type system: Inter and Geist Mono, seven sizes, three weights
 
@@ -8185,11 +8186,12 @@ bear out is not fixed.
 scheduler goes on past a failure (149); a tool that raises fails its call, not its run (150); a question a run left
 reaches the owner (151); a late one-time schedule is never dropped unseen (152); an MCP server that cannot start does
 not stop the daemon (153); the memory keeps what it learns (154); the compaction keeps a tail measured in tokens (155);
-the page text of the browser and the desktop has a floor (156).
+the page text of the browser and the desktop has a floor (156). A ninth came of reading the review's other findings
+on the memory again after 154: the changed notes a running run is handed, and their dates and authors (157).
 
 ### How to start part 25 (the handoff prompt)
 
-> Read ROADMAP.md part 25 and the status table of part 9 (rows 149 to 156). One item at a time, in order; the protocol
+> Read ROADMAP.md part 25 and the status table of part 9 (rows 149 to 157). One item at a time, in order; the protocol
 > of part 5 (branch, gate, PR, Linear MYP issue when the connector is signed in, squash merge, hash in the table, log
 > line) is unchanged. Read each finding again in the code before fixing it, and give each fix a test that fails on the
 > code of before. Never touch the owner's data directory except to read it, by the kinds and numbers of what is stored,
@@ -8364,7 +8366,7 @@ never less than the newest exchange, as the README says, not about eight message
 
 ### 156. The page text of the browser and the desktop has a floor
 
-**Status: in progress.**
+**Status: done.** Merged as `6ad598f` (PR #193; no Linear issue, the Linear connector was signed out).
 
 **As built (2026-10-13).** The browser's tools gave the text of a page what one tool result of the run may carry less
 3500 characters for the rest of the result (steps, tabs, notes and the fence lines), and the desktop's snapshot the same
@@ -8386,6 +8388,33 @@ starts, and the executor cuts the middle out of a snapshot over a small window's
 
 **What.** In a small model window the text of a page has a floor: a page never comes back empty because the window is
 small.
+
+### 157. The changed notes a running run is handed, and their dates and authors
+
+**Status: in progress.**
+
+**As built (2026-10-13).** Two findings of the review on the memory (B8 and B9), each read again in the code first. (1)
+At every step a run was handed every note changed since the step before that it had not saved itself
+(`memories_changed_since`): other agents' lessons, retired notes, and as many notes as had changed, past the budget of
+its starting notes. `live_memories` now hands it what it would be handed at its start: the notes it may be handed
+(`visible_to`) that do not rest (`resting`), as many as fit the budget of its starting notes (`memory_budget`), and the
+run is told how many more changed (`memory_search` finds them). (2) `set_memory_tags` moved a note's `updated_at`, so
+the nightly `rest` and merged tags made old notes changed for every running run, and newer than their corrections under
+the prompt's rule that the newer of two notes wins; a retag now leaves `updated_at`. (3) `memory_update` kept a note's
+author, so a note of the owner that the model rewrote still read "the user wrote it". `rewrite_memory_note` makes the
+run its author, while the owner's own edit (`PATCH /api/memories/{id}`) keeps it. The old text of a rewritten note is
+not kept: the review's proposal to invalidate a note instead of overwriting it is a larger change and is not made here.
+Tests: `tests/smoke/test_live_notes.py` runs a scripted model while notes change under it (an old lesson is retired,
+another agent's lesson retagged, that agent learns a new lesson, the owner writes a note and another run saves forty):
+the next step is handed the owner's note and part of the forty with the count of the rest, nothing of the other agent's,
+and the retired lesson keeps its date. In `tests/smoke/test_memory.py`, a note of the owner that a run rewrites with
+`memory_update` is the run's and reads "you saved it". Both failed on the code of before (the other agent's new lesson
+was handed on; the rewritten note read "the user wrote it"), and the first failed again with each of its other two fixes
+taken back alone (a retag moving the date; no budget).
+
+**What.** A running run is handed the notes changed while it works that it would be handed at its start: not another
+agent's lessons nor resting notes, and no more than the budget of its starting notes. A change of tags is no change and
+leaves a note's date. A note a run rewrites becomes the run's, so the model's words never pass for the owner's.
 
 ## Log
 
@@ -8977,3 +9006,4 @@ small.
 - 2026-10-13 (Opus 5.5): item 153 merged as `a872136` (PR #190; no Linear issue, the connector was signed out): an MCP server that cannot start is left out with the reason and Dot starts without its tools; Settings › System, `dotx run` and `dotx doctor` say so.
 - 2026-10-13 (Opus 5.5): item 154 merged as `f53eb00` (PR #191; no Linear issue, the connector was signed out): the nightly merge leaves resting notes and other agents' notes alone, a lesson and the one that says not to do it are told apart, each group of starting notes has its own share of the budget, and a failed run's lessons are asked for in words that say it failed.
 - 2026-10-13 (Opus 5.5): item 155 merged as `5b0b2cb` (PR #192; no Linear issue, the connector was signed out): a compaction keeps as many of the newest messages as fit its room in tokens, never less than the newest exchange, instead of about eight.
+- 2026-10-13 (Opus 5.5): item 156 merged as `6ad598f` (PR #193; no Linear issue, the connector was signed out): in a small model window the text of a page and of a window keeps at least half of a tool result instead of coming back empty.
