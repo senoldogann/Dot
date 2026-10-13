@@ -188,8 +188,9 @@ answer (a small model that is offered both writes the call out as text).
   fewer summaries in a long run and more input tokens a step (up to twice as many at the end of a long run); 48 000 was
   the default before 2026-10-11, and an owner on a metered key who weighs tokens over summaries sets it back. The
   summary may use a tenth of the budget and never more than 1 500 words, so a long run's summary does not grow with
-  each compaction until every step compacts, and does not cost the fast model minutes of writing. A compaction keeps the
-  newest messages that fit next to the system prompt, the tool definitions and its note in 85 % of the budget, and
+  each compaction until every step compacts, and does not cost the fast model minutes of writing. A compaction keeps as
+  many of the newest messages as fit next to the system prompt, the tool definitions and its note in 85 % of the size at
+  which it starts (`context_summarise_share` of `context_tokens`, or the whole budget when the window leaves less), and
   never less than the model's last reply with its results, so the steps after it have room. It is tried three times:
   a summary far over the limit is asked again with the limit and the overrun in front, and one that lacks a section is
   asked again once with the missing sections named and the first draft carried along; when the fast model gives no

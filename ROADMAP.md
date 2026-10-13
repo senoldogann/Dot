@@ -5074,8 +5074,8 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 151 | A question a run left reaches the owner                                              | done        | 6788a66 |
 | 152 | A late one-time schedule is never dropped unseen                                     | done        | c1ccf7e |
 | 153 | A server of tools that cannot start does not stop the daemon                         | done        | a872136 |
-| 154 | The memory keeps what it learns                                                      | in progress |         |
-| 155 | The compaction keeps a tail measured in tokens                                       | planned     |         |
+| 154 | The memory keeps what it learns                                                      | done        | f53eb00 |
+| 155 | The compaction keeps a tail measured in tokens                                       | in progress |         |
 | 156 | The page text of the browser and the desktop has a floor                             | planned     |         |
 
 ### 77. The type system: Inter and Geist Mono, seven sizes, three weights
@@ -8308,7 +8308,7 @@ All of them failed on the code of before (the daemon ended with code 2 while it 
 
 ### 154. The memory keeps what it learns
 
-**Status: in progress.**
+**Status: done.** Merged as `f53eb00` (PR #191; no Linear issue, the Linear connector was signed out).
 
 **As built (2026-10-13).** Four faults of the memory, each seen in the code first. (1) The nightly merge paired a
 resting lesson with a new one that said the same and gave the newer both notes' tags, so a lesson learnt again took the
@@ -8341,10 +8341,26 @@ words that say it failed.
 
 ### 155. The compaction keeps a tail measured in tokens
 
-**Status: planned.**
+**Status: in progress.**
 
-**What.** A compaction keeps the newest messages up to a share of the budget measured in tokens, with a fixed number as
-the least, as the README says, not about eight messages whatever the budget.
+**As built (2026-10-13).** A compaction kept about eight messages, whatever the budget: `split_for_summary` took a count
+of messages to keep (8, from the loop; a few more when the cut fell inside a tool exchange) and the room in tokens could
+only lower it, while the README and the comment on `_COMPACTION_ROOM` say that the newest messages that fit are kept.
+With the default budget of 96 000 tokens that room is about 50 000 tokens less the system prompt and the tool
+definitions, and a run kept about its last eight messages of it and lost the rest to the summary.
+`split_for_summary(messages, max_tail_tokens)` now keeps the newest messages that come to at most the room, however many
+they are: the earliest cut whose tail fits (a binary search, since the estimate only falls as the cut moves on), moved
+on past tool results so that no tool exchange is cut in two, and never later than the newest assistant message, so the
+newest exchange is always kept. The count (`_SUMMARY_KEEP_TAIL`) is gone. Right after a compaction the prompt is now
+fuller, up to 85 % of the size at which it compacts, so a long run compacts more often than before, each time with less
+to summarise; the room for the steps after it is at least the 15 % of `_COMPACTION_ROOM`. Tests: in
+`tests/unit/test_continuity.py`, twenty exchanges that fit the room are all kept, and room for a tool result but not for
+its call keeps neither; the case that pinned a count of three went with the count. With the old split and the loop's
+count of eight, the new case failed (8 of 41 messages kept). The README sentence on what a compaction keeps now names
+the size the 85 % is of.
+
+**What.** A compaction keeps as many of the newest messages as fit in a share of the budget measured in tokens, and
+never less than the newest exchange, as the README says, not about eight messages whatever the budget.
 
 ### 156. The page text of the browser and the desktop has a floor
 
@@ -8941,3 +8957,4 @@ small.
 - 2026-10-13 (Opus 5.5): item 151 merged as `6788a66` (PR #188; no Linear issue, the connector was signed out): a question a run left, a campaign that ended by itself, a firing a schedule missed and a restart after an unclean stop reach the owner, on the phone and (but the restart) in the page's notifications, and the end of a run tells the first line of its answer.
 - 2026-10-13 (Opus 5.5): item 152 merged as `c1ccf7e` (PR #189; no Linear issue, the connector was signed out): a one-time schedule whose moment passed fires late, its run reading first when it was due, and one due while the emergency stop is engaged waits for the release.
 - 2026-10-13 (Opus 5.5): item 153 merged as `a872136` (PR #190; no Linear issue, the connector was signed out): an MCP server that cannot start is left out with the reason and Dot starts without its tools; Settings › System, `dotx run` and `dotx doctor` say so.
+- 2026-10-13 (Opus 5.5): item 154 merged as `f53eb00` (PR #191; no Linear issue, the connector was signed out): the nightly merge leaves resting notes and other agents' notes alone, a lesson and the one that says not to do it are told apart, each group of starting notes has its own share of the budget, and a failed run's lessons are asked for in words that say it failed.

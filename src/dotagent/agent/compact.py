@@ -1,5 +1,6 @@
 """Context management: token estimates, trimming of stale output and repair of broken tool pairing."""
 
+from bisect import bisect_left
 from collections.abc import Sequence
 
 from dotagent.core.jsonutil import dumps_compact
@@ -114,22 +115,21 @@ def pending_calls(messages: Sequence[Message]) -> tuple[ToolCall, ...]:
     return tuple(call for call in messages[start - 1].tool_calls if call.id not in answered)
 
 
-def split_for_summary(
-    messages: Sequence[Message], keep_tail: int, max_tail_tokens: int
-) -> tuple[list[Message], list[Message]]:
+def split_for_summary(messages: Sequence[Message], max_tail_tokens: int) -> tuple[list[Message], list[Message]]:
     """Split into (older part to summarise, recent part to keep) at a point that never separates a tool exchange.
 
-    The recent part keeps about the newest ``keep_tail`` messages (more when the cut would fall inside a tool exchange)
-    and fewer when those come to more than ``max_tail_tokens`` estimated tokens, but never less than the newest
-    exchange: the newest assistant message and what follows it. A history without one has nothing to summarise.
+    The recent part is the newest messages that come to at most ``max_tail_tokens`` estimated tokens, however many
+    they are (item 155), but never less than the newest exchange: the newest assistant message and what follows it. A
+    history without one has nothing to summarise.
     """
     newest: int = max((index for index, message in enumerate(messages) if message.role == "assistant"), default=0)
-    cut: int = max(0, len(messages) - keep_tail)
-    while cut > 0 and messages[cut].role == "tool":
-        cut -= 1
-    cut = min(cut, newest)
-    while cut < newest and (messages[cut].role == "tool" or estimate_tokens(messages[cut:], ()) > max_tail_tokens):
+    # The earliest cut whose tail fits: a later cut keeps fewer messages, so the estimate only falls as the cut moves on.
+    cut: int = bisect_left(
+        range(len(messages) + 1), True, key=lambda start: estimate_tokens(messages[start:], ()) <= max_tail_tokens
+    )
+    while cut < newest and messages[cut].role == "tool":
         cut += 1
+    cut = min(cut, newest)
     return list(messages[:cut]), list(messages[cut:])
 
 
