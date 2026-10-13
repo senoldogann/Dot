@@ -35,7 +35,7 @@ from dotagent.core.logs import get_logger
 from dotagent.core.text import fold_search, redact_secrets
 from dotagent.core.types import FrozenModel
 from dotagent.memory.service import MemoryHit, SavedMemory, normalize_text, recall, save_memory
-from dotagent.memory.words import search_terms
+from dotagent.memory.words import lowercase, search_terms
 from dotagent.runtime import Runtime
 from dotagent.store.db import Store
 from dotagent.store.models import EventRecord, RunMode, RunStatus
@@ -53,6 +53,10 @@ _MIN_CHARS: int = 20
 _MAX_CHARS: int = 300
 # Two texts say the same when they share this share of their search terms (of the terms of both together).
 _SAME_TERMS: float = 0.75
+# A word that turns a sentence round ("do not", "never", "isn't", the Turkish "değil"). The search terms leave it out,
+# so a lesson and its correction have the same terms, and their embeddings are close as well. The Turkish negative
+# suffix (-ma, -me) is not recognised.
+_NEGATION: re.Pattern[str] = re.compile(r"\b(?:not|no|never|cannot|değil|yok|asla|hiç|hiçbir)\b|n['’]t\b")
 # The saved notes that fit the goal, shown to the review model so that it does not repeat them.
 _KNOWN_NOTES: int = 8
 # The saved notes that the memory search finds for a lesson and that it is compared with.
@@ -71,7 +75,7 @@ type SavedBy = Literal["auto", "owner"]
 class LessonCase(FrozenModel):
     """A run that ended and may hold lessons, as the loop saw it at its end: ``failures`` and ``resolved`` are the
     failed calls of :class:`dotagent.agent.verify.RunFacts`, ``tainted`` whether the run read content that third
-    parties can author at any point."""
+    parties can author at any point, ``reached_goal`` whether it ended done."""
 
     run_id: str
     thread_id: str
@@ -81,6 +85,7 @@ class LessonCase(FrozenModel):
     resolved: tuple[CallFact, ...]
     answer: str
     tainted: bool
+    reached_goal: bool
 
 
 class LessonView(FrozenModel):
@@ -214,9 +219,22 @@ def lesson_problem(text: str, max_chars: int) -> str | None:
     return None
 
 
+def says_not(text: str) -> bool:
+    """Whether ``text`` says not to do something, or that something is not so."""
+    return _NEGATION.search(lowercase(text)) is not None
+
+
+def same_way_round(text: str, other: str) -> bool:
+    """Whether both texts say not to, or neither does: one that says the opposite of the other never repeats it,
+    however alike their words and their meaning are."""
+    return says_not(text) == says_not(other)
+
+
 def repeats(text: str, other: str) -> bool:
-    """Whether ``text`` says what ``other`` says: the same words whatever their case and accents, or mostly the same
-    search terms."""
+    """Whether ``text`` says what ``other`` says, the same way round (:func:`same_way_round`): the same words whatever
+    their case and accents, or mostly the same search terms."""
+    if not same_way_round(text, other):
+        return False
     if fold_search(normalize_text(text)) == fold_search(normalize_text(other)):
         return True
     mine: set[str] = set(search_terms(text))
@@ -237,8 +255,9 @@ def kept_lessons(proposed: Sequence[str], known: Sequence[str], max_chars: int) 
 
 
 def _says_it(lesson: str, hit: MemoryHit, threshold: float) -> bool:
-    """Whether a saved note found for ``lesson`` already says it, by its words or by its meaning."""
-    return (hit.similarity is not None and hit.similarity >= threshold) or repeats(lesson, hit.record.content)
+    """Whether a saved note found for ``lesson`` already says it, by its words or by its meaning, the same way round."""
+    close: bool = hit.similarity is not None and hit.similarity >= threshold
+    return same_way_round(lesson, hit.record.content) and (close or repeats(lesson, hit.record.content))
 
 
 async def draw_lessons(runtime: Runtime, case: LessonCase, signals: tuple[str, ...]) -> tuple[str, ...]:
@@ -255,7 +274,14 @@ async def draw_lessons(runtime: Runtime, case: LessonCase, signals: tuple[str, .
         case.run_id,
     )
     proposal: LessonProposal = await writer(
-        LessonRequest(goal=case.goal, digest=case.digest, signals=signals, answer=case.answer, known=known)
+        LessonRequest(
+            goal=case.goal,
+            digest=case.digest,
+            signals=signals,
+            answer=case.answer,
+            known=known,
+            reached_goal=case.reached_goal,
+        )
     )
     kept: tuple[str, ...] = kept_lessons(
         proposal.lessons, (case.goal, *known), min(_MAX_CHARS, runtime.config.memory.max_chars)

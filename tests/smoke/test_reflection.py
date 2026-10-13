@@ -213,6 +213,14 @@ def _lesson_prompts(home: Home, run: RunRecord) -> list[str]:
     ]
 
 
+def _lesson_systems(home: Home, run: RunRecord) -> list[str]:
+    return [
+        request.messages[0].content
+        for request in home.model.requests
+        if request.session_key == f"{run.thread_id}:lessons"
+    ]
+
+
 def _backdate(memory_id: str, created_at: float) -> None:
     """Make a note look as if an older daemon had written it: the store writes ``now`` and nothing else."""
     connection: sqlite3.Connection = sqlite3.connect(db_path())
@@ -305,6 +313,10 @@ async def test_the_reflection_learns_from_the_runs_the_loop_did_not_ask_tidies_t
         assert len(stopped_prompts) == 1 and "The run was stopped before it finished" in stopped_prompts[0]
         assert _lesson_prompts(home, clean) == []
         assert len(_lesson_prompts(home, stumbled)) == 1
+        # Item 154: the failed and the stopped run are asked about in words that say they did not reach their goal.
+        for system in (*_lesson_systems(home, failed), *_lesson_systems(home, stopped)):
+            assert "did not reach its goal" in system and "reached its goal, but" not in system
+        assert "reached its goal, but not at the first try" in _lesson_systems(home, stumbled)[0]
         lessons: list[MemoryRecord] = await store.memories_with_tag(LESSON_TAG, 50)
         assert {
             note.content: note.source_run

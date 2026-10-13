@@ -777,7 +777,10 @@ has ended, by one call of the review model (`[models] review`). It reads a diges
 answer and the saved notes that fit the goal, and writes at most three lessons of one sentence: know-how that a later
 run could use from the start, such as that `pdftotext` keeps the columns of a table only with `-layout`. A lesson of more
 than one line, of fewer than 20 or more than 300 characters (or `[memory] max_chars`), with a secret, an e-mail address
-or a path in a home folder, or that says what the goal, another lesson or a saved note already says, is dropped. With
+or a path in a home folder, or that says what the goal, another lesson or a saved note already says, is dropped; one
+that says not to do what a saved note says to do (or the other way round) is no repeat of it, however alike their
+words and meaning are (`not`, `never`, `n't`, the Turkish `değil`, `yok`, `asla`; the suffix `-ma`/`-me` is not
+recognised). With
 `propose` the lessons wait under "Lessons from this run" on the run's page: Save to memory keeps one as a note tagged
 `lesson` whose source is the run, Dismiss drops it (`POST /api/runs/{id}/lessons/{index}/save` and `/dismiss`). A lesson
 is decided once: a second save or dismissal of it, from another page or after `auto` saved it, is refused. `dotx run`
@@ -794,9 +797,11 @@ ended, so the Memory page says "Handed to 5 runs, 4 done" under a note and `dotx
 **Reflection.** Once a day at `[agent] reflection_time` (`"03:30"` in `[scheduler] timezone`; `"off"` never), the
 daemon reflects on the runs that ended since the last reflection (the last day, the first time): it asks the review
 model for the lessons of the task and research runs the loop did not ask at their end, the failed and the stopped ones
-included, with how the run ended as one more signal, under the `lessons` setting above (`propose` leaves them on the
-run's page, `auto` saves them, `off` draws none); it folds the lesson notes that say the same into the newer one (by
-the embeddings when both have one, by the words otherwise); it rests a lesson that no run was handed for
+included, with how the run ended as one more signal and in words that say it did not reach its goal, under the
+`lessons` setting above (`propose` leaves them on the run's page, `auto` saves them, `off` draws none); it folds the
+lesson notes of one agent that say the same, the same way round, into the newer one (by the embeddings when both have
+one, by the words otherwise; a resting lesson is left alone, so one learnt again does not take its rest); it rests a
+lesson that no run was handed for
 `lesson_rest_days` (60), or whose score says it did not help (handed to `[memory] score_min_uses` runs in the last
 `score_days`, more of which failed than ended done; a lesson you saved yourself is never retired this way), by tagging
 it `rest`, after which searches skip it while `dotx memory list` and the Memory page still show it, and the log line
@@ -1518,8 +1523,10 @@ dotx memory reindex      # embed every note again, for example after changing [m
 - A run starts with the notes tagged `core` (newest first), then the notes you wrote yourself (the ones closest to the
   goal first), then the agent's notes close enough to the goal and the earlier goals of the conversation
   (`inject_min_similarity`; by fit and score), as many as fit a budget of tokens: `inject_share` (2%) of the model's
-  context window, at most `inject_tokens` (1500; the cap alone when the provider does not say the window). A note that
-  does not fit is passed over, a shorter one after it may still fit, and `memory_search` finds the rest. The run's
+  context window, at most `inject_tokens` (1500; the cap alone when the provider does not say the window). Each of
+  these groups first gets its own share, a quarter of the budget, and what is left then goes to them in the same order,
+  so many notes of yours do not crowd out the agent's lessons. A note that does not fit is passed over, a shorter one
+  after it may still fit, and `memory_search` finds the rest. The run's
   timeline says how many notes it recalled and the tokens they took.
 - Use decides what is recalled: a note handed to a run counts as used, and a search lifts the agent's notes a run was
   handed lately (a use a moment ago is worth a second place in one ranking; the lift halves every `use_half_life_days`,

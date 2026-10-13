@@ -156,6 +156,34 @@ def test_two_lesson_notes_that_say_the_same_make_a_pair_older_first_each_note_on
     assert duplicate_pairs([a, b, c, d], close) == [(c, d)]
 
 
+def test_a_resting_note_and_a_note_of_another_agent_make_no_pair() -> None:
+    """Item 154: a lesson learnt again would take the rest tag of the resting one; an agent would lose its lesson."""
+    resting: MemoryRecord = _note(
+        "a", "Create notes.txt with write_file before read_file reads it.", 10.0, None, ("lesson", "rest")
+    )
+    learnt: MemoryRecord = _note(
+        "b", "Create notes.txt with write_file before read_file reads it back.", 20.0, None, ("lesson",)
+    )
+    theirs: MemoryRecord = _note(
+        "c", "Create notes.txt with write_file before read_file reads it again.", 30.0, None, ("lesson",)
+    ).model_copy(update={"agent_id": "agent_1"})
+    same: dict[str, tuple[float, ...]] = {"a": (1.0, 0.0), "b": (1.0, 0.0), "c": (1.0, 0.0)}
+    assert duplicate_pairs([resting, learnt, theirs], {}) == []
+    assert duplicate_pairs([resting, learnt, theirs], same) == []
+
+
+def test_a_lesson_and_the_one_that_says_not_to_do_it_make_no_pair() -> None:
+    """Item 154: by their words or by their meaning, a lesson and its correction look alike; they are not repeats."""
+    use: MemoryRecord = _note(
+        "u", "Use --force when git push is refused on the deploy branch.", 10.0, None, ("lesson",)
+    )
+    avoid: MemoryRecord = _note(
+        "v", "Do not use --force when git push is refused on the deploy branch.", 20.0, None, ("lesson",)
+    )
+    assert duplicate_pairs([use, avoid], {}) == []
+    assert duplicate_pairs([use, avoid], {"u": (1.0, 0.0), "v": (1.0, 0.0)}) == []
+
+
 def test_a_lesson_rests_after_sixty_days_without_a_run_being_handed_it() -> None:
     now: float = 100 * DAY_S
     fresh: MemoryRecord = _note("fresh", "x" * 30, now - DAY_S, None, ("lesson",))

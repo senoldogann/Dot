@@ -5073,8 +5073,8 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 150 | A tool that raises fails its call, not its run                                       | done        | ba4f2a6 |
 | 151 | A question a run left reaches the owner                                              | done        | 6788a66 |
 | 152 | A late one-time schedule is never dropped unseen                                     | done        | c1ccf7e |
-| 153 | A server of tools that cannot start does not stop the daemon                         | in progress |         |
-| 154 | The memory keeps what it learns                                                      | planned     |         |
+| 153 | A server of tools that cannot start does not stop the daemon                         | done        | a872136 |
+| 154 | The memory keeps what it learns                                                      | in progress |         |
 | 155 | The compaction keeps a tail measured in tokens                                       | planned     |         |
 | 156 | The page text of the browser and the desktop has a floor                             | planned     |         |
 
@@ -8285,7 +8285,7 @@ fires late, its run reading first when it was due; one due while the emergency s
 
 ### 153. A server of tools that cannot start does not stop the daemon
 
-**Status: in progress.**
+**Status: done.** Merged as `a872136` (PR #190; no Linear issue, the Linear connector was signed out).
 
 **As built (2026-10-13).** `open_hub` used to stop every server again and raise when one enabled server could not start,
 so `open_runtime` failed and the daemon did not start at all. Now each server that cannot start is left out with the
@@ -8308,12 +8308,36 @@ All of them failed on the code of before (the daemon ended with code 2 while it 
 
 ### 154. The memory keeps what it learns
 
-**Status: planned.**
+**Status: in progress.**
 
-**What.** The nightly merge leaves retired notes and other agents' notes alone; a lesson that says not to do something
-is not taken for a repeat of the one that says to do it; the owner's notes have a relevance bar and each group of notes
-its own share of the budget, so the agent's lessons still reach a run; a lesson of a run that failed is drawn with words
-that say it failed.
+**As built (2026-10-13).** Four faults of the memory, each seen in the code first. (1) The nightly merge paired a
+resting lesson with a new one that said the same and gave the newer both notes' tags, so a lesson learnt again took the
+`rest` tag the same night; it also paired the lessons of two agents, so one agent lost its lesson to the other's.
+`duplicate_pairs` now leaves resting notes out and pairs only notes of the same agent. (2) `do`, `don` and `not` are no
+search terms (the search needs that), so "Use --force with X" and "Do not use --force with X" had the same terms and the
+correction was dropped as a repeat, and their embeddings are close too. `same_way_round` now keeps apart a text that
+says not to (`not`, `no`, `never`, `cannot`, `n't`, the Turkish `değil`, `yok`, `asla`, `hiç`, `hiçbir`) and one that
+does not: such a pair never repeats in `repeats`, a saved note that says the opposite never counts as already saying a
+lesson being drawn, by words or by meaning, and such a pair never merges at night. The Turkish suffix `-ma`/`-me` is not
+recognised. (3) A run's starting notes came from one budget filled group after group: the standing notes, every note the
+owner wrote, the agent's lessons, then the other notes that fit, so forty notes of the owner left no room for a lesson.
+The owner's notes still reach every run, as they did on purpose (they are the owner's own words), but `fit_groups` now
+gives each of the four groups a quarter of the budget first, then what is left, in the same order; no relevance bar was
+put on the owner's notes, as first planned, since that would undo that choice. (4) The lessons of a failed or stopped
+run, drawn by the nightly reflection, were asked for with instructions that said the run reached its goal. `LessonCase`
+and `LessonRequest` carry `reached_goal`, and such a run's instructions say it did not reach its goal; for both, a
+lesson may say what does not work, as the digest shows. Tests: in `tests/unit/test_reflection.py`, a resting note and
+another agent's note make no pair, and a lesson and the one that says not to do it make no pair, by words or by
+identical embeddings; in `tests/unit/test_lessons.py`, such pairs do not repeat, in English and in Turkish, and a saved
+note found with a similarity of 0.99 does not already say the opposite; in `tests/smoke/test_memory.py`, a lesson that
+fits the goal reaches a run next to forty notes of the owner, part of which come along; in
+`tests/smoke/test_reflection.py`, the failed and the stopped run are asked about in words that say they did not reach
+their goal. All of them failed on the code of before.
+
+**What.** The nightly merge leaves resting notes and other agents' notes alone; a lesson that says not to do something
+is not taken for a repeat of the one that says to do it; each group of notes has its own share of the budget, so the
+owner's notes, which reach every run, do not crowd out the agent's lessons; a lesson of a run that failed is drawn with
+words that say it failed.
 
 ### 155. The compaction keeps a tail measured in tokens
 
@@ -8916,3 +8940,4 @@ small.
 - 2026-10-13 (Opus 5.5): item 150 merged as `ba4f2a6` (PR #187; no Linear issue, the connector was signed out): any error of a tool fails that call, not the run, and one no tool expects is logged with its traceback; `edit_file` keeps a file's CRLF line ends and refuses a file that is not UTF-8 text, saying so.
 - 2026-10-13 (Opus 5.5): item 151 merged as `6788a66` (PR #188; no Linear issue, the connector was signed out): a question a run left, a campaign that ended by itself, a firing a schedule missed and a restart after an unclean stop reach the owner, on the phone and (but the restart) in the page's notifications, and the end of a run tells the first line of its answer.
 - 2026-10-13 (Opus 5.5): item 152 merged as `c1ccf7e` (PR #189; no Linear issue, the connector was signed out): a one-time schedule whose moment passed fires late, its run reading first when it was due, and one due while the emergency stop is engaged waits for the release.
+- 2026-10-13 (Opus 5.5): item 153 merged as `a872136` (PR #190; no Linear issue, the connector was signed out): an MCP server that cannot start is left out with the reason and Dot starts without its tools; Settings › System, `dotx run` and `dotx doctor` say so.
