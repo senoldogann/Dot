@@ -54,10 +54,16 @@ def resolve_path(raw: str, ctx: ToolContext) -> Path:
     return expand_path(raw, ctx.workspace)
 
 
-def _read_action(tool: str, path: Path, ctx: ToolContext, verb: str) -> ActionInfo:
+def read_flags(path: Path, ctx: ToolContext) -> tuple[Flag, ...]:
+    """The flags of reading the resolved ``path``: a protected location holds secrets."""
     path_class: PathClass = classify_path(path, ctx.workspace, ctx.runtime.protected, ctx.runtime.dot_paths)
-    flags: tuple[Flag, ...] = ("secret_access",) if path_class == "protected" else ()
-    return ActionInfo(tool=tool, kind="read", risk="safe", summary=f"{verb} {path}", target=str(path), flags=flags)
+    return ("secret_access",) if path_class == "protected" else ()
+
+
+def _read_action(tool: str, path: Path, ctx: ToolContext, verb: str) -> ActionInfo:
+    return ActionInfo(
+        tool=tool, kind="read", risk="safe", summary=f"{verb} {path}", target=str(path), flags=read_flags(path, ctx)
+    )
 
 
 def _write_action(tool: str, path: Path, ctx: ToolContext, verb: str) -> ActionInfo:

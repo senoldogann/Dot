@@ -66,7 +66,7 @@ EVENTS: tuple[EventRecord, ...] = (
     _result(10, "c5", "write_file", "", True, "wrote 3 lines"),
     _call(11, "c6", "skill", {"name": "learned-find-a-product-s-price"}),
     _result(12, "c6", "skill", "", True, "Skill learned-find-a-product-s-price"),
-    _call(13, "c7", "skill", {"name": "x-twitter-growth"}),
+    _call(13, "c7", "skill", {"name": "weekly-report"}),
 )
 
 

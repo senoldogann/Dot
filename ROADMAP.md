@@ -943,7 +943,7 @@ owner's data was not read, the numbers of 2026-10-08 are the audit's aggregate S
   takes no options (`tools/schedule.py:99-101`, `UNSET_OPTIONS`) and starts a new thread per firing
   (`scheduler/runner.py:105-107`), and a delegated run always uses the parent's model (`agent/manager.py:150-162`).
   "Repost" and "Quote" match no pattern (`policy/elements.py:28-29`), and no cap or spacing exists for public actions.
-- The owner's Claude Code skills `x-twitter-growth` and `baoyu-post-to-x` are refused by Dot's loader: their
+- Two of the owner's Claude Code skills are refused by Dot's loader: their
   `metadata` holds a date and a nested map, and `SkillFrontmatter.metadata` is `dict[str, str]` (`skills/types.py`;
   reproduced with `parse_skill` on 2026-10-09; `find-skills` loads).
 - The browser has no `drag` step and no handling of `contenteditable` editors: `type` is `press_sequentially`, `fill`
@@ -2138,8 +2138,8 @@ apart. README.
 
 ### 18. Skills written for Claude Code, and the X playbook
 
-**Status: done** (`6464881`, PR #12). **Goal.** The owner's Claude Code skills load in Dot as they are, so the X
-playbook they already own (`x-twitter-growth`, `baoyu-post-to-x`) is what a campaign on X works from.
+**Status: done** (`6464881`, PR #12). **Goal.** The owner's Claude Code skills load in Dot as they are, so the
+playbook they already own is what a campaign works from.
 
 **Why.** Both skills were refused: `SkillFrontmatter.metadata` was `dict[str, str]` (`skills/types.py`), and their
 frontmatter holds `updated: 2026-03-10` (a YAML date) and a nested `openclaw` map. The Agent Skills specification does
@@ -5093,7 +5093,14 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 170 | A delegated run's thread takes no queue                                              | done        | 336e03f |
 | 171 | The text of a desktop window follows the run's model window                          | done        | 047d0e1 |
 | 172 | A dotx command that dies does not leave its run at work                              | done        | bbb40bc |
-| 173 | Every smoke test passes alone, and the README keeps its width                        | in progress |         |
+| 173 | Every smoke test passes alone, and the README keeps its width                        | done        | 5a8b875 |
+| 174 | Protected files stay out of web_extract, and a workspace file is read as one         | in progress |         |
+| 175 | One broken MCP server never keeps Dot from starting                                  | planned     |         |
+| 176 | Long skills and PDFs are read in pages, and osascript ends with its run              | planned     |         |
+| 177 | The configuration refuses at load what would fail a run                              | planned     |         |
+| 178 | The server answers every failure as JSON, and a page says it could not read again    | planned     |         |
+| 179 | A run's end is one write, and a chat a run works on is never deleted                 | planned     |         |
+| 180 | A campaign whose session's command died goes on                                      | planned     |         |
 
 ### 77. The type system: Inter and Geist Mono, seven sizes, three weights
 
@@ -8957,7 +8964,7 @@ asked for.
 
 ### 173. Every smoke test passes alone, and the README keeps its width
 
-**Status: in progress.**
+**Status: done.** Merged as `5a8b875` (PR #211; no Linear issue, the Linear connector was signed out).
 
 **As built (2026-10-13).** The smoke tests of the MCP hub that open servers by themselves (`tests/smoke/test_mcp.py`,
 those that take only the login environment) failed when run alone: a stdio server starts in the workspace, which only
@@ -8973,6 +8980,115 @@ changed: the words, the paragraphs, the tables and the code blocks are the same,
 headings.
 
 **What.** Every smoke test passes when it runs alone, and the README's prose keeps within 120 columns.
+
+## Part 29: what the review found (planned 2026-10-13)
+
+The owner's twenty-eighth word, on 2026-10-13, while part 28 closed: start a review as well, and do everything the
+project still lacks.
+
+**Status (2026-10-13): planned.** Four reviewers read the code by area, without running anything: the agent's core and
+the store; the tools; the models, the policy, the configuration and the command line; the server, the pages, the desktop
+shell and the docs. Each was given the same five criteria: a contract the code breaks (its docstring, the README, an
+as-built text here), a failure hidden or put down to the wrong cause, a secret or the owner's data that can leak or a
+check that an ordinary path skips, the owner's goals (going on after a break, a closed app or a restart; using what the
+system offers), and a capability the README describes that the code lacks. They reported 38 findings. Each was read
+again in the code before it became an item, and so were five that part 28's report had left open. Two findings were not
+borne out: a write of a campaign outside the store's write lock (every method that writes holds it, which a scan of the
+store confirmed) and MCP servers outliving the hub (the MCP library ends a server's whole process group).
+
+**The shape of this part (the decisions).** Seven items, each a pull request of its own, the most important first:
+protected files stay out of `web_extract`, a file of the workspace is read as one, and the README names none of the
+owner's own skills (174); one broken MCP server never keeps Dot from starting (175); long skills and PDFs are read in
+pages, and `osascript` ends with its run (176); the configuration refuses at load what would fail a run (177); the
+server answers every failure as JSON, and a page says when it could not read again (178); a run's end is one write, and
+a chat a run works on is never deleted (179); a campaign whose session's command died goes on (180). Not in this part,
+each for a reason: a run of a `dotx` command shown live on the pages (the owner has not run one; a feature of its own);
+a send whose answer was lost, checked with the daemon before it is sent again (the API, the pages and the store
+together); the doctor's check of OpenAI and OpenCode Go model names against the lists they serve; a 403 that is not
+about the key; a queued message removed in the moment it starts; a journal line cut short by a full disk; the errors of
+the desktop shell's own reads; the shape of a failed run's result (the owner's rule keeps a request and its answer in an
+error's context). Two decisions are the owner's: whether installing a package asks once the run has read what a third
+party wrote, and whether an MCP server's own word that a tool only reads is trusted (it is, and item 175 has the README
+say so).
+
+### How to start part 29 (the handoff prompt)
+
+> Read ROADMAP.md part 29 and the status table of part 9 (rows 174 to 180). One item at a time, in order; the protocol
+> of part 5 (branch, gate, PR, Linear MYP issue when the connector is signed in, squash merge, hash in the table, log
+> line) is unchanged. Read each finding again in the code before closing it, give each change a test that fails on the
+> code of before, and check a page that changes in a browser, wide and on a phone, light and dark. Never touch the
+> owner's data directory except to read it, by the kinds and numbers of what is stored, and to restart the daemon when
+> `/api/status` shows no active run; PLAN.md stays untracked. The owner reads Turkish; everything written is English.
+
+### 174. Protected files stay out of web_extract, and a workspace file is read as one
+
+**Status: in progress.**
+
+**As built (2026-10-13).** `web_extract` reads a file only after the check `read_file` makes. A file's text goes to the
+fast model, so a source in a protected location gives the call the `secret_access` flag (`read_flags`, which the file
+tools share), and the review that is always on refuses it outside a `yolo` run. A source is a file when the workspace
+has a file by that name, even one whose name looks like an address (`notes.md`), or when it is a path; before, a name
+with no slash before its first dot was fetched from the web (`https://notes.md`). Files are resolved as the file tools
+resolve them. The README names none of the owner's own skills: two of them were named as examples in the README and in
+two entries of this file since 2026-10-09, and a unit test used one of the names. The README also names `SSH_AUTH_SOCK`
+among the variables the shell tool leaves out, with `[shell] pass_env` to keep it. Tests: `tests/smoke/test_crawl.py`
+reads a file of the workspace whose name looks like a host, with a web client that fails the test when anything is
+fetched (the code of before fetched `https://prices-174.md`), and names a protected file to `web_extract`, which gets
+the flag `read_file` gets and is refused by the review (the code of before gave it no flag).
+
+**What.** `web_extract` refuses a file in a protected location, as `read_file` does, since the file's text goes to the
+fast model; a file of the workspace is read by its name even when the name looks like an address; the README names none
+of the owner's own skills.
+
+### 175. One broken MCP server never keeps Dot from starting
+
+**Status: planned.**
+
+**What.** An MCP server whose tool has an input schema Dot cannot use is left out with the reason when it starts, as a
+server that cannot start is, instead of keeping Dot from starting; `dotx mcp list` reports every failure of a server
+instead of stopping at the first that is not one of Dot's own; a working directory that is missing is named as such
+rather than as a missing command; the README says that a server's own word that a tool only reads is trusted.
+
+### 176. Long skills and PDFs are read in pages, and osascript ends with its run
+
+**Status: planned.**
+
+**What.** The `skill` tool gives a long skill's instructions in parts with the place to go on from, and `read_file`
+pages a PDF's text as it pages a text file, instead of cutting out their middle; an `osascript` whose run is stopped or
+whose tool times out is killed; the browser's driver stops even when Chrome's close fails.
+
+### 177. The configuration refuses at load what would fail a run
+
+**Status: planned.**
+
+**What.** The configuration is refused when it loads, with the key named, for what would fail every run later: a
+provider's address that is not an `http://` or `https://` address with a host, a context or a timeout of zero, a model
+that names no known provider, a spending cap whose site is not a bare host. A Keychain that does not answer is a Dot
+error that says so; `dotx models` ends with 1 when every provider failed; the comment on `resume` names the `dotx`
+commands.
+
+### 178. The server answers every failure as JSON, and a page says it could not read again
+
+**Status: planned.**
+
+**What.** Every error of the API comes as `{"message": …, "context": {…}}` and an error that is not one of Dot's own is
+logged with its traceback; sign-in says what failed when the daemon answered; a page that could not read again after the
+stream came back says so, as item 160 meant; a stream that fell behind tells the page to read again.
+
+### 179. A run's end is one write, and a chat a run works on is never deleted
+
+**Status: planned.**
+
+**What.** A run's end, the close of the notes it used and its `run_finished` event are one write, so a page never waits
+for an end that was recorded without its event, and a delegated run whose end was not recorded is an error for the run
+that delegated it; deleting a chat is refused while a run of any process works on it, as the README says.
+
+### 180. A campaign whose session's command died goes on
+
+**Status: planned.**
+
+**What.** The next session of a campaign whose session's `dotx` command died is planned when the daemon closes that run,
+not at the daemon's next start; a campaign whose start failed in any way is deleted.
 
 ## Log
 
@@ -9582,3 +9698,5 @@ headings.
 - 2026-10-13 (Opus 5.5): item 170 merged as `336e03f` (PR #208; no Linear issue, the connector was signed out): the thread of a delegated run takes no queue, and deleting a chat takes the queues of the threads of the runs it delegated with them.
 - 2026-10-13 (Opus 5.5): item 171 merged as `047d0e1` (PR #209; no Linear issue, the connector was signed out): the window text of a desktop result follows the run's own tool output budget, so a model with a small window gets a shorter window instead of one cut in the middle.
 - 2026-10-13 (Opus 5.5): item 172 merged as `bbb40bc` (PR #210; no Linear issue, the connector was signed out): the daemon closes the run of a `dotx` command that died within half a minute, as cut off by the command's death, and a second Ctrl-C quits once the first one's stop is recorded.
+- 2026-10-13 (Opus 5.5): item 173 merged as `5a8b875` (PR #211; no Linear issue, the connector was signed out): the smoke tests of the MCP hub pass alone, each offline smoke test was run alone and passed, and the README's prose keeps within 120 columns. Part 28 is done.
+- 2026-10-13 (Opus 5.5): part 29, what the review found, is planned (items 174 to 180); item 174 is built: protected files stay out of `web_extract`, a file of the workspace is read as one, and the README names none of the owner's own skills.

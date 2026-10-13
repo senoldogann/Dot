@@ -389,12 +389,14 @@ of holding it all in its context, and names the file in its answer. The file is 
 It is the only file a `research` run may write.
 
 `web_extract(sources, fields)` pulls named fields out of pages or files as JSON without the pages entering the main
-model's context: for every source (an address, or a file in the workspace such as the Markdown files a crawl wrote) the
-fast model (`[models] fast`) is asked once for every field's value and the exact words of the source it comes from, and
-each quote is checked against the source, so the result says per field whether the value is `verified`; a value whose
-quote the source does not hold is kept and marked `verified: false`, a claim to treat as one, and so is a value the
-fast model gave without a quote. A source that cannot be
-read or extracted is listed under "Not extracted" with the reason. At most 20 sources and 20 fields per call.
+model's context: for every source (an address, or a file: a path, or the name of a file in the workspace such as the
+Markdown files a crawl wrote, read as a file even when the name looks like an address, `notes.md`) the fast model
+(`[models] fast`) is asked once for every field's value and the exact words of the source it comes from, and each quote
+is checked against the source, so the result says per field whether the value is `verified`; a value whose quote the
+source does not hold is kept and marked `verified: false`, a claim to treat as one, and so is a value the fast model
+gave without a quote. A file's text goes to the fast model, so a file in a protected location is refused, as `read_file`
+refuses it. A source that cannot be read or extracted is listed under "Not extracted" with the reason. At most 20
+sources and 20 fields per call.
 
 A terminal session is for a program that does not run to its end by itself: one that asks questions (an installer,
 `npm create`, `ssh`), a REPL (`python3 -i`, `psql`), or a server that must stay up while the run goes on.
@@ -498,8 +500,9 @@ the mark. A delegated run starts as untrusted as its parent.
   gives its page (its approvals, rules and settings decide what a run may do; a page of another site that takes such a
   title is refused as well). Desktop screenshots black out the password managers' windows; secure fields and web pages
   are not masked.
-- Environment variables whose names look like secrets are removed from the processes the shell tool starts
-  (`[shell] pass_env` lists exceptions).
+- Environment variables whose names look like secrets (`KEY`, `TOKEN`, `SECRET`, `PASSWORD`, `PASSWD`, `CREDENTIAL` or
+  `AUTH` in the name) are removed from the processes the shell tool starts, `SSH_AUTH_SOCK` among them, so commands do
+  not reach the keys of your SSH agent (`[shell] pass_env` lists exceptions).
 - Outside a `yolo` run the agent can neither read nor change `~/.ssh`, `~/.gnupg`, `~/Library/Keychains`, `~/.aws`,
   `~/.config/gcloud` and the data directory of your Chrome (`[policy] protected_paths`), nor Dot's own key file, token,
   browser profile, configuration, database and journals of file changes. The configuration holds the policy and the MCP
@@ -1822,9 +1825,9 @@ words is kept, as a goal can ask for more than one kind of work. Dot always look
 written for Claude Code load unchanged: Dot reads only `name` and `description` of the frontmatter, so other keys (a
 date or a nested map under `metadata`, a list of `allowed-tools`) do not leave a skill out. To use your own, put
 `dirs = ["~/.claude/skills"]` under `[skills]` in your `config.toml`; Dot reads nothing there until you do. An entry may
-also be one skill folder (`~/.claude/skills/x-twitter-growth`), to take some skills only: `~/.claude/skills` can hold
-skills written for Claude Code's own tools, such as the superpowers bundle or the skills synced from claude.ai. The X
-skills of Claude Code (`x-twitter-growth`, `baoyu-post-to-x`) are then the playbook a campaign on X can work from.
+also be one skill folder (`~/.claude/skills/<name>`), to take some skills only: `~/.claude/skills` can hold skills
+written for Claude Code's own tools, such as the superpowers bundle or the skills synced from claude.ai. The skills you
+wrote for Claude Code are then the playbook a campaign can work from.
 
 A plugin is a folder in the Claude Code layout: `.claude-plugin/plugin.json` (its name), `skills/<name>/SKILL.md` and
 `.mcp.json` (`{"mcpServers": {...}}`; `${CLAUDE_PLUGIN_ROOT}` is the plugin folder). Their skills and MCP servers are

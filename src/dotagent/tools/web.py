@@ -28,6 +28,7 @@ from dotagent.secrets import require_secret
 from dotagent.tools.base import ALL_MODES, RegisteredTool, ToolArgs, ToolResult, fail, make_tool, mark_untrusted, ok
 from dotagent.tools.browser import checked_url
 from dotagent.tools.context import ToolContext
+from dotagent.tools.files import read_flags, resolve_path
 from dotagent.web.crawl import (
     CrawledPage,
     CrawlResult,
@@ -716,10 +717,29 @@ class ExtractArgs(ToolArgs):
     fields: list[FieldArgs] = Field(min_length=1, max_length=_MAX_FIELDS, description="The fields to extract.")
 
 
+def _local_file(source: str, ctx: ToolContext) -> Path | None:
+    """The file a source names, resolved as the file tools resolve a path, or ``None`` for a web address. An address
+    with a scheme is one. A file of the workspace by that name is read, even one whose name looks like a host
+    (``notes.md``); otherwise a name whose part before its first dot has no slash is a host (``example.com/page``), and
+    any other names a file (``crawl/001.md``, ``~/notes.txt``). Blocking."""
+    if source.startswith(("http://", "https://")):
+        return None
+    path: Path = resolve_path(source, ctx)
+    return path if "/" in source.split(".", 1)[0] or path.is_file() else None
+
+
+def _source_flags(sources: list[str], ctx: ToolContext) -> tuple[Flag, ...]:
+    """The flags of reading the files among ``sources``. Their text goes to the fast model, so a file in a protected
+    location is a secret's, as it is for read_file."""
+    files: list[Path] = [path for path in (_local_file(source, ctx) for source in sources) if path is not None]
+    return tuple(sorted({flag for path in files for flag in read_flags(path, ctx)}))
+
+
 async def _source_text(source: str, ctx: ToolContext) -> str:
-    """The text of a source: a page, PDF or text file fetched from the web, or a file of the workspace."""
+    """The text of a source: a page, PDF or text file fetched from the web, or a file (:func:`_local_file`)."""
     config: AppConfig = ctx.runtime.config
-    if source.startswith(("http://", "https://")) or "/" not in source.split(".", 1)[0]:
+    local: Path | None = await asyncio.to_thread(_local_file, source, ctx)
+    if local is None:
         url: str = checked_url(source, config)
         document: FetchedDocument = await ctx.runtime.web.get(
             url, max(config.web.fetch_max_bytes, config.web.pdf_max_bytes)
@@ -731,15 +751,9 @@ async def _source_text(source: str, ctx: ToolContext) -> str:
             raise WebError("not a page, a PDF or a text file", {"url": _clip(url, _SHOWN_URL_CHARS)})
         return (await _readable(document, kind, config.web.fetch_max_bytes)).text
     try:
-        return await asyncio.to_thread(_read_local, source, ctx.workspace)
+        return await asyncio.to_thread(local.read_text, encoding="utf-8")
     except (OSError, UnicodeDecodeError) as exc:
         raise ToolInputError(f"{source} cannot be read as a text file: {exc}", {"source": source}) from exc
-
-
-def _read_local(source: str, workspace: Path) -> str:
-    """The text of a file named by ``source``: an absolute path, ``~``, or a path under the workspace."""
-    path: Path = Path(source).expanduser()
-    return (path if path.is_absolute() else workspace / path).read_text(encoding="utf-8")
 
 
 def render_extractions(extractions: tuple[Extraction, ...], problems: tuple[tuple[str, str], ...]) -> str:
@@ -772,7 +786,12 @@ def render_extractions(extractions: tuple[Extraction, ...], problems: tuple[tupl
 def _extract_tool() -> RegisteredTool:
     def classify(args: ExtractArgs, ctx: ToolContext) -> ActionInfo:
         names: str = ", ".join(field.name for field in args.fields)
-        return _action("web_extract", f"Extract {names} from {len(args.sources)} sources", args.sources[0], ())
+        return _action(
+            "web_extract",
+            f"Extract {names} from {len(args.sources)} sources",
+            args.sources[0],
+            _source_flags(args.sources, ctx),
+        )
 
     async def run(args: ExtractArgs, ctx: ToolContext) -> ToolResult:
         config: AppConfig = ctx.runtime.config
