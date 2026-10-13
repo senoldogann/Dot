@@ -7,7 +7,7 @@ import platform
 import shutil
 import sqlite3
 import time
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from pathlib import Path
 
 import httpx
@@ -91,12 +91,53 @@ async def _check_ollama_server(config: AppConfig, required: bool) -> CheckResult
     return _result("ollama server", True, required, f"{url} -> {response.text.strip()}")
 
 
-async def _check_model(router: ModelRouter, role: str, reference: str) -> CheckResult:
+class Served(FrozenModel):
+    """The names of the models a provider serves to its key, as the list it gives says, or why that list could not be
+    read (``problem``, empty when it was read)."""
+
+    names: frozenset[str]
+    problem: str
+
+
+async def _served(router: ModelRouter, provider: str) -> Served:
+    """Read the list of the models ``provider`` serves to its key, within the time of a probe."""
+    try:
+        async with asyncio.timeout(_PROBE_TIMEOUT_S):
+            connector: ChatProvider = await router.provider(provider)
+            models: tuple[ModelInfo, ...] = await connector.list_models()
+    except TimeoutError:
+        return Served(names=frozenset(), problem=f"the list did not come within {_PROBE_TIMEOUT_S:g}s")
+    except (ConfigError, ProviderError) as exc:
+        return Served(names=frozenset(), problem=exc.message)
+    return Served(names=frozenset(model.id for model in models), problem="")
+
+
+async def _check_model(router: ModelRouter, role: str, reference: str, served: Mapping[str, Served]) -> CheckResult:
+    """A configured model, which its provider must serve to its key: Ollama and Anthropic answer for the model itself,
+    OpenAI and OpenCode Go through the list of the models they serve (``served``, by provider). When that list could
+    not be read, the model is a warning: the provider's own row fails for it."""
     try:
         ref: ModelRef = parse_model_ref(reference)
         info = await router.model_info(ref)
     except (ConfigError, ProviderError) as exc:
         return _result(f"model {role}", False, True, f"{reference}: {exc.message}")
+    listing: Served | None = served.get(ref.provider)
+    if listing is not None and listing.problem:
+        return _result(
+            f"model {role}",
+            False,
+            False,
+            f"{reference}: not checked, as the list of the models {ref.provider} serves could not be read "
+            f"({listing.problem})",
+        )
+    if listing is not None and ref.model not in listing.names:
+        return _result(
+            f"model {role}",
+            False,
+            True,
+            f"{reference}: not among the {len(listing.names)} models {ref.provider} serves to this key "
+            f"(dotx models {ref.provider} lists them)",
+        )
     capabilities: str = ", ".join(
         name
         for name, present in (("tools", info.tools), ("vision", info.vision), ("thinking", info.thinking))
@@ -119,20 +160,31 @@ def _review_row(models: ModelsConfig) -> CheckResult:
     return _result("review model", True, False, f"{models.review} is not the main model")
 
 
-async def _models_row(name: str, setting: str, models: Sequence[str], providers: ProvidersConfig) -> CheckResult:
-    """Each helper or standby model and whether it can answer, as far as its provider's key tells (the pauses of the
-    running daemon are not seen from here). One that cannot answer is worth a warning, never a failure."""
+async def _models_row(
+    name: str,
+    setting: str,
+    models: Sequence[str],
+    providers: ProvidersConfig,
+    router: ModelRouter,
+    served: Mapping[str, Served],
+) -> CheckResult:
+    """Each helper or standby model and whether it can answer: its provider has a key and serves it to that key, as
+    :func:`_check_model` checks a model (the pauses of the running daemon are not seen from here). One that cannot
+    answer is worth a warning, never a failure."""
     if not models:
         return _result(name, True, False, f"none ({setting} is empty)")
     try:
         roster: Roster = roster_for(models, await keyed_providers(providers, models), {})
     except ConfigError as exc:
         return _result(name, False, False, f"{exc.message}: {', '.join(models)}")
-    states: dict[str, str] = {model: f"{model} ready" for model in roster.available} | {
-        entry.model: unavailable_text(entry, time.time()) for entry in roster.unavailable
+    checks: dict[str, CheckResult] = {
+        model: await _check_model(router, name, model, served) for model in roster.available
     }
+    states: dict[str, str] = {
+        model: f"{model} ready" if check.ok else check.detail for model, check in checks.items()
+    } | {entry.model: unavailable_text(entry, time.time()) for entry in roster.unavailable}
     in_order: list[str] = [states[label] for label in dict.fromkeys(parse_model_ref(model).label for model in models)]
-    return _result(name, bool(roster.available), False, "; ".join(in_order))
+    return _result(name, any(check.ok for check in checks.values()), False, "; ".join(in_order))
 
 
 def _has_secret(variable: str) -> bool:
@@ -168,14 +220,12 @@ def _search_row(config: AppConfig, ollama_key_present: bool, anthropic_key_prese
     return _result("web search", True, False, f"{ladder} (auto: {keys})")
 
 
-async def _check_openai_api(router: ModelRouter, required: bool) -> CheckResult:
-    """With a key present, list the models the key can use: proves the key, the project and the network path."""
-    try:
-        provider: ChatProvider = await router.provider("openai")
-        models: tuple[ModelInfo, ...] = await provider.list_models()
-    except (ConfigError, ProviderError) as exc:
-        return _result("openai api", False, required, exc.message)
-    return _result("openai api", True, required, f"{len(models)} chat models are available to this key")
+def _openai_api_row(served: Served, required: bool) -> CheckResult:
+    """With a key present, the list of the models the key can use (:func:`_served`): it proves the key, the project and
+    the network path."""
+    if served.problem:
+        return _result("openai api", False, required, served.problem)
+    return _result("openai api", True, required, f"{len(served.names)} chat models are available to this key")
 
 
 async def _check_opencode_go_api(router: ModelRouter, required: bool) -> CheckResult:
@@ -267,7 +317,7 @@ async def check_provider_key(config: AppConfig, provider: str) -> CheckResult:
     try:
         match provider:
             case "openai":
-                return await _check_openai_api(router, True)
+                return _openai_api_row(await _served(router, "openai"), True)
             case "opencode_go":
                 return await _check_opencode_go_api(router, True)
             case "anthropic":
@@ -604,18 +654,28 @@ async def _service_checks(config: AppConfig) -> list[CheckResult]:
         _search_row(config, ollama_present, anthropic_present),
     ]
     try:
+        # The connectors of OpenAI and OpenCode Go know a model by its name alone until it is called, so the list of
+        # the models each serves to its key is read once, and each configured model of theirs is checked against it.
+        served: dict[str, Served] = {
+            provider: await _served(router, provider)
+            for provider, present in (("openai", openai_present), ("opencode_go", go_present))
+            if present
+        }
         if openai_present:
-            results.append(await _check_openai_api(router, "openai" in used))
+            results.append(_openai_api_row(served["openai"], "openai" in used))
         if go_present:
             results.append(await _check_opencode_go_api(router, "opencode_go" in used))
         if anthropic_present:
             results.append(await _check_anthropic_api(router, "anthropic" in used))
         results.append(await _check_memory(router, config))
         for role, reference in configured:
-            results.append(await _check_model(router, role, reference))
+            results.append(await _check_model(router, role, reference, served))
         results.append(_review_row(config.models))
-        results.append(await _models_row("helpers", "[models] helpers", config.models.helpers, config.providers))
-        results.append(await _models_row("standby", "[models] standby", config.models.standby, config.providers))
+        for name, setting, models in (
+            ("helpers", "[models] helpers", config.models.helpers),
+            ("standby", "[models] standby", config.models.standby),
+        ):
+            results.append(await _models_row(name, setting, models, config.providers, router, served))
     finally:
         await router.aclose()
     judge_key: bool = await asyncio.to_thread(_has_secret, config.judge.api_key_env)

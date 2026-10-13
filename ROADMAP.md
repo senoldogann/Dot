@@ -5115,8 +5115,8 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 182 | A failed run's result is the error's message, and its context stays in the event     | done        | d1c2a00 |
 | 183 | A run's end the store refused is stored later, and a start that failed is told       | done        | 265da7c |
 | 184 | A queued message starts once or is removed, never both                               | done        | d462505 |
-| 185 | A provider's 403 is not a refused key, and Ollama's stream error keeps its words     | in progress |         |
-| 186 | The doctor checks each model name against the list its provider serves               | planned     |         |
+| 185 | A provider's 403 is not a refused key, and Ollama's stream error keeps its words     | done        | b178796 |
+| 186 | The doctor checks each model name against the list its provider serves               | in progress |         |
 | 187 | The service install keeps the running job until the new one is in place              | planned     |         |
 | 188 | A run of a dotx command is followed live on the pages and stopped there              | planned     |         |
 | 189 | A message sent twice starts once                                                     | planned     |         |
@@ -9355,7 +9355,7 @@ a `dotx` process that starts the next message of the same chat claims it the sam
 
 ### 185. A provider's 403 is not a refused key, and Ollama's stream error keeps its words
 
-**Status: in progress.**
+**Status: done.** Merged as `b178796` (PR #224; no Linear issue, the Linear connector was signed out).
 
 **As built (2026-10-13).** A provider's HTTP 403, as an answer or inside a stream (`permission_error`), is an error of
 its own, `ProviderAccessError`, rather than a refused key: the classifier every provider shares (`classify_generic`)
@@ -9378,7 +9378,20 @@ words, and its status is the one the table gives such an error instead of an inv
 
 ### 186. The doctor checks each model name against the list its provider serves
 
-**Status: planned.**
+**Status: in progress.**
+
+**As built (2026-10-13).** `dotx doctor` reads the list of the models OpenAI and OpenCode Go serve to their keys
+(`GET /models`, once for each, within the five seconds of a probe) and checks each configured model of theirs against
+it: `main`, `vision`, `fast` and `review`, and each helper and standby model. A model the list leaves out fails
+(`openai:gpt-missing: not among the 2 models openai serves to this key (dotx models openai lists them)`), and a helper
+or standby model left out is not ready; a list that could not be read makes the model a warning that says why, not a
+second failure beside the provider's own row. Ollama and Anthropic answer for the model itself, as before, and a helper
+or standby model of theirs is asked too, where only its provider's key was looked at before. The row of OpenAI's key
+reads the same list, so OpenAI is asked once. Before, the doctor called every model of OpenAI and OpenCode Go ready
+while their keys were set, from what Dot knows of the name alone. Tests: `tests/smoke/test_doctor.py` runs the doctor's
+checks of the model services against a stand-in model service on this Mac, through the real connectors: a model OpenAI's
+list leaves out fails (the code of before called it ready) and is no ready helper, and a model of OpenCode Go whose list
+answers 404 is a warning.
 
 **What.** `dotx doctor` asks the OpenAI and OpenCode Go services for the models their keys may use and fails a
 configured model that is not among them, as it does for Ollama and Anthropic, instead of calling every name ready; a
@@ -10044,3 +10057,4 @@ running" for all of them.
 - 2026-10-13 (Opus 5.5): item 182 merged as `d1c2a00` (PR #221; no Linear issue, the connector was signed out): a run that one of Dot's errors ends stores the error's message as its result, and its `run_finished` event keeps the error's context with the secrets masked.
 - 2026-10-13 (Opus 5.5): item 183 merged as `265da7c` (PR #222; no Linear issue, the connector was signed out): an end of a run that the store refused is stored by the daemon's half-minute check once the database takes it, a run whose start failed ends with its `run_finished` event, and the half-minute check outlives a fault of the store.
 - 2026-10-13 (Opus 5.5): item 184 merged as `d462505` (PR #223; no Linear issue, the connector was signed out): a queued message is claimed in the store before its run starts, so it starts once, after the run at work on the chat in any process, and is not edited, taken out or steered while it starts.
+- 2026-10-13 (Opus 5.5): item 185 merged as `b178796` (PR #224; no Linear issue, the connector was signed out): a provider's HTTP 403 is a refused access, not a refused key: a run moves to its standby model with that reason, Settings › Models says so without a link to the keys, and an error Ollama reports inside its stream keeps its words.

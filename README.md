@@ -33,10 +33,12 @@ uv run dotx doctor
 
 `dotx doctor` checks the home directory, ripgrep, Chrome (with a throwaway start of it), the macOS version and the
 permissions the desktop tools need, the commands and secrets of the configured MCP servers (none is started), Ollama,
-the keys of OpenAI, OpenCode Go and Anthropic, the embedding model and the three configured models, and says how to fix
-what is missing. It warns, without failing, when the review model is also the main model, and when an MCP server's
-command or secret is missing (Dot starts without that server's tools). The examples below write `dotx`: run it as
-`uv run dotx`, or put `.venv/bin` on your `PATH`.
+the keys of OpenAI, OpenCode Go and Anthropic, the embedding model and the configured models, each of which its provider
+must serve to the key (Ollama and Anthropic answer for the model itself, OpenAI and OpenCode Go through the list of the
+models they serve), and says how to fix what is missing. It warns, without failing, when the review model is also the
+main model, when an MCP server's command or secret is missing (Dot starts without that server's tools), and when a
+provider's list of models could not be read, as the provider's own row says why. The examples below write `dotx`: run it
+as `uv run dotx`, or put `.venv/bin` on your `PATH`.
 
 ```bash
 dotx run "Find the opening hours of the Helsinki Central Library and save them to hours.md"
@@ -104,14 +106,14 @@ instead, see below), and neither does a failure of the `review` or `vision` mode
 with `review` on the same provider as `main` a goal check or an `auto` approval fails while that provider cannot answer.
 
 A model is left out of both lists while its provider has no key (an Ollama model needs none), and after such an error
-for the time the provider named (at most a day) or for `helper_cooldown_s` seconds, until a call to it is answered or
-a new key of its provider is saved. Each model is paused alone: a local Ollama model stays available while a cloud one
-is paused, and a provider whose key or quota fails all its models costs one failed call per model. The process that
-runs the run keeps the pauses in memory. Both lists are empty by default, and `dotx doctor` shows which of their models
-have a key. `dotx stats` counts every call of a run for the model of the run, so after a switch the calls before it
-count for the standby model too. An answered question, a resume and a follow-up message on the run page go on with the
-standby model and its level; `dotx chat` starts every turn on its own model (`main` unless `--model`), which moves to
-the standby again when it still cannot answer.
+for the time the provider named (at most a day) or for `helper_cooldown_s` seconds, until a call to it is answered or a
+new key of its provider is saved. Each model is paused alone: a local Ollama model stays available while a cloud one is
+paused, and a provider whose key or quota fails all its models costs one failed call per model. The process that runs
+the run keeps the pauses in memory. Both lists are empty by default, and `dotx doctor` shows which of their models have
+a key and are served to it. `dotx stats` counts every call of a run for the model of the run, so after a switch the
+calls before it count for the standby model too. An answered question, a resume and a follow-up message on the run page
+go on with the standby model and its level; `dotx chat` starts every turn on its own model (`main` unless `--model`),
+which moves to the standby again when it still cannot answer.
 
 **A model out of reach.** When the run's own model cannot be reached after its connector's retries (the connection broke
 or timed out, the call took longer than `model_call_timeout_s`, or its server failed with a status that retrying can get
