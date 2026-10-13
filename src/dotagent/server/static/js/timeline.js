@@ -8,7 +8,7 @@
 
 import { approvalCard, fromEvent, LEFT_IN_RUN } from "./approvals.js";
 import { sentFiles } from "./attachments.js";
-import { clip, compact, dateTime, dateTimeFull, duration, el, plural } from "./dom.js";
+import { clip, clock, compact, dateTime, dateTimeFull, duration, el, plural } from "./dom.js";
 import { actorFace } from "./actors.js";
 import { faceState } from "./face.js";
 import { icon } from "./icons.js";
@@ -144,6 +144,8 @@ export function createTimeline({ rootRunId, actorId, startedAt, onGrow, onPlan, 
       touched: false,
       // The cards that wait for the reader's answer in this scope and the delegated runs inside it.
       asking: 0,
+      // While the run waits for its model to be reached again: the note that says so and the attempts it counts.
+      unreachable: null,
     };
   }
 
@@ -722,6 +724,28 @@ export function createTimeline({ rootRunId, actorId, startedAt, onGrow, onPlan, 
         return;
       }
       scope.panel.meta.textContent = scope.panel.meta.textContent.replace(` · ${data.from}`, ` · ${data.to}`);
+    },
+
+    // The run's model could not be reached (`error`: the connection broke or timed out, or its server failed with a
+    // status that retrying gets past): the run asks step `step` again in `retry_in_s` seconds, and keeps asking until
+    // `until` ([agent] model_wait_s). One note stands for the whole wait, each attempt rewrites it; `model_back` says that
+    // the model answered again after `waited_s` seconds (item 158).
+    model_waiting(scope, record) {
+      const data = record.data;
+      if (scope.unreachable === null) {
+        const text = el("span", null);
+        place(scope, el("div", { class: "note warn" }, icon("clock"), text), record.ts);
+        scope.unreachable = { text, tries: 0 };
+      }
+      const wait = scope.unreachable;
+      wait.tries += 1;
+      const tried = wait.tries === 1 ? "" : `tried ${wait.tries} times; `;
+      wait.text.textContent = `${data.model} cannot be reached (${data.error}); ${tried}the run asks again in ${duration(data.retry_in_s)} and keeps asking until ${clock(data.until)}`;
+    },
+    model_back(scope, record) {
+      const data = record.data;
+      scope.unreachable = null;
+      note(scope, record.ts, "refresh", `${data.model} answered again after ${duration(data.waited_s)}; the run goes on`, "");
     },
 
     // A helper model ([models] helpers) could not answer a question of the run; `until` (seconds) is when it may be

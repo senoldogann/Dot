@@ -94,9 +94,9 @@ reasoning level becomes the nearest one the new model offers. A run takes each m
 list, and never goes back to one it left. A standby model that cannot call tools while the run offers them, whose
 window cannot hold the instructions and the tools, or whose details cannot be read is passed over; when every one is,
 the run fails and says why for each. Without a standby model that can answer, the error ends the run. A transport
-error or a timeout moves nothing, and neither does a failure of the `review` or `vision` model: the review model has no
-standby, so with `review` on the same provider as `main` a goal check or an `auto` approval fails while that provider
-cannot answer.
+error or a timeout moves nothing (the run waits for its own model instead, see below), and neither does a failure of the
+`review` or `vision` model: the review model has no standby, so with `review` on the same provider as `main` a goal
+check or an `auto` approval fails while that provider cannot answer.
 
 A model is left out of both lists while its provider has no key (an Ollama model needs none), and after such an error
 for the time the provider named (at most a day) or for `helper_cooldown_s` seconds, until a call to it is answered or
@@ -107,6 +107,17 @@ have a key. `dotx stats` counts every call of a run for the model of the run, so
 count for the standby model too. An answered question, a resume and a follow-up message on the run page go on with the
 standby model and its level; `dotx chat` starts every turn on its own model (`main` unless `--model`), which moves to
 the standby again when it still cannot answer.
+
+**A model out of reach.** When the run's own model cannot be reached after its connector's retries (the connection broke
+or timed out, the call took longer than `model_call_timeout_s`, or its server failed with a status that retrying can get
+past, such as 500, 502, 503, 504 or 529) and no standby model takes over, the run waits for it rather than failing: it
+asks the same step again after 10 s, then 20 and 40 s, then every 60 s, for `model_wait_s` in `[agent]` (900 s by
+default; at least four times however short the wait; 0 does not wait), and goes on from that step as soon as the model
+answers, so a network that drops for a while costs a pause instead of the run. The timeline shows one line for the wait,
+which each try rewrites with the error, the number of tries, the next try and the time the wait ends, and one more when
+the model answers again. A stop ends the wait at once. A model still out of reach when the wait is over fails the run,
+and the result names the wait and the error. A refused request ends the run at once; a quota, rate-limit or key error or
+a missing key moves it to a standby model or ends it at once.
 
 | Provider    | Reference             | Protocol                                                                                   | Key                                                       |
 | ----------- | --------------------- | ------------------------------------------------------------------------------------------ | --------------------------------------------------------- |
@@ -256,9 +267,9 @@ answer (a small model that is offered both writes the call out as text).
   the answer, or to finish again with the same answer if it names them on purpose. The check makes no model call. It
   is off by default until evals show that it helps. The timeline shows each send-back.
 - A run has no step limit. It ends when the model calls `finish`, when the progress watchdog stops it (see
-  [Autonomy](#autonomy-approvals-goal-mode-and-the-end-of-a-run)), when a model call still fails after its retries, at
-  a limit of minutes or tokens you set, or when you stop it. In goal mode the goal check can also end it (see
-  [Autonomy](#autonomy-approvals-goal-mode-and-the-end-of-a-run)).
+  [Autonomy](#autonomy-approvals-goal-mode-and-the-end-of-a-run)), when a model call still fails after its retries and
+  the wait for a model out of reach, at a limit of minutes or tokens you set, or when you stop it. In goal mode the goal
+  check can also end it (see [Autonomy](#autonomy-approvals-goal-mode-and-the-end-of-a-run)).
 - A goal that names an outcome instead of a task (grow, earn, reach, as many as possible, find a way) is held to the
   outcome in task and research runs: the model is told to record measurable targets in its plan before it acts, to
   measure after each round and change its approach when a round brought nothing, and to call `finish` only once the
@@ -718,10 +729,11 @@ only closes the question, and a left question never expires. With `wait` such a 
 for `approval_timeout_s` at most. A run you started in `ask` or `auto` always waits for your answer.
 
 **The end of a run.** There is no step limit. A run ends by `finish`; by the progress watchdog; by a model call that
-still fails after its retries; in goal mode by the goal check giving up; at a limit of minutes or tokens you set; or
-when you stop it. With `verify_answer_paths = true` in `[agent]`, a successful end whose answer names paths that do not
-exist is sent back once before it is accepted, and before goal mode checks it (see [How a run works](#how-a-run-works)).
-A goal that should go on across runs and days until its outcome is verified is a campaign (see [Campaigns](#campaigns)).
+still fails after its retries and the wait for a model out of reach (see [Models and providers](#models-and-providers));
+in goal mode by the goal check giving up; at a limit of minutes or tokens you set; or when you stop it. With
+`verify_answer_paths = true` in `[agent]`, a successful end whose answer names paths that do not exist is sent back once
+before it is accepted, and before goal mode checks it (see [How a run works](#how-a-run-works)). A goal that should go
+on across runs and days until its outcome is verified is a campaign (see [Campaigns](#campaigns)).
 
 **Limits of a run.** `run_max_minutes` and `run_max_tokens` in `[agent]` bound a task or research run; 0, the default,
 is no limit, and a chat turn has none. The minutes are the run's wall time, waits for your approvals and answers
