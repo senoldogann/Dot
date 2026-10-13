@@ -12,6 +12,7 @@ import time
 from collections.abc import AsyncIterator
 from datetime import datetime
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 import httpx
 import pytest
@@ -267,13 +268,6 @@ async def test_an_overdue_firing_is_skipped_and_the_next_one_planned(runtime: Ru
     assert skipped.enabled
     assert skipped.next_run_at == next_firing("0 9 * * *", late, runtime.schedule_zone)
     assert (skipped.last_run_at, skipped.thread_id) == (None, None)
-
-    single: ScheduleRecord = await _schedule(runtime, _once(runtime, "Once", 3600))
-    await scheduler.tick(_planned(single) + grace_s + 120)
-    ended: ScheduleRecord = await runtime.store.get_schedule(single.id)
-    assert ended.last_status.startswith("skipped: ")
-    assert (ended.enabled, ended.next_run_at, ended.thread_id) == (False, None, None)
-
     assert len(await runtime.store.list_threads(1000)) == threads_before
 
 
@@ -388,6 +382,69 @@ async def test_while_the_emergency_stop_is_engaged_a_due_schedule_is_skipped_to_
     assert held.next_run_at == next_firing("0 9 * * *", now, runtime.schedule_zone)
     assert (held.last_run_at, held.thread_id) == (None, None)
     assert len(await runtime.store.list_threads(1000)) == threads_before
+
+
+class _Starts(RunManager):
+    """Keeps the goal of every run a firing starts; no run starts in these tests, so each firing fails to start."""
+
+    def __init__(self, runtime: Runtime) -> None:
+        super().__init__(runtime)
+        self.started: list[str] = []
+
+    async def start(
+        self,
+        goal: str,
+        mode: RunMode,
+        model: str | None,
+        thread_id: str | None,
+        source: str,
+        parent_run_id: str | None,
+        effort: Effort | None,
+        approvals: ApprovalMode | None,
+        goal_mode: bool | None,
+        files: tuple[StoredAttachment, ...],
+    ) -> RunRecord:
+        self.started.append(goal)
+        raise ConfigError("no run starts in this test", {"goal": goal})
+
+
+async def test_a_one_time_schedule_overdue_fires_late_saying_when_it_was_due(runtime: Runtime) -> None:
+    """Item 152: a one-time schedule whose moment passed while the daemon was off or the Mac slept has no next time to
+    wait for: it fires late, and its run reads when it was due, where before it was switched off unseen."""
+    single: ScheduleRecord = await _schedule(runtime, _once(runtime, "Once", 3600))
+    due: float = _planned(single)
+    late: float = due + runtime.config.scheduler.misfire_grace_s + 120
+    manager: _Starts = _Starts(runtime)
+    await Scheduler(runtime, manager).tick(late)
+    fired: ScheduleRecord = await runtime.store.get_schedule(single.id)
+    zone: ZoneInfo = runtime.schedule_zone
+    assert manager.started == [
+        f"(Scheduled for {format_local(due, zone)}; it starts late, at {format_local(late, zone)}.)\n\n{GOAL}"
+    ]
+    assert (fired.enabled, fired.next_run_at, fired.last_run_at) == (False, None, late)
+
+
+async def test_a_one_time_schedule_due_under_the_emergency_stop_waits_for_its_release(runtime: Runtime) -> None:
+    """Item 152: while the owner's emergency stop is engaged a one-time schedule does not fire, and it is not dropped
+    either: it stays due, saying why, and fires once the stop is released."""
+    single: ScheduleRecord = await _schedule(runtime, _once(runtime, "Held once", 3600))
+    due: float = _planned(single)
+    manager: _Starts = _Starts(runtime)
+    scheduler: Scheduler = Scheduler(runtime, manager)
+    stop: Path = failsafe_path()
+    await asyncio.to_thread(stop.touch)
+    try:
+        await scheduler.tick(due + 5)
+        await scheduler.tick(due + 20)
+    finally:
+        await asyncio.to_thread(stop.unlink)
+    held: ScheduleRecord = await runtime.store.get_schedule(single.id)
+    assert manager.started == []
+    assert (held.enabled, held.next_run_at, held.last_status) == (True, due, "waiting: the emergency stop is engaged")
+    await scheduler.tick(due + 35)
+    fired: ScheduleRecord = await runtime.store.get_schedule(single.id)
+    assert manager.started == [GOAL]
+    assert (fired.enabled, fired.next_run_at, fired.last_run_at) == (False, None, due + 35)
 
 
 @requires_model

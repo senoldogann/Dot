@@ -5071,8 +5071,8 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 148 | The queue of a chat, after T3 Code                                                   | done        | 5f6747b |
 | 149 | The scheduler goes on past a failure                                                 | done        | 1ec1497 |
 | 150 | A tool that raises fails its call, not its run                                       | done        | ba4f2a6 |
-| 151 | A question a run left reaches the owner                                              | in progress |         |
-| 152 | A late one-time schedule is never dropped unseen                                     | planned     |         |
+| 151 | A question a run left reaches the owner                                              | done        | 6788a66 |
+| 152 | A late one-time schedule is never dropped unseen                                     | in progress |         |
 | 153 | A server of tools that cannot start does not stop the daemon                         | planned     |         |
 | 154 | The memory keeps what it learns                                                      | planned     |         |
 | 155 | The compaction keeps a tail measured in tokens                                       | planned     |         |
@@ -8239,7 +8239,7 @@ used to end the run.
 
 ### 151. A question a run left reaches the owner
 
-**Status: in progress.**
+**Status: done.** Merged as `6788a66` (PR #188; no Linear issue, the Linear connector was signed out).
 
 **As built (2026-10-13).** The phone's pushes and the page's desktop notifications (`attention.js`, which the desktop
 app's notifications go through too) say the same things in the same words. A question a run left (`question_left`: a
@@ -8267,10 +8267,21 @@ end of a run tells the first line of its answer.
 
 ### 152. A late one-time schedule is never dropped unseen
 
-**Status: planned.**
+**Status: in progress.**
 
-**What.** A one-time schedule whose moment passed while the Mac slept or the daemon was off is never switched off
-unseen: it fires late, saying so, or tells the owner.
+**As built (2026-10-13).** A one-time schedule has no next time, so a skipped firing used to switch it off for good:
+overdue by more than `misfire_grace_s` (the daemon was off, the Mac slept) or due while the emergency stop was engaged.
+`Scheduler._fire` now treats it apart from a repeating one. Overdue, it fires late, and its run's goal begins with when
+it was due and when it starts (`late_goal`), so the run can judge what the delay changes, and the owner reads it on the
+run's page; within the grace it fires as before. Due while the emergency stop is engaged, it stays due with the status
+`waiting: the emergency stop is engaged` (written once, not at every tick) and fires at the first tick after the
+release. A repeating schedule still skips such a firing to its next time, an overdue one told to the owner since item
+151. Tests (a run manager that records the goal of each start): an overdue one-time schedule starts once with the note
+of its delay and is used up; one due under the emergency stop starts nothing while the stop is engaged, stays due, and
+starts once after the release. Both failed on the code of before, which switched the schedule off.
+
+**What.** A one-time schedule whose moment passed while the Mac slept or the daemon was off is never switched off: it
+fires late, its run reading first when it was due; one due while the emergency stop is engaged waits for the release.
 
 ### 153. A server of tools that cannot start does not stop the daemon
 
@@ -8887,3 +8898,4 @@ small.
 - 2026-10-13 (Opus 5.5): item 148 merged as `5f6747b` (PR #184; no Linear issue, the connector was signed out): T3 Code's queued messages in Dot: a message sent while a chat's run works waits in the chat's queue, shown above the composer, and starts as the chat's next run once that run has ended done; a stop, a failure or a restart holds the queue until Resume. The browser test found and the item fixed the focus and the drag of the rows and Cancel on a phone. Part 24 is done.
 - 2026-10-13 (Opus 5.5): item 149 merged as `1ec1497` (PR #186; no Linear issue, the connector was signed out): a tick of the scheduler does its parts each on its own and a failed tick is tried again, so one error no longer ends the daemon with every run it holds; only twenty failed ticks in a row end it. A check of `test_composer.py` that read a colour while it faded was made to wait for it.
 - 2026-10-13 (Opus 5.5): item 150 merged as `ba4f2a6` (PR #187; no Linear issue, the connector was signed out): any error of a tool fails that call, not the run, and one no tool expects is logged with its traceback; `edit_file` keeps a file's CRLF line ends and refuses a file that is not UTF-8 text, saying so.
+- 2026-10-13 (Opus 5.5): item 151 merged as `6788a66` (PR #188; no Linear issue, the connector was signed out): a question a run left, a campaign that ended by itself, a firing a schedule missed and a restart after an unclean stop reach the owner, on the phone and (but the restart) in the page's notifications, and the end of a run tells the first line of its answer.

@@ -593,9 +593,10 @@ the same way, except in a run nobody can answer during it (see
   session it ends stops too); the page shows a banner with a button that releases it
 - `touch ~/Library/Application\ Support/Dot/STOP` blocks desktop control the same way, without ending a run; delete the
   file to allow it again
-- while the `STOP` file exists, no schedule fires (a firing due then is skipped to its next time, saying why) and no
-  campaign starts a session (it starts once the stop is released); a run that a schedule or a campaign was starting
-  when the file appeared ends as an emergency stop as soon as it exists
+- while the `STOP` file exists, no schedule fires (a firing due then is skipped to its next time, saying why; a
+  one-time schedule, which has no next time, waits and fires once the stop is released) and no campaign starts a
+  session (it starts once the stop is released); a run that a schedule or a campaign was starting when the file
+  appeared ends as an emergency stop as soon as it exists
 - with `[desktop] failsafe_corner = true` (the default), moving the pointer into the top-left corner of the screen
   aborts the desktop step in progress, and Dot never clicks that corner
 - before each step of a desktop batch Dot checks that the pointer is where the previous step left it; if someone else is
@@ -1594,8 +1595,10 @@ left on "default" take the configured value when the schedule fires. A schedule 
 defaults: a run cannot schedule itself into another approval mode.
 
 - Schedules fire only while the daemon runs and the Mac is awake; `dotx service install` keeps the daemon running.
-- A firing is at most once. One that is overdue by more than `misfire_grace_s` (the daemon was off) is skipped and waits
-  for the next; you are told, as you are when a firing's run cannot start (see the notifications under the web UI).
+- A firing is at most once. One that is overdue by more than `misfire_grace_s` (the daemon was off, or the Mac slept)
+  is skipped and waits for the next; you are told, as you are when a firing's run cannot start (see the notifications
+  under the web UI). A one-time schedule has no next time and is never dropped: overdue, it fires late, and its run
+  reads first when it was due and when it starts.
 - The scheduler goes on past a failure: the schedules, the campaigns and the nightly reflection are each looked at on
   their own at every tick, one that fails (the store, a campaign's start) is logged, and the next tick tries again. Only
   20 failed ticks in a row (five minutes at the default `tick_s`) end the scheduler, and the daemon with it, with an

@@ -27,6 +27,15 @@ _UNFINISHED: frozenset[str] = frozenset({"starting", "running"})
 FAILED_TICKS_TO_END: int = 20
 
 
+# The status of a one-time schedule that is due while the owner's emergency stop is engaged: it waits for the release.
+HELD_STATUS: str = "waiting: the emergency stop is engaged"
+
+
+def late_goal(goal: str, due: float, now: float, zone: ZoneInfo) -> str:
+    """The goal of a one-time schedule that fires late, after a note of when it was due and when it starts."""
+    return f"(Scheduled for {format_local(due, zone)}; it starts late, at {format_local(now, zone)}.)\n\n{goal}"
+
+
 def _following(record: ScheduleRecord, now: float, zone: ZoneInfo) -> float | None:
     """When the schedule fires after a firing at ``now``: the next cron time, or never again for a one-time schedule."""
     return None if record.cron is None else next_firing(record.cron, now, zone)
@@ -198,7 +207,9 @@ class Scheduler:
 
     async def _fire(self, record: ScheduleRecord, now: float) -> None:
         """Start the run of a due schedule; a firing the emergency stop, a run still going or a long absence of the
-        daemon keeps from starting is skipped to the schedule's next time, with the reason as its status. An emergency
+        daemon keeps from starting is skipped to the schedule's next time, with the reason as its status. A one-time
+        schedule has no next time and is never dropped: while the emergency stop is engaged it waits, still due, for
+        the release, and one overdue fires late, its goal saying when it was due (:func:`late_goal`). An emergency
         stop engaged while the run was being started ends it as one. A firing missed where nobody saw it, one overdue
         or one whose run could not start, is told (:meth:`_tell_missed`)."""
         store: Store = self._runtime.store
@@ -207,7 +218,14 @@ class Scheduler:
         zone: ZoneInfo = await schedule_zone(record.options, self._zone)
         following: float | None = _following(record, now, zone)
         overdue_s: float = now - record.next_run_at
+        late: bool = overdue_s > self._runtime.config.scheduler.misfire_grace_s
+        one_time: bool = record.cron is None
         if await _emergency_stop_engaged():
+            if one_time:
+                if record.last_status != HELD_STATUS:
+                    log.warning("schedule_held_emergency_stop", schedule_id=record.id)
+                    await store.set_schedule_status(record.id, HELD_STATUS)
+                return
             log.warning("schedule_skipped_emergency_stop", schedule_id=record.id)
             await store.record_schedule_skip(record.id, following, "skipped: the emergency stop is engaged")
             return
@@ -215,7 +233,7 @@ class Scheduler:
             log.warning("schedule_skipped_running", schedule_id=record.id, run_id=self._in_flight[record.id])
             await store.record_schedule_skip(record.id, following, "skipped: the previous run was still going")
             return
-        if overdue_s > self._runtime.config.scheduler.misfire_grace_s:
+        if late and not one_time:
             log.warning("schedule_skipped_overdue", schedule_id=record.id, overdue_s=round(overdue_s))
             overdue: str = f"skipped: {round(overdue_s / 60)} minutes overdue (the daemon was not running)"
             await store.record_schedule_skip(record.id, following, overdue)
@@ -224,9 +242,11 @@ class Scheduler:
         title: str = thread_title(f"{record.name} · {format_local(now, zone)}")
         thread: ThreadRecord = await store.create_thread(title, SCHEDULE_SOURCE)
         await store.record_schedule_fire(record.id, now, following, thread.id, "starting")
+        if late:
+            log.warning("schedule_fired_late", schedule_id=record.id, overdue_s=round(overdue_s))
         try:
             run: RunRecord = await self._manager.start(
-                record.goal,
+                late_goal(record.goal, record.next_run_at, now, zone) if late else record.goal,
                 record.mode,
                 record.options.model,
                 thread.id,
