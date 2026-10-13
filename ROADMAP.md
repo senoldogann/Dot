@@ -5098,8 +5098,8 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 175 | One broken MCP server never keeps Dot from starting                                  | done        | 637e979 |
 | 176 | Long skills and PDFs are read in pages, and osascript ends with its run              | done        | 15286a3 |
 | 177 | The configuration refuses at load what would fail a run                              | done        | ce5b468 |
-| 178 | The server answers every failure as JSON, and a page says it could not read again    | in progress |         |
-| 179 | A run's end is one write, and a chat a run works on is never deleted                 | planned     |         |
+| 178 | The server answers every failure as JSON, and a page says it could not read again    | done        | 401cef2 |
+| 179 | A run's end is one write, and a chat a run works on is never deleted                 | in progress |         |
 | 180 | A campaign whose session's command died goes on                                      | planned     |         |
 
 ### 77. The type system: Inter and Geist Mono, seven sizes, three weights
@@ -9122,7 +9122,7 @@ commands.
 
 ### 178. The server answers every failure as JSON, and a page says it could not read again
 
-**Status: in progress.**
+**Status: done.** Merged as `401cef2` (PR #216; no Linear issue, the Linear connector was signed out).
 
 **As built (2026-10-13).** Every error of the API comes as `{"message": …, "context": {…}}`: those of the web framework
 itself (a path that does not exist, a method a path does not take) with their status and headers, and an error that is
@@ -9150,7 +9150,26 @@ stream came back says so, as item 160 meant; a stream that fell behind tells the
 
 ### 179. A run's end is one write, and a chat a run works on is never deleted
 
-**Status: planned.**
+**Status: in progress.**
+
+**As built (2026-10-13).** The end of a run that started is one write: `Store.end_run` stores the run's status and
+result, the scores of the notes it was handed and its `run_finished` event in one transaction that holds the write lock
+from its start, and returns the event, which the manager hands to the listeners (`EventBus.publish`). Before, they were
+three writes, and a status could be stored with its event lost: a page or a `dotx` command following the run waited for
+an end the store had. A store that refuses any part keeps none of it, and the run stays as it was while it worked until
+it is closed as a run left behind. A run that could not start is stored as failed, as before. A delegated run whose end
+the store could not record is a `StoreError` for the run that delegated it: the call fails and the run goes on; before,
+the delegating run read the delegated run as it was while it worked, as its outcome. Deleting chats is refused while a
+run of any process works on one of them, itself or through a run it delegated to: the store checks in the transaction of
+the deletes, which holds the write lock from its start, and its `RunConflict` (409) names the chats and the runs.
+Before, only the daemon's own runs were checked, by the route, and a chat whose run a `dotx` command drove was deleted
+under it. Tests: `tests/smoke/test_run_ends.py` makes the database refuse the event of a run's end (a trigger), and the
+run's status stays as it was (the code of before stored `done` without the event); a delegated run whose end is refused
+that way is an error for the run that delegated it (the code of before returned it as an outcome).
+`tests/unit/test_store_writes.py` refuses to delete a chat with a queued run and one whose run delegated to a run that
+still works, and deletes it once both are over (the code of before deleted it at once); `tests/smoke/test_server.py`
+deletes through the API a chat whose runs only the store has, as a `dotx` command's would be: 409 with the runs, then
+200 once they are over (the code of before answered 200 at once).
 
 **What.** A run's end, the close of the notes it used and its `run_finished` event are one write, so a page never waits
 for an end that was recorded without its event, and a delegated run whose end was not recorded is an error for the run
@@ -9777,3 +9796,4 @@ not at the daemon's next start; a campaign whose start failed in any way is dele
 - 2026-10-13 (Opus 5.5): item 175 merged as `637e979` (PR #213; no Linear issue, the connector was signed out): an MCP server whose tool has an input schema Dot cannot use is left out with the reason instead of keeping Dot from starting, `dotx mcp list` reports every failure of a server, and a missing working directory is named.
 - 2026-10-13 (Opus 5.5): item 176 merged as `15286a3` (PR #214; no Linear issue, the connector was signed out): the `skill` tool gives a long skill's instructions in parts, `read_file` pages a PDF's text, a cancelled `osascript` is killed, and the browser's driver stops even when the close of Chrome fails.
 - 2026-10-13 (Opus 5.5): item 177 merged as `ce5b468` (PR #215; no Linear issue, the connector was signed out): the configuration is refused when it loads for an address, a model, a spending site, a budget or a timeout that would fail every run, a Keychain that does not answer is an error that says so, and `dotx models` ends with 1 when no provider answered.
+- 2026-10-13 (Opus 5.5): item 178 merged as `401cef2` (PR #216; no Linear issue, the connector was signed out): every error of the API is JSON and a fault is logged with its traceback, sign-in says what failed when the daemon answered with an error, a page that could not read again says so, and a stream that fell behind tells the page to read again.

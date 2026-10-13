@@ -52,6 +52,7 @@ from dotagent.core.errors import (
     InvalidValueError,
     RunCancelled,
     RunConflict,
+    StoreError,
 )
 from dotagent.core.logs import get_logger
 from dotagent.core.paths import chrome_data_dir, failsafe_path, run_owners_dir
@@ -528,7 +529,8 @@ class RunManager:
         again. It is stopped when the waiting caller is cancelled. With ``agent_id`` (item 87, a message to an agent)
         the run is the agent's: its source is ``team``, it carries the agent's id, the agent's own model and effort
         bound it where the agent names them, the parent's where it does not, and it answers the policy's questions the
-        stricter way of the agent's and the parent's (item 135).
+        stricter way of the agent's and the parent's (item 135). A delegated run whose end the store could not record
+        is a ``StoreError``, not an outcome: what the store holds of it is how it was while it worked.
         """
         parent: RunRecord = await self._runtime.store.get_run(parent_run_id)
         agent: AgentRecord | None = None if agent_id is None else await self._runtime.store.get_agent(agent_id)
@@ -561,7 +563,13 @@ class RunManager:
             if handle.run_id in self._handles:
                 self.cancel(handle.run_id)
             raise
-        return DelegateOutcome(run=await self._runtime.store.get_run(handle.run_id), tainted=handle.gate.tainted)
+        child: RunRecord = await self._runtime.store.get_run(handle.run_id)
+        if child.status in WORKING_STATUSES:
+            raise StoreError(
+                "the delegated run ended, but the store could not record its end",
+                {"run_id": child.id, "stored_status": child.status},
+            )
+        return DelegateOutcome(run=child, tainted=handle.gate.tainted)
 
     def steer(self, run_id: str, text: str, files: tuple[StoredAttachment, ...]) -> None:
         """Hand the running agent an extra instruction and its attachments; it reads them before its next step, and a
@@ -1370,17 +1378,17 @@ class RunManager:
         self, run: RunRecord, status: RunStatus, result: str, needs: str, inbox: asyncio.Queue[UserInput]
     ) -> None:
         """Store how the run ended and tell about it: its waiters are released, the answers that reached its inbox
-        (shut by :meth:`_drive`) too late are kept, the status and result are stored and sent, and what follows a
+        (shut by :meth:`_drive`) too late are kept, the status and result are stored with the scores of the notes it
+        used and its ``run_finished`` event in one write (:meth:`Store.end_run`), the event is sent, and what follows a
         campaign's session is planned."""
         runtime: Runtime = self._runtime
         runtime.approvals.release_run(run.id)
         await self._keep_answers(run, [inbox.get_nowait() for _ in range(inbox.qsize())])
         clean: str = truncate_tail(redact_secrets(result), _RESULT_CHARS)
-        await runtime.store.finish_run(run.id, status, clean)
-        await runtime.store.close_memory_uses(run.id, status)
-        await runtime.bus.emit(
-            run.id, "run_finished", {"status": status, "result": clean, "needs": redact_secrets(needs)}, True
+        ended: EventRecord = await runtime.store.end_run(
+            run.id, status, clean, {"status": status, "result": clean, "needs": redact_secrets(needs)}
         )
+        runtime.bus.publish(ended)
         if run.campaign_id is not None and not self._stopping:
             await self._follow_session(run, run.campaign_id, classify_ending(status, clean), needs)
 

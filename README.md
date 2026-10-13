@@ -296,11 +296,13 @@ reminder, a resumed run) and, in goal mode, to the goal check.
   becomes the result as written. Use a larger model as `main` for task and research runs.
 - At most `max_concurrent_runs` runs go at once; the others wait. Delegated runs do not count.
 - Runs, their events and their conversations are stored in a SQLite database (WAL mode; the daemon writes through one
-  connection, one writer at a time, and waits out a lock held by another process with logged retries before it gives
-  an error; a token count that cannot be written is logged, not fatal to the run), so the web UI can replay them. A run
-  that a crashed daemon left behind is marked as failed the next time Dot starts, as ended at its last event, and so
-  is one that a `dotx` command left when it died, by the daemon within half a minute when it runs. Either can be
-  resumed, and so can a run that a shutdown of the daemon cut off (see
+  connection, one writer at a time, and waits out a lock held by another process with logged retries before it gives an
+  error; a token count that cannot be written is logged, not fatal to the run), so the web UI can replay them. The end
+  of a run that started is one write: its status, the scores of the notes it used and the event that tells of its end
+  are stored together or not at all, and a delegated run whose end could not be stored is an error for the run that
+  delegated it. A run that a crashed daemon left behind is marked as failed the next time Dot starts, as ended at its
+  last event, and so is one that a `dotx` command left when it died, by the daemon within half a minute when it runs.
+  Either can be resumed, and so can a run that a shutdown of the daemon cut off (see
   [Autonomy](#autonomy-approvals-goal-mode-and-the-end-of-a-run)).
 - A message sent to a running run (steering) reaches the model at its next step. It also clears the run's untrusted
   mark (see [Safety](#safety)).
@@ -984,8 +986,8 @@ approvals waiting, and the connection to the daemon while it is being made or lo
 the Working section. The sections (Waiting for you, Working, Chats) fold on a click of their label, and the folds are
 kept between visits. The sidebar's head holds only the button that folds it away. **Select** turns the list into
 checkboxes: tick chats (or Select all) and **Delete** asks once, then removes them with every run, step, event and
-approval of theirs. A chat with a run under way is refused: wait for the run to end, or cancel it. Escape leaves the
-selection. Under 860 px the sidebar becomes a drawer.
+approval of theirs. A chat with a run under way is refused, the run of a `dotx` command too: wait for the run to end, or
+cancel it (a `dotx` command's with Ctrl-C). Escape leaves the selection. Under 860 px the sidebar becomes a drawer.
 
 A chat's menu, after T3 Code's thread menu, opens from the **…** button at the right of its row (shown where the pointer
 rests or the focus is, over the time, and always on a touch screen), from a right-click on the row, or from the

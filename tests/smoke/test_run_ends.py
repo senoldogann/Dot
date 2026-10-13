@@ -1,11 +1,14 @@
 """How a run ends when the end itself is under pressure (item 136): a stop that comes before the run's first step, a
-message sent while the end is being recorded, and a store that fails to record it. The scripted model plays the runs;
-no network and no model service is used.
+message sent while the end is being recorded, and a store that fails to record it. A database that refuses the event of
+a run's end keeps none of that end, and a delegated run whose end was not kept is an error for the run that delegated
+it (item 179). The scripted model plays the runs; no network and no model service is used.
 """
 
 import asyncio
+import sqlite3
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 import pytest
 import pytest_asyncio
@@ -14,6 +17,7 @@ from dotagent.agent.attachments import UserInput
 from dotagent.agent.manager import RunManager
 from dotagent.config import AppConfig, load_default_config
 from dotagent.core.errors import RunConflict, StoreError
+from dotagent.core.paths import db_path
 from dotagent.evals.runner import SCRIPTED_MODEL, eval_config, eval_environment, scratch_home
 from dotagent.evals.scripted import ScriptedProvider
 from dotagent.evals.types import ScriptedCall, ScriptedTurn
@@ -21,7 +25,7 @@ from dotagent.llm.router import parse_model_ref
 from dotagent.runtime import Runtime, close_runtime, open_runtime
 from dotagent.server import UI_SOURCE
 from dotagent.store.endings import RESULT_STOPPED
-from dotagent.store.models import RunRecord, RunStatus
+from dotagent.store.models import RunRecord, RunStatus, ThreadRecord
 from dotagent.tools.meta import FINISH_TOOL
 from dotagent.tools.shell import read_login_env
 
@@ -130,5 +134,55 @@ async def test_a_store_that_fails_to_record_the_end_still_frees_the_run_and_the_
             assert await asyncio.wait_for(task, _TIME_LIMIT_S) is None
             with pytest.raises(RunConflict):
                 manager.steer(run.id, "Are you there?", ())
+        finally:
+            await manager.shutdown()
+
+
+def _refuse_ends(database: Path) -> None:
+    """Make the database at ``database`` refuse the event of every run's end, as a full disk refuses a write."""
+    connection: sqlite3.Connection = sqlite3.connect(database)
+    try:
+        connection.execute(
+            "CREATE TRIGGER refuse_ends BEFORE INSERT ON events WHEN NEW.kind = 'run_finished'"
+            " BEGIN SELECT RAISE(ABORT, 'database or disk is full'); END"
+        )
+        connection.commit()
+    finally:
+        connection.close()
+
+
+async def test_an_end_the_store_refuses_in_part_is_not_kept_at_all(login_env: dict[str, str]) -> None:
+    """Item 179: the status of a run's end, the scores of its notes and its ``run_finished`` event are one write, so a
+    run is never over in the store without the event a page waits for. Before, the status was kept and the event
+    lost."""
+    async with _runtime(login_env) as runtime:
+        await asyncio.to_thread(_refuse_ends, db_path())
+        manager: RunManager = RunManager(runtime)
+        try:
+            ended: RunRecord = await _ended(manager, await _start(manager))
+            assert (ended.status, ended.finished_at) == ("running", None)
+            assert await runtime.store.last_event(ended.id, "run_finished") is None
+        finally:
+            await manager.shutdown()
+
+
+async def test_a_delegated_run_whose_end_was_not_kept_is_an_error_for_the_run_that_delegated(
+    login_env: dict[str, str],
+) -> None:
+    """Item 179: the run that delegated is told that the end was not recorded; before, it read the delegated run as the
+    store had it while it worked, as an outcome."""
+    async with _runtime(login_env) as runtime:
+        thread: ThreadRecord = await runtime.store.create_thread("delegating", UI_SOURCE)
+        parent: RunRecord = await runtime.store.create_run(
+            thread.id, GOAL, "task", SCRIPTED_MODEL, None, UI_SOURCE, "medium", "yolo", False, None, None, None
+        )
+        await runtime.store.finish_run(parent.id, "done", "Delegated.")
+        await asyncio.to_thread(_refuse_ends, db_path())
+        manager: RunManager = RunManager(runtime)
+        try:
+            with pytest.raises(StoreError, match="could not record its end") as refused:
+                await manager.delegate(parent.id, GOAL, "task", None, None)
+            child: RunRecord = await runtime.store.get_run(str(refused.value.context["run_id"]))
+            assert (child.parent_run_id, child.status) == (parent.id, "running")
         finally:
             await manager.shutdown()
