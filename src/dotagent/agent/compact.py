@@ -103,9 +103,10 @@ def repair_history(messages: Sequence[Message]) -> list[Message]:
 
 def pending_calls(messages: Sequence[Message]) -> tuple[ToolCall, ...]:
     """The calls of the newest assistant message that have no result, when only tool results follow that message: the
-    calls a run was making when it was cut off. A run stores the results of a step only once the whole step is over,
-    so a cut-off step leaves all of its calls here, also those that finished. Empty when a message of another role
-    follows, since the conversation went on from there."""
+    calls a run was making when it was cut off. A run stores the results of a step once the whole step is over, and
+    when a stop cuts the step those of the calls that had ended (item 159), so a stop leaves here the calls that had not
+    ended, and a crash all of the step's calls, also those that finished. Empty when a message of another role follows,
+    since the conversation went on from there."""
     start: int = len(messages)
     while start > 0 and messages[start - 1].role == "tool":
         start -= 1

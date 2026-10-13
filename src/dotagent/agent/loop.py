@@ -611,6 +611,21 @@ async def _tool_messages(agent: AgentRun, outcomes: Sequence[ToolOutcome], can_s
     return [tool_message(outcome.call, text, ()) for outcome, text in zip(outcomes, texts, strict=True)]
 
 
+async def _keep_ended(agent: AgentRun, calls: Sequence[ToolCall], ended: Sequence[ToolOutcome], can_see: bool) -> None:
+    """Store the results of the calls of a cut step that had ended, in the order of ``calls``. A model that cannot see
+    gets their text without the images: a description would ask the vision model while the run is being stopped."""
+    order: dict[str, int] = {call.id: index for index, call in enumerate(calls)}
+    kept: list[ToolOutcome] = sorted(ended, key=lambda outcome: order[outcome.call.id])
+    if kept:
+        await agent.runtime.store.append_messages(
+            agent.run.thread_id,
+            [
+                tool_message(outcome.call, outcome.result.text, outcome.result.images if can_see else ())
+                for outcome in kept
+            ],
+        )
+
+
 def _act_calls(outcomes: Sequence[ToolOutcome]) -> tuple[ActCall, ...]:
     """The act calls of a step as the single-action counter sees them: the batched browser and desktop calls, with
     the steps they carried and the target of their policy action (the page's address, the application)."""
@@ -1736,9 +1751,16 @@ async def run_agent(agent: AgentRun) -> RunEnd:
             # Only text replies in a row end a task run; a step that acts starts the count again.
             if _acts(reply.tool_calls, questions):
                 nudges = 0
-            outcomes: list[ToolOutcome] = await execute_calls(
-                reply.tool_calls, registry, hidden, context, agent.gate, config.parallel_tools
-            )
+            calls_ended: list[ToolOutcome] = []
+            try:
+                outcomes: list[ToolOutcome] = await execute_calls(
+                    reply.tool_calls, registry, hidden, context, agent.gate, config.parallel_tools, calls_ended.append
+                )
+            except asyncio.CancelledError:
+                # A stop of the run or of the daemon cut the step: the results of the calls that had ended stay in the
+                # thread, so that what goes on there reads what they did instead of making them again (item 159).
+                await _keep_ended(agent, reply.tool_calls, calls_ended, info.vision)
+                raise
             turned_on: tuple[str, ...] = _turned_on(outcomes, hidden, on)
             if turned_on:
                 on = on | frozenset(turned_on)
