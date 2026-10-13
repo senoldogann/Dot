@@ -2663,10 +2663,66 @@ details[open] > summary .chev {
   background: var(--surface);
 }
 
-.options {
+/* A question's options (item 192): a row each, its label over what choosing it leads to, the one Dot recommends marked.
+   A row sends its option; when several may be chosen, rows are ticked and sent with Send answer. */
+.choices {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.choice {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color var(--motion-base) var(--ease);
+}
+
+.choice:hover,
+.choice:has(input:checked) {
+  border-color: var(--accent);
+}
+
+.choice input {
+  margin: var(--space-half) 0 0;
+  accent-color: var(--accent);
+}
+
+.choice-text {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-half);
+  min-width: 0;
+}
+
+.choice-label {
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
   gap: 8px;
+  font-weight: var(--weight-label);
+  overflow-wrap: anywhere;
+}
+
+.choice-description {
+  color: var(--text-2);
+  font-size: var(--text-sm);
+  line-height: var(--leading-sm);
+}
+
+/* The answer to a question keeps the lines it was given in (the options chosen, then what was written). */
+.approval-note {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 
 /* A delegated run is a row (item 82): the face with its state at the corner, the goal over its last line, the time it

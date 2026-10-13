@@ -638,7 +638,10 @@ run waits (its status is `blocked`) for up to `[policy] approval_timeout_s`; an 
 counts as a refusal. The note you write with your answer reaches the model. This is the default approval mode, `ask`; in
 `auto` and `yolo` the questions of the policy are answered for you. A question of the agent itself (`ask_user`) waits
 the same way, except in a run nobody can answer during it (see
-[Autonomy](#autonomy-approvals-goal-mode-and-the-end-of-a-run)).
+[Autonomy](#autonomy-approvals-goal-mode-and-the-end-of-a-run)). Its options are rows on the card, each with what it
+leads to, and the one Dot recommends is marked: a row sends its option, or, when several may be chosen, the rows ticked
+are sent with what you write, as one answer. In the terminal you type an option's number (several, separated by commas)
+or your own words. The run reads which option you chose, and whether it was the one it recommended.
 
 **Emergency stop.** Any of these stops Dot from controlling the desktop:
 

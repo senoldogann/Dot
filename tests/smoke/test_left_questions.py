@@ -244,7 +244,8 @@ async def test_a_run_the_user_watches_waits_for_the_answer(login_env: dict[str, 
         await manager.decide(str(asked.data["approval_id"]), True, UI_SOURCE, ANSWER)
         assert (await _ended(manager, run)).status == "done"
         events: list[EventRecord] = await _events(runtime, run)
-        assert _result_of(events, ASK_USER_TOOL) == f"The user answered: {ANSWER}"
+        # The answer is the option the question offered, so the run reads it as chosen (item 192).
+        assert _result_of(events, ASK_USER_TOOL) == f"The user chose “{ANSWER}”."
         assert QUESTION_LEFT_EVENT not in [event.kind for event in events]
         assert [record.id for record in await runtime.store.list_runs(5, run.thread_id)] == [run.id]
 

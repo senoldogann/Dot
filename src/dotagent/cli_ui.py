@@ -17,6 +17,7 @@ from dotagent.agent.lessons import RunLessons
 from dotagent.agent.limits import LimitReached, RunLimits, limit_spent
 from dotagent.agent.plan import StepStatus
 from dotagent.agent.progress import Rung
+from dotagent.agent.questions import QuestionOption, stored_options, takes_several, typed_answer
 from dotagent.agent.resume import CallEnd, CutOff
 from dotagent.core.errors import RunConflict
 from dotagent.core.jsonutil import dumps_compact
@@ -575,18 +576,26 @@ class TerminalUi:
             return
         await self._ask_approval(request)
 
+    def _show_options(self, options: tuple[QuestionOption, ...], several: bool) -> None:
+        """The options of a question, numbered, each with what it leads to and whether the run recommends it."""
+        for number, option in enumerate(options, 1):
+            recommended: str = " (recommended)" if option.recommended else ""
+            description: str = f" — {option.description}" if option.description else ""
+            self._line(self._paint(f"    {number}. {option.label}{recommended}{description}", "2"))
+        if options:
+            numbers: str = "numbers separated by commas" if several else "a number"
+            self._line(self._paint(f"    answer with {numbers}, or in your own words", "2"))
+
     def _on_left_question(self, question: ApprovalPayload) -> None:
-        options: JsonValue = question.args.get("options")
         self._line(self._paint(f"  ? {question.summary}", "1;35"))
-        if isinstance(options, list) and options:
-            self._line(self._paint("    options: " + " | ".join(str(option) for option in options), "2"))
+        self._show_options(stored_options(question.args), takes_several(question.args))
         self._line(self._paint("    left for you: the run goes on without the answer", "2"))
 
     async def _ask_question(self, request: ApprovalPayload) -> None:
-        options: JsonValue = request.args.get("options")
+        options: tuple[QuestionOption, ...] = stored_options(request.args)
+        several: bool = takes_several(request.args)
         self._line(self._paint(f"  ? {request.summary}", "1;35"))
-        if isinstance(options, list) and options:
-            self._line(self._paint("    options: " + " | ".join(str(option) for option in options), "2"))
+        self._show_options(options, several)
         if not self._options.interactive:
             await self._resolve(request, approve=False, note="no answer was given")
             return
@@ -597,7 +606,7 @@ class TerminalUi:
         if reply.line is None or not reply.line.strip():
             await self._resolve(request, approve=False, note="no answer was given")
             return
-        await self._resolve(request, approve=True, note=reply.line.strip())
+        await self._resolve(request, approve=True, note=typed_answer(options, several, reply.line))
 
     async def _ask_approval(self, request: ApprovalPayload) -> None:
         handoff: bool = request.severity == "handoff"
