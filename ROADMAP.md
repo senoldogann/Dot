@@ -5089,8 +5089,8 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 166 | A run's instructions list the help that fits its goal                                | done        | c3a6b83 |
 | 167 | Evals show whether a run takes the easy way                                          | done        | 3dc670c |
 | 168 | A run reads only the skills it is offered                                            | done        | f605def |
-| 169 | Help is found by meaning as well as by words                                         | in progress |         |
-| 170 | A delegated run's thread takes no queue                                              | planned     |         |
+| 169 | Help is found by meaning as well as by words                                         | done        | 5c96b14 |
+| 170 | A delegated run's thread takes no queue                                              | in progress |         |
 | 171 | The text of a desktop window follows the run's model window                          | planned     |         |
 | 172 | A dotx command that dies does not leave its run at work                              | planned     |         |
 | 173 | Every smoke test passes alone, and the README keeps its width                        | planned     |         |
@@ -8859,7 +8859,7 @@ leave out, and a refusal names only the skills the run is offered.
 
 ### 169. Help is found by meaning as well as by words
 
-**Status: in progress.**
+**Status: done.** Merged as `5c96b14` (PR #207; no Linear issue, the Linear connector was signed out).
 
 **As built (2026-10-13).** With the memory's embeddings on (`[memory] embed_enabled`, the default; bge-m3 on the local
 Ollama server reads Turkish as well as English), `find_help` ranks the help it searches by meaning as well as by words:
@@ -8889,7 +8889,17 @@ help described in another; with the embeddings off, by words as before.
 
 ### 170. A delegated run's thread takes no queue
 
-**Status: planned.**
+**Status: in progress.**
+
+**As built (2026-10-13).** A message queued on the thread of a delegated run (`POST /api/threads/{id}/queue` where the
+thread's newest run has a parent) is refused with 409, as one on the chat of a campaign is: that thread is no chat, its
+page has no composer, and the run that delegated decides what follows. Before, the API took it, and the delegated run's
+end left the queue alone, so the message never started, or, with no run at work there, it started a run of its own on
+the helper's thread. Deleting a chat now deletes the queue and the hold of the threads of the runs it delegated, along
+with those threads, unless a run of their own remains there. Tests: in `tests/smoke/test_queue.py`, the thread of a
+delegated run refuses a message, and nothing waits or starts there; in `tests/smoke/test_server.py`, deleting a chat
+leaves no queue on the deleted thread of the run it delegated, and keeps the queue of a grandchild's thread that holds a
+run of its own. On the code of before, the message was taken, and the queue of the deleted thread stayed.
 
 **What.** The thread of a delegated run takes no queue, as the chat of a campaign takes none, and deleting a chat
 deletes the queues of the threads of the runs it delegated.
@@ -9519,3 +9529,4 @@ asked for.
 - 2026-10-13 (Opus 5.5): item 167 merged as `3dc670c` (PR #204; no Linear issue, the connector was signed out): an eval task can bring skills and MCP servers and name the easy way they offer; three help tasks, the score's count of the easy ways taken and what a pass costs with and without, and `dotx eval check` reports a reference that does not take its easy way. Part 27 is done.
 - 2026-10-13 (Opus 5.5): part 28, what part 27's report found, is planned (items 168 to 173); item 168 is built: the `skill` tool reads only a skill the run is offered.
 - 2026-10-13 (Opus 5.5): item 168 merged as `f605def` (PR #206; no Linear issue, the connector was signed out): the `skill` tool reads only a skill the run is offered, and its refusal names only those; part 28 is planned.
+- 2026-10-13 (Opus 5.5): item 169 merged as `5c96b14` (PR #207; no Linear issue, the connector was signed out): `find_help` and the skills a run is given rank help by meaning as well as by words, with the memory's embeddings, so a goal or a need in Turkish finds the skills described in English.
