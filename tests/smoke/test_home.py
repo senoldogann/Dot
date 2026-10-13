@@ -5,6 +5,7 @@ strip follow the lifecycle stream. Screenshots at 1280 and 390, light and dark. 
 
 import asyncio
 import re
+import shlex
 import time
 from collections.abc import AsyncIterator
 from datetime import datetime
@@ -37,7 +38,8 @@ _PROVIDER: str = "ollama"
 TOKEN: str = "home-test-token"
 _STEP_WAIT_S: float = 20.0
 _RUN_WAIT_S: float = 90.0
-_WORK_S: int = 8
+# The working run polls for its stop file ten times a second, at most as long as the test waits for a run.
+_WORK_POLLS: int = int(_RUN_WAIT_S * 10)
 _OWNER: str = "Ada"
 _LESSON: str = "pdftotext keeps the columns of a table only with the -layout flag."
 # The schedule is due this far ahead; the due section is only asserted when that is still today.
@@ -189,12 +191,15 @@ async def test_the_home_greets_says_what_is_going_on_and_follows_the_day(
         ),
         time.time(),
     )
-    # A run that waits for an answer, then a run that works for a while.
+    # A run that waits for an answer, then a run that works until the test lets it end (``stop``), however long the
+    # pages take to look at under load.
+    stop: Path = tmp_path / "stop"
+    work: str = f"for i in $(seq {_WORK_POLLS}); do [ -e {shlex.quote(str(stop))} ] && break; sleep 0.1; done"
     MODEL.script = ScriptedProvider(
         _PROVIDER,
         [
             _turn(ASK_USER_TOOL, {"question": "Which colour?"}),
-            _turn("shell", {"command": f"sleep {_WORK_S}"}),
+            _turn("shell", {"command": work}),
             _turn(FINISH_TOOL, {"answer": "Blue it is.", "success": True}),
             _turn(FINISH_TOOL, {"answer": "Slept.", "success": True}),
         ],
@@ -274,6 +279,7 @@ async def test_the_home_greets_says_what_is_going_on_and_follows_the_day(
                 # The answered run may finish before the line repaints: it works or it ended, and nothing waits.
                 await expect(now_line).to_have_text(re.compile("^Working on [12] runs? · [12] ended today"))
                 await expect(page.locator(".home-today [data-section=waiting]")).to_have_count(0)
+                await asyncio.to_thread(stop.touch)
                 async with asyncio.timeout(_RUN_WAIT_S):
                     await manager.wait(asking.id)
                     await manager.wait(working.id)
@@ -288,5 +294,6 @@ async def test_the_home_greets_says_what_is_going_on_and_follows_the_day(
             finally:
                 await browser.close()
     finally:
+        await asyncio.to_thread(stop.touch)
         if (await runtime.store.get_approval(question.id)).status == "pending":
             await manager.decide(question.id, True, "test", "blue")

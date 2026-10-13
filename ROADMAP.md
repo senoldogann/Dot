@@ -5121,7 +5121,7 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 188 | A run of a dotx command is followed live on the pages and stopped there              | done        | 5f294aa |
 | 189 | A message sent twice starts once                                                     | done        | d615961 |
 | 190 | The pages say what they could not read, follow the rules and tell of an update       | done        | 8f92f36 |
-| 191 | The desktop shell says what it could not read                                        | in progress |         |
+| 191 | The desktop shell says what it could not read                                        | done        | a0d5eef |
 
 ### 77. The type system: Inter and Geist Mono, seven sizes, three weights
 
@@ -9492,7 +9492,7 @@ in; a page loaded before the daemon was updated says so and offers to load again
 
 ### 191. The desktop shell says what it could not read
 
-**Status: in progress.**
+**Status: done.** Merged as `a0d5eef` (PR #230; no Linear issue, the Linear connector was signed out).
 
 **As built (2026-10-14).** When the desktop shell could not read the daemon's files, the menu bar item's tip and the
 page the window shows while the daemon is down say which file and why, instead of "Dot is not running": a `config.toml`
@@ -10139,3 +10139,5 @@ running" for all of them.
 - 2026-10-14 (Opus 5.5): item 188 merged as `5f294aa` (PR #227; no Linear issue, the connector was signed out): The daemon relays the runs of `dotx` commands to its pages: they work in the sidebar and in Activity, their page follows them live and stops them, a question of theirs is answered there, and the daemon moves their chat's queue once they end; the store refuses a run on a chat where another process drives one.
 - 2026-10-14 (Opus 5.5): item 189 merged as `d615961` (PR #228; no Linear issue, the connector was signed out): A message the pages send again with its key, after an answer that was lost, gets what its first sending made (its run, its place in the queue, its steer) instead of a second one.
 - 2026-10-14 (Opus 5.5): item 190 merged as `8f92f36` (PR #229; no Linear issue, the connector was signed out): A chat whose queue could not be read says why in its place, with Read again; the rules page follows the rules changed on another page; the sign-in screen names the folder of the log by `dotx service status`; and a page loaded before an update says so in a banner, with Load again.
+- 2026-10-14 (Opus 5.5): item 191 merged as `a0d5eef` (PR #230; no Linear issue, the connector was signed out): when the desktop shell could not read the daemon's files, its menu bar item's tip and the page of a daemon that is down say which file and why (a `config.toml` that is not valid TOML with the line and column of the fault, a file it may not read, no token yet) instead of "Dot is not running", and no address is guessed in place of a `config.toml` it could not read. Part 30 is done.
+- 2026-10-14 (Opus 5.5): the home's greeting test lets its working run end by a file of its own instead of after 8 s, which the pages outlasted once on a loaded machine (the smoke of item 187).
