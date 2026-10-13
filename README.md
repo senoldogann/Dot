@@ -1070,12 +1070,14 @@ and the model's name gives way with an ellipsis, so on a phone the bar is still 
 line under the frame says so. Each pill opens its menu above it, and a pick or Escape or a click outside closes it. What
 you typed and attached and did not send is kept in this browser and is there again when you come back (so is the box of
 each run). Dot's face looks down at the box while you write and brightens when you send. Enter starts the run,
-Shift+Enter adds a line. `/` at the start of a word opens the slash menu over the box: the commands of the composer
-(`/task`, `/chat`, `/research` here; `/btw` in the box of a run), the skills by name with their description, and each
-MCP server with its tools, read from the daemon as a run reads them (`GET /api/palette`); letters filter, the arrows
-move, Enter or Tab picks and Escape closes. A skill picked reads "use the skill NAME: " in the box, a tool its name, a
-command does its work. A run that waits for your approval shows above the composer, as a card, and moves it down only
-when the cards do not fit there.
+Shift+Enter adds a line. A message whose answer was lost on its way back (the page says the sending failed and keeps the
+message) is done once when it is sent again, here and in the box of a run: the page sends each new message with a key of
+its own, and the daemon answers the same message sent again with what its first sending made. `/` at the start of a word
+opens the slash menu over the box: the commands of the composer (`/task`, `/chat`, `/research` here; `/btw` in the box
+of a run), the skills by name with their description, and each MCP server with its tools, read from the daemon as a run
+reads them (`GET /api/palette`); letters filter, the arrows move, Enter or Tab picks and Escape closes. A skill picked
+reads "use the skill NAME: " in the box, a tool its name, a command does its work. A run that waits for your approval
+shows above the composer, as a card, and moves it down only when the cards do not fit there.
 
 A run opens as a conversation under Dot's face and name. The face is the state: still when the run rests, a slow breath
 while it works, an amber ring while it waits for you, a green tick for a moment when the run ends done, red when it
@@ -1353,6 +1355,11 @@ The REST API (all under `/api`; bodies and replies are JSON, event streams are s
 | `GET\|POST\|DELETE /failsafe`, `GET /images/{name}`                             | emergency stop; screenshots of runs                          |
 | `GET /browser`, `POST /browser/mode` (`{"mode": "own"\|"attach"}`)              | which Chrome Dot browses with and what Chrome allows; switch it (409 while runs are active, 422 when Chrome refuses) |
 | `POST /desktop/permissions`                                                     | make macOS ask for the desktop permissions the daemon lacks  |
+
+`POST /runs`, `POST /runs/{id}/steer` and `POST /threads/{id}/queue` take a `key` of the caller's own (16 to 64 letters,
+digits and dashes), which the pages send with each new message. The same message sent again with its key is not done
+twice: it is answered with the run its first sending started or steered, or with the chat's queue; 409 while its first
+sending is under way, for two minutes at most. A key is kept for a day.
 
 Errors come as `{"message": …, "context": {…}}`, those of the web framework itself (a path that does not exist, a method
 a path does not take) included; an error Dot did not expect is a 500 whose context names its kind and its words, and the

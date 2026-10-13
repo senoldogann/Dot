@@ -163,6 +163,16 @@ class EventRecord(FrozenModel):
     data: JsonObject
 
 
+class SentMessage(FrozenModel):
+    """A message the pages sent with a key of their own, kept so that the same message sent again (after an answer
+    that was lost) is not done twice: ``target`` is the run it started or steered, or the queued message it became;
+    ``None`` while its sending is under way."""
+
+    key: str
+    sent_at: float
+    target: str | None
+
+
 class WorkingRun(FrozenModel):
     """A run at work (queued, running or blocked on a question), its chat, and the process that drives it
     (:mod:`dotagent.agent.owners`)."""

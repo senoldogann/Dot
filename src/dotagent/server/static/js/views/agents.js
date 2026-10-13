@@ -13,6 +13,7 @@ import { icon } from "../icons.js";
 import { lookPicker } from "../lookpicker.js";
 import { emptyPanel, errorPanel, field, loadingPanel, pageHead, statusBadge } from "../panels.js";
 import { APPROVAL_OPTIONS } from "../runmodes.js";
+import { messageKeys } from "../sending.js";
 import { setStageTitle, setStageTools } from "../stage.js";
 import { scoreLine } from "./memory.js";
 import { skillRow } from "./skills.js";
@@ -325,6 +326,7 @@ function agentComposer(record, ctx) {
   });
   const { textarea: goal, attachments } = frame;
   let starting = false;
+  const keys = messageKeys();
 
   async function submit() {
     const text = goal.value.trim();
@@ -339,7 +341,7 @@ function agentComposer(record, ctx) {
     frame.sendButton.disabled = true;
     try {
       await attempt(async () => {
-        const created = await api.post("/runs", {
+        const body = {
           goal: text,
           mode: "task",
           model: null,
@@ -350,7 +352,9 @@ function agentComposer(record, ctx) {
           thread_id: null,
           attachments: attachments.ids(),
           agent_id: record.id,
-        });
+        };
+        const created = await api.post("/runs", { ...body, key: keys.of("run", body) });
+        keys.sent();
         frame.clear();
         ctx.navigate(`/runs/${created.id}`);
       });

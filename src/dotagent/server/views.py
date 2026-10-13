@@ -100,6 +100,10 @@ class ProofQuery(FrozenModel):
 
 # ---------------------------------------------------------------------------------------------- requests
 
+# The pages' own key of a new message (item 189): the message sent again with it, after an answer that was lost, gets
+# what its first sending made (``dotagent.server.sending.send_once``).
+MessageKey = Annotated[str, StringConstraints(pattern=r"^[A-Za-z0-9-]{16,64}$")]
+
 
 class StartRunRequest(FrozenModel):
     """Start a run. ``model``, ``effort``, ``approvals`` and ``goal_mode`` left out take the configured ones.
@@ -119,6 +123,7 @@ class StartRunRequest(FrozenModel):
     # The agent the run belongs to (item 86); None for Dot. Not with standing.
     agent_id: str | None = None
     attachments: list[str] = Field(default_factory=list, max_length=MAX_ATTACHMENTS)
+    key: MessageKey | None = None
 
     @model_validator(mode="after")
     def _fits_standing(self) -> Self:
@@ -153,6 +158,7 @@ class ThreadChange(FrozenModel):
 class SteerRequest(FrozenModel):
     text: str = Field(min_length=1, max_length=_TEXT_CHARS)
     attachments: list[str] = Field(default_factory=list, max_length=MAX_ATTACHMENTS)
+    key: MessageKey | None = None
 
 
 class QueueMessageRequest(FrozenModel):
@@ -167,6 +173,7 @@ class QueueMessageRequest(FrozenModel):
     goal_mode: bool | None = None
     agent_id: str | None = None
     attachments: list[str] = Field(default_factory=list, max_length=MAX_ATTACHMENTS)
+    key: MessageKey | None = None
 
 
 class QueueEditRequest(FrozenModel):
