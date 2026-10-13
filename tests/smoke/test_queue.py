@@ -2,8 +2,9 @@
 choices it was sent with, once that run has ended done, one message after the other; a stopped or failed run holds the
 queue until the owner resumes it, as the start of the daemon does when a run works on the chat or a crash cut it; a
 queue whose run the daemon's stop cut goes on once that run, continued, ends done (item 161); a queued message steered
-reaches the run at work and leaves the queue; the queue keeps the order and the text the owner gives it. The chat's page
-shows it all above the composer, as T3 Code does, served by a real server, wide and on a phone, light and dark.
+reaches the run at work and leaves the queue; the queue keeps the order and the text the owner gives it; the thread of
+a delegated run takes no queue, as it is no chat (item 170). The chat's page shows it all above the composer, as T3
+Code does, served by a real server, wide and on a phone, light and dark.
 
 No network and no model service is used: the scripted model ends each run with its first reply, which the test lets go.
 """
@@ -23,7 +24,7 @@ from playwright.async_api import Browser, Locator, Page, async_playwright, expec
 
 from dotagent.agent.manager import QUEUE_CHANGED_EVENT, RunManager
 from dotagent.config import load_default_config
-from dotagent.core.errors import InvalidValueError, ProviderProtocolError
+from dotagent.core.errors import InvalidValueError, ProviderProtocolError, RunConflict
 from dotagent.evals.runner import SCRIPTED_MODEL, eval_config, eval_environment, scratch_home
 from dotagent.evals.scripted import ScriptedProvider
 from dotagent.evals.types import ScriptedCall, ScriptedTurn
@@ -238,6 +239,36 @@ async def test_messages_queued_while_a_run_works_start_one_after_the_other_once_
         assert await _queued(runtime, first) == []
         await model.release()
         assert (await _ended(manager, third.id)).status == "done"
+
+
+async def test_the_thread_of_a_delegated_run_takes_no_queue(login_env: dict[str, str]) -> None:
+    model: _GatedModel = _GatedModel()
+    async with _session(login_env, model) as (runtime, manager):
+        parent: RunRecord = await _start(manager)
+        await model.release()
+        assert (await _ended(manager, parent.id)).status == "done"
+        # A run the parent delegated to, on a thread of its own, as manager.delegate makes it.
+        thread: ThreadRecord = await runtime.store.create_thread("delegated", "delegate")
+        child: RunRecord = await runtime.store.create_run(
+            thread.id,
+            "Find the notes.",
+            "task",
+            SCRIPTED_MODEL,
+            parent.id,
+            "delegate",
+            "medium",
+            "yolo",
+            False,
+            None,
+            None,
+            None,
+        )
+        await runtime.store.finish_run(child.id, "done", "Found.")
+        with pytest.raises(RunConflict, match="delegated run takes no queue"):
+            await _queue(manager, child, SUMMARY, "ask")
+        # Nothing waits there, and no run started on the thread.
+        assert await _queued(runtime, child) == []
+        assert [run.id for run in await runtime.store.list_runs(10, thread.id)] == [child.id]
 
 
 async def test_a_stopped_run_holds_its_chats_queue_until_the_owner_resumes_it(login_env: dict[str, str]) -> None:

@@ -1129,6 +1129,11 @@ async def test_deleting_chats_takes_their_runs_delegations_events_and_approvals_
     )
     await runtime.store.create_approval(grandchild.id, "shell", "touch x", "write", {"command": "touch x"})
     await runtime.store.create_approval(kept.id, "shell", "touch y", "write", {"command": "touch y"})
+    # A queue on the child's thread (as the API took one before item 170) goes with the thread; the grandchild's
+    # thread, a chat of its own, keeps its queue.
+    for thread_id in (child.thread_id, grandchild.thread_id):
+        await runtime.store.add_queued(thread_id, "next", [], "task", None, None, None, None, None, "test")
+        await runtime.store.hold_queue(thread_id)
 
     answer: httpx.Response = await client.request(
         "DELETE", "/api/threads", json={"ids": [doomed.id, "thr_nothing", doomed.id]}
@@ -1149,6 +1154,10 @@ async def test_deleting_chats_takes_their_runs_delegations_events_and_approvals_
     with pytest.raises(NotFoundError):
         await runtime.store.get_thread(child.thread_id)
     assert (await runtime.store.get_thread(grandchild.thread_id)).id == grandchild.thread_id
+    assert await runtime.store.list_queued(child.thread_id) == []
+    assert not await runtime.store.queue_held(child.thread_id)
+    assert [message.text for message in await runtime.store.list_queued(grandchild.thread_id)] == ["next"]
+    assert await runtime.store.queue_held(grandchild.thread_id)
     assert await runtime.store.load_messages(doomed.id, 0) == []
     chats: list[str] = await _chat_ids(client)
     assert doomed.id not in chats and kept_chat.id in chats and grandchild.thread_id in chats

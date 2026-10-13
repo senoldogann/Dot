@@ -814,9 +814,9 @@ class Store:
     async def delete_threads(self, thread_ids: Sequence[str]) -> list[str]:
         """Delete chats with everything they hold, in one transaction: their messages and queue, their runs, the runs
         those delegated to (recursively) with the events and approvals of all of them, and the threads of the delegated
-        runs unless a run of their own remains there. Returns the ids that named a thread, in the order given; the
-        others are skipped. A schedule keeps the id of the thread it last fired into and makes a new one per firing, so
-        it is left alone."""
+        runs, with their messages and any queue, unless a run of their own remains there. Returns the ids that named a
+        thread, in the order given; the others are skipped. A schedule keeps the id of the thread it last fired into and
+        makes a new one per firing, so it is left alone."""
         named: tuple[str, ...] = tuple(thread_ids)
         marks: str = ",".join("?" * len(named))
         doomed: str = (
@@ -847,6 +847,12 @@ class Store:
                 " AND NOT EXISTS (SELECT 1 FROM runs WHERE runs.thread_id = messages.thread_id)",
                 delegated,
             )
+            for table in ("queued_messages", "queue_holds"):
+                await self._db.execute(
+                    f"DELETE FROM {table} WHERE thread_id IN ({host_marks})"
+                    f" AND NOT EXISTS (SELECT 1 FROM runs WHERE runs.thread_id = {table}.thread_id)",
+                    delegated,
+                )
             await self._db.execute(
                 f"DELETE FROM threads WHERE id IN ({host_marks})"
                 " AND NOT EXISTS (SELECT 1 FROM runs WHERE runs.thread_id = threads.id)",

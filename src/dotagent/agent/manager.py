@@ -542,7 +542,8 @@ class RunManager:
         """Put a message at the end of a chat's queue (item 148): it starts as the chat's next run, with these choices,
         once the run at work there has ended done (:meth:`_follow_queue`), one message after the other. A chat where no
         run works starts it at once, unless its queue is held. The chat of a campaign takes no queue: the campaign
-        plans what follows its sessions."""
+        plans what follows its sessions; nor does the thread of a delegated run, which is no chat: the run that
+        delegated it decides what follows (:meth:`_follow_queue` leaves it alone)."""
         store: Store = self._runtime.store
         await store.get_thread(thread_id)
         newest: list[RunRecord] = await store.list_runs(1, thread_id)
@@ -550,6 +551,11 @@ class RunManager:
             raise RunConflict("a chat takes a queue once a run has started there", {"thread_id": thread_id})
         if newest[0].campaign_id is not None:
             raise RunConflict("the chat of a campaign takes no queue: steer its session", {"thread_id": thread_id})
+        if newest[0].parent_run_id is not None:
+            raise RunConflict(
+                "the thread of a delegated run takes no queue: the run that delegated it decides what follows",
+                {"thread_id": thread_id, "parent_run_id": newest[0].parent_run_id},
+            )
         message: QueuedMessage = await store.add_queued(
             thread_id, text, [file.id for file in files], mode, model, effort, approvals, goal_mode, agent_id, source
         )
