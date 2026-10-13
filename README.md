@@ -1728,6 +1728,7 @@ dotx campaign stop|resume|achieved ID
 A campaign is a task that Dot keeps working on until its outcome is verified or you stop it. Switch on **Keep going** in
 the composer (it is there for a task), or pass `--standing` to `dotx run`. The run you start is its first session, in
 your conversation; the daemon runs the sessions after it, each a run in a thread of its own, through restarts and days.
+A campaign whose first session cannot start is not kept.
 
 - **Targets.** The first session records the campaign's targets and how a session verifies them (`campaign_targets`). A
   session that wants to end while the campaign has no targets is sent back once to record them; targets a later session
@@ -1783,10 +1784,11 @@ Every session runs with the model, reasoning level and approval mode the campaig
 the campaign's own check takes its place, so starting one with goal mode on is refused. A run's limits
 (`run_max_minutes`, `run_max_tokens`) apply to each session. Sessions run only while the daemon runs; one the daemon cut
 off is not resumed as a run: the next session starts once the daemon is back (after `campaign_gap_minutes` when the
-daemon died while it worked, so that a session that brings it down does not run again and again), and its brief says
-the last one was cut off. The threads of the sessions after the first are not in the chat list; the campaign's page
-links them. What you write in the campaign's conversation, and your answers to their questions, are instructions of
-the sessions after it.
+daemon died while it worked, so that a session that brings it down does not run again and again), and its brief says the
+last one was cut off. A session whose `dotx` command died (the first one, from `dotx run --standing`) is closed by the
+daemon within half a minute, and the next one starts `campaign_gap_minutes` after that. The threads of the sessions
+after the first are not in the chat list; the campaign's page links them. What you write in the campaign's conversation,
+and your answers to their questions, are instructions of the sessions after it.
 
 ## MCP servers
 

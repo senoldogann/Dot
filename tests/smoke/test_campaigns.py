@@ -2,7 +2,9 @@
 the scheduler starts the next session with the brief, only a claim the goal checker accepts ends the campaign, a
 session the daemon cut off is followed by a new one, the answer to a question an ended session left goes to no other
 run and brings the next session forward, a moment planned for the next session keeps the rhythm of the sessions, and
-the owner stops, lets go on and marks a campaign achieved.
+the owner stops, lets go on and marks a campaign achieved. A session whose `dotx` command died is followed by the
+next as soon as the daemon closes it, and a campaign whose opening session could not start, in any way, is not
+kept (item 180).
 
 No network and no model service is used: the scripted model plays the sessions and answers for the goal checker too,
 and the notification of the owner is recorded instead of shown.
@@ -10,11 +12,14 @@ and the notification of the owner is recorded instead of shown.
 
 import asyncio
 import dataclasses
+import errno
 import secrets
+import sqlite3
 import time
 from collections.abc import AsyncIterator, Sequence
 from contextlib import asynccontextmanager
 from datetime import datetime, timedelta
+from pathlib import Path
 
 import httpx
 import pytest
@@ -22,20 +27,21 @@ import pytest_asyncio
 
 from dotagent.agent.campaign import CAMPAIGN_ENDED_EVENT, Brief
 from dotagent.agent.campaign_control import stop_campaign
-from dotagent.agent.loop import CAMPAIGN_TARGETS_EVENT
+from dotagent.agent.loop import CAMPAIGN_TARGETS_EVENT, RunOpening
 from dotagent.agent.manager import RunHandle, RunManager, thread_title
 from dotagent.agent.reflection import REFLECTION_OFF
 from dotagent.agent.review import GOAL_TOOL
 from dotagent.config import AppConfig, load_default_config
 from dotagent.core.errors import BrowserError
-from dotagent.core.paths import failsafe_path
+from dotagent.core.paths import db_path, failsafe_path
 from dotagent.core.types import JsonObject
 from dotagent.evals import EVAL_SOURCE
 from dotagent.evals.runner import SCRIPTED_MODEL, eval_config, eval_environment, scratch_home
 from dotagent.evals.scripted import ScriptedProvider
 from dotagent.evals.types import ScriptedCall, ScriptedTurn
 from dotagent.llm.router import parse_model_ref
-from dotagent.llm.types import ChatRequest, DeltaSink, ModelInfo, ModelReply
+from dotagent.llm.types import ChatRequest, DeltaSink, Effort, ModelInfo, ModelReply
+from dotagent.policy.types import ApprovalMode
 from dotagent.runtime import Runtime, close_runtime, open_runtime
 from dotagent.scheduler import SCHEDULE_SOURCE
 from dotagent.scheduler.plans import ScheduleRequest, create_schedule
@@ -50,6 +56,7 @@ from dotagent.store.models import (
     CampaignEntry,
     CampaignRecord,
     EventRecord,
+    RunMode,
     RunRecord,
     ScheduleOptions,
     ScheduleRecord,
@@ -869,4 +876,93 @@ async def test_an_emergency_stop_engaged_while_a_schedule_starts_its_run_ends_th
             assert (ended.status, ended.result) == ("cancelled", RESULT_EMERGENCY_STOPPED)
         finally:
             await asyncio.to_thread(failsafe_path().unlink, True)
+            await manager.shutdown()
+
+
+async def test_a_session_whose_dotx_command_died_is_followed_once_the_daemon_closes_it(
+    login_env: dict[str, str],
+) -> None:
+    """Item 180: the daemon closes the session of a ``dotx`` command that died (``dotx run --standing``) within half a
+    minute, and plans the next session then, as after any end of a session; before, the campaign waited for the
+    daemon's next start."""
+    model: RecordingProvider = RecordingProvider(ScriptedProvider(_PROVIDER, []))
+    async with _session(_config(60), login_env, model, Notices()) as (runtime, manager):
+        store = runtime.store
+        thread: ThreadRecord = await store.create_thread("Leads", EVAL_SOURCE)
+        campaign: CampaignRecord = await store.create_campaign(
+            "Leads", GOAL, thread.id, SCRIPTED_MODEL, runtime.config.models.effort, "ask", (), "own"
+        )
+        # The command that drove the session is gone, and the lock of its owner with it.
+        left: RunRecord = await store.create_run(
+            thread.id,
+            GOAL,
+            "task",
+            SCRIPTED_MODEL,
+            None,
+            EVAL_SOURCE,
+            runtime.config.models.effort,
+            "ask",
+            False,
+            campaign.id,
+            None,
+            secrets.token_hex(16),
+        )
+        await store.set_run_status(left.id, "running")
+        before: float = time.time()
+        # What the daemon does every half minute while it runs.
+        assert await manager.close_runs_of_dead_commands() == 1
+        followed: CampaignRecord = await store.get_campaign(campaign.id)
+    assert followed.next_session_at is not None and abs(followed.next_session_at - (before + 3600)) < 5
+
+
+def _threads(database: Path) -> int:
+    """How many threads the database at ``database`` holds, a chat with no run yet among them."""
+    connection: sqlite3.Connection = sqlite3.connect(database)
+    try:
+        row: tuple[int] = connection.execute("SELECT COUNT(*) FROM threads").fetchone()
+        return int(row[0])
+    finally:
+        connection.close()
+
+
+class _LaunchFails(RunManager):
+    """A manager whose runs cannot start for a reason that is not one of Dot's errors, as on a full disk."""
+
+    async def _launch(
+        self,
+        goal: str,
+        mode: RunMode,
+        model: str | None,
+        thread_id: str | None,
+        source: str,
+        parent_run_id: str | None,
+        effort: Effort | None,
+        approvals: ApprovalMode | None,
+        goal_mode: bool | None,
+        opening: RunOpening,
+        campaign_id: str | None,
+        agent_id: str | None,
+    ) -> tuple[RunRecord, RunHandle]:
+        raise OSError(errno.ENOSPC, "No space left on device")
+
+
+async def test_a_campaign_whose_opening_session_could_not_start_in_any_way_is_not_kept(
+    login_env: dict[str, str],
+) -> None:
+    """Item 180: before, only one of Dot's errors took the campaign back; any other kept an active campaign with no
+    session, and the daemon's next start began it with no one having asked again."""
+    model: RecordingProvider = RecordingProvider(ScriptedProvider(_PROVIDER, []))
+    async with _session(_config(60), login_env, model, Notices()) as (runtime, _):
+        manager: _LaunchFails = _LaunchFails(runtime)
+        try:
+            threads: int = await asyncio.to_thread(_threads, db_path())
+            with pytest.raises(OSError, match="No space left on device"):
+                await manager.start_campaign(
+                    GOAL, "task", SCRIPTED_MODEL, None, UI_SOURCE, None, "ask", None, (), "own"
+                )
+            assert await runtime.store.list_campaigns() == []
+            assert await manager.resume_campaigns() == 0
+            # The thread made for the campaign went with it.
+            assert await asyncio.to_thread(_threads, db_path()) == threads
+        finally:
             await manager.shutdown()
