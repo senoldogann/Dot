@@ -26,7 +26,17 @@ from dotagent.llm.router import ModelRef, parse_model_ref
 from dotagent.policy.elements import looks_like_key
 from dotagent.policy.types import ActionInfo, Flag
 from dotagent.secrets import require_secret
-from dotagent.tools.base import ALL_MODES, RegisteredTool, ToolArgs, ToolResult, fail, make_tool, mark_untrusted, ok
+from dotagent.tools.base import (
+    ALL_MODES,
+    RegisteredTool,
+    ToolArgs,
+    ToolResult,
+    fail,
+    make_path_tool,
+    make_tool,
+    mark_untrusted,
+    ok,
+)
 from dotagent.tools.browser import checked_url
 from dotagent.tools.context import ToolContext
 from dotagent.tools.files import read_flags, resolve_path
@@ -807,7 +817,7 @@ def _extract_tool() -> RegisteredTool:
         result: ToolResult = ok(text_out) if extractions else fail(text_out)
         return mark_untrusted(result)
 
-    return make_tool(
+    return make_path_tool(
         name="web_extract",
         description=(
             "Pull named fields out of pages or files as JSON on the fast model, so the pages never enter your "

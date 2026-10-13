@@ -26,7 +26,7 @@ from dotagent.tools.base import (
     RegisteredTool,
     ToolArgs,
     ToolResult,
-    make_tool,
+    make_path_tool,
     ok,
     ok_with_images,
 )
@@ -168,7 +168,7 @@ def _read_file_tool() -> RegisteredTool:
             desktop.jpeg_quality,
         )
 
-    return make_tool(
+    return make_path_tool(
         name="read_file",
         description="Read a text file with line numbers (also images and PDFs). Use offset/limit for large files.",
         args_model=ReadFileArgs,
@@ -226,7 +226,7 @@ def _write_file_tool() -> RegisteredTool:
         written: int = await asyncio.to_thread(atomic_write, path, args.content, journal_for(ctx, "write_file"))
         return ok(f"Wrote {written} bytes ({args.content.count(chr(10)) + 1} lines) to {path}")
 
-    return make_tool(
+    return make_path_tool(
         name="write_file",
         description="Create or overwrite a file with the given content. Prefer edit_file for small changes.",
         args_model=WriteFileArgs,
@@ -309,7 +309,7 @@ def _edit_file_tool() -> RegisteredTool:
         )
         return ok(message)
 
-    return make_tool(
+    return make_path_tool(
         name="edit_file",
         description="Replace exact text in a file. Fails if the text is missing or ambiguous, so copy it verbatim.",
         args_model=EditFileArgs,
@@ -371,7 +371,7 @@ def _list_dir_tool() -> RegisteredTool:
         lines: list[str] = await asyncio.to_thread(_walk, path, args.depth or 1)
         return ok(f"{path}\n" + ("\n".join(lines) if lines else "(empty)"))
 
-    return make_tool(
+    return make_path_tool(
         name="list_dir",
         description="List a directory (directories first). Use depth for a shallow tree.",
         args_model=ListDirArgs,
@@ -471,7 +471,7 @@ def _search_files_tool() -> RegisteredTool:
             raise ToolExecutionError("ripgrep failed", {"exit": code, "stderr": stderr[:500], "pattern": args.pattern})
         return ok(_capped(stdout.splitlines(), "matches"))
 
-    return make_tool(
+    return make_path_tool(
         name="search_files",
         description="Search file contents with ripgrep (regex). Returns path:line:text.",
         args_model=SearchFilesArgs,
@@ -512,7 +512,7 @@ def _find_files_tool() -> RegisteredTool:
             raise ToolExecutionError("ripgrep failed", {"exit": code, "stderr": stderr[:500], "glob": args.glob})
         return ok(_capped(sorted(stdout.splitlines()), "files"))
 
-    return make_tool(
+    return make_path_tool(
         name="find_files",
         description="Find files by glob pattern (respects .gitignore).",
         args_model=FindFilesArgs,

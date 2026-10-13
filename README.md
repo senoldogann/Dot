@@ -513,7 +513,10 @@ the mark. A delegated run starts as untrusted as its parent.
 - Outside a `yolo` run the agent can neither read nor change `~/.ssh`, `~/.gnupg`, `~/Library/Keychains`, `~/.aws`,
   `~/.config/gcloud` and the data directory of your Chrome (`[policy] protected_paths`), nor Dot's own key file, token,
   browser profile, configuration, database and journals of file changes. The configuration holds the policy and the MCP
-  servers, the database the rules, the journals what `dotx undo` writes back.
+  servers, the database the rules, the journals what `dotx undo` writes back. In any mode, a tool that names files (the
+  file tools, `web_extract`, `browser_upload`) looks at them again as it starts: a call whose path leads elsewhere by
+  then (a link moved while the call waited for its approval) is refused, and called again it is decided for where the
+  path leads now.
 - Outside a `yolo` run the agent reads what Dot loads and runs, and runs a skill's files, but never changes them: its
   own code (the folder its package is imported from, the Python environment it runs in and the Python under that, and
   the file of the launchd job that starts the daemon), its plugins and their own files, its skills (with the
@@ -855,17 +858,18 @@ stop cut the reflection (a stop does not wait for one, and it records nothing un
 
 **Taking back the file changes of a run.** Before `write_file` or `edit_file` changes a file, the run notes the change
 in its journal (`undo/` in the home directory), and its first change to a file keeps a copy of the file as it was. When
-the change cannot be noted (a full disk, say), the file is not changed and the model is told why. `dotx undo RUN_ID`
-shows what taking back the changes of that run and of the runs it delegated to would do: a file the run changed is put
-back as it was (`restore`), with its permissions, a file it created is deleted (`delete`), and the folders it created
-are removed once they are empty. Nothing is changed until `dotx undo RUN_ID --apply`, which exits with 1 when it left a
-file as it is. A file that changed or was deleted after the run's last change to it is a conflict and is left as it is;
-`--apply --force` takes it back too, and what changed in it since is lost. A file larger than `undo_max_file_bytes`
-(10 MiB), or whose copy would bring the copies of the run past `undo_max_run_bytes` (100 MiB), is changed without a copy
-and cannot be put back; a file the run created can always be deleted again. A copy that is not the one the journal
-noted is not written back, and a folder that is now where a file was is never replaced. Only the two file tools are in
-the journal: what a shell command (`rm`, `mv`, `sed -i`), the browser or the desktop changed is not. A run that is still
-working is refused; a run of `dotx run` that a crash left working ends when the daemon starts again.
+the change cannot be noted (a full disk, say), the file is not changed and the model is told why; a note the disk cut
+short is left out of the journal, so the run's next change is noted after it and `dotx undo` still reads it.
+`dotx undo RUN_ID` shows what taking back the changes of that run and of the runs it delegated to would do: a file the
+run changed is put back as it was (`restore`), with its permissions, a file it created is deleted (`delete`), and the
+folders it created are removed once they are empty. Nothing is changed until `dotx undo RUN_ID --apply`, which exits
+with 1 when it left a file as it is. A file that changed or was deleted after the run's last change to it is a conflict
+and is left as it is; `--apply --force` takes it back too, and what changed in it since is lost. A file larger than
+`undo_max_file_bytes` (10 MiB), or whose copy would bring the copies of the run past `undo_max_run_bytes` (100 MiB), is
+changed without a copy and cannot be put back; a file the run created can always be deleted again. A copy that is not
+the one the journal noted is not written back, and a folder that is now where a file was is never replaced. Only the two
+file tools are in the journal: what a shell command (`rm`, `mv`, `sed -i`), the browser or the desktop changed is not. A
+run that is still working is refused; a run of `dotx run` that a crash left working ends when the daemon starts again.
 `dotx prune --apply` deletes the journals whose last change is older than `undo_keep_days` (30 days). The Actions card
 of the run's page shows the same plan, one file at a time, with a button for each file that is as the run left it.
 

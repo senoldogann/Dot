@@ -59,6 +59,7 @@ from dotagent.tools.base import (
     ToolArgs,
     ToolResult,
     fail,
+    make_path_tool,
     make_reviewed_tool,
     make_tool,
     mark_untrusted,
@@ -655,7 +656,7 @@ def _upload_tool() -> RegisteredTool:
         paths: list[str] = [str(expand_path(raw, ctx.workspace)) for raw in args.paths]
         return _page_result(await ctx.browser.upload(ctx.thread_id, args.ref, paths), ctx)
 
-    return make_tool(
+    return make_path_tool(
         name="browser_upload",
         description=(
             "Attach local files to an upload button or file input on the page, using its ref. Outside yolo runs only "

@@ -5,7 +5,7 @@ from dataclasses import dataclass
 
 from pydantic import BaseModel, ConfigDict, JsonValue, ValidationError
 
-from dotagent.core.errors import ToolInputError
+from dotagent.core.errors import ToolExecutionError, ToolInputError
 from dotagent.core.types import FrozenModel, JsonObject
 from dotagent.llm.types import ImageData, ToolSpec
 from dotagent.policy.types import ActionInfo
@@ -192,6 +192,42 @@ def make_tool[A: ToolArgs](
         return classify(args, ctx)
 
     async def run_authorized(args: A, ctx: ToolContext, authorized: ActionInfo) -> ToolResult:
+        return await run(args, ctx)
+
+    return _build(name, description, args_model, modes, parallel_safe, timeout_s, classify_now, run_authorized)
+
+
+def _described(action: ActionInfo) -> JsonObject:
+    flags: list[JsonValue] = list(action.flags)
+    return {"summary": action.summary, "flags": flags}
+
+
+def make_path_tool[A: ToolArgs](
+    name: str,
+    description: str,
+    args_model: type[A],
+    modes: frozenset[RunMode],
+    parallel_safe: bool,
+    timeout_s: float,
+    classify: Callable[[A, ToolContext], ActionInfo],
+    run: Callable[[A, ToolContext], Awaitable[ToolResult]],
+) -> RegisteredTool:
+    """A tool whose action is classified from its arguments and the files they name as they are on disk. It is
+    classified again as it starts, with no wait between that and ``run``, and refused when that differs from the action
+    that was authorised: a link moved while the call waited for its approval, or a path that became one, would have it
+    work on a file it was not allowed to."""
+
+    async def classify_now(args: A, ctx: ToolContext) -> ActionInfo:
+        return classify(args, ctx)
+
+    async def run_authorized(args: A, ctx: ToolContext, authorized: ActionInfo) -> ToolResult:
+        now: ActionInfo = classify(args, ctx)
+        if now != authorized:
+            raise ToolExecutionError(
+                "the call was not run: what it names changed while it waited (a path leads elsewhere now, or the page "
+                "is another); call the tool again",
+                {"tool": name, "authorized": _described(authorized), "now": _described(now)},
+            )
         return await run(args, ctx)
 
     return _build(name, description, args_model, modes, parallel_safe, timeout_s, classify_now, run_authorized)
