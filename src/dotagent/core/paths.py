@@ -79,6 +79,11 @@ def pid_path() -> Path:
     return dot_home() / "daemon.pid"
 
 
+def running_mark_path() -> Path:
+    """The mark a daemon leaves while it runs and removes when it ends without an error (``server/daemon.py``)."""
+    return dot_home() / "daemon.running"
+
+
 def run_owners_dir() -> Path:
     """The lock files of the processes that drive runs (the daemon, ``dotx run``), one per process, each held while its
     process lives (:mod:`dotagent.agent.owners`)."""

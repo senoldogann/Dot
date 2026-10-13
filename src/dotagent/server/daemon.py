@@ -19,8 +19,9 @@ from dotagent.agent.manager import RunManager
 from dotagent.config import AppConfig
 from dotagent.core.errors import ConfigError, RunConflict
 from dotagent.core.logs import get_logger
-from dotagent.core.paths import dot_home, pid_path, token_path
-from dotagent.notify.push import watch_pushes
+from dotagent.core.paths import dot_home, pid_path, running_mark_path, token_path
+from dotagent.events import DAEMON_RESTARTED_EVENT, SYSTEM_RUN_ID, DaemonRestarted, Subscription
+from dotagent.notify.push import PUSH_KINDS, watch_pushes
 from dotagent.runtime import Runtime, build_runtime, close_runtime
 from dotagent.scheduler.runner import Scheduler
 from dotagent.server.app import create_app
@@ -103,6 +104,17 @@ def instance_lock(path: Path) -> Iterator[None]:
         os.close(descriptor)
 
 
+@contextlib.contextmanager
+def running_mark(path: Path) -> Iterator[bool]:
+    """Leave a mark at ``path`` for as long as the daemon runs, and remove it only when the daemon ends without an
+    error. Yields whether the daemon before this one left its mark: it did not end cleanly (it was killed, it crashed,
+    or it ended with an error, such as a scheduler loop that failed)."""
+    left: bool = path.exists()
+    path.touch(_PRIVATE_FILE_MODE)
+    yield left
+    path.unlink()
+
+
 def _end_with_scheduler(server: DotServer, scheduler_loop: asyncio.Task[None]) -> None:
     """Schedules must not silently stop firing: when the scheduler loop ends by itself (its ticks failed
     ``FAILED_TICKS_TO_END`` times in a row, see ``scheduler/runner.py``), so does the daemon."""
@@ -140,13 +152,15 @@ async def run_daemon(config: AppConfig) -> None:
 
     Raises when the address is taken, another daemon runs, or the scheduler loop failed. On the way out the scheduler
     stops, the runs that are going on are cancelled, the schedules that finished are written and the services close.
+    A start that finds the mark of a daemon that did not end cleanly (:func:`running_mark`) tells the owner, with the
+    number of runs it left active (``daemon_restarted``).
     """
     host: str = config.server.host
     require_loopback(host)
     token: str = await asyncio.to_thread(read_or_create_token, token_path())
     loop: asyncio.AbstractEventLoop = asyncio.get_running_loop()
     stop: asyncio.Event = asyncio.Event()
-    with instance_lock(pid_path()):
+    with instance_lock(pid_path()), running_mark(running_mark_path()) as unclean:
         async with AsyncExitStack() as cleanup:
             for number in _STOP_SIGNALS:
                 loop.add_signal_handler(number, stop.set)
@@ -161,14 +175,27 @@ async def run_daemon(config: AppConfig) -> None:
             cleanup.push_async_callback(scheduler.drain)
             cleanup.push_async_callback(manager.shutdown)
             cleanup.push_async_callback(scheduler.stop)
+            stopping: asyncio.Event = asyncio.Event()
+            # The phone hears what the desktop notifications say, from before the start's own work (the restart below,
+            # the firings the scheduler's first tick finds missed) until the runs are stopped on the way out.
+            feed: Subscription = await cleanup.enter_async_context(runtime.bus.subscribe_kinds(PUSH_KINDS))
+            pusher: asyncio.Task[None] = asyncio.create_task(
+                watch_pushes(runtime.store, feed, runtime.push_keys, stopping), name="push"
+            )
+            pusher.add_done_callback(_log_push_end)
+            cleanup.push_async_callback(_cancelled, pusher)
             recovered: int = await manager.recover()
+            if unclean:
+                log.warning("daemon_restarted_after_unclean_end", runs_cut_off=recovered)
+                await runtime.bus.emit(
+                    SYSTEM_RUN_ID, DAEMON_RESTARTED_EVENT, DaemonRestarted(runs_cut_off=recovered).model_dump(), False
+                )
             # Before the scheduler and the server start: a resumed run takes its place before any new run, and no new
             # message reaches its thread before it.
             resumed: tuple[RunRecord, ...] = await manager.resume_safe() if config.agent.resume == "safe" else ()
             # A session is never resumed as a run: a campaign whose session the daemon cut off goes on with a new one.
             campaigns: int = await manager.resume_campaigns()
             scheduler_loop: asyncio.Task[None] = await scheduler.start()
-            stopping: asyncio.Event = asyncio.Event()
             context: ServerContext = ServerContext(
                 runtime=runtime,
                 manager=manager,
@@ -183,12 +210,6 @@ async def run_daemon(config: AppConfig) -> None:
             scheduler_loop.add_done_callback(functools.partial(_end_with_scheduler, server))
             stopper: asyncio.Task[None] = asyncio.create_task(_stop_server_on(stop, server), name="stop-server")
             cleanup.push_async_callback(_cancelled, stopper)
-            # The phone hears what the desktop notifications say: every push subscription gets the lifecycle events.
-            pusher: asyncio.Task[None] = asyncio.create_task(
-                watch_pushes(runtime.store, runtime.bus, runtime.push_keys, stopping), name="push"
-            )
-            pusher.add_done_callback(_log_push_end)
-            cleanup.push_async_callback(_cancelled, pusher)
             log.info(
                 "daemon_started",
                 url=base_url(host, port),

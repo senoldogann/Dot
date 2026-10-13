@@ -8,11 +8,16 @@ one with :func:`next_session_at`.
 """
 
 from collections.abc import Sequence
+from typing import Literal
 
 from dotagent.core.text import fold_search, truncate_tail
 from dotagent.core.types import FrozenModel
 from dotagent.store.models import ApprovalStatus, BrowserMode, CampaignEntry, CampaignRecord, RunRecord, RunStatus
 
+# The live event, on the run of its session, of a campaign that ended by itself: the goal checker accepted its outcome,
+# or it stopped (the owner's emergency stop ended a session, or it ran the sessions it may). What the owner does to a
+# campaign sends none: they know it.
+CAMPAIGN_ENDED_EVENT: str = "campaign_ended"
 # How many entries of the ledger a brief shows, the newest last.
 BRIEF_ENTRIES: int = 12
 # How many questions left for the owner a brief shows, the newest last.
@@ -21,6 +26,15 @@ _RESULT_CHARS: int = 600
 _SECONDS_PER_MINUTE: float = 60.0
 _SECONDS_PER_HOUR: float = 3600.0
 _SECONDS_PER_DAY: float = 86400.0
+
+
+class CampaignEnded(FrozenModel):
+    """What ``campaign_ended`` carries: the campaign, how it ended and the note its ledger got for it."""
+
+    campaign_id: str
+    title: str
+    status: Literal["achieved", "stopped"]
+    note: str
 
 
 class BriefQuestion(FrozenModel):

@@ -5070,8 +5070,8 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 147 | A folder whose reading macOS broke off does not fail a search                        | done        | ca16c37 |
 | 148 | The queue of a chat, after T3 Code                                                   | done        | 5f6747b |
 | 149 | The scheduler goes on past a failure                                                 | done        | 1ec1497 |
-| 150 | A tool that raises fails its call, not its run                                       | in progress |         |
-| 151 | A question a run left reaches the owner                                              | planned     |         |
+| 150 | A tool that raises fails its call, not its run                                       | done        | ba4f2a6 |
+| 151 | A question a run left reaches the owner                                              | in progress |         |
 | 152 | A late one-time schedule is never dropped unseen                                     | planned     |         |
 | 153 | A server of tools that cannot start does not stop the daemon                         | planned     |         |
 | 154 | The memory keeps what it learns                                                      | planned     |         |
@@ -8219,7 +8219,7 @@ daemon and every run it held.
 
 ### 150. A tool that raises fails its call, not its run
 
-**Status: in progress.**
+**Status: done.** Merged as `ba4f2a6` (PR #187; no Linear issue, the Linear connector was signed out).
 
 **As built (2026-10-13).** The executor turns any error of a tool into a failed result of that call (`_run_checked`): an
 error no tool expects, a fault in Dot rather than in what the call asked, is logged with its traceback (`tool_crashed`)
@@ -8239,10 +8239,31 @@ used to end the run.
 
 ### 151. A question a run left reaches the owner
 
-**Status: planned.**
+**Status: in progress.**
 
-**What.** A question a run left for the owner reaches the owner as a push, as an approval does, and so do the ends the
-owner would not otherwise see: a campaign that stopped or reached its goal, a schedule that could not fire.
+**As built (2026-10-13).** The phone's pushes and the page's desktop notifications (`attention.js`, which the desktop
+app's notifications go through too) say the same things in the same words. A question a run left (`question_left`: a
+`yolo`, scheduled or campaign run goes on without the answer) is told as one asked is; before, only `approval_requested`
+and `run_finished` were, so the question waited unseen, for a campaign up to `campaign_wait_hours`. The end of a run
+tells the first line of its answer rather than its goal. Three live events are new. `campaign_ended`, on the session's
+run, when the goal checker accepts a campaign's outcome or the emergency stop or `campaign_max_sessions` stops it; the
+owner's own Stop, Go on and Mark achieved tell nothing, and the accepted claim's banner of macOS Notification Center
+went, as it would be a second one on the Mac. `schedule_missed`, of Dot itself (`SYSTEM_RUN_ID`), when a firing is
+skipped as overdue or its run cannot start, once while the schedule's status stays the same; the skips of the emergency
+stop and of a run still going are not told, as the owner sees those already. `daemon_restarted`, when a start finds
+`<home>/daemon.running`, the mark a daemon leaves while it runs and removes only when it ends without an error, with the
+number of runs that start closed. The daemon opens the push subscription before its start's own work, so the restart and
+the missed firings of the first tick are pushed. Tests: a `yolo` run's question reaches the push service and the run
+goes on (two posts, not one); the page tells the question, the first line of the end, a campaign's stop and a missed
+firing; the scheduler tells an overdue firing and a failed start once; a campaign's accepted claim and its emergency
+stop send `campaign_ended`; a real daemon that starts where one did not end cleanly pushes the restart, and takes its
+own mark away when it stops; the mark stays after a daemon that raised; unit tests give the words of every message. Each
+part's test failed with that part of before.
+
+**What.** A question a run left for the owner reaches the owner as an approval does, on the phone and in the page's
+notifications, and so do the ends the owner would not otherwise see: a campaign that ended by itself, a firing a
+schedule missed, and (on the phone, as no page is there yet) a start of the daemon after it did not stop cleanly. The
+end of a run tells the first line of its answer.
 
 ### 152. A late one-time schedule is never dropped unseen
 
@@ -8865,3 +8886,4 @@ small.
 - 2026-10-13 (Opus 5.5): item 147 merged as `ca16c37` (PR #183; no Linear issue, the connector was signed out): a search shows what it found where macOS broke off the reading of a folder, as it does beside the places it may not read; found in the records of a run while answering the owner's question whether the guards of parts 22 and 23 took the agent's freedom. The daemon restarted with it. Part 23 is done.
 - 2026-10-13 (Opus 5.5): item 148 merged as `5f6747b` (PR #184; no Linear issue, the connector was signed out): T3 Code's queued messages in Dot: a message sent while a chat's run works waits in the chat's queue, shown above the composer, and starts as the chat's next run once that run has ended done; a stop, a failure or a restart holds the queue until Resume. The browser test found and the item fixed the focus and the drag of the rows and Cancel on a phone. Part 24 is done.
 - 2026-10-13 (Opus 5.5): item 149 merged as `1ec1497` (PR #186; no Linear issue, the connector was signed out): a tick of the scheduler does its parts each on its own and a failed tick is tried again, so one error no longer ends the daemon with every run it holds; only twenty failed ticks in a row end it. A check of `test_composer.py` that read a colour while it faded was made to wait for it.
+- 2026-10-13 (Opus 5.5): item 150 merged as `ba4f2a6` (PR #187; no Linear issue, the connector was signed out): any error of a tool fails that call, not the run, and one no tool expects is logged with its traceback; `edit_file` keeps a file's CRLF line ends and refuses a file that is not UTF-8 text, saying so.

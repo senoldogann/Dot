@@ -13,8 +13,10 @@ from dotagent.agent.attachments import StoredAttachment, UserInput, attachment_s
 from dotagent.agent.campaign import (
     BRIEF_ENTRIES,
     BRIEF_QUESTIONS,
+    CAMPAIGN_ENDED_EVENT,
     Brief,
     BriefQuestion,
+    CampaignEnded,
     LastSession,
     campaign_browser,
     next_session_at,
@@ -1394,37 +1396,38 @@ class RunManager:
             False,
         )
 
+    async def _tell_campaign_stopped(self, run: RunRecord, campaign: CampaignRecord, note: str) -> None:
+        ended: CampaignEnded = CampaignEnded(campaign_id=campaign.id, title=campaign.title, status="stopped", note=note)
+        await self._runtime.bus.emit(run.id, CAMPAIGN_ENDED_EVENT, ended.model_dump(), False)
+
     async def _follow_session(self, run: RunRecord, campaign_id: str, ending: Ending, needs: str) -> None:
         """Plan what follows a session of a campaign that ended as ``ending`` (one the daemon stopped is planned by
         :meth:`resume_campaigns` when it starts again). A campaign that is no longer active plans nothing; the owner's
         emergency stop of desktop control stops the campaign too, and so does running the sessions
         ``[agent] campaign_max_sessions`` allows; otherwise the next session starts as
-        :func:`dotagent.agent.campaign.next_session_at` says. A failure is logged: the run's end is recorded already,
-        and the daemon plans the campaign again when it starts."""
+        :func:`dotagent.agent.campaign.next_session_at` says. A campaign that stops is told to the owner
+        (``campaign_ended``). A failure is logged: the run's end is recorded already, and the daemon plans the campaign
+        again when it starts."""
         runtime: Runtime = self._runtime
         try:
             campaign: CampaignRecord = await runtime.store.get_campaign(campaign_id)
             if campaign.status != "active":
                 return
             if ending == "emergency_stop":
+                halted: str = "Stopped: the owner's emergency stop ended this session."
                 await runtime.store.set_campaign_status(campaign.id, "stopped", None)
-                await runtime.store.add_campaign_entry(
-                    campaign.id, run.id, "note", "Stopped: the owner's emergency stop ended this session.", {}
-                )
+                await runtime.store.add_campaign_entry(campaign.id, run.id, "note", halted, {})
                 log.info("campaign_stopped_by_an_emergency_stop", campaign_id=campaign.id, run_id=run.id)
+                await self._tell_campaign_stopped(run, campaign, halted)
                 return
             sessions: int = len(await runtime.store.campaign_sessions(campaign.id))
             limit: int = runtime.config.agent.campaign_max_sessions
             if 0 < limit <= sessions:
+                spent: str = f"Stopped after {sessions} sessions: [agent] campaign_max_sessions is {limit}."
                 await runtime.store.set_campaign_status(campaign.id, "stopped", None)
-                await runtime.store.add_campaign_entry(
-                    campaign.id,
-                    None,
-                    "note",
-                    f"Stopped after {sessions} sessions: [agent] campaign_max_sessions is {limit}.",
-                    {},
-                )
+                await runtime.store.add_campaign_entry(campaign.id, None, "note", spent, {})
                 log.info("campaign_stopped_at_its_limit", campaign_id=campaign.id, sessions=sessions)
+                await self._tell_campaign_stopped(run, campaign, spent)
                 return
             asked: list[ApprovalRecord] = await runtime.store.run_questions(run.id, ASK_USER_TOOL)
             following: float = next_session_at(

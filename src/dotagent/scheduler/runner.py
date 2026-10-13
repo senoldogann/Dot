@@ -10,8 +10,9 @@ from dotagent.agent.reflection import Reflection, last_reflection, reflection_du
 from dotagent.core.errors import DotError, NotFoundError, RunConflict, StoreError
 from dotagent.core.logs import get_logger
 from dotagent.core.paths import failsafe_path
+from dotagent.events import SYSTEM_RUN_ID
 from dotagent.runtime import Runtime
-from dotagent.scheduler import SCHEDULE_SOURCE
+from dotagent.scheduler import SCHEDULE_MISSED_EVENT, SCHEDULE_SOURCE, ScheduleMissed
 from dotagent.scheduler.plans import schedule_zone
 from dotagent.scheduler.timing import format_local, next_firing
 from dotagent.store.db import Store
@@ -198,7 +199,8 @@ class Scheduler:
     async def _fire(self, record: ScheduleRecord, now: float) -> None:
         """Start the run of a due schedule; a firing the emergency stop, a run still going or a long absence of the
         daemon keeps from starting is skipped to the schedule's next time, with the reason as its status. An emergency
-        stop engaged while the run was being started ends it as one."""
+        stop engaged while the run was being started ends it as one. A firing missed where nobody saw it, one overdue
+        or one whose run could not start, is told (:meth:`_tell_missed`)."""
         store: Store = self._runtime.store
         if record.next_run_at is None:
             raise StoreError("a due schedule has no next run", {"schedule_id": record.id})
@@ -215,9 +217,9 @@ class Scheduler:
             return
         if overdue_s > self._runtime.config.scheduler.misfire_grace_s:
             log.warning("schedule_skipped_overdue", schedule_id=record.id, overdue_s=round(overdue_s))
-            await store.record_schedule_skip(
-                record.id, following, f"skipped: {round(overdue_s / 60)} minutes overdue (the daemon was not running)"
-            )
+            overdue: str = f"skipped: {round(overdue_s / 60)} minutes overdue (the daemon was not running)"
+            await store.record_schedule_skip(record.id, following, overdue)
+            await self._tell_missed(record, overdue)
             return
         title: str = thread_title(f"{record.name} · {format_local(now, zone)}")
         thread: ThreadRecord = await store.create_thread(title, SCHEDULE_SOURCE)
@@ -237,8 +239,10 @@ class Scheduler:
             )
         except DotError as exc:
             log.error("schedule_start_failed", schedule_id=record.id, error=exc.message, context=exc.context)
-            await store.set_schedule_status(record.id, f"failed to start: {exc.message}")
+            failed: str = f"failed to start: {exc.message}"
+            await store.set_schedule_status(record.id, failed)
             await store.delete_threads([thread.id])
+            await self._tell_missed(record, failed)
             return
         if await _emergency_stop_engaged():
             log.warning("schedule_run_stopped_emergency_stop", schedule_id=record.id, run_id=run.id)
@@ -258,6 +262,14 @@ class Scheduler:
         watcher: asyncio.Task[None] = asyncio.create_task(self._watch(record.id, run.id), name=f"watch-{run.id}")
         self._watchers.add(watcher)
         watcher.add_done_callback(self._watcher_done)
+
+    async def _tell_missed(self, record: ScheduleRecord, status: str) -> None:
+        """Tell the owner that the schedule ``record`` (as it was before this firing) missed it, with ``status`` saying
+        why; not again when its status said so already, so a schedule that keeps failing the same way is told once."""
+        if record.last_status == status:
+            return
+        missed: ScheduleMissed = ScheduleMissed(schedule_id=record.id, name=record.name, status=status)
+        await self._runtime.bus.emit(SYSTEM_RUN_ID, SCHEDULE_MISSED_EVENT, missed.model_dump(), False)
 
     async def _start_session(self, campaign_id: str) -> None:
         try:

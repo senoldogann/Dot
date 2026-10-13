@@ -24,11 +24,11 @@ from dotagent.config import ModelsConfig, load_config
 from dotagent.core.errors import ConfigError, StoreError, ToolExecutionError, ToolInputError
 from dotagent.core.paths import failsafe_path, workspace_dir
 from dotagent.core.types import JsonObject
-from dotagent.events import EventBus
+from dotagent.events import SYSTEM_RUN_ID, EventBus, Subscription
 from dotagent.llm.types import Effort
 from dotagent.policy.types import ActionInfo, ApprovalMode
 from dotagent.runtime import Runtime, build_runtime, close_runtime
-from dotagent.scheduler import SCHEDULE_SOURCE
+from dotagent.scheduler import SCHEDULE_MISSED_EVENT, SCHEDULE_SOURCE
 from dotagent.scheduler.plans import UNSET_OPTIONS, ScheduleRequest, create_schedule, edit_schedule
 from dotagent.scheduler.runner import FAILED_TICKS_TO_END, Scheduler
 from dotagent.scheduler.timing import format_local, named_zone, next_firing
@@ -245,14 +245,24 @@ async def test_the_number_of_switched_on_schedules_is_limited(runtime: Runtime) 
 # --------------------------------------------------------------------------------- firing and skipping
 
 
+def _missed(feed: Subscription) -> list[tuple[str, str, str]]:
+    """The firings ``feed`` (of ``schedule_missed``) was told were missed so far: the run id, name and status."""
+    events: list[EventRecord] = [feed.queue.get_nowait() for _ in range(feed.queue.qsize())]
+    return [(event.run_id, str(event.data["name"]), str(event.data["status"])) for event in events]
+
+
 async def test_an_overdue_firing_is_skipped_and_the_next_one_planned(runtime: Runtime, scheduler: Scheduler) -> None:
     grace_s: int = runtime.config.scheduler.misfire_grace_s
     threads_before: int = len(await runtime.store.list_threads(1000))
 
     recurring: ScheduleRecord = await _schedule(runtime, _cron("Daily", "0 9 * * *"))
     late: float = _planned(recurring) + grace_s + 120
-    await scheduler.tick(late)
+    async with runtime.bus.subscribe_kinds(frozenset({SCHEDULE_MISSED_EVENT})) as feed:
+        await scheduler.tick(late)
+        told: list[tuple[str, str, str]] = _missed(feed)
     skipped: ScheduleRecord = await runtime.store.get_schedule(recurring.id)
+    # Item 151: nobody saw the firing go, so the owner is told.
+    assert told == [(SYSTEM_RUN_ID, "Daily", skipped.last_status)]
     assert skipped.last_status.startswith("skipped: ") and "overdue" in skipped.last_status
     assert skipped.enabled
     assert skipped.next_run_at == next_firing("0 9 * * *", late, runtime.schedule_zone)
@@ -275,11 +285,19 @@ async def test_a_firing_that_cannot_start_leaves_no_thread_behind(runtime: Runti
 
     recurring: ScheduleRecord = await _schedule(runtime, _cron("Broken", "0 9 * * *"))
     now: float = _planned(recurring) + 5
-    await Scheduler(broken, manager).tick(now)
+    async with runtime.bus.subscribe_kinds(frozenset({SCHEDULE_MISSED_EVENT})) as feed:
+        await Scheduler(broken, manager).tick(now)
+        told: list[tuple[str, str, str]] = _missed(feed)
+        failed: ScheduleRecord = await runtime.store.get_schedule(recurring.id)
+        assert failed.next_run_at is not None
+        # The next firing fails the same way: the owner was told already.
+        await Scheduler(broken, manager).tick(failed.next_run_at + 5)
+        told_again: list[tuple[str, str, str]] = _missed(feed)
 
-    failed: ScheduleRecord = await runtime.store.get_schedule(recurring.id)
     assert failed.last_status.startswith("failed to start: a model reference must look like")
     assert failed.next_run_at == next_firing("0 9 * * *", now, runtime.schedule_zone)
+    assert told == [(SYSTEM_RUN_ID, "Broken", failed.last_status)] and told_again == []
+    assert (await runtime.store.get_schedule(recurring.id)).last_status == failed.last_status
     assert len(await runtime.store.list_threads(1000)) == threads_before
 
 
