@@ -204,8 +204,8 @@ class ResumedCallPayload(Payload):
 
 
 class ResumedPayload(Payload):
-    """A run that goes on from where the daemon cut the run before it off: that run, how it was cut off, whether the
-    daemon resumed it on its own, and how each call of the step it was in ended."""
+    """A run that goes on from where the run before it was cut off: that run, how it was cut off, whether the daemon
+    resumed it on its own, and how each call of the step it was in ended."""
 
     from_run_id: str
     cut_off: CutOff
@@ -495,8 +495,13 @@ class TerminalUi:
 
     def _on_resumed(self, resumed: ResumedPayload) -> None:
         who: str = "on its own when the daemon started" if resumed.automatic else "by hand"
-        how: str = "was shut down" if resumed.cut_off == "daemon_shutdown" else "stopped"
-        self._line(self._paint(f"  ↺ resumed {who}: the daemon {how} while run {resumed.from_run_id} worked", "35"))
+        before: str = resumed.from_run_id
+        hows: dict[CutOff, str] = {
+            "daemon_restarted": f"the daemon stopped while run {before} worked",
+            "daemon_shutdown": f"the daemon was shut down while run {before} worked",
+            "process_ended": f"the dotx command that drove run {before} was told to end while it worked",
+        }
+        self._line(self._paint(f"  ↺ resumed {who}: {hows[resumed.cut_off]}", "35"))
         ends: dict[CallEnd, str] = {
             "succeeded": "finished",
             "failed": "failed",

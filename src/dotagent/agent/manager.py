@@ -68,6 +68,7 @@ from dotagent.store.endings import (
     PREFIX_EMERGENCY_STOP,
     PREFIX_INTERNAL_ERROR,
     RESULT_EMERGENCY_STOPPED,
+    RESULT_PROCESS_ENDED,
     RESULT_SHUTDOWN,
     RESULT_STOPPED,
     Ending,
@@ -173,6 +174,8 @@ class RunManager:
         self._stopping: bool = False
         # Active runs the owner's emergency stop is ending (:meth:`emergency_stop`).
         self._emergency: set[str] = set()
+        # Active runs that the end of the ``dotx`` command driving them is cutting off (:meth:`cut_off`).
+        self._cutting: set[str] = set()
         # How many emergency stops there were: a run being launched as one comes ends as one too (:meth:`_launch`).
         self._stops: int = 0
         # This process's hold on the runs it drives, taken with its first run (:mod:`dotagent.agent.owners`).
@@ -636,14 +639,14 @@ class RunManager:
         return can_resume(run, await self._newest_run_id(run.thread_id))
 
     async def resume(self, run_id: str) -> RunRecord:
-        """Resume by hand a run that the daemon cut off: a new run on its thread goes on from where it stopped. Refused
-        unless :meth:`resumable` allows it; any source may be resumed this way."""
+        """Resume by hand a run that was cut off (:func:`dotagent.agent.resume.cut_off_by`): a new run on its thread goes
+        on from where it stopped. Refused unless :meth:`resumable` allows it; any source may be resumed this way."""
         old: RunRecord = await self._runtime.store.get_run(run_id)
         newest_run_id: str = await self._newest_run_id(old.thread_id)
         if not can_resume(old, newest_run_id):
             raise RunConflict(
-                "only the newest run of a thread that the daemon cut off, and that no other run started, can be "
-                "resumed",
+                "only the newest run of a thread that was cut off, by the daemon or by the end of its dotx command, "
+                "and that no other run started, can be resumed",
                 {
                     "run_id": old.id,
                     "status": old.status,
@@ -691,6 +694,13 @@ class RunManager:
         """End the run ``run_id`` as the owner's emergency stop, when it is still active."""
         if run_id in self._handles:
             self._emergency.add(run_id)
+            self.cancel(run_id)
+
+    def cut_off(self, run_id: str) -> None:
+        """End the run ``run_id``, when it is still active, as cut off by the end of the ``dotx`` command that drives it
+        (its terminal was closed, or it got SIGTERM): unlike the owner's stop, it can be resumed (:meth:`resume`)."""
+        if run_id in self._handles:
+            self._cutting.add(run_id)
             self.cancel(run_id)
 
     def held(self, run_id: str) -> bool:
@@ -920,7 +930,7 @@ class RunManager:
         is the note of :func:`dotagent.agent.resume.resume_note`. ``automatic`` is recorded in the ``resumed`` event."""
         cut_off: CutOff | None = cut_off_by(old)
         if cut_off is None:
-            raise RunConflict("the daemon did not cut this run off", {"run_id": old.id, "status": old.status})
+            raise RunConflict("this run was not cut off", {"run_id": old.id, "status": old.status})
         plan: EventRecord | None = await self._runtime.store.last_event(old.id, PLAN_EVENT)
         resumption: Resumption = Resumption(
             from_run_id=old.id,
@@ -1267,11 +1277,14 @@ class RunManager:
                 log.exception("queue_not_followed", run_id=run.id, thread_id=run.thread_id)
 
     def _stop_result(self, run_id: str) -> str:
-        """Why a run that was cancelled ended: the daemon stopped, the owner's emergency stop, or a plain stop."""
+        """Why a run that was cancelled ended: the daemon stopped, the owner's emergency stop, the end of the ``dotx``
+        command that drove it, or a plain stop."""
         if self._stopping:
             return RESULT_SHUTDOWN
         if run_id in self._emergency:
             return RESULT_EMERGENCY_STOPPED
+        if run_id in self._cutting:
+            return RESULT_PROCESS_ENDED
         return RESULT_STOPPED
 
     async def _close(
@@ -1296,6 +1309,7 @@ class RunManager:
         finally:
             self._handles.pop(run.id, None)
             self._emergency.discard(run.id)
+            self._cutting.discard(run.id)
             finished.set()
 
     async def _record_end(

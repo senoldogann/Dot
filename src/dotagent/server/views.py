@@ -393,13 +393,14 @@ class CampaignChip(FrozenModel):
 
 
 class RunDetail(FrozenModel):
-    """A run as its page shows it. ``resumable`` is true when the daemon cut the run off and a new run can go on from
-    where it stopped (see ``agent.resume``); ``lessons`` is what became of the lessons drawn from the run once it ended,
-    ``None`` when none were (see ``agent.lessons``); ``questions`` are the questions the run left for the user that are
-    still open, oldest first; ``campaign`` is the campaign the run is a session of, ``None`` for any other run;
-    ``held`` is true while the user has taken the run's browser over (``POST /runs/{id}/takeover``); ``agent`` is the
-    agent the run belongs to (item 86), ``None`` for Dot; ``keep_going`` is true for a run in goal mode whose goal asks
-    it to keep going until it is done, which its goal check is told (item 132)."""
+    """A run as its page shows it. ``resumable`` is true when the run was cut off (by the daemon, or by the end of its
+    ``dotx`` command) and a new run can go on from where it stopped (see ``agent.resume``); ``lessons`` is what became
+    of the lessons drawn from the run once it ended, ``None`` when none were (see ``agent.lessons``); ``questions`` are
+    the questions the run left for the user that are still open, oldest first; ``campaign`` is the campaign the run is a
+    session of, ``None`` for any other run; ``held`` is true while the user has taken the run's browser over
+    (``POST /runs/{id}/takeover``); ``agent`` is the agent the run belongs to (item 86), ``None`` for Dot;
+    ``keep_going`` is true for a run in goal mode whose goal asks it to keep going until it is done, which its goal
+    check is told (item 132)."""
 
     run: RunRecord
     children: list[RunRecord]

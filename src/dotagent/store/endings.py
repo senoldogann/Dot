@@ -11,6 +11,8 @@ from dotagent.store.models import RunStatus
 
 RESULT_STOPPED: str = "The run was stopped."
 RESULT_SHUTDOWN: str = "The daemon was shut down while this run was active."
+# A run of ``dotx run`` (``resume``, ``chat``) whose terminal was closed, or whose process got SIGTERM.
+RESULT_PROCESS_ENDED: str = "The dotx command that drove this run was told to end while the run was active."
 RESULT_RESTARTED: str = "daemon stopped while the run was active"
 # A stop for lack of progress: the bare text of older runs, and the start of the text that says what was tried.
 RESULT_STALLED: str = "Stopped: the agent kept repeating the same failing actions."
@@ -41,6 +43,7 @@ type Ending = Literal[
     "daemon_restarted",
     "stopped",
     "daemon_shutdown",
+    "process_ended",
     "emergency_stop",
 ]
 
@@ -58,6 +61,7 @@ ENDING_LABELS: dict[Ending, str] = {
     "daemon_restarted": "cut off when the daemon died",
     "stopped": "stopped (by the user; older runs may be restarts, which were not told apart)",
     "daemon_shutdown": "cut off when the daemon shut down",
+    "process_ended": "cut off when its dotx command was told to end (a closed terminal, SIGTERM)",
     "emergency_stop": "emergency stop",
 }
 
@@ -83,6 +87,8 @@ def _failed_ending(result: str) -> Ending:
 def _cancelled_ending(result: str) -> Ending:
     if result == RESULT_SHUTDOWN:
         return "daemon_shutdown"
+    if result == RESULT_PROCESS_ENDED:
+        return "process_ended"
     if result.startswith(PREFIX_EMERGENCY_STOP):
         return "emergency_stop"
     return "stopped"

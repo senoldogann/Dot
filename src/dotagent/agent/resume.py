@@ -1,4 +1,4 @@
-"""Resuming a run that a restart or a shutdown of the daemon cut off.
+"""Resuming a run that a restart or a shutdown of the daemon cut off, or the end of the ``dotx`` command that drove it.
 
 A resumed run is a new run on the same thread, of source :data:`RESUME_SOURCE`, with the goal, mode, model, reasoning
 effort, approval mode and goal mode of the run it resumes. Its first message to the model is a note
@@ -54,12 +54,15 @@ _STEP_EVENT: str = "assistant"
 _ARGUMENTS_CHARS: int = 200
 _RESULT_CHARS: int = 300
 
-type CutOff = Literal["daemon_restarted", "daemon_shutdown"]
+type CutOff = Literal["daemon_restarted", "daemon_shutdown", "process_ended"]
 type CallEnd = Literal["succeeded", "failed", "cut_off", "not_started"]
 
 _CUT_OFF_TEXT: dict[CutOff, str] = {
     "daemon_restarted": "the Dot daemon stopped while it ran (a crash, or a restart that did not wait for it)",
     "daemon_shutdown": "the Dot daemon was shut down while it ran",
+    "process_ended": (
+        "the dotx command that drove it was told to end while it ran (its terminal was closed, or it got SIGTERM)"
+    ),
 }
 
 
@@ -88,20 +91,24 @@ class Resumption(FrozenModel):
 
 
 def cut_off_by(run: RunRecord) -> CutOff | None:
-    """How the daemon cut ``run`` off: it stopped while the run was active (a crash, or a restart that did not wait for
-    the run) or it was shut down. ``None`` when anything else ended the run, or the run has not ended."""
+    """How ``run`` was cut off: the daemon stopped while the run was active (a crash, or a restart that did not wait
+    for the run), the daemon was shut down, or the ``dotx`` command that drove the run was told to end (its terminal
+    was closed, or it got SIGTERM). ``None`` when anything else ended the run, or the run has not ended."""
     match classify_ending(run.status, run.result):
         case "daemon_restarted":
             return "daemon_restarted"
         case "daemon_shutdown":
             return "daemon_shutdown"
+        case "process_ended":
+            return "process_ended"
         case _:
             return None
 
 
 def can_resume(run: RunRecord, newest_run_id: str) -> bool:
-    """Whether ``run`` may be resumed: the daemon cut it off, no other run started it, and it is the newest run of its
-    thread (``newest_run_id``), so nothing went on after it there. A run the owner stopped is never resumed, nor is a
+    """Whether ``run`` may be resumed: it was cut off (:func:`cut_off_by`), no other run started it, and it is the
+    newest run of its thread (``newest_run_id``), so nothing went on after it there. A run the owner stopped is never
+    resumed, nor is a
     session of a campaign: the campaign goes on with its next session, whose brief says that this one was cut off."""
     return (
         run.parent_run_id is None

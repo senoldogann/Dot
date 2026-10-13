@@ -128,7 +128,9 @@ def build_parser() -> argparse.ArgumentParser:
     run.add_argument("--verbose", action="store_true", help="show tool output and token use")
 
     resume = commands.add_parser(
-        "resume", help="go on with a run that a restart or a shutdown of the daemon cut off, and print the result"
+        "resume",
+        help="go on with a run that a restart or a shutdown of the daemon, or a closed terminal, cut off, and print the "
+        "result",
     )
     resume.add_argument(
         "run_id",
