@@ -7,6 +7,7 @@ from dotagent.config import AppConfig
 from dotagent.core.errors import (
     ConfigError,
     MissingSecretError,
+    ProviderAccessError,
     ProviderAuthError,
     ProviderQuotaError,
     ProviderRateLimitError,
@@ -65,15 +66,17 @@ MAX_PAUSE_S: float = 86_400.0
 
 def unavailable_reason(error: Exception) -> str | None:
     """Why the model whose call raised ``error`` cannot answer for a while: the quota or the rate of its provider is
-    spent, its key was refused, or it has no key. ``None`` for an error that says nothing about that, such as a
-    transport or protocol error. The connector has retried what can be retried before such an error reaches its
-    caller."""
+    spent, its key was refused (HTTP 401), the access to it was refused (HTTP 403), or it has no key. ``None`` for an
+    error that says nothing about that, such as a transport or protocol error. The connector has retried what can be
+    retried before such an error reaches its caller."""
     if isinstance(error, ProviderQuotaError):
         return "quota exhausted"
     if isinstance(error, ProviderRateLimitError):
         return "rate limited"
     if isinstance(error, ProviderAuthError):
         return "key refused"
+    if isinstance(error, ProviderAccessError):
+        return "access refused"
     if isinstance(error, MissingSecretError):
         return "no key"
     return None

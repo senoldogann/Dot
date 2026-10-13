@@ -13,7 +13,13 @@ import pytest
 from PIL import Image
 
 from dotagent.config import GoRoute, OpenAIConfig, OpenCodeGoConfig
-from dotagent.core.errors import ProviderHttpError, ProviderQuotaError, ProviderRateLimitError
+from dotagent.core.errors import (
+    ProviderAccessError,
+    ProviderAuthError,
+    ProviderHttpError,
+    ProviderQuotaError,
+    ProviderRateLimitError,
+)
 from dotagent.core.jsonutil import dumps_compact
 from dotagent.core.types import JsonObject
 from dotagent.llm.anthropic import claude_traits
@@ -24,7 +30,14 @@ from dotagent.llm.connector import StreamCodec
 from dotagent.llm.http import SseEvent, is_retryable_provider_error
 from dotagent.llm.openai import OpenAIProvider, is_chat_model, openai_traits
 from dotagent.llm.opencode_go import CATALOG, OpenCodeGoProvider, go_free, go_traits, route_of
-from dotagent.llm.provider_errors import WireError, classify_anthropic, classify_openai, classify_opencode
+from dotagent.llm.provider_errors import (
+    WireError,
+    classify_anthropic,
+    classify_openai,
+    classify_opencode,
+    error_from_stream,
+)
+from dotagent.llm.router import unavailable_reason
 from dotagent.llm.traits import ModelTraits
 from dotagent.llm.types import (
     ChatProvider,
@@ -677,3 +690,22 @@ async def test_screenshots_in_tool_results_reach_the_model(route: GoRoute) -> No
     finally:
         await provider.aclose()
     assert "blue" in final.text.lower()
+
+
+def test_a_403_is_a_refused_access_and_a_401_a_refused_key() -> None:
+    """Item 185: a 403, as an answer or inside a stream, is the provider refusing what the key asked, not the key; the
+    reason a run moves to its standby model says so. Before, both were a refused key."""
+    asked: WireError = WireError(
+        kind="permission_error", code="", message="this key may not use the model", limit_name=""
+    )
+    access: ProviderHttpError = classify_openai(403, asked, None, {})
+    key: ProviderHttpError = classify_openai(
+        401, WireError(kind="", code="invalid_api_key", message="the key is not valid", limit_name=""), None, {}
+    )
+    streamed: ProviderHttpError = error_from_stream(asked, {}, classify_anthropic)
+    assert isinstance(access, ProviderAccessError) and not isinstance(access, ProviderAuthError)
+    assert isinstance(streamed, ProviderAccessError) and streamed.status == 403
+    assert isinstance(key, ProviderAuthError)
+    assert access.message == "provider answered HTTP 403: this key may not use the model"
+    assert (unavailable_reason(access), unavailable_reason(key)) == ("access refused", "key refused")
+    assert not is_retryable_provider_error(access)

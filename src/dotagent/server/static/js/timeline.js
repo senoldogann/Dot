@@ -719,9 +719,9 @@ export function createTimeline({ rootRunId, actorId, startedAt, onGrow, onPlan, 
       note(scope, record.ts, "alert", `The side question got no answer from ${record.data.model}: ${record.data.error}`, "bad");
     },
 
-    // The run's model could not answer (`reason`: a spent quota or rate, a refused or missing key), so the run goes on
-    // with a standby model ([models] standby) from this step on; the chip of the run, or the header of a delegated
-    // run, names the new model.
+    // The run's model could not answer (`reason`: a spent quota or rate, a refused or missing key, a refused access),
+    // so the run goes on with a standby model ([models] standby) from this step on; the chip of the run, or the header
+    // of a delegated run, names the new model.
     model_switched(scope, record) {
       const data = record.data;
       note(scope, record.ts, "refresh", `${data.from} cannot answer (${data.reason}); the run goes on with ${data.to}`, "warn");

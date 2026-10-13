@@ -46,7 +46,12 @@ class ProviderHttpError(ProviderError):
 
 
 class ProviderAuthError(ProviderHttpError):
-    """401/403: missing, invalid or unauthorised credentials."""
+    """401: a missing, invalid or revoked key."""
+
+
+class ProviderAccessError(ProviderHttpError):
+    """403: the provider knows the key and refuses what was asked: a model, a region or a plan the key may not
+    use."""
 
 
 class ProviderRateLimitError(ProviderHttpError):
