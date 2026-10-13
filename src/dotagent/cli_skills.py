@@ -1,18 +1,23 @@
-"""``dotx skills``: the skills and plugins Dot finds, where each comes from, and the folders it has to leave out."""
+"""``dotx skills``: the skills and plugins Dot finds, where each comes from, and the folders it has to leave out; then
+what the Mac's other agents have set up, which Dot does not use until the owner adds it (item 164)."""
 
 import asyncio
 import sys
+from pathlib import Path
 
 from dotagent.cli_commands import Command, SkillsListCommand
 from dotagent.config import AppConfig, load_user_config
 from dotagent.core.errors import InvalidValueError
 from dotagent.core.paths import plugins_dir, skills_dir
+from dotagent.help.elsewhere import FoundElsewhere, FoundSkill, found_elsewhere
 from dotagent.plugins.catalog import load_plugins
 from dotagent.plugins.types import Plugin, PluginCatalog, PluginProblem
 from dotagent.skills.catalog import load_skills, playbook_root
 from dotagent.skills.types import Skill, SkillCatalog, SkillProblem
 
 _DESCRIPTION_CHARS: int = 90
+# The line of an agent's skills names this many of them at most and says how many more there are.
+_LISTED_NAMES: int = 12
 
 
 def _clip(text: str, limit: int) -> str:
@@ -50,11 +55,53 @@ def render_catalogs(plugins: PluginCatalog, skills: SkillCatalog) -> list[str]:
     return lines
 
 
+def _counted(number: int, noun: str) -> str:
+    return f"{number} {noun}" if number == 1 else f"{number} {noun}s"
+
+
+def _printable(line: str) -> str:
+    """``line`` with each character a terminal would act on (an escape, a new line) shown as ``?``: the names of what
+    other agents set up are written by them."""
+    return "".join(char if char.isprintable() else "?" for char in line)
+
+
+def render_found(found: FoundElsewhere) -> list[str]:
+    """What the Mac's other agents have set up: a line per agent with its skills by name, a line per MCP server with
+    what it reaches, and the files that could not be read. What Dot already uses is marked; every line is printable."""
+    lines: list[str] = ["Found elsewhere on this Mac (Dot does not use these unless you add them):"]
+    if not found.skills and not found.servers and not found.problems:
+        lines.append("  Nothing: no skills or MCP servers of Claude Code, Claude Desktop, Cursor, VS Code or Codex.")
+    agents: dict[str, list[FoundSkill]] = {}
+    for skill in found.skills:
+        agents.setdefault(skill.agent, []).append(skill)
+    for agent, skills in agents.items():
+        names: list[str] = [f"{skill.name} (Dot reads it)" if skill.used else skill.name for skill in skills]
+        more: int = len(names) - _LISTED_NAMES
+        shown: str = ", ".join(names[:_LISTED_NAMES]) + (f" and {more} more" if more > 0 else "")
+        lines.append(f"  {agent}, {_counted(len(skills), 'skill')}: {shown}")
+    lines.extend(
+        f"  MCP server {server.name}  [{server.agent}]  {server.transport}, {server.reaches}"
+        + ("  (Dot has it)" if server.used else "")
+        for server in found.servers
+    )
+    lines.extend(f"  Left out {problem.path}: {problem.reason}" for problem in found.problems)
+    return [_printable(line) for line in lines]
+
+
 async def cmd_skills_list(command: SkillsListCommand) -> int:
     config: AppConfig = load_user_config()
     plugins: PluginCatalog = await asyncio.to_thread(load_plugins, config.plugins, config.mcp)
     skills: SkillCatalog = await asyncio.to_thread(load_skills, config.skills, plugins.plugins, playbook_root(config))
-    sys.stdout.write("\n".join(render_catalogs(plugins, skills)) + "\n")
+    servers: frozenset[str] = frozenset(
+        [
+            *(server.name for server in config.mcp),
+            *(server.name for plugin in plugins.plugins for server in plugin.servers),
+        ]
+    )
+    found: FoundElsewhere = await asyncio.to_thread(
+        found_elsewhere, Path.home(), frozenset(skill.root for skill in skills.skills), servers
+    )
+    sys.stdout.write("\n".join([*render_catalogs(plugins, skills), *render_found(found)]) + "\n")
     return 1 if plugins.problems or skills.problems else 0
 
 

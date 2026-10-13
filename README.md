@@ -1818,6 +1818,23 @@ every run.
 
 `dotx skills list` shows every plugin and skill found, and anything left out and why; `dotx doctor` has a row for each.
 
+**Found on this Mac.** Dot also finds, read-only, the skills and MCP servers that the Mac's other agents have set up:
+the skills of Claude Code (`~/.claude/skills`), of the plugins installed in Claude Code (each one's `installPath` in
+`~/.claude/plugins/installed_plugins.json`, with its `skills/` and `.mcp.json`) and of Codex (`~/.codex/skills`), and
+the MCP servers of Claude Code (those for every project, `mcpServers` in `~/.claude.json`; a project's own are not
+read), Claude Desktop (`claude_desktop_config.json`), Cursor (`~/.cursor/mcp.json`), VS Code (`Code/User/mcp.json`) and
+Codex (`mcp_servers` in `~/.codex/config.toml`). Only what names a thing is kept: a skill's name, description and
+folder, and a server's name, its transport and what it reaches, the base name of the program it starts or the host of
+its URL, when that is a plain name. A server's arguments, environment and headers, and the rest of its URL, can hold
+keys and tokens: they are never kept, logged or shown, not even in the reason a server is left out. A skill is marked
+when Dot reads its folder, a server when Dot has one under the name it would give it (`<plugin>-<server>` for a
+plugin's). What cannot be read is listed apart with why: a file, a skill whose `SKILL.md` Dot cannot use, a server that
+names no command or URL to use, whose command does not start with the name of a program (a URL, or a variable set before
+it), whose URL names no host, or whose entry holds values of the wrong kind (told by their keys). `dotx skills list`
+shows them after Dot's own, with `?` for any character a terminal would act on; Settings › Skills shows them under
+"Found on this Mac", read apart from the learned skills; and `GET /api/skills/elsewhere` returns them. Runs do not see
+them: Dot uses one only once you add it to its configuration (`[skills] dirs`, `[plugins] dirs` or an `[[mcp]]` table).
+
 **Finding help.** Before it takes a hard way (writing a script or a program for the work, clicking through an
 application or a site, trial and error in the shell), a run is told to call `find_help` with its need in a few plain
 words, and to call it again once a way has failed twice. It searches the skills the run is offered, the tools of the MCP

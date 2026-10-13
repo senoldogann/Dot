@@ -1,10 +1,12 @@
 // Skills Dot and its agents learned from their own work: one row each with the kind of work, where it acted, the runs
 // it comes from and how it fared; a retired one (read by two runs that then failed) is listed apart. An agent's skill
-// names the agent and is offered to its runs alone until Share; Drop removes one.
+// names the agent and is offered to its runs alone until Share; Drop removes one. Below them, what the Mac's other
+// agents set up (item 164): their skills, folded by agent, and their MCP servers by name and what they reach, never
+// their arguments or keys. Dot does not use those unless the owner adds them.
 
 import { api } from "../api.js";
 import { ago, el, plural } from "../dom.js";
-import { emptyPanel, errorPanel, loadingPanel, paneHead } from "../panels.js";
+import { emptyPanel, errorPanel, foldGroup, loadingPanel, paneHead } from "../panels.js";
 import { attempt, confirmDialog, toast } from "../ui.js";
 
 /** Drop a learned skill after a confirmation; resolves to the list after it, or null when the owner kept it. */
@@ -81,11 +83,104 @@ export function withAgentNames(items, agents) {
   return items.map((skill) => ({ ...skill, agentName: skill.agent_id === null ? null : names.get(skill.agent_id) ?? null }));
 }
 
+/** A skill another agent of this Mac set up: its name and description, and whether Dot reads its folder. */
+function foundSkillRow(skill) {
+  return el(
+    "div",
+    { class: "list-row" },
+    el(
+      "div",
+      { class: "row-main" },
+      el("div", { class: "row-title" }, skill.name),
+      el("div", { class: "row-text" }, skill.description),
+      skill.used ? el("div", { class: "row-meta" }, el("span", { class: "chip" }, "Dot reads it")) : null,
+    ),
+  );
+}
+
+/** An MCP server another agent set up: its name, the agent, the program it starts or the host it reaches. */
+function foundServerRow(server) {
+  const reach = server.transport === "stdio" ? `Starts ${server.reaches}` : `${server.transport.toUpperCase()} to ${server.reaches}`;
+  return el(
+    "div",
+    { class: "list-row" },
+    el(
+      "div",
+      { class: "row-main" },
+      el("div", { class: "row-title" }, server.name),
+      el(
+        "div",
+        { class: "row-meta" },
+        el("span", { class: "chip" }, server.agent),
+        el("span", null, reach),
+        server.used ? el("span", { class: "chip" }, "Dot has it") : null,
+      ),
+    ),
+  );
+}
+
+/** A folding group of the found section: `title`, how many it holds, and its rows. */
+function foundGroup(id, title, count, extra, rows) {
+  return foldGroup({
+    id,
+    head: el("span", { class: "row grow" }, el("strong", null, title), el("span", { class: "hint" }, count), extra),
+    body: el("div", null, rows),
+    openByDefault: false,
+  });
+}
+
+function foundHead() {
+  return el("div", { class: "row section-head" }, el("div", { class: "section-label grow" }, "Found on this Mac"));
+}
+
+/** What the Mac's other agents set up (item 164): the skills of each agent, then the MCP servers, then what was left out. */
+export function foundSection(found) {
+  const agents = new Map();
+  for (const skill of found.skills) {
+    agents.set(skill.agent, [...(agents.get(skill.agent) ?? []), skill]);
+  }
+  const groups = [...agents].map(([agent, skills]) => {
+    const read = skills.filter((skill) => skill.used).length;
+    const extra = read > 0 ? el("span", { class: "chip" }, `Dot reads ${read}`) : null;
+    // An element id holds no space ("Claude Code plugin x" becomes claude-code-plugin-x), or aria-controls breaks.
+    const slug = agent.toLowerCase().replace(/[^a-z0-9]+/g, "-");
+    return foundGroup(`found-skills-${slug}`, agent, plural(skills.length, "skill", "skills"), extra, skills.map(foundSkillRow));
+  });
+  if (found.servers.length > 0) {
+    groups.push(foundGroup("found-servers", "MCP servers", plural(found.servers.length, "server", "servers"), null, found.servers.map(foundServerRow)));
+  }
+  if (found.problems.length > 0) {
+    const rows = found.problems.map((problem) =>
+      el("div", { class: "list-row" }, el("div", { class: "row-main" }, el("div", { class: "row-text" }, problem.path), el("div", { class: "row-meta" }, problem.reason))),
+    );
+    groups.push(foundGroup("found-problems", "Left out", plural(found.problems.length, "file", "files"), null, rows));
+  }
+  const head = foundHead();
+  if (groups.length === 0) {
+    return [head, emptyPanel("Nothing found", "No other agent of this Mac (Claude Code, Claude Desktop, Cursor, VS Code, Codex) has skills or MCP servers set up.")];
+  }
+  const hint = el(
+    "div",
+    { class: "hint" },
+    "Skills and MCP servers that other agents of this Mac set up. Dot does not use them unless you add them to its configuration.",
+  );
+  return [head, hint, el("div", { class: "card" }, groups)];
+}
+
 export function mount(root) {
   let disposed = false;
   let items = null;
   let agents = [];
+  let found = null;
+  let foundError = null;
   const holder = el("div", null, loadingPanel());
+
+  function foundPart() {
+    if (foundError !== null) {
+      return [foundHead(), errorPanel(foundError)];
+    }
+    return found === null ? [foundHead(), loadingPanel()] : foundSection(found);
+  }
 
   function paint() {
     if (items === null) {
@@ -94,6 +189,7 @@ export function mount(root) {
     if (items.length === 0) {
       holder.replaceChildren(
         emptyPanel("No learned skills yet", "After a task that went well, Dot writes how it did it as a skill for the next one of its kind."),
+        ...foundPart(),
       );
       return;
     }
@@ -110,7 +206,7 @@ export function mount(root) {
         el("div", { class: "card" }, retired.map((skill) => skillRow(skill, changed))),
       );
     }
-    holder.replaceChildren(...parts);
+    holder.replaceChildren(...parts, ...foundPart());
   }
 
   function changed(list) {
@@ -136,11 +232,24 @@ export function mount(root) {
     }
   }
 
+  // Read apart from the learned skills, so that a failure here leaves them on the page.
+  async function loadFound() {
+    try {
+      found = await api.get("/skills/elsewhere");
+    } catch (error) {
+      foundError = error;
+    }
+    if (!disposed) {
+      paint();
+    }
+  }
+
   root.replaceChildren(
-    paneHead("What Dot and its agents learned from their own work, offered to later runs as advice.", []),
+    paneHead("What Dot and its agents learned from their own work, offered to later runs as advice, and what the Mac's other agents set up.", []),
     holder,
   );
   load();
+  loadFound();
   return () => {
     disposed = true;
   };

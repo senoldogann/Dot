@@ -19,6 +19,7 @@ from dotagent.core.paths import dot_home, failsafe_path, playbooks_dir, screensh
 from dotagent.desktop.perms import missing_panes, program_of_this_process, request_permissions
 from dotagent.desktop.types import Permissions
 from dotagent.doctor import CheckResult, run_quick_checks
+from dotagent.help.elsewhere import FoundElsewhere, found_elsewhere
 from dotagent.llm.router import ModelRef, ModelRouter
 from dotagent.llm.traits import effective_effort
 from dotagent.llm.types import KNOWN_PROVIDERS, Effort, ModelInfo
@@ -183,6 +184,24 @@ def system_router(ctx: ServerContext) -> APIRouter:
         await asyncio.to_thread(share_playbook, playbooks_dir(), name, request.shared)
         entries: tuple[PlaybookEntry, ...] = await asyncio.to_thread(list_playbooks, playbooks_dir())
         return LearnedSkillsView(items=tuple(learned_skill_view(entry) for entry in entries))
+
+    @router.get("/skills/elsewhere")
+    async def skills_elsewhere() -> FoundElsewhere:
+        """The skills and MCP servers of the Mac's other agents (item 164), read from their files; Dot does not use
+        them until the owner adds them. Each says whether Dot already reads its folder, or has a server under the name
+        it would give it."""
+        catalog: SkillCatalog = await asyncio.to_thread(
+            load_skills, config.skills, ctx.runtime.plugins.plugins, playbook_root(config)
+        )
+        servers: frozenset[str] = frozenset(
+            [
+                *(server.name for server in config.mcp),
+                *(server.name for plugin in ctx.runtime.plugins.plugins for server in plugin.servers),
+            ]
+        )
+        return await asyncio.to_thread(
+            found_elsewhere, Path.home(), frozenset(skill.root for skill in catalog.skills), servers
+        )
 
     @router.get("/palette")
     async def palette() -> PaletteView:
