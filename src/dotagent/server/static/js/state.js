@@ -9,7 +9,12 @@ const snapshot = {
   status: null,
   approvals: [],
   stream: "connecting",
+  // The daemon serves other pages than this one was loaded from (Dot was updated meanwhile): it is loaded again to
+  // match them.
+  outdated: false,
 };
+// What the pages were when this page read the daemon's status first (`pages` of `GET /status`).
+let loadedPages = null;
 
 const changeListeners = new Set();
 const lifecycleListeners = new Set();
@@ -51,6 +56,8 @@ export async function refresh() {
   const [status, approvals] = await Promise.all([api.get("/status"), api.get("/approvals?status=pending&limit=100")]);
   snapshot.status = status;
   snapshot.approvals = approvals;
+  loadedPages ??= status.pages;
+  snapshot.outdated = status.pages !== loadedPages;
   announce();
 }
 

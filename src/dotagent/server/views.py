@@ -641,6 +641,9 @@ class KeysView(FrozenModel):
 
 class StatusView(FrozenModel):
     version: str
+    # What the pages the daemon serves are (a digest of their files at its start): a page loaded from other pages is out
+    # of date, as after an update of Dot.
+    pages: str
     pid: int
     started_at: float
     uptime_s: float

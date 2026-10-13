@@ -5119,8 +5119,8 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 186 | The doctor checks each model name against the list its provider serves               | done        | 0b3702a |
 | 187 | The service install keeps the running job until the new one is in place              | done        | 2ad0df4 |
 | 188 | A run of a dotx command is followed live on the pages and stopped there              | done        | 5f294aa |
-| 189 | A message sent twice starts once                                                     | in progress |         |
-| 190 | The pages say what they could not read, follow the rules and tell of an update       | planned     |         |
+| 189 | A message sent twice starts once                                                     | done        | d615961 |
+| 190 | The pages say what they could not read, follow the rules and tell of an update       | in progress |         |
 | 191 | The desktop shell says what it could not read                                        | planned     |         |
 
 ### 77. The type system: Inter and Geist Mono, seven sizes, three weights
@@ -9446,7 +9446,7 @@ active.
 
 ### 189. A message sent twice starts once
 
-**Status: in progress.**
+**Status: done.** Merged as `d615961` (PR #228; no Linear issue, the Linear connector was signed out).
 
 **As built (2026-10-14).** The pages send each new message with a key of their own (`static/js/sending.js`): a new chat,
 a follow-up, a queued message and a steer. A message keeps its key until it is sent; one that changed (its text, its
@@ -9468,7 +9468,23 @@ was lost) gets the run or the queued message of the first, instead of a second c
 
 ### 190. The pages say what they could not read, follow the rules and tell of an update
 
-**Status: planned.**
+**Status: in progress.**
+
+**As built (2026-10-14).** A chat whose queue could not be read says why in the queue's place, with **Read again**, and
+keeps what the queue showed before (`static/js/queue.js`). The rules page reads its rules again when one is added,
+switched or deleted on another page: the daemon tells the pages each change as a live event of the lifecycle stream
+(`rules_changed`), and the page reads again once the stream is back. The sign-in screen of a daemon that could not
+answer says that `dotx service status` names the folder of its log, instead of naming `~/Library/Logs/Dot/dotx.log`,
+where the log of a daemon given another folder (`DOT_LOG_DIR`) is not. A page loaded before Dot was updated says so in a
+banner, with **Load again**: the status of the daemon tells what the pages it serves are (`pages`, a digest of their
+files at its start, `dotagent.server.app.pages_build`), and a page compares it with what it read first; Dot's version
+does not change with an update, so it could not tell. Before, a queue that could not be read showed nothing, as if its
+messages were gone; the rules page showed a rule changed elsewhere only once loaded again; and a page went on beside an
+updated daemon without a word. Tests: `tests/smoke/test_pages_tell.py` serves a daemon to Chrome: a queue whose read the
+daemon refuses and that is read again, the sign-in screen of a daemon whose status fails and a page whose daemon tells
+of other pages, each wide and on a phone, light and dark, and the rules page beside rules added, switched and deleted
+through the API; `tests/unit/test_pages_build.py` follows the bytes and the place of each file. Each fails on the code
+of before.
 
 **What.** A chat whose queue could not be read says so, with a way to read it again; the rules page follows the changes
 made in another window; the sign-in error names the log by what `dotx daemon` prints, not by a path the logs may not be
@@ -10108,3 +10124,4 @@ running" for all of them.
 - 2026-10-13 (Opus 5.5): item 186 merged as `0b3702a` (PR #225; no Linear issue, the connector was signed out): `dotx doctor` checks each model of OpenAI and OpenCode Go against the list of the models its provider serves to the key, a helper and a standby model too, and a list that could not be read is a warning.
 - 2026-10-13 (Opus 5.5): item 187 merged as `2ad0df4` (PR #226; no Linear issue, the connector was signed out): `dotx service install` stops the running job before it writes the new job's file, and puts the file and the job of before back when the new job does not load.
 - 2026-10-13 (Opus 5.5): item 188 merged as `5f294aa` (PR #227; no Linear issue, the connector was signed out): The daemon relays the runs of `dotx` commands to its pages: they work in the sidebar and in Activity, their page follows them live and stops them, a question of theirs is answered there, and the daemon moves their chat's queue once they end; the store refuses a run on a chat where another process drives one.
+- 2026-10-13 (Opus 5.5): item 189 merged as `d615961` (PR #228; no Linear issue, the connector was signed out): A message the pages send again with its key, after an answer that was lost, gets what its first sending made (its run, its place in the queue, its steer) instead of a second one.

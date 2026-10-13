@@ -11,6 +11,7 @@ from fastapi import APIRouter, Query
 from dotagent.agent.review import RuleDrafter, RuleWordsRequest, ToolBrief, rule_drafter_for
 from dotagent.config import SchedulerConfig
 from dotagent.core.errors import InvalidValueError, NotFoundError
+from dotagent.events import SYSTEM_RUN_ID
 from dotagent.memory.service import (
     MemoryHit,
     MemoryIndex,
@@ -75,6 +76,9 @@ async def _rule(store: Store, rule_id: str) -> RuleRecord:
 
 # How a ``datetime-local`` input writes a moment.
 _INPUT_MOMENT: str = "%Y-%m-%dT%H:%M"
+# Tells the pages that a rule was added, switched or deleted (a live event of the lifecycle stream), so that every page
+# that shows the rules reads them again.
+RULES_CHANGED_EVENT: str = "rules_changed"
 
 
 def _schedule_view(record: ScheduleRecord, zone: ZoneInfo) -> ScheduleView:
@@ -94,15 +98,20 @@ def rules_router(ctx: ServerContext) -> APIRouter:
     router: APIRouter = APIRouter(prefix="/api")
     store: Store = ctx.runtime.store
 
+    async def tell_rules_changed() -> None:
+        await ctx.runtime.bus.emit(SYSTEM_RUN_ID, RULES_CHANGED_EVENT, {}, False)
+
     @router.get("/rules")
     async def list_rules() -> list[RuleRecord]:
         return await store.list_rules()
 
     @router.post("/rules", status_code=201)
     async def add_rule(request: RuleRequest) -> RuleRecord:
-        return await store.add_rule(
+        rule: RuleRecord = await store.add_rule(
             request.behavior, request.tool_glob, _checked_pattern(request.match_regex), request.description
         )
+        await tell_rules_changed()
+        return rule
 
     @router.post("/rules/draft")
     async def draft_rule(request: RuleDraftRequest) -> DraftedRule:
@@ -127,12 +136,14 @@ def rules_router(ctx: ServerContext) -> APIRouter:
     async def set_rule_enabled(rule_id: str, request: RuleEnabledRequest) -> RuleRecord:
         await _rule(store, rule_id)
         await store.set_rule_enabled(rule_id, request.enabled)
+        await tell_rules_changed()
         return await _rule(store, rule_id)
 
     @router.delete("/rules/{rule_id}")
     async def delete_rule(rule_id: str) -> RuleRecord:
         rule: RuleRecord = await _rule(store, rule_id)
         await store.delete_rule(rule_id)
+        await tell_rules_changed()
         return rule
 
     return router

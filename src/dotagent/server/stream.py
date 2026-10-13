@@ -18,6 +18,7 @@ from dotagent.browser.types import Frame
 from dotagent.events import EventBus
 from dotagent.scheduler import SCHEDULE_MISSED_EVENT
 from dotagent.server.context import ServerContext
+from dotagent.server.routes_data import RULES_CHANGED_EVENT
 from dotagent.store.db import Store
 from dotagent.store.models import EventRecord, RunRecord
 
@@ -30,7 +31,7 @@ RESYNC: bytes = b"event: resync\ndata: {}\n\n"
 FRAME_EVENT: str = "frame"
 
 # What the lifecycle stream carries: the moments a client must refetch its lists for (the Activity sections among
-# them: a takeover moves a run between them; a chat's queue), what becomes of the lessons of a run, which are drawn
+# them: a takeover moves a run between them; a chat's queue; the rules), what becomes of the lessons of a run, which are drawn
 # once its own stream has ended, and what else the page tells as a desktop notification, as the phone hears it
 # (``notify/push.py``): a question a run left, a campaign that ended by itself, a firing a schedule missed. A restart
 # after an unexpected stop is pushed only: it happens before any page is back on the stream.
@@ -48,6 +49,7 @@ LIFECYCLE_KINDS: frozenset[str] = frozenset(
         QUESTION_LEFT_EVENT,
         CAMPAIGN_ENDED_EVENT,
         SCHEDULE_MISSED_EVENT,
+        RULES_CHANGED_EVENT,
     }
 )
 

@@ -145,7 +145,8 @@ function renderFailed(error) {
   screen(
     el("div", { class: "note bad" }, icon("alert"), el("span", null, `The daemon is running but could not answer: ${error.message}`)),
     cause === null ? null : el("p", { class: "muted mono" }, cause),
-    el("p", { class: "muted" }, "Its log, ", el("code", { class: "mono" }, "~/Library/Logs/Dot/dotx.log"), ", has the details."),
+    // The log's folder is where the daemon was told to keep it (DOT_LOG_DIR), which this page cannot know.
+    el("p", { class: "muted" }, "Its log has the details: ", el("code", { class: "mono" }, "dotx service status"), " names its folder."),
     el("div", { class: "cluster" }, el("button", { class: "btn primary", type: "button", onclick: () => attempt(connect) }, icon("refresh"), "Try again")),
   );
 }
