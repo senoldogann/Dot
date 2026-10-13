@@ -248,6 +248,32 @@ async def test_a_note_the_user_wrote_reaches_every_run_even_when_its_goal_is_unr
     assert given == [CITY]
 
 
+async def test_a_lesson_that_fits_the_goal_reaches_the_run_however_many_notes_the_owner_wrote(
+    words_only: MemoryIndex,
+) -> None:
+    """Item 154: each group of notes has its own share of the budget, so the owner's notes, which reach every run, do
+    not crowd out a lesson that fits the goal."""
+    places: list[str] = [
+        f"shelf {number} of the cupboard number {number * 7 % 41} in room {number % 9}" for number in range(40)
+    ]
+    for place in places:
+        await save_memory(
+            words_only,
+            f"The owner keeps the paper records of the year in {place}, sorted by month, with the receipts in an "
+            "envelope at the back and the warranty cards in a folder of their own, labelled by the shop.",
+            [],
+            None,
+            None,
+        )
+    lesson: str = "Convert invoices to text with pdftotext -layout, so that their tables keep the columns."
+    await save_memory(words_only, lesson, ["lesson"], AGENT_RUN, None)
+    given: list[str] = [
+        r.content for r in (await prompt_memories(words_only, "Convert the invoices to text.", BUDGET, None)).records
+    ]
+    assert lesson in given
+    assert 0 < len(given) - 1 < len(places), "the owner's notes come along as far as their share and what is left"
+
+
 async def test_a_failing_embedder_fails_the_call_instead_of_saving_without_meaning(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

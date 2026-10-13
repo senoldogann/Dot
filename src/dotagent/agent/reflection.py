@@ -29,6 +29,7 @@ from dotagent.agent.lessons import (
     LessonCase,
     learn_from,
     repeats,
+    same_way_round,
     stored_signals,
 )
 from dotagent.agent.review import OwnerDraft, OwnerRequest, OwnerWriter, goal_digest, owner_writer_for
@@ -212,10 +213,13 @@ def stored_case(run: RunRecord, events: Sequence[EventRecord]) -> LessonCase:
         resolved=resolved,
         answer=run.result,
         tainted=read_outside(results),
+        reached_goal=run.status == "done",
     )
 
 
 def _close(older: MemoryRecord, newer: MemoryRecord, vectors: Mapping[str, Vector]) -> bool:
+    if not same_way_round(older.content, newer.content):
+        return False
     mine: Vector | None = vectors.get(older.id)
     theirs: Vector | None = vectors.get(newer.id)
     if mine is not None and theirs is not None and len(mine) == len(theirs):
@@ -226,16 +230,25 @@ def _close(older: MemoryRecord, newer: MemoryRecord, vectors: Mapping[str, Vecto
 def duplicate_pairs(
     notes: Sequence[MemoryRecord], vectors: Mapping[str, Vector]
 ) -> list[tuple[MemoryRecord, MemoryRecord]]:
-    """The pairs (older, newer) of ``notes`` that say the same, each note in at most one pair: by the cosine of their
-    embeddings when both have one, by their words otherwise."""
-    by_age: list[MemoryRecord] = sorted(notes, key=lambda note: note.created_at)
+    """The pairs (older, newer) of ``notes`` that say the same the same way round, each note in at most one pair: by
+    the cosine of their embeddings when both have one, by their words otherwise. A resting note is in no pair, and two
+    notes pair only when they are the same agent's: a lesson learnt again would take the resting one's rest along,
+    and an agent would lose its lesson to another's."""
+    by_age: list[MemoryRecord] = sorted(
+        (note for note in notes if REST_TAG not in note.tags), key=lambda note: note.created_at
+    )
     taken: set[str] = set()
     pairs: list[tuple[MemoryRecord, MemoryRecord]] = []
     for index, older in enumerate(by_age):
         if older.id in taken:
             continue
         newer: MemoryRecord | None = next(
-            (note for note in by_age[index + 1 :] if note.id not in taken and _close(older, note, vectors)), None
+            (
+                note
+                for note in by_age[index + 1 :]
+                if note.id not in taken and note.agent_id == older.agent_id and _close(older, note, vectors)
+            ),
+            None,
         )
         if newer is not None:
             taken.update((older.id, newer.id))

@@ -1093,6 +1093,7 @@ def _run_end(
         resolved=facts.resolved,
         answer=outcome.result,
         tainted=agent.gate.ever_tainted,
+        reached_goal=outcome.status == "done",
     )
     return RunEnd(outcome=outcome, lessons=case)
 

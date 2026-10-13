@@ -7,6 +7,7 @@ from dotagent.agent.lessons import (
     LessonCase,
     LessonView,
     RunLessons,
+    _says_it,
     kept_lessons,
     lesson_problem,
     lessons_of,
@@ -17,7 +18,8 @@ from dotagent.agent.lessons import (
 from dotagent.agent.verify import CallFact
 from dotagent.config import LessonsMode
 from dotagent.core.types import JsonObject
-from dotagent.store.models import EventRecord, RunMode, RunStatus
+from dotagent.memory.service import MemoryHit
+from dotagent.store.models import EventRecord, MemoryRecord, RunMode, RunStatus
 
 MAX_CHARS: int = 300
 GOAL: str = "Summarise the quarterly report in report.pdf"
@@ -27,6 +29,20 @@ CSV_LESSON: str = "Large CSV files load faster with the csv module than with pan
 
 def _event(kind: str, data: JsonObject) -> EventRecord:
     return EventRecord(id=1, run_id="run-1", ts=0.0, kind=kind, data=data)
+
+
+def _note(content: str) -> MemoryRecord:
+    return MemoryRecord(
+        id="note-1",
+        content=content,
+        tags=("lesson",),
+        created_at=1.0,
+        updated_at=1.0,
+        source_run="run-0",
+        agent_id=None,
+        used_count=0,
+        last_used_at=None,
+    )
 
 
 def _case(failures: tuple[CallFact, ...], resolved: tuple[CallFact, ...]) -> LessonCase:
@@ -39,6 +55,7 @@ def _case(failures: tuple[CallFact, ...], resolved: tuple[CallFact, ...]) -> Les
         resolved=resolved,
         answer="Done.",
         tainted=False,
+        reached_goal=True,
     )
 
 
@@ -154,6 +171,19 @@ def test_a_text_repeats_another_with_the_same_words_or_mostly_the_same_search_te
         "Before summarising PDF files, read them with pdftotext -layout.",
     )
     assert not repeats(LESSON, "Run the tests with pytest -q before committing.")
+
+
+def test_a_lesson_never_repeats_the_one_that_says_the_opposite() -> None:
+    """Item 154: "do", "don" and "not" are no search terms, so a correction has the same terms as what it corrects."""
+    assert not repeats("Use --force when git push is refused.", "Do not use --force when git push is refused.")
+    assert not repeats("A login is required for the upload.", "A login isn't required for the upload.")
+    assert not repeats("Bu sitede giriş gerekli.", "Bu sitede giriş gerekli değil.")
+    # Said the same way round, they still repeat each other.
+    assert repeats("Do not use --force on main.", "Don't use --force on main.")
+    # Close in meaning is no repeat either when one of them says not to.
+    hit: MemoryHit = MemoryHit(record=_note("Use --force when git push is refused."), similarity=0.99)
+    assert not _says_it("Do not use --force when git push is refused.", hit, 0.9)
+    assert _says_it("Use --force whenever git push is refused.", hit, 0.9)
 
 
 def test_kept_lessons_drop_what_is_not_a_lesson_and_every_repeat() -> None:

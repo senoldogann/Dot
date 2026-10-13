@@ -377,13 +377,31 @@ def fit_notes(notes: Sequence[MemoryRecord], budget: int, spent: int) -> tuple[l
     return taken, spent
 
 
+def fit_groups(groups: Sequence[Sequence[MemoryRecord]], budget: int) -> tuple[list[MemoryRecord], int]:
+    """The notes of ``groups`` that fit ``budget`` tokens (:func:`fit_notes`), group by group in their order: first
+    each group within its own share (an equal part of the budget), then, in the same order, the notes left over in what
+    is left, so that a long group cannot crowd out the ones after it (item 154). Returns the taken notes and the tokens
+    spent in all."""
+    share: int = budget // max(len(groups), 1)
+    picked: set[str] = set()
+    spent: int = 0
+    for group in groups:
+        part, cost = fit_notes(group, share, 0)
+        picked.update(note.id for note in part)
+        spent += cost
+    for group in groups:
+        part, spent = fit_notes([note for note in group if note.id not in picked], budget, spent)
+        picked.update(note.id for note in part)
+    return [note for group in groups for note in group if note.id in picked], spent
+
+
 async def prompt_memories(index: MemoryIndex, query: str, budget: int, agent_id: str | None) -> Remembered:
     """The notes a run of the agent ``agent_id`` (``None`` for Dot) starts with, without repeats, as many as fit
-    ``budget`` tokens (:func:`fit_notes`), in this order: the standing ones (tagged ``core``, newest first), the ones
-    the user wrote (closest to ``query`` first), the agent's own lessons and then Dot's notes related to ``query``
-    (the goal and the earlier goals of its thread; by fit and the agent's own scores) that do not rest
-    (:func:`resting`). Only the notes the run may be handed are among them (:func:`visible_to`); a note that does not
-    fit is left to ``memory_search``.
+    ``budget`` tokens, each group within its own share first (:func:`fit_groups`), in this order: the standing ones
+    (tagged ``core``, newest first), the ones the user wrote (closest to ``query`` first), the agent's own lessons and
+    then Dot's notes related to ``query`` (the goal and the earlier goals of its thread; by fit and the agent's own
+    scores) that do not rest (:func:`resting`). Only the notes the run may be handed are among them
+    (:func:`visible_to`); a note that does not fit is left to ``memory_search``.
 
     A goal is full of everyday words that match unrelated notes, so when embeddings are on only the notes whose
     meaning clearly fits the query are taken; ``memory_search`` still finds the others, and the resting ones."""
@@ -418,11 +436,7 @@ async def prompt_memories(index: MemoryIndex, query: str, budget: int, agent_id:
     ]
     own: list[MemoryRecord] = [record for record in fresh if record.agent_id is not None]
     shared: list[MemoryRecord] = [record for record in fresh if record.agent_id is None]
-    taken: list[MemoryRecord] = []
-    spent: int = 0
-    for group in (standing, users, own, shared):
-        part, spent = fit_notes(group, budget, spent)
-        taken.extend(part)
+    taken, spent = fit_groups((standing, users, own, shared), budget)
     return Remembered(records=tuple(taken), tokens=spent)
 
 
