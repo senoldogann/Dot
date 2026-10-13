@@ -5091,8 +5091,8 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 168 | A run reads only the skills it is offered                                            | done        | f605def |
 | 169 | Help is found by meaning as well as by words                                         | done        | 5c96b14 |
 | 170 | A delegated run's thread takes no queue                                              | done        | 336e03f |
-| 171 | The text of a desktop window follows the run's model window                          | in progress |         |
-| 172 | A dotx command that dies does not leave its run at work                              | planned     |         |
+| 171 | The text of a desktop window follows the run's model window                          | done        | 047d0e1 |
+| 172 | A dotx command that dies does not leave its run at work                              | in progress |         |
 | 173 | Every smoke test passes alone, and the README keeps its width                        | planned     |         |
 
 ### 77. The type system: Inter and Geist Mono, seven sizes, three weights
@@ -8906,7 +8906,7 @@ deletes the queues of the threads of the runs it delegated.
 
 ### 171. The text of a desktop window follows the run's model window
 
-**Status: in progress.**
+**Status: done.** Merged as `047d0e1` (PR #209; no Linear issue, the Linear connector was signed out).
 
 **As built (2026-10-13).** The most text of an application window a desktop result carries is now worked out per call
 from the run's own tool output budget (`ctx.output_chars`, which a model with a small window lowers), as the text of a
@@ -8927,7 +8927,29 @@ cuts it in the middle.
 
 ### 172. A dotx command that dies does not leave its run at work
 
-**Status: planned.**
+**Status: in progress.**
+
+**As built (2026-10-13).** Every 30 seconds while it runs, the daemon closes the runs that a `dotx` command (`run`,
+`resume`, `chat`) left active when its process ended without recording their end, killed or crashed: their owner's lock
+is no longer held (`RunManager.close_runs_of_dead_commands`, `Store.close_runs_of`). Such a run fails with a result that
+names the command (`RESULT_COMMAND_DIED`, the ending `process_died`, "cut off when its dotx command died"), finished at
+its last sign of life, and its `run_finished` event is stored in the same write, then told to the pages that follow it.
+Its pending approvals expire ("its dotx command died"), and the queue of its chat is held until the owner resumes it, as
+after any end that is not done. The files of gone owners go at each check, those of commands that ended well too, which
+before stayed until the daemon's next start. A check that fails on the store or on those files is logged, and the next
+one goes on. The run can be resumed by hand, and the resumed run is told that the command that drove it died (in its
+first message, on its page and in the terminal); like any run of the command line, the daemon never resumes it on its
+own. Before, such a run stayed at work until the daemon's next start, which closed it as cut off by the daemon ("daemon
+stopped while the run was active"); that start still closes what any gone process left, since it cannot tell a command's
+runs from those of the daemon before it. A second Ctrl-C now quits once the stop that the first one asked for is
+recorded, five seconds at most, and says so when it is not (the daemon then closes the run). Before, it closed the
+runtime without waiting, and the stop was written only when the run's end came before the store closed, last: a test
+that presses Ctrl-C twice saw the run end stopped on the code of before as after, so that wait makes certain what was
+likely. Tests: in `tests/smoke/test_cli_run_end.py`, a `dotx run` in a child process is killed with SIGKILL while its
+command works: its run is left at work, the daemon's check closes it as `process_died`, stores and tells `run_finished`,
+holds the queue of its chat and clears the dead command's owner file, and the run resumed by hand is told that its
+command died. The code of before had no such check. Not done: a campaign whose first session's command died plans its
+next session at the daemon's next start, as before.
 
 **What.** The run of a `dotx` command that dies is closed while the daemon runs, not at its next start, and is said to
 be cut off by its command's end rather than by the daemon; a second Ctrl-C still writes the stop that the first one
@@ -9545,3 +9567,4 @@ asked for.
 - 2026-10-13 (Opus 5.5): item 168 merged as `f605def` (PR #206; no Linear issue, the connector was signed out): the `skill` tool reads only a skill the run is offered, and its refusal names only those; part 28 is planned.
 - 2026-10-13 (Opus 5.5): item 169 merged as `5c96b14` (PR #207; no Linear issue, the connector was signed out): `find_help` and the skills a run is given rank help by meaning as well as by words, with the memory's embeddings, so a goal or a need in Turkish finds the skills described in English.
 - 2026-10-13 (Opus 5.5): item 170 merged as `336e03f` (PR #208; no Linear issue, the connector was signed out): the thread of a delegated run takes no queue, and deleting a chat takes the queues of the threads of the runs it delegated with them.
+- 2026-10-13 (Opus 5.5): item 171 merged as `047d0e1` (PR #209; no Linear issue, the connector was signed out): the window text of a desktop result follows the run's own tool output budget, so a model with a small window gets a shorter window instead of one cut in the middle.

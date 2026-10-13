@@ -500,6 +500,7 @@ class TerminalUi:
             "daemon_restarted": f"the daemon stopped while run {before} worked",
             "daemon_shutdown": f"the daemon was shut down while run {before} worked",
             "process_ended": f"the dotx command that drove run {before} was told to end while it worked",
+            "process_died": f"the dotx command that drove run {before} died while it worked",
         }
         self._line(self._paint(f"  ↺ resumed {who}: {hows[resumed.cut_off]}", "35"))
         ends: dict[CallEnd, str] = {

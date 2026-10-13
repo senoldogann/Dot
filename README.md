@@ -45,9 +45,11 @@ dotx chat
 ```
 
 `run` carries out one goal and prints the result; `chat` keeps a conversation going (`/new` starts a fresh one, `/exit`
-leaves). Ctrl-C stops the run that is going on; a second Ctrl-C quits at once. Closing the terminal, or SIGTERM, cuts
-the run off instead: its end is recorded, and it can be resumed like a run that a stop of the daemon cut off
-(`dotx resume RUN_ID`, or Continue on its page).
+leaves). Ctrl-C stops the run that is going on; a second Ctrl-C quits as soon as that stop is recorded (five seconds at
+most). Closing the terminal, or SIGTERM, cuts the run off instead: its end is recorded, and it can be resumed like a run
+that a stop of the daemon cut off (`dotx resume RUN_ID`, or Continue on its page). A `dotx` command that dies (killed,
+or crashed) records nothing: the daemon closes its run within half a minute, as cut off by the command's death, and it
+can be resumed too.
 
 - `--mode research` makes the run read-only
 - `--model provider:model` picks the model for this run, for example `ollama:gpt-oss:20b-cloud`
@@ -294,7 +296,8 @@ answer (a small model that is offered both writes the call out as text).
 - Runs, their events and their conversations are stored in a SQLite database (WAL mode; the daemon writes through one
   connection, one writer at a time, and waits out a lock held by another process with logged retries before it gives
   an error; a token count that cannot be written is logged, not fatal to the run), so the web UI can replay them. A run
-  that a crashed daemon left behind is marked as failed the next time Dot starts, as ended at its last event. It can be
+  that a crashed daemon left behind is marked as failed the next time Dot starts, as ended at its last event, and so
+  is one that a `dotx` command left when it died, by the daemon within half a minute when it runs. Either can be
   resumed, and so can a run that a shutdown of the daemon cut off (see
   [Autonomy](#autonomy-approvals-goal-mode-and-the-end-of-a-run)).
 - A message sent to a running run (steering) reaches the model at its next step. It also clears the run's untrusted
@@ -774,16 +777,16 @@ it. Give such a run a goal that can be checked, and keep an eye on the token cou
 Details panel).
 
 **Resuming a run that was cut off.** A run that a crash, a restart or a shutdown of the daemon cut off, or a run of
-`dotx run` whose terminal was closed (or that got SIGTERM), can go on where it stopped: Continue on the run's page,
-`dotx resume RUN_ID` (in this terminal, like `dotx run`), or `POST /api/runs/{id}/resume`. A new run starts in the same
-chat, with the goal, model, reasoning level, approval mode and goal mode of the run it resumes, and the conversation so
-far, where a shutdown or a restart of the daemon, or a closed terminal, keeps the results of the calls of the step it
-was in that had ended (a crash keeps none). Its first message tells the model how that run was cut off and how each call
-of that step without a result ended: finished (with the start of its result), cut off while it ran, or not started. A
-call that was cut off may have changed something unless it only reads, and the model is told to check before it runs it
-again. The plan of that run is the plan of the new one. Only the newest run of a chat can be resumed, and never a run
-that you stopped or that another run started. After a shutdown, the chat's queue goes on once the new run ends done;
-after a crash or a restart, it waits until you resume it.
+`dotx run` whose terminal was closed (or that got SIGTERM) or whose command died, can go on where it stopped: Continue
+on the run's page, `dotx resume RUN_ID` (in this terminal, like `dotx run`), or `POST /api/runs/{id}/resume`. A new run
+starts in the same chat, with the goal, model, reasoning level, approval mode and goal mode of the run it resumes, and
+the conversation so far, where a shutdown or a restart of the daemon, or a closed terminal, keeps the results of the
+calls of the step it was in that had ended (a crash keeps none). Its first message tells the model how that run was cut
+off and how each call of that step without a result ended: finished (with the start of its result), cut off while it
+ran, or not started. A call that was cut off may have changed something unless it only reads, and the model is told to
+check before it runs it again. The plan of that run is the plan of the new one. Only the newest run of a chat can be
+resumed, and never a run that you stopped or that another run started. After a shutdown, the chat's queue goes on once
+the new run ends done; after a crash or a restart, it waits until you resume it.
 
 With `resume = "safe"` in `[agent]` the daemon also resumes runs on its own when it starts: runs of the web UI, cut off
 at most `resume_within_s` seconds before (30 minutes), whose calls that were cut off only read (a question to you

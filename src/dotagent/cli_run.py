@@ -27,6 +27,9 @@ from dotagent.policy.types import ApprovalMode
 from dotagent.runtime import Runtime, build_runtime, close_runtime
 from dotagent.store.models import RunMode, RunRecord
 
+# How long a second Ctrl-C waits for the stop that the first one asked for to be recorded before the command quits.
+_QUIT_WAIT_S: float = 5.0
+
 
 async def _pump(subscription: Subscription, ui: TerminalUi) -> None:
     while True:
@@ -64,8 +67,9 @@ async def follow_run(
 ) -> RunRecord:
     """Start a run with ``launch``, show its events live and return the finished record. Ctrl-C stops the run; a closed
     terminal (SIGHUP) and SIGTERM cut it off (:meth:`RunManager.cut_off`), so that it can be resumed. Either way the
-    run's end is recorded and the daemon does not take it for a run that still works. The events are followed before the
-    run starts, so none of them is missed."""
+    run's end is recorded and the daemon does not take it for a run that still works; a second Ctrl-C quits once the
+    stop is recorded, or after ``_QUIT_WAIT_S`` (the daemon then closes the run as its command's death). The events are
+    followed before the run starts, so none of them is missed."""
     loop: asyncio.AbstractEventLoop = asyncio.get_running_loop()
     main_task: asyncio.Task[object] | None = asyncio.current_task()
     async with runtime.bus.subscribe(None) as subscription:
@@ -76,7 +80,7 @@ async def follow_run(
         def on_interrupt() -> None:
             presses.append(1)
             if len(presses) == 1 and run.id in manager.active_run_ids():
-                sys.stderr.write("\nstopping the run (press Ctrl-C again to quit immediately)\n")
+                sys.stderr.write("\nstopping the run (press Ctrl-C again to quit as soon as the stop is recorded)\n")
                 manager.cancel(run.id)
             elif main_task is not None:
                 main_task.cancel()
@@ -97,8 +101,20 @@ async def follow_run(
             pump.cancel()
             with contextlib.suppress(asyncio.CancelledError):
                 await pump
+            if run.id in manager.active_run_ids():
+                # A second Ctrl-C: the store has to hold the stop the first one asked for before the command closes it.
+                await _until_recorded(manager, run.id)
         await _drain(subscription, ui)
     return finished
+
+
+async def _until_recorded(manager: RunManager, run_id: str) -> None:
+    """Wait at most ``_QUIT_WAIT_S`` for the end of a stopped run to be recorded, and say so when it is not."""
+    try:
+        async with asyncio.timeout(_QUIT_WAIT_S):
+            await manager.wait(run_id)
+    except TimeoutError:
+        sys.stderr.write(f"run {run_id} has not recorded its stop yet; the Dot daemon closes it\n")
 
 
 async def _read_goal(parts: list[str]) -> str:

@@ -67,6 +67,7 @@ from dotagent.store.db import Store
 from dotagent.store.endings import (
     PREFIX_EMERGENCY_STOP,
     PREFIX_INTERNAL_ERROR,
+    RESULT_COMMAND_DIED,
     RESULT_EMERGENCY_STOPPED,
     RESULT_PROCESS_ENDED,
     RESULT_SHUTDOWN,
@@ -97,6 +98,11 @@ log = get_logger(__name__)
 
 # The live event that tells the pages a chat's queue changed (item 148); it carries the chat's id.
 QUEUE_CHANGED_EVENT: str = "queue_changed"
+# How often the daemon looks for the runs of dotx commands that died (:meth:`RunManager.watch_commands`).
+COMMAND_CHECK_S: float = 30.0
+# Why a pending approval expired: its run was closed when the daemon started, or when its dotx command was found dead.
+_EXPIRED_ON_START: str = "daemon restarted"
+_EXPIRED_COMMAND_DIED: str = "its dotx command died"
 _TITLE_CHARS: int = 60
 _RESULT_CHARS: int = 20_000
 # How much of a run's result a refusal to resume it shows.
@@ -203,7 +209,7 @@ class RunManager:
             if owner is not None and not await asyncio.to_thread(owner_alive, directory, owner):
                 gone.append(owner)
         interrupted: int = await store.mark_interrupted_runs(gone)
-        await store.expire_pending_approvals()
+        await store.expire_pending_approvals(_EXPIRED_ON_START)
         # A stop of the daemon is not the owner's stop of the chat: a queue whose run the stop cut goes on once that
         # run, continued, ends done (:meth:`_follow_queue`). Any other waits for the owner to resume it: its run
         # failed, was stopped, was cut by a crash, works in a process that lives, or ended done as the daemon stopped.
@@ -213,6 +219,48 @@ class RunManager:
                 await store.hold_queue(thread_id)
         await asyncio.to_thread(clear_gone_owners, directory)
         return interrupted
+
+    async def close_runs_of_dead_commands(self) -> int:
+        """Close the runs that ``dotx`` commands (``run``, ``resume``, ``chat``) left active when they died without
+        recording their end (killed, or crashed): failed, with a result that names the command rather than the daemon,
+        and ``run_finished`` stored with that end and told to the pages that follow them. Their pending approvals
+        expire, and the queue of their chat is held until the owner resumes it, as after any end that is not done. The
+        files of the owners that are gone go, those of commands that ended well too. For the daemon, every
+        ``COMMAND_CHECK_S`` while it runs; :meth:`recover` closes, when it starts, what any process that is gone left.
+        Returns the number of runs closed."""
+        store: Store = self._runtime.store
+        directory: Path = run_owners_dir()
+        gone: list[str] = []
+        for owner in await store.active_run_owners():
+            # This process holds its own owner's lock: its runs are never taken for a dead command's.
+            if owner is not None and not await asyncio.to_thread(owner_alive, directory, owner):
+                gone.append(owner)
+        told: list[EventRecord] = await store.close_runs_of(gone, RESULT_COMMAND_DIED) if gone else []
+        for finished in told:
+            self._runtime.bus.publish(finished)
+        if told:
+            await store.expire_pending_approvals(_EXPIRED_COMMAND_DIED)
+        for finished in told:
+            await self._follow_queue(await store.get_run(finished.run_id), "failed")
+        await asyncio.to_thread(clear_gone_owners, directory)
+        return len(told)
+
+    async def watch_commands(self) -> None:
+        """Close the runs of dead ``dotx`` commands every ``COMMAND_CHECK_S`` (:meth:`close_runs_of_dead_commands`)
+        until cancelled; a check that fails, on the store or on the files of the owners, is logged and the next one goes
+        on."""
+        while True:
+            await asyncio.sleep(COMMAND_CHECK_S)
+            try:
+                closed: int = await self.close_runs_of_dead_commands()
+            except DotError as exc:
+                log.warning("dead_commands_not_checked", error=exc.message, context=exc.context)
+                continue
+            except OSError as exc:
+                log.warning("dead_commands_not_checked", error=str(exc), error_type=type(exc).__name__)
+                continue
+            if closed:
+                log.info("runs_of_dead_commands_closed", runs=closed)
 
     def active_run_ids(self) -> list[str]:
         return list(self._handles)

@@ -54,7 +54,7 @@ _STEP_EVENT: str = "assistant"
 _ARGUMENTS_CHARS: int = 200
 _RESULT_CHARS: int = 300
 
-type CutOff = Literal["daemon_restarted", "daemon_shutdown", "process_ended"]
+type CutOff = Literal["daemon_restarted", "daemon_shutdown", "process_ended", "process_died"]
 type CallEnd = Literal["succeeded", "failed", "cut_off", "not_started"]
 
 _CUT_OFF_TEXT: dict[CutOff, str] = {
@@ -63,6 +63,7 @@ _CUT_OFF_TEXT: dict[CutOff, str] = {
     "process_ended": (
         "the dotx command that drove it was told to end while it ran (its terminal was closed, or it got SIGTERM)"
     ),
+    "process_died": "the dotx command that drove it died while it ran (it was killed, or it crashed)",
 }
 
 
@@ -92,8 +93,9 @@ class Resumption(FrozenModel):
 
 def cut_off_by(run: RunRecord) -> CutOff | None:
     """How ``run`` was cut off: the daemon stopped while the run was active (a crash, or a restart that did not wait
-    for the run), the daemon was shut down, or the ``dotx`` command that drove the run was told to end (its terminal
-    was closed, or it got SIGTERM). ``None`` when anything else ended the run, or the run has not ended."""
+    for the run), the daemon was shut down, the ``dotx`` command that drove the run was told to end (its terminal was
+    closed, or it got SIGTERM), or that command died (it was killed, or it crashed). ``None`` when anything else ended
+    the run, or the run has not ended."""
     match classify_ending(run.status, run.result):
         case "daemon_restarted":
             return "daemon_restarted"
@@ -101,6 +103,8 @@ def cut_off_by(run: RunRecord) -> CutOff | None:
             return "daemon_shutdown"
         case "process_ended":
             return "process_ended"
+        case "process_died":
+            return "process_died"
         case _:
             return None
 

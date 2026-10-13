@@ -74,7 +74,7 @@ async def test_only_the_runs_of_owners_that_are_gone_are_closed_with_the_approva
         }
         assert await store.active_run_owners() == [None, "a" * 32, "b" * 32]
         assert await store.mark_interrupted_runs(["b" * 32]) == 2
-        await store.expire_pending_approvals()
+        await store.expire_pending_approvals("daemon restarted")
         assert (await store.get_run(runs["a" * 32].id)).status == "running"
         assert (await store.get_approval(waiting["a" * 32])).status == "pending"
         for gone in ("b" * 32, None):
