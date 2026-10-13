@@ -31,7 +31,7 @@ from dotagent.core.paths import added_servers_path
 from dotagent.help.added import AddedServers, dot_has, read_added_servers
 from dotagent.help.apps import APP_ROOTS, scriptable_apps
 from dotagent.help.elsewhere import SKILL_COPY_LIMIT, FoundElsewhere, FoundServer, FoundSkill, found_elsewhere
-from dotagent.help.rank import rank
+from dotagent.help.rank import rank, ranked_text
 from dotagent.help.types import HelpItem, HelpKind
 from dotagent.mcp.naming import PREFIX
 from dotagent.plugins.types import Plugin
@@ -78,7 +78,7 @@ def _skill_help(skill: Skill) -> HelpItem:
         name=skill.name,
         summary=_clip(skill.description, _SUMMARY_CHARS),
         use=f'call {SKILL_TOOL} with name "{skill.name}" and follow it',
-        text=f"{skill.name} {skill.name} {skill.description}",
+        text=ranked_text(skill.name, skill.description),
     )
 
 
@@ -90,7 +90,7 @@ def _mcp_help(name: str, description: str) -> HelpItem:
         name=name,
         summary=_clip(description, _SUMMARY_CHARS),
         use=f"call {name}",
-        text=f"{name} {name} {description}",
+        text=ranked_text(name, description),
     )
 
 
@@ -100,7 +100,7 @@ def _found_skill_help(skill: FoundSkill) -> HelpItem:
         name=skill.name,
         summary=f"{_clip(skill.description, _SUMMARY_CHARS).rstrip('. ')} (set up in {skill.agent})",
         use=f'{_ASK}; once it is added, call {SKILL_TOOL} with name "{skill.name}"',
-        text=f"{skill.name} {skill.name} {skill.description}",
+        text=ranked_text(skill.name, skill.description),
     )
 
 
@@ -111,7 +111,7 @@ def _found_server_help(server: FoundServer) -> HelpItem:
         name=server.name,
         summary=f"set up in {server.agent}, it {reach}",
         use=f"{_ASK}; Dot starts it, with its tools, the next time Dot starts",
-        text=f"{server.name} {server.name} {server.reaches}",
+        text=ranked_text(server.name, server.reaches),
     )
 
 

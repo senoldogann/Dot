@@ -39,7 +39,7 @@ _PURPOSES: dict[str, str] = {
     "team": "making a lasting teammate agent for a kind of work that recurs",
 }
 # A group's line in the prompt names this many of its tools at most and says how many more there are.
-_LISTED_TOOLS: int = 16
+LISTED_TOOLS: int = 16
 
 
 def group_of(tool: str) -> str:
@@ -70,13 +70,15 @@ def _purpose(group: str) -> str:
 
 
 def _listed(tools: Sequence[str]) -> str:
-    more: int = len(tools) - _LISTED_TOOLS
-    shown: str = ", ".join(tools[:_LISTED_TOOLS])
+    more: int = len(tools) - LISTED_TOOLS
+    shown: str = ", ".join(tools[:LISTED_TOOLS])
     return shown if more <= 0 else f"{shown} and {more} more"
 
 
 def group_lines(tools: Sequence[str]) -> tuple[str, ...]:
-    """One line for each group of ``tools`` other than core: its name, what it is for and its tools."""
+    """One line for each group of ``tools`` other than core: its name, what it is for and its tools, the first
+    LISTED_TOOLS of them in the order of ``tools`` (:func:`dotagent.help.listed.tools_in_order` puts first those of a
+    bigger group that fit the run's goal)."""
     return tuple(f"- {group}: {_purpose(group)} ({_listed(tools_in(tools, group))})" for group in groups_of(tools))
 
 

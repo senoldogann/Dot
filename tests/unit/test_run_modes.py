@@ -112,6 +112,7 @@ def _prompt(approvals: ApprovalMode, goal_mode: bool) -> str:
             [],
             [],
             [],
+            0,
             None,
             [],
             None,
@@ -172,6 +173,7 @@ def _asking(source: str, questions: QuestionMode, tool_names: list[str]) -> str:
             [],
             tool_names,
             [],
+            0,
             None,
             [],
             None,
@@ -199,7 +201,7 @@ def test_the_prompt_mentions_goal_mode_only_when_it_is_on() -> None:
 def _in_mode(mode: RunMode) -> str:
     return build_system_prompt(
         collect_prompt_inputs(
-            mode, "cli", "aggressive", "ask", "wait", False, Path("/tmp/work"), [], [], [], None, [], None, (), ()
+            mode, "cli", "aggressive", "ask", "wait", False, Path("/tmp/work"), [], [], [], 0, None, [], None, (), ()
         )
     )
 
@@ -221,7 +223,7 @@ def test_task_and_research_runs_keep_acting_and_take_an_ask_to_keep_going_at_its
     )
     session: str = build_system_prompt(
         collect_prompt_inputs(
-            "task", "cli", "aggressive", "ask", "wait", False, Path("/tmp/work"), [], [], [], 2, [], None, (), ()
+            "task", "cli", "aggressive", "ask", "wait", False, Path("/tmp/work"), [], [], [], 0, 2, [], None, (), ()
         )
     )
     for rule in rules:

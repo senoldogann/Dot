@@ -81,6 +81,12 @@ def _singular(word: str) -> str:
     return word[:-1]
 
 
+def ranked_text(name: str, about: str) -> str:
+    """The words a thing named ``name`` is ranked by, ``about`` being what it says of itself: its name counted twice, as
+    a name says most of what a thing is for."""
+    return f"{name} {name} {about}"
+
+
 def words(text: str) -> list[str]:
     """The words of ``text`` that tell what it is about, in order: its runs of letters and digits (``_`` and ``-`` part
     them), folded (:func:`fold_search`), without single letters and common words, each made singular."""
@@ -98,12 +104,16 @@ def _fit(count: int, length: int, average: float) -> float:
     return count * (_K1 + 1) / (count + _K1 * (1 - _B + _B * length / average))
 
 
-def rank(items: Sequence[HelpItem], need: str, limit: int) -> list[HelpItem]:
-    """The ``limit`` items of ``items`` that fit ``need`` best, the best first, by Okapi BM25 of the need's words over
-    the words of each item's ``text``. An item that shares no word with the need is left out, and so is one that
-    scores less than half as well as the best one; items that score the same keep their order."""
+def fitting(texts: Sequence[str], need: str) -> list[int]:
+    """The places in ``texts`` of the texts that share a word with ``need``, the best fit first, by Okapi BM25 of the
+    need's words over the words of each text; texts that fit as well keep their order."""
+    return [index for score, index in _scored(texts, need)]
+
+
+def _scored(texts: Sequence[str], need: str) -> list[tuple[float, int]]:
+    """The score and the place of each text of ``texts`` that shares a word with ``need``, the best first."""
     asked: frozenset[str] = frozenset(words(need))
-    bags: list[Counter[str]] = [Counter(words(item.text)) for item in items]
+    bags: list[Counter[str]] = [Counter(words(text)) for text in texts]
     if not asked or not bags:
         return []
     lengths: list[int] = [bag.total() for bag in bags]
@@ -114,7 +124,14 @@ def rank(items: Sequence[HelpItem], need: str, limit: int) -> list[HelpItem]:
         score: float = sum(weights[word] * _fit(bag[word], length, average) for word in asked if bag[word])
         if score > 0:
             scored.append((score, index))
-    scored.sort(key=lambda pair: (-pair[0], pair[1]))
+    return sorted(scored, key=lambda pair: (-pair[0], pair[1]))
+
+
+def rank(items: Sequence[HelpItem], need: str, limit: int) -> list[HelpItem]:
+    """The ``limit`` items of ``items`` that fit ``need`` best, the best first (:func:`fitting`, over the ``text`` of
+    each). One that scores less than half as well as the best one is left out: it shares only the weaker words of a
+    need of a few words."""
+    scored: list[tuple[float, int]] = _scored([item.text for item in items], need)
     if not scored:
         return []
     floor: float = scored[0][0] * _FLOOR

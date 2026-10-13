@@ -12,6 +12,7 @@ from dotagent.agent.prompt import PromptInputs, build_system_prompt, collect_pro
 from dotagent.agent.scaffold import Scaffold, surface_for
 from dotagent.config import AgentConfig, AppConfig, Tier, load_default_config
 from dotagent.core.types import JsonObject
+from dotagent.help.listed import tools_in_order
 from dotagent.llm.types import ToolCall, ToolSpec, assistant_message, tool_message, user_message
 from dotagent.runtime import _tool_groups
 from dotagent.tools.base import ToolResult, fail, ok
@@ -126,7 +127,22 @@ def test_the_tools_of_the_groups_that_are_off_are_hidden_with_their_group() -> N
 
 def _inputs(tool_names: list[str]) -> PromptInputs:
     return collect_prompt_inputs(
-        "task", "cli", "aggressive", "ask", "wait", False, Path("/tmp/work"), [], tool_names, [], None, [], None, (), ()
+        "task",
+        "cli",
+        "aggressive",
+        "ask",
+        "wait",
+        False,
+        Path("/tmp/work"),
+        [],
+        tool_names,
+        [],
+        0,
+        None,
+        [],
+        None,
+        (),
+        (),
     )
 
 
@@ -163,6 +179,44 @@ def test_a_large_mcp_server_is_one_group_whose_line_names_some_of_its_tools() ->
     tools: list[str] = ["read_file", *(f"mcp__wiki__page_{index:02d}" for index in range(20))]
     shown: str = ", ".join(f"mcp__wiki__page_{index:02d}" for index in range(16))
     assert group_lines(tools) == (f"- mcp__wiki: the tools of the MCP server wiki ({shown} and 4 more)",)
+
+
+_GITHUB: tuple[tuple[str, str], ...] = (
+    ("list_repos", "List the repositories of a user."),
+    ("get_repo", "Get one repository."),
+    ("create_repo", "Create a repository."),
+    ("list_branches", "List the branches of a repository."),
+    ("create_branch", "Create a branch."),
+    ("list_commits", "List the commits of a branch."),
+    ("get_commit", "Get one commit."),
+    ("list_pulls", "List the pull requests of a repository."),
+    ("get_pull", "Get one pull request."),
+    ("create_pull", "Create a pull request."),
+    ("merge_pull", "Merge a pull request."),
+    ("search_code", "Search the code of a repository."),
+    ("list_tags", "List the tags of a repository."),
+    ("get_file", "Get the content of a file."),
+    ("list_workflows", "List the workflows of a repository."),
+    ("run_workflow", "Run a workflow."),
+    ("list_issues", "List the issues of a repository."),
+    ("create_issue", "Open an issue in a repository."),
+    ("close_issue", "Close an issue."),
+    ("create_release", "Publish a release of a repository."),
+)
+
+
+def test_a_large_group_names_first_the_tools_that_fit_the_goal() -> None:
+    specs: list[ToolSpec] = [
+        ToolSpec(name="read_file", description="Read a file.", parameters={}),
+        *(ToolSpec(name=f"mcp__github__{name}", description=about, parameters={}) for name, about in _GITHUB),
+    ]
+    goal: str = "Open an issue about the crash in the last release."
+    line: str = group_lines(tools_in_order(specs, goal))[0]
+    named: list[str] = line.removesuffix(" and 4 more)").split(" (", 1)[1].split(", ")
+    fitting: set[str] = {f"mcp__github__{name}" for name in ("list_issues", "create_issue", "close_issue")}
+    assert (set(named[:4]), len(named)) == ({*fitting, "mcp__github__create_release"}, 16), line
+    # A group whose line names all its tools keeps their order.
+    assert tools_in_order(specs[:6], goal) == tuple(spec.name for spec in specs[:6])
 
 
 def _call(call_id: str, name: str, arguments: JsonObject) -> ToolCall:

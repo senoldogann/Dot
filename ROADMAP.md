@@ -5085,8 +5085,8 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 162 | A run whose terminal closed can be resumed                                           | done        | 3e33fdd |
 | 163 | A run finds the help this Mac offers before it takes the hard way                    | done        | 4eb3a6c |
 | 164 | The skills and MCP servers of the Mac's other agents are found                       | done        | 490749a |
-| 165 | Help found elsewhere is added only with the owner's yes                              | in progress |         |
-| 166 | A run's instructions list the help that fits its goal                                | planned     |         |
+| 165 | Help found elsewhere is added only with the owner's yes                              | done        | 52a7c02 |
+| 166 | A run's instructions list the help that fits its goal                                | in progress |         |
 | 167 | Evals show whether a run takes the easy way                                          | planned     |         |
 
 ### 77. The type system: Inter and Geist Mono, seven sizes, three weights
@@ -8691,7 +8691,7 @@ Desktop, Cursor, VS Code) are found and shown, read-only: their names, descripti
 
 ### 165. Help found elsewhere is added only with the owner's yes
 
-**Status: in progress.**
+**Status: done.** Merged as `52a7c02` (PR #202; no Linear issue, the Linear connector was signed out).
 
 **As built (2026-10-13).** Settings › Skills, under Found on this Mac, gives each skill and MCP server that Dot can take
 an Add to Dot button and each one added a Remove button; both ask first, in Dot's confirm dialog, and
@@ -8741,7 +8741,25 @@ needs one is told to ask the owner, and nothing is installed or configured witho
 
 ### 166. A run's instructions list the help that fits its goal
 
-**Status: planned.**
+**Status: in progress.**
+
+**As built (2026-10-13).** A run's instructions list at most `listed` skills (`[skills] listed`, 20, at least 1). A run
+offered more is listed those that share the most words with its goal and with the goals of the latest earlier runs of
+its thread (the query its notes are chosen by), the best fit first, by find_help's BM25 (`help.rank.fitting`, split out
+of `rank`, which keeps its cut at half the best score for a need of a few words): unlike find_help, the instructions
+keep a skill that shares only some of the goal's words, as a goal can ask for more than one kind of work. A line then
+says how many more installed skills fit the goal less well, that find_help searches them all and that skill reads one by
+its name; when none shares a word with the goal, the line says so instead, and the skill tool's `name` says a name may
+come from find_help. A run offered `listed` skills or fewer is given the same instructions as before. A tool group's
+line (the `grouped` surface) names at most 16 of its tools; in a bigger group, those whose names and descriptions share
+the most words with the goal now come first, where the first 16 were named before. Not done: meaning (embeddings) next
+to the words, so a goal in another language than the skills still lists none of them. Tests: a unit test lists every
+skill of a run offered few, whatever the goal; of four with a limit of three, the two that share words with a goal of
+two kinds of work, the best fit first, with the line of the two others; and none, with its own line, for a goal that
+shares no word. Another names first, in its group's line, the four tools of a twenty-tool MCP server that fit the goal,
+and keeps the order of a small group. Through the real loop, a run offered four skills with `listed = 2` is sent
+instructions that list the two that fit its goal and say two more are installed. Both failed on the code before: the
+run's instructions listed all four, and the line named the first sixteen tools.
 
 **What.** A run's instructions list the skills and tools that fit its goal, picked by relevance when there are many,
 instead of every one; the rest stay a `find_help` call away.
@@ -9352,3 +9370,4 @@ makes short, scored by the steps and the channel the run took.
 - 2026-10-13 (Opus 5.5): item 162 merged as `3e33fdd` (PR #199; no Linear issue, the connector was signed out): a run of `dotx run` whose terminal was closed, or that got SIGTERM, is cut off rather than stopped and can be resumed by hand; Ctrl-C stays the owner's stop. Part 26 is done; part 27, find help before the hard way, is planned.
 - 2026-10-13 (Opus 5.5): item 163 merged as `4eb3a6c` (PR #200; no Linear issue, the connector was signed out): a run can call `find_help` with its need in a few plain words and is told what fits among the skills it is offered, the tools of its MCP servers and the applications that AppleScript can drive, with how to use each; its instructions tell it to call it before it takes a hard way.
 - 2026-10-13 (Opus 5.5): item 164 merged as `490749a` (PR #201; no Linear issue, the connector was signed out): the skills and MCP servers that the Mac's other agents set up are found and shown, read-only and never with a key, in `dotx skills list`, `GET /api/skills/elsewhere` and Settings › Skills.
+- 2026-10-13 (Opus 5.5): item 165 merged as `52a7c02` (PR #202; no Linear issue, the connector was signed out): a skill or an MCP server that another agent of the Mac set up is added to Dot only with the owner's yes, in Settings › Skills: a skill as a copy in Dot's skills folder, a server as a line of Dot's record with a fingerprint of its entry, started while that entry is unchanged; find_help tells a run of what can be added, for the run to ask the owner.

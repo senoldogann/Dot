@@ -20,7 +20,9 @@ _SKIPPED: frozenset[str] = frozenset({"node_modules", "__pycache__"})
 
 
 class SkillArgs(ToolArgs):
-    name: str = Field(description="The name of the skill, exactly as listed under Skills in your instructions.")
+    name: str = Field(
+        description="The name of the skill, exactly as listed under Skills in your instructions or by find_help."
+    )
 
 
 def files_of_skill(root: Path) -> list[str]:
