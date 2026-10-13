@@ -5117,8 +5117,8 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 184 | A queued message starts once or is removed, never both                               | done        | d462505 |
 | 185 | A provider's 403 is not a refused key, and Ollama's stream error keeps its words     | done        | b178796 |
 | 186 | The doctor checks each model name against the list its provider serves               | done        | 0b3702a |
-| 187 | The service install keeps the running job until the new one is in place              | in progress |         |
-| 188 | A run of a dotx command is followed live on the pages and stopped there              | planned     |         |
+| 187 | The service install keeps the running job until the new one is in place              | done        | 2ad0df4 |
+| 188 | A run of a dotx command is followed live on the pages and stopped there              | in progress |         |
 | 189 | A message sent twice starts once                                                     | planned     |         |
 | 190 | The pages say what they could not read, follow the rules and tell of an update       | planned     |         |
 | 191 | The desktop shell says what it could not read                                        | planned     |         |
@@ -9399,7 +9399,7 @@ list that cannot be read says so without failing the check twice.
 
 ### 187. The service install keeps the running job until the new one is in place
 
-**Status: in progress.**
+**Status: done.** Merged as `2ad0df4` (PR #226; no Linear issue, the Linear connector was signed out).
 
 **As built (2026-10-13).** `dotx service install` unloads the job that is loaded first and writes the new job's property
 list once launchd has let the job go (`launchd.install_job`). When the new job does not load, or its file cannot be
@@ -9416,7 +9416,29 @@ back when the new job does not load, instead of leaving a new file next to an ol
 
 ### 188. A run of a dotx command is followed live on the pages and stopped there
 
-**Status: planned.**
+**Status: in progress.**
+
+**As built (2026-10-14).** The daemon relays what the runs of other processes store: every half second it tells its
+pages the events that the runs of `dotx` commands stored since, and keeps the runs at work of the commands that live
+(`RunManager.relay_elsewhere`; the detail of such a run says `elsewhere`). Such a run works in the sidebar and in
+Activity, its questions wait there, and its page follows it live, in one stream, to its end (its text comes whole at
+each step: what is streamed as it is written is not stored). A read that the store or the files of the owners refuse
+leaves the relay going, and a queue whose move the store refused is moved at the next relay. Its Stop asks the command
+to stop it through a row of the store (`run_stops`), which the command reads every half second; the command also takes
+from the store a decision made on the pages for a question or an approval of its run, which ends the prompt at its
+terminal, and an answer typed there after the pages answered no longer fails the command. A command leaves its chat's
+queue to the daemon, which moves it once it sees the run end (`RunManager.leave_queues`). The store refuses a run on a
+chat where another process drives a run at work, and on a chat whose queued message another process is starting (the gap
+the review of item 184 left); a process keeps its own runs apart itself, as before. A start of the daemon that meets the
+run of a command that died closes that run first; a command leaves that to the daemon. Before, the daemon did not know
+of a command's run: its page asked again and again, Activity counted nothing at work, its Stop answered that the run was
+not active, a decision made on the pages reached the command only at the end of its wait (15 minutes), and a message
+queued on its chat stayed in the queue after the run ended. Tests: `tests/smoke/test_command_runs.py` runs `dotx run` in
+a child process (`tests/fixtures/dot_cli_steps.py`) beside a served daemon: the run on the pages and its live stream,
+its Stop, a question answered on its page and an answer typed at the terminal after that, its chat's queue after its
+end, also with the store refusing a read of the relay and the first read of the ended run, the run a dead command left,
+and its page in Chrome, wide and on a phone, light and dark; `tests/unit/test_one_run_per_chat.py` refuses the second
+run with two stores on one database. Each fails on the code of before.
 
 **What.** A run that a `dotx` command drives is listed as working on the pages, and its page follows it live from the
 store instead of reconnecting in a loop; its Stop asks the command to stop it, instead of answering that the run is not
@@ -10069,3 +10091,4 @@ running" for all of them.
 - 2026-10-13 (Opus 5.5): item 184 merged as `d462505` (PR #223; no Linear issue, the connector was signed out): a queued message is claimed in the store before its run starts, so it starts once, after the run at work on the chat in any process, and is not edited, taken out or steered while it starts.
 - 2026-10-13 (Opus 5.5): item 185 merged as `b178796` (PR #224; no Linear issue, the connector was signed out): a provider's HTTP 403 is a refused access, not a refused key: a run moves to its standby model with that reason, Settings › Models says so without a link to the keys, and an error Ollama reports inside its stream keeps its words.
 - 2026-10-13 (Opus 5.5): item 186 merged as `0b3702a` (PR #225; no Linear issue, the connector was signed out): `dotx doctor` checks each model of OpenAI and OpenCode Go against the list of the models its provider serves to the key, a helper and a standby model too, and a list that could not be read is a warning.
+- 2026-10-13 (Opus 5.5): item 187 merged as `2ad0df4` (PR #226; no Linear issue, the connector was signed out): `dotx service install` stops the running job before it writes the new job's file, and puts the file and the job of before back when the new job does not load.

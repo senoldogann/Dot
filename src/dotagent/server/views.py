@@ -410,11 +410,14 @@ class RunDetail(FrozenModel):
     session of, ``None`` for any other run; ``held`` is true while the user has taken the run's browser over
     (``POST /runs/{id}/takeover``); ``agent`` is the agent the run belongs to (item 86), ``None`` for Dot;
     ``keep_going`` is true for a run in goal mode whose goal asks it to keep going until it is done, which its goal
-    check is told (item 132)."""
+    check is told (item 132). ``active`` is true while the daemon drives the run; ``elsewhere`` while another
+    process that lives drives it at work (a ``dotx`` command): its page follows it and its Stop asks that process to
+    stop it, but it is not steered or taken over from here."""
 
     run: RunRecord
     children: list[RunRecord]
     active: bool
+    elsewhere: bool
     resumable: bool
     lessons: RunLessons | None
     questions: list[ApprovalRecord]

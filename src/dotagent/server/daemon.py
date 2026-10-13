@@ -139,6 +139,14 @@ def _log_watch_end(watcher: asyncio.Task[None]) -> None:
     log.error("command_watch_ended", error=repr(watcher.exception()))
 
 
+def _log_relay_end(relay: asyncio.Task[None]) -> None:
+    """A relay of the runs of dotx commands that stops before the daemon does is logged: the pages see those runs only
+    as they are stored, and their chats' queues wait, until the daemon starts again."""
+    if relay.cancelled() or relay.exception() is None:
+        return
+    log.error("relay_ended", error=repr(relay.exception()))
+
+
 async def _stop_server_on(stop: asyncio.Event, server: DotServer) -> None:
     """The first stop request ends the server gracefully, a second one forces it."""
     await stop.wait()
@@ -202,6 +210,10 @@ async def run_daemon(config: AppConfig) -> None:
             watcher: asyncio.Task[None] = asyncio.create_task(manager.watch_commands(), name="dead-commands")
             watcher.add_done_callback(_log_watch_end)
             cleanup.push_async_callback(_cancelled, watcher)
+            # The runs of dotx commands work on the pages as this daemon's own do, and their chats' queues move here.
+            relay: asyncio.Task[None] = asyncio.create_task(manager.relay_elsewhere(), name="relay")
+            relay.add_done_callback(_log_relay_end)
+            cleanup.push_async_callback(_cancelled, relay)
             # Before the scheduler and the server start: a resumed run takes its place before any new run, and no new
             # message reaches its thread before it.
             resumed: tuple[RunRecord, ...] = await manager.resume_safe() if config.agent.resume == "safe" else ()

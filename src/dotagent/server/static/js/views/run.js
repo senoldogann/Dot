@@ -141,7 +141,10 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
   const face =
     agent !== null ? actorFace(agent.id, faceState(status), agent.look) : run.parent_run_id === null ? dotFace(faceState(status)) : actorFace(run.id, faceState(status), null);
   let model = run.model;
-  let active = detail.active;
+  // A run that a dotx command drives (`elsewhere`) works here too: its page follows it and its Stop asks that
+  // command to stop it, but it takes no steer, and its browser is not shown or taken over from here.
+  const elsewhere = detail.elsewhere;
+  let active = detail.active || elsewhere;
   // The run was cut off (by the daemon, or by the end of its dotx command) and a new run can go on from where it
   // stopped.
   let resumable = detail.resumable;
@@ -152,7 +155,7 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
   let scrollQueued = false;
   let answerNode = null;
   // A run that is over when the page opens lands on its answer; a live one only when the reader follows it.
-  const openedFinished = !detail.active;
+  const openedFinished = !active;
   const seen = { steps: 0, input: 0, output: 0, calls: 0, failed: 0 };
 
   ctx.setTitle(clip(run.goal, TITLE_CHARS));
@@ -587,7 +590,7 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
     send.disabled = true;
     try {
       await attempt(async () => {
-        if (active && queueing && steerNow !== true) {
+        if (active && (elsewhere || (queueing && steerNow !== true))) {
           // The level is checked against the model's own, so the models are known first.
           await choices.ready();
           const chosen = choices.value();
@@ -656,7 +659,7 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
     input.placeholder = active ? working : "Follow up, or /btw to ask on the side";
     const sendWord = active ? (queueing ? "Queue" : "Steer") : "Follow up";
     frame.setSendLabel(editing ? "Save" : sendWord);
-    queue.setActive(active);
+    queue.setActive(active && !elsewhere);
     if (active && ticker === null) {
       // The run's figures, and the time of every delegated run that works, count on every second.
       ticker = setInterval(() => {
@@ -905,7 +908,14 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
   const actorName = agent !== null ? agent.name : dotName();
   // The width of the panel (item 109): chosen on Dot's computer or dragged on the handle beside the panel.
   const stage = createStageSize({ layout });
-  const computer = createComputer({ runId, active: detail.active, held: detail.held, name: actorName, sizes: stage.chooser });
+  const computer = createComputer({
+    runId,
+    active: detail.active,
+    elsewhere,
+    held: detail.held,
+    name: actorName,
+    sizes: stage.chooser,
+  });
   // The side panel (item 84): the computer, the details, the cost (item 96), the plan and the actions. The run's state
   // is the top bar's face and the Details card's first fact; no card at the head of the conversation (item 113).
   const inspector = createInspector({

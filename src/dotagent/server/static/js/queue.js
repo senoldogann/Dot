@@ -189,7 +189,7 @@ export function createQueue({ threadId, frame, onSteered, onStarted, onEdit }) {
         icon("pencil"),
       );
       edit.addEventListener("click", () => startEdit(message));
-      const steerTitle = active ? "Send to the run now, as a steer" : "No run is working to steer";
+      const steerTitle = active ? "Send to the run now, as a steer" : "No run here can be steered";
       const steerButton = el(
         "button",
         { class: "queue-steer", type: "button", "data-id": message.id, "data-part": "steer", title: steerTitle, disabled: !active },

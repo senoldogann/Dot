@@ -1,6 +1,7 @@
 """Run lifecycle: start, queue, steer, cancel and finish agent runs, each in its own asyncio task."""
 
 import asyncio
+import sqlite3
 import time
 from collections.abc import Awaitable, Callable, Collection, Coroutine, Iterator, Sequence
 from contextlib import AbstractAsyncContextManager, contextmanager, nullcontext
@@ -50,6 +51,7 @@ from dotagent.core.errors import (
     DotError,
     FailSafeTriggered,
     InvalidValueError,
+    NotFoundError,
     RunCancelled,
     RunConflict,
     StoreError,
@@ -91,6 +93,7 @@ from dotagent.store.models import (
     RunRecord,
     RunStatus,
     ThreadRecord,
+    WorkingRun,
 )
 from dotagent.tools.context import DelegateOutcome
 from dotagent.tools.delegate import DELEGATE_SOURCE
@@ -104,6 +107,13 @@ QUEUE_CHANGED_EVENT: str = "queue_changed"
 # How often the daemon stores the ends the store refused and looks for the runs of dotx commands that died
 # (:meth:`RunManager.watch_commands`).
 COMMAND_CHECK_S: float = 30.0
+# How often the daemon tells its pages what the runs of dotx commands store (:meth:`RunManager.relay_elsewhere`), and
+# how often a process that drives runs reads the stops and the answers asked of them through another process
+# (:meth:`RunManager._answer_asks`).
+RELAY_S: float = 0.5
+ASK_CHECK_S: float = 0.5
+# The most stored events one relay tells; the rest follow with the next.
+_RELAY_PAGE: int = 500
 # Why a pending approval expired: its run was closed when the daemon started, or when its dotx command was found dead.
 _EXPIRED_ON_START: str = "daemon restarted"
 _EXPIRED_COMMAND_DIED: str = "its dotx command died"
@@ -217,6 +227,15 @@ class RunManager:
         # The claims on queued messages the store refused to end (:meth:`_end_claim`), by chat, with the store's way to
         # end each: its message started (``Store.drop_claimed``) or could not (``Store.hold_claimed``).
         self._left_claims: dict[str, Callable[[str], Awaitable[None]]] = {}
+        # The runs at work that other processes (dotx commands) drive, as the relay saw them last
+        # (:meth:`relay_elsewhere`).
+        self._elsewhere: frozenset[str] = frozenset()
+        # The runs of other processes whose end the relay told, and whose chat's queue a store refused to move so far.
+        self._unfollowed: set[str] = set()
+        # Reads the stops and the answers asked of this process's runs through another process, while it has runs.
+        self._asks: asyncio.Task[None] | None = None
+        # Whether the daemon moves the queues of the chats whose runs this process ends (:meth:`leave_queues`).
+        self._leaves_queues: bool = False
 
     async def recover(self) -> int:
         """Close out what processes that are gone left behind: the runs they left active, the approvals of runs no
@@ -231,6 +250,7 @@ class RunManager:
                 gone.append(owner)
         interrupted: int = await store.mark_interrupted_runs(gone)
         await store.expire_pending_approvals(_EXPIRED_ON_START)
+        await store.forget_stops_of_ended_runs()
         await self._hold_claims_of_gone(directory)
         # A stop of the daemon is not the owner's stop of the chat: a queue whose run the stop cut goes on once that
         # run, continued, ends done (:meth:`_follow_queue`). Any other waits for the owner to resume it: its run
@@ -274,6 +294,65 @@ class RunManager:
                 )
         await asyncio.to_thread(clear_gone_owners, directory)
         return len(told)
+
+    async def relay_elsewhere(self) -> None:
+        """Until cancelled, every ``RELAY_S``, tell this process's followers (the pages of the daemon) what the runs of
+        other processes (``dotx`` commands) store, as the events of its own runs are told (:meth:`_relay_once`),
+        from the newest event at its start on. A relay that the store or the files of the owners refuse is logged, and
+        the next goes on from where it stopped."""
+        cursor: int | None = None
+        while True:
+            try:
+                if cursor is None:
+                    cursor = await self._runtime.store.last_event_id()
+                else:
+                    cursor = await self._relay_once(cursor)
+            except DotError as exc:
+                log.warning("relay_not_done", after=cursor, error=exc.message, context=exc.context)
+            except (sqlite3.Error, OSError) as exc:
+                log.warning("relay_not_done", after=cursor, error=str(exc), error_type=type(exc).__name__)
+            await asyncio.sleep(RELAY_S)
+
+    async def _relay_once(self, after: int) -> int:
+        """Publish the events that other processes stored after the event ``after`` (one this process told already
+        passes: it stored it for them, as when it closed a dead command's run), keep the runs at work those that live
+        drive (:meth:`elsewhere_run_ids`), and move the queue of a chat whose run of theirs ended, as the end of a run
+        of this process does (:meth:`_follow_queue`); a move the store refuses is tried again at the next relay.
+        Returns the id of the event to go on after."""
+        store: Store = self._runtime.store
+        mine: str = self._owner_id()
+        upto: int = await store.last_event_id()
+        events: list[EventRecord] = await store.events_of_others(mine, after, upto, _RELAY_PAGE)
+        directory: Path = run_owners_dir()
+        working: list[WorkingRun] = await store.working_runs_of_others(mine)
+        alive: set[str] = set()
+        for owner in {run.owner for run in working}:
+            if await asyncio.to_thread(owner_alive, directory, owner):
+                alive.add(owner)
+        # Before the events go out: a follower that hears one finds its run at work.
+        self._elsewhere = frozenset(run.run_id for run in working if run.owner in alive)
+        ended: list[str] = []
+        for event in events:
+            if self._runtime.bus.told(event.id):
+                continue
+            self._runtime.bus.publish(event)
+            if event.kind == "run_finished":
+                ended.append(event.run_id)
+        self._unfollowed.update(ended)
+        for run_id in sorted(self._unfollowed):
+            try:
+                run: RunRecord = await store.get_run(run_id)
+                await self._follow_queue(run, run.status)
+            except NotFoundError:
+                # Its chat was deleted meanwhile: no queue is left to move.
+                pass
+            except (DotError, sqlite3.Error, OSError) as exc:
+                log.warning("queue_not_followed_yet", run_id=run_id, error=str(exc), error_type=type(exc).__name__)
+                continue
+            except Exception:
+                log.exception("queue_not_followed", run_id=run_id)
+            self._unfollowed.discard(run_id)
+        return events[-1].id if len(events) == _RELAY_PAGE else upto
 
     async def watch_commands(self) -> None:
         """Every ``COMMAND_CHECK_S`` until cancelled, store the ends the store refused (:meth:`store_left_ends`) and
@@ -334,6 +413,18 @@ class RunManager:
 
     def active_run_ids(self) -> list[str]:
         return list(self._handles)
+
+    def elsewhere_run_ids(self) -> list[str]:
+        """The runs at work that other processes drive (``dotx`` commands), as the relay saw them last; none unless this
+        process relays them (:meth:`relay_elsewhere`)."""
+        return sorted(self._elsewhere)
+
+    def leave_queues(self) -> None:
+        """Leave the queues of the chats whose runs this process ends to the daemon, which moves each as it sees the
+        end (:meth:`relay_elsewhere`): a ``dotx`` command ends with its run, and a queued message started there would
+        be cut off with it. Until a daemon runs, such a queue waits; the daemon holds it when it starts
+        (:meth:`recover`)."""
+        self._leaves_queues = True
 
     @contextmanager
     def deleting_threads(self, thread_ids: Collection[str]) -> Iterator[None]:
@@ -848,6 +939,47 @@ class RunManager:
         self._runtime.approvals.release_run(run_id)
         handle.task.cancel()
 
+    async def stop(self, run_id: str) -> None:
+        """Stop the run ``run_id``, as the Stop of the pages asks: a run of this process is cancelled (:meth:`cancel`),
+        and the process that lives and drives one of the others (a ``dotx`` command, :meth:`elsewhere_run_ids`) is
+        asked to, which it does within ``ASK_CHECK_S`` (:meth:`_answer_asks`). Raises ``RunConflict`` for a run that
+        is not at work."""
+        if run_id in self._elsewhere and run_id not in self._handles:
+            await self._runtime.store.ask_stop(run_id)
+            log.info("run_stop_asked", run_id=run_id)
+            return
+        self.cancel(run_id)
+
+    def _watch_asks(self) -> None:
+        """Read the asks of other processes (:meth:`_answer_asks`) from this process's first run at work on."""
+        if self._asks is None:
+            self._asks = asyncio.create_task(self._answer_asks(), name="asks")
+
+    async def _answer_asks(self) -> None:
+        """While this process drives runs, every ``ASK_CHECK_S``: stop those another process asked to stop
+        (:meth:`stop`), and wake the questions of theirs that a person answered there
+        (``ApprovalBroker.take_stored_decisions``). A read the store refuses is logged, and the next goes on; once
+        this process has no run, or the loop ended otherwise, the next run starts it again."""
+        store: Store = self._runtime.store
+        try:
+            while self._handles:
+                await asyncio.sleep(ASK_CHECK_S)
+                try:
+                    asked: list[str] = await store.stops_asked(self.active_run_ids())
+                    for run_id in asked:
+                        if run_id in self._handles:
+                            log.info("run_stopped_as_asked", run_id=run_id)
+                            self.cancel(run_id)
+                    if asked:
+                        await store.forget_stops(asked)
+                    await self._runtime.approvals.take_stored_decisions()
+                except DotError as exc:
+                    log.warning("asks_not_read", error=exc.message, context=exc.context)
+                except sqlite3.Error as exc:
+                    log.warning("asks_not_read", error=str(exc), error_type=type(exc).__name__)
+        finally:
+            self._asks = None
+
     def emergency_stop(self) -> list[str]:
         """Stop every active run as the owner's emergency stop: each ends with :data:`RESULT_EMERGENCY_STOPPED`, so
         the campaign of a session stops instead of planning the next one; a run being launched meanwhile ends so once it
@@ -945,6 +1077,8 @@ class RunManager:
         for handle in handles:
             self.cancel(handle.run_id)
         await asyncio.gather(*(handle.finished.wait() for handle in handles))
+        if self._asks is not None:
+            self._asks.cancel()
         learning: list[asyncio.Task[None]] = [*self._learning.values(), *self._distilling.values()]
         for task in learning:
             task.cancel()
@@ -1267,20 +1401,24 @@ class RunManager:
             if campaign_id is None
             else await self._session_instructions(goal, campaign_id)
         )
-        run: RunRecord = await runtime.store.create_run(
-            thread_id,
-            goal,
-            mode,
-            model_ref,
-            parent_run_id,
-            source,
-            level,
-            approval_mode,
-            with_goal_mode,
-            campaign_id,
-            agent_id,
-            self._owner_id(),
-        )
+
+        async def stored() -> RunRecord:
+            return await runtime.store.create_run(
+                thread_id,
+                goal,
+                mode,
+                model_ref,
+                parent_run_id,
+                source,
+                level,
+                approval_mode,
+                with_goal_mode,
+                campaign_id,
+                agent_id,
+                self._owner_id(),
+            )
+
+        run: RunRecord = await self._stored_run(stored)
         # Until the handle is registered no task will end the stored run: one that fails or is cancelled before
         # that ends here, failed, instead of staying queued (:meth:`_end_unstarted`).
         registered: bool = False
@@ -1343,10 +1481,24 @@ class RunManager:
             handle: RunHandle = RunHandle(run.id, thread_id, parent_run_id, task, gate, cancel, inbox, finished)
             self._handles[run.id] = handle
             registered = True
+            self._watch_asks()
             return run, handle
         finally:
             if not registered:
                 await _uncancelled(self._end_unstarted(run))
+
+    async def _stored_run(self, store_run: Callable[[], Awaitable[RunRecord]]) -> RunRecord:
+        """Store a new run with ``store_run`` (:meth:`Store.create_run`). A chat on which the run of a ``dotx`` command
+        that died is still at work refuses it until that run is closed: the daemon closes such runs
+        (:meth:`close_runs_of_dead_commands`) and stores the run then; a run of a process that lives keeps the refusal.
+        A ``dotx`` command leaves that to the daemon, as it leaves what follows such an end (a chat's queue, a
+        campaign's next session)."""
+        try:
+            return await store_run()
+        except RunConflict:
+            if self._leaves_queues or await self.close_runs_of_dead_commands() == 0:
+                raise
+            return await store_run()
 
     async def _end_unstarted(self, run: RunRecord) -> None:
         """End a run whose start failed after it was stored, before its task was registered: failed, stored as every
@@ -1534,8 +1686,9 @@ class RunManager:
     async def _follow_queue(self, run: RunRecord, status: RunStatus) -> None:
         """Move the queue of a run's chat on as the run ends: an end done starts its next message (:meth:`_drain`);
         any other end holds it until the owner resumes it, since what failed would likely fail the next message too
-        and a stop stops the chat. A delegated run and a campaign's session leave it alone."""
-        if run.parent_run_id is not None or run.campaign_id is not None:
+        and a stop stops the chat. A delegated run and a campaign's session leave it alone, and so does a process that
+        leaves the queues to the daemon (:meth:`leave_queues`)."""
+        if run.parent_run_id is not None or run.campaign_id is not None or self._leaves_queues:
             return
         store: Store = self._runtime.store
         if status == "done":

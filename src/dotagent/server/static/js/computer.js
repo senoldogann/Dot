@@ -13,16 +13,20 @@ const WAITING_FOR_FRAME = "Waiting for the page: the first frame comes when the 
 const CLOSED_HINT = "Watch the page Dot's browser is on. Nothing is sent while the view is closed.";
 // A run that has ended has no page left to watch (item 111): Watch is gone, and so is the hint that offers it.
 const ENDED_HINT = "The run has ended. Its browser's page is shown here only while a run is going on.";
+// A run of a dotx command works in that command's browser, which the daemon does not cast (item 188).
+const ELSEWHERE_HINT = "The run works in a dotx command, whose browser is not shown here.";
 
 /**
- * The card for the run `runId`, which is `active` (still going on) and `held` (the reader has its browser); `name` is
+ * The card for the run `runId`, which is `active` (still going on in the daemon), `elsewhere` (going on in a dotx
+ * command) and `held` (the reader has its browser); `name` is
  * the actor whose browser it is ("Dot has control"), `sizes` the size chooser of the panel (stagesize.js), above the
  * view beside the page's address.
  * Returns `element`, `setHeld(flag)` (the timeline calls it on the takeover and handback events), `setActive(flag)` (the
  * stream stops with the run) and `dispose()`.
  */
-export function createComputer({ runId, active, held, name, sizes }) {
+export function createComputer({ runId, active, elsewhere, held, name, sizes }) {
   let isActive = active;
+  let isElsewhere = elsewhere;
   let isHeld = held;
   let hasPage = false;
   let controller = null;
@@ -54,7 +58,15 @@ export function createComputer({ runId, active, held, name, sizes }) {
     watchButton.setAttribute("aria-pressed", String(watching));
     watchButton.hidden = !isActive;
     if (image.hidden) {
-      empty.textContent = watching ? WAITING_FOR_FRAME : !isActive ? ENDED_HINT : hasPage ? CLOSED_HINT : NO_PAGE_YET;
+      empty.textContent = watching
+        ? WAITING_FOR_FRAME
+        : isElsewhere
+          ? ELSEWHERE_HINT
+          : !isActive
+            ? ENDED_HINT
+            : hasPage
+              ? CLOSED_HINT
+              : NO_PAGE_YET;
     }
     card.setSummary(address.textContent);
     who.textContent = isHeld ? "You have control" : `${name} has control`;
@@ -141,6 +153,7 @@ export function createComputer({ runId, active, held, name, sizes }) {
     setActive(flag) {
       isActive = flag;
       if (!flag) {
+        isElsewhere = false;
         stop();
       }
       paint();
