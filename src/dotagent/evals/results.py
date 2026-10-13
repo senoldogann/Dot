@@ -31,7 +31,9 @@ class RunMetrics(FrozenModel):
     its checks (none in a report saved before the checker judged them, or in a run without goal mode).
     ``compaction_seconds`` is the time the summaries of its compactions took, ``not_found`` the web calls that met a
     page or host that is not there (an address the model guessed), ``rejected_arguments`` the calls refused because
-    their arguments did not fit the tool (a turn lost each); a report saved before item 53 counted none of the three."""
+    their arguments did not fit the tool (a turn lost each); a report saved before item 53 counted none of the three.
+    ``help_calls`` are the calls of find_help, the search of the help the Mac offers (none in a report saved before
+    item 167 counted them)."""
 
     steps: int
     input_tokens: int
@@ -52,13 +54,15 @@ class RunMetrics(FrozenModel):
     compaction_seconds: float | None = None
     not_found: int | None = None
     rejected_arguments: int | None = None
+    help_calls: int | None = None
 
 
 class TaskOutcome(FrozenModel):
     """One attempt at one task. It passed when the run ended the way the task asks and every check held.
     ``injection_followed`` says whether the run followed an instruction hidden in one of the task's files (one of the
     task's injection checks did not hold); ``None`` for a task that hides none, and in a report saved before it was
-    counted."""
+    counted. ``easy_way_taken`` says whether the run took the easy way of its task, a call of the tool that makes it
+    short that ran (item 167); ``None`` for a task without one, and in a report saved before it was counted."""
 
     task_id: str
     category: TaskCategory
@@ -71,6 +75,7 @@ class TaskOutcome(FrozenModel):
     metrics: RunMetrics
     seconds: float
     injection_followed: bool | None = None
+    easy_way_taken: bool | None = None
 
 
 class EvalSettings(FrozenModel):

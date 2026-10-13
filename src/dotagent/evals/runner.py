@@ -7,6 +7,7 @@ switch, because the home that holds the user's ``.env`` file is not the current 
 """
 
 import asyncio
+import json
 import os
 import tempfile
 import time
@@ -18,20 +19,22 @@ from dotagent.agent.manager import RunManager
 from dotagent.config import AppConfig, PluginsConfig, SkillsConfig
 from dotagent.core.errors import EvalError
 from dotagent.core.logs import get_logger
+from dotagent.core.paths import skills_dir
 from dotagent.core.text import truncate_middle
 from dotagent.evals import EVAL_SOURCE
 from dotagent.evals.checks import evaluate_checks, workspace_path
-from dotagent.evals.metrics import run_metrics
+from dotagent.evals.metrics import run_metrics, took_easy_way
 from dotagent.evals.results import CheckOutcome, Cut, RunMetrics, TaskOutcome
 from dotagent.evals.scripted import ScriptedProvider
 from dotagent.evals.site import serve_site, with_site
-from dotagent.evals.types import EvalTask, FileSeed
+from dotagent.evals.types import EvalTask, FileSeed, SkillSeed
 from dotagent.events import Subscription
 from dotagent.llm.calls import CALL_EVENT
 from dotagent.llm.router import parse_model_ref
 from dotagent.llm.types import ChatProvider
 from dotagent.runtime import Runtime, close_runtime, open_runtime
 from dotagent.secrets import resolve_secret
+from dotagent.skills.types import SKILL_FILE
 from dotagent.store.models import EventRecord, RunRecord
 
 log = get_logger(__name__)
@@ -152,12 +155,25 @@ def site_config(config: AppConfig) -> AppConfig:
     return config.model_copy(update={"web": config.web.model_copy(update={"allow_private_hosts": True})})
 
 
+def with_servers(config: AppConfig, task: EvalTask) -> AppConfig:
+    """The configuration of an attempt at ``task``, its run given the MCP servers the task brings (item 167)."""
+    return config.model_copy(update={"mcp": [*config.mcp, *task.servers]})
+
+
 def seed_workspace(workspace: Path, files: Sequence[FileSeed]) -> None:
     """Write the files a task starts from. Blocking."""
     for seed in files:
         path: Path = workspace_path(workspace, seed.path)
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(seed.content, encoding="utf-8")
+
+
+def seed_skills(folder: Path, skills: Sequence[SkillSeed]) -> None:
+    """Write the skills a task brings into ``folder``, the skills folder of the attempt's home (item 167). The
+    description is written as a quoted string, which any text can be. Blocking."""
+    for skill in skills:
+        frontmatter: str = f"---\nname: {skill.name}\ndescription: {json.dumps(skill.description)}\n---\n"
+        seed_workspace(folder / skill.name, (FileSeed(path=SKILL_FILE, content=frontmatter + skill.body),))
 
 
 def judge(
@@ -168,6 +184,7 @@ def judge(
     checks: Sequence[CheckOutcome],
     injection_checks: Sequence[CheckOutcome],
     metrics: RunMetrics,
+    easy_way_taken: bool | None,
     seconds: float,
 ) -> TaskOutcome:
     """The outcome of an attempt: it passed when the run ended the way the task asks and every check held, the
@@ -185,6 +202,7 @@ def judge(
         injection_followed=None if not injection_checks else any(not check.passed for check in injection_checks),
         metrics=metrics,
         seconds=round(seconds, 2),
+        easy_way_taken=easy_way_taken,
     )
 
 
@@ -266,7 +284,17 @@ async def _run_in(
     injection_checks: tuple[CheckOutcome, ...] = await evaluate_checks(
         task.injection_checks, runtime.workspace, record.result, runtime.shell_env
     )
-    return judge(task, attempt, record, cut, checks, injection_checks, run_metrics(record, events), seconds)
+    return judge(
+        task,
+        attempt,
+        record,
+        cut,
+        checks,
+        injection_checks,
+        run_metrics(record, events),
+        took_easy_way(task.easy_way, events),
+        seconds,
+    )
 
 
 async def _attempt(
@@ -278,14 +306,15 @@ async def _attempt(
     scripted: bool,
     attempt: int,
 ) -> TaskOutcome:
-    """One attempt in a throw-away home that is removed afterwards, with the task's site (if it has one) served for
-    its length and its address put into the goal and the reference. ``scripted`` plays the reference through a
-    scripted model instead of ``model``."""
+    """One attempt in a throw-away home that is removed afterwards, holding the skills the task brings, its run given
+    the MCP servers the task brings, with the task's site (if it has one) served for its length and its address put
+    into the goal and the reference. ``scripted`` plays the reference through a scripted model instead of ``model``."""
     with scratch_home() as home, eval_environment(home, secrets), serve_site(task.site) as address:
         placed: EvalTask = with_site(task, address) if task.site else task
         stand_in: ChatProvider | None = ScriptedProvider(_SCRIPTED_PROVIDER, placed.reference) if scripted else None
+        await asyncio.to_thread(seed_skills, skills_dir(), task.skills)
         runtime: Runtime = await open_runtime(
-            site_config(config) if task.site else config, {**login_env, **_ATTEMPT_ENV}
+            with_servers(site_config(config) if task.site else config, task), {**login_env, **_ATTEMPT_ENV}
         )
         try:
             outcome: TaskOutcome = await _run_in(runtime, placed, model, stand_in, attempt)

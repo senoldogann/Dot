@@ -7,9 +7,11 @@ import httpx
 import pytest
 
 from dotagent.core.errors import EvalError
+from dotagent.core.types import JsonObject
 from dotagent.evals.audit import catalog_problems, task_problems
 from dotagent.evals.catalog import LONG_TASK_IDS, all_tasks, select_tasks
 from dotagent.evals.checks import evaluate_check, evaluate_checks, workspace_path
+from dotagent.evals.metrics import run_metrics, took_easy_way
 from dotagent.evals.reports import load_report, report_file_name, save_report
 from dotagent.evals.results import CheckOutcome, EvalReport, EvalSettings, RunMetrics, TaskOutcome
 from dotagent.evals.scoring import (
@@ -21,11 +23,13 @@ from dotagent.evals.scoring import (
     score_report,
 )
 from dotagent.evals.site import SITE_TOKEN, render_page, serve_site, with_site
+from dotagent.evals.tool_server import HOLIDAYS, working_days
 from dotagent.evals.types import (
     AnswerContains,
     AnswerMatches,
     Check,
     CommandSucceeds,
+    EasyWay,
     EvalTask,
     FileAbsent,
     FileContains,
@@ -34,6 +38,8 @@ from dotagent.evals.types import (
     JsonEquals,
     SitePage,
 )
+from dotagent.store.models import EventRecord, RunRecord
+from dotagent.tools.help import FIND_HELP_TOOL
 
 ENV: dict[str, str] = {"PATH": "/usr/bin:/bin"}
 
@@ -154,6 +160,77 @@ def test_a_badly_written_task_is_reported() -> None:
     assert any("positive" in problem for problem in problems)
     twice: tuple[str, ...] = catalog_problems((task, task))
     assert any("used twice" in problem for problem in twice)
+
+
+def test_the_easy_way_of_a_task_must_be_one_that_its_own_help_offers() -> None:
+    memo, days = select_tasks(["memo-in-house-style", "working-days-by-mcp"])
+    assert (task_problems(memo), task_problems(days)) == ((), ())
+    assert any(
+        "which the task does not bring" in problem for problem in task_problems(memo.model_copy(update={"skills": ()}))
+    )
+    unnamed: EvalTask = memo.model_copy(update={"easy_way": EasyWay(tool="skill", skill=None)})
+    assert any("does not name it" in problem for problem in task_problems(unnamed))
+    assert any(
+        "brought twice" in problem for problem in task_problems(memo.model_copy(update={"skills": memo.skills * 2}))
+    )
+    assert any(
+        "not one of an MCP server" in problem for problem in task_problems(days.model_copy(update={"servers": ()}))
+    )
+
+
+def test_the_working_days_tool_counts_the_weekdays_that_are_not_holidays_txt() -> None:
+    assert working_days("2026-03-02", "2026-04-17") == 32
+    assert working_days("2026-04-03", "2026-04-06") == 0
+    with pytest.raises(ValueError, match="before the first day"):
+        working_days("2026-04-17", "2026-03-02")
+    days: EvalTask = select_tasks(["working-days-by-mcp"])[0]
+    assert [seed.content.split() for seed in days.files] == [list(HOLIDAYS)]
+
+
+def _event(index: int, kind: str, data: JsonObject) -> EventRecord:
+    return EventRecord(id=index, run_id="run-1", ts=float(index), kind=kind, data=data)
+
+
+def _used(call_id: str, tool: str, arguments: JsonObject, ok: bool) -> tuple[EventRecord, EventRecord]:
+    """The events of a tool call that ran (``ok``) or did not."""
+    return (
+        _event(1, "tool_call", {"call_id": call_id, "tool": tool, "args": arguments}),
+        _event(2, "tool_result", {"call_id": call_id, "tool": tool, "ok": ok, "seconds": 0.1}),
+    )
+
+
+def test_a_run_took_the_easy_way_when_a_call_of_its_tool_for_its_skill_ran() -> None:
+    house: EasyWay = EasyWay(tool="skill", skill="house-style")
+    server: EasyWay = EasyWay(tool="mcp__evals__working_days", skill=None)
+    read: tuple[EventRecord, ...] = _used("c1", "skill", {"name": "house-style"}, True)
+    other: tuple[EventRecord, ...] = _used("c2", "skill", {"name": "shop-orders"}, True)
+    off: tuple[EventRecord, ...] = _used("c3", "mcp__evals__working_days", {"first": "2026-03-02"}, False)
+    ran: tuple[EventRecord, ...] = _used("c4", "mcp__evals__working_days", {"first": "2026-03-02"}, True)
+    assert (took_easy_way(house, read), took_easy_way(house, other), took_easy_way(None, read)) == (True, False, None)
+    assert (took_easy_way(server, off), took_easy_way(server, (*off, *ran))) == (False, True)
+    run: RunRecord = RunRecord(
+        id="run-1",
+        thread_id="thread-1",
+        goal="Write the memo.",
+        mode="task",
+        model="ollama:test",
+        status="done",
+        created_at=1.0,
+        finished_at=2.0,
+        result="Done.",
+        steps=3,
+        input_tokens=0,
+        output_tokens=0,
+        parent_run_id=None,
+        source="eval",
+        effort=None,
+        approvals="ask",
+        goal_mode=False,
+        campaign_id=None,
+        agent_id=None,
+    )
+    searched: tuple[EventRecord, ...] = _used("c5", FIND_HELP_TOOL, {"need": "the house style of a memo"}, True)
+    assert run_metrics(run, (*searched, *read)).help_calls == 1
 
 
 def test_a_task_that_must_fail_needs_a_reference_that_reports_failure() -> None:
@@ -287,9 +364,42 @@ def test_the_attempts_that_followed_a_hidden_instruction_are_counted_over_the_ta
     old: Scorecard = score_report(_report((plain,)))
     assert (old.lured_attempts, old.injections_followed) == (0, None)
     assert "  hidden instructions followed -" in render_scorecard(old)
-    assert render_difference(old, card)[0].endswith("injections followed -")
-    assert render_difference(card, card)[0].endswith("injections followed +0")
-    assert render_comparison([card, old])[1].endswith("    1 of 2")
+    assert "injections followed -, " in render_difference(old, card)[0]
+    assert "injections followed +0, " in render_difference(card, card)[0]
+    assert render_comparison([card, old])[1].endswith("    1 of 2           -")
+    assert render_comparison([card, old])[2].endswith("         -           -")
+
+
+def test_the_attempts_that_took_the_easy_way_are_counted_over_the_tasks_that_help_makes_short() -> None:
+    took: TaskOutcome = _outcome("a", 1, True, "done", _metrics(3, 3000, 3, 0).model_copy(update={"help_calls": 1}))
+    missed: TaskOutcome = _outcome("a", 2, True, "done", _metrics(7, 7000, 7, 0).model_copy(update={"help_calls": 0}))
+    lost: TaskOutcome = _outcome("a", 3, False, "done", _metrics(9, 9000, 9, 0))
+    plain: TaskOutcome = _outcome("b", 1, True, "done", _metrics(2, 2000, 2, 0))
+    card: Scorecard = score_report(
+        _report(
+            (
+                took.model_copy(update={"easy_way_taken": True}),
+                missed.model_copy(update={"easy_way_taken": False}),
+                lost.model_copy(update={"easy_way_taken": False}),
+                plain,
+            )
+        )
+    )
+    assert (card.easy_attempts, card.easy_ways_taken, card.help_calls) == (3, 1, 1)
+    assert (card.easy_steps_per_pass, card.hard_steps_per_pass) == (3.0, 7.0)
+    assert (
+        "  the easy way taken 1 of 3, a pass that took it costs 3.0 steps, one that did not 7.0; find_help calls 1"
+        in render_scorecard(card)
+    )
+    old: Scorecard = score_report(_report((plain,)))
+    assert (old.easy_attempts, old.easy_ways_taken, old.easy_steps_per_pass, old.help_calls) == (0, None, None, None)
+    assert (
+        "  the easy way taken -, a pass that took it costs - steps, one that did not -; find_help calls -"
+        in render_scorecard(old)
+    )
+    assert render_difference(old, card)[0].endswith("easy way taken -")
+    assert render_difference(card, card)[0].endswith("easy way taken +0 pp")
+    assert render_comparison([card, old])[1].endswith("    1 of 3")
     assert render_comparison([card, old])[2].endswith("         -")
 
 
@@ -358,7 +468,7 @@ def test_the_difference_line_sets_the_second_report_against_the_first() -> None:
     assert "one-step acts -" in line and "cached -" in line
     assert "tool errors -14 pp" in line
     assert "compactions/100 steps +0.0, not found -, " in line
-    assert line.endswith("stalls +0, false claims +0, unproven steps -, injections followed -")
+    assert line.endswith("stalls +0, false claims +0, unproven steps -, injections followed -, easy way taken -")
 
 
 def test_the_site_of_a_task_is_served_for_the_attempt_and_named_in_its_goal_and_reference() -> None:
