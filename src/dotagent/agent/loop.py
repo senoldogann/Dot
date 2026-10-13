@@ -8,6 +8,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import Literal
 
+from pydantic import JsonValue
+
 from dotagent.agent.attachments import (
     ATTACHMENTS_EVENT,
     StoredAttachment,
@@ -144,6 +146,7 @@ from dotagent.browser.session import BrowserSession
 from dotagent.config import AgentConfig
 from dotagent.core.errors import (
     ConfigError,
+    DotError,
     MissingSecretError,
     NotFoundError,
     ProviderError,
@@ -156,6 +159,7 @@ from dotagent.core.logs import get_logger
 from dotagent.core.text import CHARS_PER_TOKEN, redact_secrets, truncate_middle
 from dotagent.core.types import FrozenModel, JsonObject
 from dotagent.llm.calls import CallOrigin
+from dotagent.llm.http import is_retryable_provider_error
 from dotagent.llm.router import ModelRef, parse_model_ref, unavailable_reason
 from dotagent.llm.traits import effective_effort
 from dotagent.llm.types import (
@@ -215,6 +219,13 @@ _NOT_FOR_DELEGATED_RUNS: frozenset[str] = frozenset(
 _SUMMARY_ATTEMPTS: int = 3
 _QUERY_EARLIER_RUNS: int = 3
 _SUMMARY_TRANSCRIPT_CHARS: int = 120_000
+# A run whose model could not be reached waits and asks the same step again (item 158): the events that say so, and the
+# delays, the first doubled each time up to the longest, and never more than a quarter of [agent] model_wait_s.
+MODEL_WAITING_EVENT: str = "model_waiting"
+MODEL_BACK_EVENT: str = "model_back"
+_RETRY_FIRST_S: float = 10.0
+_RETRY_LONGEST_S: float = 60.0
+_RETRY_LEAST: int = 4
 # A summary is never asked for in more words than this, whatever the budget: a longer one costs the writer's seconds
 # at every compaction and fills the note that every later step carries (item 55).
 _SUMMARY_MAX_WORDS: int = 1500
@@ -1162,8 +1173,9 @@ async def _complete_in_time(
     runtime: Runtime, ref: ModelRef, request: ChatRequest, sink: DeltaSink, origin: CallOrigin, timeout_s: float
 ) -> ModelReply:
     """One step's model call, given ``timeout_s`` to answer. A model that does not answer in time fails like one whose
-    connection broke (``ProviderTransportError``), so a routed step goes back to the run's own model and the run ends
-    with what happened rather than an internal error (item 116)."""
+    connection broke (``ProviderTransportError``), so a routed step goes back to the run's own model, the run waits for
+    its own model as for one out of reach (:func:`_connection_broke`), and a run that ends says what happened rather than
+    an internal error (item 116)."""
     try:
         async with asyncio.timeout(timeout_s):
             return await runtime.router.complete(ref, request, sink, origin)
@@ -1171,6 +1183,40 @@ async def _complete_in_time(
         raise ProviderTransportError(
             "the model did not answer in time", {"model": ref.label, "timeout_s": timeout_s}
         ) from exc
+
+
+def _connection_broke(error: Exception) -> bool:
+    """Whether ``error`` says that the model could not be reached, rather than that it cannot answer for a while or
+    refused the request: the connection broke or timed out, or its server failed with a status that retrying can get
+    past (the connector has retried it already). A spent quota or rate and a refused or missing key are not (item
+    158)."""
+    return is_retryable_provider_error(error) and unavailable_reason(error) is None
+
+
+def _unreachable_reason(error: DotError) -> str:
+    """Why the model could not be reached, in a few words for the run's page: what the broken connection raised (its
+    type and text, as :func:`~dotagent.llm.http.wrap_transport_error` keeps them), else the error's own message (the
+    status its server failed with and its words, or the loop's own time limit)."""
+    kind: JsonValue = error.context.get("error_type")
+    text: JsonValue = error.context.get("error")
+    if isinstance(kind, str) and isinstance(text, str):
+        return kind if text == "" else f"{kind}: {text}"
+    return error.message
+
+
+def _retry_delay(asked_again: int, wait_s: float, left_s: float) -> float:
+    """The seconds before a step whose model could not be reached is asked again after ``asked_again`` times:
+    :data:`_RETRY_FIRST_S`, doubled each time up to :data:`_RETRY_LONGEST_S`, at most a quarter of the whole wait
+    (``wait_s``), so that a short wait still asks again several times, and never past its end (``left_s``)."""
+    return min(_RETRY_FIRST_S * 2.0**asked_again, _RETRY_LONGEST_S, wait_s / _RETRY_LEAST, left_s)
+
+
+async def _wait_unless_stopped(cancel: asyncio.Event, seconds: float) -> None:
+    """Wait ``seconds``, or less when the run is stopped meanwhile: the loop then ends it."""
+    try:
+        await asyncio.wait_for(cancel.wait(), seconds)
+    except TimeoutError:
+        return
 
 
 async def _to_standby(
@@ -1486,6 +1532,9 @@ async def run_agent(agent: AgentRun) -> RunEnd:
     failures: int = 0
     failures_in_a_row: int = 0
     route_skip: bool = False
+    # Since when (monotonic seconds) the run's model could not be reached, and how often the step was asked again since.
+    unreachable_since: float | None = None
+    asked_again: int = 0
 
     async def sink(delta: StreamDelta) -> None:
         await runtime.bus.emit(run.id, "delta", {"kind": delta.kind, "text": delta.text, "step": steps}, False)
@@ -1588,7 +1637,44 @@ async def run_agent(agent: AgentRun) -> RunEnd:
                 agent, ref, error, left, bool(specs), estimate_tokens([system], specs), steps
             )
             if standby is None:
-                raise
+                if config.model_wait_s <= 0 or not _connection_broke(error):
+                    raise
+                now: float = time.monotonic()
+                if unreachable_since is None:
+                    unreachable_since, asked_again = now, 0
+                left_s: float = config.model_wait_s - (now - unreachable_since)
+                if left_s <= 0:
+                    raise ProviderTransportError(
+                        f"the model could not be reached for {config.model_wait_s:g} s: {_unreachable_reason(error)}",
+                        {**error.context, "model": ref.label, "waited_s": round(now - unreachable_since, 1)},
+                    ) from error
+                retry_in: float = _retry_delay(asked_again, config.model_wait_s, left_s)
+                asked_again += 1
+                log.warning(
+                    "model_unreachable",
+                    run_id=run.id,
+                    model=ref.label,
+                    step=steps,
+                    retry_in_s=round(retry_in, 1),
+                    error=str(error),
+                )
+                await runtime.bus.emit(
+                    run.id,
+                    MODEL_WAITING_EVENT,
+                    {
+                        "model": ref.label,
+                        "error": _unreachable_reason(error)[:300],
+                        "step": steps,
+                        "retry_in_s": round(retry_in, 1),
+                        "until": time.time() + left_s,
+                    },
+                    True,
+                )
+                await _wait_unless_stopped(agent.cancel, retry_in)
+                # The same step is asked again once the wait is over; a stop meanwhile ends the run at the loop's top.
+                steps -= 1
+                continue
+            unreachable_since = None
             history.append(
                 await _stored_note(
                     standby.agent, _SWITCH_NOTE.format(to=standby.ref.label, old=ref.label, reason=standby.reason)
@@ -1609,6 +1695,14 @@ async def run_agent(agent: AgentRun) -> RunEnd:
             steps -= 1
             ratio = 1.0
             continue
+        # The run's own model is back once it answers; a step routed to another model meanwhile says nothing of it.
+        if unreachable_since is not None and routed is None:
+            waited_s: float = round(time.monotonic() - unreachable_since, 1)
+            log.info("model_reached_again", run_id=run.id, model=step_ref.label, step=steps, waited_s=waited_s)
+            await runtime.bus.emit(
+                run.id, MODEL_BACK_EVENT, {"model": step_ref.label, "waited_s": waited_s, "step": steps}, True
+            )
+            unreachable_since = None
         allowed = None
         step_seconds: float = time.monotonic() - asked_at
         if reply.usage.input_tokens > 0 and estimated > 0:

@@ -215,6 +215,10 @@ finish_nudges = 2
 questions = "leave"
 parallel_tools = 4
 model_call_timeout_s = 420.0
+# How long a run waits for its model when the model cannot be reached (the connection broke or timed out, or its server
+# failed with a status that retrying can get past), asking the same step again after 10 s, then 20, 40 and every 60 s
+# (at least four times however short the wait), before it ends failed. 0 does not wait.
+model_wait_s = 900.0
 max_concurrent_runs = 3
 # How much help a model gets. "fixed": every model is standard. "measured": a model is weak when its newest 30 finished
 # runs made at least profile_min_calls tool calls and at least weak_refusal_share of them were refused before they ran

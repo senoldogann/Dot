@@ -5077,7 +5077,12 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 154 | The memory keeps what it learns                                                      | done        | f53eb00 |
 | 155 | The compaction keeps a tail measured in tokens                                       | done        | 5b0b2cb |
 | 156 | The page text of the browser and the desktop has a floor                             | done        | 6ad598f |
-| 157 | The changed notes a running run is handed, and their dates and authors               | in progress |         |
+| 157 | The changed notes a running run is handed, and their dates and authors               | done        | 3593f6a |
+| 158 | A model out of reach does not fail a run                                             | in progress |         |
+| 159 | A stop of the daemon is never a crash                                                | planned     |         |
+| 160 | Pages catch up after a break                                                         | planned     |         |
+| 161 | A chat's queue goes on after a clean restart                                         | planned     |         |
+| 162 | A run whose terminal closed can be resumed                                           | planned     |         |
 
 ### 77. The type system: Inter and Geist Mono, seven sizes, three weights
 
@@ -8391,7 +8396,7 @@ small.
 
 ### 157. The changed notes a running run is handed, and their dates and authors
 
-**Status: in progress.**
+**Status: done.** Merged as `3593f6a` (PR #194; no Linear issue, the Linear connector was signed out).
 
 **As built (2026-10-13).** Two findings of the review on the memory (B8 and B9), each read again in the code first. (1)
 At every step a run was handed every note changed since the step before that it had not saved itself
@@ -8415,6 +8420,99 @@ taken back alone (a retag moving the date; no budget).
 **What.** A running run is handed the notes changed while it works that it would be handed at its start: not another
 agent's lessons nor resting notes, and no more than the budget of its starting notes. A change of tags is no change and
 leaves a note's date. A note a run rewrites becomes the run's, so the model's words never pass for the owner's.
+
+## Part 26: continue where it left off (planned 2026-10-13)
+
+The owner's twenty-sixth word, on 2026-10-13, while part 25 was under way: when a connection drops, or the app is closed
+and opened again, Dot should go on from where it was; build that reconnection where it is missing. The same word asked
+for an agent that looks for the help its Mac offers (MCP servers, skills) before it takes the hard way: part 27, planned
+after this one.
+
+**Status (2026-10-13): planned.** Each kind of break was read in the code first. What exists: the desktop app only shows
+the daemon's pages, so closing it leaves the daemon and its runs at work, and opened again it shows each run from its
+first event; a run's page that loses its connection follows its run again from the last event it had; a model's
+connector tries a call again when retrying can get past its failure, six times in some fifteen to thirty seconds; a run
+cut by a stop or a crash of the daemon can be resumed, by `dotx resume` or from its page, and with `resume = "safe"` in
+`[agent]` the daemon resumes by itself, when it starts, a run it cut that was started from a page and whose cut calls
+only read. What is missing: a model out of reach past its connector's tries fails the run, and a failed run cannot be
+resumed; a stop of the daemon cancels its runs and waits for them to end without a bound, so a run slow to end keeps the
+daemon past the thirty seconds launchd gives it before it kills it, and the stop becomes a crash, while a step cut part
+way keeps none of the results of its calls that had ended; the stream of the lifecycle (`/api/stream`) replays nothing
+after a break, and of the pages only the sidebar reads its lists again; every chat's queue is held when the daemon
+starts, after a clean stop too; a run of `dotx run` whose terminal closes ends as stopped by the owner, which cannot be
+resumed.
+
+**The shape of this part (the decisions).** Five items in the order of weight, each a pull request of its own: a model
+out of reach does not fail a run (158); a stop of the daemon is never a crash (159); pages catch up after a break (160);
+a chat's queue goes on after a clean restart (161); a run whose terminal closed can be resumed (162). A run waits for
+its own model rather than moving to a standby one, which takes over only for a quota, a rate limit or a key. The default
+of `resume` stays `off` until evals show that `safe` helps, as its comment in the defaults says.
+
+### How to start part 26 (the handoff prompt)
+
+> Read ROADMAP.md part 26 and the status table of part 9 (rows 158 to 162). One item at a time, in order; the protocol
+> of part 5 (branch, gate, PR, Linear MYP issue when the connector is signed in, squash merge, hash in the table, log
+> line) is unchanged. Read each gap again in the code before closing it, give each change a test that fails on the code
+> of before, and check a page that changes in a browser, wide and on a phone, light and dark. Never touch the owner's
+> data directory except to read it, by the kinds and numbers of what is stored, and to restart the daemon when
+> `/api/status` shows no active run; PLAN.md stays untracked. The owner reads Turkish; everything written is English.
+
+### 158. A model out of reach does not fail a run
+
+**Status: in progress.**
+
+**As built (2026-10-13).** When a step's call to the run's own model fails because the model cannot be reached (the
+connection broke or timed out, the call took longer than `model_call_timeout_s`, or its server failed with a status that
+retrying can get past, such as 500, 503 or 529, after the connector's own tries) and no standby model takes the run
+over, the loop waits and asks the same step again: after 10 seconds, then 20 and 40, then every 60, each delay at most a
+quarter of the whole wait and never past its end, for `model_wait_s` in `[agent]` (900 seconds by default; 0 does not
+wait) from the first failure. The step is not counted again. Each try that fails is a `model_waiting` event (the model,
+the error in a few words, the step, the delay and the time the wait ends) and the answer that ends the wait a
+`model_back` event (how long it waited); the run's timeline shows one line for the wait, which each try rewrites, and
+one for the return. A stop during the wait ends the run at once. A model still out of reach when the wait is over fails
+the run, and the result names the wait and the error; a refused request ends the run at once, as does a quota,
+rate-limit or key error or a missing key that no standby model takes over. Before, the first such failure after the
+connector's tries failed the run. Tests: `tests/smoke/test_model_wait.py` runs a scripted model behind a connection that
+fails, with the error the connector raises: twice, after which the run asks the same step again and ends done, with two
+`model_waiting` events, one `model_back` and four calls for its two steps; once with a 529, after which it ends done;
+always, after which it fails at the end of a wait of two seconds, having asked again at least four times; always with a
+stop during a wait of ten minutes, which ends the run in less than three seconds; with a 400, and with a 429 (a status
+the connector retries, but a rate limit), each of which fails the run at once. The first four failed on the code of
+before, where the first failure ended the run. The run's page was checked in a browser, wide and on a phone, light and
+dark, with a run that waited and went on and one that failed at the end of its wait.
+
+**What.** A run whose model cannot be reached for a while (the network drops, its server fails for a time) waits for it
+and goes on from the same step, for a time the owner sets, instead of failing; its page shows the wait and the return.
+
+### 159. A stop of the daemon is never a crash
+
+**Status: planned.**
+
+**What.** A stop of the daemon (the service stopped or restarted, a log-out) ends its runs within the time launchd gives
+it, so it is never killed part way, and a step it cuts keeps the results of the calls that had ended, so that the run,
+resumed, does not make them again.
+
+### 160. Pages catch up after a break
+
+**Status: planned.**
+
+**What.** A page whose connection to the daemon broke reads again what changed while it was away: the stream of the
+lifecycle goes on from the last event the page had, or the page reads its lists again, and a run's page reads its run
+again, its status and its result, not only its events.
+
+### 161. A chat's queue goes on after a clean restart
+
+**Status: planned.**
+
+**What.** A queue held only because the daemon stopped goes on when the daemon starts again: a stop of the daemon is not
+the owner's stop of the chat. A crash still holds the queues.
+
+### 162. A run whose terminal closed can be resumed
+
+**Status: planned.**
+
+**What.** A run of `dotx run` whose terminal is closed can be resumed, by `dotx resume` or from its page, as a run cut
+by a stop of the daemon can.
 
 ## Log
 
@@ -9007,3 +9105,4 @@ leaves a note's date. A note a run rewrites becomes the run's, so the model's wo
 - 2026-10-13 (Opus 5.5): item 154 merged as `f53eb00` (PR #191; no Linear issue, the connector was signed out): the nightly merge leaves resting notes and other agents' notes alone, a lesson and the one that says not to do it are told apart, each group of starting notes has its own share of the budget, and a failed run's lessons are asked for in words that say it failed.
 - 2026-10-13 (Opus 5.5): item 155 merged as `5b0b2cb` (PR #192; no Linear issue, the connector was signed out): a compaction keeps as many of the newest messages as fit its room in tokens, never less than the newest exchange, instead of about eight.
 - 2026-10-13 (Opus 5.5): item 156 merged as `6ad598f` (PR #193; no Linear issue, the connector was signed out): in a small model window the text of a page and of a window keeps at least half of a tool result instead of coming back empty.
+- 2026-10-13 (Opus 5.5): item 157 merged as `3593f6a` (PR #194; no Linear issue, the connector was signed out): a running run is handed only the changed notes it would be handed at its start, within their budget; a change of tags leaves a note's date; a note a run rewrites becomes the run's.
