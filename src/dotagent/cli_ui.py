@@ -18,10 +18,12 @@ from dotagent.agent.limits import LimitReached, RunLimits, limit_spent
 from dotagent.agent.plan import StepStatus
 from dotagent.agent.progress import Rung
 from dotagent.agent.resume import CallEnd, CutOff
+from dotagent.core.errors import RunConflict
 from dotagent.core.jsonutil import dumps_compact
 from dotagent.core.text import truncate_tail
 from dotagent.core.types import FrozenModel, JsonObject
 from dotagent.runtime import Runtime
+from dotagent.server import UI_SOURCE
 from dotagent.store.models import ApprovalRecord, EventRecord
 
 _STDIN_POLL_S: float = 0.2
@@ -252,6 +254,14 @@ async def read_line(prompt: str) -> str | None:
         return await asyncio.to_thread(_read_line_blocking, prompt, stop)
     finally:
         stop.set()
+
+
+class PromptReply(FrozenModel):
+    """What ended the prompt for a decision: the line typed at it (``None`` at the end of input), or the decision that
+    came first from elsewhere (the pages of the daemon) or from the deadline."""
+
+    line: str | None
+    decided: ApprovalRecord | None
 
 
 def preview_args(args: JsonObject) -> str:
@@ -577,11 +587,17 @@ class TerminalUi:
         self._line(self._paint(f"  ? {request.summary}", "1;35"))
         if isinstance(options, list) and options:
             self._line(self._paint("    options: " + " | ".join(str(option) for option in options), "2"))
-        answer: str | None = await read_line("  answer> ") if self._options.interactive else None
-        if answer is None or not answer.strip():
+        if not self._options.interactive:
             await self._resolve(request, approve=False, note="no answer was given")
             return
-        await self._resolve(request, approve=True, note=answer.strip())
+        reply: PromptReply = await self._read_unless_decided(request.approval_id, "  answer> ")
+        if reply.decided is not None:
+            self._say_decided(reply.decided)
+            return
+        if reply.line is None or not reply.line.strip():
+            await self._resolve(request, approve=False, note="no answer was given")
+            return
+        await self._resolve(request, approve=True, note=reply.line.strip())
 
     async def _ask_approval(self, request: ApprovalPayload) -> None:
         handoff: bool = request.severity == "handoff"
@@ -591,14 +607,55 @@ class TerminalUi:
             self._line(self._paint("    no interactive terminal: denied", "2"))
             await self._resolve(request, approve=False, note="no interactive terminal was available")
             return
+        prompt: str = (
+            "    do this step yourself, then press Enter (or type 'skip')> " if handoff else "    allow? [y/N]> "
+        )
+        reply: PromptReply = await self._read_unless_decided(request.approval_id, prompt)
+        if reply.decided is not None:
+            self._say_decided(reply.decided)
+            return
         if handoff:
-            reply: str | None = await read_line("    do this step yourself, then press Enter (or type 'skip')> ")
-            skipped: bool = reply is None or reply.strip().lower() == "skip"
+            skipped: bool = reply.line is None or reply.line.strip().lower() == "skip"
             await self._resolve(request, approve=not skipped, note="the user completed the step themselves")
             return
-        reply = await read_line("    allow? [y/N]> ")
-        approved: bool = reply is not None and reply.strip().lower() in ("y", "yes", "e", "evet")
+        approved: bool = reply.line is not None and reply.line.strip().lower() in ("y", "yes", "e", "evet")
         await self._resolve(request, approve=approved, note="" if approved else "denied in the terminal")
 
+    async def _read_unless_decided(self, approval_id: str, prompt: str) -> PromptReply:
+        """The line typed at ``prompt`` for the approval ``approval_id``, unless the approval is decided first without
+        it: on the pages of the daemon, whose decisions reach the runs of this command, or by the deadline."""
+        reading: asyncio.Task[str | None] = asyncio.create_task(read_line(prompt))
+        settling: asyncio.Task[None] = asyncio.create_task(self._runtime.approvals.settled(approval_id))
+        try:
+            done, _ = await asyncio.wait({reading, settling}, return_when=asyncio.FIRST_COMPLETED)
+        finally:
+            reading.cancel()
+            settling.cancel()
+            await asyncio.wait({reading, settling})
+        line: str | None = None if settling in done else reading.result()
+        # Without a line typed (a decision from elsewhere, the end of input) the prompt's line is still open: what
+        # follows starts on a line of its own.
+        self._open_line = line is None
+        if settling in done:
+            return PromptReply(line=None, decided=await self._runtime.store.get_approval(approval_id))
+        return PromptReply(line=line, decided=None)
+
+    def _say_decided(self, decided: ApprovalRecord) -> None:
+        """Say how an approval was decided without the prompt: elsewhere, or by the deadline (its note says so once it
+        is stored)."""
+        if decided.status not in ("approved", "denied"):
+            self._line(self._paint(f"    {decided.note or 'the wait for an answer is over'}", "2"))
+            return
+        approved: bool = decided.status == "approved"
+        verdict: str = ("answered" if approved else "skipped") if decided.severity == "question" else decided.status
+        where: str = "on the pages" if decided.decided_by == UI_SOURCE else f"by {decided.decided_by}"
+        note: str = f": {decided.note}" if decided.note else ""
+        self._line(self._paint(f"    {verdict} {where}{note}", "32" if approved else "31"))
+
     async def _resolve(self, request: ApprovalPayload, approve: bool, note: str) -> None:
-        await self._runtime.approvals.resolve(request.approval_id, approve, "cli", note)
+        """Store the decision made at this terminal, unless one made elsewhere came first: the run goes on with that
+        one, which is said instead."""
+        try:
+            await self._runtime.approvals.resolve(request.approval_id, approve, "cli", note)
+        except RunConflict:
+            self._say_decided(await self._runtime.store.get_approval(request.approval_id))

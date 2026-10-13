@@ -268,7 +268,8 @@ async def activity_view(store: Store, manager: RunManager, now: float) -> Activi
     waiting: list[ActivityRow] = []
     working: list[ActivityRow] = []
     live: dict[str, RunRecord] = {}
-    for run_id in manager.active_run_ids():
+    # The runs of dotx commands work here too; a question of theirs answered here reaches the command.
+    for run_id in [*manager.active_run_ids(), *manager.elsewhere_run_ids()]:
         live[run_id] = await store.get_run(run_id)
     covered: set[str] = set()
     for approval in await store.list_approvals("pending", _RECENT_RUNS):

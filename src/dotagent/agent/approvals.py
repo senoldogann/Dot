@@ -141,7 +141,8 @@ class ApprovalBroker:
 
     async def resolve(self, approval_id: str, approve: bool, decided_by: str, note: str) -> ApprovalRecord:
         """Record a decision. Raises if the approval does not exist or was already decided. A question a run left has
-        no waiter, so its ``approval_decided`` is sent here."""
+        no waiter, so its ``approval_decided`` is sent here; one a run of another process waits for is taken from the
+        store by that process (:meth:`take_stored_decisions`)."""
         record: ApprovalRecord = await self._store.get_approval(approval_id)
         if record.status not in ("pending", "left"):
             raise RunConflict("approval is not open", {"approval_id": approval_id, "status": record.status})
@@ -158,8 +159,32 @@ class ApprovalBroker:
                 record.run_id, "approval_decided", {"approval_id": approval_id, "status": status, "note": note}, True
             )
         else:
-            log.warning("approval decided without a waiting run", approval_id=approval_id, run_id=record.run_id)
+            log.info("approval_decided_for_another_process", approval_id=approval_id, run_id=record.run_id)
         return decided
+
+    async def settled(self, approval_id: str) -> None:
+        """Return once this process no longer waits for the approval ``approval_id``: it was decided here, through
+        another process (:meth:`take_stored_decisions`) or by the deadline; at once for one it does not wait for."""
+        future: asyncio.Future[ApprovalOutcome] | None = self._waiting.get(approval_id)
+        if future is not None:
+            await asyncio.wait({future})
+
+    async def take_stored_decisions(self) -> None:
+        """Wake the waits whose question a person decided through another process (the pages of the daemon, for a run
+        of a ``dotx`` command), which stored the decision with no wait of its own to wake."""
+        for approval_id, future in tuple(self._waiting.items()):
+            if future.done():
+                continue
+            record: ApprovalRecord = await self._store.get_approval(approval_id)
+            if record.status in ("approved", "denied") and record.decided_by is not None and not future.done():
+                future.set_result(
+                    ApprovalOutcome(
+                        approval_id=approval_id,
+                        status="approved" if record.status == "approved" else "denied",
+                        decided_by=record.decided_by,
+                        note=record.note,
+                    )
+                )
 
     def release_run(self, run_id: str) -> None:
         """Wake waiters of a run that is over so they unwind instead of waiting for the deadline."""

@@ -172,6 +172,7 @@ async def cmd_run(command: RunCommand) -> int:
             verbose=command.verbose,
         )
         manager: RunManager = RunManager(runtime)
+        manager.leave_queues()
         ui: TerminalUi = TerminalUi(runtime, options)
         run: RunRecord = (
             await follow_run(
@@ -228,6 +229,7 @@ async def cmd_resume(command: ResumeCommand) -> int:
             verbose=command.verbose,
         )
         manager: RunManager = RunManager(runtime)
+        manager.leave_queues()
         ui: TerminalUi = TerminalUi(runtime, options)
         run: RunRecord = await follow_run(runtime, manager, ui, lambda: manager.resume(command.run_id))
         _print_result(run)
@@ -245,6 +247,7 @@ async def cmd_chat(command: ChatCommand) -> int:
     try:
         _say_left_out_servers(runtime)
         manager: RunManager = RunManager(runtime)
+        manager.leave_queues()
         ui: TerminalUi = TerminalUi(
             runtime,
             UiOptions(interactive=True, stream_text=True, show_thinking=command.thinking, verbose=command.verbose),

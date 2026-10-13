@@ -316,14 +316,22 @@ reminder, a resumed run) and, in goal mode, to the goal check.
   mark (see [Safety](#safety)).
 - A run belongs to the daemon, not to the page that started it: leave the chat and it goes on, its status stays live in
   the sidebar, and you can steer it when you come back.
+- A run of a `dotx` command (`dotx run`, `dotx resume`, `dotx chat`) is on the pages too while the daemon runs: it works
+  in the sidebar and in Activity, and its page follows it live, as it follows the daemon's own runs, though its text
+  comes whole at each step rather than as it is written. Its Stop asks the command to stop it, which it does within a
+  second. A question or an approval of it can be answered on the pages, which ends the prompt at its terminal; the first
+  answer stands, wherever it was given. It takes no steering from the pages: a message sent there waits in the chat's
+  queue. A chat has one run at work at a time, whichever process drives it: a second is refused (409), and the run a
+  `dotx` command left at work when it died is closed first.
 - A message sent to a chat while its run works waits in the chat's queue, after T3 Code's: it starts as the chat's next
   run, with the mode, model, reasoning, approvals and goal mode it was sent with, once the run before it has ended done,
   one message after the other. A stop, a failed run or a crash of the daemon holds the queue until you resume it; a
   shutdown of the daemon does not, and once the run it cut off is resumed and the new run ends done, the queue goes on.
   The daemon keeps the queue, so it goes on with no page open, and a queued message can be sent to the run at work
-  (steered) instead. A message starts once, and only after the run at work on the chat has ended, whichever process (the
-  daemon or a `dotx` command) moves the queue; while its run is starting, editing it, taking it out or steering it is
-  refused (409). A campaign's chat has no queue: a message there steers its session.
+  (steered) instead. A message starts once, and only after the run at work on the chat has ended, in whichever process
+  that run worked: the daemon moves the queue of a chat whose run a `dotx` command drove once it sees that run end, and
+  holds it when it starts after such an end. While a message's run is starting, editing it, taking it out or steering it
+  is refused (409). A campaign's chat has no queue: a message there steers its session.
 - `/btw <question>` in the box of a run (the slash menu offers it) asks on the side: the run's model answers from what
   the run has done so far,
   without tools, and the run neither sees the question nor stops for it. Several can be asked at once. The question and
@@ -1330,7 +1338,7 @@ The REST API (all under `/api`; bodies and replies are JSON, event streams are s
 | `GET /health` (public), `GET /status`, `GET /models`, `GET /doctor`             | liveness, state of the daemon, models per provider (with their reasoning levels), checks |
 | `GET /runs`, `POST /runs`, `GET /runs/{id}`, `GET /runs/{id}/events`            | list, start and read runs                                    |
 | `GET /runs/{id}/stream?after=N`, `GET /stream`                                  | live events of a run with its sub-runs; lifecycle of all runs |
-| `POST /runs/{id}/steer`, `POST /runs/{id}/cancel`                               | message a running run; stop it                               |
+| `POST /runs/{id}/steer`, `POST /runs/{id}/cancel`                               | message a running run; stop it (a `dotx` command's run: the command is asked to stop it) |
 | `POST /runs/{id}/btw` (`{"text": …}`)                                           | a side question, answered without the run seeing it          |
 | `GET\|POST\|PUT /threads/{id}/queue`, `POST /threads/{id}/queue/resume`         | a chat's queue (`held`, `messages`); queue a message (`text` and the choices of `POST /runs`; 409 for a chat with no run yet, a campaign's, or the thread of a delegated run); reorder it (`{"ids": […]}`, each once); resume a held one |
 | `PATCH\|DELETE /queue/{id}` (`{"text": …}`), `POST /queue/{id}/steer`            | edit or take out a queued message; send it to the run at work now (409 with none); 409 while its run is starting; each answers with the queue |

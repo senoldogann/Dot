@@ -61,9 +61,10 @@ async def test_only_the_runs_of_owners_that_are_gone_are_closed_with_the_approva
     approval it waits on; it closes the runs of the owners it names gone and those made before owners were kept."""
     store: Store = await Store.open(tmp_path / "dot.sqlite3", tmp_path / "screenshots")
     try:
-        thread: ThreadRecord = await store.create_thread("t", "test")
         runs: dict[str | None, RunRecord] = {}
         for owner in ("a" * 32, "b" * 32, None):
+            # Each in a chat of its own: a chat takes the run of one process at work at a time.
+            thread: ThreadRecord = await store.create_thread("t", "test")
             runs[owner] = await store.create_run(
                 thread.id, "goal", "task", "ollama:m", None, "test", "medium", "ask", False, None, None, owner
             )

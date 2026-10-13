@@ -3,6 +3,7 @@
 import asyncio
 import contextlib
 import time
+from collections import deque
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
@@ -17,6 +18,8 @@ SYSTEM_RUN_ID: str = "_system"
 # with an error).
 DAEMON_RESTARTED_EVENT: str = "daemon_restarted"
 _QUEUE_SIZE: int = 2000
+# How many of the stored events it published lately a bus keeps in mind (:meth:`EventBus.told`).
+_TOLD_KEPT: int = 4096
 
 log = get_logger(__name__)
 
@@ -62,6 +65,9 @@ class EventBus:
     def __init__(self, store: Store) -> None:
         self._store: Store = store
         self._subscriptions: set[Subscription] = set()
+        # The ids of the stored events published lately, oldest first, and the same as a set to look them up.
+        self._told: deque[int] = deque()
+        self._told_ids: set[int] = set()
 
     async def emit(self, run_id: str, kind: str, data: JsonObject, persist: bool) -> EventRecord:
         """Publish an event. Persisted events get a database id; live-only events use id 0."""
@@ -74,9 +80,19 @@ class EventBus:
 
     def publish(self, record: EventRecord) -> None:
         """Offer an event the store already holds, or one only shown live, to those who follow it."""
+        if record.id > 0 and record.id not in self._told_ids:
+            if len(self._told) == _TOLD_KEPT:
+                self._told_ids.discard(self._told.popleft())
+            self._told.append(record.id)
+            self._told_ids.add(record.id)
         for subscription in tuple(self._subscriptions):
             if subscription.wants(record):
                 subscription.offer(record)
+
+    def told(self, event_id: int) -> bool:
+        """Whether this bus published the stored event ``event_id`` lately (one of the last ``_TOLD_KEPT``): a process
+        that relays the events other processes store passes over those it told already."""
+        return event_id in self._told_ids
 
     @asynccontextmanager
     async def subscribe(self, run_id: str | None) -> AsyncIterator[Subscription]:

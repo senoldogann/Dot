@@ -122,7 +122,8 @@ async def _next_event(queue: asyncio.Queue[EventRecord], stopping: asyncio.Event
 
 
 async def follow_run(ctx: ServerContext, run_id: str, after: int) -> AsyncIterator[bytes]:
-    """The events of ``run_id`` and of the runs it delegated to: the stored ones after ``after``, then live ones.
+    """The events of ``run_id`` and of the runs it delegated to: the stored ones after ``after``, then live ones, those
+    of a run a ``dotx`` command drives as the daemon relays them (``RunManager.relay_elsewhere``).
 
     Ends after the run's last event, immediately when the run is over already, and when the daemon starts to stop.
     """
@@ -158,7 +159,7 @@ async def follow_run(ctx: ServerContext, run_id: str, after: int) -> AsyncIterat
                 return
         dropped: int = 0
         while True:
-            if run_id not in ctx.manager.active_run_ids():
+            if run_id not in ctx.manager.active_run_ids() and run_id not in ctx.manager.elsewhere_run_ids():
                 # The run is over; whatever it stored since is still in the database.
                 for frame, _ in await stored():
                     yield frame

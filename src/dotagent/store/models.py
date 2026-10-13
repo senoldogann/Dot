@@ -163,6 +163,15 @@ class EventRecord(FrozenModel):
     data: JsonObject
 
 
+class WorkingRun(FrozenModel):
+    """A run at work (queued, running or blocked on a question), its chat, and the process that drives it
+    (:mod:`dotagent.agent.owners`)."""
+
+    run_id: str
+    thread_id: str
+    owner: str
+
+
 class ApprovalRecord(FrozenModel):
     id: str
     run_id: str

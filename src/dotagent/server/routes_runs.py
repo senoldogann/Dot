@@ -64,11 +64,13 @@ def runs_router(ctx: ServerContext) -> APIRouter:
         # A run's end is stored before it stops being active, so a run read after it was seen not to be active is read
         # with its end; read the other way round, a run that ends in between would show as neither active nor ended.
         active: bool = run_id in ctx.manager.active_run_ids()
+        elsewhere: bool = run_id in ctx.manager.elsewhere_run_ids()
         run: RunRecord = await store.get_run(run_id)
         return RunDetail(
             run=run,
             children=await store.list_child_runs(run_id),
             active=active,
+            elsewhere=elsewhere,
             resumable=await ctx.manager.resumable(run),
             lessons=await run_lessons(store, run_id),
             questions=await store.list_left_questions(run_id),
@@ -212,8 +214,9 @@ def runs_router(ctx: ServerContext) -> APIRouter:
 
     @router.post("/runs/{run_id}/cancel", status_code=202)
     async def cancel_run(run_id: str) -> RunDetail:
+        """Stop the run: one of the daemon at once, one of a dotx command once that command reads the ask."""
         await store.get_run(run_id)
-        ctx.manager.cancel(run_id)
+        await ctx.manager.stop(run_id)
         return await detail(run_id)
 
     @router.get("/runs/{run_id}/screencast")

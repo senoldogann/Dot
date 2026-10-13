@@ -57,6 +57,7 @@ from dotagent.store.models import (
     ScheduleRecord,
     ThreadRecord,
     ThreadSummary,
+    WorkingRun,
 )
 from dotagent.store.stats import ModelProfile, RunCosts, collect_run_costs, read_model_profile
 from dotagent.tools.team import TEAM_SOURCE
@@ -103,6 +104,7 @@ CREATE TABLE IF NOT EXISTS queue_holds (thread_id TEXT PRIMARY KEY, held_at REAL
 CREATE TABLE IF NOT EXISTS queue_claims (
     thread_id TEXT PRIMARY KEY, message_id TEXT NOT NULL, owner TEXT NOT NULL, claimed_at REAL NOT NULL
 );
+CREATE TABLE IF NOT EXISTS run_stops (run_id TEXT PRIMARY KEY, asked_at REAL NOT NULL);
 CREATE TABLE IF NOT EXISTS push_subscriptions (
     endpoint TEXT PRIMARY KEY, p256dh TEXT NOT NULL, auth TEXT NOT NULL, created_at REAL NOT NULL
 );
@@ -1095,10 +1097,21 @@ class Store:
             campaign_id=campaign_id,
             agent_id=agent_id,
         )
-        await self._db.execute(
+        working: tuple[RunStatus, ...] = tuple(sorted(WORKING_STATUSES))
+        # A chat has one run at work at a time, whichever process drives it, and none beside a queued message that
+        # another process is starting (:meth:`claim_queued`); a delegated run works in a chat of its own. A process
+        # keeps its own runs on a chat apart itself (``RunManager``), its run whose end is still to be stored too.
+        refusal: str = (
+            ""
+            if parent_run_id is not None
+            else " WHERE NOT EXISTS (SELECT 1 FROM runs WHERE thread_id = ? AND parent_run_id IS NULL"
+            f" AND status IN ({','.join('?' * len(working))}) AND owner IS NOT ?)"
+            " AND NOT EXISTS (SELECT 1 FROM queue_claims WHERE thread_id = ? AND owner IS NOT ?)"
+        )
+        async with self._db.execute(
             "INSERT INTO runs(id, thread_id, goal, mode, model, status, created_at, finished_at, result, steps,"
             " input_tokens, output_tokens, parent_run_id, source, effort, approvals, goal_mode, campaign_id, agent_id,"
-            " owner) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            f" owner) SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?{refusal} RETURNING id",
             (
                 record.id,
                 record.thread_id,
@@ -1120,9 +1133,19 @@ class Store:
                 record.campaign_id,
                 record.agent_id,
                 owner,
+                *(() if parent_run_id is not None else (thread_id, *working, owner, thread_id, owner)),
             ),
-        )
+        ) as cursor:
+            inserted: aiosqlite.Row | None = await cursor.fetchone()
         await self._db.commit()
+        if inserted is None:
+            rows = await self._all(
+                "SELECT id FROM runs WHERE thread_id = ? AND parent_run_id IS NULL"
+                f" AND status IN ({','.join('?' * len(working))}) AND owner IS NOT ? ORDER BY created_at",
+                (thread_id, *working, owner),
+            )
+            runs: JsonArray = [str(row["id"]) for row in rows]
+            raise RunConflict("a run is already active on this thread", {"thread_id": thread_id, "run_ids": runs})
         return record
 
     @_writing
@@ -1210,6 +1233,78 @@ class Store:
             "SELECT DISTINCT owner FROM runs WHERE status IN ('running', 'queued', 'blocked') ORDER BY owner", ()
         )
         return [None if row["owner"] is None else str(row["owner"]) for row in rows]
+
+    async def working_runs_of_others(self, owner: str) -> list[WorkingRun]:
+        """The runs at work that processes other than ``owner`` drive (``dotx`` commands, for the daemon), oldest
+        first."""
+        working: tuple[RunStatus, ...] = tuple(sorted(WORKING_STATUSES))
+        rows = await self._all(
+            "SELECT id, thread_id, owner FROM runs WHERE owner IS NOT NULL AND owner != ?"
+            f" AND status IN ({','.join('?' * len(working))}) ORDER BY created_at, id",
+            (owner, *working),
+        )
+        return [
+            WorkingRun(run_id=str(row["id"]), thread_id=str(row["thread_id"]), owner=str(row["owner"])) for row in rows
+        ]
+
+    async def last_event_id(self) -> int:
+        """The id of the newest stored event, 0 when there is none. Every event with a smaller id is stored already:
+        one process writes at a time, and an event gets its id in the write that stores it."""
+        row: aiosqlite.Row | None = await self._one("SELECT COALESCE(MAX(id), 0) AS last FROM events", ())
+        return 0 if row is None else int(row["last"])
+
+    async def events_of_others(self, owner: str, after: int, upto: int, limit: int) -> list[EventRecord]:
+        """The stored events with an id after ``after`` and up to ``upto``, oldest first and at most ``limit``, of the
+        runs that processes other than ``owner`` drive."""
+        rows = await self._all(
+            "SELECT events.* FROM events JOIN runs ON runs.id = events.run_id"
+            " WHERE events.id > ? AND events.id <= ? AND runs.owner IS NOT NULL AND runs.owner != ?"
+            " ORDER BY events.id LIMIT ?",
+            (after, upto, owner, limit),
+        )
+        return [_event(row) for row in rows]
+
+    @_writing
+    async def ask_stop(self, run_id: str) -> None:
+        """Ask the process that drives the run ``run_id`` to stop it (:meth:`stops_asked`); nothing is asked of a run
+        that is not at work."""
+        working: tuple[RunStatus, ...] = tuple(sorted(WORKING_STATUSES))
+        await self._db.execute(
+            "INSERT OR IGNORE INTO run_stops(run_id, asked_at)"
+            f" SELECT id, ? FROM runs WHERE id = ? AND status IN ({','.join('?' * len(working))})",
+            (time.time(), run_id, *working),
+        )
+        await self._db.commit()
+
+    async def stops_asked(self, run_ids: Sequence[str]) -> list[str]:
+        """The runs of ``run_ids`` that another process asked to stop (:meth:`ask_stop`)."""
+        if not run_ids:
+            return []
+        rows = await self._all(
+            f"SELECT run_id FROM run_stops WHERE run_id IN ({','.join('?' * len(run_ids))}) ORDER BY run_id",
+            tuple(run_ids),
+        )
+        return [str(row["run_id"]) for row in rows]
+
+    @_writing
+    async def forget_stops(self, run_ids: Sequence[str]) -> None:
+        """The asks to stop ``run_ids`` were answered, or their runs ended: they go."""
+        await self._db.execute(
+            f"DELETE FROM run_stops WHERE run_id IN ({','.join('?' * len(run_ids))})", tuple(run_ids)
+        )
+        await self._db.commit()
+
+    @_writing
+    async def forget_stops_of_ended_runs(self) -> None:
+        """The asks to stop runs that are no longer at work go: their process ended them, or went, before it saw the
+        ask."""
+        working: tuple[RunStatus, ...] = tuple(sorted(WORKING_STATUSES))
+        await self._db.execute(
+            "DELETE FROM run_stops WHERE run_id NOT IN"
+            f" (SELECT id FROM runs WHERE status IN ({','.join('?' * len(working))}))",
+            working,
+        )
+        await self._db.commit()
 
     @_writing
     async def mark_interrupted_runs(self, gone: Sequence[str]) -> int:
