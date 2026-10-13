@@ -262,19 +262,51 @@ def _remove_file(path: Path) -> bool:
     return True
 
 
+def _read_file(path: Path) -> bytes | None:
+    return path.read_bytes() if path.exists() else None
+
+
 async def install_job(plist: Path, content: bytes, uid: int) -> bool:
-    """Write the property list and load the job, which starts it. A job that is loaded already is replaced.
+    """Load the job of the property list ``content``, which starts it. A job that is loaded already is unloaded first,
+    and the file is written once launchd has let it go. When the new job does not load, the file that was there before
+    is put back (or the new one removed, when there was none) and its job, when it was loaded, is loaded again, so a
+    failed step leaves the job and its file as they were.
 
     Returns whether there was a job to replace.
     """
     replaced: bool = await inspect_job(uid) is not None
-    await asyncio.to_thread(_write_plist, plist, content)
+    previous: bytes | None = await asyncio.to_thread(_read_file, plist)
     if replaced:
         await _checked(["bootout", service_target(uid)], "launchctl cannot unload the job that is loaded")
         await _wait_until_unloaded(uid)
-    await _checked(["bootstrap", domain_target(uid), str(plist)], "launchctl cannot load the job")
+    try:
+        await asyncio.to_thread(_write_plist, plist, content)
+        await _checked(["bootstrap", domain_target(uid), str(plist)], "launchctl cannot load the job")
+    except (ServiceError, OSError) as exc:
+        await _put_back(plist, previous, replaced, uid, exc)
+        raise
     log.info("service_installed", plist=str(plist), replaced=replaced)
     return replaced
+
+
+async def _put_back(plist: Path, previous: bytes | None, reload: bool, uid: int, failure: Exception) -> None:
+    """Put the property list that was there before ``failure`` back (``previous``; ``None`` removes the new one) and,
+    with ``reload``, load its job again. Raises :class:`ServiceError` naming both failures when that job does not load
+    either."""
+    if previous is None:
+        await asyncio.to_thread(_remove_file, plist)
+        log.warning("service_install_undone", plist=str(plist), reloaded=False, error=str(failure))
+        return
+    await asyncio.to_thread(_write_plist, plist, previous)
+    if reload:
+        result: LaunchctlResult = await run_launchctl(["bootstrap", domain_target(uid), str(plist)])
+        if result.returncode != 0:
+            back: ServiceError = _failure(result, "launchctl cannot load the job that was there before")
+            raise ServiceError(
+                "the new job did not load, and the job that was there before did not load again",
+                {"new": str(failure), "before": back.context},
+            ) from failure
+    log.warning("service_install_undone", plist=str(plist), reloaded=reload, error=str(failure))
 
 
 async def uninstall_job(plist: Path, uid: int) -> Removal:

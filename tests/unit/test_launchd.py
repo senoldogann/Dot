@@ -1,4 +1,6 @@
-"""The launchd job of the daemon: the property list it is made of and the way its state is read."""
+"""The launchd job of the daemon: the property list it is made of, the way its state is read, and how a new job
+takes the place of the one loaded (against a stand-in for ``launchctl``, so that the job of this Mac is left
+alone)."""
 
 import plistlib
 import subprocess
@@ -7,6 +9,7 @@ from pathlib import Path
 
 import pytest
 
+from dotagent import launchd
 from dotagent.core.errors import ServiceError
 from dotagent.launchd import (
     LABEL,
@@ -15,6 +18,7 @@ from dotagent.launchd import (
     LaunchAgent,
     agent_plist,
     build_launch_agent,
+    install_job,
     launch_agent_path,
     parse_job,
     render_launch_agent,
@@ -116,3 +120,71 @@ def test_macos_accepts_the_property_list(tmp_path: Path) -> None:
         [PLUTIL, "-lint", str(plist)], capture_output=True, text=True, check=False
     )
     assert linted.returncode == 0, linted.stdout + linted.stderr
+
+
+# The property lists of the jobs the stand-in launchctl loads: launchd refuses one that says ``refused-by-launchd``.
+JOB_OF_BEFORE: bytes = b"<plist>the job of before</plist>\n"
+NEXT_JOB: bytes = b"<plist>the next job</plist>\n"
+REFUSED_JOB: bytes = b"<plist>refused-by-launchd</plist>\n"
+UID: int = 501
+
+
+def _job_and_file(plist: Path, state: Path) -> tuple[bytes | None, bytes | None]:
+    """The property list the job the stand-in launchctl keeps was loaded from, and the one in the job's file; ``None``
+    for none."""
+    loaded: Path = state / "loaded"
+    return (loaded.read_bytes() if loaded.exists() else None, plist.read_bytes() if plist.exists() else None)
+
+
+@pytest.fixture
+def launchctl(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+    """A stand-in for launchctl, which the launchd module runs in its place: the job is loaded while ``loaded`` is in
+    the returned directory, holding the property list it was loaded from; launchd refuses a list that says
+    ``refused-by-launchd`` and cannot unload the job while ``stuck`` is there."""
+    state: Path = tmp_path / "launchd"
+    state.mkdir()
+    (state / "printed").write_text(WAITING_AFTER_A_CRASH, encoding="utf-8")
+    script: Path = state / "launchctl"
+    script.write_text(
+        "#!/bin/sh\n"
+        f"cd '{state}' || exit 70\n"
+        'case "$1" in\n'
+        "print) [ -f loaded ] || exit 113; cat printed ;;\n"
+        "bootout) [ -f stuck ] && { echo 'Boot-out failed: 5: Input/output error' >&2; exit 5; }; rm -f loaded ;;\n"
+        "bootstrap) grep -q refused-by-launchd \"$3\" && { echo 'Bootstrap failed: 5: Input/output error' >&2; exit 5; }; "
+        'cp "$3" loaded ;;\n'
+        "*) exit 64 ;;\n"
+        "esac\n",
+        encoding="utf-8",
+    )
+    script.chmod(0o755)
+    monkeypatch.setattr(launchd, "_LAUNCHCTL", str(script))
+    return state
+
+
+async def test_a_new_job_launchd_refuses_leaves_the_job_of_before_and_its_file(tmp_path: Path, launchctl: Path) -> None:
+    """Item 187: when the new job does not load, the property list of before is put back and its job loaded again;
+    without one before, the refused list is removed."""
+    plist: Path = tmp_path / "LaunchAgents" / f"{LABEL}.plist"
+    with pytest.raises(ServiceError, match="launchctl cannot load the job"):
+        await install_job(plist, REFUSED_JOB, UID)
+    assert _job_and_file(plist, launchctl) == (None, None)
+
+    assert await install_job(plist, JOB_OF_BEFORE, UID) is False
+    with pytest.raises(ServiceError, match="launchctl cannot load the job"):
+        await install_job(plist, REFUSED_JOB, UID)
+    assert _job_and_file(plist, launchctl) == (JOB_OF_BEFORE, JOB_OF_BEFORE)
+
+    assert await install_job(plist, NEXT_JOB, UID) is True
+    assert _job_and_file(plist, launchctl) == (NEXT_JOB, NEXT_JOB)
+
+
+async def test_a_job_launchd_cannot_unload_keeps_its_property_list(tmp_path: Path, launchctl: Path) -> None:
+    """Item 187: the new property list is written only once the job of before is unloaded, so a job that cannot be
+    unloaded keeps the list it was loaded from."""
+    plist: Path = tmp_path / "LaunchAgents" / f"{LABEL}.plist"
+    await install_job(plist, JOB_OF_BEFORE, UID)
+    (launchctl / "stuck").touch()
+    with pytest.raises(ServiceError, match="launchctl cannot unload the job that is loaded"):
+        await install_job(plist, NEXT_JOB, UID)
+    assert _job_and_file(plist, launchctl) == (JOB_OF_BEFORE, JOB_OF_BEFORE)

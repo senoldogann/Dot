@@ -5116,8 +5116,8 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 183 | A run's end the store refused is stored later, and a start that failed is told       | done        | 265da7c |
 | 184 | A queued message starts once or is removed, never both                               | done        | d462505 |
 | 185 | A provider's 403 is not a refused key, and Ollama's stream error keeps its words     | done        | b178796 |
-| 186 | The doctor checks each model name against the list its provider serves               | in progress |         |
-| 187 | The service install keeps the running job until the new one is in place              | planned     |         |
+| 186 | The doctor checks each model name against the list its provider serves               | done        | 0b3702a |
+| 187 | The service install keeps the running job until the new one is in place              | in progress |         |
 | 188 | A run of a dotx command is followed live on the pages and stopped there              | planned     |         |
 | 189 | A message sent twice starts once                                                     | planned     |         |
 | 190 | The pages say what they could not read, follow the rules and tell of an update       | planned     |         |
@@ -9378,7 +9378,7 @@ words, and its status is the one the table gives such an error instead of an inv
 
 ### 186. The doctor checks each model name against the list its provider serves
 
-**Status: in progress.**
+**Status: done.** Merged as `0b3702a` (PR #225; no Linear issue, the Linear connector was signed out).
 
 **As built (2026-10-13).** `dotx doctor` reads the list of the models OpenAI and OpenCode Go serve to their keys
 (`GET /models`, once for each, within the five seconds of a probe) and checks each configured model of theirs against
@@ -9399,7 +9399,17 @@ list that cannot be read says so without failing the check twice.
 
 ### 187. The service install keeps the running job until the new one is in place
 
-**Status: planned.**
+**Status: in progress.**
+
+**As built (2026-10-13).** `dotx service install` unloads the job that is loaded first and writes the new job's property
+list once launchd has let the job go (`launchd.install_job`). When the new job does not load, or its file cannot be
+written, the file of before is put back, or the new one removed when there was none, and the job of before, when it was
+loaded, is loaded again; the install fails with launchd's words, and when the job of before does not load either, the
+error names both failures. Before, the new file was written first: a job that could not be unloaded ran beside a file it
+was not loaded from, and a new job that did not load left its file and no job. Tests: `tests/unit/test_launchd.py`
+installs jobs through a stand-in for `launchctl`, so the job of this Mac is left alone: a job launchd refuses leaves the
+job of before and its file, or no file when there was no job (the code of before left the refused file and no job), and
+a job launchd cannot unload keeps its file (before: the new file was in its place).
 
 **What.** `dotx service install` takes the running job down before it writes the new job file, and puts the old file
 back when the new job does not load, instead of leaving a new file next to an old job, or no job, after a failed step.
@@ -10058,3 +10068,4 @@ running" for all of them.
 - 2026-10-13 (Opus 5.5): item 183 merged as `265da7c` (PR #222; no Linear issue, the connector was signed out): an end of a run that the store refused is stored by the daemon's half-minute check once the database takes it, a run whose start failed ends with its `run_finished` event, and the half-minute check outlives a fault of the store.
 - 2026-10-13 (Opus 5.5): item 184 merged as `d462505` (PR #223; no Linear issue, the connector was signed out): a queued message is claimed in the store before its run starts, so it starts once, after the run at work on the chat in any process, and is not edited, taken out or steered while it starts.
 - 2026-10-13 (Opus 5.5): item 185 merged as `b178796` (PR #224; no Linear issue, the connector was signed out): a provider's HTTP 403 is a refused access, not a refused key: a run moves to its standby model with that reason, Settings › Models says so without a link to the keys, and an error Ollama reports inside its stream keeps its words.
+- 2026-10-13 (Opus 5.5): item 186 merged as `0b3702a` (PR #225; no Linear issue, the connector was signed out): `dotx doctor` checks each model of OpenAI and OpenCode Go against the list of the models its provider serves to the key, a helper and a standby model too, and a list that could not be read is a warning.
