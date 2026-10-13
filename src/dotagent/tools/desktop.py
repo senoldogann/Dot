@@ -12,7 +12,7 @@ from typing import Literal
 
 from pydantic import Field
 
-from dotagent.config import AppConfig, DesktopConfig
+from dotagent.config import AppConfig
 from dotagent.core.errors import ToolInputError
 from dotagent.desktop.actions import SecureFieldCheck, enter_secure_field, refuse_secure_field
 from dotagent.desktop.render import (
@@ -78,15 +78,11 @@ def _nonce() -> str:
     return secrets.token_hex(_NONCE_BYTES)
 
 
-def snapshot_budget(config: AppConfig) -> int:
-    """The most characters of window text one result may carry: what the agent allows a tool, minus the headroom, and
-    never less than half of it (:func:`text_room`)."""
-    return min(config.desktop.snapshot_max_chars, text_room(config.agent.tool_output_chars, _HEADROOM_CHARS))
-
-
-def sized_for_agent(config: AppConfig) -> DesktopConfig:
-    """The desktop settings with the snapshot budget lowered to what fits in one tool result."""
-    return config.desktop.model_copy(update={"snapshot_max_chars": snapshot_budget(config)})
+def snapshot_budget(config: AppConfig, output_chars: int) -> int:
+    """The most characters of window text a result of at most ``output_chars`` may carry (a run's are its
+    ``ctx.output_chars``, which a model with a small window lowers): that, minus the headroom, never less than half of
+    it (:func:`text_room`), and never more than ``[desktop] snapshot_max_chars``."""
+    return min(config.desktop.snapshot_max_chars, text_room(output_chars, _HEADROOM_CHARS))
 
 
 def _clip(text: str, limit: int) -> str:
@@ -171,7 +167,9 @@ def _open_app_tool() -> RegisteredTool:
         return _action("desktop_open_app", "app_control", "low", f"Open {args.app}", args.app, ())
 
     async def run(args: OpenAppArgs, ctx: ToolContext) -> ToolResult:
-        opened: OpenedApp = await ctx.runtime.desktop.open_app(ctx.thread_id, args.app)
+        opened: OpenedApp = await ctx.runtime.desktop.open_app(
+            ctx.thread_id, args.app, snapshot_budget(ctx.runtime.config, ctx.output_chars)
+        )
         return _screen_result(render_opened_app(opened, _nonce()))
 
     return make_tool(
@@ -212,7 +210,10 @@ def _snapshot_tool() -> RegisteredTool:
 
     async def run(args: SnapshotArgs, ctx: ToolContext) -> ToolResult:
         ref: int | None = _ref_of(args.ref) if args.ref is not None else None
-        request: ViewRequest = ViewRequest(scope=args.scope, ref=ref, query=args.query, full=args.full)
+        budget: int = snapshot_budget(ctx.runtime.config, ctx.output_chars)
+        request: ViewRequest = ViewRequest(
+            scope=args.scope, ref=ref, query=args.query, full=args.full, max_chars=budget
+        )
         view: SnapshotView = await ctx.runtime.desktop.snapshot(ctx.thread_id, args.app, request)
         return _screen_result(render_snapshot(view, _nonce()))
 
@@ -352,7 +353,12 @@ def _act_tool() -> RegisteredTool:
         secure_field: SecureFieldCheck = enter_secure_field if ctx.approvals == "yolo" else refuse_secure_field
         limit: int = ctx.runtime.config.desktop.max_batch_steps
         outcome: ActOutcome = await ctx.runtime.desktop.act(
-            ctx.thread_id, args.app, first_steps(args.steps, limit), review, secure_field
+            ctx.thread_id,
+            args.app,
+            first_steps(args.steps, limit),
+            review,
+            secure_field,
+            snapshot_budget(ctx.runtime.config, ctx.output_chars),
         )
         source: str = outcome.view.app.name if outcome.view is not None else (args.app or "application")
         note: str = batch_cut_note(len(args.steps), limit)

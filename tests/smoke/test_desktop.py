@@ -23,7 +23,7 @@ import pytest_asyncio
 from AppKit import NSPasteboard
 from pydantic import BaseModel, ConfigDict
 
-from dotagent.config import DesktopConfig, load_config
+from dotagent.config import DesktopConfig, load_config, load_default_config
 from dotagent.core.errors import FailSafeTriggered
 from dotagent.desktop.actions import refuse_secure_field
 from dotagent.desktop.input import PasteboardLike, PasteboardSnapshot, _restore_pasteboard, _snapshot_pasteboard
@@ -36,7 +36,9 @@ _FIXTURE: Path = Path(__file__).resolve().parents[1] / "fixtures" / "dot_fixture
 _THREAD: str = "smoke"
 _READY_TIMEOUT_S: float = 15.0
 _FINDER: str = "com.apple.finder"
-_FULL_WINDOW: ViewRequest = ViewRequest(scope="window", ref=None, query=None, full=True)
+# The whole window of the fixture application, as [desktop] snapshot_max_chars lets a view carry it.
+_MAX_CHARS: int = load_default_config().desktop.snapshot_max_chars
+_FULL_WINDOW: ViewRequest = ViewRequest(scope="window", ref=None, query=None, full=True, max_chars=_MAX_CHARS)
 
 pytestmark = [
     pytest.mark.desktop,
@@ -178,7 +180,7 @@ def owner_clipboard() -> Iterator[None]:
 async def session(app: FixtureApp, failsafe_file: Path, settings_file: Path) -> AsyncIterator[DesktopSession]:
     config: DesktopConfig = load_config(settings_file).desktop
     desktop: DesktopSession = DesktopSession(config, failsafe_file)
-    await desktop.open_app(_THREAD, str(app.pid))
+    await desktop.open_app(_THREAD, str(app.pid), _MAX_CHARS)
     yield desktop
     await desktop.close()
 
@@ -189,7 +191,7 @@ async def _body(session: DesktopSession, app: FixtureApp) -> str:
 
 
 async def _act(session: DesktopSession, app: FixtureApp, steps: list[Step]) -> ActOutcome:
-    outcome: ActOutcome = await session.act(_THREAD, str(app.pid), steps, _allow, refuse_secure_field)
+    outcome: ActOutcome = await session.act(_THREAD, str(app.pid), steps, _allow, refuse_secure_field, _MAX_CHARS)
     await asyncio.sleep(0.15)
     return outcome
 
@@ -300,7 +302,7 @@ async def test_right_click_opens_a_menu_whose_items_can_be_chosen(session: Deskt
     await _act(session, app, [Step(action="right_click", ref=pad)])
     assert _since(app, mark, "pad_context")
     menu: SnapshotView = await session.snapshot(
-        _THREAD, str(app.pid), ViewRequest(scope="window", ref=None, query="Alpha", full=False)
+        _THREAD, str(app.pid), ViewRequest(scope="window", ref=None, query="Alpha", full=False, max_chars=_MAX_CHARS)
     )
     await _act(session, app, [Step(action="click", ref=_ref_of(menu.body, r"Alpha"))])
     assert [event.item for event in _since(app, mark, "context_pick")] == ["Alpha"]
@@ -361,7 +363,7 @@ async def test_activate_switches_to_another_application_and_back(session: Deskto
 
 async def _timed_act(session: DesktopSession, app: FixtureApp, steps: list[Step]) -> float:
     started: float = time.perf_counter()
-    outcome: ActOutcome = await session.act(_THREAD, str(app.pid), steps, _allow, refuse_secure_field)
+    outcome: ActOutcome = await session.act(_THREAD, str(app.pid), steps, _allow, refuse_secure_field, _MAX_CHARS)
     elapsed: float = time.perf_counter() - started
     assert [report.outcome for report in outcome.steps] == ["done"] * len(steps), outcome
     await asyncio.sleep(0.15)
@@ -388,7 +390,9 @@ async def test_the_failsafe_file_stops_a_batch_and_work_resumes_when_it_is_remov
     await asyncio.to_thread(_arm_failsafe, failsafe_file)
     try:
         with pytest.raises(FailSafeTriggered):
-            await session.act(_THREAD, str(app.pid), [Step(action="click", ref=button)], _allow, refuse_secure_field)
+            await session.act(
+                _THREAD, str(app.pid), [Step(action="click", ref=button)], _allow, refuse_secure_field, _MAX_CHARS
+            )
     finally:
         await asyncio.to_thread(_disarm_failsafe, failsafe_file)
     mark: int = _mark(app)

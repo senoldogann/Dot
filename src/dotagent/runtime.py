@@ -61,7 +61,7 @@ from dotagent.tools.campaign import build_campaign_tools
 from dotagent.tools.codes import build_code_tools
 from dotagent.tools.consult import build_consult_tools
 from dotagent.tools.delegate import build_delegate_tools
-from dotagent.tools.desktop import build_desktop_tools, sized_for_agent
+from dotagent.tools.desktop import build_desktop_tools
 from dotagent.tools.files import build_file_tools
 from dotagent.tools.help import build_find_help_tool
 from dotagent.tools.judge_items import build_judge_items_tool
@@ -321,7 +321,7 @@ async def open_runtime(config: AppConfig, login_env: dict[str, str]) -> Runtime:
             typesafe=typesafe,
             browser=browsers.main,
             browsers=browsers,
-            desktop=DesktopSession(sized_for_agent(config), failsafe_path()),
+            desktop=DesktopSession(config.desktop, failsafe_path()),
             terminals=Terminals(config.shell.terminal_sessions, config.shell.terminal_idle_s, shell_env),
             web=WebClient(config.web, config.browser.allowed_hosts, config.browser.blocked_hosts),
             search_key_present=ollama_key is not None,

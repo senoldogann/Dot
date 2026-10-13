@@ -15,7 +15,7 @@ from dotagent.cli_commands import (
     DesktopSetupCommand,
     DesktopSnapshotCommand,
 )
-from dotagent.config import load_user_config
+from dotagent.config import AppConfig, load_user_config
 from dotagent.core.errors import InvalidValueError
 from dotagent.core.paths import (
     failsafe_path,
@@ -32,7 +32,7 @@ from dotagent.desktop.render import render_apps, render_snapshot
 from dotagent.desktop.session import DesktopSession
 from dotagent.desktop.types import AppView, Permissions, ScreenshotView, SnapshotView
 from dotagent.desktop.views import ViewRequest
-from dotagent.tools.desktop import sized_for_agent
+from dotagent.tools.desktop import snapshot_budget
 
 _NONCE_BYTES: int = 8
 _EFFORT_HELP: str = "reasoning level; the levels a model offers are listed by 'dotx models'"
@@ -47,9 +47,9 @@ _CLI_THREAD: str = "cli"
 
 
 @contextlib.asynccontextmanager
-async def _desktop_session() -> AsyncIterator[DesktopSession]:
-    """A desktop session sized the way the agent's is, closed again afterwards."""
-    session: DesktopSession = DesktopSession(sized_for_agent(load_user_config()), failsafe_path())
+async def _desktop_session(config: AppConfig) -> AsyncIterator[DesktopSession]:
+    """A desktop session, closed again afterwards."""
+    session: DesktopSession = DesktopSession(config.desktop, failsafe_path())
     try:
         yield session
     finally:
@@ -88,15 +88,18 @@ async def cmd_desktop_setup(command: DesktopSetupCommand) -> int:
 
 
 async def cmd_desktop_apps(command: DesktopAppsCommand) -> int:
-    async with _desktop_session() as session:
+    async with _desktop_session(load_user_config()) as session:
         views: tuple[AppView, ...] = await session.list_apps()
     sys.stdout.write(render_apps(views, secrets.token_hex(_NONCE_BYTES)) + "\n")
     return 0
 
 
 async def cmd_desktop_snapshot(command: DesktopSnapshotCommand) -> int:
-    request: ViewRequest = ViewRequest(scope=command.scope, ref=None, query=command.query, full=True)
-    async with _desktop_session() as session:
+    config: AppConfig = load_user_config()
+    # As much of the window as one tool result of the agent's carries, when the model does not lower it.
+    budget: int = snapshot_budget(config, config.agent.tool_output_chars)
+    request: ViewRequest = ViewRequest(scope=command.scope, ref=None, query=command.query, full=True, max_chars=budget)
+    async with _desktop_session(config) as session:
         view: SnapshotView = await session.snapshot(_CLI_THREAD, command.app, request)
     sys.stdout.write(render_snapshot(view, secrets.token_hex(_NONCE_BYTES)) + "\n")
     return 0
@@ -109,7 +112,7 @@ def _write_screenshot(path_text: str, image: bytes) -> Path:
 
 
 async def cmd_desktop_screenshot(command: DesktopScreenshotCommand) -> int:
-    async with _desktop_session() as session:
+    async with _desktop_session(load_user_config()) as session:
         shot: ScreenshotView = await session.screenshot()
     target: Path = await asyncio.to_thread(_write_screenshot, command.path, shot.image)
     sys.stdout.write(f"{target} ({shot.width}x{shot.height} px, {len(shot.image)} bytes)\n")

@@ -1,5 +1,6 @@
-"""The scaffold of a run: the budget that follows the model's window, the tier that follows its refused tool calls, the
-reminders of a weak model, and the profile those come from, read from a real database file."""
+"""The scaffold of a run: the budget that follows the model's window (with the window of an application it is shown),
+the tier that follows its refused tool calls, the reminders of a weak model, and the profile those come from, read from
+a real database file."""
 
 import sqlite3
 import time
@@ -12,6 +13,7 @@ import pytest_asyncio
 from dotagent.agent.scaffold import (
     Scaffold,
     choose_tier,
+    output_budget,
     reminder_due,
     require_room,
     scaffold_event,
@@ -21,6 +23,9 @@ from dotagent.cli_profile import render_profile
 from dotagent.config import AgentConfig, AppConfig, OllamaConfig, load_default_config
 from dotagent.core.errors import ConfigError
 from dotagent.core.types import JsonObject
+from dotagent.desktop.render import render_snapshot
+from dotagent.desktop.types import AppView, Node, Snapshot, SnapshotView
+from dotagent.desktop.views import ViewRequest, build_view
 from dotagent.llm.ollama import num_ctx_for, parse_model_details
 from dotagent.llm.types import INVALID_ARGUMENTS_KEY, ModelInfo
 from dotagent.store.db import Store
@@ -79,10 +84,42 @@ def test_the_budget_follows_a_small_window_and_the_tool_output_shrinks_with_it()
 
 def test_the_text_of_a_desktop_window_keeps_half_of_a_small_tool_result() -> None:
     config: AppConfig = load_default_config()
-    assert snapshot_budget(config) == 8500
+    assert snapshot_budget(config, config.agent.tool_output_chars) == 8500
     # 3000 characters leave nothing next to the 3500 kept for the rest of a result: half of the result is the floor.
-    small: AppConfig = config.model_copy(update={"agent": config.agent.model_copy(update={"tool_output_chars": 3000})})
-    assert snapshot_budget(small) == 1500
+    assert snapshot_budget(config, 3000) == 1500
+
+
+def test_a_window_shown_to_a_run_with_a_small_model_window_fits_in_one_of_its_tool_results() -> None:
+    config: AppConfig = load_default_config()
+    # A window of 16 000 tokens lowers the run's tool results to their floor of 2000 characters.
+    output_chars: int = output_budget(config.agent, 16_000)
+    rows: tuple[Node, ...] = tuple(
+        Node(
+            ref=ref,
+            role="AXStaticText",
+            subrole="",
+            label=f"Row {ref} of a long list",
+            value="",
+            frame=None,
+            enabled=True,
+            focused=False,
+            selected=False,
+            indent=0,
+        )
+        for ref in range(1, 600)
+    )
+    snapshot: Snapshot = Snapshot(
+        pid=1, nodes=rows, elements={}, next_ref=600, truncated=False, elapsed_ms=0.0, skipped={}
+    )
+    app: AppView = AppView(pid=1, name="Lister", bundle_id=None, frontmost=True, windows=())
+    budget: int = snapshot_budget(config, output_chars)
+    request: ViewRequest = ViewRequest(scope="window", ref=None, query=None, full=True, max_chars=budget)
+    view: SnapshotView = build_view(app, "Window", snapshot, request, None, 1.0, ()).view
+    shown: str = render_snapshot(view, "0" * 16)
+    # The view leaves rows out and says so, and the whole of it fits: the executor has nothing to cut from its middle.
+    assert (output_chars, budget) == (2000, 1000)
+    assert view.omitted > 0
+    assert len(shown) <= output_chars, len(shown)
 
 
 def test_the_tier_is_measured_only_when_asked_and_a_hand_set_tier_always_wins() -> None:
