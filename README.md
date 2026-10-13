@@ -1378,12 +1378,15 @@ the agent itself.
   room above and below them; the page keeps room for them in the sidebar's head, as tall as the top bar so that its
   button stands on the same line, or in the top bar while the sidebar is away, and the window drags by those bars.
   The themes, the colour scheme and the density are the web UI's own settings.
-- **Signed in by itself.** The shell reads the daemon's address from `config.toml` (`[server]`, or the defaults) and the
-  token from the token file under the home directory, and opens the UI with the token in the fragment, never typed, once
-  the daemon has proven that it holds that token (see the server above; each poll checks it again before it sends the
-  token). While the daemon is down, the window shows Dot's wordmark and the one command that starts it, and opens the UI
-  by itself when the daemon answers. The window leaves the UI for that page only after three polls in a row go
-  unanswered, so one slow answer of a busy daemon does not throw the open page away.
+- **Signed in by itself.** The shell reads the daemon's address from `config.toml` (`[server]`, or the defaults without
+  that file) and the token from the token file under the home directory, and opens the UI with the token in the
+  fragment, never typed, once the daemon has proven that it holds that token (see the server above; each poll checks it
+  again before it sends the token). While the daemon is down, the window shows Dot's wordmark and the one command that
+  starts it, and opens the UI by itself when the daemon answers. When the shell could not read one of those files, that
+  page and the menu bar item's tip say which and why instead, and the shell guesses no address: a `config.toml` that is
+  not valid TOML, with the line and column of the fault; a file it may not read, in the system's words; no token file
+  yet, which the daemon makes the first time it starts. The window leaves the UI for that page only after three polls in
+  a row go unanswered, so one slow answer of a busy daemon does not throw the open page away.
 - **The menu bar item** is Dot's mark in the state of the whole of Dot (looking at you at rest, glancing up while a
 run works, a blue pastille while something waits for you) with the count of what waits for you beside it, read from
 `GET /api/activity/count` every second. A click opens the window; the menu has Open Dot, New chat and Quit. Closing the

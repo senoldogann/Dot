@@ -18,9 +18,11 @@
       <path class="letter" d="M413 -133V36A47 47 0 0 0 460 83H476M383 -83H469"/>
     </svg>
     <h1>Dot is not running</h1>
-    <p>The daemon that does the work is off. Start it once and it stays on, at every login and after a crash:</p>
-    <pre>uv run dotx service install</pre>
+    <p class="why" hidden></p>
+    <p class="start">The daemon that does the work is off. Start it once and it stays on, at every login and after a crash:</p>
+    <pre class="start">uv run dotx service install</pre>
     <p class="muted">This window opens the web UI by itself as soon as the daemon answers.</p>
   </main>
+  <script src="down.js"></script>
 </body>
 </html>
