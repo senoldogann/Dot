@@ -67,7 +67,6 @@ _IDLE_HOLD_S: int = 5
 _REAP_TIMEOUT_S: float = 2.0
 _CAFFEINATE: str = "/usr/bin/caffeinate"
 _FRONT_ACTIONS: frozenset[str] = frozenset({"click", "double_click", "right_click", "type", "paste", "key", "drag"})
-_WINDOW_VIEW: ViewRequest = ViewRequest(scope="window", ref=None, query=None, full=False)
 
 
 class StepReview(FrozenModel):
@@ -108,6 +107,11 @@ class _Batch:
     env: StepEnv
     state: ThreadDesktop
     side_effects: bool
+
+
+def _window_view(max_chars: int) -> ViewRequest:
+    """The view shown after an application opens or a batch ends: its window, the changes since the last view."""
+    return ViewRequest(scope="window", ref=None, query=None, full=False, max_chars=max_chars)
 
 
 def _pick_app(state: ThreadDesktop, name: str | None, running: Sequence[AppInfo]) -> AppInfo:
@@ -443,17 +447,16 @@ class DesktopSession:
             request,
             remembered.rendered.get(key),
             walk.scale,
-            self._config.snapshot_max_chars,
             tuple(notes),
         )
         return result.view, memory.after_walk(state, app.pid, walk.snapshot, key, result.baseline)
 
     async def _closing_view(
-        self, state: ThreadDesktop, app: AppInfo
+        self, state: ThreadDesktop, app: AppInfo, max_chars: int
     ) -> tuple[SnapshotView | None, str | None, ThreadDesktop]:
-        """The window after a batch, or the reason there is none."""
+        """The window after a batch, at most ``max_chars`` of its text, or the reason there is none."""
         try:
-            view, updated = await self._look(state, app, _WINDOW_VIEW)
+            view, updated = await self._look(state, app, _window_view(max_chars))
         except FailSafeTriggered:
             raise
         except DesktopError as error:
@@ -529,8 +532,9 @@ class DesktopSession:
                 return False
             await asyncio.sleep(_WINDOW_POLL_S)
 
-    async def open_app(self, thread_id: str, query: str) -> OpenedApp:
-        """Open (or bring forward) an application, make it the thread's target and show its window."""
+    async def open_app(self, thread_id: str, query: str, max_chars: int) -> OpenedApp:
+        """Open (or bring forward) an application, make it the thread's target and show its window, at most
+        ``max_chars`` of its text."""
         async with self._lock:
             await self._prepare(self._prepare_acting)
             opened, fresh = await self._call(partial(_open_job, self._config, query))
@@ -547,7 +551,7 @@ class DesktopSession:
                         "File > New, or look at its menu bar with scope menu_bar"
                     ),
                 )
-            view, updated = await self._look(state, opened, _WINDOW_VIEW)
+            view, updated = await self._look(state, opened, _window_view(max_chars))
             self._remember(thread_id, updated)
             return OpenedApp(app=view.app, view=view, note=None)
 
@@ -654,9 +658,11 @@ class DesktopSession:
         steps: Sequence[Step],
         reviewer: StepReviewer,
         secure_field: SecureFieldCheck,
+        max_chars: int,
     ) -> ActOutcome:
-        """Perform a batch of steps in one application, each reviewed first, and show the window afterwards.
-        ``secure_field`` decides what a step does at a secure text field: a step it refuses fails and stops the batch."""
+        """Perform a batch of steps in one application, each reviewed first, and show the window afterwards, at most
+        ``max_chars`` of its text. ``secure_field`` decides what a step does at a secure text field: a step it refuses
+        fails and stops the batch."""
         async with self._lock:
             await self._prepare(self._prepare_acting)
             state: ThreadDesktop = self._thread(thread_id)
@@ -668,7 +674,7 @@ class DesktopSession:
                 await self._call(
                     partial(ax.wait_until_quiet, batch.env.app.pid, quiet_s, self._config.settle_ms / 1000)
                 )
-            view, note, updated = await self._closing_view(batch.state, batch.env.app)
+            view, note, updated = await self._closing_view(batch.state, batch.env.app, max_chars)
             self._remember(thread_id, updated)
             return ActOutcome(steps=batch.reports, stopped=batch.stopped, view=view, view_note=note)
 

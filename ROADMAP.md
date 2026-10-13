@@ -5090,8 +5090,8 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 167 | Evals show whether a run takes the easy way                                          | done        | 3dc670c |
 | 168 | A run reads only the skills it is offered                                            | done        | f605def |
 | 169 | Help is found by meaning as well as by words                                         | done        | 5c96b14 |
-| 170 | A delegated run's thread takes no queue                                              | in progress |         |
-| 171 | The text of a desktop window follows the run's model window                          | planned     |         |
+| 170 | A delegated run's thread takes no queue                                              | done        | 336e03f |
+| 171 | The text of a desktop window follows the run's model window                          | in progress |         |
 | 172 | A dotx command that dies does not leave its run at work                              | planned     |         |
 | 173 | Every smoke test passes alone, and the README keeps its width                        | planned     |         |
 
@@ -8889,7 +8889,7 @@ help described in another; with the embeddings off, by words as before.
 
 ### 170. A delegated run's thread takes no queue
 
-**Status: in progress.**
+**Status: done.** Merged as `336e03f` (PR #208; no Linear issue, the Linear connector was signed out).
 
 **As built (2026-10-13).** A message queued on the thread of a delegated run (`POST /api/threads/{id}/queue` where the
 thread's newest run has a parent) is refused with 409, as one on the chat of a campaign is: that thread is no chat, its
@@ -8906,7 +8906,21 @@ deletes the queues of the threads of the runs it delegated.
 
 ### 171. The text of a desktop window follows the run's model window
 
-**Status: planned.**
+**Status: in progress.**
+
+**As built (2026-10-13).** The most text of an application window a desktop result carries is now worked out per call
+from the run's own tool output budget (`ctx.output_chars`, which a model with a small window lowers), as the text of a
+page already was: `snapshot_budget(config, output_chars)` keeps 3500 characters for the rest of the result, never less
+than half of it, and never more than `[desktop] snapshot_max_chars`. `desktop_snapshot`, `desktop_open_app` and
+`desktop_act` (its window after the batch) hand it to the desktop session with the view they ask for
+(`ViewRequest.max_chars`). Before, the session was built once with the budget of the configured `tool_output_chars`
+(8500 characters), so a run whose model has a window of 16 000 tokens, whose results carry 2000, got about 8400
+characters of window text, and the executor cut out their middle; now it gets 1000, with the rows left out counted.
+`dotx desktop snapshot` keeps the configured budget. The README's line on the budget (the text of a page or an
+application window takes what is left next to the rest of the result) now holds for the desktop too. Tests: a unit test
+renders a window of 600 rows for such a run, and the whole of it fits in one of its results; a probe on the code of
+before rendered 8394 characters for a result of 2000. The desktop smoke tests (`desktop`-marked, run only on a Mac set
+up for them) pass the budget of a view; they were collected, not run.
 
 **What.** The text of a desktop window follows the run's model window, as the text of a page does, so the executor never
 cuts it in the middle.
@@ -9530,3 +9544,4 @@ asked for.
 - 2026-10-13 (Opus 5.5): part 28, what part 27's report found, is planned (items 168 to 173); item 168 is built: the `skill` tool reads only a skill the run is offered.
 - 2026-10-13 (Opus 5.5): item 168 merged as `f605def` (PR #206; no Linear issue, the connector was signed out): the `skill` tool reads only a skill the run is offered, and its refusal names only those; part 28 is planned.
 - 2026-10-13 (Opus 5.5): item 169 merged as `5c96b14` (PR #207; no Linear issue, the connector was signed out): `find_help` and the skills a run is given rank help by meaning as well as by words, with the memory's embeddings, so a goal or a need in Turkish finds the skills described in English.
+- 2026-10-13 (Opus 5.5): item 170 merged as `336e03f` (PR #208; no Linear issue, the connector was signed out): the thread of a delegated run takes no queue, and deleting a chat takes the queues of the threads of the runs it delegated with them.

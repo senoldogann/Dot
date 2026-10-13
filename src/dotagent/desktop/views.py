@@ -36,12 +36,14 @@ _TITLE_CHARS: int = 80
 @dataclass(frozen=True, slots=True)
 class ViewRequest:
     """Which view of an application is wanted: a scope, or the subtree of one ref, optionally filtered by a query.
-    ``full`` asks for the whole view even when only a little changed since the last one."""
+    ``full`` asks for the whole view even when only a little changed since the last one; ``max_chars`` is the most text
+    of the window it may carry, what one tool result of the run that asks has room for."""
 
     scope: SnapshotScope
     ref: int | None
     query: str | None
     full: bool
+    max_chars: int
 
 
 @dataclass(frozen=True, slots=True)
@@ -161,17 +163,16 @@ def build_view(
     request: ViewRequest,
     baseline: Mapping[int, str] | None,
     scale: float,
-    max_chars: int,
     notes: tuple[str, ...],
 ) -> ViewResult:
     """Turn a walk of the tree into what the model reads: matches of a query, the changes since the stored baseline,
-    or the whole view fitted to ``max_chars``."""
+    or the whole view fitted to the request's ``max_chars``."""
     if request.query is not None:
         return ViewResult(_search_view(app, heading, snapshot, request.query, scale, notes), None)
     lines: tuple[Line, ...] = render_lines(snapshot.nodes, scale)
     delta: Delta | None = None if request.full else _delta_for(baseline, lines)
     shown: tuple[Line, ...] = lines if delta is None else delta.changed
-    body, omitted = fit_lines(shown, max_chars)
+    body, omitted = fit_lines(shown, request.max_chars)
     view: SnapshotView = SnapshotView(
         app=app,
         heading=heading,
