@@ -5113,8 +5113,8 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 180 | A campaign whose session's command died goes on                                      | done        | baca51a |
 | 181 | Tools that name files work on what was approved, and a cut journal line is left out  | done        | 05185bc |
 | 182 | A failed run's result is the error's message, and its context stays in the event     | done        | d1c2a00 |
-| 183 | A run's end the store refused is stored later, and a start that failed is told       | in progress |         |
-| 184 | A queued message starts once or is removed, never both                               | planned     |         |
+| 183 | A run's end the store refused is stored later, and a start that failed is told       | done        | 265da7c |
+| 184 | A queued message starts once or is removed, never both                               | in progress |         |
 | 185 | A provider's 403 is not a refused key, and Ollama's stream error keeps its words     | planned     |         |
 | 186 | The doctor checks each model name against the list its provider serves               | planned     |         |
 | 187 | The service install keeps the running job until the new one is in place              | planned     |         |
@@ -9298,7 +9298,7 @@ instead, where it no longer puts the start of a request on the phone's lock scre
 
 ### 183. A run's end the store refused is stored later, and a start that failed is told
 
-**Status: in progress.**
+**Status: done.** Merged as `265da7c` (PR #222; no Linear issue, the Linear connector was signed out).
 
 **As built (2026-10-13).** An end of a run that the store refused (a full disk, say) is kept by the run manager and
 stored by the daemon's half-minute check (`RunManager.store_left_ends`) once the database takes it, as it was to be
@@ -9326,7 +9326,28 @@ a fault of the store; the scores half of item 179's one write and a refused dele
 
 ### 184. A queued message starts once or is removed, never both
 
-**Status: planned.**
+**Status: in progress.**
+
+**As built (2026-10-13).** The first message of a chat's queue is claimed in the store for the chat's next run before
+that run starts (`Store.claim_queued`, a row of the new `queue_claims` table, one per chat), in one write, and only when
+the queue is not held, no run of any process works on the chat and no message of it is claimed already. The claimed
+message leaves the queue once its run has started (`drop_claimed`); when the run could not start, the claim ends, the
+message stays first and the queue is held, as before (`hold_claimed`). A claim the store refused to end is ended by the
+chat's next start in the process, and a start goes on when the call that began it is cancelled. While it is claimed,
+editing it, taking it out or steering it is refused (409, "the message is starting as its chat's next run"), and so is
+deleting its chat. A steered message leaves the queue, as it is, before it is sent (`take_queued`); when the run ended
+in that moment, the message goes back where it was and the queue moves on as the end of that run does. The claims of a
+process that is gone end, at the daemon's start and in its half-minute check, and the queues of their chats are held: a
+claimed message whose run that process made leaves the queue, as it started, and any other stays first. Before, a
+message left the queue only after its run had started: a removal or an edit in that moment answered success for a
+message whose run started anyway, a `dotx` command and the daemon that moved one queue at once could both start its
+message, and the daemon started a message beside the run of a `dotx` command at work on the chat. Tests:
+`tests/smoke/test_queue.py` removes and edits a message while its run starts (the code of before took both), queues a
+message through a second run manager while the first one's run works on the chat (before: it started at once), lets a
+held queue go in two run managers at once (before: both started it), holds the queue of a claim whose process is gone,
+steers a message as its run ends (it starts after that run) and ends a claim the store refused to end at the chat's next
+start; `tests/unit/test_queue_claims.py` covers the claim in the store, two stores on one database and the claim of a
+gone process that made its run included.
 
 **What.** A queued message is claimed in the store before its run starts, so a removal, an edit or a steer that comes in
 that moment is refused, the message having started, instead of answering success for a message whose run starts anyway;
@@ -10006,3 +10027,4 @@ running" for all of them.
 - 2026-10-13 (Opus 5.5): part 30, the remaining problems, is planned (items 181 to 191), and the owner's three decisions of the day are recorded (open owner decisions 34 to 36); item 181 is built: a tool that names files works on what was approved, and a journal line cut short is left out.
 - 2026-10-13 (Opus 5.5): item 181 merged as `05185bc` (PR #220; no Linear issue, the connector was signed out): the tools that name files are classified again as they start and refused when a path leads elsewhere by then, and a journal line that a full disk cut short is left out.
 - 2026-10-13 (Opus 5.5): item 182 merged as `d1c2a00` (PR #221; no Linear issue, the connector was signed out): a run that one of Dot's errors ends stores the error's message as its result, and its `run_finished` event keeps the error's context with the secrets masked.
+- 2026-10-13 (Opus 5.5): item 183 merged as `265da7c` (PR #222; no Linear issue, the connector was signed out): an end of a run that the store refused is stored by the daemon's half-minute check once the database takes it, a run whose start failed ends with its `run_finished` event, and the half-minute check outlives a fault of the store.

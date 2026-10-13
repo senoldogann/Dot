@@ -2,7 +2,7 @@
 
 import asyncio
 import time
-from collections.abc import Collection, Coroutine, Iterator, Sequence
+from collections.abc import Awaitable, Callable, Collection, Coroutine, Iterator, Sequence
 from contextlib import AbstractAsyncContextManager, contextmanager, nullcontext
 from dataclasses import dataclass
 from pathlib import Path
@@ -164,10 +164,10 @@ def _goal_mode_asked(goal: str, mode: RunMode, goal_mode: bool | None) -> bool |
     return True if mode != "chat" and keep_going_ask(goal) is not None else goal_mode
 
 
-async def _uncancelled(work: Coroutine[object, object, None]) -> None:
+async def _uncancelled[T](work: Coroutine[object, object, T]) -> T:
     """Run ``work`` to its end even when the caller is cancelled meanwhile (a second stop of a run while its end is
-    being recorded), then raise the cancellation (item 116)."""
-    task: asyncio.Task[None] = asyncio.ensure_future(work)
+    being recorded), then raise the cancellation (item 116); returns what ``work`` returns."""
+    task: asyncio.Task[T] = asyncio.ensure_future(work)
     cancelled: bool = False
     while not task.done():
         try:
@@ -176,7 +176,7 @@ async def _uncancelled(work: Coroutine[object, object, None]) -> None:
             cancelled = True
     if cancelled:
         raise asyncio.CancelledError
-    task.result()
+    return task.result()
 
 
 class RunManager:
@@ -214,6 +214,9 @@ class RunManager:
         self._draining: asyncio.Lock = asyncio.Lock()
         # The ends the store refused, by run id, until they are stored (:meth:`store_left_ends`).
         self._left_ends: dict[str, _LeftEnd] = {}
+        # The claims on queued messages the store refused to end (:meth:`_end_claim`), by chat, with the store's way to
+        # end each: its message started (``Store.drop_claimed``) or could not (``Store.hold_claimed``).
+        self._left_claims: dict[str, Callable[[str], Awaitable[None]]] = {}
 
     async def recover(self) -> int:
         """Close out what processes that are gone left behind: the runs they left active, the approvals of runs no
@@ -228,6 +231,7 @@ class RunManager:
                 gone.append(owner)
         interrupted: int = await store.mark_interrupted_runs(gone)
         await store.expire_pending_approvals(_EXPIRED_ON_START)
+        await self._hold_claims_of_gone(directory)
         # A stop of the daemon is not the owner's stop of the chat: a queue whose run the stop cut goes on once that
         # run, continued, ends done (:meth:`_follow_queue`). Any other waits for the owner to resume it: its run
         # failed, was stopped, was cut by a crash, works in a process that lives, or ended done as the daemon stopped.
@@ -254,6 +258,7 @@ class RunManager:
             # This process holds its own owner's lock: its runs are never taken for a dead command's.
             if owner is not None and not await asyncio.to_thread(owner_alive, directory, owner):
                 gone.append(owner)
+        await self._hold_claims_of_gone(directory)
         told: list[EventRecord] = await store.close_runs_of(gone, RESULT_COMMAND_DIED) if gone else []
         for finished in told:
             self._runtime.bus.publish(finished)
@@ -293,6 +298,17 @@ class RunManager:
                 continue
             if closed:
                 log.info("runs_of_dead_commands_closed", runs=closed)
+
+    async def _hold_claims_of_gone(self, directory: Path) -> None:
+        """End the claims on queued messages (:meth:`Store.claim_queued`) of the processes that are gone, and hold the
+        queues of their chats until the owner resumes them."""
+        store: Store = self._runtime.store
+        gone: list[str] = [
+            owner for owner in await store.claim_owners() if not await asyncio.to_thread(owner_alive, directory, owner)
+        ]
+        if gone:
+            held: int = await store.hold_claims_of(gone)
+            log.warning("queue_claims_of_gone_processes_held", claims=held)
 
     async def store_left_ends(self) -> int:
         """Store the ends that the store refused when their runs ended (:meth:`_record_end`, :meth:`_end_unstarted`),
@@ -692,7 +708,7 @@ class RunManager:
         return message
 
     async def edit_queued(self, message_id: str, text: str) -> str:
-        """Change the text of a queued message; returns its chat."""
+        """Change the text of a queued message; returns its chat. One starting as the chat's next run is refused."""
         store: Store = self._runtime.store
         await store.edit_queued(message_id, text)
         thread_id: str = (await store.get_queued(message_id)).thread_id
@@ -700,7 +716,7 @@ class RunManager:
         return thread_id
 
     async def remove_queued(self, message_id: str) -> str:
-        """Take a message out of its chat's queue; returns its chat."""
+        """Take a message out of its chat's queue; returns its chat. One starting as the chat's next run is refused."""
         store: Store = self._runtime.store
         thread_id: str = (await store.get_queued(message_id)).thread_id
         await store.delete_queued(message_id)
@@ -713,17 +729,35 @@ class RunManager:
 
     async def steer_queued(self, message_id: str) -> str:
         """Send a queued message, with its files, to the run at work on its chat now (:meth:`steer`) and take it out of
-        the queue; returns its chat. A chat where no run of this process works has none to steer."""
+        the queue; returns its chat. A chat where no run of this process works has none to steer, and a message starting
+        as the chat's next run is refused. The message leaves the queue as it is before it is sent, so that nothing
+        starts, changes or removes it meanwhile, and goes back when the run ended in that moment."""
         store: Store = self._runtime.store
         message: QueuedMessage = await store.get_queued(message_id)
-        handle: RunHandle | None = self._active_on(message.thread_id)
-        if handle is None:
+        if self._active_on(message.thread_id) is None:
             raise RunConflict("no run works on the chat to steer", {"thread_id": message.thread_id})
         files: tuple[StoredAttachment, ...] = await load_attachments(self._runtime.workspace, message.attachments)
-        self.steer(handle.run_id, message.text, files)
-        await store.delete_queued(message_id)
-        await self._queue_changed(message.thread_id, None, None, None)
-        return message.thread_id
+        taken: QueuedMessage = await store.take_queued(message_id)
+        handle: RunHandle | None = self._active_on(taken.thread_id)
+        try:
+            if handle is None:
+                raise RunConflict("no run works on the chat to steer", {"thread_id": taken.thread_id})
+            self.steer(handle.run_id, taken.text, files)
+        except BaseException:
+            await _uncancelled(self._put_back(taken))
+            raise
+        await self._queue_changed(taken.thread_id, None, None, None)
+        return taken.thread_id
+
+    async def _put_back(self, message: QueuedMessage) -> None:
+        """Put a message taken to steer the run at work back where it was, now that the run ended in that moment, and
+        move the queue on as the end of that run does (:meth:`_follow_queue`), since that end may have found the queue
+        without it; a run whose end is not stored yet moves the queue on itself, and finds it there."""
+        store: Store = self._runtime.store
+        await store.put_back_queued(message)
+        newest: list[RunRecord] = await store.list_runs(1, message.thread_id)
+        if newest and newest[0].status not in WORKING_STATUSES:
+            await self._follow_queue(newest[0], newest[0].status)
 
     async def resume_queue(self, thread_id: str) -> None:
         """Let a held queue go on: its next message starts now when no run works on the chat, else after that run."""
@@ -1511,34 +1545,61 @@ class RunManager:
             await self._queue_changed(run.thread_id, None, None, None)
 
     async def _drain(self, thread_id: str, after_run_id: str) -> None:
-        """Start the first message of a chat's queue as the chat's next run, unless the queue is held or a run of this
+        """Start the first message of a chat's queue as the chat's next run, unless the queue is held or a run of any
         process works on the chat; ``after_run_id`` is the run it follows, the chat's newest, so that a page showing
-        that run follows the chat to the new one. A message that cannot start holds the queue, and the pages are told
-        why."""
-        store: Store = self._runtime.store
+        that run follows the chat to the new one. The message is claimed in the store before its run starts
+        (:meth:`Store.claim_queued`), so it starts once whichever process moves the queue, and is not edited, taken out
+        or steered meanwhile; it leaves the queue once its run has started. A message that cannot start holds the
+        queue, and the pages are told why. A cancellation waits for the claim to end (:func:`_uncancelled`): a claim
+        left open would keep the chat's queue from moving."""
         async with self._draining:
             if self._stopping or thread_id in self._claimed or self._active_on(thread_id) is not None:
                 return
-            if await store.queue_held(thread_id):
-                return
-            queued: list[QueuedMessage] = await store.list_queued(thread_id)
-            if not queued:
-                return
-            try:
-                run: RunRecord = await self._start_queued(queued[0])
-            except DotError as exc:
-                log.warning(
-                    "queued_message_not_started",
-                    thread_id=thread_id,
-                    message_id=queued[0].id,
-                    error=exc.message,
-                    context=exc.context,
-                )
-                await store.hold_queue(thread_id)
-                await self._queue_changed(thread_id, None, None, exc.message)
-                return
-            await store.delete_queued(queued[0].id)
-        await self._queue_changed(thread_id, run.id, after_run_id, None)
+            run: RunRecord | None = await _uncancelled(self._start_next(thread_id))
+        if run is not None:
+            await self._queue_changed(thread_id, run.id, after_run_id, None)
+
+    async def _start_next(self, thread_id: str) -> RunRecord | None:
+        """Claim the first message of the chat's queue (:meth:`Store.claim_queued`), start it as the chat's next run
+        and end the claim: the message leaves the queue, or, when it could not start, stays first in a held queue, and
+        the pages are told why. A claim of the chat the store refused to end before is ended first. Returns the run
+        started, if any."""
+        store: Store = self._runtime.store
+        left: Callable[[str], Awaitable[None]] | None = self._left_claims.get(thread_id)
+        if left is not None:
+            await left(thread_id)
+            del self._left_claims[thread_id]
+        message: QueuedMessage | None = await store.claim_queued(thread_id, self._owner_id())
+        if message is None:
+            return None
+        try:
+            run: RunRecord = await self._start_queued(message)
+        except DotError as exc:
+            log.warning(
+                "queued_message_not_started",
+                thread_id=thread_id,
+                message_id=message.id,
+                error=exc.message,
+                context=exc.context,
+            )
+            await self._end_claim(thread_id, store.hold_claimed)
+            await self._queue_changed(thread_id, None, None, exc.message)
+            return None
+        except Exception:
+            await self._end_claim(thread_id, store.hold_claimed)
+            raise
+        await self._end_claim(thread_id, store.drop_claimed)
+        return run
+
+    async def _end_claim(self, thread_id: str, end: Callable[[str], Awaitable[None]]) -> None:
+        """End the claim on the chat's queued message with ``end``: ``Store.drop_claimed`` when its run started,
+        ``Store.hold_claimed`` when it could not. One the store refuses is logged and ended at the chat's next drain
+        (:meth:`_start_next`), instead of keeping the queue from moving while this process lives."""
+        try:
+            await end(thread_id)
+        except DotError as exc:
+            log.error("queue_claim_not_ended", thread_id=thread_id, error=exc.message, context=exc.context)
+            self._left_claims[thread_id] = end
 
     async def _start_queued(self, message: QueuedMessage) -> RunRecord:
         """Start a queued message as its chat's next run, with the choices and the files it was sent with."""

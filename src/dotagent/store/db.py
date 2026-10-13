@@ -100,6 +100,9 @@ CREATE TABLE IF NOT EXISTS queued_messages (
 );
 CREATE INDEX IF NOT EXISTS queued_messages_thread ON queued_messages(thread_id, position);
 CREATE TABLE IF NOT EXISTS queue_holds (thread_id TEXT PRIMARY KEY, held_at REAL NOT NULL);
+CREATE TABLE IF NOT EXISTS queue_claims (
+    thread_id TEXT PRIMARY KEY, message_id TEXT NOT NULL, owner TEXT NOT NULL, claimed_at REAL NOT NULL
+);
 CREATE TABLE IF NOT EXISTS push_subscriptions (
     endpoint TEXT PRIMARY KEY, p256dh TEXT NOT NULL, auth TEXT NOT NULL, created_at REAL NOT NULL
 );
@@ -877,7 +880,8 @@ class Store:
 
     async def _refuse_working_chats(self, named: tuple[str, ...]) -> None:
         """Raise ``RunConflict`` when a run of any process works on one of the chats ``named``, itself or through a run
-        it delegated to; the chats it names are those given."""
+        it delegated to, or when a queued message of one is starting as its next run (:meth:`claim_queued`); the chats
+        it names are those given."""
         working: tuple[RunStatus, ...] = tuple(sorted(WORKING_STATUSES))
         rows: list[aiosqlite.Row] = await self._all(
             "WITH RECURSIVE doomed(id, chat) AS ("
@@ -887,8 +891,14 @@ class Store:
             f" WHERE runs.status IN ({','.join('?' * len(working))}) ORDER BY chat, run",
             (*named, *working),
         )
-        if rows:
-            chats: JsonArray = list(dict.fromkeys(str(row["chat"]) for row in rows))
+        starting: list[aiosqlite.Row] = await self._all(
+            f"SELECT thread_id FROM queue_claims WHERE thread_id IN ({','.join('?' * len(named))}) ORDER BY thread_id",
+            named,
+        )
+        if rows or starting:
+            chats: JsonArray = list(
+                dict.fromkeys([*(str(row["chat"]) for row in rows), *(str(row["thread_id"]) for row in starting)])
+            )
             runs: JsonArray = list(dict.fromkeys(str(row["run"]) for row in rows))
             raise RunConflict("chats with a run under way cannot be deleted", {"thread_ids": chats, "run_ids": runs})
 
@@ -1555,6 +1565,12 @@ class Store:
             source=source,
             created_at=time.time(),
         )
+        await self._insert_queued(record)
+        await self._db.commit()
+        return record
+
+    async def _insert_queued(self, record: QueuedMessage) -> None:
+        """Store ``record`` in its chat's queue; the caller commits."""
         await self._db.execute(
             "INSERT INTO queued_messages(id, thread_id, position, text, attachments, mode, model, effort, approvals,"
             " goal_mode, agent_id, source, created_at) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
@@ -1574,22 +1590,134 @@ class Store:
                 record.created_at,
             ),
         )
-        await self._db.commit()
-        return record
+
+    async def _not_waiting(self, message_id: str) -> RunConflict | NotFoundError:
+        """Why the queued message ``message_id`` cannot be changed: it is starting as its chat's next run
+        (:meth:`claim_queued`), or it is in no queue."""
+        if await self._one("SELECT 1 FROM queue_claims WHERE message_id = ?", (message_id,)) is not None:
+            return RunConflict("the message is starting as its chat's next run", {"message_id": message_id})
+        return NotFoundError("queued message not found", {"message_id": message_id})
 
     @_writing
     async def edit_queued(self, message_id: str, text: str) -> None:
-        cursor = await self._db.execute("UPDATE queued_messages SET text = ? WHERE id = ?", (text, message_id))
+        """Change the text of a queued message; one starting as its chat's next run is refused (``RunConflict``)."""
+        cursor = await self._db.execute(
+            "UPDATE queued_messages SET text = ? WHERE id = ? AND id NOT IN (SELECT message_id FROM queue_claims)",
+            (text, message_id),
+        )
         await self._db.commit()
         if cursor.rowcount == 0:
-            raise NotFoundError("queued message not found", {"message_id": message_id})
+            raise await self._not_waiting(message_id)
 
     @_writing
     async def delete_queued(self, message_id: str) -> None:
-        cursor = await self._db.execute("DELETE FROM queued_messages WHERE id = ?", (message_id,))
+        """Take a message out of its chat's queue; one starting as its chat's next run is refused (``RunConflict``)."""
+        cursor = await self._db.execute(
+            "DELETE FROM queued_messages WHERE id = ? AND id NOT IN (SELECT message_id FROM queue_claims)",
+            (message_id,),
+        )
         await self._db.commit()
         if cursor.rowcount == 0:
-            raise NotFoundError("queued message not found", {"message_id": message_id})
+            raise await self._not_waiting(message_id)
+
+    @_writing
+    async def take_queued(self, message_id: str) -> QueuedMessage:
+        """Take a message out of its chat's queue as it is now, in one write, to send it to the run at work; one
+        starting as its chat's next run is refused (``RunConflict``)."""
+        async with self._db.execute(
+            "DELETE FROM queued_messages WHERE id = ? AND id NOT IN (SELECT message_id FROM queue_claims) RETURNING *",
+            (message_id,),
+        ) as cursor:
+            row: aiosqlite.Row | None = await cursor.fetchone()
+        await self._db.commit()
+        if row is None:
+            raise await self._not_waiting(message_id)
+        return _queued(row)
+
+    @_writing
+    async def put_back_queued(self, message: QueuedMessage) -> None:
+        """Put a message taken out of its chat's queue (:meth:`take_queued`) back where it was."""
+        await self._insert_queued(message)
+        await self._db.commit()
+
+    @_writing
+    async def claim_queued(self, thread_id: str, owner: str) -> QueuedMessage | None:
+        """Claim the first message of a chat's queue for the chat's next run, for the process ``owner``, in one write:
+        unless the queue is held, a run of any process works on the chat, or a message of it is claimed already. The
+        claimed message stays in the queue, where it cannot be edited, taken out or steered, until its run has started
+        (:meth:`drop_claimed`) or could not start (:meth:`hold_claimed`). Returns it, or ``None`` when none was
+        claimed."""
+        working: tuple[RunStatus, ...] = tuple(sorted(WORKING_STATUSES))
+        async with self._db.execute(
+            "INSERT INTO queue_claims(thread_id, message_id, owner, claimed_at)"
+            " SELECT thread_id, id, ?, ? FROM queued_messages WHERE thread_id = ?"
+            " AND NOT EXISTS (SELECT 1 FROM queue_holds WHERE thread_id = ?)"
+            " AND NOT EXISTS (SELECT 1 FROM queue_claims WHERE thread_id = ?)"
+            f" AND NOT EXISTS (SELECT 1 FROM runs WHERE thread_id = ? AND status IN ({','.join('?' * len(working))}))"
+            " ORDER BY position LIMIT 1 RETURNING message_id",
+            (owner, time.time(), thread_id, thread_id, thread_id, thread_id, *working),
+        ) as cursor:
+            claimed: aiosqlite.Row | None = await cursor.fetchone()
+        await self._db.commit()
+        if claimed is None:
+            return None
+        row: aiosqlite.Row | None = await self._one(
+            "SELECT * FROM queued_messages WHERE id = ?", (str(claimed["message_id"]),)
+        )
+        if row is None:
+            raise StoreError("the claimed message is not in the queue", {"thread_id": thread_id})
+        return _queued(row)
+
+    @_writing
+    async def drop_claimed(self, thread_id: str) -> None:
+        """The claimed message of a chat has started its run (:meth:`claim_queued`): it leaves the queue, and its claim
+        ends, in one write."""
+        await self._db.execute(
+            "DELETE FROM queued_messages WHERE id IN (SELECT message_id FROM queue_claims WHERE thread_id = ?)",
+            (thread_id,),
+        )
+        await self._db.execute("DELETE FROM queue_claims WHERE thread_id = ?", (thread_id,))
+        await self._db.commit()
+
+    @_writing
+    async def hold_claimed(self, thread_id: str) -> None:
+        """The claimed message of a chat could not start its run (:meth:`claim_queued`): its claim ends, it stays first
+        in the queue, and the queue is held until the owner resumes it, in one write."""
+        await self._db.execute("DELETE FROM queue_claims WHERE thread_id = ?", (thread_id,))
+        await self._db.execute(
+            "INSERT OR IGNORE INTO queue_holds(thread_id, held_at) VALUES(?, ?)", (thread_id, time.time())
+        )
+        await self._db.commit()
+
+    async def claim_owners(self) -> list[str]:
+        """The processes that claim a queued message (:meth:`claim_queued`), each once."""
+        rows = await self._all("SELECT DISTINCT owner FROM queue_claims ORDER BY owner", ())
+        return [str(row["owner"]) for row in rows]
+
+    @_writing
+    async def hold_claims_of(self, owners: Sequence[str]) -> int:
+        """The claims of ``owners``, processes that are gone, end, and the queue of each of their chats is held, in one
+        write. A claimed message whose run the process made before it went (a run of that process on the chat, made at
+        the claim or after) leaves the queue, as it started; any other stays first, for the owner to resume. Returns
+        how many claims ended."""
+        marks: str = ",".join("?" * len(owners))
+        await self._db.execute(
+            "DELETE FROM queued_messages WHERE id IN (SELECT claim.message_id FROM queue_claims AS claim"
+            f" WHERE claim.owner IN ({marks}) AND EXISTS (SELECT 1 FROM runs WHERE runs.thread_id = claim.thread_id"
+            " AND runs.owner = claim.owner AND runs.created_at >= claim.claimed_at))",
+            tuple(owners),
+        )
+        async with self._db.execute(
+            f"DELETE FROM queue_claims WHERE owner IN ({marks}) RETURNING thread_id",
+            tuple(owners),
+        ) as cursor:
+            chats: list[str] = [str(row["thread_id"]) for row in await cursor.fetchall()]
+        held_at: float = time.time()
+        await self._db.executemany(
+            "INSERT OR IGNORE INTO queue_holds(thread_id, held_at) VALUES(?, ?)", [(chat, held_at) for chat in chats]
+        )
+        await self._db.commit()
+        return len(chats)
 
     @_writing
     async def order_queue(self, thread_id: str, message_ids: Sequence[str]) -> None:
