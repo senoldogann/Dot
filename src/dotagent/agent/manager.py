@@ -190,9 +190,9 @@ class RunManager:
 
     async def recover(self) -> int:
         """Close out what processes that are gone left behind: the runs they left active, the approvals of runs no
-        longer active, and their lock files, and hold the queue of every chat (:meth:`queue`). The runs of a process
-        that lives (``dotx run`` in a terminal) go on, with the approvals they wait on. Returns the number of runs
-        closed."""
+        longer active, and their lock files; and hold the queue of each chat (:meth:`queue`) whose run the daemon's stop
+        did not cut. The runs of a process that lives (``dotx run`` in a terminal) go on, with the approvals they wait
+        on. Returns the number of runs closed."""
         store: Store = self._runtime.store
         directory: Path = run_owners_dir()
         gone: list[str] = []
@@ -201,8 +201,13 @@ class RunManager:
                 gone.append(owner)
         interrupted: int = await store.mark_interrupted_runs(gone)
         await store.expire_pending_approvals()
-        # The run each queue waited for went with the process before: the owner says when the queues go on.
-        await store.hold_every_queue()
+        # A stop of the daemon is not the owner's stop of the chat: a queue whose run the stop cut goes on once that
+        # run, continued, ends done (:meth:`_follow_queue`). Any other waits for the owner to resume it: its run
+        # failed, was stopped, was cut by a crash, works in a process that lives, or ended done as the daemon stopped.
+        for thread_id in await store.queued_threads():
+            newest: list[RunRecord] = await store.list_runs(1, thread_id)
+            if not newest or cut_off_by(newest[0]) != "daemon_shutdown":
+                await store.hold_queue(thread_id)
         await asyncio.to_thread(clear_gone_owners, directory)
         return interrupted
 

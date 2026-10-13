@@ -1435,6 +1435,11 @@ class Store:
         """Whether a chat's queue waits for the owner to resume it (see :meth:`hold_queue`)."""
         return await self._one("SELECT 1 FROM queue_holds WHERE thread_id = ?", (thread_id,)) is not None
 
+    async def queued_threads(self) -> list[str]:
+        """The chats whose queue holds a message."""
+        rows = await self._all("SELECT DISTINCT thread_id FROM queued_messages ORDER BY thread_id", ())
+        return [str(row["thread_id"]) for row in rows]
+
     @_writing
     async def add_queued(
         self,
@@ -1534,17 +1539,6 @@ class Store:
     async def release_queue(self, thread_id: str) -> None:
         await self._db.execute("DELETE FROM queue_holds WHERE thread_id = ?", (thread_id,))
         await self._db.commit()
-
-    @_writing
-    async def hold_every_queue(self) -> int:
-        """Hold the queue of every chat that has one, as the daemon starts: the run each waited for is gone, so the
-        owner says when they go on. Returns the number of chats held."""
-        cursor = await self._db.execute(
-            "INSERT OR IGNORE INTO queue_holds(thread_id, held_at) SELECT DISTINCT thread_id, ? FROM queued_messages",
-            (time.time(),),
-        )
-        await self._db.commit()
-        return cursor.rowcount
 
     # ----- push subscriptions ------------------------------------------------------------------
 

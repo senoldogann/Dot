@@ -301,8 +301,9 @@ answer (a small model that is offered both writes the call out as text).
   the sidebar, and you can steer it when you come back.
 - A message sent to a chat while its run works waits in the chat's queue, after T3 Code's: it starts as the chat's next
   run, with the mode, model, reasoning, approvals and goal mode it was sent with, once the run before it has ended done,
-  one message after the other. A stop, a failed run or a start of the daemon holds the queue until you resume it. The
-  daemon keeps the queue, so it goes on with no page open, and a queued message can be sent to the run at work
+  one message after the other. A stop, a failed run or a crash of the daemon holds the queue until you resume it; a
+  shutdown of the daemon does not, and once the run it cut off is resumed and the new run ends done, the queue goes on.
+  The daemon keeps the queue, so it goes on with no page open, and a queued message can be sent to the run at work
   (steered) instead. A campaign's chat has no queue: a message there steers its session.
 - `/btw <question>` in the box of a run (the slash menu offers it) asks on the side: the run's model answers from what
   the run has done so far,
@@ -776,7 +777,8 @@ results of the calls of the step it was in that had ended (a crash keeps none). 
 that run was cut off and how each call of that step without a result ended: finished (with the start of its result), cut
 off while it ran, or not started. A call that was cut off may have changed something unless it only reads, and the model
 is told to check before it runs it again. The plan of that run is the plan of the new one. Only the newest run of a chat
-can be resumed, and never a run that you stopped or that another run started.
+can be resumed, and never a run that you stopped or that another run started. After a shutdown, the chat's queue goes on
+once the new run ends done; after a crash or a restart, it waits until you resume it.
 
 With `resume = "safe"` in `[agent]` the daemon also resumes runs on its own when it starts: runs of the web UI, cut off
 at most `resume_within_s` seconds before (30 minutes), whose calls that were cut off only read (a question to you

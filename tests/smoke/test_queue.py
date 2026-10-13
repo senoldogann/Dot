@@ -1,8 +1,9 @@
 """The queue of a chat (item 148): a message sent while a run works waits, and starts as the chat's next run, with the
 choices it was sent with, once that run has ended done, one message after the other; a stopped or failed run holds the
-queue until the owner resumes it, as the start of the daemon does; a queued message steered reaches the run at work and leaves the
-queue; the queue keeps the order and the text the owner gives it. The chat's page shows it all above the composer, as
-T3 Code does, served by a real server, wide and on a phone, light and dark.
+queue until the owner resumes it, as the start of the daemon does when a run works on the chat or a crash cut it; a
+queue whose run the daemon's stop cut goes on once that run, continued, ends done (item 161); a queued message steered
+reaches the run at work and leaves the queue; the queue keeps the order and the text the owner gives it. The chat's page
+shows it all above the composer, as T3 Code does, served by a real server, wide and on a phone, light and dark.
 
 No network and no model service is used: the scripted model ends each run with its first reply, which the test lets go.
 """
@@ -13,6 +14,7 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from pathlib import Path
+from secrets import token_hex
 from typing import Literal
 
 import pytest
@@ -34,7 +36,8 @@ from dotagent.server.app import create_app
 from dotagent.server.context import ServerContext
 from dotagent.server.daemon import DotServer, bind_listener, serving_config
 from dotagent.server.links import ui_url
-from dotagent.store.models import EventRecord, QueuedMessage, RunRecord
+from dotagent.store.endings import RESULT_RESTARTED, RESULT_SHUTDOWN
+from dotagent.store.models import EventRecord, QueuedMessage, RunRecord, ThreadRecord
 from dotagent.tools.shell import read_login_env
 
 pytestmark = pytest.mark.asyncio(loop_scope="module")
@@ -121,16 +124,24 @@ async def login_env() -> dict[str, str]:
 async def _session(login_env: dict[str, str], model: ScriptedProvider) -> AsyncIterator[tuple[Runtime, RunManager]]:
     """A runtime in a throw-away home whose model is ``model``, and its runs."""
     with scratch_home() as home, eval_environment(home, {}):
-        runtime: Runtime = await open_runtime(eval_config(load_default_config()), login_env)
+        async with _daemon(login_env, model) as (runtime, manager):
+            yield runtime, manager
+
+
+@asynccontextmanager
+async def _daemon(login_env: dict[str, str], model: ScriptedProvider) -> AsyncIterator[tuple[Runtime, RunManager]]:
+    """A runtime in the home of the environment whose model is ``model``, and its runs, which the daemon's way out
+    ends: one life of the daemon."""
+    runtime: Runtime = await open_runtime(eval_config(load_default_config()), login_env)
+    try:
+        await runtime.router.register(_PROVIDER, model)
+        manager: RunManager = RunManager(runtime)
         try:
-            await runtime.router.register(_PROVIDER, model)
-            manager: RunManager = RunManager(runtime)
-            try:
-                yield runtime, manager
-            finally:
-                await manager.shutdown()
+            yield runtime, manager
         finally:
-            await close_runtime(runtime)
+            await manager.shutdown()
+    finally:
+        await close_runtime(runtime)
 
 
 @asynccontextmanager
@@ -305,6 +316,52 @@ async def test_the_queue_keeps_the_owners_order_and_text_and_the_start_of_the_da
         assert len(await runtime.store.list_runs(10, first.thread_id)) == 2
         await model.release()
         assert (await _ended(manager, second.id)).status == "done"
+
+
+async def test_a_queue_the_daemons_stop_left_goes_on_once_the_chats_run_continued_ends_done(
+    login_env: dict[str, str],
+) -> None:
+    with scratch_home() as home, eval_environment(home, {}):
+        cut_model: _GatedModel = _GatedModel()
+        async with _daemon(login_env, cut_model) as (runtime, manager):
+            first: RunRecord = await _start(manager)
+            summary: QueuedMessage = await _queue(manager, first, SUMMARY, "yolo")
+            # The run works at its first step when the daemon stops.
+            await cut_model.asked()
+        model: _GatedModel = _GatedModel()
+        async with _daemon(login_env, model) as (runtime, manager), _changes(runtime) as changes:
+            cut: RunRecord = await runtime.store.get_run(first.id)
+            assert (cut.status, cut.result) == ("cancelled", RESULT_SHUTDOWN)
+            assert await manager.recover() == 0
+            assert not await runtime.store.queue_held(first.thread_id)
+            assert await _queued(runtime, first) == [(summary.id, SUMMARY)]
+            # Continue, on the page of the run.
+            resumed: RunRecord = await manager.resume(first.id)
+            await model.release()
+            assert (await _ended(manager, resumed.id)).status == "done"
+            second: RunRecord = await _started(changes, runtime, resumed)
+            assert (second.goal, second.approvals) == (SUMMARY, "yolo")
+            assert await _queued(runtime, first) == []
+            await model.release()
+            assert (await _ended(manager, second.id)).status == "done"
+
+
+async def test_a_run_a_crash_left_active_holds_its_chats_queue_when_the_daemon_starts(
+    login_env: dict[str, str],
+) -> None:
+    async with _session(login_env, _GatedModel()) as (runtime, manager):
+        thread: ThreadRecord = await runtime.store.create_thread(GOAL, UI_SOURCE)
+        # The process that drove the run is gone: no lock file holds its owner.
+        run: RunRecord = await runtime.store.create_run(
+            thread.id, GOAL, "task", SCRIPTED_MODEL, None, UI_SOURCE, "medium", "yolo", False, None, None, token_hex(16)
+        )
+        await runtime.store.set_run_status(run.id, "running")
+        await runtime.store.add_queued(
+            thread.id, SUMMARY, (), "task", SCRIPTED_MODEL, None, "yolo", False, None, UI_SOURCE
+        )
+        assert await manager.recover() == 1
+        assert (await runtime.store.get_run(run.id)).result == RESULT_RESTARTED
+        assert await runtime.store.queue_held(thread.id)
 
 
 async def _texts(runtime: Runtime, run: RunRecord) -> list[str]:

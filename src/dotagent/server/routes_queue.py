@@ -1,6 +1,7 @@
 """Routes for the queue of a chat (item 148): the messages sent while a run worked there, which start as the chat's next
 runs one after the other; each can be edited, moved, sent to the run at work now (steer) or taken out, and a queue that
-a stop, a failure or a restart held goes on when the owner resumes it. Each answers with the queue as it then is."""
+a stop, a failure or a crash of the daemon held goes on when the owner resumes it. Each answers with the queue as it then
+is."""
 
 from fastapi import APIRouter
 
