@@ -1,20 +1,29 @@
 """The doctor rows that look at this Mac for real: the commands and secrets of MCP servers, and whether macOS can capture
 the screen. Nothing is started and nothing is mocked: the login shell, PATH, ``.env`` file, Keychain and ScreenCaptureKit
-are all asked."""
+are all asked. The model rows ask a stand-in model service on this Mac through the real connectors."""
 
+import json
 import platform
 import sys
+import threading
+from collections.abc import Iterator
+from contextlib import contextmanager
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 import pytest
 
-from dotagent.config import McpServerConfig
+from dotagent.config import McpServerConfig, load_config
 from dotagent.desktop.capture import rect_capture_supported
-from dotagent.doctor import CheckResult, mcp_checks
+from dotagent.doctor import CheckResult, _service_checks, mcp_checks
 
 LOGIN_TIMEOUT_S: float = 15.0
 FIRST_MACOS_WITH_RECT_CAPTURE: tuple[int, int] = (15, 2)
 UNSET_SECRET: str = "DOT_TEST_SURELY_UNSET_SECRET"
+OPENAI_KEY_ENV: str = "DOT_TEST_DOCTOR_OPENAI_KEY"
+GO_KEY_ENV: str = "DOT_TEST_DOCTOR_GO_KEY"
+# The models the stand-in service lists as OpenAI's.
+SERVED: tuple[str, ...] = ("gpt-5.5", "gpt-5.5-mini")
 
 
 async def test_without_servers_the_mcp_row_says_where_to_add_them(
@@ -79,3 +88,87 @@ async def test_each_server_gets_a_row_that_names_what_is_missing(
 def test_the_screen_capture_check_follows_the_macos_version() -> None:
     numbers: list[int] = [int(part) for part in platform.mac_ver()[0].split(".")]
     assert rect_capture_supported() is (tuple(numbers[:2]) >= FIRST_MACOS_WITH_RECT_CAPTURE)
+
+
+class _ModelsHandler(BaseHTTPRequestHandler):
+    """A model service whose ``/v1/models`` lists the models of ``SERVED``, as OpenAI's does; any other path, the list
+    of OpenCode Go among them, answers 404."""
+
+    def do_GET(self) -> None:
+        listed: bool = self.path == "/v1/models"
+        body: str = json.dumps(
+            {"object": "list", "data": [{"id": model, "object": "model"} for model in SERVED]}
+            if listed
+            else {"error": {"message": "no such route", "type": "invalid_request_error"}}
+        )
+        payload: bytes = body.encode("utf-8")
+        self.send_response(200 if listed else 404)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(payload)))
+        self.end_headers()
+        self.wfile.write(payload)
+
+    def log_message(self, format: str, *args: object) -> None:
+        return None
+
+
+@contextmanager
+def _model_service() -> Iterator[str]:
+    """The stand-in model service, on a free port of this Mac, for as long as the block runs."""
+    server: ThreadingHTTPServer = ThreadingHTTPServer(("127.0.0.1", 0), _ModelsHandler)
+    thread: threading.Thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        yield f"http://127.0.0.1:{server.server_address[1]}"
+    finally:
+        server.shutdown()
+        server.server_close()
+
+
+def _models_config(root: str) -> str:
+    """Models of OpenAI and OpenCode Go alone, whose services are the stand-in at ``root``; every other key is one no
+    source has, so nothing else is asked."""
+    return (
+        '[models]\nmain = "openai:gpt-missing"\nvision = "openai:gpt-5.5"\nfast = "openai:gpt-5.5-mini"\n'
+        'review = "opencode_go:kimi-k2"\nhelpers = ["openai:gpt-missing", "openai:gpt-5.5"]\n'
+        'standby = ["opencode_go:kimi-k2"]\n\n'
+        f'[providers.ollama]\nbase_url = "{root}"\napi_key_env = "{UNSET_SECRET}"\n\n'
+        f'[providers.openai]\nbase_url = "{root}/v1"\napi_key_env = "{OPENAI_KEY_ENV}"\n'
+        f'organization_env = "{UNSET_SECRET}"\nproject_env = "{UNSET_SECRET}"\n\n'
+        f'[providers.opencode_go]\nbase_url = "{root}/go"\napi_key_env = "{GO_KEY_ENV}"\n\n'
+        f'[providers.anthropic]\napi_key_env = "{UNSET_SECRET}"\n\n'
+        f'[judge]\napi_key_env = "{UNSET_SECRET}"\n\n'
+        "[memory]\nembed_enabled = false\n"
+    )
+
+
+async def test_a_model_its_provider_does_not_serve_fails_and_one_whose_list_was_not_read_warns(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """Item 186: a model of OpenAI or OpenCode Go is checked against the list of the models its provider serves to the
+    key. One the list leaves out fails, and is no ready helper; one whose list could not be read is a warning, beside
+    the provider's own row."""
+    monkeypatch.setenv("DOT_HOME", str(tmp_path))
+    monkeypatch.setenv(OPENAI_KEY_ENV, "sk-test-doctor")
+    monkeypatch.setenv(GO_KEY_ENV, "go-test-doctor")
+    monkeypatch.delenv(UNSET_SECRET, raising=False)
+    with _model_service() as root:
+        (tmp_path / "config.toml").write_text(_models_config(root), encoding="utf-8")
+        rows: dict[str, CheckResult] = {
+            row.name: row for row in await _service_checks(load_config(tmp_path / "config.toml"))
+        }
+    assert (rows["openai api"].ok, rows["openai api"].detail) == (True, "2 chat models are available to this key")
+    main, vision, fast, review = (rows[f"model {role}"] for role in ("main", "vision", "fast", "review"))
+    assert (main.ok, main.required) == (False, True)
+    assert main.detail == (
+        "openai:gpt-missing: not among the 2 models openai serves to this key (dotx models openai lists them)"
+    )
+    assert (vision.ok, fast.ok) == (True, True)
+    assert (review.ok, review.required) == (False, False)
+    assert review.detail.startswith(
+        "opencode_go:kimi-k2: not checked, as the list of the models opencode_go serves could not be read (provider "
+        "answered HTTP 404"
+    )
+    assert (rows["helpers"].ok, rows["helpers"].required) == (True, False)
+    assert rows["helpers"].detail == f"{main.detail}; openai:gpt-5.5 ready"
+    assert (rows["standby"].ok, rows["standby"].required, rows["standby"].detail) == (False, False, review.detail)
