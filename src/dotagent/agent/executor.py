@@ -62,8 +62,9 @@ def batch_steps(arguments: JsonObject) -> int:
     return len(steps) if isinstance(steps, list) else 0
 
 
-def _describe_failure(exc: Exception, tool: RegisteredTool) -> str | None:
-    """The text the model sees for an expected failure, or ``None`` when the exception is not an expected one."""
+def _describe_failure(exc: Exception, tool: RegisteredTool) -> str:
+    """The text the model sees for a call that failed: what an expected error says, or the kind and the words of one
+    that no tool expects (a fault in Dot, not in what the call asked)."""
     if isinstance(exc, ToolInputError):
         return exc.message
     if isinstance(exc, PolicyDenied | ApprovalRejected):
@@ -76,7 +77,7 @@ def _describe_failure(exc: Exception, tool: RegisteredTool) -> str | None:
         return f"{tool.spec.name} timed out after {tool.timeout_s:.0f}s."
     if isinstance(exc, OSError):
         return f"Operating system error: {exc}"
-    return None
+    return f"{tool.spec.name} failed with an unexpected error ({type(exc).__name__}): {exc}"
 
 
 class _GateTime:
@@ -149,10 +150,12 @@ async def _run_checked(call: ToolCall, tool: RegisteredTool, ctx: ToolContext, g
             result: ToolResult = await prepared.run(replace(ctx, gate=_PausedClock(ctx.gate, scope, at_gate)))
     except (RunCancelled, FailSafeTriggered):
         raise
-    except (DotError, TimeoutError, OSError) as exc:
-        text: str | None = _describe_failure(exc, tool)
-        if text is None:
-            raise
+    except Exception as exc:
+        # Any error fails the call, not the run: the model reads what went wrong and goes on. One that no tool expects
+        # is a fault in Dot, logged with its traceback.
+        if not isinstance(exc, DotError | TimeoutError | OSError):
+            log.exception("tool_crashed", run_id=ctx.run_id, tool=tool.spec.name)
+        text: str = _describe_failure(exc, tool)
         handed_off: bool = isinstance(exc, HandedOff)
         failed: ToolResult = _with_approval_note(ok(text) if handed_off else fail(text), note)
         return _Checked(result=failed, action=action, waited_s=at_gate.seconds)
