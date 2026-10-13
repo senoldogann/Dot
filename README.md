@@ -154,9 +154,10 @@ a missing key moves it to a standby model or ends it at once.
   with another system prompt) is dropped by the API instead of failing the request (beta
   `thinking-binding-controls-2026-08-01`).
 
-`dotx models [ollama|openai|opencode_go|anthropic]` lists what a provider offers, including the reasoning levels of
-each model. `dotx models profile [provider:model]` shows how reliably a model worked in its newest runs and the help its
-next run gets (see [How a run works](#how-a-run-works)); without a model it shows `[models] main`.
+`dotx models [ollama|openai|opencode_go|anthropic]` lists what a provider offers, including the reasoning levels of each
+model, and ends with 1 when no provider answered (the one named, when one is). `dotx models profile [provider:model]`
+shows how reliably a model worked in its newest runs and the help its next run gets (see [How a run
+works](#how-a-run-works)); without a model it shows `[models] main`.
 
 **Reasoning level.** A model that can think offers a ladder of levels, lowest first, in the words of its provider mapped
 to one neutral scale: `off`, `on` (a plain thinking switch), `minimal`, `low`, `medium`, `high`, `xhigh`, `max`. A model
@@ -167,13 +168,14 @@ offer is refused (a 422 over HTTP); the configured default, which is not tied to
 level the model has (`off` to its lowest, `max` to its highest).
 
 **Keys** are read from the environment of the process, then from `<home>/.env`, then from the macOS Keychain (service
-`dot-agent`, account = the variable name). `dotx auth set OPENAI_API_KEY` reads the value from the terminal without
-echoing it and writes the file with mode 0600; `dotx auth status` shows which keys are present. `.env.example` is a
-template for the file. An OpenAI key is created on platform.openai.com under API keys (`OPENAI_API_KEY`); the OpenCode
-Go key (`OPENCODE_API_KEY`) is the one the OpenCode Console at opencode.ai/auth shows once you have subscribed to Go; an
-Anthropic key (`ANTHROPIC_API_KEY`) is created in the Claude Console at platform.claude.com/settings/keys. The Ollama
-models, local or `:cloud` through the signed-in local server, need no key. A running daemon picks up a key added later
-when a run first uses that provider, without a restart.
+`dot-agent`, account = the variable name); a Keychain that does not answer within 15 seconds (locked, or waiting for a
+prompt nobody answers) is an error that says so. `dotx auth set OPENAI_API_KEY` reads the value from the terminal
+without echoing it and writes the file with mode 0600; `dotx auth status` shows which keys are present. `.env.example`
+is a template for the file. An OpenAI key is created on platform.openai.com under API keys (`OPENAI_API_KEY`); the
+OpenCode Go key (`OPENCODE_API_KEY`) is the one the OpenCode Console at opencode.ai/auth shows once you have subscribed
+to Go; an Anthropic key (`ANTHROPIC_API_KEY`) is created in the Claude Console at platform.claude.com/settings/keys. The
+Ollama models, local or `:cloud` through the signed-in local server, need no key. A running daemon picks up a key added
+later when a run first uses that provider, without a restart.
 
 Settings › API keys in the web UI does what `dotx auth set` does for the key of each provider, and more: it shows
 where the key in use comes from (the daemon's environment, Dot's `.env` file or the Keychain) and, for a key of 16
@@ -1941,10 +1943,14 @@ cannot choose: a task run's helper can do what the task run can, a research run'
 
 `config.toml` in the home directory is merged over the packaged `src/dotagent/defaults.toml`, which lists every key with
 a comment and is the reference. A key that does not exist is an error, and so is a number that would stop Dot from
-working: a count of runs, tools, tabs, tries or calls at once below 1, a timeout or the scheduler's tick of 0 or less,
-a port outside 1 to 65535, a browser page smaller than 320 by 240 or larger than 3840 by 2160, a screenshot quality
-outside 1 to 100. Two environment variables of the process move things: `DOT_HOME` (the home directory) and
-`DOT_LOG_DIR` (the logs).
+working: a count of runs, tools, tabs, tries or calls at once below 1, a timeout or the scheduler's tick of 0 or less, a
+port outside 1 to 65535, a browser page smaller than 320 by 240 or larger than 3840 by 2160, a screenshot quality
+outside 1 to 100, a context budget of 0 or less, a tool output under 2,000 characters, a default shell timeout above
+`max_timeout_s`. So is a value no run could use: an address of a provider or of the judge that is not `http://` or
+`https://` with a host, a model that is not `<provider>:<model>` with a provider Dot knows (`[models] search` an
+Anthropic one), a site under `[policy.spend]` that is not a bare host in lower case without `www.`, such as
+`example.com`. Two environment variables of the process move things: `DOT_HOME` (the home directory) and `DOT_LOG_DIR`
+(the logs).
 
 | Path (under `~/Library/Application Support/Dot`) | Content                                                              |
 | ------------------------------------------------ | -------------------------------------------------------------------- |

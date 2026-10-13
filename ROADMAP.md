@@ -5096,8 +5096,8 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 173 | Every smoke test passes alone, and the README keeps its width                        | done        | 5a8b875 |
 | 174 | Protected files stay out of web_extract, and a workspace file is read as one         | done        | 3f450ef |
 | 175 | One broken MCP server never keeps Dot from starting                                  | done        | 637e979 |
-| 176 | Long skills and PDFs are read in pages, and osascript ends with its run              | in progress |         |
-| 177 | The configuration refuses at load what would fail a run                              | planned     |         |
+| 176 | Long skills and PDFs are read in pages, and osascript ends with its run              | done        | 15286a3 |
+| 177 | The configuration refuses at load what would fail a run                              | in progress |         |
 | 178 | The server answers every failure as JSON, and a page says it could not read again    | planned     |         |
 | 179 | A run's end is one write, and a chat a run works on is never deleted                 | planned     |         |
 | 180 | A campaign whose session's command died goes on                                      | planned     |         |
@@ -9065,7 +9065,7 @@ rather than as a missing command; the README says that a server's own word that 
 
 ### 176. Long skills and PDFs are read in pages, and osascript ends with its run
 
-**Status: in progress.**
+**Status: done.** Merged as `15286a3` (PR #214; no Linear issue, the Linear connector was signed out).
 
 **As built (2026-10-13).** The `skill` tool hands a skill's instructions over in parts when they are longer than one
 tool result: each part fits the result next to the first line, the fence and, in the first part only, the list of the
@@ -9092,7 +9092,27 @@ whose tool times out is killed; the browser's driver stops even when Chrome's cl
 
 ### 177. The configuration refuses at load what would fail a run
 
-**Status: planned.**
+**Status: in progress.**
+
+**As built (2026-10-13).** The configuration is refused when it loads, with the key named, for what would fail every run
+later. An address of a provider or of the judge has to be `http://` or `https://` with a host, read as the HTTP client
+reads it (`ServiceAddress`); before, a malformed one failed every call of the provider with an error of the client. A
+model has to be `<provider>:<model>` with a provider Dot knows (`ModelReference`, by `split_model_ref`, the one rule
+`parse_model_ref` uses as well), and `[models] search` an Anthropic model. A site under `[policy.spend]` has to be a
+bare host in lower case without `www.` (`SpendSite`), the form a payment step's address is matched in; a cap under
+another name never applied. The budgets and timeouts that no run can work with are refused: a tool output under 2,000
+characters (the floor a run keeps however small its window), a context budget of 0 or less, a shell timeout under 1
+second or a default above `max_timeout_s`, and a timeout of 0 or less for the login shell's environment, the desktop's
+reads, captures, launches and scripts, and a fetch. A budget above 0 that the system prompt and the tools fill is still
+refused when a run starts, where the model is known (`require_room`). A Keychain that does not answer within 15 seconds
+is a `ConfigError` that names the key and says what to do, instead of the timeout of a child process. `dotx models` ends
+with 1 when no provider answered; before, only when the one provider it was given failed. The comment on
+`[agent] resume` names the runs of a `dotx` command that can be resumed (a closed terminal, SIGTERM, a command that
+died) and says that Ctrl-C is a stop. The owner's configuration was loaded under the new checks before the merge, and
+passes. Tests: `tests/unit/test_config_bounds.py` refuses each of these values with its key;
+`tests/unit/test_keychain_timeout.py` finds that error for a Keychain that times out; `tests/smoke/test_cli_models.py`
+runs `dotx models` in a child process with every provider at a closed port and the keys in its environment, so the
+Keychain is never read, and it ends with 1. Each failed on the code of before.
 
 **What.** The configuration is refused when it loads, with the key named, for what would fail every run later: a
 provider's address that is not an `http://` or `https://` address with a host, a context or a timeout of zero, a model
@@ -9735,3 +9755,4 @@ not at the daemon's next start; a campaign whose start failed in any way is dele
 - 2026-10-13 (Opus 5.5): part 29, what the review found, is planned (items 174 to 180); item 174 is built: protected files stay out of `web_extract`, a file of the workspace is read as one, and the README names none of the owner's own skills.
 - 2026-10-13 (Opus 5.5): item 174 merged as `3f450ef` (PR #212; no Linear issue, the connector was signed out): `web_extract` refuses a file in a protected location as `read_file` does, a file of the workspace is read by its name even when the name looks like an address, and the README names none of the owner's own skills.
 - 2026-10-13 (Opus 5.5): item 175 merged as `637e979` (PR #213; no Linear issue, the connector was signed out): an MCP server whose tool has an input schema Dot cannot use is left out with the reason instead of keeping Dot from starting, `dotx mcp list` reports every failure of a server, and a missing working directory is named.
+- 2026-10-13 (Opus 5.5): item 176 merged as `15286a3` (PR #214; no Linear issue, the connector was signed out): the `skill` tool gives a long skill's instructions in parts, `read_file` pages a PDF's text, a cancelled `osascript` is killed, and the browser's driver stops even when the close of Chrome fails.
