@@ -3,7 +3,9 @@
 Binding to a loopback address keeps other machines out. The Host check defeats DNS rebinding, the Origin check keeps
 the pages of other sites from using the API through the browser, and the token keeps other programs of this Mac out.
 The clients send the token only to a server that first proves it holds it (:func:`daemon_proof`), so a program that took
-the port while the daemon was down is sent nothing.
+the port while the daemon was down is sent nothing. A page that a run showed (``/pages/<id>``) is served without the
+token, to whoever names its id, which cannot be guessed; it runs the run's scripts, so it is sandboxed wherever it
+opens (:data:`PAGE_HEADERS`).
 """
 
 import hashlib
@@ -17,6 +19,7 @@ from starlette.datastructures import Headers, MutableHeaders
 from starlette.responses import JSONResponse
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
+from dotagent.agent.pages import LIBRARY_HOSTS
 from dotagent.core.errors import ConfigError
 from dotagent.core.types import FrozenModel
 
@@ -24,6 +27,7 @@ API_ROOT: str = "/api"
 API_PREFIX: str = f"{API_ROOT}/"
 PROOF_PATH: str = f"{API_ROOT}/proof"
 PUBLIC_PATHS: frozenset[str] = frozenset({f"{API_ROOT}/health", PROOF_PATH})
+PAGES_PREFIX: str = "/pages/"
 
 _PRIVATE_FILE_MODE: int = 0o600
 _PERMISSION_BITS: int = 0o777
@@ -36,11 +40,13 @@ _HTTP_UNAUTHORIZED: int = 401
 # What the proof of the daemon puts before the nonce, so that it is good for nothing else keyed with the token.
 _PROOF_LABEL: bytes = b"dot daemon proof\n"
 
-# The pages of the UI load only their own scripts and styles, and nothing can frame them.
+# The pages of the UI load only their own scripts and styles, frame only pages of the server itself (the pages runs
+# showed), and nothing can frame them.
 SECURITY_HEADERS: tuple[tuple[str, str], ...] = (
     (
         "Content-Security-Policy",
         "default-src 'none'; script-src 'self'; style-src 'self'; font-src 'self'; img-src 'self' blob: data:; manifest-src 'self'; "
+        "frame-src 'self'; "
         # The desktop shell's bridge (Tauri IPC) is a connection the page makes; a browser never sees these sources.
         "connect-src 'self' ipc: http://ipc.localhost; "
         "base-uri 'none'; form-action 'none'; frame-ancestors 'none'",
@@ -49,6 +55,25 @@ SECURITY_HEADERS: tuple[tuple[str, str], ...] = (
     ("Referrer-Policy", "no-referrer"),
     ("X-Frame-Options", "DENY"),
     ("Cross-Origin-Resource-Policy", "same-origin"),
+)
+_LIBRARIES: str = " ".join(f"https://{host}" for host in LIBRARY_HOSTS)
+# A page that a run showed runs the run's scripts. Sandboxed, framed or opened full size, its origin is opaque, so it
+# reads no storage of the UI and reaches neither the API nor the pages that frame it; it loads libraries from the
+# CDNs of LIBRARY_HOSTS and nothing else, submits no form and asks for no camera, microphone or position. Only the
+# pages of the server itself may frame it.
+PAGE_HEADERS: tuple[tuple[str, str], ...] = (
+    (
+        "Content-Security-Policy",
+        "sandbox allow-scripts; default-src 'none'; "
+        f"script-src 'unsafe-inline' 'unsafe-eval' {_LIBRARIES}; style-src 'unsafe-inline' {_LIBRARIES}; "
+        f"font-src data: {_LIBRARIES}; connect-src {_LIBRARIES}; worker-src blob: {_LIBRARIES}; "
+        "img-src data: blob:; media-src data: blob:; base-uri 'none'; form-action 'none'; frame-ancestors 'self'",
+    ),
+    ("Permissions-Policy", "camera=(), microphone=(), geolocation=()"),
+    ("X-Content-Type-Options", "nosniff"),
+    ("Referrer-Policy", "no-referrer"),
+    ("Cross-Origin-Resource-Policy", "same-origin"),
+    ("X-DNS-Prefetch-Control", "off"),
 )
 
 
@@ -126,6 +151,18 @@ def needs_token(path: str) -> bool:
     return is_api_path(path) and path not in PUBLIC_PATHS
 
 
+def is_page_path(path: str) -> bool:
+    return path.startswith(PAGES_PREFIX)
+
+
+def response_headers(path: str) -> tuple[tuple[str, str], ...]:
+    """The security headers of the response to ``path``, with how long it may be cached: the API's answers and the
+    pages runs showed never, the files of the UI once checked again."""
+    if is_page_path(path):
+        return (*PAGE_HEADERS, ("Cache-Control", "no-store"))
+    return (*SECURITY_HEADERS, ("Cache-Control", "no-store" if is_api_path(path) else "no-cache"))
+
+
 def check_request(
     path: str,
     host: str | None,
@@ -171,16 +208,15 @@ def read_or_create_token(path: Path) -> str:
     return token
 
 
-def _secured(send: Send, api: bool) -> Send:
-    """``send`` with the security headers added to the response that is started through it."""
+def _secured(send: Send, added: tuple[tuple[str, str], ...]) -> Send:
+    """``send`` with the headers ``added`` set on the response that is started through it."""
 
     async def secured_send(message: Message) -> None:
         if message["type"] == "http.response.start":
             message.setdefault("headers", [])
             headers: MutableHeaders = MutableHeaders(scope=message)
-            for name, value in SECURITY_HEADERS:
+            for name, value in added:
                 headers[name] = value
-            headers["Cache-Control"] = "no-store" if api else "no-cache"
         await send(message)
 
     return secured_send
@@ -204,7 +240,7 @@ class LocalGuard:
             return
         headers: Headers = Headers(scope=scope)
         path: str = scope["path"]
-        secured: Send = _secured(send, is_api_path(path))
+        secured: Send = _secured(send, response_headers(path))
         refusal: Refusal | None = check_request(
             path,
             headers.get("host"),

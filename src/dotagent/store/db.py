@@ -12,6 +12,7 @@ import contextlib
 import hashlib
 import os
 import re
+import secrets
 import sqlite3
 import struct
 import tempfile
@@ -56,6 +57,7 @@ from dotagent.store.models import (
     ScheduleOptions,
     ScheduleRecord,
     SentMessage,
+    ShownPage,
     ThreadRecord,
     ThreadSummary,
     WorkingRun,
@@ -91,6 +93,10 @@ CREATE TABLE IF NOT EXISTS approvals (
     args TEXT NOT NULL, decided_by TEXT, note TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS approvals_run ON approvals(run_id, status);
+CREATE TABLE IF NOT EXISTS shown_pages (
+    id TEXT PRIMARY KEY, run_id TEXT NOT NULL, title TEXT NOT NULL, html TEXT NOT NULL, created_at REAL NOT NULL
+);
+CREATE INDEX IF NOT EXISTS shown_pages_run ON shown_pages(run_id);
 CREATE TABLE IF NOT EXISTS rules (
     id TEXT PRIMARY KEY, position INTEGER NOT NULL, enabled INTEGER NOT NULL, behavior TEXT NOT NULL,
     tool_glob TEXT NOT NULL, match_regex TEXT NOT NULL, description TEXT NOT NULL, created_at REAL NOT NULL
@@ -167,6 +173,9 @@ _EXTENSIONS: dict[str, str] = {
 # A screenshot saved this recently may belong to a message or event that is not stored yet, so deleting a chat leaves it
 # for ``orphan_images`` to find later.
 _RECENT_IMAGE_S: float = 60.0
+# The random bytes of a shown page's id. The id is all that serves the page (``GET /pages/<id>``), so it is too
+# long to guess, as the API's token is.
+_PAGE_ID_BYTES: int = 18
 
 
 def _prepare_dirs(database: Path, image_dir: Path) -> None:
@@ -828,12 +837,12 @@ class Store:
     @_writing
     async def delete_threads(self, thread_ids: Sequence[str]) -> list[str]:
         """Delete chats with everything they hold, in one transaction: their messages and queue, their runs, the runs
-        those delegated to (recursively) with the events and approvals of all of them, and the threads of the delegated
-        runs, with their messages and any queue, unless a run of their own remains there. Returns the ids that named a
-        thread, in the order given; the others are skipped. A schedule keeps the id of the thread it last fired into and
-        makes a new one per firing, so it is left alone. Nothing is deleted while a run of any process works on one of
-        the chats, itself or through a run it delegated to: ``RunConflict`` names the chats and the runs. The check is
-        made in the transaction of the deletes, which holds the write lock from its start."""
+        those delegated to (recursively) with the events, approvals and shown pages of all of them, and the threads of
+        the delegated runs, with their messages and any queue, unless a run of their own remains there. Returns the ids
+        that named a thread, in the order given; the others are skipped. A schedule keeps the id of the thread it last
+        fired into and makes a new one per firing, so it is left alone. Nothing is deleted while a run of any process
+        works on one of the chats, itself or through a run it delegated to: ``RunConflict`` names the chats and the runs.
+        The check is made in the transaction of the deletes, which holds the write lock from its start."""
         named: tuple[str, ...] = tuple(thread_ids)
         marks: str = ",".join("?" * len(named))
         doomed: str = (
@@ -854,6 +863,7 @@ class Store:
         candidates: set[str] = await self._screenshots_of(doomed, named, delegated)
         await self._db.execute(f"{doomed} DELETE FROM events WHERE run_id IN (SELECT id FROM doomed)", named)
         await self._db.execute(f"{doomed} DELETE FROM approvals WHERE run_id IN (SELECT id FROM doomed)", named)
+        await self._db.execute(f"{doomed} DELETE FROM shown_pages WHERE run_id IN (SELECT id FROM doomed)", named)
         await self._db.execute(f"{doomed} DELETE FROM runs WHERE id IN (SELECT id FROM doomed)", named)
         await self._db.execute(f"DELETE FROM messages WHERE thread_id IN ({marks})", named)
         await self._db.execute(f"DELETE FROM queued_messages WHERE thread_id IN ({marks})", named)
@@ -951,12 +961,11 @@ class Store:
 
     @_writing
     async def delete_events_of_runs_ended_before(self, before: float) -> int:
-        """Delete the events of the runs that ended before ``before``; the runs stay. Returns how many events went.
-        The screenshots those events named become orphans for :meth:`orphan_images`."""
-        cursor = await self._db.execute(
-            "DELETE FROM events WHERE run_id IN (SELECT id FROM runs WHERE finished_at IS NOT NULL AND finished_at < ?)",
-            (before,),
-        )
+        """Delete the events of the runs that ended before ``before``, and the pages they showed; the runs stay.
+        Returns how many events went. The screenshots those events named become orphans for :meth:`orphan_images`."""
+        ended: str = "SELECT id FROM runs WHERE finished_at IS NOT NULL AND finished_at < ?"
+        cursor = await self._db.execute(f"DELETE FROM events WHERE run_id IN ({ended})", (before,))
+        await self._db.execute(f"DELETE FROM shown_pages WHERE run_id IN ({ended})", (before,))
         await self._db.commit()
         return cursor.rowcount
 
@@ -1594,6 +1603,33 @@ class Store:
         )
         await self._db.commit()
         return cursor.rowcount
+
+    # ----- shown pages -----------------------------------------------------------------------
+
+    @_writing
+    async def add_shown_page(self, run_id: str, title: str, html: str) -> ShownPage:
+        """Keep a page that the run ``run_id`` shows, under an id that cannot be guessed (:data:`_PAGE_ID_BYTES`)."""
+        page: ShownPage = ShownPage(
+            id=f"page_{secrets.token_urlsafe(_PAGE_ID_BYTES)}",
+            run_id=run_id,
+            title=title,
+            html=html,
+            created_at=time.time(),
+        )
+        await self._db.execute(
+            "INSERT INTO shown_pages(id, run_id, title, html, created_at) VALUES(?, ?, ?, ?, ?)",
+            (page.id, page.run_id, page.title, page.html, page.created_at),
+        )
+        await self._db.commit()
+        return page
+
+    async def get_shown_page(self, page_id: str) -> ShownPage:
+        row = await self._one("SELECT * FROM shown_pages WHERE id = ?", (page_id,))
+        if row is None:
+            raise NotFoundError("page not found", {"page_id": page_id})
+        return ShownPage(
+            id=row["id"], run_id=row["run_id"], title=row["title"], html=row["html"], created_at=row["created_at"]
+        )
 
     # ----- rules -----------------------------------------------------------------------------
 

@@ -354,6 +354,7 @@ reminder, a resumed run) and, in goal mode, to the goal check.
 | macOS           | `apple_script`, `notify`, `code_fetch`                                                                             |
 | Memory, time    | `memory_save`, `memory_search`, `memory_forget`, `schedule_create`, `schedule_list`, `schedule_delete`             |
 | Orchestration   | `delegate`, `consult`, `update_plan`, `ask_user`, `finish`, `use_tools`                                            |
+| Pages           | `show_page`                                                                                                        |
 | Skills          | `skill`, `find_help`                                                                                               |
 | MCP             | `mcp__<server>__<tool>`                                                                                            |
 
@@ -412,6 +413,20 @@ result says so: the run reads the ones it needs with `read_file` or hands them t
 `<home>/workspace/notes/<run id>.md`: a long research run writes what it found there as it goes, with sources, instead
 of holding it all in its context, and names the file in its answer. The file is in the undo journal like any file write.
 It is the only file a `research` run may write.
+
+**Pages in the conversation.** `show_page(title, html)` shows you a page the run writes in HTML, in the conversation: a
+chart, a table, a diagram, a 3D view, a mockup. It sits under its title in a frame as wide as the conversation and as
+tall as the page (80 to 2,000 pixels), and Open shows it full size in your browser. It is drawn in the colours of the
+theme on screen, given to it as CSS variables (`--background`, `--foreground`, `--accent`, `--chart-1` to `--chart-6`
+and others), and takes the new ones when the theme or the system's scheme changes. Its scripts run sandboxed, framed or
+full size: its origin is opaque, so they read nothing of the web UI and reach neither the API nor the page around them.
+They fetch nothing but libraries from cdn.jsdelivr.net, unpkg.com, cdnjs.cloudflare.com and esm.sh, submit no form and
+ask for no camera, microphone or position. A link you click in the page opens in your browser; a script of the page
+cannot open one by itself, nor with a click you made elsewhere. A page that loads another page in its frame is closed,
+with Show it again. A page of up to 500,000 characters is kept in the database under an id that cannot be guessed, which
+is all it takes to read it (`GET /pages/<id>`, no token, never cached); it goes with its chat, and with the events of
+its run under `dotx prune`. `dotx run` prints the page's address. The tool is in a group of its own, `pages`, and the
+system prompt asks for a page when a chart, a table, a diagram or a 3D view would say more than words.
 
 `web_extract(sources, fields)` pulls named fields out of pages or files as JSON without the pages entering the main
 model's context: for every source (an address, or a file: a path, or the name of a file in the workspace such as the
@@ -1286,11 +1301,12 @@ Ctrl-C stops the daemon: the runs that are going on are cancelled, and the brows
 
 The server listens on `127.0.0.1:8765` (`[server]`) and refuses to start on any other address. Every request must carry
 a `Host` of the loopback address and, when it has one, an `Origin` of the server itself; every call under `/api` except
-`/api/health` and `/api/proof` needs the bearer token in `<home>/api-token` (mode 0600). `dotx url` puts the token in
-the fragment of the address (`#token=…`), so it never reaches the server or a log; the page keeps it in the browser's
-local storage and removes it from the address bar. A page that cannot sign in says why: a token the daemon does not take
-is asked for again, a daemon that does not answer is to be started, and one that answered with an error is running, and
-the page shows that error. Pages are served with a strict content security policy and no CORS headers.
+`/api/health` and `/api/proof` needs the bearer token in `<home>/api-token` (mode 0600). A page a run showed
+(`/pages/<id>`) needs none: its id cannot be guessed, and it is served sandboxed (see [Tools](#tools)). `dotx url` puts
+the token in the fragment of the address (`#token=…`), so it never reaches the server or a log; the page keeps it in the
+browser's local storage and removes it from the address bar. A page that cannot sign in says why: a token the daemon
+does not take is asked for again, a daemon that does not answer is to be started, and one that answered with an error is
+running, and the page shows that error. Pages are served with a strict content security policy and no CORS headers.
 
 The token goes only to the daemon. Before `dotx open`, `dotx url` and `dotx service permissions` hand it over, and
 before each request of the page and each poll of the desktop shell that carries it, the client sends a fresh nonce to

@@ -1,9 +1,10 @@
 // The service worker of the phone (and of any browser that installs Dot): the shell files are fetched from the
-// network and kept as the fallback for when the Mac is out of reach, nothing under /api is ever cached, and a push
-// from the daemon becomes a notification whose tap opens the run.
+// network and kept as the fallback for when the Mac is out of reach, nothing under /api or /pages (the pages runs
+// showed) is ever cached, and a push from the daemon becomes a notification whose tap opens the run.
 
 const SHELL_CACHE = "dot-shell-v1";
 const API_PREFIX = "/api";
+const PAGES_PREFIX = "/pages/";
 
 self.addEventListener("install", () => {
   self.skipWaiting();
@@ -38,7 +39,12 @@ async function shellFirst(request) {
 
 self.addEventListener("fetch", (event) => {
   const url = new URL(event.request.url);
-  if (event.request.method !== "GET" || url.origin !== self.location.origin || url.pathname.startsWith(API_PREFIX)) {
+  if (
+    event.request.method !== "GET" ||
+    url.origin !== self.location.origin ||
+    url.pathname.startsWith(API_PREFIX) ||
+    url.pathname.startsWith(PAGES_PREFIX)
+  ) {
     return;
   }
   event.respondWith(shellFirst(event.request));
