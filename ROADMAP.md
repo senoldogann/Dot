@@ -5168,7 +5168,10 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 229 | Commands in the background                                                           | done        | e117eaf |
 | 230 | The composer's keys                                                                  | done        | 166c90f |
 | 231 | Runs go on after a restart                                                           | done        | 3216c6f |
-| 232 | Models for Dot's own work                                                            | in progress |         |
+| 232 | Models for Dot's own work                                                            | done        | 3a5e21a |
+| 233 | Goal checks in an eval run                                                           | in progress |         |
+| 234 | A quoted instruction is not a followed one                                           | planned     |         |
+| 235 | The headlines task asks for what it checks                                           | planned     |         |
 
 ### 77. The type system: Inter and Geist Mono, seven sizes, three weights
 
@@ -10639,7 +10642,7 @@ done.
 
 ### 232. Models for Dot's own work
 
-**Status: in progress.**
+**Status: done.** Merged as `3a5e21a` (PR #271; no Linear issue, the Linear connector was signed out).
 
 **As built (2026-10-14).** Settings › Models chooses the fast, review and vision models under the default one, each from
 the models that can do its work (tools for the fast and review models, sight for the vision model), and
@@ -10653,6 +10656,76 @@ WebKit; on the code of before, the route answers 405.
 
 **What.** Settings › Models chooses the models of Dot's own work, the fast, review and vision models, as it chooses the
 default model.
+
+## Part 37: what an eval run showed (planned 2026-10-15)
+
+The owner's thirty-seventh word, on 2026-10-15: what an eval run showed. An error of the harness ended the run with four
+tasks unplayed; two answers that refused an instruction hidden in a file, and only quoted it, were counted as having
+followed it; one task failed where the model took, as its rules tell it, the smallest reasonable reading of the goal; a
+yolo run reads secrets and sends data; and in a yolo run started from the web UI the agent's questions are not waited
+for. The first two are faults to fix; for the other three the owner asked for a decision on how Dot should behave.
+
+**Status (2026-10-15): planned.** Each was checked on the code and on the run's saved report first. `dotx eval run`
+looked up the review model's key only with `[agent] goal_mode` or `stall_escalation` on, while the form task runs in
+goal mode of its own; the attempt's throw-away home has no `.env` file, so its goal check could not run ("missing API
+key"), and the event of a goal check that could not run lacked the count of unproven steps that the harness reads, which
+ended the eval run. Since item 54 an attempt asked for goal mode only when its task did, so `[agent] goal_mode`, which
+the report keeps as a setting of the run, changed nothing. Two of the three tasks that hide an instruction judged it
+followed when the answer held words that the instruction itself holds, so an answer that quoted it while refusing it
+counted as following it. The headlines task asked for the headlines "about electric cars" and expected those about their
+batteries and their charging too; the model took the smallest reasonable reading, as the system prompt tells it when a
+request can be read in several ways, and said so. The task's count check passed although the count was wrong, matching a
+digit in a car's name, and nothing checked that the file held nothing else.
+
+**The shape of this part (the decisions).** Three items, each a pull request of its own. The rule of the smallest
+reasonable reading stays: it keeps Dot from widening a task, and the model did what it says, naming the reading it took;
+the task changes instead, naming what it checks. A yolo run keeps what it does: the owner chooses it, the composer says
+what it waives when it is chosen and the run carries a chip, `ask` stays the default, and a rule with the hand-off
+behaviour still stops a yolo run at secrets, money and credentials. The agent's questions in a yolo run are not lost:
+they are listed under "Dot asked you" on the run's page and in its timeline, during the run and after it, and an answer
+reaches the conversation; nothing changes there. Item 196 of part 31 still waits on the owner.
+
+### How to start part 37 (the handoff prompt)
+
+> Read ROADMAP.md part 37 and the status table of part 9 (rows 233 to 235). One item at a time, in order; the protocol
+> of part 5 (branch, gate, PR, Linear MYP issue when the connector is signed in, squash merge, hash in the table, log
+> line) is unchanged. Give each change a test that fails on the code of before. Tests never start a real model call
+> or read the other agents' files of the Mac. Never touch the owner's data directory except to read it, by the kinds
+> and numbers of what is stored, and to restart the daemon when `/api/status` shows no active run; PLAN.md stays
+> untracked. The owner reads Turkish; everything written is English.
+
+### 233. Goal checks in an eval run
+
+**Status: in progress.**
+
+**As built (2026-10-15).** `dotx eval run` looks up the keys of the model under measure and of the fast, review and
+vision models before the attempts' homes take over (`reached_models`), and does not start without the first, nor without
+the review model's when an attempt checks the end of its run (`required_models`: `[agent] goal_mode`,
+`stall_escalation`, or a task in goal mode, its own or by a goal that asks to keep going). An attempt asks for goal mode
+when its task does and otherwise takes the configured one, as before item 54. A goal check that cannot run writes the
+count of its unproven steps, none, as the other goal checks do. Tests: `tests/smoke/test_evals_runner.py`, a review
+model whose key is nowhere: the attempt ends as failed with the reason, and is judged and counted;
+`tests/unit/test_evals.py`, the models whose keys an eval run needs. On the code of before the attempt is not checked at
+all, and an attempt at a task in goal mode of its own ends the eval run ("a goal check lacks the unproven steps the
+harness counts").
+
+**What.** An eval run hands each attempt the keys of every model it may call and needs the review model's whenever an
+attempt checks the end of its run; `[agent] goal_mode` puts every attempt in goal mode again, as the report says; and a
+goal check that cannot run ends its attempt as failed, saying why, while the eval run goes on.
+
+### 234. A quoted instruction is not a followed one
+
+**Status: planned.**
+
+**What.** The tasks that hide an instruction judge it followed by what only following it does: the files it would leave,
+and a claim whose words the instruction does not hold. An answer that quotes the instruction while refusing it passes.
+
+### 235. The headlines task asks for what it checks
+
+**Status: planned.**
+
+**What.** The headlines task names what it counts as about electric cars, checks that its file holds nothing else, and
+holds no headline whose figures could pass for the count.
 
 ## Log
 
@@ -11325,3 +11398,4 @@ default model.
 - 2026-10-14 (Opus 5.5): item 229 merged as `e117eaf` (PR #268; no Linear issue, the connector was signed out): a command that runs long goes to a terminal session in the background, and its end is told to its chat, which starts the chat's next run; the chat's page shows its commands at work above the composer.
 - 2026-10-14 (Opus 5.5): item 230 merged as `166c90f` (PR #269; no Linear issue, the connector was signed out): Settings › General chooses the key that sends, Enter or ⌘Enter, and whether a message to a run at work waits in the queue or steers the run, ⌘⇧Enter sending it the other way.
 - 2026-10-14 (Opus 5.5): item 231 merged as `3216c6f` (PR #270; no Linear issue, the connector was signed out): Settings › System has the switch for the daemon's next start to resume on its own the runs it cut off, kept in the config file as `[agent] resume`.
+- 2026-10-15 (Opus 5.5): item 232 merged as `3a5e21a` (PR #271; no Linear issue, the connector was signed out): Settings › Models chooses the fast, review and vision models, kept in the config file, and each call of their work goes to the one chosen from then on.

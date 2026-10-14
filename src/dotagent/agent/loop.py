@@ -938,6 +938,8 @@ async def _ask_checker(
             {
                 "decision": "error",
                 "reason": shorten_reason(error.message),
+                # No step was judged; every goal check says how many it could not bear out, which the evals count.
+                "unproven_steps": [],
                 "check": sent_back + 1,
                 "patience": patience,
                 "final": True,

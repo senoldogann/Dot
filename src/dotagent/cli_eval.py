@@ -24,7 +24,9 @@ from dotagent.evals.runner import (
     eval_config,
     lookup_secrets,
     play,
+    reached_models,
     replay_reference,
+    required_models,
     required_secret_names,
     secret_names,
 )
@@ -145,11 +147,11 @@ async def cmd_eval_run(command: EvalRunCommand) -> int:
     model: str = command.model if command.model is not None else config.models.main
     parse_model_ref(model)
     tasks: tuple[EvalTask, ...] = select_tasks(command.tasks)
-    # The review model checks the goal in goal mode and gives the second opinion of the progress watchdog.
-    consults: bool = config.agent.goal_mode or config.agent.stall_escalation
-    models: list[str] = [model, *([config.models.review] if consults else [])]
-    secrets: dict[str, str] = await asyncio.to_thread(lookup_secrets, secret_names(config, models))
-    missing: list[str] = [name for name in required_secret_names(config, models) if name not in secrets]
+    needed: tuple[str, ...] = required_models(config, model, tasks)
+    secrets: dict[str, str] = await asyncio.to_thread(
+        lookup_secrets, secret_names(config, reached_models(config, model))
+    )
+    missing: list[str] = [name for name in required_secret_names(config, needed) if name not in secrets]
     if missing:
         raise ConfigError(
             "an API key the eval run needs is missing",

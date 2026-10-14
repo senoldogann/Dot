@@ -6,6 +6,7 @@ from pathlib import Path
 import httpx
 import pytest
 
+from dotagent.config import AppConfig, load_default_config
 from dotagent.core.errors import EvalError
 from dotagent.core.types import JsonObject
 from dotagent.evals.audit import catalog_problems, task_problems
@@ -14,6 +15,7 @@ from dotagent.evals.checks import evaluate_check, evaluate_checks, workspace_pat
 from dotagent.evals.metrics import run_metrics, took_easy_way
 from dotagent.evals.reports import load_report, report_file_name, save_report
 from dotagent.evals.results import CheckOutcome, EvalReport, EvalSettings, RunMetrics, TaskOutcome
+from dotagent.evals.runner import eval_config, reached_models, required_models
 from dotagent.evals.scoring import (
     Scorecard,
     failure_reason,
@@ -249,6 +251,27 @@ def test_asking_for_a_task_that_does_not_exist_names_the_known_ones() -> None:
         "write-todo-note",
         "count-errors",
     ]
+
+
+def test_an_eval_run_needs_the_key_of_the_review_model_when_an_attempt_checks_the_end_of_its_run() -> None:
+    config: AppConfig = eval_config(load_default_config())
+    measured: str = "openai:gpt-5.5"
+    review: str = config.models.review
+    plain: tuple[EvalTask, ...] = select_tasks(["write-todo-note"])
+    assert required_models(config, measured, plain) == (measured,)
+    # The form task runs in goal mode of its own, where the review model checks the end of its run.
+    assert required_models(config, measured, select_tasks(["write-todo-note", "newsletter-form-verified"])) == (
+        measured,
+        review,
+    )
+    for setting in ("goal_mode", "stall_escalation"):
+        on: AppConfig = config.model_copy(update={"agent": config.agent.model_copy(update={setting: True})})
+        assert required_models(on, measured, plain) == (measured, review)
+    # A goal that asks to keep going until it is done runs in goal mode whatever was chosen.
+    kept: EvalTask = plain[0].model_copy(update={"goal": f"{plain[0].goal} Do not stop until it is done."})
+    assert required_models(config, measured, (kept,)) == (measured, review)
+    # The keys of the models of Dot's own work go to an attempt too, when they are found.
+    assert reached_models(config, measured) == (measured, config.models.fast, review, config.models.vision)
 
 
 def _metrics(steps: int, tokens: int, tool_calls: int, tool_errors: int) -> RunMetrics:

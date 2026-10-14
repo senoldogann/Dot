@@ -2,8 +2,9 @@
 task, and everything it does is counted.
 
 The process points at a throw-away Dot home for the length of an attempt (``DOT_HOME``), so the database, the
-workspace and the screenshots of the user are never touched. The API keys the model needs are looked up before the
-switch, because the home that holds the user's ``.env`` file is not the current one then, and are passed on by name.
+workspace and the screenshots of the user are never touched. The API keys of the models an attempt may call
+(:func:`reached_models`) are looked up before the switch, because the home that holds the user's ``.env`` file is not
+the current one then, and are passed on by name.
 """
 
 import asyncio
@@ -15,7 +16,7 @@ from collections.abc import AsyncIterator, Iterator, Mapping, Sequence
 from contextlib import contextmanager
 from pathlib import Path
 
-from dotagent.agent.manager import RunManager
+from dotagent.agent.manager import RunManager, goal_mode_asked
 from dotagent.config import AppConfig, PluginsConfig, SkillsConfig
 from dotagent.core.errors import EvalError
 from dotagent.core.logs import get_logger
@@ -96,6 +97,32 @@ def secret_names(config: AppConfig, models: Sequence[str]) -> tuple[str, ...]:
     if "anthropic" in providers:
         names.append(config.providers.anthropic.api_key_env)
     return tuple(names)
+
+
+def _chosen_goal_mode(task: EvalTask) -> bool | None:
+    """The goal mode an attempt at ``task`` asks for: on for a task that runs in goal mode, otherwise none, so that the
+    run takes the configured one (``[agent] goal_mode``), which the report keeps as a setting of the eval run."""
+    return True if task.goal_mode else None
+
+
+def required_models(config: AppConfig, model: str, tasks: Sequence[EvalTask]) -> tuple[str, ...]:
+    """The models the attempts at ``tasks`` cannot go without, whose keys an eval run needs before it starts: ``model``,
+    the one under measure, and the review model when it checks the end of runs or gives second opinions: with
+    ``[agent] goal_mode`` or ``stall_escalation`` on, or for a task that runs in goal mode (its own, or a goal that asks
+    to keep going until it is done)."""
+    consults: bool = (
+        config.agent.goal_mode
+        or config.agent.stall_escalation
+        or any(goal_mode_asked(task.goal, task.mode, _chosen_goal_mode(task)) is True for task in tasks)
+    )
+    return (model, config.models.review) if consults else (model,)
+
+
+def reached_models(config: AppConfig, model: str) -> tuple[str, ...]:
+    """Every model an attempt may call: ``model`` and the models of Dot's own work (the fast, review and vision models).
+    The keys of those that have one go to the attempt as the daemon would find them, since its home has no ``.env``
+    file; only those of :func:`required_models` must be found."""
+    return (model, config.models.fast, config.models.review, config.models.vision)
 
 
 def required_secret_names(config: AppConfig, models: Sequence[str]) -> tuple[str, ...]:
@@ -270,7 +297,17 @@ async def _run_in(
     try:
         async with runtime.bus.subscribe(None) as subscription:
             run: RunRecord = await manager.start(
-                task.goal, task.mode, model, None, EVAL_SOURCE, None, None, "standard", "ask", task.goal_mode, ()
+                task.goal,
+                task.mode,
+                model,
+                None,
+                EVAL_SOURCE,
+                None,
+                None,
+                "standard",
+                "ask",
+                _chosen_goal_mode(task),
+                (),
             )
             cut: Cut = await _supervise(runtime, manager, subscription, run.id, task)
         record: RunRecord = await manager.wait(run.id)
