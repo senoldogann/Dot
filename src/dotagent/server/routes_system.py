@@ -14,7 +14,7 @@ from fastapi.responses import FileResponse
 from dotagent import __version__
 from dotagent.agent.playbooks import PlaybookEntry, drop_playbook, list_playbooks, share_playbook
 from dotagent.config import AppConfig, ModelsConfig
-from dotagent.config_edit import set_default_model
+from dotagent.config_edit import set_default_model, set_resume
 from dotagent.core.errors import (
     ConfigError,
     DotError,
@@ -80,6 +80,8 @@ from dotagent.server.views import (
     ProviderProblem,
     PushKeyView,
     PushSubscribeRequest,
+    ResumeRequest,
+    ResumeView,
     SkillShareRequest,
     StatusView,
 )
@@ -169,6 +171,10 @@ def system_router(ctx: ServerContext, pages: str) -> APIRouter:
         """The configured models, the default one as the owner last made it (item 199)."""
         return config.models.model_copy(update={"main": ctx.manager.main_model()})
 
+    def resume_now() -> ResumeView:
+        """Whether the daemon's next start resumes the runs it cut off, as the owner last chose (item 231)."""
+        return ResumeView(resume=ctx.manager.resume_mode(), resume_within_s=config.agent.resume_within_s)
+
     @router.get("/push/key")
     async def push_key() -> PushKeyView:
         """The key a page gives ``PushManager.subscribe``; the daemon signs its pushes with the private half."""
@@ -208,6 +214,7 @@ def system_router(ctx: ServerContext, pages: str) -> APIRouter:
             mcp_tools=len(ctx.runtime.mcp.tools),
             mcp_failures=list(ctx.runtime.mcp.failures),
             models=models_now(),
+            resume=resume_now(),
         )
 
     @router.get("/models")
@@ -230,6 +237,15 @@ def system_router(ctx: ServerContext, pages: str) -> APIRouter:
         await asyncio.to_thread(set_default_model, config_path(), request.model)
         ctx.manager.set_main_model(request.model)
         return models_now()
+
+    @router.put("/agent/resume")
+    async def choose_resume(request: ResumeRequest) -> ResumeView:
+        """Have the daemon's next start resume on its own the runs it cut off, or leave them to the owner (item 231):
+        the config file keeps it as ``[agent] resume``; a config file that cannot be changed is refused, and nothing
+        changes then. This start's runs were resumed or left as it began."""
+        await asyncio.to_thread(set_resume, config_path(), request.resume)
+        ctx.manager.set_resume_mode(request.resume)
+        return resume_now()
 
     @router.get("/skills/learned")
     async def learned_skills() -> LearnedSkillsView:

@@ -167,11 +167,37 @@ function buildDaemon() {
     "Refresh",
   );
   const body = el("div", null, inlineLoading());
+  // Item 231: whether the daemon's next start resumes on its own the runs it cut off, kept in the config file.
+  let resume = null;
+  const goOn = switchSetting({
+    label: "Go on after a restart",
+    hint: "",
+    read: () => resume !== null && resume.resume === "safe",
+    write: async (on) => {
+      resume = await api.put("/agent/resume", { resume: on ? "safe" : "off" });
+      toast("ok", on ? "From the daemon's next start, the runs it cut off go on by themselves." : "From the daemon's next start, the runs it cut off wait for you.");
+      await refresh();
+    },
+    onToggled: () => paintResume(),
+  });
+  goOn.element.hidden = true;
+
+  function paintResume() {
+    goOn.paint();
+    if (resume !== null) {
+      const minutes = Math.round(resume.resume_within_s / 60);
+      goOn.note.textContent = `When the daemon starts again, a run you started here that its stop or a crash cut off in the last ${minutes} min goes on by itself, as long as every call it cut off only reads; any other run waits for you to continue it. Kept in the config file as [agent] resume.`;
+    }
+  }
+
   return {
-    element: section("Daemon", refreshButton, body),
+    element: section("Daemon", refreshButton, el("div", null, body, el("div", { class: "card-pad" }, goOn.element))),
     paint(snapshot) {
       if (snapshot.status !== null) {
         body.replaceChildren(el("dl", { class: "kv" }, statusEntries(snapshot.status)));
+        resume = snapshot.status.resume;
+        goOn.element.hidden = false;
+        paintResume();
       }
     },
   };

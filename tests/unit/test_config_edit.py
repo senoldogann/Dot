@@ -1,5 +1,6 @@
-"""Switching ``[browser] mode`` and ``raise_window``, and the default model (``[models] main``, item 199), in the user's
-config.toml: the comments and the other settings stay as written."""
+"""Switching ``[browser] mode`` and ``raise_window``, the default model (``[models] main``, item 199) and whether the
+daemon resumes the runs it cut off (``[agent] resume``, item 231), in the user's config.toml: the comments and the other
+settings stay as written."""
 
 import stat
 import tomllib
@@ -12,6 +13,7 @@ from dotagent.config_edit import (
     set_browser_mode,
     set_browser_setting,
     set_default_model,
+    set_resume,
     with_browser_mode,
     with_browser_setting,
 )
@@ -164,3 +166,15 @@ def test_a_models_table_written_inline_is_refused_and_left_as_it_was(tmp_path: P
     with pytest.raises(ConfigError, match='add main = "ollama:new" under \\[models\\] by hand'):
         set_default_model(path, "ollama:new")
     assert path.read_text(encoding="utf-8") == original
+
+
+def test_resume_is_written_under_agent_and_replaced_there_and_the_other_tables_stay(tmp_path: Path) -> None:
+    path: Path = tmp_path / "config.toml"
+    path.write_text('[models]\nmain = "ollama:x"\n', encoding="utf-8")
+    set_resume(path, "safe")
+    assert path.read_text(encoding="utf-8") == '[models]\nmain = "ollama:x"\n\n[agent]\nresume = "safe"\n'
+    path.write_text('[agent]\ngoal_mode = true\nresume = "safe"  # mine\n\n[models]\nresume = "x"\n', encoding="utf-8")
+    set_resume(path, "off")
+    assert path.read_text(encoding="utf-8") == (
+        '[agent]\ngoal_mode = true\nresume = "off"  # mine\n\n[models]\nresume = "x"\n'
+    )
