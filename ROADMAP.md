@@ -5175,8 +5175,8 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 234 | A quoted instruction is not a followed one                                           | done        | 4a54433 |
 | 235 | The headlines task asks for what it checks                                           | done        | c5aeed3 |
 | 236 | An import names each found item once                                                 | done        | db0bf8d |
-| 237 | The prompt cache holds when old output is shortened                                  | in progress |         |
-| 238 | The side panel at the window's edge                                                  | planned     |         |
+| 237 | The prompt cache holds when old output is shortened                                  | done        | 24194bf |
+| 238 | The side panel at the window's edge                                                  | in progress |         |
 | 239 | The meter says why the budget is smaller than the window                             | planned     |         |
 
 ### 77. The type system: Inter and Geist Mono, seven sizes, three weights
@@ -10831,7 +10831,7 @@ accepted.
 
 ### 237. The prompt cache holds when old output is shortened
 
-**Status: in progress.**
+**Status: done.** Merged as `24194bf` (PR #277; no Linear issue, the Linear connector was signed out).
 
 **As built (2026-10-15).** `ChatRequest.cache_mark` names the last message the next step sends unchanged. The loop gives
 the one before the oldest of the newest `keep_recent_tool_results` tool results and `keep_recent_screenshots`
@@ -10854,7 +10854,14 @@ a shortening costs only the newest steps.
 
 ### 238. The side panel at the window's edge
 
-**Status: planned.**
+**Status: in progress.**
+
+**As built (2026-10-15).** While the panel stands beside the conversation, at any of its sizes, the run page lets go of
+its reading width and keeps 12 px on its right, as far as the panel stands from the top bar (`css/run.css`). The
+conversation keeps its own reading width (`--lane-w`), centred in the room the panel leaves it, and the drawer of a
+narrow page is as it was. Before, the panel stood 20 px from the window's right edge at 1,280 px, 224 px at 1,920 and
+544 px at 2,560; now 12 px at each. Tests: `tests/smoke/test_side_panel.py` measures the panel and the conversation at
+the three widths, and fails on the code of before. Checked in Chrome and WebKit, wide and on a phone, light and dark.
 
 **What.** Beside a conversation the side panel stands at the window's right edge, as T3 Code's does, at every width that
 has room for it; the conversation keeps its reading width.
@@ -11543,3 +11550,4 @@ prompt again, and how to change it.
 - 2026-10-15 (Opus 5.5): item 235 merged as `c5aeed3` (PR #274; no Linear issue, the connector was signed out): the headlines task asks for the headlines about electric cars, their batteries and their charging, checks that its file holds the six alone, and reads the count in figures or in words.
 - 2026-10-15 (Opus 5.5): item 196 merged as `6be48a8` (PR #275; no Linear issue, the connector was signed out): three skills come with Dot, `excel`, `word` and `onedrive`, read after the owner's own; `{{dot_python}}` names Dot's own Python in them; `dotx doctor` lists the Office applications with their versions and counts the OneDrive folders by the kind of account; the eval tasks `excel-add-a-month` and `word-rename-company` check them.
 - 2026-10-15 (Opus 5.5): item 236 merged as `db0bf8d` (PR #276; no Linear issue, the connector was signed out): each skill and MCP server found elsewhere is found once by its agent and its name; a skill named as one before it in the same agent's folders, and a plugin of another marketplace whose name is taken, are listed under Left out; a plugin installed for the user and for a project is read from the user's install.
+- 2026-10-15 (Opus 5.5): item 237 merged as `24194bf` (PR #277; no Linear issue, the connector was signed out): a step's request to Anthropic marks the end of the part of the run the next step sends unchanged, so the step after a shortening reads the run before the newest tool results from the cache; `truncate_middle` keeps its mark within the size it is given, so old output is shortened once.

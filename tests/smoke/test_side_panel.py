@@ -49,6 +49,15 @@ _SHOTS: tuple[tuple[int, Literal["light", "dark"]], ...] = (
     (390, "light"),
     (390, "dark"),
 )
+# Where the panel stands beside the conversation (item 238): as far from the window's right edge as from the top bar;
+# the conversation keeps its reading width (--lane-w).
+_EDGE_PX: float = 12.0
+_LANE_PX: float = 768.0
+# The panel's box and the conversation's, and the width of the window's content, without a scroll bar.
+_PLACES: str = (
+    "() => [document.querySelector('.inspector').getBoundingClientRect().toJSON(),"
+    " document.querySelector('.run-main').getBoundingClientRect().toJSON(), document.documentElement.clientWidth]"
+)
 
 
 def _turn(*calls: ScriptedCall) -> ScriptedTurn:
@@ -324,6 +333,26 @@ async def test_the_side_panel_slides_in_and_out_beside_the_conversation(
                 else:
                     await expect(toolbar).to_be_visible()
                 await _shoot(page, tmp_path / f"panel-screen-ended-{width}-{scheme}.png")
+                await page.close()
+        finally:
+            await browser.close()
+
+
+async def test_beside_the_conversation_the_panel_stands_at_the_windows_right_edge(
+    runtime: Runtime, served: tuple[RunManager, str], tmp_path: Path
+) -> None:
+    # On a wide window the panel stood in the middle: the run page kept its reading width of 1,240 px (item 238).
+    _, address = served
+    run: RunRecord = await _ended_run(runtime)
+    async with async_playwright() as playwright:
+        browser: Browser = await playwright.chromium.launch(channel=runtime.config.browser.channel, headless=True)
+        try:
+            for width, scheme in ((1280, "light"), (1920, "dark"), (2560, "light")):
+                page: Page = await _open_panel(browser, address, run.id, width, scheme)
+                panel, talk, room = await page.evaluate(_PLACES)
+                assert room - panel["right"] == pytest.approx(_EDGE_PX, abs=1), (width, room, panel)
+                assert talk["width"] <= _LANE_PX + 1 and talk["right"] < panel["left"], (width, talk, panel)
+                await _shoot(page, tmp_path / f"panel-edge-{width}-{scheme}.png")
                 await page.close()
         finally:
             await browser.close()
