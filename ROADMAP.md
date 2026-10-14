@@ -5134,7 +5134,7 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 193 | The chat shows pages Dot makes: charts, 3D drawings and other visuals                | done        | 1cc6fac |
 | 194 | Dot reads Word, Excel and PowerPoint files                                           | done        | 5592965 |
 | 195 | A file opens in a panel beside the chat: PDF, sheets, documents and more             | done        | 6ef8fa8 |
-| 196 | Dot knows its way around Word, Excel and OneDrive on the Mac                         | in progress |         |
+| 196 | Dot knows its way around Word, Excel and OneDrive on the Mac                         | done        | 6be48a8 |
 | 197 | A stopped run stops the runs it delegated, and their rows stop                       | done        | 0b3a7d4 |
 | 198 | The side menu shows every agent of a run, folded under it                            | done        | dee248f |
 | 199 | The default model is chosen in Settings, and a chat keeps its model                  | done        | de8069e |
@@ -5174,6 +5174,10 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 233 | Goal checks in an eval run                                                           | done        | 7c47b6c |
 | 234 | A quoted instruction is not a followed one                                           | done        | 4a54433 |
 | 235 | The headlines task asks for what it checks                                           | done        | c5aeed3 |
+| 236 | An import names each found item once                                                 | in progress |         |
+| 237 | The prompt cache holds when old output is shortened                                  | planned     |         |
+| 238 | The side panel at the window's edge                                                  | planned     |         |
+| 239 | The meter says why the budget is smaller than the window                             | planned     |         |
 
 ### 77. The type system: Inter and Geist Mono, seven sizes, three weights
 
@@ -9724,7 +9728,7 @@ file in its application on the Mac.
 
 ### 196. Dot knows its way around Word, Excel and OneDrive on the Mac
 
-**Status: in progress.**
+**Status: done.** Merged as `6be48a8` (PR #275; no Linear issue, the Linear connector was signed out).
 
 **As built (2026-10-15).** Three skills come with Dot (`src/dotagent/skills/builtin/`). `excel` says when to change a
 workbook with openpyxl and how to get the results of its formulas, which openpyxl does not compute (worked out in
@@ -10768,6 +10772,85 @@ of the owner's run (four headlines listed, "There are 4") passed the count.
 **What.** The headlines task names what it counts as about electric cars, checks that its file holds nothing else, and
 holds no headline whose figures could pass for the count.
 
+## Part 38: imports, the prompt cache, the side panel, the run's budget (planned 2026-10-15)
+
+The owner's thirty-eighth word, on 2026-10-15: an import from other apps failed with "an item is named more than once";
+the context meter of a model that holds a million tokens shows a budget of 96,000; the side panel should stand at the
+window's right edge, as T3 Code's does; and after many features, speed, streaming, the agent's flow and ease of use had
+not been reviewed.
+
+**Status (2026-10-15): planned.** Each was checked on the code, and the cache on the owner's record of model calls of
+the last four days, by kinds and numbers only. The import: Dot finds the skills of another agent's folder as it finds
+its own, a few levels down, and one name can be there more than once (on the owner's Mac, 13 names, each 3, 7 or 9
+times); the checklist offered each copy, and the import, which names an item by its agent and its name, refused the
+whole request. A plugin installed for the user and for a project, or by two marketplaces, would do the same. The budget:
+`[agent] context_tokens` is Dot's budget for a run's prompt, 96,000 tokens whatever the model's window (decision 33);
+the meter gives both numbers but not why they differ. The cache: Anthropic step calls whose prompt was under 57,600
+tokens (60 % of the budget, past which older tool output is shortened) read 63 to 71 % of it from the cache and took 5
+to 12 s on average; above it, 184 of 291 calls, they read 2 to 3 % and took 35 s. Past that point each step shortens the
+tool result that leaves the newest six, some 25 blocks before the end, while Anthropic looks for a cached prefix at most
+20 blocks before a request's breakpoint, and Dot sets one breakpoint, at the end: so each such step reads the whole
+prompt anew and writes it to the cache again, at 1.25 times the price of input. DeepSeek through OpenCode Go keeps 79 %
+there, as its cache matches the part before a change. The panel: the run page keeps a reading width of 1,240 px while
+the panel has its own width, so on a wide window the panel stands in the middle.
+
+**The shape of this part.** Four items, each a pull request of its own: the import, which stops the owner, first; then
+the cache, the largest cost measured; then the panel and the meter. Found by the same review and left for a part of
+their own, each to be measured first: a change of the open plan, which sits at the end of the system prompt, misses the
+whole cache on every provider (8 of 291 Anthropic step calls, 73 of about 2,100 OpenCode Go ones); the tools a step
+offers change when a group turns on or the watchdog narrows them, which misses it too; a run page receives the stream of
+every run and loads the whole log of a long run at once.
+
+### How to start part 38 (the handoff prompt)
+
+> Read ROADMAP.md part 38 and the status table of part 9 (rows 236 to 239). One item at a time, in order; the protocol
+> of part 5 (branch, gate, PR, Linear MYP issue when the connector is signed in, squash merge, hash in the table, log
+> line) is unchanged. Give each change a test that fails on the code of before. Tests never start a real model call
+> or read the other agents' files of the Mac. Never touch the owner's data directory except to read it, by the kinds
+> and numbers of what is stored, and to restart the daemon when `/api/status` shows no active run; PLAN.md stays
+> untracked. The owner reads Turkish; everything written is English.
+
+### 236. An import names each found item once
+
+**Status: in progress.**
+
+**As built (2026-10-15).** `found_elsewhere` (`help/elsewhere.py`) finds each skill of an agent's folders once by its
+name, as Dot's own catalog does: a file reached again through a link is read once, and a skill named as one before it is
+listed under Left out ("another skill is already called <name>: <folder>"). The plugins of `installed_plugins.json` are
+read one folder a name: the install whose scope is `user`, which Claude Code uses outside a project, or else the first
+listed; a plugin of another marketplace whose name is taken is listed under Left out. Tests:
+`tests/unit/test_found_elsewhere.py` builds a home with one name in three bundles and a link to one of them, a plugin
+installed for a project at 0.9.0 and for the user at 1.0.0, and a plugin of the same name in another marketplace: it
+finds one skill, one plugin skill and one server, lists the three left out with why, and the import of everything found
+is accepted. On the code of before the import refused the same home with "an item is named more than once".
+
+**What.** Each skill and MCP server found elsewhere is found once by its agent and its name: a skill named as one before
+it in the same agent's folders, and a plugin named as one of another marketplace, are listed under Left out with why,
+and a plugin installed for the user and for a project is read from the user's install. An import of everything found is
+accepted.
+
+### 237. The prompt cache holds when old output is shortened
+
+**Status: planned.**
+
+**What.** A step's request to Anthropic marks, besides its end, the end of the part of the run that the next step sends
+unchanged, before the newest tool results that may still be shortened. The next step reads that part from the cache, and
+a shortening costs only the newest steps.
+
+### 238. The side panel at the window's edge
+
+**Status: planned.**
+
+**What.** Beside a conversation the side panel stands at the window's right edge, as T3 Code's does, at every width that
+has room for it; the conversation keeps its reading width.
+
+### 239. The meter says why the budget is smaller than the window
+
+**Status: planned.**
+
+**What.** The context meter says why a run's budget is smaller than the model's window, as every step sends the whole
+prompt again, and how to change it.
+
 ## Log
 
 - 2026-10-08: roadmap written from the owner's go-ahead for all eight items, in this order. Nothing implemented yet.
@@ -11443,3 +11526,4 @@ holds no headline whose figures could pass for the count.
 - 2026-10-15 (Opus 5.5): item 233 merged as `7c47b6c` (PR #272; no Linear issue, the connector was signed out): an eval run hands each attempt the keys of the models it may call and needs the review model's when an attempt checks the end of its run, `[agent] goal_mode` applies to every attempt again, and a goal check that cannot run fails its attempt without ending the eval run.
 - 2026-10-15 (Opus 5.5): item 234 merged as `4a54433` (PR #273; no Linear issue, the connector was signed out): the tasks that hide an instruction judge it followed by what only following it does, so an answer that quotes it while refusing it passes, and `dotx eval check` reports a check that such a quote would fail.
 - 2026-10-15 (Opus 5.5): item 235 merged as `c5aeed3` (PR #274; no Linear issue, the connector was signed out): the headlines task asks for the headlines about electric cars, their batteries and their charging, checks that its file holds the six alone, and reads the count in figures or in words.
+- 2026-10-15 (Opus 5.5): item 196 merged as `6be48a8` (PR #275; no Linear issue, the connector was signed out): three skills come with Dot, `excel`, `word` and `onedrive`, read after the owner's own; `{{dot_python}}` names Dot's own Python in them; `dotx doctor` lists the Office applications with their versions and counts the OneDrive folders by the kind of account; the eval tasks `excel-add-a-month` and `word-rename-company` check them.

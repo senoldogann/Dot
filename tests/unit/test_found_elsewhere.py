@@ -7,6 +7,7 @@ import json
 from pathlib import Path
 
 from dotagent.help.elsewhere import SKILL_COPY_LIMIT, AddedServer, DotHas, FoundElsewhere, found_elsewhere
+from dotagent.server.views import ElsewhereImport, ElsewhereItem
 
 SECRETS: tuple[str, ...] = tuple(f"secret-{index}-7f3a9c" for index in range(8))
 
@@ -190,3 +191,60 @@ def test_what_cannot_be_read_is_told_without_its_keys_and_the_rest_is_still_foun
         ("Claude Desktop", "filesystem"),
     ]
     assert [skill.name for skill in found.skills] == ["csv-clean", "pdf-tools", "notes-search", "release-notes"]
+
+
+def test_each_skill_and_server_is_found_once_by_its_agent_and_name_so_an_import_of_them_all_is_valid(
+    tmp_path: Path,
+) -> None:
+    # Item 236: one name in three bundles of a skills folder, and one copy reached again through a link.
+    skills: Path = tmp_path / ".claude" / "skills"
+    for bundle in ("first", "second", "third"):
+        _skill(skills / bundle / "skills" / "pdf-tools", "pdf-tools", f"Fill PDF forms ({bundle}).")
+    (skills / "linked").symlink_to(skills / "first" / "skills" / "pdf-tools")
+    # A plugin installed for a project at 0.9.0 and for the user at 1.0.0, and one of the same name elsewhere.
+    cache: Path = tmp_path / ".claude" / "plugins" / "cache"
+    for market, version in (("market", "0.9.0"), ("market", "1.0.0"), ("other", "2.0.0")):
+        plugin: Path = cache / market / "notes" / version
+        _skill(plugin / "skills" / "notes-search", "notes-search", f"Search the notes ({market} {version}).")
+        _json(plugin / ".mcp.json", {"mcpServers": {"notes_db": {"command": "node", "args": ["server.js"]}}})
+    _json(
+        tmp_path / ".claude" / "plugins" / "installed_plugins.json",
+        {
+            "version": 2,
+            "plugins": {
+                "notes@market": [
+                    {
+                        "scope": "project",
+                        "projectPath": "/Users/someone/work",
+                        "installPath": str(cache / "market" / "notes" / "0.9.0"),
+                    },
+                    {"scope": "user", "installPath": str(cache / "market" / "notes" / "1.0.0")},
+                ],
+                "notes@other": [{"scope": "user", "installPath": str(cache / "other" / "notes" / "2.0.0")}],
+            },
+        },
+    )
+    found: FoundElsewhere = found_elsewhere(tmp_path, _has(tmp_path, frozenset(), frozenset(), ()), SKILL_COPY_LIMIT)
+    assert [(skill.agent, skill.name, skill.description) for skill in found.skills] == [
+        ("Claude Code", "pdf-tools", "Fill PDF forms (first)."),
+        ("Claude Code plugin notes", "notes-search", "Search the notes (market 1.0.0)."),
+    ]
+    assert [(server.agent, server.name) for server in found.servers] == [("Claude Code plugin notes", "notes_db")]
+    first: Path = skills / "first" / "skills" / "pdf-tools"
+    assert [(problem.path, problem.reason) for problem in found.problems] == [
+        (
+            skills / "second" / "skills" / "pdf-tools" / "SKILL.md",
+            f"another skill is already called pdf-tools: {first}",
+        ),
+        (skills / "third" / "skills" / "pdf-tools" / "SKILL.md", f"another skill is already called pdf-tools: {first}"),
+        (
+            tmp_path / ".claude" / "plugins" / "installed_plugins.json",
+            "another plugin is already called notes: notes@market",
+        ),
+    ]
+    # What the import dialog sends when the owner chooses all: Dot accepts it.
+    items: tuple[ElsewhereItem, ...] = (
+        *(ElsewhereItem(kind="skill", agent=skill.agent, name=skill.name) for skill in found.skills),
+        *(ElsewhereItem(kind="server", agent=server.agent, name=server.name) for server in found.servers),
+    )
+    assert len(ElsewhereImport(items=items).items) == 3
