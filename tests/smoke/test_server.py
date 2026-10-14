@@ -16,7 +16,10 @@ from contextlib import aclosing
 from dataclasses import dataclass
 from pathlib import Path
 
+import docx
 import httpx
+import openpyxl
+import pptx
 import pytest
 import pytest_asyncio
 from PIL import Image
@@ -481,6 +484,29 @@ def tiny_png() -> bytes:
     return buffer.getvalue()
 
 
+def tiny_office(name: str, text: str) -> bytes:
+    """A Word document, an Excel workbook or a presentation, by the suffix of ``name``, that holds ``text``."""
+    buffer: io.BytesIO = io.BytesIO()
+    match Path(name).suffix:
+        case ".docx":
+            document = docx.Document()
+            document.add_paragraph(text)
+            document.save(buffer)
+        case ".xlsx":
+            workbook = openpyxl.Workbook()
+            sheet = workbook.active
+            assert sheet is not None
+            sheet["A1"] = text
+            workbook.save(buffer)
+        case ".pptx":
+            presentation = pptx.Presentation()
+            slide = presentation.slides.add_slide(presentation.slide_layouts[5])
+            assert slide.shapes.title is not None
+            slide.shapes.title.text = text
+            presentation.save(buffer)
+    return buffer.getvalue()
+
+
 async def _upload(client: httpx.AsyncClient, name: str, media_type: str, data: bytes) -> httpx.Response:
     return await client.post(
         "/api/attachments",
@@ -500,8 +526,22 @@ async def test_attached_files_are_kept_and_reach_the_message_the_model_reads(
     assert (pdf.status_code, pdf.json()["kind"]) == (201, "pdf"), pdf.text
     photo: httpx.Response = await _upload(client, "photo.png", "", tiny_png())
     assert (photo.status_code, photo.json()["kind"], photo.json()["media_type"]) == (201, "image", "image/png")
+    # Word, Excel and PowerPoint files are read for their text (item 194); one of before 2007 or locked with a
+    # password is refused, with what to save instead.
+    office_names: tuple[str, ...] = ("plan.docx", "budget.xlsx", "deck.pptx")
+    office: list[httpx.Response] = [
+        await _upload(client, name, "", tiny_office(name, f"{name} says {code}")) for name in office_names
+    ]
+    assert [sent.status_code for sent in office] == [201] * 3, [sent.text for sent in office]
+    assert [sent.json()["kind"] for sent in office] == ["office"] * 3
+    compound: bytes = b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1" + bytes(504)
+    old: httpx.Response = await _upload(client, "budget.xls", "application/vnd.ms-excel", compound)
+    assert (old.status_code, "save it as .xlsx" in old.text) == (422, True), old.text
+    locked: httpx.Response = await _upload(client, "plan.docx", "", compound)
+    assert (locked.status_code, "locked with a password" in locked.text) == (422, True), locked.text
 
-    # Refused: a file that is no text, PDF or image, a broken image, bad base64, an unknown or crafted id.
+    # Refused: a file that is no text, PDF, Office file or image, a broken image, bad base64, an unknown or crafted
+    # id.
     assert (await _upload(client, "tool.bin", "application/octet-stream", bytes(range(256)) * 4)).status_code == 422
     assert (await _upload(client, "fake.png", "image/png", b"not an image")).status_code == 422
     bad: httpx.Response = await client.post(
@@ -512,11 +552,15 @@ async def test_attached_files_are_kept_and_reach_the_message_the_model_reads(
         started: httpx.Response = await client.post("/api/runs", json={"goal": "hi", "attachments": [wrong]})
         assert started.status_code == 404, started.text
 
-    files = await load_attachments(runtime.workspace, [notes.json()["id"], pdf.json()["id"], photo.json()["id"]])
+    files = await load_attachments(
+        runtime.workspace,
+        [notes.json()["id"], pdf.json()["id"], photo.json()["id"], *(sent.json()["id"] for sent in office)],
+    )
     message: Message = await message_with_attachments(runtime, "thread_test", None, "Use the files.", files, True)
     assert message.content.startswith("Use the files.")
     assert f"SECRET = '{code}'" in message.content
     assert f"PDF says {code}-pdf" in message.content
+    assert all(f"{name} says {code}" in message.content for name in office_names)
     assert notes.json()["path"] in message.content
     assert [image.media_type for image in message.images] == ["image/jpeg"]
 
