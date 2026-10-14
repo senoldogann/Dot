@@ -2075,6 +2075,16 @@ server whose name does not fit Dot's rule for server names (a lower-case letter,
 hyphens, at most 24 characters) or is taken, or that uses a variable its agent fills in: any `${...}` in its command,
 arguments or URL, or one in its environment or headers other than `${NAME}`, which Dot looks up like an API key.
 
+**Importing several at once.** Import from other apps, at the head of Settings › Skills, opens a checklist of what is
+found that Dot can add: the skills by agent, each with its description, ticked at first, then the MCP servers, each
+with its agent and what it starts or reaches, not ticked, as a server starts a program of this Mac; Choose all ticks
+or clears every one, and a line says how many others Dot has already or cannot add (Found on this Mac says why). The
+button is off until what the other agents set up is read and something of it can be added. Import N adds what is
+ticked in one request (`POST /api/skills/elsewhere/import` with `items`, each `kind`, `agent` and `name`, at most 500
+and each once), each as Add to Dot would, from one look at the other agents' files: what is added is said in a toast,
+and what is not, with its reason, in one toast each, as when two agents have a skill of the same name and the first
+is copied. Cancel adds nothing.
+
 **Finding help.** Before it takes a hard way (writing a script or a program for the work, clicking through an
 application or a site, trial and error in the shell), a run is told to call `find_help` with its need in a few plain
 words, and to call it again once a way has failed twice. It searches the skills the run is offered, the tools of the MCP

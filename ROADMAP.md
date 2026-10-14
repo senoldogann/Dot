@@ -5154,8 +5154,8 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 215 | Small hardenings after the review                                                    | done        | 58e159f |
 | 216 | The README says what leaves this Mac                                                 | done        | b8d6f34 |
 | 217 | A weekly audit of the dependencies                                                   | done        | 48772b2 |
-| 218 | The lists of skills and notes keep a size                                            | in progress |         |
-| 219 | Import from other apps                                                               | planned     |         |
+| 218 | The lists of skills and notes keep a size                                            | done        | 58acd2a |
+| 219 | Import from other apps                                                               | in progress |         |
 | 220 | The side panel slides, and the screen says why it is empty                           | planned     |         |
 | 221 | The window of every provider's models, as published                                  | planned     |         |
 | 222 | A context meter in the run's composer                                                | planned     |         |
@@ -10357,7 +10357,7 @@ Item 196 of part 31 still waits on the owner.
 
 ### 218. The lists of skills and notes keep a size
 
-**Status: in progress.**
+**Status: done.** Merged as `58acd2a` (PR #257; no Linear issue, the Linear connector was signed out).
 
 **As built (2026-10-14).** Each of these lists sits in a box that keeps its size (`.list-box` in `app.css`: at most
 560 px, or 60 % of the window's height when that is less) and scrolls inside past its first rows; a scroll or a wheel
@@ -10373,7 +10373,19 @@ inside past its first rows, so what is under a long list stays near.
 
 ### 219. Import from other apps
 
-**Status: planned.**
+**Status: in progress.**
+
+**As built (2026-10-14).** Import from other apps, at the head of Settings › Skills, opens a checklist of what Dot can
+add from the Mac's other agents (Claude Code and its plugins, Claude Desktop, Cursor, VS Code, Codex): the skills by
+agent, with their descriptions, ticked at first, and the MCP servers, each with its agent and what it starts or reaches,
+not ticked, as a server starts a program of this Mac. Choose all ticks or clears them; a line counts what Dot has
+already or cannot add, and the button is off until something can be added. `POST /api/skills/elsewhere/import` adds what
+is ticked in one request, each as `PUT /api/skills/elsewhere` adds one, from one look at the other agents' files; one
+that cannot be added comes back with its reason while the others go on, and a toast says what was added and what was
+not. The tour of every page gives the Skills page a home of the test's own. Tests:
+`tests/smoke/test_import_elsewhere.py`, with a home of its own (two skills of Claude Code, one of Codex with the name of
+one of them, a server of Claude Desktop), wide and on a phone, light and dark; on the code of before, both fail (no
+button, and the request is refused with 405).
 
 **What.** A button at the head of Settings › Skills imports, from a checklist, the skills and MCP servers the Mac's
 other agents set up, several at once.
@@ -11063,3 +11075,4 @@ a time; the API's refusal is shown as it is.
 - 2026-10-14 (Opus 5.5): item 215 merged as `58e159f` (PR #254; no Linear issue, the connector was signed out): the macOS tools Dot runs itself are named by their paths, an IPv6 address that carries an IPv4 one is judged by it in each form, the file panel tells `~/Library` and the workspace apart whatever the case of a path, and a notification opens only the page's own routes.
 - 2026-10-14 (Opus 5.5): item 216 merged as `b8d6f34` (PR #255; no Linear issue, the connector was signed out): the README says in one place what leaves this Mac, where it goes, and how to keep a run's conversation here.
 - 2026-10-14 (Opus 5.5): item 217 merged as `48772b2` (PR #256; no Linear issue, the connector was signed out): a weekly job checks the Python and Rust dependencies as locked against the public advisories.
+- 2026-10-14 (Opus 5.5): item 218 merged as `58acd2a` (PR #257; no Linear issue, the connector was signed out): Settings › Skills and Settings › Memory keep their lists in a box of a fixed height that scrolls inside.

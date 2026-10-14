@@ -9,6 +9,7 @@ from dotagent.agent.lessons import RunLessons
 from dotagent.config import ModelReference, ModelsConfig
 from dotagent.core.types import FrozenModel
 from dotagent.desktop.perms import Pane
+from dotagent.help.elsewhere import FoundElsewhere
 from dotagent.llm.types import Effort
 from dotagent.mcp.types import McpFailure
 from dotagent.policy.types import ApprovalMode
@@ -387,6 +388,41 @@ class ElsewhereChange(FrozenModel):
     agent: str = Field(min_length=1, max_length=200)
     name: str = Field(min_length=1, max_length=200)
     added: bool
+
+
+class ElsewhereItem(FrozenModel):
+    """A skill or an MCP server that another agent of the Mac set up, as found: by its kind, its agent and its name."""
+
+    kind: Literal["skill", "server"]
+    agent: str = Field(min_length=1, max_length=200)
+    name: str = Field(min_length=1, max_length=200)
+
+
+class ElsewhereImport(FrozenModel):
+    """The owner's yes to several found items at once (item 219), each named once."""
+
+    items: tuple[ElsewhereItem, ...] = Field(min_length=1, max_length=500)
+
+    @model_validator(mode="after")
+    def _each_once(self) -> Self:
+        if len(set(self.items)) != len(self.items):
+            raise ValueError("an item is named more than once")
+        return self
+
+
+class ElsewhereRefusal(FrozenModel):
+    """A found item an import could not add, and why."""
+
+    item: ElsewhereItem
+    reason: str
+
+
+class ElsewhereImported(FrozenModel):
+    """What an import did (item 219): the items it added, those it could not and why, and what is found after it."""
+
+    added: tuple[ElsewhereItem, ...]
+    refused: tuple[ElsewhereRefusal, ...]
+    found: FoundElsewhere
 
 
 class AgentLearning(FrozenModel):

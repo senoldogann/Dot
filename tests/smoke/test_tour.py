@@ -284,7 +284,7 @@ async def _shoot(context: BrowserContext, base: str, pages: tuple[tuple[str, str
 
 
 async def test_every_page_in_both_schemes_at_both_widths(
-    runtime: Runtime, manager: RunManager, client: httpx.AsyncClient, tmp_path: Path
+    runtime: Runtime, manager: RunManager, client: httpx.AsyncClient, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     host: str = client.base_url.host
     port: int | None = client.base_url.port
@@ -353,6 +353,10 @@ async def test_every_page_in_both_schemes_at_both_widths(
     await asyncio.to_thread(out.mkdir)
     async with async_playwright() as playwright:
         browser: Browser = await playwright.chromium.launch(channel=runtime.config.browser.channel, headless=True)
+        # The Skills page reads what other agents set up from the home folder: an empty one of the test's own, so the
+        # tour shows none of the Mac's (item 219).
+        await asyncio.to_thread((tmp_path / "home").mkdir)
+        monkeypatch.setenv("HOME", str(tmp_path / "home"))
         try:
             for scheme in _SCHEMES:
                 for size, width, height in _SIZES:
