@@ -79,16 +79,25 @@ def _result(name: str, ok: bool, required: bool, detail: str) -> CheckResult:
     return CheckResult(name=name, ok=ok, required=required, detail=detail)
 
 
-async def _check_ollama_server(config: AppConfig, required: bool) -> CheckResult:
+class ServerCheck(FrozenModel):
+    """The row of the Ollama server, and whether the server answered at all (``reached``; a wrong answer is one)."""
+
+    row: CheckResult
+    reached: bool
+
+
+async def _check_ollama_server(config: AppConfig, required: bool) -> ServerCheck:
     url: str = f"{config.providers.ollama.base_url.rstrip('/')}/api/version"
     try:
         async with httpx.AsyncClient(timeout=_PROBE_TIMEOUT_S) as client:
             response: httpx.Response = await client.get(url)
     except httpx.HTTPError as exc:
-        return _result("ollama server", False, required, f"{url} is not reachable ({type(exc).__name__}); start Ollama")
+        detail: str = f"{url} is not reachable ({type(exc).__name__}); start Ollama"
+        return ServerCheck(row=_result("ollama server", False, required, detail), reached=False)
     if response.status_code != 200:
-        return _result("ollama server", False, required, f"{url} answered HTTP {response.status_code}")
-    return _result("ollama server", True, required, f"{url} -> {response.text.strip()}")
+        row: CheckResult = _result("ollama server", False, required, f"{url} answered HTTP {response.status_code}")
+        return ServerCheck(row=row, reached=True)
+    return ServerCheck(row=_result("ollama server", True, required, f"{url} -> {response.text.strip()}"), reached=True)
 
 
 class Served(FrozenModel):
@@ -112,12 +121,18 @@ async def _served(router: ModelRouter, provider: str) -> Served:
     return Served(names=frozenset(model.id for model in models), problem="")
 
 
-async def _check_model(router: ModelRouter, role: str, reference: str, served: Mapping[str, Served]) -> CheckResult:
+async def _check_model(
+    router: ModelRouter, role: str, reference: str, served: Mapping[str, Served], down: Mapping[str, str]
+) -> CheckResult:
     """A configured model, which its provider must serve to its key: Ollama and Anthropic answer for the model itself,
     OpenAI and OpenCode Go through the list of the models they serve (``served``, by provider). When that list could
-    not be read, the model is a warning: the provider's own row fails for it."""
+    not be read, the model is a warning: the provider's own row fails for it. So is a model of a provider whose server
+    could not be reached (``down``: what its row says, by provider), which is not asked, as the call would only wait
+    out its retries (item 212)."""
     try:
         ref: ModelRef = parse_model_ref(reference)
+        if ref.provider in down:
+            return _result(f"model {role}", False, False, f"{reference}: not checked, as {down[ref.provider]}")
         info = await router.model_info(ref)
     except (ConfigError, ProviderError) as exc:
         return _result(f"model {role}", False, True, f"{reference}: {exc.message}")
@@ -167,6 +182,7 @@ async def _models_row(
     providers: ProvidersConfig,
     router: ModelRouter,
     served: Mapping[str, Served],
+    down: Mapping[str, str],
 ) -> CheckResult:
     """Each helper or standby model and whether it can answer: its provider has a key and serves it to that key, as
     :func:`_check_model` checks a model (the pauses of the running daemon are not seen from here). One that cannot
@@ -178,7 +194,7 @@ async def _models_row(
     except ConfigError as exc:
         return _result(name, False, False, f"{exc.message}: {', '.join(models)}")
     checks: dict[str, CheckResult] = {
-        model: await _check_model(router, name, model, served) for model in roster.available
+        model: await _check_model(router, name, model, served, down) for model in roster.available
     }
     states: dict[str, str] = {
         model: f"{model} ready" if check.ok else check.detail for model, check in checks.items()
@@ -358,14 +374,16 @@ async def _check_openai_embeddings(config: AppConfig) -> CheckResult:
     )
 
 
-async def _check_memory(router: ModelRouter, app: AppConfig) -> CheckResult:
+async def _check_memory(router: ModelRouter, app: AppConfig, down: Mapping[str, str]) -> CheckResult:
     """With embeddings on, the embedding model must be reachable: installed in Ollama (an English-centric one gets a
-    hint) or served to the OpenAI key."""
+    hint) or served to the OpenAI key. An Ollama server that could not be reached (``down``) is not asked (item 212)."""
     config: MemoryConfig = app.memory
     if not config.embed_enabled:
         return _result("memory", True, False, "notes are searched by words only ([memory] embed_enabled = false)")
     if config.embed_provider == "openai":
         return await _check_openai_embeddings(app)
+    if "ollama" in down:
+        return _result("memory", False, True, f"the embedding models cannot be listed, as {down['ollama']}")
     try:
         provider: ChatProvider = await router.provider("ollama")
         if not isinstance(provider, OllamaProvider):
@@ -646,8 +664,10 @@ async def _service_checks(config: AppConfig) -> list[CheckResult]:
     go_present: bool = await asyncio.to_thread(_has_secret, config.providers.opencode_go.api_key_env)
     anthropic_present: bool = await asyncio.to_thread(_has_secret, config.providers.anthropic.api_key_env)
     ollama_present: bool = await asyncio.to_thread(_has_secret, config.providers.ollama.api_key_env)
+    server: ServerCheck = await _check_ollama_server(config, "ollama" in used)
+    down: dict[str, str] = {} if server.reached else {"ollama": server.row.detail}
     results: list[CheckResult] = [
-        await _check_ollama_server(config, "ollama" in used),
+        server.row,
         _check_key("openai", config.providers.openai.api_key_env, openai_present, "openai" in used),
         _check_key("opencode go", config.providers.opencode_go.api_key_env, go_present, "opencode_go" in used),
         _check_key("anthropic", config.providers.anthropic.api_key_env, anthropic_present, "anthropic" in used),
@@ -667,15 +687,15 @@ async def _service_checks(config: AppConfig) -> list[CheckResult]:
             results.append(await _check_opencode_go_api(router, "opencode_go" in used))
         if anthropic_present:
             results.append(await _check_anthropic_api(router, "anthropic" in used))
-        results.append(await _check_memory(router, config))
+        results.append(await _check_memory(router, config, down))
         for role, reference in configured:
-            results.append(await _check_model(router, role, reference, served))
+            results.append(await _check_model(router, role, reference, served, down))
         results.append(_review_row(config.models))
         for name, setting, models in (
             ("helpers", "[models] helpers", config.models.helpers),
             ("standby", "[models] standby", config.models.standby),
         ):
-            results.append(await _models_row(name, setting, models, config.providers, router, served))
+            results.append(await _models_row(name, setting, models, config.providers, router, served, down))
     finally:
         await router.aclose()
     judge_key: bool = await asyncio.to_thread(_has_secret, config.judge.api_key_env)

@@ -1,9 +1,12 @@
 """The doctor rows that look at this Mac for real: the commands and secrets of MCP servers, and whether macOS can capture
 the screen. Nothing is started and nothing is mocked: the login shell, PATH, ``.env`` file, Keychain and ScreenCaptureKit
-are all asked. The model rows ask a stand-in model service on this Mac through the real connectors."""
+are all asked. The model rows ask a stand-in model service on this Mac through the real connectors, or an address of this
+Mac where nothing listens."""
 
+import asyncio
 import json
 import platform
+import socket
 import sys
 import threading
 from collections.abc import Iterator
@@ -13,11 +16,16 @@ from pathlib import Path
 
 import pytest
 
-from dotagent.config import McpServerConfig, load_config
+from dotagent.config import AppConfig, McpServerConfig, load_config
+from dotagent.core.errors import ProviderTransportError
 from dotagent.desktop.capture import rect_capture_supported
 from dotagent.doctor import CheckResult, _service_checks, mcp_checks
+from dotagent.llm.ollama import OllamaProvider
 
 LOGIN_TIMEOUT_S: float = 15.0
+# Time enough for checks that ask no server, and less than the retries of one call to a server out of reach (15 s at
+# the least, with Ollama's six attempts).
+AT_ONCE_S: float = 10.0
 FIRST_MACOS_WITH_RECT_CAPTURE: tuple[int, int] = (15, 2)
 UNSET_SECRET: str = "DOT_TEST_SURELY_UNSET_SECRET"
 OPENAI_KEY_ENV: str = "DOT_TEST_DOCTOR_OPENAI_KEY"
@@ -172,3 +180,61 @@ async def test_a_model_its_provider_does_not_serve_fails_and_one_whose_list_was_
     assert (rows["helpers"].ok, rows["helpers"].required) == (True, False)
     assert rows["helpers"].detail == f"{main.detail}; openai:gpt-5.5 ready"
     assert (rows["standby"].ok, rows["standby"].required, rows["standby"].detail) == (False, False, review.detail)
+
+
+def _closed_port() -> int:
+    """A port of this Mac where nothing listens: one the system gives out, freed again."""
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as probe:
+        probe.bind(("127.0.0.1", 0))
+        port: int = probe.getsockname()[1]
+    return port
+
+
+async def test_an_ollama_server_that_is_not_running_is_reported_at_once(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """Item 212: with no Ollama server at its address on this Mac, the list of its models (the menu of models asks for
+    it) fails at once, and so does the doctor: the server's row fails, the memory row says the embedding models cannot
+    be listed, and each Ollama model is a warning that was not asked, instead of each call waiting out its retries."""
+    monkeypatch.setenv("DOT_HOME", str(tmp_path))
+    monkeypatch.delenv(UNSET_SECRET, raising=False)
+    root: str = f"http://127.0.0.1:{_closed_port()}"
+    roles: dict[str, str] = {
+        "main": "ollama:qwen3",
+        "vision": "ollama:qwen3",
+        "fast": "ollama:qwen3",
+        "review": "ollama:gemma3",
+    }
+    (tmp_path / "config.toml").write_text(
+        "[models]\n"
+        + "".join(f'{role} = "{reference}"\n' for role, reference in roles.items())
+        + 'helpers = ["ollama:gemma3"]\n\n'
+        f'[providers.ollama]\nbase_url = "{root}"\napi_key_env = "{UNSET_SECRET}"\n\n'
+        f'[providers.openai]\napi_key_env = "{UNSET_SECRET}"\n\n'
+        f'[providers.opencode_go]\napi_key_env = "{UNSET_SECRET}"\n\n'
+        f'[providers.anthropic]\napi_key_env = "{UNSET_SECRET}"\n\n'
+        f'[judge]\napi_key_env = "{UNSET_SECRET}"\n',
+        encoding="utf-8",
+    )
+    config: AppConfig = load_config(tmp_path / "config.toml")
+    provider: OllamaProvider = OllamaProvider(config.providers.ollama, None)
+    async with asyncio.timeout(AT_ONCE_S):
+        try:
+            with pytest.raises(ProviderTransportError):
+                await provider.list_models()
+        finally:
+            await provider.aclose()
+        rows: dict[str, CheckResult] = {row.name: row for row in await _service_checks(config)}
+    server: CheckResult = rows["ollama server"]
+    assert (server.ok, server.required) == (False, True)
+    assert server.detail == f"{root}/api/version is not reachable (ConnectError); start Ollama"
+    memory: CheckResult = rows["memory"]
+    assert (memory.ok, memory.required, memory.detail) == (
+        False,
+        True,
+        f"the embedding models cannot be listed, as {server.detail}",
+    )
+    for role, reference in roles.items():
+        row: CheckResult = rows[f"model {role}"]
+        assert (row.ok, row.required, row.detail) == (False, False, f"{reference}: not checked, as {server.detail}")
+    assert (rows["helpers"].ok, rows["helpers"].detail) == (False, f"ollama:gemma3: not checked, as {server.detail}")

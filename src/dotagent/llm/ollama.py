@@ -6,6 +6,7 @@ with an API key.
 """
 
 import asyncio
+import ipaddress
 import json
 
 import httpx
@@ -328,6 +329,17 @@ def parse_model_details(model: str, shown: JsonObject, num_ctx: int) -> OllamaMo
     return OllamaModelDetails(info=info, think_values=values)
 
 
+def _on_this_mac(base_url: str) -> bool:
+    """Whether ``base_url`` names a server on this Mac: ``localhost`` or a loopback address."""
+    host: str = httpx.URL(base_url).host
+    if host == "localhost":
+        return True
+    try:
+        return ipaddress.ip_address(host).is_loopback
+    except ValueError:
+        return False
+
+
 class OllamaProvider:
     """Connector to an Ollama server (local, or ollama.com with an API key)."""
 
@@ -340,6 +352,11 @@ class OllamaProvider:
         self._details_cache: dict[str, OllamaModelDetails] = {}
         self._slots: asyncio.Semaphore = asyncio.Semaphore(config.max_concurrent)
         self._policy: RetryPolicy = RetryPolicy(attempts=config.attempts, base_delay_s=1.0, max_delay_s=20.0)
+        self._list_policy: RetryPolicy = (
+            RetryPolicy(attempts=1, base_delay_s=0.0, max_delay_s=0.0)
+            if _on_this_mac(config.base_url)
+            else self._policy
+        )
 
     @property
     def name(self) -> str:
@@ -366,9 +383,11 @@ class OllamaProvider:
         return (await self._details(model)).info
 
     async def installed_names(self) -> tuple[str, ...]:
-        """The names of the models the server has, embedding models included."""
+        """The names of the models the server has, embedding models included. A server on this Mac is asked once (item
+        212): with no network in between, a refused connection means it is not running, and retries would only keep
+        the menu of models and the doctor waiting for it."""
         tags: JsonObject = await get_json(
-            self._client, self._url("/api/tags"), self._headers, classify_generic, self._policy, "ollama.tags"
+            self._client, self._url("/api/tags"), self._headers, classify_generic, self._list_policy, "ollama.tags"
         )
         listed: JsonValue = tags.get("models")
         names: list[str] = []
