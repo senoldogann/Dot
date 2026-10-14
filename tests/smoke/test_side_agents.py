@@ -1,7 +1,7 @@
 """The side menu shows every agent of a run (item 198): under a run at work, every run it delegated, those at work with
 their time and those that ended with how they ended, behind a button that says how many work and folds them; the fold
-is kept. The Activity page shows them under the run too, and both count what works. Scripted runs, served by a real
-server, wide and on a phone, light and dark."""
+is kept. The Activity page shows them under the run too, and counts what works; the side menu counts the chats at
+work (item 202). Scripted runs, served by a real server, wide and on a phone, light and dark."""
 
 import asyncio
 import time
@@ -154,8 +154,8 @@ async def test_the_side_menu_shows_every_agent_of_a_run_and_folds_them(
             for index, (width, scheme) in enumerate(_SHOTS):
                 page: Page = await _open_sidebar(browser, address, width, scheme)
                 section: Locator = page.locator("#sidebar [data-section=working]")
-                # What works: the run and the one delegated run at work; the two that ended are not counted.
-                await expect(section.locator(".side-label")).to_have_text("Working 2")
+                # Working holds the run's chat (item 202), every run it delegated under it.
+                await expect(section.locator(".side-label")).to_have_text("Working 1")
                 fold: Locator = section.locator("button.side-children-fold")
                 await expect(fold).to_have_text("3 delegated runs · 1 working")
                 await expect(fold).to_have_attribute("aria-expanded", "true")

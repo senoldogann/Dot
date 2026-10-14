@@ -1038,17 +1038,21 @@ The web UI is laid out like a chat app: the chats in a sidebar on the left, one 
 page of their own.
 
 The sidebar lists your chats (the conversation threads) grouped by day, newest activity first, the pinned ones above the
-days; a live dot marks those with a run going on, waiting for you or failed, and a chat opens at its latest run. While a
-chat's latest run works, the time at the right of its row gives way to a dashed circle, **Working** and how long since
-the run was asked for ("12s", "4m", "1h 5m", read again every second), as T3 Code's sidebar has it; every run of the
-Working section says the same, a delegated run under its parent too, and a run that waits for you keeps its amber dot
-and its time. Under a run at work hang all the runs it delegated (item 198), those that ended saying how, behind a line
-that says how many there are and, while some have ended, how many work; a click on it folds them, and the fold is kept.
-The Working section counts what works, and so does Activity, which shows them under the run too. Above the list: a
-search over the titles (⌘K or `/`), **New chat** (⇧⌘O) and the ways to **Agents**, **Activity** and **Campaigns**; in
-the foot, **Settings** and the red square of the **Emergency stop** (which comes along beside the button that shows the
-sidebar while the sidebar is closed). The top bar shows only what needs you: the approvals waiting, and the connection
-to the daemon while it is being made or lost; the runs that work are counted in the Working section. The sections
+days; a live dot marks those with a run going on, waiting for you or failed, and a chat opens at its latest run. Each
+chat stands once (item 202, after T3 Code's Working shelf): while its latest run works, a chat leaves its day for the
+**Working** section above the list, and goes back once the run ends; a pinned chat stays under Pinned. At the right of a
+chat at work the time gives way to a dashed circle, **Working** and how long since the run was asked for ("12s", "4m",
+"1h 5m", read again every second), as T3 Code's sidebar has it, and the face of the agent or the campaign at work stands
+in its dot's place. Under it hang all the runs it delegated (item 198), each saying the same while it works and how it
+ended once it has, behind a line that says how many there are and, while some have ended, how many work; a click on it
+folds them, and the fold is kept. Working lists too what is no chat's: a schedule about to fire, the session of a
+campaign (which works in a thread of its own). A chat whose run waits for you keeps its amber dot and its time among the
+days, and what it asks stands under **Waiting for you**. Working counts what it lists, and Activity the runs that work,
+which it shows under the run too. Folded, Working keeps the open chat in sight, and the search finds the chats at work
+too. Above the list: a search over the titles (⌘K or `/`), **New chat** (⇧⌘O) and the ways to **Agents**, **Activity**
+and **Campaigns**; in the foot, **Settings** and the red square of the **Emergency stop** (which comes along beside the
+button that shows the sidebar while the sidebar is closed). The top bar shows only what needs you: the approvals
+waiting, and the connection to the daemon while it is being made or lost; what works stands under Working. The sections
 (Waiting for you, Working, Chats) fold on a click of their label, and the folds are kept between visits. The sidebar's
 head holds only the button that folds it away. **Select** turns the list into checkboxes: tick chats (or Select all) and
 **Delete** asks once, then removes them with every run, step, event and approval of theirs. A chat with a run under way

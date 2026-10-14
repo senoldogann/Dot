@@ -232,8 +232,13 @@ async def test_the_sections_show_what_waits_what_works_and_a_campaign_session_wi
                     await expect(sidebar.locator("[data-section=waiting] .side-label")).to_have_text(
                         "Waiting for you 1"
                     )
-                    await expect(sidebar.locator("[data-section=working] .side-label")).to_have_text("Working 3")
-                    await expect(sidebar.locator("[data-section=working] a.side-activity")).to_have_count(3)
+                    # Working holds the chat at work (item 202), and the campaign's session as a row of its own: the
+                    # session works in a thread of its own, which is not among the chats.
+                    await expect(sidebar.locator("[data-section=working] .side-label")).to_have_text("Working 2")
+                    await expect(sidebar.locator("[data-section=working] .side-chat")).to_have_count(1)
+                    session_row = sidebar.locator("[data-section=working] > a.side-activity")
+                    await expect(session_row).to_contain_text("Find leads")
+                    await expect(session_row.locator(".avatar")).to_have_count(1)
                     # The delegated run hangs under its parent, with its steps; the parent says it delegated one.
                     nested = sidebar.locator("[data-section=working] .side-children a.side-child")
                     await expect(nested).to_have_count(1)
