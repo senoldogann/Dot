@@ -1222,7 +1222,10 @@ line. A delegated run is a row: the face with its state at the corner (turning w
 you, green with a check when it is done, red when it failed), its goal over the last thing it did, the time it has taken
 (counting on every second while it works), the way to its own page and a chevron that opens its steps; rows that follow
 each other share one card. The row is closed from the start, as T3 Code draws a subagent: an approval the run asks for
-opens it until you have decided, and a row you never opened or closed yourself closes again. Its own page names the
+opens it until you have decided, and a row you never opened or closed yourself closes again. Resting the pointer on a
+row, or moving the focus to it, shows its card (item 226, after T3 Code's): the whole goal, the model with its reasoning
+level, how the run stands and for how long, counting on while it works, and what it does now or did last; the pointer
+leaving, a click or Escape puts it away, and on a touch screen a tap opens the row as before. Its own page names the
 parent in the top bar as a breadcrumb (the parent's goal, a link, then its own) and closes the conversation with a pill:
 the model, how long it took ("Completed in 1m 46s", "Working for 2m"), whether its parent still works ("Runs on its own"
 once not), "Open parent" and, while it works, **Stop**. The tool calls of one stretch of work fold into a single "Worked

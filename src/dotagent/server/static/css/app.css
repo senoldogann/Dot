@@ -3299,6 +3299,81 @@ details[open] > summary .chev {
   border-left: 1px solid var(--border);
 }
 
+/* The card of a delegated run (item 226): its face and whole goal, its model and level, its state with the time it has
+   taken, and what it does or did last. It stands on the window by its row (helpercard.js places it), over the dock and
+   under the drawer, and takes no pointer, so that it never comes between the pointer and the row. */
+.helper-card {
+  position: fixed;
+  z-index: 30;
+  width: min(340px, calc(100vw - 16px));
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  background: var(--surface);
+  box-shadow: var(--shadow-float);
+  pointer-events: none;
+  animation: fade-in var(--motion-quick) var(--ease);
+}
+
+.helper-card-head {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+}
+
+.helper-card-face {
+  flex: none;
+  width: 24px;
+  height: 24px;
+}
+
+.helper-card-face .avatar {
+  width: 24px;
+  height: 24px;
+}
+
+.helper-card-goal {
+  display: -webkit-box;
+  overflow: hidden;
+  font-weight: var(--weight-label);
+  line-height: var(--leading-sm);
+  overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+}
+
+.helper-card-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+  font-size: var(--text-sm);
+  line-height: var(--leading-sm);
+}
+
+.helper-card-meta {
+  color: var(--muted);
+}
+
+.helper-card-meta .status-ring {
+  width: 12px;
+  height: 12px;
+}
+
+.helper-card-label {
+  flex: none;
+  color: var(--faint);
+}
+
+.helper-card-action {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 /* The bar's breadcrumb on a delegated run's page: the parent's goal, a link, then the run's own. */
 .stage-crumb {
   flex: 0 3 auto;

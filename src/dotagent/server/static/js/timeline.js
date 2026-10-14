@@ -11,6 +11,7 @@ import { sentFiles } from "./attachments.js";
 import { clip, clock, compact, dateTime, duration, el, plural } from "./dom.js";
 import { actorFace } from "./actors.js";
 import { faceState } from "./face.js";
+import { helperCard } from "./helpercard.js";
 import { icon } from "./icons.js";
 import { foldSteps } from "./layout.js";
 import { answerMessage, userMessage } from "./messages.js";
@@ -121,6 +122,8 @@ function paintGroup(group) {
  */
 export function createTimeline({ rootRunId, actorId, startedAt, onGrow, onPlan, onStats, onScaffold, onCalls, onRunStatus, onAnswer, onImage, onQuestionLeft, onHeld, onBrowserStep, sendAgain, onGoalFiles }) {
   const element = el("div", { class: "timeline" });
+  // The card a delegated run's row shows when the pointer rests on it or the focus comes to it (item 226).
+  const card = helperCard(element);
   const scopes = new Map();
   const cards = new Map();
   // The scopes of the delegated runs that have not ended: their rows count their time on (`tick`).
@@ -268,7 +271,20 @@ export function createTimeline({ rootRunId, actorId, startedAt, onGrow, onPlan, 
       scope.touched = true;
     });
     place(parent, node, ts);
-    const scope = makeScope({ runId, actorId: data.agent_id ?? runId, container: inner, panel: { node, face, status, meta, progress, time, steps: 0 }, parent, began: ts });
+    // What the row's card tells of the delegated run, kept up to date by its events (see helperCard).
+    const helper = {
+      goal: data.goal ?? "",
+      model: data.model ?? null,
+      effort: data.effort ?? null,
+      speed: data.speed ?? "standard",
+      status: "running",
+      began: ts,
+      ended: null,
+      action: null,
+      calls: 0,
+    };
+    card.attach(summary, helper, () => actorFace(data.agent_id ?? runId, faceState(helper.status), null));
+    const scope = makeScope({ runId, actorId: data.agent_id ?? runId, container: inner, panel: { node, face, status, meta, progress, time, steps: 0, helper }, parent, began: ts });
     scopes.set(runId, scope);
     liveChildren.add(scope);
     return scope;
@@ -282,6 +298,7 @@ export function createTimeline({ rootRunId, actorId, startedAt, onGrow, onPlan, 
 
   /** The row of the delegated run of `scope` shows that the run ended with `status` at `ts` after `steps` steps. */
   function endChild(scope, status, steps, ts) {
+    Object.assign(scope.panel.helper, { status, ended: ts, calls: 0 });
     paintRing(scope.panel.status, status);
     scope.panel.face.setAttribute("data-state", faceState(status));
     scope.panel.face.classList.add("ended");
@@ -310,11 +327,12 @@ export function createTimeline({ rootRunId, actorId, startedAt, onGrow, onPlan, 
 
   /** The row of every delegated run that has not ended says how long it has worked at `now` (seconds): the page calls
    * this every second while the run works, so a folded row's time counts on between the events of its run, as T3 Code
-   * counts a working subagent's (item 123). */
+   * counts a working subagent's (item 123), and as an event comes. The card a row shows follows (item 226). */
   function tick(now) {
     for (const scope of liveChildren) {
       scope.panel.time.textContent = duration(Math.max(now - scope.began, 0));
     }
+    card.refresh(now);
   }
 
   /**
@@ -346,7 +364,8 @@ export function createTimeline({ rootRunId, actorId, startedAt, onGrow, onPlan, 
       onRunStatus({ status: waiting ? "blocked" : "running", model: null, endedAt: null });
       return;
     }
-    paintRing(scope.panel.status, waiting ? "blocked" : "running");
+    scope.panel.helper.status = waiting ? "blocked" : "running";
+    paintRing(scope.panel.status, scope.panel.helper.status);
   }
 
   function showThinking(scope, characters) {
@@ -385,6 +404,7 @@ export function createTimeline({ rootRunId, actorId, startedAt, onGrow, onPlan, 
         return;
       }
       scope.panel.meta.textContent = `${scope.panel.meta.textContent} · ${record.data.model}`;
+      scope.panel.helper.model = record.data.model;
     },
 
     run_finished(scope, record) {
@@ -494,6 +514,8 @@ export function createTimeline({ rootRunId, actorId, startedAt, onGrow, onPlan, 
       }
       if (scope.panel !== null) {
         paintChild(scope, record.ts, [`step ${scope.panel.steps}`, data.tool]);
+        scope.panel.helper.action = describeCall(data.tool, data.args);
+        scope.panel.helper.calls += 1;
       }
       showCall(scope, { id: data.call_id, tool: data.tool, args: data.args });
     },
@@ -511,6 +533,9 @@ export function createTimeline({ rootRunId, actorId, startedAt, onGrow, onPlan, 
       const entry = scope.calls.get(data.call_id) ?? showCall(scope, { id: data.call_id, tool: data.tool, args: {} });
       const { row, group } = entry;
       row.finish(data);
+      if (scope.panel !== null) {
+        scope.panel.helper.calls = Math.max(0, scope.panel.helper.calls - 1);
+      }
       group.pending = Math.max(0, group.pending - 1);
       group.end = Math.max(group.end, record.ts);
       group.longest = Math.max(group.longest, data.seconds);
@@ -765,6 +790,7 @@ export function createTimeline({ rootRunId, actorId, startedAt, onGrow, onPlan, 
         return;
       }
       scope.panel.meta.textContent = scope.panel.meta.textContent.replace(` · ${data.from}`, ` · ${data.to}`);
+      scope.panel.helper.model = data.to;
     },
 
     // The run's model could not be reached (`error`: the connection broke or timed out, or its server failed with a
