@@ -18,6 +18,7 @@ from Quartz import PDFDocument
 from dotagent.core.errors import ToolExecutionError
 from dotagent.core.images import EncodedImage, encode_image
 from dotagent.core.text import truncate_middle
+from dotagent.office import OfficeKind, names_office_file, office_kind, office_text, unreadable_office_file
 from dotagent.policy.paths import CHANGES_DOT, PathClass, classify_path, expand_path
 from dotagent.policy.types import ActionInfo, Flag, Risk
 from dotagent.tools.base import (
@@ -141,6 +142,18 @@ def _read_blocking(path: Path, offset: int, limit: int, budget: int, max_edge: i
         if not text:
             return ok("(the PDF contains no extractable text)")
         return ok(_numbered(iter(text.splitlines()), path, offset, limit, budget))
+    if names_office_file(path.name):
+        # A Word, Excel or PowerPoint file reads as its text (dotagent.office), paged by its lines like a PDF's.
+        data: bytes = path.read_bytes()
+        unreadable: str | None = unreadable_office_file(path.name, data)
+        if unreadable is not None:
+            raise ToolExecutionError(unreadable, {"path": str(path)})
+        office: OfficeKind | None = office_kind(path.name, data)
+        if office is not None:
+            written: str = office_text(office, data)
+            if not written:
+                return ok("(the file holds no text)")
+            return ok(_numbered(iter(written.splitlines()), path, offset, limit, budget))
     if _is_binary(path):
         return ok(f"Binary file ({path.stat().st_size} bytes): {path}")
     return ok(_numbered_window(path, offset, limit, budget))
@@ -170,7 +183,10 @@ def _read_file_tool() -> RegisteredTool:
 
     return make_path_tool(
         name="read_file",
-        description="Read a text file with line numbers (also images and PDFs). Use offset/limit for large files.",
+        description=(
+            "Read a text file with line numbers (also images, PDFs and Word, Excel and PowerPoint files). Use "
+            "offset/limit for large files."
+        ),
         args_model=ReadFileArgs,
         modes=ALL_MODES,
         parallel_safe=True,

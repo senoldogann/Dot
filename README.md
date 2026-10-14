@@ -337,10 +337,15 @@ reminder, a resumed run) and, in goal mode, to the goal check.
   without tools, and the run neither sees the question nor stops for it. Several can be asked at once. The question and
   the answer are `aside_question` and `aside_answer` events, never messages of the conversation.
 - Files can go with a goal or a steering message (attach, drop or paste them in the web UI; at most 10 of 20 MB each).
-  Text, code and PDF files are put into the message as text (a long one shortened, with its path to read the rest),
-  images go to the model as images or, for a model that cannot see, as the `vision` model's description. Anything else
-  is refused at upload. The files are kept in `workspace/attachments/`, where the agent's tools can open them; one
-  named like a file Dot keeps next to it (`meta.json`, `text.txt`) gets an underscore before its name.
+  Text, code, PDF, Word, Excel and PowerPoint files are put into the message as text (a long one shortened, with its
+  path to read the rest), images go to the model as images or, for a model that cannot see, as the `vision` model's
+  description. A Word document (`.docx`) reads as its paragraphs and tables in order, headings and list items marked as
+  Markdown marks them; a workbook (`.xlsx`, `.xlsm`) sheet by sheet, each cell after its address and a formula with the
+  value Excel last worked out for it (up to 100,000 cells); a presentation (`.pptx`) slide by slide, with its tables,
+  its charts' series and its notes; `read_file` reads such a file on disk the same way. A file of before 2007 (`.doc`,
+  `.xls`, `.ppt`) or one locked with a password is refused, saying what to save instead. Anything else is refused at
+  upload. The files are kept in `workspace/attachments/`, where the agent's tools can open them; one named like a file
+  Dot keeps next to it (`meta.json`, `text.txt`) gets an underscore before its name.
 
 ## Tools
 

@@ -1,10 +1,11 @@
 """Files the user attaches to a message: kept in the workspace and turned into what the model reads.
 
 An upload is stored as ``<workspace>/attachments/<id>/<name>``, next to ``meta.json`` (its name, type and kind) and,
-for text, code and PDF files, ``text.txt`` with the text read out of it at upload, so a broken or locked file is
-refused right away instead of in the middle of a run. The agent can open the whole file with its file and shell tools.
+for text, code, PDF, Word, Excel and PowerPoint files, ``text.txt`` with the text read out of it at upload
+(``dotagent.office`` for the last three), so a broken or locked file is refused right away instead of in the middle
+of a run. The agent can open the whole file with its file and shell tools.
 
-When a message with attachments reaches a run, the text of each text, code or PDF file goes into the message (long
+When a message with attachments reaches a run, the text of each file that is no image goes into the message (long
 ones shortened in the middle, with the path to read the rest) and images go to the model as images, or, for a model
 that cannot see, as the vision model's description.
 """
@@ -27,6 +28,7 @@ from dotagent.core.text import truncate_middle
 from dotagent.core.types import FrozenModel
 from dotagent.llm.calls import CallOrigin
 from dotagent.llm.types import ImageData, Message, user_message
+from dotagent.office import OFFICE_MEDIA_TYPES, OfficeKind, office_kind, office_text, unreadable_office_file
 from dotagent.runtime import Runtime
 from dotagent.web.pdf import pdf_to_text
 from dotagent.web.text import document_kind
@@ -52,7 +54,7 @@ _IMAGE_MAGIC: tuple[tuple[bytes, str], ...] = (
 )
 _IMAGE_TYPES: frozenset[str] = frozenset({"image/png", "image/jpeg", "image/gif", "image/webp"})
 
-type AttachmentKind = Literal["image", "pdf", "text"]
+type AttachmentKind = Literal["image", "pdf", "office", "text"]
 
 
 class StoredAttachment(FrozenModel):
@@ -89,11 +91,17 @@ def _image_type(media_type: str, head: bytes) -> str | None:
 
 
 def _kind_of(name: str, media_type: str, data: bytes) -> tuple[AttachmentKind, str]:
-    """The kind of an upload and its media type; anything that is no image, PDF or text is refused."""
+    """The kind of an upload and its media type; anything that is no image, PDF, Office file or text is refused."""
     head: bytes = data[:_SNIFF_BYTES]
     image: str | None = _image_type(media_type, head)
     if image is not None:
         return "image", image
+    office: OfficeKind | None = office_kind(name, head)
+    if office is not None:
+        return "office", OFFICE_MEDIA_TYPES[office]
+    unreadable: str | None = unreadable_office_file(name, head)
+    if unreadable is not None:
+        raise InvalidValueError(unreadable, {"name": name, "media_type": media_type, "bytes": len(data)})
     match document_kind(media_type, head):
         case "pdf":
             return "pdf", "application/pdf"
@@ -101,7 +109,7 @@ def _kind_of(name: str, media_type: str, data: bytes) -> tuple[AttachmentKind, s
             return "text", media_type or "text/plain"
         case "binary":
             raise InvalidValueError(
-                "only text, code, PDF and image files can be attached",
+                "only text, code, PDF, Word, Excel, PowerPoint and image files can be attached",
                 {"name": name, "media_type": media_type, "bytes": len(data)},
             )
 
@@ -109,6 +117,11 @@ def _kind_of(name: str, media_type: str, data: bytes) -> tuple[AttachmentKind, s
 def _text_of(name: str, kind: AttachmentKind, data: bytes) -> str:
     if kind == "text":
         return data.decode("utf-8", errors="replace")
+    if kind == "office":
+        office: OfficeKind | None = office_kind(name, data)
+        if office is None:
+            raise InvalidValueError("the file is no Office file", {"name": name})
+        return office_text(office, data)
     try:
         return pdf_to_text(data, name)
     except WebError as error:

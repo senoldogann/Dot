@@ -5129,8 +5129,8 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 190 | The pages say what they could not read, follow the rules and tell of an update       | done        | 8f92f36 |
 | 191 | The desktop shell says what it could not read                                        | done        | a0d5eef |
 | 192 | A question offers its options with what each leads to and the one recommended        | done        | 5a41ac7 |
-| 193 | The chat shows pages Dot makes: charts, 3D drawings and other visuals                | in progress |         |
-| 194 | Dot reads Word, Excel and PowerPoint files                                           | planned     |         |
+| 193 | The chat shows pages Dot makes: charts, 3D drawings and other visuals                | done        | 1cc6fac |
+| 194 | Dot reads Word, Excel and PowerPoint files                                           | in progress |         |
 | 195 | A file opens in a panel beside the chat: PDF, sheets, documents and more             | planned     |         |
 | 196 | Dot knows its way around Word, Excel and OneDrive on the Mac                         | planned     |         |
 
@@ -9580,7 +9580,7 @@ chosen when that fits, and always takes an answer of the user's own words.
 
 ### 193. The chat shows pages Dot makes: charts, 3D drawings and other visuals
 
-**Status: in progress.**
+**Status: done.** Merged as `1cc6fac` (PR #233; no Linear issue, the Linear connector was signed out).
 
 **As built (2026-10-14).** `show_page(title, html)` keeps a page the run writes in HTML (up to 500,000 characters) in
 the database under an id that cannot be guessed, and the run's `page_shown` event names it; the chat shows it in a card
@@ -9617,7 +9617,26 @@ the colours of the theme in use.
 
 ### 194. Dot reads Word, Excel and PowerPoint files
 
-**Status: planned.**
+**Status: in progress.**
+
+**As built (2026-10-14).** Word, Excel and PowerPoint files of Office Open XML (`.docx`; `.xlsx` and `.xlsm`; `.pptx`)
+can be attached, as the `office` kind, and their text reaches the model in the message as a PDF's does
+(`dotagent.office`, with `python-docx`, `openpyxl` and `python-pptx`). A document reads as its paragraphs and tables in
+order, headings and list items marked as Markdown marks them, and a table as a Markdown table; a workbook reads sheet by
+sheet (its name, and hidden when it is), a line for each row that holds anything, each cell after its address and a
+formula with the value Excel last worked out for it, or not worked out yet when no program that calculates saved it; at
+most 100,000 cells, and the text says where it stops. Every sheet is read to its last cell: a sheet read only stops
+where the size it records of itself ends, and a file another program wrote can record one too small. A presentation
+reads slide by slide, its title first, then the text of its shapes (those in groups too, a paragraph indented by its
+level), its tables, its charts (title, kind, and each series' values by category; a chart of a kind `python-pptx` does
+not read, 3D bars or a stock chart, is named as not read, and the rest of the slide is read) and its notes. `read_file`
+reads such a file on disk the same way, paged by its lines like a PDF. A file of before 2007 (`.doc`, `.xls`, `.ppt`) or
+one locked with a password is refused, at upload and by `read_file`, saying what to save instead, and a broken one says
+that it cannot be read and why. Before, attachments refused Word, Excel and PowerPoint files, and `read_file` called
+them binary. Tests: `tests/unit/test_office.py` (files made with the same libraries, two of them edited in their zip
+packages into what the libraries do not write) and the attachment test of `tests/smoke/test_server.py`, which uploads a
+Word document, a workbook and a presentation and finds their text in the message the model reads, and is refused a
+workbook of before 2007 and a locked document.
 
 **What.** A Word, Excel or PowerPoint file attached to a chat reaches the model as text: a document's paragraphs and
 tables, a sheet's cells with their addresses and formulas, a presentation's slides and notes. A tool reads such a file
@@ -10273,3 +10292,4 @@ installed, and eval tasks check the skills.
 - 2026-10-14 (Opus 5.5): the home's greeting test lets its working run end by a file of its own instead of after 8 s, which the pages outlasted once on a loaded machine (the smoke of item 187).
 - 2026-10-14 (Opus 5.5): part 31, Office files, previews, visuals and questions, is planned (items 192 to 196), and two questions to the owner are recorded (open owner decisions 37 and 38); item 192 is built: a question offers its options with what each leads to and the one recommended, and several may be chosen.
 - 2026-10-14 (Opus 5.5): item 192 merged as `5a41ac7` (PR #232; no Linear issue, the connector was signed out): A question of the agent offers its options with what each leads to and the one it recommends, several may be chosen, and the terminal takes an option's number.
+- 2026-10-14 (Opus 5.5): item 193 merged as `1cc6fac` (PR #233; no Linear issue, the connector was signed out): The chat shows pages a run writes in HTML (charts, 3D drawings, tables, diagrams) in a card, sandboxed, sized to the page and in the colours of the theme on screen.
