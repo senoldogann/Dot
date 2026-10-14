@@ -704,10 +704,12 @@ class ActivityRow(FrozenModel):
 
 class ActivityView(FrozenModel):
     """``GET /activity``: what waits for the user, what works now, what ended today, what was learned today and what
-    is due later today (see ``server.activity``)."""
+    is due later today (see ``server.activity``). ``ended_delegated`` are the runs that runs at work delegated and
+    that have ended: the pages show them under the run that delegated them, with those at work (item 198)."""
 
     waiting: list[ActivityRow]
     working: list[ActivityRow]
+    ended_delegated: list[ActivityRow]
     recent: list[ActivityRow]
     learned_today: list[ActivityRow]
     due: list[ActivityRow]

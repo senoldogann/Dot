@@ -54,6 +54,8 @@ export function mount(root, ctx) {
     body.replaceChildren(
       ...SECTIONS.map(({ key, title, empty, hint }) => {
         const items = shown(view[key]);
+        // A run at work shows the runs it delegated that have ended under it (item 198); the count is of what works.
+        const rows = key === "working" ? [...items, ...shown(view.ended_delegated)] : items;
         return el(
           "section",
           { class: "card activity-section", "data-section": key },
@@ -63,7 +65,7 @@ export function mount(root, ctx) {
             : el(
                 "div",
                 { class: "activity-list" },
-                ...nestRows(items).map(({ row: item, children }) => [
+                ...nestRows(rows).map(({ row: item, children }) => [
                   activityRow(item, false),
                   children.length === 0 ? null : el("div", { class: "activity-children" }, children.map((kid) => activityRow(kid, true))),
                 ]),

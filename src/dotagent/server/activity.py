@@ -262,9 +262,10 @@ def _reflection_row(reflection: Reflection) -> ActivityRow:
 async def activity_view(store: Store, manager: RunManager, now: float) -> ActivityView:
     """The three sections at ``now``: waiting (the approvals and questions runs wait for, the questions runs left for
     the user, the runs the user holds),
-    working (the live runs that wait for nothing, the schedules due within the hour), recent (the runs that ended
-    today and the reflection that ran today, newest first), learned_today (the journal and the lessons written today)
-    and due (the schedules and campaign sessions due before the day ends)."""
+    working (the live runs that wait for nothing, the schedules due within the hour), ended_delegated (the runs that
+    the runs of working delegated and that have ended, oldest first), recent (the runs that ended today but those,
+    and the reflection that ran today, newest first), learned_today (the journal and the lessons written today) and
+    due (the schedules and campaign sessions due before the day ends)."""
     waiting: list[ActivityRow] = []
     working: list[ActivityRow] = []
     live: dict[str, RunRecord] = {}
@@ -289,13 +290,22 @@ async def activity_view(store: Store, manager: RunManager, now: float) -> Activi
     for run in live.values():
         if run.id not in covered:
             working.append(await _working_row(store, run))
+    # A run at work shows every run it delegated (item 198): those that ended stay under it, until it ends too.
+    ended_delegated: list[ActivityRow] = []
+    for run in live.values():
+        if run.id in covered or run.parent_run_id is not None:
+            continue
+        for child in await store.list_child_runs(run.id):
+            if child.id not in live and child.status in _ENDED:
+                ended_delegated.append(await _working_row(store, child))
     for schedule in await store.list_schedules():
         if schedule.enabled and schedule.next_run_at is not None and schedule.next_run_at - now <= _DUE_WITHIN_S:
             working.append(_schedule_row(schedule, now))
+    under: set[str] = {row.id for row in ended_delegated}
     recent: list[ActivityRow] = []
     today: float = start_of_today(now)
     for run in await store.list_runs(_RECENT_RUNS, None):
-        if run.status in _ENDED and run.finished_at is not None and run.finished_at >= today:
+        if run.status in _ENDED and run.finished_at is not None and run.finished_at >= today and run.id not in under:
             recent.append(await _run_row(store, run, "recent", "run", "", _title(run.goal)))
     reflection: Reflection | None = await last_reflection(store)
     if reflection is not None and reflection.at >= today:
@@ -306,6 +316,7 @@ async def activity_view(store: Store, manager: RunManager, now: float) -> Activi
     return ActivityView(
         waiting=waiting,
         working=working,
+        ended_delegated=ended_delegated,
         recent=recent,
         learned_today=await _learned_today(store, today),
         due=await _due_today(store, now),
