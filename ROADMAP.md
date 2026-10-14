@@ -5143,8 +5143,8 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 204 | Adding or deleting keeps the page where it is                                        | done        | db647a3 |
 | 205 | A message's time, its copy and a send again, after T3 Code                           | done        | 9934575 |
 | 206 | Markdown in the conversation, and copies that keep it                                | done        | 33a7f8d |
-| 207 | The composer shows the markdown it holds, after T3 Code                              | in progress |         |
-| 208 | The model menu: providers at the side, a search and favourites, after T3 Code        | planned     |         |
+| 207 | The composer shows the markdown it holds, after T3 Code                              | done        | 23f1d9a |
+| 208 | The model menu: providers at the side, a search and favourites, after T3 Code        | in progress |         |
 
 ### 77. The type system: Inter and Geist Mono, seven sizes, three weights
 
@@ -10049,7 +10049,7 @@ formatted copy goes along for the applications that read it. The copy buttons co
 
 ### 207. The composer shows the markdown it holds, after T3 Code
 
-**Status: in progress.**
+**Status: done.** Merged as `23f1d9a` (PR #246; no Linear issue, the Linear connector was signed out).
 
 **As built (2026-10-14).** T3 Code's composer is a rich text editor that hides the marks it reads; Dot's box stays a
 text field, which the slash menu, the files, the queue, the drafts, the keys, the listening face and the send all use,
@@ -10084,7 +10084,35 @@ as before.
 
 ### 208. The model menu: providers at the side, a search and favourites, after T3 Code
 
-**Status: planned.**
+**Status: in progress.**
+
+**As built (2026-10-14).** The Model pill's menu is T3 Code's model picker made of Dot's own parts (`modelpicker.js`): a
+rail on its left with the favourites' star, a rule, then the mark of each provider that lists models that can call
+tools, its name where the pointer rests; the view shown is pressed, with a bar on the rail's edge. A provider's view
+lists its models in the order the provider gives them, the favourites' view lists the favourites with their providers'
+names, and the daemon's default stays the first row of every view. The search above the list takes the keys as the menu
+opens (where a pointer can hover; on a touch screen it leaves the focus where it is, so that no keyboard springs up over
+the list) and looks across every provider: each word has to be in the model's name, its provider's name or id, or
+"free"; a name counts before a provider and a whole word or a start before the middle, the favourites go first on a tie,
+then the providers' order; while it searches the rail presses none, and a search that finds nothing says so. Each model
+has a star that keeps it among the favourites without picking it. The favourites are kept in this browser, as the home's
+choices are (`dot.models.favourites`, read back only as a list of references), and the menu opens on them once one of
+them is offered, else on the provider of the model a run would use (a menu opened before the models or the daemon's
+default had come chooses again once they come); a row starred or unstarred stays in its place until the list is shown
+again. The keys stay in the search: the arrows move the row they are on (the tint; the chosen model has its tick), Enter
+picks it, ⌘1 to ⌘9 pick the first nine models of the list, which show those keys, ⌘D stars the row the keys are on, the
+left arrow on an empty search or Shift+Tab goes to the rail (up and down there, Enter shows a view, the right arrow goes
+back) and Escape closes the menu; a press on a row or a star leaves the keys in the search. The menu keeps one height
+whatever it shows, so a view never moves its top, and only the list scrolls. `popover.js` lets a control of a panel take
+the focus as it opens (`data-autofocus`) and keep the arrows it answers itself; the providers' headings of the old list
+(`.pop-group`) went with it. Tests: `tests/smoke/test_model_picker.py`, a real server whose providers list the test's
+models (stand-ins for OpenAI and Anthropic, which answer nothing; a model that cannot call tools and a provider with no
+key are left out): the rail and its marks, the opening view, a provider's view, searches across providers (one for a
+free model, one that finds nothing), a star that picks nothing and is kept, the arrows and Enter, the favourites' view
+and ⌘1, ⌘D, the rail by the keys, Escape and the default's row; at 1280 px light and dark and at 390 px, and on a touch
+screen, where the search takes no focus and the rows show no keys; and a menu opened while the model list was held back,
+which moves to its opening view once the list comes. On the code of before, it found no picker. It passed in WebKit too,
+and the tests of the composer's other menus pass unchanged.
 
 **What.** The composer's model menu gets a rail of the providers' marks at its left (favourites first), which filters
 the list to one provider; a search over every provider's models; a star on each model that keeps it among the
@@ -10736,3 +10764,4 @@ favourites; and keys: the arrows and Enter, ⌘1 to ⌘9 for the rows in sight. 
 - 2026-10-14 (Opus 5.5): item 204 merged as `db647a3` (PR #243; no Linear issue, the connector was signed out): Adding or deleting keeps the page where it is: the side menu brings the open chat into view only when the page comes to another chat, and the Memory page keeps the notes it read, their rows and its place.
 - 2026-10-14 (Opus 5.5): item 205 merged as `9934575` (PR #244; no Linear issue, the connector was signed out): Under each of the owner's messages, once its turn has its answer: when it was sent, a copy of it and Send again; under each answer, a copy of it and when it came.
 - 2026-10-14 (Opus 5.5): item 206 merged as `33a7f8d` (PR #245; no Linear issue, the connector was signed out): The owner's messages read as markdown, and a copy out of the conversation keeps the markdown it was written in, a list as a list and a table as a table.
+- 2026-10-14 (Opus 5.5): item 207 merged as `23f1d9a` (PR #246; no Linear issue, the connector was signed out): The composer's box shows the markdown it holds as it reads, its marks quieter than its words, letter for letter under the text as typed.
