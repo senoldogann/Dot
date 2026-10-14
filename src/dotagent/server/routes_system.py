@@ -62,6 +62,10 @@ from dotagent.server.guard import daemon_proof
 from dotagent.server.palette import palette_view
 from dotagent.server.views import (
     ElsewhereChange,
+    ElsewhereImport,
+    ElsewhereImported,
+    ElsewhereItem,
+    ElsewhereRefusal,
     FailsafeView,
     HealthView,
     LearnedSkillsView,
@@ -252,23 +256,22 @@ def system_router(ctx: ServerContext, pages: str) -> APIRouter:
         has: DotHas = dot_has(config, catalog, ctx.runtime.plugins.plugins, added)
         return await asyncio.to_thread(found_elsewhere, Path.home(), has, SKILL_COPY_LIMIT)
 
-    async def add_found(change: ElsewhereChange) -> None:
-        """Add the skill or the MCP server ``change`` names, as it is found now."""
-        found: FoundElsewhere = await found_now()
-        context: dict[str, str] = {"kind": change.kind, "agent": change.agent, "name": change.name}
-        if change.kind == "skill":
+    async def add_found(found: FoundElsewhere, wanted: ElsewhereItem) -> None:
+        """Add the skill or the MCP server ``wanted`` names, as ``found`` has it."""
+        context: dict[str, str] = {"kind": wanted.kind, "agent": wanted.agent, "name": wanted.name}
+        if wanted.kind == "skill":
             skill: FoundSkill | None = next(
-                (item for item in found.skills if (item.agent, item.name) == (change.agent, change.name)), None
+                (item for item in found.skills if (item.agent, item.name) == (wanted.agent, wanted.name)), None
             )
             if skill is None:
-                raise ElsewhereError(f"no skill {change.name} of {change.agent} is found on this Mac", context)
+                raise ElsewhereError(f"no skill {wanted.name} of {wanted.agent} is found on this Mac", context)
             await asyncio.to_thread(add_skill, skills_dir(), skill, SKILL_COPY_LIMIT)
             return
         server: FoundServer | None = next(
-            (item for item in found.servers if (item.agent, item.name) == (change.agent, change.name)), None
+            (item for item in found.servers if (item.agent, item.name) == (wanted.agent, wanted.name)), None
         )
         if server is None:
-            raise ElsewhereError(f"no MCP server {change.name} of {change.agent} is found on this Mac", context)
+            raise ElsewhereError(f"no MCP server {wanted.name} of {wanted.agent} is found on this Mac", context)
         await asyncio.to_thread(add_server, added_servers_path(), Path.home(), server)
 
     @router.get("/skills/elsewhere")
@@ -285,13 +288,32 @@ def system_router(ctx: ServerContext, pages: str) -> APIRouter:
         Dot's next start. One is taken back by its agent and its name, whether or not the agent still has it. What is
         found after it."""
         if change.added:
-            await add_found(change)
+            await add_found(await found_now(), ElsewhereItem(kind=change.kind, agent=change.agent, name=change.name))
         elif change.kind == "skill":
             await asyncio.to_thread(remove_skill, skills_dir(), change.agent, change.name)
         else:
             await asyncio.to_thread(remove_server, added_servers_path(), change.agent, change.name)
         log.info("elsewhere_changed", kind=change.kind, agent=change.agent, name=change.name, added=change.added)
         return await found_now()
+
+    @router.post("/skills/elsewhere/import")
+    async def import_elsewhere(request: ElsewhereImport) -> ElsewhereImported:
+        """Add several skills and MCP servers found elsewhere at once: the owner's yes to each (item 219). Each is added
+        as the one scan before them found it, as ``PUT /skills/elsewhere`` adds one; one that cannot be added (taken by
+        an item before it, changed, gone) is told with its reason and the others go on. What it added, what it could
+        not, and what is found after it."""
+        found: FoundElsewhere = await found_now()
+        added: list[ElsewhereItem] = []
+        refused: list[ElsewhereRefusal] = []
+        for item in request.items:
+            try:
+                await add_found(found, item)
+            except ElsewhereError as error:
+                refused.append(ElsewhereRefusal(item=item, reason=error.message))
+                continue
+            added.append(item)
+        log.info("elsewhere_imported", asked=len(request.items), added=len(added), refused=len(refused))
+        return ElsewhereImported(added=tuple(added), refused=tuple(refused), found=await found_now())
 
     @router.get("/palette")
     async def palette() -> PaletteView:

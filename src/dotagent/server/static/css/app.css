@@ -3828,6 +3828,73 @@ dialog.modal::backdrop {
   padding: 16px 20px 16px;
 }
 
+/* Import from other apps (item 219, skills.js): a checklist by agent that scrolls inside past its first rows; a row is
+   a label, so its name and its detail tick its box too. */
+dialog.modal.import-dialog {
+  width: min(560px, calc(100vw - 32px));
+  max-width: min(560px, calc(100vw - 32px));
+}
+
+.import-all {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border);
+  font-weight: var(--weight-label);
+  cursor: pointer;
+}
+
+.import-list {
+  max-height: min(360px, 50vh);
+  max-height: min(360px, 50dvh);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.import-group-head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 12px 0 4px;
+  color: var(--text-2);
+  font-weight: var(--weight-label);
+}
+
+.import-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 8px 0;
+  cursor: pointer;
+}
+
+.import-row input,
+.import-all input {
+  flex: none;
+  margin-top: 4px;
+  accent-color: var(--accent);
+}
+
+.import-row-main {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.import-row-name {
+  font-weight: var(--weight-label);
+}
+
+.import-row-detail {
+  overflow: hidden;
+  color: var(--muted);
+  font-size: var(--text-sm);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 dialog.lightbox {
   border: 0;
   padding: 0;

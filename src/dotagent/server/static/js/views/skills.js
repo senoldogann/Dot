@@ -4,10 +4,12 @@
 // agents set up (item 164): their skills, folded by agent, and their MCP servers by name and what they reach, never
 // their arguments or keys. Dot uses one only once the owner adds it here, after a confirmation (item 165): a skill is
 // copied into Dot's skills folder and offered to runs at once, a server is started from Dot's next start; Remove
-// takes it back. Each list keeps a size and scrolls inside past its first rows (item 218).
+// takes it back. Import from other apps, at the head of the page, adds several at once from a checklist (item 219).
+// Each list keeps a size and scrolls inside past its first rows (item 218).
 
 import { api } from "../api.js";
-import { ago, el, plural } from "../dom.js";
+import { ago, clip, el, plural } from "../dom.js";
+import { icon } from "../icons.js";
 import { emptyPanel, errorPanel, foldGroup, loadingPanel, paneHead } from "../panels.js";
 import { attempt, confirmDialog, toast } from "../ui.js";
 
@@ -154,6 +156,125 @@ export function changeFound(kind, item, added) {
   return askAndChange(foundDialog(kind, item, added), { kind, agent: item.agent, name: item.name, added }, done);
 }
 
+/** Whether Dot can add a found item: it does not have it, and nothing stands in the way. */
+function addable(item) {
+  return !item.added && !item.used && item.refusal === null;
+}
+
+/** What a found MCP server starts or reaches, in a few words. */
+function reachOf(server) {
+  return server.transport === "stdio" ? `Starts ${server.reaches}` : `${server.transport.toUpperCase()} to ${server.reaches}`;
+}
+
+/**
+ * The owner's choice of what to import (item 219): a checklist of the skills, by agent, and the MCP servers that Dot can
+ * add, the skills chosen at first and the servers not, as a server starts a program of this Mac. Resolves to the items
+ * chosen (`{ kind, agent, name }`), or null when the owner closed it.
+ */
+function importDialog(found) {
+  return new Promise((resolve) => {
+    const skills = found.skills.filter(addable);
+    const servers = found.servers.filter(addable);
+    const ticks = [];
+    const dialog = el("dialog", { class: "modal import-dialog", "aria-labelledby": "import-title" });
+    const go = el("button", { class: "btn primary", type: "button", onclick: () => dialog.close("ok") });
+    const cancel = el("button", { class: "btn", type: "button", onclick: () => dialog.close("cancel") }, "Cancel");
+    const all = el("input", { type: "checkbox" });
+
+    function paint() {
+      const chosen = ticks.filter((tick) => tick.box.checked).length;
+      go.textContent = chosen === 0 ? "Import" : `Import ${chosen}`;
+      go.disabled = chosen === 0;
+      all.checked = chosen === ticks.length;
+      all.indeterminate = chosen > 0 && chosen < ticks.length;
+    }
+
+    function tick(kind, item, chosen, detail) {
+      const box = el("input", { type: "checkbox", checked: chosen, onchange: paint });
+      ticks.push({ box, item: { kind, agent: item.agent, name: item.name } });
+      return el(
+        "label",
+        { class: "import-row" },
+        box,
+        el("span", { class: "import-row-main" }, el("span", { class: "import-row-name" }, item.name), el("span", { class: "import-row-detail" }, detail)),
+      );
+    }
+
+    const agents = new Map();
+    for (const skill of skills) {
+      agents.set(skill.agent, [...(agents.get(skill.agent) ?? []), skill]);
+    }
+    const groups = [...agents].map(([agent, list]) =>
+      el(
+        "div",
+        { class: "import-group" },
+        el("div", { class: "import-group-head" }, agent, el("span", { class: "hint" }, plural(list.length, "skill", "skills"))),
+        list.map((skill) => tick("skill", skill, true, clip(skill.description, 140))),
+      ),
+    );
+    if (servers.length > 0) {
+      groups.push(
+        el(
+          "div",
+          { class: "import-group" },
+          el("div", { class: "import-group-head" }, "MCP servers", el("span", { class: "hint" }, "start with Dot's next start")),
+          servers.map((server) => tick("server", server, false, `${server.agent} · ${reachOf(server)}`)),
+        ),
+      );
+    }
+    all.addEventListener("change", () => {
+      for (const { box } of ticks) {
+        box.checked = all.checked;
+      }
+      paint();
+    });
+    const others = found.skills.length + found.servers.length - skills.length - servers.length;
+    dialog.append(
+      el(
+        "div",
+        { class: "modal-body" },
+        el("h3", { id: "import-title" }, "Import from other apps"),
+        el(
+          "p",
+          { class: "muted" },
+          "What Claude Code, Codex and the Mac's other agents set up. A skill is copied into Dot and offered to runs at once; an MCP server starts with Dot's next start, as its app starts it.",
+        ),
+        el("label", { class: "import-all" }, all, el("span", null, "Choose all")),
+        el("div", { class: "import-list" }, groups),
+        others === 0 ? null : el("p", { class: "hint" }, `${plural(others, "other item is", "other items are")} in Dot already or cannot be added; Found on this Mac says which.`),
+      ),
+      el("div", { class: "modal-actions" }, cancel, go),
+    );
+    dialog.addEventListener("close", () => {
+      dialog.remove();
+      resolve(dialog.returnValue === "ok" ? ticks.filter((one) => one.box.checked).map((one) => one.item) : null);
+    });
+    paint();
+    document.body.append(dialog);
+    dialog.showModal();
+    go.focus();
+  });
+}
+
+/**
+ * Import what the owner chooses of `found` (item 219): one request adds them all, and a toast says what was added and
+ * what could not be; resolves to what is found after it, or null when the owner chose nothing.
+ */
+export async function importFound(found) {
+  const items = await importDialog(found);
+  if (items === null || items.length === 0) {
+    return null;
+  }
+  const done = await api.post("/skills/elsewhere/import", { items });
+  if (done.added.length > 0) {
+    toast("ok", `Imported ${plural(done.added.length, "item", "items")}.`);
+  }
+  for (const refused of done.refused) {
+    toast("error", `${refused.item.name} was not imported: ${refused.reason}`);
+  }
+  return done.found;
+}
+
 /** A line of why Dot cannot take a found item, under its name. */
 function refusalLine(text) {
   return el("div", { class: "row-meta" }, el("span", { class: "hint" }, text));
@@ -202,7 +323,7 @@ function foundSkillRow(skill, onFound) {
 
 /** An MCP server another agent set up: its name, the agent, the program it starts or the host it reaches, and Add. */
 function foundServerRow(server, onFound) {
-  const reach = server.transport === "stdio" ? `Starts ${server.reaches}` : `${server.transport.toUpperCase()} to ${server.reaches}`;
+  const reach = reachOf(server);
   const { chip, refusal, action } = foundState("server", server, "Dot has it", onFound);
   return el(
     "div",
@@ -294,6 +415,22 @@ export function mount(root) {
   let found = null;
   let foundError = null;
   const holder = el("div", null, loadingPanel());
+  const importButton = el("button", { class: "btn sm", type: "button", disabled: true }, icon("download"), "Import from other apps");
+  importButton.addEventListener("click", () => attempt(async () => foundChanged(await importFound(found))));
+
+  // The button can be pressed once what other apps set up is read and something of it can be added.
+  function paintImport() {
+    const count = found === null ? 0 : found.skills.filter(addable).length + found.servers.filter(addable).length;
+    importButton.disabled = count === 0;
+    importButton.title =
+      found === null
+        ? foundError === null
+          ? "Looking for what other apps set up…"
+          : "What other apps set up could not be read"
+        : count === 0
+          ? "Nothing found that Dot can add"
+          : `${plural(count, "item", "items")} found that Dot can add`;
+  }
 
   function foundPart() {
     if (foundError !== null) {
@@ -303,6 +440,7 @@ export function mount(root) {
   }
 
   function paint() {
+    paintImport();
     if (items === null) {
       return;
     }
@@ -372,7 +510,7 @@ export function mount(root) {
   }
 
   root.replaceChildren(
-    paneHead("What Dot and its agents learned from their own work, offered to later runs as advice, and what the Mac's other agents set up.", []),
+    paneHead("What Dot and its agents learned from their own work, offered to later runs as advice, and what the Mac's other agents set up.", [importButton]),
     holder,
   );
   load();
