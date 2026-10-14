@@ -31,6 +31,8 @@ pytestmark = pytest.mark.asyncio(loop_scope="module")
 
 GOAL: str = "Work in a terminal."
 SECRET: str = "correct-horse-7"
+# What Python's http.server says once it serves, with its port.
+_SERVING: str = r"Serving HTTP on 127\.0\.0\.1 port (\d+)"
 
 
 @pytest_asyncio.fixture(scope="module", loop_scope="module")
@@ -137,7 +139,12 @@ async def test_a_server_stays_up_between_calls_and_stops_with_its_session(runtim
     ctx: ToolContext = await _yolo_context(runtime)
     _, opened = await _call(ctx, "terminal_open", {"command": "python3 -m http.server 0 --bind 127.0.0.1"})
     session: str = _session(opened)
-    port: re.Match[str] | None = re.search(r"Serving HTTP on 127\.0\.0\.1 port (\d+)", opened)
+    port: re.Match[str] | None = re.search(_SERVING, opened)
+    if port is None:
+        # A cold Python, as on CI's runner, can take more than the 2 s terminal_open waits to say where it serves.
+        _, more = await _call(ctx, "terminal_read", {"session": session, "wait_s": 30})
+        opened += more
+        port = re.search(_SERVING, opened)
     assert port is not None, opened
     url: str = f"http://127.0.0.1:{port.group(1)}/"
     async with httpx.AsyncClient(trust_env=False) as client:
