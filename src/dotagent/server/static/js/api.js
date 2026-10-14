@@ -353,6 +353,24 @@ export function forgetImages() {
   images.clear();
 }
 
+/**
+ * A `blob:` URL for the picture the daemon answers at `path` (a page of a PDF, an image of a file), fetched with the token
+ * and never kept in the browser's cache: the file may change. Whoever asked lets it go with `URL.revokeObjectURL`.
+ */
+export async function blobUrl(path) {
+  await proven();
+  let response;
+  try {
+    response = await fetch(`/api${path}`, { headers: authHeaders(), cache: "no-store" });
+  } catch (cause) {
+    throw new ApiError(0, "Cannot reach the Dot daemon. Is it running?", { path, cause: String(cause) });
+  }
+  if (!response.ok) {
+    throw await errorOf(response, path);
+  }
+  return URL.createObjectURL(await response.blob());
+}
+
 /** A `blob:` URL for a stored screenshot; images need the token, so they cannot be plain `<img src>` links. */
 export function imageUrl(name) {
   let pending = images.get(name);

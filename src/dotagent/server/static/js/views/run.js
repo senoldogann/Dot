@@ -10,7 +10,7 @@ import { createComputer } from "../computer.js";
 import { createCostCard } from "../cost.js";
 import { createDetails } from "../details.js";
 import { composerFrame } from "../composer.js";
-import { clip, dateTimeFull, debounce, duration, el, modelName } from "../dom.js";
+import { clip, dateTimeFull, debounce, duration, el, FILE_BUTTONS, fileSource, modelName, OPEN_FILE_EVENT, requestFile } from "../dom.js";
 import { levelLabel } from "../efforts.js";
 import { continuedIn, earlierTurns, loadHistory, RESUME_SOURCE } from "../history.js";
 import { dotName, faceState, faceStateAtEnd } from "../face.js";
@@ -44,6 +44,8 @@ const LESSON_KINDS = new Set(["lessons_proposed", "lesson_saved", "lesson_dismis
 const LESSON_STATES = { saved: { mark: "check", text: "Saved to memory" }, dismissed: { mark: "x", text: "Dismissed" } };
 // A replayed run brings its question events in a burst: one refresh after it is enough.
 const QUESTIONS_SETTLE_MS = 120;
+// The conversation changes with every event of a run: the list of its files is drawn again once it settles.
+const FILES_SETTLE_MS = 250;
 // How often the cost card is read again while the run works (its numbers come from a query over the run's events).
 const COST_REFRESH_MS = 10_000;
 // What the Actions panel says of a file change, by the state of its undo (see undo.restore.UndoStep).
@@ -858,7 +860,7 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
       el(
         "div",
         { class: "row-main" },
-        el("div", { class: "row-title mono" }, edit.path),
+        el("button", { class: "row-title mono file-link", type: "button", title: "Show the file", dataset: { path: edit.path }, onclick: (event) => requestFile(event.currentTarget) }, edit.path),
         edit.reason === null ? null : el("div", { class: "row-text small muted" }, edit.reason),
         el(
           "div",
@@ -913,6 +915,44 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
     }
   }
 
+  // ------------------------------------------------------------------------------------------------- files
+  // The files of the conversation (item 195): those its messages carried and those its answers name, in the order it
+  // shows them, each opening beside it as its chip or its path does. The list follows the conversation as it grows.
+  const filesBody = el("div", { class: "files-list" });
+  const filesCard = foldCard({ id: "run-files", title: "Files", actions: null, body: filesBody, openByDefault: false });
+  filesCard.element.hidden = true;
+  let filesShown = "";
+
+  function fileRow(source) {
+    const name = source.name ?? source.path.slice(source.path.lastIndexOf("/") + 1);
+    return el(
+      "button",
+      { class: "file-row", type: "button", title: source.path ?? name, dataset: source, onclick: (event) => requestFile(event.currentTarget) },
+      icon("file"),
+      el("span", { class: "file-row-name" }, name),
+      source.path === undefined ? null : el("span", { class: "small muted file-row-where" }, source.path),
+    );
+  }
+
+  function paintFiles(thread) {
+    const sources = new Map();
+    for (const button of thread.querySelectorAll(FILE_BUTTONS)) {
+      const source = fileSource(button);
+      const key = source.attachment ?? source.path;
+      if (!sources.has(key)) {
+        sources.set(key, source);
+      }
+    }
+    const shown = [...sources.keys()].join("\n");
+    if (shown === filesShown) {
+      return;
+    }
+    filesShown = shown;
+    filesCard.element.hidden = sources.size === 0;
+    filesCard.setSummary(el("span", null, sources.size === 1 ? "1 file" : `${sources.size} files`));
+    filesBody.replaceChildren(...[...sources.values()].map(fileRow));
+  }
+
   const actorName = agent !== null ? agent.name : dotName();
   // The width of the panel (item 109): chosen on Dot's computer or dragged on the handle beside the panel.
   const stage = createStageSize({ layout });
@@ -928,8 +968,10 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
   // is the top bar's face and the Details card's first fact; no card at the head of the conversation (item 113).
   const inspector = createInspector({
     layout,
-    content: [computer.element, details.element, cost.element, plan.element, actionsCard.element],
+    content: [computer.element, details.element, cost.element, plan.element, filesCard.element, actionsCard.element],
   });
+  // A file a message carries, or one the conversation names, takes the panel (item 195).
+  layout.addEventListener(OPEN_FILE_EVENT, (event) => inspector.showFile(event.detail, event.target));
   const timeline = createTimeline({
     rootRunId: runId,
     actorId: agent !== null ? agent.id : run.parent_run_id === null ? "dot" : run.id,
@@ -964,30 +1006,27 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
   setStageTitle(face, crumb, crumbSep, stageName);
   setStageTools(inspector.toggle);
 
+  // The conversation grows into the room a short one leaves, so the dock under it stands at the window's foot from the
+  // first message (item 129).
+  const thread = el(
+    "div",
+    { class: "run-thread" },
+    el("h1", { class: "visually-hidden" }, run.goal),
+    connectionNote,
+    problem,
+    earlierTurns(history.earlier),
+    // A resumed run's goal is the one of the run above it; its timeline opens with how it resumed that run.
+    run.source === RESUME_SOURCE ? null : userMessage(run.goal, dateTimeFull(run.created_at)),
+    timeline.element,
+    waitingList,
+    questionsList,
+    lessonsCard,
+    continuedIn(history.later),
+  );
+  const filesWatch = new MutationObserver(debounce(() => paintFiles(thread), FILES_SETTLE_MS));
+  filesWatch.observe(thread, { childList: true, subtree: true });
   layout.append(
-    el(
-      "div",
-      { class: "run-main" },
-      // The conversation grows into the room a short one leaves, so the dock under it stands at the window's foot from
-      // the first message (item 129).
-      el(
-        "div",
-        { class: "run-thread" },
-        el("h1", { class: "visually-hidden" }, run.goal),
-        connectionNote,
-        problem,
-        earlierTurns(history.earlier),
-        // A resumed run's goal is the one of the run above it; its timeline opens with how it resumed that run.
-        run.source === RESUME_SOURCE ? null : userMessage(run.goal, dateTimeFull(run.created_at)),
-        timeline.element,
-        waitingList,
-        questionsList,
-        lessonsCard,
-        continuedIn(history.later),
-      ),
-      dock,
-      foot,
-    ),
+    el("div", { class: "run-main" }, thread, dock, foot),
     stage.handle,
     inspector.element,
     inspector.scrim,
@@ -997,6 +1036,7 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
   inspector.arrange();
   paintStats();
   paintCost();
+  paintFiles(thread);
   syncControls();
   paintLessons(detail.lessons);
   paintQuestions(detail.questions);
@@ -1052,6 +1092,7 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
 
   return () => {
     window.removeEventListener("scroll", onScroll);
+    filesWatch.disconnect();
     stopLifecycle();
     stopBack();
     computer.dispose();

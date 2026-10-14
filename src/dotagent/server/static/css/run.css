@@ -39,8 +39,14 @@
   --panel-w: clamp(320px, var(--stage-px), calc(100% - 388px));
 }
 
+/* A file in the panel (item 195) takes half of the page when the panel has only its own width. */
+.run-layout[data-inspector="on"][data-file="on"][data-stage="compact"] {
+  --panel-w: minmax(320px, 1fr);
+}
+
 /* A panel wider than its own width takes the page: the frame lets go of its reading width. */
-.page[data-layout="run"]:has(.run-layout[data-inspector="on"]:not([data-stage="compact"])) {
+.page[data-layout="run"]:has(.run-layout[data-inspector="on"]:not([data-stage="compact"])),
+.page[data-layout="run"]:has(.run-layout[data-inspector="on"][data-file="on"]) {
   max-width: none;
 }
 
@@ -312,6 +318,308 @@
 .inspector[data-mode="drawer"] .inspector-head {
   display: flex;
   padding: 0 16px 8px;
+}
+
+/* ---------- a file in the panel (item 195) ---------- */
+
+/* A file takes the panel to its full height: its head stays, what it shows scrolls under it. On a narrow page the
+   drawer covers the page. */
+.inspector[data-file="on"] {
+  height: calc(100vh - var(--stagebar-h) - 24px);
+  height: calc(100dvh - var(--stagebar-h) - 24px);
+  overflow: hidden;
+}
+
+.inspector[data-file="on"] > :not(.file-view) {
+  display: none;
+}
+
+.inspector[data-mode="drawer"][data-file="on"] {
+  width: 100vw;
+  height: auto;
+  padding: 0;
+  border-left: 0;
+}
+
+.file-view {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+}
+
+/* The view takes the focus when it opens, for a screen reader to name it; it is no control to ring. */
+.file-view:focus {
+  outline: none;
+}
+
+.file-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 12px 12px 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.file-heading {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.file-heading > * {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* The sheets' tabs and what the cell clicked holds; nothing while there is nothing to show. */
+.file-toolbar {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.file-toolbar:not(:has(> :not([hidden]))) {
+  display: none;
+}
+
+.file-tabs {
+  align-self: flex-start;
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+.file-tabs button {
+  flex: none;
+  white-space: nowrap;
+}
+
+/* What the cell clicked holds, as a spreadsheet's formula bar says it. */
+.file-cell-line {
+  display: flex;
+  gap: 12px;
+  font-family: var(--mono);
+  font-size: var(--text-sm);
+  overflow-wrap: anywhere;
+}
+
+.file-body {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 16px;
+}
+
+/* A grid runs to the panel's edges, its letters and its numbers held in sight as it scrolls. */
+.file-view[data-kind="workbook"] .file-body,
+.file-view[data-kind="table"] .file-body {
+  padding: 0;
+}
+
+.file-sheet > .hint {
+  padding: 12px 16px;
+}
+
+.file-grid {
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
+}
+
+.file-grid th,
+.file-grid td {
+  max-width: 320px;
+  padding: 4px 8px;
+  overflow: hidden;
+  border-right: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.file-grid thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--surface-2);
+  color: var(--muted);
+  font-weight: var(--weight-label);
+  text-align: center;
+}
+
+.file-grid tbody th {
+  position: sticky;
+  left: 0;
+  background: var(--surface-2);
+  color: var(--muted);
+  font-weight: var(--weight-text);
+  text-align: right;
+}
+
+.file-grid thead th.corner {
+  left: 0;
+  z-index: 2;
+}
+
+.file-grid td[data-cell] {
+  cursor: pointer;
+}
+
+.file-grid td.num {
+  text-align: right;
+}
+
+/* A formula no program that calculates has worked out yet shows as itself. */
+.file-grid td.pending {
+  color: var(--muted);
+  font-style: italic;
+}
+
+.file-pages,
+.file-slides {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* A page holds its place at its own proportions until the daemon has drawn it. */
+.file-page {
+  margin: 0;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xs);
+  background: var(--surface-2);
+}
+
+.file-page img {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.file-page img:not([src]) {
+  visibility: hidden;
+}
+
+.file-picture img {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  margin: 0 auto;
+  border-radius: var(--radius-xs);
+}
+
+.file-text {
+  margin: 0;
+  font: var(--code-size) / var(--code-leading) var(--mono);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+/* A document's headings and a slide's title stand out from their text more than an answer's headings do. */
+.file-doc h2,
+.file-slide h3 {
+  font-size: var(--text-lg);
+  line-height: var(--leading-lg);
+  font-weight: var(--weight-title);
+}
+
+.file-slide {
+  padding: 12px 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+
+.file-line.level-1 {
+  padding-left: 16px;
+}
+
+.file-line.level-2 {
+  padding-left: 32px;
+}
+
+.file-line.level-3 {
+  padding-left: 48px;
+}
+
+.file-line.level-4 {
+  padding-left: 64px;
+}
+
+.file-slide-notes {
+  padding-top: 8px;
+  border-top: 1px dashed var(--border);
+  color: var(--text-2);
+}
+
+.file-chart {
+  margin: 0;
+}
+
+.file-chart figcaption {
+  margin-bottom: 4px;
+}
+
+/* The files of the conversation, in the panel: a row a file, its name over where it is. */
+.files-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.file-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  column-gap: 8px;
+  align-items: center;
+  padding: 4px 8px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.file-row:hover {
+  background: var(--surface-2);
+}
+
+.file-row-name,
+.file-row-where {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.file-row-where {
+  grid-column: 2;
+}
+
+/* A file the run changed, in Actions, shows the file at a click. */
+.action-edit .file-link {
+  display: block;
+  max-width: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font-family: var(--mono);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-label);
+  text-align: left;
+  overflow-wrap: anywhere;
+  cursor: pointer;
+}
+
+.action-edit .file-link:hover {
+  text-decoration: underline;
 }
 
 .inspector-scrim {

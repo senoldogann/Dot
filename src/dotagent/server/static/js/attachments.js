@@ -1,7 +1,7 @@
 // Files attached to a message: picked, dropped or pasted, uploaded at once, and listed with their state until the message goes.
 
 import { api } from "./api.js";
-import { clip, el } from "./dom.js";
+import { clip, el, requestFile } from "./dom.js";
 import { icon } from "./icons.js";
 import { toast } from "./ui.js";
 
@@ -29,13 +29,25 @@ function readBase64(file) {
   });
 }
 
-/** The attachments a message carried, as chips (used by the timeline for sent messages). */
+/** The attachments a message carried, as chips (used by the timeline for sent messages); a chip shows its file beside the conversation. */
 export function sentFiles(files) {
   return el(
     "div",
     { class: "attach-list sent" },
     files.map((file) =>
-      el("span", { class: "attach-chip ready", title: file.name }, icon(file.kind === "image" ? "image" : "file"), el("span", null, clip(file.name, NAME_CHARS)), el("span", { class: "muted" }, sizeLabel(file.size))),
+      el(
+        "button",
+        {
+          class: "attach-chip ready",
+          type: "button",
+          title: `Show ${file.name}`,
+          dataset: { attachment: file.id, name: file.name },
+          onclick: (event) => requestFile(event.currentTarget),
+        },
+        icon(file.kind === "image" ? "image" : "file"),
+        el("span", null, clip(file.name, NAME_CHARS)),
+        el("span", { class: "muted" }, sizeLabel(file.size)),
+      ),
     ),
   );
 }

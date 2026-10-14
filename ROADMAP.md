@@ -5130,8 +5130,8 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 191 | The desktop shell says what it could not read                                        | done        | a0d5eef |
 | 192 | A question offers its options with what each leads to and the one recommended        | done        | 5a41ac7 |
 | 193 | The chat shows pages Dot makes: charts, 3D drawings and other visuals                | done        | 1cc6fac |
-| 194 | Dot reads Word, Excel and PowerPoint files                                           | in progress |         |
-| 195 | A file opens in a panel beside the chat: PDF, sheets, documents and more             | planned     |         |
+| 194 | Dot reads Word, Excel and PowerPoint files                                           | done        | 5592965 |
+| 195 | A file opens in a panel beside the chat: PDF, sheets, documents and more             | in progress |         |
 | 196 | Dot knows its way around Word, Excel and OneDrive on the Mac                         | planned     |         |
 
 ### 77. The type system: Inter and Geist Mono, seven sizes, three weights
@@ -9617,7 +9617,7 @@ the colours of the theme in use.
 
 ### 194. Dot reads Word, Excel and PowerPoint files
 
-**Status: in progress.**
+**Status: done.** Merged as `5592965` (PR #234; no Linear issue, the Linear connector was signed out).
 
 **As built (2026-10-14).** Word, Excel and PowerPoint files of Office Open XML (`.docx`; `.xlsx` and `.xlsm`; `.pptx`)
 can be attached, as the `office` kind, and their text reaches the model in the message as a PDF's does
@@ -9644,7 +9644,37 @@ on disk the same way, a part at a time (`openpyxl`, `python-docx`, `python-pptx`
 
 ### 195. A file opens in a panel beside the chat: PDF, sheets, documents and more
 
-**Status: planned.**
+**Status: in progress.**
+
+**As built (2026-10-14).** A file opens in the side panel of the run page, which the file takes while it is open: half
+of the page when the panel has its own width, the whole screen on a phone; Close and Escape give the panel back as it
+was and the focus to what opened the file. It opens from a sent file's chip, from a file's path an answer names in code
+(`~/...` or `/Users/<name>/...`, to a name with a suffix; the prompt asks the model to name a file by its full path, in
+backticks), from the panel's Files card, which lists the conversation's files (those its messages carried and those its
+answers name, as it shows them), and from a file's path in Actions (the files the run changed with its file tools):
+these, rather than a list in the side menu, are where a chat's files are. `dotagent.previews` reads the file.
+`located_file` finds it, its links followed, in the workspace or in the home folder outside hidden folders and outside
+`~/Library`, but for `~/Library/CloudStorage` (OneDrive) and `~/Library/Mobile Documents` (iCloud Drive), and every
+route of `server/routes_files.py` finds its file with it; `shown_kind` tells how to show the file by its first bytes. A
+PDF shows its pages as PNGs that Core Graphics draws on a worker thread at one of four widths (`GET /api/files/page`) as
+they come into view, in their proportions and turned as the page says; a locked PDF says so. A workbook and a CSV or TSV
+table (its delimiter sniffed: a comma, or a semicolon where the comma marks decimals; its byte order mark read) show as
+a grid of the rows and the columns that hold anything, under their numbers and letters, with a tab for each sheet (a
+hidden one named so), at most 20,000 cells; a click on a cell says what it holds, its formula and the value last worked
+out, or that it is not worked out yet. A Word document shows its headings, paragraphs, lists and tables, and a
+presentation its slides with their text by level, tables, charts' series by category and notes: `dotagent.office` now
+reads a file into typed models, and makes the text for the model from them as before. An image is drawn from
+`GET /api/files/image`, a text shows as text (at most 512 KB), and any other file says why it is not shown (one of
+before 2007 says what to save instead). **Open on the Mac** (`POST /api/files/open`, `open` of Launch Services) opens a
+document of a kind in `OPENED_SUFFIXES`, never a script, a page or a program. The prompt's line costs the small-window
+scaffold test 14 tokens of its margin (its largest step is 20,232 of 20,250). Tests: `tests/unit/test_previews.py` (the
+places shown and refused, a link out of them, the kinds by first bytes, a CSV split at its semicolons and cut, a text
+cut between characters, a workbook's formulas, a PDF's pages drawn at a width) and `tests/smoke/test_file_panel.py` in
+Chrome at 1280 and 390 px, light and dark: a PDF, a workbook, a document and a presentation from their chips; from their
+paths in the answer, a CSV table that opens on the Mac through a stand-in, a text whose markup shows as written, an
+image, and a file in a hidden folder refused; the Files card, and the file the run wrote from Actions; the routes refuse
+`/etc/hosts` and a script to open, and draw a page as a PNG. It passed in WebKit too. Before, chips and paths were text,
+and nothing showed a file.
 
 **What.** A file of the chat opens in a panel beside it: an attachment, or a file a run wrote, from its chip or from a
 list of the chat's files in the side menu. A PDF shows as it is, a sheet as a grid, a document as its text with its
@@ -10293,3 +10323,4 @@ installed, and eval tasks check the skills.
 - 2026-10-14 (Opus 5.5): part 31, Office files, previews, visuals and questions, is planned (items 192 to 196), and two questions to the owner are recorded (open owner decisions 37 and 38); item 192 is built: a question offers its options with what each leads to and the one recommended, and several may be chosen.
 - 2026-10-14 (Opus 5.5): item 192 merged as `5a41ac7` (PR #232; no Linear issue, the connector was signed out): A question of the agent offers its options with what each leads to and the one it recommends, several may be chosen, and the terminal takes an option's number.
 - 2026-10-14 (Opus 5.5): item 193 merged as `1cc6fac` (PR #233; no Linear issue, the connector was signed out): The chat shows pages a run writes in HTML (charts, 3D drawings, tables, diagrams) in a card, sandboxed, sized to the page and in the colours of the theme on screen.
+- 2026-10-14 (Opus 5.5): item 194 merged as `5592965` (PR #234; no Linear issue, the connector was signed out): Dot reads Word, Excel and PowerPoint files, attached or on disk: a document's text and tables, a workbook's cells with their formulas, a presentation's slides with their charts and notes.

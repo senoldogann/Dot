@@ -2332,6 +2332,28 @@ a.pill:hover {
   overflow-wrap: anywhere;
 }
 
+/* A file's path in code is a button that shows the file beside the conversation (item 195). */
+.code-path {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: inherit;
+  cursor: pointer;
+}
+
+.code-path code {
+  overflow-wrap: anywhere;
+  text-decoration: underline dotted;
+  text-underline-offset: 3px;
+}
+
+.code-path:hover code {
+  border-color: var(--border-strong);
+  background: var(--surface-3);
+}
+
 .prose pre code {
   padding: 0;
   border: 0;
@@ -4009,6 +4031,19 @@ dialog.lightbox img {
 
 .attach-list.sent .attach-chip {
   padding-right: 8px;
+}
+
+/* A sent file's chip shows the file beside the conversation (item 195). */
+button.attach-chip {
+  color: inherit;
+  font: inherit;
+  font-size: var(--text-xs);
+  cursor: pointer;
+}
+
+button.attach-chip:hover {
+  border-color: var(--border-strong);
+  background: var(--surface-3);
 }
 
 .attach-chip.uploading {
