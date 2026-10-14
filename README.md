@@ -1057,7 +1057,9 @@ waiting, and the connection to the daemon while it is being made or lost; what w
 head holds only the button that folds it away. **Select** turns the list into checkboxes: tick chats (or Select all) and
 **Delete** asks once, then removes them with every run, step, event and approval of theirs. A chat with a run under way
 is refused, the run of a `dotx` command too: wait for the run to end, or cancel it (a `dotx` command's with Ctrl-C).
-Escape leaves the selection. Under 860 px the sidebar becomes a drawer.
+Escape leaves the selection. Under 860 px the sidebar becomes a drawer. The list stays where you scrolled it while it is
+painted again (a chat deleted, pinned, renamed or marked, chats deleted under Select, a run that starts or ends, a
+follow-up in the open chat): it brings the open chat into view only when the page comes to another chat (item 204).
 
 A chat's menu, after T3 Code's thread menu, opens from the **…** button at the right of its row (shown where the pointer
 rests or the focus is, over the time, and always on a touch screen), from a right-click on the row, or from the
@@ -1663,7 +1665,9 @@ anything else (a binary) is refused at once with those three forms, instead of b
 
 Dot keeps short notes between runs: facts about you, your machine and how you like things done. `memory_save`,
 `memory_search` and `memory_forget` are tools of the agent; you manage the same notes with `dotx memory` and in the web
-UI.
+UI, where Settings › Memory lists the notes changed last first, 30 at a time with **Load more** for the next;
+forgetting, correcting or adding a note keeps the notes read and the page where it was, and a correction open on another
+note stays open (item 204).
 
 ```bash
 dotx memory add --tag core "I prefer answers in Turkish, with code and commands in English"
