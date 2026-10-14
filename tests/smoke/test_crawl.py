@@ -17,6 +17,7 @@ import pytest_asyncio
 
 from dotagent.agent.verify import new_facts
 from dotagent.config import load_config
+from dotagent.core.errors import ProviderRateLimitError
 from dotagent.core.paths import workspace_dir
 from dotagent.core.types import JsonObject
 from dotagent.evals.runner import SCRIPTED_MODEL
@@ -24,6 +25,7 @@ from dotagent.evals.scripted import ScriptedProvider
 from dotagent.evals.types import ScriptedCall, ScriptedTurn
 from dotagent.llm.calls import log_model_call
 from dotagent.llm.router import ModelRouter
+from dotagent.llm.types import ChatRequest, DeltaSink, ModelReply
 from dotagent.policy.engine import auto_review
 from dotagent.policy.types import ActionInfo, Decision
 from dotagent.runtime import Runtime, build_runtime, close_runtime
@@ -362,6 +364,46 @@ async def test_a_file_of_the_workspace_is_read_even_when_its_name_looks_like_a_h
     finally:
         await router.aclose()
     assert result.text.startswith("Extracted 1 of 1 sources; 0 values whose quote is not in the source"), result.text
+
+
+class _RateLimited(ScriptedProvider):
+    """The fast model's provider, answering every call with a rate limit; it counts the calls."""
+
+    def __init__(self) -> None:
+        super().__init__("ollama", [])
+        self.calls: int = 0
+
+    async def complete(self, request: ChatRequest, sink: DeltaSink) -> ModelReply:
+        self.calls += 1
+        raise ProviderRateLimitError("the fast model is rate limited", 429, None, {"model": request.model})
+
+
+async def test_a_fast_model_paused_after_a_rate_limit_is_not_asked_again_and_the_extraction_says_why(
+    runtime: Runtime,
+) -> None:
+    name: str = "prices-240.md"
+    path: Path = workspace_dir() / name
+    await asyncio.to_thread(path.parent.mkdir, parents=True, exist_ok=True)
+    await asyncio.to_thread(path.write_text, "The jar costs 4,20 EUR.", "utf-8")
+    router: ModelRouter = ModelRouter(runtime.config, log_model_call)
+    limited: _RateLimited = _RateLimited()
+    await router.register("ollama", limited)
+    offline: Runtime = dataclasses.replace(runtime, router=router, web=_NoFetch())  # type: ignore[arg-type]
+    arguments: JsonObject = {
+        "sources": [name, name],
+        "fields": [{"name": "price", "description": "The price with its currency."}],
+    }
+    try:
+        first, _ = await _call(offline, "web_extract", arguments, 200_000)
+        again, _ = await _call(offline, "web_extract", arguments, 200_000)
+    finally:
+        await router.aclose()
+    # The first source met the rate limit, which paused the fast model; nothing after it was sent (item 240).
+    assert limited.calls == 1
+    assert first.is_error and again.is_error
+    paused: str = rf"- {re.escape(name)}: {re.escape(SCRIPTED_MODEL)} \(rate limited until [^)]+\) cannot answer now; "
+    assert re.search(rf"- {re.escape(name)}: the fast model is rate limited\n{paused}", first.text), first.text
+    assert len(re.findall(paused, again.text)) == 2, again.text
 
 
 async def test_a_protected_file_is_refused_to_the_extraction_as_it_is_to_read_file(runtime: Runtime) -> None:

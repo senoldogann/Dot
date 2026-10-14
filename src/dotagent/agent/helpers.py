@@ -95,6 +95,14 @@ async def current_roster(router: ModelRouter, providers: ProvidersConfig, models
     return roster_for(models, keyed, router.paused(time.time()))
 
 
+def paused_model(router: ModelRouter, model: str, now: float) -> Unavailable | None:
+    """``model`` (a label) as unavailable while ``router`` has it paused at ``now``, with why and until when; ``None``
+    when it is not paused. Dot's own work on the fast model asks first and leaves a paused one out (item 240): a call
+    to it would spend the connector's retries on an answer its provider has refused already."""
+    pause: Pause | None = router.paused(now).get(model)
+    return None if pause is None else Unavailable(model=model, reason=pause.reason, until=pause.until)
+
+
 def unavailable_after(router: ModelRouter, model: str, error: Exception) -> Unavailable | None:
     """What ``error``, raised by a call to ``model`` (a label), made of the model: unavailable until the end of its
     pause, or ``None`` when the error says nothing about the model being unable to answer."""

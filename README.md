@@ -116,13 +116,16 @@ with `review` on the same provider as `main` a goal check or an `auto` approval 
 
 A model is left out of both lists while its provider has no key (an Ollama model needs none), and after such an error
 for the time the provider named (at most a day) or for `helper_cooldown_s` seconds, until a call to it is answered or a
-new key of its provider is saved. Each model is paused alone: a local Ollama model stays available while a cloud one is
-paused, and a provider whose key or quota fails all its models costs one failed call per model. The process that runs
-the run keeps the pauses in memory. Both lists are empty by default, and `dotx doctor` shows which of their models have
-a key and are served to it. `dotx stats` counts every call of a run for the model of the run, so after a switch the
-calls before it count for the standby model too. An answered question and a resume go on with the standby model and
-its level; a follow-up message on the run page starts on the chat's own model (item 199), and `dotx chat` every turn
-on its own (`main` unless `--model`), each moving to the standby again when that model still cannot answer.
+new key of its provider is saved. The fast model's work leaves a paused fast model out as well (item 240): a run's
+summary is written by the run's own model at once, and `web_extract` reads no source and says until when the fast model
+cannot answer, instead of spending the connector's retries on a provider that has refused already. Each model is paused
+alone: a local Ollama model stays available while a cloud one is paused, and a provider whose key or quota fails all its
+models costs one failed call per model. The process that runs the run keeps the pauses in memory. Both lists are empty
+by default, and `dotx doctor` shows which of their models have a key and are served to it. `dotx stats` counts every
+call of a run for the model of the run, so after a switch the calls before it count for the standby model too. An
+answered question and a resume go on with the standby model and its level; a follow-up message on the run page starts on
+the chat's own model (item 199), and `dotx chat` every turn on its own (`main` unless `--model`), each moving to the
+standby again when that model still cannot answer.
 
 **A model out of reach.** When the run's own model cannot be reached after its connector's retries (the connection broke
 or timed out, the call took longer than `model_call_timeout_s`, or its server failed with a status that retrying can get
@@ -237,10 +240,11 @@ is the answer (a small model that is offered both writes the call out as text).
   which it starts (`context_summarise_share` of `context_tokens`, or the whole budget when the window leaves less), and
   never less than the model's last reply with its results, so the steps after it have room. It is tried three times:
   a summary far over the limit is asked again with the limit and the overrun in front, and one that lacks a section is
-  asked again once with the missing sections named and the first draft carried along; when the fast model gives no
-  text, a summary far too long, an error or a timeout, the run's own model writes it and the `compacted` event names
-  the fast model's problem; when neither writes one, a mechanical summary takes its place and the timeline says so
-  with the reason. Next to the summary a continuity note keeps the
+  asked again once with the missing sections named and the first draft carried along; when the fast model gives no text,
+  a summary far too long, an error or a timeout, the run's own model writes it, and while the fast model is paused after
+  a quota, rate-limit or key error (see `standby`) the run's own model writes it without asking the fast one (item 240);
+  the `compacted` event names the fast model's problem; when neither writes one, a mechanical summary takes its place
+  and the timeline says so with the reason. Next to the summary a continuity note keeps the
   goal, the plan with the state of each step and its targets, and your messages, and of the work already done and the
   paths touched the newest that fit in another tenth of the budget (it says how many earlier ones it leaves out), and a
   check lists names, paths and links in the summary that the conversation never had (an address cut short, with the
@@ -484,8 +488,9 @@ Markdown files a crawl wrote, read as a file even when the name looks like an ad
 is checked against the source, so the result says per field whether the value is `verified`; a value whose quote the
 source does not hold is kept and marked `verified: false`, a claim to treat as one, and so is a value the fast model
 gave without a quote. A file's text goes to the fast model, so a file in a protected location is refused, as `read_file`
-refuses it. A source that cannot be read or extracted is listed under "Not extracted" with the reason. At most 20
-sources and 20 fields per call.
+refuses it. A source that cannot be read or extracted is listed under "Not extracted" with the reason; while the fast
+model is paused after a quota, rate-limit or key error, no source is read or sent to it, and each is listed with the
+pause (item 240). At most 20 sources and 20 fields per call.
 
 A terminal session is for a program that does not run to its end by itself: one that asks questions (an installer,
 `npm create`, `ssh`), a REPL (`python3 -i`, `psql`), or a server that must stay up while the run goes on.

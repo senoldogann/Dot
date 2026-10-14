@@ -15,6 +15,7 @@ from urllib.parse import urlsplit, urlunsplit
 
 from pydantic import Field
 
+from dotagent.agent.helpers import Unavailable, paused_model, unavailable_text
 from dotagent.browser.safety import url_flags
 from dotagent.browser.session import RenderedDocument
 from dotagent.browser.snapshot import fence_untrusted
@@ -794,15 +795,24 @@ def _extract_tool() -> RegisteredTool:
         fields: tuple[FieldSpec, ...] = tuple(
             FieldSpec(name=field.name, description=field.description) for field in args.fields
         )
+        fast: str = ctx.runtime.roles.fast()
         extractions: list[Extraction] = []
         problems: list[tuple[str, str]] = []
         for source in args.sources:
+            # A fast model the router has paused is not asked, nor the source read, until the pause ends (item 240).
+            now: float = time.time()
+            paused: Unavailable | None = paused_model(ctx.runtime.router, parse_model_ref(fast).label, now)
+            if paused is not None:
+                problems.append(
+                    (source, f"{unavailable_text(paused, now)} cannot answer now; read it with web_fetch or read_file")
+                )
+                continue
             try:
                 text: str = await _source_text(source, ctx)
                 extractions.append(
                     await extract(
                         ctx.runtime.router,
-                        ctx.runtime.roles.fast(),
+                        fast,
                         config.agent.model_call_timeout_s,
                         f"{ctx.thread_id}:extract",
                         ctx.run_id,
