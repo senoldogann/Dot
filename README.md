@@ -1149,38 +1149,42 @@ finished and how long the run took show where the pointer rests on it (on a touc
 stands at the foot of the window from the first message, the conversation filling the space above it from the top, and
 is the same frame as the home's, with the attach button and the send in its bar; what you typed there and did not send
 waits for you. While the end of the conversation, or its answer, is below the window, a round arrow just above the
-composer leads there. In the side panel (Run details), after Details, a folded **Cost** card carries the bill of the run
-in one line (its minutes, steps and tokens); open, it says where the minutes went (the model, the summaries, the tools,
-the time spent waiting for you), the input tokens with the share the provider served from its cache, the output tokens,
-the compactions (with their rate per 100 steps) and the runs it delegated. It is `GET /api/runs/{id}/stats` (the same
-numbers as `dotx stats --run ID`), read again every ten seconds while the run works and once at its end. A strip under
-the head links the other runs of the same thread, and the box at the bottom queues a message for after a run that is
-going on, or follows up on a finished one. While the run works and the box is empty, the box's send is the run's
-**Stop** (a round button in the danger colour with a square) and cancels it; a word typed turns it back into the send,
-**Queue**, and the message waits in the chat's queue (see [How a run works](#how-a-run-works)), shown above the box as
-T3 Code shows it: a sheet whose head (Queued and the count) folds it, with a row per message: a handle to drag it to
-another place or move it with the arrow keys, its text on one line (all of it in the tooltip), a pencil that edits it in
-the box (the send says Save; Escape or Cancel gives the box its draft back), **Steer**, which sends it to the run now,
-and × to take it out. ⌘⇧Enter steers the run with what the box holds, past the queue, or with the queue's next message
-when the box is empty. A held queue says it is paused, with **Resume**, and a queue the page could not read says why,
-with **Read again**. When the run ends done, the next message starts and the page follows it; every open page shows the
-queue as it changes. In a campaign's chat the message steers the session. The box wears the home's pills too, after T3
-Code's composer: the mode, the model with its reasoning and the Options (approvals and goal mode) of the chat, and a
-follow-up or a queued message starts its run with them on the same thread, for the same agent. The chat keeps them
-(item 199): those its first run started with, then each one chosen in the box, at once and for every browser, so a
-reload, a restart of the daemon or a run moved to a standby model leaves them as they are (a chat from before has the
-open run's until its next run starts). They are not kept in the browser as the home's are, and Keep going stays a new
-chat's choice. The run under way keeps its own: while it works, the pills step back and say that they wait for the next
-follow-up. A run the daemon cut off offers **Continue** on a line above the box. A Details panel shows the status, the
-agent of a chat with one, the model and its reasoning level, the approval mode and goal mode, the campaign of a session,
-the model turns, the tool calls (with the failed ones), the tokens (of every model call of the run: its steps and its
-side calls, such as compactions, reviews and the goal check), the duration, the start and the run id, then the plan, an
-Actions card and the latest screenshots. It stays closed until the panel button in the head of the run opens it (the
-choice is kept in the browser); open, it sits beside the conversation from 960 px and is a drawer below that. The run's
-head is the top bar itself: Dot's face and name on the left, the panel button on the right; the bar is solid with a
-hairline under it, so nothing scrolls under a blur, the panel stays in place under it, and the box stays at the bottom.
-Every other page names itself in the same bar (Agents, Activity, Campaigns, Settings) and opens with one line of
-description.
+composer leads there. At the left of the conversation a column of short marks stands for your messages, one mark for
+each, top to bottom (item 201, after T3 Code's): resting the pointer on it shows the message nearest to it and the start
+of its answer, a click goes to that message, and from the keyboard the arrows walk the marks and Enter goes; the marks
+of the messages in sight are darker. The column needs a pointer that rests, two messages or more, and room at the left
+of the conversation: a phone has none, nor has a page whose side panel presses the conversation against its edge. In the
+side panel (Run details), after Details, a folded **Cost** card carries the bill of the run in one line (its minutes,
+steps and tokens); open, it says where the minutes went (the model, the summaries, the tools, the time spent waiting for
+you), the input tokens with the share the provider served from its cache, the output tokens, the compactions (with their
+rate per 100 steps) and the runs it delegated. It is `GET /api/runs/{id}/stats` (the same numbers as
+`dotx stats --run ID`), read again every ten seconds while the run works and once at its end. A strip under the head
+links the other runs of the same thread, and the box at the bottom queues a message for after a run that is going on, or
+follows up on a finished one. While the run works and the box is empty, the box's send is the run's **Stop** (a round
+button in the danger colour with a square) and cancels it; a word typed turns it back into the send, **Queue**, and the
+message waits in the chat's queue (see [How a run works](#how-a-run-works)), shown above the box as T3 Code shows it: a
+sheet whose head (Queued and the count) folds it, with a row per message: a handle to drag it to another place or move
+it with the arrow keys, its text on one line (all of it in the tooltip), a pencil that edits it in the box (the send
+says Save; Escape or Cancel gives the box its draft back), **Steer**, which sends it to the run now, and × to take it
+out. ⌘⇧Enter steers the run with what the box holds, past the queue, or with the queue's next message when the box is
+empty. A held queue says it is paused, with **Resume**, and a queue the page could not read says why, with **Read
+again**. When the run ends done, the next message starts and the page follows it; every open page shows the queue as it
+changes. In a campaign's chat the message steers the session. The box wears the home's pills too, after T3 Code's
+composer: the mode, the model with its reasoning and the Options (approvals and goal mode) of the chat, and a follow-up
+or a queued message starts its run with them on the same thread, for the same agent. The chat keeps them (item 199):
+those its first run started with, then each one chosen in the box, at once and for every browser, so a reload, a restart
+of the daemon or a run moved to a standby model leaves them as they are (a chat from before has the open run's until its
+next run starts). They are not kept in the browser as the home's are, and Keep going stays a new chat's choice. The run
+under way keeps its own: while it works, the pills step back and say that they wait for the next follow-up. A run the
+daemon cut off offers **Continue** on a line above the box. A Details panel shows the status, the agent of a chat with
+one, the model and its reasoning level, the approval mode and goal mode, the campaign of a session, the model turns, the
+tool calls (with the failed ones), the tokens (of every model call of the run: its steps and its side calls, such as
+compactions, reviews and the goal check), the duration, the start and the run id, then the plan, an Actions card and the
+latest screenshots. It stays closed until the panel button in the head of the run opens it (the choice is kept in the
+browser); open, it sits beside the conversation from 960 px and is a drawer below that. The run's head is the top bar
+itself: Dot's face and name on the left, the panel button on the right; the bar is solid with a hairline under it, so
+nothing scrolls under a blur, the panel stays in place under it, and the box stays at the bottom. Every other page names
+itself in the same bar (Agents, Activity, Campaigns, Settings) and opens with one line of description.
 
 In the conversation each turn of the actor (Dot, or the agent the run belongs to, in its look), and the answer at the
 end, opens with its still face; the run's state is the top bar's face and the first fact of Details, with no card for it
