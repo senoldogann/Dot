@@ -5176,8 +5176,8 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 235 | The headlines task asks for what it checks                                           | done        | c5aeed3 |
 | 236 | An import names each found item once                                                 | done        | db0bf8d |
 | 237 | The prompt cache holds when old output is shortened                                  | done        | 24194bf |
-| 238 | The side panel at the window's edge                                                  | in progress |         |
-| 239 | The meter says why the budget is smaller than the window                             | planned     |         |
+| 238 | The side panel at the window's edge                                                  | done        | f9e6799 |
+| 239 | The meter says why the budget is smaller than the window                             | in progress |         |
 
 ### 77. The type system: Inter and Geist Mono, seven sizes, three weights
 
@@ -10854,7 +10854,7 @@ a shortening costs only the newest steps.
 
 ### 238. The side panel at the window's edge
 
-**Status: in progress.**
+**Status: done.** Merged as `f9e6799` (PR #278; no Linear issue, the Linear connector was signed out).
 
 **As built (2026-10-15).** While the panel stands beside the conversation, at any of its sizes, the run page lets go of
 its reading width and keeps 12 px on its right, as far as the panel stands from the top bar (`css/run.css`). The
@@ -10868,7 +10868,13 @@ has room for it; the conversation keeps its reading width.
 
 ### 239. The meter says why the budget is smaller than the window
 
-**Status: planned.**
+**Status: in progress.**
+
+**As built (2026-10-15).** The context meter's panel ends with why a run's budget is smaller than the model's window and
+where it is set: each step sends the model the whole run again, so a run kept within its budget is answered sooner and
+costs less, and `[agent] context_tokens` in config.toml sets the budget, up to three quarters of the model's window
+(`js/contextmeter.js`). Tests: `tests/smoke/test_context_meter.py` reads the panel's three paragraphs, and fails on the
+code of before. Checked in Chrome and WebKit, wide and on a phone, light and dark.
 
 **What.** The context meter says why a run's budget is smaller than the model's window, as every step sends the whole
 prompt again, and how to change it.
@@ -11551,3 +11557,4 @@ prompt again, and how to change it.
 - 2026-10-15 (Opus 5.5): item 196 merged as `6be48a8` (PR #275; no Linear issue, the connector was signed out): three skills come with Dot, `excel`, `word` and `onedrive`, read after the owner's own; `{{dot_python}}` names Dot's own Python in them; `dotx doctor` lists the Office applications with their versions and counts the OneDrive folders by the kind of account; the eval tasks `excel-add-a-month` and `word-rename-company` check them.
 - 2026-10-15 (Opus 5.5): item 236 merged as `db0bf8d` (PR #276; no Linear issue, the connector was signed out): each skill and MCP server found elsewhere is found once by its agent and its name; a skill named as one before it in the same agent's folders, and a plugin of another marketplace whose name is taken, are listed under Left out; a plugin installed for the user and for a project is read from the user's install.
 - 2026-10-15 (Opus 5.5): item 237 merged as `24194bf` (PR #277; no Linear issue, the connector was signed out): a step's request to Anthropic marks the end of the part of the run the next step sends unchanged, so the step after a shortening reads the run before the newest tool results from the cache; `truncate_middle` keeps its mark within the size it is given, so old output is shortened once.
+- 2026-10-15 (Opus 5.5): item 238 merged as `f9e6799` (PR #278; no Linear issue, the connector was signed out): while the side panel stands beside the conversation, the run page lets go of its reading width and keeps 12 px on its right, so the panel stands at the window's edge at every width (before, 20, 224 and 544 px from it at 1,280, 1,920 and 2,560 px).

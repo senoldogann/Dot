@@ -1,7 +1,8 @@
 // The context meter of a run's composer (item 222), after T3 Code's: a ring of how much of the run's context budget its
 // last step filled, and on a click what that is: the tokens the step sent the model against the budget past which Dot
-// summarizes the older part of the run, and the model's whole window. The run's scaffold event gives the budget and the
-// window, each step's assistant event what its prompt held; nothing is asked of the model.
+// summarizes the older part of the run, the model's whole window, and why the budget is smaller and where it is set
+// (item 239). The run's scaffold event gives the budget and the window, each step's assistant event what its prompt
+// held; nothing is asked of the model.
 
 import { compact, el, svg } from "./dom.js";
 import { anchoredPopover } from "./popover.js";
@@ -47,6 +48,14 @@ export function createContextMeter({ frame }) {
         `The run's last step sent the model ${used.toLocaleString("en-GB")} tokens. Past ${budget.toLocaleString("en-GB")}, the run's budget, Dot summarizes its older part.`,
       ),
       modelWindow === null ? null : el("p", { class: "context-meter-text" }, `The model holds ${modelWindow.toLocaleString("en-GB")} tokens.`),
+      // Why the budget is smaller than the window, and where it is set (item 239).
+      el(
+        "p",
+        { class: "context-meter-text" },
+        "Each step sends the model the whole run again, so a run kept within its budget is answered sooner and costs less. ",
+        el("code", null, "[agent] context_tokens"),
+        " in config.toml sets the budget, up to three quarters of the model's window.",
+      ),
     ];
   }
 
