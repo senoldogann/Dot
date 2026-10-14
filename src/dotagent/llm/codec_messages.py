@@ -49,12 +49,17 @@ class MessagesOptions(FrozenModel):
     a replayed thinking block whose earlier context changed is dropped by the server instead of failing the request
     (``block_binding``, which needs the ``thinking-binding-controls-2026-08-01`` beta header). Without it a model with
     a thinking switch gets only the switch (OpenCode Go). ``prompt_cache``: the server caches the prompt up to its last
-    block, so the next step of a run reads it back at a fraction of the price. ``default_max_tokens``: the output limit
-    of a request that names none (``None``: the model's own); never more than the model's own.
+    block, so the next step of a run reads it back at a fraction of the price. ``settled_mark`` (Anthropic, item 237):
+    the request's ``cache_mark`` also gets a cache mark, at the end of the part of the run the next step sends
+    unchanged. Anthropic looks for a cached prefix at most 20 blocks before a mark, and a step that shortens an older
+    tool result changes the prompt further back than that from its end: the mark keeps the run before it in the cache.
+    ``default_max_tokens``: the output limit of a request that names none (``None``: the model's own); never more than
+    the model's own.
     """
 
     adaptive_thinking: bool
     prompt_cache: bool
+    settled_mark: bool
     default_max_tokens: int | None
 
 
@@ -111,11 +116,23 @@ def _tool_results_first(blocks: Sequence[JsonObject]) -> list[JsonObject]:
     return sorted(blocks, key=lambda block: 0 if get_str(block, "type") == "tool_result" else 1)
 
 
-def encode_messages(messages: Sequence[Message], origin: str) -> list[JsonObject]:
-    """Neutral messages as alternating user/assistant turns; neighbours with the same role are merged."""
+def _with_cache_mark(blocks: Sequence[JsonObject]) -> list[JsonObject]:
+    """``blocks`` with a cache mark on the last one that can carry it: a thinking block cannot."""
+    for index in range(len(blocks) - 1, -1, -1):
+        if get_str(blocks[index], "type") not in _THINKING_BLOCKS:
+            marked: JsonObject = {**blocks[index], "cache_control": {"type": "ephemeral"}}
+            return [*blocks[:index], marked, *blocks[index + 1 :]]
+    return list(blocks)
+
+
+def encode_messages(messages: Sequence[Message], origin: str, marked: int | None) -> list[JsonObject]:
+    """Neutral messages as alternating user/assistant turns; neighbours with the same role are merged. The message at
+    index ``marked`` ends with a cache mark."""
     turns: list[tuple[str, list[JsonObject]]] = []
-    for message in messages:
+    for index, message in enumerate(messages):
         role, blocks = _turn_of(message, origin)
+        if index == marked:
+            blocks = _with_cache_mark(blocks)
         if turns and turns[-1][0] == role:
             turns[-1] = (role, [*turns[-1][1], *blocks])
         else:
@@ -153,6 +170,16 @@ def _adaptive_fields(label: str | None) -> JsonObject:
     return {"thinking": thinking} if label is None else {"thinking": thinking, "output_config": {"effort": label}}
 
 
+def _settled_index(request: ChatRequest, conversation: Sequence[Message], options: MessagesOptions) -> int | None:
+    """The index in ``conversation`` (the request's messages after its leading instructions) of the message that ends
+    with the settled part's cache mark: none when the server takes no such mark, when the request names no message of
+    the conversation, or when it names the last one, which the automatic mark already ends."""
+    if not options.settled_mark or request.cache_mark is None:
+        return None
+    index: int = request.cache_mark - (len(request.messages) - len(conversation))
+    return index if 0 <= index < len(conversation) - 1 else None
+
+
 def build_messages_body(request: ChatRequest, traits: ModelTraits, origin: str, options: MessagesOptions) -> JsonObject:
     """The JSON object to POST. ``stream`` is the last key, which OpenCode's gateway relies on."""
     instructions, conversation = split_instructions(request.messages)
@@ -165,7 +192,7 @@ def build_messages_body(request: ChatRequest, traits: ModelTraits, origin: str, 
         body["cache_control"] = {"type": "ephemeral"}
     if instructions:
         body["system"] = instructions
-    body["messages"] = list(encode_messages(replayed, origin))
+    body["messages"] = list(encode_messages(replayed, origin, _settled_index(request, conversation, options)))
     if request.tools:
         body["tools"] = list(encode_tools(request.tools))
     if traits.thinking_toggle:

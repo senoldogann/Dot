@@ -44,14 +44,21 @@ def fold_search(text: str) -> str:
     return "".join(char for char in decomposed if not unicodedata.combining(char)).replace("ı", "i").strip()
 
 
+def _omitted_mark(count: int) -> str:
+    return f"\n...[{count} chars omitted]...\n"
+
+
 def truncate_middle(text: str, max_chars: int) -> str:
-    """Keep the head and tail of ``text`` and mark how many characters were dropped."""
+    """Keep the head and tail of ``text`` and mark how many characters were dropped, the mark within ``max_chars``: a
+    text shortened again to the same size stays as it is, so the old tool output of a run is shortened once and the
+    provider's cache keeps it (item 237). A size under the mark's own gives the mark alone."""
     if len(text) <= max_chars:
         return text
-    head: int = max_chars * 2 // 3
-    tail: int = max_chars - head
-    omitted: int = len(text) - head - tail
-    return f"{text[:head]}\n...[{omitted} chars omitted]...\n{text[len(text) - tail :]}"
+    # The count has at most as many digits as the length of the text, so a mark sized for that one fits.
+    room: int = max(0, max_chars - len(_omitted_mark(len(text))))
+    head: int = room * 2 // 3
+    tail: int = room - head
+    return f"{text[:head]}{_omitted_mark(len(text) - head - tail)}{text[len(text) - tail :]}"
 
 
 def text_window(text: str, start: int, budget: int) -> tuple[str, int]:

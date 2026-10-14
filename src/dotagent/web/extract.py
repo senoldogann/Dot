@@ -172,6 +172,7 @@ async def extract(
         effort="off",
         speed="standard",
         session_key=session_key,
+        cache_mark=None,
     )
     try:
         async with asyncio.timeout(timeout_s):

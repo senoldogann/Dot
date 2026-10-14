@@ -1957,12 +1957,14 @@ itself, and an answering run messages no one further. The sender's chat shows th
 the agent's face. **Team** (a button on the Agents page, `#/team`) is today's thread of these messages: who to whom, the
 message, the reply, the time and the two runs; an agent's page lists the messages it sent or received. `GET /api/team`
 gives the thread. Three `[agent]` settings follow the harness study arXiv 2609.20804: `context_elide_share` (0.6, past
-which older tool output is shortened), `context_summarise_share` (0.85 of the configured budget, past which the older
-part of the run is summarised) and `plan_each_turn` (on: the open plan is appended to the system message of every step).
-The API: `GET /api/agents` (Dot first, each agent with its newest run), `POST /api/agents`,
-`GET`/`PUT`/`DELETE /api/agents/{id}` (Dot is neither changed nor deleted), `GET /api/tools` (the names an agent may be
-given), and `POST /api/runs` with `agent_id` (not with `standing`: a campaign is Dot's own, and the two together are
-refused with a 422).
+which older tool output is shortened, once, to 700 characters; a step's request to Anthropic also marks the end of the
+part of the run the next step sends unchanged, before the newest tool results, as Anthropic looks for a cached prefix
+only 20 blocks back from a mark, so the step after a shortening still reads the run before it from the provider's
+cache), `context_summarise_share` (0.85 of the configured budget, past which the older part of the run is summarised)
+and `plan_each_turn` (on: the open plan is appended to the system message of every step). The API: `GET /api/agents`
+(Dot first, each agent with its newest run), `POST /api/agents`, `GET`/`PUT`/`DELETE /api/agents/{id}` (Dot is neither
+changed nor deleted), `GET /api/tools` (the names an agent may be given), and `POST /api/runs` with `agent_id` (not with
+`standing`: a campaign is Dot's own, and the two together are refused with a 422).
 
 ## Campaigns
 

@@ -21,6 +21,7 @@ from dotagent.agent.campaign import session_number
 from dotagent.agent.compact import (
     drop_old_images,
     estimate_tokens,
+    last_settled,
     render_transcript,
     repair_history,
     shrink_old_tool_results,
@@ -409,6 +410,7 @@ async def _model_summary(
             effort="off" if attempt == 1 else "low",
             speed="standard",
             session_key=f"{agent.run.thread_id}:summary",
+            cache_mark=None,
         )
         try:
             async with asyncio.timeout(agent.runtime.config.agent.model_call_timeout_s):
@@ -535,6 +537,13 @@ def _compaction_event(compaction: Compaction, summarised: int, ledger: RunLedger
             "touched": len(ledger.touched),
         },
     }
+
+
+def _cache_mark(history: Sequence[Message], config: AgentConfig) -> int | None:
+    """The index in a step's messages, its system message first, of the last one that trimming leaves as it is in the
+    steps to come (:func:`dotagent.agent.compact.last_settled`)."""
+    settled: int | None = last_settled(history, config.keep_recent_tool_results, config.keep_recent_screenshots)
+    return None if settled is None else settled + 1
 
 
 async def _fit_context(
@@ -1628,6 +1637,8 @@ async def run_agent(agent: AgentRun) -> RunEnd:
             # The run's speed where the step's model has fast mode: a routed or standby model may not (item 223).
             speed=run.speed if offers_fast_mode(step_ref) else "standard",
             session_key=run.thread_id,
+            # The end of what the next step sends unchanged, after the system message (item 237).
+            cache_mark=_cache_mark(history, config),
         )
         steps += 1
         asked_at: float = time.monotonic()

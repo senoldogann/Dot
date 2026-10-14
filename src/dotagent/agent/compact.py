@@ -55,6 +55,20 @@ def trim_history(messages: Sequence[Message], keep_recent_results: int, keep_rec
     return shrink_old_tool_results(drop_old_images(messages, keep_recent_images), keep_recent_results)
 
 
+def last_settled(messages: Sequence[Message], keep_recent_results: int, keep_recent_images: int) -> int | None:
+    """The index of the last of ``messages`` that trimming leaves as it is in the steps to come (item 237): the one
+    before the oldest of the newest ``keep_recent_results`` tool messages and the newest ``keep_recent_images``
+    messages with images, which a later step may shorten or strip. ``None`` when nothing comes before them."""
+    results: list[int] = [index for index, message in enumerate(messages) if message.role == "tool"]
+    holders: list[int] = [index for index, message in enumerate(messages) if message.images]
+    open_ones: list[int] = [
+        *results[max(0, len(results) - keep_recent_results) :],
+        *holders[max(0, len(holders) - keep_recent_images) :],
+    ]
+    first_open: int = min(open_ones, default=len(messages))
+    return first_open - 1 if first_open > 0 else None
+
+
 def repair_history(messages: Sequence[Message]) -> list[Message]:
     """Make tool calls and tool results pair up again, as providers require.
 

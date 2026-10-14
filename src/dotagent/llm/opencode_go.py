@@ -37,9 +37,10 @@ _OPENAI_RESPONSES: ResponsesOptions = ResponsesOptions(image_detail="original", 
 _OTHER_RESPONSES: ResponsesOptions = ResponsesOptions(image_detail="auto", tool_output_images=False)
 # The gateway's messages route takes a plain thinking switch and the automatic cache mark (measured 2026-10-12: Claude
 # Haiku 5.5 reads a repeated prompt from the cache only when it is marked, Qwen caches by itself and with the mark,
-# MiniMax takes it); the format insists on an output limit, and this one is used when the request names none.
+# MiniMax takes it); the format insists on an output limit, and this one is used when the request names none. A mark
+# inside the conversation (item 237) was not tried on the gateway, so it gets none.
 _MESSAGES_OPTIONS: MessagesOptions = MessagesOptions(
-    adaptive_thinking=False, prompt_cache=True, default_max_tokens=32768
+    adaptive_thinking=False, prompt_cache=True, settled_mark=False, default_max_tokens=32768
 )
 # OpenCode names the models it serves at no cost with this ending (Go's list on 2026-10-12: `longcat-2.5-preview-free`,
 # `step-5-preview-free`).
