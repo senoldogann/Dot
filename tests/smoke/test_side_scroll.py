@@ -1,8 +1,8 @@
 """Adding or deleting keeps the page where it is (item 204). The side menu brings the open chat into view when the
 page comes to another chat, and a list painted again after a delete, a pin, a run that starts or a follow-up in the
 open chat stays where the reader scrolled it; the Memory page keeps the notes it has read, and its place, when one of
-them is forgotten. Chats and notes in a home of their own, scripted runs, served by a real server, wide and on a
-phone, light and dark."""
+them is forgotten. The learned skills and the notes keep a size and scroll inside it (item 218). Chats, notes and
+skills in a home of their own, scripted runs, served by a real server, wide and on a phone, light and dark."""
 
 import asyncio
 import re
@@ -16,7 +16,10 @@ import pytest_asyncio
 from playwright.async_api import Browser, Locator, Page, async_playwright, expect
 
 from dotagent.agent.manager import RunManager
+from dotagent.agent.playbooks import Playbook, playbook_name, write_playbook
+from dotagent.agent.review import PlaybookDraft
 from dotagent.config import load_config
+from dotagent.core.paths import playbooks_dir
 from dotagent.evals.runner import SCRIPTED_MODEL
 from dotagent.evals.scripted import ScriptedProvider
 from dotagent.evals.types import ScriptedCall, ScriptedTurn
@@ -42,6 +45,9 @@ _STEP_WAIT_S: float = 20.0
 _RUN_WAIT_S: float = 30.0
 # A list one row shorter may move by about a row; a jump back to the open chat moves it by the whole list.
 _ROW_SLACK_PX: int = 80
+# Enough learned skills for their list to scroll inside its box, and the most the box may be tall (.list-box, app.css).
+_SKILLS: int = 20
+_BOX_MOST_PX: int = 560
 _SHOTS: tuple[tuple[int, Literal["light", "dark"]], ...] = ((1280, "light"), (1280, "dark"), (390, "light"))
 
 
@@ -140,6 +146,22 @@ async def _window_kept(page: Page, before: int) -> bool:
     """Whether the window is where it was scrolled to, or as near as the end of a shorter page lets it be."""
     now, end = await page.evaluate("[window.scrollY, document.documentElement.scrollHeight - window.innerHeight]")
     return int(now) >= min(before, int(end)) - _ROW_SLACK_PX
+
+
+async def _box_scroll(box: Locator) -> int:
+    return int(await box.evaluate("node => node.scrollTop"))
+
+
+async def _box_kept(box: Locator, before: int) -> bool:
+    """Whether a list's box is where it was scrolled to, or as near as the end of a shorter list lets it be."""
+    now, end = await box.evaluate("node => [node.scrollTop, node.scrollHeight - node.clientHeight]")
+    return int(now) >= min(before, int(end)) - _ROW_SLACK_PX
+
+
+async def _scrolls_inside(box: Locator) -> bool:
+    """Whether a list's box keeps its size and scrolls inside: no taller than its most, with more rows than it shows."""
+    shown, whole = await box.evaluate("node => [node.clientHeight, node.scrollHeight]")
+    return int(shown) <= _BOX_MOST_PX and int(whole) > int(shown)
 
 
 async def _list_scroll(page: Page) -> int:
@@ -275,34 +297,88 @@ async def test_the_memory_page_keeps_the_notes_it_read_and_its_place_when_one_is
             page: Page = await _page(browser, address, 1280, "light", "/settings/memory")
             notes: Locator = page.locator("[data-memory]")
             await expect(notes).to_have_count(30)
+            # The notes keep a size (item 218): their box scrolls inside, and Load more under it adds the next page.
+            box: Locator = page.locator(".list-box").first
+            assert await _scrolls_inside(box)
             await page.get_by_role("button", name="Load more").click()
             await expect(notes).to_have_count(_NOTES)
-            await page.evaluate("window.scrollTo(0, document.documentElement.scrollHeight)")
-            before: int = int(await page.evaluate("window.scrollY"))
-            assert before > 400, f"the page does not scroll: {before}"
+            await box.evaluate("node => { node.scrollTop = node.scrollHeight; }")
+            before: int = await _box_scroll(box)
+            assert before > 400, f"the list does not scroll: {before}"
             # A note near the end is being corrected while another is forgotten.
             note_id: str = await notes.nth(_NOTES - 3).get_attribute("data-memory") or ""
             corrected: Locator = page.locator(f"[data-memory='{note_id}']")
             await corrected.get_by_role("button", name="Edit this note").click()
             await expect(corrected.get_by_role("textbox", name="Note")).to_be_visible()
-            before = int(await page.evaluate("window.scrollY"))
+            before = await _box_scroll(box)
             await notes.last.get_by_role("button", name="Forget this note").click()
             await page.get_by_role("dialog").get_by_role("button", name="Forget").click()
             await expect(page.locator(".toast", has_text="Forgotten.")).to_be_visible()
-            # The notes read stay read, one fewer, the page stays where it was and the form stays open.
+            # The notes read stay read, one fewer, the list stays where it was and the form stays open.
             await expect(notes).to_have_count(_NOTES - 1)
-            assert await _window_kept(page, before)
+            assert await _box_kept(box, before)
             await expect(corrected.get_by_role("textbox", name="Note")).to_be_visible()
             # The correction is saved: the note goes to the head of the list, where the notes changed last stand, and
-            # the page stays.
-            before = int(await page.evaluate("window.scrollY"))
+            # the list stays.
+            before = await _box_scroll(box)
             await corrected.get_by_role("textbox", name="Note").fill("A corrected note about the garden.")
             await corrected.get_by_role("button", name="Save").click()
             await expect(page.locator(".toast", has_text="Note updated.")).to_be_visible()
             await expect(notes.first).to_contain_text("A corrected note about the garden.")
             await expect(notes).to_have_count(_NOTES - 1)
-            assert await _window_kept(page, before)
+            assert await _box_kept(box, before)
             await page.screenshot(path=str(tmp_path / "memory-forgotten-1280-light.png"), animations="disabled")
             await page.close()
+        finally:
+            await browser.close()
+
+
+def _learned(number: int) -> Playbook:
+    kind: str = f"Look up the hours of library {number:02d}"
+    return Playbook(
+        name=playbook_name(kind),
+        kind=kind,
+        host="library.example.com",
+        draft=PlaybookDraft(
+            kind=kind,
+            description=f"Open the page of library {number:02d} on library.example.com and read its opening hours.",
+            when=f"A goal that asks when library {number:02d} is open.",
+            steps=("Open https://library.example.com.", f"Read the opening hours of library {number:02d}."),
+            parameters=(),
+        ),
+        run_id=f"run-{number}",
+        agent_id=None,
+        goal=f"When is library {number:02d} open?",
+        written_at=1_700_000_000.0 + number,
+        acting_steps=2,
+    )
+
+
+async def test_the_learned_skills_keep_a_size_and_scroll_inside(
+    runtime: Runtime, served: tuple[RunManager, str], tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Item 218: a long list of learned skills sits in a box of its own size that scrolls inside, wide and on a phone,
+    and a wheel over it stops at its edge, so what the Mac's other agents set up stays in reach under it."""
+    _, address = served
+    for number in range(1, _SKILLS + 1):
+        await asyncio.to_thread(write_playbook, playbooks_dir(), _learned(number))
+    async with async_playwright() as playwright:
+        browser: Browser = await playwright.chromium.launch(channel=runtime.config.browser.channel, headless=True)
+        # The page reads what other agents set up from the home folder: an empty one of the test's own.
+        monkeypatch.setenv("HOME", str(tmp_path))
+        try:
+            for width, scheme in _SHOTS:
+                page: Page = await _page(browser, address, width, scheme, "/settings/skills")
+                box: Locator = page.locator(".list-box").first
+                await expect(box.locator(".list-row")).to_have_count(_SKILLS)
+                await expect(page.get_by_text("Nothing found")).to_be_visible()
+                assert await _scrolls_inside(box)
+                await box.hover()
+                page_at: int = int(await page.evaluate("window.scrollY"))
+                await page.mouse.wheel(0, 4000)
+                await page.wait_for_function("() => document.querySelector('.list-box').scrollTop > 400")
+                assert int(await page.evaluate("window.scrollY")) == page_at
+                await page.screenshot(path=str(tmp_path / f"skills-{width}-{scheme}.png"), animations="disabled")
+                await page.close()
         finally:
             await browser.close()

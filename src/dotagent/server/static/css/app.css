@@ -1033,6 +1033,15 @@ a.pill:hover {
   padding: var(--pad-card);
 }
 
+/* A long list keeps a size (item 218): past its first rows it scrolls inside its card, and the scroll stops at the
+   card's edge instead of carrying the page along. */
+.list-box {
+  max-height: min(560px, 60vh);
+  max-height: min(560px, 60dvh);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
 /* A card's head orients and recedes (item 74): a lighter weight, the second ink, a lighter line under it. */
 .card-head {
   display: flex;

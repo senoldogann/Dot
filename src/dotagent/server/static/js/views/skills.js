@@ -4,7 +4,7 @@
 // agents set up (item 164): their skills, folded by agent, and their MCP servers by name and what they reach, never
 // their arguments or keys. Dot uses one only once the owner adds it here, after a confirmation (item 165): a skill is
 // copied into Dot's skills folder and offered to runs at once, a server is started from Dot's next start; Remove
-// takes it back.
+// takes it back. Each list keeps a size and scrolls inside past its first rows (item 218).
 
 import { api } from "../api.js";
 import { ago, el, plural } from "../dom.js";
@@ -284,7 +284,7 @@ export function foundSection(found, onFound) {
     { class: "hint" },
     "Skills and MCP servers that other agents of this Mac set up. Dot uses one only once you add it: a skill is copied and offered to runs at once, a server starts with Dot's next start.",
   );
-  return [head, hint, el("div", { class: "card" }, groups)];
+  return [head, hint, el("div", { class: "card list-box" }, groups)];
 }
 
 export function mount(root) {
@@ -318,12 +318,12 @@ export function mount(root) {
     const retired = named.filter((skill) => skill.retired);
     const parts = [];
     if (active.length > 0) {
-      parts.push(el("div", { class: "card" }, active.map((skill) => skillRow(skill, changed))));
+      parts.push(el("div", { class: "card list-box" }, active.map((skill) => skillRow(skill, changed))));
     }
     if (retired.length > 0) {
       parts.push(
         el("div", { class: "row section-head" }, el("div", { class: "section-label grow" }, "Retired")),
-        el("div", { class: "card" }, retired.map((skill) => skillRow(skill, changed))),
+        el("div", { class: "card list-box" }, retired.map((skill) => skillRow(skill, changed))),
       );
     }
     holder.replaceChildren(...parts, ...foundPart());

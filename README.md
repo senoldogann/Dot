@@ -1732,9 +1732,9 @@ anything else (a binary) is refused at once with those three forms, instead of b
 
 Dot keeps short notes between runs: facts about you, your machine and how you like things done. `memory_save`,
 `memory_search` and `memory_forget` are tools of the agent; you manage the same notes with `dotx memory` and in the web
-UI, where Settings › Memory lists the notes changed last first, 30 at a time with **Load more** for the next;
-forgetting, correcting or adding a note keeps the notes read and the page where it was, and a correction open on another
-note stays open (item 204).
+UI, where Settings › Memory lists the notes changed last first, 30 at a time with **Load more** for the next, in a
+box that keeps its size and scrolls inside past its first notes (item 218); forgetting, correcting or adding a note
+keeps the notes read and the list where it was, and a correction open on another note stays open (item 204).
 
 ```bash
 dotx memory add --tag core "I prefer answers in Turkish, with code and commands in English"
@@ -2109,7 +2109,8 @@ fails, or a folder that cannot be written, leaves a `playbook_failed` event on t
 `playbook_written` event and a retired one a `playbook_retired` event. The distillation reads pages third parties wrote,
 so the skill never takes an instruction from them as a step, and never holds a secret, a one-time code, an e-mail
 address or a home path. Settings › Skills lists the learned skills (kind, where, the runs, how they fared, the retired
-ones apart, an agent's with its name and Share) with Drop; `dotx playbooks list` shows them with their use,
+ones apart, an agent's with its name and Share) with Drop, each list in a box that keeps its size and scrolls inside
+past its first rows (item 218); `dotx playbooks list` shows them with their use,
 `dotx playbooks show NAME` prints one and `dotx playbooks drop NAME` removes one, active or retired. Delegated runs,
 chats and evals (which always run without learned skills) write none. `dotx stats` counts the skills written, retired
 and read, and compares, per host, the runs that read a skill with the runs on that host that did not (act calls and
