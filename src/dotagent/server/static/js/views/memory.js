@@ -7,6 +7,8 @@ import { emptyPanel, errorPanel, field, loadingPanel, paneHead } from "../panels
 import { attempt, confirmDialog, toast } from "../ui.js";
 
 const PAGE_SIZE = 30;
+// The most notes the route reads at once (MemoriesQuery in server/views.py).
+const MOST_READ = 200;
 const SEARCH_LIMIT = 30;
 const SEARCH_DELAY_MS = 250;
 const STRONG_MATCH = 0.75;
@@ -143,6 +145,25 @@ function memoryRow({ record, similarity, score }, actions) {
   return row;
 }
 
+/**
+ * Make `nodes` the children of `parent`, in order, leaving in place the ones that already are: WebKit, the desktop app's
+ * engine, moves the page when the rows in view are taken out and put back (item 204).
+ */
+function placeChildren(parent, nodes) {
+  const wanted = new Set(nodes);
+  for (const child of [...parent.children]) {
+    if (!wanted.has(child)) {
+      child.remove();
+    }
+  }
+  nodes.forEach((node, index) => {
+    const current = parent.children[index];
+    if (current !== node) {
+      parent.insertBefore(node, current ?? null);
+    }
+  });
+}
+
 /** What saving a note led to: remembered or merged, and the notes that say nearly the same. */
 function outcomeNodes(saved, actions) {
   const verdict = saved.created
@@ -195,6 +216,17 @@ export function mount(root, ctx) {
   const count = el("div", { class: "hint" });
   const holder = el("div", null, loadingPanel());
   const more = el("button", { class: "btn", type: "button", hidden: true }, "Load more");
+  const awakeCard = el("div", { class: "card" });
+  const restingHead = el(
+    "div",
+    { class: "row section-head", dataset: { resting: "" } },
+    el("div", { class: "section-label grow" }, "Resting"),
+    el("span", { class: "hint" }, "No run was handed these lately; a search still finds them, runs no longer start with them."),
+  );
+  const restingCard = el("div", { class: "card" });
+  // The rows painted, by note id, with the hit each shows: a paint keeps the row of a note that did not change, so that
+  // the page keeps its place and a note being corrected its form (item 204).
+  let rowsShown = new Map();
 
   function paint() {
     count.textContent =
@@ -202,25 +234,21 @@ export function mount(root, ctx) {
         ? plural(total, "note", "notes")
         : `${plural(hits.length, "result", "results")} for “${clip(shownQuery, 40)}”`;
     more.hidden = shownQuery !== "" || hits.length >= total;
+    const rows = new Map();
+    const rowOf = (hit) => {
+      const shown = JSON.stringify(hit);
+      const kept = rowsShown.get(hit.record.id);
+      const row = kept !== undefined && kept.shown === shown ? kept.row : memoryRow(hit, rowActions);
+      rows.set(hit.record.id, { shown, row });
+      return row;
+    };
+    const awake = hits.filter((hit) => !resting.has(hit.record.id)).map(rowOf);
+    const asleep = hits.filter((hit) => resting.has(hit.record.id)).map(rowOf);
+    rowsShown = rows;
     if (hits.length > 0) {
-      const awake = hits.filter((hit) => !resting.has(hit.record.id));
-      const asleep = hits.filter((hit) => resting.has(hit.record.id));
-      const parts = [];
-      if (awake.length > 0) {
-        parts.push(el("div", { class: "card" }, awake.map((hit) => memoryRow(hit, rowActions))));
-      }
-      if (asleep.length > 0) {
-        parts.push(
-          el(
-            "div",
-            { class: "row section-head", dataset: { resting: "" } },
-            el("div", { class: "section-label grow" }, "Resting"),
-            el("span", { class: "hint" }, "No run was handed these lately; a search still finds them, runs no longer start with them."),
-          ),
-          el("div", { class: "card" }, asleep.map((hit) => memoryRow(hit, rowActions))),
-        );
-      }
-      holder.replaceChildren(...parts);
+      placeChildren(awakeCard, awake);
+      placeChildren(restingCard, asleep);
+      placeChildren(holder, [...(awake.length > 0 ? [awakeCard] : []), ...(asleep.length > 0 ? [restingHead, restingCard] : [])]);
     } else if (shownQuery === "") {
       holder.replaceChildren(emptyPanel("Nothing remembered yet", "Add a note above, or ask Dot to remember something during a run."));
     } else {
@@ -228,19 +256,35 @@ export function mount(root, ctx) {
     }
   }
 
+  /** The first `count` notes of the list (fewer when there are fewer), read as many at a time as the route allows. */
+  async function readList(count) {
+    let page = await api.get(`/memories${query({ limit: Math.min(count, MOST_READ), offset: 0 })}`);
+    const read = { agents: page.agents, items: [...page.items], scores: { ...page.scores }, resting: [...page.resting], total: page.total };
+    while (read.items.length < Math.min(count, read.total) && page.items.length > 0) {
+      page = await api.get(`/memories${query({ limit: Math.min(count - read.items.length, MOST_READ), offset: read.items.length })}`);
+      read.items.push(...page.items);
+      Object.assign(read.scores, page.scores);
+      read.resting.push(...page.resting);
+      read.total = page.total;
+    }
+    return read;
+  }
+
   async function reload() {
     const mine = ++ticket;
     const text = search.value.trim();
     try {
       if (text === "") {
-        const page = await api.get(`/memories${query({ limit: PAGE_SIZE, offset: 0 })}`);
-        agentNames = page.agents;
+        // After a change the list reads again as many notes as it showed, so that it keeps its length and the page its
+        // place (item 204); a first read, or one after a search, takes a page.
+        const listed = await readList(shownQuery === "" ? Math.max(PAGE_SIZE, hits.length) : PAGE_SIZE);
         if (disposed || mine !== ticket) {
           return;
         }
-        hits = page.items.map((record) => ({ record, similarity: null, score: page.scores[record.id] }));
-        total = page.total;
-        resting = new Set(page.resting);
+        agentNames = listed.agents;
+        hits = listed.items.map((record) => ({ record, similarity: null, score: listed.scores[record.id] }));
+        total = listed.total;
+        resting = new Set(listed.resting);
       } else {
         const found = await api.get(`/memories/search${query({ q: text, limit: SEARCH_LIMIT })}`);
         if (disposed || mine !== ticket) {

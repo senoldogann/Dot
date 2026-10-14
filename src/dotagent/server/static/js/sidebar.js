@@ -266,6 +266,10 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
   // The chat that holds the run on the page; resolved from the list when the run is the latest one of a chat, otherwise
   // asked from the daemon.
   let routeThreadId = null;
+  // The open chat last brought into the list's view (item 204): the list follows the page when it comes to another
+  // chat, and otherwise stays where the owner scrolled it, through a delete, a pin, a rename, a reload of the activity
+  // and a follow-up in the same chat, which moves the chat under Working.
+  let revealedThreadId = null;
   let resolveTicket = 0;
   // The open chat the owner marked unread (item 131): it stays so until it is opened again or the page comes back into
   // view. Any other open chat is seen whenever the page is in view, so a run that ends there leaves no dot.
@@ -362,7 +366,8 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
       node.hidden = folds.working === true && (chatId === null || chatId !== routeThreadId);
     }
     const active = rowNodes.get(routeThreadId);
-    if (active !== undefined) {
+    if (active !== undefined && routeThreadId !== revealedThreadId) {
+      revealedThreadId = routeThreadId;
       active.scrollIntoView({ block: "nearest" });
     }
   }
@@ -655,19 +660,21 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
     return null;
   }
 
+  // The focus follows the chat to its new place, and the list stays where the owner scrolled it (item 204): a pinned
+  // chat goes to the top of the list, and an unpinned one among its days.
   async function markChat(chat, seen) {
     if (chat.id === routeThreadId) {
       keptUnread = seen ? null : chat.id;
     }
     await api.patch(`/threads/${chat.id}`, { seen });
     await load();
-    rowNodes.get(chat.id)?.focus();
+    rowNodes.get(chat.id)?.focus({ preventScroll: true });
   }
 
   async function pinChat(chat, pinned) {
     await api.patch(`/threads/${chat.id}`, { pinned });
     await load();
-    rowNodes.get(chat.id)?.focus();
+    rowNodes.get(chat.id)?.focus({ preventScroll: true });
   }
 
   // The chat's name becomes a field in its row: Enter or leaving it keeps a name that changed, Escape leaves the old
@@ -762,12 +769,14 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
     (first === undefined ? cancelButton : first).focus();
   }
 
+  // The list stays where it was scrolled to tick the chats (item 204): a box that had the focus hands it to its chat's
+  // link, and otherwise it goes to Select, which takes the bar's place at the head of the list.
   function leaveSelectMode() {
     selecting = false;
     selected.clear();
     paintLists();
-    if (!selectButton.hidden) {
-      selectButton.focus();
+    if (!list.contains(document.activeElement) && !selectButton.hidden) {
+      selectButton.focus({ preventScroll: true });
     }
   }
 

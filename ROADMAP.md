@@ -5139,7 +5139,12 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 200 | Reconnecting, checked end to end                                                     | done        | 0dab7de |
 | 201 | Marks of the conversation's messages: a look and a jump, after T3 Code               | done        | 4f23e25 |
 | 202 | The side menu, designed again                                                        | done        | 7e03ac3 |
-| 203 | The run's side panel, designed again                                                 | in progress |         |
+| 203 | The run's side panel, designed again                                                 | done        | 94985af |
+| 204 | Adding or deleting keeps the page where it is                                        | in progress |         |
+| 205 | A message's time, its copy and a send again, after T3 Code                           | planned     |         |
+| 206 | Markdown in the conversation, and copies that keep it                                | planned     |         |
+| 207 | The composer shows the markdown it holds, after T3 Code                              | planned     |         |
+| 208 | The model menu: providers at the side, a search and favourites, after T3 Code        | planned     |         |
 
 ### 77. The type system: Inter and Geist Mono, seven sizes, three weights
 
@@ -9892,7 +9897,7 @@ in it and what waits for the owner, and how its parts fold. Screenshots looked a
 
 ### 203. The run's side panel, designed again
 
-**Status: in progress.**
+**Status: done.** Merged as `94985af` (PR #242; no Linear issue, the Linear connector was signed out).
 
 **As built (2026-10-14).** The run's side panel shows one thing at a time, in tabs after T3 Code's side panel
 (`inspector.js`, `panels.js`). Before, it stacked seven cards that arrived folded (Dot's computer, Details, Cost, Plan,
@@ -9919,6 +9924,102 @@ under the top bar, as it did before; the test takes its screenshots with the pag
 
 **What.** The run's side panel designed again, in its structure and in how it works: Dot's computer, the details, the
 cost, the plan, the files, the actions and the screens. Screenshots looked at, wide and on a phone, light and dark.
+
+## Part 33: a page that stays put, messages with their time, markdown kept (planned 2026-10-14)
+
+The owner's thirty-second word, on 2026-10-14: in T3 Code a text pasted into the composer comes in as markdown, not as
+the broken text Dot shows, and copies come out cleaner; that order should hold in Dot's conversation and in its
+composer. Under the owner's own message, once it has an answer, there should be the time it was sent, a copy and a way
+to send it again; under the agent's answer, its time and a copy. Deleting or adding something scrolls the app back to
+the top, as a refresh would, and it should not. And, if it can be done, the composer's model menu should have small
+marks of the providers at its left that filter their models, a search, and favourites the owner chooses, as T3 Code's
+has.
+
+**Status (2026-10-14): planned.** What exists was read in the code, and T3 Code's sources were read for the way it does
+each. The side menu reveals the open chat with `scrollIntoView` every time it paints its list (after a delete, a pin, a
+rename, a read, and since item 202 after each reload of the activity), so a list scrolled away from the open chat jumps
+back to it; a pin and a mark give the moved chat's row the focus, and leaving Select gives it to Select at the head of
+the list, each scrolling the list there; the Memory page reads its first page again after a change and drops the pages
+read after it. The owner's messages are shown as typed, never read as markdown, with their time only in a tooltip; an
+answer has a Copy button with its word and shows its time where the pointer rests. A copy of a part of the conversation
+is the browser's plain text, so a table, a list or a heading loses its markdown. The composer is a plain text box, so
+the markdown in it shows its marks. The model menu lists the models that call tools under their providers, with no
+search and no favourites. T3 Code turns a copied part of its conversation back into markdown, keeps the composer's text
+as markdown while it shows it styled (its marks faded, shown only where the caret is), puts the time, a copy and "Edit
+from here" under a message, and gives its model menu a rail of providers with favourites first, a search and a star on
+each model.
+
+**The shape of this part (the decisions).** Five items, each a pull request of its own, the defect first: adding or
+deleting keeps the page where it is (204); a message's time, its copy and a send again (205); markdown in the
+conversation, and copies that keep it (206); the composer shows the markdown it holds (207), the largest, as the
+composer is the page's most used part; the model menu (208). Item 196 of part 31 follows this part: it waits on the
+owner (Excel and the OneDrive app installed, and the kind of Microsoft account).
+
+### How to start part 33 (the handoff prompt)
+
+> Read ROADMAP.md part 33 and the status table of part 9 (rows 204 to 208). One item at a time, in order; the protocol
+> of part 5 (branch, gate, PR, Linear MYP issue when the connector is signed in, squash merge, hash in the table, log
+> line) is unchanged. Give each change a test that fails on the code of before, and check a page that changes in a
+> browser, wide and on a phone, light and dark. Never touch the owner's data directory except to read it, by the
+> kinds and numbers of what is stored, and to restart the daemon when `/api/status` shows no active run; PLAN.md
+> stays untracked. The owner reads Turkish; everything written is English.
+
+### 204. Adding or deleting keeps the page where it is
+
+**Status: in progress.**
+
+**As built (2026-10-14).** The side menu brings the open chat into view once, when the page comes to it from another
+chat (`sidebar.js` keeps the chat it brought into view last), where it did so at every paint of its list; a delete from
+a chat's menu, a pin, a rename, a mark, a delete under Select, a run that starts or ends and a follow-up in the open
+chat (which takes the chat under Working) leave the list where it was scrolled. A pin or a mark gives the moved chat's
+row the focus without scrolling the list to it; Escape under Select leaves the focus on the chat whose box had it, and
+the focus goes to Select, without a scroll, only from the bar that Select takes the place of. The Memory page reads
+again, after a forget, a correction or a note added, as many notes as it showed (in reads of up to 200, the route's
+most), where it read the first 30 and dropped the notes read with **Load more**; and a paint keeps the row of each note
+that did not change, so a correction open on another note stays open. In WebKit, the desktop app's engine, painting the
+rows anew moved the page: after a forget at the foot of 45 notes it went from 3 773 px to 291 px, and turning scroll
+anchoring off (`overflow-anchor: none`) did not change it; with the rows kept, it stays. The Activity page, painted anew
+when a run starts or ends, stays in place in both engines (measured with 40 runs). Tests:
+`tests/smoke/test_side_scroll.py`, a real server on a scripted model with 36 chats and 45 notes, at 1280 px light and
+dark and at 390 px: the list scrolled to its end stays there through a delete from a chat's menu, a pin, Escape under
+Select, a delete under Select, a run started in a new chat and a follow-up in the open chat, and coming to another chat
+brings it into view; the Memory page keeps its 45 notes read and its place through a forget and a correction, and a
+correction open on another note stays open through the forget. On the code of before, the list went from 1 080 px to
+294 px at the first delete, Escape under Select took it to the top, and the Memory page fell back to 30 notes. It passed
+in WebKit too.
+
+### 205. A message's time, its copy and a send again, after T3 Code
+
+**Status: planned.**
+
+**What.** Under each of the owner's messages that has its answer: the time it was sent (the day too when it was not
+today, the full date where the pointer rests), a copy of the message as it was written, and a button that sends it again
+to the same chat, with the files it carried. Under each answer: its time and a copy, an icon each. After T3 Code's.
+
+### 206. Markdown in the conversation, and copies that keep it
+
+**Status: planned.**
+
+**What.** The owner's messages are read as markdown, as the answers are (headings, lists, tables, code, emphasis). A
+copy of a part of the conversation keeps its markdown, as T3 Code's does: the text carries the markdown, and the
+formatted copy goes along for the applications that read it. The copy buttons copy the markdown as written.
+
+### 207. The composer shows the markdown it holds, after T3 Code
+
+**Status: planned.**
+
+**What.** The composer keeps the markdown it holds and shows it styled: headings as headings, emphasis, code, lists,
+quotes, fences, rules and tables' pipes, their marks faded, after T3 Code's composer. A paste of markdown shows at once
+in that order. What is sent is the markdown, as now; the slash menu, the files, the queue, the drafts and the keys work
+as before.
+
+### 208. The model menu: providers at the side, a search and favourites, after T3 Code
+
+**Status: planned.**
+
+**What.** The composer's model menu gets a rail of the providers' marks at its left (favourites first), which filters
+the list to one provider; a search over every provider's models; a star on each model that keeps it among the
+favourites; and keys: the arrows and Enter, ⌘1 to ⌘9 for the rows in sight. After T3 Code's.
 
 ## Log
 
@@ -10562,3 +10663,4 @@ cost, the plan, the files, the actions and the screens. Screenshots looked at, w
 - 2026-10-14 (Opus 5.5): item 200 merged as `0dab7de` (PR #239; no Linear issue, the connector was signed out): A page that loses the daemon comes back by itself: one loaded while the daemon is down tries again and says when, a stream silent for 45 seconds is cut and made again, a page back in view or on the network tries at once, and the desktop window keeps the page through a restart of the daemon.
 - 2026-10-14 (Opus 5.5): item 201 merged as `4f23e25` (PR #240; no Linear issue, the connector was signed out): At the left of the conversation, a column of short marks stands for the owner's messages, after T3 Code's: resting the pointer on it shows a message and the start of its answer, and a click or Enter goes to it.
 - 2026-10-14 (Opus 5.5): item 202 merged as `7e03ac3` (PR #241; no Linear issue, the connector was signed out): Each chat stands once in the side menu, after T3 Code's Working shelf: a chat whose latest run works leaves its day for Working, as the chat it is, with the runs it delegated folded under it, and goes back once the run ends; a pinned chat stays under Pinned.
+- 2026-10-14 (Opus 5.5): item 203 merged as `94985af` (PR #242; no Linear issue, the connector was signed out): The run's side panel shows one thing at a time, in four tabs after T3 Code's side panel (Run, Plan, Actions, Screen), each tab's sections open, the cost listed as the details are, and the tab chosen last kept.
