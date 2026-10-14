@@ -1266,16 +1266,19 @@ at the head of the conversation. The panel is one card on the composer's corner,
 (item 203): **Run** (Details and Cost), **Plan** (its steps; the tab says how many are done), **Actions** (what the run
 changed and asked, and the conversation's Files) and **Screen** (Dot's computer and the screenshots, which the tab
 counts). A tab shows its sections open, on hairlines; the arrow keys, Home and End move between the tabs, and the tab
-chosen last is kept in the browser (`dot.panelTab`). Beside the conversation the panel has a size: three buttons on
+chosen last is kept in the browser (`dot.panelTab`). Beside the conversation the panel slides in as it is shown and out
+before it hides, the conversation taking its room back once the slide is over, at once under reduced motion (item
+220), and it has a size: three buttons on
 Dot's computer make it **Compact** (its own 320 px), **Wide** (half of the page) or **Full** (the conversation at its
 narrowest, 360 px, the rest for the panel), and the handle between the conversation and the panel drags it to any width
 between (the arrow keys move it a step, a double click gives it back its own width); the size is kept in the browser
 (`dot.computer.size`). While the panel is wider than its own width, the computer's view grows with the panel in its warm
 frame. The drawer of a narrow page has one width. **Dot's computer**, on the panel's Screen tab, shows the page of the
 run's browser as Chrome paints it (`GET /api/runs/{id}/screencast`, Chrome's own screencast, sent only while the view is
-open; a tab that does not change sends nothing). The view starts by itself at the run's first browser step and says,
-until then, that the run has not opened a page; **Watch** and **Close the view** open and close it by hand; once the run
-has ended it keeps the last screen and Watch goes. A pill under it says who has the browser ("Dot has control", or the
+open; a tab that does not change sends nothing). The view starts by itself at the run's first browser step; until a
+frame comes it keeps the shape of a screen and says why, with a mark and a title (no page yet, waiting for the page,
+the view closed, the run ended, or a run in a `dotx` command, item 220). **Watch** and **Close the view** open and close
+it by hand; once the run has ended it keeps the last screen and Watch goes. A pill under it says who has the browser ("Dot has control", or the
 agent's name). Since that view shows the page, Dot's own Chrome stays in the background while a run works
 (`[browser] raise_window`, off by default, items 97 and 118): the tabs Dot opens are opened behind, the app you were in
 gets the focus back right after Chrome starts and after a page opens a tab of its own, and switching tabs does not raise

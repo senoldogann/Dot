@@ -8,13 +8,17 @@ import { icon } from "./icons.js";
 import { panelSection } from "./panels.js";
 import { toast } from "./ui.js";
 
-const NO_PAGE_YET = "The run has not opened a page in its browser yet; the view starts by itself when it does.";
-const WAITING_FOR_FRAME = "Waiting for the page: the first frame comes when the run's browser paints.";
-const CLOSED_HINT = "Watch the page Dot's browser is on. Nothing is sent while the view is closed.";
-// A run that has ended has no page left to watch (item 111): Watch is gone, and so is the hint that offers it.
-const ENDED_HINT = "The run has ended. Its browser's page is shown here only while a run is going on.";
-// A run of a dotx command works in that command's browser, which the daemon does not cast (item 188).
-const ELSEWHERE_HINT = "The run works in a dotx command, whose browser is not shown here.";
+// While the view has no frame it keeps the shape of a screen and says why (item 220): a mark, a title and a hint, by
+// the state of the run and of the view. A run that has ended has no page left to watch (item 111): Watch is gone, and
+// so is the hint that offers it. A run of a dotx command works in that command's browser, which the daemon does not
+// cast (item 188).
+const EMPTY_STATES = {
+  "no-page": { mark: "globe", title: "No page yet", hint: "The view starts by itself when the run opens a page in its browser." },
+  waiting: { mark: "monitor", title: "Waiting for the page", hint: "The first frame comes when the run's browser paints." },
+  closed: { mark: "eye", title: "The view is closed", hint: "Watch shows the page Dot's browser is on. Nothing is sent while the view is closed." },
+  ended: { mark: "clock", title: "The run has ended", hint: "Its browser's page is shown here only while a run is going on." },
+  elsewhere: { mark: "terminal", title: "Working elsewhere", hint: "The run works in a dotx command, whose browser is not shown here." },
+};
 
 /**
  * The section of the panel's Screen tab for the run `runId`, which is `active` (still going on in the daemon),
@@ -33,7 +37,10 @@ export function createComputer({ runId, active, elsewhere, held, name, sizes }) 
   let objectUrl = null;
 
   const image = el("img", { class: "computer-image", alt: "The page of Dot's browser", hidden: true });
-  const empty = el("div", { class: "hint" }, CLOSED_HINT);
+  const emptyMark = el("span", { class: "computer-empty-mark", "aria-hidden": "true" });
+  const emptyTitle = el("div", { class: "computer-empty-title" });
+  const emptyHint = el("div", { class: "hint" });
+  const empty = el("div", { class: "computer-empty" }, emptyMark, emptyTitle, emptyHint);
   const screen = el("div", { class: "computer-screen" }, image, empty);
   const address = el("div", { class: "small muted computer-url" });
   const who = el("span", { class: "computer-who" });
@@ -57,21 +64,24 @@ export function createComputer({ runId, active, elsewhere, held, name, sizes }) 
     watchButton.setAttribute("aria-pressed", String(watching));
     watchButton.hidden = !isActive;
     if (image.hidden) {
-      empty.textContent = watching
-        ? WAITING_FOR_FRAME
-        : isElsewhere
-          ? ELSEWHERE_HINT
-          : !isActive
-            ? ENDED_HINT
-            : hasPage
-              ? CLOSED_HINT
-              : NO_PAGE_YET;
+      showEmpty(watching ? "waiting" : isElsewhere ? "elsewhere" : !isActive ? "ended" : hasPage ? "closed" : "no-page");
     }
     who.textContent = isHeld ? "You have control" : `${name} has control`;
     handButton.textContent = isHeld ? "Return control" : "Take over";
     handButton.title = isHeld ? "Let the run go on; it is told the page may have changed" : "Hold the run at its next tool call and use the browser yourself";
     pill.hidden = !isActive;
     pill.dataset.held = String(isHeld);
+  }
+
+  function showEmpty(state) {
+    if (empty.dataset.state === state) {
+      return;
+    }
+    const { mark, title, hint } = EMPTY_STATES[state];
+    empty.dataset.state = state;
+    emptyMark.replaceChildren(icon(mark));
+    emptyTitle.textContent = title;
+    emptyHint.textContent = hint;
   }
 
   function show(frame) {

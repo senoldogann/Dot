@@ -1,8 +1,8 @@
 // The side panel of the run page: the details and the plan of the run and the screens the agent looked at, in tabs
 // after T3 Code's side panel (item 203), one at a time, the one chosen last kept per browser. On a wide page it sits
-// beside the conversation when the reader wants it (see layout.js); on a narrow page it is a drawer that the button in
-// the header slides in over the conversation. A file the conversation carries or names takes the panel while it is open
-// (item 195, filepanel.js).
+// beside the conversation when the reader wants it (see layout.js), sliding in and out (item 220); on a narrow page it is
+// a drawer that the button in the header slides in over the conversation. A file the conversation carries or names
+// takes the panel while it is open (item 195, filepanel.js).
 
 import { imageUrl } from "./api.js";
 import { el, motionMs } from "./dom.js";
@@ -16,6 +16,7 @@ import { showImage } from "./ui.js";
 
 // The page needs this much width for a readable column next to the panel.
 const MIN_WIDTH_PX = 960;
+const REDUCED_MOTION = window.matchMedia("(prefers-reduced-motion: reduce)");
 const STRIP_LIMIT = 24;
 // The tab the reader chose last, for every run page of this browser.
 const TAB_KEY = "dot.panelTab";
@@ -239,21 +240,59 @@ export function createInspector({ layout, tabs, screensIn }) {
       drawerOpen = false;
     }
     const wanted = showInspector() || file !== null;
-    layout.dataset.inspector = room && wanted ? "on" : "off";
     element.dataset.mode = room ? "docked" : "drawer";
     if (room) {
       clearTimeout(hideTimer);
       hideTimer = null;
-      element.hidden = !wanted;
       scrim.hidden = true;
       delete element.dataset.open;
       delete scrim.dataset.open;
+      dock(wanted);
     } else {
+      stopLeaving();
+      layout.dataset.inspector = "off";
       showDrawer(drawerOpen);
     }
     const shown = room ? wanted : drawerOpen;
     toggle.setAttribute("aria-pressed", String(shown));
     toggle.title = shown ? "Hide the details" : "Show the details";
+  }
+
+  // Beside the conversation the panel slides in as it is shown and out before it hides (item 220): the conversation
+  // makes room for it at once and takes the room back once the slide has had its time; under reduced motion it comes
+  // and goes at once.
+  let leaveTimer = null;
+  function dock(wanted) {
+    if (wanted) {
+      stopLeaving();
+      layout.dataset.inspector = "on";
+      element.hidden = false;
+      return;
+    }
+    if (element.hidden || REDUCED_MOTION.matches) {
+      stopLeaving();
+      hideDocked();
+      return;
+    }
+    if (leaveTimer === null) {
+      element.dataset.leaving = "true";
+      leaveTimer = setTimeout(() => {
+        leaveTimer = null;
+        hideDocked();
+      }, motionMs("--motion-panel"));
+    }
+  }
+
+  function stopLeaving() {
+    clearTimeout(leaveTimer);
+    leaveTimer = null;
+    delete element.dataset.leaving;
+  }
+
+  function hideDocked() {
+    delete element.dataset.leaving;
+    element.hidden = true;
+    layout.dataset.inspector = "off";
   }
 
   // The drawer slides (item 85): shown first, then opened once its first frame is laid out so the slide plays; closing,
@@ -329,6 +368,11 @@ export function createInspector({ layout, tabs, screensIn }) {
       return;
     }
     drawerOpen = dropped.drawerBefore;
+    // A panel that was hidden before the file goes with it at once: its slide would show the tabs, not the file.
+    if (measuredWidth >= MIN_WIDTH_PX && !showInspector()) {
+      stopLeaving();
+      hideDocked();
+    }
     arrange();
     (dropped.opener.isConnected ? dropped.opener : toggle).focus();
   }
@@ -379,6 +423,7 @@ export function createInspector({ layout, tabs, screensIn }) {
     setCount,
     showFile,
     dispose: () => {
+      stopLeaving();
       dropFile();
       observer.disconnect();
       window.removeEventListener("keydown", onKey);

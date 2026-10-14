@@ -5155,8 +5155,8 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 216 | The README says what leaves this Mac                                                 | done        | b8d6f34 |
 | 217 | A weekly audit of the dependencies                                                   | done        | 48772b2 |
 | 218 | The lists of skills and notes keep a size                                            | done        | 58acd2a |
-| 219 | Import from other apps                                                               | in progress |         |
-| 220 | The side panel slides, and the screen says why it is empty                           | planned     |         |
+| 219 | Import from other apps                                                               | done        | d017075 |
+| 220 | The side panel slides, and the screen says why it is empty                           | in progress |         |
 | 221 | The window of every provider's models, as published                                  | planned     |         |
 | 222 | A context meter in the run's composer                                                | planned     |         |
 | 223 | Claude's fast mode                                                                   | planned     |         |
@@ -10373,7 +10373,7 @@ inside past its first rows, so what is under a long list stays near.
 
 ### 219. Import from other apps
 
-**Status: in progress.**
+**Status: done.** Merged as `d017075` (PR #258; no Linear issue, the Linear connector was signed out).
 
 **As built (2026-10-14).** Import from other apps, at the head of Settings › Skills, opens a checklist of what Dot can
 add from the Mac's other agents (Claude Code and its plugins, Claude Desktop, Cursor, VS Code, Codex): the skills by
@@ -10392,7 +10392,16 @@ other agents set up, several at once.
 
 ### 220. The side panel slides, and the screen says why it is empty
 
-**Status: planned.**
+**Status: in progress.**
+
+**As built (2026-10-14).** Beside the conversation the run page's side panel slides in as it is shown and out before it
+hides (`inspector.js`, `--motion-panel`): the conversation makes room for it at once and takes the room back once the
+slide is over, so nothing under the panel jumps while it moves; under reduced motion it comes and goes at once. The
+Screen tab's empty view keeps the shape of a screen (16:10) and says why it has no frame with a mark, a title and a
+hint: no page yet, waiting for the page (the mark breathes unless motion is reduced), the view closed, the run ended, or
+a run in a `dotx` command. In a phone's drawer a toolbar with no address no longer leaves an empty row. Tests:
+`tests/smoke/test_side_panel.py`, wide and on a phone, light and dark; on the code of before, both tests fail (the panel
+hides at once, and the empty screen says nothing of its state).
 
 **What.** Beside the conversation the side panel slides in and out, and the Screen tab's view keeps the shape of a
 screen and says why it has no frame.
@@ -11076,3 +11085,4 @@ a time; the API's refusal is shown as it is.
 - 2026-10-14 (Opus 5.5): item 216 merged as `b8d6f34` (PR #255; no Linear issue, the connector was signed out): the README says in one place what leaves this Mac, where it goes, and how to keep a run's conversation here.
 - 2026-10-14 (Opus 5.5): item 217 merged as `48772b2` (PR #256; no Linear issue, the connector was signed out): a weekly job checks the Python and Rust dependencies as locked against the public advisories.
 - 2026-10-14 (Opus 5.5): item 218 merged as `58acd2a` (PR #257; no Linear issue, the connector was signed out): Settings › Skills and Settings › Memory keep their lists in a box of a fixed height that scrolls inside.
+- 2026-10-14 (Opus 5.5): item 219 merged as `d017075` (PR #258; no Linear issue, the connector was signed out): a button of Settings › Skills imports, from a checklist, the skills and MCP servers the Mac's other agents set up, several at once.
