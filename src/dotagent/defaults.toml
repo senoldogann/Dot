@@ -64,8 +64,8 @@ helper_cooldown_s = 600
 base_url = "http://localhost:11434"
 api_key_env = "OLLAMA_API_KEY"
 num_ctx = 65536
-# The window asked of a cloud model (a name ending in ":cloud", run on Ollama's servers, so it costs this Mac no memory);
-# the model's own window caps it.
+# The window asked of a cloud model (its tag is "cloud" or ends in "-cloud": kimi-k3:cloud, gpt-oss:120b-cloud; it runs on
+# Ollama's servers, so it costs this Mac no memory); the model's own window caps it.
 num_ctx_cloud = 262144
 keep_alive = "30m"
 connect_timeout_s = 10.0

@@ -100,6 +100,7 @@ def _option(provider: str, info: ModelInfo, default_effort: Effort) -> ModelOpti
         tools=info.tools,
         thinking=info.thinking,
         context_length=info.context_length,
+        own_context_length=info.own_context_length,
         efforts=list(info.efforts),
         default_effort=effective_effort(info.efforts, default_effort),
         free=info.free,

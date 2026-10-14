@@ -82,6 +82,7 @@ class Models:
                 tools=model == "thinker",
                 thinking=model == "thinker",
                 context_length=_CONTEXT_LENGTH,
+                own_context_length=None,
                 efforts=("low", "medium", "high") if model == "thinker" else (),
                 free=False,
             )

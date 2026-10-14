@@ -99,6 +99,7 @@ class SpendingProvider:
             tools=model != BLIND.partition(":")[2],
             thinking=False,
             context_length=128_000,
+            own_context_length=None,
             efforts=("low", "medium", "high"),
             free=False,
         )

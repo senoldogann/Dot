@@ -248,8 +248,11 @@ reminder, a resumed run) and, in goal mode, to the goal check.
 - How much help a run gets depends on its model. The window is what one request of the model can hold; for Ollama it is
   the smaller of the model's own window and the `num_ctx` Dot sends with every request (the Models table of the System
   page shows it): `[providers.ollama] num_ctx` (65 536) for a model that runs on this Mac, where it sets the memory of
-  the model's cache, and `num_ctx_cloud` (262 144) for a cloud model, whose name ends in `:cloud` and which runs on
-  Ollama's servers. When three quarters of the window is less than `context_tokens`, the run's budget
+  the model's cache, and `num_ctx_cloud` (262 144) for a cloud model, whose tag is `cloud` or ends in `-cloud`
+  (`kimi-k3:cloud`, `gpt-oss:120b-cloud`) and which runs on Ollama's servers; where the model's own window is larger,
+  the table shows it beside the one Dot asks for ("262k tokens of 1.0M", item 221). OpenAI's and OpenCode Go's
+  windows come from Dot's tables of their models, kept to their published pages; Anthropic's from its list of models. When three quarters of the window is less
+  than `context_tokens`, the run's budget
   is that, and `tool_output_chars`, the most one tool result may carry, shrinks in the same proportion (never below 2000
   characters). The text of a page or an application window in a browser or desktop result takes what is left next to the
   rest of the result, and never less than half the result, so a small window shortens a page instead of leaving it out.

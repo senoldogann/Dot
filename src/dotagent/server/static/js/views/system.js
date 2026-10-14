@@ -259,6 +259,19 @@ function reasoningControl(model) {
   return reasoningSelect(model, `Reasoning level of ${model.ref}`);
 }
 
+/** The window a model gets, and its own beside it when Dot asks for less of it (item 221). */
+function contextCell(model) {
+  if (model.context_length === null) {
+    return el("td", { class: "muted" }, NOT_SET);
+  }
+  const used = `${compact(model.context_length)} tokens`;
+  if (model.own_context_length === null) {
+    return el("td", { class: "muted" }, used);
+  }
+  const title = `Dot asks for ${model.context_length.toLocaleString()} tokens ([providers.ollama] num_ctx or num_ctx_cloud); the model takes ${model.own_context_length.toLocaleString()}.`;
+  return el("td", { class: "muted", title }, `${used} of ${compact(model.own_context_length)}`);
+}
+
 function modelRow(model, mainModel) {
   return el(
     "tr",
@@ -271,7 +284,7 @@ function modelRow(model, mainModel) {
     ),
     el("td", null, capabilities(model)),
     el("td", { class: "reasoning-cell" }, reasoningControl(model)),
-    el("td", { class: "muted" }, model.context_length === null ? NOT_SET : `${compact(model.context_length)} tokens`),
+    contextCell(model),
   );
 }
 

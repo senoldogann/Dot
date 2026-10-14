@@ -79,14 +79,23 @@ def _plain(context: int, max_output: int, vision: bool) -> ModelTraits:
     )
 
 
-# Facts come from OpenAI's model pages (GPT-6 family) and are kept conservative for older families: a context
-# or output limit that is too small only makes the agent compact earlier, while an effort label a model rejects
-# fails the call.
+# Facts come from OpenAI's model pages (the windows of GPT-5.1 and later read again 2026-10-14, item 221) and are kept
+# conservative for older families: a context or output limit that is too small only makes the agent compact earlier,
+# while an effort label a model rejects fails the call.
 RULES: tuple[TraitRule, ...] = (
     TraitRule(prefix="gpt-6-luna", traits=_reasoning(1_050_000, 128_000, _LUNA_EFFORTS, True)),
     TraitRule(prefix="gpt-5.6-luna", traits=_reasoning(1_050_000, 128_000, _LUNA_EFFORTS, True)),
     TraitRule(prefix="gpt-6", traits=_reasoning(1_050_000, 128_000, _SOL_EFFORTS, True)),
     TraitRule(prefix="gpt-5.6", traits=_reasoning(1_050_000, 128_000, _SOL_EFFORTS, True)),
+    # GPT-5.4 and 5.5 hold 1.05 M tokens, the mini and the nano of 5.4 400 k; the chat models of 5.1 to 5.3 hold 128 k,
+    # as gpt-5-chat does.
+    TraitRule(prefix="gpt-5.4-mini", traits=_reasoning(400_000, 128_000, _GPT5_EFFORTS, True)),
+    TraitRule(prefix="gpt-5.4-nano", traits=_reasoning(400_000, 128_000, _GPT5_EFFORTS, True)),
+    TraitRule(prefix="gpt-5.4", traits=_reasoning(1_050_000, 128_000, _GPT5_EFFORTS, True)),
+    TraitRule(prefix="gpt-5.5", traits=_reasoning(1_050_000, 128_000, _GPT5_EFFORTS, True)),
+    TraitRule(prefix="gpt-5.1-chat", traits=_reasoning(128_000, 16_384, _GPT5_EFFORTS, True)),
+    TraitRule(prefix="gpt-5.2-chat", traits=_reasoning(128_000, 16_384, _GPT5_EFFORTS, True)),
+    TraitRule(prefix="gpt-5.3-chat", traits=_reasoning(128_000, 16_384, _GPT5_EFFORTS, True)),
     TraitRule(prefix="gpt-5-chat", traits=_plain(128_000, 16_384, True)),
     TraitRule(prefix="gpt-5.", traits=_reasoning(400_000, 128_000, _GPT5_EFFORTS, True)),
     TraitRule(prefix="gpt-5", traits=_reasoning(400_000, 128_000, _CLASSIC_EFFORTS, True)),

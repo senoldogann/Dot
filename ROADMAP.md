@@ -5156,8 +5156,8 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 217 | A weekly audit of the dependencies                                                   | done        | 48772b2 |
 | 218 | The lists of skills and notes keep a size                                            | done        | 58acd2a |
 | 219 | Import from other apps                                                               | done        | d017075 |
-| 220 | The side panel slides, and the screen says why it is empty                           | in progress |         |
-| 221 | The window of every provider's models, as published                                  | planned     |         |
+| 220 | The side panel slides, and the screen says why it is empty                           | done        | e1d8176 |
+| 221 | The window of every provider's models, as published                                  | in progress |         |
 | 222 | A context meter in the run's composer                                                | planned     |         |
 | 223 | Claude's fast mode                                                                   | planned     |         |
 
@@ -10392,7 +10392,7 @@ other agents set up, several at once.
 
 ### 220. The side panel slides, and the screen says why it is empty
 
-**Status: in progress.**
+**Status: done.** Merged as `e1d8176` (PR #259; no Linear issue, the Linear connector was signed out).
 
 **As built (2026-10-14).** Beside the conversation the run page's side panel slides in as it is shown and out before it
 hides (`inspector.js`, `--motion-panel`): the conversation makes room for it at once and takes the room back once the
@@ -10408,7 +10408,16 @@ screen and says why it has no frame.
 
 ### 221. The window of every provider's models, as published
 
-**Status: planned.**
+**Status: in progress.**
+
+**As built (2026-10-14).** Against the providers' pages, read again on 2026-10-14: OpenAI's GPT-5.4, 5.4 pro, 5.5 and
+5.5 pro hold 1,050,000 tokens (Dot said 400,000) and the chat models of GPT-5.1 to 5.3 hold 128,000; the mini and nano
+of 5.4 stay at 400,000. An Ollama cloud model is one whose tag is `cloud` or ends in `-cloud`, as Ollama names them;
+those of the second form were taken for models of this Mac and asked for `num_ctx` instead of `num_ctx_cloud`. A model
+whose own window is larger than the one Dot asks for keeps it in view (Settings › Models says "262k tokens of 1.0M";
+`own_context_length`). Anthropic's windows come from its list of models and were right, as were OpenCode Go's known
+ones; an id no page publishes keeps the provider's assumed window. Tests: `tests/unit/test_model_windows.py`; on the
+code of before, 8 of 18 OpenAI ids had another window and both models of the second tag form asked for 65,536 tokens.
 
 **What.** Every provider's models show the window their pages publish, OpenAI's newer models and Ollama's cloud models
 among them, and a run's budget follows it.
@@ -11086,3 +11095,4 @@ a time; the API's refusal is shown as it is.
 - 2026-10-14 (Opus 5.5): item 217 merged as `48772b2` (PR #256; no Linear issue, the connector was signed out): a weekly job checks the Python and Rust dependencies as locked against the public advisories.
 - 2026-10-14 (Opus 5.5): item 218 merged as `58acd2a` (PR #257; no Linear issue, the connector was signed out): Settings › Skills and Settings › Memory keep their lists in a box of a fixed height that scrolls inside.
 - 2026-10-14 (Opus 5.5): item 219 merged as `d017075` (PR #258; no Linear issue, the connector was signed out): a button of Settings › Skills imports, from a checklist, the skills and MCP servers the Mac's other agents set up, several at once.
+- 2026-10-14 (Opus 5.5): item 220 merged as `e1d8176` (PR #259; no Linear issue, the connector was signed out): beside the conversation the side panel slides in and out, and the Screen tab's empty view keeps the shape of a screen and says why it has no frame.
