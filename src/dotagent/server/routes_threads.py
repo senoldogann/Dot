@@ -1,5 +1,6 @@
 """Routes for the chats of the sidebar: every thread a person started a run on, deleting several at once, naming or
-pinning one from its menu (item 130), and keeping what its composer chose (item 199)."""
+pinning one from its menu (item 130), keeping what its composer chose (item 199), and the helpers its runs started
+(item 227)."""
 
 from typing import Annotated
 
@@ -8,9 +9,9 @@ from fastapi import APIRouter, Query
 from dotagent.core.errors import ConfigError
 from dotagent.llm.router import ModelRef, offers_fast_mode, parse_model_ref
 from dotagent.server.context import ServerContext
-from dotagent.server.views import DeletedThreads, DeleteThreadsRequest, ThreadChange, ThreadsQuery
+from dotagent.server.views import DeletedThreads, DeleteThreadsRequest, HelpersQuery, ThreadChange, ThreadsQuery
 from dotagent.store.db import Store
-from dotagent.store.models import ThreadSummary
+from dotagent.store.models import RunRecord, ThreadSummary
 
 
 def threads_router(ctx: ServerContext) -> APIRouter:
@@ -20,6 +21,13 @@ def threads_router(ctx: ServerContext) -> APIRouter:
     @router.get("/threads")
     async def list_threads(query: Annotated[ThreadsQuery, Query()]) -> list[ThreadSummary]:
         return await store.list_thread_summaries(query.limit)
+
+    @router.get("/threads/{thread_id}/helpers")
+    async def list_helpers(thread_id: str, query: Annotated[HelpersQuery, Query()]) -> list[RunRecord]:
+        """The runs the chat's runs started on their behalf, newest first (the side panel's Agents tab); 404 for no
+        chat."""
+        await store.get_thread(thread_id)
+        return await store.list_thread_helpers(thread_id, query.limit)
 
     @router.delete("/threads")
     async def delete_threads(request: DeleteThreadsRequest) -> DeletedThreads:

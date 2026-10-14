@@ -37,7 +37,7 @@ _STEPS: tuple[str, ...] = ("Read the brief", "Draft the outline", "Write the sum
 _WAIT_COMMAND: str = "sleep 300"
 _STEP_WAIT_S: float = 20.0
 _RUN_WAIT_S: float = 30.0
-_TABS: list[str] = ["Run", "Plan 1/3", "Actions", "Screen"]
+_TABS: list[str] = ["Run", "Plan 1/3", "Actions", "Agents", "Screen"]
 # Whether the panel is leaving, whether it is hidden, and whether the conversation keeps room for it.
 _PANEL_STATE: str = (
     "() => [document.querySelector('.inspector').dataset.leaving ?? '', document.querySelector('.inspector').hidden,"

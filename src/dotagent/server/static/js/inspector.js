@@ -1,8 +1,9 @@
-// The side panel of the run page: the details and the plan of the run and the screens the agent looked at, in tabs
-// after T3 Code's side panel (item 203), one at a time, the one chosen last kept per browser. On a wide page it sits
-// beside the conversation when the reader wants it (see layout.js), sliding in and out (item 220); on a narrow page it is
-// a drawer that the button in the header slides in over the conversation. A file the conversation carries or names
-// takes the panel while it is open (item 195, filepanel.js).
+// The side panel of the run page: the details and the plan of the run, the agents of its chat and the screens the agent
+// looked at, in tabs after T3 Code's side panel (item 203), each with its icon (item 227), one at a time, the one
+// chosen last kept per browser. On a wide page it sits beside the conversation when the reader wants it (see
+// layout.js), sliding in and out (item 220); on a narrow page it is a drawer that the button in the header slides in
+// over the conversation. A file the conversation carries or names takes the panel while it is open (item 195,
+// filepanel.js).
 
 import { imageUrl } from "./api.js";
 import { el, motionMs } from "./dom.js";
@@ -24,9 +25,10 @@ const TAB_KEY = "dot.panelTab";
 const TAB_KEYS = new Set(["ArrowLeft", "ArrowRight", "Home", "End"]);
 
 /**
- * The panel for a run page whose frame is `layout`, in `tabs` (`[{ id, label, sections }]`, `sections` a list of
- * nodes); the screenshots go at the end of the tab `screensIn`. The frame gets `data-inspector="on"` while the panel
- * sits beside the conversation and `"off"` otherwise, and `data-file="on"` while a file takes it. Returns `element`
+ * The panel for a run page whose frame is `layout`, in `tabs` (`[{ id, label, icon, sections }]`, `icon` the name of
+ * the tab's icon, `sections` a list of nodes); the screenshots go at the end of the tab `screensIn`. The frame gets
+ * `data-inspector="on"` while the panel sits beside the conversation and `"off"` otherwise, and `data-file="on"` while
+ * a file takes it. Returns `element`
  * (the panel) and `scrim` (the veil behind the drawer), both to put inside the frame, `toggle` (the header button that
  * shows or hides the panel), `arrange()` (call it once the frame is on the page), `addImage(name)`, `setCount(tabId,
  * text)` (a short count beside a tab's name; "" for none), `showFile(source, opener)` (see `fileView`; `opener` gets
@@ -58,7 +60,7 @@ export function createInspector({ layout, tabs, screensIn }) {
   );
 
   // ------------------------------------------------------------------------------------------------- tabs
-  const tabNodes = tabs.map(({ id, label, sections }) => {
+  const tabNodes = tabs.map(({ id, label, icon: iconName, sections }) => {
     const count = el("span", { class: "inspector-count", hidden: true });
     const button = el(
       "button",
@@ -70,9 +72,13 @@ export function createInspector({ layout, tabs, screensIn }) {
         "aria-controls": `inspector-panel-${id}`,
         "aria-selected": "false",
         tabindex: "-1",
+        title: label,
         onclick: () => choose(id, false),
       },
-      el("span", null, label),
+      icon(iconName),
+      // Where the strip has no room for every name, only the chosen tab shows its own (run.css); the others keep it for
+      // a screen reader and in their tooltip.
+      el("span", { class: "inspector-tab-label" }, label),
       // A space between the name and the count, so that a screen reader says "Plan 1/3".
       " ",
       count,

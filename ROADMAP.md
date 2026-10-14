@@ -5162,8 +5162,8 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 223 | Claude's fast mode                                                                   | done        | a3ace6d |
 | 224 | A summary's check knows a path however it is written                                 | done        | 109c270 |
 | 225 | A model that declines is said to have declined                                       | done        | 103f5b2 |
-| 226 | A helper's card                                                                      | in progress |         |
-| 227 | Previous agents in the side panel                                                    | planned     |         |
+| 226 | A helper's card                                                                      | done        | 0db06a8 |
+| 227 | Previous agents in the side panel                                                    | in progress |         |
 | 228 | The rail of messages beside the docked panel                                         | planned     |         |
 | 229 | Commands in the background                                                           | planned     |         |
 | 230 | The composer's keys                                                                  | planned     |         |
@@ -10540,7 +10540,7 @@ so at once, instead of asking again and saying that the model did not use its to
 
 ### 226. A helper's card
 
-**Status: in progress.**
+**Status: done.** Merged as `0db06a8` (PR #265; no Linear issue, the Linear connector was signed out).
 
 **As built (2026-10-14).** Resting the pointer on a helper's row for 400 ms, or moving the keyboard's focus to it, shows
 a card beside it (`static/js/helpercard.js`), as T3 Code does for a subagent: the helper's face and whole goal, the
@@ -10556,7 +10556,15 @@ level, its state with the time it has run, and what it is doing or did last.
 
 ### 227. Previous agents in the side panel
 
-**Status: planned.**
+**Status: in progress.**
+
+**As built (2026-10-14).** `GET /api/threads/{id}/helpers` lists the runs a chat's runs started on their behalf, newest
+first (a helper has a thread of its own, so the chat's own list of runs never held them). The side panel's new Agents
+tab (`static/js/agentlist.js`) shows them as T3 Code's "Previous agents": the face with its state, the goal over its
+state and model, how long it took; five at first and the rest on Show N more; a row opens the helper's page, and the tab
+counts them. Every tab wears an SVG icon, and where the strip has no room for every name, the tabs not chosen show their
+icon and count alone. Tests: `tests/smoke/test_previous_agents.py`, seeded runs, the API and the tab, wide and on a
+phone, light and dark, in Chrome and WebKit; on the code of before, the list's address answers 404.
 
 **What.** The run page's side panel lists the chat's earlier helpers, each with its face, its title, its state and its
 time, a few at first and more on demand, and the panel's tabs have icons.
@@ -11261,3 +11269,4 @@ default model.
 - 2026-10-14 (Opus 5.5): item 223 merged as `a3ace6d` (PR #262; no Linear issue, the connector was signed out): Claude Opus 5.5, Opus 5 and Opus 4.8 offer fast mode in a chat's reasoning menu, off until the owner turns it on.
 - 2026-10-14 (Opus 5.5): item 224 merged as `109c270` (PR #263; no Linear issue, the connector was signed out): a summary's check knows a path in each of the ways a Mac writes it, `~` or the home folder, `/tmp` or `/private/tmp`.
 - 2026-10-14 (Opus 5.5): item 225 merged as `103f5b2` (PR #264; no Linear issue, the connector was signed out): a review model that declines is said to have declined, naming it, and is not asked again.
+- 2026-10-14 (Opus 5.5): item 226 merged as `0db06a8` (PR #265; no Linear issue, the connector was signed out): resting the pointer on a helper's row, or moving the focus to it, shows a card with its goal, model and level, state, time and current action.

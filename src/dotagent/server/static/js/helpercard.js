@@ -28,6 +28,11 @@ const STATE_WORDS = {
 
 let cards = 0;
 
+/** A helper's state in a word, for its card and the side panel's list of agents (item 227). */
+export function stateWord(status) {
+  return STATE_WORDS[status] ?? status;
+}
+
 /** The model of `helper` in words: the model's name, then its reasoning level and fast mode when it has them. */
 function modelLine(helper) {
   const parts = [modelName(helper.model)];
@@ -117,7 +122,7 @@ export function helperCard(container) {
     }
     ring.className = `status-ring s-${helper.status}`;
     const until = helper.ended ?? now;
-    state.textContent = `${STATE_WORDS[helper.status] ?? helper.status} · ${duration(Math.max(until - helper.began, 0))}`;
+    state.textContent = `${stateWord(helper.status)} · ${duration(Math.max(until - helper.began, 0))}`;
     const line = actionLine(helper);
     doing.hidden = line === null;
     if (line !== null) {

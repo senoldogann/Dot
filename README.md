@@ -1275,7 +1275,11 @@ window. It reads the run's `scaffold` and `assistant` events and asks the model 
 offers **Continue** on a line above the box. The panel's Details show the status, the agent of a chat with one, the model and its reasoning level, the
 approval mode and goal mode, the campaign of a session, the model turns, the tool calls (with the failed ones), the
 tokens (of every model call of the run: its steps and its side calls, such as compactions, reviews and the goal check),
-the duration, the start and the run id; its other tabs hold the plan, the actions and the latest screenshots. It stays
+the duration, the start and the run id; its other tabs hold the plan, the actions, the agents of the chat and the latest
+screenshots. Each tab wears its icon, and where the strip has no room for every name, the tabs not chosen show their
+icon and count alone (item 227). The Agents tab lists, newest first, the runs the chat's runs handed work to, after T3
+Code's "Previous agents": five at first and the rest on **Show N more**, each with its face and goal, its state and
+model and how long it took, and a row opens its page. It stays
 closed until the panel button in the head of the run opens it (the choice is kept in the browser); open, it sits beside
 the conversation from 960 px and is a drawer below that. The run's head is the top bar itself: Dot's face and name on
 the left, the panel button on the right; the bar is solid with a hairline under it, so nothing scrolls under a blur, the
@@ -1510,6 +1514,7 @@ The REST API (all under `/api`; bodies and replies are JSON, event streams are s
 | `POST /attachments` (`{"name", "media_type", "data_b64"}`)                      | keep a file for a message; `POST /runs` and `steer` name it in `attachments` |
 | `GET /threads?limit=N`, `DELETE /threads` (`{"ids": […]}`)                      | the chats, the pinned first, then newest activity first; delete some with their runs (409 with the ids while one has a run under way) |
 | `PATCH /threads/{id}` (`{"title": …, "pinned": …, "seen": …, "choices": …}`)   | name a chat, pin it, mark it seen or unseen, or keep the choices its next follow-up starts with (`mode`, `model`, `effort`, `approvals`, `goal_mode`; `GET /runs/{id}` has them as `choices`); one at least (204; 404 for no chat); a chat's `unread` is in the list |
+| `GET /threads/{id}/helpers?limit=N`                                            | the runs a chat's runs delegated, newest first (the side panel's Agents tab; 404 for no chat) |
 | `GET /approvals`, `POST /approvals/{id}/decision`                               | pending approvals; answer one                                |
 | `GET\|POST /rules`, `PATCH\|DELETE /rules/{id}`                                 | custom policy rules                                          |
 | `POST /rules/draft` (`{"sentence": …}`)                                         | a rule drafted from your words, not kept (422 with the model's reason when the words make no rule) |
