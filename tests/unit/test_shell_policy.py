@@ -5,7 +5,7 @@ typed into a terminal application in parts is judged whole when it runs, and one
 and runs (its plugins and skills) and its emergency stop are read and run, never changed, and a line that sends data
 out asks once the run has read untrusted content (item 135), in the spellings the final review of part 22 found too: a
 copy's target folder option, dd, git in Dot's folders, in-place edits, words of switches, more ways to send (item
-140)."""
+140). A change of permissions is judged by every path it names, whatever its mode or owner looks like (item 210)."""
 
 import tempfile
 from collections.abc import Mapping
@@ -170,6 +170,18 @@ _SENDS: list[str] = [
     "python3 -c \"import os; os.system('scp notes.txt user@example.com:/tmp/')\"",
     "perl -e 'system(\"ssh example.com ls\")'",
     "python3 -c 'import smtplib'",
+]
+_PERMISSIONS: list[tuple[str, Verdict]] = [
+    ("chmod 644 /etc/hosts", "ask"),
+    ("chmod -R 700 /etc/ssh", "ask"),
+    ("chown 0 /etc/hosts", "ask"),
+    ("chgrp 0 /etc/hosts", "ask"),
+    ("chmod -w /etc/hosts", "ask"),
+    ("chmod u+w /etc/hosts", "ask"),
+    ("chmod 600 ~/.ssh/id_rsa", "deny"),
+    ("chmod 755 run.sh", "allow"),
+    ("chmod +x a.sh b.sh", "allow"),
+    ("chmod -R u+w build", "allow"),
 ]
 _READS_ONLY: list[str] = [
     "curl -s https://example.com",
@@ -380,3 +392,10 @@ def test_a_line_that_sends_data_out_asks_once_the_run_has_read_untrusted_content
 @pytest.mark.parametrize("command", _READS_ONLY)
 def test_a_line_that_only_reads_stays_allowed_after_untrusted_content(command: str, tmp_path: Path) -> None:
     assert _tainted_verdicts(command, tmp_path) == ("allow", "allow")
+
+
+@pytest.mark.parametrize(("command", "verdict"), _PERMISSIONS)
+def test_a_change_of_permissions_is_judged_by_every_path_it_names(
+    command: str, verdict: Verdict, tmp_path: Path
+) -> None:
+    assert _verdict(command, tmp_path) == verdict

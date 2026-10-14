@@ -1260,10 +1260,10 @@ def _target_folders(args: list[str]) -> tuple[list[str], list[str]]:
 
 def _assess_writes(command: str, args: list[str], scope: ShellScope) -> Finding:
     words, folders = _target_folders(args) if command in _TARGET_FOLDER_COMMANDS else (args, [])
-    # The folder an option names is where the command writes: it comes last, as the operand a copy writes.
+    # The folder an option names is where the command writes: it comes last, as the operand a copy writes. The mode or
+    # the owner of chmod, chown and chgrp counts as a path too: none can be told apart for sure (a number is left out,
+    # and a mode can start with "-", like an option), and as a word of the line's own folder it judges no path milder.
     targets: list[str] = [*(target for target in _positional(words) if not target.isdigit()), *folders]
-    if command == "chmod" or command == "chown" or command == "chgrp":
-        targets = targets[1:]
     classes: list[PathClass] = [_path_class(target, scope) for target in targets]
     if command in _COPIES:
         classes = [*(_read_as(path_class) for path_class in classes[:-1]), *classes[-1:]]

@@ -5145,8 +5145,8 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 206 | Markdown in the conversation, and copies that keep it                                | done        | 33a7f8d |
 | 207 | The composer shows the markdown it holds, after T3 Code                              | done        | 23f1d9a |
 | 208 | The model menu: providers at the side, a search and favourites, after T3 Code        | done        | 2545d60 |
-| 209 | The default model, changed from the model menu                                       | in progress |         |
-| 210 | The shell check: changes of permissions                                              | planned     |         |
+| 209 | The default model, changed from the model menu                                       | done        | a83c6b7 |
+| 210 | The shell check: changes of permissions                                              | in progress |         |
 | 211 | Secrets kept from the agent by default                                               | planned     |         |
 | 212 | A provider that is not running answers at once                                       | planned     |         |
 | 213 | Tests: a bare pytest, and every offline smoke test in CI                             | planned     |         |
@@ -10159,7 +10159,7 @@ run. Item 196 of part 31 still waits on the owner.
 
 ### 209. The default model, changed from the model menu
 
-**Status: in progress.**
+**Status: done.** Merged as `a83c6b7` (PR #248; no Linear issue, the Linear connector was signed out).
 
 **As built (2026-10-14).** The default's row of the composer's model menu (`modelpicker.js`), the first of every view,
 has Change once the daemon's default is known. Change turns the list to choosing the default: a tinted bar under the
@@ -10189,7 +10189,16 @@ Settings › Models; a chat with a model of its own keeps it.
 
 ### 210. The shell check: changes of permissions
 
-**Status: planned.**
+**Status: in progress.**
+
+**As built (2026-10-14).** The shell check judges a change of permissions or of owner (`chmod`, `chown`, `chgrp`) by
+every path the line names. It set the first word after the options aside as the mode or the owner, after the words that
+are numbers had already been left out, and a mode can start with "-" like an option, so the word set aside was not
+always the mode. Now no word is set aside: a number is still left out, and a mode or an owner that is no number is
+judged as a path in the line's own folder, which never makes the line milder than the paths beside it. Tests:
+`tests/unit/test_shell_policy.py`, ten lines: a change of a system file's permissions or owner asks (a mode as a number,
+as letters or starting with "-", recursive or not), one of a protected file is refused, and one in the workspace runs,
+as before. On the code of before, five of them were judged too mildly.
 
 **What.** The shell check judges a change of permissions by every path it names. The details are written here once the
 fix is merged.
@@ -10889,3 +10898,4 @@ is sent to them, and how to keep it on the Mac.
 - 2026-10-14 (Opus 5.5): item 206 merged as `33a7f8d` (PR #245; no Linear issue, the connector was signed out): The owner's messages read as markdown, and a copy out of the conversation keeps the markdown it was written in, a list as a list and a table as a table.
 - 2026-10-14 (Opus 5.5): item 207 merged as `23f1d9a` (PR #246; no Linear issue, the connector was signed out): The composer's box shows the markdown it holds as it reads, its marks quieter than its words, letter for letter under the text as typed.
 - 2026-10-14 (Opus 5.5): item 208 merged as `2545d60` (PR #247; no Linear issue, the connector was signed out): The composer's model menu has a rail of the favourites and the providers' marks, a search across providers, a star on each model and keys, after T3 Code's.
+- 2026-10-14 (Opus 5.5): item 209 merged as `a83c6b7` (PR #248; no Linear issue, the connector was signed out): the composer's model menu changes the daemon's default model too: Change on the default's row, then a pick.
