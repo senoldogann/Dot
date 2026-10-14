@@ -2220,6 +2220,13 @@ a.pill:hover {
   color: var(--text);
 }
 
+/* What you wrote reads as markdown (item 206): its code and its tables' heads one surface up from the bubble's. */
+.bubble.user .prose code,
+.bubble.user .prose pre,
+.bubble.user .prose th {
+  background: var(--surface-3);
+}
+
 /* Under your message, at the bubble's right edge (item 205): when it was sent, a copy of it and a way to send it again,
    as quiet as the answer's foot. A turn at work keeps them back until its answer is in. */
 .user-message {

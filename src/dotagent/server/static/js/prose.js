@@ -1,5 +1,6 @@
-// Turns the text an agent wrote into DOM nodes. Everything goes in as text nodes; only http(s) links become anchors, and
-// the path of a file in code a button that shows the file beside the conversation (item 195).
+// Turns the text an agent or the owner wrote into DOM nodes. Everything goes in as text nodes; only http(s) links
+// become anchors, and the path of a file in code a button that shows the file beside the conversation (item 195). A
+// heading is drawn one level down and keeps the level it was written at in `data-level`, for a copy (item 206).
 
 import { el, requestFile } from "./dom.js";
 import { parseBlocks } from "./markdown.js";
@@ -48,7 +49,7 @@ function blockNode(block) {
     case "code":
       return el("pre", null, el("code", null, block.text));
     case "heading":
-      return el(`h${Math.min(block.level + 1, 4)}`, null, inlineNodes(block.inline));
+      return el(`h${Math.min(block.level + 1, 4)}`, { dataset: { level: String(block.level) } }, inlineNodes(block.inline));
     case "list":
       return el(
         block.ordered ? "ol" : "ul",
