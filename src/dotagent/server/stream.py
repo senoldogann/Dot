@@ -13,7 +13,7 @@ from dotagent.agent.approvals import QUESTION_LEFT_EVENT
 from dotagent.agent.campaign import CAMPAIGN_ENDED_EVENT
 from dotagent.agent.gate import HANDBACK_EVENT, TAKEOVER_EVENT
 from dotagent.agent.lessons import LESSON_EVENTS
-from dotagent.agent.manager import QUEUE_CHANGED_EVENT
+from dotagent.agent.manager import QUEUE_CHANGED_EVENT, TERMINALS_CHANGED_EVENT
 from dotagent.browser.types import Frame
 from dotagent.events import EventBus
 from dotagent.scheduler import SCHEDULE_MISSED_EVENT
@@ -30,11 +30,11 @@ RESYNC: bytes = b"event: resync\ndata: {}\n\n"
 # The event of the screencast stream (``GET /runs/{id}/screencast``).
 FRAME_EVENT: str = "frame"
 
-# What the lifecycle stream carries: the moments a client must refetch its lists for (the Activity sections among
-# them: a takeover moves a run between them; a chat's queue; the rules), what becomes of the lessons of a run, which are drawn
-# once its own stream has ended, and what else the page tells as a desktop notification, as the phone hears it
-# (``notify/push.py``): a question a run left, a campaign that ended by itself, a firing a schedule missed. A restart
-# after an unexpected stop is pushed only: it happens before any page is back on the stream.
+# What the lifecycle stream carries: the moments a client must refetch its lists for (the Activity sections among them:
+# a takeover moves a run between them; a chat's queue and its terminal sessions; the rules), what becomes of the lessons
+# of a run, which are drawn once its own stream has ended, and what else the page tells as a desktop notification, as
+# the phone hears it (``notify/push.py``): a question a run left, a campaign that ended by itself, a firing a schedule
+# missed. A restart after an unexpected stop is pushed only: it happens before any page is back on the stream.
 LIFECYCLE_KINDS: frozenset[str] = frozenset(
     {
         "run_queued",
@@ -45,6 +45,7 @@ LIFECYCLE_KINDS: frozenset[str] = frozenset(
         TAKEOVER_EVENT,
         HANDBACK_EVENT,
         QUEUE_CHANGED_EVENT,
+        TERMINALS_CHANGED_EVENT,
         *LESSON_EVENTS,
         QUESTION_LEFT_EVENT,
         CAMPAIGN_ENDED_EVENT,

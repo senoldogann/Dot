@@ -23,7 +23,7 @@ from dotagent.core.paths import workspace_dir
 from dotagent.core.types import JsonObject
 from dotagent.runtime import Runtime, build_runtime, close_runtime
 from dotagent.store.models import EventRecord, RunRecord, ThreadRecord
-from dotagent.terminal.session import Terminals
+from dotagent.terminal.session import Terminals, TerminalSession
 from dotagent.tools.base import PreparedCall
 from dotagent.tools.context import ToolContext
 
@@ -177,13 +177,81 @@ async def test_a_server_stays_up_between_calls_and_stops_with_its_session(runtim
     assert closed == f"[session {session} is closed]"
 
 
+class _Watcher:
+    """What a run manager hears of the sessions: the chats whose sessions changed, and the commands in the background
+    that ended, as ``(chat, session, exit status)``."""
+
+    def __init__(self) -> None:
+        self.changed: list[str] = []
+        self.ended: asyncio.Queue[tuple[str, str, int | None]] = asyncio.Queue()
+
+    async def sessions_changed(self, thread_id: str) -> None:
+        self.changed.append(thread_id)
+
+    async def command_ended(self, thread_id: str, session: TerminalSession) -> None:
+        self.ended.put_nowait((thread_id, session.id, session.exit_status))
+
+
+async def test_a_command_in_the_background_runs_unread_and_its_end_alone_is_told(runtime: Runtime) -> None:
+    """Item 229: the idle are closed, but not a command in the background while it runs; its end is told with its exit
+    status, and it is kept the idle time more for what it printed to be read. A session closed by hand tells nothing."""
+    terminals: Terminals = Terminals(3, 1.0, runtime.shell_env)
+    watcher: _Watcher = _Watcher()
+    terminals.watch(watcher)
+    try:
+        idle: TerminalSession = await terminals.open("chat", "sleep 30", (), workspace_dir(), False)
+        left: TerminalSession = await terminals.open("chat", "sleep 3; echo done", (), workspace_dir(), True)
+        stopped: TerminalSession = await terminals.open("chat", "sleep 30", (), workspace_dir(), True)
+        await terminals.close("chat", stopped.id)
+        # The reaper looks every half of the idle time.
+        await asyncio.sleep(2.5)
+        assert [session.id for session in terminals.sessions("chat")] == [left.id], idle.id
+        assert await asyncio.wait_for(watcher.ended.get(), 10.0) == ("chat", left.id, 0)
+        assert [session.id for session in terminals.sessions("chat")] == [left.id]
+        await asyncio.sleep(2.5)
+        assert terminals.sessions("chat") == []
+        # Opened three times, closed by hand, closed idle twice, and one end: each was heard.
+        assert watcher.changed.count("chat") >= 6, watcher.changed
+        assert watcher.ended.empty()
+    finally:
+        await terminals.aclose()
+
+
+async def test_a_command_in_the_background_needs_a_chat_to_tell(runtime: Runtime) -> None:
+    """Item 229: a delegated run opens no command in the background, since no chat of its own would hear of its end;
+    nor does a process whose chats hear of no command's end, as a dotx command's, which ends with its run."""
+    ctx: ToolContext = await _yolo_context(runtime)
+    helper: RunRecord = await runtime.store.create_run(
+        ctx.thread_id,
+        GOAL,
+        "task",
+        "ollama:none",
+        ctx.run_id,
+        "delegate",
+        "medium",
+        "standard",
+        "yolo",
+        False,
+        None,
+        None,
+        None,
+    )
+    background: JsonObject = {"command": "sleep 5", "background": True}
+    with pytest.raises(ToolInputError, match="a delegated run or a campaign's session has none"):
+        await _call(dataclasses.replace(ctx, run_id=helper.id), "terminal_open", background)
+    # No run manager watches this runtime's sessions.
+    with pytest.raises(ToolInputError, match="tells no chat"):
+        await _call(ctx, "terminal_open", background)
+    assert runtime.terminals.sessions(ctx.thread_id) == []
+
+
 async def test_a_chat_keeps_its_limit_of_sessions_and_an_idle_session_is_closed(runtime: Runtime) -> None:
     terminals: Terminals = Terminals(1, 1.0, runtime.shell_env)
     try:
-        first: str = (await terminals.open("chat", "sleep 30", (), workspace_dir())).id
+        first: str = (await terminals.open("chat", "sleep 30", (), workspace_dir(), False)).id
         with pytest.raises(ToolInputError, match="the most it may have"):
-            await terminals.open("chat", "sleep 30", (), workspace_dir())
-        await terminals.open("another chat", "sleep 30", (), workspace_dir())
+            await terminals.open("chat", "sleep 30", (), workspace_dir(), False)
+        await terminals.open("another chat", "sleep 30", (), workspace_dir(), False)
         # The reaper looks every half of the idle time.
         await asyncio.sleep(2.5)
         with pytest.raises(ToolInputError, match=f"no terminal session {first}"):

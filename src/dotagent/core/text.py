@@ -91,6 +91,17 @@ def _mask_match(match: re.Match[str]) -> str:
     return "***"
 
 
+def duration_text(seconds: float) -> str:
+    """How long ``seconds`` lasted, in the words of a person: 45 s, 12 min, 9 h 41 min."""
+    whole: int = max(0, round(seconds))
+    if whole < 60:
+        return f"{whole} s"
+    minutes: int = whole // 60
+    if minutes < 60:
+        return f"{minutes} min"
+    return f"{minutes // 60} h {minutes % 60} min"
+
+
 def until_text(until: float, now: float) -> str:
     """A moment in local time: the time of day when it is today (``now``), else with its date."""
     end: datetime = datetime.fromtimestamp(until).astimezone()

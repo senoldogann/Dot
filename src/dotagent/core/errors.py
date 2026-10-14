@@ -160,7 +160,7 @@ class StoreError(DotError):
 
 
 class NotFoundError(StoreError):
-    """The thread, run, approval, note or schedule asked for does not exist."""
+    """The thread, run, approval, note, schedule or terminal session asked for does not exist."""
 
 
 class InvalidValueError(StoreError):

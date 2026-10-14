@@ -492,6 +492,18 @@ in another directory, so later lines are judged from the home folder. A chat kee
 sessions open (3; 0 removes the tools), each closed after `terminal_idle_s` without use (30 minutes) and all of them
 when the daemon stops; the end of a run closes none, so a server it started stays up for the next message.
 
+A command that runs long and ends by itself, as an eval or a long build, past the 30 minutes that `shell` may wait
+(`[shell] max_timeout_s`), goes to a terminal session in the background (`terminal_open` with `background`, item 229,
+after T3 Code's background work): it is not closed while it runs for being left unread, and the run that started it can
+end. When it ends by itself, its chat is told in a message of its queue, which starts the chat's next run with the
+chat's choices once no run works there (a held queue keeps it). The message says which command ended, with its exit
+status and how long it ran, and nothing it printed, which the run reads with `terminal_read`, as untrusted; Dot wrote
+it, so it opens that run as a note and is no instruction of the owner. Right above the composer, the chat's page shows
+each of its commands at work, with the time it has run and a Stop; the dot of a command in the background pulses, as its
+end will wake Dot. A command stopped there, closed by the run or ended by the daemon's stop tells nothing. A delegated
+run or a campaign's session opens none, having no chat of its own to tell, and neither does a `dotx` command, which ends
+with its run: a command in the background lives as long as the daemon.
+
 ## What leaves this Mac
 
 Dot sends nothing to the people who make it: there is no telemetry, no crash report and no check for updates. What
@@ -1515,6 +1527,8 @@ The REST API (all under `/api`; bodies and replies are JSON, event streams are s
 | `GET /threads?limit=N`, `DELETE /threads` (`{"ids": […]}`)                      | the chats, the pinned first, then newest activity first; delete some with their runs (409 with the ids while one has a run under way) |
 | `PATCH /threads/{id}` (`{"title": …, "pinned": …, "seen": …, "choices": …}`)   | name a chat, pin it, mark it seen or unseen, or keep the choices its next follow-up starts with (`mode`, `model`, `effort`, `approvals`, `goal_mode`; `GET /runs/{id}` has them as `choices`); one at least (204; 404 for no chat); a chat's `unread` is in the list |
 | `GET /threads/{id}/helpers?limit=N`                                            | the runs a chat's runs delegated, newest first (the side panel's Agents tab; 404 for no chat) |
+| `GET /threads/{id}/terminals`                                                  | the chat's terminal sessions: command, background or not, start, end and exit status (404 for no chat) |
+| `DELETE /threads/{id}/terminals/{session}`                                     | ends a session's program and what it started; the chat is told nothing (404 for no such session) |
 | `GET /approvals`, `POST /approvals/{id}/decision`                               | pending approvals; answer one                                |
 | `GET\|POST /rules`, `PATCH\|DELETE /rules/{id}`                                 | custom policy rules                                          |
 | `POST /rules/draft` (`{"sentence": …}`)                                         | a rule drafted from your words, not kept (422 with the model's reason when the words make no rule) |

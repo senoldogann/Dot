@@ -74,6 +74,19 @@ class HelpersQuery(FrozenModel):
     limit: int = Field(default=50, ge=1, le=200)
 
 
+class TerminalView(FrozenModel):
+    """A terminal session of a chat (item 229), as the line over the composer shows it: its command, whether it runs in
+    the background (its end is told to the chat), when it started (seconds since the epoch), whether its program has
+    ended, and its exit status once it ended by itself."""
+
+    id: str
+    command: str
+    background: bool
+    started_at: float
+    ended: bool
+    exit_status: int | None
+
+
 class EventsQuery(FrozenModel):
     after: int = Field(default=0, ge=0)
     limit: int = Field(default=500, ge=1, le=2000)
