@@ -567,12 +567,15 @@ the mark. A delegated run starts as untrusted as its parent.
   `AUTH` in the name) are removed from the processes the shell tool starts, `SSH_AUTH_SOCK` among them, so commands do
   not reach the keys of your SSH agent (`[shell] pass_env` lists exceptions).
 - Outside a `yolo` run the agent can neither read nor change `~/.ssh`, `~/.gnupg`, `~/Library/Keychains`, `~/.aws`,
-  `~/.config/gcloud` and the data directory of your Chrome (`[policy] protected_paths`), nor Dot's own key file, token,
-  browser profile, configuration, database and journals of file changes. The configuration holds the policy and the MCP
-  servers, the database the rules, the journals what `dotx undo` writes back. In any mode, a tool that names files (the
-  file tools, `web_extract`, `browser_upload`) looks at them again as it starts: a call whose path leads elsewhere by
-  then (a link moved while the call waited for its approval) is refused, and called again it is decided for where the
-  path leads now.
+  `~/.config/gcloud`, the data of your browsers (Chrome, Safari, Firefox, Brave, Edge and Arc) and their cookies, the
+  tokens and passwords that command lines keep (`~/.netrc`, `~/.git-credentials`, `~/.config/gh`, `~/.npmrc`,
+  `~/.pypirc`, the credentials of Cargo and RubyGems, `~/.docker/config.json`, `~/.kube`, `~/.azure`, `~/.config/op`,
+  `~/.password-store`), the shell's history, Messages and Mail (`[policy] protected_paths`; a list of your own replaces
+  this one), nor Dot's own key file, token, browser profile, configuration, database and journals of file changes. The
+  configuration holds the policy and the MCP servers, the database the rules, the journals what `dotx undo` writes back.
+  In any mode, a tool that names files (the file tools, `web_extract`, `browser_upload`) looks at them again as it
+  starts: a call whose path leads elsewhere by then (a link moved while the call waited for its approval) is refused,
+  and called again it is decided for where the path leads now.
 - Outside a `yolo` run the agent reads what Dot loads and runs, and runs a skill's files, but never changes them: its
   own code (the folder its package is imported from, the Python environment it runs in and the Python under that, and
   the file of the launchd job that starts the daemon), its plugins and their own files, its skills (with the
