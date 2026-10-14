@@ -87,6 +87,7 @@ from dotagent.store.models import (
     BrowserMode,
     CampaignEntry,
     CampaignRecord,
+    ChatChoices,
     EventRecord,
     QueuedMessage,
     RunMode,
@@ -236,6 +237,9 @@ class RunManager:
         self._asks: asyncio.Task[None] | None = None
         # Whether the daemon moves the queues of the chats whose runs this process ends (:meth:`leave_queues`).
         self._leaves_queues: bool = False
+        # The model a run that names none starts on: ``[models] main``, or the one the owner made the default since
+        # (:meth:`set_main_model`).
+        self._main_model: str = runtime.config.models.main
 
     async def recover(self) -> int:
         """Close out what processes that are gone left behind: the runs they left active, the approvals of runs no
@@ -414,6 +418,16 @@ class RunManager:
     def active_run_ids(self) -> list[str]:
         return list(self._handles)
 
+    def main_model(self) -> str:
+        """The model a run that names none starts on (:meth:`set_main_model`)."""
+        return self._main_model
+
+    def set_main_model(self, model: str) -> None:
+        """Make ``model`` the one a run that names none starts on from now on (item 199); the runs under way keep
+        theirs, and so does a chat that has its own (``ChatChoices``)."""
+        self._main_model = model
+        log.info("main_model_set", model=model)
+
     def elsewhere_run_ids(self) -> list[str]:
         """The runs at work that other processes drive (``dotx`` commands), as the relay saw them last; none unless this
         process relays them (:meth:`relay_elsewhere`)."""
@@ -471,9 +485,7 @@ class RunManager:
         :func:`_goal_mode_asked`).
         """
         if effort is not None:
-            await self._check_effort(
-                parse_model_ref(model if model is not None else self._runtime.config.models.main), effort
-            )
+            await self._check_effort(parse_model_ref(model if model is not None else self._main_model), effort)
         run, _ = await self._launch(
             goal,
             mode,
@@ -510,9 +522,7 @@ class RunManager:
         level: Effort | None = effort if effort is not None else agent.effort
         approval_mode: ApprovalMode | None = approvals if approvals is not None else agent.approvals
         if level is not None:
-            await self._check_effort(
-                parse_model_ref(model_ref if model_ref is not None else self._runtime.config.models.main), level
-            )
+            await self._check_effort(parse_model_ref(model_ref if model_ref is not None else self._main_model), level)
         run, _ = await self._launch(
             goal,
             mode,
@@ -559,7 +569,7 @@ class RunManager:
                 "goal mode does not apply to a campaign: campaign_achieved checks its outcome", {"goal_mode": goal_mode}
             )
         runtime: Runtime = self._runtime
-        model_ref: str = model if model is not None else runtime.config.models.main
+        model_ref: str = model if model is not None else self._main_model
         if effort is not None:
             await self._check_effort(parse_model_ref(model_ref), effort)
         level: Effort = runtime.config.models.effort if effort is None else effort
@@ -1322,7 +1332,7 @@ class RunManager:
         """Create the run, register it and start its task. A run launched by an active, untrusted parent is untrusted;
         ``campaign_id`` makes it a session of that campaign."""
         runtime: Runtime = self._runtime
-        model_ref: str = model if model is not None else runtime.config.models.main
+        model_ref: str = model if model is not None else self._main_model
         parse_model_ref(model_ref)
         level: Effort = runtime.config.models.effort if effort is None else effort
         approval_mode: ApprovalMode = runtime.config.policy.approvals if approvals is None else approvals
@@ -1428,6 +1438,15 @@ class RunManager:
         # that ends here, failed, instead of staying queued (:meth:`_end_unstarted`).
         registered: bool = False
         try:
+            if parent_run_id is None:
+                # What the chat's next follow-up starts with, from its first run on (item 199): a move of the run
+                # to a standby model later leaves it as it is.
+                await runtime.store.keep_first_chat_choices(
+                    thread_id,
+                    ChatChoices(
+                        mode=mode, model=model_ref, effort=level, approvals=approval_mode, goal_mode=with_goal_mode
+                    ),
+                )
             await runtime.bus.emit(
                 run.id,
                 "run_queued",

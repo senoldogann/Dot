@@ -10,7 +10,7 @@ import {
   setTellEvenWhenLooking,
   tellEvenWhenLooking,
 } from "../attention.js";
-import { compact, copyText, dateTimeFull, duration, el, plural } from "../dom.js";
+import { compact, copyText, dateTimeFull, duration, el, modelName, plural } from "../dom.js";
 import { offersChoice } from "../efforts.js";
 import { engageFailsafe, releaseFailsafe } from "../failsafe.js";
 import { dotName, NAME_CHARS, setDotName } from "../face.js";
@@ -374,8 +374,67 @@ function modelsSummary(providers, inUse) {
   ];
 }
 
+/**
+ * The default model (item 199): the one a run that names none starts on, a new chat's among them. It offers the models
+ * that can call tools, as the composer does, and the one that is the default now, listed or not. `paint(providers,
+ * mainModel)` fills it again; the select stays, and so does the focus on it.
+ */
+function defaultModelSetting() {
+  let shown = "";
+  const select = el("select", { class: "select sm", "aria-label": "Default model" });
+  const element = el(
+    "div",
+    { class: "setting models-default", hidden: true },
+    el("div", { class: "row" }, el("span", { class: "grow" }, "Default model"), select),
+    el("div", { class: "hint" }, "New chats start on it, and so does any run that names no model. A chat keeps the model it has; Default in its composer follows this one."),
+  );
+  // Each pick is sent once the one before it was answered, so the last one made is the default; the select shows the
+  // default the status says after each.
+  let making = Promise.resolve();
+  select.addEventListener("change", () => {
+    const ref = select.value;
+    making = making.then(() =>
+      attempt(async () => {
+        try {
+          await api.post("/models/main", { model: ref });
+          toast("ok", `New chats start on ${modelName(ref)}.`);
+          await refresh();
+        } finally {
+          select.value = shown;
+        }
+      }),
+    );
+  });
+
+  function paint(providers, mainModel) {
+    const groups = providers
+      .map((provider) => ({ provider: provider.provider, models: provider.models.filter((model) => model.tools) }))
+      .filter((group) => group.models.length > 0);
+    const listed = groups.some((group) => group.models.some((model) => model.ref === mainModel));
+    // The native replaceChildren writes a null as text: the option of a default not listed is left out instead.
+    const unlisted = listed || mainModel === "" ? [] : [el("option", { value: mainModel }, `${modelName(mainModel)} (not listed now)`)];
+    select.replaceChildren(
+      ...unlisted,
+      ...groups.map((group) =>
+        el("optgroup", { label: providerLabel(group.provider) }, group.models.map((model) => el("option", { value: model.ref }, modelName(model.ref)))),
+      ),
+    );
+    shown = mainModel;
+    select.value = mainModel;
+    element.hidden = false;
+  }
+
+  function hide() {
+    element.hidden = true;
+  }
+
+  return { element, paint, hide };
+}
+
 function buildModels(isDisposed) {
-  const body = el("div", null, inlineLoading());
+  const list = el("div", null, inlineLoading());
+  const main = defaultModelSetting();
+  const body = el("div", null, main.element, list);
   let providers = null;
   const reload = el(
     "button",
@@ -401,14 +460,16 @@ function buildModels(isDisposed) {
     }
     painted = { providers, mainModel, usage };
     card.setSummary(...modelsSummary(providers, inUse));
-    body.replaceChildren(...providers.map((provider) => providerBlock(provider, mainModel, inUse.includes(provider.provider))));
+    main.paint(providers, mainModel);
+    list.replaceChildren(...providers.map((provider) => providerBlock(provider, mainModel, inUse.includes(provider.provider))));
     cueTables();
   }
 
   async function load() {
     forgetModels();
     painted = null;
-    body.replaceChildren(inlineLoading());
+    main.hide();
+    list.replaceChildren(inlineLoading());
     card.setSummary();
     try {
       const found = await loadModels();
@@ -421,7 +482,7 @@ function buildModels(isDisposed) {
       if (!isDisposed()) {
         console.error("the models could not be listed", error);
         card.setSummary(el("span", { class: "badge b-bad" }, "could not list"));
-        body.replaceChildren(inlineError(error, () => attempt(load)));
+        list.replaceChildren(inlineError(error, () => attempt(load)));
       }
     }
   }
@@ -432,7 +493,7 @@ function buildModels(isDisposed) {
     for (const stop of cues) {
       stop();
     }
-    cues = [...body.querySelectorAll(".table-scroll")].map(scrollCue);
+    cues = [...list.querySelectorAll(".table-scroll")].map(scrollCue);
   }
 
   return { element: card.element, load, paint, dispose: cueTables };

@@ -1,7 +1,7 @@
 // The choices of a run besides its goal, as the pills of a composer (item 108): the mode, the model with its reasoning
 // and the Options (approvals and goal mode), each with its menu. The home's box and a chat's dock (item 133) both wear
-// them; where they start and where a choice is kept is the box's own (`kept`): this browser's on the home, the open
-// run's on a chat's page, held by the page for the next follow-up.
+// them; where they start and where a choice is kept is the box's own (`kept`): this browser's on the home, the chat's
+// on a chat's page, which the daemon keeps for its next follow-up (item 199).
 
 import { composerPill } from "./composer.js";
 import { el, modelName } from "./dom.js";
@@ -58,16 +58,27 @@ export function optionRow({ lead, label, hint, selected, onPick }) {
  * the box starts and keeps them: `mode` (an id of `MODES`), `model` (a reference, or "" for the daemon's default),
  * `level` (`read(info)`, the reasoning level chosen for a model, or null for the daemon's; `write(info, level)`, null to
  * go back to the daemon's), `approvals` and `goalMode` (as `approvalsPicker` and `goalModePicker` take them).
- * `optionsTitle` is the Options pill's tooltip, `more()` the lines its menu shows after goal mode, and `onMode(id)` runs
- * after a mode was chosen.
+ * `optionsTitle` is the Options pill's tooltip, `more()` the lines its menu shows after goal mode, `onMode(id)` runs
+ * after a mode was chosen, and `onChange()` after any choice was made (`value()` has it then).
  *
  * Returns `pills` (`{ mode, model, reasoning, options }`, the elements), `setMode(id)`, `goalMode` (its picker),
  * `ready()` (resolves once the models are loaded), `value()` (what a run starts with: `{ mode, model, effort, approvals,
  * goal_mode }`), `sync()` after a status change, `setWaiting(on)` (while a run works, the choices wait for the next
  * follow-up and the pills say so) and `dispose()`.
  */
-export function runChoices({ frame, kept, optionsTitle, more, onMode }) {
+export function runChoices({ frame, kept, optionsTitle, more, onMode, onChange }) {
   let waiting = false;
+
+  // A choice of the Options is kept as `kept` keeps it, and told as the others are.
+  function told(choice) {
+    return {
+      read: choice.read,
+      write: (value) => {
+        choice.write(value);
+        onChange();
+      },
+    };
+  }
 
   // A pill's tooltip, which says that the choice waits while it does.
   function setTitle(pill, text) {
@@ -83,8 +94,8 @@ export function runChoices({ frame, kept, optionsTitle, more, onMode }) {
     optionsPill.setValue(shown === null ? "" : approvalLabel(shown), "");
     optionsPill.setIcon(icon(shown === null ? "lock" : APPROVAL_ICONS[shown]));
     optionsPill.setTone(shown === "yolo" ? "warn" : null);
-  }, kept.approvals);
-  const goalMode = goalModePicker(kept.goalMode);
+  }, told(kept.approvals));
+  const goalMode = goalModePicker(told(kept.goalMode));
   const optionsMenu = anchoredPopover({
     anchor: optionsPill.element,
     frame: frame.element,
@@ -111,11 +122,13 @@ export function runChoices({ frame, kept, optionsTitle, more, onMode }) {
   function setMode(id) {
     showMode(id);
     onMode(id);
+    onChange();
   }
   function pickMode(id) {
     showMode(id);
     modeMenu.close();
     onMode(id);
+    onChange();
   }
   const modeMenu = anchoredPopover({
     anchor: modePill.element,
@@ -175,6 +188,7 @@ export function runChoices({ frame, kept, optionsTitle, more, onMode }) {
     modelMenu.close();
     paintModel();
     modelPill.element.focus();
+    onChange();
   }
 
   function pickLevel(info, level) {
@@ -182,6 +196,7 @@ export function runChoices({ frame, kept, optionsTitle, more, onMode }) {
     reasoningMenu.close();
     paintModel();
     reasoningPill.element.focus();
+    onChange();
   }
 
   function modelRows() {

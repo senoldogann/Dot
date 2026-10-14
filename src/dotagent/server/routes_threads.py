@@ -1,10 +1,11 @@
-"""Routes for the chats of the sidebar: every thread a person started a run on, deleting several at once, and naming or
-pinning one from its menu (item 130)."""
+"""Routes for the chats of the sidebar: every thread a person started a run on, deleting several at once, naming or
+pinning one from its menu (item 130), and keeping what its composer chose (item 199)."""
 
 from typing import Annotated
 
 from fastapi import APIRouter, Query
 
+from dotagent.llm.router import parse_model_ref
 from dotagent.server.context import ServerContext
 from dotagent.server.views import DeletedThreads, DeleteThreadsRequest, ThreadChange, ThreadsQuery
 from dotagent.store.db import Store
@@ -31,13 +32,17 @@ def threads_router(ctx: ServerContext) -> APIRouter:
 
     @router.patch("/threads/{thread_id}", status_code=204)
     async def change_thread(thread_id: str, change: ThreadChange) -> None:
-        """Give a chat the name the owner typed, pin it (first among the pinned) or unpin it, or mark it seen or unseen;
-        404 for no chat."""
+        """Give a chat the name the owner typed, pin it (first among the pinned) or unpin it, mark it seen or unseen,
+        or keep the choices its composer shows for its next follow-up; 404 for no chat."""
+        if change.choices is not None and change.choices.model is not None:
+            parse_model_ref(change.choices.model)
         if change.title is not None:
             await store.rename_thread(thread_id, change.title)
         if change.pinned is not None:
             await store.pin_thread(thread_id, change.pinned)
         if change.seen is not None:
             await store.see_thread(thread_id, change.seen)
+        if change.choices is not None:
+            await store.set_chat_choices(thread_id, change.choices)
 
     return router

@@ -5134,8 +5134,8 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 195 | A file opens in a panel beside the chat: PDF, sheets, documents and more             | done        | 6ef8fa8 |
 | 196 | Dot knows its way around Word, Excel and OneDrive on the Mac                         | planned     |         |
 | 197 | A stopped run stops the runs it delegated, and their rows stop                       | done        | 0b3a7d4 |
-| 198 | The side menu shows every agent of a run, folded under it                            | in progress |         |
-| 199 | The default model is chosen in Settings, and a chat keeps its model                  | planned     |         |
+| 198 | The side menu shows every agent of a run, folded under it                            | done        | dee248f |
+| 199 | The default model is chosen in Settings, and a chat keeps its model                  | in progress |         |
 | 200 | Reconnecting, checked end to end                                                     | planned     |         |
 | 201 | Marks of the conversation's messages: a look and a jump, after T3 Code               | planned     |         |
 | 202 | The side menu, designed again                                                        | planned     |         |
@@ -9757,7 +9757,7 @@ first (`2 < 1`). It passed in WebKit too.
 
 ### 198. The side menu shows every agent of a run, folded under it
 
-**Status: in progress.**
+**Status: done.** Merged as `dee248f` (PR #237; no Linear issue, the Linear connector was signed out).
 
 **As built (2026-10-14).** Under a run at work, the side menu's Working section shows every run it delegated: those at
 work with Working and their time, as before, and those that ended with how they ended (their face or dot at rest, the
@@ -9779,7 +9779,27 @@ worked, those that ended with how they ended. The run's row folds them, and keep
 
 ### 199. The default model is chosen in Settings, and a chat keeps its model
 
-**Status: planned.**
+**Status: in progress.**
+
+**As built (2026-10-14).** Settings › Models opens with **Default model**, a menu of the models that can call tools (as
+the composer offers them) and of the default one, listed or not. A pick is `POST /api/models/main`: the provider is
+asked about the model (one it does not know fails with its error, one that cannot call tools is refused with 422),
+`config.toml` gets `[models] main` with its comments and its other settings as they were (`config_edit.set_setting`, for
+a `[models]` setting as for a `[browser]` one; a file it cannot change is refused, with how to change it by hand), and
+only then the daemon starts the runs that name no model on it, at once: a new chat's, a schedule's, an agent's without a
+model of its own. `/api/status` and the health checks say the default as it is now, so the composer's Default and the
+badge of the Models table follow it. A chat keeps its choices (`ChatChoices`: the mode, the model, the reasoning level,
+the approvals and goal mode) in the `threads` table: those its first run started with (a chat from before: those of its
+next run), then each one picked in its composer, sent to `PATCH /api/threads/{id}` at once and one after the other, so
+that the last one made is kept. `GET /api/runs/{id}` has them as `choices`, and the chat's page starts its composer from
+them; a run moved to a standby model leaves them as they are, so a follow-up starts on the chat's model again. Before,
+the composer started from the open run: a reload lost what was picked, and after a move to a standby model it showed
+that model. Tests: `tests/smoke/test_chat_choices.py`, a real server on scripted models, in Chrome at 1280 and 390 px,
+light and dark: the default picked in Settings starts a run that names no model, the home's composer and the file have
+it, and a model without tools is refused; a chat's mode, model, level and approvals picked in its composer are there
+after a reload and in another browser, and its follow-up starts with them; a run moved to a standby model leaves the
+chat's model. Unit tests for `[models] main` in the file and for the store. On the code of before, Settings had no such
+menu, a reload showed Task again, and the composer showed the standby model. It passed in WebKit too.
 
 **What.** Settings chooses the model new chats start on (`[models] main`), with no edit of `config.toml` by hand and no
 restart of the daemon. A chat keeps the model and the reasoning chosen in it, through a reload of the page and a restart
@@ -10451,3 +10471,4 @@ cost, the plan, the files, the actions and the screens. Screenshots looked at, w
 - 2026-10-14 (Opus 5.5): item 195 merged as `6ef8fa8` (PR #235; no Linear issue, the connector was signed out): A file opens in the side panel of the run page, from a sent file's chip, a path an answer names, the Files card or Actions: a PDF's pages, the grid of a workbook or a CSV, a document, a presentation, an image or a text.
 - 2026-10-14 (Opus 5.5): part 32, runs that stop whole, every agent in the side menu, a model that stays, is planned (items 197 to 203); item 196 of part 31 follows its defects (197 to 200).
 - 2026-10-14 (Opus 5.5): item 197 merged as `0b3a7d4` (PR #236; no Linear issue, the connector was signed out): A run that is stopped stops the runs it delegated and stores its end after theirs, so the rows of those runs end on its page; a restart and a dead command's close store the same order, and a run stored the other way shows its rows ended from the database.
+- 2026-10-14 (Opus 5.5): item 198 merged as `dee248f` (PR #237; no Linear issue, the connector was signed out): The side menu shows every run a run at work delegated, those that ended too, folded under a line that says how many there are and how many work; the fold is kept, and Activity shows them under the run as well.

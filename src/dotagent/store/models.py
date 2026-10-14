@@ -1,6 +1,8 @@
 """Row types returned by the store."""
 
-from typing import Literal
+from typing import Literal, Self
+
+from pydantic import model_validator
 
 from dotagent.core.types import FrozenModel, JsonObject
 from dotagent.llm.types import Effort
@@ -32,6 +34,25 @@ class ThreadRecord(FrozenModel):
     source: str
     created_at: float
     updated_at: float
+
+
+class ChatChoices(FrozenModel):
+    """What the next follow-up of a chat starts with, as its composer shows it (item 199): the mode, the model and the
+    reasoning level asked of it, the approval mode and goal mode. ``None`` takes the daemon's: its default model, the
+    configured level, ``[policy] approvals`` and ``[agent] goal_mode``; a chat (the mode) has no goal mode. A chat's
+    choices are those its first run started with, until the owner picks others in its composer."""
+
+    mode: RunMode
+    model: str | None
+    effort: Effort | None
+    approvals: ApprovalMode | None
+    goal_mode: bool | None
+
+    @model_validator(mode="after")
+    def _goal_mode_fits(self) -> Self:
+        if self.mode == "chat" and self.goal_mode is True:
+            raise ValueError("goal mode is for task and research runs, not for a chat")
+        return self
 
 
 class ThreadSummary(FrozenModel):

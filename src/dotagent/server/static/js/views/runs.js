@@ -67,6 +67,8 @@ function buildComposer(ctx, listener) {
     optionsTitle: "Approvals, goal mode and keep going",
     more: () => [standing.element],
     onMode: modePicked,
+    // HOME_KEPT keeps what it keeps as it is chosen.
+    onChange: () => {},
   });
   // A campaign checks its outcome itself, so goal mode does not apply to one; the switch only shows for a task.
   const standing = standingPicker((on) => choices.goalMode.setAvailable(!on));
