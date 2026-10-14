@@ -63,6 +63,24 @@ def test_the_panel_shows_files_of_the_workspace_and_of_the_home_folder_outside_h
         located_file("~/Documents/gone.txt", home, workspace)
 
 
+def test_the_files_of_applications_stay_hidden_whatever_case_their_path_is_written_in(tmp_path: Path) -> None:
+    """Item 215: the Mac's disk finds a file whatever case its path is written in, so ~/Library is told apart from the
+    home's other folders in any case."""
+    home: Path = tmp_path / "home"
+    workspace: Path = home / "Library" / "Application Support" / "Dot" / "workspace"
+    synced: Path = _file(home / "Library" / "CloudStorage" / "OneDrive-Personal" / "budget.xlsx", b"PK\x03\x04")
+    _file(home / "Library" / "Preferences" / "settings.txt", b"settings")
+    _file(home / "Library" / "Application Support" / "Dot" / "api-token", b"token")
+    notes: Path = _file(workspace / "notes.txt", b"notes")
+    if not (home / "LIBRARY").is_dir():
+        pytest.skip("this disk tells the case of names apart, so another case finds no file")
+    for raw in ("~/library/Preferences/settings.txt", "~/LIBRARY/Application Support/Dot/api-token"):
+        assert _refusal(raw, home, workspace) == "the file is among the files of an application", raw
+    assert located_file("~/library/cloudstorage/OneDrive-Personal/budget.xlsx", home, workspace).samefile(synced)
+    # The workspace is in ~/Library here, and its files show in any case as well.
+    assert located_file("~/library/application support/dot/WORKSPACE/notes.txt", home, workspace).samefile(notes)
+
+
 def test_how_the_panel_shows_a_file_is_told_by_its_first_bytes(tmp_path: Path) -> None:
     package: bytes = b"PK\x03\x04" + bytes(20)
     assert shown_kind(tmp_path / "plan.docx", package) == "document"

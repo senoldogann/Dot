@@ -23,6 +23,8 @@ from dotagent.desktop.types import AppInfo, AppKind
 
 _log = get_logger("dotagent.desktop.apps")
 
+_OPEN: str = "/usr/bin/open"
+_LSAPPINFO: str = "/usr/bin/lsappinfo"
 _COMMAND_TIMEOUT_S: float = 30.0
 _POLL_S: float = 0.03
 _LAUNCH_ATTEMPTS: int = 6
@@ -46,17 +48,18 @@ def ensure_window_server() -> None:
 
 
 def _stdout(arguments: Sequence[str]) -> str:
+    tool: str = Path(arguments[0]).name
     try:
         outcome: subprocess.CompletedProcess[str] = subprocess.run(
             arguments, capture_output=True, text=True, timeout=_COMMAND_TIMEOUT_S, check=False
         )
     except subprocess.TimeoutExpired as error:
         raise DesktopError(
-            f"{arguments[0]} did not finish within {_COMMAND_TIMEOUT_S:g} s", {"command": " ".join(arguments)}
+            f"{tool} did not finish within {_COMMAND_TIMEOUT_S:g} s", {"command": " ".join(arguments)}
         ) from error
     if outcome.returncode != 0:
         raise DesktopError(
-            f"{arguments[0]} failed",
+            f"{tool} failed",
             {"command": " ".join(arguments), "code": outcome.returncode, "stderr": outcome.stderr.strip()},
         )
     return outcome.stdout
@@ -111,7 +114,7 @@ def frontmost_pid() -> int | None:
 def list_apps() -> tuple[AppInfo, ...]:
     """Every registered application (about 40 ms); the one with the keyboard focus is marked ``frontmost``."""
     front: int | None = frontmost_pid()
-    return tuple(replace(app, frontmost=app.pid == front) for app in parse_lsappinfo(_stdout(["lsappinfo", "list"])))
+    return tuple(replace(app, frontmost=app.pid == front) for app in parse_lsappinfo(_stdout([_LSAPPINFO, "list"])))
 
 
 def _names_of(app: AppInfo) -> tuple[str, ...]:
@@ -177,7 +180,7 @@ def launch(query: str) -> None:
     arguments: list[str] = open_arguments(query)
     for attempt in range(1, _LAUNCH_ATTEMPTS + 1):
         outcome: subprocess.CompletedProcess[str] = subprocess.run(
-            ["open", *arguments], capture_output=True, text=True, timeout=_COMMAND_TIMEOUT_S, check=False
+            [_OPEN, *arguments], capture_output=True, text=True, timeout=_COMMAND_TIMEOUT_S, check=False
         )
         if outcome.returncode == 0:
             return
@@ -196,7 +199,7 @@ def open_document(path: Path) -> None:
     """Ask Launch Services to open the file at ``path`` in the application the Mac opens it with, as a double click in
     the Finder does."""
     outcome: subprocess.CompletedProcess[str] = subprocess.run(
-        ["open", str(path)], capture_output=True, text=True, timeout=_COMMAND_TIMEOUT_S, check=False
+        [_OPEN, str(path)], capture_output=True, text=True, timeout=_COMMAND_TIMEOUT_S, check=False
     )
     if outcome.returncode != 0:
         raise DesktopError(

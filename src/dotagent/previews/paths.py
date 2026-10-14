@@ -65,8 +65,10 @@ OPENED_SUFFIXES: frozenset[str] = frozenset(
         ".yml",
     }
 )
-# The folders of ~/Library that hold a person's own files: those cloud drives sync.
-_CLOUD_FOLDERS: frozenset[str] = frozenset({"CloudStorage", "Mobile Documents"})
+# The folders of ~/Library that hold a person's own files: those cloud drives sync. Names of ~/Library are compared
+# without their case, as the Mac's disk finds a file whatever case its path is written in (item 215).
+_LIBRARY: str = "library"
+_CLOUD_FOLDERS: frozenset[str] = frozenset({"cloudstorage", "mobile documents"})
 
 
 def _named(raw: str, home: Path) -> Path:
@@ -79,8 +81,15 @@ def _named(raw: str, home: Path) -> Path:
 
 
 def _within(path: Path, root: Path) -> tuple[str, ...] | None:
-    """The parts of ``path`` under ``root``, or ``None`` when it is not under it."""
-    return path.relative_to(root).parts if path.is_relative_to(root) else None
+    """The parts of ``path`` under ``root``, or ``None`` when it is not under it; names are compared without their case,
+    as in ~/Library, so the workspace is the workspace in any case too."""
+    count: int = len(root.parts)
+    head: tuple[str, ...] = path.parts[:count]
+    if len(head) < count or any(
+        part.casefold() != name.casefold() for part, name in zip(head, root.parts, strict=True)
+    ):
+        return None
+    return path.parts[count:]
 
 
 def located_file(raw: str, home: Path, workspace: Path) -> Path:
@@ -100,7 +109,7 @@ def located_file(raw: str, home: Path, workspace: Path) -> Path:
         raise InvalidValueError("the file is outside your home folder", {"path": raw})
     if any(part.startswith(".") for part in parts):
         raise InvalidValueError("the file is in a hidden folder", {"path": raw})
-    if parts[0] == "Library" and (len(parts) < 3 or parts[1] not in _CLOUD_FOLDERS):
+    if parts[0].casefold() == _LIBRARY and (len(parts) < 3 or parts[1].casefold() not in _CLOUD_FOLDERS):
         raise InvalidValueError("the file is among the files of an application", {"path": raw})
     return path
 

@@ -5150,8 +5150,8 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 211 | Secrets kept from the agent by default                                               | done        | e6c8185 |
 | 212 | A provider that is not running answers at once                                       | done        | d6f90eb |
 | 213 | Tests: a bare pytest, and every offline smoke test in CI                             | done        | e73a257 |
-| 214 | The redactor knows more kinds of secrets                                             | in progress |         |
-| 215 | Small hardenings after the review                                                    | planned     |         |
+| 214 | The redactor knows more kinds of secrets                                             | done        | 3347d33 |
+| 215 | Small hardenings after the review                                                    | in progress |         |
 | 216 | The README says what leaves this Mac                                                 | planned     |         |
 | 217 | A weekly audit of the dependencies                                                   | planned     |         |
 
@@ -10257,7 +10257,7 @@ chosen by their marks instead of by a list of files.
 
 ### 214. The redactor knows more kinds of secrets
 
-**Status: in progress.**
+**Status: done.** Merged as `3347d33` (PR #253; no Linear issue, the Linear connector was signed out).
 
 **As built (2026-10-14).** The redactor (`core/text.py`, `redact_secrets`), which masks what goes into the log, the
 events, the errors the API answers with and the lessons, knew keys that start with `sk-`, bearer tokens and the value of
@@ -10273,9 +10273,19 @@ like one are left alone, and no pattern tries a long run of words against the wh
 
 ### 215. Small hardenings after the review
 
-**Status: planned.**
+**Status: in progress.**
 
-**What.** Small hardenings the review suggested. The details are written here once the fix is merged.
+**As built (2026-10-14).** Four small changes the review suggested. The macOS tools Dot runs itself are named by their
+paths (`security`, `open`, `osascript`, `lsappinfo`, as `launchctl` and the others already were), and the daemon's PATH
+starts with Homebrew's folders. An IPv6 address that carries an IPv4 one is judged by it in each form that carries one
+(mapped, compatible, the NAT64 prefix), so none counts as public when its IPv4 address is not. The file panel tells
+`~/Library`, its cloud folders and the workspace apart whatever case a path is written in. A tap on a notification opens
+one of the page's own routes and nothing else. Two notes are left as they are: the XML the help tool reads comes from
+the applications of this Mac, and an error's context is typed as JSON. Tests: `tests/unit/test_addresses.py` and
+`tests/unit/test_previews.py`; on the code of before, 6 of 14 addresses counted as public and the file panel showed
+files of applications whose path was written in another case.
+
+**What.** Small hardenings the review suggested.
 
 ### 216. The README says what leaves this Mac
 
@@ -10943,3 +10953,4 @@ is sent to them, and how to keep it on the Mac.
 - 2026-10-14 (Opus 5.5): item 211 merged as `e6c8185` (PR #250; no Linear issue, the connector was signed out): more of the places where a Mac keeps credentials and private data are protected by default.
 - 2026-10-14 (Opus 5.5): item 212 merged as `d6f90eb` (PR #251; no Linear issue, the connector was signed out): a provider on this Mac that is not running (Ollama) answers at once: the model list, `dotx models` and the doctor say so without the retries.
 - 2026-10-14 (Opus 5.5): item 213 merged as `e73a257` (PR #252; no Linear issue, the connector was signed out): a bare `pytest` collects every test without an error, and CI runs every smoke test that needs no service, chosen by its marks.
+- 2026-10-14 (Opus 5.5): item 214 merged as `3347d33` (PR #253; no Linear issue, the connector was signed out): the redactor knows the keys and tokens of more services, private keys, Basic credentials, a URL's password and more names of `key=value`.
