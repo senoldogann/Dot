@@ -5178,7 +5178,7 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 237 | The prompt cache holds when old output is shortened                                  | done        | 24194bf |
 | 238 | The side panel at the window's edge                                                  | done        | f9e6799 |
 | 239 | The meter says why the budget is smaller than the window                             | done        | 75bcb6e |
-| 240 | Dot's own work leaves a paused fast model out                                        | in progress |         |
+| 240 | Dot's own work leaves a paused fast model out                                        | done        | 87b5cfc |
 
 ### 77. The type system: Inter and Geist Mono, seven sizes, three weights
 
@@ -10885,7 +10885,7 @@ prompt again, and how to change it.
 
 ### 240. Dot's own work leaves a paused fast model out
 
-**Status: in progress.**
+**Status: done.** Merged as `87b5cfc` (PR #280; no Linear issue, the Linear connector was signed out).
 
 **As built (2026-10-15).** `paused_model` (`agent/helpers.py`) gives a model the router has paused, with why and until
 when. `_compact` (`agent/loop.py`) asks it first: a paused fast model that is not the run's own is left out, the run's
@@ -11581,3 +11581,4 @@ median), 107 of them within the pause of the one before, and each summary then t
 - 2026-10-15 (Opus 5.5): item 237 merged as `24194bf` (PR #277; no Linear issue, the connector was signed out): a step's request to Anthropic marks the end of the part of the run the next step sends unchanged, so the step after a shortening reads the run before the newest tool results from the cache; `truncate_middle` keeps its mark within the size it is given, so old output is shortened once.
 - 2026-10-15 (Opus 5.5): item 238 merged as `f9e6799` (PR #278; no Linear issue, the connector was signed out): while the side panel stands beside the conversation, the run page lets go of its reading width and keeps 12 px on its right, so the panel stands at the window's edge at every width (before, 20, 224 and 544 px from it at 1,280, 1,920 and 2,560 px).
 - 2026-10-15 (Opus 5.5): item 239 merged as `75bcb6e` (PR #279; no Linear issue, the connector was signed out): the context meter's panel says why a run's budget is smaller than the model's window, as each step sends the model the whole run again, and that `[agent] context_tokens` sets it, up to three quarters of the window.
+- 2026-10-15 (Opus 5.5): item 240 merged as `87b5cfc` (PR #280; no Linear issue, the connector was signed out): a run's summary and `web_extract` leave the fast model out while the router has paused it after a quota, rate-limit or key error: the run's own model writes the summary at once, and `web_extract` says until when the fast model cannot answer. Part 38 is done.
