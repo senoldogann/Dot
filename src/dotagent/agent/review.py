@@ -22,7 +22,12 @@ from typing import Annotated, Literal
 
 from pydantic import Field, StringConstraints, ValidationError
 
-from dotagent.core.errors import InvalidValueError, ProviderProtocolError, ProviderTransportError
+from dotagent.core.errors import (
+    InvalidValueError,
+    ProviderProtocolError,
+    ProviderRefusedError,
+    ProviderTransportError,
+)
 from dotagent.core.logs import get_logger
 from dotagent.core.text import redact_secrets, truncate_middle
 from dotagent.core.types import FrozenModel, JsonObject
@@ -54,8 +59,10 @@ OWNER_TOOL: str = "describe_owner"
 RULE_TOOL: str = "draft_rule"
 # Some thought helps a judgement, a long one only delays the run.
 _JUDGEMENT_EFFORT: Effort = "low"
-# The first answer and one more after a reply that is not a verdict.
+# The first answer and one more after a reply that is not a verdict; a refusal is not asked again.
 _ATTEMPTS: int = 2
+# How a provider ends a reply its model declined to give: Anthropic's stop reason, OpenAI's finish reason.
+_DECLINED_FINISHES: frozenset[str] = frozenset({"refusal", "content_filter"})
 _MAX_INSTRUCTIONS: int = 12
 _INSTRUCTION_CHARS: int = 1500
 _FIELD_CHARS: int = 1500
@@ -629,7 +636,8 @@ def goal_digest(transcript: str) -> str:
 
 
 def _verdict_from[V: FrozenModel](reply: ModelReply, tool: str, verdict_type: type[V], model: str) -> V:
-    """The verdict a reply carries; anything else is a protocol error that names what was wrong with it."""
+    """The verdict a reply carries; anything else is a protocol error that names what was wrong with it, but for a
+    reply the provider ended as a refusal, a :class:`ProviderRefusedError` that names the model."""
     context: JsonObject = {
         "model": model,
         "finish": reply.raw_finish,
@@ -637,6 +645,10 @@ def _verdict_from[V: FrozenModel](reply: ModelReply, tool: str, verdict_type: ty
         "text": truncate_middle(reply.text, _PROBLEM_CHARS),
     }
     calls: list[ToolCall] = [call for call in reply.tool_calls if call.name == tool]
+    if not calls and reply.raw_finish in _DECLINED_FINISHES:
+        raise ProviderRefusedError(
+            f"the review model {model} declined to answer (stop reason: {reply.raw_finish})", context
+        )
     if not calls:
         raise ProviderProtocolError(f"the review model did not call {tool}", context)
     broken: str | None = invalid_arguments_text(calls[0].arguments)
@@ -689,7 +701,7 @@ async def _decide[V: FrozenModel](question: _Question[V]) -> V:
 async def _decide_checked[V: FrozenModel, R](question: _Question[V], check: Callable[[V], R]) -> R:
     """Ask until a valid verdict comes back that ``check`` turns into the answer (it raises a
     :class:`ProviderProtocolError` for a verdict it cannot use, which is asked for again); the last attempt's error is
-    raised."""
+    raised, and a refusal at once."""
     retry_note: str = ""
     for attempt in range(1, _ATTEMPTS):
         try:

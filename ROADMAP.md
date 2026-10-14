@@ -5160,8 +5160,8 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 221 | The window of every provider's models, as published                                  | done        | bc61bed |
 | 222 | A context meter in the run's composer                                                | done        | a99e07e |
 | 223 | Claude's fast mode                                                                   | done        | a3ace6d |
-| 224 | A summary's check knows a path however it is written                                 | in progress |         |
-| 225 | A model that declines is said to have declined                                       | planned     |         |
+| 224 | A summary's check knows a path however it is written                                 | done        | 109c270 |
+| 225 | A model that declines is said to have declined                                       | in progress |         |
 | 226 | A helper's card                                                                      | planned     |         |
 | 227 | Previous agents in the side panel                                                    | planned     |         |
 | 228 | The rail of messages beside the docked panel                                         | planned     |         |
@@ -10509,7 +10509,7 @@ reasons, is in the report of this part. Item 196 of part 31 still waits on the o
 
 ### 224. A summary's check knows a path however it is written
 
-**Status: in progress.**
+**Status: done.** Merged as `109c270` (PR #263; no Linear issue, the Linear connector was signed out).
 
 **As built (2026-10-14).** Before Dot replaces a run's older history with a summary, it checks that each path, address
 and id the summary names is in the history it replaces, and a summary that names one that is not is flagged as
@@ -10524,7 +10524,16 @@ the home folder, `/tmp` or `/private/tmp`, and flags no path the history holds.
 
 ### 225. A model that declines is said to have declined
 
-**Status: planned.**
+**Status: in progress.**
+
+**As built (2026-10-14).** The review model answers Dot's own questions, each by a call of one tool, and a reply without
+it is asked for once more. A reply its provider ends as a refusal (Anthropic's stop reason `refusal`, OpenAI's finish
+reason `content_filter`) with no call is now a `ProviderRefusedError` (`core/errors.py`), raised at once and not asked
+again, that names the model: "the review model … declined to answer (stop reason: refusal)". It is a `ProviderError`, so
+the goal check, the second opinion, the lessons, the reflection and a rule's words handle it as they handled the model's
+failures; Dot does not turn to another model by itself. Tests: `tests/unit/test_review_declined.py`, a stand-in model
+whose replies end as a refusal, as filtered content, or with no call; on the code of before, the refusal and the
+filtered reply were each asked twice and reported as a model that did not call `propose_lessons`.
 
 **What.** When the review model declines, its provider ending the reply as a refusal, the lessons and the reflection say
 so at once, instead of asking again and saying that the model did not use its tool.
@@ -11241,3 +11250,4 @@ default model.
 - 2026-10-14 (Opus 5.5): item 221 merged as `bc61bed` (PR #260; no Linear issue, the connector was signed out): every provider's models show the window their pages publish, OpenAI's newer models and Ollama's cloud models among them.
 - 2026-10-14 (Opus 5.5): item 222 merged as `a99e07e` (PR #261; no Linear issue, the connector was signed out): a ring in a run's composer shows how much of the run's context budget its last step filled.
 - 2026-10-14 (Opus 5.5): item 223 merged as `a3ace6d` (PR #262; no Linear issue, the connector was signed out): Claude Opus 5.5, Opus 5 and Opus 4.8 offer fast mode in a chat's reasoning menu, off until the owner turns it on.
+- 2026-10-14 (Opus 5.5): item 224 merged as `109c270` (PR #263; no Linear issue, the connector was signed out): a summary's check knows a path in each of the ways a Mac writes it, `~` or the home folder, `/tmp` or `/private/tmp`.
