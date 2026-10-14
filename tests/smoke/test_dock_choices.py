@@ -75,6 +75,7 @@ class ThreeModels:
                 tools=True,
                 thinking=True,
                 context_length=_CONTEXT_LENGTH,
+                own_context_length=None,
                 efforts=("low", "medium", "high"),
                 free=False,
             )

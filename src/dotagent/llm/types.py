@@ -97,14 +97,16 @@ class StreamDelta(FrozenModel):
 
 class ModelInfo(FrozenModel):
     """What a model offers. ``context_length`` is the number of tokens one request (prompt and reply) can hold, ``None``
-    when the provider does not say. ``efforts`` are its reasoning levels, lowest first; fewer than two means no choice.
-    ``free``: the provider serves it at no cost."""
+    when the provider does not say; ``own_context_length`` is the model's own window where Dot asks for less of it (an
+    Ollama model past ``num_ctx``), else ``None``. ``efforts`` are its reasoning levels, lowest first; fewer than two
+    means no choice. ``free``: the provider serves it at no cost."""
 
     id: str
     vision: bool
     tools: bool
     thinking: bool
     context_length: int | None
+    own_context_length: int | None
     efforts: tuple[Effort, ...]
     free: bool
 

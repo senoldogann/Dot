@@ -42,7 +42,16 @@ _RAIL_ITEMS: str = "[role=toolbar][aria-label='Providers'] button"
 
 
 def _model(name: str, tools: bool, free: bool) -> ModelInfo:
-    return ModelInfo(id=name, vision=False, tools=tools, thinking=False, context_length=None, efforts=(), free=free)
+    return ModelInfo(
+        id=name,
+        vision=False,
+        tools=tools,
+        thinking=False,
+        context_length=None,
+        own_context_length=None,
+        efforts=(),
+        free=free,
+    )
 
 
 class Listed:

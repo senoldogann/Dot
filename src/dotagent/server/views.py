@@ -578,14 +578,17 @@ class ScheduleView(FrozenModel):
 
 
 class ModelOption(FrozenModel):
-    """A model as the pickers show it. ``efforts`` are its reasoning levels, lowest first (fewer than two: no choice);
-    ``default_effort`` is the level the configured default effort selects on it; ``free``: served at no cost."""
+    """A model as the pickers show it. ``context_length`` is the window Dot uses, ``own_context_length`` the model's own
+    when it is larger (see ``ModelInfo``); ``efforts`` are its reasoning levels, lowest first (fewer than two: no
+    choice); ``default_effort`` is the level the configured default effort selects on it; ``free``: served at no
+    cost."""
 
     ref: str
     vision: bool
     tools: bool
     thinking: bool
     context_length: int | None
+    own_context_length: int | None
     efforts: list[Effort]
     default_effort: Effort | None
     free: bool

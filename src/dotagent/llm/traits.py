@@ -114,6 +114,7 @@ def info_from_traits(model: str, traits: ModelTraits, free: bool) -> ModelInfo:
         tools=True,
         thinking=traits.reasoning,
         context_length=traits.context_length,
+        own_context_length=None,
         efforts=efforts_of(traits),
         free=free,
     )

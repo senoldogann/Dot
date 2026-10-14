@@ -158,10 +158,17 @@ def choose_think(details: OllamaModelDetails, effort: Effort) -> str | bool | No
     return any(value is True for value in values)
 
 
+def is_cloud_model(model: str) -> bool:
+    """Whether ``model`` runs on Ollama's servers: its tag is ``cloud`` (``kimi-k3:cloud``) or ends in ``-cloud``
+    (``gpt-oss:120b-cloud``), as Ollama names them (item 221)."""
+    name, colon, tag = model.rpartition(":")
+    return colon == ":" and name != "" and (tag == "cloud" or tag.endswith("-cloud"))
+
+
 def num_ctx_for(model: str, config: OllamaConfig) -> int:
-    """The window asked of ``model`` with every request: ``num_ctx_cloud`` for a cloud model (a name ending in
-    ``:cloud``, which runs on Ollama's servers), ``num_ctx`` for one that runs on this Mac."""
-    return config.num_ctx_cloud if model.endswith(":cloud") else config.num_ctx
+    """The window asked of ``model`` with every request: ``num_ctx_cloud`` for a cloud model (:func:`is_cloud_model`),
+    ``num_ctx`` for one that runs on this Mac."""
+    return config.num_ctx_cloud if is_cloud_model(model) else config.num_ctx
 
 
 def build_chat_payload(request: ChatRequest, details: OllamaModelDetails, config: OllamaConfig) -> JsonObject:
@@ -305,7 +312,7 @@ def _parse_think_values(raw: JsonValue) -> tuple[str | bool, ...]:
 
 def parse_model_details(model: str, shown: JsonObject, num_ctx: int) -> OllamaModelDetails:
     """What ``/api/show`` says about a model. Every request is sent with ``num_ctx``, the window Ollama gives the model,
-    so the context length is the smaller of that and the model's own window."""
+    so the context length is the smaller of that and the model's own window, which is kept when it is the larger."""
     capabilities: JsonValue = shown.get("capabilities")
     caps: set[str] = {str(item) for item in capabilities} if isinstance(capabilities, list) else set()
     thinking: bool = "thinking" in caps
@@ -323,6 +330,7 @@ def parse_model_details(model: str, shown: JsonObject, num_ctx: int) -> OllamaMo
         tools="tools" in caps,
         thinking=thinking,
         context_length=num_ctx if trained is None else min(trained, num_ctx),
+        own_context_length=trained if trained is not None and trained > num_ctx else None,
         efforts=think_ladder(thinking, values),
         free=False,
     )
