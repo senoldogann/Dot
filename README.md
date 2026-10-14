@@ -1207,7 +1207,9 @@ says so and the default has the tick, and the model picked (by a click, Enter or
 Settings › Models; the menu goes back to the chat's model and stays open. A chat that has a model of its own keeps it,
 and one that follows the default moves with it. Escape or Cancel goes back without a change. What you typed and attached
 and did not send is kept in this browser and is there again when you come back (so is the box of each run). Dot's face
-looks down at the box while you write and brightens when you send. Enter starts the run, Shift+Enter adds a line. The
+looks down at the box while you write and brightens when you send. Enter starts the run, Shift+Enter adds a line, or
+⌘Enter (Ctrl+Enter) starts it and Enter adds a line, as Settings › General › Composer chooses for every composer of this
+browser (item 230, after T3 Code's settings). The
 markdown in the box shows as it reads (item 207, after T3 Code's composer): its marks (a heading's hashes, a list's
 mark, the stars of bold, the backticks of code, a link's brackets, a table's pipes) quieter than its words, bold words,
 headings and a table's head heavier, code tinted, quotes softer and links in the colour of links; the box is still a
@@ -1270,7 +1272,9 @@ run works](#how-a-run-works)), shown above the box as T3 Code shows it: a sheet 
 it, with a row per message: a handle to drag it to another place or move it with the arrow keys, its text on one line
 (all of it in the tooltip), a pencil that edits it in the box (the send says Save; Escape or Cancel gives the box its
 draft back), **Steer**, which sends it to the run now, and × to take it out. ⌘⇧Enter steers the run with what the box
-holds, past the queue, or with the queue's next message when the box is empty. A held queue says it is paused, with
+holds, past the queue, or with the queue's next message when the box is empty. Settings › General › Composer can have a
+message steer the run instead (item 230): the send then says **Steer**, and ⌘⇧Enter puts what the box holds in the
+queue. A held queue says it is paused, with
 **Resume**, and a queue the page could not read says why, with **Read again**. When the run ends done, the next message
 starts and the page follows it; every open page shows the queue as it changes. In a campaign's chat the message steers
 the session. The box wears the home's pills too, after T3 Code's composer: the mode, the model with its reasoning and

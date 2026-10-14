@@ -118,6 +118,24 @@ export const CHAT_WIDTH = {
   paint: (value) => (value === "comfortable" ? dropFlag("data-chat-width") : setFlag("data-chat-width", value)),
 };
 
+/** The key that sends what a composer holds (item 230): Enter, Shift+Enter breaking a line, or ⌘Enter (Ctrl+Enter),
+ * Enter breaking it. Settings › General chooses it; it puts nothing on the page. */
+export const SEND_KEY = {
+  key: "dot.sendKey",
+  initial: "enter",
+  parse: oneOf(["enter", "mod-enter"]),
+  paint: () => undefined,
+};
+
+/** What a message to a run at work does unless ⌘⇧Enter asks the other way (item 230): it waits in the chat's queue, or
+ * steers the run at once. Settings › General chooses it; it puts nothing on the page. */
+export const BUSY_SEND = {
+  key: "dot.busySend",
+  initial: "queue",
+  parse: oneOf(["queue", "steer"]),
+  paint: () => undefined,
+};
+
 /** How long the sidebar and the details panel slide, 0 to 400 ms on steps of 25. */
 export const PANEL_MOTION = {
   key: "dot.panelMotion",

@@ -4,6 +4,7 @@
 import { actorFace, dotFace, setActorState } from "../actors.js";
 import { agentList } from "../agentlist.js";
 import { api, follow } from "../api.js";
+import { BUSY_SEND, valueOf } from "../appearance/settings.js";
 import { approvalCard, fromRecord, LEFT_IN_CAMPAIGN, LEFT_IN_RUN } from "../approvals.js";
 import { readyToSend } from "../attachments.js";
 import { backgroundWork } from "../background.js";
@@ -423,15 +424,15 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
   }
 
   // ------------------------------------------------------------------------------------------------ dock
-  // The shared frame (composer.js): Enter sends and Shift+Enter breaks a line; "/" opens the slash menu, whose one
-  // command here asks on the side; what is typed and not sent is kept for this run.
+  // The shared frame (composer.js): Enter or ⌘Enter sends, as Settings › General chooses; "/" opens the slash menu,
+  // whose one command here asks on the side; what is typed and not sent is kept for this run.
   const frame = composerFrame({
     label: "Message",
     boxLabel: `Message for ${agent !== null ? agent.name : dotName()}`,
     placeholder: "",
     maxPx: MAX_INPUT_PX,
     commands: [{ label: "/btw", hint: "Ask on the side: the run never sees the question.", insert: "/btw " }],
-    send: () => submit(),
+    send: () => submit(false),
     sendLabel: "Steer",
     draftKey: runId,
     listener: null,
@@ -441,8 +442,9 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
   const meter = createContextMeter({ frame: frame.element });
   send.before(meter.element);
   // The chat's queue (item 148), right above the composer: a message sent while the run works waits there and starts
-  // as the chat's next run once this one has ended done; the page follows it there. A campaign's chat takes no queue:
-  // a message steers its session, as before.
+  // as the chat's next run once this one has ended done; the page follows it there, unless Settings › General has a
+  // message steer the run at work (item 230). A campaign's chat takes no queue: a message steers its session, as
+  // before.
   const queueing = run.campaign_id === null;
   const queue = createQueue({
     threadId: run.thread_id,
@@ -455,9 +457,10 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
     },
     onEdit: () => syncControls(),
   });
-  // ⌘⇧Enter sends what the box holds to the run now, past the queue, or the queue's next message when the box is
-  // empty (T3 Code's key); Escape ends the edit of a queued message. A key the box already took (a pick of the slash
-  // menu, or of an input method's composition) is left to it.
+  // ⌘⇧Enter sends what the box holds the other way than the send does (`steers`): to the run now, past the queue, or
+  // into the queue where a message steers; with the box empty, it sends the queue's next message to the run (T3
+  // Code's key). Escape ends the edit of a queued message. A key the box already took (a pick of the slash menu, or of
+  // an input method's composition) is left to it.
   input.addEventListener("keydown", (event) => {
     if (event.defaultPrevented || event.isComposing || event.keyCode === 229) {
       return;
@@ -595,8 +598,8 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
   let sending = false;
   const keys = messageKeys();
 
-  // `steerNow` sends the message to the run under way past the queue (⌘⇧Enter).
-  async function submit(steerNow) {
+  // `other` sends the message the other way than the send does (⌘⇧Enter): see `steers`.
+  async function submit(other) {
     if (sending) {
       return;
     }
@@ -634,7 +637,7 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
     send.disabled = true;
     try {
       await attempt(async () => {
-        const next = await deliver(text, files, steerNow);
+        const next = await deliver(text, files, other);
         frame.clear();
         if (next !== null) {
           ctx.navigate(`/runs/${next}`);
@@ -646,11 +649,21 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
     }
   }
 
-  // Send `text` with the files `files` (their ids) as the composer's Enter does: into the queue or to the run under way
-  // while it works (`steerNow` passes the queue), otherwise as the chat's next run, whose id is returned (null for the
-  // others).
-  async function deliver(text, files, steerNow) {
-    if (active && (elsewhere || (queueing && steerNow !== true))) {
+  // Whether a message sent while the run works goes to it at once rather than into the queue (item 230): a run that a
+  // dotx command drives takes no steer and a campaign's session no queue; else Settings › General chooses, and
+  // `other` (⌘⇧Enter) turns it around.
+  function steers(other) {
+    if (elsewhere) {
+      return false;
+    }
+    return !queueing || (valueOf(BUSY_SEND) === "steer") !== other;
+  }
+
+  // Send `text` with the files `files` (their ids) as the composer's send does: to the run under way or into the queue
+  // while it works (`steers`, `other` the way ⌘⇧Enter sends), otherwise as the chat's next run, whose id is returned
+  // (null for the others).
+  async function deliver(text, files, other) {
+    if (active && !steers(other)) {
       // The level is checked against the model's own, so the models are known first.
       await choices.ready();
       const chosen = choices.value();
@@ -743,9 +756,9 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
     choices.setWaiting(active);
     footStop.hidden = !active;
     // Short enough for one line of a phone's composer (item 111).
-    const working = queueing ? "Queue a message, or /btw to ask on the side" : "Steer this run, or /btw to ask on the side";
+    const working = steers(false) ? "Steer this run, or /btw to ask on the side" : "Queue a message, or /btw to ask on the side";
     input.placeholder = active ? working : "Follow up, or /btw to ask on the side";
-    const sendWord = active ? (queueing ? "Queue" : "Steer") : "Follow up";
+    const sendWord = active ? (steers(false) ? "Steer" : "Queue") : "Follow up";
     frame.setSendLabel(editing ? "Save" : sendWord);
     queue.setActive(active && !elsewhere);
     if (active && ticker === null) {

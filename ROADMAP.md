@@ -5165,8 +5165,8 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 226 | A helper's card                                                                      | done        | 0db06a8 |
 | 227 | Previous agents in the side panel                                                    | done        | b948cd7 |
 | 228 | The rail of messages beside the docked panel                                         | done        | 46a8ef0 |
-| 229 | Commands in the background                                                           | in progress |         |
-| 230 | The composer's keys                                                                  | planned     |         |
+| 229 | Commands in the background                                                           | done        | e117eaf |
+| 230 | The composer's keys                                                                  | in progress |         |
 | 231 | Runs go on after a restart                                                           | planned     |         |
 | 232 | Models for Dot's own work                                                            | planned     |         |
 
@@ -10588,7 +10588,7 @@ instead of hiding.
 
 ### 229. Commands in the background
 
-**Status: in progress.**
+**Status: done.** Merged as `e117eaf` (PR #268; no Linear issue, the Linear connector was signed out).
 
 **As built (2026-10-14).** `terminal_open` takes `background` for a command that runs long and ends by itself: it is not
 closed while it runs for being left unread, and the run that opened it can end. When it ends by itself, its chat is told
@@ -10605,7 +10605,16 @@ what runs, as T3 Code's does, and when a command ends its chat is told, with its
 
 ### 230. The composer's keys
 
-**Status: planned.**
+**Status: in progress.**
+
+**As built (2026-10-14).** Settings › General › Composer chooses, for this browser, the key that sends in every
+composer, Enter (Shift+Enter breaking a line) or ⌘Enter (Ctrl+Enter; Enter breaking a line), and what a message sent
+while a run works does: it waits in the chat's queue, as before, or steers the run at once. ⌘⇧Enter sends it the other
+way, and with the box empty still steers with the queue's next message; a campaign's session is always steered and a run
+that a `dotx` command drives always queued. The run page's send and placeholder say which. Tests:
+`tests/smoke/test_queue.py`, the choices kept, Enter breaking the line in the new chat's and the run's composers, ⌘Enter
+steering the run at work and ⌘⇧Enter queueing, wide and on a phone, light and dark, in Chrome and WebKit; on the code of
+before, Settings › General has no Composer card.
 
 **What.** Settings chooses whether Enter or ⌘Enter sends, and whether a message to a busy run is queued or steers it
 unless asked otherwise.
@@ -11292,3 +11301,4 @@ default model.
 - 2026-10-14 (Opus 5.5): item 226 merged as `0db06a8` (PR #265; no Linear issue, the connector was signed out): resting the pointer on a helper's row, or moving the focus to it, shows a card with its goal, model and level, state, time and current action.
 - 2026-10-14 (Opus 5.5): item 227 merged as `b948cd7` (PR #266; no Linear issue, the connector was signed out): the run page's side panel lists the chat's earlier helpers in an Agents tab, newest first, and its tabs wear SVG icons.
 - 2026-10-14 (Opus 5.5): item 228 merged as `46a8ef0` (PR #267; no Linear issue, the connector was signed out): the rail of marks at the conversation's left shows beside the docked side panel too, the conversation leaving it room, and in WebKit a pointer resting on it no longer loses it.
+- 2026-10-14 (Opus 5.5): item 229 merged as `e117eaf` (PR #268; no Linear issue, the connector was signed out): a command that runs long goes to a terminal session in the background, and its end is told to its chat, which starts the chat's next run; the chat's page shows its commands at work above the composer.

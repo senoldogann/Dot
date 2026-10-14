@@ -227,6 +227,19 @@ export function switchSetting({ label, hint, read, write, onToggled }) {
   };
 }
 
+/** A choice of a few, as Density is drawn: the label and the buttons on a line, the hint under them. */
+export function choiceSetting({ label, hint, options, selected, onSelect }) {
+  const choice = segmented(options, selected, onSelect);
+  choice.element.setAttribute("aria-label", label);
+  const element = el(
+    "div",
+    { class: "setting" },
+    el("div", { class: "row" }, el("span", { class: "grow" }, label), choice.element),
+    el("div", { class: "hint" }, hint),
+  );
+  return { element, choice };
+}
+
 /**
  * A setting that is a number on a scale (item 127): its label with the value as `format` writes it ("100%", "200 ms")
  * on one line, the range under them and the hint under that. Every step of a drag is written at once.
