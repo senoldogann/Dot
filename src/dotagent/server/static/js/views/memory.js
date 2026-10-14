@@ -1,4 +1,5 @@
 // What Dot remembers: add a note, look things up by meaning or by words, correct a note and forget what is out of date.
+// The notes keep a size and scroll inside past their first rows (item 218).
 
 import { api, query } from "../api.js";
 import { ago, clip, dateTimeFull, debounce, el, plural } from "../dom.js";
@@ -216,14 +217,14 @@ export function mount(root, ctx) {
   const count = el("div", { class: "hint" });
   const holder = el("div", null, loadingPanel());
   const more = el("button", { class: "btn", type: "button", hidden: true }, "Load more");
-  const awakeCard = el("div", { class: "card" });
+  const awakeCard = el("div", { class: "card list-box" });
   const restingHead = el(
     "div",
     { class: "row section-head", dataset: { resting: "" } },
     el("div", { class: "section-label grow" }, "Resting"),
     el("span", { class: "hint" }, "No run was handed these lately; a search still finds them, runs no longer start with them."),
   );
-  const restingCard = el("div", { class: "card" });
+  const restingCard = el("div", { class: "card list-box" });
   // The rows painted, by note id, with the hit each shows: a paint keeps the row of a note that did not change, so that
   // the page keeps its place and a note being corrected its form (item 204).
   let rowsShown = new Map();
