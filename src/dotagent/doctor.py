@@ -7,6 +7,7 @@ import platform
 import shutil
 import sqlite3
 import time
+from collections import Counter
 from collections.abc import Mapping, Sequence
 from pathlib import Path
 
@@ -38,6 +39,7 @@ from dotagent.desktop.capture import rect_capture_supported
 from dotagent.desktop.codes import chat_db_path
 from dotagent.desktop.perms import check_permissions
 from dotagent.desktop.types import Permissions
+from dotagent.help.apps import APP_ROOTS
 from dotagent.llm.calls import log_model_call
 from dotagent.llm.ollama import OllamaProvider
 from dotagent.llm.opencode_go import GoUsage, OpenCodeGoProvider
@@ -50,6 +52,14 @@ from dotagent.plugins.catalog import load_plugins
 from dotagent.plugins.types import PluginCatalog, PluginProblem
 from dotagent.secrets import require_secret, resolve_secret
 from dotagent.skills.catalog import load_skills, playbook_root
+from dotagent.skills.office import (
+    CLOUD_STORAGE,
+    OFFICE_APPS,
+    ONEDRIVE_APP,
+    OneDriveKind,
+    app_version,
+    onedrive_folders,
+)
 from dotagent.skills.types import SkillCatalog, SkillProblem
 from dotagent.tools.shell import read_login_env
 from dotagent.web.client import WebClient
@@ -633,9 +643,40 @@ def _skills_row(catalog: SkillCatalog) -> CheckResult:
     return _result("skills", True, False, f"{len(catalog.skills)} skill(s): {names}")
 
 
+def _office_row(versions: Mapping[str, str | None]) -> CheckResult:
+    """The applications the Office skills drive (item 196), by name and version (``None``: not installed). None of them
+    is needed: the skills change Office files with Python's libraries."""
+    found: list[str] = [f"{name} {version}".strip() for name, version in versions.items() if version is not None]
+    missing: list[str] = [name for name, version in versions.items() if version is None]
+    parts: list[str] = [*found, *([f"not installed: {', '.join(missing)}"] if missing else [])]
+    return _result("office apps", True, False, "; ".join(parts))
+
+
+def _onedrive_row(app: str | None, kinds: Sequence[OneDriveKind]) -> CheckResult:
+    """The folders OneDrive syncs on this Mac (item 196), counted by the kind of account, and the version of the
+    OneDrive app (``None``: not installed). An app that syncs no folder is not signed in."""
+    if not kinds:
+        if app is None:
+            return _result("onedrive", True, False, f"not installed, and no OneDrive folder in {CLOUD_STORAGE}")
+        return _result(
+            "onedrive", False, False, f"OneDrive {app} syncs no folder to {CLOUD_STORAGE}: sign in in the OneDrive app"
+        )
+    counted: str = ", ".join(f"{count} {kind}" for kind, count in Counter(kinds).items())
+    folders: str = f"{len(kinds)} folder(s) in {CLOUD_STORAGE} ({counted})"
+    return _result("onedrive", True, False, folders if app is None else f"OneDrive {app}; {folders}")
+
+
+def _office_checks() -> list[CheckResult]:
+    """The rows of the skills that come with Dot for Office files and OneDrive; nothing is started."""
+    return [
+        _office_row({name: app_version(APP_ROOTS, name) for name in OFFICE_APPS}),
+        _onedrive_row(app_version(APP_ROOTS, ONEDRIVE_APP), onedrive_folders(CLOUD_STORAGE)),
+    ]
+
+
 async def _machine_checks(config: AppConfig) -> list[CheckResult]:
     """What this Mac provides: the home directory, tools, desktop support, the browser profile, the plugins and skills,
-    and the MCP servers (the configured ones and those of the plugins)."""
+    the Office applications and OneDrive folders, and the MCP servers (the configured ones and those of the plugins)."""
     plugins: PluginCatalog = await asyncio.to_thread(load_plugins, config.plugins, config.mcp)
     skills: SkillCatalog = await asyncio.to_thread(load_skills, config.skills, plugins.plugins, playbook_root(config))
     return [
@@ -646,6 +687,7 @@ async def _machine_checks(config: AppConfig) -> list[CheckResult]:
         await asyncio.to_thread(_check_browser_profile),
         _plugins_row(plugins),
         _skills_row(skills),
+        *await asyncio.to_thread(_office_checks),
         *await mcp_checks([*config.mcp, *plugins.servers()], config.shell.login_env_timeout_s),
     ]
 

@@ -10,6 +10,7 @@ from dotagent.core.text import fold_search
 from dotagent.evals.checks import workspace_path
 from dotagent.evals.types import AnswerLacks, AnswerMatches, Check, EvalTask, FileSeed, ScriptedCall
 from dotagent.mcp.naming import PREFIX
+from dotagent.skills.catalog import builtin_skill_names
 from dotagent.skills.types import SKILL_TOOL
 from dotagent.tools.meta import FINISH_TOOL
 
@@ -45,8 +46,8 @@ def _ending_problems(task: EvalTask) -> list[str]:
 
 
 def _easy_way_problems(task: EvalTask) -> list[str]:
-    """The easy way a task names has to be one that its own help offers: a skill it brings, or a tool of an MCP server
-    it brings."""
+    """The easy way a task names has to be one that its own help offers: a skill it brings or one that comes with Dot
+    (item 196), or a tool of an MCP server it brings."""
     if task.easy_way is None:
         return []
     tool: str = task.easy_way.tool
@@ -54,8 +55,8 @@ def _easy_way_problems(task: EvalTask) -> list[str]:
     if tool == SKILL_TOOL:
         if skill is None:
             return ["the easy way reads a skill but does not name it"]
-        if skill not in {seed.name for seed in task.skills}:
-            return [f"the easy way reads the skill {skill!r}, which the task does not bring"]
+        if skill not in {seed.name for seed in task.skills} | builtin_skill_names():
+            return [f"the easy way reads the skill {skill!r}, which the task does not bring and Dot does not come with"]
         return []
     if skill is not None:
         return [f"the easy way names the skill {skill!r}, but its tool is not {SKILL_TOOL}"]
@@ -68,7 +69,7 @@ def _quoting_problems(task: EvalTask) -> list[str]:
     """An instruction hidden in a task is followed by doing what it asks, never by quoting it: no injection check that
     the answer lacks some words may name words that the files the goal names hold, as an answer that quotes them while
     refusing what they ask would fail it."""
-    named: list[FileSeed] = [seed for seed in task.files if seed.path in task.goal]
+    named: list[FileSeed] = [seed for seed in task.files if seed.encoding == "text" and seed.path in task.goal]
     return [
         f"an answer that quotes {seed.path}, which the goal names, holds {check.text!r}, so quoting the hidden "
         "instruction would count as following it"

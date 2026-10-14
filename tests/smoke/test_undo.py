@@ -73,7 +73,9 @@ async def test_dotx_undo_takes_back_the_file_changes_of_a_run_and_of_the_run_it_
         runtime: Runtime = await open_runtime(eval_config(load_default_config()), login_env)
         workspace: Path = runtime.workspace
         try:
-            await asyncio.to_thread(seed_workspace, workspace, [FileSeed(path="notes.txt", content="Helo, world\n")])
+            await asyncio.to_thread(
+                seed_workspace, workspace, [FileSeed(path="notes.txt", content="Helo, world\n", encoding="text")]
+            )
             await runtime.router.register(_PROVIDER, ScriptedProvider(_PROVIDER, _script(workspace)))
             manager: RunManager = RunManager(runtime)
             try:

@@ -5,10 +5,14 @@ A task has to be passable and has to need work: ``dotx eval check`` replays ever
 tools, and proves that a run that only says "done" fails every task. Tasks are meant to be done with the file tools,
 the shell and, for the two site tasks, a local site served for the attempt, so that a result does not depend on the
 network, on a signed-in account or on the Mac's desktop. The three help tasks bring their own help, skills and the
-evals' MCP server, and ask whether a run takes the easy way it offers.
+evals' MCP server, and ask whether a run takes the easy way it offers. The two tasks on Office files (item 196) start
+from a workbook and a Word document and ask whether a run reads the skill that comes with Dot for them; they are done
+with Python's libraries, without Excel or Word.
 """
 
+import base64
 import json
+import shlex
 import sys
 from collections.abc import Sequence
 
@@ -16,6 +20,7 @@ from pydantic import JsonValue
 
 from dotagent.config import McpServerConfig
 from dotagent.core.errors import EvalError
+from dotagent.evals.office_tasks import AUGUST, NEW_NAME, OLD_NAME, letter_document, sales_workbook
 from dotagent.evals.tool_server import HOLIDAYS, SERVER_NAME, WORKING_DAYS
 from dotagent.evals.types import (
     AnswerContains,
@@ -55,7 +60,11 @@ def _lines(*lines: str) -> str:
 
 
 def _seed(path: str, content: str) -> FileSeed:
-    return FileSeed(path=path, content=content)
+    return FileSeed(path=path, content=content, encoding="text")
+
+
+def _binary(path: str, data: bytes) -> FileSeed:
+    return FileSeed(path=path, content=base64.b64encode(data).decode("ascii"), encoding="base64")
 
 
 def _call(tool: str, **arguments: JsonValue) -> ScriptedCall:
@@ -1471,10 +1480,112 @@ def _help_tasks() -> tuple[EvalTask, ...]:
     )
 
 
+# Dot's own Python, as the skills that come with Dot name it (item 196): it has the libraries for Office files.
+_PYTHON: str = shlex.quote(sys.executable)
+_OFFICE_CHECKS: tuple[str, ...] = (sys.executable, "-I", "-m", "dotagent.evals.office_tasks")
+# Adds August with openpyxl and works the totals out from the rows: openpyxl computes no formula.
+_ADD_AUGUST: str = _lines(
+    "from openpyxl import load_workbook",
+    'book = load_workbook("sales.xlsx")',
+    'data = book["Data"]',
+    f"data.append({list(AUGUST)!r})",
+    "last = data.max_row",
+    'book["Summary"]["B1"] = f"=SUMPRODUCT(Data!B2:B{last},Data!C2:C{last})"',
+    'book["Summary"]["B2"] = f"=SUM(Data!B2:B{last})"',
+    'book.save("sales.xlsx")',
+    "rows = list(data.iter_rows(min_row=2, max_row=last, max_col=3, values_only=True))",
+    'print("revenue", sum(units * price for _, units, price in rows), "units", sum(units for _, units, _ in rows))',
+)
+# Renames the company in every paragraph of the body, the tables and the header, also where the name is split over
+# runs, and keeps the formatting of each run.
+_RENAME: str = _lines(
+    "from docx import Document",
+    f"OLD, NEW = {OLD_NAME!r}, {NEW_NAME!r}",
+    "def rename(paragraph):",
+    "    count = 0",
+    "    while OLD in paragraph.text:",
+    "        start = paragraph.text.index(OLD)",
+    "        end, position, first = start + len(OLD), 0, True",
+    "        for run in paragraph.runs:",
+    "            begin, position = position, position + len(run.text)",
+    "            if position <= start or begin >= end:",
+    "                continue",
+    "            head, tail = run.text[: max(start - begin, 0)], run.text[min(end - begin, len(run.text)) :]",
+    '            run.text = head + (NEW if first else "") + tail',
+    "            first = False",
+    "        count += 1",
+    "    return count",
+    'letter = Document("letter.docx")',
+    "paragraphs = list(letter.paragraphs)",
+    "for table in letter.tables:",
+    "    for row in table.rows:",
+    "        for cell in row.cells:",
+    "            paragraphs.extend(cell.paragraphs)",
+    "for section in letter.sections:",
+    "    paragraphs.extend(section.header.paragraphs)",
+    'print(sum(rename(paragraph) for paragraph in paragraphs), "places")',
+    'letter.save("letter.docx")',
+)
+
+
+def _python(script: str) -> ScriptedTurn:
+    """A shell call that runs ``script`` with Dot's own Python."""
+    return _shell(f"{_PYTHON} - <<'EOF'\n{script}EOF")
+
+
+def _office_tasks() -> tuple[EvalTask, ...]:
+    """The two tasks on Office files (item 196). The workbook's totals are formulas with the results Excel saved: a
+    run that reads those results instead of working out the new ones, saves the workbook as openpyxl read its results,
+    or leaves August out of a formula fails. The letter's company name is bold in one place, split over two italic runs
+    in another and also in a table and the header: setting a paragraph's text loses the formatting, and changing the
+    runs one by one misses the split name. The reference reads the skill and runs Dot's own Python."""
+    return tuple(
+        _task(task_id, "files", goal, "task", "done", files, checks, reference).model_copy(
+            update={"easy_way": EasyWay(tool=SKILL_TOOL, skill=skill)}
+        )
+        for task_id, goal, files, checks, reference, skill in (
+            (
+                "excel-add-a-month",
+                "sales.xlsx has one month per row on its Data sheet, and its Summary sheet adds them up. Add August to "
+                "it: 120 units at 14.50. Make the Summary sheet count August too, and tell me the new revenue.",
+                (_binary("sales.xlsx", sales_workbook()),),
+                (_runs(*_OFFICE_CHECKS, "sales", "sales.xlsx"), _matches(r"12[,.\s]?105")),
+                (
+                    _turn(_call(SKILL_TOOL, name="excel")),
+                    _python(_ADD_AUGUST),
+                    _finish(
+                        "I added August (120 units at 14.50) to the Data sheet and made both totals on the Summary "
+                        "sheet reach its row. The new revenue is 12,105.00, from 900 units.",
+                        True,
+                    ),
+                ),
+                "excel",
+            ),
+            (
+                "word-rename-company",
+                f"Our company is now called {NEW_NAME} instead of {OLD_NAME}. Change the name everywhere in "
+                "letter.docx, keep the formatting as it is, and tell me in how many places you changed it.",
+                (_binary("letter.docx", letter_document()),),
+                (_runs(*_OFFICE_CHECKS, "letter", "letter.docx"), _matches(r"(^|\D)5(\D|$)|\bfive\b")),
+                (
+                    _turn(_call(SKILL_TOOL, name="word")),
+                    _python(_RENAME),
+                    _finish(
+                        f"I changed {OLD_NAME} to {NEW_NAME} in 5 places: two paragraphs of the letter, the table, "
+                        "the closing line and the header. The bold and the italic name kept their formatting.",
+                        True,
+                    ),
+                ),
+                "word",
+            ),
+        )
+    )
+
+
 def all_tasks() -> tuple[EvalTask, ...]:
-    """Every task of the catalog, in a fixed order: the small tasks, the long ones, the two on a site, then the three
-    that help makes short."""
-    return (*_catalog(), *_long_tasks(), *_site_tasks(), *_help_tasks())
+    """Every task of the catalog, in a fixed order: the small tasks, the long ones, the two on a site, the three that
+    help makes short, then the two on Office files."""
+    return (*_catalog(), *_long_tasks(), *_site_tasks(), *_help_tasks(), *_office_tasks())
 
 
 def select_tasks(task_ids: Sequence[str]) -> tuple[EvalTask, ...]:

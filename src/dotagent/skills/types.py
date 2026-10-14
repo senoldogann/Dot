@@ -11,6 +11,9 @@ SKILL_FILE: str = "SKILL.md"
 SKILL_TOOL: str = "skill"
 # The specification: 1-64 lower-case letters, digits and hyphens, no hyphen at either end and none doubled.
 SKILL_NAME_PATTERN: str = r"^[a-z0-9]+(-[a-z0-9]+)*$"
+# Stands for Dot's own Python in a skill's instructions, which the skill tool replaces with its path as the shell takes
+# it: that Python has the libraries for Office files (item 196).
+PYTHON_MARK: str = "{{dot_python}}"
 
 
 class SkillFrontmatter(FrozenModel):

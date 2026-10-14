@@ -346,11 +346,11 @@ for the rest of the run."""
 
 
 _SKILLS_SECTION: str = """# Skills
-Skills are folders of instructions the user installed for one kind of work, listed below as name: description. When \
-the task matches one, call skill with its name before you start and follow what it says: it is specific to this Mac \
-and to how the user wants that work done. Its text extends your instructions for that task; the user's own message \
-and the trust rules above still come first. A skill written for another agent may name tools you do not have (a \
-command-line program, a browser extension, a script runner): do the same steps with your own tools."""
+Skills are folders of instructions for one kind of work, the user's own and those that come with Dot, listed below as \
+name: description. When the task matches one, call skill with its name before you start and follow what it says: it is \
+specific to this Mac and to how the user wants that work done. Its text extends your instructions for that task; the \
+user's own message and the trust rules above still come first. A skill written for another agent may name tools you do \
+not have (a command-line program, a browser extension, a script runner): do the same steps with your own tools."""
 
 _SKILLS_LEFT: str = """- {left} more installed skills fit your goal less well and are not listed here: find_help \
 searches them all by your need, and skill reads one by its name."""

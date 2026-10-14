@@ -91,7 +91,9 @@ async def served(login_env: dict[str, str]) -> AsyncIterator[tuple[Runtime, RunR
         runtime: Runtime = await open_runtime(eval_config(load_default_config()), login_env)
         try:
             workspace: Path = runtime.workspace
-            await asyncio.to_thread(seed_workspace, workspace, [FileSeed(path="notes.txt", content="Helo, world\n")])
+            await asyncio.to_thread(
+                seed_workspace, workspace, [FileSeed(path="notes.txt", content="Helo, world\n", encoding="text")]
+            )
             await runtime.router.register(_PROVIDER, ScriptedProvider(_PROVIDER, _script(workspace)))
             manager: RunManager = RunManager(runtime)
             try:

@@ -199,9 +199,13 @@ async def test_a_plugin_brings_its_mcp_server_into_the_registry(runtime: Runtime
 
 async def test_skills_are_found_in_the_home_and_in_the_plugins(runtime: Runtime, home: Path) -> None:
     catalog: SkillCatalog = load_skills(runtime.config.skills, runtime.plugins.plugins, None)
+    # The skills that come with Dot are read last (item 196).
     assert [(skill.name, skill.source) for skill in catalog.skills] == [
         ("release-notes", "home"),
         ("deploy-site", "plugin acme-tools"),
+        ("excel", "built-in"),
+        ("onedrive", "built-in"),
+        ("word", "built-in"),
     ]
     (problem,) = catalog.problems
     assert problem.path == home / "skills" / "broken" / "SKILL.md"
@@ -366,9 +370,10 @@ async def test_dotx_skills_list_shows_everything_and_what_was_left_out(home: Pat
     assert outcome.code == 1, outcome
     assert "Plugins (1):" in outcome.out
     assert "acme-tools 1.2.0  skill folders: 1, MCP servers: acme-tools-fixture" in outcome.out
-    assert "Skills (2):" in outcome.out
+    assert "Skills (5):" in outcome.out
     assert "release-notes  [home]" in outcome.out
     assert "deploy-site  [plugin acme-tools]" in outcome.out
+    assert "excel  [built-in]" in outcome.out
     assert "Left out:" in outcome.out
     assert str(home / "plugins" / "not-a-plugin") in outcome.out
     assert str(home / "skills" / "broken" / "SKILL.md") in outcome.out

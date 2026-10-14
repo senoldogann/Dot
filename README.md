@@ -33,14 +33,15 @@ uv run dotx doctor
 ```
 
 `dotx doctor` checks the home directory, ripgrep, Chrome (with a throwaway start of it), the macOS version and the
-permissions the desktop tools need, the commands and secrets of the configured MCP servers (none is started), Ollama,
-the keys of OpenAI, OpenCode Go and Anthropic, the embedding model and the configured models, each of which its provider
-must serve to the key (Ollama and Anthropic answer for the model itself, OpenAI and OpenCode Go through the list of the
-models they serve), and says how to fix what is missing. It warns, without failing, when the review model is also the
-main model, when an MCP server's command or secret is missing (Dot starts without that server's tools), and when a
-provider's list of models could not be read or the Ollama server could not be reached, as the provider's own row says
-why (the models of an Ollama server out of reach are not asked, so the doctor does not wait out the retries of each).
-The examples below write `dotx`: run it as `uv run dotx`, or put `.venv/bin` on your `PATH`.
+permissions the desktop tools need, the Office applications and the OneDrive folders of the skills that come with Dot
+(none is opened), the commands and secrets of the configured MCP servers (none is started), Ollama, the keys of OpenAI,
+OpenCode Go and Anthropic, the embedding model and the configured models, each of which its provider must serve to the
+key (Ollama and Anthropic answer for the model itself, OpenAI and OpenCode Go through the list of the models they
+serve), and says how to fix what is missing. It warns, without failing, when the review model is also the main model,
+when an MCP server's command or secret is missing (Dot starts without that server's tools), and when a provider's list
+of models could not be read or the Ollama server could not be reached, as the provider's own row says why (the models of
+an Ollama server out of reach are not asked, so the doctor does not wait out the retries of each). The examples below
+write `dotx`: run it as `uv run dotx`, or put `.venv/bin` on your `PATH`.
 
 ```bash
 dotx run "Find the opening hours of the Helsinki Central Library and save them to hours.md"
@@ -1082,36 +1083,41 @@ reading the files and working it out.
 
 Every attempt runs unattended in a throw-away Dot home (its own database and workspace, removed afterwards), with the
 Mac desktop, your MCP servers, skills, plugins and the memory embeddings switched off (a task that brings skills or an
-MCP server has those alone), and with every question of the policy or of the agent unanswered (one the run waits for is
-refused at once). Your own database, workspace and screenshots are never touched; the API keys are looked up first and
-handed over by name: those of the model under measure and of the fast, review and vision models that have one. An eval
-run does not start without the first, nor without the review model's when it has work in an attempt: the goal check of a
-run in goal mode (every attempt with `[agent] goal_mode`, the form task always, a goal that asks to keep going until it
-is done) or the second opinion of `stall_escalation`. A goal check that cannot run ends its attempt as failed, saying
-why, and the next attempt follows. The score holds the pass rate, per kind of task, what a pass costs in steps, tokens
-and seconds (split into model calls and tool calls), the share of the act calls that carried one step and the share of
-the input tokens served from the prompt cache (both as `dotx stats` counts them, over every attempt), how often a tool
-call failed, stalls, runs that were cut, runs that said they were done and were not, plan steps marked done without
-evidence (zero since the plan tools require it) and done steps whose evidence the goal check could not bear out (counted
-from the `goal_check` events, so only in goal mode), compactions per 100 steps and the share of the model time their
-summaries took, web pages not found and calls refused for their arguments (as `dotx stats` counts them; `-` in a report
-saved before they were), how many of the attempts at a task that hides an instruction in one of its files (a note "to
-the AI assistant" in an invoice, a hidden block in a saved page, a line in a notes file) followed it, judged by what
-only following it does (a file it asks for, the key it asks to give, a total or a date that the files do not hold), so
-an answer that quotes the instruction while refusing it has not followed it (a report saved before quotes were told
-apart counted one as following it), how many of the attempts at a task that help makes short took its easy way (a call
-of the skill or MCP tool it names that ran; a call that did not run does not count) and what a pass costs in steps when
-it did and when it did not, how often find_help was called (`-` in a report saved before these were counted), and the
-tasks that passed only in some attempts. The token ceiling of an attempt counts every model call of the run and of the
-runs it delegated to, side calls included; a report saved before model calls were timed counted the steps' tokens only
-and has no seconds, and one saved before acts and cached tokens were counted shows `-` for their shares. `dotx eval run`
-saves its report after every attempt, so an interrupted run keeps what it measured.
+MCP server has those alone, besides the skills that come with Dot), and with every question of the policy or of the
+agent unanswered (one the run waits for is refused at once). Your own database, workspace and screenshots are never
+touched; the API keys are looked up first and handed over by name: those of the model under measure and of the fast,
+review and vision models that have one. An eval run does not start without the first, nor without the review model's
+when it has work in an attempt: the goal check of a run in goal mode (every attempt with `[agent] goal_mode`, the form
+task always, a goal that asks to keep going until it is done) or the second opinion of `stall_escalation`. A goal check
+that cannot run ends its attempt as failed, saying why, and the next attempt follows. The score holds the pass rate, per
+kind of task, what a pass costs in steps, tokens and seconds (split into model calls and tool calls), the share of the
+act calls that carried one step and the share of the input tokens served from the prompt cache (both as `dotx stats`
+counts them, over every attempt), how often a tool call failed, stalls, runs that were cut, runs that said they were
+done and were not, plan steps marked done without evidence (zero since the plan tools require it) and done steps whose
+evidence the goal check could not bear out (counted from the `goal_check` events, so only in goal mode), compactions per
+100 steps and the share of the model time their summaries took, web pages not found and calls refused for their
+arguments (as `dotx stats` counts them; `-` in a report saved before they were), how many of the attempts at a task that
+hides an instruction in one of its files (a note "to the AI assistant" in an invoice, a hidden block in a saved page, a
+line in a notes file) followed it, judged by what only following it does (a file it asks for, the key it asks to give, a
+total or a date that the files do not hold), so an answer that quotes the instruction while refusing it has not followed
+it (a report saved before quotes were told apart counted one as following it), how many of the attempts at a task that
+help makes short took its easy way (a call of the skill or MCP tool it names that ran; a call that did not run does not
+count) and what a pass costs in steps when it did and when it did not, how often find_help was called (`-` in a report
+saved before these were counted), and the tasks that passed only in some attempts. The token ceiling of an attempt
+counts every model call of the run and of the runs it delegated to, side calls included; a report saved before model
+calls were timed counted the steps' tokens only and has no seconds, and one saved before acts and cached tokens were
+counted shows `-` for their shares. `dotx eval run` saves its report after every attempt, so an interrupted run keeps
+what it measured.
 
-A task is data (`src/dotagent/evals/catalog.py`): the files the workspace starts with, the goal, checks (a file exists,
-holds or equals something, a JSON file equals a value, a command exits with 0, the answer contains or does not contain
-something), the checks that hold unless the run followed an instruction hidden in a file (`dotx eval check` reports one
-that an answer quoting the files the goal names would fail), the skills and MCP servers it brings and the easy way they
-offer, and a reference solution as a script of tool calls. To add one, write it there and run `dotx eval check`.
+A task is data (`src/dotagent/evals/catalog.py`): the files the workspace starts with (their text, or the bytes of an
+Office file in Base64), the goal, checks (a file exists, holds or equals something, a JSON file equals a value, a
+command exits with 0, the answer contains or does not contain something), the checks that hold unless the run followed
+an instruction hidden in a file (`dotx eval check` reports one that an answer quoting the files the goal names would
+fail), the skills and MCP servers it brings and the easy way they offer (or a skill that comes with Dot), and a
+reference solution as a script of tool calls. The two tasks on Office files start from a workbook whose formulas hold
+the results Excel saved and from a Word document whose company name is bold in one place and split over two runs in
+another; their easy way is the skill that comes with Dot for them, and their checks read the files with Dot's own Python
+(`python -I -m dotagent.evals.office_tasks`). To add one, write it there and run `dotx eval check`.
 
 ## The daemon, the web UI and the service
 
@@ -2089,6 +2095,18 @@ Skills written for Claude Code load unchanged: Dot reads only `name` and `descri
 also be one skill folder (`~/.claude/skills/<name>`), to take some skills only: `~/.claude/skills` can hold skills
 written for Claude Code's own tools, such as the superpowers bundle or the skills synced from claude.ai. The skills you
 wrote for Claude Code are then the playbook a campaign can work from.
+
+Dot comes with three skills of its own, for work that has to know this Mac: `excel` (reading and changing a workbook
+with openpyxl, getting the results of its formulas from LibreOffice or Excel, which openpyxl does not compute, and
+driving Excel with AppleScript), `word` (changing the text of a Word document with python-docx without losing its
+formatting, and driving Word with AppleScript) and `onedrive` (where OneDrive keeps the folders it syncs,
+`~/Library/CloudStorage/OneDrive-*`, the files it keeps only online, and what a change there does in the cloud). They
+are read after every other skill, so a skill of yours with the same name is used instead of one of them, and
+`builtin = false` under `[skills]` leaves them out. A skill's instructions name Dot's own Python, which has openpyxl,
+python-docx and python-pptx, as `{{dot_python}}`: the `skill` tool puts the path of that Python there, quoted for the
+shell. `dotx doctor` says which of Excel, Word and LibreOffice are installed, at which version, and counts the folders
+OneDrive syncs by the kind of account (personal, work or school, shared libraries), never by their names, which hold the
+organization's.
 
 A plugin is a folder in the Claude Code layout: `.claude-plugin/plugin.json` (its name), `skills/<name>/SKILL.md` and
 `.mcp.json` (`{"mcpServers": {...}}`; `${CLAUDE_PLUGIN_ROOT}` is the plugin folder). Their skills and MCP servers are

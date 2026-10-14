@@ -438,11 +438,13 @@ class SkillsConfig(FrozenModel):
     whether ``find_help`` also lists the skills and MCP servers that the Mac's other agents set up and the owner can
     add (item 165); the evals turn it off, as they run without the user's skills. ``listed``: how many skills a run's
     instructions list at most; a run offered more is listed those that fit its goal best, and find_help searches the
-    rest (item 166)."""
+    rest (item 166). ``builtin``: whether runs are offered the skills that come with Dot (Excel, Word and OneDrive on
+    the Mac, item 196); a skill of the user's with the same name is used instead of one of them."""
 
     dirs: list[str] = Field(default_factory=list)
     elsewhere: bool = True
     listed: int = Field(default=20, ge=1)
+    builtin: bool = True
 
 
 class PluginsConfig(FrozenModel):

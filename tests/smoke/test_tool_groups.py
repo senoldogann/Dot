@@ -238,13 +238,14 @@ async def test_a_run_that_offers_every_tool_has_no_groups_and_answers_use_tools_
     (played,) = await _play(config, login_env, [[_use("schedule"), _turn(_LIST), DONE]])
     assert played.record.status == "done"
     assert played.groups == ()
-    # Every tool of the mode at every step, as before there were groups (skill is left out: no skill is installed; so
-    # are consult, as no helper model is set up, and the campaign tools, which only a session of a campaign has;
-    # message_agent stays although the owner made no agent, since the run may make one with create_agent, item 99).
+    # Every tool of the mode at every step, as before there were groups (consult is left out, as no helper model is set
+    # up, and so are the campaign tools, which only a session of a campaign has; skill stays, for the skills that come
+    # with Dot, item 196; message_agent stays although the owner made no agent, since the run may make one with
+    # create_agent, item 99).
     every: list[str] = [
         spec.name
         for spec in specs_for_mode(build_registry(_tool_groups(config, False)), "task")
-        if spec.name not in {USE_TOOLS_TOOL, "skill", CONSULT_TOOL, *CAMPAIGN_TOOLS}
+        if spec.name not in {USE_TOOLS_TOOL, CONSULT_TOOL, *CAMPAIGN_TOOLS}
     ]
     assert all(_names(step) == every for step in played.steps)
     assert all("# Tool groups" not in step.messages[0].content for step in played.steps)

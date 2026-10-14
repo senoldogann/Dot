@@ -37,7 +37,7 @@ QUESTION: str = "Which port does the staging server use?"
 ANSWER: str = "8431"
 CARRIED: str = f"Answer to your question “{QUESTION}”: {ANSWER}"
 NEEDS: str = "The port of the staging server."
-NOTES: FileSeed = FileSeed(path="notes.txt", content="The staging server runs the API.\n")
+NOTES: FileSeed = FileSeed(path="notes.txt", content="The staging server runs the API.\n", encoding="text")
 _PROVIDER: str = parse_model_ref(SCRIPTED_MODEL).provider
 _TIME_LIMIT_S: float = 60.0
 _MAX_EVENTS: int = 10_000

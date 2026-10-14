@@ -25,7 +25,7 @@ from dotagent.tools.shell import read_login_env
 pytestmark = pytest.mark.asyncio(loop_scope="module")
 
 GOAL: str = "Read todo.txt and say what is on it."
-TODO: FileSeed = FileSeed(path="todo.txt", content="Water the plants.\n")
+TODO: FileSeed = FileSeed(path="todo.txt", content="Water the plants.\n", encoding="text")
 TURNS: tuple[ScriptedTurn, ...] = (
     ScriptedTurn(text="", calls=(ScriptedCall(tool="read_file", arguments={"path": TODO.path}),)),
     ScriptedTurn(

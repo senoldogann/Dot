@@ -23,19 +23,30 @@ class SkillRoot(FrozenModel):
 
 # Where a skill that Dot distilled itself was found (:mod:`dotagent.agent.playbooks`).
 PLAYBOOK_SOURCE: str = "learned"
+# Where a skill that comes with Dot was found, and the folder of those skills in the package (item 196).
+BUILTIN_SOURCE: str = "built-in"
+BUILTIN_SKILLS: Path = Path(__file__).parent / "builtin"
 
 
 def skill_roots(config: SkillsConfig, plugins: Sequence[Plugin], playbooks: Path | None) -> tuple[SkillRoot, ...]:
     """``<home>/skills``, then the ``[skills] dirs`` entries, then the skill folders of each plugin, then the playbook
-    folder when playbooks are on (``None`` when they are off: a playbook that exists is not offered then). A playbook
-    folder that does not exist yet is no problem: none was written."""
+    folder when playbooks are on (``None`` when they are off: a playbook that exists is not offered then), then the
+    skills that come with Dot when ``[skills] builtin`` is on. A playbook folder that does not exist yet is no problem:
+    none was written."""
     roots: list[SkillRoot] = [SkillRoot(path=skills_dir(), source="home")]
     roots.extend(SkillRoot(path=Path(entry).expanduser(), source="config") for entry in config.dirs)
     for plugin in plugins:
         roots.extend(SkillRoot(path=folder, source=f"plugin {plugin.name}") for folder in plugin.skill_dirs)
     if playbooks is not None and playbooks.is_dir():
         roots.append(SkillRoot(path=playbooks, source=PLAYBOOK_SOURCE))
+    if config.builtin:
+        roots.append(SkillRoot(path=BUILTIN_SKILLS, source=BUILTIN_SOURCE))
     return tuple(roots)
+
+
+def builtin_skill_names() -> frozenset[str]:
+    """The names of the skills that come with Dot, which are the names of their folders."""
+    return frozenset(file.parent.name for file in find_skill_files(BUILTIN_SKILLS))
 
 
 def _reason(error: SkillError) -> str:
@@ -53,7 +64,9 @@ def _read_skill(file: Path, source: str) -> Skill:
 
 def load_catalog(roots: Sequence[SkillRoot]) -> SkillCatalog:
     """Read every root. A root that is missing, a folder that is not a skill, or a name used twice is reported and left
-    out while the other skills still load. A skill reached through two roots (a symlink and its target) counts once."""
+    out while the other skills still load. A skill reached through two roots (a symlink and its target) counts once. A
+    skill that comes with Dot gives way to one of the user's with its name, which is no problem: it is how the user
+    replaces it."""
     skills: dict[str, Skill] = {}
     problems: list[SkillProblem] = []
     seen: set[Path] = set()
@@ -77,10 +90,11 @@ def load_catalog(roots: Sequence[SkillRoot]) -> SkillCatalog:
                 problems.append(SkillProblem(path=file, reason=_reason(exc)))
                 continue
             if skill.name in skills:
-                taken: Path = skills[skill.name].root
-                problems.append(
-                    SkillProblem(path=file, reason=f"another skill is already called {skill.name}: {taken}")
-                )
+                if root.source != BUILTIN_SOURCE:
+                    taken: Path = skills[skill.name].root
+                    problems.append(
+                        SkillProblem(path=file, reason=f"another skill is already called {skill.name}: {taken}")
+                    )
                 continue
             skills[skill.name] = skill
     return SkillCatalog(skills=tuple(skills.values()), problems=tuple(problems))
