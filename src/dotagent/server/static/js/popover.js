@@ -1,7 +1,8 @@
 // A panel that opens above a control of a frame (the composer's pills): built when it opens, closed by Escape, by a
 // click outside it, or by whoever opened it. The control says aria-expanded. The focus moves into the panel when it
-// opens (to the chosen option, or the first control), the arrow keys move it between the panel's controls, and it goes
-// back to the control when the panel closes around it.
+// opens (to a control marked `data-autofocus`, else the chosen option, or the first control), the arrow keys move it
+// between the panel's controls unless a control answered them itself, and it goes back to the control when the panel
+// closes around it.
 
 import { el } from "./dom.js";
 
@@ -26,7 +27,11 @@ export function anchoredPopover({ anchor, frame, label, build }) {
   }
 
   function focusChoice() {
-    (panel.querySelector("[aria-selected='true']") ?? panel.querySelector("button, [tabindex]"))?.focus();
+    (
+      panel.querySelector("[data-autofocus]") ??
+      panel.querySelector("[aria-selected='true']") ??
+      panel.querySelector("button, [tabindex]")
+    )?.focus();
   }
 
   // A repaint replaces the panel's children, so the focus goes back to the one chosen, or the first control.
@@ -60,7 +65,11 @@ export function anchoredPopover({ anchor, frame, label, build }) {
       event.preventDefault();
       close();
       anchor.focus();
-    } else if ((event.key === "ArrowDown" || event.key === "ArrowUp") && panel.contains(document.activeElement)) {
+    } else if (
+      (event.key === "ArrowDown" || event.key === "ArrowUp") &&
+      !event.defaultPrevented &&
+      panel.contains(document.activeElement)
+    ) {
       event.preventDefault();
       moveFocus(event.key === "ArrowDown" ? 1 : -1);
     }

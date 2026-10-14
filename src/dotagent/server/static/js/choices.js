@@ -1,14 +1,16 @@
 // The choices of a run besides its goal, as the pills of a composer (item 108): the mode, the model with its reasoning
 // and the Options (approvals and goal mode), each with its menu. The home's box and a chat's dock (item 133) both wear
 // them; where they start and where a choice is kept is the box's own (`kept`): this browser's on the home, the chat's
-// on a chat's page, which the daemon keeps for its next follow-up (item 199).
+// on a chat's page, which the daemon keeps for its next follow-up (item 199). The model's menu is modelpicker.js
+// (item 208).
 
 import { composerPill } from "./composer.js";
 import { el, modelName } from "./dom.js";
 import { allModels, levelLabel, offersChoice } from "./efforts.js";
 import { icon } from "./icons.js";
+import { modelPicker } from "./modelpicker.js";
 import { anchoredPopover } from "./popover.js";
-import { providerLabel, providerMark, providerOf } from "./providers.js";
+import { providerMark, providerOf } from "./providers.js";
 import { approvalLabel, approvalsPicker, goalModePicker } from "./runmodes.js";
 import { getSnapshot, loadModels } from "./state.js";
 
@@ -34,11 +36,6 @@ function toolGroups(providers) {
   return providers
     .map((provider) => ({ provider: provider.provider, models: provider.models.filter((model) => model.tools) }))
     .filter((group) => group.models.length > 0);
-}
-
-/** The words of the daemon's default model, for the row that follows it. */
-function defaultRowText(ref) {
-  return ref === null ? "Default model" : `Default (${modelName(ref)})`;
 }
 
 /** The option row of a popover's list: `lead` (a mark or an icon, or null), the label with its `hint` under it (or ""),
@@ -199,24 +196,6 @@ export function runChoices({ frame, kept, optionsTitle, more, onMode, onChange }
     onChange();
   }
 
-  function modelRows() {
-    const fallback = defaultRefOf(getSnapshot());
-    const list = el(
-      "div",
-      { role: "listbox", "aria-label": "Model" },
-      optionRow({ lead: providerMark(fallback === null ? "" : providerOf(fallback)), label: defaultRowText(fallback), hint: "", selected: chosenRef === "", onPick: () => pickModel("") }),
-    );
-    for (const group of toolGroups(providers)) {
-      list.append(el("div", { class: "pop-group" }, providerLabel(group.provider)));
-      for (const info of group.models) {
-        const row = optionRow({ lead: providerMark(group.provider), label: modelName(info.ref), hint: info.free ? "Free" : "", selected: chosenRef === info.ref, onPick: () => pickModel(info.ref) });
-        row.title = info.ref;
-        list.append(row);
-      }
-    }
-    return [list];
-  }
-
   function reasoningRows() {
     const info = selectedInfo();
     if (info === null || !offersChoice(info)) {
@@ -234,7 +213,14 @@ export function runChoices({ frame, kept, optionsTitle, more, onMode, onChange }
     ];
   }
 
-  const modelMenu = anchoredPopover({ anchor: modelPill.element, frame: frame.element, label: "Model", build: modelRows });
+  // The model's menu (item 208): the favourites and the providers on a rail, a search, a star on each model.
+  const picker = modelPicker({ onPick: pickModel });
+  const modelMenu = anchoredPopover({
+    anchor: modelPill.element,
+    frame: frame.element,
+    label: "Model",
+    build: () => picker.build({ groups: toolGroups(providers), chosen: chosenRef, fallback: defaultRefOf(getSnapshot()) }),
+  });
   const reasoningMenu = anchoredPopover({ anchor: reasoningPill.element, frame: frame.element, label: "Reasoning", build: reasoningRows });
 
   // Called on every status update; it only does work when the daemon's default model changed.
