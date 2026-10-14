@@ -1,8 +1,9 @@
 """The marks of a conversation's messages (item 201), after T3 Code's: a column of short marks at the left of the
 conversation, one for each message of the owner. Resting the pointer on it shows the message nearest to it and the start
 of its answer; a click, or Enter after the arrows, goes to that message; the marks of the messages in sight stand out. On a
-phone, in a conversation of one message, or with no room at the left of the conversation, there is no column. A real
-server on a scripted model, wide and on a phone, light and dark."""
+phone, or in a conversation of one message, there is no column. Beside the side panel, the conversation leaves the
+column its room (item 228), and neither covers the other. A real server on a scripted model, wide and on a phone,
+light and dark."""
 
 import asyncio
 import time
@@ -162,12 +163,30 @@ async def _clear_of_the_conversation(page: Page) -> None:
     )
 
 
+async def _clear_of_the_panel(page: Page) -> None:
+    """The conversation ends where the handle of the side panel begins, or before: giving the column its room, it does
+    not run under the panel."""
+    await page.wait_for_function(
+        "() => document.querySelector('.run-main').getBoundingClientRect().right"
+        " <= document.querySelector('.stage-handle').getBoundingClientRect().left"
+    )
+
+
 async def _rest_on(page: Page, index: int) -> None:
     """Rest the pointer on the column at the height of the mark ``index``."""
     box = await page.locator(".outline-rail").bounding_box()
     assert box is not None
     along: float = index / (len(_TURNS) - 1)
     await page.mouse.move(box["x"] + box["width"] / 2, box["y"] + along * box["height"])
+
+
+async def _counted_again(page: Page) -> None:
+    """Change the conversation as a run that writes does, and wait for the column to count its marks again."""
+    await page.locator(".outline-mark").evaluate_all(
+        "(marks) => marks.forEach((mark) => { mark.dataset.before = ''; })"
+    )
+    await page.locator(".run-thread").evaluate("(thread) => thread.append(document.createElement('div'))")
+    await expect(page.locator(".outline-mark[data-before]")).to_have_count(0)
 
 
 async def test_the_marks_show_each_message_and_go_to_it(
@@ -209,6 +228,14 @@ async def test_the_marks_show_each_message_and_go_to_it(
                 await expect(marks.nth(2)).to_have_attribute("data-near", "1")
                 await page.screenshot(path=str(tmp_path / f"outline-{width}-{scheme}.png"), animations="disabled")
 
+                # The conversation changes while the pointer rests, as when a run writes: the marks are counted again,
+                # and leaving the column still puts the preview away.
+                await _counted_again(page)
+                await page.mouse.move(4, 400)
+                await expect(preview).to_be_hidden()
+                await _rest_on(page, 1)
+                await expect(preview).to_be_visible()
+
                 # A click goes to it; the mark of that message stands out then.
                 await expect(_message(page, 1)).not_to_be_in_viewport()
                 await page.mouse.down()
@@ -235,7 +262,7 @@ async def test_the_marks_show_each_message_and_go_to_it(
             await browser.close()
 
 
-async def test_there_is_no_column_for_one_message_or_without_room(
+async def test_the_conversation_leaves_the_column_its_room_beside_the_side_panel_and_one_message_has_none(
     runtime: Runtime, served: tuple[RunManager, str], chats: tuple[RunRecord, RunRecord], tmp_path: Path
 ) -> None:
     _, address = served
@@ -246,21 +273,28 @@ async def test_there_is_no_column_for_one_message_or_without_room(
             page, errors = await _run_page(browser, address, last.id, 1280, "light")
             await expect(page.locator(".outline")).to_be_visible()
 
-            # The side panel beside the conversation leaves it no room at the left: the column goes, and comes back.
+            # Beside the side panel the conversation gives the column its room at the left: the column stays, clear of
+            # the conversation, which stays clear of the panel's handle.
             details: Locator = page.get_by_role("button", name="Run details")
             await details.click()
             await expect(page.locator(".run-layout")).to_have_attribute("data-inspector", "on")
-            await expect(page.locator(".outline")).to_be_hidden()
+            await expect(page.locator(".outline")).to_be_visible()
+            await _clear_of_the_conversation(page)
+            await _clear_of_the_panel(page)
+            await _rest_on(page, 1)
+            await expect(page.locator(".outline-preview")).to_be_visible()
+            await page.screenshot(path=str(tmp_path / "outline-1280-light-panel.png"), animations="disabled")
             await details.click()
             await expect(page.locator(".run-layout")).to_have_attribute("data-inspector", "off")
             await expect(page.locator(".outline")).to_be_visible()
 
-            # A wide window leaves the column its room beside the side panel, and it stays clear of the conversation.
+            # So does a wider window, where the conversation had the room already.
             wide, wide_errors = await _run_page(browser, address, last.id, 1512, "dark")
             await wide.get_by_role("button", name="Run details").click()
             await expect(wide.locator(".run-layout")).to_have_attribute("data-inspector", "on")
             await expect(wide.locator(".outline")).to_be_visible()
             await _clear_of_the_conversation(wide)
+            await _clear_of_the_panel(wide)
             await _rest_on(wide, 2)
             await expect(wide.locator(".outline-preview")).to_be_visible()
             await wide.screenshot(path=str(tmp_path / "outline-1512-dark-panel.png"), animations="disabled")
