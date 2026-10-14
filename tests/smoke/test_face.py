@@ -326,7 +326,8 @@ async def test_the_run_page_has_no_character_card_and_its_answer_wears_the_face(
             page: Page = await browser.new_page(viewport={"width": 1280, "height": 900})
             await page.goto(ui_url(host, port, TOKEN))
             await page.evaluate(
-                "localStorage.setItem('dot.inspector', 'on'); localStorage.setItem('dot.computer.size', 'wide')"
+                "localStorage.setItem('dot.inspector', 'on'); localStorage.setItem('dot.computer.size', 'wide');"
+                " localStorage.setItem('dot.panelTab', 'screen')"
             )
             await page.goto(f"{base}/#/runs/{run.id}")
             await expect(page.locator(".run-layout")).to_have_attribute("data-stage", "wide")

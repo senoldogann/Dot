@@ -371,40 +371,118 @@
   background: var(--surface);
 }
 
-.inspector > .card {
-  border: 0;
-  border-radius: 0;
-  background: transparent;
+/* The panel's tabs (item 203), after T3 Code's side panel: one surface at a time, the chosen one in ink over a line,
+   a short count beside a name (the plan's steps done, the screenshots). The strip stays at the top of the panel as it
+   scrolls; beside the conversation the header's button hides the panel, and the drawer keeps its own close button. */
+.inspector-head {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px 0;
+  background: var(--surface);
+  box-shadow: inset 0 -1px 0 var(--border);
 }
 
-.inspector > .card:not([hidden]) ~ .card:not([hidden]) {
+.inspector-tabs {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  gap: 4px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.inspector-tab {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 4px;
+  padding: 8px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-label);
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.inspector-tab:hover {
+  color: var(--text-2);
+}
+
+.inspector-tab[aria-selected="true"] {
+  border-bottom-color: var(--text);
+  color: var(--text);
+}
+
+.inspector-tab:focus-visible {
+  border-radius: var(--radius-sm);
+  outline: 2px solid var(--ring);
+  outline-offset: -2px;
+}
+
+.inspector-count {
+  color: var(--muted);
+  font-weight: var(--weight-text);
+  font-variant-numeric: tabular-nums;
+}
+
+.inspector:not([data-mode="drawer"]) .inspector-close {
+  display: none;
+}
+
+/* A section of a tab: its head (the title, its actions at the right, and under them the line that sums it up) over its
+   body, which is always open; the sections of a tab sit on hairlines (item 121). */
+.inspector-panel > .panel-section:not([hidden]) ~ .panel-section:not([hidden]) {
   border-top: 1px solid var(--border);
 }
 
-.inspector .fold > .card-head {
-  border-bottom-color: transparent;
-}
-
-/* At the panel's compact width the facts beside a fold's title (the cost's "123 ms · 13 steps · 13k in · 650 out")
-   do not fit beside it: they take the line under it, as on a phone (item 111). */
-@container inspector (max-width: 420px) {
-  .fold-toggle {
-    flex-wrap: wrap;
-    row-gap: var(--space-half);
-  }
-
-  .fold-summary {
-    flex: 1 0 100%;
-    flex-wrap: wrap;
-    padding-left: 24px;
-    white-space: normal;
-  }
-}
-
-.inspector-head {
-  display: none;
+.panel-section-head {
+  display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 8px;
+  gap: 4px 8px;
+  padding: 12px 16px 4px;
+  color: var(--text-2);
+}
+
+.panel-section-title {
+  flex: 1 1 auto;
+  margin: 0;
+  font: inherit;
+  font-weight: var(--weight-label);
+}
+
+.panel-summary {
+  display: flex;
+  flex: 1 0 100%;
+  flex-wrap: wrap;
+  order: 1;
+  align-items: center;
+  gap: 4px 12px;
+  min-width: 0;
+  color: var(--muted);
+  font-size: var(--text-sm);
+}
+
+.panel-summary:empty {
+  display: none;
+}
+
+/* Every body sits inside the section's padding, so no text hugs the edge; the actions list draws its own rows edge to
+   edge with their own padding (item 84). */
+.panel-section-body {
+  padding: 4px 16px 16px;
+}
+
+.panel-section-body:has(> .actions-list) {
+  padding: 0;
 }
 
 /* On a narrow page the panel slides in over the conversation (item 85): inspector.js shows it, then opens it on the
@@ -442,11 +520,6 @@
   .inspector-scrim {
     transition: none;
   }
-}
-
-.inspector[data-mode="drawer"] .inspector-head {
-  display: flex;
-  padding: 0 16px 8px;
 }
 
 /* ---------- a file in the panel (item 195) ---------- */

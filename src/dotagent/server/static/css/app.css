@@ -1107,16 +1107,6 @@ a.pill:hover {
   padding: 0 16px 16px;
 }
 
-/* The side panel's cards (item 84): every body sits inside the card's padding, so no text hugs the edge; the actions
-   list draws its own rows edge to edge with their own padding. */
-.inspector .fold > .fold-body {
-  padding: 4px 16px 16px;
-}
-
-.inspector .fold > .fold-body:has(> .actions-list) {
-  padding: 0;
-}
-
 .visually-hidden {
   position: absolute;
   width: 1px;
@@ -1382,9 +1372,8 @@ a.pill:hover {
   grid-column: 1 / -1;
 }
 
-/* Short cells (the bill of a run in cost.js, the Browser tab's four facts) go three or four abreast on a wide page and
-   two on a phone, so a phone never sees three and a stray one. */
-.cost-grid,
+/* Short cells (the Browser tab's four facts) go three or four abreast on a wide page and two on a phone, so a phone
+   never sees three and a stray one. */
 .kv-pairs {
   grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
 }

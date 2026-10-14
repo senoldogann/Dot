@@ -365,8 +365,8 @@ async def test_an_agent_is_made_runs_in_its_own_voice_and_bounds_and_leaves_its_
             await page_ui.wait_for_timeout(_SETTLE_MS)
             assert await page_ui.locator(".stage-title .stage-name").inner_text() == "Scout"
             assert await page_ui.locator(".stage-title .avatar[data-hue][data-shape]").count() == 1
-            # The agent is a fact of the Details card, a link to its page; the bar has no chips (item 120).
-            await expect(page_ui.locator(f"#fold-run-details a[href='#/agents/{agent_id}']")).to_have_text("Scout")
+            # The agent is a fact of the panel's Details, a link to its page; the bar has no chips (item 120).
+            await expect(page_ui.locator(f"#panel-run-details a[href='#/agents/{agent_id}']")).to_have_text("Scout")
             await expect(page_ui.locator(".stagebar .chip")).to_have_count(0)
             # A look given to the agent (item 102) is worn in the bar, in its row and on its page.
             dressed = await client.put(

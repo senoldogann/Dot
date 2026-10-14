@@ -259,19 +259,22 @@ async def _shoot(context: BrowserContext, base: str, pages: tuple[tuple[str, str
             await page.wait_for_timeout(_SETTLE_MS)
             await expect(page.get_by_role("button", name="Jump to the answer")).to_be_visible()
             await page.screenshot(path=str(out / f"{tag}-run-top.png"), full_page=False)
-            # The side panel with its Details card open (item 84): on a wide window beside the chat, on a phone a drawer.
+            # The side panel on its Run tab, the details first (items 84, 203): on a wide window beside the chat, on a phone
+            # a drawer.
             await page.get_by_role("button", name="Run details").click()
-            await page.locator(".inspector .fold-toggle", has_text="Details").click()
+            await expect(page.locator(".inspector").get_by_role("tab", name="Run")).to_have_attribute(
+                "aria-selected", "true"
+            )
             await page.wait_for_timeout(_SETTLE_MS)
             await page.screenshot(path=str(out / f"{tag}-run-panel.png"), full_page=False)
-            # The facts beside a fold's title are not cut at the panel's compact width (item 111).
-            clipped: list[str] = await page.locator(".inspector .fold-summary").evaluate_all(
+            # The line under a section's title is not cut at the panel's compact width (item 111).
+            clipped: list[str] = await page.locator(".inspector .panel-summary").evaluate_all(
                 "nodes => nodes.filter((node) => node.scrollWidth > node.clientWidth + 1).map((node) => node.textContent)"
             )
             assert clipped == [], clipped
             if await page.locator(".inspector[data-mode='docked']").is_visible():
                 # The panel at half the page (item 109), the character at the head of the conversation; then back.
-                await page.locator("section.computer button[aria-controls='fold-run-computer']").click()
+                await page.locator(".inspector").get_by_role("tab", name="Screen").click()
                 sizes = page.locator("section.computer .stage-sizes")
                 await sizes.get_by_role("button", name="Wide").click()
                 await page.wait_for_timeout(_SETTLE_MS)
