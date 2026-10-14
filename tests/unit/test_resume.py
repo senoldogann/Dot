@@ -43,6 +43,7 @@ def _run(status: RunStatus, result: str, source: str, parent_run_id: str | None)
         parent_run_id=parent_run_id,
         source=source,
         effort=None,
+        speed="standard",
         approvals="yolo",
         goal_mode=False,
         campaign_id=None,

@@ -5,7 +5,8 @@ from typing import Annotated
 
 from fastapi import APIRouter, Query
 
-from dotagent.llm.router import parse_model_ref
+from dotagent.core.errors import ConfigError
+from dotagent.llm.router import ModelRef, offers_fast_mode, parse_model_ref
 from dotagent.server.context import ServerContext
 from dotagent.server.views import DeletedThreads, DeleteThreadsRequest, ThreadChange, ThreadsQuery
 from dotagent.store.db import Store
@@ -33,9 +34,14 @@ def threads_router(ctx: ServerContext) -> APIRouter:
     @router.patch("/threads/{thread_id}", status_code=204)
     async def change_thread(thread_id: str, change: ThreadChange) -> None:
         """Give a chat the name the owner typed, pin it (first among the pinned) or unpin it, mark it seen or unseen,
-        or keep the choices its composer shows for its next follow-up; 404 for no chat."""
-        if change.choices is not None and change.choices.model is not None:
-            parse_model_ref(change.choices.model)
+        or keep the choices its composer shows for its next follow-up; 404 for no chat. Fast mode is kept only with a
+        model that has it (item 223)."""
+        if change.choices is not None:
+            ref: ModelRef = parse_model_ref(
+                change.choices.model if change.choices.model is not None else ctx.manager.main_model()
+            )
+            if change.choices.speed == "fast" and not offers_fast_mode(ref):
+                raise ConfigError("the model does not offer fast mode", {"model": ref.label})
         if change.title is not None:
             await store.rename_thread(thread_id, change.title)
         if change.pinned is not None:

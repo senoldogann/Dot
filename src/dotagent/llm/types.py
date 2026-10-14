@@ -12,6 +12,9 @@ Role = Literal["system", "user", "assistant", "tool"]
 FinishReason = Literal["stop", "tool_calls", "length", "other"]
 # One scale for every provider: ``off`` and ``on`` are the two ends of a plain thinking switch, the rest are levels.
 Effort = Literal["off", "on", "minimal", "low", "medium", "high", "xhigh", "max"]
+# How fast a model writes its answer (item 223): ``fast`` is the faster output some Claude models offer at a higher
+# price (``llm/anthropic.py``), ``standard`` every other model's.
+Speed = Literal["standard", "fast"]
 
 INVALID_ARGUMENTS_KEY: str = "__invalid_arguments__"
 
@@ -66,7 +69,8 @@ class Usage(FrozenModel):
 
 
 class ChatRequest(FrozenModel):
-    """One model call. ``session_key`` is stable for a conversation and lets providers reuse their prompt cache."""
+    """One model call. ``session_key`` is stable for a conversation and lets providers reuse their prompt cache;
+    ``speed`` is ``fast`` only for a model that offers it (:func:`dotagent.llm.router.offers_fast_mode`)."""
 
     model: str
     messages: tuple[Message, ...]
@@ -74,6 +78,7 @@ class ChatRequest(FrozenModel):
     temperature: float | None
     max_output_tokens: int | None
     effort: Effort
+    speed: Speed
     session_key: str
 
 

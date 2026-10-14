@@ -183,7 +183,7 @@ async def test_the_activity_page_lists_a_run_that_ended_while_its_connection_was
         await expect(ended).to_contain_text("No run ended today")
         await _break(page, server)
         run: RunRecord = await manager.start(
-            GOAL, "task", SCRIPTED_MODEL, None, UI_SOURCE, None, None, "yolo", False, ()
+            GOAL, "task", SCRIPTED_MODEL, None, UI_SOURCE, None, None, "standard", "yolo", False, ()
         )
         async with asyncio.timeout(WAIT_S):
             assert (await manager.wait(run.id)).status == "done"
@@ -197,7 +197,7 @@ async def test_a_runs_page_shows_a_message_queued_while_its_connection_was_broke
     model: _HeldModel = _HeldModel()
     async with _served(login_env, model) as (manager, server):
         run: RunRecord = await manager.start(
-            GOAL, "task", SCRIPTED_MODEL, None, UI_SOURCE, None, None, "yolo", False, ()
+            GOAL, "task", SCRIPTED_MODEL, None, UI_SOURCE, None, None, "standard", "yolo", False, ()
         )
         async with asyncio.timeout(WAIT_S):
             await model.asked.wait()
@@ -206,7 +206,7 @@ async def test_a_runs_page_shows_a_message_queued_while_its_connection_was_broke
             await expect(page.locator(".dock .btn.send")).to_have_attribute("aria-label", "Stop")
             await expect(queue).to_be_hidden()
             await _break(page, server)
-            await manager.queue(run.thread_id, QUEUED, (), "task", None, None, None, None, None, UI_SOURCE)
+            await manager.queue(run.thread_id, QUEUED, (), "task", None, None, "standard", None, None, None, UI_SOURCE)
             await _mend(page, server)
             await expect(queue.locator(".queue-text")).to_have_text([QUEUED], timeout=_CAUGHT_UP_MS)
         model.go.set()

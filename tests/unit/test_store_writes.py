@@ -28,7 +28,7 @@ class _CutShort(Store):
 async def _runs_and_thread(store: Store) -> tuple[ThreadRecord, str]:
     thread: ThreadRecord = await store.create_thread("t", "test")
     run = await store.create_run(
-        thread.id, "goal", "task", "ollama:m", None, "test", "medium", "ask", False, None, None, None
+        thread.id, "goal", "task", "ollama:m", None, "test", "medium", "standard", "ask", False, None, None, None
     )
     return thread, run.id
 
@@ -112,7 +112,19 @@ async def test_a_chat_a_run_works_on_is_not_deleted_whichever_process_drives_the
         await store.finish_run(run_id, "done", "Delegated.")
         aside: ThreadRecord = await store.create_thread("delegated", "delegate")
         child: RunRecord = await store.create_run(
-            aside.id, "part", "task", "ollama:m", run_id, "delegate", "medium", "ask", False, None, None, None
+            aside.id,
+            "part",
+            "task",
+            "ollama:m",
+            run_id,
+            "delegate",
+            "medium",
+            "standard",
+            "ask",
+            False,
+            None,
+            None,
+            None,
         )
         with pytest.raises(RunConflict) as delegated:
             await store.delete_threads([thread.id])

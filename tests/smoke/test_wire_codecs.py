@@ -89,6 +89,7 @@ def request_for(model: str, messages: tuple[Message, ...], tools: tuple[ToolSpec
         temperature=None,
         max_output_tokens=None,
         effort="low",
+        speed="standard",
         session_key="smoke-session",
     )
 

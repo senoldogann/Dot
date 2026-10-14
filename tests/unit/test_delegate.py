@@ -40,6 +40,7 @@ def _run(status: RunStatus) -> RunRecord:
         parent_run_id="run_parent",
         source="delegate",
         effort=None,
+        speed="standard",
         approvals="yolo",
         goal_mode=False,
         campaign_id=None,

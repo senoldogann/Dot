@@ -109,7 +109,7 @@ async def test_a_step_a_stop_of_the_daemon_cuts_keeps_the_results_of_the_calls_t
             try:
                 async with runtime.bus.subscribe(None) as subscription:
                     run: RunRecord = await manager.start(
-                        GOAL, "task", SCRIPTED_MODEL, None, UI_SOURCE, None, None, "yolo", False, ()
+                        GOAL, "task", SCRIPTED_MODEL, None, UI_SOURCE, None, None, "standard", "yolo", False, ()
                     )
                     async with asyncio.timeout(_TIME_LIMIT_S):
                         await _call_starts(subscription, run.id, SHELL.tool)
@@ -149,7 +149,7 @@ async def test_a_stop_of_the_daemon_does_not_wait_for_a_reflection_under_way(log
             scheduler: Scheduler = Scheduler(runtime, manager)
             try:
                 run: RunRecord = await manager.start(
-                    GOAL, "task", SCRIPTED_MODEL, None, UI_SOURCE, None, None, "ask", False, ()
+                    GOAL, "task", SCRIPTED_MODEL, None, UI_SOURCE, None, None, "standard", "ask", False, ()
                 )
                 async with asyncio.timeout(_TIME_LIMIT_S):
                     await manager.wait(run.id)

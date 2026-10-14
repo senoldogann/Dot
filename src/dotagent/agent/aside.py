@@ -83,6 +83,7 @@ async def _ask(runtime: Runtime, ref: ModelRef, run: RunRecord, record: str, que
             temperature=0.2,
             max_output_tokens=None,
             effort="off" if attempt == 1 else "low",
+            speed="standard",
             session_key=f"{run.thread_id}:aside",
         )
         try:

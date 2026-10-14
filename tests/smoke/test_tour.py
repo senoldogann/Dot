@@ -301,7 +301,17 @@ async def test_every_page_in_both_schemes_at_both_widths(
         ],
     )
     run: RunRecord = await manager.start(
-        "Count the files in the workspace", "task", SCRIPTED_MODEL, None, "test", None, None, "yolo", False, ()
+        "Count the files in the workspace",
+        "task",
+        SCRIPTED_MODEL,
+        None,
+        "test",
+        None,
+        None,
+        "standard",
+        "yolo",
+        False,
+        (),
     )
     async with asyncio.timeout(_RUN_WAIT_S):
         await manager.wait(run.id)

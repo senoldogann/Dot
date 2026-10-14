@@ -185,6 +185,7 @@ async def _ask(ctx: ToolContext, ref: ModelRef, text: str, image: ImageData | No
         temperature=None,
         max_output_tokens=None,
         effort=ctx.runtime.config.models.effort,
+        speed="standard",
         session_key=f"{ctx.thread_id}:consult",
     )
     async with asyncio.timeout(ctx.runtime.config.agent.model_call_timeout_s):

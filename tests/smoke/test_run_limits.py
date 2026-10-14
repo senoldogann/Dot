@@ -133,7 +133,9 @@ async def _session(
 
 
 async def _start(manager: RunManager, goal_mode: bool) -> RunRecord:
-    return await manager.start(GOAL, "task", SCRIPTED_MODEL, None, EVAL_SOURCE, None, None, "ask", goal_mode, ())
+    return await manager.start(
+        GOAL, "task", SCRIPTED_MODEL, None, EVAL_SOURCE, None, None, "standard", "ask", goal_mode, ()
+    )
 
 
 async def _played(runtime: Runtime, model: RecordingProvider, record: RunRecord) -> Played:

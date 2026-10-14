@@ -40,7 +40,7 @@ from dotagent.evals.runner import SCRIPTED_MODEL, eval_config, eval_environment,
 from dotagent.evals.scripted import ScriptedProvider
 from dotagent.evals.types import ScriptedCall, ScriptedTurn
 from dotagent.llm.router import parse_model_ref
-from dotagent.llm.types import ChatRequest, DeltaSink, Effort, ModelInfo, ModelReply
+from dotagent.llm.types import ChatRequest, DeltaSink, Effort, ModelInfo, ModelReply, Speed
 from dotagent.policy.types import ApprovalMode
 from dotagent.runtime import Runtime, close_runtime, open_runtime
 from dotagent.scheduler import SCHEDULE_SOURCE
@@ -207,7 +207,9 @@ async def _events(runtime: Runtime, run_id: str, kind: str) -> list[EventRecord]
 
 
 async def _start_campaign(manager: RunManager) -> RunRecord:
-    return await manager.start_campaign(GOAL, "task", SCRIPTED_MODEL, None, EVAL_SOURCE, None, "ask", None, (), None)
+    return await manager.start_campaign(
+        GOAL, "task", SCRIPTED_MODEL, None, EVAL_SOURCE, None, "standard", "ask", None, (), None
+    )
 
 
 async def _ended_sessions(runtime: Runtime, campaign_id: str, count: int) -> list[RunRecord]:
@@ -251,7 +253,7 @@ async def test_the_opening_session_records_the_targets_before_it_ends_and_plans_
         entries: list[CampaignEntry] = await runtime.store.campaign_entries(campaign.id, 10)
         reminders: list[EventRecord] = await _events(runtime, opening.id, CAMPAIGN_TARGETS_EVENT)
         other: RunRecord = await manager.start(
-            GOAL, "task", SCRIPTED_MODEL, None, EVAL_SOURCE, None, None, "ask", False, ()
+            GOAL, "task", SCRIPTED_MODEL, None, EVAL_SOURCE, None, None, "standard", "ask", False, ()
         )
         async with asyncio.timeout(_TIME_LIMIT_S):
             await manager.wait(other.id)
@@ -423,7 +425,7 @@ async def test_a_session_the_daemon_cut_off_is_not_resumed_and_the_next_session_
         store = runtime.store
         thread: ThreadRecord = await store.create_thread("Leads", EVAL_SOURCE)
         campaign: CampaignRecord = await store.create_campaign(
-            "Leads", GOAL, thread.id, SCRIPTED_MODEL, runtime.config.models.effort, "ask", (), "own"
+            "Leads", GOAL, thread.id, SCRIPTED_MODEL, runtime.config.models.effort, "standard", "ask", (), "own"
         )
         await store.set_campaign_targets(campaign.id, TARGETS, VERIFICATION)
         cut: RunRecord = await store.create_run(
@@ -434,6 +436,7 @@ async def test_a_session_the_daemon_cut_off_is_not_resumed_and_the_next_session_
             None,
             EVAL_SOURCE,
             runtime.config.models.effort,
+            "standard",
             "ask",
             False,
             campaign.id,
@@ -489,7 +492,17 @@ async def test_an_answer_to_a_question_an_ended_session_left_goes_to_no_other_ru
             ended: RunRecord = await manager.wait(opening.id)
         waiting: CampaignRecord = await runtime.store.get_campaign(opening.campaign_id)
         follow_up: RunRecord = await manager.start(
-            "Also note the CRM.", "task", SCRIPTED_MODEL, opening.thread_id, UI_SOURCE, None, None, "ask", False, ()
+            "Also note the CRM.",
+            "task",
+            SCRIPTED_MODEL,
+            opening.thread_id,
+            UI_SOURCE,
+            None,
+            None,
+            "standard",
+            "ask",
+            False,
+            (),
         )
         async with asyncio.timeout(_TIME_LIMIT_S):
             await _blocked(runtime, follow_up.id)
@@ -629,11 +642,11 @@ async def test_a_campaign_that_asks_for_the_owners_chrome_is_refused_while_that_
     async with _session(_config(60.0), login_env, model, Notices()) as (runtime, manager):
         with pytest.raises(BrowserError, match="Chrome is not running"):
             await manager.start_campaign(
-                GOAL, "task", SCRIPTED_MODEL, None, EVAL_SOURCE, None, "ask", None, (), "attach"
+                GOAL, "task", SCRIPTED_MODEL, None, EVAL_SOURCE, None, "standard", "ask", None, (), "attach"
             )
         assert await runtime.store.list_campaigns() == []
         opening: RunRecord = await manager.start_campaign(
-            GOAL, "task", SCRIPTED_MODEL, None, EVAL_SOURCE, None, "ask", None, (), "own"
+            GOAL, "task", SCRIPTED_MODEL, None, EVAL_SOURCE, None, "standard", "ask", None, (), "own"
         )
         assert opening.campaign_id is not None
         assert (await runtime.store.get_campaign(opening.campaign_id)).browser == "own"
@@ -668,7 +681,7 @@ async def test_the_emergency_stop_ends_a_session_as_one_and_holds_the_campaign_w
         runtime.bus.subscribe_kinds(frozenset({CAMPAIGN_ENDED_EVENT})) as ending,
     ):
         session: RunRecord = await manager.start_campaign(
-            GOAL, "task", SCRIPTED_MODEL, None, EVAL_SOURCE, None, "yolo", None, (), None
+            GOAL, "task", SCRIPTED_MODEL, None, EVAL_SOURCE, None, "standard", "yolo", None, (), None
         )
         assert session.campaign_id is not None
         async with asyncio.timeout(_TIME_LIMIT_S):
@@ -723,7 +736,7 @@ async def test_a_campaign_stopped_while_its_session_starts_ends_that_session(log
         manager: _StoppedWhileStarting = _StoppedWhileStarting(runtime)
         try:
             opening: RunRecord = await manager.start_campaign(
-                GOAL, "task", SCRIPTED_MODEL, None, EVAL_SOURCE, None, "yolo", None, (), None
+                GOAL, "task", SCRIPTED_MODEL, None, EVAL_SOURCE, None, "standard", "yolo", None, (), None
             )
             assert opening.campaign_id is not None
             async with asyncio.timeout(_TIME_LIMIT_S):
@@ -774,7 +787,7 @@ async def test_an_emergency_stop_while_a_session_starts_ends_it_and_the_schedule
             campaigns: list[str] = []
             for _ in range(2):
                 opening: RunRecord = await manager.start_campaign(
-                    GOAL, "task", SCRIPTED_MODEL, None, EVAL_SOURCE, None, "yolo", None, (), None
+                    GOAL, "task", SCRIPTED_MODEL, None, EVAL_SOURCE, None, "standard", "yolo", None, (), None
                 )
                 assert opening.campaign_id is not None
                 async with asyncio.timeout(_TIME_LIMIT_S):
@@ -820,7 +833,7 @@ async def test_an_emergency_stop_while_a_run_is_launched_ends_that_run_as_one(lo
         manager: _EmergencyWhileLaunching = _EmergencyWhileLaunching(runtime)
         try:
             run: RunRecord = await manager.start(
-                GOAL, "task", SCRIPTED_MODEL, None, EVAL_SOURCE, None, None, "yolo", False, ()
+                GOAL, "task", SCRIPTED_MODEL, None, EVAL_SOURCE, None, None, "standard", "yolo", False, ()
             )
             async with asyncio.timeout(_TIME_LIMIT_S):
                 ended: RunRecord = await manager.wait(run.id)
@@ -890,7 +903,7 @@ async def test_a_session_whose_dotx_command_died_is_followed_once_the_daemon_clo
         store = runtime.store
         thread: ThreadRecord = await store.create_thread("Leads", EVAL_SOURCE)
         campaign: CampaignRecord = await store.create_campaign(
-            "Leads", GOAL, thread.id, SCRIPTED_MODEL, runtime.config.models.effort, "ask", (), "own"
+            "Leads", GOAL, thread.id, SCRIPTED_MODEL, runtime.config.models.effort, "standard", "ask", (), "own"
         )
         # The command that drove the session is gone, and the lock of its owner with it.
         left: RunRecord = await store.create_run(
@@ -901,6 +914,7 @@ async def test_a_session_whose_dotx_command_died_is_followed_once_the_daemon_clo
             None,
             EVAL_SOURCE,
             runtime.config.models.effort,
+            "standard",
             "ask",
             False,
             campaign.id,
@@ -937,6 +951,7 @@ class _LaunchFails(RunManager):
         source: str,
         parent_run_id: str | None,
         effort: Effort | None,
+        speed: Speed,
         approvals: ApprovalMode | None,
         goal_mode: bool | None,
         opening: RunOpening,
@@ -958,7 +973,7 @@ async def test_a_campaign_whose_opening_session_could_not_start_in_any_way_is_no
             threads: int = await asyncio.to_thread(_threads, db_path())
             with pytest.raises(OSError, match="No space left on device"):
                 await manager.start_campaign(
-                    GOAL, "task", SCRIPTED_MODEL, None, UI_SOURCE, None, "ask", None, (), "own"
+                    GOAL, "task", SCRIPTED_MODEL, None, UI_SOURCE, None, "standard", "ask", None, (), "own"
                 )
             assert await runtime.store.list_campaigns() == []
             assert await manager.resume_campaigns() == 0

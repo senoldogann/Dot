@@ -185,7 +185,9 @@ def _lessons(*lessons: str) -> ScriptedTurn:
 
 
 async def _start(home: Home, goal: str, approvals: str) -> RunRecord:
-    return await home.manager.start(goal, "task", SCRIPTED_MODEL, None, "test", None, None, approvals, False, ())  # type: ignore[arg-type]
+    return await home.manager.start(
+        goal, "task", SCRIPTED_MODEL, None, "test", None, None, "standard", approvals, False, ()
+    )  # type: ignore[arg-type]
 
 
 async def _ended(home: Home, run: RunRecord) -> RunRecord:

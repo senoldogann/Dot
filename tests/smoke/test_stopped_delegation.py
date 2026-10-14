@@ -166,11 +166,35 @@ async def _stored_the_old_way(runtime: Runtime) -> RunRecord:
     store = runtime.store
     thread: ThreadRecord = await store.create_thread("Count the shelves", "test")
     run: RunRecord = await store.create_run(
-        thread.id, "Count the shelves", "task", SCRIPTED_MODEL, None, "test", "medium", "yolo", False, None, None, None
+        thread.id,
+        "Count the shelves",
+        "task",
+        SCRIPTED_MODEL,
+        None,
+        "test",
+        "medium",
+        "standard",
+        "yolo",
+        False,
+        None,
+        None,
+        None,
     )
     side: ThreadRecord = await store.create_thread(_SHELVES[0], "delegate")
     delegated: RunRecord = await store.create_run(
-        side.id, _SHELVES[0], "task", SCRIPTED_MODEL, run.id, "delegate", "medium", "yolo", False, None, None, None
+        side.id,
+        _SHELVES[0],
+        "task",
+        SCRIPTED_MODEL,
+        run.id,
+        "delegate",
+        "medium",
+        "standard",
+        "yolo",
+        False,
+        None,
+        None,
+        None,
     )
     for record in (run, delegated):
         await store.add_event(
@@ -192,7 +216,7 @@ async def test_a_stopped_run_stops_the_runs_it_delegated_and_their_rows_end(
 ) -> None:
     manager, address = served
     run: RunRecord = await manager.start(
-        "Count the shelves", "task", SCRIPTED_MODEL, None, "test", None, None, "yolo", False, ()
+        "Count the shelves", "task", SCRIPTED_MODEL, None, "test", None, None, "standard", "yolo", False, ()
     )
     delegated: list[RunRecord] = await _children_of(runtime, run.id, len(_SHELVES))
     for child in delegated:

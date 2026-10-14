@@ -201,11 +201,11 @@ async def test_the_messages_have_their_time_a_copy_and_a_send_again_once_answere
         store_attachment, runtime.workspace, "beds.txt", "text/plain", b"North bed, south bed.\n"
     )
     first: RunRecord = await manager.start(
-        _FIRST, "task", SCRIPTED_MODEL, None, "test", None, None, "yolo", False, (file,)
+        _FIRST, "task", SCRIPTED_MODEL, None, "test", None, None, "standard", "yolo", False, (file,)
     )
     assert (await _ended(runtime, first.id)).status == "done"
     second: RunRecord = await manager.start(
-        _SECOND, "task", SCRIPTED_MODEL, first.thread_id, "test", None, None, "yolo", False, ()
+        _SECOND, "task", SCRIPTED_MODEL, first.thread_id, "test", None, None, "standard", "yolo", False, ()
     )
     await _events(runtime, second.id, "tool_call", 1)
     manager.steer(second.id, _STEER, ())

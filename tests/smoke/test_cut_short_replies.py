@@ -73,7 +73,9 @@ async def _manager(login_env: dict[str, str], model: _CutShort) -> AsyncIterator
 
 
 async def _ended(manager: RunManager, mode: RunMode) -> RunRecord:
-    run: RunRecord = await manager.start(GOAL, mode, SCRIPTED_MODEL, None, UI_SOURCE, None, None, "yolo", False, ())
+    run: RunRecord = await manager.start(
+        GOAL, mode, SCRIPTED_MODEL, None, UI_SOURCE, None, None, "standard", "yolo", False, ()
+    )
     async with asyncio.timeout(_TIME_LIMIT_S):
         return await manager.wait(run.id)
 

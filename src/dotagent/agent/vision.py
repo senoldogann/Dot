@@ -45,6 +45,7 @@ async def _describe(
         temperature=0.1,
         max_output_tokens=None,
         effort="off",
+        speed="standard",
         session_key=session_key,
     )
     reply: ModelReply = await router.complete(ref, request, _discard, origin)

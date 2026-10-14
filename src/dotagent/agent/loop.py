@@ -159,7 +159,7 @@ from dotagent.core.types import FrozenModel, JsonObject
 from dotagent.help.listed import SkillListing, listed_skills, skill_text, tools_in_order
 from dotagent.llm.calls import CallOrigin
 from dotagent.llm.http import is_retryable_provider_error
-from dotagent.llm.router import ModelRef, parse_model_ref, unavailable_reason
+from dotagent.llm.router import ModelRef, offers_fast_mode, parse_model_ref, unavailable_reason
 from dotagent.llm.traits import effective_effort
 from dotagent.llm.types import (
     ChatRequest,
@@ -406,6 +406,7 @@ async def _model_summary(
             temperature=0.2,
             max_output_tokens=None,
             effort="off" if attempt == 1 else "low",
+            speed="standard",
             session_key=f"{agent.run.thread_id}:summary",
         )
         try:
@@ -1621,6 +1622,8 @@ async def run_agent(agent: AgentRun) -> RunEnd:
             temperature=None,
             max_output_tokens=None,
             effort=effort if routed_effort is None else routed_effort,
+            # The run's speed where the step's model has fast mode: a routed or standby model may not (item 223).
+            speed=run.speed if offers_fast_mode(step_ref) else "standard",
             session_key=run.thread_id,
         )
         steps += 1

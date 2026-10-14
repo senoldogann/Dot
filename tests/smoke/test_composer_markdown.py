@@ -155,7 +155,19 @@ async def _chat(runtime: Runtime) -> RunRecord:
     """A chat whose one run is over, for its dock."""
     thread: ThreadRecord = await runtime.store.create_thread("Garden", "test")
     run: RunRecord = await runtime.store.create_run(
-        thread.id, "Plan the beds.", "task", SCRIPTED_MODEL, None, "test", "medium", "yolo", False, None, None, None
+        thread.id,
+        "Plan the beds.",
+        "task",
+        SCRIPTED_MODEL,
+        None,
+        "test",
+        "medium",
+        "standard",
+        "yolo",
+        False,
+        None,
+        None,
+        None,
     )
     await runtime.store.end_run(run.id, "done", "Done.", {"status": "done", "result": "Done.", "needs": ""})
     return run

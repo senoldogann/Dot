@@ -5158,8 +5158,8 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 219 | Import from other apps                                                               | done        | d017075 |
 | 220 | The side panel slides, and the screen says why it is empty                           | done        | e1d8176 |
 | 221 | The window of every provider's models, as published                                  | done        | bc61bed |
-| 222 | A context meter in the run's composer                                                | in progress |         |
-| 223 | Claude's fast mode                                                                   | planned     |         |
+| 222 | A context meter in the run's composer                                                | done        | a99e07e |
+| 223 | Claude's fast mode                                                                   | in progress |         |
 
 ### 77. The type system: Inter and Geist Mono, seven sizes, three weights
 
@@ -10424,7 +10424,7 @@ among them, and a run's budget follows it.
 
 ### 222. A context meter in the run's composer
 
-**Status: in progress.**
+**Status: done.** Merged as `a99e07e` (PR #261; no Linear issue, the Linear connector was signed out).
 
 **As built (2026-10-14).** After T3 Code's, a ring beside the send of a run's composer shows how much of the run's
 context budget its last step filled (`contextmeter.js`), and a click opens its figures: the tokens that step sent the
@@ -10440,7 +10440,19 @@ gives the figures and the model's window.
 
 ### 223. Claude's fast mode
 
-**Status: planned.**
+**Status: in progress.**
+
+**As built (2026-10-14).** Claude Opus 5.5, Opus 5 and Opus 4.8 have fast mode: up to 2.5 times the output speed at
+twice the price, a research preview. The Models API does not say which models have it, so `FAST_MODE_MODELS` in
+`llm/anthropic.py` names them from Anthropic's page; a request in fast mode sends `speed: "fast"` with the beta
+`fast-mode-2026-02-01`, and Dot never falls back to the standard speed by itself. The speed is kept like the reasoning
+level, by the run, a chat's choices, a queued message and a campaign (those of before hold `standard`); each step of a
+run in fast mode asks for it where the step's model has it, and summaries, reviews and the other calls run at the
+standard speed. Fast mode for a model without it is refused (a 422 over HTTP). The Reasoning menu of such a model has
+Speed, Standard or Fast, off at first; the pill then reads `High · Fast`. Tests: `tests/smoke/test_fast_mode.py`,
+against a stand-in of Anthropic's API and in a browser, and `tests/unit/test_store_speed.py`; on the code of before, all
+four fail. Not checked against Anthropic, as fast mode needs an organization let into the preview. Left to the owner:
+Ultracode and Ultrathink, for which the API has no levels.
 
 **What.** The Claude models that have fast mode offer it in the composer's reasoning menu, off by default, for a chat at
 a time; the API's refusal is shown as it is.
@@ -11106,3 +11118,4 @@ a time; the API's refusal is shown as it is.
 - 2026-10-14 (Opus 5.5): item 219 merged as `d017075` (PR #258; no Linear issue, the connector was signed out): a button of Settings › Skills imports, from a checklist, the skills and MCP servers the Mac's other agents set up, several at once.
 - 2026-10-14 (Opus 5.5): item 220 merged as `e1d8176` (PR #259; no Linear issue, the connector was signed out): beside the conversation the side panel slides in and out, and the Screen tab's empty view keeps the shape of a screen and says why it has no frame.
 - 2026-10-14 (Opus 5.5): item 221 merged as `bc61bed` (PR #260; no Linear issue, the connector was signed out): every provider's models show the window their pages publish, OpenAI's newer models and Ollama's cloud models among them.
+- 2026-10-14 (Opus 5.5): item 222 merged as `a99e07e` (PR #261; no Linear issue, the connector was signed out): a ring in a run's composer shows how much of the run's context budget its last step filled.

@@ -5,7 +5,7 @@ from typing import Literal, Self
 from pydantic import model_validator
 
 from dotagent.core.types import FrozenModel, JsonObject
-from dotagent.llm.types import Effort
+from dotagent.llm.types import Effort, Speed
 from dotagent.policy.types import ApprovalMode
 
 # Which Chrome the browser tools work in: Dot's own, or the one the user has open (attached over its debugging port).
@@ -38,13 +38,15 @@ class ThreadRecord(FrozenModel):
 
 class ChatChoices(FrozenModel):
     """What the next follow-up of a chat starts with, as its composer shows it (item 199): the mode, the model and the
-    reasoning level asked of it, the approval mode and goal mode. ``None`` takes the daemon's: its default model, the
-    configured level, ``[policy] approvals`` and ``[agent] goal_mode``; a chat (the mode) has no goal mode. A chat's
-    choices are those its first run started with, until the owner picks others in its composer."""
+    reasoning level asked of it, the speed (fast mode, item 223), the approval mode and goal mode. ``None`` takes the
+    daemon's: its default model, the configured level, ``[policy] approvals`` and ``[agent] goal_mode``; a chat (the
+    mode) has no goal mode. A chat's choices are those its first run started with, until the owner picks others in its
+    composer."""
 
     mode: RunMode
     model: str | None
     effort: Effort | None
+    speed: Speed
     approvals: ApprovalMode | None
     goal_mode: bool | None
 
@@ -79,9 +81,11 @@ class ThreadSummary(FrozenModel):
 
 class RunRecord(FrozenModel):
     """One run. ``effort`` is the reasoning level it was started with (``None`` for runs stored before it was kept);
+    ``speed`` is ``fast`` when it was started in fast mode (item 223), which its steps on a model with fast mode use;
     ``approvals`` and ``goal_mode`` are the approval mode and the goal mode it ran with (runs stored before they were
-    kept hold ``ask`` and ``False``, which is how those runs behaved). ``campaign_id`` is the campaign the run is a
-    session of, ``None`` for any other run. ``agent_id`` is the agent the run belongs to (item 86), ``None`` for Dot."""
+    kept hold ``standard``, ``ask`` and ``False``, which is how those runs behaved). ``campaign_id`` is the campaign the
+    run is a session of, ``None`` for any other run. ``agent_id`` is the agent the run belongs to (item 86), ``None``
+    for Dot."""
 
     id: str
     thread_id: str
@@ -98,6 +102,7 @@ class RunRecord(FrozenModel):
     parent_run_id: str | None
     source: str
     effort: Effort | None
+    speed: Speed
     approvals: ApprovalMode
     goal_mode: bool
     campaign_id: str | None
@@ -253,6 +258,7 @@ class QueuedMessage(FrozenModel):
     mode: RunMode
     model: str | None
     effort: Effort | None
+    speed: Speed
     approvals: ApprovalMode | None
     goal_mode: bool | None
     agent_id: str | None
@@ -316,8 +322,8 @@ class CampaignRecord(FrozenModel):
     """A goal that Dot works on in sessions, through restarts and days, until its outcome is verified or the owner
     stops it. ``thread_id`` is the owner's conversation it was started in. ``targets`` and ``verification`` are what
     its sessions recorded with ``campaign_targets`` (empty until then). ``cron`` repeats its sessions;
-    ``next_session_at`` is when the next one starts, ``None`` while none is planned. ``model``, ``effort`` and
-    ``approvals`` are the settings of the run that opened it, which every session keeps. ``files`` are the paths of
+    ``next_session_at`` is when the next one starts, ``None`` while none is planned. ``model``, ``effort``, ``speed``
+    and ``approvals`` are the settings of the run that opened it, which every session keeps. ``files`` are the paths of
     the files the owner attached to its goal. ``evidence`` is what the accepted claim of the outcome said, empty while
     the campaign is not achieved. ``browser`` is the Chrome its sessions work in: Dot's own (``own``) or the one the
     owner has open (``attach``); ``None`` for a campaign from before the choice, whose sessions use the daemon's."""
@@ -331,6 +337,7 @@ class CampaignRecord(FrozenModel):
     thread_id: str
     model: str
     effort: Effort
+    speed: Speed
     approvals: ApprovalMode
     files: tuple[str, ...]
     cron: str | None

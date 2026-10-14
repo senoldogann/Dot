@@ -17,7 +17,7 @@ STARTING: str = "starting as its chat's next run"
 
 
 async def _queued(store: Store, thread: ThreadRecord, text: str) -> QueuedMessage:
-    return await store.add_queued(thread.id, text, [], "task", None, None, None, None, None, "test")
+    return await store.add_queued(thread.id, text, [], "task", None, None, "standard", None, None, None, "test")
 
 
 async def _texts(store: Store, thread: ThreadRecord) -> list[str]:
@@ -59,7 +59,19 @@ async def test_a_claim_waits_for_a_held_queue_and_for_the_run_at_work_on_the_cha
         assert await store.claim_queued(thread.id, "owner-a") is None
         await store.release_queue(thread.id)
         run = await store.create_run(
-            thread.id, "goal", "task", "ollama:a", None, "test", "medium", "ask", False, None, None, "owner-b"
+            thread.id,
+            "goal",
+            "task",
+            "ollama:a",
+            None,
+            "test",
+            "medium",
+            "standard",
+            "ask",
+            False,
+            None,
+            None,
+            "owner-b",
         )
         assert await store.claim_queued(thread.id, "owner-a") is None
         await store.end_run(run.id, "done", "answer", {"status": "done", "result": "answer"})
@@ -142,7 +154,7 @@ async def test_a_claimed_message_whose_run_its_gone_process_made_leaves_the_queu
         await _queued(store, thread, "second")
         await store.claim_queued(thread.id, "gone")
         await store.create_run(
-            thread.id, "first", "task", "ollama:a", None, "test", "medium", "ask", False, None, None, "gone"
+            thread.id, "first", "task", "ollama:a", None, "test", "medium", "standard", "ask", False, None, None, "gone"
         )
         assert await store.hold_claims_of(["gone"]) == 1
         assert await _texts(store, thread) == ["second"]

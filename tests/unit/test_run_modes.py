@@ -284,7 +284,19 @@ async def test_a_database_from_before_the_switches_gets_their_defaults(tmp_path:
     store = await Store.open(database, tmp_path / "images")
     try:
         created: RunRecord = await store.create_run(
-            "thread_new", "a new goal", "task", "ollama:x", None, "cli", "medium", "yolo", True, None, None, None
+            "thread_new",
+            "a new goal",
+            "task",
+            "ollama:x",
+            None,
+            "cli",
+            "medium",
+            "standard",
+            "yolo",
+            True,
+            None,
+            None,
+            None,
         )
         reread: RunRecord = await store.get_run(created.id)
         assert (reread.approvals, reread.goal_mode) == ("yolo", True)

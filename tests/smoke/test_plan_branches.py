@@ -89,7 +89,9 @@ async def _session(
 
 
 async def _play(runtime: Runtime, manager: RunManager) -> Played:
-    run: RunRecord = await manager.start(GOAL, "task", SCRIPTED_MODEL, None, EVAL_SOURCE, None, None, "yolo", False, ())
+    run: RunRecord = await manager.start(
+        GOAL, "task", SCRIPTED_MODEL, None, EVAL_SOURCE, None, None, "standard", "yolo", False, ()
+    )
     async with asyncio.timeout(_TIME_LIMIT_S):
         record: RunRecord = await manager.wait(run.id)
     children: tuple[RunRecord, ...] = tuple(

@@ -241,7 +241,7 @@ async def test_a_takeover_holds_the_run_until_the_handback_and_the_waiting_call_
     the result of the call that waited."""
     MODEL.script = ScriptedProvider(_PROVIDER, [_shell("echo one"), _shell("echo two"), _FINISH])
     run: RunRecord = await manager.start(
-        "Echo twice", "task", SCRIPTED_MODEL, None, "test", None, None, "yolo", False, ()
+        "Echo twice", "task", SCRIPTED_MODEL, None, "test", None, None, "standard", "yolo", False, ()
     )
     taken: httpx.Response = await client.post(f"/api/runs/{run.id}/takeover")
     assert taken.status_code == 202, taken.text
@@ -308,7 +308,7 @@ async def test_a_takeover_brings_up_the_tab_in_the_browser_the_run_works_in_and_
     monkeypatch.setattr("dotagent.agent.manager.read_debug_endpoint", chrome_is_open)
     MODEL.script = ScriptedProvider(_PROVIDER, [_shell("sleep 5"), _FINISH, _FINISH])
     session: RunRecord = await manager.start_campaign(
-        "Echo once", "task", SCRIPTED_MODEL, None, "test", None, "yolo", None, (), "attach"
+        "Echo once", "task", SCRIPTED_MODEL, None, "test", None, "standard", "yolo", None, (), "attach"
     )
     assert await manager.take_over(session.id, "test") == "https://example.test/"
     assert asked == ["attach"]
@@ -319,7 +319,7 @@ async def test_a_takeover_brings_up_the_tab_in_the_browser_the_run_works_in_and_
 
     MODEL.script = ScriptedProvider(_PROVIDER, [_shell("sleep 5"), _FINISH])
     run: RunRecord = await manager.start(
-        "Echo once", "task", SCRIPTED_MODEL, None, "test", None, None, "yolo", False, ()
+        "Echo once", "task", SCRIPTED_MODEL, None, "test", None, None, "standard", "yolo", False, ()
     )
     with pytest.raises(BrowserError):
         await manager.take_over(run.id, "test")
@@ -395,7 +395,7 @@ async def test_the_run_page_shows_the_computer_card_with_the_pill_wide_and_on_a_
     is handed back and ends, the pill goes with it. Screenshots are kept under ``tmp_path``."""
     MODEL.script = ScriptedProvider(_PROVIDER, [_shell("echo one"), _FINISH])
     run: RunRecord = await manager.start(
-        "Echo once", "task", SCRIPTED_MODEL, None, "test", None, None, "yolo", False, ()
+        "Echo once", "task", SCRIPTED_MODEL, None, "test", None, None, "standard", "yolo", False, ()
     )
     assert (await client.post(f"/api/runs/{run.id}/takeover")).status_code == 202
     host: str = client.base_url.host

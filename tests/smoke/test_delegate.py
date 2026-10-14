@@ -80,7 +80,7 @@ async def _stored_run(runtime: Runtime, mode: RunMode, parent_run_id: str | None
     """A run that only exists in the store: enough for the checks that happen before any model is involved."""
     thread: ThreadRecord = await runtime.store.create_thread("delegation test", source)
     return await runtime.store.create_run(
-        thread.id, "goal", mode, MODEL_REF, parent_run_id, source, "medium", "ask", False, None, None, None
+        thread.id, "goal", mode, MODEL_REF, parent_run_id, source, "medium", "standard", "ask", False, None, None, None
     )
 
 
@@ -177,7 +177,7 @@ async def test_the_delegate_tool_is_known_to_every_mode_and_classified_as_safe(r
 async def test_a_run_reads_a_file_through_a_delegated_run(runtime: Runtime, manager: RunManager) -> None:
     path, token = _secret_file()
     parent: RunRecord = await manager.start(
-        _delegating_goal(path), "task", None, None, "test", None, None, None, None, ()
+        _delegating_goal(path), "task", None, None, "test", None, None, "standard", None, None, ()
     )
     finished: RunRecord = await asyncio.wait_for(manager.wait(parent.id), RUN_TIMEOUT_S)
     children: list[RunRecord] = await _children_of(runtime, parent.id)
@@ -203,7 +203,7 @@ async def test_a_delegated_run_starts_as_untrusted_as_its_parent(runtime: Runtim
         "Do these in order. 1. Fetch https://www.iana.org/help/example-domains with web_fetch. 2. "
         f"{_delegating_goal(path)}"
     )
-    parent: RunRecord = await manager.start(goal, "task", None, None, "test", None, None, None, None, ())
+    parent: RunRecord = await manager.start(goal, "task", None, None, "test", None, None, "standard", None, None, ())
     finished: RunRecord = await asyncio.wait_for(manager.wait(parent.id), RUN_TIMEOUT_S)
     assert finished.status == "done", finished
     assert token in finished.result

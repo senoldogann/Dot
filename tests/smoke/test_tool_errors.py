@@ -89,7 +89,9 @@ async def _session(login_env: dict[str, str], call: ScriptedCall) -> AsyncIterat
 
 
 async def _run(manager: RunManager) -> RunRecord:
-    run: RunRecord = await manager.start(GOAL, "task", SCRIPTED_MODEL, None, UI_SOURCE, None, None, "yolo", False, ())
+    run: RunRecord = await manager.start(
+        GOAL, "task", SCRIPTED_MODEL, None, UI_SOURCE, None, None, "standard", "yolo", False, ()
+    )
     async with asyncio.timeout(WAIT_S):
         return await manager.wait(run.id)
 

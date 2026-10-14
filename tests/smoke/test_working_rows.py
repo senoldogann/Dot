@@ -160,7 +160,7 @@ async def test_a_working_chat_and_the_working_runs_say_working_and_how_long_wide
 ) -> None:
     manager, address = served
     working: RunRecord = await manager.start(
-        "Count the files", "task", SCRIPTED_MODEL, None, "test", None, None, "yolo", False, ()
+        "Count the files", "task", SCRIPTED_MODEL, None, "test", None, None, "standard", "yolo", False, ()
     )
     await _first_tool_call(runtime, working.id)
     delegation: asyncio.Task[DelegateOutcome] = asyncio.create_task(
@@ -169,7 +169,7 @@ async def test_a_working_chat_and_the_working_runs_say_working_and_how_long_wide
     delegated: RunRecord = await _child_of(runtime, working.id)
     await _first_tool_call(runtime, delegated.id)
     asking: RunRecord = await manager.start(
-        "Pick a shelf", "task", SCRIPTED_MODEL, None, "test", None, None, "ask", False, ()
+        "Pick a shelf", "task", SCRIPTED_MODEL, None, "test", None, None, "standard", "ask", False, ()
     )
     await _pending_question(runtime, asking.id)
     async with async_playwright() as playwright:

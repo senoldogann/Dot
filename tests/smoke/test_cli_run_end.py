@@ -205,7 +205,7 @@ async def test_the_daemon_closes_the_run_of_a_dotx_run_that_died_as_cut_off_by_i
                 left: RunRecord = await runtime.store.get_run(run_id)
                 # A message the owner queued on the chat while the run worked.
                 await runtime.store.add_queued(
-                    left.thread_id, "Next.", [], "task", None, None, None, None, None, "test"
+                    left.thread_id, "Next.", [], "task", None, None, "standard", None, None, None, "test"
                 )
                 # What the daemon does every half minute while it runs.
                 async with runtime.bus.subscribe(run_id) as subscription:

@@ -162,7 +162,7 @@ async def test_the_side_panel_shows_one_tab_at_a_time_and_keeps_the_one_chosen_w
 ) -> None:
     manager, address = served
     run: RunRecord = await manager.start(
-        "Summarise the brief", "task", SCRIPTED_MODEL, None, "test", None, None, "yolo", False, ()
+        "Summarise the brief", "task", SCRIPTED_MODEL, None, "test", None, None, "standard", "yolo", False, ()
     )
     await _tool_calls(runtime, run.id, 2)
     async with async_playwright() as playwright:
@@ -247,7 +247,19 @@ async def _ended_run(runtime: Runtime) -> RunRecord:
     """A chat whose one run is over."""
     thread: ThreadRecord = await runtime.store.create_thread("Read the brief", "test")
     run: RunRecord = await runtime.store.create_run(
-        thread.id, "Read the brief", "task", SCRIPTED_MODEL, None, "test", "medium", "yolo", False, None, None, None
+        thread.id,
+        "Read the brief",
+        "task",
+        SCRIPTED_MODEL,
+        None,
+        "test",
+        "medium",
+        "standard",
+        "yolo",
+        False,
+        None,
+        None,
+        None,
     )
     await runtime.store.end_run(run.id, "done", "Done.", {"status": "done", "result": "Done.", "needs": ""})
     return run

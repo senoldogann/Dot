@@ -9,7 +9,7 @@ import { readyToSend } from "../attachments.js";
 import { MODES, optionRow, runChoices } from "../choices.js";
 import { composerFrame, composerPill } from "../composer.js";
 import { el } from "../dom.js";
-import { forgetLevel, savedLevel, saveLevel } from "../efforts.js";
+import { forgetLevel, KEPT_SPEED, savedLevel, saveLevel } from "../efforts.js";
 import { trackHeight } from "../layout.js";
 import { anchoredPopover } from "../popover.js";
 import { buildPresence } from "../presence.js";
@@ -36,6 +36,7 @@ const HOME_KEPT = {
       }
     },
   },
+  speed: KEPT_SPEED,
   approvals: KEPT_APPROVALS,
   goalMode: KEPT_GOAL_MODE,
 };
@@ -159,6 +160,7 @@ function buildComposer(ctx, listener) {
           mode: chosen.mode,
           model: chosen.model,
           effort: chosen.effort,
+          speed: chosen.speed,
           approvals: chosen.approvals,
           goal_mode: standing.value() ? null : chosen.goal_mode,
           standing: standing.value(),

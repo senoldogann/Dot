@@ -90,6 +90,7 @@ def _run(status: str, result: str) -> RunRecord:
         parent_run_id="run_1",
         source="team",
         effort=None,
+        speed="standard",
         approvals="yolo",
         goal_mode=False,
         campaign_id=None,

@@ -100,7 +100,19 @@ async def _seed(runtime: Runtime, title: str) -> RunRecord:
     """A chat a person started, whose one run is over, so that nothing keeps it from being deleted."""
     thread: ThreadRecord = await runtime.store.create_thread(title, "test")
     run: RunRecord = await runtime.store.create_run(
-        thread.id, f"{title} goal", "chat", SCRIPTED_MODEL, None, "test", "medium", "ask", False, None, None, None
+        thread.id,
+        f"{title} goal",
+        "chat",
+        SCRIPTED_MODEL,
+        None,
+        "test",
+        "medium",
+        "standard",
+        "ask",
+        False,
+        None,
+        None,
+        None,
     )
     await runtime.store.finish_run(run.id, "done", "Done.")
     return run
