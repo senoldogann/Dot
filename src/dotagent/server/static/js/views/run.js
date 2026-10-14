@@ -778,6 +778,10 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
       paintCost();
       paintLessons(fresh.lessons);
       paintQuestions(fresh.questions);
+      // Once the run is over, a row of a delegated run whose end its events did not bring shows how that run ended.
+      if (!active) {
+        timeline.settle(fresh.children);
+      }
     } catch (error) {
       readFailed("The run", error);
     }

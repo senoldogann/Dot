@@ -87,6 +87,43 @@ async def test_only_the_runs_of_owners_that_are_gone_are_closed_with_the_approva
         await store.close()
 
 
+async def _working_family(store: Store, owner: str | None) -> tuple[RunRecord, RunRecord]:
+    """A run at work of ``owner`` and a run it delegated, at work too; the run is made first."""
+    thread: ThreadRecord = await store.create_thread("t", "test")
+    run: RunRecord = await store.create_run(
+        thread.id, "goal", "task", "ollama:m", None, "test", "medium", "ask", False, None, None, owner
+    )
+    side: ThreadRecord = await store.create_thread("part", "delegate")
+    delegated: RunRecord = await store.create_run(
+        side.id, "part", "task", "ollama:m", run.id, "delegate", "medium", "ask", False, None, None, owner
+    )
+    for record in (run, delegated):
+        await store.set_run_status(record.id, "running")
+    return run, delegated
+
+
+async def _end_id(store: Store, run: RunRecord) -> int:
+    ends: list[EventRecord] = await store.events_of_kind(run.id, "run_finished", 2)
+    assert len(ends) == 1, ends
+    return ends[0].id
+
+
+async def test_the_end_of_a_delegated_run_closed_with_its_parent_comes_first(tmp_path: Path) -> None:
+    """Item 197: the page of a run reads its events up to the run's own end, so a restart, and the daemon closing the
+    runs of a command that died, store the end of a delegated run before the end of the run that delegated it."""
+    store: Store = await Store.open(tmp_path / "dot.sqlite3", tmp_path / "screenshots")
+    try:
+        run, delegated = await _working_family(store, None)
+        assert await store.mark_interrupted_runs(()) == 2
+        assert await _end_id(store, delegated) < await _end_id(store, run)
+        run, delegated = await _working_family(store, "a" * 32)
+        told: list[EventRecord] = await store.close_runs_of(["a" * 32], "the command died")
+        assert [event.run_id for event in told] == [delegated.id, run.id]
+        assert await _end_id(store, delegated) < await _end_id(store, run)
+    finally:
+        await store.close()
+
+
 async def test_a_closed_run_whose_events_were_pruned_gets_none_back(tmp_path: Path) -> None:
     store: Store = await Store.open(tmp_path / "dot.sqlite3", tmp_path / "screenshots")
     try:

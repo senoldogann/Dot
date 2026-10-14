@@ -705,11 +705,13 @@ class RunManager:
         The delegated run starts as untrusted as its parent is, can do no more than its parent (a research run only
         delegates research) and cannot delegate again. It answers the policy's questions the way its parent does and
         takes the parent's instructions as its own; the parent checks its result, so goal mode is not applied to it
-        again. It is stopped when the waiting caller is cancelled. With ``agent_id`` (item 87, a message to an agent)
-        the run is the agent's: its source is ``team``, it carries the agent's id, the agent's own model and effort
-        bound it where the agent names them, the parent's where it does not, and it answers the policy's questions the
-        stricter way of the agent's and the parent's (item 135). A delegated run whose end the store could not record
-        is a ``StoreError``, not an outcome: what the store holds of it is how it was while it worked.
+        again. It is stopped when the waiting caller is cancelled, and the cancellation goes on once its end is stored,
+        so that the end of a run is stored after the ends of the runs it delegated (item 197). With ``agent_id`` (item
+        87, a message to an agent) the run is the agent's: its source is ``team``, it carries the agent's id, the
+        agent's own model and effort bound it where the agent names them, the parent's where it does not, and it
+        answers the policy's questions the stricter way of the agent's and the parent's (item 135). A delegated run
+        whose end the store could not record is a ``StoreError``, not an outcome: what the store holds of it is how it
+        was while it worked.
         """
         parent: RunRecord = await self._runtime.store.get_run(parent_run_id)
         agent: AgentRecord | None = None if agent_id is None else await self._runtime.store.get_agent(agent_id)
@@ -741,6 +743,9 @@ class RunManager:
         except asyncio.CancelledError:
             if handle.run_id in self._handles:
                 self.cancel(handle.run_id)
+            # The page of the run that waits reads its events up to its own end: the delegated run's end is
+            # stored first.
+            await _uncancelled(handle.finished.wait())
             raise
         child: RunRecord = await self._runtime.store.get_run(handle.run_id)
         if child.status in WORKING_STATUSES:

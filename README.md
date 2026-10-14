@@ -305,13 +305,16 @@ reminder, a resumed run) and, in goal mode, to the goal check.
   error; a token count that cannot be written is logged, not fatal to the run), so the web UI can replay them. The end
   of a run that started is one write: its status, the scores of the notes it used and the event that tells of its end
   are stored together or not at all, and a delegated run whose end could not be stored is an error for the run that
-  delegated it. An end the database refused (a full disk, say) is tried again every half minute until it is stored, with
-  the event that tells of it and what follows it (the chat's next message, a campaign's next session); until then the
-  run stays as the database has it, and a Stop says its end is on its way. A run that could not be started is stored as
+  delegated it. A run that is stopped stops the runs it delegated, and its end is stored after theirs, so that its page
+  shows each of them ended; the page of a run stored the other way, before item 197, reads how they ended from the
+  database. An end the database refused (a full disk, say) is tried again every half minute until it is stored, with the
+  event that tells of it and what follows it (the chat's next message, a campaign's next session); until then the run
+  stays as the database has it, and a Stop says its end is on its way. A run that could not be started is stored as
   failed with that event too, so a page that showed it queued sees it end. A run that a crashed daemon left behind is
-  marked as failed the next time Dot starts, as ended at its last event, and so is one that a `dotx` command left when
-  it died, by the daemon within half a minute when it runs. Either can be resumed, and so can a run that a shutdown of
-  the daemon cut off (see [Autonomy](#autonomy-approvals-goal-mode-and-the-end-of-a-run)).
+  marked as failed the next time Dot starts, as ended at its last event (the runs it delegated before it), and so is one
+  that a `dotx` command left when it died, by the daemon within half a minute when it runs. Either can be resumed, and
+  so can a run that a shutdown of the daemon cut off (see
+  [Autonomy](#autonomy-approvals-goal-mode-and-the-end-of-a-run)).
 - A message sent to a running run (steering) reaches the model at its next step. It also clears the run's untrusted
   mark (see [Safety](#safety)).
 - A run belongs to the daemon, not to the page that started it: leave the chat and it goes on, its status stays live in

@@ -277,6 +277,34 @@ export function createTimeline({ rootRunId, actorId, startedAt, onGrow, onPlan, 
     scope.panel.time.textContent = duration(Math.max(ts - scope.began, 0));
   }
 
+  /** The row of the delegated run of `scope` shows that the run ended with `status` at `ts` after `steps` steps. */
+  function endChild(scope, status, steps, ts) {
+    paintRing(scope.panel.status, status);
+    scope.panel.face.setAttribute("data-state", faceState(status));
+    scope.panel.face.classList.add("ended");
+    paintChild(scope, ts, [status, plural(steps, "step", "steps")]);
+    liveChildren.delete(scope);
+    // Whatever it asked is moot now: a row the reader never opened or closed by hand is closed again.
+    if (!scope.touched) {
+      scope.panel.node.open = false;
+    }
+  }
+
+  /**
+   * The rows of the delegated runs whose end the page did not read show how those runs ended, from `runs`, their
+   * records as the store has them (the `children` of the run's detail). Until item 197, the end of a stopped run was
+   * stored before the ends of the runs it delegated, and the page reads the events of a run up to its own end.
+   */
+  function settle(runs) {
+    for (const run of runs) {
+      const scope = scopes.get(run.id);
+      if (scope !== undefined && liveChildren.has(scope) && run.finished_at !== null) {
+        settleGroups(scope, run.finished_at);
+        endChild(scope, run.status, run.steps, run.finished_at);
+      }
+    }
+  }
+
   /** The row of every delegated run that has not ended says how long it has worked at `now` (seconds): the page calls
    * this every second while the run works, so a folded row's time counts on between the events of its run, as T3 Code
    * counts a working subagent's (item 123). */
@@ -381,17 +409,9 @@ export function createTimeline({ rootRunId, actorId, startedAt, onGrow, onPlan, 
         onRunStatus({ status, model: null, endedAt: record.ts });
         return;
       }
-      paintRing(scope.panel.status, status);
-      scope.panel.face.setAttribute("data-state", faceState(status));
-      scope.panel.face.classList.add("ended");
-      paintChild(scope, record.ts, [status, plural(scope.panel.steps, "step", "steps")]);
-      liveChildren.delete(scope);
+      endChild(scope, status, scope.panel.steps, record.ts);
       // The parent resumes when the delegated run is over; the time in between was spent on the delegation.
       scope.parent.boundary = record.ts;
-      // Whatever it asked is moot now: a row the reader never opened or closed by hand is closed again.
-      if (!scope.touched) {
-        scope.panel.node.open = false;
-      }
     },
 
     assistant(scope, record) {
@@ -858,5 +878,5 @@ export function createTimeline({ rootRunId, actorId, startedAt, onGrow, onPlan, 
     onGrow();
   }
 
-  return { element, push, tick };
+  return { element, push, tick, settle };
 }
