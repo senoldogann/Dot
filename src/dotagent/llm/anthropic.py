@@ -35,7 +35,9 @@ _FAST_MODE_BETA: str = "fast-mode-2026-02-01"
 FAST_MODE_MODELS: frozenset[str] = frozenset({"claude-opus-5-5", "claude-opus-5", "claude-opus-4-8"})
 # The largest page of the model listing.
 _PAGE_SIZE: int = 1000
-_OPTIONS: MessagesOptions = MessagesOptions(adaptive_thinking=True, prompt_cache=True, default_max_tokens=None)
+_OPTIONS: MessagesOptions = MessagesOptions(
+    adaptive_thinking=True, prompt_cache=True, settled_mark=True, default_max_tokens=None
+)
 # The levels of the effort parameter, lowest first.
 _EFFORT_LABELS: tuple[str, ...] = ("low", "medium", "high", "xhigh", "max")
 # The limits of a model whose entry names none: the smallest window of the current models, and the output limit

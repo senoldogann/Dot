@@ -678,6 +678,7 @@ async def _attempt[V: FrozenModel](question: _Question[V], retry_note: str) -> V
         effort=_JUDGEMENT_EFFORT,
         speed="standard",
         session_key=question.session_key,
+        cache_mark=None,
     )
     try:
         async with asyncio.timeout(question.timeout_s):

@@ -47,6 +47,7 @@ async def _describe(
         effort="off",
         speed="standard",
         session_key=session_key,
+        cache_mark=None,
     )
     reply: ModelReply = await router.complete(ref, request, _discard, origin)
     text: str = reply.text.strip()

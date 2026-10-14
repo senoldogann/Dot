@@ -70,7 +70,9 @@ class Usage(FrozenModel):
 
 class ChatRequest(FrozenModel):
     """One model call. ``session_key`` is stable for a conversation and lets providers reuse their prompt cache;
-    ``speed`` is ``fast`` only for a model that offers it (:func:`dotagent.llm.router.offers_fast_mode`)."""
+    ``speed`` is ``fast`` only for a model that offers it (:func:`dotagent.llm.router.offers_fast_mode`).
+    ``cache_mark`` is the index in ``messages`` of the last message the conversation's next call sends unchanged, when
+    the caller knows it (item 237); a provider whose cache looks back only a few blocks from a mark marks it there."""
 
     model: str
     messages: tuple[Message, ...]
@@ -80,6 +82,7 @@ class ChatRequest(FrozenModel):
     effort: Effort
     speed: Speed
     session_key: str
+    cache_mark: int | None
 
 
 class ModelReply(FrozenModel):

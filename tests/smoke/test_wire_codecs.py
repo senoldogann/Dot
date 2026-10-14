@@ -60,9 +60,13 @@ OLLAMA_ROOT: str = "http://localhost:11434"
 LIVE_MODEL: str = "gpt-oss:20b-cloud"
 VISION_MODEL: str = "gemma4:cloud"
 # What OpenCode Go's messages route sends: a plain thinking switch, no cache marks, and its own output limit.
-GO_MESSAGES: MessagesOptions = MessagesOptions(adaptive_thinking=False, prompt_cache=False, default_max_tokens=32768)
+GO_MESSAGES: MessagesOptions = MessagesOptions(
+    adaptive_thinking=False, prompt_cache=False, settled_mark=False, default_max_tokens=32768
+)
 # What the Anthropic connector sends: adaptive thinking at the reasoning level, the prompt cache, the model's own limit.
-CLAUDE_MESSAGES: MessagesOptions = MessagesOptions(adaptive_thinking=True, prompt_cache=True, default_max_tokens=None)
+CLAUDE_MESSAGES: MessagesOptions = MessagesOptions(
+    adaptive_thinking=True, prompt_cache=True, settled_mark=True, default_max_tokens=None
+)
 
 TEMPERATURE_TOOL: ToolSpec = ToolSpec(
     name="get_temperature",
@@ -91,6 +95,7 @@ def request_for(model: str, messages: tuple[Message, ...], tools: tuple[ToolSpec
         effort="low",
         speed="standard",
         session_key="smoke-session",
+        cache_mark=None,
     )
 
 

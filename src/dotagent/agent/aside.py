@@ -85,6 +85,7 @@ async def _ask(runtime: Runtime, ref: ModelRef, run: RunRecord, record: str, que
             effort="off" if attempt == 1 else "low",
             speed="standard",
             session_key=f"{run.thread_id}:aside",
+            cache_mark=None,
         )
         try:
             async with asyncio.timeout(runtime.config.agent.model_call_timeout_s):

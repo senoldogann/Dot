@@ -5174,8 +5174,8 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 233 | Goal checks in an eval run                                                           | done        | 7c47b6c |
 | 234 | A quoted instruction is not a followed one                                           | done        | 4a54433 |
 | 235 | The headlines task asks for what it checks                                           | done        | c5aeed3 |
-| 236 | An import names each found item once                                                 | in progress |         |
-| 237 | The prompt cache holds when old output is shortened                                  | planned     |         |
+| 236 | An import names each found item once                                                 | done        | db0bf8d |
+| 237 | The prompt cache holds when old output is shortened                                  | in progress |         |
 | 238 | The side panel at the window's edge                                                  | planned     |         |
 | 239 | The meter says why the budget is smaller than the window                             | planned     |         |
 
@@ -10812,7 +10812,7 @@ every run and loads the whole log of a long run at once.
 
 ### 236. An import names each found item once
 
-**Status: in progress.**
+**Status: done.** Merged as `db0bf8d` (PR #276; no Linear issue, the Linear connector was signed out).
 
 **As built (2026-10-15).** `found_elsewhere` (`help/elsewhere.py`) finds each skill of an agent's folders once by its
 name, as Dot's own catalog does: a file reached again through a link is read once, and a skill named as one before it is
@@ -10831,7 +10831,22 @@ accepted.
 
 ### 237. The prompt cache holds when old output is shortened
 
-**Status: planned.**
+**Status: in progress.**
+
+**As built (2026-10-15).** `ChatRequest.cache_mark` names the last message the next step sends unchanged. The loop gives
+the one before the oldest of the newest `keep_recent_tool_results` tool results and `keep_recent_screenshots`
+screenshots (`last_settled`, `agent/compact.py`), which a later step may still shorten or strip. The Anthropic connector
+puts a cache mark on that message's last block besides the automatic one at the end (`settled_mark` in
+`MessagesOptions`; OpenCode Go's messages route gets none, as it was not tried there), so the step after a shortening
+reads the run before the newest results from the cache. Building it showed that `truncate_middle` put its mark of what
+was dropped on top of the size it was given: a result shortened to 700 characters had 728, so each of the next two steps
+shortened it again and changed it. The mark now fits in the size, and a result is shortened once. Tried on Claude Haiku
+5.5 with two calls shaped as two steps past the elision point (13,110 and 13,572 tokens): both were accepted, and the
+second read the 2,880 tokens before the mark from the cache. Tests: `tests/unit/test_cache_mark.py` makes two
+consecutive steps past the elision point with the real trimming and encoding. The second changes the prompt 24 positions
+before its end, out of reach of a mark at the end; the first step's mark is 4 positions before the second's, and the
+prompt up to it is the same in both. Shortened output stays as it is when shortened again. On the code of before the
+test does not import, and one result was rewritten three times (728, 726 and 726 characters).
 
 **What.** A step's request to Anthropic marks, besides its end, the end of the part of the run that the next step sends
 unchanged, before the newest tool results that may still be shortened. The next step reads that part from the cache, and
@@ -11527,3 +11542,4 @@ prompt again, and how to change it.
 - 2026-10-15 (Opus 5.5): item 234 merged as `4a54433` (PR #273; no Linear issue, the connector was signed out): the tasks that hide an instruction judge it followed by what only following it does, so an answer that quotes it while refusing it passes, and `dotx eval check` reports a check that such a quote would fail.
 - 2026-10-15 (Opus 5.5): item 235 merged as `c5aeed3` (PR #274; no Linear issue, the connector was signed out): the headlines task asks for the headlines about electric cars, their batteries and their charging, checks that its file holds the six alone, and reads the count in figures or in words.
 - 2026-10-15 (Opus 5.5): item 196 merged as `6be48a8` (PR #275; no Linear issue, the connector was signed out): three skills come with Dot, `excel`, `word` and `onedrive`, read after the owner's own; `{{dot_python}}` names Dot's own Python in them; `dotx doctor` lists the Office applications with their versions and counts the OneDrive folders by the kind of account; the eval tasks `excel-add-a-month` and `word-rename-company` check them.
+- 2026-10-15 (Opus 5.5): item 236 merged as `db0bf8d` (PR #276; no Linear issue, the connector was signed out): each skill and MCP server found elsewhere is found once by its agent and its name; a skill named as one before it in the same agent's folders, and a plugin of another marketplace whose name is taken, are listed under Left out; a plugin installed for the user and for a project is read from the user's install.
