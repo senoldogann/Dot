@@ -8,7 +8,7 @@
 
 import { approvalCard, fromEvent, LEFT_IN_RUN } from "./approvals.js";
 import { sentFiles } from "./attachments.js";
-import { clip, clock, compact, dateTime, dateTimeFull, duration, el, plural } from "./dom.js";
+import { clip, clock, compact, dateTime, duration, el, plural } from "./dom.js";
 import { actorFace } from "./actors.js";
 import { faceState } from "./face.js";
 import { icon } from "./icons.js";
@@ -114,9 +114,11 @@ function paintGroup(group) {
  * review, a description of images), `onCalls({ calls, failed })` after every tool call of the run,
  * `onRunStatus({ status, model, endedAt })` (`endedAt` is null until the run is over), `onAnswer(node)` when the answer is
  * on the page, `onImage(name)` for every screenshot a tool returned and `onBrowserStep()` for the root run's first
- * browser tool call (Dot's computer starts its view on it).
+ * browser tool call (Dot's computer starts its view on it). `sendAgain(text, files)` sends a message written to the run
+ * again with its files (item 205); null where the page sends nothing. `onGoalFiles(files)` takes the files that came
+ * with the run's goal, to show them under it; null where the page shows no goal, and they stand in the timeline.
  */
-export function createTimeline({ rootRunId, actorId, startedAt, onGrow, onPlan, onStats, onCalls, onRunStatus, onAnswer, onImage, onQuestionLeft, onHeld, onBrowserStep }) {
+export function createTimeline({ rootRunId, actorId, startedAt, onGrow, onPlan, onStats, onCalls, onRunStatus, onAnswer, onImage, onQuestionLeft, onHeld, onBrowserStep, sendAgain, onGoalFiles }) {
   const element = el("div", { class: "timeline" });
   const scopes = new Map();
   const cards = new Map();
@@ -599,14 +601,16 @@ export function createTimeline({ rootRunId, actorId, startedAt, onGrow, onPlan, 
 
     steer(scope, record) {
       const files = record.data.files ?? [];
-      place(scope, userMessage(record.data.text, dateTimeFull(record.ts)), record.ts);
-      if (files.length > 0) {
-        place(scope, sentFiles(files), record.ts);
-      }
+      const text = record.data.text;
+      place(scope, userMessage({ text, sentAt: record.ts, files, sendAgain: sendAgain === null ? null : () => sendAgain(text, files) }), record.ts);
     },
 
     // The files that came with the goal; they sit under the goal's bubble.
     attachments(scope, record) {
+      if (scope.runId === rootRunId && onGoalFiles !== null) {
+        onGoalFiles(record.data.files);
+        return;
+      }
       place(scope, sentFiles(record.data.files), record.ts);
     },
 

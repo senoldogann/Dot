@@ -1,7 +1,8 @@
 // The messages of a conversation that more than one view draws: what the user wrote, and how a run ended with Dot's answer.
 
-import { copyText, dateTimeFull, duration, el } from "./dom.js";
+import { copyText, dateTimeFull, duration, el, messageTime } from "./dom.js";
 import { actorFace } from "./actors.js";
+import { sentFiles } from "./attachments.js";
 import { faceStateAtEnd } from "./face.js";
 import { icon } from "./icons.js";
 import { prose } from "./prose.js";
@@ -12,42 +13,104 @@ const OUTCOMES = {
   failed: { label: "Failed", empty: "The run failed without saying why." },
   cancelled: { label: "Cancelled", empty: "The run was cancelled before it wrote an answer." },
 };
+// How long a copy button shows its check once the text is on the clipboard.
+const COPIED_MS = 1500;
 
-/** What the user wrote, as a bubble on the right. The text is shown as typed, never read as markdown. */
-export function userMessage(text, title) {
-  return el("div", { class: "bubble user", title }, el("div", { class: "prose" }, el("p", { class: "para" }, text)));
+/** When a message was sent or an answer came, in sight; `title` says more where the pointer rests. */
+function stamp(ts, title) {
+  return el("time", { class: "message-time", datetime: new Date(ts * 1000).toISOString(), title }, messageTime(ts));
 }
 
-function copyButton(text) {
-  return el(
+// A copy of `text` as it was written, after T3 Code's (item 205): the icon turns to a check for a moment once the text
+// is on the clipboard; a copy that fails says why.
+function copyButton(text, label) {
+  let restore = null;
+  const button = el(
     "button",
     {
-      class: "btn ghost sm",
+      class: "btn ghost sm icon-only",
       type: "button",
-      title: "Copy the answer",
-      "aria-label": "Copy the answer",
+      title: label,
+      "aria-label": label,
       onclick: () =>
         copyText(text).then(
-          () => toast("ok", "Answer copied"),
+          () => {
+            clearTimeout(restore);
+            button.replaceChildren(icon("check"));
+            button.setAttribute("aria-label", "Copied");
+            restore = setTimeout(() => {
+              button.replaceChildren(icon("copy"));
+              button.setAttribute("aria-label", label);
+            }, COPIED_MS);
+          },
           (error) => toast("error", `Could not copy: ${error.message}`),
         ),
     },
     icon("copy"),
-    el("span", { class: "label" }, "Copy"),
   );
+  return button;
+}
+
+// `sendAgain()` sends the message once more and resolves once it is on its way; the button waits meanwhile.
+function sendAgainButton(sendAgain) {
+  const button = el(
+    "button",
+    {
+      class: "btn ghost sm icon-only",
+      type: "button",
+      title: "Send again",
+      "aria-label": "Send again",
+      onclick: () => {
+        button.disabled = true;
+        sendAgain().finally(() => {
+          button.disabled = false;
+        });
+      },
+    },
+    icon("refresh"),
+  );
+  return button;
+}
+
+/**
+ * What the user wrote, as a bubble on the right, the files that came with it (`files`, as the timeline has them), and
+ * under them (item 205): when it was sent (`sentAt`), a copy of it as it was written and, unless `sendAgain` is null, a
+ * button that sends it again. The foot shows once the turn has its answer: a run at work keeps it back (`.run-working`,
+ * `.turn-working`). The text is shown as typed, never read as markdown.
+ */
+export function userMessage({ text, sentAt, files, sendAgain }) {
+  return el(
+    "div",
+    { class: "user-message" },
+    el("div", { class: "bubble user" }, el("div", { class: "prose" }, el("p", { class: "para" }, text))),
+    files.length > 0 ? sentFiles(files) : null,
+    el(
+      "div",
+      { class: "message-foot" },
+      stamp(sentAt, dateTimeFull(sentAt)),
+      copyButton(text, "Copy the message"),
+      sendAgain === null ? null : sendAgainButton(sendAgain),
+    ),
+  );
+}
+
+/** The files that came with the message `message` (a `userMessage`), once they are known: over its foot. */
+export function showMessageFiles(message, files) {
+  message.querySelector(".message-foot").before(sentFiles(files));
 }
 
 /**
  * How a run ended, as the actor's answer: the face of `actorId` (an agent id, a run id, or "dot") on the left, the answer
- * itself or why there is none, then one line with the outcome, when it ended and how long the run took. `startedAt` is null
- * when the start of the run is not known; `href` leads to the run itself (null when the reader is there).
+ * itself or why there is none, then one line with a copy of it, when it ended, the outcome and how long the run took.
+ * `startedAt` is null when the start of the run is not known; `href` leads to the run itself (null when the reader is
+ * there).
  */
 export function answerMessage({ actorId, status, text, endedAt, startedAt, href }) {
   const outcome = OUTCOMES[status] ?? { label: status, empty: "" };
   const written = text.trim() !== "";
-  const facts = [outcome.label, dateTimeFull(endedAt)];
+  const facts = [stamp(endedAt, dateTimeFull(endedAt)), el("span", null, outcome.label)];
   if (startedAt !== null) {
-    facts.push(duration(Math.max(0, endedAt - startedAt)));
+    facts.push(el("span", { class: "answer-took" }, duration(Math.max(0, endedAt - startedAt))));
   }
   return el(
     "article",
@@ -58,8 +121,8 @@ export function answerMessage({ actorId, status, text, endedAt, startedAt, href 
     el(
       "div",
       { class: "answer-foot" },
-      written ? copyButton(text) : null,
-      el("span", { class: "answer-facts meta-facts" }, ...facts.map((fact) => el("span", null, fact))),
+      written ? copyButton(text, "Copy the answer") : null,
+      el("span", { class: "answer-facts meta-facts" }, ...facts),
       href === null ? null : el("a", { class: "small", href }, "Open run"),
     ),
   );
