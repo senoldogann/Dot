@@ -37,8 +37,9 @@ the keys of OpenAI, OpenCode Go and Anthropic, the embedding model and the confi
 must serve to the key (Ollama and Anthropic answer for the model itself, OpenAI and OpenCode Go through the list of the
 models they serve), and says how to fix what is missing. It warns, without failing, when the review model is also the
 main model, when an MCP server's command or secret is missing (Dot starts without that server's tools), and when a
-provider's list of models could not be read, as the provider's own row says why. The examples below write `dotx`: run it
-as `uv run dotx`, or put `.venv/bin` on your `PATH`.
+provider's list of models could not be read or the Ollama server could not be reached, as the provider's own row says
+why (the models of an Ollama server out of reach are not asked, so the doctor does not wait out the retries of each).
+The examples below write `dotx`: run it as `uv run dotx`, or put `.venv/bin` on your `PATH`.
 
 ```bash
 dotx run "Find the opening hours of the Helsinki Central Library and save them to hours.md"
@@ -160,9 +161,11 @@ answer keeps its words, Ollama's too.
   `thinking-binding-controls-2026-08-01`).
 
 `dotx models [ollama|openai|opencode_go|anthropic]` lists what a provider offers, including the reasoning levels of each
-model, and ends with 1 when no provider answered (the one named, when one is). `dotx models profile [provider:model]`
-shows how reliably a model worked in its newest runs and the help its next run gets (see [How a run
-works](#how-a-run-works)); without a model it shows `[models] main`.
+model, and ends with 1 when no provider answered (the one named, when one is). An Ollama server on this Mac is asked for
+its list once, so one that is not running is reported at once, here, in the model menu and by `dotx doctor`, not after
+the retries a network needs (item 212). `dotx models profile [provider:model]` shows how reliably a model worked in its
+newest runs and the help its next run gets (see [How a run works](#how-a-run-works)); without a model it shows
+`[models] main`.
 
 **Reasoning level.** A model that can think offers a ladder of levels, lowest first, in the words of its provider mapped
 to one neutral scale: `off`, `on` (a plain thinking switch), `minimal`, `low`, `medium`, `high`, `xhigh`, `max`. A model

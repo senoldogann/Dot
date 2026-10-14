@@ -5147,8 +5147,8 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 208 | The model menu: providers at the side, a search and favourites, after T3 Code        | done        | 2545d60 |
 | 209 | The default model, changed from the model menu                                       | done        | a83c6b7 |
 | 210 | The shell check: changes of permissions                                              | done        | 34f4816 |
-| 211 | Secrets kept from the agent by default                                               | in progress |         |
-| 212 | A provider that is not running answers at once                                       | planned     |         |
+| 211 | Secrets kept from the agent by default                                               | done        | e6c8185 |
+| 212 | A provider that is not running answers at once                                       | in progress |         |
 | 213 | Tests: a bare pytest, and every offline smoke test in CI                             | planned     |         |
 | 214 | The redactor knows more kinds of secrets                                             | planned     |         |
 | 215 | Small hardenings after the review                                                    | planned     |         |
@@ -10204,7 +10204,7 @@ as before. On the code of before, five of them were judged too mildly.
 
 ### 211. Secrets kept from the agent by default
 
-**Status: in progress.**
+**Status: done.** Merged as `e6c8185` (PR #250; no Linear issue, the Linear connector was signed out).
 
 **As built (2026-10-14).** The places the agent can neither read nor change by default (`[policy] protected_paths` in
 `defaults.toml`) hold more of those where a Mac keeps credentials and private data: the tokens and passwords command
@@ -10221,10 +10221,23 @@ code of before, all eleven were allowed.
 
 ### 212. A provider that is not running answers at once
 
-**Status: planned.**
+**Status: in progress.**
+
+**As built (2026-10-14).** A server on this Mac (`localhost` or a loopback address) is asked for its list of models once
+(`llm/ollama.py`): with no network in between, a refused connection means it is not running, so the model menu's list
+and `dotx models` fail at once instead of after the retries of the call (about half a minute; the doctor took about two
+minutes, as it asked each configured model in turn). A chat and a run's lookup of a model keep their retries, and so
+does the list of a server elsewhere (ollama.com, another machine). The doctor (`doctor.py`) asks nothing more of an
+Ollama server it could not reach at all: each model row (`main`, `vision`, `fast`, `review`, helpers, standby) is a
+warning that says why, and the memory row (with Ollama's embeddings) fails with the server's reason, beside the
+server's own failing row; a server that answers wrongly is still asked.
+The plan's checks side by side within a time limit were not needed once nothing waits. Tests: a new test in
+`tests/smoke/test_doctor.py`, with the Ollama server at a port of this Mac where nothing listens and the real
+connectors: the list fails at once and the doctor's rows say why, within 10 s (it took 0.2 s); on the code of before it
+was cut at 10 s, the retries still going.
 
 **What.** When a provider's app is not running (Ollama on this Mac), the model list and the health checks say so at once
-instead of trying again for half a minute, and the health checks of the models run side by side within a time limit.
+instead of trying again for half a minute.
 
 ### 213. Tests: a bare pytest, and every offline smoke test in CI
 
@@ -10909,3 +10922,4 @@ is sent to them, and how to keep it on the Mac.
 - 2026-10-14 (Opus 5.5): item 208 merged as `2545d60` (PR #247; no Linear issue, the connector was signed out): The composer's model menu has a rail of the favourites and the providers' marks, a search across providers, a star on each model and keys, after T3 Code's.
 - 2026-10-14 (Opus 5.5): item 209 merged as `a83c6b7` (PR #248; no Linear issue, the connector was signed out): the composer's model menu changes the daemon's default model too: Change on the default's row, then a pick.
 - 2026-10-14 (Opus 5.5): item 210 merged as `34f4816` (PR #249; no Linear issue, the connector was signed out): the shell check judges a change of permissions or of owner by every path the line names.
+- 2026-10-14 (Opus 5.5): item 211 merged as `e6c8185` (PR #250; no Linear issue, the connector was signed out): more of the places where a Mac keeps credentials and private data are protected by default.
