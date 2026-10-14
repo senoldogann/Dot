@@ -1358,7 +1358,8 @@ class Store:
         kept) become 'failed', finished at their last sign of life: their newest event, else the time they were created.
         Each one also gets, at that time, the ``run_finished`` event that every other end of a run stores, and that ends
         the stream of its events; so does a run closed this way before that event was stored, unless its events were
-        pruned since (the run keeps none, and gets none back). Returns how many runs changed."""
+        pruned since (the run keeps none, and gets none back). The events of delegated runs come first, as a run's
+        end follows the ends of the runs it delegated (item 197). Returns how many runs changed."""
         async with self._db.execute(
             "UPDATE runs SET status = 'failed', result = ?,"
             " finished_at = COALESCE((SELECT MAX(ts) FROM events WHERE events.run_id = runs.id), created_at)"
@@ -1372,7 +1373,8 @@ class Store:
             " WHERE status = 'failed' AND result = ?"
             f" AND (id IN ({','.join('?' * len(closed))})"
             " OR EXISTS (SELECT 1 FROM events WHERE events.run_id = runs.id))"
-            " AND NOT EXISTS (SELECT 1 FROM events WHERE events.run_id = runs.id AND events.kind = 'run_finished')",
+            " AND NOT EXISTS (SELECT 1 FROM events WHERE events.run_id = runs.id AND events.kind = 'run_finished')"
+            " ORDER BY parent_run_id IS NULL",
             (dumps_compact({"status": "failed", "result": RESULT_RESTARTED}), RESULT_RESTARTED, *closed),
         )
         await self._db.commit()
@@ -1382,18 +1384,21 @@ class Store:
     async def close_runs_of(self, owners: Sequence[str], result: str) -> list[EventRecord]:
         """The active runs of ``owners``, processes that are gone, become 'failed' with ``result``, finished at their
         last sign of life: their newest event, else the time they were created. In the same write each gets, at that
-        time, the ``run_finished`` event that every other end of a run stores; returns those events, for the pages that
-        follow the runs. Unlike :meth:`mark_interrupted_runs`, a run without an owner stays as it is."""
+        time, the ``run_finished`` event that every other end of a run stores, those of delegated runs first; returns
+        those events, for the pages that follow the runs. Unlike :meth:`mark_interrupted_runs`, a run without an owner
+        stays as it is."""
         async with self._db.execute(
             "UPDATE runs SET status = 'failed', result = ?,"
             " finished_at = COALESCE((SELECT MAX(ts) FROM events WHERE events.run_id = runs.id), created_at)"
             f" WHERE status IN ('running', 'queued', 'blocked') AND owner IN ({','.join('?' * len(owners))})"
-            " RETURNING id, finished_at",
+            " RETURNING id, finished_at, parent_run_id",
             (result, *owners),
         ) as cursor:
-            closed: list[tuple[str, float]] = [
-                (str(row["id"]), float(row["finished_at"])) for row in await cursor.fetchall()
-            ]
+            rows: list[sqlite3.Row] = list(await cursor.fetchall())
+        closed: list[tuple[str, float]] = [
+            (str(row["id"]), float(row["finished_at"]))
+            for row in sorted(rows, key=lambda row: row["parent_run_id"] is None)
+        ]
         data: JsonObject = {"status": "failed", "result": result}
         told: list[EventRecord] = []
         for run_id, finished_at in closed:

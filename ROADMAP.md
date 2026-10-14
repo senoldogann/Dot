@@ -5131,8 +5131,15 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 192 | A question offers its options with what each leads to and the one recommended        | done        | 5a41ac7 |
 | 193 | The chat shows pages Dot makes: charts, 3D drawings and other visuals                | done        | 1cc6fac |
 | 194 | Dot reads Word, Excel and PowerPoint files                                           | done        | 5592965 |
-| 195 | A file opens in a panel beside the chat: PDF, sheets, documents and more             | in progress |         |
+| 195 | A file opens in a panel beside the chat: PDF, sheets, documents and more             | done        | 6ef8fa8 |
 | 196 | Dot knows its way around Word, Excel and OneDrive on the Mac                         | planned     |         |
+| 197 | A stopped run stops the runs it delegated, and their rows stop                       | in progress |         |
+| 198 | The side menu shows every agent of a run, folded under it                            | planned     |         |
+| 199 | The default model is chosen in Settings, and a chat keeps its model                  | planned     |         |
+| 200 | Reconnecting, checked end to end                                                     | planned     |         |
+| 201 | Marks of the conversation's messages: a look and a jump, after T3 Code               | planned     |         |
+| 202 | The side menu, designed again                                                        | planned     |         |
+| 203 | The run's side panel, designed again                                                 | planned     |         |
 
 ### 77. The type system: Inter and Geist Mono, seven sizes, three weights
 
@@ -9644,7 +9651,7 @@ on disk the same way, a part at a time (`openpyxl`, `python-docx`, `python-pptx`
 
 ### 195. A file opens in a panel beside the chat: PDF, sheets, documents and more
 
-**Status: in progress.**
+**Status: done.** Merged as `6ef8fa8` (PR #235; no Linear issue, the Linear connector was signed out).
 
 **As built (2026-10-14).** A file opens in the side panel of the run page, which the file takes while it is open: half
 of the page when the panel has its own width, the whole screen on a phone; Close and Escape give the panel back as it
@@ -9689,6 +9696,108 @@ file in its application on the Mac.
 libraries (and recalculate a workbook through Excel or LibreOffice), when to drive the application with AppleScript, and
 where OneDrive keeps the files it syncs (`~/Library/CloudStorage/OneDrive-*`); `dotx doctor` says which of them are
 installed, and eval tasks check the skills.
+
+## Part 32: runs that stop whole, every agent in the side menu, a model that stays (planned 2026-10-14)
+
+The owner's thirty-first word, on 2026-10-14: the default model should be chosen in Settings, and the model chosen in a
+chat should stay chosen through a reload or a restart; reconnecting should be sure to work; small marks at the left of
+the conversation, one for each message, should show the message when the pointer rests on one and go to it on a click,
+as in T3 Code; once a run is stopped, the rows of the runs it delegated should stop moving; a run with three agents at
+work showed one of them in the side menu, and they could not be folded or unfolded; and the left menu and the right
+panel should both be designed and work better, after T3 Code or in a way of Dot's own.
+
+**Status (2026-10-14): planned.** What exists was read in the code. A run that was stopped stored its end before the
+ends of the runs it delegated (`RunManager.delegate` stopped a delegated run and went on at once), and the run page
+reads a run's events up to its own end: the rows of those runs kept working. So did a crash's: the daemon that starts
+next stores the ends it left in the order the runs were made. The side menu's Working section lists the runs at work
+alone (`server/activity.py`): a delegated run that ended leaves it, and the rows under a run do not fold. The default
+model is `[models] main` in `config.toml`, which Settings shows and no page changes; a chat's composer takes the model
+of the run its page shows, and a model picked there and not sent is lost with a reload. The pages follow their streams
+again after a break and read again what changed (item 160); the first screen of a daemon that is down waits for a click,
+a few pages read nothing again, and the desktop shell polls the daemon every second. The conversation has no marks of
+its messages.
+
+**The shape of this part (the decisions).** Seven items, each a pull request of its own, the defects first: a stopped
+run stops the runs it delegated, and their rows stop (197); the side menu shows every agent of a run, folded under it
+(198); the default model is chosen in Settings, and a chat keeps its model (199); reconnecting is checked end to end,
+and what it misses is mended (200); then the marks of the conversation's messages (201), and the side menu (202) and the
+run's side panel (203) designed again, in their structure and in how they work. Item 196 of part 31 follows the defects
+(197 to 200) unless the owner orders otherwise.
+
+### How to start part 32 (the handoff prompt)
+
+> Read ROADMAP.md part 32 and the status table of part 9 (rows 197 to 203). One item at a time, in order; the protocol
+> of part 5 (branch, gate, PR, Linear MYP issue when the connector is signed in, squash merge, hash in the table, log
+> line) is unchanged. Give each change a test that fails on the code of before, and check a page that changes in a
+> browser, wide and on a phone, light and dark. Never touch the owner's data directory except to read it, by the
+> kinds and numbers of what is stored, and to restart the daemon when `/api/status` shows no active run; PLAN.md
+> stays untracked. The owner reads Turkish; everything written is English.
+
+### 197. A stopped run stops the runs it delegated, and their rows stop
+
+**Status: in progress.**
+
+**As built (2026-10-14).** A run that is stopped stops the runs it delegated, and its end is stored after theirs.
+`RunManager.delegate`, cancelled while it waits, stops the delegated run and lets the cancellation go on once that run's
+end is stored; the calls of a turn that run together are all awaited before the turn's cancellation goes on
+(`executor._together`), so the run's own end comes last. The run page reads a run's events up to its own end: each row
+of a delegated run now ends on the page that watched the stop, and on every page opened after it. A daemon that starts
+stores the ends a crash left behind (`Store.mark_interrupted_runs`), and the daemon the ends of the runs of a `dotx`
+command that died (`Store.close_runs_of`), those of delegated runs first. A run stored the other way, before this item,
+shows its rows ended too: once its own end is read, the page reads the run again, as it did, and a row whose run has
+ended shows how, from the run's `children` (`timeline.settle`). Before, the rows of a stopped run's delegated runs kept
+their ring and their last line ("starting", or their last step), after a reload too. Tests:
+`tests/smoke/test_stopped_delegation.py`, a real server on the scripted model, in Chrome at 1280 and 390 px, light and
+dark: a run delegates three runs that wait in a shell command, the page's Stop ends them all as stopped with their ends
+stored before the run's, and every row shows its run cancelled, on that page and after a reload; a run stored the old
+way shows its row cancelled. `tests/unit/test_store_runs.py`: both ways of closing what a process left store the
+delegated run's end first. On the code of before, a delegated run was still at work once the run that delegated it had
+ended (`('running', '') == ('cancelled', ...)`), the row of the old way kept working, and a restart stored the run's end
+first (`2 < 1`). It passed in WebKit too.
+
+### 198. The side menu shows every agent of a run, folded under it
+
+**Status: planned.**
+
+**What.** The Working section lists, under a run at work, every run it delegated: those at work with how long they have
+worked, those that ended with how they ended. The run's row folds them, and keeps the fold.
+
+### 199. The default model is chosen in Settings, and a chat keeps its model
+
+**Status: planned.**
+
+**What.** Settings chooses the model new chats start on (`[models] main`), with no edit of `config.toml` by hand and no
+restart of the daemon. A chat keeps the model and the reasoning chosen in it, through a reload of the page and a restart
+of the app or of the daemon.
+
+### 200. Reconnecting, checked end to end
+
+**Status: planned.**
+
+**What.** Every way a page loses the daemon is tried and comes back by itself: a restart of the daemon, a stream that
+drops, the app opened while the daemon is down, the Mac waking from sleep. A page that reads nothing again after a break
+reads what changed. A test for each.
+
+### 201. Marks of the conversation's messages: a look and a jump, after T3 Code
+
+**Status: planned.**
+
+**What.** A column of short marks at the left of the conversation, one for each message of the owner: resting on one
+shows the message and the start of its answer, and a click goes to it. After T3 Code's.
+
+### 202. The side menu, designed again
+
+**Status: planned.**
+
+**What.** The side menu designed again, in its structure and in how it works: what it lists, how a chat shows what works
+in it and what waits for the owner, and how its parts fold. Screenshots looked at, wide and on a phone, light and dark.
+
+### 203. The run's side panel, designed again
+
+**Status: planned.**
+
+**What.** The run's side panel designed again, in its structure and in how it works: Dot's computer, the details, the
+cost, the plan, the files, the actions and the screens. Screenshots looked at, wide and on a phone, light and dark.
 
 ## Log
 
@@ -10324,3 +10433,5 @@ installed, and eval tasks check the skills.
 - 2026-10-14 (Opus 5.5): item 192 merged as `5a41ac7` (PR #232; no Linear issue, the connector was signed out): A question of the agent offers its options with what each leads to and the one it recommends, several may be chosen, and the terminal takes an option's number.
 - 2026-10-14 (Opus 5.5): item 193 merged as `1cc6fac` (PR #233; no Linear issue, the connector was signed out): The chat shows pages a run writes in HTML (charts, 3D drawings, tables, diagrams) in a card, sandboxed, sized to the page and in the colours of the theme on screen.
 - 2026-10-14 (Opus 5.5): item 194 merged as `5592965` (PR #234; no Linear issue, the connector was signed out): Dot reads Word, Excel and PowerPoint files, attached or on disk: a document's text and tables, a workbook's cells with their formulas, a presentation's slides with their charts and notes.
+- 2026-10-14 (Opus 5.5): item 195 merged as `6ef8fa8` (PR #235; no Linear issue, the connector was signed out): A file opens in the side panel of the run page, from a sent file's chip, a path an answer names, the Files card or Actions: a PDF's pages, the grid of a workbook or a CSV, a document, a presentation, an image or a text.
+- 2026-10-14 (Opus 5.5): part 32, runs that stop whole, every agent in the side menu, a model that stays, is planned (items 197 to 203); item 196 of part 31 follows its defects (197 to 200).
