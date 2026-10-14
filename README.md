@@ -1126,14 +1126,18 @@ and the model's name gives way with an ellipsis, so on a phone the bar is still 
 line under the frame says so. Each pill opens its menu above it, and a pick or Escape or a click outside closes it. What
 you typed and attached and did not send is kept in this browser and is there again when you come back (so is the box of
 each run). Dot's face looks down at the box while you write and brightens when you send. Enter starts the run,
-Shift+Enter adds a line. A message whose answer was lost on its way back (the page says the sending failed and keeps the
-message) is done once when it is sent again, here and in the box of a run: the page sends each new message with a key of
-its own, and the daemon answers the same message sent again with what its first sending made. `/` at the start of a word
-opens the slash menu over the box: the commands of the composer (`/task`, `/chat`, `/research` here; `/btw` in the box
-of a run), the skills by name with their description, and each MCP server with its tools, read from the daemon as a run
-reads them (`GET /api/palette`); letters filter, the arrows move, Enter or Tab picks and Escape closes. A skill picked
-reads "use the skill NAME: " in the box, a tool its name, a command does its work. A run that waits for your approval
-shows above the composer, as a card, and moves it down only when the cards do not fit there.
+Shift+Enter adds a line. The markdown in the box shows as it reads (item 207, after T3 Code's composer): its marks (a
+heading's hashes, a list's mark, the stars of bold, the backticks of code, a link's brackets, a table's pipes) quieter
+than its words, bold words, headings and a table's head heavier, code tinted, quotes softer and links in the colour of
+links; the box is still a text field, with its caret, selection, spelling and undo, and what is sent is the text as
+typed. A message whose answer was lost on its way back (the page says the sending failed and keeps the message) is done
+once when it is sent again, here and in the box of a run: the page sends each new message with a key of its own, and the
+daemon answers the same message sent again with what its first sending made. `/` at the start of a word opens the slash
+menu over the box: the commands of the composer (`/task`, `/chat`, `/research` here; `/btw` in the box of a run), the
+skills by name with their description, and each MCP server with its tools, read from the daemon as a run reads them
+(`GET /api/palette`); letters filter, the arrows move, Enter or Tab picks and Escape closes. A skill picked reads "use
+the skill NAME: " in the box, a tool its name, a command does its work. A run that waits for your approval shows above
+the composer, as a card, and moves it down only when the cards do not fit there.
 
 A run opens as a conversation under Dot's face and name. The face is the state: still when the run rests, a slow breath
 while it works, an amber ring while it waits for you, a green tick for a moment when the run ends done, red when it
