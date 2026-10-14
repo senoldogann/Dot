@@ -5161,8 +5161,8 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 222 | A context meter in the run's composer                                                | done        | a99e07e |
 | 223 | Claude's fast mode                                                                   | done        | a3ace6d |
 | 224 | A summary's check knows a path however it is written                                 | done        | 109c270 |
-| 225 | A model that declines is said to have declined                                       | in progress |         |
-| 226 | A helper's card                                                                      | planned     |         |
+| 225 | A model that declines is said to have declined                                       | done        | 103f5b2 |
+| 226 | A helper's card                                                                      | in progress |         |
 | 227 | Previous agents in the side panel                                                    | planned     |         |
 | 228 | The rail of messages beside the docked panel                                         | planned     |         |
 | 229 | Commands in the background                                                           | planned     |         |
@@ -10524,7 +10524,7 @@ the home folder, `/tmp` or `/private/tmp`, and flags no path the history holds.
 
 ### 225. A model that declines is said to have declined
 
-**Status: in progress.**
+**Status: done.** Merged as `103f5b2` (PR #264; no Linear issue, the Linear connector was signed out).
 
 **As built (2026-10-14).** The review model answers Dot's own questions, each by a call of one tool, and a reply without
 it is asked for once more. A reply its provider ends as a refusal (Anthropic's stop reason `refusal`, OpenAI's finish
@@ -10540,7 +10540,16 @@ so at once, instead of asking again and saying that the model did not use its to
 
 ### 226. A helper's card
 
-**Status: planned.**
+**Status: in progress.**
+
+**As built (2026-10-14).** Resting the pointer on a helper's row for 400 ms, or moving the keyboard's focus to it, shows
+a card beside it (`static/js/helpercard.js`), as T3 Code does for a subagent: the helper's face and whole goal, the
+model with its reasoning level (and Fast in fast mode), its state with the time it has taken, counting on at the second
+the row's time does, and what it does now (the call that is out, else Thinking) or did last. It stands under the row, or
+over it where the window has no room below, and describes the row while it shows; the pointer leaving, a click, the
+focus moving on or Escape put it away. On a touch screen a tap opens the row as before. Tests:
+`tests/smoke/test_helper_card.py`, a parent and its helper waiting in a shell command, wide and on a phone, light and
+dark, in Chrome and WebKit; on the code of before, there is no card.
 
 **What.** Hovering or focusing a helper's row in the conversation opens a card with its title, its model and reasoning
 level, its state with the time it has run, and what it is doing or did last.
@@ -11251,3 +11260,4 @@ default model.
 - 2026-10-14 (Opus 5.5): item 222 merged as `a99e07e` (PR #261; no Linear issue, the connector was signed out): a ring in a run's composer shows how much of the run's context budget its last step filled.
 - 2026-10-14 (Opus 5.5): item 223 merged as `a3ace6d` (PR #262; no Linear issue, the connector was signed out): Claude Opus 5.5, Opus 5 and Opus 4.8 offer fast mode in a chat's reasoning menu, off until the owner turns it on.
 - 2026-10-14 (Opus 5.5): item 224 merged as `109c270` (PR #263; no Linear issue, the connector was signed out): a summary's check knows a path in each of the ways a Mac writes it, `~` or the home folder, `/tmp` or `/private/tmp`.
+- 2026-10-14 (Opus 5.5): item 225 merged as `103f5b2` (PR #264; no Linear issue, the connector was signed out): a review model that declines is said to have declined, naming it, and is not asked again.
