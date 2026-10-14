@@ -47,7 +47,7 @@ import {
   setShowInspector,
   showInspector,
 } from "../layout.js";
-import { paneHead, rangeSetting, segmented, switchSetting } from "../panels.js";
+import { choiceSetting, paneHead, rangeSetting, switchSetting } from "../panels.js";
 import {
   SCHEMES,
   allThemes,
@@ -411,19 +411,6 @@ function themesCard(onEditing) {
 // The value of "Another family…" in a family's menu, which no stack has.
 const ANOTHER = "another";
 const TYPED_HINT = "Letters, digits, spaces, quotes, dots, dashes and underscores, with a comma between two families.";
-
-// A choice of a few, as Density is drawn: the label and the buttons on a line, the hint under them.
-function choiceSetting({ label, hint, options, selected, onSelect }) {
-  const choice = segmented(options, selected, onSelect);
-  choice.element.setAttribute("aria-label", label);
-  const element = el(
-    "div",
-    { class: "setting" },
-    el("div", { class: "row" }, el("span", { class: "grow" }, label), choice.element),
-    el("div", { class: "hint" }, hint),
-  );
-  return { element, choice };
-}
 
 // An on/off setting of appearance/settings.js, whose values are "on" and "off".
 function onOffSetting({ label, hint, setting }) {

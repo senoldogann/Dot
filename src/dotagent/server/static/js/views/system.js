@@ -2,6 +2,7 @@
 
 import { DOT_ID, lookOf, rememberLook } from "../actors.js";
 import { api, clearToken } from "../api.js";
+import { BUSY_SEND, SEND_KEY, setValue, valueOf } from "../appearance/settings.js";
 import {
   notificationsAvailable,
   notificationsBlocked,
@@ -17,7 +18,7 @@ import { dotName, NAME_CHARS, setDotName } from "../face.js";
 import { OWNER_CHARS, ownerName, setOwnerName } from "../presence.js";
 import { icon } from "../icons.js";
 import { lookPicker } from "../lookpicker.js";
-import { foldCard, foldGroup, inlineError, inlineLoading, paneHead, segmented, switchSetting } from "../panels.js";
+import { choiceSetting, foldCard, foldGroup, inlineError, inlineLoading, paneHead, segmented, switchSetting } from "../panels.js";
 import { providerLabel, providerOf } from "../providers.js";
 import { reasoningSelect } from "../reasoning.js";
 import { approvalLabel } from "../runmodes.js";
@@ -126,6 +127,32 @@ function buildNotifications() {
 
   paint();
   return section("Notifications", null, el("div", { class: "card-pad stack" }, setting.element, always.element));
+}
+
+/** The composer's keys (item 230), kept in this browser: the key that sends, and what a message to a run at work
+ * does. */
+function buildComposerCard() {
+  const sendKey = choiceSetting({
+    label: "Send with",
+    hint: "Enter sends and Shift+Enter breaks a line, or ⌘Enter (Ctrl+Enter) sends and Enter breaks a line.",
+    options: [
+      { id: "enter", label: "Enter", hint: "Enter sends; Shift+Enter breaks a line." },
+      { id: "mod-enter", label: "⌘Enter", hint: "⌘Enter or Ctrl+Enter sends; Enter breaks a line." },
+    ],
+    selected: valueOf(SEND_KEY),
+    onSelect: (id) => setValue(SEND_KEY, id),
+  });
+  const busy = choiceSetting({
+    label: "While a run works",
+    hint: "A message waits in the chat's queue and starts the next run once this one has ended, or steers the run at once; ⌘⇧Enter sends it the other way. A campaign's session is always steered.",
+    options: [
+      { id: "queue", label: "Queue", hint: "The message waits in the chat's queue." },
+      { id: "steer", label: "Steer", hint: "The message goes to the run at work at once." },
+    ],
+    selected: valueOf(BUSY_SEND),
+    onSelect: (id) => setValue(BUSY_SEND, id),
+  });
+  return section("Composer", null, el("div", { class: "card-pad stack" }, sendKey.element, busy.element));
 }
 
 function buildDaemon() {
@@ -779,10 +806,11 @@ function buildDotLookCard() {
 export function mountGeneral(root, ctx) {
   const look = buildDotLookCard();
   root.append(
-    paneHead("What Dot is called and calls you, its own face, how it draws your attention, and the token this browser is signed in with.", null),
+    paneHead("What Dot is called and calls you, its own face, how it draws your attention, the composer's keys, and the token this browser is signed in with.", null),
     buildNameCard(),
     look.element,
     buildNotifications(),
+    buildComposerCard(),
     buildTokenCard(),
   );
   return look.dispose;

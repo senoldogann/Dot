@@ -8,7 +8,8 @@ so a removal or an edit in that moment is refused; it starts after the run at wo
 processes that move the queue at once start it once, the claim of a process that died holds the queue, a message
 steered as its run ends goes back and starts after it, and a claim the store refused to end is ended by the next start
 (item 184). The chat's page shows it all above the composer, as T3 Code does, served by a real server, wide and on a
-phone, light and dark.
+phone, light and dark. Settings › General chooses the key that sends, Enter or ⌘Enter, and whether a message sent while
+a run works waits in the queue or steers the run, ⌘⇧Enter sending it the other way (item 230).
 
 No network and no model service is used: the scripted model ends each run with its first reply, which the test lets go.
 """
@@ -555,6 +556,95 @@ async def test_the_chats_page_queues_moves_edits_steers_and_resumes_messages_abo
                     await model.release()
                     assert (await _ended(manager, third.id)).status == "done"
                     await page.close()
+        finally:
+            await browser.close()
+
+
+@pytest.mark.browser
+async def test_the_settings_choose_the_key_that_sends_and_whether_a_message_steers_the_run_at_work(
+    login_env: dict[str, str], tmp_path: Path
+) -> None:
+    model: _GatedModel = _GatedModel()
+    async with _served(login_env, model) as (runtime, manager, address), async_playwright() as playwright:
+        host, port = "127.0.0.1", int(address.rpartition(":")[2])
+        browser: Browser = await playwright.chromium.launch(channel=runtime.config.browser.channel, headless=True)
+        try:
+            for width, scheme in _SHOTS:
+                page: Page = await browser.new_page(
+                    viewport={"width": width, "height": 800}, color_scheme=scheme, reduced_motion="reduce"
+                )
+                await page.goto(ui_url(host, port, TOKEN))
+
+                # Settings › General: Enter sends and a message waits in the queue, until the owner chooses otherwise.
+                await page.goto(f"{address}/#/settings/general")
+                card: Locator = page.locator("section.card").filter(has=page.locator(".card-head", has_text="Composer"))
+                send_with: Locator = card.get_by_role("group", name="Send with")
+                busy: Locator = card.get_by_role("group", name="While a run works")
+                await expect(send_with.get_by_role("button", name="Enter", exact=True)).to_have_attribute(
+                    "aria-pressed", "true"
+                )
+                await expect(busy.get_by_role("button", name="Queue")).to_have_attribute("aria-pressed", "true")
+                await send_with.get_by_role("button", name="⌘Enter").click()
+                await busy.get_by_role("button", name="Steer").click()
+                await expect(send_with.get_by_role("button", name="⌘Enter")).to_have_attribute("aria-pressed", "true")
+                await expect(busy.get_by_role("button", name="Steer")).to_have_attribute("aria-pressed", "true")
+                kept: list[str | None] = await page.evaluate(
+                    "() => [localStorage.getItem('dot.sendKey'), localStorage.getItem('dot.busySend')]"
+                )
+                assert kept == ["mod-enter", "steer"]
+                assert await card.evaluate("(card) => card.scrollWidth <= card.clientWidth")
+                await card.scroll_into_view_if_needed()
+                await _shot(page, tmp_path / f"composer-keys-{width}-{scheme}.png")
+
+                # Where ⌘Enter sends, Enter breaks the line, in the new chat's composer as in the run's.
+                await page.goto(f"{address}/#/")
+                home: Locator = page.locator(".home .composer textarea")
+                await home.fill(GOAL)
+                at: str = page.url
+                await home.press("Enter")
+                await expect(home).to_have_value(f"{GOAL}\n")
+                await expect(page).to_have_url(at)
+                await home.fill("")
+
+                async with _changes(runtime) as changes:
+                    first: RunRecord = await _start(manager)
+                    # The run waits at its first step from here on: what is steered reaches it at its second.
+                    waiting: _Reply = await model.asked()
+                    await page.goto(f"{address}/#/runs/{first.id}")
+                    box: Locator = page.locator(".dock textarea")
+                    send: Locator = page.locator(".dock .btn.send")
+                    queue: Locator = page.locator(".dock .queue")
+                    await expect(send).to_have_attribute("aria-label", "Stop")
+                    await expect(box).to_have_attribute("placeholder", "Steer this run, or /btw to ask on the side")
+
+                    # A message steers the run at work, sent with ⌘Enter.
+                    await box.fill(NOW)
+                    await expect(send).to_have_attribute("aria-label", "Steer")
+                    await box.press("Enter")
+                    await expect(box).to_have_value(f"{NOW}\n")
+                    await box.press("ControlOrMeta+Enter")
+                    await expect(box).to_have_value("")
+                    await expect(page.get_by_text(f"Waiting for the next step: “{NOW}”")).to_be_visible()
+                    await expect(queue).to_be_hidden()
+
+                    # ⌘⇧Enter sends it the other way: into the queue.
+                    await box.fill(CLOSE)
+                    await box.press("ControlOrMeta+Shift+Enter")
+                    await expect(box).to_have_value("")
+                    await expect(queue.locator(".queue-text")).to_have_text([CLOSE])
+
+                    # The run reads the steered message at its second step and ends done; the queued one starts after.
+                    waiting.go.set()
+                    await model.release()
+                    assert (await _ended(manager, first.id)).status == "done"
+                    second: RunRecord = await _started(changes, runtime, first)
+                    assert second.goal == CLOSE
+                    steers: list[EventRecord] = await runtime.store.events_of_kind(first.id, "steer", 10)
+                    assert [event.data["text"] for event in steers] == [NOW]
+                    await expect(page).to_have_url(f"{address}/#/runs/{second.id}")
+                    await model.release()
+                    assert (await _ended(manager, second.id)).status == "done"
+                await page.close()
         finally:
             await browser.close()
 

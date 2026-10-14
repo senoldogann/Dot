@@ -1,11 +1,13 @@
 // What the three composers share (the new chat's, the run's dock and the agent's page): one frame with the box that
-// grows with its text, the attached files under it and a bar of pills; Enter sends and Shift+Enter breaks a line; `/`
+// grows with its text, the attached files under it and a bar of pills; Enter sends and Shift+Enter breaks a line, or
+// ⌘Enter sends and Enter breaks it, as Settings › General chooses (item 230); `/`
 // at the start of a word opens the slash menu of commands, skills and MCP tools (slash.js says what it offers; this
 // file draws it and listens to the keys, after the APG combobox pattern: the arrows move, Enter and Tab pick, Escape
 // closes, letters filter); a draft keeps the text and the ready files in this browser until they are sent. The markdown
 // in the box shows as it reads, its marks quiet (mirror.js, item 207).
 
 import { api } from "./api.js";
+import { SEND_KEY, valueOf } from "./appearance/settings.js";
 import { createAttachments } from "./attachments.js";
 import { el } from "./dom.js";
 import { icon } from "./icons.js";
@@ -46,11 +48,11 @@ function loadPalette() {
   return paletteLoad;
 }
 
-/** Wire `textarea`: `send()` on Enter, autosize up to `maxPx`, the slash menu with `commands`
- * (`{ label: "/btw", hint, insert }`, or `run()` for one that acts on the composer) and the markdown it holds shown
- * under it; `edited()` runs after a pick of the menu changed the text, as the input event does after typing. Returns
- * the menu element and the box's field (the box with its markdown under it) to place in the composer's frame,
- * `autosize()`, to call after any change of the text, and `dispose()`. */
+/** Wire `textarea`: `send()` on the key that sends (Enter, or ⌘Enter: `SEND_KEY`), autosize up to `maxPx`, the slash
+ * menu with `commands` (`{ label: "/btw", hint, insert }`, or `run()` for one that acts on the composer) and the
+ * markdown it holds shown under it; `edited()` runs after a pick of the menu changed the text, as the input event does
+ * after typing. Returns the menu element and the box's field (the box with its markdown under it) to place in the
+ * composer's frame, `autosize()`, to call after any change of the text, and `dispose()`. */
 export function wireComposer(textarea, { maxPx, send, commands, edited }) {
   const menu = el("div", { class: "slash-menu", role: "listbox", id: `slash-${Math.random().toString(36).slice(2, 8)}`, hidden: true });
   textarea.setAttribute("aria-controls", menu.id);
@@ -189,7 +191,8 @@ export function wireComposer(textarea, { maxPx, send, commands, edited }) {
         return;
       }
     }
-    if (event.key === "Enter" && !event.shiftKey) {
+    // Enter sends, with ⌘ or Ctrl or without; where ⌘Enter is the key that sends, Enter alone breaks the line.
+    if (event.key === "Enter" && !event.shiftKey && (valueOf(SEND_KEY) === "enter" || event.metaKey || event.ctrlKey)) {
       event.preventDefault();
       send();
     }
