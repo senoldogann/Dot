@@ -96,6 +96,7 @@ from dotagent.store.models import (
     ThreadRecord,
     WorkingRun,
 )
+from dotagent.terminal.session import TerminalSession, ended_notice
 from dotagent.tools.context import DelegateOutcome
 from dotagent.tools.delegate import DELEGATE_SOURCE
 from dotagent.tools.meta import ASK_USER_TOOL
@@ -105,6 +106,10 @@ log = get_logger(__name__)
 
 # The live event that tells the pages a chat's queue changed (item 148); it carries the chat's id.
 QUEUE_CHANGED_EVENT: str = "queue_changed"
+# The live event that tells the pages a chat's terminal sessions changed (item 229); it carries the chat's id.
+TERMINALS_CHANGED_EVENT: str = "terminals_changed"
+# The source of the message that tells a chat that its command in the background ended (item 229).
+BACKGROUND_SOURCE: str = "background"
 # How often the daemon stores the ends the store refused and looks for the runs of dotx commands that died
 # (:meth:`RunManager.watch_commands`).
 COMMAND_CHECK_S: float = 30.0
@@ -166,6 +171,11 @@ def _answer_text(question: ApprovalRecord, answer: str) -> str:
 def stricter_approvals(first: ApprovalMode, second: ApprovalMode) -> ApprovalMode:
     """The stricter of two approval modes."""
     return min(first, second, key=_APPROVALS_STRICTEST_FIRST.index)
+
+
+def _offers(info: ModelInfo, effort: Effort) -> bool:
+    """Whether the model ``info`` tells of offers the level ``effort``: a model with fewer than two has no choice."""
+    return len(info.efforts) >= 2 and effort in info.efforts
 
 
 def _check_speed(ref: ModelRef, speed: Speed) -> None:
@@ -243,6 +253,8 @@ class RunManager:
         self._asks: asyncio.Task[None] | None = None
         # Whether the daemon moves the queues of the chats whose runs this process ends (:meth:`leave_queues`).
         self._leaves_queues: bool = False
+        # The ends of the commands in the background are told to their chats from here (item 229).
+        runtime.terminals.watch(self)
         # The model a run that names none starts on: ``[models] main``, or the one the owner made the default since
         # (:meth:`set_main_model`).
         self._main_model: str = runtime.config.models.main
@@ -443,8 +455,10 @@ class RunManager:
         """Leave the queues of the chats whose runs this process ends to the daemon, which moves each as it sees the
         end (:meth:`relay_elsewhere`): a ``dotx`` command ends with its run, and a queued message started there would
         be cut off with it. Until a daemon runs, such a queue waits; the daemon holds it when it starts
-        (:meth:`recover`)."""
+        (:meth:`recover`). Nor does such a process tell a chat of a command in the background: the command would end
+        with the process, so it opens none (item 229)."""
         self._leaves_queues = True
+        self._runtime.terminals.unwatch(self)
 
     @contextmanager
     def deleting_threads(self, thread_ids: Collection[str]) -> Iterator[None]:
@@ -1126,8 +1140,10 @@ class RunManager:
     async def shutdown(self) -> None:
         """Stop every live run. They end as cancelled with a result that says the daemon shut down, so the owner can tell
         them from runs stopped by hand; their thread keeps everything up to the step they were in. Lessons still being
-        drawn from runs that ended are dropped."""
+        drawn from runs that ended are dropped. A command in the background that ends from now on is told to no
+        chat: the daemon's stop ends it too."""
         self._stopping = True
+        self._runtime.terminals.unwatch(self)
         handles: list[RunHandle] = list(self._handles.values())
         for handle in handles:
             self.cancel(handle.run_id)
@@ -1459,8 +1475,10 @@ class RunManager:
         """Create the run record and its gate, start its task and register its handle."""
         runtime: Runtime = self._runtime
         parent: RunHandle | None = None if parent_run_id is None else self._handles.get(parent_run_id)
+        # The goal of a run that tells its chat of a command in the background is Dot's, not the owner's (item 229).
+        own: tuple[str, ...] = () if source == BACKGROUND_SOURCE else (goal,)
         instructions: tuple[str, ...] = (
-            await self._instructions_for(goal, thread_id, parent_run_id, parent)
+            await self._instructions_for(own, thread_id, parent_run_id, parent)
             if campaign_id is None
             else await self._session_instructions(goal, campaign_id)
         )
@@ -1593,16 +1611,21 @@ class RunManager:
         self._runtime.bus.publish(ended)
 
     async def _instructions_for(
-        self, goal: str, thread_id: str, parent_run_id: str | None, parent: RunHandle | None
+        self, own: tuple[str, ...], thread_id: str, parent_run_id: str | None, parent: RunHandle | None
     ) -> tuple[str, ...]:
         """What the user has told a run that is about to start, which is all a reviewer takes as authority: the goals
-        of the thread's earlier runs and this goal, or, for a delegated run, what its parent was told (its own goal was
-        written by the parent and is not an instruction)."""
+        of the thread's earlier runs and the run's ``own`` words (its goal), or, for a delegated run, what its parent
+        was told (its own goal was written by the parent and is not an instruction). The goal of a run that told its
+        chat of a command in the background is Dot's words, and none (item 229)."""
         if parent_run_id is not None:
             return () if parent is None else parent.gate.instructions
         recent: list[RunRecord] = await self._runtime.store.list_runs(_THREAD_INSTRUCTION_RUNS, thread_id)
-        earlier: list[str] = [record.goal for record in reversed(recent) if record.parent_run_id is None]
-        return (*earlier, goal)
+        earlier: list[str] = [
+            record.goal
+            for record in reversed(recent)
+            if record.parent_run_id is None and record.source != BACKGROUND_SOURCE
+        ]
+        return (*earlier, *own)
 
     async def _session_instructions(self, goal: str, campaign_id: str) -> tuple[str, ...]:
         """What the owner has told a session of a campaign that is about to start: the goals of the runs in the
@@ -1614,12 +1637,12 @@ class RunManager:
         answers: list[str] = [
             _answer_text(question, question.note) for question in asked if question.status == "approved"
         ]
-        return (*await self._instructions_for(goal, campaign.thread_id, None, None), *answers)
+        return (*await self._instructions_for((goal,), campaign.thread_id, None, None), *answers)
 
     async def _check_effort(self, ref: ModelRef, effort: Effort) -> None:
         """A level chosen for a run has to be one the model offers (a model with fewer than two has no choice)."""
         info: ModelInfo = await self._runtime.router.model_info(ref)
-        if len(info.efforts) < 2 or effort not in info.efforts:
+        if not _offers(info, effort):
             raise ConfigError(
                 "the model does not offer that reasoning effort",
                 {"model": ref.label, "effort": effort, "offered": list(info.efforts)},
@@ -1875,6 +1898,53 @@ class RunManager:
             QUEUE_CHANGED_EVENT,
             {"thread_id": thread_id, "started_run_id": started_run_id, "after_run_id": after_run_id, "error": error},
             False,
+        )
+
+    async def sessions_changed(self, thread_id: str) -> None:
+        """Tell the pages that a chat's terminal sessions changed (item 229), as a live event of its newest run."""
+        await self._runtime.bus.emit(
+            await self._newest_run_id(thread_id), TERMINALS_CHANGED_EVENT, {"thread_id": thread_id}, False
+        )
+
+    async def command_ended(self, thread_id: str, session: TerminalSession) -> None:
+        """Tell a chat that its command in the background ended (item 229): a message at the end of its queue, with the
+        chat's choices and agent, which starts its next run at once when no run works there and the queue is not held,
+        else waits its turn. The message says what Dot saw, and nothing the command printed (:func:`ended_notice`)."""
+        store: Store = self._runtime.store
+        newest: RunRecord = (await store.list_runs(1, thread_id))[0]
+        kept: ChatChoices | None = await store.chat_choices(thread_id)
+        choices: ChatChoices = (
+            kept
+            if kept is not None
+            else ChatChoices(
+                mode=newest.mode,
+                model=newest.model,
+                effort=newest.effort,
+                speed=newest.speed,
+                approvals=newest.approvals,
+                goal_mode=newest.goal_mode,
+            )
+        )
+        if session.exit_status is None:
+            raise ValueError(f"the command of session {session.id} has not ended")
+        text: str = ended_notice(session.id, session.command, session.exit_status, time.time() - session.started_at)
+        # A kept level the model does not offer is not asked for, as the composer does not ask it (item 116).
+        info: ModelInfo = await self._runtime.router.model_info(
+            parse_model_ref(choices.model if choices.model is not None else self._main_model)
+        )
+        effort: Effort | None = choices.effort if choices.effort is not None and _offers(info, choices.effort) else None
+        await self.queue(
+            thread_id,
+            text,
+            (),
+            choices.mode,
+            choices.model,
+            effort,
+            choices.speed,
+            choices.approvals,
+            choices.goal_mode,
+            newest.agent_id,
+            BACKGROUND_SOURCE,
         )
 
     async def _tell_campaign_stopped(self, run: RunRecord, campaign: CampaignRecord, note: str) -> None:

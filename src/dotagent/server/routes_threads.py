@@ -1,15 +1,22 @@
 """Routes for the chats of the sidebar: every thread a person started a run on, deleting several at once, naming or
-pinning one from its menu (item 130), keeping what its composer chose (item 199), and the helpers its runs started
-(item 227)."""
+pinning one from its menu (item 130), keeping what its composer chose (item 199), the helpers its runs started
+(item 227), and its terminal sessions (item 229)."""
 
 from typing import Annotated
 
 from fastapi import APIRouter, Query
 
-from dotagent.core.errors import ConfigError
+from dotagent.core.errors import ConfigError, NotFoundError
 from dotagent.llm.router import ModelRef, offers_fast_mode, parse_model_ref
 from dotagent.server.context import ServerContext
-from dotagent.server.views import DeletedThreads, DeleteThreadsRequest, HelpersQuery, ThreadChange, ThreadsQuery
+from dotagent.server.views import (
+    DeletedThreads,
+    DeleteThreadsRequest,
+    HelpersQuery,
+    TerminalView,
+    ThreadChange,
+    ThreadsQuery,
+)
 from dotagent.store.db import Store
 from dotagent.store.models import RunRecord, ThreadSummary
 
@@ -28,6 +35,33 @@ def threads_router(ctx: ServerContext) -> APIRouter:
         chat."""
         await store.get_thread(thread_id)
         return await store.list_thread_helpers(thread_id, query.limit)
+
+    @router.get("/threads/{thread_id}/terminals")
+    async def list_terminals(thread_id: str) -> list[TerminalView]:
+        """The chat's terminal sessions, in the order they opened (item 229): the line over the composer shows those
+        whose program runs. 404 for no chat."""
+        await store.get_thread(thread_id)
+        return [
+            TerminalView(
+                id=session.id,
+                command=session.command,
+                background=session.background,
+                started_at=session.started_at,
+                ended=session.ended,
+                exit_status=session.exit_status,
+            )
+            for session in ctx.runtime.terminals.sessions(thread_id)
+        ]
+
+    @router.delete("/threads/{thread_id}/terminals/{session_id}", status_code=204)
+    async def close_terminal(thread_id: str, session_id: str) -> None:
+        """End the program of one of the chat's terminal sessions and everything it started, as Stop on the line over
+        the composer does (item 229); the chat is told nothing. 404 for no such session."""
+        if session_id not in {session.id for session in ctx.runtime.terminals.sessions(thread_id)}:
+            raise NotFoundError(
+                "the chat has no such terminal session", {"thread_id": thread_id, "session": session_id}
+            )
+        await ctx.runtime.terminals.close(thread_id, session_id)
 
     @router.delete("/threads")
     async def delete_threads(request: DeleteThreadsRequest) -> DeletedThreads:

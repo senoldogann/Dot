@@ -6,6 +6,7 @@ import { agentList } from "../agentlist.js";
 import { api, follow } from "../api.js";
 import { approvalCard, fromRecord, LEFT_IN_CAMPAIGN, LEFT_IN_RUN } from "../approvals.js";
 import { readyToSend } from "../attachments.js";
+import { backgroundWork } from "../background.js";
 import { runChoices } from "../choices.js";
 import { createComputer } from "../computer.js";
 import { createCostCard } from "../cost.js";
@@ -14,7 +15,7 @@ import { composerFrame } from "../composer.js";
 import { createContextMeter } from "../contextmeter.js";
 import { clip, dateTimeFull, debounce, duration, el, FILE_BUTTONS, fileSource, modelName, OPEN_FILE_EVENT, requestFile } from "../dom.js";
 import { levelLabel } from "../efforts.js";
-import { continuedIn, earlierTurns, loadHistory, RESUME_SOURCE } from "../history.js";
+import { BACKGROUND_SOURCE, backgroundNote, continuedIn, earlierTurns, loadHistory, RESUME_SOURCE } from "../history.js";
 import { dotName, faceState, faceStateAtEnd } from "../face.js";
 import { icon } from "../icons.js";
 import { createInspector } from "../inspector.js";
@@ -524,7 +525,9 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
   });
   frame.options.append(choices.pills.mode, choices.pills.model, choices.pills.reasoning, choices.pills.options);
   const stopStatus = onChange(choices.sync);
-  const dock = el("div", { class: "dock" }, resumeLine, queue.element, frame.element);
+  // The chat's commands at work (item 229), between the queue and the composer, as T3 Code shows its background work.
+  const background = backgroundWork({ threadId: run.thread_id });
+  const dock = el("div", { class: "dock" }, resumeLine, queue.element, background.element, frame.element);
 
   // Steer messages that are sent but not read yet; each one leaves when the run reports reading it.
   const waitingMessages = [];
@@ -900,11 +903,14 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
   const layout = el("div", { class: "run-layout" });
   // A delegated run's page sends nothing: the run that delegated it wrote its goal, and its composer is hidden (item 96).
   const ownsMessages = run.parent_run_id === null;
-  // A resumed run's goal is the one of the run above it; its timeline opens with how it resumed that run.
+  // A resumed run's goal is the one of the run above it; its timeline opens with how it resumed that run. The goal of a
+  // run that tells of a command in the background is Dot's note (item 229).
   const goalMessage =
     run.source === RESUME_SOURCE
       ? null
-      : userMessage({ text: run.goal, sentAt: run.created_at, files: [], sendAgain: ownsMessages ? () => sendAgain(run.goal, () => filesOfRun(run.id)) : null });
+      : run.source === BACKGROUND_SOURCE
+        ? backgroundNote(run.goal)
+        : userMessage({ text: run.goal, sentAt: run.created_at, files: [], sendAgain: ownsMessages ? () => sendAgain(run.goal, () => filesOfRun(run.id)) : null });
   // ------------------------------------------------------------------------------------------- actions
   // What the run did and what can be undone: its acting steps, its approvals and its file changes (see server.actions).
   const actionsBody = el("div", { class: "actions-list" });
@@ -1233,6 +1239,7 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
     stopStatus();
     choices.dispose();
     queue.dispose();
+    background.dispose();
     meter.dispose();
     frame.dispose();
     if (ticker !== null) {

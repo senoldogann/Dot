@@ -220,7 +220,9 @@ def build_shell_tool() -> RegisteredTool:
             "Run a shell command on the user's Mac (zsh, non-interactive, no stdin). Prefer this over the GUI whenever a "
             "command, script or CLI can do the job: it is the fastest and most reliable tool. Output is capped, so filter "
             "with grep/head/tail/jq. Long-running servers must be started in the background "
-            "(nohup cmd > log 2>&1 &) and polled later. Outside yolo the command runs in a macOS sandbox that keeps "
+            "(nohup cmd > log 2>&1 &) and polled later. A command that runs longer than timeout_s and ends by itself "
+            "(an eval, a long build) goes to terminal_open with background: this chat is told when it ends. Outside "
+            "yolo the command runs in a macOS sandbox that keeps "
             "it out of Dot's own files, and macOS starts no program that runs as root there (ps, top, sudo): use "
             "pgrep -lf and lsof instead of ps."
         ),

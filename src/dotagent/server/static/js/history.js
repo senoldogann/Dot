@@ -14,6 +14,8 @@ const FINISHED = new Set(["done", "failed", "cancelled"]);
 // The source of a run that goes on from where the run before it was cut off (agent/resume.py): its goal is that run's
 // goal, so it is not shown as asked again.
 export const RESUME_SOURCE = "resume";
+// The source of a run that tells the chat that its command in the background ended (item 229).
+export const BACKGROUND_SOURCE = "background";
 
 /** The runs of a thread that the user started, oldest first; delegated runs belong to the run that delegated them. */
 function conversation(runs) {
@@ -34,6 +36,14 @@ export async function loadHistory(run) {
   return { earlier: runs.slice(0, at), later: runs.slice(at + 1) };
 }
 
+/**
+ * What opens a run that tells its chat that a command in the background ended (item 229): Dot wrote it, not the
+ * owner, so it reads as a note, its first line, which says which command ended and how.
+ */
+export function backgroundNote(goal) {
+  return el("div", { class: "note background-note" }, icon("terminal"), el("span", null, goal.split("\n")[0]));
+}
+
 /** One earlier run as what was asked and how it ended; a run still going keeps the foot of its message back. */
 function turn(past, sendAgainOf) {
   const href = `#/runs/${past.id}`;
@@ -44,7 +54,9 @@ function turn(past, sendAgainOf) {
   const asked =
     past.source === RESUME_SOURCE
       ? el("div", { class: "note" }, icon("refresh"), el("span", null, "Resumed where the run above was cut off"))
-      : userMessage({ text: past.goal, sentAt: past.created_at, files: [], sendAgain: sendAgainOf(past) });
+      : past.source === BACKGROUND_SOURCE
+        ? backgroundNote(past.goal)
+        : userMessage({ text: past.goal, sentAt: past.created_at, files: [], sendAgain: sendAgainOf(past) });
   return el("section", { class: ended ? "turn" : "turn turn-working" }, asked, answer);
 }
 

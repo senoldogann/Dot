@@ -5164,8 +5164,8 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 225 | A model that declines is said to have declined                                       | done        | 103f5b2 |
 | 226 | A helper's card                                                                      | done        | 0db06a8 |
 | 227 | Previous agents in the side panel                                                    | done        | b948cd7 |
-| 228 | The rail of messages beside the docked panel                                         | in progress |         |
-| 229 | Commands in the background                                                           | planned     |         |
+| 228 | The rail of messages beside the docked panel                                         | done        | 46a8ef0 |
+| 229 | Commands in the background                                                           | in progress |         |
 | 230 | The composer's keys                                                                  | planned     |         |
 | 231 | Runs go on after a restart                                                           | planned     |         |
 | 232 | Models for Dot's own work                                                            | planned     |         |
@@ -10571,7 +10571,7 @@ time, a few at first and more on demand, and the panel's tabs have icons.
 
 ### 228. The rail of messages beside the docked panel
 
-**Status: in progress.**
+**Status: done.** Merged as `46a8ef0` (PR #267; no Linear issue, the Linear connector was signed out).
 
 **As built (2026-10-14).** Where a pointer rests and the window is wider than a phone's, the conversation leaves the
 rail of marks 44 px at its left (`run.css`, `--outline-room`): it keeps its reading width and stays centred where there
@@ -10588,7 +10588,17 @@ instead of hiding.
 
 ### 229. Commands in the background
 
-**Status: planned.**
+**Status: in progress.**
+
+**As built (2026-10-14).** `terminal_open` takes `background` for a command that runs long and ends by itself: it is not
+closed while it runs for being left unread, and the run that opened it can end. When it ends by itself, its chat is told
+in a message of its queue, with the chat's choices, which starts the chat's next run once no run works there; the
+message says which command ended, its exit status and how long it ran, and nothing it printed, and as Dot's words it is
+no instruction of the owner. `GET /api/threads/{id}/terminals` and `DELETE /api/threads/{id}/terminals/{session}` list
+and stop a chat's sessions, and the chat's page shows its commands at work right above the composer, as T3 Code shows
+its background work, with a dot that pulses for one whose end wakes Dot. A delegated run, a campaign's session and a
+`dotx` command open none. Tests: `tests/smoke/test_background_commands.py` and two in `tests/smoke/test_terminal.py`; on
+the code of before, `terminal_open` refuses `background` and no run follows.
 
 **What.** A run can start a long command in the background, past the shell's limit, and go on; a line over the box shows
 what runs, as T3 Code's does, and when a command ends its chat is told, with its last lines.
@@ -11281,3 +11291,4 @@ default model.
 - 2026-10-14 (Opus 5.5): item 225 merged as `103f5b2` (PR #264; no Linear issue, the connector was signed out): a review model that declines is said to have declined, naming it, and is not asked again.
 - 2026-10-14 (Opus 5.5): item 226 merged as `0db06a8` (PR #265; no Linear issue, the connector was signed out): resting the pointer on a helper's row, or moving the focus to it, shows a card with its goal, model and level, state, time and current action.
 - 2026-10-14 (Opus 5.5): item 227 merged as `b948cd7` (PR #266; no Linear issue, the connector was signed out): the run page's side panel lists the chat's earlier helpers in an Agents tab, newest first, and its tabs wear SVG icons.
+- 2026-10-14 (Opus 5.5): item 228 merged as `46a8ef0` (PR #267; no Linear issue, the connector was signed out): the rail of marks at the conversation's left shows beside the docked side panel too, the conversation leaving it room, and in WebKit a pointer resting on it no longer loses it.

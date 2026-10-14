@@ -11,6 +11,9 @@ or a REPL prints what other people wrote. Text typed while
 the program's last line asks for a password is a ``credential``: a ``yolo`` run types it, alone so that no command goes
 with it unjudged, and the policy records it; in ``ask`` and ``auto`` the tool refuses, as the browser refuses a password
 field, since nobody else can type into the session.
+
+A command opened with ``background`` (item 229) runs on its own, past the shell's time limit and unread, and its end is
+told to its chat; a delegated run and a campaign's session have no chat of their own to tell, and open none.
 """
 
 from pathlib import Path
@@ -22,6 +25,7 @@ from dotagent.core.text import truncate_middle
 from dotagent.policy.paths import classify_path, expand_path
 from dotagent.policy.shell import ShellAssessment, assess_shell, assess_typed, typed_lines
 from dotagent.policy.types import ActionInfo, ActionKind, Flag, Risk
+from dotagent.store.models import RunRecord
 from dotagent.terminal.session import TerminalSession
 from dotagent.tools.base import ACTING_MODES, RegisteredTool, ToolArgs, ToolResult, make_tool, mark_untrusted, ok
 from dotagent.tools.context import ToolContext, run_sandbox
@@ -38,6 +42,14 @@ class OpenArgs(ToolArgs):
         min_length=1, description="The command line, run by zsh on a terminal of its own: python3 -i, npm create vite"
     )
     cwd: str | None = Field(default=None, description="Working directory. Defaults to the workspace.")
+    background: bool = Field(
+        default=False,
+        description=(
+            "True for a command that runs long and ends by itself (an eval, a long build or download): it runs past "
+            "shell's time limit and is not closed for being left unread, and when it ends this chat is told, in a new "
+            "run once the run at work there has ended. Not for a program you type into, nor a server."
+        ),
+    )
 
 
 class SendArgs(ToolArgs):
@@ -127,10 +139,23 @@ def build_terminal_tools() -> tuple[RegisteredTool, ...]:
 
     async def run_open(args: OpenArgs, ctx: ToolContext) -> ToolResult:
         cwd: Path = expand_path(args.cwd, ctx.workspace) if args.cwd else ctx.workspace
+        if args.background:
+            run: RunRecord = await ctx.runtime.store.get_run(ctx.run_id)
+            if run.parent_run_id is not None or run.campaign_id is not None:
+                raise ToolInputError(
+                    "A command in the background is told to its chat when it ends, and a delegated run or a "
+                    "campaign's session has none: run it with shell, or in a terminal session you read.",
+                    {"run_id": run.id, "parent_run_id": run.parent_run_id, "campaign_id": run.campaign_id},
+                )
         session: TerminalSession = await ctx.runtime.terminals.open(
-            ctx.thread_id, args.command, run_sandbox(ctx).commands, cwd
+            ctx.thread_id, args.command, run_sandbox(ctx).commands, cwd, args.background
         )
-        return mark_untrusted(ok(f"[session {session.id}: {args.command}]\n{await _read(session, _OPEN_WAIT_S, ctx)}"))
+        head: str = (
+            f"[session {session.id}, in the background: {args.command}; this chat is told when it ends]"
+            if args.background
+            else f"[session {session.id}: {args.command}]"
+        )
+        return mark_untrusted(ok(f"{head}\n{await _read(session, _OPEN_WAIT_S, ctx)}"))
 
     def classify_send(args: SendArgs, ctx: ToolContext) -> ActionInfo:
         session: TerminalSession = ctx.runtime.terminals.get(ctx.thread_id, args.session)
@@ -178,8 +203,9 @@ def build_terminal_tools() -> tuple[RegisteredTool, ...]:
             description=(
                 "Start a program on a terminal of its own and keep it running: one that asks questions (an installer, "
                 "npm create, ssh), a REPL (python3 -i, psql, node), or a server that must stay up while you work. "
-                "Returns the session name and its first output. For a command that just runs to its end use shell. "
-                "No terminal emulator runs: full-screen programs such as vim or htop show as garbled text."
+                "Returns the session name and its first output. For a command that just runs to its end use shell; "
+                "for one that runs longer than shell may wait, set background. No terminal emulator runs: full-screen "
+                "programs such as vim or htop show as garbled text."
             ),
             args_model=OpenArgs,
             modes=ACTING_MODES,

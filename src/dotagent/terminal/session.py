@@ -6,6 +6,11 @@ process group of its own, with the environment of the shell tool. What it prints
 full-screen program (vim, htop) shows as garbled text. The sessions belong to a thread: at most ``[shell]
 terminal_sessions`` at a time, each closed once it was not used for ``terminal_idle_s``, and all of them when the daemon
 stops. The end of a run closes none: a server outlives the run that started it.
+
+A command in the background (item 229) is a session the run left to run on its own, as an eval or a long build: it is
+not closed for being left unread while it runs, and when it ends by itself its chat is told (:class:`TerminalWatcher`,
+the run manager), with no word of what it printed: that is read with ``terminal_read``, as untrusted. A session closed
+by the run, by the owner or by the daemon's stop tells nothing.
 """
 
 import asyncio
@@ -20,9 +25,11 @@ import signal
 import termios
 import time
 from pathlib import Path
+from typing import Protocol
 
 from dotagent.core.errors import ToolExecutionError, ToolInputError
 from dotagent.core.logs import get_logger
+from dotagent.core.text import duration_text, truncate_middle
 from dotagent.policy.shell import typed_lines
 from dotagent.tools.shell import kill_group
 
@@ -38,6 +45,8 @@ _READ_BYTES: int = 65536
 _QUIET_S: float = 0.3
 _CLOSE_GRACE_S: float = 1.0
 _REAP_EVERY_S: float = 60.0
+# The most of a command that the notice of its end names.
+_NOTICE_COMMAND_CHARS: int = 300
 # The basic REPL of Python 3.13 instead of the one that needs a terminal with cursor control.
 _TERMINAL_ENV: dict[str, str] = {"TERM": "dumb", "PYTHON_BASIC_REPL": "1"}
 
@@ -50,6 +59,17 @@ def plain_text(raw: str) -> str:
 def asks_for_secret(recent: str) -> bool:
     """Whether the last line of the ``recent`` output prompts for a password, a passphrase or a PIN."""
     return _SECRET_PROMPT.search(plain_text(recent)) is not None
+
+
+def ended_notice(session_id: str, command: str, exit_status: int, seconds: float) -> str:
+    """What the chat of a command in the background that ended is told (item 229): the session, its exit status, how
+    long it ran and the command, as Dot saw them, on the first line, and none of what it printed, which is untrusted and
+    read with ``terminal_read``."""
+    shown: str = truncate_middle(" ".join(command.split()), _NOTICE_COMMAND_CHARS)
+    return (
+        f"The command in the background {session_id} ended with exit {exit_status} after {duration_text(seconds)}: "
+        f"{shown}\nRead what it printed with terminal_read {session_id}, then go on with what it was started for."
+    )
 
 
 def _controlling_terminal() -> None:
@@ -67,6 +87,7 @@ class TerminalSession:
         command: str,
         cwd: Path,
         sandboxed: bool,
+        background: bool,
         process: asyncio.subprocess.Process,
         master: int,
     ) -> None:
@@ -75,6 +96,11 @@ class TerminalSession:
         self.cwd: Path = cwd
         # Whether the program started in the sandbox of a run (:mod:`dotagent.policy.sandbox`).
         self.sandboxed: bool = sandboxed
+        # Whether the run left it to run on its own (item 229): it is not closed while it runs for being left unread,
+        # and its end is told to its chat.
+        self.background: bool = background
+        # When it started, for the pages (seconds since the epoch).
+        self.started_at: float = time.time()
         self._process: asyncio.subprocess.Process = process
         self._master: int = master
         self._decoder: codecs.IncrementalDecoder = codecs.getincrementaldecoder("utf-8")(errors="replace")
@@ -88,6 +114,12 @@ class TerminalSession:
         self.cwd_known: bool = True
         self.used_at: float = time.monotonic()
         self.ended: bool = False
+        # Set once the program is gone, whether it ended by itself or the session was closed.
+        self.finished: asyncio.Event = asyncio.Event()
+        # Whether the session is being closed by hand: by the run, the owner, its idleness or the daemon's stop.
+        self.closing: bool = False
+        # The program's exit status, once it ended by itself.
+        self.exit_status: int | None = None
         self._arrived: asyncio.Event = asyncio.Event()
         asyncio.get_running_loop().add_reader(master, self._on_readable)
 
@@ -114,6 +146,7 @@ class TerminalSession:
         else:
             asyncio.get_running_loop().remove_reader(self._master)
             self.ended = True
+            self.finished.set()
         self._arrived.set()
 
     def send(self, text: str) -> None:
@@ -156,6 +189,7 @@ class TerminalSession:
 
     async def close(self) -> None:
         """End the program and everything it started in its process group, and release the terminal."""
+        self.closing = True
         if self._process.returncode is None:
             with contextlib.suppress(ProcessLookupError, PermissionError):
                 os.killpg(self._process.pid, signal.SIGTERM)
@@ -166,7 +200,21 @@ class TerminalSession:
         if not self.ended:
             asyncio.get_running_loop().remove_reader(self._master)
             self.ended = True
+        self.finished.set()
         os.close(self._master)
+
+
+class TerminalWatcher(Protocol):
+    """Who hears of the daemon's terminal sessions (item 229), the run manager: the pages follow a chat's sessions as
+    they change, and the end of a command in the background is told to its chat."""
+
+    async def sessions_changed(self, thread_id: str) -> None:
+        """A session of the chat ``thread_id`` opened, ended or was closed."""
+        ...
+
+    async def command_ended(self, thread_id: str, session: TerminalSession) -> None:
+        """The program of ``session``, a command in the background of the chat ``thread_id``, ended by itself."""
+        ...
 
 
 class Terminals:
@@ -179,10 +227,31 @@ class Terminals:
         self._sessions: dict[str, dict[str, TerminalSession]] = {}
         self._opened: int = 0
         self._reaper: asyncio.Task[None] | None = None
+        # What waits for the end of each session's program, by session.
+        self._follows: dict[str, asyncio.Task[None]] = {}
+        self._watcher: TerminalWatcher | None = None
 
-    async def open(self, thread_id: str, command: str, confinement: tuple[str, ...], cwd: Path) -> TerminalSession:
+    def watch(self, watcher: TerminalWatcher) -> None:
+        """Have ``watcher`` hear of the sessions from now on, in place of the one before."""
+        self._watcher = watcher
+
+    def unwatch(self, watcher: TerminalWatcher) -> None:
+        """Stop telling ``watcher``, if it is the one that hears."""
+        if self._watcher is watcher:
+            self._watcher = None
+
+    async def open(
+        self, thread_id: str, command: str, confinement: tuple[str, ...], cwd: Path, background: bool
+    ) -> TerminalSession:
         """Start ``command`` in zsh on a terminal of its own, started by ``confinement`` (the words of the run's
-        sandbox, or none)."""
+        sandbox, or none); ``background`` for a command the run leaves to run on its own (item 229), which a process
+        that tells no chat of its end (a ``dotx`` command, which ends with its run) refuses."""
+        if background and self._watcher is None:
+            raise ToolInputError(
+                "This process tells no chat when a command ends (a dotx command ends with its run): run it with shell, "
+                "or in a terminal session you read.",
+                {"command": command},
+            )
         mine: dict[str, TerminalSession] = self._sessions.setdefault(thread_id, {})
         if len(mine) >= self._limit:
             raise ToolInputError(
@@ -213,12 +282,20 @@ class Terminals:
         finally:
             os.close(slave)
         self._opened += 1
-        session: TerminalSession = TerminalSession(f"t{self._opened}", command, cwd, bool(confinement), process, master)
+        session: TerminalSession = TerminalSession(
+            f"t{self._opened}", command, cwd, bool(confinement), background, process, master
+        )
         mine[session.id] = session
+        self._follows[session.id] = asyncio.create_task(self._follow(thread_id, session))
         if self._reaper is None:
             self._reaper = asyncio.create_task(self._reap())
-        log.info("terminal_opened", thread_id=thread_id, session=session.id, command=command)
+        log.info("terminal_opened", thread_id=thread_id, session=session.id, command=command, background=background)
+        await self._changed(thread_id)
         return session
+
+    def sessions(self, thread_id: str) -> list[TerminalSession]:
+        """The sessions of the chat ``thread_id``, in the order they opened."""
+        return list(self._sessions.get(thread_id, {}).values())
 
     def get(self, thread_id: str, session_id: str) -> TerminalSession:
         mine: dict[str, TerminalSession] = self._sessions.get(thread_id, {})
@@ -235,15 +312,54 @@ class Terminals:
         del self._sessions[thread_id][session_id]
         await session.close()
         log.info("terminal_closed", thread_id=thread_id, session=session_id)
+        await self._changed(thread_id)
+
+    async def _changed(self, thread_id: str) -> None:
+        if self._watcher is not None:
+            await self._watcher.sessions_changed(thread_id)
+
+    async def _follow(self, thread_id: str, session: TerminalSession) -> None:
+        """Wait for the program of ``session`` to end. One that ended by itself is kept ``idle_s`` more for what it
+        printed last to be read, and the watcher hears of it: of a command in the background, its chat is told. A
+        session closed by hand tells nothing more. A watcher that fails is logged: nothing awaits this."""
+        try:
+            await session.finished.wait()
+            if session.closing:
+                return
+            session.exit_status = await session.exit_code()
+            session.used_at = time.monotonic()
+            log.info(
+                "terminal_ended",
+                thread_id=thread_id,
+                session=session.id,
+                background=session.background,
+                exit_status=session.exit_status,
+            )
+            watcher: TerminalWatcher | None = self._watcher
+            if watcher is None:
+                return
+            await watcher.sessions_changed(thread_id)
+            if session.background:
+                await watcher.command_ended(thread_id, session)
+        except Exception:
+            log.exception("terminal_end_not_told", thread_id=thread_id, session=session.id)
+        finally:
+            self._follows.pop(session.id, None)
 
     async def _reap(self) -> None:
-        """Close the sessions that were not used for ``idle_s``, as long as the daemon runs. A session that fails to
-        close is logged, and the others are still closed."""
+        """Close the sessions that were not used for ``idle_s``, as long as the daemon runs; a command in the
+        background is left alone while it runs. A session that fails to close is logged, and the others are still
+        closed."""
         while True:
             await asyncio.sleep(min(_REAP_EVERY_S, self._idle_s / 2))
             now: float = time.monotonic()
             for thread_id, mine in list(self._sessions.items()):
-                for session in [session for session in mine.values() if now - session.used_at > self._idle_s]:
+                idle: list[TerminalSession] = [
+                    session
+                    for session in mine.values()
+                    if now - session.used_at > self._idle_s and (session.ended or not session.background)
+                ]
+                for session in idle:
                     del mine[session.id]
                     try:
                         await session.close()
@@ -251,12 +367,22 @@ class Terminals:
                         log.exception("terminal_idle_close_failed", thread_id=thread_id, session=session.id)
                         continue
                     log.info("terminal_idle_closed", thread_id=thread_id, session=session.id, command=session.command)
+                if idle:
+                    await self._changed(thread_id)
 
     async def aclose(self) -> None:
+        """Close every session, as the daemon stops: no watcher hears of it."""
+        self._watcher = None
         if self._reaper is not None:
             self._reaper.cancel()
             with contextlib.suppress(asyncio.CancelledError):
                 await self._reaper
+        follows: list[asyncio.Task[None]] = list(self._follows.values())
+        for follow in follows:
+            follow.cancel()
+        for follow in follows:
+            with contextlib.suppress(asyncio.CancelledError):
+                await follow
         sessions: list[TerminalSession] = [session for mine in self._sessions.values() for session in mine.values()]
         self._sessions.clear()
         # Every session is closed even when one fails to; the error is raised once all were tried.
