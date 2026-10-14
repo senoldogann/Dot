@@ -5142,8 +5142,8 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 203 | The run's side panel, designed again                                                 | done        | 94985af |
 | 204 | Adding or deleting keeps the page where it is                                        | done        | db647a3 |
 | 205 | A message's time, its copy and a send again, after T3 Code                           | done        | 9934575 |
-| 206 | Markdown in the conversation, and copies that keep it                                | in progress |         |
-| 207 | The composer shows the markdown it holds, after T3 Code                              | planned     |         |
+| 206 | Markdown in the conversation, and copies that keep it                                | done        | 33a7f8d |
+| 207 | The composer shows the markdown it holds, after T3 Code                              | in progress |         |
 | 208 | The model menu: providers at the side, a search and favourites, after T3 Code        | planned     |         |
 
 ### 77. The type system: Inter and Geist Mono, seven sizes, three weights
@@ -10020,7 +10020,7 @@ to the same chat, with the files it carried. Under each answer: its time and a c
 
 ### 206. Markdown in the conversation, and copies that keep it
 
-**Status: in progress.**
+**Status: done.** Merged as `33a7f8d` (PR #245; no Linear issue, the Linear connector was signed out).
 
 **As built (2026-10-14).** The owner's messages are drawn by the answers' reader (`prose.js`): a goal, a message that
 steered a run and an earlier turn read as markdown, with their headings, lists, quotes, tables, code, emphasis and web
@@ -10049,7 +10049,33 @@ formatted copy goes along for the applications that read it. The copy buttons co
 
 ### 207. The composer shows the markdown it holds, after T3 Code
 
-**Status: planned.**
+**Status: in progress.**
+
+**As built (2026-10-14).** T3 Code's composer is a rich text editor that hides the marks it reads; Dot's box stays a
+text field, which the slash menu, the files, the queue, the drafts, the keys, the listening face and the send all use,
+and shows its markdown from under it (`mirror.js`): a copy of the box's text lies under the box in the same room, letter
+for letter, and the box's own letters are clear over it, so the caret, the selection (the system's colour, light enough
+to read through), the spelling, an input method and the undo stay the text field's own. Each line of the copy is read as
+`parseBlocks` and `parseInline` read it (`sourceLines` in `markdown.js`, which keeps every character in its place): a
+heading's hashes, a list's mark, a quote's >, the stars of bold and italics, the backticks of code, a link's brackets
+and address, a table's pipes and the dashes under its head, a fence and a rule show quieter than the words; bold words,
+headings and a table's head heavier; inline code and the lines of a block of code tinted; quotes softer; links in the
+colour of links. The marks are read within one line, so bold or code that runs over a line break shows plain in the box,
+though the conversation shows it as written. Nothing in the copy changes a letter's size or width, or it would set its
+letters elsewhere than the box: headings keep the size of the text and italics stay upright, weight is a stroke on a
+whole line and a shadow on a bold word, and the marks within a line are highlights of the line's one text (the CSS
+Custom Highlight API), not elements, since a line cut into elements sets its letters a fraction of a pixel apart from
+the box's (0.1 px over a line in Chrome, 0.3 px in WebKit), enough to wrap a word elsewhere. The box and its copy sit in
+a field that is a column, as the composer is, so the composer is no higher for the copy. The copy scrolls with the box,
+leaves the room of its scroll bar, and paints again on every change of the text: typing, a paste, a pick of the slash
+menu, a draft brought back, an edit of the queue, a send. A browser without highlights (before Chrome 105 or Safari
+17.2) shows the lines' kinds without the marks' colours; with the system's colours forced, the box shows its own
+letters. Tests: `tests/smoke/test_composer_markdown.py`, a real server; at 1280 px light and dark and at 390 px: every
+kind of line and mark in the new chat's box; the copy holding the box's text after typing, a pick of the slash menu, a
+draft brought back by a reload and a paste; and the pixels: the copy in one colour and the box's own letters differ in
+no more than 0.1 % of the box, in the new chat's box and in a chat's dock scrolled half way and to its end (a copy one
+pixel off differs in 2 %), while the copy as it shows differs from the copy in one colour; the field is as high as the
+box in it (5 px higher before it was a column). On the code of before, it found no copy. It passed in WebKit too.
 
 **What.** The composer keeps the markdown it holds and shows it styled: headings as headings, emphasis, code, lists,
 quotes, fences, rules and tables' pipes, their marks faded, after T3 Code's composer. A paste of markdown shows at once
@@ -10709,3 +10735,4 @@ favourites; and keys: the arrows and Enter, ⌘1 to ⌘9 for the rows in sight. 
 - 2026-10-14 (Opus 5.5): item 203 merged as `94985af` (PR #242; no Linear issue, the connector was signed out): The run's side panel shows one thing at a time, in four tabs after T3 Code's side panel (Run, Plan, Actions, Screen), each tab's sections open, the cost listed as the details are, and the tab chosen last kept.
 - 2026-10-14 (Opus 5.5): item 204 merged as `db647a3` (PR #243; no Linear issue, the connector was signed out): Adding or deleting keeps the page where it is: the side menu brings the open chat into view only when the page comes to another chat, and the Memory page keeps the notes it read, their rows and its place.
 - 2026-10-14 (Opus 5.5): item 205 merged as `9934575` (PR #244; no Linear issue, the connector was signed out): Under each of the owner's messages, once its turn has its answer: when it was sent, a copy of it and Send again; under each answer, a copy of it and when it came.
+- 2026-10-14 (Opus 5.5): item 206 merged as `33a7f8d` (PR #245; no Linear issue, the connector was signed out): The owner's messages read as markdown, and a copy out of the conversation keeps the markdown it was written in, a list as a list and a table as a table.

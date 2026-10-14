@@ -1573,6 +1573,85 @@ a.pill:hover {
   outline: none;
 }
 
+/* The markdown in the box shows as it reads (item 207, mirror.js): a copy of its text lies under it in the same room,
+   letter for letter (the box's padding, face, size and leading, and the room of its scroll bar, `--mirror-bar`), and
+   the box's own letters are clear over it. Nothing in the copy changes a letter's size or width: a stroke or a shadow
+   stands for weight, and italics stay upright. The field is a column, as the composer is, so the box in it is a block
+   and the field no taller than the box. */
+.composer-field {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.composer-mirror {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  padding: var(--space-2) calc(var(--space-2) + var(--mirror-bar, 0px)) var(--space-1) var(--space-2);
+  font-family: var(--composer-font);
+  font-size: var(--composer-size);
+  line-height: var(--composer-leading);
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+  color: var(--text);
+  pointer-events: none;
+  user-select: none;
+}
+
+.composer-field.mirrored .textarea {
+  position: relative;
+  color: transparent;
+  caret-color: var(--text);
+}
+
+/* The selection is the system's colour, light enough to read the copy under it. */
+.composer-field.mirrored .textarea::selection {
+  color: transparent;
+  background: color-mix(in srgb, Highlight 40%, transparent);
+}
+
+/* The marks within a line, highlights of its text (mirror.js), and the kinds of whole lines. */
+::highlight(md-mark),
+::highlight(md-address) {
+  color: var(--muted);
+}
+
+/* A highlight paints no stroke, so a bold word's weight is a shadow of its letters half a pixel over, as heavy as
+   the stroke of a whole line. */
+::highlight(md-strong) {
+  text-shadow: 0.5px 0 0 currentColor;
+}
+
+::highlight(md-code) {
+  background-color: var(--surface-2);
+}
+
+::highlight(md-link) {
+  color: var(--accent-strong);
+}
+
+.md-heading,
+.md-table-head {
+  -webkit-text-stroke-width: 0.6px;
+}
+
+.md-block {
+  background: var(--surface-2);
+}
+
+.md-quote {
+  color: var(--text-2);
+}
+
+/* With the system's colours forced, the box shows its own letters. */
+@media (forced-colors: active) {
+  .composer-mirror {
+    display: none;
+  }
+}
+
 .composer .attach-list {
   padding: 4px 8px;
 }

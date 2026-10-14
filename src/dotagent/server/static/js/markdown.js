@@ -1,5 +1,6 @@
 // A small Markdown reader for what the agent writes: code, lists, headings, quotes, tables, bold, italics and links.
-// It only produces plain data (no HTML); prose.js turns that into DOM nodes.
+// It only produces plain data (no HTML); prose.js turns that into DOM nodes, and mirror.js the composer's text as it
+// reads (`sourceLines`).
 
 const FENCE = /^\s*(`{3,}|~{3,})\s*([\w+#.-]*)\s*$/;
 const HEADING = /^(#{1,4})\s+(.*)$/;
@@ -198,4 +199,131 @@ export function parseBlocks(text) {
     index = read.next;
   }
   return blocks;
+}
+
+function piece(kind, text) {
+  return { kind, text };
+}
+
+// The pieces of `text` outside code and links: bare addresses as links, the rest as it is.
+function sourceAddresses(text) {
+  return linkParts(text).map((part) => piece(part.type === "link" ? "link" : "text", part.value));
+}
+
+// The pieces of `text` outside code and links, as `emphasisParts` reads it: bold and italics between their marks.
+function sourceEmphasis(text) {
+  const pieces = [];
+  let last = 0;
+  for (const match of text.matchAll(EMPHASIS)) {
+    pieces.push(...sourceAddresses(text.slice(last, match.index)));
+    const mark = match[1] === undefined ? "*" : "**";
+    pieces.push(piece("mark", mark), piece(match[1] === undefined ? "em" : "strong", match[1] ?? match[2]), piece("mark", mark));
+    last = match.index + match[0].length;
+  }
+  pieces.push(...sourceAddresses(text.slice(last)));
+  return pieces;
+}
+
+// The pieces of `text` outside code, as `markdownLinkParts` reads it: a link to the web as its words and its address
+// between their brackets.
+function sourceLinks(text) {
+  const pieces = [];
+  let last = 0;
+  for (const match of text.matchAll(LINK)) {
+    pieces.push(...sourceEmphasis(text.slice(last, match.index)));
+    if (SAFE_URL.test(match[2])) {
+      pieces.push(piece("mark", "["), piece("link", match[1]), piece("mark", "]("), piece("address", match[2]), piece("mark", ")"));
+    } else {
+      pieces.push(piece("text", match[0]));
+    }
+    last = match.index + match[0].length;
+  }
+  pieces.push(...sourceEmphasis(text.slice(last)));
+  return pieces;
+}
+
+// The pieces of one line as `parseInline` reads it, with the marks it reads kept in place.
+function sourceInline(text) {
+  const pieces = [];
+  const segments = text.split(/(`+)/);
+  for (let index = 0; index < segments.length; index += 1) {
+    if (index % 2 === 0) {
+      pieces.push(...sourceLinks(segments[index]));
+      continue;
+    }
+    const fence = segments[index];
+    const closing = segments.indexOf(fence, index + 1);
+    if (closing === -1 || closing % 2 === 0) {
+      pieces.push(piece("text", fence));
+      continue;
+    }
+    pieces.push(piece("mark", fence), piece("code", segments.slice(index + 1, closing).join("")), piece("mark", fence));
+    index = closing;
+  }
+  return pieces.filter((part) => part.text !== "");
+}
+
+// A line of a table: its pipes as marks between its cells.
+function sourceRow(line) {
+  return line.split(/((?<!\\)\|)/).flatMap((part, index) => (index % 2 === 1 ? [piece("mark", part)] : sourceInline(part)));
+}
+
+// A line that begins with a mark (`pattern`'s groups: the indent, the mark, the space after it and the rest).
+function sourceMarked(match) {
+  return [piece("text", match[1]), piece("mark", match[2]), piece("text", match[3]), ...sourceInline(match[4])].filter((part) => part.text !== "");
+}
+
+const SOURCE_HEADING = /^()(#{1,4})(\s+)(.*)$/;
+const SOURCE_BULLET = /^(\s*)([-*+])(\s+)(.*)$/;
+const SOURCE_NUMBERED = /^(\s*)(\d+[.)])(\s+)(.*)$/;
+const SOURCE_QUOTE = /^(\s*)(>)(\s?)(.*)$/;
+
+/**
+ * The text of the composer as it reads (item 207): one entry for each line, `{ kind, pieces }`, read as `parseBlocks`
+ * and `parseInline` read it. A line's `kind` is "text", "heading", "list", "quote", "fence" (one that opens or closes
+ * code), "block" (a line of that code), "table-head" (a table's first line), "table-rule" (the dashes under it),
+ * "table" (a row after them) or "rule". Its `pieces` are `{ kind, text }` in order, whose texts together give the line
+ * back exactly: "text", "mark" (what the reader takes as a mark: a heading's hashes, a list's mark, a quote's >, the
+ * stars of bold and italics, the backticks of code, a link's brackets, a table's pipes), "strong", "em", "code", "link"
+ * (a link's words or a bare address) and "address" (a link's address).
+ */
+export function sourceLines(text) {
+  const lines = text.split("\n");
+  const shown = [];
+  let fence = null;
+  let table = false;
+  for (let index = 0; index < lines.length; index += 1) {
+    const line = lines[index];
+    const next = lines[index + 1];
+    if (fence !== null) {
+      const closes = line.trim().startsWith(fence) && line.trim().replace(/[`~]/g, "") === "";
+      shown.push(closes ? { kind: "fence", pieces: [piece("mark", line)] } : { kind: "block", pieces: [piece("text", line)] });
+      fence = closes ? null : fence;
+      continue;
+    }
+    table = table && line.includes("|") && line.trim() !== "";
+    if (table) {
+      shown.push({ kind: "table", pieces: sourceRow(line) });
+    } else if (FENCE.test(line)) {
+      fence = FENCE.exec(line)[1];
+      shown.push({ kind: "fence", pieces: [piece("mark", line)] });
+    } else if (SOURCE_HEADING.test(line)) {
+      shown.push({ kind: "heading", pieces: sourceMarked(SOURCE_HEADING.exec(line)) });
+    } else if (RULE.test(line)) {
+      shown.push({ kind: "rule", pieces: [piece("mark", line)] });
+    } else if (SOURCE_BULLET.test(line)) {
+      shown.push({ kind: "list", pieces: sourceMarked(SOURCE_BULLET.exec(line)) });
+    } else if (SOURCE_NUMBERED.test(line)) {
+      shown.push({ kind: "list", pieces: sourceMarked(SOURCE_NUMBERED.exec(line)) });
+    } else if (SOURCE_QUOTE.test(line)) {
+      shown.push({ kind: "quote", pieces: sourceMarked(SOURCE_QUOTE.exec(line)) });
+    } else if (line.includes("|") && next !== undefined && TABLE_SEPARATOR.test(next) && next.includes("-")) {
+      shown.push({ kind: "table-head", pieces: sourceRow(line) }, { kind: "table-rule", pieces: [piece("mark", next)] });
+      index += 1;
+      table = true;
+    } else {
+      shown.push({ kind: "text", pieces: sourceInline(line) });
+    }
+  }
+  return shown;
 }
