@@ -80,7 +80,7 @@ function statusEntries(status) {
     entry("Waiting for you", plural(status.pending_approvals, "approval", "approvals")),
     entry("Main model", status.models.main),
     entry("Vision model", orDash(status.models.vision)),
-    entry("Compaction model", "each run's own model"),
+    entry("Fast model", orDash(status.models.fast)),
     entry("Review model", orDash(status.models.review)),
     entry("Reasoning effort", orDash(status.models.effort)),
     // A whole row, so it comes after the cells, like Home: among them it would cut the row before it short.
@@ -441,30 +441,54 @@ function modelsSummary(providers, inUse) {
   ];
 }
 
+// The models of Dot's own work (item 232), which Settings › Models chooses under the default one: what each does, and
+// the models that can do it.
+const ROLE_SETTINGS = [
+  {
+    role: "fast",
+    label: "Fast model",
+    hint: "Writes the summary of a long run first (the run's own model does when it cannot) and reads pages for the facts asked of them.",
+    fits: (model) => model.tools,
+  },
+  {
+    role: "review",
+    label: "Review model",
+    hint: "Checks runs (their goal and a second opinion), draws their lessons and skills, and drafts rules from your words.",
+    fits: (model) => model.tools,
+  },
+  {
+    role: "vision",
+    label: "Vision model",
+    hint: "Reads images and screenshots for a model that cannot see them.",
+    fits: (model) => model.vision,
+  },
+];
+
 /**
- * The default model (item 199): the one a run that names none starts on, a new chat's among them. It offers the models
- * that can call tools, as the composer does, and the one that is the default now, listed or not. `paint(providers,
- * mainModel)` fills it again; the select stays, and so does the focus on it.
+ * A model that Settings › Models chooses: the default one (item 199), the one a run that names none starts on, a new
+ * chat's among them, or one of Dot's own work (item 232). It offers the models that `fits` (the default one, as the
+ * composer does, and the fast and review models call tools; the vision model sees), and the one chosen now, listed or
+ * not; `choose(ref)` makes the choice. `paint(providers, chosen)` fills it again; the select stays, and so does the
+ * focus on it.
  */
-function defaultModelSetting() {
+function modelSetting({ label, hint, className, fits, choose }) {
   let shown = "";
-  const select = el("select", { class: "select sm", "aria-label": "Default model" });
+  const select = el("select", { class: "select sm", "aria-label": label });
   const element = el(
     "div",
-    { class: "setting models-default", hidden: true },
-    el("div", { class: "row" }, el("span", { class: "grow" }, "Default model"), select),
-    el("div", { class: "hint" }, "New chats start on it, and so does any run that names no model. A chat keeps the model it has; Default in its composer follows this one."),
+    { class: `setting ${className}`, hidden: true },
+    el("div", { class: "row" }, el("span", { class: "grow" }, label), select),
+    el("div", { class: "hint" }, hint),
   );
-  // Each pick is sent once the one before it was answered, so the last one made is the default; the select shows the
-  // default the status says after each.
+  // Each pick is sent once the one before it was answered, so the last one made holds; the select shows the model the
+  // status says after each.
   let making = Promise.resolve();
   select.addEventListener("change", () => {
     const ref = select.value;
     making = making.then(() =>
       attempt(async () => {
         try {
-          await api.post("/models/main", { model: ref });
-          toast("ok", `New chats start on ${modelName(ref)}.`);
+          await choose(ref);
           await refresh();
         } finally {
           select.value = shown;
@@ -473,21 +497,21 @@ function defaultModelSetting() {
     );
   });
 
-  function paint(providers, mainModel) {
+  function paint(providers, chosen) {
     const groups = providers
-      .map((provider) => ({ provider: provider.provider, models: provider.models.filter((model) => model.tools) }))
+      .map((provider) => ({ provider: provider.provider, models: provider.models.filter(fits) }))
       .filter((group) => group.models.length > 0);
-    const listed = groups.some((group) => group.models.some((model) => model.ref === mainModel));
-    // The native replaceChildren writes a null as text: the option of a default not listed is left out instead.
-    const unlisted = listed || mainModel === "" ? [] : [el("option", { value: mainModel }, `${modelName(mainModel)} (not listed now)`)];
+    const listed = groups.some((group) => group.models.some((model) => model.ref === chosen));
+    // The native replaceChildren writes a null as text: the option of a model not listed is left out instead.
+    const unlisted = listed || chosen === "" ? [] : [el("option", { value: chosen }, `${modelName(chosen)} (not listed now)`)];
     select.replaceChildren(
       ...unlisted,
       ...groups.map((group) =>
         el("optgroup", { label: providerLabel(group.provider) }, group.models.map((model) => el("option", { value: model.ref }, modelName(model.ref)))),
       ),
     );
-    shown = mainModel;
-    select.value = mainModel;
+    shown = chosen;
+    select.value = chosen;
     element.hidden = false;
   }
 
@@ -500,8 +524,30 @@ function defaultModelSetting() {
 
 function buildModels(isDisposed) {
   const list = el("div", null, inlineLoading());
-  const main = defaultModelSetting();
-  const body = el("div", null, main.element, list);
+  const main = modelSetting({
+    label: "Default model",
+    hint: "New chats start on it, and so does any run that names no model. A chat keeps the model it has; Default in its composer follows this one.",
+    className: "models-default",
+    fits: (model) => model.tools,
+    choose: async (ref) => {
+      await api.post("/models/main", { model: ref });
+      toast("ok", `New chats start on ${modelName(ref)}.`);
+    },
+  });
+  const roles = ROLE_SETTINGS.map((setting) => ({
+    role: setting.role,
+    control: modelSetting({
+      label: setting.label,
+      hint: setting.hint,
+      className: "models-role",
+      fits: setting.fits,
+      choose: async (ref) => {
+        await api.post("/models/roles", { role: setting.role, model: ref });
+        toast("ok", `The ${setting.label.toLowerCase()} is ${modelName(ref)} from its next call.`);
+      },
+    }),
+  }));
+  const body = el("div", null, main.element, ...roles.map(({ control }) => control.element), list);
   let providers = null;
   const reload = el(
     "button",
@@ -520,14 +566,18 @@ function buildModels(isDisposed) {
     }
     const status = getSnapshot().status;
     const mainModel = status === null ? "" : status.models.main;
+    const chosen = roles.map(({ role }) => (status === null ? "" : status.models[role])).join(" ");
     const inUse = providersInUse(status);
     const usage = inUse.join(" ");
-    if (painted !== null && painted.providers === providers && painted.mainModel === mainModel && painted.usage === usage) {
+    if (painted !== null && painted.providers === providers && painted.mainModel === mainModel && painted.chosen === chosen && painted.usage === usage) {
       return;
     }
-    painted = { providers, mainModel, usage };
+    painted = { providers, mainModel, chosen, usage };
     card.setSummary(...modelsSummary(providers, inUse));
     main.paint(providers, mainModel);
+    for (const { role, control } of roles) {
+      control.paint(providers, status === null ? "" : status.models[role]);
+    }
     list.replaceChildren(...providers.map((provider) => providerBlock(provider, mainModel, inUse.includes(provider.provider))));
     cueTables();
   }
@@ -536,6 +586,9 @@ function buildModels(isDisposed) {
     forgetModels();
     painted = null;
     main.hide();
+    for (const { control } of roles) {
+      control.hide();
+    }
     list.replaceChildren(inlineLoading());
     card.setSummary();
     try {

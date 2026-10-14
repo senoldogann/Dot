@@ -802,7 +802,7 @@ def _extract_tool() -> RegisteredTool:
                 extractions.append(
                     await extract(
                         ctx.runtime.router,
-                        config.models.fast,
+                        ctx.runtime.roles.fast(),
                         config.agent.model_call_timeout_s,
                         f"{ctx.thread_id}:extract",
                         ctx.run_id,

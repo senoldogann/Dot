@@ -1,6 +1,6 @@
-"""Switching ``[browser] mode`` and ``raise_window``, the default model (``[models] main``, item 199) and whether the
-daemon resumes the runs it cut off (``[agent] resume``, item 231), in the user's config.toml: the comments and the other
-settings stay as written."""
+"""Switching ``[browser] mode`` and ``raise_window``, the default model (``[models] main``, item 199), the models of Dot's
+own work (``[models] fast``, ``review`` and ``vision``, item 232) and whether the daemon resumes the runs it cut off
+(``[agent] resume``, item 231), in the user's config.toml: the comments and the other settings stay as written."""
 
 import stat
 import tomllib
@@ -14,6 +14,7 @@ from dotagent.config_edit import (
     set_browser_setting,
     set_default_model,
     set_resume,
+    set_role_model,
     with_browser_mode,
     with_browser_setting,
 )
@@ -177,4 +178,14 @@ def test_resume_is_written_under_agent_and_replaced_there_and_the_other_tables_s
     set_resume(path, "off")
     assert path.read_text(encoding="utf-8") == (
         '[agent]\ngoal_mode = true\nresume = "off"  # mine\n\n[models]\nresume = "x"\n'
+    )
+
+
+def test_a_model_of_dots_own_work_is_replaced_under_models_and_the_others_stay(tmp_path: Path) -> None:
+    path: Path = tmp_path / "config.toml"
+    path.write_text('[models]\nmain = "ollama:x"\nreview = "ollama:old"  # mine\n', encoding="utf-8")
+    set_role_model(path, "review", "anthropic:claude-x")
+    set_role_model(path, "vision", "ollama:llava")
+    assert path.read_text(encoding="utf-8") == (
+        '[models]\nvision = "ollama:llava"\nmain = "ollama:x"\nreview = "anthropic:claude-x"  # mine\n'
     )

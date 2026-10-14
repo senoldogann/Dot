@@ -1,6 +1,7 @@
 """Changing one setting of the user's ``config.toml`` in place: a ``[browser]`` one (the mode, or whether Chrome is
-raised), the default model, ``[models] main`` (item 199), or whether the daemon resumes on its own the runs it cut off,
-``[agent] resume`` (item 231), so the comments and the other settings stay as written."""
+raised), the default model, ``[models] main`` (item 199), a model of Dot's own work, ``[models] fast``, ``review`` or
+``vision`` (item 232), or whether the daemon resumes on its own the runs it cut off, ``[agent] resume`` (item 231), so
+the comments and the other settings stay as written."""
 
 import os
 import re
@@ -13,6 +14,7 @@ from typing import Literal
 from dotagent.config import ResumeMode
 from dotagent.core.errors import ConfigError
 from dotagent.core.types import JsonObject
+from dotagent.llm.roles import ModelRole
 from dotagent.store.models import BrowserMode
 
 _TABLE_HEADER: re.Pattern[str] = re.compile(r"^\s*\[")
@@ -25,7 +27,7 @@ _EDITING: threading.Lock = threading.Lock()
 type ConfigTable = Literal["agent", "browser", "models"]
 type AgentSetting = Literal["resume"]
 type BrowserSetting = Literal["mode", "raise_window"]
-type ModelsSetting = Literal["main"]
+type ModelsSetting = Literal["main", "fast", "review", "vision"]
 type SettingKey = AgentSetting | BrowserSetting | ModelsSetting
 type SettingValue = str | bool
 
@@ -120,6 +122,12 @@ def set_default_model(path: Path, model: str) -> None:
     """Write ``[models] main``, the model a run that names none starts on, into the config file at ``path`` (see
     :func:`set_setting`)."""
     set_setting(path, "models", "main", model)
+
+
+def set_role_model(path: Path, role: ModelRole, model: str) -> None:
+    """Write ``[models] fast``, ``review`` or ``vision``, the model of that part of Dot's own work, into the config file
+    at ``path`` (see :func:`set_setting`)."""
+    set_setting(path, "models", role, model)
 
 
 def set_resume(path: Path, mode: ResumeMode) -> None:

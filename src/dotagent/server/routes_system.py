@@ -14,7 +14,7 @@ from fastapi.responses import FileResponse
 from dotagent import __version__
 from dotagent.agent.playbooks import PlaybookEntry, drop_playbook, list_playbooks, share_playbook
 from dotagent.config import AppConfig, ModelsConfig
-from dotagent.config_edit import set_default_model, set_resume
+from dotagent.config_edit import set_default_model, set_resume, set_role_model
 from dotagent.core.errors import (
     ConfigError,
     DotError,
@@ -82,6 +82,7 @@ from dotagent.server.views import (
     PushSubscribeRequest,
     ResumeRequest,
     ResumeView,
+    RoleModelRequest,
     SkillShareRequest,
     StatusView,
 )
@@ -168,8 +169,9 @@ def system_router(ctx: ServerContext, pages: str) -> APIRouter:
         return await asyncio.to_thread(failsafe_path().exists)
 
     def models_now() -> ModelsConfig:
-        """The configured models, the default one as the owner last made it (item 199)."""
-        return config.models.model_copy(update={"main": ctx.manager.main_model()})
+        """The configured models, the default one and those of Dot's own work as the owner last chose them (items 199
+        and 232)."""
+        return ctx.runtime.roles.applied(config.models.model_copy(update={"main": ctx.manager.main_model()}))
 
     def resume_now() -> ResumeView:
         """Whether the daemon's next start resumes the runs it cut off, as the owner last chose (item 231)."""
@@ -246,6 +248,23 @@ def system_router(ctx: ServerContext, pages: str) -> APIRouter:
         await asyncio.to_thread(set_resume, config_path(), request.resume)
         ctx.manager.set_resume_mode(request.resume)
         return resume_now()
+
+    @router.post("/models/roles")
+    async def choose_role_model(request: RoleModelRequest) -> ModelsConfig:
+        """Have ``model`` do a part of Dot's own work from the next call on (item 232): the fast model, which writes the
+        summaries of long runs first, reads pages for the facts asked of them and may take a run's simpler steps; the
+        review model, which checks runs and draws their lessons; or the vision model, which reads images for a model
+        that cannot. The config file keeps it as ``[models] <role>``. A model its provider does not offer is refused, as
+        is one that cannot call tools for the fast or the review model, or one that cannot see for the vision model;
+        nothing changes then."""
+        info: ModelInfo = await ctx.runtime.router.model_info(parse_model_ref(request.model))
+        if request.role == "vision" and not info.vision:
+            raise ConfigError("the vision model must be one that can see images", {"model": request.model})
+        if request.role != "vision" and not info.tools:
+            raise ConfigError(f"the {request.role} model must be one that can call tools", {"model": request.model})
+        await asyncio.to_thread(set_role_model, config_path(), request.role, request.model)
+        ctx.runtime.roles.choose(request.role, request.model)
+        return models_now()
 
     @router.get("/skills/learned")
     async def learned_skills() -> LearnedSkillsView:

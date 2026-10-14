@@ -120,7 +120,7 @@ def rules_router(ctx: ServerContext) -> APIRouter:
         rule are answered 422 with the model's reason."""
         drafter: RuleDrafter = rule_drafter_for(
             ctx.runtime.router,
-            ctx.runtime.config.models.review,
+            ctx.runtime.roles.review(),
             ctx.runtime.config.agent.model_call_timeout_s,
             f"rules:{int(time.time())}",
         )

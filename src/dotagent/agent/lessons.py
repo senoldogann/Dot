@@ -268,7 +268,7 @@ async def draw_lessons(runtime: Runtime, case: LessonCase, signals: tuple[str, .
     )
     writer: LessonWriter = lesson_writer_for(
         runtime.router,
-        runtime.config.models.review,
+        runtime.roles.review(),
         runtime.config.agent.model_call_timeout_s,
         f"{case.thread_id}:lessons",
         case.run_id,

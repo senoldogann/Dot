@@ -10,6 +10,7 @@ from dotagent.config import ModelReference, ModelsConfig, ResumeMode
 from dotagent.core.types import FrozenModel
 from dotagent.desktop.perms import Pane
 from dotagent.help.elsewhere import FoundElsewhere
+from dotagent.llm.roles import ModelRole
 from dotagent.llm.types import Effort, Speed
 from dotagent.mcp.types import McpFailure
 from dotagent.policy.types import ApprovalMode
@@ -306,6 +307,13 @@ class BrowserModeRequest(FrozenModel):
 class MainModelRequest(FrozenModel):
     """The model to make the default (item 199): the one a run that names none starts on."""
 
+    model: ModelReference
+
+
+class RoleModelRequest(FrozenModel):
+    """The model for a part of Dot's own work (item 232): the ``fast``, the ``review`` or the ``vision`` model."""
+
+    role: ModelRole
     model: ModelReference
 
 

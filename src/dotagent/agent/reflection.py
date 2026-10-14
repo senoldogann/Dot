@@ -420,7 +420,7 @@ async def _describe_owner(runtime: Runtime, runs: Sequence[RunRecord], now: floa
     notes: list[MemoryRecord] = await runtime.store.user_memories(_OWNER_NOTES)
     writer: OwnerWriter = owner_writer_for(
         runtime.router,
-        runtime.config.models.review,
+        runtime.roles.review(),
         runtime.config.agent.model_call_timeout_s,
         f"reflection:{int(now)}:owner",
     )

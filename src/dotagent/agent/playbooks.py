@@ -519,7 +519,7 @@ async def _write_from(
     same kind. Returns the SKILL.md, the skill's name and whether it was updated rather than written."""
     writer: PlaybookWriter = playbook_writer_for(
         runtime.router,
-        runtime.config.models.review,
+        runtime.roles.review(),
         runtime.config.agent.model_call_timeout_s,
         f"{run.thread_id}:playbook",
         run.id,
