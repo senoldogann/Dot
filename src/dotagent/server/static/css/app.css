@@ -2220,6 +2220,43 @@ a.pill:hover {
   color: var(--text);
 }
 
+/* Under your message, at the bubble's right edge (item 205): when it was sent, a copy of it and a way to send it again,
+   as quiet as the answer's foot. A turn at work keeps them back until its answer is in. */
+.user-message {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: var(--space-half);
+  min-width: 0;
+}
+
+.message-foot {
+  display: flex;
+  align-items: center;
+  gap: var(--space-half);
+  color: var(--muted);
+  font-size: var(--text-sm);
+}
+
+.message-foot .btn:last-child {
+  margin-right: -8px;
+}
+
+.user-message .attach-list.sent {
+  margin-top: 0;
+}
+
+.run-working > .user-message .message-foot,
+.run-working .timeline .user-message .message-foot,
+.turn-working .message-foot {
+  display: none;
+}
+
+.message-time {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
 .bubble.live .stream {
   white-space: pre-wrap;
   word-break: break-word;
@@ -2971,16 +3008,16 @@ details[open] > summary .chev {
   margin-left: -8px;
 }
 
-/* Where a pointer can hover, when the answer came and how long the run took wait for a second look (item 121); the copy
-   button and the outcome stay in sight. */
+/* Where a pointer can hover, how long the run took waits for a second look (item 121); the copy button, when the answer
+   came (item 205) and the outcome stay in sight. */
 @media (hover: hover) {
-  .answer-facts > :not(:first-child) {
+  .answer-took {
     opacity: 0;
     transition: opacity var(--motion-quick) var(--ease);
   }
 
-  .answer:hover .answer-facts > *,
-  .answer:focus-within .answer-facts > * {
+  .answer:hover .answer-took,
+  .answer:focus-within .answer-took {
     opacity: 1;
   }
 }

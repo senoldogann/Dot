@@ -17,7 +17,7 @@ import { dotName, faceState, faceStateAtEnd } from "../face.js";
 import { icon } from "../icons.js";
 import { createInspector } from "../inspector.js";
 import { createQueue } from "../queue.js";
-import { userMessage } from "../messages.js";
+import { showMessageFiles, userMessage } from "../messages.js";
 import { messageOutline } from "../outline.js";
 import { emptyPanel, errorPanel, loadingPanel, panelSection } from "../panels.js";
 import { heldChoice } from "../runmodes.js";
@@ -40,6 +40,9 @@ const BTW_PATTERN = /^\/btw(?:\s+([\s\S]*))?$/i;
 const MAX_INPUT_PX = 160;
 const TITLE_CHARS = 70;
 const QUOTE_CHARS = 160;
+// The first events of a run, read for the files that came with its goal: its `attachments` event is among them
+// (agent/loop.py).
+const OPENING_EVENTS = 100;
 // The events that change what became of the lessons of a run; they come on the lifecycle stream, after the run's end.
 const LESSON_KINDS = new Set(["lessons_proposed", "lesson_saved", "lesson_dismissed", "lessons_failed"]);
 const LESSON_STATES = { saved: { mark: "check", text: "Saved to memory" }, dismissed: { mark: "x", text: "Dismissed" } };
@@ -618,61 +621,97 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
     send.disabled = true;
     try {
       await attempt(async () => {
-        if (active && (elsewhere || (queueing && steerNow !== true))) {
-          // The level is checked against the model's own, so the models are known first.
-          await choices.ready();
-          const chosen = choices.value();
-          const body = {
-            text,
-            mode: chosen.mode,
-            model: chosen.model,
-            effort: chosen.effort,
-            approvals: chosen.approvals,
-            goal_mode: chosen.goal_mode,
-            agent_id: run.agent_id,
-            attachments: files,
-          };
-          await queue.add({ ...body, key: keys.of("queue", run.thread_id, body) });
-          keys.sent();
-          frame.clear();
-          return;
-        }
-        if (active) {
-          const entry = holdMessage(text);
-          const body = { text, attachments: files };
-          try {
-            await api.post(`/runs/${runId}/steer`, { ...body, key: keys.of("steer", runId, body) });
-          } catch (error) {
-            releaseMessage(entry);
-            throw error;
-          }
-          keys.sent();
-          frame.clear();
-          return;
-        }
-        // The level is checked against the model's own, so the models are known first.
-        await choices.ready();
-        const chosen = choices.value();
-        const body = {
-          goal: text,
-          mode: chosen.mode,
-          model: chosen.model,
-          effort: chosen.effort,
-          approvals: chosen.approvals,
-          goal_mode: chosen.goal_mode,
-          thread_id: run.thread_id,
-          agent_id: run.agent_id,
-          attachments: files,
-        };
-        const next = await api.post("/runs", { ...body, key: keys.of("run", body) });
-        keys.sent();
+        const next = await deliver(text, files, steerNow);
         frame.clear();
-        ctx.navigate(`/runs/${next.id}`);
+        if (next !== null) {
+          ctx.navigate(`/runs/${next}`);
+        }
       });
     } finally {
       sending = false;
       send.disabled = false;
     }
+  }
+
+  // Send `text` with the files `files` (their ids) as the composer's Enter does: into the queue or to the run under way
+  // while it works (`steerNow` passes the queue), otherwise as the chat's next run, whose id is returned (null for the
+  // others).
+  async function deliver(text, files, steerNow) {
+    if (active && (elsewhere || (queueing && steerNow !== true))) {
+      // The level is checked against the model's own, so the models are known first.
+      await choices.ready();
+      const chosen = choices.value();
+      const body = {
+        text,
+        mode: chosen.mode,
+        model: chosen.model,
+        effort: chosen.effort,
+        approvals: chosen.approvals,
+        goal_mode: chosen.goal_mode,
+        agent_id: run.agent_id,
+        attachments: files,
+      };
+      await queue.add({ ...body, key: keys.of("queue", run.thread_id, body) });
+      keys.sent();
+      return null;
+    }
+    if (active) {
+      const entry = holdMessage(text);
+      const body = { text, attachments: files };
+      try {
+        await api.post(`/runs/${runId}/steer`, { ...body, key: keys.of("steer", runId, body) });
+      } catch (error) {
+        releaseMessage(entry);
+        throw error;
+      }
+      keys.sent();
+      return null;
+    }
+    // The level is checked against the model's own, so the models are known first.
+    await choices.ready();
+    const chosen = choices.value();
+    const body = {
+      goal: text,
+      mode: chosen.mode,
+      model: chosen.model,
+      effort: chosen.effort,
+      approvals: chosen.approvals,
+      goal_mode: chosen.goal_mode,
+      thread_id: run.thread_id,
+      agent_id: run.agent_id,
+      attachments: files,
+    };
+    const next = await api.post("/runs", { ...body, key: keys.of("run", body) });
+    keys.sent();
+    return next.id;
+  }
+
+  // The owner's message `text` sent again with the files it carried (item 205), as the composer sends: what is typed in
+  // the composer stays. `filesOf()` reads the files when they are wanted.
+  async function sendAgain(text, filesOf) {
+    if (sending) {
+      return;
+    }
+    sending = true;
+    send.disabled = true;
+    try {
+      await attempt(async () => {
+        const files = await filesOf();
+        const next = await deliver(text, files.map((file) => file.id), false);
+        if (next !== null) {
+          ctx.navigate(`/runs/${next}`);
+        }
+      });
+    } finally {
+      sending = false;
+      send.disabled = false;
+    }
+  }
+
+  /** The files that came with the goal of the run `id`: its `attachments` event, among its first events. */
+  async function filesOfRun(id) {
+    const events = await api.get(`/runs/${id}/events?limit=${OPENING_EVENTS}`);
+    return events.find((event) => event.kind === "attachments")?.data.files ?? [];
   }
 
   function syncControls() {
@@ -798,6 +837,7 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
       model = run.model;
       finishedAt = run.finished_at;
       paintStats();
+      paintWorking();
       syncControls();
       paintCost();
       paintLessons(fresh.lessons);
@@ -829,6 +869,7 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
       computer.setActive(false);
       messagesMissed();
       finishedAt = update.endedAt;
+      paintWorking();
       syncControls();
       reconcile();
       loadActions();
@@ -836,8 +877,20 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
     paintStats();
   }
 
+  // The feet of the run's own messages (their time, a copy, a send again) wait for its answer (item 205).
+  function paintWorking() {
+    thread.classList.toggle("run-working", !TERMINAL.has(status));
+  }
+
   // ------------------------------------------------------------------------------------------ assemble
   const layout = el("div", { class: "run-layout" });
+  // A delegated run's page sends nothing: the run that delegated it wrote its goal, and its composer is hidden (item 96).
+  const ownsMessages = run.parent_run_id === null;
+  // A resumed run's goal is the one of the run above it; its timeline opens with how it resumed that run.
+  const goalMessage =
+    run.source === RESUME_SOURCE
+      ? null
+      : userMessage({ text: run.goal, sentAt: run.created_at, files: [], sendAgain: ownsMessages ? () => sendAgain(run.goal, () => filesOfRun(run.id)) : null });
   // ------------------------------------------------------------------------------------------- actions
   // What the run did and what can be undone: its acting steps, its approvals and its file changes (see server.actions).
   const actionsBody = el("div", { class: "actions-list" });
@@ -1031,6 +1084,8 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
     onQuestionLeft: debounce(() => reconcile(), QUESTIONS_SETTLE_MS),
     onHeld: computer.setHeld,
     onBrowserStep: (page) => computer.notePage(page),
+    sendAgain: ownsMessages ? (text, files) => sendAgain(text, async () => files) : null,
+    onGoalFiles: goalMessage === null ? null : (files) => showMessageFiles(goalMessage, files),
   });
   const problem =
     historyProblem === null
@@ -1050,15 +1105,15 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
     el("h1", { class: "visually-hidden" }, run.goal),
     connectionNote,
     problem,
-    earlierTurns(history.earlier),
-    // A resumed run's goal is the one of the run above it; its timeline opens with how it resumed that run.
-    run.source === RESUME_SOURCE ? null : userMessage(run.goal, dateTimeFull(run.created_at)),
+    earlierTurns(history.earlier, (past) => () => sendAgain(past.goal, () => filesOfRun(past.id))),
+    goalMessage,
     timeline.element,
     waitingList,
     questionsList,
     lessonsCard,
     continuedIn(history.later),
   );
+  paintWorking();
   const filesWatch = new MutationObserver(debounce(() => paintFiles(thread), FILES_SETTLE_MS));
   filesWatch.observe(thread, { childList: true, subtree: true });
   const main = el("div", { class: "run-main" }, thread, dock, foot);

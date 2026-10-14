@@ -5140,8 +5140,8 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 201 | Marks of the conversation's messages: a look and a jump, after T3 Code               | done        | 4f23e25 |
 | 202 | The side menu, designed again                                                        | done        | 7e03ac3 |
 | 203 | The run's side panel, designed again                                                 | done        | 94985af |
-| 204 | Adding or deleting keeps the page where it is                                        | in progress |         |
-| 205 | A message's time, its copy and a send again, after T3 Code                           | planned     |         |
+| 204 | Adding or deleting keeps the page where it is                                        | done        | db647a3 |
+| 205 | A message's time, its copy and a send again, after T3 Code                           | in progress |         |
 | 206 | Markdown in the conversation, and copies that keep it                                | planned     |         |
 | 207 | The composer shows the markdown it holds, after T3 Code                              | planned     |         |
 | 208 | The model menu: providers at the side, a search and favourites, after T3 Code        | planned     |         |
@@ -9966,7 +9966,7 @@ owner (Excel and the OneDrive app installed, and the kind of Microsoft account).
 
 ### 204. Adding or deleting keeps the page where it is
 
-**Status: in progress.**
+**Status: done.** Merged as `db647a3` (PR #243; no Linear issue, the Linear connector was signed out).
 
 **As built (2026-10-14).** The side menu brings the open chat into view once, when the page comes to it from another
 chat (`sidebar.js` keeps the chat it brought into view last), where it did so at every paint of its list; a delete from
@@ -9990,7 +9990,29 @@ in WebKit too.
 
 ### 205. A message's time, its copy and a send again, after T3 Code
 
-**Status: planned.**
+**Status: in progress.**
+
+**As built (2026-10-14).** Each of the owner's messages has a foot once its turn has its answer, after T3 Code's
+(`messages.js`): when it was sent, as short as its day allows ("14:05", "Yesterday, 14:05", "5 Oct, 14:05", the year too
+when it was another; the full date where the pointer rests; `messageTime` in `dom.js`), a copy of it as it was written,
+and **Send again**. A copy's icon turns to a check for a moment once the text is on the clipboard, as T3 Code's does,
+where a toast said it before. Send again sends the message once more with the files it came with, as the composer's
+Enter does (into the queue or to the run while one works, otherwise as the chat's next run, whose page opens); the run
+page sends both ways with one function (`deliver`), and what is typed in the composer stays. The files of an earlier
+message are read from the first events of its run (its `attachments` event), those of a message that steered a run from
+the message. The foot stands at the bubble's right edge, as quiet as the answer's; a turn at work keeps it back
+(`.run-working` on the conversation while its run works, `.turn-working` on an earlier turn still going), and it shows
+as the run ends, without a reload. The files a message came with stand between it and its foot. The answer's foot has an
+icon to copy it, when it came and how it ended in sight; how long the run took still waits for the pointer (item 121). A
+delegated run's page has no Send again: the run that delegated it wrote its goal. Tests:
+`tests/smoke/test_message_feet.py`, a real server on a scripted model, a chat whose first message came with a file and
+was answered and whose second works, is steered, and works on until it is stopped; at 1280 px light and dark and at
+390 px: the earlier message's foot (its time, the full date where the pointer rests, the copy, Send again), the answer's
+(the copy, the time, the run's length hidden until the pointer rests), no foot under the goal or the steering message
+while the run works and both once it is stopped, each copy on the clipboard with its check, Send again starting the
+chat's next run with the first message and its file and leaving the draft in the composer, the file between the message
+and its foot, the icons at the bubble's edge, and the forms of the time. On the code of before, it found no foot. It
+passed in WebKit too.
 
 **What.** Under each of the owner's messages that has its answer: the time it was sent (the day too when it was not
 today, the full date where the pointer rests), a copy of the message as it was written, and a button that sends it again
@@ -10664,3 +10686,4 @@ favourites; and keys: the arrows and Enter, ⌘1 to ⌘9 for the rows in sight. 
 - 2026-10-14 (Opus 5.5): item 201 merged as `4f23e25` (PR #240; no Linear issue, the connector was signed out): At the left of the conversation, a column of short marks stands for the owner's messages, after T3 Code's: resting the pointer on it shows a message and the start of its answer, and a click or Enter goes to it.
 - 2026-10-14 (Opus 5.5): item 202 merged as `7e03ac3` (PR #241; no Linear issue, the connector was signed out): Each chat stands once in the side menu, after T3 Code's Working shelf: a chat whose latest run works leaves its day for Working, as the chat it is, with the runs it delegated folded under it, and goes back once the run ends; a pinned chat stays under Pinned.
 - 2026-10-14 (Opus 5.5): item 203 merged as `94985af` (PR #242; no Linear issue, the connector was signed out): The run's side panel shows one thing at a time, in four tabs after T3 Code's side panel (Run, Plan, Actions, Screen), each tab's sections open, the cost listed as the details are, and the tab chosen last kept.
+- 2026-10-14 (Opus 5.5): item 204 merged as `db647a3` (PR #243; no Linear issue, the connector was signed out): Adding or deleting keeps the page where it is: the side menu brings the open chat into view only when the page comes to another chat, and the Memory page keeps the notes it read, their rows and its place.

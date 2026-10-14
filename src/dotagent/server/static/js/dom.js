@@ -124,7 +124,10 @@ const DATE_TIME_FULL = new Intl.DateTimeFormat("en-GB", {
   hour12: false,
 });
 const CLOCK = new Intl.DateTimeFormat("en-GB", { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false });
+const HOUR_MINUTE = new Intl.DateTimeFormat("en-GB", { hour: "2-digit", minute: "2-digit", hour12: false });
 const DAY = new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short" });
+const DAY_YEAR = new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short", year: "numeric" });
+const DAY_MS = 86400 * 1000;
 const WEEK_S = 7 * 86400;
 
 /** "5 Oct, 14:03" */
@@ -139,6 +142,29 @@ export function dateTimeFull(ts) {
 
 export function clock(ts) {
   return CLOCK.format(new Date(ts * 1000));
+}
+
+/** The start of the local day of `date`, in milliseconds. */
+function dayStart(date) {
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
+}
+
+/**
+ * When a message was sent or an answer came, as short as its day allows, after T3 Code (item 205): "14:03" today,
+ * "Yesterday, 14:03", "5 Oct, 14:03" this year, "5 Oct 2025, 14:03" before.
+ */
+export function messageTime(ts) {
+  const date = new Date(ts * 1000);
+  const now = new Date();
+  // Rounded, so that a day of 23 or 25 hours, when the clocks change, is a day all the same.
+  const days = Math.round((dayStart(now) - dayStart(date)) / DAY_MS);
+  if (days <= 0) {
+    return HOUR_MINUTE.format(date);
+  }
+  if (days === 1) {
+    return `Yesterday, ${HOUR_MINUTE.format(date)}`;
+  }
+  return date.getFullYear() === now.getFullYear() ? dateTime(ts) : `${DAY_YEAR.format(date)}, ${HOUR_MINUTE.format(date)}`;
 }
 
 /** "just now", "5m ago", "3h ago", "yesterday", then the date. */

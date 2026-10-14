@@ -2,7 +2,7 @@
 // follow-up reads as the next turn of one chat, and the way on to the run that continued it.
 
 import { api } from "./api.js";
-import { clip, dateTimeFull, el, plural } from "./dom.js";
+import { clip, el, plural } from "./dom.js";
 import { icon } from "./icons.js";
 import { answerMessage, userMessage } from "./messages.js";
 
@@ -34,21 +34,25 @@ export async function loadHistory(run) {
   return { earlier: runs.slice(0, at), later: runs.slice(at + 1) };
 }
 
-/** One earlier run as what was asked and how it ended. */
-function turn(past) {
+/** One earlier run as what was asked and how it ended; a run still going keeps the foot of its message back. */
+function turn(past, sendAgainOf) {
   const href = `#/runs/${past.id}`;
-  const answer = FINISHED.has(past.status)
+  const ended = FINISHED.has(past.status);
+  const answer = ended
     ? answerMessage({ actorId: past.agent_id ?? "dot", status: past.status, text: past.result, endedAt: past.finished_at, startedAt: past.created_at, href })
     : el("div", { class: "note" }, icon("clock"), el("span", null, "This run is still going."), el("a", { class: "small", href }, "Open run"));
   const asked =
     past.source === RESUME_SOURCE
       ? el("div", { class: "note" }, icon("refresh"), el("span", null, "Resumed where the run above was cut off"))
-      : userMessage(past.goal, dateTimeFull(past.created_at));
-  return el("section", { class: "turn" }, asked, answer);
+      : userMessage({ text: past.goal, sentAt: past.created_at, files: [], sendAgain: sendAgainOf(past) });
+  return el("section", { class: ended ? "turn" : "turn turn-working" }, asked, answer);
 }
 
-/** The earlier turns of the conversation as one block, or null when there are none. */
-export function earlierTurns(earlier) {
+/**
+ * The earlier turns of the conversation as one block, or null when there are none. `sendAgainOf(run)` gives what sends
+ * the message of an earlier run again (item 205).
+ */
+export function earlierTurns(earlier, sendAgainOf) {
   if (earlier.length === 0) {
     return null;
   }
@@ -66,7 +70,7 @@ export function earlierTurns(earlier) {
           el("span", null, `${plural(left, "earlier run is", "earlier runs are")} not shown.`),
           el("a", { class: "small", href: `#/runs/${earlier[0].id}` }, "Open the first run"),
         ),
-    shown.map(turn),
+    shown.map((past) => turn(past, sendAgainOf)),
   );
 }
 
