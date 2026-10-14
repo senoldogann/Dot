@@ -301,16 +301,23 @@ def _found_skill(agent: str, skill: Skill, has: DotHas, limit: CopyLimit) -> Fou
 
 def _skills(agent: str, folder: Path, has: DotHas, limit: CopyLimit) -> _Found:
     """The skills in ``folder``, found as Dot finds its own: the skill folders in it, and those of container folders a
-    few levels down (:func:`dotagent.skills.discover.find_skill_files`)."""
+    few levels down (:func:`dotagent.skills.discover.find_skill_files`). As in Dot's own catalog, a file reached again
+    through a link is read once, and a skill named as one before it is left out with the reason: an import names each
+    skill by its agent and its name (item 236)."""
     if not folder.is_dir():
         return _NOTHING
     try:
         files: tuple[Path, ...] = find_skill_files(folder)
     except SkillError as error:
         return _only(FoundProblem(path=folder, reason=error.message))
-    skills: list[FoundSkill] = []
+    skills: dict[str, FoundSkill] = {}
+    seen: set[Path] = set()
     problems: list[FoundProblem] = []
     for file in files:
+        real: Path = file.resolve()
+        if real in seen:
+            continue
+        seen.add(real)
         try:
             skill: Skill = parse_skill(file, file.read_text(encoding="utf-8"), agent)
         except (OSError, UnicodeDecodeError) as error:
@@ -319,8 +326,14 @@ def _skills(agent: str, folder: Path, has: DotHas, limit: CopyLimit) -> _Found:
         except SkillError as error:
             problems.append(FoundProblem(path=file, reason=error.message))
             continue
-        skills.append(_found_skill(agent, skill, has, limit))
-    return _Found(skills=tuple(skills), servers=(), problems=tuple(problems))
+        taken: FoundSkill | None = skills.get(skill.name)
+        if taken is not None:
+            problems.append(
+                FoundProblem(path=file, reason=f"another skill is already called {skill.name}: {taken.folder}")
+            )
+            continue
+        skills[skill.name] = _found_skill(agent, skill, has, limit)
+    return _Found(skills=tuple(skills.values()), servers=(), problems=tuple(problems))
 
 
 def _program(command: str) -> str | None:
@@ -516,8 +529,11 @@ def _plugin_servers(name: str, root: Path, has: DotHas) -> _Found:
 
 
 def _plugin_roots(path: Path) -> tuple[tuple[tuple[str, Path], ...], tuple[FoundProblem, ...]]:
-    """The folders of the plugins installed in Claude Code, each with the plugin's name, from ``installed_plugins.json``
-    (``{"plugins": {"<name>@<marketplace>": [{"installPath": ...}]}}``; an entry may be one object rather than a list)."""
+    """The folder of each plugin installed in Claude Code, with the plugin's name, from ``installed_plugins.json``
+    (``{"plugins": {"<name>@<marketplace>": [{"scope": "user", "installPath": ...}]}}``; an entry may be one object
+    rather than a list). One folder a name, as an import names a plugin's skills and servers by its name (item 236):
+    the install for the user, which Claude Code uses outside a project, or else the first listed; a plugin named as one
+    of another marketplace before it is left out with the reason."""
     if not path.is_file():
         return (), ()
     try:
@@ -527,16 +543,26 @@ def _plugin_roots(path: Path) -> tuple[tuple[tuple[str, Path], ...], tuple[Found
     plugins: object = loaded.get("plugins") if isinstance(loaded, dict) else None
     if not isinstance(plugins, dict):
         return (), (FoundProblem(path=path, reason="it names no plugins"),)
-    roots: dict[Path, str] = {}
+    roots: dict[str, Path] = {}
+    keys: dict[str, str] = {}
     problems: list[FoundProblem] = []
     for key, value in plugins.items():
+        name: str = str(key).split("@", 1)[0]
+        installs: list[tuple[bool, Path]] = []
         for entry in value if isinstance(value, list) else [value]:
             folder: object = entry.get("installPath") if isinstance(entry, dict) else None
-            if not isinstance(folder, str) or not Path(folder).is_dir():
+            if not isinstance(entry, dict) or not isinstance(folder, str) or not Path(folder).is_dir():
                 problems.append(FoundProblem(path=path, reason=f"the folder of the plugin {key} is not there"))
                 continue
-            roots.setdefault(Path(folder), str(key).split("@", 1)[0])
-    return tuple((name, root) for root, name in roots.items()), tuple(problems)
+            installs.append((entry.get("scope") == "user", Path(folder)))
+        if not installs:
+            continue
+        if name in roots:
+            problems.append(FoundProblem(path=path, reason=f"another plugin is already called {name}: {keys[name]}"))
+            continue
+        roots[name] = next((root for for_user, root in installs if for_user), installs[0][1])
+        keys[name] = str(key)
+    return tuple(roots.items()), tuple(problems)
 
 
 def _copies(folder: Path) -> tuple[SkillCopy, ...]:

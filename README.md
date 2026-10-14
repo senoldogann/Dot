@@ -2122,17 +2122,21 @@ the skills of Claude Code (`~/.claude/skills`), of the plugins installed in Clau
 the MCP servers of Claude Code (those for every project, `mcpServers` in `~/.claude.json`; a project's own are not
 read), Claude Desktop (`claude_desktop_config.json`), Cursor (`~/.cursor/mcp.json`), VS Code (`Code/User/mcp.json`) and
 Codex (`mcp_servers` in `~/.codex/config.toml`). Their skills are found as Dot finds its own: the skill folders of a
-folder, and those of the folders in it a few levels down. Only what names a thing is kept: a skill's name, description
-and folder, and a server's name, its transport and what it reaches, the base name of the program it starts or the host
-of its URL, when that is a plain name. A server's arguments, environment and headers, and the rest of its URL, can hold
-keys and tokens: they are never kept, logged or shown, not even in the reason a server is left out. A skill is marked
-when Dot reads its folder, a server when Dot has one under the name it would give it (`<plugin>-<server>` for a
-plugin's). What cannot be read is listed apart with why: a file, a skill whose `SKILL.md` Dot cannot use, a server that
-names no command or URL to use, whose command does not start with the name of a program (a URL, or a variable set before
-it), whose URL names no host, or whose entry holds values of the wrong kind (told by their keys). `dotx skills list`
-shows them after Dot's own, with `?` for any character a terminal would act on; Settings › Skills shows them under
-"Found on this Mac", read apart from the learned skills; and `GET /api/skills/elsewhere` returns them. Runs do not see
-them: Dot uses one only once you add it (below), or name its folder in `[skills] dirs` or `[plugins] dirs`.
+folder, and those of the folders in it a few levels down. Each is found once by its agent and its name, which is how an
+import names it: a plugin installed for you and for a project is read from your install, the one Claude Code uses
+outside a project. Only what names a thing is kept: a skill's name, description and folder, and a server's name, its
+transport and what it reaches, the base name of the program it starts or the host of its URL, when that is a plain name.
+A server's arguments, environment and headers, and the rest of its URL, can hold keys and tokens: they are never kept,
+logged or shown, not even in the reason a server is left out. A skill is marked when Dot reads its folder, a server when
+Dot has one under the name it would give it (`<plugin>-<server>` for a plugin's). What cannot be read is listed apart
+with why: a file, a skill whose `SKILL.md` Dot cannot use, a skill named as one before it in the same agent's folders (a
+second copy reached through a link is not counted), a plugin named as one of another marketplace before it, a server
+that names no command or URL to use, whose command does not start with the name of a program (a URL, or a variable set
+before it), whose URL names no host, or whose entry holds values of the wrong kind (told by their keys).
+`dotx skills list` shows them after Dot's own, with `?` for any character a terminal would act on; Settings › Skills
+shows them under "Found on this Mac", read apart from the learned skills; and `GET /api/skills/elsewhere` returns them.
+Runs do not see them: Dot uses one only once you add it (below), or name its folder in `[skills] dirs` or
+`[plugins] dirs`.
 
 **Adding what is found.** Under Found on this Mac, Add to Dot asks first, then adds a skill or an MCP server to Dot;
 Remove asks, then takes it back (`PUT /api/skills/elsewhere` with `kind`, `agent`, `name` and `added`;
