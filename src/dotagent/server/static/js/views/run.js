@@ -10,6 +10,7 @@ import { createComputer } from "../computer.js";
 import { createCostCard } from "../cost.js";
 import { createDetails } from "../details.js";
 import { composerFrame } from "../composer.js";
+import { createContextMeter } from "../contextmeter.js";
 import { clip, dateTimeFull, debounce, duration, el, FILE_BUTTONS, fileSource, modelName, OPEN_FILE_EVENT, requestFile } from "../dom.js";
 import { levelLabel } from "../efforts.js";
 import { continuedIn, earlierTurns, loadHistory, RESUME_SOURCE } from "../history.js";
@@ -430,6 +431,9 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
     listener: null,
   });
   const { textarea: input, attachments, sendButton: send } = frame;
+  // How much of its context budget the run's last step filled (item 222), beside the send.
+  const meter = createContextMeter({ frame: frame.element });
+  send.before(meter.element);
   // The chat's queue (item 148), right above the composer: a message sent while the run works waits there and starts
   // as the chat's next run once this one has ended done; the page follows it there. A campaign's chat takes no queue:
   // a message steers its session, as before.
@@ -1072,7 +1076,11 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
       seen.input += inputTokens;
       seen.output += outputTokens;
       paintStats();
+      if (step > 0) {
+        meter.setUsed(inputTokens);
+      }
     },
+    onScaffold: ({ context_tokens: contextTokens, window: modelWindow }) => meter.setBudget(contextTokens, modelWindow),
     onCalls: ({ calls, failed }) => {
       seen.calls = calls;
       seen.failed = failed;
@@ -1191,6 +1199,7 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
     stopStatus();
     choices.dispose();
     queue.dispose();
+    meter.dispose();
     frame.dispose();
     if (ticker !== null) {
       clearInterval(ticker);

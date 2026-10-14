@@ -111,14 +111,15 @@ function paintGroup(group) {
  * The timeline of the run `rootRunId`, which was created at `startedAt` (seconds). `push(record)` takes events in order; the
  * callbacks tell the page about what the timeline cannot show by itself: `onGrow()` after every event, `onPlan(steps, targets)`,
  * `onStats({ step, input, output })` after every model turn and every side call of the run (`step` 0: a compaction, a
- * review, a description of images), `onCalls({ calls, failed })` after every tool call of the run,
+ * review, a description of images), `onScaffold({ context_tokens, window })` for the run's scaffold event (its context
+ * budget and its model's window), `onCalls({ calls, failed })` after every tool call of the run,
  * `onRunStatus({ status, model, endedAt })` (`endedAt` is null until the run is over), `onAnswer(node)` when the answer is
  * on the page, `onImage(name)` for every screenshot a tool returned and `onBrowserStep()` for the root run's first
  * browser tool call (Dot's computer starts its view on it). `sendAgain(text, files)` sends a message written to the run
  * again with its files (item 205); null where the page sends nothing. `onGoalFiles(files)` takes the files that came
  * with the run's goal, to show them under it; null where the page shows no goal, and they stand in the timeline.
  */
-export function createTimeline({ rootRunId, actorId, startedAt, onGrow, onPlan, onStats, onCalls, onRunStatus, onAnswer, onImage, onQuestionLeft, onHeld, onBrowserStep, sendAgain, onGoalFiles }) {
+export function createTimeline({ rootRunId, actorId, startedAt, onGrow, onPlan, onStats, onScaffold, onCalls, onRunStatus, onAnswer, onImage, onQuestionLeft, onHeld, onBrowserStep, sendAgain, onGoalFiles }) {
   const element = el("div", { class: "timeline" });
   const scopes = new Map();
   const cards = new Map();
@@ -683,9 +684,13 @@ export function createTimeline({ rootRunId, actorId, startedAt, onGrow, onPlan, 
     },
 
     // How much help the run's model gets. Shown only where it differs from the configuration: a context budget cut to
-    // fit the model's window, and reminders of the goal for a model of the weak tier.
+    // fit the model's window, and reminders of the goal for a model of the weak tier. The run's own budget and window go
+    // to the context meter (item 222).
     scaffold(scope, record) {
       const data = record.data;
+      if (scope.runId === rootRunId) {
+        onScaffold({ context_tokens: data.context_tokens, window: data.window });
+      }
       if (data.cut_to_window) {
         const output = `tool output up to ${compact(data.tool_output_chars)} characters`;
         note(scope, record.ts, "sliders", `Context budget ${compact(data.context_tokens)} tokens to fit the model's window of ${compact(data.window)}, ${output}`, "");

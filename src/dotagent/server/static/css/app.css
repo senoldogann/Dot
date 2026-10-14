@@ -1727,6 +1727,90 @@ a.pill:hover {
   color: var(--text);
 }
 
+/* The context meter of a run's composer (item 222, contextmeter.js): a ring of how much of the run's budget its last
+   step filled, in the pills' ink; near the budget in the warning colour, past it in the bad one. Its panel says the
+   figures. */
+.context-meter {
+  display: inline-grid;
+  flex: none;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: none;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.context-meter:hover,
+.context-meter[aria-expanded="true"] {
+  background: var(--surface-2);
+  color: var(--text);
+}
+
+.context-meter[data-level="near"] {
+  color: var(--warn);
+}
+
+.context-meter[data-level="full"] {
+  color: var(--bad);
+}
+
+.context-ring {
+  width: 18px;
+  height: 18px;
+  transform: rotate(-90deg);
+}
+
+.context-ring circle {
+  fill: none;
+  stroke-width: 2.5;
+}
+
+.context-ring-track {
+  stroke: var(--border-strong);
+}
+
+/* How much of the ring is filled is the circle's stroke-dasharray attribute (contextmeter.js), which a rule here would
+   override. */
+.context-ring-fill {
+  stroke: currentColor;
+  stroke-linecap: round;
+  transition: stroke-dasharray var(--motion-base) var(--ease);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .context-ring-fill {
+    transition: none;
+  }
+}
+
+.context-meter-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 4px 4px 0;
+}
+
+.context-meter-title {
+  font-weight: var(--weight-label);
+}
+
+.context-meter-figure {
+  color: var(--text-2);
+  font-variant-numeric: tabular-nums;
+}
+
+.context-meter-text {
+  margin: 0;
+  padding: 0 4px 4px;
+  color: var(--muted);
+  font-size: var(--text-sm);
+}
+
 /* The model's pill is the one that gives way when the bar is short. */
 .composer-pill[data-pill="model"] {
   flex: 0 1 auto;
