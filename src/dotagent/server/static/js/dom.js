@@ -73,20 +73,6 @@ export function svg(tag, props, ...children) {
   return node;
 }
 
-export function sleep(ms, signal) {
-  return new Promise((resolve) => {
-    const timer = setTimeout(resolve, ms);
-    signal.addEventListener(
-      "abort",
-      () => {
-        clearTimeout(timer);
-        resolve();
-      },
-      { once: true },
-    );
-  });
-}
-
 /** A function that runs `fn` once `ms` after the last call. */
 export function debounce(fn, ms) {
   let timer = null;

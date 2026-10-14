@@ -131,12 +131,48 @@ function renderSignIn(message) {
   input.focus();
 }
 
+// A daemon out of reach is asked again by itself (item 200): soon at first, since it may be starting or the Mac waking,
+// then less often; at once when the browser is back on the network or the page back in view.
+const RETRY_FIRST_MS = 2000;
+const RETRY_MAX_MS = 30000;
+let retryPause = RETRY_FIRST_MS;
+let stopRetry = () => {};
+
+function retryNow() {
+  stopRetry();
+  attempt(connect);
+}
+
 function renderUnreachable(message) {
+  const when = el("span", null, "");
   screen(
     el("div", { class: "note bad" }, icon("alert"), el("span", null, message)),
-    el("p", { class: "muted" }, "Make sure the daemon is running (", el("code", { class: "mono" }, "dotx daemon"), ") and try again."),
-    el("div", { class: "cluster" }, el("button", { class: "btn primary", type: "button", onclick: () => attempt(connect) }, icon("refresh"), "Try again")),
+    el("p", { class: "muted" }, "Make sure the daemon is running (", el("code", { class: "mono" }, "dotx daemon"), "); this page tries again by itself."),
+    el("p", { class: "muted" }, when),
+    el("div", { class: "cluster" }, el("button", { class: "btn primary", type: "button", onclick: retryNow }, icon("refresh"), "Try again")),
   );
+  const due = Date.now() + retryPause;
+  retryPause = Math.min(retryPause * 2, RETRY_MAX_MS);
+  const tell = () => {
+    when.textContent = `Trying again in ${Math.max(1, Math.ceil((due - Date.now()) / 1000))} s.`;
+  };
+  const inView = () => {
+    if (document.visibilityState === "visible") {
+      retryNow();
+    }
+  };
+  tell();
+  const ticker = setInterval(tell, 1000);
+  const timer = setTimeout(retryNow, due - Date.now());
+  window.addEventListener("online", retryNow);
+  document.addEventListener("visibilitychange", inView);
+  stopRetry = () => {
+    clearInterval(ticker);
+    clearTimeout(timer);
+    window.removeEventListener("online", retryNow);
+    document.removeEventListener("visibilitychange", inView);
+    stopRetry = () => {};
+  };
 }
 
 /** The daemon answered, with an error: it runs, so the screen says what failed rather than to start it. */
@@ -256,13 +292,15 @@ async function connect() {
       renderSignIn("The daemon did not accept that access token.");
       return;
     }
-    if (error instanceof ApiError) {
+    // A status is the daemon's answer; without one (0, or no ApiError) nothing that is the daemon answered.
+    if (error instanceof ApiError && error.status !== 0) {
       renderFailed(error);
       return;
     }
     renderUnreachable(error.message);
     return;
   }
+  retryPause = RETRY_FIRST_MS;
   beginSession();
 }
 
