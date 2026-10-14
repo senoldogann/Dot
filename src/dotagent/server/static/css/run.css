@@ -485,6 +485,27 @@
   padding: 0;
 }
 
+/* Beside the conversation the panel slides in as it is shown and out before it hides (item 220, inspector.js): the
+   conversation makes room for it at once and takes the room back once the slide is over. */
+.inspector[data-mode="docked"] {
+  animation: inspector-in var(--motion-panel) var(--ease);
+  transition:
+    opacity var(--motion-panel) var(--ease),
+    transform var(--motion-panel) var(--ease);
+}
+
+.inspector[data-mode="docked"][data-leaving="true"] {
+  opacity: 0;
+  transform: translateX(16px);
+}
+
+@keyframes inspector-in {
+  from {
+    opacity: 0;
+    transform: translateX(16px);
+  }
+}
+
 /* On a narrow page the panel slides in over the conversation (item 85): inspector.js shows it, then opens it on the
    next frame; closing, it waits for the slide before it hides. The scrim fades with it. */
 .inspector[data-mode="drawer"] {
@@ -516,8 +537,10 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .inspector[data-mode="docked"],
   .inspector[data-mode="drawer"],
   .inspector-scrim {
+    animation: none;
     transition: none;
   }
 }
@@ -902,8 +925,56 @@
   display: none;
 }
 
+/* So in the drawer, before a page has an address, the toolbar has nothing to show and takes no room (item 220). */
+.inspector[data-mode="drawer"] .computer-toolbar:has(> .computer-url:empty) {
+  display: none;
+}
+
 .computer-screen .hint {
   color: var(--on-bubble);
+  text-align: center;
+}
+
+/* With no frame the view keeps the shape of a screen and says why (item 220, computer.js): a mark in a ring, a title
+   and the hint, the mark breathing while the first frame is on its way. */
+.computer-screen:has(> .computer-empty:not([hidden])) {
+  aspect-ratio: 16 / 10;
+}
+
+.computer-empty {
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+  max-width: 280px;
+}
+
+.computer-empty-mark {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  margin-bottom: 4px;
+  border: 1px solid color-mix(in srgb, var(--on-bubble) 18%, transparent);
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--surface) 55%, transparent);
+  color: var(--on-bubble);
+}
+
+.computer-empty[data-state="waiting"] .computer-empty-mark {
+  animation: breathe var(--motion-breath) ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .computer-empty[data-state="waiting"] .computer-empty-mark {
+    animation: none;
+  }
+}
+
+.computer-empty-title {
+  color: var(--on-bubble);
+  font-size: var(--text-md);
+  font-weight: var(--weight-title);
+  line-height: var(--leading-ui);
   text-align: center;
 }
 
