@@ -5144,7 +5144,16 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 205 | A message's time, its copy and a send again, after T3 Code                           | done        | 9934575 |
 | 206 | Markdown in the conversation, and copies that keep it                                | done        | 33a7f8d |
 | 207 | The composer shows the markdown it holds, after T3 Code                              | done        | 23f1d9a |
-| 208 | The model menu: providers at the side, a search and favourites, after T3 Code        | in progress |         |
+| 208 | The model menu: providers at the side, a search and favourites, after T3 Code        | done        | 2545d60 |
+| 209 | The default model, changed from the model menu                                       | in progress |         |
+| 210 | The shell check: changes of permissions                                              | planned     |         |
+| 211 | Secrets kept from the agent by default                                               | planned     |         |
+| 212 | A provider that is not running answers at once                                       | planned     |         |
+| 213 | Tests: a bare pytest, and every offline smoke test in CI                             | planned     |         |
+| 214 | The redactor knows more kinds of secrets                                             | planned     |         |
+| 215 | Small hardenings after the review                                                    | planned     |         |
+| 216 | The README says what leaves this Mac                                                 | planned     |         |
+| 217 | A weekly audit of the dependencies                                                   | planned     |         |
 
 ### 77. The type system: Inter and Geist Mono, seven sizes, three weights
 
@@ -10084,7 +10093,7 @@ as before.
 
 ### 208. The model menu: providers at the side, a search and favourites, after T3 Code
 
-**Status: in progress.**
+**Status: done.** Merged as `2545d60` (PR #247; no Linear issue, the Linear connector was signed out).
 
 **As built (2026-10-14).** The Model pill's menu is T3 Code's model picker made of Dot's own parts (`modelpicker.js`): a
 rail on its left with the favourites' star, a rule, then the mark of each provider that lists models that can call
@@ -10117,6 +10126,120 @@ and the tests of the composer's other menus pass unchanged.
 **What.** The composer's model menu gets a rail of the providers' marks at its left (favourites first), which filters
 the list to one provider; a search over every provider's models; a star on each model that keeps it among the
 favourites; and keys: the arrows and Enter, ⌘1 to ⌘9 for the rows in sight. After T3 Code's.
+
+## Part 34: the default model from the model menu, and what the outside review found (planned 2026-10-14)
+
+The owner's thirty-third word, on 2026-10-14: why the default model still cannot be changed in the app, which the owner
+had built again; the problems that remain should be fixed, among them those an outside review of the code found (a
+report the owner had pasted, checked here on macOS first); and the fixes suggested besides are to be talked over.
+
+**Status (2026-10-14): planned.** Settings › Models has had the default model's menu since item 199, and it works: it
+was checked on the daemon of the owner's Mac in WebKit and in Chrome, read-only, with every model listed. But the owner
+picks models in the composer's model menu, where a pick changes the chat's model alone and the default's row cannot
+change the default, and the default had never been changed (`[models] main` was still unset). T3 Code starts its new
+chats on the model picked last. The outside review's findings were each checked on the code of item 208 on macOS, those
+of the shell check by asking the policy what it would decide, with nothing run.
+
+**The shape of this part (the decisions).** Nine items, each a pull request of its own: the default model first, as the
+owner asked about it; then the shell check's changes of permissions (210) and the secrets it keeps from the agent (211);
+a provider that is not running (212), the tests (213), the redactor (214), small hardenings (215), what leaves this Mac
+(216) and an audit of the dependencies (217). The review's other findings about the shell check are not planned here.
+Left to the owner, and asked: the default preset, a licence, and a consent to the models in the cloud before the first
+run. Item 196 of part 31 still waits on the owner.
+
+### How to start part 34 (the handoff prompt)
+
+> Read ROADMAP.md part 34 and the status table of part 9 (rows 209 to 217). One item at a time, in order; the protocol
+> of part 5 (branch, gate, PR, Linear MYP issue when the connector is signed in, squash merge, hash in the table, log
+> line) is unchanged. Give each change a test that fails on the code of before, and check a page that changes in a
+> browser, wide and on a phone, light and dark. Describe no line the shell check lets through in a commit message, a
+> pull request's text or this file before its fix is merged. Never touch the owner's data directory except to read
+> it, by the kinds and numbers of what is stored, and to restart the daemon when `/api/status` shows no active run;
+> PLAN.md stays untracked. The owner reads Turkish; everything written is English.
+
+### 209. The default model, changed from the model menu
+
+**Status: in progress.**
+
+**As built (2026-10-14).** The default's row of the composer's model menu (`modelpicker.js`), the first of every view,
+has Change once the daemon's default is known. Change turns the list to choosing the default: a tinted bar under the
+search says "Choose the default model" and has Cancel, the default's row leaves the list, the tick moves to the daemon's
+default and the keys stay in the search. The model picked then (a click or a tap, Enter, ⌘1 to ⌘9) goes to
+`POST /api/models/main`, as the Settings' menu sends it (item 199), one at a time, the bar saying which model is being
+made the default. Once the daemon took it, a toast says "New chats start on …", the status is read again, and the menu
+goes back to the chat's model and stays open: the default's row names the new default and the pill of a chat that
+follows the default (the home's, until a model is picked there) shows it, while a chat with a model of its own keeps it.
+A change the daemon refuses is told in a toast with its words and the list stays choosing; Escape or Cancel goes back
+without a change and leaves the menu open (Escape closes the menu only when it is not choosing). Tab reaches Change
+(Option+Tab in WebKit, which tabs to text fields alone unless told otherwise, as macOS does). Why: Settings › Models has
+had the default's menu since item 199 and it works on the owner's Mac (checked read-only in WebKit and Chrome), but the
+owner picks models in the composer's menu, where only the chat's model could change, and the default had never been
+changed. Tests: a new test in `tests/smoke/test_model_picker.py`, on a real server whose providers list the test's
+models: Change and its bar, the tick on the default, Escape that keeps the menu, Tab to Change and Enter on it, a pick
+in another provider's view that makes the default (the toast, the default's row, the home's pill, `/api/status`, and
+`[models] main` in the config file with the other settings unchanged), a chat with its own model that keeps it, Enter on
+a search, a change the daemon refuses (held by the test) that keeps the default and the choosing, Cancel, and Settings ›
+Models showing the default made; at 1280 px light and dark and at 390 px, and on a touch screen, where taps make the
+default. On the code of before it found no Change. It passed in WebKit too, and the tests of the composer's other menus
+and of the Settings' default pass unchanged.
+
+**What.** The composer's model menu changes the daemon's default too, where the owner picks models: Change on the
+default's row turns the list to choosing the model new chats start on, and the model picked becomes the default, as in
+Settings › Models; a chat with a model of its own keeps it.
+
+### 210. The shell check: changes of permissions
+
+**Status: planned.**
+
+**What.** The shell check judges a change of permissions by every path it names. The details are written here once the
+fix is merged.
+
+### 211. Secrets kept from the agent by default
+
+**Status: planned.**
+
+**What.** More of the places where credentials are kept are protected by default. The details are written here once the
+fix is merged.
+
+### 212. A provider that is not running answers at once
+
+**Status: planned.**
+
+**What.** When a provider's app is not running (Ollama on this Mac), the model list and the health checks say so at once
+instead of trying again for half a minute, and the health checks of the models run side by side within a time limit.
+
+### 213. Tests: a bare pytest, and every offline smoke test in CI
+
+**Status: planned.**
+
+**What.** A bare `pytest` collects every test without an error, and CI runs every smoke test that needs no service,
+chosen by their marks instead of by a list of files.
+
+### 214. The redactor knows more kinds of secrets
+
+**Status: planned.**
+
+**What.** The redactor that keeps secrets out of logs, lessons and errors knows more kinds of them. The details are
+written here once the fix is merged.
+
+### 215. Small hardenings after the review
+
+**Status: planned.**
+
+**What.** Small hardenings the review suggested. The details are written here once the fix is merged.
+
+### 216. The README says what leaves this Mac
+
+**Status: planned.**
+
+**What.** The README says in one place what leaves this Mac and where it goes: the models in the cloud by default, what
+is sent to them, and how to keep it on the Mac.
+
+### 217. A weekly audit of the dependencies
+
+**Status: planned.**
+
+**What.** A weekly job checks the Python and Rust dependencies against the public advisories.
 
 ## Log
 
@@ -10765,3 +10888,4 @@ favourites; and keys: the arrows and Enter, ⌘1 to ⌘9 for the rows in sight. 
 - 2026-10-14 (Opus 5.5): item 205 merged as `9934575` (PR #244; no Linear issue, the connector was signed out): Under each of the owner's messages, once its turn has its answer: when it was sent, a copy of it and Send again; under each answer, a copy of it and when it came.
 - 2026-10-14 (Opus 5.5): item 206 merged as `33a7f8d` (PR #245; no Linear issue, the connector was signed out): The owner's messages read as markdown, and a copy out of the conversation keeps the markdown it was written in, a list as a list and a table as a table.
 - 2026-10-14 (Opus 5.5): item 207 merged as `23f1d9a` (PR #246; no Linear issue, the connector was signed out): The composer's box shows the markdown it holds as it reads, its marks quieter than its words, letter for letter under the text as typed.
+- 2026-10-14 (Opus 5.5): item 208 merged as `2545d60` (PR #247; no Linear issue, the connector was signed out): The composer's model menu has a rail of the favourites and the providers' marks, a search across providers, a star on each model and keys, after T3 Code's.

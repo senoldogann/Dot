@@ -1,22 +1,25 @@
 """The composer's model menu (item 208), after T3 Code's: a rail of the favourites and of each provider's mark shows one
 view at a time, a search finds models across every provider, a star keeps a model among the favourites (in this
 browser) without picking it, and the keys move, pick, star and leave; on a touch screen the search leaves the focus
-where it is. A real server, whose providers list the test's models and answer nothing; nothing is sent. Wide and on
-a phone, light and dark."""
+where it is. Change, on the default's row, makes the daemon's default from the menu (item 209). A real server, whose
+providers list the test's models and answer nothing; nothing is sent. Wide and on a phone, light and dark."""
 
 import asyncio
 import json
 import time
+import tomllib
 from collections.abc import AsyncIterator
 from pathlib import Path
 from typing import Literal
 
+import httpx
 import pytest
 import pytest_asyncio
 from playwright.async_api import Browser, BrowserContext, Locator, Page, Route, async_playwright, expect
 
 from dotagent.agent.manager import RunManager
 from dotagent.config import load_config
+from dotagent.core.paths import config_path
 from dotagent.evals.runner import SCRIPTED_MODEL
 from dotagent.evals.scripted import ScriptedProvider
 from dotagent.llm.router import parse_model_ref
@@ -321,5 +324,154 @@ async def test_the_model_menu_shows_providers_finds_models_and_keeps_favourites(
             assert (await _rail(menu))[1] == ("Ollama", "true")
             assert await _rows(menu) == ["Default (scripted)", "scripted", "qwen3-coder"]
             await early.close()
+        finally:
+            await browser.close()
+
+
+async def _main_model(address: str) -> str:
+    """The daemon's default model, as its status says."""
+    async with httpx.AsyncClient(base_url=address, headers={"Authorization": f"Bearer {TOKEN}"}) as http:
+        status: httpx.Response = await http.get("/api/status")
+    status.raise_for_status()
+    return str(status.json()["models"]["main"])
+
+
+def _written() -> dict[str, object]:
+    """The config file's settings, as the daemon would read them."""
+    return tomllib.loads(config_path().read_text(encoding="utf-8"))
+
+
+async def test_the_model_menu_makes_the_default_that_new_chats_start_on(
+    runtime: Runtime, served: str, tmp_path: Path
+) -> None:
+    async with async_playwright() as playwright:
+        browser: Browser = await playwright.chromium.launch(channel=runtime.config.browser.channel, headless=True)
+        try:
+            # No service worker, so that the test can hold a request of the page in every browser (WebKit sends the
+            # page's requests past `page.route` once one is installed).
+            host, port = "127.0.0.1", int(served.rpartition(":")[2])
+            context: BrowserContext = await browser.new_context(
+                viewport={"width": 1280, "height": 860}, reduced_motion="reduce", service_workers="block"
+            )
+            page: Page = await context.new_page()
+            errors: list[str] = []
+            page.on("pageerror", lambda error: errors.append(str(error)))
+            await page.add_init_script("sessionStorage.setItem('dot.opened', '1')")
+            await page.goto(ui_url(host, port, TOKEN))
+            pill: Locator = page.locator(".composer .composer-pill[data-pill='model']")
+            menu: Locator = page.locator(_MENU)
+            search: Locator = menu.locator("input[aria-label='Search models']")
+            choosing: Locator = menu.locator(".model-choosing")
+            change: Locator = menu.get_by_role("button", name="Change")
+            await expect(pill).to_contain_text("scripted")
+
+            # Change, on the default's row, turns the list to choosing the default: a bar says so, the default's row
+            # leaves, the tick is on the default and the keys stay in the search.
+            await pill.click()
+            await expect(choosing).to_be_hidden()
+            await expect(change).to_have_attribute("title", "Choose the model new chats start on")
+            await page.screenshot(path=str(tmp_path / "change-1280-light.png"), animations="disabled")
+            await change.click()
+            await expect(choosing.locator(".model-choosing-text")).to_have_text("Choose the default model")
+            assert await _rows(menu) == ["scripted", "qwen3-coder"]
+            await expect(menu.locator("[role=option][aria-selected=true]")).to_have_count(1)
+            await expect(menu.locator("[role=option][aria-selected=true]")).to_contain_text("scripted")
+            await expect(search).to_be_focused()
+            await page.screenshot(path=str(tmp_path / "choosing-1280-light.png"), animations="disabled")
+
+            # Escape leaves the choosing and the menu stays open; Tab reaches Change (Option+Tab in WebKit, which tabs
+            # to text fields alone unless told otherwise, as macOS does), and Enter on it chooses again.
+            await page.keyboard.press("Escape")
+            await expect(choosing).to_be_hidden()
+            await expect(menu).to_be_visible()
+            assert await _rows(menu) == ["Default (scripted)", "scripted", "qwen3-coder"]
+            await search.focus()
+            await page.keyboard.press("Alt+Tab" if browser.browser_type.name == "webkit" else "Tab")
+            await expect(change).to_be_focused()
+            await page.keyboard.press("Enter")
+            await expect(choosing).to_be_visible()
+            await expect(search).to_be_focused()
+
+            # A model picked while choosing is the default: told, the list back to the chat's model, the default's
+            # row and the home's pill (which follows the default) name it, and the daemon and its config file have it.
+            await menu.get_by_role("button", name="OpenAI").click()
+            await menu.get_by_role("option", name="gpt-5.5-mini", exact=True).click()
+            await expect(page.locator(".toast.ok")).to_contain_text("New chats start on gpt-5.5-mini.")
+            await expect(choosing).to_be_hidden()
+            await expect(menu).to_be_visible()
+            await expect(menu.get_by_role("option", name="Default (gpt-5.5-mini)")).to_be_visible()
+            await expect(pill).to_contain_text("gpt-5.5-mini")
+            assert await _main_model(served) == "openai:gpt-5.5-mini"
+            models: object = _written()["models"]
+            assert isinstance(models, dict) and models["main"] == "openai:gpt-5.5-mini", models
+            assert _written()["browser"] == {"headless": True}
+
+            # The keys choose too; a chat with a model of its own keeps it when the default changes.
+            await menu.get_by_role("button", name="Ollama").click()
+            await menu.locator("[role=option]").filter(has_text="qwen3-coder").click()
+            await expect(menu).to_be_hidden()
+            await expect(pill).to_contain_text("qwen3-coder")
+            await pill.click()
+            await change.click()
+            await search.fill("haiku")
+            await page.keyboard.press("Enter")
+            await expect(page.locator(".toast.ok").last).to_contain_text("New chats start on claude-haiku-5-5.")
+            await expect(choosing).to_be_hidden()
+            await expect(pill).to_contain_text("qwen3-coder")
+            assert await _main_model(served) == "anthropic:claude-haiku-5-5"
+
+            # A change the daemon refuses says why, leaves the default as it was and keeps choosing.
+            async def refused(route: Route) -> None:
+                await route.fulfill(
+                    status=422,
+                    json={"message": "a run needs a model that can call tools", "context": {"model": "openai:gpt-5.5"}},
+                )
+
+            await page.route("**/api/models/main", refused)
+            await search.fill("")
+            await change.click()
+            await menu.get_by_role("button", name="OpenAI").click()
+            await menu.get_by_role("option", name="gpt-5.5", exact=True).click()
+            await expect(page.locator(".toast.error")).to_contain_text("a run needs a model that can call tools")
+            await expect(choosing.locator(".model-choosing-text")).to_have_text("Choose the default model")
+            await page.unroute("**/api/models/main")
+            await menu.get_by_role("button", name="Cancel").click()
+            await expect(choosing).to_be_hidden()
+            await expect(menu.get_by_role("option", name="Default (claude-haiku-5-5)")).to_be_visible()
+            assert await _main_model(served) == "anthropic:claude-haiku-5-5"
+
+            # The Settings show the default the menu made.
+            await page.keyboard.press("Escape")
+            await page.goto(f"{served}/#/settings/models")
+            await expect(page.locator(".models-default select")).to_have_value("anthropic:claude-haiku-5-5")
+            assert errors == []
+            await page.context.close()
+
+            # Dark, and on a phone: the bar and Change fit.
+            for width, scheme in ((1280, "dark"), (390, "light")):
+                shown, shown_errors = await _page(browser, served, width, scheme)
+                await shown.locator(".composer .composer-pill[data-pill='model']").click()
+                await shown.locator(_MENU).get_by_role("button", name="Change").click()
+                await expect(shown.locator(_MENU).locator(".model-choosing")).to_be_visible()
+                await shown.screenshot(path=str(tmp_path / f"choosing-{width}-{scheme}.png"), animations="disabled")
+                assert shown_errors == []
+                await shown.context.close()
+
+            # On a touch screen: a tap on Change, then on a model, makes it the default.
+            touch: BrowserContext = await browser.new_context(
+                viewport={"width": 390, "height": 860}, is_mobile=True, has_touch=True, reduced_motion="reduce"
+            )
+            phone: Page = await touch.new_page()
+            await phone.add_init_script("sessionStorage.setItem('dot.opened', '1')")
+            await phone.goto(ui_url(host, port, TOKEN))
+            await phone.locator(".composer .composer-pill[data-pill='model']").tap()
+            menu = phone.locator(_MENU)
+            await menu.get_by_role("button", name="Change").tap()
+            await menu.get_by_role("button", name="Ollama").tap()
+            await menu.locator("[role=option]").filter(has_text="qwen3-coder").tap()
+            await expect(phone.locator(".toast.ok")).to_contain_text("New chats start on qwen3-coder.")
+            await expect(menu.get_by_role("option", name="Default (qwen3-coder)")).to_be_visible()
+            assert await _main_model(served) == f"{_PROVIDER}:qwen3-coder"
+            await touch.close()
         finally:
             await browser.close()
