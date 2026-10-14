@@ -5159,7 +5159,16 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 220 | The side panel slides, and the screen says why it is empty                           | done        | e1d8176 |
 | 221 | The window of every provider's models, as published                                  | done        | bc61bed |
 | 222 | A context meter in the run's composer                                                | done        | a99e07e |
-| 223 | Claude's fast mode                                                                   | in progress |         |
+| 223 | Claude's fast mode                                                                   | done        | a3ace6d |
+| 224 | A summary's check knows a path however it is written                                 | in progress |         |
+| 225 | A model that declines is said to have declined                                       | planned     |         |
+| 226 | A helper's card                                                                      | planned     |         |
+| 227 | Previous agents in the side panel                                                    | planned     |         |
+| 228 | The rail of messages beside the docked panel                                         | planned     |         |
+| 229 | Commands in the background                                                           | planned     |         |
+| 230 | The composer's keys                                                                  | planned     |         |
+| 231 | Runs go on after a restart                                                           | planned     |         |
+| 232 | Models for Dot's own work                                                            | planned     |         |
 
 ### 77. The type system: Inter and Geist Mono, seven sizes, three weights
 
@@ -10440,7 +10449,7 @@ gives the figures and the model's window.
 
 ### 223. Claude's fast mode
 
-**Status: in progress.**
+**Status: done.** Merged as `a3ace6d` (PR #262; no Linear issue, the Linear connector was signed out).
 
 **As built (2026-10-14).** Claude Opus 5.5, Opus 5 and Opus 4.8 have fast mode: up to 2.5 times the output speed at
 twice the price, a research preview. The Models API does not say which models have it, so `FAST_MODE_MODELS` in
@@ -10456,6 +10465,118 @@ Ultracode and Ultrathink, for which the API has no levels.
 
 **What.** The Claude models that have fast mode offer it in the composer's reasoning menu, off by default, for a chat at
 a time; the API's refusal is shown as it is.
+
+## Part 36: helpers at a glance, previous agents, commands in the background (planned 2026-10-14)
+
+The owner's thirty-fifth and thirty-sixth words, on 2026-10-14. The first: a helper's row should look as T3 Code's does,
+with a card on hovering it that gives the helper's model, its reasoning level, how long it has run and what it is doing;
+what is useful among T3 Code's settings should come to Dot; and at the conversation's far left there should be the rail
+of dashes that stands for each message and each session. The second, queued after the first: the side panel should list
+the previous agents as T3 Code's does, and look better, with SVG icons; a run's lessons that could not be drawn as "the
+review model did not call propose_lessons", and a summary's check that flagged a path under `~` as unverified, should be
+fixed if they are faults; and a command that runs for hours, past the shell's limit of 30 minutes, should run in the
+background, as in T3 Code, with Dot checking on it.
+
+**Status (2026-10-14): planned.** Each was checked on the code first. A helper's row in the conversation showed its
+title and its state; its model and reasoning level were kept but shown nowhere, and what it was doing showed only once
+it was opened. The run page's side panel had no list of a chat's helpers. The rail of marks of item 201 hid itself when
+less than 40 px was left at the conversation's left, as beside the docked side panel. Of T3 Code's settings, Dot had
+skills in the slash menu and a question before a delete; Enter always sent, a message to a busy run was always queued
+(⌘⇧Enter steered it), runs went on after a restart only through `[agent] resume` in the config file, and Settings ›
+Models showed the fast, review and vision models with no way to change them. The review model that draws a run's lessons
+at times declined: Anthropic's API ended its reply as a `refusal`, with no call and no text, and Dot asked it once more
+and then said it did not call `propose_lessons`. The check of a summary knew a path only as the history wrote it, so a
+summary that wrote `~/…` for a path the history held under the home folder's full name was flagged. The shell ends a
+command at its timeout, 30 minutes at most; a terminal session is closed after 30 minutes without a read, and nothing
+told a chat that a long command had ended.
+
+**The shape of this part (the decisions).** Nine items, each a pull request of its own, after those of part 35; the two
+faults first. A refusal is said as it is and not asked again, and Dot does not turn to another model by itself: whether
+the lessons should is left to the owner, who can choose the review model in Settings › Models (item 232). A command in
+the background belongs to its chat: it outlives the run that started it but not the daemon, and its end is told to the
+chat as a message. Of T3 Code's other settings, Dot has what they do already or has no use for them; the list, with the
+reasons, is in the report of this part. Item 196 of part 31 still waits on the owner.
+
+### How to start part 36 (the handoff prompt)
+
+> Read ROADMAP.md part 36 and the status table of part 9 (rows 224 to 232). One item at a time, in order; the protocol
+> of part 5 (branch, gate, PR, Linear MYP issue when the connector is signed in, squash merge, hash in the table, log
+> line) is unchanged. Give each change a test that fails on the code of before, and check a page that changes in a
+> browser, wide and on a phone, light and dark. Tests never start a real model call or read the other agents' files
+> of the Mac. Never touch the owner's data directory except to read it, by the kinds and numbers of what is stored,
+> and to restart the daemon when `/api/status` shows no active run; PLAN.md stays untracked. The owner reads Turkish;
+> everything written is English.
+
+### 224. A summary's check knows a path however it is written
+
+**Status: in progress.**
+
+**As built (2026-10-14).** Before Dot replaces a run's older history with a summary, it checks that each path, address
+and id the summary names is in the history it replaces, and a summary that names one that is not is flagged as
+unverified. A path counted only as the history wrote it. It now counts in each of the ways a Mac writes it (`spellings`
+in `agent/continuity.py`): `~` for the home folder and the home folder for `~`, and `/tmp` or `/var` with or without
+`/private` before them; an address or an id is only itself. Tests: `tests/unit/test_continuity.py`, a summary that names
+in one spelling three paths the history holds in another, and two paths the history holds in none; on the code of
+before, the three are flagged.
+
+**What.** The check of a summary that replaces a run's history knows a path in each of the ways a Mac writes it, `~` or
+the home folder, `/tmp` or `/private/tmp`, and flags no path the history holds.
+
+### 225. A model that declines is said to have declined
+
+**Status: planned.**
+
+**What.** When the review model declines, its provider ending the reply as a refusal, the lessons and the reflection say
+so at once, instead of asking again and saying that the model did not use its tool.
+
+### 226. A helper's card
+
+**Status: planned.**
+
+**What.** Hovering or focusing a helper's row in the conversation opens a card with its title, its model and reasoning
+level, its state with the time it has run, and what it is doing or did last.
+
+### 227. Previous agents in the side panel
+
+**Status: planned.**
+
+**What.** The run page's side panel lists the chat's earlier helpers, each with its face, its title, its state and its
+time, a few at first and more on demand, and the panel's tabs have icons.
+
+### 228. The rail of messages beside the docked panel
+
+**Status: planned.**
+
+**What.** The rail of marks at the conversation's left shows beside the docked side panel too, making room for itself
+instead of hiding.
+
+### 229. Commands in the background
+
+**Status: planned.**
+
+**What.** A run can start a long command in the background, past the shell's limit, and go on; a line over the box shows
+what runs, as T3 Code's does, and when a command ends its chat is told, with its last lines.
+
+### 230. The composer's keys
+
+**Status: planned.**
+
+**What.** Settings chooses whether Enter or ⌘Enter sends, and whether a message to a busy run is queued or steers it
+unless asked otherwise.
+
+### 231. Runs go on after a restart
+
+**Status: planned.**
+
+**What.** Settings has the switch for runs to go on after the daemon restarts, and what a restart left undone of that is
+done.
+
+### 232. Models for Dot's own work
+
+**Status: planned.**
+
+**What.** Settings › Models chooses the models of Dot's own work, the fast, review and vision models, as it chooses the
+default model.
 
 ## Log
 
@@ -11119,3 +11240,4 @@ a time; the API's refusal is shown as it is.
 - 2026-10-14 (Opus 5.5): item 220 merged as `e1d8176` (PR #259; no Linear issue, the connector was signed out): beside the conversation the side panel slides in and out, and the Screen tab's empty view keeps the shape of a screen and says why it has no frame.
 - 2026-10-14 (Opus 5.5): item 221 merged as `bc61bed` (PR #260; no Linear issue, the connector was signed out): every provider's models show the window their pages publish, OpenAI's newer models and Ollama's cloud models among them.
 - 2026-10-14 (Opus 5.5): item 222 merged as `a99e07e` (PR #261; no Linear issue, the connector was signed out): a ring in a run's composer shows how much of the run's context budget its last step filled.
+- 2026-10-14 (Opus 5.5): item 223 merged as `a3ace6d` (PR #262; no Linear issue, the connector was signed out): Claude Opus 5.5, Opus 5 and Opus 4.8 offer fast mode in a chat's reasoning menu, off until the owner turns it on.
