@@ -28,6 +28,7 @@ _PANE_TITLES: dict[Pane, str] = {
     "automation": "Automation",
     "full_disk_access": "Full Disk Access",
 }
+_OPEN: str = "/usr/bin/open"
 _OPEN_TIMEOUT_S: float = 10.0
 
 
@@ -62,7 +63,7 @@ def open_settings(pane: Pane) -> None:
     """Show a pane of System Settings > Privacy & Security."""
     url: str = settings_url(pane)
     outcome: subprocess.CompletedProcess[str] = subprocess.run(
-        ["open", url], capture_output=True, text=True, timeout=_OPEN_TIMEOUT_S, check=False
+        [_OPEN, url], capture_output=True, text=True, timeout=_OPEN_TIMEOUT_S, check=False
     )
     if outcome.returncode != 0:
         raise DesktopError(

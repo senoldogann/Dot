@@ -9,6 +9,7 @@ from dotagent.core.text import truncate_middle
 
 type ScriptLanguage = Literal["AppleScript", "JavaScript"]
 
+_OSASCRIPT: str = "/usr/bin/osascript"
 _SCRIPT_CONTEXT_CHARS: int = 600
 _REAP_TIMEOUT_S: float = 5.0
 
@@ -19,7 +20,7 @@ async def run_osascript(language: ScriptLanguage, script: str, confinement: tupl
     stopped run, the tool's own timeout) is killed, so it never goes on acting on the Mac without its run."""
     process: asyncio.subprocess.Process = await asyncio.create_subprocess_exec(
         *confinement,
-        "osascript",
+        _OSASCRIPT,
         "-l",
         language,
         "-e",

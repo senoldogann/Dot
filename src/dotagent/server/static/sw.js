@@ -68,7 +68,9 @@ self.addEventListener("push", (event) => {
 
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
-  const route = typeof event.notification.data?.route === "string" ? event.notification.data.route : "#/activity";
+  // A tap opens one of the page's own routes (`#/…`, as the daemon sends them); anything else opens the activity.
+  const given = event.notification.data?.route;
+  const route = typeof given === "string" && given.startsWith("#/") ? given : "#/activity";
   const target = new URL(`/${route}`, self.location.origin).href;
   event.waitUntil(
     self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((windows) => {

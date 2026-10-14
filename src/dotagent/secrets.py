@@ -16,6 +16,7 @@ from dotagent.core.types import FrozenModel
 
 KEYCHAIN_SERVICE: str = "dot-agent"
 # The end of a key that may be shown so the owner can tell two keys apart; a shorter key shows nothing of itself.
+_SECURITY: str = "/usr/bin/security"
 _KEYCHAIN_TIMEOUT_S: float = 15.0
 _TAIL_CHARS: int = 4
 _TAIL_MIN_CHARS: int = 16
@@ -96,7 +97,7 @@ def _from_keychain(name: str) -> str | None:
     waiting for a prompt nobody answers) is a ``ConfigError`` that says so."""
     try:
         completed: subprocess.CompletedProcess[str] = subprocess.run(
-            ["security", "find-generic-password", "-s", KEYCHAIN_SERVICE, "-a", name, "-w"],
+            [_SECURITY, "find-generic-password", "-s", KEYCHAIN_SERVICE, "-a", name, "-w"],
             capture_output=True,
             text=True,
             timeout=_KEYCHAIN_TIMEOUT_S,
