@@ -1280,6 +1280,16 @@ class Store:
         rows = await self._all("SELECT * FROM runs WHERE parent_run_id = ? ORDER BY created_at", (parent_run_id,))
         return [_run(row) for row in rows]
 
+    async def list_thread_helpers(self, thread_id: str, limit: int) -> list[RunRecord]:
+        """The runs that the runs of the chat ``thread_id`` started on their behalf (item 227), newest first, at most
+        ``limit``. A helper's own runs are not among them: a delegated run delegates no further."""
+        rows = await self._all(
+            "SELECT * FROM runs WHERE parent_run_id IN (SELECT id FROM runs WHERE thread_id = ?)"
+            " ORDER BY created_at DESC LIMIT ?",
+            (thread_id, limit),
+        )
+        return [_run(row) for row in rows]
+
     async def family_tokens(self, run_id: str) -> int:
         """The tokens (input and output) of a run and of the runs started on its behalf, as their totals stand now."""
         row = await self._one(

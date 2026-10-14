@@ -122,6 +122,14 @@ const SHAPES = {
     ["line", { x1: 3, x2: 3.01, y1: 18, y2: 18 }],
   ],
   user: [["path", { d: "M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" }], ["circle", { cx: 12, cy: 7, r: 4 }]],
+  // For the side panel's tabs (item 227): the run's details, and the agents of a chat.
+  info: [["circle", { cx: 12, cy: 12, r: 10 }], ["path", { d: "M12 16v-4" }], ["path", { d: "M12 8h.01" }]],
+  users: [
+    ["path", { d: "M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" }],
+    ["circle", { cx: 9, cy: 7, r: 4 }],
+    ["path", { d: "M22 21v-2a4 4 0 0 0-3-3.87" }],
+    ["path", { d: "M16 3.13a4 4 0 0 1 0 7.75" }],
+  ],
   copy: [
     ["rect", { width: 14, height: 14, x: 8, y: 8, rx: 2, ry: 2 }],
     ["path", { d: "M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" }],

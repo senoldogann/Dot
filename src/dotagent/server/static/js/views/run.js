@@ -2,6 +2,7 @@
 // the run, steer it or follow up on it.
 
 import { actorFace, dotFace, setActorState } from "../actors.js";
+import { agentList } from "../agentlist.js";
 import { api, follow } from "../api.js";
 import { approvalCard, fromRecord, LEFT_IN_CAMPAIGN, LEFT_IN_RUN } from "../approvals.js";
 import { readyToSend } from "../attachments.js";
@@ -51,6 +52,10 @@ const LESSON_STATES = { saved: { mark: "check", text: "Saved to memory" }, dismi
 const QUESTIONS_SETTLE_MS = 120;
 // The conversation changes with every event of a run: the list of its files is drawn again once it settles.
 const FILES_SETTLE_MS = 250;
+// A helper that starts or ends reads the chat's agents again (item 227), once a burst of its events has settled.
+const AGENTS_SETTLE_MS = 250;
+// The events of a run that start or end it.
+const RUN_ENDS = new Set(["run_queued", "run_finished"]);
 // How often the cost card is read again while the run works (its numbers come from a query over the run's events).
 const COST_REFRESH_MS = 10_000;
 // What the Actions panel says of a file change, by the state of its undo (see undo.restore.UndoStep).
@@ -741,10 +746,12 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
     frame.setSendLabel(editing ? "Save" : sendWord);
     queue.setActive(active && !elsewhere);
     if (active && ticker === null) {
-      // The run's figures, and the time of every delegated run that works, count on every second.
+      // The run's figures, and the time of every delegated run that works (in the conversation and in the Agents tab),
+      // count on every second.
       ticker = setInterval(() => {
         paintStats();
         timeline.tick(Date.now() / 1000);
+        agents.tick(Date.now() / 1000);
       }, 1000);
       costTicker = setInterval(paintCost, COST_REFRESH_MS);
     } else if (!active && ticker !== null) {
@@ -1052,20 +1059,40 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
     name: actorName,
     sizes: stage.chooser,
   });
-  // The side panel (item 84), in tabs after T3 Code's (item 203): the run (its details and its cost, item 96), the
-  // plan, the actions (and the files of the conversation) and the screen (Dot's computer and the screenshots). The
-  // run's state is the top bar's face and the Details section's first fact; no card at the head of the conversation
-  // (item 113).
+  // The agents of the chat: the runs its runs handed work to (item 227).
+  const agents = agentList({ threadId: run.thread_id });
+  // The side panel (item 84), in tabs after T3 Code's (item 203), each with its icon (item 227): the run (its details
+  // and its cost, item 96), the plan, the actions (and the files of the conversation), the agents of the chat and the
+  // screen (Dot's computer and the screenshots). The run's state is the top bar's face and the Details section's first
+  // fact; no card at the head of the conversation (item 113).
   const inspector = createInspector({
     layout,
     tabs: [
-      { id: "run", label: "Run", sections: [details.element, cost.element] },
-      { id: "plan", label: "Plan", sections: [plan.element] },
-      { id: "actions", label: "Actions", sections: [actionsCard.element, filesCard.element] },
-      { id: "screen", label: "Screen", sections: [computer.element] },
+      { id: "run", label: "Run", icon: "info", sections: [details.element, cost.element] },
+      { id: "plan", label: "Plan", icon: "squareCheck", sections: [plan.element] },
+      { id: "actions", label: "Actions", icon: "bolt", sections: [actionsCard.element, filesCard.element] },
+      { id: "agents", label: "Agents", icon: "users", sections: [agents.element] },
+      { id: "screen", label: "Screen", icon: "monitor", sections: [computer.element] },
     ],
     screensIn: "screen",
   });
+
+  /** Read the chat's agents again; their tab counts them. */
+  async function paintAgents() {
+    try {
+      const count = await agents.refresh();
+      if (!signal.aborted) {
+        inspector.setCount("agents", count === 0 ? "" : String(count));
+      }
+    } catch (error) {
+      if (!signal.aborted) {
+        agents.fail(`The agents could not be loaded: ${error.message}`);
+      }
+    }
+  }
+
+  // A helper that starts or ends changes the list; the events of one moment are read as one.
+  const agentsChanged = debounce(() => paintAgents(), AGENTS_SETTLE_MS);
   // A file a message carries, or one the conversation names, takes the panel (item 195).
   layout.addEventListener(OPEN_FILE_EVENT, (event) => inspector.showFile(event.detail, event.target));
   const timeline = createTimeline({
@@ -1141,6 +1168,7 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
   paintLessons(detail.lessons);
   paintQuestions(detail.questions);
   loadActions();
+  paintAgents();
   window.addEventListener("scroll", onScroll, { passive: true });
   // Lessons change after the run, and a question may be answered or skipped in another tab.
   const stopLifecycle = onLifecycle((event) => {
@@ -1164,6 +1192,9 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
         messageRead(message.data.data.text);
       }
       timeline.push(message.data);
+      if (message.data.run_id !== runId && RUN_ENDS.has(message.data.kind)) {
+        agentsChanged();
+      }
       // A delegated run's row says how long it has worked as soon as its events are in, not at the next second.
       if (active) {
         timeline.tick(Date.now() / 1000);

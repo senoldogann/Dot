@@ -70,6 +70,10 @@ class ThreadsQuery(FrozenModel):
     limit: int = Field(default=100, ge=1, le=500)
 
 
+class HelpersQuery(FrozenModel):
+    limit: int = Field(default=50, ge=1, le=200)
+
+
 class EventsQuery(FrozenModel):
     after: int = Field(default=0, ge=0)
     limit: int = Field(default=500, ge=1, le=2000)
