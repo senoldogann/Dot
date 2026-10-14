@@ -22,6 +22,9 @@ from dotagent.tools.shell import read_login_env
 
 pytestmark = pytest.mark.asyncio(loop_scope="module")
 
+# The name of an API key that nobody sets: a provider that needs it cannot be called.
+UNSET_KEY: str = "DOT_TEST_SURELY_UNSET_KEY"
+
 
 @pytest.fixture(scope="module")
 def config() -> AppConfig:
@@ -119,6 +122,29 @@ async def test_a_question_nobody_can_answer_is_left_or_declined_and_counted(
     outcome: TaskOutcome = await replay_reference(asking, asked, login_env)
     assert outcome.passed
     assert outcome.metrics.unanswered_questions == 1
+
+
+async def test_a_goal_check_that_cannot_run_fails_the_attempt_which_is_judged_and_counted(
+    config: AppConfig, login_env: dict[str, str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """``[agent] goal_mode`` puts every attempt in goal mode, and the review model's key is nowhere, as when an eval
+    run did not pass it on: the goal check cannot run. The run ends as failed and says why, and the harness counts
+    the check and judges the attempt, so the eval run goes on (item 233)."""
+    monkeypatch.delenv(UNSET_KEY, raising=False)
+    keyless: AppConfig = config.model_copy(
+        update={
+            "agent": config.agent.model_copy(update={"goal_mode": True}),
+            "models": config.models.model_copy(update={"review": "anthropic:claude-haiku-5-5"}),
+            "providers": config.providers.model_copy(
+                update={"anthropic": config.providers.anthropic.model_copy(update={"api_key_env": UNSET_KEY})}
+            ),
+        }
+    )
+    outcome: TaskOutcome = await replay_reference(select_tasks(["write-todo-note"])[0], keyless, login_env)
+    assert outcome.status == "failed", outcome
+    assert "the check could not run (missing API key)" in outcome.answer
+    assert all(check.passed for check in outcome.checks) and not outcome.passed
+    assert outcome.metrics.unproven_steps == 0
 
 
 async def test_a_run_that_takes_longer_than_its_task_allows_is_cut_and_its_command_is_ended(

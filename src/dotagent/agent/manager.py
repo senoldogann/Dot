@@ -185,7 +185,7 @@ def _check_speed(ref: ModelRef, speed: Speed) -> None:
         raise ConfigError("the model does not offer fast mode", {"model": ref.label, "speed": speed})
 
 
-def _goal_mode_asked(goal: str, mode: RunMode, goal_mode: bool | None) -> bool | None:
+def goal_mode_asked(goal: str, mode: RunMode, goal_mode: bool | None) -> bool | None:
     """The goal mode of a run a person starts: on for a task or research run whose goal asks it to keep going until it
     is done (item 132), on every model, whatever was chosen; otherwise as chosen. A delegated run, a campaign's session,
     a resumed run and one that an answer starts do not come here: they keep the goal mode they are given."""
@@ -518,7 +518,7 @@ class RunManager:
         An ``effort`` that is given has to be one of the levels the model offers, and ``speed`` can be ``fast`` only
         for a model with fast mode (item 223). ``goal_mode`` is for task and research runs: asking for it on a chat is
         refused, and the configured default does not apply to a chat. A task or research run whose goal asks it to
-        keep going until it is done runs in goal mode whatever was chosen (see :func:`_goal_mode_asked`).
+        keep going until it is done runs in goal mode whatever was chosen (see :func:`goal_mode_asked`).
         """
         ref: ModelRef = parse_model_ref(model if model is not None else self._main_model)
         _check_speed(ref, speed)
@@ -534,7 +534,7 @@ class RunManager:
             effort,
             speed,
             approvals,
-            _goal_mode_asked(goal, mode, goal_mode),
+            goal_mode_asked(goal, mode, goal_mode),
             RunOpening(text=goal, files=files, resumed=None),
             None,
             None,
@@ -575,7 +575,7 @@ class RunManager:
             level,
             speed,
             approval_mode,
-            _goal_mode_asked(goal, mode, goal_mode),
+            goal_mode_asked(goal, mode, goal_mode),
             RunOpening(text=goal, files=files, resumed=None),
             None,
             agent.id,

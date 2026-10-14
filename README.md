@@ -1083,23 +1083,27 @@ reading the files and working it out.
 Every attempt runs unattended in a throw-away Dot home (its own database and workspace, removed afterwards), with the
 Mac desktop, your MCP servers, skills, plugins and the memory embeddings switched off (a task that brings skills or an
 MCP server has those alone), and with every question of the policy or of the agent unanswered (one the run waits for is
-refused at once). Your own database, workspace and screenshots are never touched; the API keys the model needs are
-looked up first and handed over by name. The score holds the pass rate, per kind of task, what a pass costs in steps,
-tokens and seconds (split into model calls and tool calls), the share of the act calls that carried one step and the
-share of the input tokens served from the prompt cache (both as `dotx stats` counts them, over every attempt), how often
-a tool call failed, stalls, runs that were cut, runs that said they were done and were not, plan steps marked done
-without evidence (zero since the plan tools require it) and done steps whose evidence the goal check could not bear out
-(counted from the `goal_check` events, so only in goal mode), compactions per 100 steps and the share of the model time
-their summaries took, web pages not found and calls refused for their arguments (as `dotx stats` counts them; `-` in a
-report saved before they were), how many of the attempts at a task that hides an instruction in one of its files (a note
-"to the AI assistant" in an invoice, a hidden block in a saved page, a line in a notes file) followed it, how many of
-the attempts at a task that help makes short took its easy way (a call of the skill or MCP tool it names that ran; a
-call that did not run does not count) and what a pass costs in steps when it did and when it did not, how often
-find_help was called (`-` in a report saved before these were counted), and the tasks that passed only in some attempts.
-The token ceiling of an attempt counts every model call of the run and of the runs it delegated to, side calls included;
-a report saved before model calls were timed counted the steps' tokens only and has no seconds, and one saved before
-acts and cached tokens were counted shows `-` for their shares. `dotx eval run` saves its report after every attempt, so
-an interrupted run keeps what it measured.
+refused at once). Your own database, workspace and screenshots are never touched; the API keys are looked up first and
+handed over by name: those of the model under measure and of the fast, review and vision models that have one. An eval
+run does not start without the first, nor without the review model's when it has work in an attempt: the goal check of a
+run in goal mode (every attempt with `[agent] goal_mode`, the form task always, a goal that asks to keep going until it
+is done) or the second opinion of `stall_escalation`. A goal check that cannot run ends its attempt as failed, saying
+why, and the next attempt follows. The score holds the pass rate, per kind of task, what a pass costs in steps, tokens
+and seconds (split into model calls and tool calls), the share of the act calls that carried one step and the share of
+the input tokens served from the prompt cache (both as `dotx stats` counts them, over every attempt), how often a tool
+call failed, stalls, runs that were cut, runs that said they were done and were not, plan steps marked done without
+evidence (zero since the plan tools require it) and done steps whose evidence the goal check could not bear out (counted
+from the `goal_check` events, so only in goal mode), compactions per 100 steps and the share of the model time their
+summaries took, web pages not found and calls refused for their arguments (as `dotx stats` counts them; `-` in a report
+saved before they were), how many of the attempts at a task that hides an instruction in one of its files (a note "to
+the AI assistant" in an invoice, a hidden block in a saved page, a line in a notes file) followed it, how many of the
+attempts at a task that help makes short took its easy way (a call of the skill or MCP tool it names that ran; a call
+that did not run does not count) and what a pass costs in steps when it did and when it did not, how often find_help was
+called (`-` in a report saved before these were counted), and the tasks that passed only in some attempts. The token
+ceiling of an attempt counts every model call of the run and of the runs it delegated to, side calls included; a report
+saved before model calls were timed counted the steps' tokens only and has no seconds, and one saved before acts and
+cached tokens were counted shows `-` for their shares. `dotx eval run` saves its report after every attempt, so an
+interrupted run keeps what it measured.
 
 A task is data (`src/dotagent/evals/catalog.py`): the files the workspace starts with, the goal, checks (a file exists,
 holds or equals something, a JSON file equals a value, a command exits with 0, the answer contains or does not contain
