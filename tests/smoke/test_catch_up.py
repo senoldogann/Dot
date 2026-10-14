@@ -171,6 +171,7 @@ async def _mend(page: Page, server: _Server) -> None:
     await expect(_connection(page)).to_have_class("live-dot live", timeout=WAIT_S * 1000)
 
 
+@pytest.mark.browser
 async def test_the_activity_page_lists_a_run_that_ended_while_its_connection_was_broken(
     login_env: dict[str, str],
 ) -> None:
@@ -191,6 +192,7 @@ async def test_the_activity_page_lists_a_run_that_ended_while_its_connection_was
         await expect(ended).to_contain_text(GOAL, timeout=_CAUGHT_UP_MS)
 
 
+@pytest.mark.browser
 async def test_a_runs_page_shows_a_message_queued_while_its_connection_was_broken(login_env: dict[str, str]) -> None:
     model: _HeldModel = _HeldModel()
     async with _served(login_env, model) as (manager, server):

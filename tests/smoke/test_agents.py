@@ -183,6 +183,7 @@ def _agent(tools: list[str]) -> dict[str, object]:
     }
 
 
+@pytest.mark.browser
 async def test_a_run_makes_a_lasting_teammate_and_learns_of_it_at_its_next_step(
     runtime: Runtime, manager: RunManager, client: httpx.AsyncClient, tmp_path: Path
 ) -> None:
@@ -246,6 +247,7 @@ async def test_a_run_makes_a_lasting_teammate_and_learns_of_it_at_its_next_step(
     assert (await client.delete(f"/api/agents/{pilot['id']}")).status_code == 204
 
 
+@pytest.mark.browser
 async def test_an_agent_is_made_runs_in_its_own_voice_and_bounds_and_leaves_its_chats_to_dot(
     runtime: Runtime, manager: RunManager, client: httpx.AsyncClient, tmp_path: Path
 ) -> None:

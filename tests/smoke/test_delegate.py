@@ -173,6 +173,7 @@ async def test_the_delegate_tool_is_known_to_every_mode_and_classified_as_safe(r
 
 
 @requires_model
+@pytest.mark.live
 async def test_a_run_reads_a_file_through_a_delegated_run(runtime: Runtime, manager: RunManager) -> None:
     path, token = _secret_file()
     parent: RunRecord = await manager.start(
@@ -194,6 +195,7 @@ async def test_a_run_reads_a_file_through_a_delegated_run(runtime: Runtime, mana
 
 
 @requires_model
+@pytest.mark.live
 @pytest.mark.internet
 async def test_a_delegated_run_starts_as_untrusted_as_its_parent(runtime: Runtime, manager: RunManager) -> None:
     path, token = _secret_file()
@@ -211,6 +213,7 @@ async def test_a_delegated_run_starts_as_untrusted_as_its_parent(runtime: Runtim
 
 
 @requires_model
+@pytest.mark.live
 async def test_stopping_the_waiting_caller_stops_the_delegated_run(runtime: Runtime, manager: RunManager) -> None:
     marker: str = f"sleep 47.{secrets.randbelow(900) + 100}"
     parent: RunRecord = await _stored_run(runtime, "task", None, "test")

@@ -269,6 +269,7 @@ async def _one_size(
     await context.close()
 
 
+@pytest.mark.browser
 async def test_a_page_a_run_shows_is_drawn_in_the_conversation_and_reaches_nothing_of_dots(
     login_env: dict[str, str], tmp_path: Path
 ) -> None:

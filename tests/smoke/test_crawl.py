@@ -207,6 +207,7 @@ async def _call(runtime: Runtime, name: str, arguments: JsonObject, output_chars
     return await prepared.run(ctx), prepared.action
 
 
+@pytest.mark.browser
 async def test_the_crawl_stays_in_scope_within_its_limits_renders_the_app_page_and_reports_robots(
     runtime: Runtime, site: str
 ) -> None:
@@ -231,6 +232,7 @@ async def test_the_crawl_stays_in_scope_within_its_limits_renders_the_app_page_a
     assert fences[0].startswith("# Catalogue\nSource:")
 
 
+@pytest.mark.browser
 async def test_a_page_that_refuses_the_plain_request_is_read_in_the_browser_and_one_that_refuses_both_is_left_out(
     runtime: Runtime, site: str
 ) -> None:

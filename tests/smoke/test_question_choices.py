@@ -140,6 +140,7 @@ async def _answered(runtime: Runtime, manager: RunManager, run: RunRecord, quest
     return (await runtime.store.get_approval(question.id)).note, read[0]
 
 
+@pytest.mark.browser
 async def test_a_question_offers_its_options_and_the_run_reads_what_was_chosen(
     login_env: dict[str, str], tmp_path: Path
 ) -> None:

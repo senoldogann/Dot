@@ -925,6 +925,7 @@ def _secret_file(workspace: Path) -> tuple[Path, str]:
 
 
 @requires_model
+@pytest.mark.live
 async def test_a_run_started_through_the_api_finishes_and_is_replayed_by_its_stream(client: httpx.AsyncClient) -> None:
     started: RunRecord = await _start(client, "Call the finish tool right away with the answer pong and success true.")
     assert (started.source, started.mode, started.model, started.parent_run_id) == ("ui", "task", MODEL_REF, None)
@@ -944,6 +945,7 @@ async def test_a_run_started_through_the_api_finishes_and_is_replayed_by_its_str
 
 
 @requires_model
+@pytest.mark.live
 async def test_a_run_keeps_working_after_the_page_that_followed_it_is_left(
     runtime: Runtime, manager: RunManager
 ) -> None:
@@ -979,6 +981,7 @@ async def test_a_run_keeps_working_after_the_page_that_followed_it_is_left(
 
 
 @requires_model
+@pytest.mark.live
 async def test_a_shell_command_waits_for_the_approval_of_the_user_and_runs_once_it_is_given(
     client: httpx.AsyncClient, runtime: Runtime
 ) -> None:
@@ -1010,6 +1013,7 @@ async def test_a_shell_command_waits_for_the_approval_of_the_user_and_runs_once_
 
 
 @requires_model
+@pytest.mark.live
 async def test_a_shell_command_the_user_denies_does_not_run(client: httpx.AsyncClient, runtime: Runtime) -> None:
     path: Path = runtime.workspace / f"denied-{secrets.token_hex(3)}.txt"
     goal: str = f"Run exactly this shell command: touch {path}  If it is not allowed, call finish and say so."
@@ -1026,6 +1030,7 @@ async def test_a_shell_command_the_user_denies_does_not_run(client: httpx.AsyncC
 
 
 @requires_model
+@pytest.mark.live
 async def test_a_question_of_the_run_is_answered_with_the_note_of_the_decision(client: httpx.AsyncClient) -> None:
     codeword: str = f"MARKER-{secrets.token_hex(6)}"
     goal: str = (
@@ -1045,6 +1050,7 @@ async def test_a_question_of_the_run_is_answered_with_the_note_of_the_decision(c
 
 
 @requires_model
+@pytest.mark.live
 async def test_a_run_started_in_yolo_mode_is_never_asked_what_the_cautious_preset_would_ask(
     client: httpx.AsyncClient, runtime: Runtime
 ) -> None:
@@ -1063,6 +1069,7 @@ async def test_a_run_started_in_yolo_mode_is_never_asked_what_the_cautious_prese
 
 
 @requires_model
+@pytest.mark.live
 async def test_a_run_waiting_for_an_approval_can_be_steered_and_cancelled(
     client: httpx.AsyncClient, runtime: Runtime
 ) -> None:
@@ -1265,6 +1272,7 @@ async def test_a_chat_is_marked_read_and_unread_from_its_menu(client: httpx.Asyn
 
 
 @requires_model
+@pytest.mark.live
 async def test_a_chat_with_a_run_under_way_is_kept_until_the_run_is_over(
     client: httpx.AsyncClient, runtime: Runtime
 ) -> None:
@@ -1308,6 +1316,7 @@ async def _follow_approving(live: httpx.AsyncClient, run_id: str) -> list[SseMes
 
 
 @requires_model
+@pytest.mark.live
 async def test_a_live_stream_shows_a_run_as_it_happens_and_ends_with_it(
     live: httpx.AsyncClient, runtime: Runtime
 ) -> None:
@@ -1325,6 +1334,7 @@ async def test_a_live_stream_shows_a_run_as_it_happens_and_ends_with_it(
 
 
 @requires_model
+@pytest.mark.live
 async def test_a_live_stream_carries_the_runs_the_run_delegated_to(live: httpx.AsyncClient, runtime: Runtime) -> None:
     path, token = _secret_file(runtime.workspace)
     goal: str = (
@@ -1379,6 +1389,7 @@ async def test_the_web_ui_signs_in_from_the_address_dotx_open_builds_and_refuses
 
 @pytest.mark.browser
 @requires_model
+@pytest.mark.live
 async def test_a_file_attached_in_the_web_ui_reaches_the_model(live: httpx.AsyncClient, runtime: Runtime) -> None:
     """Attach a file in the composer, see it uploaded, start the run, and get an answer only the file holds."""
     port: int | None = live.base_url.port

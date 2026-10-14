@@ -31,6 +31,25 @@ pytestmark = pytest.mark.asyncio(loop_scope="module")
 
 GOAL: str = "Work in a terminal."
 SECRET: str = "correct-horse-7"
+# A server for a terminal to keep running: Python's http.server, bound without the reverse lookup of its address that
+# `python3 -m http.server` makes before it says where it serves, which kept CI's runner silent for over 30 s.
+_SERVER: str = """\
+import http.server
+import socketserver
+
+
+class Server(http.server.ThreadingHTTPServer):
+    def server_bind(self):
+        socketserver.TCPServer.server_bind(self)
+        self.server_name, self.server_port = self.server_address[:2]
+
+
+with Server(("127.0.0.1", 0), http.server.SimpleHTTPRequestHandler) as served:
+    print(f"Serving HTTP on 127.0.0.1 port {served.server_address[1]}", flush=True)
+    served.serve_forever()
+"""
+# What the server says once it serves, with its port.
+_SERVING: str = r"Serving HTTP on 127\.0\.0\.1 port (\d+)"
 
 
 @pytest_asyncio.fixture(scope="module", loop_scope="module")
@@ -133,11 +152,18 @@ async def test_a_password_prompt_takes_a_secret_only_in_yolo_and_the_secret_show
         assert SECRET not in shown, shown
 
 
-async def test_a_server_stays_up_between_calls_and_stops_with_its_session(runtime: Runtime) -> None:
+async def test_a_server_stays_up_between_calls_and_stops_with_its_session(runtime: Runtime, tmp_path: Path) -> None:
     ctx: ToolContext = await _yolo_context(runtime)
-    _, opened = await _call(ctx, "terminal_open", {"command": "python3 -m http.server 0 --bind 127.0.0.1"})
+    server: Path = tmp_path / "serve.py"
+    await asyncio.to_thread(server.write_text, _SERVER, encoding="utf-8")
+    _, opened = await _call(ctx, "terminal_open", {"command": f"python3 {server}"})
     session: str = _session(opened)
-    port: re.Match[str] | None = re.search(r"Serving HTTP on 127\.0\.0\.1 port (\d+)", opened)
+    port: re.Match[str] | None = re.search(_SERVING, opened)
+    if port is None:
+        # A cold Python can take more than the 2 s terminal_open waits to say where it serves.
+        _, more = await _call(ctx, "terminal_read", {"session": session, "wait_s": 30})
+        opened += more
+        port = re.search(_SERVING, opened)
     assert port is not None, opened
     url: str = f"http://127.0.0.1:{port.group(1)}/"
     async with httpx.AsyncClient(trust_env=False) as client:

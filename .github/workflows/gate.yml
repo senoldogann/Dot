@@ -1,6 +1,7 @@
 # The gate every change passes before it is merged: the same commands as README "Development", on macOS because the
-# package depends on PyObjC. The smoke tests here are the ones that need no service: a scripted model plays the real
-# loop, tools, policy and store. The tests marked live, browser, internet, desktop or hosted stay on the developer's Mac.
+# package depends on PyObjC. The smoke tests here are every one that needs no service, chosen by their marks: a scripted
+# model or a stand-in plays the real loop, tools, policy and store. The tests marked live, browser, internet, desktop or
+# hosted stay on the developer's Mac; one that needs the local Ollama server's embedding model skips itself here.
 name: gate
 
 on:
@@ -53,29 +54,8 @@ jobs:
         run: uv run dotx eval check
       - name: Offline smoke tests
         run: >
-          uv run pytest -q -p no:cacheprovider
-          tests/smoke/test_answer_check.py
-          tests/smoke/test_approval_modes.py
-          tests/smoke/test_campaigns.py
-          tests/smoke/test_cli_auth.py
-          tests/smoke/test_cli_run_end.py
-          tests/smoke/test_doctor.py
-          tests/smoke/test_evals_runner.py
-          tests/smoke/test_find_help.py
-          tests/smoke/test_found_elsewhere.py
-          tests/smoke/test_helpers.py
-          tests/smoke/test_left_questions.py
-          tests/smoke/test_lessons.py
-          tests/smoke/test_mcp_http.py
-          tests/smoke/test_plan_branches.py
-          tests/smoke/test_progress_watchdog.py
-          tests/smoke/test_research_notes.py
-          tests/smoke/test_resume.py
-          tests/smoke/test_run_limits.py
-          tests/smoke/test_scaffold.py
-          tests/smoke/test_site_locks.py
-          tests/smoke/test_tool_groups.py
-          tests/smoke/test_undo.py
+          uv run pytest tests/smoke -q -p no:cacheprovider
+          -m "not live and not browser and not internet and not desktop and not hosted"
 
   # The desktop shell (desktop/): the Rust compiles, is clean and passes its tests; the bundle itself is built on the
   # owner's Mac.

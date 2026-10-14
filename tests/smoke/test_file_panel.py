@@ -403,6 +403,7 @@ async def _refusals(browser: Browser, address: str, report: StoredAttachment, op
     await page.close()
 
 
+@pytest.mark.browser
 async def test_a_file_a_message_carries_or_an_answer_names_opens_beside_the_conversation(
     login_env: dict[str, str], tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
