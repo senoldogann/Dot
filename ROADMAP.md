@@ -5136,8 +5136,8 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 197 | A stopped run stops the runs it delegated, and their rows stop                       | done        | 0b3a7d4 |
 | 198 | The side menu shows every agent of a run, folded under it                            | done        | dee248f |
 | 199 | The default model is chosen in Settings, and a chat keeps its model                  | done        | de8069e |
-| 200 | Reconnecting, checked end to end                                                     | in progress |         |
-| 201 | Marks of the conversation's messages: a look and a jump, after T3 Code               | planned     |         |
+| 200 | Reconnecting, checked end to end                                                     | done        | 0dab7de |
+| 201 | Marks of the conversation's messages: a look and a jump, after T3 Code               | in progress |         |
 | 202 | The side menu, designed again                                                        | planned     |         |
 | 203 | The run's side panel, designed again                                                 | planned     |         |
 
@@ -9807,7 +9807,7 @@ of the app or of the daemon.
 
 ### 200. Reconnecting, checked end to end
 
-**Status: in progress.**
+**Status: done.** Merged as `0dab7de` (PR #239; no Linear issue, the Linear connector was signed out).
 
 **As built (2026-10-14).** Every way a page loses the daemon was tried against a real server, stopped and started again
 at its address. A page open while the daemon restarts came back by itself already (item 160) and still does: it says
@@ -9839,7 +9839,24 @@ reads what changed. A test for each.
 
 ### 201. Marks of the conversation's messages: a look and a jump, after T3 Code
 
-**Status: planned.**
+**Status: in progress.**
+
+**As built (2026-10-14).** At the left of the conversation a column of short marks stands for the owner's messages, one
+mark for each, top to bottom as they stand in it (`outline.js`, after T3 Code's): the question of each earlier turn, the
+run's goal and each message sent while it worked; a delegated run's are its own. Resting the pointer on the column shows
+the message of the mark nearest to it and the start of its answer, the last that Dot wrote before the next message, in
+three lines; a click brings that message to the top of what the window shows, under the stage bar. The column is one
+button: from the keyboard the arrows, Home and End walk the marks, Enter goes, and the button names the message it goes
+to. A mark is short at rest and longer the nearer it is to the one chosen, and the marks of the messages in sight are
+darker as the conversation scrolls. The column stands at the left edge of the run's layout, in the middle of what the
+window shows between the stage bar and the dock, 8 px between marks until it is as tall as the window lets it be. It
+needs a pointer that rests, two messages or more, and 40 px of room at the left of the conversation (its inset, a whole
+mark and a little air): a phone has none, and beside the side panel a window needs 1512 px. T3 Code asks for 48, which
+the side panel never leaves. Tests: `tests/smoke/test_outline.py`, a real server on a scripted model, with a chat of
+five messages and long answers and one of a single message: the marks at 1280 px, light and dark, clear of the
+conversation, the one in sight darker; resting on the second shows its message and the start of its answer; a click, and
+Enter after the arrows, bring a message into view; no column on a phone, for a single message, or beside the side panel
+at 1280 px, and one at 1512 px. On the code of before there was no column. It passed in WebKit too.
 
 **What.** A column of short marks at the left of the conversation, one for each message of the owner: resting on one
 shows the message and the start of its answer, and a click goes to it. After T3 Code's.
@@ -10497,3 +10514,4 @@ cost, the plan, the files, the actions and the screens. Screenshots looked at, w
 - 2026-10-14 (Opus 5.5): item 197 merged as `0b3a7d4` (PR #236; no Linear issue, the connector was signed out): A run that is stopped stops the runs it delegated and stores its end after theirs, so the rows of those runs end on its page; a restart and a dead command's close store the same order, and a run stored the other way shows its rows ended from the database.
 - 2026-10-14 (Opus 5.5): item 198 merged as `dee248f` (PR #237; no Linear issue, the connector was signed out): The side menu shows every run a run at work delegated, those that ended too, folded under a line that says how many there are and how many work; the fold is kept, and Activity shows them under the run as well.
 - 2026-10-14 (Opus 5.5): item 199 merged as `de8069e` (PR #238; no Linear issue, the connector was signed out): The default model is chosen in Settings › Models and starts the runs that name none at once; a chat keeps what its composer chose, through a reload, another browser and a move of its run to a standby model.
+- 2026-10-14 (Opus 5.5): item 200 merged as `0dab7de` (PR #239; no Linear issue, the connector was signed out): A page that loses the daemon comes back by itself: one loaded while the daemon is down tries again and says when, a stream silent for 45 seconds is cut and made again, a page back in view or on the network tries at once, and the desktop window keeps the page through a restart of the daemon.

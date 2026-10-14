@@ -124,6 +124,135 @@
   }
 }
 
+/* ---------- the marks of the conversation's messages (item 201) ---------- */
+
+/* A column of marks, one for each message you wrote, at the left edge of the run's layout and in the middle of what the
+   window shows of the conversation, between the stage bar and the dock; it stays there as the conversation scrolls.
+   outline.js measures the dock (--dock-h) and sets the column's natural height (--outline-h, 8 px a mark) and width
+   (--outline-w, as much of the room at the left of the conversation as it may take). */
+.outline {
+  position: fixed;
+  z-index: 10;
+  top: calc(var(--stagebar-h) + (100dvh - var(--stagebar-h) - var(--dock-h)) / 2);
+  width: var(--outline-w);
+  height: min(var(--outline-h), calc(100dvh - var(--stagebar-h) - var(--dock-h) - 96px));
+  margin-left: var(--space-3);
+  translate: 0 -50%;
+}
+
+/* The whole column is one button: the mark nearest to the pointer, or the one the arrows chose, is the one it goes to. */
+.outline-rail {
+  position: absolute;
+  inset: 0;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-xs);
+  background: transparent;
+  cursor: pointer;
+}
+
+.outline-line {
+  position: absolute;
+  inset: 0 auto 0 12px;
+  width: 1px;
+  background: var(--border);
+}
+
+.outline-marks {
+  position: absolute;
+  inset: 0;
+}
+
+/* A mark is short at rest and longer the nearer it is to the one chosen; those of the messages in sight are darker. Only
+   its scale and opacity move, which the compositor draws alone. */
+.outline-mark {
+  position: absolute;
+  left: 0;
+  width: 24px;
+  height: 2px;
+  border-radius: var(--radius-pill);
+  background: var(--faint);
+  opacity: 0.5;
+  translate: 0 -50%;
+  scale: 0.333 1;
+  transform-origin: left center;
+  transition:
+    scale var(--motion-quick) var(--ease),
+    opacity var(--motion-quick) var(--ease);
+}
+
+.outline-mark[data-seen="true"] {
+  background: var(--text);
+  opacity: 0.9;
+}
+
+.outline-mark[data-near="0"] {
+  background: var(--text);
+  opacity: 1;
+  scale: 1 1;
+}
+
+.outline-mark[data-near="1"] {
+  scale: 0.667 1;
+}
+
+.outline-mark[data-near="2"] {
+  scale: 0.417 1;
+}
+
+/* The message of the chosen mark and the start of its answer, beside the column at the mark's height. */
+.outline-preview {
+  position: absolute;
+  left: calc(100% + var(--space-2));
+  width: 320px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: var(--space-3);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  background: var(--surface);
+  box-shadow: var(--shadow-float);
+  translate: 0 -50%;
+  pointer-events: none;
+  animation: fade-in var(--motion-quick) var(--ease);
+}
+
+.outline-asked {
+  overflow: hidden;
+  color: var(--text);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-label);
+  line-height: var(--leading-sm);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.outline-reply {
+  display: -webkit-box;
+  overflow: hidden;
+  color: var(--muted);
+  font-size: var(--text-sm);
+  line-height: var(--leading-sm);
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+}
+
+/* A message the column goes to stands under the stage bar, not behind it. */
+.run-thread .bubble.user {
+  scroll-margin-top: calc(var(--stagebar-h) + var(--space-4));
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .outline-mark {
+    transition: none;
+  }
+
+  .outline-preview {
+    animation: none;
+  }
+}
+
 /* ---------- lessons drawn from a run ---------- */
 
 .lessons {

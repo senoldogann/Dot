@@ -18,6 +18,7 @@ import { icon } from "../icons.js";
 import { createInspector } from "../inspector.js";
 import { createQueue } from "../queue.js";
 import { userMessage } from "../messages.js";
+import { messageOutline } from "../outline.js";
 import { emptyPanel, errorPanel, foldCard, loadingPanel } from "../panels.js";
 import { heldChoice } from "../runmodes.js";
 import { messageKeys } from "../sending.js";
@@ -1047,12 +1048,10 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
   );
   const filesWatch = new MutationObserver(debounce(() => paintFiles(thread), FILES_SETTLE_MS));
   filesWatch.observe(thread, { childList: true, subtree: true });
-  layout.append(
-    el("div", { class: "run-main" }, thread, dock, foot),
-    stage.handle,
-    inspector.element,
-    inspector.scrim,
-  );
+  const main = el("div", { class: "run-main" }, thread, dock, foot);
+  // The marks of the conversation's messages stand at the layout's left edge (item 201).
+  const outline = messageOutline({ layout, main, thread, dock });
+  layout.append(outline.element, main, stage.handle, inspector.element, inspector.scrim);
   root.replaceChildren(layout);
   stage.paint();
   inspector.arrange();
@@ -1115,6 +1114,7 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
   return () => {
     window.removeEventListener("scroll", onScroll);
     filesWatch.disconnect();
+    outline.dispose();
     stopLifecycle();
     stopBack();
     computer.dispose();
