@@ -316,6 +316,33 @@ protected_paths = [
   "~/.aws",
   "~/.config/gcloud",
   "~/Library/Application Support/Google/Chrome",
+  # The tokens and passwords that command lines keep for their hosts and registries.
+  "~/.netrc",
+  "~/.git-credentials",
+  "~/.config/gh",
+  "~/.npmrc",
+  "~/.pypirc",
+  "~/.cargo/credentials",
+  "~/.cargo/credentials.toml",
+  "~/.gem/credentials",
+  "~/.docker/config.json",
+  "~/.kube",
+  "~/.azure",
+  "~/.config/op",
+  "~/.password-store",
+  # The shell's history, which can hold a secret typed on a command line.
+  "~/.zsh_history",
+  "~/.bash_history",
+  # Messages, mail, cookies and the data of the other browsers.
+  "~/Library/Messages",
+  "~/Library/Mail",
+  "~/Library/Cookies",
+  "~/Library/Safari",
+  "~/Library/Containers/com.apple.Safari",
+  "~/Library/Application Support/Firefox",
+  "~/Library/Application Support/BraveSoftware",
+  "~/Library/Application Support/Microsoft Edge",
+  "~/Library/Application Support/Arc",
 ]
 # The applications code_fetch may read a one-time code from: "mail" (Mail.app, through AppleScript) and "messages"
 # (Messages.app, its database read-only; needs Full Disk Access for the program that runs Dot). Only the code of the

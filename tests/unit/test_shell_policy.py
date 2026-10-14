@@ -5,7 +5,9 @@ typed into a terminal application in parts is judged whole when it runs, and one
 and runs (its plugins and skills) and its emergency stop are read and run, never changed, and a line that sends data
 out asks once the run has read untrusted content (item 135), in the spellings the final review of part 22 found too: a
 copy's target folder option, dd, git in Dot's folders, in-place edits, words of switches, more ways to send (item
-140). A change of permissions is judged by every path it names, whatever its mode or owner looks like (item 210)."""
+140). A change of permissions is judged by every path it names, whatever its mode or owner looks like (item 210). The
+default protected locations hold the usual stores of credentials, the shell's history, messages, mail, cookies and the
+data of the browsers (item 211)."""
 
 import tempfile
 from collections.abc import Mapping
@@ -13,6 +15,7 @@ from pathlib import Path
 
 import pytest
 
+from dotagent.config import load_default_config
 from dotagent.desktop.safety import StepContext, assess_step, lines_after
 from dotagent.desktop.types import Step
 from dotagent.policy import paths
@@ -182,6 +185,19 @@ _PERMISSIONS: list[tuple[str, Verdict]] = [
     ("chmod 755 run.sh", "allow"),
     ("chmod +x a.sh b.sh", "allow"),
     ("chmod -R u+w build", "allow"),
+]
+_KEPT_BY_DEFAULT: list[str] = [
+    "cat ~/.netrc",
+    "cat ~/.git-credentials",
+    "cat ~/.config/gh/hosts.yml",
+    "cat ~/.npmrc",
+    "cat ~/.docker/config.json",
+    "cat ~/.kube/config",
+    "cat ~/.zsh_history",
+    "ls ~/Library/Cookies",
+    "ls ~/Library/Messages",
+    "ls ~/Library/Mail",
+    "ls ~/Library/Application\\ Support/Firefox",
 ]
 _READS_ONLY: list[str] = [
     "curl -s https://example.com",
@@ -399,3 +415,13 @@ def test_a_change_of_permissions_is_judged_by_every_path_it_names(
     command: str, verdict: Verdict, tmp_path: Path
 ) -> None:
     assert _verdict(command, tmp_path) == verdict
+
+
+@pytest.mark.parametrize("command", _KEPT_BY_DEFAULT)
+def test_the_default_protected_locations_hold_the_usual_stores_of_credentials(command: str, tmp_path: Path) -> None:
+    protected: tuple[Path, ...] = expand_protected(load_default_config().policy.protected_paths, ())
+    assessment: ShellAssessment = assess_shell(command, tmp_path, tmp_path, protected, ())
+    info: ActionInfo = ActionInfo(
+        tool="shell", kind="shell", risk=assessment.risk, summary=command, target=command, flags=assessment.flags
+    )
+    assert _default_verdict(info) == "deny"

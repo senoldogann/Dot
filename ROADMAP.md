@@ -5146,8 +5146,8 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 207 | The composer shows the markdown it holds, after T3 Code                              | done        | 23f1d9a |
 | 208 | The model menu: providers at the side, a search and favourites, after T3 Code        | done        | 2545d60 |
 | 209 | The default model, changed from the model menu                                       | done        | a83c6b7 |
-| 210 | The shell check: changes of permissions                                              | in progress |         |
-| 211 | Secrets kept from the agent by default                                               | planned     |         |
+| 210 | The shell check: changes of permissions                                              | done        | 34f4816 |
+| 211 | Secrets kept from the agent by default                                               | in progress |         |
 | 212 | A provider that is not running answers at once                                       | planned     |         |
 | 213 | Tests: a bare pytest, and every offline smoke test in CI                             | planned     |         |
 | 214 | The redactor knows more kinds of secrets                                             | planned     |         |
@@ -10189,7 +10189,7 @@ Settings › Models; a chat with a model of its own keeps it.
 
 ### 210. The shell check: changes of permissions
 
-**Status: in progress.**
+**Status: done.** Merged as `34f4816` (PR #249; no Linear issue, the Linear connector was signed out).
 
 **As built (2026-10-14).** The shell check judges a change of permissions or of owner (`chmod`, `chown`, `chgrp`) by
 every path the line names. It set the first word after the options aside as the mode or the owner, after the words that
@@ -10200,15 +10200,24 @@ judged as a path in the line's own folder, which never makes the line milder tha
 as letters or starting with "-", recursive or not), one of a protected file is refused, and one in the workspace runs,
 as before. On the code of before, five of them were judged too mildly.
 
-**What.** The shell check judges a change of permissions by every path it names. The details are written here once the
-fix is merged.
+**What.** The shell check judges a change of permissions by every path it names.
 
 ### 211. Secrets kept from the agent by default
 
-**Status: planned.**
+**Status: in progress.**
 
-**What.** More of the places where credentials are kept are protected by default. The details are written here once the
-fix is merged.
+**As built (2026-10-14).** The places the agent can neither read nor change by default (`[policy] protected_paths` in
+`defaults.toml`) hold more of those where a Mac keeps credentials and private data: the tokens and passwords command
+lines keep for their hosts and registries (`~/.netrc`, `~/.git-credentials`, `~/.config/gh`, `~/.npmrc`, `~/.pypirc`,
+the credentials of Cargo and RubyGems, `~/.docker/config.json`, `~/.kube`, `~/.azure`, `~/.config/op`,
+`~/.password-store`), the shell's history, Messages, Mail, the cookies, and the data of Safari, Firefox, Brave, Edge and
+Arc. Commands such as `git` and `gh` still read their own credentials; a line or a file tool that names these places is
+refused. A list of one's own in `config.toml` replaces the default one, as before, which the README now says. Dot's own
+reading of a code from Messages goes on: it opens the database itself, not through the agent's tools. Tests:
+`tests/unit/test_shell_policy.py`, eleven lines that read from these places are refused with the default list; on the
+code of before, all eleven were allowed.
+
+**What.** More of the places where credentials are kept are protected by default.
 
 ### 212. A provider that is not running answers at once
 
@@ -10899,3 +10908,4 @@ is sent to them, and how to keep it on the Mac.
 - 2026-10-14 (Opus 5.5): item 207 merged as `23f1d9a` (PR #246; no Linear issue, the connector was signed out): The composer's box shows the markdown it holds as it reads, its marks quieter than its words, letter for letter under the text as typed.
 - 2026-10-14 (Opus 5.5): item 208 merged as `2545d60` (PR #247; no Linear issue, the connector was signed out): The composer's model menu has a rail of the favourites and the providers' marks, a search across providers, a star on each model and keys, after T3 Code's.
 - 2026-10-14 (Opus 5.5): item 209 merged as `a83c6b7` (PR #248; no Linear issue, the connector was signed out): the composer's model menu changes the daemon's default model too: Change on the default's row, then a pick.
+- 2026-10-14 (Opus 5.5): item 210 merged as `34f4816` (PR #249; no Linear issue, the connector was signed out): the shell check judges a change of permissions or of owner by every path the line names.
