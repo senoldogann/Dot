@@ -45,10 +45,12 @@
   --panel-w: minmax(320px, 1fr);
 }
 
-/* A panel wider than its own width takes the page: the frame lets go of its reading width. */
-.page[data-layout="run"]:has(.run-layout[data-inspector="on"]:not([data-stage="compact"])),
-.page[data-layout="run"]:has(.run-layout[data-inspector="on"][data-file="on"]) {
+/* Beside the conversation the panel stands at the window's right edge, as T3 Code's does (item 238): the frame lets go
+   of its reading width, the conversation keeps its own in the room the panel leaves it, and the panel stands as far from
+   the edge as from the top bar. */
+.page[data-layout="run"]:has(.run-layout[data-inspector="on"]) {
   max-width: none;
+  padding-right: 12px;
 }
 
 /* The handle between the conversation and the panel: a grip that grows under the pointer; dragged it sets the panel's
