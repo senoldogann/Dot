@@ -5148,8 +5148,8 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 209 | The default model, changed from the model menu                                       | done        | a83c6b7 |
 | 210 | The shell check: changes of permissions                                              | done        | 34f4816 |
 | 211 | Secrets kept from the agent by default                                               | done        | e6c8185 |
-| 212 | A provider that is not running answers at once                                       | in progress |         |
-| 213 | Tests: a bare pytest, and every offline smoke test in CI                             | planned     |         |
+| 212 | A provider that is not running answers at once                                       | done        | d6f90eb |
+| 213 | Tests: a bare pytest, and every offline smoke test in CI                             | in progress |         |
 | 214 | The redactor knows more kinds of secrets                                             | planned     |         |
 | 215 | Small hardenings after the review                                                    | planned     |         |
 | 216 | The README says what leaves this Mac                                                 | planned     |         |
@@ -10221,7 +10221,7 @@ code of before, all eleven were allowed.
 
 ### 212. A provider that is not running answers at once
 
-**Status: in progress.**
+**Status: done.** Merged as `d6f90eb` (PR #251; no Linear issue, the Linear connector was signed out).
 
 **As built (2026-10-14).** A server on this Mac (`localhost` or a loopback address) is asked for its list of models once
 (`llm/ollama.py`): with no network in between, a refused connection means it is not running, so the model menu's list
@@ -10241,7 +10241,16 @@ instead of trying again for half a minute.
 
 ### 213. Tests: a bare pytest, and every offline smoke test in CI
 
-**Status: planned.**
+**Status: in progress.**
+
+**As built (2026-10-14).** `pyproject.toml`: each test module is imported by its path (`--import-mode=importlib`), as
+`tests/unit` and `tests/smoke` have modules of the same name, and a smoke test that borrows from another finds it on
+`tests/smoke`; a mark that is not registered fails (`--strict-markers`), so a mistyped one cannot pick a test that needs
+a service. A bare `pytest` collects all 1,854 tests without an error (19 errors before). CI (`gate.yml`) runs every
+smoke test that needs no service, chosen by its marks (not `live`, `browser`, `internet`, `desktop` or `hosted`),
+instead of a list of 22 files: 312 passed and 1 skipped on this Mac in 2 min 36 s. The smoke tests that drove a browser
+or a model without saying so got their marks, 12 `browser` and 14 `live` in 11 files. The model menu's test waits for
+the providers' rail, which it once read before the daemon had listed them.
 
 **What.** A bare `pytest` collects every test without an error, and CI runs every smoke test that needs no service,
 chosen by their marks instead of by a list of files.
@@ -10923,3 +10932,4 @@ is sent to them, and how to keep it on the Mac.
 - 2026-10-14 (Opus 5.5): item 209 merged as `a83c6b7` (PR #248; no Linear issue, the connector was signed out): the composer's model menu changes the daemon's default model too: Change on the default's row, then a pick.
 - 2026-10-14 (Opus 5.5): item 210 merged as `34f4816` (PR #249; no Linear issue, the connector was signed out): the shell check judges a change of permissions or of owner by every path the line names.
 - 2026-10-14 (Opus 5.5): item 211 merged as `e6c8185` (PR #250; no Linear issue, the connector was signed out): more of the places where a Mac keeps credentials and private data are protected by default.
+- 2026-10-14 (Opus 5.5): item 212 merged as `d6f90eb` (PR #251; no Linear issue, the connector was signed out): a provider on this Mac that is not running (Ollama) answers at once: the model list, `dotx models` and the doctor say so without the retries.

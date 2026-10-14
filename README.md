@@ -2152,17 +2152,20 @@ service are marked:
 | `desktop`  | a logged-in screen and `DOT_DESKTOP_TESTS=1`; it moves the real pointer and keyboard against a local AppKit window |
 | `hosted`   | your own `OPENAI_API_KEY`, `OPENCODE_API_KEY`, `ANTHROPIC_API_KEY` and `OLLAMA_API_KEY`; a few tiny requests, skipped per missing key |
 
-`pytest -m "not live and not internet"` skips the first and third kind, `pytest -m "not hosted"` the requests that
-use your keys.
+`pytest -m "not live and not internet"` skips the first and third kind, `pytest -m "not hosted"` the requests that use
+your keys. A few smoke tests that use the local Ollama server's embedding model skip themselves without it. A bare
+`pytest` collects every test, as each test module is imported by its path (`tests/unit` and `tests/smoke` have modules
+of the same name), and a mark that is not in the table fails, so a mistyped one cannot pick a test that needs a service
+(item 213).
 
 The smoke tests of the eval runner (`tests/smoke/test_evals_runner.py`) need no service at all: a scripted model
 plays the real loop, tools, policy and store.
 
-The gate runs on every pull request and every push to `main` (`.github/workflows/gate.yml`, on macOS because the
-package depends on PyObjC): the format check, the lint, mypy, the unit tests, `dotx eval check` and the smoke tests
-that need no service, which the workflow lists by file, and for the desktop shell `cargo fmt --check`, clippy and
-`cargo test`. Each action the workflow uses is pinned by the commit its tag named, so a tag moved later cannot change
-what runs. The tests marked above stay on your Mac.
+The gate runs on every pull request and every push to `main` (`.github/workflows/gate.yml`, on macOS because the package
+depends on PyObjC): the format check, the lint, mypy, the unit tests, `dotx eval check` and every smoke test that needs
+no service, chosen by its marks (`-m "not live and not browser and not internet and not desktop and not hosted"`), and
+for the desktop shell `cargo fmt --check`, clippy and `cargo test`. Each action the workflow uses is pinned by the
+commit its tag named, so a tag moved later cannot change what runs. The tests marked above stay on your Mac.
 
 The work on the agent's autonomy (measuring it, noticing a stuck run, adapting to the model, resuming, learning) is
 planned and tracked in [ROADMAP.md](ROADMAP.md); read it before continuing that work.

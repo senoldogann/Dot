@@ -164,6 +164,7 @@ async def test_a_page_that_is_not_there_is_reported_with_the_front_pages_likely_
     assert not there.is_error and "About Acme." in there.text
 
 
+@pytest.mark.browser
 async def test_a_page_that_turns_the_plain_request_away_is_read_in_dots_own_chrome(runtime: Runtime, wall: str) -> None:
     read: ToolResult = await _fetch(runtime, f"{wall}/wall")
     assert not read.is_error and read.untrusted
@@ -184,6 +185,7 @@ async def test_a_page_that_turns_the_plain_request_away_is_read_in_dots_own_chro
     assert runtime.browser.current_url("fetch-test") is None
 
 
+@pytest.mark.browser
 async def test_a_host_that_refused_once_is_read_in_the_browser_first_from_then_on(runtime: Runtime, wall: str) -> None:
     refused: RefusedHosts = RefusedHosts()
     walled: ToolResult = await _fetch_as(runtime, f"{wall}/wall-999", refused)

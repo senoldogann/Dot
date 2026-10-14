@@ -37,6 +37,8 @@ _PROVIDER: str = parse_model_ref(SCRIPTED_MODEL).provider
 _SHOTS: tuple[tuple[int, Literal["light", "dark"]], ...] = ((1280, "light"), (1280, "dark"), (390, "light"))
 _FAVOURITES_KEY: str = "dot.models.favourites"
 _MENU: str = ".composer .composer-popover[aria-label='Model']"
+# The rail of the menu: Favourites, then one mark for each provider that serves models.
+_RAIL_ITEMS: str = "[role=toolbar][aria-label='Providers'] button"
 
 
 def _model(name: str, tools: bool, free: bool) -> ModelInfo:
@@ -149,7 +151,7 @@ async def _page(browser: Browser, address: str, width: int, scheme: Literal["lig
 
 async def _rail(menu: Locator) -> list[tuple[str, str]]:
     """The rail's items, `(label, pressed)`, in order."""
-    items: Locator = menu.locator("[role=toolbar][aria-label='Providers'] button")
+    items: Locator = menu.locator(_RAIL_ITEMS)
     return [
         (str(await item.get_attribute("aria-label")), str(await item.get_attribute("aria-pressed")))
         for item in await items.all()
@@ -184,6 +186,8 @@ async def test_the_model_menu_shows_providers_finds_models_and_keeps_favourites(
                 # Opened with no favourites: on the provider of the model a run would use, the search taking the keys.
                 await pill.click()
                 await expect(menu.locator(".model-picker")).to_have_count(1)
+                # The menu opens at once and lists the providers once the daemon has said which models they serve.
+                await expect(menu.locator(_RAIL_ITEMS)).to_have_count(4)
                 assert await _rail(menu) == [
                     ("Favourites", "false"),
                     ("Ollama", "true"),

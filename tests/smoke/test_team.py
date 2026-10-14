@@ -134,6 +134,7 @@ def _system(request: ChatRequest) -> str:
     return next(message.content for message in request.messages if message.role == "system")
 
 
+@pytest.mark.browser
 async def test_a_run_messages_an_agent_and_reads_its_reply_and_the_team_page_shows_the_exchange(
     runtime: Runtime, manager: RunManager, client: httpx.AsyncClient, tmp_path: Path
 ) -> None:

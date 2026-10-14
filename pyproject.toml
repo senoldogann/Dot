@@ -85,6 +85,11 @@ ignore_missing_imports = true
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
+# tests/unit and tests/smoke have modules of the same name, so each is imported by its path; a smoke test that borrows
+# from another finds it on tests/smoke. A mark that is not registered below fails, as a mistyped one would select a
+# test that needs a service.
+addopts = ["--import-mode=importlib", "--strict-markers"]
+pythonpath = ["tests/smoke"]
 markers = [
     "live: needs a running Ollama server with a signed-in cloud model",
     "browser: drives a real headless Chrome against a local fixture server",
