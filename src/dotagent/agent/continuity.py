@@ -48,6 +48,8 @@ _TRAILING_PUNCTUATION: str = ".,;:!?…"
 # An identifier that starts with a known identifier this long is that address with a fragment or a query the
 # history did not have; a shorter known identifier says little about what follows it.
 _LONG_IDENTIFIER_CHARS: int = 24
+# Where a Mac's paths have a second spelling: ``/tmp`` and ``/var`` are ``/private/tmp`` and ``/private/var``.
+_PRIVATE_PREFIXES: tuple[tuple[str, str], ...] = (("/tmp/", "/private/tmp/"), ("/var/", "/private/var/"))
 
 
 class LedgerAction(FrozenModel):
@@ -170,26 +172,45 @@ def missing_sections(summary: str) -> tuple[str, ...]:
     return tuple(section for section in SUMMARY_SECTIONS if section not in upper)
 
 
-def _is_known(name: str, known: str, known_names: Collection[str]) -> bool:
-    """Whether the history holds ``name`` (a cut identifier is a part of its whole) or a long identifier it starts
-    with."""
-    return name in known or any(
-        len(other) >= _LONG_IDENTIFIER_CHARS and name.startswith(other) for other in known_names
+def spellings(name: str, home: str) -> tuple[str, ...]:
+    """``name`` and the other ways a Mac writes the same path: ``~`` for the home folder ``home`` and ``home`` for
+    ``~``, and ``/tmp`` or ``/var`` with or without ``/private`` before them. An address or an id is only itself."""
+    forms: list[str] = [name]
+    if name.startswith("~/"):
+        forms.append(home + name[1:])
+    elif name.startswith(f"{home}/"):
+        forms.append("~" + name[len(home) :])
+    for short, full in _PRIVATE_PREFIXES:
+        for form in tuple(forms):
+            if form.startswith(short):
+                forms.append(full + form[len(short) :])
+            elif form.startswith(full):
+                forms.append(short + form[len(full) :])
+    return tuple(forms)
+
+
+def _is_known(name: str, known: str, known_names: Collection[str], home: str) -> bool:
+    """Whether the history holds ``name``, as it is written or as the Mac also writes it (:func:`spellings`): whole,
+    cut short (a cut identifier is a part of its whole), or as a long identifier it starts with."""
+    return any(
+        form in known or any(len(other) >= _LONG_IDENTIFIER_CHARS and form.startswith(other) for other in known_names)
+        for form in spellings(name, home)
     )
 
 
-def check_continuity(summary: str, reference: str, ledger: RunLedger) -> ContinuityCheck:
+def check_continuity(summary: str, reference: str, ledger: RunLedger, home: str) -> ContinuityCheck:
     """Validate a model's summary against ``reference`` (the full text of the history it replaces) and the ledger.
 
     An identifier counts as known when the history holds it, whole or cut short (a trailing ellipsis, the mark of a
     value Dot cut, is not part of it), or when it starts with a known identifier of at least 24 characters (an
-    address with a fragment the history did not have).
+    address with a fragment the history did not have). A path counts in any of its spellings: ``~`` for ``home``,
+    the home folder, and ``/tmp`` or ``/var`` with or without ``/private``.
     """
     missing: tuple[str, ...] = missing_sections(summary)
     known: str = "\n".join([reference, ledger.goal, *ledger.instructions, *ledger.touched])
     known_names: set[str] = identifiers(known)
     unverified: tuple[str, ...] = tuple(
-        sorted(name for name in identifiers(summary) if not _is_known(name, known, known_names))
+        sorted(name for name in identifiers(summary) if not _is_known(name, known, known_names, home))
     )
     return ContinuityCheck(
         ok=bool(summary.strip()) and not missing and not unverified,

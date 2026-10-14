@@ -5,6 +5,7 @@ import time
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, replace
 from datetime import datetime
+from pathlib import Path
 from typing import Literal
 
 from pydantic import JsonValue
@@ -495,7 +496,7 @@ async def _compact(
             fast_problem=fast_problem,
             check=None,
         )
-    check: ContinuityCheck = check_continuity(text, history_text(head), ledger)
+    check: ContinuityCheck = check_continuity(text, history_text(head), ledger, str(Path.home()))
     author: str = (
         f"written by you, {writer.label}" if writer.label == own.label else f"written by the fast model {writer.label}"
     )

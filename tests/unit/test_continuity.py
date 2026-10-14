@@ -42,6 +42,8 @@ from dotagent.tools.meta import build_meta_tools
 from dotagent.tools.registry import build_registry
 
 GOAL: str = "Write the weekly report to ~/Reports/week41.md and mail it to the team."
+# The home folder the check is told of: a made-up one, not this Mac's.
+HOME: str = "/Users/owner"
 SUMMARY: str = (
     "GOAL: weekly report.\nDONE: wrote ~/Reports/week41.md.\nSTATE: draft saved.\nPROBLEMS: none.\nNEXT: send the mail."
 )
@@ -71,12 +73,14 @@ def test_the_ledger_keeps_work_actions_touched_paths_and_instructions() -> None:
 def test_the_check_flags_identifiers_the_history_never_mentioned() -> None:
     reference: str = history_text([user_message(GOAL, ()), user_message("wrote ~/Reports/week41.md", ())])
     ledger = new_ledger(GOAL)
-    clean = check_continuity(SUMMARY, reference, ledger)
+    clean = check_continuity(SUMMARY, reference, ledger, HOME)
     assert clean.ok
-    invented = check_continuity(SUMMARY + "\nAlso uploaded https://files.example.com/report.pdf", reference, ledger)
+    invented = check_continuity(
+        SUMMARY + "\nAlso uploaded https://files.example.com/report.pdf", reference, ledger, HOME
+    )
     assert not invented.ok
     assert invented.unverified == ("https://files.example.com/report.pdf",)
-    missing = check_continuity("GOAL: report. DONE: wrote it.", reference, ledger)
+    missing = check_continuity("GOAL: report. DONE: wrote it.", reference, ledger, HOME)
     assert missing.missing_sections == ("STATE", "PROBLEMS", "NEXT")
 
 
@@ -85,15 +89,38 @@ def test_the_check_takes_an_address_cut_short_or_lengthened_as_known_and_another
     reference: str = history_text([user_message(GOAL, ()), user_message(f"read {page} and ~/Reports/a.md", ())])
     ledger = new_ledger(GOAL)
     # The model copied the address as a rendering cut it, ellipsis and all, or added a fragment the history lacks.
-    cut = check_continuity(SUMMARY + f"\nSee {page[:40]}…", reference, ledger)
+    cut = check_continuity(SUMMARY + f"\nSee {page[:40]}…", reference, ledger, HOME)
     assert cut.ok, cut.unverified
-    lengthened = check_continuity(SUMMARY + f"\nSee {page}#step-3", reference, ledger)
+    lengthened = check_continuity(SUMMARY + f"\nSee {page}#step-3", reference, ledger, HOME)
     assert lengthened.ok, lengthened.unverified
     # Another page under the same prefix is not this one, and a short known path says nothing about a longer one.
     other = check_continuity(
-        SUMMARY + f"\nSee {page.rsplit('/', 1)[0]}/delete-all and ~/Reports/a.md.bak", reference, ledger
+        SUMMARY + f"\nSee {page.rsplit('/', 1)[0]}/delete-all and ~/Reports/a.md.bak", reference, ledger, HOME
     )
     assert other.unverified == ("https://docs.example.com/guides/backups/delete-all", "~/Reports/a.md.bak")
+
+
+def test_the_check_knows_a_path_in_the_other_spellings_a_mac_has_for_it() -> None:
+    reference: str = history_text(
+        [
+            user_message(GOAL, ()),
+            user_message(f"ran {HOME}/Desktop/Dot/.venv/bin/dotx, then read ~/Reports/a.md and /tmp/build/out.log", ()),
+        ]
+    )
+    ledger = new_ledger(GOAL)
+    # The home folder written as ~ or written out, /tmp and /var with or without the /private before them.
+    same = check_continuity(
+        SUMMARY + f"\nRan ~/Desktop/Dot/.venv/bin/dotx, read {HOME}/Reports/a.md and /private/tmp/build/out.log.",
+        reference,
+        ledger,
+        HOME,
+    )
+    assert same.ok, same.unverified
+    # Another user's home, or another file in a known folder, is still not known.
+    other = check_continuity(
+        SUMMARY + "\nRead /Users/someone/Reports/a.md and ~/Reports/b.md.", reference, ledger, HOME
+    )
+    assert other.unverified == ("/Users/someone/Reports/a.md", "~/Reports/b.md")
 
 
 def test_a_continuity_note_pins_the_facts_and_a_new_compaction_reads_only_its_summary() -> None:
@@ -104,7 +131,7 @@ def test_a_continuity_note_pins_the_facts_and_a_new_compaction_reads_only_its_su
         steps=(PlanItem(text="Write the report", status="done"), PlanItem(text="Mail it", status="in_progress")),
         targets="the team has the report: the mail is in the Sent folder",
     )
-    check = check_continuity(SUMMARY + " see https://made.up/x", GOAL, ledger)
+    check = check_continuity(SUMMARY + " see https://made.up/x", GOAL, ledger, HOME)
     note: str = continuity_note(ledger, plan, 4000, SUMMARY, "written by you, ollama:m", check)
     assert note.startswith(CONTINUITY_MARK)
     assert GOAL in note
