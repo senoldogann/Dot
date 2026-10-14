@@ -18,7 +18,8 @@ export function nestRows(rows) {
   return top;
 }
 
-/** The facts of a row's progress: its steps, then its channel and its detail. */
+/** The facts of a nested row's progress: its steps, then its channel. Its detail (that another run delegated it) is
+ * what its place under that run says already (item 198). */
 export function progressFacts(row) {
   const parts = [];
   if (row.steps !== null && row.steps > 0) {
@@ -26,9 +27,6 @@ export function progressFacts(row) {
   }
   if (row.channel !== "") {
     parts.push(row.channel);
-  }
-  if (row.detail !== "") {
-    parts.push(row.detail);
   }
   return parts;
 }

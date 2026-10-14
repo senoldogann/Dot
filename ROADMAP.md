@@ -5133,8 +5133,8 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 194 | Dot reads Word, Excel and PowerPoint files                                           | done        | 5592965 |
 | 195 | A file opens in a panel beside the chat: PDF, sheets, documents and more             | done        | 6ef8fa8 |
 | 196 | Dot knows its way around Word, Excel and OneDrive on the Mac                         | planned     |         |
-| 197 | A stopped run stops the runs it delegated, and their rows stop                       | in progress |         |
-| 198 | The side menu shows every agent of a run, folded under it                            | planned     |         |
+| 197 | A stopped run stops the runs it delegated, and their rows stop                       | done        | 0b3a7d4 |
+| 198 | The side menu shows every agent of a run, folded under it                            | in progress |         |
 | 199 | The default model is chosen in Settings, and a chat keeps its model                  | planned     |         |
 | 200 | Reconnecting, checked end to end                                                     | planned     |         |
 | 201 | Marks of the conversation's messages: a look and a jump, after T3 Code               | planned     |         |
@@ -9735,7 +9735,7 @@ run's side panel (203) designed again, in their structure and in how they work. 
 
 ### 197. A stopped run stops the runs it delegated, and their rows stop
 
-**Status: in progress.**
+**Status: done.** Merged as `0b3a7d4` (PR #236; no Linear issue, the Linear connector was signed out).
 
 **As built (2026-10-14).** A run that is stopped stops the runs it delegated, and its end is stored after theirs.
 `RunManager.delegate`, cancelled while it waits, stops the delegated run and lets the cancellation go on once that run's
@@ -9757,7 +9757,22 @@ first (`2 < 1`). It passed in WebKit too.
 
 ### 198. The side menu shows every agent of a run, folded under it
 
-**Status: planned.**
+**Status: in progress.**
+
+**As built (2026-10-14).** Under a run at work, the side menu's Working section shows every run it delegated: those at
+work with Working and their time, as before, and those that ended with how they ended (their face or dot at rest, the
+status first in their facts). `GET /activity` lists the ended ones apart, as `ended_delegated` (the runs that the runs
+at work delegated and that have ended; Ended today leaves them out until their run ends), so that the sections, the
+home's line and its Today strip count what works as before; the side menu and Activity hang them under their run. A line
+under the run says how many runs it delegated and, while some have ended, how many of them work ("3 delegated runs · 1
+working"); a click on it folds them, in place, so the focus stays on it, and the fold is kept with the folds of the
+sections (`dot.sideFolds`, the runs folded, forgotten once their run is no longer listed). Before, the section listed
+the delegated runs at work alone, the line under the run said "1 delegated run" while three were, and nothing folded
+them. Tests: `tests/smoke/test_side_agents.py`, a real server on the scripted model, in Chrome at 1280 and 390 px, light
+and dark: a run delegates three runs, two of which finish while the third waits in a shell command; the section counts
+two at work, the line says "3 delegated runs · 1 working", the three rows show under it, two of them done, and a fold is
+kept after a reload; the Activity page shows the three under the run and counts two. On the code of before, the section
+showed one row under the run and no line to fold them. It passed in WebKit too.
 
 **What.** The Working section lists, under a run at work, every run it delegated: those at work with how long they have
 worked, those that ended with how they ended. The run's row folds them, and keeps the fold.
@@ -10435,3 +10450,4 @@ cost, the plan, the files, the actions and the screens. Screenshots looked at, w
 - 2026-10-14 (Opus 5.5): item 194 merged as `5592965` (PR #234; no Linear issue, the connector was signed out): Dot reads Word, Excel and PowerPoint files, attached or on disk: a document's text and tables, a workbook's cells with their formulas, a presentation's slides with their charts and notes.
 - 2026-10-14 (Opus 5.5): item 195 merged as `6ef8fa8` (PR #235; no Linear issue, the connector was signed out): A file opens in the side panel of the run page, from a sent file's chip, a path an answer names, the Files card or Actions: a PDF's pages, the grid of a workbook or a CSV, a document, a presentation, an image or a text.
 - 2026-10-14 (Opus 5.5): part 32, runs that stop whole, every agent in the side menu, a model that stays, is planned (items 197 to 203); item 196 of part 31 follows its defects (197 to 200).
+- 2026-10-14 (Opus 5.5): item 197 merged as `0b3a7d4` (PR #236; no Linear issue, the connector was signed out): A run that is stopped stops the runs it delegated and stores its end after theirs, so the rows of those runs end on its page; a restart and a dead command's close store the same order, and a run stored the other way shows its rows ended from the database.

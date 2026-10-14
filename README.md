@@ -1042,15 +1042,18 @@ days; a live dot marks those with a run going on, waiting for you or failed, and
 chat's latest run works, the time at the right of its row gives way to a dashed circle, **Working** and how long since
 the run was asked for ("12s", "4m", "1h 5m", read again every second), as T3 Code's sidebar has it; every run of the
 Working section says the same, a delegated run under its parent too, and a run that waits for you keeps its amber dot
-and its time. Above the list: a search over the titles (⌘K or `/`), **New chat** (⇧⌘O) and the ways to **Agents**,
-**Activity** and **Campaigns**; in the foot, **Settings** and the red square of the **Emergency stop** (which comes
-along beside the button that shows the sidebar while the sidebar is closed). The top bar shows only what needs you: the
-approvals waiting, and the connection to the daemon while it is being made or lost; the runs that work are counted in
-the Working section. The sections (Waiting for you, Working, Chats) fold on a click of their label, and the folds are
-kept between visits. The sidebar's head holds only the button that folds it away. **Select** turns the list into
-checkboxes: tick chats (or Select all) and **Delete** asks once, then removes them with every run, step, event and
-approval of theirs. A chat with a run under way is refused, the run of a `dotx` command too: wait for the run to end, or
-cancel it (a `dotx` command's with Ctrl-C). Escape leaves the selection. Under 860 px the sidebar becomes a drawer.
+and its time. Under a run at work hang all the runs it delegated (item 198), those that ended saying how, behind a line
+that says how many there are and, while some have ended, how many work; a click on it folds them, and the fold is kept.
+The Working section counts what works, and so does Activity, which shows them under the run too. Above the list: a
+search over the titles (⌘K or `/`), **New chat** (⇧⌘O) and the ways to **Agents**, **Activity** and **Campaigns**; in
+the foot, **Settings** and the red square of the **Emergency stop** (which comes along beside the button that shows the
+sidebar while the sidebar is closed). The top bar shows only what needs you: the approvals waiting, and the connection
+to the daemon while it is being made or lost; the runs that work are counted in the Working section. The sections
+(Waiting for you, Working, Chats) fold on a click of their label, and the folds are kept between visits. The sidebar's
+head holds only the button that folds it away. **Select** turns the list into checkboxes: tick chats (or Select all) and
+**Delete** asks once, then removes them with every run, step, event and approval of theirs. A chat with a run under way
+is refused, the run of a `dotx` command too: wait for the run to end, or cancel it (a `dotx` command's with Ctrl-C).
+Escape leaves the selection. Under 860 px the sidebar becomes a drawer.
 
 A chat's menu, after T3 Code's thread menu, opens from the **…** button at the right of its row (shown where the pointer
 rests or the focus is, over the time, and always on a touch screen), from a right-click on the row, or from the

@@ -10,6 +10,7 @@ import { age, clip, clipWords, copyText, dateTime, debounce, el, foldSearch, plu
 import { failsafeButton } from "./failsafe.js";
 import { icon } from "./icons.js";
 import { actorFace } from "./actors.js";
+import { faceState } from "./face.js";
 import { closeMenu, menuOpenedBy, openMenu } from "./menu.js";
 import { nestRows, progressFacts } from "./nesting.js";
 import { readFolds, writePref } from "./prefs.js";
@@ -31,7 +32,8 @@ const DAY_LABELS = ["Today", "Yesterday", "Previous 7 days", "Older"];
 // A row of the activity sections shows this many words of its title at most, on one line (item 95).
 const ROW_WORDS = 7;
 const ROW_CHARS = 56;
-// Which sections the owner folded (`waiting`, `working`, `chats`), kept between visits.
+// Which sections the owner folded (`waiting`, `working`, `chats`), and the runs whose delegated runs they folded
+// (`runs`, item 198), kept between visits.
 const FOLDS_KEY = "dot.sideFolds";
 // What a status dot means, for screen readers; a chat whose latest run is done or cancelled shows no dot and needs no word.
 const STATUS_WORD = { queued: "queued", running: "running", blocked: "waiting for you", failed: "failed" };
@@ -138,14 +140,15 @@ function chatLink(chat, onNavigate) {
   );
 }
 
-/** One row of the activity sections: the state dot, the title and what it needs or where it works. A run that
- * delegated runs says how many; a delegated run (`child`) sits under its parent with its steps. A run of the Working
- * section says Working and for how long at its right (item 122); a schedule due there does not work yet. */
-function activityRow(row, onNavigate, children, child) {
+/** One row of the activity sections: the state dot, the title and what it needs or where it works. A delegated run
+ * (`child`) sits under its parent with its steps, and one that ended says how. A run of the Working section says
+ * Working and for how long at its right (item 122); a schedule due there does not work yet. */
+function activityRow(row, onNavigate, child) {
+  const ended = ENDED.has(row.status);
   const detail = child ? progressFacts(row) : [row.channel, row.detail].filter((part) => part !== "");
-  const delegated = children === 0 ? [] : [children === 1 ? "1 delegated run" : `${children} delegated runs`];
-  const facts = [...detail, ...delegated];
+  const facts = ended ? [row.status, ...detail] : detail;
   const words = facts.join(", ");
+  const state = row.section === "waiting" ? "waiting" : ended ? faceState(row.status) : "working";
   return el(
     "a",
     {
@@ -156,8 +159,8 @@ function activityRow(row, onNavigate, children, child) {
       onclick: onNavigate,
     },
     row.actor_id === null
-      ? el("span", { class: `status-dot s-${row.section === "waiting" ? "blocked" : "running"}` })
-      : actorFace(row.actor_id, row.section === "waiting" ? "waiting" : "working", null),
+      ? el("span", { class: `status-dot s-${row.section === "waiting" ? "blocked" : ended ? row.status : "running"}` })
+      : actorFace(row.actor_id, state, null),
     el(
       "span",
       { class: "side-run-goal" },
@@ -168,12 +171,38 @@ function activityRow(row, onNavigate, children, child) {
   );
 }
 
-/** The rows of a section: each parent, then its delegated runs under it. */
-function activityRows(rows, onNavigate) {
-  return nestRows(rows).map(({ row, children }) => [
-    activityRow(row, onNavigate, children.length, false),
-    children.length === 0 ? null : el("div", { class: "side-children" }, children.map((kid) => activityRow(kid, onNavigate, 0, true))),
-  ]);
+/** The rows of a section: each parent, then the runs it delegated under it, at work or ended (item 198), behind a
+ * button that says how many and folds them. `folded` holds the runs whose delegated runs are folded; `onFold(runId,
+ * folded)` keeps a change, which the button shows at once. */
+function activityRows(rows, onNavigate, folded, onFold) {
+  return nestRows(rows).map(({ row, children }) => {
+    const link = activityRow(row, onNavigate, false);
+    if (children.length === 0) {
+      return link;
+    }
+    const hidden = folded.has(row.run_id);
+    const list = el("div", { class: "side-children", id: `side-children-${row.run_id}`, hidden }, children.map((kid) => activityRow(kid, onNavigate, true)));
+    const working = children.filter((kid) => WORKING.has(kid.status)).length;
+    const count = children.length === 1 ? "1 delegated run" : `${children.length} delegated runs`;
+    const toggle = el(
+      "button",
+      {
+        class: "side-fold side-children-fold",
+        type: "button",
+        "aria-expanded": hidden ? "false" : "true",
+        "aria-controls": list.id,
+        onclick: () => {
+          const fold = !list.hidden;
+          list.hidden = fold;
+          toggle.setAttribute("aria-expanded", fold ? "false" : "true");
+          onFold(row.run_id, fold);
+        },
+      },
+      icon("chevron"),
+      working > 0 && working < children.length ? `${count} · ${working} working` : count,
+    );
+    return el("div", { class: "side-family" }, link, toggle, list);
+  });
 }
 
 /** A chat as a row to tick while chats are being chosen for deletion. */
@@ -708,10 +737,29 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
           "section",
           { class: "side-group", "data-section": key, "data-folded": folded ? "true" : null },
           foldLabel("h3", folded, () => toggleFold(key), `${label} `, el("span", { class: "side-label-count" }, String(activity[key].length))),
-          folded ? null : activityRows(activity[key], onNavigate),
+          // The runs at work show those they delegated that have ended too (item 198); the count is of what works.
+          folded ? null : activityRows(key === "working" ? [...activity.working, ...activity.ended_delegated] : activity[key], onNavigate, foldedRuns(), foldRun),
         );
       }),
     );
+  }
+
+  // The runs whose delegated runs the owner folded (item 198), kept with the folds of the sections; a run that is no
+  // longer listed is forgotten at the next fold.
+  function foldedRuns() {
+    return new Set(Array.isArray(folds.runs) ? folds.runs.filter((id) => typeof id === "string") : []);
+  }
+
+  function foldRun(runId, fold) {
+    const listed = new Set(activity === null ? [] : activity.working.map((row) => row.run_id));
+    const runs = new Set([...foldedRuns()].filter((id) => listed.has(id)));
+    if (fold) {
+      runs.add(runId);
+    } else {
+      runs.delete(runId);
+    }
+    folds = { ...folds, runs: [...runs] };
+    writePref(FOLDS_KEY, JSON.stringify(folds));
   }
 
   // The newest load answers for what is shown: an older answer that comes after it is dropped, not painted over it.
