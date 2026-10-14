@@ -6,10 +6,30 @@ from datetime import datetime
 
 from pydantic import JsonValue
 
+# What a pattern matches is masked; one with two groups keeps them (a URL up to the colon before its password, or the
+# name of a secret and what stands between it and its value) and masks the rest.
 _SECRET_PATTERNS: tuple[re.Pattern[str], ...] = (
+    # A private key in PEM, to its end or to the end of the text.
+    re.compile(r"-----BEGIN [A-Z0-9 ]*PRIVATE KEY-----[\s\S]*?(?:-----END [A-Z0-9 ]*PRIVATE KEY-----|\Z)"),
+    # The password of a URL: scheme://user:password@host.
+    re.compile(r"(?i)\b([a-z][a-z0-9+.\-]{0,30}://[^\s/@:]+)(:)[^\s/]+(?=@[^\s/@]+)"),
+    # Keys and tokens by the forms their services give them: OpenAI's and Anthropic's; GitHub's, an AWS access key id,
+    # a Google API key, Slack's and a JSON web token (tried only where a run of its letters starts).
     re.compile(r"sk-[A-Za-z0-9_\-]{16,}"),
+    re.compile(
+        r"\b(?:gh[pousr]_[A-Za-z0-9]{36,}|github_pat_[A-Za-z0-9_]{22,}|(?:AKIA|ASIA)[0-9A-Z]{16}\b"
+        r"|AIza[0-9A-Za-z_\-]{35}|xox[abprs]-[0-9A-Za-z\-]{10,}"
+        r"|(?<![A-Za-z0-9_\-])eyJ[A-Za-z0-9_\-]{8,}\.eyJ[A-Za-z0-9_\-]{8,}\.[A-Za-z0-9_\-]{8,})"
+    ),
+    # The credentials of an Authorization header.
+    re.compile(r"(?i)(authorization\"?\s*[:=]\s*\"?basic)(\s+)[A-Za-z0-9+/=]{4,}"),
     re.compile(r"(?i)bearer\s+[A-Za-z0-9._\-]{16,}"),
-    re.compile(r"(?i)(api[_-]?key|token|secret|password)(\"?\s*[:=]\s*\"?)[^\s\"',}]{8,}"),
+    # The value of key=value or "key": "value" whose key names a secret, and a password's however short it is.
+    re.compile(
+        r"(?i)(?<![\w.\-])([\w.\-]{0,40}?(?:api[_-]?key|access[_-]?key|private[_-]?key|secret|token|password|passwd"
+        r"|credentials?))(\"?\s*[:=]\s*\"?)[^\s\"',}]{8,}"
+    ),
+    re.compile(r"(?i)(?<![\w.\-])([\w.\-]{0,40}?(?:password|passwd))(\"?\s*[:=]\s*\"?)[^\s\"',}]+"),
 )
 
 _BLOB_THRESHOLD: int = 400
@@ -56,7 +76,8 @@ def truncate_tail(text: str, max_chars: int) -> str:
 
 
 def redact_secrets(text: str) -> str:
-    """Mask API keys, bearer tokens and ``key=value`` secrets."""
+    """Mask secrets (item 214): keys and tokens by their known forms, private keys, the credentials of an Authorization
+    header, the password of a URL, and the value of a ``key=value`` whose key names a secret."""
     masked: str = text
     for pattern in _SECRET_PATTERNS:
         masked = pattern.sub(_mask_match, masked)

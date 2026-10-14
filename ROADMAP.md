@@ -5149,8 +5149,8 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 210 | The shell check: changes of permissions                                              | done        | 34f4816 |
 | 211 | Secrets kept from the agent by default                                               | done        | e6c8185 |
 | 212 | A provider that is not running answers at once                                       | done        | d6f90eb |
-| 213 | Tests: a bare pytest, and every offline smoke test in CI                             | in progress |         |
-| 214 | The redactor knows more kinds of secrets                                             | planned     |         |
+| 213 | Tests: a bare pytest, and every offline smoke test in CI                             | done        | e73a257 |
+| 214 | The redactor knows more kinds of secrets                                             | in progress |         |
 | 215 | Small hardenings after the review                                                    | planned     |         |
 | 216 | The README says what leaves this Mac                                                 | planned     |         |
 | 217 | A weekly audit of the dependencies                                                   | planned     |         |
@@ -10241,7 +10241,7 @@ instead of trying again for half a minute.
 
 ### 213. Tests: a bare pytest, and every offline smoke test in CI
 
-**Status: in progress.**
+**Status: done.** Merged as `e73a257` (PR #252; no Linear issue, the Linear connector was signed out).
 
 **As built (2026-10-14).** `pyproject.toml`: each test module is imported by its path (`--import-mode=importlib`), as
 `tests/unit` and `tests/smoke` have modules of the same name, and a smoke test that borrows from another finds it on
@@ -10257,10 +10257,19 @@ chosen by their marks instead of by a list of files.
 
 ### 214. The redactor knows more kinds of secrets
 
-**Status: planned.**
+**Status: in progress.**
 
-**What.** The redactor that keeps secrets out of logs, lessons and errors knows more kinds of them. The details are
-written here once the fix is merged.
+**As built (2026-10-14).** The redactor (`core/text.py`, `redact_secrets`), which masks what goes into the log, the
+events, the errors the API answers with and the lessons, knew keys that start with `sk-`, bearer tokens and the value of
+`key=value` under a few names. It now knows the keys and tokens of GitHub, an AWS access key id, a Google API key,
+Slack's tokens and a JSON web token by the forms their services give them; a private key in PEM; the credentials of a
+Basic Authorization header; the password of a URL, keeping the rest of it; and the value of `key=value` or
+`"key": "value"` under more names, a password's however short. What surrounds a secret is kept, words that only look
+like one are left alone, and no pattern tries a long run of words against the whole rest of the text. Tests:
+`tests/unit/test_redaction.py`, 19 made-up secrets (those in the form of a real service's key put together at run time),
+9 look-alikes and a long text; on the code of before, 14 of the 19 stayed in the text.
+
+**What.** The redactor that keeps secrets out of logs, lessons and errors knows more kinds of them.
 
 ### 215. Small hardenings after the review
 
@@ -10933,3 +10942,4 @@ is sent to them, and how to keep it on the Mac.
 - 2026-10-14 (Opus 5.5): item 210 merged as `34f4816` (PR #249; no Linear issue, the connector was signed out): the shell check judges a change of permissions or of owner by every path the line names.
 - 2026-10-14 (Opus 5.5): item 211 merged as `e6c8185` (PR #250; no Linear issue, the connector was signed out): more of the places where a Mac keeps credentials and private data are protected by default.
 - 2026-10-14 (Opus 5.5): item 212 merged as `d6f90eb` (PR #251; no Linear issue, the connector was signed out): a provider on this Mac that is not running (Ollama) answers at once: the model list, `dotx models` and the doctor say so without the retries.
+- 2026-10-14 (Opus 5.5): item 213 merged as `e73a257` (PR #252; no Linear issue, the connector was signed out): a bare `pytest` collects every test without an error, and CI runs every smoke test that needs no service, chosen by its marks.
