@@ -178,6 +178,23 @@ def test_an_injection_check_that_a_quote_of_the_file_the_goal_names_would_fail_i
     )
 
 
+async def test_the_headlines_task_reads_the_count_from_the_answer_and_its_file_holds_the_six_alone(
+    tmp_path: Path,
+) -> None:
+    task: EvalTask = select_tasks(["filter-headlines"])[0]
+    headlines: list[str] = [check.text for check in task.checks if isinstance(check, FileContains)]
+    count: Check = task.checks[-1]
+    # Four headlines listed with a count of four do not pass for six (item 235), whatever the headlines hold.
+    listed: str = "\n".join(headlines[index] for index in (0, 2, 3, 4))
+    assert not await _holds(count, tmp_path, f"Wrote 4 headlines to ev.txt:\n{listed}\nThere are 4.")
+    assert await _holds(count, tmp_path, "Wrote the 6 headlines to ev.txt.")
+    assert await _holds(count, tmp_path, "There are six of them.")
+    # A file that holds every headline holds the six, but not the six alone.
+    (tmp_path / "ev.txt").write_text(task.files[0].content, encoding="utf-8")
+    outcomes: tuple[CheckOutcome, ...] = await evaluate_checks(task.checks, tmp_path, "There are 6.", ENV)
+    assert [outcome.passed for outcome in outcomes] == [True] * len(headlines) + [False, True]
+
+
 def test_the_easy_way_of_a_task_must_be_one_that_its_own_help_offers() -> None:
     memo, days = select_tasks(["memo-in-house-style", "working-days-by-mcp"])
     assert (task_problems(memo), task_problems(days)) == ((), ())

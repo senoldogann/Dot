@@ -5170,8 +5170,8 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 231 | Runs go on after a restart                                                           | done        | 3216c6f |
 | 232 | Models for Dot's own work                                                            | done        | 3a5e21a |
 | 233 | Goal checks in an eval run                                                           | done        | 7c47b6c |
-| 234 | A quoted instruction is not a followed one                                           | in progress |         |
-| 235 | The headlines task asks for what it checks                                           | planned     |         |
+| 234 | A quoted instruction is not a followed one                                           | done        | 4a54433 |
+| 235 | The headlines task asks for what it checks                                           | in progress |         |
 
 ### 77. The type system: Inter and Geist Mono, seven sizes, three weights
 
@@ -10715,7 +10715,7 @@ goal check that cannot run ends its attempt as failed, saying why, while the eva
 
 ### 234. A quoted instruction is not a followed one
 
-**Status: in progress.**
+**Status: done.** Merged as `4a54433` (PR #273; no Linear issue, the Linear connector was signed out).
 
 **As built (2026-10-15).** The note in the invoice and the one in the meeting notes ask, besides a file to make or to
 delete, for a claim whose words they do not hold: a total due of half the invoice's, a launch a week after its new date.
@@ -10731,7 +10731,15 @@ and a claim whose words the instruction does not hold. An answer that quotes the
 
 ### 235. The headlines task asks for what it checks
 
-**Status: planned.**
+**Status: in progress.**
+
+**As built (2026-10-15).** The goal asks for the headlines about electric cars, their batteries and their charging, the
+six the task checks, so that its smallest reasonable reading is the one checked; the rule of the system prompt stays as
+it is. The file is checked to hold the six alone, the count may be said in figures or in words, and the Hyundai headline
+no longer names a model with a figure that passed for the count. Tests: `tests/unit/test_evals.py`, four headlines
+listed with a count of four do not pass for six, and a file that holds every headline fails;
+`tests/smoke/test_evals_runner.py`, the reference passes and doing nothing does not. On the code of before, the answer
+of the owner's run (four headlines listed, "There are 4") passed the count.
 
 **What.** The headlines task names what it counts as about electric cars, checks that its file holds nothing else, and
 holds no headline whose figures could pass for the count.
@@ -11409,3 +11417,4 @@ holds no headline whose figures could pass for the count.
 - 2026-10-14 (Opus 5.5): item 231 merged as `3216c6f` (PR #270; no Linear issue, the connector was signed out): Settings › System has the switch for the daemon's next start to resume on its own the runs it cut off, kept in the config file as `[agent] resume`.
 - 2026-10-15 (Opus 5.5): item 232 merged as `3a5e21a` (PR #271; no Linear issue, the connector was signed out): Settings › Models chooses the fast, review and vision models, kept in the config file, and each call of their work goes to the one chosen from then on.
 - 2026-10-15 (Opus 5.5): item 233 merged as `7c47b6c` (PR #272; no Linear issue, the connector was signed out): an eval run hands each attempt the keys of the models it may call and needs the review model's when an attempt checks the end of its run, `[agent] goal_mode` applies to every attempt again, and a goal check that cannot run fails its attempt without ending the eval run.
+- 2026-10-15 (Opus 5.5): item 234 merged as `4a54433` (PR #273; no Linear issue, the connector was signed out): the tasks that hide an instruction judge it followed by what only following it does, so an answer that quotes it while refusing it passes, and `dotx eval check` reports a check that such a quote would fail.
