@@ -13,8 +13,10 @@ from fastapi.responses import FileResponse
 
 from dotagent import __version__
 from dotagent.agent.playbooks import PlaybookEntry, drop_playbook, list_playbooks, share_playbook
-from dotagent.config import AppConfig
+from dotagent.config import AppConfig, ModelsConfig
+from dotagent.config_edit import set_default_model
 from dotagent.core.errors import (
+    ConfigError,
     DotError,
     ElsewhereError,
     MissingSecretError,
@@ -25,6 +27,7 @@ from dotagent.core.errors import (
 from dotagent.core.logs import get_logger
 from dotagent.core.paths import (
     added_servers_path,
+    config_path,
     dot_home,
     failsafe_path,
     playbooks_dir,
@@ -51,7 +54,7 @@ from dotagent.help.elsewhere import (
     FoundSkill,
     found_elsewhere,
 )
-from dotagent.llm.router import ModelRef, ModelRouter
+from dotagent.llm.router import ModelRef, ModelRouter, parse_model_ref
 from dotagent.llm.traits import effective_effort
 from dotagent.llm.types import KNOWN_PROVIDERS, Effort, ModelInfo
 from dotagent.server.context import ServerContext
@@ -63,6 +66,7 @@ from dotagent.server.views import (
     HealthView,
     LearnedSkillsView,
     LearnedSkillView,
+    MainModelRequest,
     ModelOption,
     PaletteView,
     PermissionsView,
@@ -154,6 +158,10 @@ def system_router(ctx: ServerContext, pages: str) -> APIRouter:
     async def engaged() -> bool:
         return await asyncio.to_thread(failsafe_path().exists)
 
+    def models_now() -> ModelsConfig:
+        """The configured models, the default one as the owner last made it (item 199)."""
+        return config.models.model_copy(update={"main": ctx.manager.main_model()})
+
     @router.get("/push/key")
     async def push_key() -> PushKeyView:
         """The key a page gives ``PushManager.subscribe``; the daemon signs its pushes with the private half."""
@@ -192,7 +200,7 @@ def system_router(ctx: ServerContext, pages: str) -> APIRouter:
             desktop_enabled=config.desktop.enabled,
             mcp_tools=len(ctx.runtime.mcp.tools),
             mcp_failures=list(ctx.runtime.mcp.failures),
-            models=config.models,
+            models=models_now(),
         )
 
     @router.get("/models")
@@ -203,6 +211,18 @@ def system_router(ctx: ServerContext, pages: str) -> APIRouter:
                 *(_provider_models(ctx.runtime.router, name, default_effort) for name in KNOWN_PROVIDERS)
             )
         )
+
+    @router.post("/models/main")
+    async def make_main_model(request: MainModelRequest) -> ModelsConfig:
+        """Make ``model`` the default (item 199): the runs that name none start on it from now on, and the config
+        file keeps it as ``[models] main``. A model its provider does not offer, or one that cannot call tools, is
+        refused, and so is a config file that cannot be changed; nothing changes then."""
+        info: ModelInfo = await ctx.runtime.router.model_info(parse_model_ref(request.model))
+        if not info.tools:
+            raise ConfigError("a run needs a model that can call tools", {"model": request.model})
+        await asyncio.to_thread(set_default_model, config_path(), request.model)
+        ctx.manager.set_main_model(request.model)
+        return models_now()
 
     @router.get("/skills/learned")
     async def learned_skills() -> LearnedSkillsView:
@@ -283,7 +303,7 @@ def system_router(ctx: ServerContext, pages: str) -> APIRouter:
 
     @router.get("/doctor")
     async def doctor() -> list[CheckResult]:
-        return await run_quick_checks(config)
+        return await run_quick_checks(config.model_copy(update={"models": models_now()}))
 
     @router.post("/desktop/permissions")
     async def ask_for_desktop_permissions() -> PermissionsView:

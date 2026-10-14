@@ -1,5 +1,5 @@
-"""Changing one ``[browser]`` setting of the user's ``config.toml`` in place (the mode, or whether Chrome is raised),
-so the comments and the other settings stay as written."""
+"""Changing one setting of the user's ``config.toml`` in place: a ``[browser]`` one (the mode, or whether Chrome is
+raised) or the default model, ``[models] main`` (item 199), so the comments and the other settings stay as written."""
 
 import os
 import re
@@ -14,30 +14,36 @@ from dotagent.core.types import JsonObject
 from dotagent.store.models import BrowserMode
 
 _TABLE_HEADER: re.Pattern[str] = re.compile(r"^\s*\[")
-_BROWSER_HEADER: re.Pattern[str] = re.compile(r"^\s*\[\s*browser\s*\]\s*(#.*)?$")
 _FILE_MODE: int = 0o600
 # One edit at a time in this process: each reads the file, edits it and replaces it, so two at once (the browser mode
 # and raise_window changed together from the web UI) would keep only the later one.
 _EDITING: threading.Lock = threading.Lock()
 
-# The [browser] settings this module changes, and the TOML literal of each value.
+# The tables this module changes a setting of, the settings of each, and the TOML literal of each value.
+type ConfigTable = Literal["browser", "models"]
 type BrowserSetting = Literal["mode", "raise_window"]
-type SettingValue = BrowserMode | bool
+type ModelsSetting = Literal["main"]
+type SettingKey = BrowserSetting | ModelsSetting
+type SettingValue = str | bool
 
 
 def _literal(value: SettingValue) -> str:
     return ("true" if value else "false") if isinstance(value, bool) else f'"{value}"'
 
 
-def _key_line(key: BrowserSetting) -> re.Pattern[str]:
+def _header(table: ConfigTable) -> re.Pattern[str]:
+    return re.compile(rf"^\s*\[\s*{table}\s*\]\s*(#.*)?$")
+
+
+def _key_line(key: SettingKey) -> re.Pattern[str]:
     return re.compile(rf"^\s*{key}\s*=")
 
 
-def _key_value(key: BrowserSetting) -> re.Pattern[str]:
+def _key_value(key: SettingKey) -> re.Pattern[str]:
     return re.compile(rf"""^(\s*{key}\s*=\s*)("[^"]*"|'[^']*'|true|false)(.*)$""")
 
 
-def _replaced_line(line: str, key: BrowserSetting, setting: str) -> str:
+def _replaced_line(line: str, key: SettingKey, setting: str) -> str:
     """``line`` (a ``key = ...`` line) with its value replaced by ``setting``, a trailing comment kept."""
     match: re.Match[str] | None = _key_value(key).match(line)
     if match is None:
@@ -45,14 +51,15 @@ def _replaced_line(line: str, key: BrowserSetting, setting: str) -> str:
     return f"{match.group(1)}{setting}{match.group(3)}"
 
 
-def with_browser_setting(text: str, key: BrowserSetting, value: SettingValue) -> str:
-    """``text`` (the contents of a config.toml) with ``[browser] key`` set to ``value``; nothing else changes."""
+def with_setting(text: str, table: ConfigTable, key: SettingKey, value: SettingValue) -> str:
+    """``text`` (the contents of a config.toml) with ``[table] key`` set to ``value``; nothing else changes."""
     setting: str = _literal(value)
     lines: list[str] = text.splitlines()
-    start: int | None = next((index for index, line in enumerate(lines) if _BROWSER_HEADER.match(line)), None)
+    header: re.Pattern[str] = _header(table)
+    start: int | None = next((index for index, line in enumerate(lines) if header.match(line)), None)
     if start is None:
         separator: list[str] = [""] if lines and lines[-1].strip() else []
-        return "\n".join([*lines, *separator, "[browser]", f"{key} = {setting}"]) + "\n"
+        return "\n".join([*lines, *separator, f"[{table}]", f"{key} = {setting}"]) + "\n"
     end: int = next((index for index in range(start + 1, len(lines)) if _TABLE_HEADER.match(lines[index])), len(lines))
     key_line: re.Pattern[str] = _key_line(key)
     existing: int | None = next((index for index in range(start + 1, end) if key_line.match(lines[index])), None)
@@ -61,21 +68,25 @@ def with_browser_setting(text: str, key: BrowserSetting, value: SettingValue) ->
     return "\n".join([*lines[:existing], _replaced_line(lines[existing], key, setting), *lines[existing + 1 :]]) + "\n"
 
 
+def with_browser_setting(text: str, key: BrowserSetting, value: SettingValue) -> str:
+    """``text`` with ``[browser] key`` set to ``value``; nothing else changes."""
+    return with_setting(text, "browser", key, value)
+
+
 def with_browser_mode(text: str, mode: BrowserMode) -> str:
     """``text`` with ``[browser] mode`` set to ``mode``; nothing else changes."""
-    return with_browser_setting(text, "mode", mode)
+    return with_setting(text, "browser", "mode", mode)
 
 
-def _without_setting(settings: JsonObject, key: BrowserSetting) -> JsonObject:
-    """``settings`` with the one value this module changes left out, and the browser table too when that leaves it
-    empty (a file without the table and a file with an empty one are the same settings), to compare a file before and
-    after."""
-    browser: object = settings.get("browser")
-    if not isinstance(browser, dict):
+def _without_setting(settings: JsonObject, table: ConfigTable, key: SettingKey) -> JsonObject:
+    """``settings`` with the one value this module changes left out, and its table too when that leaves it empty (a
+    file without the table and a file with an empty one are the same settings), to compare a file before and after."""
+    values: object = settings.get(table)
+    if not isinstance(values, dict):
         return settings
-    others: JsonObject = {key_: value for key_, value in settings.items() if key_ != "browser"}
-    remaining: JsonObject = {key_: value for key_, value in browser.items() if key_ != key}
-    return {**others, "browser": remaining} if remaining else others
+    others: JsonObject = {key_: value for key_, value in settings.items() if key_ != table}
+    remaining: JsonObject = {key_: value for key_, value in values.items() if key_ != key}
+    return {**others, table: remaining} if remaining else others
 
 
 def _parse(text: str, path: Path) -> JsonObject:
@@ -85,35 +96,46 @@ def _parse(text: str, path: Path) -> JsonObject:
         raise ConfigError("config file is not valid TOML", {"path": str(path), "error": str(error)}) from error
 
 
-def _by_hand(key: BrowserSetting, value: SettingValue, path: Path, reason: str) -> ConfigError:
+def _by_hand(table: ConfigTable, key: SettingKey, value: SettingValue, path: Path, reason: str) -> ConfigError:
     return ConfigError(
-        f"the config file could not be changed automatically; add {key} = {_literal(value)} under [browser] by hand",
+        f"the config file could not be changed automatically; add {key} = {_literal(value)} under [{table}] by hand",
         {"path": str(path), "reason": reason},
     )
 
 
 def set_browser_mode(path: Path, mode: BrowserMode) -> None:
-    """Write ``[browser] mode`` into the config file at ``path`` (see :func:`set_browser_setting`)."""
-    set_browser_setting(path, "mode", mode)
+    """Write ``[browser] mode`` into the config file at ``path`` (see :func:`set_setting`)."""
+    set_setting(path, "browser", "mode", mode)
 
 
 def set_browser_setting(path: Path, key: BrowserSetting, value: SettingValue) -> None:
-    """Write ``[browser] key = value`` into the config file at ``path`` (created when missing). The result is parsed
-    again before it replaces the file: it must hold the new value and every other setting unchanged, or nothing is
+    """Write ``[browser] key = value`` into the config file at ``path`` (see :func:`set_setting`)."""
+    set_setting(path, "browser", key, value)
+
+
+def set_default_model(path: Path, model: str) -> None:
+    """Write ``[models] main``, the model a run that names none starts on, into the config file at ``path`` (see
+    :func:`set_setting`)."""
+    set_setting(path, "models", "main", model)
+
+
+def set_setting(path: Path, table: ConfigTable, key: SettingKey, value: SettingValue) -> None:
+    """Write ``[table] key = value`` into the config file at ``path`` (created when missing). The result is parsed again
+    before it replaces the file: it must hold the new value and every other setting unchanged, or nothing is
     written."""
     with _EDITING:
         before: str = path.read_text(encoding="utf-8") if path.exists() else ""
         old_settings: JsonObject = _parse(before, path)
-        after: str = with_browser_setting(before, key, value)
+        after: str = with_setting(before, table, key, value)
         try:
             new_settings: JsonObject = tomllib.loads(after)
         except tomllib.TOMLDecodeError as error:
-            raise _by_hand(key, value, path, f"the edited file is not valid TOML: {error}") from error
-        browser: object = new_settings.get("browser")
-        if not isinstance(browser, dict) or browser.get(key) != value:
-            raise _by_hand(key, value, path, "the edited file does not hold the new value")
-        if _without_setting(new_settings, key) != _without_setting(old_settings, key):
-            raise _by_hand(key, value, path, "the edit changed another setting")
+            raise _by_hand(table, key, value, path, f"the edited file is not valid TOML: {error}") from error
+        values: object = new_settings.get(table)
+        if not isinstance(values, dict) or values.get(key) != value:
+            raise _by_hand(table, key, value, path, "the edited file does not hold the new value")
+        if _without_setting(new_settings, table, key) != _without_setting(old_settings, table, key):
+            raise _by_hand(table, key, value, path, "the edit changed another setting")
         path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
         descriptor, temporary = tempfile.mkstemp(dir=path.parent, prefix=f".{path.name}.", suffix=".tmp")
         try:

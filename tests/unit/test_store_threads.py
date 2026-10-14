@@ -1,7 +1,9 @@
 """A chat's pin (item 130): a store made before there were pins gains them, with its chats unpinned, and lists the
 pinned chats first, the last pinned first, however old they are. A chat's unread mark (item 131): a chat is unread once
 its latest run has ended after it was last seen, a store made before the mark takes its chats as seen, even when the
-process that first opened it died part way, and the owner can mark a chat seen or unseen."""
+process that first opened it died part way, and the owner can mark a chat seen or unseen. A chat's choices (item 199):
+a store made before them gains them, a chat keeps those of its first run, or of the next run of a chat from before,
+until its composer picks others."""
 
 import asyncio
 import signal
@@ -11,10 +13,11 @@ import sys
 from pathlib import Path
 
 import pytest
+from pydantic import ValidationError
 
 from dotagent.core.errors import NotFoundError
 from dotagent.store.db import Store
-from dotagent.store.models import RunRecord, ThreadRecord
+from dotagent.store.models import ChatChoices, RunRecord, ThreadRecord
 
 
 async def _chat(store: Store, title: str) -> ThreadRecord:
@@ -173,5 +176,44 @@ async def test_a_chat_is_unread_once_its_latest_run_ends_until_it_is_seen(tmp_pa
         assert await _unread(store) == [("Chat", True)]
         with pytest.raises(NotFoundError):
             await store.see_thread("thr_nothing", True)
+    finally:
+        await store.close()
+
+
+def _forget_choices(path: Path) -> None:
+    """Make the database at `path` what a version from before a chat kept its choices left: threads without them."""
+    connection: sqlite3.Connection = sqlite3.connect(path)
+    try:
+        connection.execute("ALTER TABLE threads DROP COLUMN choices")
+        connection.commit()
+    finally:
+        connection.close()
+
+
+async def test_a_chat_keeps_the_choices_of_its_first_run_until_its_composer_picks_others(tmp_path: Path) -> None:
+    path: Path = tmp_path / "dot.sqlite3"
+    store: Store = await Store.open(path, tmp_path / "screenshots")
+    try:
+        old: ThreadRecord = await _chat(store, "Old")
+    finally:
+        await store.close()
+    await asyncio.to_thread(_forget_choices, path)
+    store = await Store.open(path, tmp_path / "screenshots")
+    try:
+        assert await store.chat_choices(old.id) is None
+        first: ChatChoices = ChatChoices(mode="task", model="ollama:a", effort="high", approvals="auto", goal_mode=True)
+        later: ChatChoices = ChatChoices(mode="chat", model="ollama:b", effort=None, approvals=None, goal_mode=None)
+        await store.keep_first_chat_choices(old.id, first)
+        await store.keep_first_chat_choices(old.id, later)
+        assert await store.chat_choices(old.id) == first
+        picked: ChatChoices = ChatChoices(mode="chat", model=None, effort=None, approvals="yolo", goal_mode=None)
+        await store.set_chat_choices(old.id, picked)
+        assert await store.chat_choices(old.id) == picked
+        with pytest.raises(NotFoundError):
+            await store.set_chat_choices("thr_nothing", picked)
+        with pytest.raises(NotFoundError):
+            await store.chat_choices("thr_nothing")
+        with pytest.raises(ValidationError, match="goal mode is for task and research runs"):
+            ChatChoices(mode="chat", model=None, effort=None, approvals=None, goal_mode=True)
     finally:
         await store.close()

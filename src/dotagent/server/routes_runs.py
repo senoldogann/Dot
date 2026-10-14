@@ -79,6 +79,7 @@ def runs_router(ctx: ServerContext) -> APIRouter:
             held=ctx.manager.held(run_id),
             agent=None if run.agent_id is None else await store.get_agent(run.agent_id),
             keep_going=run.goal_mode and keep_going_ask(run.goal) is not None,
+            choices=await store.chat_choices(run.thread_id),
         )
 
     @router.get("/runs")

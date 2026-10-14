@@ -64,6 +64,17 @@
   margin-bottom: 16px;
 }
 
+/* The default model (item 199), above the providers of the Models card; its select keeps to the room the row leaves. */
+.models-default {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.models-default .select {
+  min-width: 0;
+  max-width: 60%;
+}
+
 /* ---------- browser tab ---------- */
 
 .browser-steps {

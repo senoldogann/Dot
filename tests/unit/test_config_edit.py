@@ -1,5 +1,5 @@
-"""Switching ``[browser] mode`` and ``raise_window`` in the user's config.toml: the comments and the other settings stay
-as written."""
+"""Switching ``[browser] mode`` and ``raise_window``, and the default model (``[models] main``, item 199), in the user's
+config.toml: the comments and the other settings stay as written."""
 
 import stat
 import tomllib
@@ -8,7 +8,13 @@ from pathlib import Path
 import pytest
 
 from dotagent.config import BrowserMode
-from dotagent.config_edit import set_browser_mode, set_browser_setting, with_browser_mode, with_browser_setting
+from dotagent.config_edit import (
+    set_browser_mode,
+    set_browser_setting,
+    set_default_model,
+    with_browser_mode,
+    with_browser_setting,
+)
 from dotagent.core.errors import ConfigError
 from dotagent.core.types import JsonObject
 
@@ -127,3 +133,34 @@ def test_a_raise_window_written_as_a_string_is_replaced_by_the_boolean(tmp_path:
     path.write_text('[browser]\nraise_window = "yes"  # typo\n', encoding="utf-8")
     set_browser_setting(path, "raise_window", True)
     assert path.read_text(encoding="utf-8") == "[browser]\nraise_window = true  # typo\n"
+
+
+def test_the_default_model_is_replaced_under_models_and_the_other_tables_stay(tmp_path: Path) -> None:
+    path: Path = tmp_path / "config.toml"
+    path.write_text(
+        '[browser]\nmain = "x"\n\n[models]\nfast = "ollama:quick"\nmain = "ollama:old"  # the default\n',
+        encoding="utf-8",
+    )
+    set_default_model(path, "anthropic:claude-x")
+    assert path.read_text(encoding="utf-8") == (
+        '[browser]\nmain = "x"\n\n[models]\nfast = "ollama:quick"\nmain = "anthropic:claude-x"  # the default\n'
+    )
+
+
+def test_a_file_without_models_gets_the_table_with_the_default_model(tmp_path: Path) -> None:
+    path: Path = tmp_path / "config.toml"
+    path.write_text("[browser]\nheadless = true\n", encoding="utf-8")
+    set_default_model(path, "ollama:glm")
+    assert path.read_text(encoding="utf-8") == '[browser]\nheadless = true\n\n[models]\nmain = "ollama:glm"\n'
+    missing: Path = tmp_path / "Dot" / "config.toml"
+    set_default_model(missing, "ollama:glm")
+    assert missing.read_text(encoding="utf-8") == '[models]\nmain = "ollama:glm"\n'
+
+
+def test_a_models_table_written_inline_is_refused_and_left_as_it_was(tmp_path: Path) -> None:
+    original: str = 'models = { main = "ollama:old" }\n'
+    path: Path = tmp_path / "config.toml"
+    path.write_text(original, encoding="utf-8")
+    with pytest.raises(ConfigError, match='add main = "ollama:new" under \\[models\\] by hand'):
+        set_default_model(path, "ollama:new")
+    assert path.read_text(encoding="utf-8") == original

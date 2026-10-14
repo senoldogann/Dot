@@ -72,7 +72,7 @@ A model is written `provider:model`. The `[models]` table of the configuration s
 
 | Key                 | Used for                                                                                  | Default                     |
 | ------------------- | ----------------------------------------------------------------------------------------- | --------------------------- |
-| `main`              | the agent loop                                                                            | `ollama:minimax-m2.7:cloud` |
+| `main`              | the agent loop of a run that names no model; Settings › Models sets it                    | `ollama:minimax-m2.7:cloud` |
 | `vision`            | describing the images a tool returns, when `main` cannot see them                         | `ollama:gemma4:cloud`       |
 | `fast`              | writing the summary of a compaction (see [Tools](#tools))                                 | `ollama:gpt-oss:20b-cloud`  |
 | `search`            | relaying a web search through the Anthropic API's own search tool (see [Tools](#tools))   | `anthropic:claude-haiku-5-5` |
@@ -111,9 +111,9 @@ new key of its provider is saved. Each model is paused alone: a local Ollama mod
 paused, and a provider whose key or quota fails all its models costs one failed call per model. The process that runs
 the run keeps the pauses in memory. Both lists are empty by default, and `dotx doctor` shows which of their models have
 a key and are served to it. `dotx stats` counts every call of a run for the model of the run, so after a switch the
-calls before it count for the standby model too. An answered question, a resume and a follow-up message on the run page
-go on with the standby model and its level; `dotx chat` starts every turn on its own model (`main` unless `--model`),
-which moves to the standby again when it still cannot answer.
+calls before it count for the standby model too. An answered question and a resume go on with the standby model and
+its level; a follow-up message on the run page starts on the chat's own model (item 199), and `dotx chat` every turn
+on its own (`main` unless `--model`), each moving to the standby again when that model still cannot answer.
 
 **A model out of reach.** When the run's own model cannot be reached after its connector's retries (the connection broke
 or timed out, the call took longer than `model_call_timeout_s`, or its server failed with a status that retrying can get
@@ -1161,19 +1161,22 @@ and × to take it out. ⌘⇧Enter steers the run with what the box holds, past 
 when the box is empty. A held queue says it is paused, with **Resume**, and a queue the page could not read says why,
 with **Read again**. When the run ends done, the next message starts and the page follows it; every open page shows the
 queue as it changes. In a campaign's chat the message steers the session. The box wears the home's pills too, after T3
-Code's composer: the mode, the model with its reasoning and the Options (approvals and goal mode), set at first to the
-open run's, and a follow-up or a queued message starts its run with them on the same thread, for the same agent; they
-are the page's, not kept in the browser as the home's are, and Keep going stays a new chat's choice. The run under way
-keeps its own: while it works, the pills step back and say that they wait for the next follow-up. A run the daemon cut
-off offers **Continue** on a line above the box. A Details panel shows the status, the agent of a chat with one, the
-model and its reasoning level, the approval mode and goal mode, the campaign of a session, the model turns, the tool
-calls (with the failed ones), the tokens (of every model call of the run: its steps and its side calls, such as
-compactions, reviews and the goal check), the duration, the start and the run id, then the plan, an Actions card and the
-latest screenshots. It stays closed until the panel button in the head of the run opens it (the choice is kept in the
-browser); open, it sits beside the conversation from 960 px and is a drawer below that. The run's head is the top bar
-itself: Dot's face and name on the left, the panel button on the right; the bar is solid with a hairline under it, so
-nothing scrolls under a blur, the panel stays in place under it, and the box stays at the bottom. Every other page names
-itself in the same bar (Agents, Activity, Campaigns, Settings) and opens with one line of description.
+Code's composer: the mode, the model with its reasoning and the Options (approvals and goal mode) of the chat, and a
+follow-up or a queued message starts its run with them on the same thread, for the same agent. The chat keeps them
+(item 199): those its first run started with, then each one chosen in the box, at once and for every browser, so a
+reload, a restart of the daemon or a run moved to a standby model leaves them as they are (a chat from before has the
+open run's until its next run starts). They are not kept in the browser as the home's are, and Keep going stays a new
+chat's choice. The run under way keeps its own: while it works, the pills step back and say that they wait for the next
+follow-up. A run the daemon cut off offers **Continue** on a line above the box. A Details panel shows the status, the
+agent of a chat with one, the model and its reasoning level, the approval mode and goal mode, the campaign of a session,
+the model turns, the tool calls (with the failed ones), the tokens (of every model call of the run: its steps and its
+side calls, such as compactions, reviews and the goal check), the duration, the start and the run id, then the plan, an
+Actions card and the latest screenshots. It stays closed until the panel button in the head of the run opens it (the
+choice is kept in the browser); open, it sits beside the conversation from 960 px and is a drawer below that. The run's
+head is the top bar itself: Dot's face and name on the left, the panel button on the right; the bar is solid with a
+hairline under it, so nothing scrolls under a blur, the panel stays in place under it, and the box stays at the bottom.
+Every other page names itself in the same bar (Agents, Activity, Campaigns, Settings) and opens with one line of
+description.
 
 In the conversation each turn of the actor (Dot, or the agent the run belongs to, in its look), and the answer at the
 end, opens with its still face; the run's state is the top bar's face and the first fact of Details, with no card for it
@@ -1211,14 +1214,16 @@ back once the run has ended (`POST /api/runs/{id}/undo`); the card itself is `GE
 
 **Settings** (`#/settings`) is one page with tabs: **General** (Dot's name and yours, Dot's own look, desktop
 notifications and the token this browser is signed in with), **Appearance** (the look of this browser, below),
-**Models** (one fold per provider, with the reasoning levels of each model and a menu to choose one; a provider without
-a key, or whose key was refused (HTTP 401), says so and links to API keys, and one that refused access (HTTP 403) says
-that, with its words), **API keys** (the key of each provider; see [Models and providers](#models-and-providers)),
-**Browser** (which Chrome Dot browses with and what Chrome has to allow first; see [Browser use](#browser-use)),
-**Rules**, **Memory**, **Skills**, **Schedules** and **System** (the daemon, the emergency stop and the health checks in
-a fold, closed, with the number of failures on its line). Which folds are open is kept in the browser. The tabs sit
-beside their content when the window has the room and above it otherwise; the earlier addresses of the memory,
-schedules, rules and system pages lead to their tabs.
+**Models** (the **Default model** first, a menu of the models that can call tools: the runs that name no model, a new
+chat's among them, start on the one chosen at once, and `config.toml` keeps it as `[models] main`; then one fold per
+provider, with the reasoning levels of each model and a menu to choose one; a provider without a key, or whose key was
+refused (HTTP 401), says so and links to API keys, and one that refused access (HTTP 403) says that, with its words),
+**API keys** (the key of each provider; see [Models and providers](#models-and-providers)), **Browser** (which Chrome
+Dot browses with and what Chrome has to allow first; see [Browser use](#browser-use)), **Rules**, **Memory**,
+**Skills**, **Schedules** and **System** (the daemon, the emergency stop and the health checks in a fold, closed, with
+the number of failures on its line). Which folds are open is kept in the browser. The tabs sit beside their content when
+the window has the room and above it otherwise; the earlier addresses of the memory, schedules, rules and system pages
+lead to their tabs.
 
 Settings › Appearance (⌥⌘A), after T3 Code's page, holds the look of this browser. **Colour scheme** is three cards,
 each a miniature of Dot's window drawn in the scheme it names: System (the default, split down the middle), Light and
@@ -1385,6 +1390,7 @@ The REST API (all under `/api`; bodies and replies are JSON, event streams are s
 | Route                                                                           | Purpose                                                      |
 | ------------------------------------------------------------------------------- | ------------------------------------------------------------ |
 | `GET /health` (public), `GET /status`, `GET /models`, `GET /doctor`             | liveness, state of the daemon, models per provider (with their reasoning levels), checks |
+| `POST /models/main` (`{"model": "provider:model"}`)                            | make the default model, kept in `config.toml` (422 for one that cannot call tools or of no known provider; the provider's error, 502, for one it does not know) |
 | `GET /runs`, `POST /runs`, `GET /runs/{id}`, `GET /runs/{id}/events`            | list, start and read runs                                    |
 | `GET /runs/{id}/stream?after=N`, `GET /stream`                                  | live events of a run with its sub-runs; lifecycle of all runs |
 | `POST /runs/{id}/steer`, `POST /runs/{id}/cancel`                               | message a running run; stop it (a `dotx` command's run: the command is asked to stop it) |
@@ -1393,7 +1399,7 @@ The REST API (all under `/api`; bodies and replies are JSON, event streams are s
 | `PATCH\|DELETE /queue/{id}` (`{"text": …}`), `POST /queue/{id}/steer`            | edit or take out a queued message; send it to the run at work now (409 with none); 409 while its run is starting; each answers with the queue |
 | `POST /attachments` (`{"name", "media_type", "data_b64"}`)                      | keep a file for a message; `POST /runs` and `steer` name it in `attachments` |
 | `GET /threads?limit=N`, `DELETE /threads` (`{"ids": […]}`)                      | the chats, the pinned first, then newest activity first; delete some with their runs (409 with the ids while one has a run under way) |
-| `PATCH /threads/{id}` (`{"title": …, "pinned": …, "seen": …}`, one at least)   | name a chat, pin it, or mark it seen or unseen (204; 404 for no chat); a chat's `unread` is in the list |
+| `PATCH /threads/{id}` (`{"title": …, "pinned": …, "seen": …, "choices": …}`)   | name a chat, pin it, mark it seen or unseen, or keep the choices its next follow-up starts with (`mode`, `model`, `effort`, `approvals`, `goal_mode`; `GET /runs/{id}` has them as `choices`); one at least (204; 404 for no chat); a chat's `unread` is in the list |
 | `GET /approvals`, `POST /approvals/{id}/decision`                               | pending approvals; answer one                                |
 | `GET\|POST /rules`, `PATCH\|DELETE /rules/{id}`                                 | custom policy rules                                          |
 | `POST /rules/draft` (`{"sentence": …}`)                                         | a rule drafted from your words, not kept (422 with the model's reason when the words make no rule) |

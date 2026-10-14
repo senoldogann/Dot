@@ -6,7 +6,7 @@ from pydantic import Field, JsonValue, StrictBool, StringConstraints, model_vali
 
 from dotagent.agent.attachments import MAX_ATTACHMENT_BYTES, MAX_ATTACHMENTS
 from dotagent.agent.lessons import RunLessons
-from dotagent.config import ModelsConfig
+from dotagent.config import ModelReference, ModelsConfig
 from dotagent.core.types import FrozenModel
 from dotagent.desktop.perms import Pane
 from dotagent.llm.types import Effort
@@ -22,6 +22,7 @@ from dotagent.store.models import (
     BrowserMode,
     CampaignEntry,
     CampaignRecord,
+    ChatChoices,
     MemoryRecord,
     MemoryScore,
     QueuedMessage,
@@ -141,17 +142,18 @@ class DeleteThreadsRequest(FrozenModel):
 
 
 class ThreadChange(FrozenModel):
-    """What the owner changes on a chat from its menu (item 130): its name, its pin, or whether it is seen (item 131);
-    one of them at least."""
+    """What the owner changes on a chat: from its menu (item 130), its name, its pin, or whether it is seen (item 131);
+    from its composer, the choices its next follow-up starts with (item 199). One of them at least."""
 
     title: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=_NAME_CHARS)] | None = None
     pinned: StrictBool | None = None
     seen: StrictBool | None = None
+    choices: ChatChoices | None = None
 
     @model_validator(mode="after")
     def _something(self) -> Self:
-        if self.title is None and self.pinned is None and self.seen is None:
-            raise ValueError("a change of a chat names its title, its pin or whether it is seen")
+        if self.title is None and self.pinned is None and self.seen is None and self.choices is None:
+            raise ValueError("a change of a chat names its title, its pin, whether it is seen or its choices")
         return self
 
 
@@ -278,6 +280,12 @@ class ScheduleUpdateRequest(FrozenModel):
 
 class BrowserModeRequest(FrozenModel):
     mode: BrowserMode
+
+
+class MainModelRequest(FrozenModel):
+    """The model to make the default (item 199): the one a run that names none starts on."""
+
+    model: ModelReference
 
 
 class BrowserRaiseRequest(FrozenModel):
@@ -419,7 +427,8 @@ class RunDetail(FrozenModel):
     ``keep_going`` is true for a run in goal mode whose goal asks it to keep going until it is done, which its goal
     check is told (item 132). ``active`` is true while the daemon drives the run; ``elsewhere`` while another
     process that lives drives it at work (a ``dotx`` command): its page follows it and its Stop asks that process to
-    stop it, but it is not steered or taken over from here."""
+    stop it, but it is not steered or taken over from here. ``choices`` are what the next follow-up of the run's chat
+    starts with (item 199), ``None`` for a chat that has none of its own yet."""
 
     run: RunRecord
     children: list[RunRecord]
@@ -432,6 +441,7 @@ class RunDetail(FrozenModel):
     campaign: CampaignChip | None
     held: bool
     keep_going: bool
+    choices: ChatChoices | None
 
 
 class ActionStep(FrozenModel):

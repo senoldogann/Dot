@@ -51,8 +51,8 @@ export const KEPT_APPROVALS = { read: savedApprovals, write: (id) => writePref(A
 /** The home's choice of goal mode, kept per browser, as `KEPT_APPROVALS`. */
 export const KEPT_GOAL_MODE = { read: savedGoalMode, write: (on) => writePref(GOAL_MODE_KEY, on ? "on" : "off") };
 
-/** A choice held by one page from `initial`, as `KEPT_APPROVALS` reads and writes, and gone with the page: what a chat's
- * page holds for its next follow-up (item 133). */
+/** A choice held by one page from `initial`, as `KEPT_APPROVALS` reads and writes: what a chat's page holds for its next
+ * follow-up (item 133), and tells the daemon, which keeps it for the chat (item 199). */
 export function heldChoice(initial) {
   let value = initial;
   return {

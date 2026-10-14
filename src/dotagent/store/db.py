@@ -44,6 +44,7 @@ from dotagent.store.models import (
     CampaignEntry,
     CampaignEntryKind,
     CampaignRecord,
+    ChatChoices,
     EventRecord,
     MemoryRecord,
     MemoryScore,
@@ -68,7 +69,7 @@ from dotagent.tools.team import TEAM_SOURCE
 _SCHEMA: str = """
 CREATE TABLE IF NOT EXISTS threads (
     id TEXT PRIMARY KEY, title TEXT NOT NULL, source TEXT NOT NULL,
-    created_at REAL NOT NULL, updated_at REAL NOT NULL, pinned_at REAL, seen_at REAL
+    created_at REAL NOT NULL, updated_at REAL NOT NULL, pinned_at REAL, seen_at REAL, choices TEXT
 );
 CREATE TABLE IF NOT EXISTS messages (
     thread_id TEXT NOT NULL, seq INTEGER NOT NULL, body TEXT NOT NULL,
@@ -572,9 +573,10 @@ _ADDED_SCHEDULE_COLUMNS: tuple[tuple[str, str], ...] = (
 
 # Columns of ``campaigns`` added later: NULL means the daemon's browser, which is where an older campaign's sessions ran.
 _ADDED_CAMPAIGN_COLUMNS: tuple[tuple[str, str], ...] = (("browser", "TEXT"),)
-# Columns of ``threads`` added later: NULL means a chat the owner has not pinned (item 130), and one the owner has not
-# seen since its runs began or since they marked it unread (item 131).
-_ADDED_THREAD_COLUMNS: tuple[tuple[str, str], ...] = (("pinned_at", "REAL"), ("seen_at", "REAL"))
+# Columns of ``threads`` added later: NULL means a chat the owner has not pinned (item 130), one the owner has not seen
+# since its runs began or since they marked it unread (item 131), and one without choices of its own yet (a
+# ``ChatChoices`` as JSON, item 199).
+_ADDED_THREAD_COLUMNS: tuple[tuple[str, str], ...] = (("pinned_at", "REAL"), ("seen_at", "REAL"), ("choices", "TEXT"))
 # Columns of ``agents`` added later: NULL means the owner made the agent (item 99).
 _ADDED_AGENT_COLUMNS: tuple[tuple[str, str], ...] = (
     ("made_by", "TEXT"),
@@ -811,6 +813,34 @@ class Store:
         await self._db.commit()
         if cursor.rowcount == 0:
             raise NotFoundError("thread not found", {"thread_id": thread_id})
+
+    async def chat_choices(self, thread_id: str) -> ChatChoices | None:
+        """What the chat's next follow-up starts with (item 199), ``None`` while it has no choices of its own: its
+        runs began before chats kept them."""
+        row: aiosqlite.Row | None = await self._one("SELECT choices FROM threads WHERE id = ?", (thread_id,))
+        if row is None:
+            raise NotFoundError("thread not found", {"thread_id": thread_id})
+        stored: str | None = row["choices"]
+        return None if stored is None else ChatChoices.model_validate_json(stored)
+
+    @_writing
+    async def set_chat_choices(self, thread_id: str, choices: ChatChoices) -> None:
+        """Keep what the owner picked in the chat's composer for its next follow-up (item 199)."""
+        cursor: aiosqlite.Cursor = await self._db.execute(
+            "UPDATE threads SET choices = ? WHERE id = ?", (choices.model_dump_json(), thread_id)
+        )
+        await self._db.commit()
+        if cursor.rowcount == 0:
+            raise NotFoundError("thread not found", {"thread_id": thread_id})
+
+    @_writing
+    async def keep_first_chat_choices(self, thread_id: str, choices: ChatChoices) -> None:
+        """Keep what a run of the chat starts with as the chat's choices when it has none yet (item 199): those of its
+        first run, or of the next run of a chat from before."""
+        await self._db.execute(
+            "UPDATE threads SET choices = ? WHERE id = ? AND choices IS NULL", (choices.model_dump_json(), thread_id)
+        )
+        await self._db.commit()
 
     async def list_thread_summaries(self, limit: int) -> list[ThreadSummary]:
         """The chats, the pinned ones first (the last pinned first, so they are listed however old), then the latest

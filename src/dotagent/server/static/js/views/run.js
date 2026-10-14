@@ -23,7 +23,7 @@ import { heldChoice } from "../runmodes.js";
 import { messageKeys } from "../sending.js";
 import { setStageTitle, setStageTools } from "../stage.js";
 import { createStageSize } from "../stagesize.js";
-import { onChange, onLifecycle, onStreamBack, readFailed } from "../state.js";
+import { getSnapshot, onChange, onLifecycle, onStreamBack, readFailed } from "../state.js";
 import { createTimeline } from "../timeline.js";
 import { attempt, confirmDialog, toast } from "../ui.js";
 
@@ -455,15 +455,32 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
       queue.cancelEdit();
     }
   });
-  // The choices of the next follow-up (item 133), after T3 Code's composer: the open run's mode, model with its
-  // reasoning, approvals and goal mode at first, held by the page. The agent stays the chat's, and Keep going is a
-  // new chat's, since a campaign starts from a goal of its own.
-  const levels = new Map(run.effort === null ? [] : [[run.model, run.effort]]);
+  // The choices of the next follow-up (item 133), after T3 Code's composer: the mode, the model with its reasoning,
+  // approvals and goal mode of the chat (item 199), which the daemon keeps as its first run started and as they are
+  // chosen here, so that a reload, another browser or a run moved to a standby model leaves them as they are; a chat
+  // from before has the open run's. The agent stays the chat's, and Keep going is a new chat's, since a campaign
+  // starts from a goal of its own.
+  const start = detail.choices ?? { mode: run.mode, model: run.model, effort: run.effort, approvals: run.approvals, goal_mode: run.goal_mode };
+  // A level chosen while the chat follows the daemon's default model is that model's.
+  const snapshot = getSnapshot();
+  const levelModel = start.model ?? (snapshot.status === null ? "" : snapshot.status.models.main);
+  const levels = new Map(start.effort === null ? [] : [[levelModel, start.effort]]);
+  // Each choice made here is kept for the chat once the one before it was, as the choices are then: the last one made
+  // is the one kept. The level is checked against the model's own, so the models are known first.
+  let keeping = Promise.resolve();
+  function keepChoices() {
+    keeping = keeping.then(() =>
+      attempt(async () => {
+        await choices.ready();
+        await api.patch(`/threads/${run.thread_id}`, { choices: choices.value() });
+      }),
+    );
+  }
   const choices = runChoices({
     frame,
     kept: {
-      mode: run.mode,
-      model: run.model,
+      mode: start.mode,
+      model: start.model ?? "",
       level: {
         // A level the model does not offer is not given: the daemon refuses it (item 116).
         read: (info) => {
@@ -478,12 +495,13 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
           }
         },
       },
-      approvals: heldChoice(run.approvals),
-      goalMode: heldChoice(run.goal_mode),
+      approvals: heldChoice(start.approvals),
+      goalMode: heldChoice(start.goal_mode),
     },
     optionsTitle: "Approvals and goal mode",
     more: () => [],
     onMode: () => input.focus(),
+    onChange: keepChoices,
   });
   frame.options.append(choices.pills.mode, choices.pills.model, choices.pills.reasoning, choices.pills.options);
   const stopStatus = onChange(choices.sync);
