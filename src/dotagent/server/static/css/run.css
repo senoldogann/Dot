@@ -25,18 +25,19 @@
 }
 
 /* The panel's width (item 109, stagesize.js): half of the page, the conversation at its narrowest, or as dragged; never
-   under its own 320 px, and the conversation never under 360. */
+   under its own 320 px, and the conversation never under 360, with the room it leaves the rail of its messages when it
+   leaves one (item 228). */
 .run-layout[data-inspector="on"][data-stage="wide"] {
   --panel-w: minmax(320px, 1fr);
 }
 
 .run-layout[data-inspector="on"][data-stage="full"] {
-  --chat-w: 360px;
+  --chat-w: calc(360px + var(--outline-room, 0px));
   --panel-w: minmax(320px, 1fr);
 }
 
 .run-layout[data-inspector="on"][data-stage="custom"] {
-  --panel-w: clamp(320px, var(--stage-px), calc(100% - 388px));
+  --panel-w: clamp(320px, var(--stage-px), calc(100% - 388px - var(--outline-room, 0px)));
 }
 
 /* A file in the panel (item 195) takes half of the page when the panel has only its own width. */
@@ -130,6 +131,26 @@
    window shows of the conversation, between the stage bar and the dock; it stays there as the conversation scrolls.
    outline.js measures the dock (--dock-h) and sets the column's natural height (--outline-h, 8 px a mark) and width
    (--outline-w, as much of the room at the left of the conversation as it may take). */
+/* Where a pointer rests (outline.js sets data-outline), the conversation leaves the column its room at the left (item
+   228): where the panel beside it or the full chat width would press it against the edge, it gives up that much of its
+   width and stays centred where it can. A window of a phone's width keeps all of it for the text. */
+@media (min-width: 721px) {
+  .run-layout[data-outline="on"] {
+    --outline-room: 44px;
+  }
+
+  .run-layout[data-outline="on"] > .run-main {
+    max-width: min(var(--lane-w), calc(100% - var(--outline-room)));
+    margin-left: max(var(--outline-room), calc((100% - var(--lane-w)) / 2));
+  }
+
+  /* The full chat width has no reading width to centre. */
+  :root[data-chat-width="full"] .run-layout[data-outline="on"] > .run-main {
+    max-width: calc(100% - var(--outline-room));
+    margin-left: var(--outline-room);
+  }
+}
+
 .outline {
   position: fixed;
   z-index: 10;
@@ -149,6 +170,13 @@
   border-radius: var(--radius-xs);
   background: transparent;
   cursor: pointer;
+}
+
+/* The pointer meets the column itself, never what is drawn in it: the marks are drawn again as the conversation
+   changes, and WebKit tells the column nothing more of a pointer whose mark was taken out from under it (no
+   pointerleave, and a click can be lost). */
+.outline-rail > * {
+  pointer-events: none;
 }
 
 .outline-line {

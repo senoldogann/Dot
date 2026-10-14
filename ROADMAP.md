@@ -5163,8 +5163,8 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 224 | A summary's check knows a path however it is written                                 | done        | 109c270 |
 | 225 | A model that declines is said to have declined                                       | done        | 103f5b2 |
 | 226 | A helper's card                                                                      | done        | 0db06a8 |
-| 227 | Previous agents in the side panel                                                    | in progress |         |
-| 228 | The rail of messages beside the docked panel                                         | planned     |         |
+| 227 | Previous agents in the side panel                                                    | done        | b948cd7 |
+| 228 | The rail of messages beside the docked panel                                         | in progress |         |
 | 229 | Commands in the background                                                           | planned     |         |
 | 230 | The composer's keys                                                                  | planned     |         |
 | 231 | Runs go on after a restart                                                           | planned     |         |
@@ -10556,7 +10556,7 @@ level, its state with the time it has run, and what it is doing or did last.
 
 ### 227. Previous agents in the side panel
 
-**Status: in progress.**
+**Status: done.** Merged as `b948cd7` (PR #266; no Linear issue, the Linear connector was signed out).
 
 **As built (2026-10-14).** `GET /api/threads/{id}/helpers` lists the runs a chat's runs started on their behalf, newest
 first (a helper has a thread of its own, so the chat's own list of runs never held them). The side panel's new Agents
@@ -10571,7 +10571,17 @@ time, a few at first and more on demand, and the panel's tabs have icons.
 
 ### 228. The rail of messages beside the docked panel
 
-**Status: planned.**
+**Status: in progress.**
+
+**As built (2026-10-14).** Where a pointer rests and the window is wider than a phone's, the conversation leaves the
+rail of marks 44 px at its left (`run.css`, `--outline-room`): it keeps its reading width and stays centred where there
+is room, and gives up that much of its width where the docked side panel or the full chat width presses it against the
+edge, so the rail shows beside the panel too; beside the panel at its widest the conversation still keeps 360 px, and
+the panel gives up that room. The rail's line and marks take no pointer events: in WebKit, a pointer resting on a mark
+that was drawn again as the conversation changed lost the rail, and the preview stayed after the pointer left. Tests:
+`tests/smoke/test_outline.py`, beside the docked panel at 1280 and 1512 px, on a phone, and a conversation that changes
+under a resting pointer, in Chrome and WebKit; on the code of before, the rail stays hidden beside the panel, and in
+WebKit the preview stays.
 
 **What.** The rail of marks at the conversation's left shows beside the docked side panel too, making room for itself
 instead of hiding.
@@ -11270,3 +11280,4 @@ default model.
 - 2026-10-14 (Opus 5.5): item 224 merged as `109c270` (PR #263; no Linear issue, the connector was signed out): a summary's check knows a path in each of the ways a Mac writes it, `~` or the home folder, `/tmp` or `/private/tmp`.
 - 2026-10-14 (Opus 5.5): item 225 merged as `103f5b2` (PR #264; no Linear issue, the connector was signed out): a review model that declines is said to have declined, naming it, and is not asked again.
 - 2026-10-14 (Opus 5.5): item 226 merged as `0db06a8` (PR #265; no Linear issue, the connector was signed out): resting the pointer on a helper's row, or moving the focus to it, shows a card with its goal, model and level, state, time and current action.
+- 2026-10-14 (Opus 5.5): item 227 merged as `b948cd7` (PR #266; no Linear issue, the connector was signed out): the run page's side panel lists the chat's earlier helpers in an Agents tab, newest first, and its tabs wear SVG icons.

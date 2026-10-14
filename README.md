@@ -1244,8 +1244,8 @@ answer, is below the window, a round arrow just above the composer leads there. 
 of short marks stands for your messages, one mark for each, top to bottom (item 201, after T3 Code's): resting the
 pointer on it shows the message nearest to it and the start of its answer, a click goes to that message, and from the
 keyboard the arrows walk the marks and Enter goes; the marks of the messages in sight are darker. The column needs a
-pointer that rests, two messages or more, and room at the left of the conversation: a phone has none, nor has a page
-whose side panel presses the conversation against its edge. In the side panel (Run details), under Details on the Run
+pointer that rests, two messages or more, and a window wider than a phone's; there, the conversation leaves it its room
+at the left, beside the side panel too (item 228). In the side panel (Run details), under Details on the Run
 tab, **Cost** lists the bill of the run, each value beside its label as in Details: where the minutes went (the model,
 the summaries, the tools, the time spent waiting for you), the steps, the input tokens with the share the provider
 served from its cache, the output tokens, the compactions (with their rate per 100 steps), the runs it delegated and the

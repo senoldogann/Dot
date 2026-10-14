@@ -2,8 +2,8 @@
 // conversation, one for each message the owner wrote, top to bottom as they stand in it. Resting the pointer on the column
 // shows the message nearest to it and the start of its answer, and a click goes to that message; from the keyboard the
 // arrows walk the marks and Enter goes. The marks of the messages in sight stand out, and follow the scroll. The column
-// needs a pointer that rests and room at the left of the conversation: on a phone, or when the side panel presses the
-// conversation against the left edge, it stays away, so that it never covers the text.
+// needs a pointer that rests and a window wider than a phone's: else it stays away. There, the conversation leaves the
+// column its room at the left, beside the side panel too (item 228, run.css), so that it never covers the text.
 
 import { debounce, el } from "./dom.js";
 import { trackHeight } from "./layout.js";
@@ -16,7 +16,7 @@ const SPACING_PX = 8;
 const INSET_PX = 12;
 const WIDTH_PX = 40;
 // With less room than this at the left of the conversation, the column stays away: the inset, a whole mark (24 px) and a
-// little air. Beside the side panel, a window of 1512 px or more leaves 42.
+// little air. The conversation leaves it 44 px (run.css, --outline-room).
 const ROOM_PX = 40;
 // The marks are counted again once the conversation has stopped changing for this long.
 const SETTLE_MS = 150;
@@ -198,8 +198,10 @@ export function messageOutline({ layout, main, thread, dock }) {
     });
   }
 
-  /** Show the column where it has the room it needs at the left of the conversation, as wide as that room lets it. */
+  /** Where a pointer rests, have the conversation leave the column its room (item 228); show the column where it has
+   * that room and something to walk, as wide as the room lets it be. */
   function arrange() {
+    layout.dataset.outline = FINE_POINTER.matches ? "on" : "off";
     const room = main.getBoundingClientRect().left - layout.getBoundingClientRect().left;
     const shown = FINE_POINTER.matches && messages.length >= MIN_MESSAGES && room >= ROOM_PX;
     element.hidden = !shown;

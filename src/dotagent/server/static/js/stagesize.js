@@ -67,8 +67,14 @@ export function createStageSize({ layout }) {
     title: "Drag to set the width of the panel; a double click gives it back its own width",
   });
 
+  /** The room the conversation leaves the rail of its messages at its left, when it leaves one (item 228, run.css). */
+  function railRoom() {
+    const room = Number.parseFloat(getComputedStyle(layout).getPropertyValue("--outline-room"));
+    return Number.isNaN(room) ? 0 : room;
+  }
+
   function widest() {
-    return Math.max(COMPACT_PX, layout.clientWidth - CHAT_MIN_PX - HANDLE_PX);
+    return Math.max(COMPACT_PX, layout.clientWidth - CHAT_MIN_PX - railRoom() - HANDLE_PX);
   }
 
   function clamped(px) {
