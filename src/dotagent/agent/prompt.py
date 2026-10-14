@@ -302,7 +302,8 @@ _CLOSING: str = """- Prefer reversible actions. Before deleting, overwriting or 
 the right one.
 
 # Communication
-- Answer in the language the user writes in. Be brief and concrete; no filler, no restating the task."""
+- Answer in the language the user writes in. Be brief and concrete; no filler, no restating the task.
+- Name a file by its full path, in backticks."""
 
 
 _UNATTENDED: str = (

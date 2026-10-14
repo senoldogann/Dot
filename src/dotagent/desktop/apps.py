@@ -192,6 +192,19 @@ def launch(query: str) -> None:
     raise DesktopError("cannot open the application", {"query": query})
 
 
+def open_document(path: Path) -> None:
+    """Ask Launch Services to open the file at ``path`` in the application the Mac opens it with, as a double click in
+    the Finder does."""
+    outcome: subprocess.CompletedProcess[str] = subprocess.run(
+        ["open", str(path)], capture_output=True, text=True, timeout=_COMMAND_TIMEOUT_S, check=False
+    )
+    if outcome.returncode != 0:
+        raise DesktopError(
+            "the Mac could not open the file",
+            {"path": str(path), "code": outcome.returncode, "stderr": outcome.stderr.strip()},
+        )
+
+
 def open_app(query: str, timeout_s: float) -> AppInfo:
     """The running application ``query`` names, started first when it is not running yet."""
     running: AppInfo | None = find_app(query, list_apps())

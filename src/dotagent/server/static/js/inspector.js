@@ -1,9 +1,11 @@
 // The side panel of the run page: the details and the plan of the run and the screens the agent looked at. On a wide page it
 // sits beside the conversation when the reader wants it (see layout.js); on a narrow page it is a drawer that the button in
-// the header slides in over the conversation.
+// the header slides in over the conversation. A file the conversation carries or names takes the panel while it is open
+// (item 195, filepanel.js).
 
 import { imageUrl } from "./api.js";
 import { el, motionMs } from "./dom.js";
+import { fileView } from "./filepanel.js";
 import { icon } from "./icons.js";
 import { foldCard } from "./panels.js";
 import { setShowInspector, showInspector } from "./layout.js";
@@ -16,9 +18,11 @@ const STRIP_LIMIT = 24;
 
 /**
  * The panel for a run page whose frame is `layout`, with `content` (a list of nodes) above the screens. The frame gets
- * `data-inspector="on"` while the panel sits beside the conversation and `"off"` otherwise. Returns `element` (the panel) and
- * `scrim` (the veil behind the drawer), both to put inside the frame, `toggle` (the header button that shows or hides the
- * panel), `arrange()` (call it once the frame is on the page), `addImage(name)` and `dispose()`.
+ * `data-inspector="on"` while the panel sits beside the conversation and `"off"` otherwise, and `data-file="on"` while a
+ * file takes it. Returns `element` (the panel) and `scrim` (the veil behind the drawer), both to put inside the frame,
+ * `toggle` (the header button that shows or hides the panel), `arrange()` (call it once the frame is on the page),
+ * `addImage(name)`, `showFile(source, opener)` (see `fileView`; `opener` gets the focus back when the file closes) and
+ * `dispose()`.
  */
 export function createInspector({ layout, content }) {
   const names = [];
@@ -148,7 +152,7 @@ export function createInspector({ layout, content }) {
     if (room) {
       drawerOpen = false;
     }
-    const wanted = showInspector();
+    const wanted = showInspector() || file !== null;
     layout.dataset.inspector = room && wanted ? "on" : "off";
     element.dataset.mode = room ? "docked" : "drawer";
     if (room) {
@@ -192,12 +196,62 @@ export function createInspector({ layout, content }) {
   }
 
   function setDrawer(open) {
+    if (!open && file !== null) {
+      closeFile();
+      return;
+    }
     drawerOpen = open;
     arrange();
     (open ? closeButton : toggle).focus();
   }
 
+  // ------------------------------------------------------------------------------------------------- a file
+  // A file takes the panel: beside the conversation, at half of the page when the panel has only its own width, or over
+  // all of a narrow page. Closing it gives the panel back as it was, and the focus to what opened it.
+  let file = null;
+
+  function dropFile() {
+    const dropped = file;
+    if (dropped !== null) {
+      file = null;
+      dropped.view.dispose();
+      dropped.view.element.remove();
+      delete element.dataset.file;
+      delete layout.dataset.file;
+    }
+    return dropped;
+  }
+
+  function showFile(source, opener) {
+    const drawerBefore = file === null ? drawerOpen : file.drawerBefore;
+    dropFile();
+    const view = fileView(source, closeFile);
+    file = { view, opener, drawerBefore };
+    element.append(view.element);
+    element.dataset.file = "on";
+    layout.dataset.file = "on";
+    if (measuredWidth < MIN_WIDTH_PX) {
+      drawerOpen = true;
+    }
+    arrange();
+    view.element.focus({ preventScroll: true });
+  }
+
+  function closeFile() {
+    const dropped = dropFile();
+    if (dropped === null) {
+      return;
+    }
+    drawerOpen = dropped.drawerBefore;
+    arrange();
+    (dropped.opener.isConnected ? dropped.opener : toggle).focus();
+  }
+
   toggle.addEventListener("click", () => {
+    if (file !== null) {
+      closeFile();
+      return;
+    }
     if (measuredWidth >= MIN_WIDTH_PX) {
       setShowInspector(!showInspector());
       arrange();
@@ -206,13 +260,20 @@ export function createInspector({ layout, content }) {
     setDrawer(!drawerOpen);
   });
 
+  // On the window, so that what answers Escape on the page (a menu, a popover) does so first and keeps it.
   function onKey(event) {
-    if (event.key === "Escape" && drawerOpen) {
+    if (event.key !== "Escape" || event.defaultPrevented) {
+      return;
+    }
+    if (file !== null) {
+      event.preventDefault();
+      closeFile();
+    } else if (drawerOpen) {
       setDrawer(false);
     }
   }
 
-  document.addEventListener("keydown", onKey);
+  window.addEventListener("keydown", onKey);
 
   // Only a change of width can change the answer, and the height of the page changes with every event of the run.
   const observer = new ResizeObserver(() => {
@@ -229,9 +290,11 @@ export function createInspector({ layout, content }) {
     toggle,
     arrange,
     addImage,
+    showFile,
     dispose: () => {
+      dropFile();
       observer.disconnect();
-      document.removeEventListener("keydown", onKey);
+      window.removeEventListener("keydown", onKey);
       stopTheme();
     },
   };

@@ -346,6 +346,21 @@ reminder, a resumed run) and, in goal mode, to the goal check.
   `.xls`, `.ppt`) or one locked with a password is refused, saying what to save instead. Anything else is refused at
   upload. The files are kept in `workspace/attachments/`, where the agent's tools can open them; one named like a file
   Dot keeps next to it (`meta.json`, `text.txt`) gets an underscore before its name.
+- A file opens beside the conversation (item 195). A sent file's chip, a file's path an answer names in code (under `~/`
+  or `/Users/<you>/`; Dot names the files it made by their full paths), a file in the side panel's **Files** card (the
+  conversation's files: those its messages carried and those its answers name) and a file the run changed, in
+  **Actions**, open it in the side panel, which takes half of the page while it has its own width, and the whole screen
+  on a phone. A PDF shows its pages as pictures the daemon draws with Core Graphics as they come into view; a workbook,
+  and a CSV or TSV table (split at its commas, or at its semicolons where a comma marks decimals), a grid with a tab for
+  each sheet, a click on a cell saying what it holds (its formula and the value last worked out); a Word document its
+  headings, paragraphs, lists and tables; a presentation its slides with their text, tables, charts' series and notes;
+  an image itself; any other text as text, never as a page. Pictures, shapes and formatting in an Office file are not
+  drawn: **Open on the Mac** opens a document in its application (`open`), never a script or a program. Close or Escape
+  gives the panel back as it was. The panel shows files of the workspace and of the home folder outside hidden folders
+  and outside `~/Library`, but for the folders cloud drives sync (OneDrive's and the others' in
+  `~/Library/CloudStorage`, iCloud Drive's in `~/Library/Mobile Documents`), judged once links are followed; for another
+  file it says why not. The routes are `GET /api/files/preview?path=`, `GET /api/attachments/{id}/preview`,
+  `GET /api/files/page` (a PDF's page as a PNG), `GET /api/files/image` and `POST /api/files/open`.
 
 ## Tools
 

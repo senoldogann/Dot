@@ -41,6 +41,22 @@ function appendChildren(node, children) {
   }
 }
 
+/** The event a button of a file sends up the page to show its file in the panel beside the conversation (item 195). */
+export const OPEN_FILE_EVENT = "dot:open-file";
+/** The buttons of files: each names its file in its data, as `fileSource` reads it. */
+export const FILE_BUTTONS = "button[data-attachment], button[data-path]";
+
+/** The file a button names: `{ attachment, name }` for a file a message carries, `{ path }` for one named by its path. */
+export function fileSource(node) {
+  const { attachment, name, path } = node.dataset;
+  return attachment === undefined ? { path } : { attachment, name };
+}
+
+/** Ask the page to show the file `node` names beside the conversation (filepanel.js). */
+export function requestFile(node) {
+  node.dispatchEvent(new CustomEvent(OPEN_FILE_EVENT, { bubbles: true, detail: fileSource(node) }));
+}
+
 /** Create an HTML element: `el("div", { class: "x" }, "text", childNode)`. */
 export function el(tag, props, ...children) {
   const node = document.createElement(tag);
