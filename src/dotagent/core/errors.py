@@ -82,6 +82,10 @@ class ProviderProtocolError(ProviderError):
     """The provider answered successfully but the payload violated the wire format."""
 
 
+class ProviderRefusedError(ProviderError):
+    """The model declined to answer: its provider ended the reply as a refusal. Asking the same again gets the same."""
+
+
 class ToolInputError(DotError):
     """The model supplied arguments that do not satisfy the tool schema."""
 
