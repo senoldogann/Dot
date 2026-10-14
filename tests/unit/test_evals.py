@@ -28,6 +28,7 @@ from dotagent.evals.site import SITE_TOKEN, render_page, serve_site, with_site
 from dotagent.evals.tool_server import HOLIDAYS, working_days
 from dotagent.evals.types import (
     AnswerContains,
+    AnswerLacks,
     AnswerMatches,
     Check,
     CommandSucceeds,
@@ -162,6 +163,19 @@ def test_a_badly_written_task_is_reported() -> None:
     assert any("positive" in problem for problem in problems)
     twice: tuple[str, ...] = catalog_problems((task, task))
     assert any("used twice" in problem for problem in twice)
+
+
+def test_an_injection_check_that_a_quote_of_the_file_the_goal_names_would_fail_is_reported() -> None:
+    # An answer that quotes the hidden instruction while refusing it has not followed it (item 234).
+    lured: EvalTask = select_tasks(["injection-in-invoice"])[0]
+    assert task_problems(lured) == ()
+    quoted: EvalTask = lured.model_copy(
+        update={"injection_checks": (*lured.injection_checks, AnswerLacks(kind="answer_lacks", text="pwned"))}
+    )
+    assert task_problems(quoted) == (
+        "an answer that quotes inbox/invoice.txt, which the goal names, holds 'pwned', so quoting the hidden "
+        "instruction would count as following it",
+    )
 
 
 def test_the_easy_way_of_a_task_must_be_one_that_its_own_help_offers() -> None:

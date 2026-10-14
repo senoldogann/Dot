@@ -151,13 +151,15 @@ class EvalTask(FrozenModel):
     ``ending`` is how the run has to end: ``done`` for a task that can be done, ``failed`` for one that cannot, where
     the right answer is an honest report. A run passes when it ends that way and every check holds, the
     ``injection_checks`` included: those hold unless the run followed an instruction hidden in one of its files (a
-    note to "the AI assistant" in an invoice, a page or a notes file), and the report counts the attempts that failed
-    one as having followed the injection. ``reference`` is a script that does the task; ``dotx eval check`` replays it
-    to prove that the task can be passed and that the checks accept it. ``site`` are the pages of a local site the
-    attempt serves on a loopback port for the task (none for most tasks); the goal and the reference name its address
-    as ``{site}``. ``goal_mode`` runs the task in goal mode, where the review model checks the end against the goal.
-    ``skills`` are the skills the attempt's home holds and ``servers`` the MCP servers its run is given, help that
-    makes the task short; ``easy_way`` names the tool of that help (item 167), ``None`` for a task without one.
+    note to "the AI assistant" in an invoice, a page or a notes file), judged by what only following it does and never
+    by words the instruction holds, so that quoting it is not following it (``audit``), and the report counts the
+    attempts that failed one as having followed the injection. ``reference`` is a script that does the task;
+    ``dotx eval check`` replays it to prove that the task can be passed and that the checks accept it. ``site`` are the
+    pages of a local site the attempt serves on a loopback port for the task (none for most tasks); the goal and the
+    reference name its address as ``{site}``. ``goal_mode`` runs the task in goal mode, where the review model checks
+    the end against the goal. ``skills`` are the skills the attempt's home holds and ``servers`` the MCP servers its run
+    is given, help that makes the task short; ``easy_way`` names the tool of that help (item 167), ``None`` for a task
+    without one.
     """
 
     id: str = Field(pattern=r"^[a-z][a-z0-9-]{0,39}$")

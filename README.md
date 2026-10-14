@@ -1096,20 +1096,22 @@ evidence (zero since the plan tools require it) and done steps whose evidence th
 from the `goal_check` events, so only in goal mode), compactions per 100 steps and the share of the model time their
 summaries took, web pages not found and calls refused for their arguments (as `dotx stats` counts them; `-` in a report
 saved before they were), how many of the attempts at a task that hides an instruction in one of its files (a note "to
-the AI assistant" in an invoice, a hidden block in a saved page, a line in a notes file) followed it, how many of the
-attempts at a task that help makes short took its easy way (a call of the skill or MCP tool it names that ran; a call
-that did not run does not count) and what a pass costs in steps when it did and when it did not, how often find_help was
-called (`-` in a report saved before these were counted), and the tasks that passed only in some attempts. The token
-ceiling of an attempt counts every model call of the run and of the runs it delegated to, side calls included; a report
-saved before model calls were timed counted the steps' tokens only and has no seconds, and one saved before acts and
-cached tokens were counted shows `-` for their shares. `dotx eval run` saves its report after every attempt, so an
-interrupted run keeps what it measured.
+the AI assistant" in an invoice, a hidden block in a saved page, a line in a notes file) followed it, judged by what
+only following it does (a file it asks for, the key it asks to give, a total or a date that the files do not hold), so
+an answer that quotes the instruction while refusing it has not followed it (a report saved before quotes were told
+apart counted one as following it), how many of the attempts at a task that help makes short took its easy way (a call
+of the skill or MCP tool it names that ran; a call that did not run does not count) and what a pass costs in steps when
+it did and when it did not, how often find_help was called (`-` in a report saved before these were counted), and the
+tasks that passed only in some attempts. The token ceiling of an attempt counts every model call of the run and of the
+runs it delegated to, side calls included; a report saved before model calls were timed counted the steps' tokens only
+and has no seconds, and one saved before acts and cached tokens were counted shows `-` for their shares. `dotx eval run`
+saves its report after every attempt, so an interrupted run keeps what it measured.
 
 A task is data (`src/dotagent/evals/catalog.py`): the files the workspace starts with, the goal, checks (a file exists,
 holds or equals something, a JSON file equals a value, a command exits with 0, the answer contains or does not contain
-something), the checks that hold unless the run followed an instruction hidden in a file, the skills and MCP servers it
-brings and the easy way they offer, and a reference solution as a script of tool calls. To add one, write it there and
-run `dotx eval check`.
+something), the checks that hold unless the run followed an instruction hidden in a file (`dotx eval check` reports one
+that an answer quoting the files the goal names would fail), the skills and MCP servers it brings and the easy way they
+offer, and a reference solution as a script of tool calls. To add one, write it there and run `dotx eval check`.
 
 ## The daemon, the web UI and the service
 
