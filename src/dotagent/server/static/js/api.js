@@ -1,6 +1,5 @@
 // The client of the Dot daemon API: bearer token, JSON requests, server-sent events and images.
 
-import { sleep } from "./dom.js";
 import { toast } from "./ui.js";
 
 const TOKEN_KEY = "dot.token";
@@ -10,6 +9,10 @@ const PROOF_LABEL = "dot daemon proof\n";
 const NONCE_BYTES = 32;
 const RECONNECT_MIN_MS = 500;
 const RECONNECT_MAX_MS = 8000;
+// The daemon writes a keepalive into every stream at least every 15 s (`_KEEPALIVE_S` in server/stream.py): a stream
+// silent for three of them has stopped without closing (a network that changed, a Mac that slept) and is cut, to be
+// followed again (item 200).
+const STALL_MS = 45000;
 // An event the page fails to show, or a read of a page that fails, is logged every time and told at most this often,
 // so a fault that hits every event of a busy run does not bury the page in toasts.
 const NOT_SHOWN_TOLD_EVERY_MS = 10000;
@@ -240,24 +243,39 @@ function parseBlock(block) {
 
 /**
  * Read a server-sent event stream with fetch, so the bearer token travels in a header and not in the URL. `onOpen` is
- * called once the server has taken the stream, before its first event.
+ * called once the server has taken the stream, before its first event. A stream from which nothing came for
+ * `STALL_MS`, not even a keepalive, is cut: the read fails, as for a stream that broke.
  */
 export async function* sse(path, signal, onOpen) {
   await proven();
-  const response = await fetch(`/api${path}`, {
-    headers: { ...authHeaders(), Accept: "text/event-stream" },
-    signal,
-    cache: "no-store",
-  });
-  if (!response.ok) {
-    throw await errorOf(response, path);
+  const cut = new AbortController();
+  const stop = () => cut.abort();
+  signal.addEventListener("abort", stop, { once: true });
+  if (signal.aborted) {
+    stop();
   }
-  onOpen();
-  const reader = response.body.getReader();
-  const decoder = new TextDecoder();
-  let buffer = "";
+  let silence = null;
+  const watch = () => {
+    clearTimeout(silence);
+    silence = setTimeout(() => cut.abort(new ApiError(0, "The stream went silent.", { path })), STALL_MS);
+  };
+  let reader = null;
   try {
+    watch();
+    const response = await fetch(`/api${path}`, {
+      headers: { ...authHeaders(), Accept: "text/event-stream" },
+      signal: cut.signal,
+      cache: "no-store",
+    });
+    if (!response.ok) {
+      throw await errorOf(response, path);
+    }
+    onOpen();
+    reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
     for (;;) {
+      watch();
       const { done, value } = await reader.read();
       if (done) {
         return;
@@ -272,8 +290,37 @@ export async function* sse(path, signal, onOpen) {
       }
     }
   } finally {
-    await reader.cancel().catch(() => undefined);
+    clearTimeout(silence);
+    signal.removeEventListener("abort", stop);
+    if (reader !== null) {
+      await reader.cancel().catch(() => undefined);
+    }
   }
+}
+
+/**
+ * Wait `ms` before a stream is tried again, or less: once the browser is back on the network, or the page back in
+ * view (a Mac that woke), it is tried at once. Ends at once when `signal` aborts.
+ */
+function untilRetry(ms, signal) {
+  return new Promise((resolve) => {
+    const timer = setTimeout(done, ms);
+    function inView() {
+      if (document.visibilityState === "visible") {
+        done();
+      }
+    }
+    function done() {
+      clearTimeout(timer);
+      window.removeEventListener("online", done);
+      document.removeEventListener("visibilitychange", inView);
+      signal.removeEventListener("abort", done);
+      resolve();
+    }
+    window.addEventListener("online", done);
+    document.addEventListener("visibilitychange", inView);
+    signal.addEventListener("abort", done);
+  });
 }
 
 function withAfter(path, after) {
@@ -301,7 +348,8 @@ export function tellOutOfDate(text) {
 
 /**
  * Follow a stream until `isFinished(message)` says so or `signal` aborts, reconnecting from the last event seen.
- * A rejected token or a missing resource ends the loop with the error; anything else is retried with a growing pause.
+ * A rejected token or a missing resource ends the loop with the error; anything else is retried with a pause that
+ * grows while the stream cannot be made and starts again from the shortest once it is (`untilRetry`).
  * The stream is said to be live once the server has taken it, and reconnecting when it broke or could not be made.
  * A fault of the page in showing one event is not a break of the stream: it is told, and the next event comes.
  */
@@ -310,8 +358,11 @@ export async function follow({ path, after, signal, onMessage, onState, isFinish
   let pause = RECONNECT_MIN_MS;
   while (!signal.aborted) {
     try {
-      for await (const message of sse(withAfter(path, lastId), signal, () => onState("live"))) {
+      const opened = () => {
         pause = RECONNECT_MIN_MS;
+        onState("live");
+      };
+      for await (const message of sse(withAfter(path, lastId), signal, opened)) {
         lastId = Math.max(lastId, message.id);
         try {
           onMessage(message);
@@ -335,7 +386,7 @@ export async function follow({ path, after, signal, onMessage, onState, isFinish
       return;
     }
     onState("reconnecting");
-    await sleep(pause, signal);
+    await untilRetry(pause, signal);
     pause = Math.min(pause * 2, RECONNECT_MAX_MS);
   }
 }

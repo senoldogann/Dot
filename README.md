@@ -1082,12 +1082,16 @@ Both follow the lifecycle stream, so a run moves between the sections the moment
 ends. The stream replays nothing after a break of the connection (the network dropped, the daemon restarted), so once it
 is back every page that follows it, the run's page and its queue among them, reads again what it shows; so does every
 page when the stream fell so far behind that events were lost (`resync`). A page that cannot read again keeps what it
-showed and says so. The rules page reads its rules again when one is added, switched or deleted on another page. A page
-loaded before Dot was updated says so in a banner, with **Load again**: the daemon's status tells what the pages it
-serves are (`pages`, a digest of their files at its start), and the page compares it with what it was loaded from. A run
-delegated by another run sits under the run that delegated it, in both the sidebar and the Activity page, with its steps
-so far and its channel; the parent's row says how many runs it delegated. In the chat, the delegated run's card carries
-a chip with its progress ("step 3 · web_fetch", then "done · 12 steps") and an **open** link to the run's own page.
+showed and says so. A stream from which nothing came for 45 seconds, not even the keepalive the daemon writes every 15,
+has stopped without closing (a network that changed, a Mac that slept): the page cuts it and makes it again (item 200).
+Between tries the page waits half a second, then longer, up to 8 seconds, and from half a second again once a stream is
+made; a page that comes back into view, or a browser back on the network, tries at once. The rules page reads its rules
+again when one is added, switched or deleted on another page. A page loaded before Dot was updated says so in a banner,
+with **Load again**: the daemon's status tells what the pages it serves are (`pages`, a digest of their files at its
+start), and the page compares it with what it was loaded from. A run delegated by another run sits under the run that
+delegated it, in both the sidebar and the Activity page, with its steps so far and its channel; the parent's row says
+how many runs it delegated. In the chat, the delegated run's card carries a chip with its progress ("step 3 ·
+web_fetch", then "done · 12 steps") and an **open** link to the run's own page.
 
 **New chat** is Dot's presence and one composer, standing in the middle of the space under the top bar, across and down,
 however long the day under them is. The face is Dot's character, moving (idle with a wink now and then; a still frame
@@ -1436,8 +1440,9 @@ the agent itself.
   starts it, and opens the UI by itself when the daemon answers. When the shell could not read one of those files, that
   page and the menu bar item's tip say which and why instead, and the shell guesses no address: a `config.toml` that is
   not valid TOML, with the line and column of the fault; a file it may not read, in the system's words; no token file
-  yet, which the daemon makes the first time it starts. The window leaves the UI for that page only after three polls in
-  a row go unanswered, so one slow answer of a busy daemon does not throw the open page away.
+  yet, which the daemon makes the first time it starts. The window leaves the UI for that page only after ten polls in
+  a row go unanswered (item 200): a restart of the daemon, a few seconds, and one slow answer of a busy daemon leave the
+  open page, which says that it reconnects and reads again what changed once the daemon is back.
 - **The menu bar item** is Dot's mark in the state of the whole of Dot (looking at you at rest, glancing up while a
 run works, a blue pastille while something waits for you) with the count of what waits for you beside it, read from
 `GET /api/activity/count` every second. A click opens the window; the menu has Open Dot, New chat and Quit. Closing the
@@ -1489,7 +1494,10 @@ needs to reach the Mac, and a push needs a secure address, so the way there is y
    and go when their push service says they are gone. Settings › General › Notifications off drops the subscription.
 
 The service worker (`sw.js`) keeps the shell files as a fallback for when the Mac is out of reach and caches nothing
-under `/api`. Without Tailscale, the same works on the Mac itself (`localhost` counts as secure) and on nothing else.
+under `/api`. A page loaded from them while the daemon is out of reach says so and tries again by itself (item 200):
+after 2 seconds, then twice as long each time up to 30, and at once when the browser is back on the network or the page
+back in view, until the daemon answers. Without Tailscale, the same works on the Mac itself (`localhost` counts as
+secure) and on nothing else.
 
 ## Browser use
 

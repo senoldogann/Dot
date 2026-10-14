@@ -36,9 +36,10 @@ const TRAY: &str = "main";
 const DOWN_PAGE: &str = "down.html";
 const POLL: Duration = Duration::from_secs(1);
 const REQUEST_TIMEOUT: Duration = Duration::from_millis(800);
-/// Polls in a row the daemon may leave unanswered before the window leaves the UI for the down page: one slow answer
-/// of a busy daemon does not throw the open page away.
-const MISSES_BEFORE_DOWN: u32 = 3;
+/// Polls in a row the daemon may leave unanswered before the window leaves the UI for the down page (item 200): a
+/// restart of the daemon, one to six seconds from its stop to its start, and one slow answer of a busy daemon leave the
+/// open page as it is, which says that it reconnects and reads again what changed once the daemon is back.
+const MISSES_BEFORE_DOWN: u32 = 10;
 const DEFAULT_HOST: &str = "127.0.0.1";
 const DEFAULT_PORT: u16 = 8765;
 const CONFIG_FILE: &str = "config.toml";
@@ -464,6 +465,11 @@ fn open_ui(app: &AppHandle, daemon: &Daemon) {
     open(app, &ui_url(daemon));
 }
 
+/// Whether the window leaves the UI for the down page after `misses` polls in a row that did not count.
+fn leaves_ui(misses: u32) -> bool {
+    misses >= MISSES_BEFORE_DOWN
+}
+
 /// Every second: the count for the menu bar item, and the window's page when the daemon comes or goes or what keeps
 /// the shell from it changes. `shown` is the page `setup` opened: the window leaves the UI after `MISSES_BEFORE_DOWN`
 /// polls in a row that did not count, and opens it again at the first that does.
@@ -499,7 +505,7 @@ fn watch(app: AppHandle, shown: Shown) {
                 let _ = tray.set_tooltip(Some(tip));
             }
             shown = match (shown, daemon) {
-                (Shown::Ui, _) if misses < MISSES_BEFORE_DOWN => Shown::Ui,
+                (Shown::Ui, _) if !leaves_ui(misses) => Shown::Ui,
                 (Shown::Down(_), Some(daemon)) if counted => {
                     open_ui(&app, &daemon);
                     Shown::Ui
@@ -879,6 +885,14 @@ mod tests {
                 error: EMPTY_TOKEN.to_string()
             })
         );
+    }
+
+    #[test]
+    fn a_restart_of_the_daemon_leaves_the_open_page_and_a_daemon_gone_for_longer_does_not() {
+        // The longest stop of the daemon to its start in its own log, as the shell's polls see it: one a second.
+        let restart_polls: u32 = 6;
+        assert!((0..=restart_polls).all(|misses| !leaves_ui(misses)));
+        assert!(leaves_ui(MISSES_BEFORE_DOWN));
     }
 
     #[test]

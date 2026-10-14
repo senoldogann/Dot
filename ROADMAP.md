@@ -5135,8 +5135,8 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 196 | Dot knows its way around Word, Excel and OneDrive on the Mac                         | planned     |         |
 | 197 | A stopped run stops the runs it delegated, and their rows stop                       | done        | 0b3a7d4 |
 | 198 | The side menu shows every agent of a run, folded under it                            | done        | dee248f |
-| 199 | The default model is chosen in Settings, and a chat keeps its model                  | in progress |         |
-| 200 | Reconnecting, checked end to end                                                     | planned     |         |
+| 199 | The default model is chosen in Settings, and a chat keeps its model                  | done        | de8069e |
+| 200 | Reconnecting, checked end to end                                                     | in progress |         |
 | 201 | Marks of the conversation's messages: a look and a jump, after T3 Code               | planned     |         |
 | 202 | The side menu, designed again                                                        | planned     |         |
 | 203 | The run's side panel, designed again                                                 | planned     |         |
@@ -9779,7 +9779,7 @@ worked, those that ended with how they ended. The run's row folds them, and keep
 
 ### 199. The default model is chosen in Settings, and a chat keeps its model
 
-**Status: in progress.**
+**Status: done.** Merged as `de8069e` (PR #238; no Linear issue, the Linear connector was signed out).
 
 **As built (2026-10-14).** Settings › Models opens with **Default model**, a menu of the models that can call tools (as
 the composer offers them) and of the default one, listed or not. A pick is `POST /api/models/main`: the provider is
@@ -9807,7 +9807,31 @@ of the app or of the daemon.
 
 ### 200. Reconnecting, checked end to end
 
-**Status: planned.**
+**Status: in progress.**
+
+**As built (2026-10-14).** Every way a page loses the daemon was tried against a real server, stopped and started again
+at its address. A page open while the daemon restarts came back by itself already (item 160) and still does: it says
+that it reconnects, is live again once the daemon is back and reads what changed, without loading again. Three ways did
+not. A page loaded while the daemon is down, from the service worker's copy of the shell as a phone has it, said that
+the daemon ran but could not answer (an error without a status, which nothing that is the daemon answered, was taken for
+the daemon's answer) and waited for a click; it now says that it cannot reach the daemon and tries again by itself,
+after 2 seconds, then twice as long each time up to 30, and at once when the browser is back on the network or the page
+back in view, saying when, with **Try again** kept. A stream that stopped without closing, as a network that changed or
+a Mac that slept leaves one, stayed silent and the page took it for live; the daemon writes a keepalive into every
+stream every 15 seconds, and a stream from which nothing came for 45 is now cut and made again from its last event,
+after which the page reads what changed. The pause between tries, half a second growing to 8, started from the shortest
+again only once an event came; it now does once a stream is made, and a page back in view or a browser back on the
+network tries at once. The desktop window left the UI for its down page after three polls without an answer, so a
+restart of the daemon (one to six seconds) loaded the page again; it now waits for ten, and the open page reconnects by
+itself. The memory and skills pages read once and follow no stream, and they hold open editors that a read would wipe:
+they are left as they were. Tests: `tests/smoke/test_reconnect.py`, a real server in Chrome: a restart with a page open;
+a page loaded from the service worker's copy while the daemon is down, at 1280 px light and 390 px dark; a page back in
+view and a browser back on the network, each in the middle of its longest pause; a stream through a proxy that stops
+passing its bytes without closing them. On the code of before, the page loaded while the daemon was down said that it
+ran and waited, the page back in view waited for its pause to end, and the silent stream was never cut; the restart
+passed there too. A Rust test for the desktop window fails with three polls. It passed in WebKit too, where a font the
+page had not used before the daemon went down, which no copy holds, is told as an error of the page; the page shows the
+system's own.
 
 **What.** Every way a page loses the daemon is tried and comes back by itself: a restart of the daemon, a stream that
 drops, the app opened while the daemon is down, the Mac waking from sleep. A page that reads nothing again after a break
@@ -10472,3 +10496,4 @@ cost, the plan, the files, the actions and the screens. Screenshots looked at, w
 - 2026-10-14 (Opus 5.5): part 32, runs that stop whole, every agent in the side menu, a model that stays, is planned (items 197 to 203); item 196 of part 31 follows its defects (197 to 200).
 - 2026-10-14 (Opus 5.5): item 197 merged as `0b3a7d4` (PR #236; no Linear issue, the connector was signed out): A run that is stopped stops the runs it delegated and stores its end after theirs, so the rows of those runs end on its page; a restart and a dead command's close store the same order, and a run stored the other way shows its rows ended from the database.
 - 2026-10-14 (Opus 5.5): item 198 merged as `dee248f` (PR #237; no Linear issue, the connector was signed out): The side menu shows every run a run at work delegated, those that ended too, folded under a line that says how many there are and how many work; the fold is kept, and Activity shows them under the run as well.
+- 2026-10-14 (Opus 5.5): item 199 merged as `de8069e` (PR #238; no Linear issue, the connector was signed out): The default model is chosen in Settings › Models and starts the runs that name none at once; a chat keeps what its composer chose, through a reload, another browser and a move of its run to a standby model.
