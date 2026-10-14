@@ -5151,8 +5151,8 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 212 | A provider that is not running answers at once                                       | done        | d6f90eb |
 | 213 | Tests: a bare pytest, and every offline smoke test in CI                             | done        | e73a257 |
 | 214 | The redactor knows more kinds of secrets                                             | done        | 3347d33 |
-| 215 | Small hardenings after the review                                                    | in progress |         |
-| 216 | The README says what leaves this Mac                                                 | planned     |         |
+| 215 | Small hardenings after the review                                                    | done        | 58e159f |
+| 216 | The README says what leaves this Mac                                                 | in progress |         |
 | 217 | A weekly audit of the dependencies                                                   | planned     |         |
 
 ### 77. The type system: Inter and Geist Mono, seven sizes, three weights
@@ -10273,7 +10273,7 @@ like one are left alone, and no pattern tries a long run of words against the wh
 
 ### 215. Small hardenings after the review
 
-**Status: in progress.**
+**Status: done.** Merged as `58e159f` (PR #254; no Linear issue, the Linear connector was signed out).
 
 **As built (2026-10-14).** Four small changes the review suggested. The macOS tools Dot runs itself are named by their
 paths (`security`, `open`, `osascript`, `lsappinfo`, as `launchctl` and the others already were), and the daemon's PATH
@@ -10289,7 +10289,15 @@ files of applications whose path was written in another case.
 
 ### 216. The README says what leaves this Mac
 
-**Status: planned.**
+**Status: in progress.**
+
+**As built (2026-10-14).** The README's opening paragraph sends the reader to a new section before Safety, What leaves
+this Mac. Dot sends nothing to the people who make it (no telemetry, no crash report, no check for updates); what leaves
+is what a run needs, where the configuration points: the run's conversation to the models (by default Ollama's cloud
+models, through the Ollama server of this Mac), each note and search of the memory to the embedding model, the query to
+the search engines, the requests to the sites a run visits, whatever a shell command sends, the texts TypeSafe judges
+once its key is saved, a line to a phone whose notifications are on, and what the tools of MCP servers and plugins are
+given. It ends with what stays on the Mac and how to keep a run's conversation here too. README only.
 
 **What.** The README says in one place what leaves this Mac and where it goes: the models in the cloud by default, what
 is sent to them, and how to keep it on the Mac.
@@ -10954,3 +10962,4 @@ is sent to them, and how to keep it on the Mac.
 - 2026-10-14 (Opus 5.5): item 212 merged as `d6f90eb` (PR #251; no Linear issue, the connector was signed out): a provider on this Mac that is not running (Ollama) answers at once: the model list, `dotx models` and the doctor say so without the retries.
 - 2026-10-14 (Opus 5.5): item 213 merged as `e73a257` (PR #252; no Linear issue, the connector was signed out): a bare `pytest` collects every test without an error, and CI runs every smoke test that needs no service, chosen by its marks.
 - 2026-10-14 (Opus 5.5): item 214 merged as `3347d33` (PR #253; no Linear issue, the connector was signed out): the redactor knows the keys and tokens of more services, private keys, Basic credentials, a URL's password and more names of `key=value`.
+- 2026-10-14 (Opus 5.5): item 215 merged as `58e159f` (PR #254; no Linear issue, the connector was signed out): the macOS tools Dot runs itself are named by their paths, an IPv6 address that carries an IPv4 one is judged by it in each form, the file panel tells `~/Library` and the workspace apart whatever the case of a path, and a notification opens only the page's own routes.

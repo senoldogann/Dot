@@ -11,7 +11,8 @@ REST API.
 
 By default Dot acts without asking. It stops for what it must not decide alone (money, credentials, public posts,
 messages sent for you, privilege, system settings), everything it does is recorded, and it can be stopped at once. Read
-[Safety](#safety) before you let it work on a machine that holds data you care about.
+[Safety](#safety) before you let it work on a machine that holds data you care about, and
+[What leaves this Mac](#what-leaves-this-mac): by default its models run on Ollama's servers.
 
 ## Requirements
 
@@ -475,6 +476,46 @@ other than Ctrl-C, Ctrl-U) leaves a line Dot cannot tell, and running it asks; o
 in another directory, so later lines are judged from the home folder. A chat keeps at most `[shell] terminal_sessions`
 sessions open (3; 0 removes the tools), each closed after `terminal_idle_s` without use (30 minutes) and all of them
 when the daemon stops; the end of a run closes none, so a server it started stays up for the next message.
+
+## What leaves this Mac
+
+Dot sends nothing to the people who make it: there is no telemetry, no crash report and no check for updates. What
+leaves the Mac is what a run needs, sent where the configuration points:
+
+- **To the models: the run's conversation.** Each call sends the goal, the messages, what the tools returned (the text
+  of the files and pages the run read, what commands printed) and the screenshots the run takes or is given. By default
+  every role (`main`, `vision`, `fast`, `review`) is a cloud model of Ollama: the Ollama server on this Mac passes each
+  call on to Ollama's servers once it is signed in. Dot's own work on what its runs did goes there too: lessons,
+  playbooks and the nightly reflection to `review`, the shortening of a long run's conversation to `fast`. OpenAI,
+  OpenCode Go and Anthropic get it only when a role, a helper or a standby model names one of their models (see
+  [Models and providers](#models-and-providers)).
+- **To the embedding model: each note and each search of the memory.** It is Ollama's `bge-m3` on this Mac by default;
+  with `[memory] embed_provider = "openai"` the texts go to OpenAI (see [Memory](#memory)).
+- **To the search engines: the query.** The `[web] search_backend` ladder asks Ollama's hosted search when
+  `OLLAMA_API_KEY` is saved, then DuckDuckGo and Brave Search, then DuckDuckGo in Dot's own Chrome; Anthropic's search
+  (relayed by `[models] search`) joins when `ANTHROPIC_API_KEY` is saved, and `[web] anthropic_search = "off"` leaves it
+  out.
+- **To the sites a run visits: its requests.** The web tools fetch public addresses only, unless
+  `[web] allow_private_hosts` allows more; Dot's browser carries the cookies of its profile (Dot's own, or your Chrome's
+  when it is attached). `web_extract` sends what it read to the `fast` model, and a page a run shows in the conversation
+  loads its libraries from public CDNs (see [Tools](#tools)).
+- **From the shell: whatever a command sends.** The sandbox closes Dot's own files, not the network; a run that has read
+  untrusted content asks before a line that sends data out (see [Safety](#safety)).
+- **To TypeSafe, once its key is saved: the texts it judges.** `judge_items` and the tools of posts and campaigns send
+  the texts they judge; with `[judge] provider = "typesafe"` the judge of clicks and checks sends what it judges (a
+  button's words, the page's address without its query, its title and visible text). `[judge] provider` is `"none"` by
+  default.
+- **To a phone, once you turn its notifications on: a line.** A title, up to 140 characters of the question or the
+  result and the page to open, encrypted for that phone's browser and carried by its maker's push service (see
+  [Dot on the phone](#dot-on-the-phone)).
+- **To MCP servers and plugins: what their tools are given.** A server's own process reaches what it reaches; none is
+  set up by default (see [MCP servers](#mcp-servers)).
+
+The record of the runs, the notes, the logs and the screenshots stay on this Mac in Dot's folders (see
+[Configuration](#configuration)), and a key goes only to its own service. To keep a run's conversation here too, give
+every role a model of the Ollama server on this Mac (one whose name has no `cloud`), leave the helpers and standby
+models empty or local, and keep the embeddings on Ollama; the searches and pages a run asks for still go to the sites it
+reaches (item 216).
 
 ## Safety
 
