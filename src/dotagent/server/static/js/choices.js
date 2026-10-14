@@ -2,8 +2,9 @@
 // and the Options (approvals and goal mode), each with its menu. The home's box and a chat's dock (item 133) both wear
 // them; where they start and where a choice is kept is the box's own (`kept`): this browser's on the home, the chat's
 // on a chat's page, which the daemon keeps for its next follow-up (item 199). The model's menu is modelpicker.js
-// (item 208).
+// (item 208), which makes the daemon's default too (item 209).
 
+import { api } from "./api.js";
 import { composerPill } from "./composer.js";
 import { el, modelName } from "./dom.js";
 import { allModels, levelLabel, offersChoice } from "./efforts.js";
@@ -12,7 +13,8 @@ import { modelPicker } from "./modelpicker.js";
 import { anchoredPopover } from "./popover.js";
 import { providerMark, providerOf } from "./providers.js";
 import { approvalLabel, approvalsPicker, goalModePicker } from "./runmodes.js";
-import { getSnapshot, loadModels } from "./state.js";
+import { getSnapshot, loadModels, refresh } from "./state.js";
+import { attempt, toast } from "./ui.js";
 
 export const MODES = [
   { id: "task", label: "Task", hint: "Carry the goal out end to end on this Mac", icon: "target" },
@@ -213,8 +215,23 @@ export function runChoices({ frame, kept, optionsTitle, more, onMode, onChange }
     ];
   }
 
+  // The daemon's default, made from the model's menu as from the Settings (item 209): told as made, or why it was not;
+  // resolves to whether the daemon took it. The chat keeps its own model; a chat that follows the default moves with it.
+  async function makeDefault(ref) {
+    try {
+      await api.post("/models/main", { model: ref });
+    } catch (error) {
+      console.error("the default model could not be changed", error);
+      toast("error", error.message);
+      return false;
+    }
+    toast("ok", `New chats start on ${modelName(ref)}.`);
+    await attempt(refresh);
+    return true;
+  }
+
   // The model's menu (item 208): the favourites and the providers on a rail, a search, a star on each model.
-  const picker = modelPicker({ onPick: pickModel });
+  const picker = modelPicker({ onPick: pickModel, onMakeDefault: makeDefault });
   const modelMenu = anchoredPopover({
     anchor: modelPill.element,
     frame: frame.element,

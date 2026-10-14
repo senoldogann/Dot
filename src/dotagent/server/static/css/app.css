@@ -2200,6 +2200,52 @@ a.pill:hover {
   font-size: var(--text-sm);
 }
 
+/* Change, on the default's row, and Cancel while the list chooses the default (item 209): words, as a ghost button. */
+.model-change {
+  flex: none;
+  min-height: 28px;
+  padding: 0 var(--space-2);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-2);
+  font: inherit;
+  font-size: var(--text-sm);
+  cursor: pointer;
+}
+
+.model-change:hover {
+  background: var(--surface-2);
+  color: var(--text);
+}
+
+/* While the list chooses the default: a tinted bar under the search says so. */
+.model-choosing {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0 var(--space-2) var(--space-1);
+  padding: var(--space-1) var(--space-1) var(--space-1) var(--space-3);
+  border-radius: var(--radius-sm);
+  background: var(--accent-weak);
+  color: var(--text);
+  font-size: var(--text-sm);
+}
+
+.model-choosing[hidden] {
+  display: none;
+}
+
+.model-choosing-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.model-choosing .model-change:hover {
+  background: var(--surface);
+}
+
 .slash-option {
   display: flex;
   align-items: baseline;

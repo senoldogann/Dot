@@ -1127,7 +1127,11 @@ pick or Escape or a click outside closes it. The model's menu (item 208, after T
 for the favourites and the mark of each provider, that shows the favourites or one provider's models; a search over the
 models of every provider, which has the keys as the menu opens and reads names, providers and "free"; and on each model
 a star that keeps it among the favourites in that browser, where the menu opens once there are any. The arrows and Enter
-pick a model, ⌘1 to ⌘9 the rows that show those keys, and ⌘D stars the row the keys are on. What you typed and attached
+pick a model, ⌘1 to ⌘9 the rows that show those keys, and ⌘D stars the row the keys are on. The default's row, the first
+of every view, has **Change** (item 209): the list then chooses the model new chats start on, a bar under the search
+says so and the default has the tick, and the model picked (by a click, Enter or ⌘1 to ⌘9) becomes the default, as in
+Settings › Models; the menu goes back to the chat's model and stays open. A chat that has a model of its own keeps it,
+and one that follows the default moves with it. Escape or Cancel goes back without a change. What you typed and attached
 and did not send is kept in this browser and is there again when you come back (so is the box of each run). Dot's face
 looks down at the box while you write and brightens when you send. Enter starts the run, Shift+Enter adds a line. The
 markdown in the box shows as it reads (item 207, after T3 Code's composer): its marks (a heading's hashes, a list's
@@ -1249,15 +1253,15 @@ that one change back once the run has ended (`POST /api/runs/{id}/undo`); the se
 **Settings** (`#/settings`) is one page with tabs: **General** (Dot's name and yours, Dot's own look, desktop
 notifications and the token this browser is signed in with), **Appearance** (the look of this browser, below),
 **Models** (the **Default model** first, a menu of the models that can call tools: the runs that name no model, a new
-chat's among them, start on the one chosen at once, and `config.toml` keeps it as `[models] main`; then one fold per
-provider, with the reasoning levels of each model and a menu to choose one; a provider without a key, or whose key was
-refused (HTTP 401), says so and links to API keys, and one that refused access (HTTP 403) says that, with its words),
-**API keys** (the key of each provider; see [Models and providers](#models-and-providers)), **Browser** (which Chrome
-Dot browses with and what Chrome has to allow first; see [Browser use](#browser-use)), **Rules**, **Memory**,
-**Skills**, **Schedules** and **System** (the daemon, the emergency stop and the health checks in a fold, closed, with
-the number of failures on its line). Which folds are open is kept in the browser. The tabs sit beside their content when
-the window has the room and above it otherwise; the earlier addresses of the memory, schedules, rules and system pages
-lead to their tabs.
+chat's among them, start on the one chosen at once, and `config.toml` keeps it as `[models] main`, as when it is changed
+from the composer's model menu; then one fold per provider, with the reasoning levels of each model and a menu to choose
+one; a provider without a key, or whose key was refused (HTTP 401), says so and links to API keys, and one that refused
+access (HTTP 403) says that, with its words), **API keys** (the key of each provider; see [Models and
+providers](#models-and-providers)), **Browser** (which Chrome Dot browses with and what Chrome has to allow first; see
+[Browser use](#browser-use)), **Rules**, **Memory**, **Skills**, **Schedules** and **System** (the daemon, the emergency
+stop and the health checks in a fold, closed, with the number of failures on its line). Which folds are open is kept in
+the browser. The tabs sit beside their content when the window has the room and above it otherwise; the earlier
+addresses of the memory, schedules, rules and system pages lead to their tabs.
 
 Settings › Appearance (⌥⌘A), after T3 Code's page, holds the look of this browser. **Colour scheme** is three cards,
 each a miniature of Dot's window drawn in the scheme it names: System (the default, split down the middle), Light and

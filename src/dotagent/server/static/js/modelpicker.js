@@ -4,6 +4,7 @@
 // home's choices are; the menu opens on them when there are any, else on the provider of the model a run would use.
 // The focus stays in the search: the arrows move the active row, Enter picks it, ⌘1 to ⌘9 pick the rows that show
 // those keys, ⌘D stars the active row, and the left arrow (on an empty search) goes to the rail, the right arrow back.
+// The default's row has Change (item 209): the list then chooses the daemon's default instead of the chat's model.
 
 import { el, foldSearch, modelName } from "./dom.js";
 import { icon } from "./icons.js";
@@ -130,10 +131,13 @@ function keepFocus(event) {
  * The model menu of one composer, for `anchoredPopover`: `build({ groups, chosen, fallback })` returns its content, where
  * `groups` are the models runs can use, by provider (`{ provider, models }`), `chosen` the reference picked ("" for the
  * daemon's default) and `fallback` the daemon's default (null while it is not known); `onPick(ref)` runs when a row is
- * picked ("" for the default). A menu opened anew starts on its opening view with an empty search; one built again
- * while it is open (a repaint) keeps its search and its view.
+ * picked ("" for the default). Change, on the default's row, turns the list to choosing the daemon's default: a row
+ * picked then goes to `onMakeDefault(ref)`, which resolves to whether the daemon took it, and the list goes back to the
+ * chat's model once it did; Escape or Cancel goes back at once, and the menu stays open. A menu opened anew starts on
+ * its opening view with an empty search, choosing the chat's model; one built again while it is open (a repaint) keeps
+ * its search, its view and what it chooses.
  */
-export function modelPicker({ onPick }) {
+export function modelPicker({ onPick, onMakeDefault }) {
   made += 1;
   const listId = `model-list-${made}`;
   let query = "";
@@ -142,12 +146,19 @@ export function modelPicker({ onPick }) {
   let guessed = false;
   // The menu as last built: no longer on the page once the menu has closed.
   let root = null;
+  // Whether the list chooses the daemon's default instead of the chat's model, and the model being made the default
+  // (null while none is).
+  let choosingDefault = false;
+  let making = null;
+  // Paints the menu as last built again, while it is open: what a default being made ended in.
+  let repaintBuilt = () => undefined;
 
   function build({ groups, chosen, fallback }) {
     const views = [FAVOURITES, ...groups.map((group) => group.provider)];
     const anew = root === null || !root.isConnected;
     if (anew) {
       query = "";
+      choosingDefault = false;
     }
     if (anew || guessed || !views.includes(view)) {
       view = openingView(groups, readFavourites(), chosen === "" ? fallback : chosen);
@@ -250,6 +261,59 @@ export function modelPicker({ onPick }) {
       paintStar(row.star, starred);
     }
 
+    // The model the tick is on: the chat's, or the daemon's default while the list chooses it.
+    function tickedRef() {
+      return choosingDefault ? fallback : chosen;
+    }
+
+    // A row picked: the chat's model, or the daemon's default while the list chooses it.
+    function pickRow(ref) {
+      if (choosingDefault) {
+        makeDefault(ref);
+      } else {
+        onPick(ref);
+      }
+    }
+
+    function chooseDefault() {
+      choosingDefault = true;
+      paintList();
+      if (keyboard) {
+        search.focus();
+      }
+    }
+
+    function leaveChoosing() {
+      choosingDefault = false;
+      paintList();
+      if (keyboard) {
+        search.focus();
+      }
+    }
+
+    // One default is made at a time; the list says which while the daemon takes it.
+    function makeDefault(ref) {
+      if (making !== null) {
+        return;
+      }
+      if (ref === fallback) {
+        leaveChoosing();
+        return;
+      }
+      making = ref;
+      paintList();
+      Promise.resolve(onMakeDefault(ref))
+        .then((taken) => {
+          if (taken) {
+            choosingDefault = false;
+          }
+        })
+        .finally(() => {
+          making = null;
+          repaintBuilt();
+        });
+    }
+
     function optionOf({ lead, label, hint, key, ref }) {
       const index = rows.length;
       const option = el(
@@ -260,14 +324,14 @@ export function modelPicker({ onPick }) {
           role: "option",
           id: `${listId}-${index}`,
           tabindex: "-1",
-          "aria-selected": String(ref === chosen),
+          "aria-selected": String(ref === tickedRef()),
           onmousedown: keepFocus,
           onpointermove: () => {
             if (active !== index) {
               setActive(index);
             }
           },
-          onclick: () => onPick(ref),
+          onclick: () => pickRow(ref),
         },
         lead,
         el("span", { class: "pop-option-text" }, el("span", null, label), hint === "" ? null : el("span", { class: "pop-option-hint" }, hint)),
@@ -279,6 +343,7 @@ export function modelPicker({ onPick }) {
       return row;
     }
 
+    // The default's row, with Change, which turns the list to choosing the default (once the default is known).
     function defaultRow() {
       const { option } = optionOf({
         lead: providerMark(fallback === null ? "" : providerOf(fallback)),
@@ -287,7 +352,29 @@ export function modelPicker({ onPick }) {
         key: null,
         ref: "",
       });
-      return el("div", { class: "model-row", role: "none" }, option, el("span", { class: "model-star-room", "aria-hidden": "true" }));
+      const change =
+        fallback === null
+          ? el("span", { class: "model-star-room", "aria-hidden": "true" })
+          : el(
+              "button",
+              { class: "model-change", type: "button", title: "Choose the model new chats start on", onmousedown: keepFocus, onclick: chooseDefault },
+              "Change",
+            );
+      return el("div", { class: "model-row", role: "none" }, option, change);
+    }
+
+    // While the list chooses the default: what it does, or the model being made the default, and the way back.
+    const choosingText = el("span", { class: "model-choosing-text", "aria-live": "polite" });
+    const choosing = el(
+      "div",
+      { class: "model-choosing", hidden: true },
+      choosingText,
+      el("button", { class: "model-change", type: "button", onmousedown: keepFocus, onclick: leaveChoosing }, "Cancel"),
+    );
+
+    function paintChoosing() {
+      choosing.hidden = !choosingDefault;
+      choosingText.textContent = making === null ? "Choose the default model" : `Making ${modelName(making)} the default…`;
     }
 
     // A model's row: in a view of one provider its name, and "Free" when it costs nothing; among the favourites and in a
@@ -308,8 +395,8 @@ export function modelPicker({ onPick }) {
     }
 
     // The rows of the search, or of the view when there is none: the default's row first (in a search only when its
-    // words match), then the models, the first nine with their keys. A row starred or not stays where it is until the
-    // list is shown again.
+    // words match; never while the list chooses the default), then the models, the first nine with their keys. A row
+    // starred or not stays where it is until the list is shown again.
     function paintList() {
       const words = foldSearch(query)
         .split(/\s+/)
@@ -317,10 +404,11 @@ export function modelPicker({ onPick }) {
       const searching = words.length > 0;
       const favourites = readFavourites();
       const entries = searching ? foundEntries(groups, words, favourites) : viewEntries(groups, view, favourites);
+      paintChoosing();
       setActive(-1);
       rows = [];
       const children = [];
-      if (!searching || searchScore([foldSearch(defaultRowText(fallback))], words) !== null) {
+      if (!choosingDefault && (!searching || searchScore([foldSearch(defaultRowText(fallback))], words) !== null)) {
         children.push(defaultRow());
       }
       entries.forEach((entry, index) => {
@@ -339,7 +427,7 @@ export function modelPicker({ onPick }) {
       list.replaceChildren(...children);
       list.scrollTop = 0;
       if (rows.length > 0) {
-        const current = rows.findIndex((row) => row.ref === chosen);
+        const current = rows.findIndex((row) => row.ref === tickedRef());
         setActive(searching || current === -1 ? 0 : current);
         // A menu being built is not on the page yet: its list is measured once it is.
         queueMicrotask(() => {
@@ -377,14 +465,14 @@ export function modelPicker({ onPick }) {
       } else if (event.key === "Enter") {
         event.preventDefault();
         if (active !== -1) {
-          onPick(rows[active].ref);
+          pickRow(rows[active].ref);
         }
       } else if (command && /^Digit[1-9]$/.test(event.code)) {
         // Read by where the key sits, with or without Shift, as a layout may need Shift for its digits.
         event.preventDefault();
         const ref = keyed[Number(event.code.slice("Digit".length)) - 1];
         if (ref !== undefined) {
-          onPick(ref);
+          pickRow(ref);
         }
       } else if (command && !event.shiftKey && event.key.toLowerCase() === "d") {
         event.preventDefault();
@@ -410,12 +498,26 @@ export function modelPicker({ onPick }) {
       }
     });
 
-    root = el(
+    const built = el(
       "div",
       { class: "model-picker" },
       rail,
-      el("div", { class: "model-main" }, el("label", { class: "model-search" }, icon("search"), search), list, note),
+      el("div", { class: "model-main" }, el("label", { class: "model-search" }, icon("search"), search), choosing, list, note),
     );
+    // Escape leaves the choosing of the default, wherever the keys are in the menu, and the menu stays open.
+    built.addEventListener("keydown", (event) => {
+      if (event.key === "Escape" && choosingDefault) {
+        event.preventDefault();
+        event.stopPropagation();
+        leaveChoosing();
+      }
+    });
+    root = built;
+    repaintBuilt = () => {
+      if (built.isConnected) {
+        paintList();
+      }
+    };
     paintRail();
     paintList();
     return [root];
