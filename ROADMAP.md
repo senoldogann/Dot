@@ -5166,8 +5166,8 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 227 | Previous agents in the side panel                                                    | done        | b948cd7 |
 | 228 | The rail of messages beside the docked panel                                         | done        | 46a8ef0 |
 | 229 | Commands in the background                                                           | done        | e117eaf |
-| 230 | The composer's keys                                                                  | in progress |         |
-| 231 | Runs go on after a restart                                                           | planned     |         |
+| 230 | The composer's keys                                                                  | done        | 166c90f |
+| 231 | Runs go on after a restart                                                           | in progress |         |
 | 232 | Models for Dot's own work                                                            | planned     |         |
 
 ### 77. The type system: Inter and Geist Mono, seven sizes, three weights
@@ -10605,7 +10605,7 @@ what runs, as T3 Code's does, and when a command ends its chat is told, with its
 
 ### 230. The composer's keys
 
-**Status: in progress.**
+**Status: done.** Merged as `166c90f` (PR #269; no Linear issue, the Linear connector was signed out).
 
 **As built (2026-10-14).** Settings › General › Composer chooses, for this browser, the key that sends in every
 composer, Enter (Shift+Enter breaking a line) or ⌘Enter (Ctrl+Enter; Enter breaking a line), and what a message sent
@@ -10621,7 +10621,18 @@ unless asked otherwise.
 
 ### 231. Runs go on after a restart
 
-**Status: planned.**
+**Status: in progress.**
+
+**As built (2026-10-14).** Settings › System › Daemon has **Go on after a restart**, which writes `[agent] resume` into
+the config file, `"safe"` on and `"off"` off, the comments and the other settings left as they were
+(`PUT /api/agent/resume`; `GET /api/status` says the choice). The daemon's next start reads it, and the card says which
+runs go on by themselves: one started in the web UI, cut off in the last `resume_within_s`, whose calls that were cut
+off only read; any other waits for its Continue. What a restart leaves was looked at again and kept: a run cut off in a
+question to the owner goes on and asks again, a call that waited for an approval counts as cut off (the safe side), and
+a chat's queue waits for the run the stop cut off to go on (item 161). Tests: `tests/smoke/test_resume_switch.py`, a
+throw-away home whose config file has an `[agent]` table of its own, wide and on a phone, light and dark, in Chrome and
+WebKit, and `tests/unit/test_config_edit.py`; on the code of before, the status says nothing of resuming and there is no
+switch.
 
 **What.** Settings has the switch for runs to go on after the daemon restarts, and what a restart left undone of that is
 done.
@@ -11302,3 +11313,4 @@ default model.
 - 2026-10-14 (Opus 5.5): item 227 merged as `b948cd7` (PR #266; no Linear issue, the connector was signed out): the run page's side panel lists the chat's earlier helpers in an Agents tab, newest first, and its tabs wear SVG icons.
 - 2026-10-14 (Opus 5.5): item 228 merged as `46a8ef0` (PR #267; no Linear issue, the connector was signed out): the rail of marks at the conversation's left shows beside the docked side panel too, the conversation leaving it room, and in WebKit a pointer resting on it no longer loses it.
 - 2026-10-14 (Opus 5.5): item 229 merged as `e117eaf` (PR #268; no Linear issue, the connector was signed out): a command that runs long goes to a terminal session in the background, and its end is told to its chat, which starts the chat's next run; the chat's page shows its commands at work above the composer.
+- 2026-10-14 (Opus 5.5): item 230 merged as `166c90f` (PR #269; no Linear issue, the connector was signed out): Settings › General chooses the key that sends, Enter or ⌘Enter, and whether a message to a run at work waits in the queue or steers the run, ⌘⇧Enter sending it the other way.

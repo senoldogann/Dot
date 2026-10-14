@@ -46,6 +46,7 @@ from dotagent.agent.resume import (
 from dotagent.agent.review import reviewer_for
 from dotagent.browser.attach import read_debug_endpoint
 from dotagent.browser.session import BrowserSession
+from dotagent.config import ResumeMode
 from dotagent.core.errors import (
     ConfigError,
     DotError,
@@ -258,6 +259,9 @@ class RunManager:
         # The model a run that names none starts on: ``[models] main``, or the one the owner made the default since
         # (:meth:`set_main_model`).
         self._main_model: str = runtime.config.models.main
+        # Whether the daemon's next start resumes on its own the runs it cut off: ``[agent] resume``, or what the owner
+        # chose since (:meth:`set_resume_mode`).
+        self._resume_mode: ResumeMode = runtime.config.agent.resume
 
     async def recover(self) -> int:
         """Close out what processes that are gone left behind: the runs they left active, the approvals of runs no
@@ -445,6 +449,17 @@ class RunManager:
         theirs, and so does a chat that has its own (``ChatChoices``)."""
         self._main_model = model
         log.info("main_model_set", model=model)
+
+    def resume_mode(self) -> ResumeMode:
+        """Whether the daemon's next start resumes on its own the runs it cut off (:meth:`set_resume_mode`)."""
+        return self._resume_mode
+
+    def set_resume_mode(self, mode: ResumeMode) -> None:
+        """Have the daemon's next start resume on its own the runs it cut off (``"safe"``: :meth:`resume_safe`) or
+        leave them to the owner (``"off"``), as the config file says once the owner chose (item 231); this start's
+        runs were resumed or left as it began."""
+        self._resume_mode = mode
+        log.info("resume_mode_set", mode=mode)
 
     def elsewhere_run_ids(self) -> list[str]:
         """The runs at work that other processes drive (``dotx`` commands), as the relay saw them last; none unless this

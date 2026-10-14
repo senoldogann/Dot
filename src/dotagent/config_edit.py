@@ -1,5 +1,6 @@
 """Changing one setting of the user's ``config.toml`` in place: a ``[browser]`` one (the mode, or whether Chrome is
-raised) or the default model, ``[models] main`` (item 199), so the comments and the other settings stay as written."""
+raised), the default model, ``[models] main`` (item 199), or whether the daemon resumes on its own the runs it cut off,
+``[agent] resume`` (item 231), so the comments and the other settings stay as written."""
 
 import os
 import re
@@ -9,6 +10,7 @@ import tomllib
 from pathlib import Path
 from typing import Literal
 
+from dotagent.config import ResumeMode
 from dotagent.core.errors import ConfigError
 from dotagent.core.types import JsonObject
 from dotagent.store.models import BrowserMode
@@ -20,10 +22,11 @@ _FILE_MODE: int = 0o600
 _EDITING: threading.Lock = threading.Lock()
 
 # The tables this module changes a setting of, the settings of each, and the TOML literal of each value.
-type ConfigTable = Literal["browser", "models"]
+type ConfigTable = Literal["agent", "browser", "models"]
+type AgentSetting = Literal["resume"]
 type BrowserSetting = Literal["mode", "raise_window"]
 type ModelsSetting = Literal["main"]
-type SettingKey = BrowserSetting | ModelsSetting
+type SettingKey = AgentSetting | BrowserSetting | ModelsSetting
 type SettingValue = str | bool
 
 
@@ -117,6 +120,12 @@ def set_default_model(path: Path, model: str) -> None:
     """Write ``[models] main``, the model a run that names none starts on, into the config file at ``path`` (see
     :func:`set_setting`)."""
     set_setting(path, "models", "main", model)
+
+
+def set_resume(path: Path, mode: ResumeMode) -> None:
+    """Write ``[agent] resume``, whether the daemon resumes on its own, when it starts, the runs it cut off, into the
+    config file at ``path`` (see :func:`set_setting`)."""
+    set_setting(path, "agent", "resume", mode)
 
 
 def set_setting(path: Path, table: ConfigTable, key: SettingKey, value: SettingValue) -> None:

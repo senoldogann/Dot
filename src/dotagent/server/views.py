@@ -6,7 +6,7 @@ from pydantic import Field, JsonValue, StrictBool, StringConstraints, model_vali
 
 from dotagent.agent.attachments import MAX_ATTACHMENT_BYTES, MAX_ATTACHMENTS
 from dotagent.agent.lessons import RunLessons
-from dotagent.config import ModelReference, ModelsConfig
+from dotagent.config import ModelReference, ModelsConfig, ResumeMode
 from dotagent.core.types import FrozenModel
 from dotagent.desktop.perms import Pane
 from dotagent.help.elsewhere import FoundElsewhere
@@ -307,6 +307,20 @@ class MainModelRequest(FrozenModel):
     """The model to make the default (item 199): the one a run that names none starts on."""
 
     model: ModelReference
+
+
+class ResumeRequest(FrozenModel):
+    """Whether the daemon's next start resumes on its own the runs it cut off (item 231): ``[agent] resume``."""
+
+    resume: ResumeMode
+
+
+class ResumeView(FrozenModel):
+    """Whether the daemon's next start resumes on its own the runs it cut off, and how long before it they may have been
+    cut off (``[agent] resume_within_s``)."""
+
+    resume: ResumeMode
+    resume_within_s: int
 
 
 class BrowserRaiseRequest(FrozenModel):
@@ -733,6 +747,8 @@ class StatusView(FrozenModel):
     # The enabled MCP servers that could not start with the daemon, each with the reason; Dot runs without their tools.
     mcp_failures: list[McpFailure]
     models: ModelsConfig
+    # Whether the daemon's next start resumes on its own the runs it cut off (item 231).
+    resume: ResumeView
 
 
 # The sections: what waits for the user, what works now, what ended today, what was learned today (item 72: the

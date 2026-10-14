@@ -940,8 +940,9 @@ at most `resume_within_s` seconds before (30 minutes), whose calls that were cut
 counts: it is asked again). A run of `dotx run`, of a schedule or of an eval, a run that itself resumed another (so a
 run that brings the daemon down is not resumed again and again), and a run cut off in a call that may have changed
 something (a command, a write, a click, or a delegation, whose run may have done anything) wait for you. `resume` is
-`"off"` by default until evals show that it helps. The timeline of the new run shows how each call ended, with a link to
-the run it resumes.
+`"off"` by default until evals show that it helps; **Go on after a restart** in Settings › System › Daemon writes it
+into the config file (item 231), and the daemon's next start reads it. The timeline of the new run shows how each call
+ended, with a link to the run it resumes.
 
 **Lessons.** With `lessons = "propose"` or `"auto"` in `[agent]`, a task or research run of its own that reached its
 goal after something went wrong on the way (a call failed, whether the run found its way around it or not; the progress
@@ -1521,6 +1522,7 @@ The REST API (all under `/api`; bodies and replies are JSON, event streams are s
 | ------------------------------------------------------------------------------- | ------------------------------------------------------------ |
 | `GET /health` (public), `GET /status`, `GET /models`, `GET /doctor`             | liveness, state of the daemon, models per provider (with their reasoning levels), checks |
 | `POST /models/main` (`{"model": "provider:model"}`)                            | make the default model, kept in `config.toml` (422 for one that cannot call tools or of no known provider; the provider's error, 502, for one it does not know) |
+| `PUT /agent/resume` (`{"resume": "safe"}`)                                     | whether the daemon's next start resumes the runs it cut off (`"safe"` or `"off"`), kept in `config.toml` |
 | `GET /runs`, `POST /runs`, `GET /runs/{id}`, `GET /runs/{id}/events`            | list, start and read runs                                    |
 | `GET /runs/{id}/stream?after=N`, `GET /stream`                                  | live events of a run with its sub-runs; lifecycle of all runs |
 | `POST /runs/{id}/steer`, `POST /runs/{id}/cancel`                               | message a running run; stop it (a `dotx` command's run: the command is asked to stop it) |
