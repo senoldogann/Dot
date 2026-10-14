@@ -2206,7 +2206,10 @@ The gate runs on every pull request and every push to `main` (`.github/workflows
 depends on PyObjC): the format check, the lint, mypy, the unit tests, `dotx eval check` and every smoke test that needs
 no service, chosen by its marks (`-m "not live and not browser and not internet and not desktop and not hosted"`), and
 for the desktop shell `cargo fmt --check`, clippy and `cargo test`. Each action the workflow uses is pinned by the
-commit its tag named, so a tag moved later cannot change what runs. The tests marked above stay on your Mac.
+commit its tag named, so a tag moved later cannot change what runs. The tests marked above stay on your Mac. Once a
+week, and when asked, `.github/workflows/audit.yml` checks the dependencies as locked against the public advisories
+(pip-audit for `uv.lock`, cargo audit for the desktop shell's `Cargo.lock`) and fails on a known vulnerability
+(item 217).
 
 The work on the agent's autonomy (measuring it, noticing a stuck run, adapting to the model, resuming, learning) is
 planned and tracked in [ROADMAP.md](ROADMAP.md); read it before continuing that work.
