@@ -5157,8 +5157,8 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 218 | The lists of skills and notes keep a size                                            | done        | 58acd2a |
 | 219 | Import from other apps                                                               | done        | d017075 |
 | 220 | The side panel slides, and the screen says why it is empty                           | done        | e1d8176 |
-| 221 | The window of every provider's models, as published                                  | in progress |         |
-| 222 | A context meter in the run's composer                                                | planned     |         |
+| 221 | The window of every provider's models, as published                                  | done        | bc61bed |
+| 222 | A context meter in the run's composer                                                | in progress |         |
 | 223 | Claude's fast mode                                                                   | planned     |         |
 
 ### 77. The type system: Inter and Geist Mono, seven sizes, three weights
@@ -10408,7 +10408,7 @@ screen and says why it has no frame.
 
 ### 221. The window of every provider's models, as published
 
-**Status: in progress.**
+**Status: done.** Merged as `bc61bed` (PR #260; no Linear issue, the Linear connector was signed out).
 
 **As built (2026-10-14).** Against the providers' pages, read again on 2026-10-14: OpenAI's GPT-5.4, 5.4 pro, 5.5 and
 5.5 pro hold 1,050,000 tokens (Dot said 400,000) and the chat models of GPT-5.1 to 5.3 hold 128,000; the mini and nano
@@ -10424,7 +10424,16 @@ among them, and a run's budget follows it.
 
 ### 222. A context meter in the run's composer
 
-**Status: planned.**
+**Status: in progress.**
+
+**As built (2026-10-14).** After T3 Code's, a ring beside the send of a run's composer shows how much of the run's
+context budget its last step filled (`contextmeter.js`), and a click opens its figures: the tokens that step sent the
+model, the budget past which Dot summarizes the older part of the run (`[agent] context_tokens`, or three quarters of
+the model's window when that is less) and the model's window. The ring takes the pills' ink, the warning colour past
+80 % of the budget and the danger colour past it, and stays hidden until the model has answered a step. The page reads
+the budget and the window from the run's scaffold event and each step's input tokens from its stats; nothing is asked of
+the model or the daemon. Tests: `tests/smoke/test_context_meter.py`, runs seeded near the budget, past it, with room and
+before any step, wide and on a phone, light and dark; on the code of before, it fails, as there is no meter.
 
 **What.** A ring in a run's composer shows how much of the run's context budget its last step filled; a click on it
 gives the figures and the model's window.
@@ -11096,3 +11105,4 @@ a time; the API's refusal is shown as it is.
 - 2026-10-14 (Opus 5.5): item 218 merged as `58acd2a` (PR #257; no Linear issue, the connector was signed out): Settings › Skills and Settings › Memory keep their lists in a box of a fixed height that scrolls inside.
 - 2026-10-14 (Opus 5.5): item 219 merged as `d017075` (PR #258; no Linear issue, the connector was signed out): a button of Settings › Skills imports, from a checklist, the skills and MCP servers the Mac's other agents set up, several at once.
 - 2026-10-14 (Opus 5.5): item 220 merged as `e1d8176` (PR #259; no Linear issue, the connector was signed out): beside the conversation the side panel slides in and out, and the Screen tab's empty view keeps the shape of a screen and says why it has no frame.
+- 2026-10-14 (Opus 5.5): item 221 merged as `bc61bed` (PR #260; no Linear issue, the connector was signed out): every provider's models show the window their pages publish, OpenAI's newer models and Ollama's cloud models among them.

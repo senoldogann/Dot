@@ -1252,8 +1252,12 @@ same thread, for the same agent. The chat keeps them (item 199): those its first
 in the box, at once and for every browser, so a reload, a restart of the daemon or a run moved to a standby model leaves
 them as they are (a chat from before has the open run's until its next run starts). They are not kept in the browser as
 the home's are, and Keep going stays a new chat's choice. The run under way keeps its own: while it works, the pills
-step back and say that they wait for the next follow-up. A run the daemon cut off offers **Continue** on a line above
-the box. The panel's Details show the status, the agent of a chat with one, the model and its reasoning level, the
+step back and say that they wait for the next follow-up. Beside the send, a ring after T3 Code's shows how much of the
+run's context budget its last step filled (item 222): the tokens that step sent the model against `context_tokens`,
+or three quarters of the window when that is less, past which Dot summarizes the older part of the run; it turns to
+the warning colour past 80 % and to the danger colour past the budget, and a click shows the figures and the model's
+window. It reads the run's `scaffold` and `assistant` events and asks the model nothing. A run the daemon cut off
+offers **Continue** on a line above the box. The panel's Details show the status, the agent of a chat with one, the model and its reasoning level, the
 approval mode and goal mode, the campaign of a session, the model turns, the tool calls (with the failed ones), the
 tokens (of every model call of the run: its steps and its side calls, such as compactions, reviews and the goal check),
 the duration, the start and the run id; its other tabs hold the plan, the actions and the latest screenshots. It stays
