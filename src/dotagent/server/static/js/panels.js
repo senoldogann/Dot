@@ -146,6 +146,23 @@ export function foldCard({ id, title, actions, body, openByDefault }) {
   return { element, setSummary: (...nodes) => summary.replaceChildren(...nodes.filter((node) => node !== null)) };
 }
 
+/**
+ * A section of the run's side panel (item 203): a head with its title, a short line that sums it up
+ * (`setSummary(...nodes)`) and `actions` at its right, over `body`, which is always open: the panel's tabs choose what
+ * is in sight, after T3 Code's side panel. Its body is `panel-${id}`. Returns the element and `setSummary`, as
+ * `foldCard` does.
+ */
+export function panelSection({ id, title, actions, body }) {
+  const summary = el("span", { class: "panel-summary" });
+  const element = el(
+    "section",
+    { class: "panel-section" },
+    el("div", { class: "panel-section-head" }, el("h3", { class: "panel-section-title" }, title), summary, actions ?? null),
+    el("div", { class: "panel-section-body", id: `panel-${id}` }, body),
+  );
+  return { element, setSummary: (...nodes) => summary.replaceChildren(...nodes.filter((node) => node !== null)) };
+}
+
 /** A plain block with a folding head, for a group inside a card: `head` is what the button shows, `body` what folds. */
 export function foldGroup({ id, head, body, openByDefault }) {
   const state = foldState(id, openByDefault);

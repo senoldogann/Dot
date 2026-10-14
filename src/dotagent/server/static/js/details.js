@@ -5,7 +5,7 @@
 import { compact, copyText, dateTimeFull, duration, el, modelName } from "./dom.js";
 import { levelLabel } from "./efforts.js";
 import { icon } from "./icons.js";
-import { foldCard, statusBadge } from "./panels.js";
+import { panelSection, statusBadge } from "./panels.js";
 import { approvalLabel } from "./runmodes.js";
 import { attempt, toast } from "./ui.js";
 
@@ -46,11 +46,10 @@ export function createDetails(run, agent, campaign, keepGoing) {
       ? null
       : fact("Delegated by", el("dd", null, el("a", { href: `#/runs/${run.parent_run_id}` }, "Open the parent run")));
 
-  const card = foldCard({
+  const card = panelSection({
     id: "run-details",
     title: "Details",
     actions: null,
-    openByDefault: false,
     body: el(
       "dl",
       { class: "facts" },
@@ -80,7 +79,6 @@ export function createDetails(run, agent, campaign, keepGoing) {
     status.replaceChildren(statusBadge(state.status));
     model.textContent = state.model === "" ? "Default" : modelName(state.model);
     model.title = state.model;
-    card.setSummary(el("span", null, state.status), el("span", null, model.textContent));
     turns.textContent = String(state.steps);
     calls.replaceChildren(...[el("span", null, String(state.calls)), ...(state.failed === 0 ? [] : [el("span", null, `${state.failed} failed`)])]);
     tokens.replaceChildren(el("span", null, `${compact(state.input)} in`), el("span", null, `${compact(state.output)} out`));

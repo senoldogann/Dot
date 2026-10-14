@@ -5138,8 +5138,8 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 199 | The default model is chosen in Settings, and a chat keeps its model                  | done        | de8069e |
 | 200 | Reconnecting, checked end to end                                                     | done        | 0dab7de |
 | 201 | Marks of the conversation's messages: a look and a jump, after T3 Code               | done        | 4f23e25 |
-| 202 | The side menu, designed again                                                        | in progress |         |
-| 203 | The run's side panel, designed again                                                 | planned     |         |
+| 202 | The side menu, designed again                                                        | done        | 7e03ac3 |
+| 203 | The run's side panel, designed again                                                 | in progress |         |
 
 ### 77. The type system: Inter and Geist Mono, seven sizes, three weights
 
@@ -9863,7 +9863,7 @@ shows the message and the start of its answer, and a click goes to it. After T3 
 
 ### 202. The side menu, designed again
 
-**Status: in progress.**
+**Status: done.** Merged as `7e03ac3` (PR #241; no Linear issue, the Linear connector was signed out).
 
 **As built (2026-10-14).** Each chat stands once in the side menu, after T3 Code's Working shelf (`sidebar.js`). Before,
 a chat at work stood twice: its run among the rows of the Working section, with the runs it delegated, and the chat
@@ -9892,7 +9892,30 @@ in it and what waits for the owner, and how its parts fold. Screenshots looked a
 
 ### 203. The run's side panel, designed again
 
-**Status: planned.**
+**Status: in progress.**
+
+**As built (2026-10-14).** The run's side panel shows one thing at a time, in tabs after T3 Code's side panel
+(`inspector.js`, `panels.js`). Before, it stacked seven cards that arrived folded (Dot's computer, Details, Cost, Plan,
+Files, Actions, Screen), each with a line under its title; open, they made one column some 1 800 px tall at 1280 px. Now
+its head is a strip of four tabs: Run (the details and the cost), Plan (the plan's steps; the tab says how many are
+done, "1/3"), Actions (the acting steps, the approvals and questions and the files changed, then the conversation's
+files) and Screen (Dot's computer, with the sizes of the panel, and the screenshots, which the tab counts). A tab's
+sections are open, each under its title, on hairlines. A line under a title stays only where it sums up a list (Actions,
+Files); those that said again what stands right under them went: the state and the model over the details, the minutes,
+steps and tokens over the cost, the steps done over the plan, the address over the computer. The cost is listed as the
+details are, each value beside its label, instead of a grid of cells. The strip is a tab list: the arrow keys go round
+the tabs, Home and End go to the ends, and only the chosen tab is in the tab order; it stays at the top as the panel
+scrolls, and the tab chosen last is kept in the browser (`dot.panelTab`) for every run page. The drawer of a narrow page
+keeps its close button beside the tabs; beside the conversation the header's button hides the panel, as before. A run
+without a plan says on the Plan tab why it has none. A file that opens in the panel (item 195) takes it as before.
+Tests: `tests/smoke/test_side_panel.py`, a real server on a scripted model with a run whose plan has three steps (one
+done) and that waits in a shell command, at 1280 and 390 px, light and dark: the four tabs with "1/3" beside Plan, Run
+first with its sections open and no line repeating them, the Plan tab's steps, the keys, the tab kept after a reload,
+beside the conversation and in the drawer, and the drawer's close button. On the code of before, it found no tab list.
+The tests that opened a folded card (`test_actions_panel.py`, `test_activity.py`, `test_agents.py`,
+`test_command_runs.py`, `test_face.py`, `test_file_panel.py`, `test_takeover.py`, `test_tour.py`) choose its tab now. It
+passed in WebKit too. Found: while a page fades in (200 ms, a fade under reduced motion too), the page holds the drawer
+under the top bar, as it did before; the test takes its screenshots with the page's entrance played out.
 
 **What.** The run's side panel designed again, in its structure and in how it works: Dot's computer, the details, the
 cost, the plan, the files, the actions and the screens. Screenshots looked at, wide and on a phone, light and dark.
@@ -10538,3 +10561,4 @@ cost, the plan, the files, the actions and the screens. Screenshots looked at, w
 - 2026-10-14 (Opus 5.5): item 199 merged as `de8069e` (PR #238; no Linear issue, the connector was signed out): The default model is chosen in Settings › Models and starts the runs that name none at once; a chat keeps what its composer chose, through a reload, another browser and a move of its run to a standby model.
 - 2026-10-14 (Opus 5.5): item 200 merged as `0dab7de` (PR #239; no Linear issue, the connector was signed out): A page that loses the daemon comes back by itself: one loaded while the daemon is down tries again and says when, a stream silent for 45 seconds is cut and made again, a page back in view or on the network tries at once, and the desktop window keeps the page through a restart of the daemon.
 - 2026-10-14 (Opus 5.5): item 201 merged as `4f23e25` (PR #240; no Linear issue, the connector was signed out): At the left of the conversation, a column of short marks stands for the owner's messages, after T3 Code's: resting the pointer on it shows a message and the start of its answer, and a click or Enter goes to it.
+- 2026-10-14 (Opus 5.5): item 202 merged as `7e03ac3` (PR #241; no Linear issue, the connector was signed out): Each chat stands once in the side menu, after T3 Code's Working shelf: a chat whose latest run works leaves its day for Working, as the chat it is, with the runs it delegated folded under it, and goes back once the run ends; a pinned chat stays under Pinned.

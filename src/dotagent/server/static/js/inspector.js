@@ -1,5 +1,6 @@
-// The side panel of the run page: the details and the plan of the run and the screens the agent looked at. On a wide page it
-// sits beside the conversation when the reader wants it (see layout.js); on a narrow page it is a drawer that the button in
+// The side panel of the run page: the details and the plan of the run and the screens the agent looked at, in tabs
+// after T3 Code's side panel (item 203), one at a time, the one chosen last kept per browser. On a wide page it sits
+// beside the conversation when the reader wants it (see layout.js); on a narrow page it is a drawer that the button in
 // the header slides in over the conversation. A file the conversation carries or names takes the panel while it is open
 // (item 195, filepanel.js).
 
@@ -7,7 +8,8 @@ import { imageUrl } from "./api.js";
 import { el, motionMs } from "./dom.js";
 import { fileView } from "./filepanel.js";
 import { icon } from "./icons.js";
-import { foldCard } from "./panels.js";
+import { panelSection } from "./panels.js";
+import { readPref, writePref } from "./prefs.js";
 import { setShowInspector, showInspector } from "./layout.js";
 import { onThemeChange } from "./theme.js";
 import { showImage } from "./ui.js";
@@ -15,16 +17,21 @@ import { showImage } from "./ui.js";
 // The page needs this much width for a readable column next to the panel.
 const MIN_WIDTH_PX = 960;
 const STRIP_LIMIT = 24;
+// The tab the reader chose last, for every run page of this browser.
+const TAB_KEY = "dot.panelTab";
+// The keys that move between the tabs, as a tab list's do.
+const TAB_KEYS = new Set(["ArrowLeft", "ArrowRight", "Home", "End"]);
 
 /**
- * The panel for a run page whose frame is `layout`, with `content` (a list of nodes) above the screens. The frame gets
- * `data-inspector="on"` while the panel sits beside the conversation and `"off"` otherwise, and `data-file="on"` while a
- * file takes it. Returns `element` (the panel) and `scrim` (the veil behind the drawer), both to put inside the frame,
- * `toggle` (the header button that shows or hides the panel), `arrange()` (call it once the frame is on the page),
- * `addImage(name)`, `showFile(source, opener)` (see `fileView`; `opener` gets the focus back when the file closes) and
- * `dispose()`.
+ * The panel for a run page whose frame is `layout`, in `tabs` (`[{ id, label, sections }]`, `sections` a list of
+ * nodes); the screenshots go at the end of the tab `screensIn`. The frame gets `data-inspector="on"` while the panel
+ * sits beside the conversation and `"off"` otherwise, and `data-file="on"` while a file takes it. Returns `element`
+ * (the panel) and `scrim` (the veil behind the drawer), both to put inside the frame, `toggle` (the header button that
+ * shows or hides the panel), `arrange()` (call it once the frame is on the page), `addImage(name)`, `setCount(tabId,
+ * text)` (a short count beside a tab's name; "" for none), `showFile(source, opener)` (see `fileView`; `opener` gets
+ * the focus back when the file closes) and `dispose()`.
  */
-export function createInspector({ layout, content }) {
+export function createInspector({ layout, tabs, screensIn }) {
   const names = [];
   const thumbs = [];
   let selected = -1;
@@ -37,21 +44,99 @@ export function createInspector({ layout, content }) {
   const caption = el("span", { class: "small muted" });
   const preview = el("button", { class: "inspector-shot", type: "button", hidden: true });
   const strip = el("div", { class: "inspector-strip", hidden: true });
-  const screenCard = foldCard({
+  const screens = panelSection({
     id: "run-screen",
-    title: "Screen",
+    title: "Screenshots",
     actions: caption,
     body: el("div", { class: "stack tight" }, empty, preview, strip),
-    openByDefault: false,
-  });
-  const screens = screenCard.element;
+  }).element;
   const closeButton = el(
     "button",
-    { class: "btn ghost sm icon-only", type: "button", title: "Close", "aria-label": "Close the details", onclick: () => setDrawer(false) },
+    { class: "btn ghost sm icon-only inspector-close", type: "button", title: "Close", "aria-label": "Close the details", onclick: () => setDrawer(false) },
     icon("x"),
   );
-  const head = el("div", { class: "inspector-head" }, el("strong", { class: "grow" }, "Run details"), closeButton);
-  const element = el("aside", { class: "inspector", "aria-label": "Run details", hidden: true }, head, content, screens);
+
+  // ------------------------------------------------------------------------------------------------- tabs
+  const tabNodes = tabs.map(({ id, label, sections }) => {
+    const count = el("span", { class: "inspector-count", hidden: true });
+    const button = el(
+      "button",
+      {
+        class: "inspector-tab",
+        type: "button",
+        role: "tab",
+        id: `inspector-tab-${id}`,
+        "aria-controls": `inspector-panel-${id}`,
+        "aria-selected": "false",
+        tabindex: "-1",
+        onclick: () => choose(id, false),
+      },
+      el("span", null, label),
+      // A space between the name and the count, so that a screen reader says "Plan 1/3".
+      " ",
+      count,
+    );
+    const panel = el(
+      "div",
+      { class: "inspector-panel", role: "tabpanel", id: `inspector-panel-${id}`, "aria-labelledby": button.id, hidden: true },
+      ...sections,
+      id === screensIn ? screens : null,
+    );
+    return { id, button, panel, count };
+  });
+  const tabList = el(
+    "div",
+    { class: "inspector-tabs", role: "tablist", "aria-label": "Run details", onkeydown: walkTabs },
+    tabNodes.map((tab) => tab.button),
+  );
+  const head = el("div", { class: "inspector-head" }, tabList, closeButton);
+  const element = el(
+    "aside",
+    { class: "inspector", "aria-label": "Run details", hidden: true },
+    head,
+    tabNodes.map((tab) => tab.panel),
+  );
+
+  function show(id) {
+    for (const tab of tabNodes) {
+      const on = tab.id === id;
+      tab.button.setAttribute("aria-selected", String(on));
+      tab.button.tabIndex = on ? 0 : -1;
+      tab.panel.hidden = !on;
+    }
+  }
+
+  /** Show the tab `id` and keep it as the reader's choice; `focus` moves the focus to its button, as the keys do. */
+  function choose(id, focus) {
+    show(id);
+    writePref(TAB_KEY, id);
+    if (focus) {
+      tabNodes.find((tab) => tab.id === id)?.button.focus();
+    }
+  }
+
+  // The arrows go to the tab beside (round the ends), Home and End to the first and the last, each shown at once.
+  function walkTabs(event) {
+    const index = tabNodes.findIndex((tab) => tab.button === document.activeElement);
+    if (!TAB_KEYS.has(event.key) || index === -1) {
+      return;
+    }
+    event.preventDefault();
+    const last = tabNodes.length - 1;
+    const next = { ArrowLeft: index === 0 ? last : index - 1, ArrowRight: index === last ? 0 : index + 1, Home: 0, End: last };
+    choose(tabNodes[next[event.key]].id, true);
+  }
+
+  function setCount(id, text) {
+    const tab = tabNodes.find((node) => node.id === id);
+    if (tab !== undefined) {
+      tab.count.textContent = text;
+      tab.count.hidden = text === "";
+    }
+  }
+
+  const kept = readPref(TAB_KEY);
+  show(tabNodes.some((tab) => tab.id === kept) ? kept : tabNodes[0].id);
   const scrim = el("div", { class: "inspector-scrim", hidden: true, onclick: () => setDrawer(false) });
   const toggle = el(
     "button",
@@ -137,6 +222,7 @@ export function createInspector({ layout, content }) {
     preview.hidden = false;
     strip.hidden = false;
     addThumb(names.length - 1);
+    setCount(screensIn, String(names.length));
     if (pinned) {
       caption.textContent = label(selected);
     } else {
@@ -290,6 +376,7 @@ export function createInspector({ layout, content }) {
     toggle,
     arrange,
     addImage,
+    setCount,
     showFile,
     dispose: () => {
       dropFile();

@@ -19,7 +19,7 @@ import { createInspector } from "../inspector.js";
 import { createQueue } from "../queue.js";
 import { userMessage } from "../messages.js";
 import { messageOutline } from "../outline.js";
-import { emptyPanel, errorPanel, foldCard, loadingPanel } from "../panels.js";
+import { emptyPanel, errorPanel, loadingPanel, panelSection } from "../panels.js";
 import { heldChoice } from "../runmodes.js";
 import { messageKeys } from "../sending.js";
 import { setStageTitle, setStageTools } from "../stage.js";
@@ -62,6 +62,8 @@ function backLink() {
   return el("a", { class: "back", href: "#/runs" }, icon("arrowLeft"), "All runs");
 }
 
+// What the Plan tab says of a run without a plan (item 203).
+const NO_PLAN = "This run has no plan: Dot writes one for work of several steps.";
 const STEP_MARKS = { done: "check", failed: "x", skipped: "arrowRight" };
 const STEP_LABELS = { pending: "Not started", in_progress: "In progress", done: "Done", failed: "Failed", skipped: "Skipped" };
 
@@ -88,9 +90,9 @@ function planStep(step) {
 }
 
 /**
- * Build the page of a loaded run and start following it. `history` is `{ earlier, later }`, the runs of the conversation
- * around this one; `historyProblem` is the error that kept them from loading, or null. Returns the function that stops
- * everything the page started.
+ * Build the page of a loaded run and start following it. `history` is `{ earlier, later }`, the runs of the
+ * conversation around this one; `historyProblem` is the error that kept them from loading, or null. Returns the
+ * function that stops everything the page started.
  */
 function actionStep(step) {
   return el(
@@ -255,14 +257,17 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
 
   // ------------------------------------------------------------------------------------ details and plan
   const details = createDetails(run, agent, detail.campaign, detail.keep_going);
-  const planBody = el("div", { class: "plan-list" });
-  const plan = foldCard({ id: "run-plan", title: "Plan", actions: null, body: planBody, openByDefault: false });
-  plan.element.hidden = true;
+  const planBody = el("div", { class: "plan-list" }, el("div", { class: "hint" }, NO_PLAN));
+  const plan = panelSection({ id: "run-plan", title: "Plan", actions: null, body: planBody });
 
+  // The Plan tab says how far the plan has come (item 203); a run without a plan says why there is none.
   function paintPlan(steps, targets) {
     const done = steps.filter((step) => step.status === "done").length;
-    plan.element.hidden = steps.length === 0;
-    plan.setSummary(`${done} of ${steps.length} done`);
+    inspector.setCount("plan", steps.length === 0 ? "" : `${done}/${steps.length}`);
+    if (steps.length === 0) {
+      planBody.replaceChildren(el("div", { class: "hint" }, NO_PLAN));
+      return;
+    }
     // The native replaceChildren writes a null as the text "null", so a plan without targets passes nothing for them.
     planBody.replaceChildren(...(targets === "" ? [] : [planTargets(targets)]), ...steps.map(planStep));
   }
@@ -836,7 +841,7 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
   // ------------------------------------------------------------------------------------------- actions
   // What the run did and what can be undone: its acting steps, its approvals and its file changes (see server.actions).
   const actionsBody = el("div", { class: "actions-list" });
-  const actionsCard = foldCard({ id: "run-actions", title: "Actions", actions: null, body: actionsBody, openByDefault: false });
+  const actionsCard = panelSection({ id: "run-actions", title: "Actions", actions: null, body: actionsBody });
   // The paths being taken back, so that a second press does not send the same undo twice.
   const undoing = new Set();
 
@@ -942,7 +947,7 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
   // The files of the conversation (item 195): those its messages carried and those its answers name, in the order it
   // shows them, each opening beside it as its chip or its path does. The list follows the conversation as it grows.
   const filesBody = el("div", { class: "files-list" });
-  const filesCard = foldCard({ id: "run-files", title: "Files", actions: null, body: filesBody, openByDefault: false });
+  const filesCard = panelSection({ id: "run-files", title: "Files", actions: null, body: filesBody });
   filesCard.element.hidden = true;
   let filesShown = "";
 
@@ -987,11 +992,19 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
     name: actorName,
     sizes: stage.chooser,
   });
-  // The side panel (item 84): the computer, the details, the cost (item 96), the plan and the actions. The run's state
-  // is the top bar's face and the Details card's first fact; no card at the head of the conversation (item 113).
+  // The side panel (item 84), in tabs after T3 Code's (item 203): the run (its details and its cost, item 96), the
+  // plan, the actions (and the files of the conversation) and the screen (Dot's computer and the screenshots). The
+  // run's state is the top bar's face and the Details section's first fact; no card at the head of the conversation
+  // (item 113).
   const inspector = createInspector({
     layout,
-    content: [computer.element, details.element, cost.element, plan.element, filesCard.element, actionsCard.element],
+    tabs: [
+      { id: "run", label: "Run", sections: [details.element, cost.element] },
+      { id: "plan", label: "Plan", sections: [plan.element] },
+      { id: "actions", label: "Actions", sections: [actionsCard.element, filesCard.element] },
+      { id: "screen", label: "Screen", sections: [computer.element] },
+    ],
+    screensIn: "screen",
   });
   // A file a message carries, or one the conversation names, takes the panel (item 195).
   layout.addEventListener(OPEN_FILE_EVENT, (event) => inspector.showFile(event.detail, event.target));
@@ -1025,7 +1038,7 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
       : el("div", { class: "note warn" }, icon("alert"), el("span", null, `The earlier part of this conversation could not be loaded: ${historyProblem.message}`));
   // Dot's face and name, or a delegated run's breadcrumb, name the page in the top bar (item 78), and the side panel's
   // switch is the bar's one tool (item 120): the run's state, start, agent, model, approvals and campaign are in the
-  // panel's Details card. The goal, the first message, is the page's heading for a reader of the structure.
+  // Details of the panel's Run tab. The goal, the first message, is the page's heading for a reader of the structure.
   setStageTitle(face, crumb, crumbSep, stageName);
   setStageTools(inspector.toggle);
 

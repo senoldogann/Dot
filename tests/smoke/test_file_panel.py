@@ -334,12 +334,12 @@ async def _one_size(
     await expect(view).to_have_count(0)
     assert await layout.get_attribute("data-inspector") == panel
 
-    # The side panel lists the conversation's files, each opening beside it; the details come back after it.
+    # The side panel's Actions tab lists the conversation's files, each opening beside it; the tab comes back after it.
     if width < 960 or panel != "on":
         await page.get_by_role("button", name="Run details", exact=True).click()
     details: Locator = page.locator(".inspector")
-    files_card: Locator = details.locator(".fold", has=page.locator(".fold-title", has_text="Files"))
-    await files_card.locator(".fold-toggle").click()
+    await details.get_by_role("tab", name="Actions").click()
+    files_card: Locator = details.locator(".panel-section", has=page.locator(".panel-section-title", has_text="Files"))
     listed: Locator = files_card.locator("button.file-row")
     await expect(listed).to_have_text(
         [
@@ -364,9 +364,8 @@ async def _one_size(
     await expect(listed_budget).to_be_focused()
     await page.screenshot(path=str(shots / f"files-{width}-{scheme}.png"))
 
-    # The file the run wrote, from its path in Actions.
-    actions: Locator = details.locator(".fold", has=page.locator(".fold-title", has_text="Actions"))
-    await actions.locator(".fold-toggle").click()
+    # The file the run wrote, from its path in Actions, in the same tab.
+    actions: Locator = details.locator(".panel-section", has=page.locator(".panel-section-title", has_text="Actions"))
     written: Locator = actions.locator("button.file-link")
     await expect(written).to_have_text(str(_summary(runtime.workspace)))
     await written.click()

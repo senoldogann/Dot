@@ -1,10 +1,11 @@
-// The bill of a run: what it cost and where it went, from `GET /runs/{id}/stats` (store.stats.RunCosts). A folded card
-// whose head line carries the numbers a glance wants (the minutes, the steps, the tokens); open, the grid says where the
-// minutes went (the model, the summaries, the tools, the gate) and what the tokens, the compactions and the delegated
-// runs came to. `paint(costs)` takes the route's answer as it is; the card says "Counting…" until the first one.
+// The bill of a run: what it cost and where it went, from `GET /runs/{id}/stats` (store.stats.RunCosts). A section of
+// the side panel's Run tab, under the details, which already say the minutes, the steps and the tokens; its list says
+// where the minutes went (the model, the summaries, the tools, the gate) and what the tokens, the compactions and the
+// delegated runs came to. `paint(costs)` takes the route's answer as it is; the section says "Counting…" until the
+// first one.
 
 import { compact, duration, el } from "./dom.js";
-import { foldCard } from "./panels.js";
+import { panelSection } from "./panels.js";
 
 const HINTS = {
   model: "The seconds the model took to answer: its steps and its side calls together",
@@ -20,7 +21,7 @@ const HINTS = {
 };
 
 function cell(label, value, hint) {
-  return el("div", null, el("dt", null, label), el("dd", { title: hint }, value));
+  return [el("dt", null, label), el("dd", { title: hint }, value)];
 }
 
 function share(part, whole) {
@@ -32,19 +33,13 @@ function spent(seconds, total) {
   return seconds <= 0 ? "None" : `${duration(seconds)} · ${share(seconds, total)}`;
 }
 
-/** The head line as four facts a gap apart: "12m 03s", "48 steps", "1.2M in", "8.1k out" (item 79). */
-export function costFacts(costs) {
-  const stats = costs.stats;
-  const facts = [duration(costs.minutes * 60), `${stats.steps} steps`, `${compact(stats.input_tokens)} in`, `${compact(stats.output_tokens)} out`];
-  return facts.map((fact) => el("span", null, fact));
-}
-
 export function createCostCard() {
-  const grid = el("dl", { class: "kv cost-grid" });
-  const card = foldCard({ id: "run-cost", title: "Cost", actions: null, body: grid, openByDefault: false });
+  // Label and value side by side, as the details above them are.
+  const grid = el("dl", { class: "facts" });
+  const body = el("div", null, el("div", { class: "hint" }, "Counting…"));
+  const card = panelSection({ id: "run-cost", title: "Cost", actions: null, body });
   card.element.classList.add("cost-card");
   card.element.setAttribute("aria-label", "Cost of this run");
-  card.setSummary("Counting…");
 
   function paint(costs) {
     const stats = costs.stats;
@@ -55,8 +50,7 @@ export function createCostCard() {
     const compactions = stats.compaction.compactions === 0 ? "None" : `${stats.compaction.compactions}${perHundred}`;
     const delegated = stats.delegation.runs === 0 ? "None" : `${stats.delegation.runs} · ${duration(stats.delegation.seconds)} waited`;
     const searches = stats.searches.length === 0 ? "None" : stats.searches.map((entry) => `${entry.searches} ${entry.engine}`).join(" · ");
-    card.setSummary(...costFacts(costs));
-    grid.replaceChildren(
+    grid.replaceChildren(...[
       cell("Model", spent(time.model_seconds, total), HINTS.model),
       cell("Summaries", spent(time.compaction_seconds, total), HINTS.summaries),
       cell("Tools", spent(costs.tool_seconds, total), HINTS.tools),
@@ -67,7 +61,8 @@ export function createCostCard() {
       cell("Compactions", compactions, HINTS.compactions),
       cell("Delegated runs", delegated, HINTS.delegated),
       cell("Searches", searches, HINTS.searches),
-    );
+    ].flat());
+    body.replaceChildren(grid);
   }
 
   return { element: card.element, paint };
