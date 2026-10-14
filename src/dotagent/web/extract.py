@@ -170,6 +170,7 @@ async def extract(
         temperature=None,
         max_output_tokens=None,
         effort="off",
+        speed="standard",
         session_key=session_key,
     )
     try:

@@ -109,7 +109,7 @@ async def _play(
                 for _ in runs:
                     asked: int = len(model.requests)
                     run: RunRecord = await manager.start(
-                        GOAL, "task", SCRIPTED_MODEL, thread_id, EVAL_SOURCE, None, None, "ask", False, ()
+                        GOAL, "task", SCRIPTED_MODEL, thread_id, EVAL_SOURCE, None, None, "standard", "ask", False, ()
                     )
                     async with asyncio.timeout(_TIME_LIMIT_S):
                         record: RunRecord = await manager.wait(run.id)

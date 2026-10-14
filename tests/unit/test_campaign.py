@@ -203,6 +203,7 @@ def test_a_session_number_counts_the_sessions_of_the_campaign_from_one() -> None
             parent_run_id=None,
             source="schedule",
             effort=None,
+            speed="standard",
             approvals="yolo",
             goal_mode=False,
             campaign_id="cmp_1",

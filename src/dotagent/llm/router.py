@@ -14,7 +14,7 @@ from dotagent.core.errors import (
 )
 from dotagent.core.logs import get_logger
 from dotagent.core.types import FrozenModel
-from dotagent.llm.anthropic import AnthropicProvider
+from dotagent.llm.anthropic import FAST_MODE_MODELS, AnthropicProvider
 from dotagent.llm.calls import CANCELLED, CallOrigin, CallRecorder, ModelCall
 from dotagent.llm.ollama import OllamaProvider
 from dotagent.llm.openai import OpenAIProvider
@@ -51,6 +51,11 @@ def parse_model_ref(text: str) -> ModelRef:
             {"value": text, "providers": list(KNOWN_PROVIDERS)},
         )
     return ModelRef(provider=split[0], model=split[1])
+
+
+def offers_fast_mode(ref: ModelRef) -> bool:
+    """Whether the model ``ref`` names has fast mode (item 223): some of Anthropic's, as its page names them."""
+    return ref.provider == "anthropic" and ref.model in FAST_MODE_MODELS
 
 
 class Pause(FrozenModel):

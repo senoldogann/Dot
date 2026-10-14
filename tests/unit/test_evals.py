@@ -224,6 +224,7 @@ def test_a_run_took_the_easy_way_when_a_call_of_its_tool_for_its_skill_ran() -> 
         parent_run_id=None,
         source="eval",
         effort=None,
+        speed="standard",
         approvals="ask",
         goal_mode=False,
         campaign_id=None,

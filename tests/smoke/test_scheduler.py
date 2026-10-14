@@ -26,7 +26,7 @@ from dotagent.core.errors import ConfigError, StoreError, ToolExecutionError, To
 from dotagent.core.paths import failsafe_path, workspace_dir
 from dotagent.core.types import JsonObject
 from dotagent.events import SYSTEM_RUN_ID, EventBus, Subscription
-from dotagent.llm.types import Effort
+from dotagent.llm.types import Effort, Speed
 from dotagent.policy.types import ActionInfo, ApprovalMode
 from dotagent.runtime import Runtime, build_runtime, close_runtime
 from dotagent.scheduler import SCHEDULE_MISSED_EVENT, SCHEDULE_SOURCE
@@ -333,6 +333,7 @@ class _OwnerSwitchesTheOtherOff(RunManager):
         source: str,
         parent_run_id: str | None,
         effort: Effort | None,
+        speed: Speed,
         approvals: ApprovalMode | None,
         goal_mode: bool | None,
         files: tuple[StoredAttachment, ...],
@@ -400,6 +401,7 @@ class _Starts(RunManager):
         source: str,
         parent_run_id: str | None,
         effort: Effort | None,
+        speed: Speed,
         approvals: ApprovalMode | None,
         goal_mode: bool | None,
         files: tuple[StoredAttachment, ...],

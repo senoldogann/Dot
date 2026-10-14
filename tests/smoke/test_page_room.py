@@ -85,7 +85,7 @@ async def _small_window_context(runtime: Runtime) -> ToolContext:
     """The context of a run whose tool results are as small as a 32 768-token window makes them."""
     thread: ThreadRecord = await runtime.store.create_thread("page room", "test")
     run: RunRecord = await runtime.store.create_run(
-        thread.id, GOAL, "task", "ollama:none", None, "test", "medium", "yolo", False, None, None, None
+        thread.id, GOAL, "task", "ollama:none", None, "test", "medium", "standard", "yolo", False, None, None, None
     )
     return ToolContext(
         runtime=runtime,

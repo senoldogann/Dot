@@ -137,6 +137,7 @@ async def test_the_greeting_and_the_composer_stand_in_the_middle_and_the_strip_i
             "test",
             None,
             None,
+            "standard",
             "yolo",
             False,
             (),

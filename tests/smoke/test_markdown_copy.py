@@ -145,7 +145,7 @@ async def served(runtime: Runtime) -> AsyncIterator[str]:
 async def _turn(runtime: Runtime, thread: ThreadRecord, goal: str, answer: str) -> RunRecord:
     """A run of the chat ``thread`` that was asked ``goal`` and answered ``answer``."""
     run: RunRecord = await runtime.store.create_run(
-        thread.id, goal, "task", SCRIPTED_MODEL, None, "test", "medium", "yolo", False, None, None, None
+        thread.id, goal, "task", SCRIPTED_MODEL, None, "test", "medium", "standard", "yolo", False, None, None, None
     )
     await runtime.store.end_run(run.id, "done", answer, {"status": "done", "result": answer, "needs": ""})
     return run

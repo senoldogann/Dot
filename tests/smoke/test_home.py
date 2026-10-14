@@ -136,7 +136,7 @@ def _turn(tool: str, arguments: dict[str, str | bool]) -> ScriptedTurn:
 
 
 async def _start(manager: RunManager, goal: str, approvals: Literal["ask", "yolo"]) -> RunRecord:
-    return await manager.start(goal, "task", SCRIPTED_MODEL, None, "test", None, None, approvals, False, ())
+    return await manager.start(goal, "task", SCRIPTED_MODEL, None, "test", None, None, "standard", approvals, False, ())
 
 
 async def _pending_question(runtime: Runtime, run_id: str) -> ApprovalRecord:

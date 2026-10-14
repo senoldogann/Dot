@@ -110,7 +110,7 @@ async def _runtime(login_env: dict[str, str]) -> AsyncIterator[Runtime]:
 
 
 async def _start(manager: RunManager) -> RunRecord:
-    return await manager.start(GOAL, "task", SCRIPTED_MODEL, None, UI_SOURCE, None, None, "yolo", False, ())
+    return await manager.start(GOAL, "task", SCRIPTED_MODEL, None, UI_SOURCE, None, None, "standard", "yolo", False, ())
 
 
 async def _ended(manager: RunManager, run: RunRecord) -> RunRecord:
@@ -197,7 +197,19 @@ async def test_a_delegated_run_whose_end_was_not_kept_is_an_error_for_the_run_th
     async with _runtime(login_env) as runtime:
         thread: ThreadRecord = await runtime.store.create_thread("delegating", UI_SOURCE)
         parent: RunRecord = await runtime.store.create_run(
-            thread.id, GOAL, "task", SCRIPTED_MODEL, None, UI_SOURCE, "medium", "yolo", False, None, None, None
+            thread.id,
+            GOAL,
+            "task",
+            SCRIPTED_MODEL,
+            None,
+            UI_SOURCE,
+            "medium",
+            "standard",
+            "yolo",
+            False,
+            None,
+            None,
+            None,
         )
         await runtime.store.finish_run(parent.id, "done", "Delegated.")
         await asyncio.to_thread(_refuse_ends, db_path())
@@ -313,7 +325,7 @@ async def test_the_error_of_a_failed_campaign_start_stays_when_its_cleanup_fails
         try:
             with pytest.raises(StoreError, match="the gate of the run could not be made"):
                 await manager.start_campaign(
-                    GOAL, "task", SCRIPTED_MODEL, None, UI_SOURCE, None, "yolo", None, (), None
+                    GOAL, "task", SCRIPTED_MODEL, None, UI_SOURCE, None, "standard", "yolo", None, (), None
                 )
             assert await runtime.store.list_campaigns() == []
         finally:
@@ -353,6 +365,7 @@ async def test_the_half_minute_check_outlives_a_write_the_database_refuses(
             None,
             UI_SOURCE,
             "medium",
+            "standard",
             "yolo",
             False,
             None,

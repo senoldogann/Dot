@@ -120,7 +120,9 @@ async def _daemon(login_env: dict[str, str]) -> AsyncIterator[tuple[Runtime, Run
 
 async def _asked(runtime: Runtime, manager: RunManager, goal: str) -> tuple[RunRecord, ApprovalRecord]:
     """A run started for ``goal`` that asks its question, and that question once it waits for the user."""
-    run: RunRecord = await manager.start(goal, "task", SCRIPTED_MODEL, None, "test", None, None, "ask", False, ())
+    run: RunRecord = await manager.start(
+        goal, "task", SCRIPTED_MODEL, None, "test", None, None, "standard", "ask", False, ()
+    )
     deadline: float = time.monotonic() + WAIT_S
     while not (
         asked := [record for record in await runtime.store.list_approvals("pending", 20) if record.run_id == run.id]

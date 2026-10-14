@@ -182,7 +182,7 @@ async def _served(login_env: dict[str, str], model: ScriptedProvider) -> AsyncIt
 
 
 async def _start(manager: RunManager) -> RunRecord:
-    return await manager.start(GOAL, "task", SCRIPTED_MODEL, None, UI_SOURCE, None, None, "yolo", False, ())
+    return await manager.start(GOAL, "task", SCRIPTED_MODEL, None, UI_SOURCE, None, None, "standard", "yolo", False, ())
 
 
 async def _ended(manager: RunManager, run_id: str) -> RunRecord:
@@ -192,7 +192,9 @@ async def _ended(manager: RunManager, run_id: str) -> RunRecord:
 
 
 async def _queue(manager: RunManager, run: RunRecord, text: str, approvals: ApprovalMode) -> QueuedMessage:
-    return await manager.queue(run.thread_id, text, (), "task", SCRIPTED_MODEL, None, approvals, False, None, UI_SOURCE)
+    return await manager.queue(
+        run.thread_id, text, (), "task", SCRIPTED_MODEL, None, "standard", approvals, False, None, UI_SOURCE
+    )
 
 
 @asynccontextmanager
@@ -263,6 +265,7 @@ async def test_the_thread_of_a_delegated_run_takes_no_queue(login_env: dict[str,
             parent.id,
             "delegate",
             "medium",
+            "standard",
             "yolo",
             False,
             None,
@@ -390,11 +393,23 @@ async def test_a_run_a_crash_left_active_holds_its_chats_queue_when_the_daemon_s
         thread: ThreadRecord = await runtime.store.create_thread(GOAL, UI_SOURCE)
         # The process that drove the run is gone: no lock file holds its owner.
         run: RunRecord = await runtime.store.create_run(
-            thread.id, GOAL, "task", SCRIPTED_MODEL, None, UI_SOURCE, "medium", "yolo", False, None, None, token_hex(16)
+            thread.id,
+            GOAL,
+            "task",
+            SCRIPTED_MODEL,
+            None,
+            UI_SOURCE,
+            "medium",
+            "standard",
+            "yolo",
+            False,
+            None,
+            None,
+            token_hex(16),
         )
         await runtime.store.set_run_status(run.id, "running")
         await runtime.store.add_queued(
-            thread.id, SUMMARY, (), "task", SCRIPTED_MODEL, None, "yolo", False, None, UI_SOURCE
+            thread.id, SUMMARY, (), "task", SCRIPTED_MODEL, None, "standard", "yolo", False, None, UI_SOURCE
         )
         assert await manager.recover() == 1
         assert (await runtime.store.get_run(run.id)).result == RESULT_RESTARTED

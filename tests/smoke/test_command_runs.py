@@ -310,7 +310,9 @@ async def _queued_beside_a_command(runtime: Runtime, manager: RunManager, home: 
         _command(home, "yolo", "", [_WAITING, _FINISH]) as child,
     ):
         run: RunRecord = await runtime.store.get_run(await _working(child, relayed))
-        await manager.queue(run.thread_id, SUMMARY, (), "task", SCRIPTED_MODEL, None, "yolo", False, None, UI_SOURCE)
+        await manager.queue(
+            run.thread_id, SUMMARY, (), "task", SCRIPTED_MODEL, None, "standard", "yolo", False, None, UI_SOURCE
+        )
         assert [other.id for other in await runtime.store.list_runs(10, run.thread_id)] == [run.id]
         await asyncio.to_thread(_let_the_command_end)
         assert await _said(child, "ended") == "done"
@@ -378,10 +380,22 @@ async def test_a_new_run_on_a_chat_closes_first_the_run_a_dead_command_left_at_w
             thread: ThreadRecord = await runtime.store.create_thread("Build", "test")
             # A process that is gone: its lock file is not there.
             left: RunRecord = await runtime.store.create_run(
-                thread.id, GOAL, "task", SCRIPTED_MODEL, None, "cli", "medium", "yolo", False, None, None, "0" * 32
+                thread.id,
+                GOAL,
+                "task",
+                SCRIPTED_MODEL,
+                None,
+                "cli",
+                "medium",
+                "standard",
+                "yolo",
+                False,
+                None,
+                None,
+                "0" * 32,
             )
             run: RunRecord = await manager.start(
-                SUMMARY, "task", SCRIPTED_MODEL, thread.id, UI_SOURCE, None, None, "yolo", False, ()
+                SUMMARY, "task", SCRIPTED_MODEL, thread.id, UI_SOURCE, None, None, "standard", "yolo", False, ()
             )
             assert (await runtime.store.get_run(left.id)).status == "failed"
             async with asyncio.timeout(WAIT_S):

@@ -325,7 +325,19 @@ async def _context(runtime: Runtime, campaign_id: str | None) -> ToolContext:
 async def _context_in(runtime: Runtime, campaign_id: str | None, approvals: ApprovalMode) -> ToolContext:
     thread: ThreadRecord = await runtime.store.create_thread("typed judge", "test")
     run: RunRecord = await runtime.store.create_run(
-        thread.id, GOAL, "task", "ollama:none", None, "test", "medium", approvals, False, campaign_id, None, None
+        thread.id,
+        GOAL,
+        "task",
+        "ollama:none",
+        None,
+        "test",
+        "medium",
+        "standard",
+        approvals,
+        False,
+        campaign_id,
+        None,
+        None,
     )
     return ToolContext(
         runtime=runtime,
@@ -433,7 +445,7 @@ async def test_a_campaign_claim_the_judge_finds_unlikely_is_refused_before_the_g
 ) -> None:
     thread: ThreadRecord = await runtime.store.create_thread("leads", "test")
     campaign: CampaignRecord = await runtime.store.create_campaign(
-        "Leads", GOAL, thread.id, "ollama:none", "medium", "ask", (), "own"
+        "Leads", GOAL, thread.id, "ollama:none", "medium", "standard", "ask", (), "own"
     )
     await runtime.store.set_campaign_targets(campaign.id, "50 leads in leads.csv", "wc -l leads.csv counts 51 lines")
     ctx: ToolContext = await _context(runtime, campaign.id)
@@ -553,6 +565,7 @@ async def _campaign_context(runtime: Runtime) -> tuple[ToolContext, CampaignReco
         thread.id,
         "ollama:none",
         "medium",
+        "standard",
         "ask",
         (),
         "own",
@@ -757,7 +770,9 @@ async def test_in_goal_mode_a_claim_the_judge_finds_false_is_sent_back_without_t
     MODEL.script = ScriptedProvider(_PROVIDER, [finish] * (patience + 1))
     manager: RunManager = RunManager(runtime)
     try:
-        run: RunRecord = await manager.start(GOAL, "task", SCRIPTED_MODEL, None, "test", None, None, "ask", True, ())
+        run: RunRecord = await manager.start(
+            GOAL, "task", SCRIPTED_MODEL, None, "test", None, None, "standard", "ask", True, ()
+        )
         async with asyncio.timeout(60.0):
             ended: RunRecord = await manager.wait(run.id)
     finally:
@@ -799,7 +814,7 @@ async def test_a_typed_judgment_sends_a_routine_step_to_the_fast_model_and_a_har
     manager: RunManager = RunManager(runtime)
     try:
         run: RunRecord = await manager.start(
-            "Echo three markers.", "task", SCRIPTED_MODEL, None, "test", None, None, "ask", False, ()
+            "Echo three markers.", "task", SCRIPTED_MODEL, None, "test", None, None, "standard", "ask", False, ()
         )
         async with asyncio.timeout(60.0):
             ended: RunRecord = await manager.wait(run.id)

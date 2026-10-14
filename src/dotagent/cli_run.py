@@ -58,7 +58,7 @@ async def execute_run(
         runtime,
         manager,
         ui,
-        lambda: manager.start(goal, mode, model, thread_id, "cli", None, effort, approvals, goal_mode, ()),
+        lambda: manager.start(goal, mode, model, thread_id, "cli", None, effort, "standard", approvals, goal_mode, ()),
     )
 
 
@@ -186,6 +186,7 @@ async def cmd_run(command: RunCommand) -> int:
                     command.thread,
                     "cli",
                     command.effort,
+                    "standard",
                     command.approvals,
                     command.goal_mode,
                     (),

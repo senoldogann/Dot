@@ -108,7 +108,9 @@ async def served(runtime: Runtime) -> AsyncIterator[tuple[RunManager, str]]:
 
 async def _answered(runtime: Runtime, manager: RunManager, goal: str, thread_id: str | None) -> RunRecord:
     """Send ``goal`` to the chat ``thread_id`` (a new one for ``None``) and wait until the run has answered it."""
-    run: RunRecord = await manager.start(goal, "task", SCRIPTED_MODEL, thread_id, "test", None, None, "yolo", False, ())
+    run: RunRecord = await manager.start(
+        goal, "task", SCRIPTED_MODEL, thread_id, "test", None, None, "standard", "yolo", False, ()
+    )
     deadline: float = time.monotonic() + _RUN_WAIT_S
     while time.monotonic() < deadline:
         ended: RunRecord = await runtime.store.get_run(run.id)

@@ -237,7 +237,7 @@ async def test_an_approval_card_offers_to_make_a_rule_of_its_action(
         ],
     )
     run: RunRecord = await manager.start(
-        "Write the shopping notes", "task", SCRIPTED_MODEL, None, "test", None, None, "ask", False, ()
+        "Write the shopping notes", "task", SCRIPTED_MODEL, None, "test", None, None, "standard", "ask", False, ()
     )
     asked: ApprovalRecord = await _pending(runtime, run.id)
     assert asked.tool == "write_file"

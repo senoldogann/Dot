@@ -473,7 +473,7 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
   // chosen here, so that a reload, another browser or a run moved to a standby model leaves them as they are; a chat
   // from before has the open run's. The agent stays the chat's, and Keep going is a new chat's, since a campaign
   // starts from a goal of its own.
-  const start = detail.choices ?? { mode: run.mode, model: run.model, effort: run.effort, approvals: run.approvals, goal_mode: run.goal_mode };
+  const start = detail.choices ?? { mode: run.mode, model: run.model, effort: run.effort, speed: run.speed, approvals: run.approvals, goal_mode: run.goal_mode };
   // A level chosen while the chat follows the daemon's default model is that model's.
   const snapshot = getSnapshot();
   const levelModel = start.model ?? (snapshot.status === null ? "" : snapshot.status.models.main);
@@ -508,6 +508,7 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
           }
         },
       },
+      speed: heldChoice(start.speed),
       approvals: heldChoice(start.approvals),
       goalMode: heldChoice(start.goal_mode),
     },
@@ -650,6 +651,7 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
         mode: chosen.mode,
         model: chosen.model,
         effort: chosen.effort,
+        speed: chosen.speed,
         approvals: chosen.approvals,
         goal_mode: chosen.goal_mode,
         agent_id: run.agent_id,
@@ -679,6 +681,7 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
       mode: chosen.mode,
       model: chosen.model,
       effort: chosen.effort,
+      speed: chosen.speed,
       approvals: chosen.approvals,
       goal_mode: chosen.goal_mode,
       thread_id: run.thread_id,

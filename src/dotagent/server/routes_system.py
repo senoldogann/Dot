@@ -54,7 +54,7 @@ from dotagent.help.elsewhere import (
     FoundSkill,
     found_elsewhere,
 )
-from dotagent.llm.router import ModelRef, ModelRouter, parse_model_ref
+from dotagent.llm.router import ModelRef, ModelRouter, offers_fast_mode, parse_model_ref
 from dotagent.llm.traits import effective_effort
 from dotagent.llm.types import KNOWN_PROVIDERS, Effort, ModelInfo
 from dotagent.server.context import ServerContext
@@ -94,8 +94,9 @@ _PENDING_LIMIT: int = 500
 
 
 def _option(provider: str, info: ModelInfo, default_effort: Effort) -> ModelOption:
+    ref: ModelRef = ModelRef(provider=provider, model=info.id)
     return ModelOption(
-        ref=ModelRef(provider=provider, model=info.id).label,
+        ref=ref.label,
         vision=info.vision,
         tools=info.tools,
         thinking=info.thinking,
@@ -104,6 +105,7 @@ def _option(provider: str, info: ModelInfo, default_effort: Effort) -> ModelOpti
         efforts=list(info.efforts),
         default_effort=effective_effort(info.efforts, default_effort),
         free=info.free,
+        fast_mode=offers_fast_mode(ref),
     )
 
 

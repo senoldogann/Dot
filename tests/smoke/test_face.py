@@ -187,7 +187,7 @@ async def test_the_face_tells_the_state_through_a_runs_life_and_wears_the_name(
         ],
     )
     run: RunRecord = await manager.start(
-        "Pick a colour", "task", SCRIPTED_MODEL, None, "test", None, None, "ask", False, ()
+        "Pick a colour", "task", SCRIPTED_MODEL, None, "test", None, None, "standard", "ask", False, ()
     )
     question: ApprovalRecord = await _pending_question(runtime, run.id)
     schemes: tuple[tuple[int, Literal["light", "dark"]], ...] = ((1280, "light"), (1280, "dark"), (390, "light"))
@@ -231,7 +231,7 @@ async def test_the_face_tells_the_state_through_a_runs_life_and_wears_the_name(
 
                 MODEL.script = ScriptedProvider(_PROVIDER, [])
                 failing: RunRecord = await manager.start(
-                    "Fail at once", "task", SCRIPTED_MODEL, None, "test", None, None, "ask", False, ()
+                    "Fail at once", "task", SCRIPTED_MODEL, None, "test", None, None, "standard", "ask", False, ()
                 )
                 async with asyncio.timeout(_RUN_WAIT_S):
                     failed: RunRecord = await manager.wait(failing.id)
@@ -273,7 +273,7 @@ async def test_the_face_breathes_at_rest_pulses_at_work_and_holds_still_under_re
             await expect(face).to_have_attribute("data-still", "false")
             assert await page.evaluate(_CORE_ANIMATION) == "none"
             run: RunRecord = await manager.start(
-                "Rest a while", "task", SCRIPTED_MODEL, None, "test", None, None, "yolo", False, ()
+                "Rest a while", "task", SCRIPTED_MODEL, None, "test", None, None, "standard", "yolo", False, ()
             )
             await expect(face).to_have_attribute("data-state", "working")
             assert await page.evaluate(_CORE_ANIMATION) == "pulse-face"
@@ -316,7 +316,9 @@ async def test_the_run_page_has_no_character_card_and_its_answer_wears_the_face(
     assert port is not None
     base: str = f"http://{host}:{port}"
     MODEL.script = ScriptedProvider(_PROVIDER, [_turn(FINISH_TOOL, {"answer": "Done.", "success": True})])
-    run: RunRecord = await manager.start("Say done", "task", SCRIPTED_MODEL, None, "test", None, None, "ask", False, ())
+    run: RunRecord = await manager.start(
+        "Say done", "task", SCRIPTED_MODEL, None, "test", None, None, "standard", "ask", False, ()
+    )
     async with asyncio.timeout(_RUN_WAIT_S):
         ended: RunRecord = await manager.wait(run.id)
     assert ended.status == "done", ended

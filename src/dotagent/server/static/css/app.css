@@ -2073,6 +2073,27 @@ a.pill:hover {
   font-size: var(--text-sm);
 }
 
+/* A group of a composer menu under a heading of its own, such as the speeds under the reasoning levels (item 223);
+   a rule sets it apart from what is above it. */
+.composer-popover .pop-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.composer-popover .pop-group:not(:first-child) {
+  margin-top: 4px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+}
+
+.pop-heading {
+  padding: 0 8px;
+  color: var(--muted);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-label);
+}
+
 /* The slash menu (item 64): a listbox over the composer's frame, grouped Commands, Skills and MCP; the active option
    is marked by aria-selected. The frame is the anchor, so the menu sits above the text in both composers. */
 .composer {

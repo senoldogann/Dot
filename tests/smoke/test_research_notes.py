@@ -79,7 +79,7 @@ async def test_a_research_run_keeps_its_notes_file_and_a_memory_note(session: tu
     assert {NOTES_TOOL, "memory_save", "web_crawl"} <= offered
     assert not {"write_file", "edit_file", "shell"} & offered
     run: RunRecord = await manager.start(
-        GOAL, "research", SCRIPTED_MODEL, None, EVAL_SOURCE, None, None, "yolo", False, ()
+        GOAL, "research", SCRIPTED_MODEL, None, EVAL_SOURCE, None, None, "standard", "yolo", False, ()
     )
     async with asyncio.timeout(_TIME_LIMIT_S):
         record: RunRecord = await manager.wait(run.id)

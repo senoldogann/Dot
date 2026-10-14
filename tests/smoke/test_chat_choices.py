@@ -248,7 +248,7 @@ async def test_the_default_model_chosen_in_settings_starts_the_runs_that_name_no
             await page.goto(f"{address}/#/runs")
             await expect(page.locator(".composer-pill[data-pill='model']")).to_contain_text("other")
             started: RunRecord = await manager.start(
-                "Sort the photos.", "task", None, None, "test", None, None, "ask", False, ()
+                "Sort the photos.", "task", None, None, "test", None, None, "standard", "ask", False, ()
             )
             assert started.model == OTHER
             async with asyncio.timeout(_RUN_WAIT_S):
@@ -275,7 +275,7 @@ async def test_a_chat_keeps_what_its_composer_chose_after_a_reload_and_in_anothe
 ) -> None:
     manager, address = served
     started: RunRecord = await manager.start(
-        "Sort the photos.", "task", SCRIPTED_MODEL, None, "test", None, None, "ask", False, ()
+        "Sort the photos.", "task", SCRIPTED_MODEL, None, "test", None, None, "standard", "ask", False, ()
     )
     async with asyncio.timeout(_RUN_WAIT_S):
         first: RunRecord = await manager.wait(started.id)
@@ -300,7 +300,9 @@ async def test_a_chat_keeps_what_its_composer_chose_after_a_reload_and_in_anothe
             await _kept(
                 runtime,
                 first.thread_id,
-                ChatChoices(mode="research", model=THINKER, effort="high", approvals="auto", goal_mode=False),
+                ChatChoices(
+                    mode="research", model=THINKER, effort="high", speed="standard", approvals="auto", goal_mode=False
+                ),
             )
 
             # A reload shows them, and so does another browser.
@@ -336,13 +338,13 @@ async def test_a_run_moved_to_a_standby_model_leaves_the_chats_model(
 ) -> None:
     manager, address = served
     started: RunRecord = await manager.start(
-        "Count the files.", "task", THINKER, None, "test", None, "low", "ask", False, ()
+        "Count the files.", "task", THINKER, None, "test", None, "low", "standard", "ask", False, ()
     )
     async with asyncio.timeout(_RUN_WAIT_S):
         first: RunRecord = await manager.wait(started.id)
     # A chat keeps what its first run started with ...
     assert await runtime.store.chat_choices(first.thread_id) == ChatChoices(
-        mode="task", model=THINKER, effort="low", approvals="ask", goal_mode=False
+        mode="task", model=THINKER, effort="low", speed="standard", approvals="ask", goal_mode=False
     )
     # ... when the daemon moves the run to a standby model, as agent.loop._to_standby does.
     await runtime.store.set_run_model(first.id, STANDBY, None)

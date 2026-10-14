@@ -24,6 +24,7 @@ REQUEST: ChatRequest = ChatRequest(
     temperature=None,
     max_output_tokens=None,
     effort="medium",
+    speed="standard",
     session_key="thr_x:goal",
 )
 REPLY: ModelReply = ModelReply(

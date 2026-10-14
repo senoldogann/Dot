@@ -248,6 +248,7 @@ function capabilities(model) {
     model.tools ? el("span", { class: "chip" }, "tools") : null,
     model.thinking ? el("span", { class: "chip" }, "thinking") : null,
     model.free ? el("span", { class: "chip" }, "free") : null,
+    model.fast_mode ? el("span", { class: "chip", title: "Fast mode, chosen in the composer's Reasoning menu" }, "fast mode") : null,
   );
 }
 

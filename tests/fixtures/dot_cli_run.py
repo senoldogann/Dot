@@ -47,7 +47,7 @@ async def main(goal: str, turn: ScriptedTurn) -> None:
 
         async def launch() -> RunRecord:
             run: RunRecord = await manager.start(
-                goal, "task", SCRIPTED_MODEL, None, "cli", None, None, "yolo", False, ()
+                goal, "task", SCRIPTED_MODEL, None, "cli", None, None, "standard", "yolo", False, ()
             )
             _say(f"run {run.id}")
             return run

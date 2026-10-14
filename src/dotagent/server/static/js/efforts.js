@@ -1,9 +1,16 @@
 // The reasoning level a person prefers for each model. A model lists the levels it offers, lowest first (fewer than two
-// means there is nothing to choose); the choice is kept per browser and goes with every run started from here.
+// means there is nothing to choose); the choice is kept per browser and goes with every run started from here. Beside
+// it, fast mode (item 223), for the Claude models that have it.
 
 import { readPref, writePref } from "./prefs.js";
 
 const KEY_PREFIX = "dot.effort.";
+const SPEED_KEY = "dot.speed";
+// What each speed is, under its name in the reasoning menu.
+export const SPEED_HINTS = {
+  standard: "The model's usual speed",
+  fast: "Up to 2.5 times faster, at twice the price",
+};
 const LABELS = {
   off: "Off",
   on: "On",
@@ -23,6 +30,12 @@ function keyOf(model) {
 export function levelLabel(level) {
   return LABELS[level] ?? level;
 }
+
+/** The home's choice of speed, kept per browser: "fast" for fast mode, else "standard". */
+export const KEPT_SPEED = {
+  read: () => (readPref(SPEED_KEY) === "fast" ? "fast" : "standard"),
+  write: (speed) => writePref(SPEED_KEY, speed),
+};
 
 /** Whether the model has more than one level to choose from. */
 export function offersChoice(model) {

@@ -30,7 +30,7 @@ from dotagent.core.logs import get_logger
 from dotagent.core.text import fold_search
 from dotagent.core.types import JsonArray, JsonObject
 from dotagent.llm.calls import CALL_EVENT, CallPurpose
-from dotagent.llm.types import Effort, ImageData, Message
+from dotagent.llm.types import Effort, ImageData, Message, Speed
 from dotagent.policy.types import ApprovalMode, PaceClass
 from dotagent.store.endings import RESULT_RESTARTED
 from dotagent.store.models import (
@@ -363,6 +363,7 @@ def _run(row: aiosqlite.Row) -> RunRecord:
         parent_run_id=row["parent_run_id"],
         source=row["source"],
         effort=row["effort"],
+        speed=row["speed"],
         approvals=row["approvals"],
         goal_mode=bool(row["goal_mode"]),
         campaign_id=row["campaign_id"],
@@ -413,6 +414,7 @@ def _campaign(row: aiosqlite.Row) -> CampaignRecord:
             "thread_id": row["thread_id"],
             "model": row["model"],
             "effort": row["effort"],
+            "speed": row["speed"],
             "approvals": row["approvals"],
             "files": parse_json_value(row["files"], "campaign files"),
             "cron": row["cron"],
@@ -490,6 +492,7 @@ def _queued(row: aiosqlite.Row) -> QueuedMessage:
         mode=row["mode"],
         model=row["model"],
         effort=row["effort"],
+        speed=row["speed"],
         approvals=row["approvals"],
         goal_mode=None if goal_mode is None else bool(goal_mode),
         agent_id=row["agent_id"],
@@ -545,7 +548,7 @@ def _option_values(options: ScheduleOptions) -> tuple[str | None, str | None, st
 
 # Columns of ``runs`` added after the first version, with the definition that gives the rows of an older database the
 # value those runs had in effect: no reasoning level kept, ``ask``, no goal mode, no campaign, no owner (a run of a
-# process of before owners, which a daemon that starts takes for gone, as it took every run then).
+# process of before owners, which a daemon that starts takes for gone, as it took every run then), the standard speed.
 _ADDED_RUN_COLUMNS: tuple[tuple[str, str], ...] = (
     ("effort", "TEXT"),
     ("approvals", "TEXT NOT NULL DEFAULT 'ask'"),
@@ -553,6 +556,7 @@ _ADDED_RUN_COLUMNS: tuple[tuple[str, str], ...] = (
     ("campaign_id", "TEXT"),
     ("agent_id", "TEXT"),
     ("owner", "TEXT"),
+    ("speed", "TEXT NOT NULL DEFAULT 'standard'"),
 )
 # Columns of ``memories`` added later: notes of an older database were never counted as used, and are Dot's.
 _ADDED_MEMORY_COLUMNS: tuple[tuple[str, str], ...] = (
@@ -571,8 +575,14 @@ _ADDED_SCHEDULE_COLUMNS: tuple[tuple[str, str], ...] = (
 )
 
 
-# Columns of ``campaigns`` added later: NULL means the daemon's browser, which is where an older campaign's sessions ran.
-_ADDED_CAMPAIGN_COLUMNS: tuple[tuple[str, str], ...] = (("browser", "TEXT"),)
+# Columns of ``campaigns`` added later: NULL means the daemon's browser, which is where an older campaign's sessions ran;
+# they ran at the standard speed too.
+_ADDED_CAMPAIGN_COLUMNS: tuple[tuple[str, str], ...] = (
+    ("browser", "TEXT"),
+    ("speed", "TEXT NOT NULL DEFAULT 'standard'"),
+)
+# Columns of ``queued_messages`` added later: an older message was sent at the standard speed.
+_ADDED_QUEUE_COLUMNS: tuple[tuple[str, str], ...] = (("speed", "TEXT NOT NULL DEFAULT 'standard'"),)
 # Columns of ``threads`` added later: NULL means a chat the owner has not pinned (item 130), one the owner has not seen
 # since its runs began or since they marked it unread (item 131), and one without choices of its own yet (a
 # ``ChatChoices`` as JSON, item 199).
@@ -606,14 +616,22 @@ async def _add_missing_columns(connection: aiosqlite.Connection) -> None:
     """Give a database created by an older version the columns added since, and the indexes on them, in one
     transaction: a process that dies part way leaves the database as it was, and the next start does it all."""
     await connection.execute("BEGIN")
-    await _add_columns(connection, "runs", _ADDED_RUN_COLUMNS)
+    added_to_runs: tuple[str, ...] = await _add_columns(connection, "runs", _ADDED_RUN_COLUMNS)
     await _add_columns(connection, "memories", _ADDED_MEMORY_COLUMNS)
     await _add_columns(connection, "schedules", _ADDED_SCHEDULE_COLUMNS)
     await _add_columns(connection, "campaigns", _ADDED_CAMPAIGN_COLUMNS)
+    await _add_columns(connection, "queued_messages", _ADDED_QUEUE_COLUMNS)
     await _add_columns(connection, "agents", _ADDED_AGENT_COLUMNS)
     if "seen_at" in await _add_columns(connection, "threads", _ADDED_THREAD_COLUMNS):
         # The chats of a store from before item 131 are taken as seen, so that none of them shows up unread at once.
         await connection.execute("UPDATE threads SET seen_at = ?", (time.time(),))
+    if "speed" in added_to_runs:
+        # A store from before fast mode (item 223): the choices its chats kept are those of the standard speed. Only
+        # then, as an UPDATE takes the write lock even when it changes nothing, and a store opens beside other writers.
+        await connection.execute(
+            "UPDATE threads SET choices = json_set(choices, '$.speed', 'standard')"
+            " WHERE choices IS NOT NULL AND json_type(choices, '$.speed') IS NULL"
+        )
     await connection.execute("CREATE INDEX IF NOT EXISTS runs_campaign ON runs(campaign_id, created_at)")
     # The runs of a chat, of a run that delegated, of an agent; the approvals waiting, newest first.
     await connection.execute("CREATE INDEX IF NOT EXISTS runs_thread ON runs(thread_id, created_at)")
@@ -1110,6 +1128,7 @@ class Store:
         parent_run_id: str | None,
         source: str,
         effort: Effort,
+        speed: Speed,
         approvals: ApprovalMode,
         goal_mode: bool,
         campaign_id: str | None,
@@ -1133,6 +1152,7 @@ class Store:
             parent_run_id=parent_run_id,
             source=source,
             effort=effort,
+            speed=speed,
             approvals=approvals,
             goal_mode=goal_mode,
             campaign_id=campaign_id,
@@ -1151,8 +1171,8 @@ class Store:
         )
         async with self._db.execute(
             "INSERT INTO runs(id, thread_id, goal, mode, model, status, created_at, finished_at, result, steps,"
-            " input_tokens, output_tokens, parent_run_id, source, effort, approvals, goal_mode, campaign_id, agent_id,"
-            f" owner) SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?{refusal} RETURNING id",
+            " input_tokens, output_tokens, parent_run_id, source, effort, speed, approvals, goal_mode, campaign_id,"
+            f" agent_id, owner) SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?{refusal} RETURNING id",
             (
                 record.id,
                 record.thread_id,
@@ -1169,6 +1189,7 @@ class Store:
                 record.parent_run_id,
                 record.source,
                 record.effort,
+                record.speed,
                 record.approvals,
                 int(record.goal_mode),
                 record.campaign_id,
@@ -1744,6 +1765,7 @@ class Store:
         mode: RunMode,
         model: str | None,
         effort: Effort | None,
+        speed: Speed,
         approvals: ApprovalMode | None,
         goal_mode: bool | None,
         agent_id: str | None,
@@ -1762,6 +1784,7 @@ class Store:
             mode=mode,
             model=model,
             effort=effort,
+            speed=speed,
             approvals=approvals,
             goal_mode=goal_mode,
             agent_id=agent_id,
@@ -1775,8 +1798,8 @@ class Store:
     async def _insert_queued(self, record: QueuedMessage) -> None:
         """Store ``record`` in its chat's queue; the caller commits."""
         await self._db.execute(
-            "INSERT INTO queued_messages(id, thread_id, position, text, attachments, mode, model, effort, approvals,"
-            " goal_mode, agent_id, source, created_at) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            "INSERT INTO queued_messages(id, thread_id, position, text, attachments, mode, model, effort, speed,"
+            " approvals, goal_mode, agent_id, source, created_at) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (
                 record.id,
                 record.thread_id,
@@ -1786,6 +1809,7 @@ class Store:
                 record.mode,
                 record.model,
                 record.effort,
+                record.speed,
                 record.approvals,
                 None if record.goal_mode is None else int(record.goal_mode),
                 record.agent_id,
@@ -2421,6 +2445,7 @@ class Store:
         thread_id: str,
         model: str,
         effort: Effort,
+        speed: Speed,
         approvals: ApprovalMode,
         files: Sequence[str],
         browser: BrowserMode,
@@ -2437,6 +2462,7 @@ class Store:
             thread_id=thread_id,
             model=model,
             effort=effort,
+            speed=speed,
             approvals=approvals,
             files=tuple(files),
             cron=None,
@@ -2447,9 +2473,9 @@ class Store:
             browser=browser,
         )
         await self._db.execute(
-            "INSERT INTO campaigns(id, title, goal, targets, verification, status, thread_id, model, effort, approvals,"
-            " files, cron, next_session_at, created_at, updated_at, evidence, browser)"
-            " VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            "INSERT INTO campaigns(id, title, goal, targets, verification, status, thread_id, model, effort, speed,"
+            " approvals, files, cron, next_session_at, created_at, updated_at, evidence, browser)"
+            " VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (
                 record.id,
                 record.title,
@@ -2460,6 +2486,7 @@ class Store:
                 record.thread_id,
                 record.model,
                 record.effort,
+                record.speed,
                 record.approvals,
                 dumps_compact(list(record.files)),
                 record.cron,

@@ -41,7 +41,7 @@ def test_a_page_is_sandboxed_loads_nothing_of_the_daemon_and_only_the_ui_frames_
 
 async def _ended_run(store: Store, thread: ThreadRecord) -> RunRecord:
     run: RunRecord = await store.create_run(
-        thread.id, "chart", "task", "ollama:x", None, "test", None, "ask", False, None, None, None
+        thread.id, "chart", "task", "ollama:x", None, "test", None, "standard", "ask", False, None, None, None
     )
     await store.finish_run(run.id, "done", "done")
     return run

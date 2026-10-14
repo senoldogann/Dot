@@ -258,6 +258,7 @@ class Scheduler:
                 SCHEDULE_SOURCE,
                 None,
                 record.options.effort,
+                "standard",
                 record.options.approvals,
                 record.options.goal_mode,
                 (),

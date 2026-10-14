@@ -270,7 +270,7 @@ async def _run_in(
     try:
         async with runtime.bus.subscribe(None) as subscription:
             run: RunRecord = await manager.start(
-                task.goal, task.mode, model, None, EVAL_SOURCE, None, None, "ask", task.goal_mode, ()
+                task.goal, task.mode, model, None, EVAL_SOURCE, None, None, "standard", "ask", task.goal_mode, ()
             )
             cut: Cut = await _supervise(runtime, manager, subscription, run.id, task)
         record: RunRecord = await manager.wait(run.id)

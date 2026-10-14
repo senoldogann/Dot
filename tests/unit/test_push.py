@@ -39,6 +39,7 @@ def _run(parent: str | None) -> RunRecord:
         parent_run_id=parent,
         source="test",
         effort=None,
+        speed="standard",
         approvals="ask",
         goal_mode=False,
         campaign_id=None,

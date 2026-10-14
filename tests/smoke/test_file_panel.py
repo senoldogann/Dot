@@ -235,7 +235,17 @@ async def _one_size(
     )
     await page.goto(ui_url("127.0.0.1", int(address.rpartition(":")[2]), TOKEN))
     run: RunRecord = await manager.start(
-        f"Look at the files ({width}, {scheme})", "task", SCRIPTED_MODEL, None, "test", None, None, "ask", False, files
+        f"Look at the files ({width}, {scheme})",
+        "task",
+        SCRIPTED_MODEL,
+        None,
+        "test",
+        None,
+        None,
+        "standard",
+        "ask",
+        False,
+        files,
     )
     async with asyncio.timeout(WAIT_S):
         assert (await manager.wait(run.id)).status == "done"

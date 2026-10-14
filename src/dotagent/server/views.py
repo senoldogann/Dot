@@ -10,7 +10,7 @@ from dotagent.config import ModelReference, ModelsConfig
 from dotagent.core.types import FrozenModel
 from dotagent.desktop.perms import Pane
 from dotagent.help.elsewhere import FoundElsewhere
-from dotagent.llm.types import Effort
+from dotagent.llm.types import Effort, Speed
 from dotagent.mcp.types import McpFailure
 from dotagent.policy.types import ApprovalMode
 from dotagent.secrets import SecretSource
@@ -108,15 +108,17 @@ MessageKey = Annotated[str, StringConstraints(pattern=r"^[A-Za-z0-9-]{16,64}$")]
 
 
 class StartRunRequest(FrozenModel):
-    """Start a run. ``model``, ``effort``, ``approvals`` and ``goal_mode`` left out take the configured ones.
-    ``standing`` ("Keep going until done") starts a campaign on the goal instead, with this run as its opening session:
-    a task, without goal mode (see ``RunManager.start_campaign``)."""
+    """Start a run. ``model``, ``effort``, ``approvals`` and ``goal_mode`` left out take the configured ones; ``speed``
+    is ``fast`` for fast mode, on a model that has it (item 223). ``standing`` ("Keep going until done") starts a
+    campaign on the goal instead, with this run as its opening session: a task, without goal mode (see
+    ``RunManager.start_campaign``)."""
 
     goal: str = Field(min_length=1, max_length=_GOAL_CHARS)
     mode: RunMode = "task"
     model: str | None = None
     thread_id: str | None = None
     effort: Effort | None = None
+    speed: Speed = "standard"
     approvals: ApprovalMode | None = None
     goal_mode: bool | None = None
     standing: bool = False
@@ -172,6 +174,7 @@ class QueueMessageRequest(FrozenModel):
     mode: RunMode = "task"
     model: str | None = None
     effort: Effort | None = None
+    speed: Speed = "standard"
     approvals: ApprovalMode | None = None
     goal_mode: bool | None = None
     agent_id: str | None = None
@@ -581,7 +584,7 @@ class ModelOption(FrozenModel):
     """A model as the pickers show it. ``context_length`` is the window Dot uses, ``own_context_length`` the model's own
     when it is larger (see ``ModelInfo``); ``efforts`` are its reasoning levels, lowest first (fewer than two: no
     choice); ``default_effort`` is the level the configured default effort selects on it; ``free``: served at no
-    cost."""
+    cost; ``fast_mode``: it has fast mode (item 223)."""
 
     ref: str
     vision: bool
@@ -592,6 +595,7 @@ class ModelOption(FrozenModel):
     efforts: list[Effort]
     default_effort: Effort | None
     free: bool
+    fast_mode: bool
 
 
 type ProviderProblem = Literal["no_key", "key_refused", "access_refused", "failed"]

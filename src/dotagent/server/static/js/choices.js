@@ -7,7 +7,7 @@
 import { api } from "./api.js";
 import { composerPill } from "./composer.js";
 import { el, modelName } from "./dom.js";
-import { allModels, levelLabel, offersChoice } from "./efforts.js";
+import { allModels, levelLabel, offersChoice, SPEED_HINTS } from "./efforts.js";
 import { icon } from "./icons.js";
 import { modelPicker } from "./modelpicker.js";
 import { anchoredPopover } from "./popover.js";
@@ -56,13 +56,15 @@ export function optionRow({ lead, label, hint, selected, onPick }) {
  * The pills of a run's choices for the composer `frame` (composer.js), whose frame bounds their menus. `kept` is where
  * the box starts and keeps them: `mode` (an id of `MODES`), `model` (a reference, or "" for the daemon's default),
  * `level` (`read(info)`, the reasoning level chosen for a model, or null for the daemon's; `write(info, level)`, null to
- * go back to the daemon's), `approvals` and `goalMode` (as `approvalsPicker` and `goalModePicker` take them).
+ * go back to the daemon's), `speed` (`read()`, "fast" or "standard"; `write(speed)`: fast mode, which a run asks for
+ * only of a model that has it, item 223), `approvals` and `goalMode` (as `approvalsPicker` and `goalModePicker` take
+ * them).
  * `optionsTitle` is the Options pill's tooltip, `more()` the lines its menu shows after goal mode, `onMode(id)` runs
  * after a mode was chosen, and `onChange()` after any choice was made (`value()` has it then).
  *
  * Returns `pills` (`{ mode, model, reasoning, options }`, the elements), `setMode(id)`, `goalMode` (its picker),
- * `ready()` (resolves once the models are loaded), `value()` (what a run starts with: `{ mode, model, effort, approvals,
- * goal_mode }`), `sync()` after a status change, `setWaiting(on)` (while a run works, the choices wait for the next
+ * `ready()` (resolves once the models are loaded), `value()` (what a run starts with: `{ mode, model, effort, speed,
+ * approvals, goal_mode }`), `sync()` after a status change, `setWaiting(on)` (while a run works, the choices wait for the next
  * follow-up and the pills say so) and `dispose()`.
  */
 export function runChoices({ frame, kept, optionsTitle, more, onMode, onChange }) {
@@ -148,7 +150,7 @@ export function runChoices({ frame, kept, optionsTitle, more, onMode, onChange }
 
   // The model: the daemon's default until one is picked, worn with its provider's mark (item 108).
   const modelPill = composerPill({ id: "model", caption: "Model", value: "", icon: null });
-  // The reasoning level of a model that offers a choice; hidden for the others.
+  // The reasoning level of a model that offers a choice, and its speed when it has fast mode; hidden for the others.
   const reasoningPill = composerPill({ id: "reasoning", caption: "Reasoning", value: "", icon: icon("brain") });
   setTitle(reasoningPill.element, "Reasoning level");
   reasoningPill.element.hidden = true;
@@ -162,8 +164,13 @@ export function runChoices({ frame, kept, optionsTitle, more, onMode, onChange }
     return allModels(providers).find((candidate) => candidate.ref === ref) ?? null;
   }
 
+  // Whether a run would ask the model `info` for fast mode: it has it, and fast was chosen.
+  function fastOn(info) {
+    return info !== null && info.fast_mode && kept.speed.read() === "fast";
+  }
+
   // The Model pill shows the mark and the name, its tooltip the whole reference; the Reasoning pill the level chosen,
-  // or the one the daemon would use.
+  // or the one the daemon would use, and Fast while fast mode is on.
   function paintModel() {
     const info = selectedInfo();
     const ref = chosenRef === "" ? defaultRefOf(getSnapshot()) : chosenRef;
@@ -171,10 +178,13 @@ export function runChoices({ frame, kept, optionsTitle, more, onMode, onChange }
     modelPill.setIcon(providerMark(ref === null ? "" : providerOf(ref)));
     setTitle(modelPill.element, info === null ? "" : info.ref);
     const choice = info !== null && offersChoice(info);
-    reasoningPill.element.hidden = !choice;
-    if (choice) {
-      const level = kept.level.read(info) ?? info.default_effort;
-      reasoningPill.setValue(level === null ? "Default" : levelLabel(level), "");
+    const shown = choice || (info !== null && info.fast_mode);
+    reasoningPill.element.hidden = !shown;
+    if (shown) {
+      const level = choice ? (kept.level.read(info) ?? info.default_effort) : null;
+      const words = choice ? (level === null ? "Default" : levelLabel(level)) : "";
+      reasoningPill.setValue(fastOn(info) ? (words === "" ? "Fast" : `${words} · Fast`) : words, "");
+      reasoningPill.setIcon(icon(fastOn(info) ? "bolt" : "brain"));
     } else {
       reasoningMenu.close();
     }
@@ -198,21 +208,50 @@ export function runChoices({ frame, kept, optionsTitle, more, onMode, onChange }
     onChange();
   }
 
+  function pickSpeed(speed) {
+    kept.speed.write(speed);
+    reasoningMenu.close();
+    paintModel();
+    reasoningPill.element.focus();
+    onChange();
+  }
+
+  // The levels of a model that offers a choice, then the speeds of one with fast mode (item 223).
   function reasoningRows() {
     const info = selectedInfo();
-    if (info === null || !offersChoice(info)) {
+    if (info === null) {
       return [];
     }
-    const chosen = kept.level.read(info);
-    const fallback = info.default_effort === null ? "Default" : `Default (${levelLabel(info.default_effort)})`;
-    return [
-      el(
-        "div",
-        { role: "listbox", "aria-label": "Reasoning" },
-        optionRow({ lead: null, label: fallback, hint: "The daemon's own choice", selected: chosen === null, onPick: () => pickLevel(info, null) }),
-        ...info.efforts.map((level) => optionRow({ lead: null, label: levelLabel(level), hint: "", selected: chosen === level, onPick: () => pickLevel(info, level) })),
-      ),
-    ];
+    const rows = [];
+    if (offersChoice(info)) {
+      const chosen = kept.level.read(info);
+      const fallback = info.default_effort === null ? "Default" : `Default (${levelLabel(info.default_effort)})`;
+      rows.push(
+        el(
+          "div",
+          { role: "listbox", "aria-label": "Reasoning" },
+          optionRow({ lead: null, label: fallback, hint: "The daemon's own choice", selected: chosen === null, onPick: () => pickLevel(info, null) }),
+          ...info.efforts.map((level) => optionRow({ lead: null, label: levelLabel(level), hint: "", selected: chosen === level, onPick: () => pickLevel(info, level) })),
+        ),
+      );
+    }
+    if (info.fast_mode) {
+      const fast = fastOn(info);
+      rows.push(
+        el(
+          "div",
+          { class: "pop-group", role: "group", "aria-label": "Speed" },
+          el("div", { class: "pop-heading", "aria-hidden": "true" }, "Speed"),
+          el(
+            "div",
+            { role: "listbox", "aria-label": "Speed" },
+            optionRow({ lead: null, label: "Standard", hint: SPEED_HINTS.standard, selected: !fast, onPick: () => pickSpeed("standard") }),
+            optionRow({ lead: null, label: "Fast", hint: SPEED_HINTS.fast, selected: fast, onPick: () => pickSpeed("fast") }),
+          ),
+        ),
+      );
+    }
+    return rows;
   }
 
   // The daemon's default, made from the model's menu as from the Settings (item 209): told as made, or why it was not;
@@ -274,6 +313,7 @@ export function runChoices({ frame, kept, optionsTitle, more, onMode, onChange }
         mode: modeId,
         model: chosenRef === "" ? null : chosenRef,
         effort: level,
+        speed: fastOn(info) ? "fast" : "standard",
         approvals: approvals.value(),
         goal_mode: modeId === "chat" ? null : goalMode.value(),
       };

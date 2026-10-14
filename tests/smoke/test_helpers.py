@@ -166,7 +166,9 @@ def _spent() -> SpendingProvider:
 
 
 async def _play(runtime: Runtime, manager: RunManager, model: str, effort: Effort | None) -> Played:
-    run: RunRecord = await manager.start(GOAL, "task", model, None, EVAL_SOURCE, None, effort, "ask", False, ())
+    run: RunRecord = await manager.start(
+        GOAL, "task", model, None, EVAL_SOURCE, None, effort, "standard", "ask", False, ()
+    )
     async with asyncio.timeout(_TIME_LIMIT_S):
         record: RunRecord = await manager.wait(run.id)
     return Played(record=record, events=tuple(await runtime.store.list_events(record.id, 0, _MAX_EVENTS)))

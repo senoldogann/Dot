@@ -3,7 +3,7 @@
 The body and the stream are the Messages codec that OpenCode Go's messages route uses as well; what only Anthropic
 takes (adaptive thinking with the reasoning level as ``output_config.effort``, and the prompt cache) is switched on
 through :class:`MessagesOptions`. What a model can do is read from the Models API, so a new Claude model needs no change
-here.
+here; fast mode is the exception, as the Models API does not say which models have it (``FAST_MODE_MODELS``).
 """
 
 import asyncio
@@ -29,6 +29,10 @@ ANTHROPIC_VERSION: str = "2023-06-01"
 # Lets a request have a replayed thinking block whose earlier context changed dropped instead of refused: a run edits
 # its history when it drops an old screenshot, and the next run of a chat starts with a new system prompt.
 _THINKING_BINDING_BETA: str = "thinking-binding-controls-2026-08-01"
+# Fast mode (item 223): a research preview of up to 2.5 times the output speed, at twice the price, which an
+# organization has to be let into; a request asks for it with ``speed`` and this beta. The models its page names.
+_FAST_MODE_BETA: str = "fast-mode-2026-02-01"
+FAST_MODE_MODELS: frozenset[str] = frozenset({"claude-opus-5-5", "claude-opus-5", "claude-opus-4-8"})
 # The largest page of the model listing.
 _PAGE_SIZE: int = 1000
 _OPTIONS: MessagesOptions = MessagesOptions(adaptive_thinking=True, prompt_cache=True, default_max_tokens=None)
@@ -89,6 +93,10 @@ class AnthropicProvider:
         self._client: httpx.AsyncClient = build_client(config.connect_timeout_s, config.read_timeout_s)
         self._headers: dict[str, str] = _request_headers(api_key)
         self._message_headers: dict[str, str] = {**self._headers, "anthropic-beta": _THINKING_BINDING_BETA}
+        self._fast_headers: dict[str, str] = {
+            **self._headers,
+            "anthropic-beta": f"{_THINKING_BINDING_BETA},{_FAST_MODE_BETA}",
+        }
         self._traits_cache: dict[str, ModelTraits] = {}
         self._slots: asyncio.Semaphore = asyncio.Semaphore(config.max_concurrent)
         self._policy: RetryPolicy = RetryPolicy(attempts=config.attempts, base_delay_s=1.0, max_delay_s=30.0)
@@ -138,6 +146,11 @@ class AnthropicProvider:
     async def complete(self, request: ChatRequest, sink: DeltaSink) -> ModelReply:
         traits: ModelTraits = await self._traits(request.model)
         body: JsonObject = build_messages_body(request, traits, f"anthropic:{request.model}", _OPTIONS)
+        # Fast mode is asked for, never fallen back from: a refusal (no access, its own rate limit) is the run's error.
+        # The body still ends with ``stream``, as every body does.
+        if request.speed == "fast":
+            body = {**{key: value for key, value in body.items() if key != "stream"}, "speed": "fast", "stream": True}
+        headers: dict[str, str] = self._fast_headers if request.speed == "fast" else self._message_headers
         url: str = self._url("/messages")
         payload: str = dumps_compact(body)
         context: JsonObject = request_context(url, body)
@@ -148,7 +161,7 @@ class AnthropicProvider:
                 self._client,
                 url,
                 payload,
-                self._message_headers,
+                headers,
                 context,
                 classify_anthropic,
                 codec,

@@ -290,7 +290,17 @@ async def test_find_help_tells_a_run_of_a_skill_another_agent_set_up_and_to_ask_
             manager: RunManager = RunManager(runtime)
             try:
                 run: RunRecord = await manager.start(
-                    "Fill in the form.", "task", SCRIPTED_MODEL, None, UI_SOURCE, None, None, "yolo", False, ()
+                    "Fill in the form.",
+                    "task",
+                    SCRIPTED_MODEL,
+                    None,
+                    UI_SOURCE,
+                    None,
+                    None,
+                    "standard",
+                    "yolo",
+                    False,
+                    (),
                 )
                 async with asyncio.timeout(_TIME_LIMIT_S):
                     done: RunRecord = await manager.wait(run.id)

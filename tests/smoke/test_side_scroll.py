@@ -116,7 +116,19 @@ async def _seed(runtime: Runtime, title: str) -> RunRecord:
     """A chat whose one run is over; a follow-up in it runs as a task with no approval asked, as the script's do."""
     thread: ThreadRecord = await runtime.store.create_thread(title, "test")
     run: RunRecord = await runtime.store.create_run(
-        thread.id, f"{title} goal", "task", SCRIPTED_MODEL, None, "test", "medium", "yolo", False, None, None, None
+        thread.id,
+        f"{title} goal",
+        "task",
+        SCRIPTED_MODEL,
+        None,
+        "test",
+        "medium",
+        "standard",
+        "yolo",
+        False,
+        None,
+        None,
+        None,
     )
     await runtime.store.end_run(run.id, "done", "Done.", {"status": "done", "result": "Done.", "needs": ""})
     return run
@@ -243,6 +255,7 @@ async def test_the_side_menu_stays_where_it_was_scrolled_through_a_delete_a_pin_
                     "test",
                     None,
                     None,
+                    "standard",
                     "yolo",
                     False,
                     (),

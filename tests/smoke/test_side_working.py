@@ -183,22 +183,22 @@ async def test_a_chat_at_work_stands_once_in_working_and_a_pinned_one_stays_pinn
 ) -> None:
     manager, address = served
     garden: RunRecord = await manager.start(
-        "Plan the garden", "task", SCRIPTED_MODEL, None, "test", None, None, "yolo", False, ()
+        "Plan the garden", "task", SCRIPTED_MODEL, None, "test", None, None, "standard", "yolo", False, ()
     )
     async with asyncio.timeout(_RUN_WAIT_S):
         assert (await manager.wait(garden.id)).status == "done"
     shelves: RunRecord = await manager.start(
-        "Read the shelves", "task", SCRIPTED_MODEL, None, "test", None, None, "yolo", False, ()
+        "Read the shelves", "task", SCRIPTED_MODEL, None, "test", None, None, "standard", "yolo", False, ()
     )
     reading: list[RunRecord] = await _delegated(runtime, shelves.id, len(_SHELVES))
     boxes: RunRecord = await manager.start(
-        "Count the boxes", "task", SCRIPTED_MODEL, None, "test", None, None, "yolo", False, ()
+        "Count the boxes", "task", SCRIPTED_MODEL, None, "test", None, None, "standard", "yolo", False, ()
     )
     counting: list[RunRecord] = await _delegated(runtime, boxes.id, 1)
     assert boxes.thread_id is not None
     await runtime.store.pin_thread(boxes.thread_id, True)
     asking: RunRecord = await manager.start(
-        "Pick a shelf", "task", SCRIPTED_MODEL, None, "test", None, None, "ask", False, ()
+        "Pick a shelf", "task", SCRIPTED_MODEL, None, "test", None, None, "standard", "ask", False, ()
     )
     await _pending_question(runtime, asking.id)
     async with async_playwright() as playwright:

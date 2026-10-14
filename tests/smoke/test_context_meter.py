@@ -95,6 +95,7 @@ async def _seeded_run(runtime: Runtime, prompts: tuple[int, ...]) -> RunRecord:
         None,
         "test",
         "medium",
+        "standard",
         "yolo",
         False,
         None,

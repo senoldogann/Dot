@@ -58,6 +58,7 @@ export function createDetails(run, agent, campaign, keepGoing) {
       fact("Mode", el("dd", null, run.mode)),
       fact("Model", model),
       fact("Reasoning", el("dd", null, run.effort === null ? "Model default" : levelLabel(run.effort))),
+      run.speed === "fast" ? fact("Speed", el("dd", null, "Fast mode, on the steps of a model that has it")) : null,
       fact("Approvals", el("dd", null, approvalLabel(run.approvals))),
       fact("Goal mode", el("dd", null, run.goal_mode ? (keepGoing ? "On, asked not to stop" : "On") : "Off")),
       campaign === null

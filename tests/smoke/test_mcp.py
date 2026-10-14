@@ -692,6 +692,7 @@ async def test_a_model_calls_an_mcp_tool_and_uses_its_answer(runtime: Runtime) -
         "test",
         None,
         None,
+        "standard",
         None,
         None,
         (),

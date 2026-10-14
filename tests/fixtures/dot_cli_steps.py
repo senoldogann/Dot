@@ -58,7 +58,7 @@ async def main(goal: str, approvals: ApprovalMode, thread_id: str | None, turns:
 
         async def launch() -> RunRecord:
             run: RunRecord = await manager.start(
-                goal, "task", SCRIPTED_MODEL, thread_id, "cli", None, None, approvals, False, ()
+                goal, "task", SCRIPTED_MODEL, thread_id, "cli", None, None, "standard", approvals, False, ()
             )
             _say(f"run {run.id}")
             return run

@@ -183,7 +183,7 @@ async def test_a_follow_up_starts_its_run_with_the_choices_made_on_the_chats_pag
 ) -> None:
     manager, address = served
     started: RunRecord = await manager.start(
-        "Sort the photos.", "task", SCRIPTED_MODEL, None, "test", None, None, "ask", False, ()
+        "Sort the photos.", "task", SCRIPTED_MODEL, None, "test", None, None, "standard", "ask", False, ()
     )
     async with asyncio.timeout(_RUN_WAIT_S):
         first: RunRecord = await manager.wait(started.id)
@@ -269,7 +269,9 @@ async def test_while_a_run_works_the_pills_wait_for_the_next_follow_up(
     runtime: Runtime, served: tuple[RunManager, str], models: ThreeModels, tmp_path: Path
 ) -> None:
     manager, address = served
-    held: RunRecord = await manager.start("Count the files.", "task", HELD, None, "test", None, None, "ask", False, ())
+    held: RunRecord = await manager.start(
+        "Count the files.", "task", HELD, None, "test", None, None, "standard", "ask", False, ()
+    )
     async with async_playwright() as playwright:
         browser: Browser = await playwright.chromium.launch(channel=runtime.config.browser.channel, headless=True)
         try:
@@ -295,7 +297,7 @@ async def test_a_reasoning_level_is_not_carried_to_a_model_without_levels(
 ) -> None:
     manager, address = served
     started: RunRecord = await manager.start(
-        "Tidy the notes.", "task", THINKER, None, "test", None, "high", "ask", False, ()
+        "Tidy the notes.", "task", THINKER, None, "test", None, "high", "standard", "ask", False, ()
     )
     async with asyncio.timeout(_RUN_WAIT_S):
         first: RunRecord = await manager.wait(started.id)

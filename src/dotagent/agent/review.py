@@ -664,6 +664,7 @@ async def _attempt[V: FrozenModel](question: _Question[V], retry_note: str) -> V
         temperature=None,
         max_output_tokens=None,
         effort=_JUDGEMENT_EFFORT,
+        speed="standard",
         session_key=question.session_key,
     )
     try:

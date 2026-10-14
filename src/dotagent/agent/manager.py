@@ -60,8 +60,8 @@ from dotagent.core.logs import get_logger
 from dotagent.core.paths import chrome_data_dir, failsafe_path, run_owners_dir
 from dotagent.core.text import redact_json, redact_secrets, truncate_tail
 from dotagent.core.types import JsonObject
-from dotagent.llm.router import ModelRef, parse_model_ref
-from dotagent.llm.types import Effort, ModelInfo, user_message
+from dotagent.llm.router import ModelRef, offers_fast_mode, parse_model_ref
+from dotagent.llm.types import Effort, ModelInfo, Speed, user_message
 from dotagent.memory.service import SavedMemory
 from dotagent.policy.types import ApprovalMode
 from dotagent.runtime import Runtime
@@ -166,6 +166,12 @@ def _answer_text(question: ApprovalRecord, answer: str) -> str:
 def stricter_approvals(first: ApprovalMode, second: ApprovalMode) -> ApprovalMode:
     """The stricter of two approval modes."""
     return min(first, second, key=_APPROVALS_STRICTEST_FIRST.index)
+
+
+def _check_speed(ref: ModelRef, speed: Speed) -> None:
+    """Fast mode is asked only of a model that has it (item 223)."""
+    if speed == "fast" and not offers_fast_mode(ref):
+        raise ConfigError("the model does not offer fast mode", {"model": ref.label, "speed": speed})
 
 
 def _goal_mode_asked(goal: str, mode: RunMode, goal_mode: bool | None) -> bool | None:
@@ -472,6 +478,7 @@ class RunManager:
         source: str,
         parent_run_id: str | None,
         effort: Effort | None,
+        speed: Speed,
         approvals: ApprovalMode | None,
         goal_mode: bool | None,
         files: tuple[StoredAttachment, ...],
@@ -479,13 +486,15 @@ class RunManager:
         """Queue a run. ``model``, ``effort``, ``approvals`` and ``goal_mode`` fall back to the configured ones when
         ``None``; ``files`` are the attachments that come with the goal.
 
-        An ``effort`` that is given has to be one of the levels the model offers. ``goal_mode`` is for task and research
-        runs: asking for it on a chat is refused, and the configured default does not apply to a chat. A task or
-        research run whose goal asks it to keep going until it is done runs in goal mode whatever was chosen (see
-        :func:`_goal_mode_asked`).
+        An ``effort`` that is given has to be one of the levels the model offers, and ``speed`` can be ``fast`` only
+        for a model with fast mode (item 223). ``goal_mode`` is for task and research runs: asking for it on a chat is
+        refused, and the configured default does not apply to a chat. A task or research run whose goal asks it to
+        keep going until it is done runs in goal mode whatever was chosen (see :func:`_goal_mode_asked`).
         """
+        ref: ModelRef = parse_model_ref(model if model is not None else self._main_model)
+        _check_speed(ref, speed)
         if effort is not None:
-            await self._check_effort(parse_model_ref(model if model is not None else self._main_model), effort)
+            await self._check_effort(ref, effort)
         run, _ = await self._launch(
             goal,
             mode,
@@ -494,6 +503,7 @@ class RunManager:
             source,
             parent_run_id,
             effort,
+            speed,
             approvals,
             _goal_mode_asked(goal, mode, goal_mode),
             RunOpening(text=goal, files=files, resumed=None),
@@ -511,6 +521,7 @@ class RunManager:
         thread_id: str | None,
         source: str,
         effort: Effort | None,
+        speed: Speed,
         approvals: ApprovalMode | None,
         goal_mode: bool | None,
         files: tuple[StoredAttachment, ...],
@@ -521,8 +532,10 @@ class RunManager:
         model_ref: str | None = model if model is not None else (agent.model if agent.model != "" else None)
         level: Effort | None = effort if effort is not None else agent.effort
         approval_mode: ApprovalMode | None = approvals if approvals is not None else agent.approvals
+        agent_ref: ModelRef = parse_model_ref(model_ref if model_ref is not None else self._main_model)
+        _check_speed(agent_ref, speed)
         if level is not None:
-            await self._check_effort(parse_model_ref(model_ref if model_ref is not None else self._main_model), level)
+            await self._check_effort(agent_ref, level)
         run, _ = await self._launch(
             goal,
             mode,
@@ -531,6 +544,7 @@ class RunManager:
             source,
             None,
             level,
+            speed,
             approval_mode,
             _goal_mode_asked(goal, mode, goal_mode),
             RunOpening(text=goal, files=files, resumed=None),
@@ -547,6 +561,7 @@ class RunManager:
         thread_id: str | None,
         source: str,
         effort: Effort | None,
+        speed: Speed,
         approvals: ApprovalMode | None,
         goal_mode: bool | None,
         files: tuple[StoredAttachment, ...],
@@ -554,7 +569,7 @@ class RunManager:
     ) -> RunRecord:
         """Start a campaign on ``goal`` ("Keep going until done") with its opening session: a run of ``source`` on
         ``thread_id`` (a new thread when ``None``), which becomes the campaign's conversation. Every session keeps the
-        model, reasoning level and approval mode the opening one starts with (``None`` takes the configured one), and
+        model, reasoning level, speed and approval mode the opening one starts with (``None`` takes the configured one), and
         works in the Chrome ``browser`` names (``None``: ``[agent] campaign_browser``); a campaign that asks for the
         owner's Chrome is refused while that Chrome is closed or does not allow the connection, so that its sessions do
         not fail one after the other.
@@ -570,6 +585,7 @@ class RunManager:
             )
         runtime: Runtime = self._runtime
         model_ref: str = model if model is not None else self._main_model
+        _check_speed(parse_model_ref(model_ref), speed)
         if effort is not None:
             await self._check_effort(parse_model_ref(model_ref), effort)
         level: Effort = runtime.config.models.effort if effort is None else effort
@@ -583,7 +599,15 @@ class RunManager:
             else await runtime.store.get_thread(thread_id)
         )
         campaign: CampaignRecord = await runtime.store.create_campaign(
-            thread_title(goal), goal, thread.id, model_ref, level, approval_mode, [file.path for file in files], chrome
+            thread_title(goal),
+            goal,
+            thread.id,
+            model_ref,
+            level,
+            speed,
+            approval_mode,
+            [file.path for file in files],
+            chrome,
         )
         try:
             run, _ = await self._launch(
@@ -594,6 +618,7 @@ class RunManager:
                 source,
                 None,
                 level,
+                speed,
                 approval_mode,
                 False,
                 RunOpening(text=goal, files=files, resumed=None),
@@ -655,6 +680,7 @@ class RunManager:
                 SCHEDULE_SOURCE,
                 None,
                 campaign.effort,
+                campaign.speed,
                 campaign.approvals,
                 False,
                 RunOpening(text=brief, files=(), resumed=None),
@@ -740,6 +766,7 @@ class RunManager:
             DELEGATE_SOURCE if agent is None else TEAM_SOURCE,
             parent.id,
             parent.effort if agent is None or agent.effort is None else agent.effort,
+            parent.speed,
             parent.approvals
             if agent is None or agent.approvals is None
             else stricter_approvals(parent.approvals, agent.approvals),
@@ -784,6 +811,7 @@ class RunManager:
         mode: RunMode,
         model: str | None,
         effort: Effort | None,
+        speed: Speed,
         approvals: ApprovalMode | None,
         goal_mode: bool | None,
         agent_id: str | None,
@@ -793,7 +821,9 @@ class RunManager:
         once the run at work there has ended done (:meth:`_follow_queue`), one message after the other. A chat where no
         run works starts it at once, unless its queue is held. The chat of a campaign takes no queue: the campaign
         plans what follows its sessions; nor does the thread of a delegated run, which is no chat: the run that
-        delegated it decides what follows (:meth:`_follow_queue` leaves it alone)."""
+        delegated it decides what follows (:meth:`_follow_queue` leaves it alone). Fast mode is refused at once for a
+        model without it (item 223)."""
+        _check_speed(parse_model_ref(model if model is not None else self._main_model), speed)
         store: Store = self._runtime.store
         await store.get_thread(thread_id)
         newest: list[RunRecord] = await store.list_runs(1, thread_id)
@@ -807,7 +837,17 @@ class RunManager:
                 {"thread_id": thread_id, "parent_run_id": newest[0].parent_run_id},
             )
         message: QueuedMessage = await store.add_queued(
-            thread_id, text, [file.id for file in files], mode, model, effort, approvals, goal_mode, agent_id, source
+            thread_id,
+            text,
+            [file.id for file in files],
+            mode,
+            model,
+            effort,
+            speed,
+            approvals,
+            goal_mode,
+            agent_id,
+            source,
         )
         await self._queue_changed(thread_id, None, None, None)
         await self._drain(thread_id, newest[0].id)
@@ -1156,6 +1196,7 @@ class RunManager:
             source,
             None,
             asked.effort,
+            asked.speed,
             asked.approvals,
             asked.goal_mode,
             RunOpening(text=goal, files=(), resumed=None),
@@ -1268,6 +1309,7 @@ class RunManager:
             RESUME_SOURCE,
             None,
             old.effort,
+            old.speed,
             old.approvals,
             old.goal_mode,
             RunOpening(text=resume_note(old.goal, resumption), files=(), resumed=resumption),
@@ -1286,6 +1328,7 @@ class RunManager:
         source: str,
         parent_run_id: str | None,
         effort: Effort | None,
+        speed: Speed,
         approvals: ApprovalMode | None,
         goal_mode: bool | None,
         opening: RunOpening,
@@ -1303,6 +1346,7 @@ class RunManager:
             source,
             parent_run_id,
             effort,
+            speed,
             approvals,
             goal_mode,
             opening,
@@ -1323,6 +1367,7 @@ class RunManager:
         source: str,
         parent_run_id: str | None,
         effort: Effort | None,
+        speed: Speed,
         approvals: ApprovalMode | None,
         goal_mode: bool | None,
         opening: RunOpening,
@@ -1349,6 +1394,7 @@ class RunManager:
                 source,
                 parent_run_id,
                 level,
+                speed,
                 approval_mode,
                 with_goal_mode,
                 opening,
@@ -1370,6 +1416,7 @@ class RunManager:
                 source,
                 parent_run_id,
                 level,
+                speed,
                 approval_mode,
                 with_goal_mode,
                 opening,
@@ -1402,6 +1449,7 @@ class RunManager:
         source: str,
         parent_run_id: str | None,
         level: Effort,
+        speed: Speed,
         approval_mode: ApprovalMode,
         with_goal_mode: bool,
         opening: RunOpening,
@@ -1426,6 +1474,7 @@ class RunManager:
                 parent_run_id,
                 source,
                 level,
+                speed,
                 approval_mode,
                 with_goal_mode,
                 campaign_id,
@@ -1444,7 +1493,12 @@ class RunManager:
                 await runtime.store.keep_first_chat_choices(
                     thread_id,
                     ChatChoices(
-                        mode=mode, model=model_ref, effort=level, approvals=approval_mode, goal_mode=with_goal_mode
+                        mode=mode,
+                        model=model_ref,
+                        effort=level,
+                        speed=speed,
+                        approvals=approval_mode,
+                        goal_mode=with_goal_mode,
                     ),
                 )
             await runtime.bus.emit(
@@ -1455,6 +1509,7 @@ class RunManager:
                     "mode": mode,
                     "model": model_ref,
                     "effort": level,
+                    "speed": speed,
                     "approvals": approval_mode,
                     "goal_mode": with_goal_mode,
                     "parent_run_id": parent_run_id,
@@ -1791,6 +1846,7 @@ class RunManager:
                 message.thread_id,
                 message.source,
                 message.effort,
+                message.speed,
                 message.approvals,
                 message.goal_mode,
                 files,
@@ -1803,6 +1859,7 @@ class RunManager:
             message.source,
             None,
             message.effort,
+            message.speed,
             message.approvals,
             message.goal_mode,
             files,

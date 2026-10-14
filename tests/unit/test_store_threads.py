@@ -24,7 +24,19 @@ async def _chat(store: Store, title: str) -> ThreadRecord:
     """A chat a person started, with one run that is over."""
     thread: ThreadRecord = await store.create_thread(title, "test")
     run: RunRecord = await store.create_run(
-        thread.id, f"{title} goal", "chat", "ollama:m", None, "test", "medium", "ask", False, None, None, None
+        thread.id,
+        f"{title} goal",
+        "chat",
+        "ollama:m",
+        None,
+        "test",
+        "medium",
+        "standard",
+        "ask",
+        False,
+        None,
+        None,
+        None,
     )
     await store.finish_run(run.id, "done", "Done.")
     return thread
@@ -169,7 +181,19 @@ async def test_a_chat_is_unread_once_its_latest_run_ends_until_it_is_seen(tmp_pa
         await store.see_thread(chat.id, True)
         # A run under way leaves the chat read; its end, after the chat was seen, makes it unread.
         run: RunRecord = await store.create_run(
-            chat.id, "Chat again", "chat", "ollama:m", None, "test", "medium", "ask", False, None, None, None
+            chat.id,
+            "Chat again",
+            "chat",
+            "ollama:m",
+            None,
+            "test",
+            "medium",
+            "standard",
+            "ask",
+            False,
+            None,
+            None,
+            None,
         )
         assert await _unread(store) == [("Chat", False)]
         await store.finish_run(run.id, "failed", "It broke.")
@@ -201,12 +225,18 @@ async def test_a_chat_keeps_the_choices_of_its_first_run_until_its_composer_pick
     store = await Store.open(path, tmp_path / "screenshots")
     try:
         assert await store.chat_choices(old.id) is None
-        first: ChatChoices = ChatChoices(mode="task", model="ollama:a", effort="high", approvals="auto", goal_mode=True)
-        later: ChatChoices = ChatChoices(mode="chat", model="ollama:b", effort=None, approvals=None, goal_mode=None)
+        first: ChatChoices = ChatChoices(
+            mode="task", model="ollama:a", effort="high", speed="standard", approvals="auto", goal_mode=True
+        )
+        later: ChatChoices = ChatChoices(
+            mode="chat", model="ollama:b", effort=None, speed="standard", approvals=None, goal_mode=None
+        )
         await store.keep_first_chat_choices(old.id, first)
         await store.keep_first_chat_choices(old.id, later)
         assert await store.chat_choices(old.id) == first
-        picked: ChatChoices = ChatChoices(mode="chat", model=None, effort=None, approvals="yolo", goal_mode=None)
+        picked: ChatChoices = ChatChoices(
+            mode="chat", model=None, effort=None, speed="standard", approvals="yolo", goal_mode=None
+        )
         await store.set_chat_choices(old.id, picked)
         assert await store.chat_choices(old.id) == picked
         with pytest.raises(NotFoundError):
@@ -214,6 +244,6 @@ async def test_a_chat_keeps_the_choices_of_its_first_run_until_its_composer_pick
         with pytest.raises(NotFoundError):
             await store.chat_choices("thr_nothing")
         with pytest.raises(ValidationError, match="goal mode is for task and research runs"):
-            ChatChoices(mode="chat", model=None, effort=None, approvals=None, goal_mode=True)
+            ChatChoices(mode="chat", model=None, effort=None, speed="standard", approvals=None, goal_mode=True)
     finally:
         await store.close()
