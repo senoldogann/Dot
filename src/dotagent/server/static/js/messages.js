@@ -76,13 +76,13 @@ function sendAgainButton(sendAgain) {
  * What the user wrote, as a bubble on the right, the files that came with it (`files`, as the timeline has them), and
  * under them (item 205): when it was sent (`sentAt`), a copy of it as it was written and, unless `sendAgain` is null, a
  * button that sends it again. The foot shows once the turn has its answer: a run at work keeps it back (`.run-working`,
- * `.turn-working`). The text is shown as typed, never read as markdown.
+ * `.turn-working`). The text reads as markdown, as an answer does (item 206).
  */
 export function userMessage({ text, sentAt, files, sendAgain }) {
   return el(
     "div",
     { class: "user-message" },
-    el("div", { class: "bubble user" }, el("div", { class: "prose" }, el("p", { class: "para" }, text))),
+    el("div", { class: "bubble user" }, prose(text)),
     files.length > 0 ? sentFiles(files) : null,
     el(
       "div",

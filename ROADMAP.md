@@ -5141,8 +5141,8 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 202 | The side menu, designed again                                                        | done        | 7e03ac3 |
 | 203 | The run's side panel, designed again                                                 | done        | 94985af |
 | 204 | Adding or deleting keeps the page where it is                                        | done        | db647a3 |
-| 205 | A message's time, its copy and a send again, after T3 Code                           | in progress |         |
-| 206 | Markdown in the conversation, and copies that keep it                                | planned     |         |
+| 205 | A message's time, its copy and a send again, after T3 Code                           | done        | 9934575 |
+| 206 | Markdown in the conversation, and copies that keep it                                | in progress |         |
 | 207 | The composer shows the markdown it holds, after T3 Code                              | planned     |         |
 | 208 | The model menu: providers at the side, a search and favourites, after T3 Code        | planned     |         |
 
@@ -9990,7 +9990,7 @@ in WebKit too.
 
 ### 205. A message's time, its copy and a send again, after T3 Code
 
-**Status: in progress.**
+**Status: done.** Merged as `9934575` (PR #244; no Linear issue, the Linear connector was signed out).
 
 **As built (2026-10-14).** Each of the owner's messages has a foot once its turn has its answer, after T3 Code's
 (`messages.js`): when it was sent, as short as its day allows ("14:05", "Yesterday, 14:05", "5 Oct, 14:05", the year too
@@ -10020,7 +10020,28 @@ to the same chat, with the files it carried. Under each answer: its time and a c
 
 ### 206. Markdown in the conversation, and copies that keep it
 
-**Status: planned.**
+**Status: in progress.**
+
+**As built (2026-10-14).** The owner's messages are drawn by the answers' reader (`prose.js`): a goal, a message that
+steered a run and an earlier turn read as markdown, with their headings, lists, quotes, tables, code, emphasis and web
+links, and the line breaks as typed; in the bubble, code and the heads of a table sit one surface up from it. A copy out
+of the conversation keeps its markdown, after T3 Code's (`clipboard.js`): a selection that starts in a message or an
+answer goes on the clipboard as the markdown it was written in, read back from copies of the selected nodes. Headings
+come back at the level they were written at (`data-level`; Dot draws them one level down), with lists, quotes, fenced
+code (its fence longer than any run of backticks in it), inline code, bold, italic, web links (an address that repeats
+its words stays bare), tables with their pipes escaped and a row of dashes under the first, and rules. A file's path, a
+button, copies as its code; the other buttons, the faces, the line under a message or an answer and what only a screen
+reader hears stay out. A selection across the items of a list or the rows of a table keeps its list or table; one within
+a line keeps its marks. The formatted copy goes along as clean HTML for the applications that read it: of the attributes
+only a web link's address stays, and it is serialized from the nodes, never built from a string. A copy within one block
+of code, or out of the composer, is the browser's own. T3 Code's composer takes a paste as its text, so the composer's
+part is item 207. Tests: `tests/smoke/test_markdown_copy.py`, a real server, a chat of two turns whose first message
+holds a table and a list and whose answer holds every kind of block and mark; at 1280 px light and dark and at 390 px:
+the message's table, list and marks, a whole answer copied back to the text it was written in, the message with its
+answer without their feet and the face, two items of a list and two rows of a table as a list and a table, the marks
+within a line, the browser's own copy within code and out of the composer, the HTML without classes, data or buttons,
+and a real ⌘C to the clipboard in Chrome. On the code of before, it found no table in the message. It passed in WebKit
+too.
 
 **What.** The owner's messages are read as markdown, as the answers are (headings, lists, tables, code, emphasis). A
 copy of a part of the conversation keeps its markdown, as T3 Code's does: the text carries the markdown, and the
@@ -10687,3 +10708,4 @@ favourites; and keys: the arrows and Enter, ⌘1 to ⌘9 for the rows in sight. 
 - 2026-10-14 (Opus 5.5): item 202 merged as `7e03ac3` (PR #241; no Linear issue, the connector was signed out): Each chat stands once in the side menu, after T3 Code's Working shelf: a chat whose latest run works leaves its day for Working, as the chat it is, with the runs it delegated folded under it, and goes back once the run ends; a pinned chat stays under Pinned.
 - 2026-10-14 (Opus 5.5): item 203 merged as `94985af` (PR #242; no Linear issue, the connector was signed out): The run's side panel shows one thing at a time, in four tabs after T3 Code's side panel (Run, Plan, Actions, Screen), each tab's sections open, the cost listed as the details are, and the tab chosen last kept.
 - 2026-10-14 (Opus 5.5): item 204 merged as `db647a3` (PR #243; no Linear issue, the connector was signed out): Adding or deleting keeps the page where it is: the side menu brings the open chat into view only when the page comes to another chat, and the Memory page keeps the notes it read, their rows and its place.
+- 2026-10-14 (Opus 5.5): item 205 merged as `9934575` (PR #244; no Linear issue, the connector was signed out): Under each of the owner's messages, once its turn has its answer: when it was sent, a copy of it and Send again; under each answer, a copy of it and when it came.

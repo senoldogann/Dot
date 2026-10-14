@@ -5,6 +5,7 @@ import { ApiError, clearToken, forgetImages, hasToken, loadToken, onAuthLost, se
 import { loadOwnThemes } from "./appearance/own.js";
 import { applyStoredSettings } from "./appearance/settings.js";
 import { setPageTitle, watchAttention } from "./attention.js";
+import { wireConversationCopy } from "./clipboard.js";
 import { el } from "./dom.js";
 import { icon, wordmark } from "./icons.js";
 import { buildShell } from "./shell.js";
@@ -328,6 +329,8 @@ if ("serviceWorker" in navigator) {
   navigator.serviceWorker.register("sw.js").catch((error) => console.warn("the service worker could not be registered", error));
 }
 onAuthLost(handleAuthLost);
+// A copy out of the conversation goes on the clipboard as the markdown it was written in (item 206).
+wireConversationCopy(document);
 
 window.addEventListener("unhandledrejection", (event) => {
   const reason = event.reason;
