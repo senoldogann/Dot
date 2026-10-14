@@ -565,7 +565,10 @@
   color: var(--muted);
 }
 
-.side-activity .avatar {
+/* A face in a row: an activity row's, and a chat's at work, where the agent or the campaign at work stands in its dot's
+   place (item 202). */
+.side-activity .avatar,
+.side-chat .avatar {
   width: 20px;
   height: 20px;
 }

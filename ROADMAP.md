@@ -5137,8 +5137,8 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 198 | The side menu shows every agent of a run, folded under it                            | done        | dee248f |
 | 199 | The default model is chosen in Settings, and a chat keeps its model                  | done        | de8069e |
 | 200 | Reconnecting, checked end to end                                                     | done        | 0dab7de |
-| 201 | Marks of the conversation's messages: a look and a jump, after T3 Code               | in progress |         |
-| 202 | The side menu, designed again                                                        | planned     |         |
+| 201 | Marks of the conversation's messages: a look and a jump, after T3 Code               | done        | 4f23e25 |
+| 202 | The side menu, designed again                                                        | in progress |         |
 | 203 | The run's side panel, designed again                                                 | planned     |         |
 
 ### 77. The type system: Inter and Geist Mono, seven sizes, three weights
@@ -9839,7 +9839,7 @@ reads what changed. A test for each.
 
 ### 201. Marks of the conversation's messages: a look and a jump, after T3 Code
 
-**Status: in progress.**
+**Status: done.** Merged as `4f23e25` (PR #240; no Linear issue, the Linear connector was signed out).
 
 **As built (2026-10-14).** At the left of the conversation a column of short marks stands for the owner's messages, one
 mark for each, top to bottom as they stand in it (`outline.js`, after T3 Code's): the question of each earlier turn, the
@@ -9863,7 +9863,29 @@ shows the message and the start of its answer, and a click goes to it. After T3 
 
 ### 202. The side menu, designed again
 
-**Status: planned.**
+**Status: in progress.**
+
+**As built (2026-10-14).** Each chat stands once in the side menu, after T3 Code's Working shelf (`sidebar.js`). Before,
+a chat at work stood twice: its run among the rows of the Working section, with the runs it delegated, and the chat
+among the days, with nothing under it; a pinned chat at work stood under Working and under Pinned. Now a chat whose
+latest run is one of the runs at work leaves its day for Working, as the chat it is (its row, its menu, Working and the
+time at its right, the face of the agent or the campaign at work in its dot's place), with the runs it delegated folded
+under it as in item 198, and goes back among the days once the run ends. A pinned chat stays under Pinned, as T3 Code
+keeps pins where the owner put them, with the runs it delegated under it there. Working lists as before what is no
+listed chat's: a schedule about to fire, the session of a campaign (which works in a thread of its own), a run whose
+chat is not listed. Waiting for you is as it was: what a run asks is the news, and the chat of that run keeps its amber
+dot among the days. Working counts what it lists. Folded, it keeps the open chat in sight, so that a chat just sent on
+its way from the composer does not leave the menu. The search finds the chats at work too, and leaves under Working only
+those it finds; the arrow keys walk Working's rows and the list's, and Enter in the search opens the first chat found.
+The sections and the list are painted together: a paint gives the focus back to the chat's link, "…" button or box that
+had it; until the chats come, Working waits for them, so that a chat at work never shows first as its run's row; and a
+chat chosen for deletion whose run starts is no longer chosen. Tests: `tests/smoke/test_side_working.py`, a real server
+on a scripted model with a chat at rest, a chat at work with three delegated runs (two done), a pinned chat at work with
+one, and a chat that asks a question, at 1280 and 390 px, light and dark: each chat once, the pinned one under Pinned,
+the question above; Working folded on the working chat's page keeps it, and not on another; the search; and, on the page
+as it is, the chats back among the days once the runs are stopped, the focus kept on a chat's "…". On the code of
+before, Working said 4 where it lists 1. The tests of the Working section (`test_activity.py`, `test_side_agents.py`,
+`test_working_rows.py`) say where a chat at work stands now. It passed in WebKit too.
 
 **What.** The side menu designed again, in its structure and in how it works: what it lists, how a chat shows what works
 in it and what waits for the owner, and how its parts fold. Screenshots looked at, wide and on a phone, light and dark.
@@ -10515,3 +10537,4 @@ cost, the plan, the files, the actions and the screens. Screenshots looked at, w
 - 2026-10-14 (Opus 5.5): item 198 merged as `dee248f` (PR #237; no Linear issue, the connector was signed out): The side menu shows every run a run at work delegated, those that ended too, folded under a line that says how many there are and how many work; the fold is kept, and Activity shows them under the run as well.
 - 2026-10-14 (Opus 5.5): item 199 merged as `de8069e` (PR #238; no Linear issue, the connector was signed out): The default model is chosen in Settings › Models and starts the runs that name none at once; a chat keeps what its composer chose, through a reload, another browser and a move of its run to a standby model.
 - 2026-10-14 (Opus 5.5): item 200 merged as `0dab7de` (PR #239; no Linear issue, the connector was signed out): A page that loses the daemon comes back by itself: one loaded while the daemon is down tries again and says when, a stream silent for 45 seconds is cut and made again, a page back in view or on the network tries at once, and the desktop window keeps the page through a restart of the daemon.
+- 2026-10-14 (Opus 5.5): item 201 merged as `4f23e25` (PR #240; no Linear issue, the connector was signed out): At the left of the conversation, a column of short marks stands for the owner's messages, after T3 Code's: resting the pointer on it shows a message and the start of its answer, and a click or Enter goes to it.

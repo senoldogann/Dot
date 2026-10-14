@@ -178,15 +178,15 @@ async def test_a_working_chat_and_the_working_runs_say_working_and_how_long_wide
             for index, (width, scheme) in enumerate(_SHOTS):
                 page: Page = await _open_sidebar(browser, address, width, scheme)
                 sidebar: Locator = page.locator("#sidebar")
-                # The Working section: the chat's run and, under it, the run it delegated, each with its time.
+                # The Working section: the chat at work (item 202) and, under it, the run it delegated, each with its time.
                 section: Locator = sidebar.locator("[data-section=working]")
-                await expect(section.locator("a.side-activity .side-working")).to_have_count(2)
+                await expect(section.locator("a.side-run .side-working")).to_have_count(2)
                 await expect(section.locator(".side-children a.side-child .side-working")).to_have_count(1)
                 for slot in await section.locator(".side-working").all():
                     await expect(slot).to_have_text(_WORKING)
                     await expect(slot.locator("svg[data-icon='circleDashed']")).to_have_count(1)
-                # The chats: the one that works says so in its age's place; the one that waits keeps its dot and age.
-                busy: Locator = sidebar.locator(f".side-runs a.side-run[href='#/runs/{working.id}']")
+                # The chat at work says so in its age's place; the one that waits keeps its dot and age among the days.
+                busy: Locator = section.locator(f".side-chat a.side-run[href='#/runs/{working.id}']")
                 await expect(busy.locator(".side-working")).to_have_text(_WORKING)
                 await expect(busy.locator(".side-age")).to_have_count(0)
                 waiting: Locator = sidebar.locator(f".side-runs a.side-run[href='#/runs/{asking.id}']")

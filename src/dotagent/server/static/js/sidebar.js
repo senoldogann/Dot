@@ -3,7 +3,9 @@
 // and, in the foot, the way to the settings and the emergency stop (item 120). A row whose run works says Working and
 // for how long (item 122). A chat's menu (item 130), after T3 Code's thread menu, pins it, names it, copies its link,
 // starts choosing chats with it and deletes it; the pinned chats come first, under Pinned. A chat whose latest run
-// ended after it was last seen is unread (item 131): an accent dot, until it is opened, or Mark read.
+// ended after it was last seen is unread (item 131): an accent dot, until it is opened, or Mark read. Each chat stands
+// once (item 202), after T3 Code's Working shelf: a chat at work stands under Working, with the runs it delegated folded
+// under it, and goes back among the days once it rests; a pinned one stays under Pinned, its delegated runs under it.
 
 import { ApiError, api, request } from "./api.js";
 import { age, clip, clipWords, copyText, dateTime, debounce, el, foldSearch, plural, workingFor } from "./dom.js";
@@ -119,8 +121,9 @@ function chatDot(chat) {
 }
 
 /** A chat as a link: it opens on the latest run a person started on it. Its last activity is at the right, in the
- * fewest characters (item 121), or, while its latest run works, Working and for how long (item 122). */
-function chatLink(chat, onNavigate) {
+ * fewest characters (item 121), or, while its latest run works, Working and for how long (item 122). `face`, the face
+ * of the agent or the campaign whose run works (item 202), stands in its dot's place; it is null otherwise. */
+function chatLink(chat, onNavigate, face) {
   const word = [STATUS_WORD[chat.latest_status], chat.unread === true ? "unread" : undefined].filter((part) => part !== undefined).join(", ");
   const title = clip(chat.title, 120);
   return el(
@@ -132,7 +135,7 @@ function chatLink(chat, onNavigate) {
       "aria-label": word === "" ? null : `${title} (${word})`,
       onclick: onNavigate,
     },
-    chatDot(chat),
+    face ?? chatDot(chat),
     el("span", { class: "side-run-goal" }, title),
     WORKING.has(chat.latest_status)
       ? workingSlot(chat.latest_created_at)
@@ -171,38 +174,64 @@ function activityRow(row, onNavigate, child) {
   );
 }
 
-/** The rows of a section: each parent, then the runs it delegated under it, at work or ended (item 198), behind a
- * button that says how many and folds them. `folded` holds the runs whose delegated runs are folded; `onFold(runId,
- * folded)` keeps a change, which the button shows at once. */
-function activityRows(rows, onNavigate, folded, onFold) {
-  return nestRows(rows).map(({ row, children }) => {
-    const link = activityRow(row, onNavigate, false);
-    if (children.length === 0) {
-      return link;
-    }
-    const hidden = folded.has(row.run_id);
-    const list = el("div", { class: "side-children", id: `side-children-${row.run_id}`, hidden }, children.map((kid) => activityRow(kid, onNavigate, true)));
-    const working = children.filter((kid) => WORKING.has(kid.status)).length;
-    const count = children.length === 1 ? "1 delegated run" : `${children.length} delegated runs`;
-    const toggle = el(
-      "button",
-      {
-        class: "side-fold side-children-fold",
-        type: "button",
-        "aria-expanded": hidden ? "false" : "true",
-        "aria-controls": list.id,
-        onclick: () => {
-          const fold = !list.hidden;
-          list.hidden = fold;
-          toggle.setAttribute("aria-expanded", fold ? "false" : "true");
-          onFold(row.run_id, fold);
-        },
+/** `head`, the row of the run `runId`, with the runs it delegated under it, at work or ended (item 198), behind a
+ * button that says how many and folds them; with none, `head` alone. `folded` holds the runs whose delegated runs are
+ * folded; `onFold(runId, folded)` keeps a change, which the button shows at once. */
+function withDelegated(head, runId, children, onNavigate, folded, onFold) {
+  if (children.length === 0) {
+    return head;
+  }
+  const hidden = folded.has(runId);
+  const list = el("div", { class: "side-children", id: `side-children-${runId}`, hidden }, children.map((kid) => activityRow(kid, onNavigate, true)));
+  const working = children.filter((kid) => WORKING.has(kid.status)).length;
+  const count = children.length === 1 ? "1 delegated run" : `${children.length} delegated runs`;
+  const toggle = el(
+    "button",
+    {
+      class: "side-fold side-children-fold",
+      type: "button",
+      "aria-expanded": hidden ? "false" : "true",
+      "aria-controls": list.id,
+      onclick: () => {
+        const fold = !list.hidden;
+        list.hidden = fold;
+        toggle.setAttribute("aria-expanded", fold ? "false" : "true");
+        onFold(runId, fold);
       },
-      icon("chevron"),
-      working > 0 && working < children.length ? `${count} · ${working} working` : count,
-    );
-    return el("div", { class: "side-family" }, link, toggle, list);
-  });
+    },
+    icon("chevron"),
+    working > 0 && working < children.length ? `${count} · ${working} working` : count,
+  );
+  return el("div", { class: "side-family" }, head, toggle, list);
+}
+
+/** The rows of a section: each parent, then the runs it delegated under it (`withDelegated`). */
+function activityRows(rows, onNavigate, folded, onFold) {
+  return nestRows(rows).map(({ row, children }) => withDelegated(activityRow(row, onNavigate, false), row.run_id, children, onNavigate, folded, onFold));
+}
+
+/**
+ * Where the runs at work stand (item 202). `rows` are the rows of Working with the delegated runs that ended under
+ * them, `chats` the chats listed. A chat whose latest run is one of them stands once, as that chat, with the runs it
+ * delegated: under Working (`working`, `{ chat, row, children }`), unless it is pinned, which keeps it under Pinned
+ * (`pinned`, its family by chat id). A row that is no listed chat's (a schedule about to fire, a run whose chat is not
+ * listed, a delegated run whose parent is not) stands under Working as it is, its `chat` null.
+ */
+function placeWork(rows, chats) {
+  const byRun = new Map(chats.map((chat) => [chat.latest_run_id, chat]));
+  const working = [];
+  const pinned = new Map();
+  for (const { row, children } of nestRows(rows)) {
+    const chat = row.run_id === null ? undefined : byRun.get(row.run_id);
+    if (chat === undefined) {
+      working.push({ chat: null, row, children });
+    } else if (chat.pinned_at === null) {
+      working.push({ chat, row, children });
+    } else {
+      pinned.set(chat.id, { row, children });
+    }
+  }
+  return { working, pinned };
 }
 
 /** A chat as a row to tick while chats are being chosen for deletion. */
@@ -271,8 +300,7 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
   function toggleFold(key) {
     folds = { ...folds, [key]: folds[key] !== true };
     writePref(FOLDS_KEY, JSON.stringify(folds));
-    paintActivity();
-    paintChats();
+    paintLists();
   }
   const chatsLabel = foldLabel("h2", folds.chats === true, () => toggleFold("chats"), "Chats");
   const head = el("div", { class: "side-list-head" }, chatsLabel, selectButton);
@@ -296,23 +324,42 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
     el("div", { class: "row" }, allButton, deleteButton),
   );
   let activity = null;
+  // Where the runs at work stand (`placeWork`), worked out at each paint, and Working's entries as painted, each with
+  // the id of its chat (null for a row that is no chat's).
+  let work = { working: [], pinned: new Map() };
+  let workingNodes = [];
   const activityNav = el("nav", { class: "side-activity-nav", "aria-label": "Activity", hidden: true });
   const agentsLink = el("a", { class: "side-link", href: "#/agents", onclick: onNavigate }, icon("user"), el("span", null, "Agents"));
   const activityLink = el("a", { class: "side-link", href: "#/activity", onclick: onNavigate }, icon("bolt"), el("span", null, "Activity"));
   const campaignsLink = el("a", { class: "side-link", href: "#/campaigns", onclick: onNavigate }, icon("target"), el("span", null, "Campaigns"));
   const settingsLink = el("a", { class: "side-link", href: "#/settings", onclick: onNavigate }, icon("sliders"), el("span", null, "Settings"));
 
+  // The rows the arrow keys walk and the search's Enter opens, in order: Working's and the list's, the delegated runs
+  // under a chat among them; while chats are being chosen, their boxes. A row folded away is left out.
   function rows() {
-    return [...list.querySelectorAll("a.side-run, input.side-check")];
+    const nodes = selecting
+      ? list.querySelectorAll("input.side-check")
+      : [...activityNav.querySelectorAll("[data-section=working] a.side-run"), ...list.querySelectorAll("a.side-run")];
+    return [...nodes].filter((node) => node.getClientRects().length > 0);
   }
 
+  function atWork(chat) {
+    return work.working.some((entry) => entry.chat !== null && entry.chat.id === chat.id);
+  }
+
+  // The chats of the list: every chat but those that stand under Working (item 202).
   function shownChats() {
-    return chats === null ? [] : chats.filter((chat) => matchesQuery(chat, needle));
+    return chats === null ? [] : chats.filter((chat) => !atWork(chat) && matchesQuery(chat, needle));
   }
 
   function markCurrent() {
     for (const [id, node] of rowNodes) {
       mark(node, id === routeThreadId);
+    }
+    // Folded, Working keeps the open chat in sight (item 202), as T3 Code's shelf does: a chat just sent on its way
+    // from the composer stands there.
+    for (const { chatId, node } of workingNodes) {
+      node.hidden = folds.working === true && (chatId === null || chatId !== routeThreadId);
     }
     const active = rowNodes.get(routeThreadId);
     if (active !== undefined) {
@@ -335,12 +382,7 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
       return;
     }
     chats = chats.map((chat) => (chat.id === open.id ? { ...chat, unread: false } : chat));
-    // The repaint takes the rows away, so the focus goes back to the row that had it (a chat opened by a key).
-    const focused = [...rowNodes].find(([, node]) => node === document.activeElement);
-    paintChats();
-    if (focused !== undefined) {
-      rowNodes.get(focused[0])?.focus();
-    }
+    paintLists();
     api.patch(`/threads/${open.id}`, { seen: true }).catch((error) => console.warn("the open chat could not be marked seen", error));
   }
 
@@ -387,14 +429,57 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
     ];
   }
 
-  function paintChats() {
+  // What the list says when it shows no chat: that there is none yet, or none that matches the search; nothing while
+  // every chat stands under Working, or while one there matches.
+  function emptyNote() {
+    if (needle !== "") {
+      const found = work.working.some((entry) => entry.chat !== null && matchesQuery(entry.chat, needle));
+      return found ? [] : [el("div", { class: "side-note" }, `No chat matches “${search.value.trim()}”.`)];
+    }
+    return chats.length === 0 ? [el("div", { class: "side-note" }, "No chats yet. Start one with New chat.")] : [];
+  }
+
+  // The "…" button beside the link `node` of a chat; null beside a box.
+  function moreOf(node) {
+    return node.closest(".side-chat")?.querySelector(".side-more") ?? null;
+  }
+
+  // The sections and the list, painted together: a chat stands in one place or the other (item 202). The paint takes
+  // the rows away, so the focus goes back to the chat whose link, "…" button or box had it (a chat reached by a key).
+  function paintLists() {
     if (renaming !== null) {
       return;
     }
+    const active = document.activeElement;
+    const focused = active === null ? undefined : [...rowNodes].find(([, node]) => node.contains(active) || moreOf(node) === active);
+    const onMore = focused !== undefined && moreOf(focused[1]) === active;
     // A chat's menu acts on the rows it was opened from, which go now.
     closeMenu();
     rowNodes.clear();
-    selectButton.hidden = selecting || chats === null || chats.length === 0;
+    // The runs at work show those they delegated that have ended too (item 198). Until the chats come, what works waits
+    // for them, so that a chat at work does not show first as its run's row; if they cannot come, the rows show.
+    const loading = chats === null && failure === null;
+    work = placeWork(activity === null || loading ? [] : [...activity.working, ...activity.ended_delegated], chats ?? []);
+    // A chat chosen for deletion whose run starts leaves the list for Working, and the choice goes with it: a chat at
+    // work cannot be deleted.
+    for (const entry of work.working) {
+      if (entry.chat !== null) {
+        selected.delete(entry.chat.id);
+      }
+    }
+    paintActivity();
+    paintChats();
+    paintBar();
+    markCurrent();
+    if (focused !== undefined) {
+      const node = rowNodes.get(focused[0]);
+      const target = node === undefined ? null : onMore ? moreOf(node) : (node.querySelector("input.side-check") ?? node);
+      target?.focus({ preventScroll: true });
+    }
+  }
+
+  function paintChats() {
+    selectButton.hidden = selecting || chats === null || chats.every((chat) => atWork(chat));
     head.hidden = selecting;
     bar.hidden = !selecting;
     // The chats fold under their label (item 95); choosing chats to delete needs them in sight.
@@ -414,7 +499,7 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
               type: "button",
               onclick: () => {
                 failure = null;
-                paintChats();
+                paintLists();
                 load();
               },
             },
@@ -431,8 +516,7 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
     }
     const shown = shownChats();
     if (shown.length === 0) {
-      const text = needle === "" ? "No chats yet. Start one with New chat." : `No chat matches “${search.value.trim()}”.`;
-      list.replaceChildren(el("div", { class: "side-note" }, text), ...olderNote());
+      list.replaceChildren(...emptyNote(), ...olderNote());
       return;
     }
     list.replaceChildren(
@@ -447,15 +531,59 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
               rowNodes.set(chat.id, pick);
               return pick;
             }
-            const link = chatLink(chat, onNavigate);
-            rowNodes.set(chat.id, link);
-            return chatRow(chat, link);
+            return chatEntry(chat, work.pinned.get(chat.id) ?? null);
           }),
         ),
       ),
       ...olderNote(),
     );
-    markCurrent();
+  }
+
+  // The sections above the chats. Working's entries are all painted, the open chat's among them, and `markCurrent`
+  // hides them while Working is folded; the search leaves there only the chats it finds (item 202).
+  function paintActivity() {
+    workingNodes = [];
+    const found = needle === "" ? work.working : work.working.filter((entry) => entry.chat !== null && matchesQuery(entry.chat, needle));
+    const counts = { waiting: activity === null ? 0 : activity.waiting.length, working: found.length };
+    const groups = activity === null ? [] : ACTIVITY_SECTIONS.filter(({ key }) => counts[key] > 0);
+    activityNav.hidden = groups.length === 0;
+    activityNav.replaceChildren(
+      ...groups.map(({ key, label }) => {
+        const folded = folds[key] === true;
+        let items = null;
+        if (key === "working") {
+          items = found.map(workingEntry);
+        } else if (!folded) {
+          items = activityRows(activity[key], onNavigate, foldedRuns(), foldRun);
+        }
+        return el(
+          "section",
+          { class: "side-group", "data-section": key, "data-folded": folded ? "true" : null },
+          foldLabel("h3", folded, () => toggleFold(key), `${label} `, el("span", { class: "side-label-count" }, String(counts[key]))),
+          items,
+        );
+      }),
+    );
+  }
+
+  // An entry of Working: a chat at work, or a row that is no chat's, each with the runs it delegated under it.
+  function workingEntry(entry) {
+    const node =
+      entry.chat === null
+        ? withDelegated(activityRow(entry.row, onNavigate, false), entry.row.run_id, entry.children, onNavigate, foldedRuns(), foldRun)
+        : chatEntry(entry.chat, entry);
+    workingNodes.push({ chatId: entry.chat === null ? null : entry.chat.id, node });
+    return node;
+  }
+
+  // A chat's entry: its row and, while its latest run works (`family`, that run's row and the runs it delegated; null
+  // at rest), the face of the agent or the campaign at work in its dot's place and those runs under it (item 202).
+  function chatEntry(chat, family) {
+    const face = family === null || family.row.actor_id === null ? null : actorFace(family.row.actor_id, "working", null);
+    const link = chatLink(chat, onNavigate, face);
+    rowNodes.set(chat.id, link);
+    const row = chatRow(chat, link);
+    return family === null ? row : withDelegated(row, family.row.run_id, family.children, onNavigate, foldedRuns(), foldRun);
   }
 
   // A chat's row: its link and the button of its menu, which a right-click on the row and the context-menu key open
@@ -509,7 +637,8 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
       { label: "Rename", icon: "pencil", run: () => renameChat(chat) },
       { label: "Copy link", icon: "link", run: () => attempt(() => copyLink(chat)) },
       "separator",
-      { label: "Select", icon: "squareCheck", run: () => enterSelectMode(chat.id) },
+      // A chat under Working is not in the list, where the chats are chosen.
+      atWork(chat) ? null : { label: "Select", icon: "squareCheck", run: () => enterSelectMode(chat.id) },
       { label: "Delete", icon: "trash", danger: true, run: () => attempt(() => deleteChats([chat.id])) },
     ].filter((item) => item !== null);
   }
@@ -567,11 +696,11 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
       renaming = null;
       const title = field.value.trim();
       if (!keep || title === "" || title === chat.title) {
-        paintChats();
+        paintLists();
         return;
       }
       chats = chats.map((one) => (one.id === chat.id ? { ...one, title } : one));
-      paintChats();
+      paintLists();
       await attempt(() => api.patch(`/threads/${chat.id}`, { title }));
       await load();
     }
@@ -618,8 +747,7 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
         selected.add(chat.id);
       }
     }
-    paintChats();
-    paintBar();
+    paintLists();
   }
 
   // `chosen` is a chat ticked at the start, when its menu began the choosing; the focus goes to its box then.
@@ -629,8 +757,7 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
     if (chosen !== undefined) {
       selected.add(chosen);
     }
-    paintChats();
-    paintBar();
+    paintLists();
     const first = chosen === undefined ? rows()[0] : rowNodes.get(chosen)?.querySelector("input.side-check");
     (first === undefined ? cancelButton : first).focus();
   }
@@ -638,8 +765,7 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
   function leaveSelectMode() {
     selecting = false;
     selected.clear();
-    paintChats();
-    paintBar();
+    paintLists();
     if (!selectButton.hidden) {
       selectButton.focus();
     }
@@ -686,7 +812,7 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
     if (selecting) {
       leaveSelectMode();
     } else {
-      paintChats();
+      paintLists();
     }
     if (routeThreadId !== null && gone.has(routeThreadId)) {
       location.hash = homeHref;
@@ -727,23 +853,6 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
     resolveThread(routeRunId);
   }
 
-  function paintActivity() {
-    const groups = activity === null ? [] : ACTIVITY_SECTIONS.filter(({ key }) => activity[key].length > 0);
-    activityNav.hidden = groups.length === 0;
-    activityNav.replaceChildren(
-      ...groups.map(({ key, label }) => {
-        const folded = folds[key] === true;
-        return el(
-          "section",
-          { class: "side-group", "data-section": key, "data-folded": folded ? "true" : null },
-          foldLabel("h3", folded, () => toggleFold(key), `${label} `, el("span", { class: "side-label-count" }, String(activity[key].length))),
-          // The runs at work show those they delegated that have ended too (item 198); the count is of what works.
-          folded ? null : activityRows(key === "working" ? [...activity.working, ...activity.ended_delegated] : activity[key], onNavigate, foldedRuns(), foldRun),
-        );
-      }),
-    );
-  }
-
   // The runs whose delegated runs the owner folded (item 198), kept with the folds of the sections; a run that is no
   // longer listed is forgotten at the next fold.
   function foldedRuns() {
@@ -782,7 +891,7 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
       }
       return;
     }
-    paintActivity();
+    paintLists();
   }
 
   async function load() {
@@ -811,8 +920,7 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
       }
       failure = error;
     }
-    paintChats();
-    paintBar();
+    paintLists();
     locateRoute();
     seeOpenChat();
   }
@@ -844,8 +952,7 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
 
   search.addEventListener("input", () => {
     needle = foldSearch(search.value);
-    paintChats();
-    paintBar();
+    paintLists();
   });
   search.addEventListener("keydown", (event) => {
     if (event.key === "Escape") {
@@ -853,8 +960,7 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
         event.preventDefault();
         search.value = "";
         needle = "";
-        paintChats();
-        paintBar();
+        paintLists();
       } else {
         search.blur();
       }
@@ -872,7 +978,8 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
       }
     }
   });
-  list.addEventListener("keydown", (event) => {
+  // The arrows walk the rows of `rows()`, from Working into the list and back; up from the first, the search.
+  function walkRows(event) {
     if (event.key !== "ArrowDown" && event.key !== "ArrowUp") {
       return;
     }
@@ -888,10 +995,11 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
     } else if (event.key === "ArrowUp") {
       search.focus();
     }
-  });
+  }
+  activityNav.addEventListener("keydown", walkRows);
+  list.addEventListener("keydown", walkRows);
 
-  paintChats();
-  paintBar();
+  paintLists();
   load();
 
   const element = el(
