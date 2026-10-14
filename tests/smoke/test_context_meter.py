@@ -176,11 +176,15 @@ async def test_the_context_meter_shows_how_much_of_the_budget_the_last_step_fill
                 panel: Locator = page.locator(".composer-popover[aria-label='Context']")
                 await expect(panel.locator(".context-meter-title")).to_have_text("Context window")
                 await expect(panel.locator(".context-meter-figure")).to_have_text("84% · 81k / 96k")
+                # Why the budget is a tenth of the window, and where it is set (item 239).
                 await expect(panel.locator(".context-meter-text")).to_have_text(
                     [
                         "The run's last step sent the model 81,000 tokens. Past 96,000, the run's budget, Dot "
                         "summarizes its older part.",
                         "The model holds 1,000,000 tokens.",
+                        "Each step sends the model the whole run again, so a run kept within its budget is answered "
+                        "sooner and costs less. [agent] context_tokens in config.toml sets the budget, up to three "
+                        "quarters of the model's window.",
                     ]
                 )
                 await page.screenshot(path=str(tmp_path / f"meter-{width}-{scheme}.png"), animations="disabled")
