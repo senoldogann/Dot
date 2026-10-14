@@ -64,13 +64,16 @@
   margin-bottom: 16px;
 }
 
-/* The default model (item 199), above the providers of the Models card; its select keeps to the room the row leaves. */
-.models-default {
+/* The default model (item 199) and those of Dot's own work (item 232), above the providers of the Models card; each
+   select keeps to the room the row leaves. */
+.models-default,
+.models-role {
   padding: 12px 16px;
   border-bottom: 1px solid var(--border);
 }
 
-.models-default .select {
+.models-default .select,
+.models-role .select {
   min-width: 0;
   max-width: 60%;
 }

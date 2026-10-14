@@ -75,10 +75,10 @@ A model is written `provider:model`. The `[models]` table of the configuration s
 | Key                 | Used for                                                                                  | Default                     |
 | ------------------- | ----------------------------------------------------------------------------------------- | --------------------------- |
 | `main`              | the agent loop of a run that names no model; Settings › Models sets it                    | `ollama:minimax-m2.7:cloud` |
-| `vision`            | describing the images a tool returns, when `main` cannot see them                         | `ollama:gemma4:cloud`       |
-| `fast`              | writing the summary of a compaction (see [Tools](#tools))                                 | `ollama:gpt-oss:20b-cloud`  |
+| `vision`            | describing the images a tool returns, when `main` cannot see them; Settings › Models sets it | `ollama:gemma4:cloud`    |
+| `fast`              | writing the summary of a compaction (see [Tools](#tools)); Settings › Models sets it      | `ollama:gpt-oss:20b-cloud`  |
 | `search`            | relaying a web search through the Anthropic API's own search tool (see [Tools](#tools))   | `anthropic:claude-haiku-5-5` |
-| `review`            | answering the policy's questions in `auto` approvals, and checking a run against its goal | `ollama:minimax-m2.7:cloud` |
+| `review`            | answering the policy's questions in `auto` approvals, checking a run against its goal, and drawing its lessons; Settings › Models sets it | `ollama:minimax-m2.7:cloud` |
 | `effort`            | default reasoning level of a run on `main` (see below)                                    | `medium`                    |
 | `helpers`           | models a run may ask for advice or hand a part of its work to (see below)                 | `[]`                        |
 | `standby`           | models a run moves to when its own model cannot answer (see below)                        | `[]`                        |
@@ -86,6 +86,12 @@ A model is written `provider:model`. The `[models]` table of the configuration s
 
 `review` checks the work of `main`. A model checking its own work is the weaker check, so pick a `review` model of
 another family than `main` when you can; `dotx doctor` warns while they are the same model, as they are by default.
+
+Settings › Models chooses `fast`, `review` and `vision` under the default model (item 232), each from the models that
+can do its work: those that call tools for `fast` and `review`, those that see for `vision`. A choice holds from the
+next call of that work on, with no restart (a run under way keeps the review model it started with for its goal check,
+its second opinion and its approvals), and the config file keeps it with the rest of the file as it was; a model that
+cannot do the work is refused, and nothing changes (`POST /api/models/roles`).
 
 **Helpers and standby.** `helpers` lists models, best first, that a run may turn to. The `consult` tool asks one of them
 a question and returns its answer, fenced as advice; `delegate` can run a part of the work on one of them. A helper has
@@ -1522,6 +1528,7 @@ The REST API (all under `/api`; bodies and replies are JSON, event streams are s
 | ------------------------------------------------------------------------------- | ------------------------------------------------------------ |
 | `GET /health` (public), `GET /status`, `GET /models`, `GET /doctor`             | liveness, state of the daemon, models per provider (with their reasoning levels), checks |
 | `POST /models/main` (`{"model": "provider:model"}`)                            | make the default model, kept in `config.toml` (422 for one that cannot call tools or of no known provider; the provider's error, 502, for one it does not know) |
+| `POST /models/roles` (`{"role": "review", "model": "provider:model"}`)         | make the fast, review or vision model, kept in `config.toml` (422 for one that cannot do that work) |
 | `PUT /agent/resume` (`{"resume": "safe"}`)                                     | whether the daemon's next start resumes the runs it cut off (`"safe"` or `"off"`), kept in `config.toml` |
 | `GET /runs`, `POST /runs`, `GET /runs/{id}`, `GET /runs/{id}/events`            | list, start and read runs                                    |
 | `GET /runs/{id}/stream?after=N`, `GET /stream`                                  | live events of a run with its sub-runs; lifecycle of all runs |

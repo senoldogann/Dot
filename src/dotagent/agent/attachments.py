@@ -248,7 +248,7 @@ async def message_with_attachments(
     described: str = await text_for_blind_images(
         runtime.router,
         runtime.config.agent,
-        runtime.config.models.vision,
+        runtime.roles.vision(),
         session_key,
         CallOrigin(run_id=run_id, purpose="attachment"),
         f"The user attached these images to a message: {names}. The message: {truncate_middle(text, 600)}",

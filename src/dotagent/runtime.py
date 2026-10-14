@@ -42,6 +42,7 @@ from dotagent.help.added import AddedServers, added_server_configs, read_added_s
 from dotagent.help.meaning import HelpVectors
 from dotagent.launchd import launch_agent_path
 from dotagent.llm.calls import CALL_EVENT, CallRecorder, ModelCall, call_event_data, log_model_call
+from dotagent.llm.roles import ModelRoles
 from dotagent.llm.router import ModelRouter
 from dotagent.mcp.hub import McpHub, open_hub
 from dotagent.memory.service import MemoryIndex, close_memory_index, open_memory_index
@@ -92,6 +93,8 @@ class Runtime:
     # The gates' locks per site (pace and spending), shared by every run of this process.
     site_locks: SiteLocks
     router: ModelRouter
+    # The models of Dot's own work, as the config file names them or as the owner chose them since (item 232).
+    roles: ModelRoles
     judge: Judge
     # TypeSafe's service, shared by the judge and judge_items; ``None`` when neither is on.
     typesafe: TypeSafeService | None
@@ -319,6 +322,7 @@ async def open_runtime(config: AppConfig, login_env: dict[str, str]) -> Runtime:
             approvals=ApprovalBroker(store, bus, config.policy.approval_timeout_s),
             site_locks=SiteLocks(),
             router=ModelRouter(config, _call_recorder(store, bus)),
+            roles=ModelRoles(config.models),
             judge=judge_for(config, typesafe),
             typesafe=typesafe,
             browser=browsers.main,

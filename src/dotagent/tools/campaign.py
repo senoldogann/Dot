@@ -297,7 +297,7 @@ def _achieved_tool() -> RegisteredTool:
         config: AppConfig = ctx.runtime.config
         checker: GoalChecker = goal_checker_for(
             ctx.runtime.router,
-            config.models.review,
+            ctx.runtime.roles.review(),
             config.agent.model_call_timeout_s,
             f"{ctx.thread_id}:campaign",
             ctx.run_id,

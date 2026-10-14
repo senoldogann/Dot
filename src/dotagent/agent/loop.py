@@ -467,7 +467,7 @@ async def _compact(
     transcript instead and says so.
     """
     own: ModelRef = parse_model_ref(agent.run.model)
-    fast: ModelRef = parse_model_ref(agent.runtime.config.models.fast)
+    fast: ModelRef = parse_model_ref(agent.runtime.roles.fast())
     readable: list[Message] = [
         message.model_copy(update={"content": summary_part(message.content)}) for message in head
     ]
@@ -598,7 +598,7 @@ async def _tool_messages(agent: AgentRun, outcomes: Sequence[ToolOutcome], can_s
                 text_for_blind_model(
                     runtime.router,
                     runtime.config.agent,
-                    runtime.config.models.vision,
+                    runtime.roles.vision(),
                     agent.run.thread_id,
                     agent.run.id,
                     outcome.call,
@@ -1291,7 +1291,7 @@ async def _routing(agent: AgentRun, ref: ModelRef, offers_tools: bool, fixed_tok
         return ()
     helpers: Roster = await current_roster(runtime.router, runtime.config.providers, runtime.config.models.helpers)
     named: list[tuple[StepModel, str]] = [
-        ("fast", runtime.config.models.fast),
+        ("fast", runtime.roles.fast()),
         *(("helper", m) for m in helpers.available[:1]),
     ]
     candidates: list[_Candidate] = []
@@ -1500,7 +1500,7 @@ async def run_agent(agent: AgentRun) -> RunEnd:
     )
     checker: GoalChecker | None = (
         goal_checker_for(
-            runtime.router, runtime.config.models.review, config.model_call_timeout_s, f"{run.thread_id}:goal", run.id
+            runtime.router, runtime.roles.review(), config.model_call_timeout_s, f"{run.thread_id}:goal", run.id
         )
         if run.goal_mode
         else None
@@ -1524,7 +1524,7 @@ async def run_agent(agent: AgentRun) -> RunEnd:
     ladder: tuple[Rung, ...] = ladder_for(config.stall_escalation, can_ask)
     consultant: ProgressConsultant = progress_consultant_for(
         runtime.router,
-        runtime.config.models.review,
+        runtime.roles.review(),
         config.model_call_timeout_s,
         f"{run.thread_id}:progress",
         run.id,

@@ -1550,8 +1550,8 @@ class RunManager:
                     "models": {
                         "steps": model_ref,
                         "compaction": model_ref,
-                        "review": runtime.config.models.review,
-                        "vision": runtime.config.models.vision,
+                        "review": runtime.roles.review(),
+                        "vision": runtime.roles.vision(),
                     },
                 },
                 True,
@@ -1568,7 +1568,7 @@ class RunManager:
                 approval_mode,
                 reviewer_for(
                     runtime.router,
-                    runtime.config.models.review,
+                    runtime.roles.review(),
                     runtime.config.agent.model_call_timeout_s,
                     f"{thread_id}:review",
                     run.id,
