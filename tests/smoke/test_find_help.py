@@ -189,10 +189,11 @@ async def test_a_run_offered_more_skills_than_its_instructions_list_is_listed_th
             await close_runtime(runtime)
     assert done.status == "done", done.result
     skills: str = model.requests[0].messages[0].content.split("\n# Skills\n", 1)[1]
+    # Two of the seven skills are listed; the two others offered and the three that come with Dot (item 196) are not.
     assert (
         "- weekly-report: Write the weekly report from the week's notes, in the owner's format.\n"
         "- mail-merge: Send one email to each contact of a list.\n"
-        "- 2 more installed skills fit your goal less well and are not listed here: find_help searches them all by "
+        "- 5 more installed skills fit your goal less well and are not listed here: find_help searches them all by "
         "your need, and skill reads one by its name."
     ) in skills, skills
     assert "release-notes" not in skills and "invoice-pdf" not in skills, skills

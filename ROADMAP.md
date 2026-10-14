@@ -4134,12 +4134,14 @@ rows carry minutes and tokens.
 36. The git history (item 174), decided by the owner on 2026-10-13: the two names item 174 took out of the README stay
     in it. Rewriting it would change the hash of every commit since 2026-10-09, which the status table of this file
     records, and the merged pull requests keep the old commits on GitHub anyway.
-37. Excel and the OneDrive app (part 31), asked of the owner on 2026-10-14: neither is installed on this Mac, where
-    Word, PowerPoint and LibreOffice are. Item 196 checks its skills for Excel and OneDrive on them once they are; until
-    then a workbook is read and written with the libraries and recalculated with LibreOffice.
-38. The kind of Microsoft account (part 31), asked of the owner on 2026-10-14: Microsoft's own MCP servers for Word and
-    OneDrive serve only a work or school account (Microsoft Entra). With a personal account, Dot reaches OneDrive
-    through the folder the OneDrive app syncs.
+37. Excel and the OneDrive app (part 31), asked of the owner on 2026-10-14 and answered on 2026-10-15: both are
+    installed now, beside Word, PowerPoint and LibreOffice, and item 196 gives Dot skills for them. Driving Excel and
+    Word waits on the owner's first use: macOS asks the owner to allow Dot to control them, and to confirm the first
+    start of LibreOffice, which was never opened on this Mac.
+38. The kind of Microsoft account (part 31), asked of the owner on 2026-10-14: the OneDrive folder on this Mac is of
+    a work or school account (seen on 2026-10-15 by the kind of its folder; its name is not recorded here).
+    Microsoft's own MCP servers for Word and OneDrive serve such an account once the organization allows them in
+    Microsoft Entra; until the owner asks for them, Dot reaches OneDrive through the folder the OneDrive app syncs.
 
 ## Part 6: the web that does not fail (planned 2026-10-11)
 
@@ -5132,7 +5134,7 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 193 | The chat shows pages Dot makes: charts, 3D drawings and other visuals                | done        | 1cc6fac |
 | 194 | Dot reads Word, Excel and PowerPoint files                                           | done        | 5592965 |
 | 195 | A file opens in a panel beside the chat: PDF, sheets, documents and more             | done        | 6ef8fa8 |
-| 196 | Dot knows its way around Word, Excel and OneDrive on the Mac                         | planned     |         |
+| 196 | Dot knows its way around Word, Excel and OneDrive on the Mac                         | in progress |         |
 | 197 | A stopped run stops the runs it delegated, and their rows stop                       | done        | 0b3a7d4 |
 | 198 | The side menu shows every agent of a run, folded under it                            | done        | dee248f |
 | 199 | The default model is chosen in Settings, and a chat keeps its model                  | done        | de8069e |
@@ -5171,7 +5173,7 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 232 | Models for Dot's own work                                                            | done        | 3a5e21a |
 | 233 | Goal checks in an eval run                                                           | done        | 7c47b6c |
 | 234 | A quoted instruction is not a followed one                                           | done        | 4a54433 |
-| 235 | The headlines task asks for what it checks                                           | in progress |         |
+| 235 | The headlines task asks for what it checks                                           | done        | c5aeed3 |
 
 ### 77. The type system: Inter and Geist Mono, seven sizes, three weights
 
@@ -9722,7 +9724,29 @@ file in its application on the Mac.
 
 ### 196. Dot knows its way around Word, Excel and OneDrive on the Mac
 
-**Status: planned.**
+**Status: in progress.**
+
+**As built (2026-10-15).** Three skills come with Dot (`src/dotagent/skills/builtin/`). `excel` says when to change a
+workbook with openpyxl and how to get the results of its formulas, which openpyxl does not compute (worked out in
+Python, or read from a copy LibreOffice computes without a window), and gives the terms of Excel's dictionary for
+driving it. `word` says how to change a document's text with python-docx without losing the formatting of its runs and
+where text hides (tables, headers), and gives the terms of Word's dictionary. `onedrive` says where OneDrive keeps its
+folders (`~/Library/CloudStorage`), what a file kept only online needs, and that a change there reaches the cloud. They
+are read after every other skill, so the owner's own skill of a name is used instead without a problem reported, and
+`[skills] builtin = false` leaves them out. They name Dot's own Python as `{{dot_python}}`, which the `skill` tool fills
+with its path: the shell's `python3` lacks the libraries, and the shell guard asks about a command whose name only a
+variable gives. `dotx doctor` lists Excel, Word and LibreOffice with their versions and counts the OneDrive folders by
+the kind of account, never by name, and opens nothing. Two eval tasks check the skills, their easy way the skill that
+comes with Dot. `excel-add-a-month` starts from a workbook whose totals hold the results Excel saved: a run that reports
+those, saves the workbook as openpyxl read its results or leaves the new month out of a formula fails.
+`word-rename-company` starts from a letter whose company name is bold in one place, split over two italic runs in
+another, and also in a table and the header. The seeds of an eval task may be bytes, in Base64, and both references pass
+without Office. Tests: `tests/unit/test_skills.py` and `tests/unit/test_evals.py`; `tests/smoke/test_evals_runner.py`
+replays both references through the real loop, and the skills, help and scaffold smoke tests count the skills that come
+with Dot (the small window of the scaffold test is 1,000 tokens wider for the skill tool and its section). On the code
+of before, the new tests fail to import. Not tried on this Mac: Excel and Word driven by AppleScript, whose first use
+asks the owner to allow it, and LibreOffice's computing: it was never opened here, and macOS asks to confirm its first
+start.
 
 **What.** Dot knows the ways to Word, Excel and OneDrive on the Mac. Built-in skills say when to edit a file with the
 libraries (and recalculate a workbook through Excel or LibreOffice), when to drive the application with AppleScript, and
@@ -10731,7 +10755,7 @@ and a claim whose words the instruction does not hold. An answer that quotes the
 
 ### 235. The headlines task asks for what it checks
 
-**Status: in progress.**
+**Status: done.** Merged as `c5aeed3` (PR #274; no Linear issue, the Linear connector was signed out).
 
 **As built (2026-10-15).** The goal asks for the headlines about electric cars, their batteries and their charging, the
 six the task checks, so that its smallest reasonable reading is the one checked; the rule of the system prompt stays as
@@ -11418,3 +11442,4 @@ holds no headline whose figures could pass for the count.
 - 2026-10-15 (Opus 5.5): item 232 merged as `3a5e21a` (PR #271; no Linear issue, the connector was signed out): Settings › Models chooses the fast, review and vision models, kept in the config file, and each call of their work goes to the one chosen from then on.
 - 2026-10-15 (Opus 5.5): item 233 merged as `7c47b6c` (PR #272; no Linear issue, the connector was signed out): an eval run hands each attempt the keys of the models it may call and needs the review model's when an attempt checks the end of its run, `[agent] goal_mode` applies to every attempt again, and a goal check that cannot run fails its attempt without ending the eval run.
 - 2026-10-15 (Opus 5.5): item 234 merged as `4a54433` (PR #273; no Linear issue, the connector was signed out): the tasks that hide an instruction judge it followed by what only following it does, so an answer that quotes it while refusing it passes, and `dotx eval check` reports a check that such a quote would fail.
+- 2026-10-15 (Opus 5.5): item 235 merged as `c5aeed3` (PR #274; no Linear issue, the connector was signed out): the headlines task asks for the headlines about electric cars, their batteries and their charging, checks that its file holds the six alone, and reads the count in figures or in words.

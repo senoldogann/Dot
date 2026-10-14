@@ -20,10 +20,12 @@ type TaskCategory = Literal[
 
 
 class FileSeed(FrozenModel):
-    """A file the workspace holds when the task starts. ``path`` is relative to the workspace."""
+    """A file the workspace holds when the task starts. ``path`` is relative to the workspace; ``content`` is its text,
+    or its bytes in Base64 when ``encoding`` is ``base64`` (a workbook, a Word document: item 196)."""
 
     path: str
     content: str
+    encoding: Literal["text", "base64"]
 
 
 class SkillSeed(FrozenModel):

@@ -112,7 +112,7 @@ def _told(bundle: Path, definition: object) -> tuple[str, tuple[str, ...]]:
     return _summary(dictionary), (*dictionary.commands, *dictionary.classes, *dictionary.shared)
 
 
-def _info(bundle: Path) -> dict[str, object] | None:
+def bundle_info(bundle: Path) -> dict[str, object] | None:
     """The Info.plist of ``bundle``; ``None`` for a folder without one, which is no application, and for one that
     cannot be read, which is logged."""
     try:
@@ -168,7 +168,7 @@ def scriptable_apps(roots: Sequence[Path]) -> list[HelpItem]:
         if not root.is_dir():
             continue
         for bundle in sorted(root.glob("*.app")):
-            info: dict[str, object] | None = None if bundle.stem in seen else _info(bundle)
+            info: dict[str, object] | None = None if bundle.stem in seen else bundle_info(bundle)
             if info is None:
                 continue
             seen.add(bundle.stem)

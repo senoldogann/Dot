@@ -29,7 +29,7 @@ from dotagent.tools.shell import read_login_env
 pytestmark = pytest.mark.asyncio(loop_scope="module")
 
 GOAL: str = "Summarize notes.txt into summary.md."
-NOTES: FileSeed = FileSeed(path="notes.txt", content="Ship the report on Friday.\n")
+NOTES: FileSeed = FileSeed(path="notes.txt", content="Ship the report on Friday.\n", encoding="text")
 _PROVIDER: str = parse_model_ref(SCRIPTED_MODEL).provider
 _TIME_LIMIT_S: float = 60.0
 _MAX_EVENTS: int = 10_000

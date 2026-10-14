@@ -2,6 +2,8 @@
 
 import asyncio
 import secrets
+import shlex
+import sys
 from collections.abc import Sequence
 from pathlib import Path
 
@@ -12,7 +14,7 @@ from dotagent.config import AppConfig
 from dotagent.core.text import text_window
 from dotagent.policy.types import ActionInfo
 from dotagent.skills.catalog import load_skills, playbook_root
-from dotagent.skills.types import SKILL_FILE, SKILL_TOOL, Skill, SkillCatalog
+from dotagent.skills.types import PYTHON_MARK, SKILL_FILE, SKILL_TOOL, Skill, SkillCatalog
 from dotagent.tools.base import ALL_MODES, RegisteredTool, ToolArgs, ToolResult, fail, make_tool, ok
 from dotagent.tools.context import ToolContext
 
@@ -50,6 +52,12 @@ def files_of_skill(root: Path) -> list[str]:
         if len(listed) >= _MAX_LISTED_FILES:
             break
     return listed
+
+
+def with_python(skill: Skill, python: str) -> Skill:
+    """``skill`` with :data:`PYTHON_MARK` in its instructions replaced by ``python``, the path of Dot's own Python as the
+    shell takes it."""
+    return skill.model_copy(update={"body": skill.body.replace(PYTHON_MARK, python)})
 
 
 def fence_skill(skill: Skill, text: str, nonce: str) -> str:
@@ -109,10 +117,11 @@ def build_skill_tool() -> RegisteredTool:
             load_skills, config.skills, ctx.runtime.plugins.plugins, playbook_root(config)
         )
         offered: tuple[Skill, ...] = await offered_to_run(config, catalog, ctx.run_id, ctx.agent_id)
-        skill: Skill | None = next((entry for entry in offered if entry.name == args.name), None)
-        if skill is None:
+        found: Skill | None = next((entry for entry in offered if entry.name == args.name), None)
+        if found is None:
             names: str = ", ".join(entry.name for entry in offered) or "none"
             return fail(f"No skill offered to this run is called {args.name}. The skills it is offered: {names}.")
+        skill: Skill = with_python(found, shlex.quote(sys.executable))
         start: int = args.start or 0
         if start > 0 and start >= len(skill.body):
             return fail(

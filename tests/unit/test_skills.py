@@ -2,6 +2,7 @@
 configuration, and what the prompt says about them. The folders are real folders in a temporary directory."""
 
 import json
+import plistlib
 import sys
 from pathlib import Path
 
@@ -9,17 +10,19 @@ import pytest
 from pydantic import ValidationError
 
 from dotagent.agent.prompt import build_system_prompt, collect_prompt_inputs
-from dotagent.config import McpServerConfig, PluginsConfig
+from dotagent.config import McpServerConfig, PluginsConfig, SkillsConfig
 from dotagent.core.errors import PluginError, SkillError
+from dotagent.doctor import CheckResult, _office_row, _onedrive_row
 from dotagent.help.listed import SkillListing, listed_skills
 from dotagent.plugins.catalog import load_plugins, read_plugin
 from dotagent.plugins.manifest import PluginVariables, parse_manifest, parse_servers_file, to_server_config
 from dotagent.plugins.types import McpServerJson, PluginCatalog
-from dotagent.skills.catalog import SkillRoot, load_catalog
+from dotagent.skills.catalog import BUILTIN_SKILLS, BUILTIN_SOURCE, SkillRoot, load_catalog, skill_roots
 from dotagent.skills.discover import find_skill_files
+from dotagent.skills.office import CLOUD_STORAGE, OFFICE_APPS, ONEDRIVE_APP, app_version, onedrive_folders
 from dotagent.skills.parse import parse_skill
-from dotagent.skills.types import Skill
-from dotagent.tools.skill import fence_skill
+from dotagent.skills.types import PYTHON_MARK, Skill
+from dotagent.tools.skill import fence_skill, with_python
 
 REAL_WORLD: str = """---
 name: brainstorming
@@ -153,6 +156,64 @@ def test_the_fence_around_a_skill_cannot_be_closed_from_inside(tmp_path: Path) -
     fenced: str = fence_skill(skill, skill.body, "abc")
     assert fenced.count('</skill_content nonce="abc">') == 1
     assert fenced.endswith('more\n</skill_content nonce="abc">')
+
+
+# ------------------------------------------------------------------------------------------------- built-in skills
+
+
+def test_the_skills_that_come_with_dot_load_last_give_way_to_the_users_own_and_can_be_left_out(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("DOT_HOME", str(tmp_path))
+    _skill_dir(tmp_path / "skills", "excel", _simple("excel"))
+    roots: tuple[SkillRoot, ...] = skill_roots(SkillsConfig(), [], None)
+    assert roots[-1] == SkillRoot(path=BUILTIN_SKILLS, source=BUILTIN_SOURCE)
+    catalog = load_catalog(roots)
+    # The user's excel replaces Dot's without a problem to report; Dot's word and onedrive name Dot's own Python.
+    assert [(skill.name, skill.source) for skill in catalog.skills] == [
+        ("excel", "home"),
+        ("onedrive", BUILTIN_SOURCE),
+        ("word", BUILTIN_SOURCE),
+    ]
+    assert catalog.problems == ()
+    assert PYTHON_MARK in next(skill for skill in catalog.skills if skill.name == "word").body
+    assert [root.source for root in skill_roots(SkillsConfig(builtin=False), [], None)] == ["home"]
+
+
+def test_the_skill_tool_puts_dots_own_python_where_a_skill_names_it(tmp_path: Path) -> None:
+    skill: Skill = Skill(
+        name="excel", description="x", root=tmp_path, body=f"{PYTHON_MARK} - <<'EOF'\n{PYTHON_MARK} -V", source="home"
+    )
+    assert with_python(skill, "'/Applications/My Dot/python3'").body == (
+        "'/Applications/My Dot/python3' - <<'EOF'\n'/Applications/My Dot/python3' -V"
+    )
+
+
+def test_doctor_gives_the_office_apps_with_their_versions_and_counts_the_onedrive_folders_by_kind(
+    tmp_path: Path,
+) -> None:
+    apps: Path = tmp_path / "Applications"
+    for name, version in (("Microsoft Excel", "16.113.4"), (ONEDRIVE_APP, "26.168")):
+        (apps / f"{name}.app" / "Contents").mkdir(parents=True)
+        with (apps / f"{name}.app" / "Contents" / "Info.plist").open("wb") as handle:
+            plistlib.dump({"CFBundleShortVersionString": version}, handle)
+    cloud: Path = tmp_path / "CloudStorage"
+    for folder in ("GoogleDrive-me", "OneDrive-Personal", "OneDrive-Contoso", "OneDrive-SharedLibraries-Contoso"):
+        (cloud / folder).mkdir(parents=True)
+    roots: tuple[Path, ...] = (tmp_path / "missing", apps)
+
+    office: CheckResult = _office_row({name: app_version(roots, name) for name in OFFICE_APPS})
+    assert (office.ok, office.detail) == (True, "Microsoft Excel 16.113.4; not installed: Microsoft Word, LibreOffice")
+    assert onedrive_folders(cloud) == ("work or school", "personal", "shared libraries")
+    # A folder is never named: a work or school account's carries the organization's name.
+    synced: CheckResult = _onedrive_row(app_version(roots, ONEDRIVE_APP), onedrive_folders(cloud))
+    assert (synced.ok, synced.detail) == (
+        True,
+        f"OneDrive 26.168; 3 folder(s) in {CLOUD_STORAGE} (1 work or school, 1 personal, 1 shared libraries)",
+    )
+    signed_out: CheckResult = _onedrive_row("26.168", onedrive_folders(tmp_path / "nowhere"))
+    assert (signed_out.ok, signed_out.required) == (False, False)
+    assert "sign in in the OneDrive app" in signed_out.detail
 
 
 # ------------------------------------------------------------------------------------------------- plugins

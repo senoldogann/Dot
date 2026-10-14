@@ -49,6 +49,7 @@ from dotagent.help.elsewhere import (
     server_config,
 )
 from dotagent.plugins.types import McpServerJson, Plugin
+from dotagent.skills.catalog import BUILTIN_SOURCE
 from dotagent.skills.types import SkillCatalog
 
 _FILE_MODE: int = 0o600
@@ -90,10 +91,11 @@ def _write(path: Path, record: AddedServers) -> None:
 
 def dot_has(config: AppConfig, catalog: SkillCatalog, plugins: Sequence[Plugin], added: AddedServers) -> DotHas:
     """What Dot has, for :func:`dotagent.help.elsewhere.found_elsewhere`: the skills of ``catalog``, the servers of
-    ``[[mcp]]`` and of ``plugins``, Dot's skills folder and the servers ``added``."""
+    ``[[mcp]]`` and of ``plugins``, Dot's skills folder and the servers ``added``. A skill that comes with Dot keeps no
+    name from the owner: one added with its name is used instead of it."""
     return DotHas(
         skill_folders=frozenset(skill.root.resolve() for skill in catalog.skills),
-        skill_names=frozenset(skill.name for skill in catalog.skills),
+        skill_names=frozenset(skill.name for skill in catalog.skills if skill.source != BUILTIN_SOURCE),
         servers=frozenset([*(server.name for server in config.mcp), *(s.name for p in plugins for s in p.servers)]),
         skills_dir=skills_dir(),
         added_servers=added.servers,

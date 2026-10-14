@@ -567,6 +567,9 @@ elsewhere = true
 # The most skills a run's instructions list by name and description. When a run is offered more, they list those that
 # share the most words with its goal and say how many more there are, which find_help searches.
 listed = 20
+# The skills that come with Dot: excel, word and onedrive, how to do that work on this Mac. A skill of yours with the
+# same name is used instead of one of them; false leaves them all out.
+builtin = true
 
 [plugins]
 # Plugins in the Claude Code layout: <plugin>/.claude-plugin/plugin.json (name), skills/<name>/SKILL.md and .mcp.json

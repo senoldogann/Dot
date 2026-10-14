@@ -8,6 +8,7 @@ the current one then, and are passed on by name.
 """
 
 import asyncio
+import base64
 import json
 import os
 import tempfile
@@ -192,7 +193,10 @@ def seed_workspace(workspace: Path, files: Sequence[FileSeed]) -> None:
     for seed in files:
         path: Path = workspace_path(workspace, seed.path)
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(seed.content, encoding="utf-8")
+        if seed.encoding == "base64":
+            path.write_bytes(base64.b64decode(seed.content, validate=True))
+        else:
+            path.write_text(seed.content, encoding="utf-8")
 
 
 def seed_skills(folder: Path, skills: Sequence[SkillSeed]) -> None:
@@ -200,7 +204,9 @@ def seed_skills(folder: Path, skills: Sequence[SkillSeed]) -> None:
     description is written as a quoted string, which any text can be. Blocking."""
     for skill in skills:
         frontmatter: str = f"---\nname: {skill.name}\ndescription: {json.dumps(skill.description)}\n---\n"
-        seed_workspace(folder / skill.name, (FileSeed(path=SKILL_FILE, content=frontmatter + skill.body),))
+        seed_workspace(
+            folder / skill.name, (FileSeed(path=SKILL_FILE, content=frontmatter + skill.body, encoding="text"),)
+        )
 
 
 def judge(

@@ -40,7 +40,7 @@ SPENT_MAIN: str = "anthropic:scripted-spent"
 SPENT_OTHER: str = "anthropic:scripted-spent-too"
 # A model of the spent provider that cannot call tools.
 BLIND: str = "anthropic:scripted-blind"
-NOTES: FileSeed = FileSeed(path="notes.txt", content="Export the contacts as CSV.\n")
+NOTES: FileSeed = FileSeed(path="notes.txt", content="Export the contacts as CSV.\n", encoding="text")
 QUESTION: str = "CSV or JSON for 40 contacts that a spreadsheet opens?"
 _STAND_IN_KEY: str = "stand-in-key-of-the-test"
 _TIME_LIMIT_S: float = 60.0

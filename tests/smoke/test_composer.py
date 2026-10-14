@@ -123,16 +123,16 @@ async def client(runtime: Runtime) -> AsyncIterator[httpx.AsyncClient]:
 async def test_the_palette_names_the_skills_and_the_servers(client: httpx.AsyncClient) -> None:
     answer: httpx.Response = await client.get("/api/palette")
     assert answer.status_code == 200, answer.text
-    assert answer.json() == {
-        "skills": [
-            {
-                "name": "scan-catalogue",
-                "description": "Scan a product catalogue page by page and report the items.",
-                "source": "home",
-            }
-        ],
-        "servers": [],
-    }
+    found: dict[str, list[dict[str, str]]] = answer.json()
+    # By name, the owner's skill among the three that come with Dot (item 196).
+    assert [(skill["name"], skill["source"]) for skill in found["skills"]] == [
+        ("excel", "built-in"),
+        ("onedrive", "built-in"),
+        ("scan-catalogue", "home"),
+        ("word", "built-in"),
+    ]
+    assert found["skills"][2]["description"] == "Scan a product catalogue page by page and report the items."
+    assert found["servers"] == []
 
 
 async def test_a_slash_opens_the_menu_letters_filter_it_and_enter_picks_without_sending(
@@ -154,7 +154,8 @@ async def test_a_slash_opens_the_menu_letters_filter_it_and_enter_picks_without_
                 await goal.type("/")
                 await expect(menu).to_be_visible()
                 await expect(menu.locator(".slash-group")).to_have_text(["Commands", "Skills"])
-                await expect(menu.locator("[role=option]")).to_have_count(4)
+                # Three commands, the owner's skill and the three that come with Dot (item 196).
+                await expect(menu.locator("[role=option]")).to_have_count(7)
                 await expect(menu.locator("[role=option][aria-selected=true]")).to_contain_text("/task")
                 assert await goal.get_attribute("aria-expanded") == "true"
                 await page.screenshot(path=str(tmp_path / f"slash-open-{width}.png"))

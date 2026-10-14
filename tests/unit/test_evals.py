@@ -1,10 +1,15 @@
 """The pieces of the eval harness that are plain judgments: the checks, the structure of the catalog and the score."""
 
+import io
 import json
 from pathlib import Path
 
 import httpx
 import pytest
+from docx import Document
+from docx.document import Document as DocumentObject
+from docx.text.paragraph import Paragraph
+from openpyxl import Workbook, load_workbook
 
 from dotagent.config import AppConfig, load_default_config
 from dotagent.core.errors import EvalError
@@ -13,9 +18,19 @@ from dotagent.evals.audit import catalog_problems, task_problems
 from dotagent.evals.catalog import LONG_TASK_IDS, all_tasks, select_tasks
 from dotagent.evals.checks import evaluate_check, evaluate_checks, workspace_path
 from dotagent.evals.metrics import run_metrics, took_easy_way
+from dotagent.evals.office_tasks import (
+    AUGUST,
+    NEW_NAME,
+    OLD_NAME,
+    letter_document,
+    letter_problems,
+    reaches,
+    sales_problems,
+    sales_workbook,
+)
 from dotagent.evals.reports import load_report, report_file_name, save_report
 from dotagent.evals.results import CheckOutcome, EvalReport, EvalSettings, RunMetrics, TaskOutcome
-from dotagent.evals.runner import eval_config, reached_models, required_models
+from dotagent.evals.runner import eval_config, reached_models, required_models, seed_workspace
 from dotagent.evals.scoring import (
     Scorecard,
     failure_reason,
@@ -41,6 +56,7 @@ from dotagent.evals.types import (
     JsonEquals,
     SitePage,
 )
+from dotagent.skills.types import SKILL_TOOL
 from dotagent.store.models import EventRecord, RunRecord
 from dotagent.tools.help import FIND_HELP_TOOL
 
@@ -193,6 +209,70 @@ async def test_the_headlines_task_reads_the_count_from_the_answer_and_its_file_h
     (tmp_path / "ev.txt").write_text(task.files[0].content, encoding="utf-8")
     outcomes: tuple[CheckOutcome, ...] = await evaluate_checks(task.checks, tmp_path, "There are 6.", ENV)
     assert [outcome.passed for outcome in outcomes] == [True] * len(headlines) + [False, True]
+
+
+def _reloaded(book: Workbook) -> Workbook:
+    """``book`` saved and read again, as the next program to open the file reads it."""
+    saved: io.BytesIO = io.BytesIO()
+    book.save(saved)
+    return load_workbook(io.BytesIO(saved.getvalue()))
+
+
+def _paragraphs(letter: DocumentObject) -> list[Paragraph]:
+    cells: list[Paragraph] = [
+        paragraph
+        for table in letter.tables
+        for row in table.rows
+        for cell in row.cells
+        for paragraph in cell.paragraphs
+    ]
+    header: list[Paragraph] = [paragraph for section in letter.sections for paragraph in section.header.paragraphs]
+    return [*letter.paragraphs, *cells, *header]
+
+
+def test_the_office_tasks_start_from_their_files_and_read_the_skill_that_comes_with_dot(tmp_path: Path) -> None:
+    sales, letter = select_tasks(["excel-add-a-month", "word-rename-company"])
+    assert (sales.easy_way, letter.easy_way) == (
+        EasyWay(tool=SKILL_TOOL, skill="excel"),
+        EasyWay(tool=SKILL_TOOL, skill="word"),
+    )
+    seed_workspace(tmp_path, [*sales.files, *letter.files])
+    assert (tmp_path / "sales.xlsx").read_bytes() == sales_workbook()
+    assert sales_problems(load_workbook(tmp_path / "sales.xlsx")) == [f"no row of the Data sheet holds {AUGUST}"]
+    assert f"{NEW_NAME!r} is in 0 places, not 5" in letter_problems(Document(str(tmp_path / "letter.docx")))
+
+
+def test_the_workbook_check_refuses_totals_saved_as_figures_and_totals_that_leave_august_out() -> None:
+    # Saved as openpyxl read the results that Excel stored with the formulas: the totals are figures now.
+    results: Workbook = load_workbook(io.BytesIO(sales_workbook()), data_only=True)
+    results["Data"].append(list(AUGUST))
+    assert sales_problems(_reloaded(results)) == [
+        "Summary!B1 holds no formula but 10365",
+        "Summary!B2 holds no formula but 780",
+    ]
+    book: Workbook = load_workbook(io.BytesIO(sales_workbook()))
+    book["Data"].append(list(AUGUST))
+    assert [problem.split(" (")[0] for problem in sales_problems(_reloaded(book))] == ["Summary!B1", "Summary!B2"]
+    book["Summary"]["B1"] = "=SUMPRODUCT(Data!$B$2:$B$9,Data!$C$2:$C$9)"
+    book["Summary"]["B2"] = "=SUM(Data!B:B)"
+    assert sales_problems(_reloaded(book)) == []
+    assert reaches("=Data!B9*Data!C9+Data!B8*Data!C8", 9)
+    assert not reaches("=LOG10(B2)+SUM(B2:B8)", 10)
+
+
+def test_the_letter_check_refuses_a_paragraph_set_anew_and_a_name_split_over_runs_left_behind() -> None:
+    # Setting a paragraph's text makes one plain run of it: the bold and the italic name lose their formatting.
+    flat: DocumentObject = Document(io.BytesIO(letter_document()))
+    for paragraph in _paragraphs(flat):
+        paragraph.text = paragraph.text.replace(OLD_NAME, NEW_NAME)
+    problems: list[str] = letter_problems(flat)
+    assert [("not bold" in problem, "not italic" in problem) for problem in problems] == [(True, False), (False, True)]
+    # Changing the runs one by one leaves the name that is split over two of them.
+    by_run: DocumentObject = Document(io.BytesIO(letter_document()))
+    for paragraph in _paragraphs(by_run):
+        for run in paragraph.runs:
+            run.text = run.text.replace(OLD_NAME, NEW_NAME)
+    assert letter_problems(by_run)[1:2] == [f"{NEW_NAME!r} is in 4 places, not 5"]
 
 
 def test_the_easy_way_of_a_task_must_be_one_that_its_own_help_offers() -> None:

@@ -72,6 +72,17 @@ def _writable(tree: Path) -> None:
         folder.chmod(0o755)
 
 
+def test_a_skill_of_another_agent_may_take_the_name_of_one_that_comes_with_dot(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    home: Path = tmp_path / "user"
+    monkeypatch.setenv("DOT_HOME", str(tmp_path / "dot"))
+    _skill(home / ".claude" / "skills" / "excel", "excel")
+    config: AppConfig = load_default_config().model_copy(update={"skills": SkillsConfig(dirs=[])})
+    # Added, it is used instead of Dot's own excel (item 196).
+    assert _skill_of(_found(home, config), "excel").refusal is None
+
+
 def test_a_skill_is_added_as_a_copy_that_dot_reads_and_removing_it_deletes_that_copy_alone(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
