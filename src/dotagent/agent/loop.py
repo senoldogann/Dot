@@ -44,7 +44,14 @@ from dotagent.agent.continuity import (
 )
 from dotagent.agent.executor import ToolOutcome, batch_steps, execute_calls
 from dotagent.agent.gate import RunGate
-from dotagent.agent.helpers import MODEL_SWITCHED_EVENT, Roster, current_roster
+from dotagent.agent.helpers import (
+    MODEL_SWITCHED_EVENT,
+    Roster,
+    Unavailable,
+    current_roster,
+    paused_model,
+    unavailable_text,
+)
 from dotagent.agent.judge import ClaimJudgment, TypeSafeService, claim_refused, claim_state, describe_claim
 from dotagent.agent.keep_going import keep_going_ask
 from dotagent.agent.lessons import LessonCase, may_learn
@@ -353,8 +360,8 @@ class Compaction(FrozenModel):
     """How the earlier conversation was folded: the note that replaces it and how that note came about.
 
     ``method`` is ``model`` when a model wrote the summary (``model`` names it: the fast model of ``[models] fast``, or
-    the run's own model when the fast one gave no usable summary, which ``fast_problem`` explains) and ``mechanical``
-    when neither could (``problem`` says why) and the newest part of the transcript stands in for it.
+    the run's own model when the fast one gave no usable summary or was paused, which ``fast_problem`` explains) and
+    ``mechanical`` when neither could (``problem`` says why) and the newest part of the transcript stands in for it.
     """
 
     note: Message
@@ -461,8 +468,9 @@ async def _compact(
 ) -> Compaction:
     """Fold ``head`` into a continuity note written by the fast model (``[models] fast``), the side work of a run that
     its own, slower model need not do; the run's own model writes it when the fast one gives no usable summary (a
-    provider error, a timeout, no text, a summary far too long), and the compaction event names the fast model's
-    problem, so that a fast model that never answers is seen, not hidden.
+    provider error, a timeout, no text, a summary far too long) and, without asking the fast one, while the router has
+    paused it (item 240). The compaction event names the fast model's problem, so that a fast model that never answers
+    is seen, not hidden.
 
     The ledger and the plan are pinned into the note in about ``part_chars`` characters; the model's summary is checked
     against ``head``. When neither model writes one, the note carries the newest ``part_chars`` characters of the
@@ -475,10 +483,16 @@ async def _compact(
     ]
     transcript: str = truncate_middle(render_transcript(readable), _SUMMARY_TRANSCRIPT_CHARS)
     plan: PlanPayload = await _current_plan(agent)
-    writer: ModelRef = fast
-    text, attempts, problem = await _model_summary(agent, fast, transcript, context_tokens)
-    fast_problem: str | None = None
-    if text is None and fast.label != own.label:
+    now: float = time.time()
+    paused: Unavailable | None = (
+        None if fast.label == own.label else paused_model(agent.runtime.router, fast.label, now)
+    )
+    writer: ModelRef = fast if paused is None else own
+    fast_problem: str | None = None if paused is None else f"{unavailable_text(paused, now)} cannot answer now"
+    if paused is not None:
+        log.info("summary_fast_paused", run_id=agent.run.id, fast=fast.label, own=own.label, until=paused.until)
+    text, attempts, problem = await _model_summary(agent, writer, transcript, context_tokens)
+    if text is None and writer.label != own.label:
         fast_problem = problem if problem is not None else "no reply"
         log.warning("summary_fast_failed", run_id=agent.run.id, fast=fast.label, own=own.label, problem=fast_problem)
         writer = own

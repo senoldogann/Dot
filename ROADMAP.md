@@ -5177,7 +5177,8 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 236 | An import names each found item once                                                 | done        | db0bf8d |
 | 237 | The prompt cache holds when old output is shortened                                  | done        | 24194bf |
 | 238 | The side panel at the window's edge                                                  | done        | f9e6799 |
-| 239 | The meter says why the budget is smaller than the window                             | in progress |         |
+| 239 | The meter says why the budget is smaller than the window                             | done        | 75bcb6e |
+| 240 | Dot's own work leaves a paused fast model out                                        | in progress |         |
 
 ### 77. The type system: Inter and Geist Mono, seven sizes, three weights
 
@@ -10794,16 +10795,19 @@ prompt anew and writes it to the cache again, at 1.25 times the price of input. 
 there, as its cache matches the part before a change. The panel: the run page keeps a reading width of 1,240 px while
 the panel has its own width, so on a wide window the panel stands in the middle.
 
-**The shape of this part.** Four items, each a pull request of its own: the import, which stops the owner, first; then
-the cache, the largest cost measured; then the panel and the meter. Found by the same review and left for a part of
-their own, each to be measured first: a change of the open plan, which sits at the end of the system prompt, misses the
-whole cache on every provider (8 of 291 Anthropic step calls, 73 of about 2,100 OpenCode Go ones); the tools a step
-offers change when a group turns on or the watchdog narrows them, which misses it too; a run page receives the stream of
-every run and loads the whole log of a long run at once.
+**The shape of this part.** Five items, each a pull request of its own: the import, which stops the owner, first; then
+the cache, the largest cost measured; then the panel and the meter; last the fast model's pause, which the review found
+in the side calls of the owner's runs. Found by the same review and left for a part of their own: a change of the open
+plan, which sits at the end of the system prompt, misses the whole cache on every provider (8 of 291 Anthropic step
+calls, 73 of about 2,100 OpenCode Go ones), and moving the plan to the end of the request would make each step a new
+turn of the owner's, which a model that reasons may take differently, so it waits for an eval on real models; a summary
+holds its run up while it is written (27.6 s on average on OpenCode Go). Measured and left as they are: a run page loads
+the whole log of its run, on the owner's record at most 1,674 events and 1.2 MB; a step whose tools changed missed no
+cache there; a reply's live text is set as plain text and drawn once at its end.
 
 ### How to start part 38 (the handoff prompt)
 
-> Read ROADMAP.md part 38 and the status table of part 9 (rows 236 to 239). One item at a time, in order; the protocol
+> Read ROADMAP.md part 38 and the status table of part 9 (rows 236 to 240). One item at a time, in order; the protocol
 > of part 5 (branch, gate, PR, Linear MYP issue when the connector is signed in, squash merge, hash in the table, log
 > line) is unchanged. Give each change a test that fails on the code of before. Tests never start a real model call
 > or read the other agents' files of the Mac. Never touch the owner's data directory except to read it, by the kinds
@@ -10868,7 +10872,7 @@ has room for it; the conversation keeps its reading width.
 
 ### 239. The meter says why the budget is smaller than the window
 
-**Status: in progress.**
+**Status: done.** Merged as `75bcb6e` (PR #279; no Linear issue, the Linear connector was signed out).
 
 **As built (2026-10-15).** The context meter's panel ends with why a run's budget is smaller than the model's window and
 where it is set: each step sends the model the whole run again, so a run kept within its budget is answered sooner and
@@ -10878,6 +10882,24 @@ code of before. Checked in Chrome and WebKit, wide and on a phone, light and dar
 
 **What.** The context meter says why a run's budget is smaller than the model's window, as every step sends the whole
 prompt again, and how to change it.
+
+### 240. Dot's own work leaves a paused fast model out
+
+**Status: in progress.**
+
+**As built (2026-10-15).** `paused_model` (`agent/helpers.py`) gives a model the router has paused, with why and until
+when. `_compact` (`agent/loop.py`) asks it first: a paused fast model that is not the run's own is left out, the run's
+own model writes the summary, and the `compacted` event's `fast_problem` says that the fast model (rate limited until a
+time) cannot answer now. `web_extract` (`tools/web.py`) asks it before each source and lists a source it did not read
+with the same words. Tests: `tests/smoke/test_scaffold.py` (a fast model that answers with a rate limit is asked once in
+a run of many compactions; 39 times on the code of before) and `tests/smoke/test_crawl.py` (two extractions of two
+sources each ask it once; four times on the code of before).
+
+**What.** A run's summary and `web_extract` leave the fast model out while the router has paused it after a quota,
+rate-limit or key error: the run's own model writes the summary at once, and `web_extract` reads no source and says
+until when the fast model cannot answer. Before, each asked it anyway and spent the connector's retries first: on the
+owner's record of four days, 122 calls of the fast model failed on its rate limit, 19 to 31 s each (24.8 s at the
+median), 107 of them within the pause of the one before, and each summary then took 27.6 s more on the run's own model.
 
 ## Log
 
@@ -11558,3 +11580,4 @@ prompt again, and how to change it.
 - 2026-10-15 (Opus 5.5): item 236 merged as `db0bf8d` (PR #276; no Linear issue, the connector was signed out): each skill and MCP server found elsewhere is found once by its agent and its name; a skill named as one before it in the same agent's folders, and a plugin of another marketplace whose name is taken, are listed under Left out; a plugin installed for the user and for a project is read from the user's install.
 - 2026-10-15 (Opus 5.5): item 237 merged as `24194bf` (PR #277; no Linear issue, the connector was signed out): a step's request to Anthropic marks the end of the part of the run the next step sends unchanged, so the step after a shortening reads the run before the newest tool results from the cache; `truncate_middle` keeps its mark within the size it is given, so old output is shortened once.
 - 2026-10-15 (Opus 5.5): item 238 merged as `f9e6799` (PR #278; no Linear issue, the connector was signed out): while the side panel stands beside the conversation, the run page lets go of its reading width and keeps 12 px on its right, so the panel stands at the window's edge at every width (before, 20, 224 and 544 px from it at 1,280, 1,920 and 2,560 px).
+- 2026-10-15 (Opus 5.5): item 239 merged as `75bcb6e` (PR #279; no Linear issue, the connector was signed out): the context meter's panel says why a run's budget is smaller than the model's window, as each step sends the model the whole run again, and that `[agent] context_tokens` sets it, up to three quarters of the window.

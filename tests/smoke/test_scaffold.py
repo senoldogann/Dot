@@ -7,6 +7,7 @@ the summaries of a compaction, and reports as the size of each prompt the size t
 """
 
 import asyncio
+import re
 from collections.abc import Sequence
 from itertools import pairwise
 
@@ -16,7 +17,7 @@ import pytest_asyncio
 from dotagent.agent.compact import estimate_tokens
 from dotagent.agent.manager import RunManager
 from dotagent.config import AppConfig, Tier, load_default_config
-from dotagent.core.errors import ProviderError
+from dotagent.core.errors import ProviderError, ProviderRateLimitError
 from dotagent.core.types import FrozenModel, JsonObject, JsonValue
 from dotagent.evals import EVAL_SOURCE
 from dotagent.evals.runner import SCRIPTED_MODEL, eval_config, eval_environment, scratch_home, seed_workspace
@@ -144,6 +145,21 @@ class BrokenFastProvider(WindowedProvider):
     async def complete(self, request: ChatRequest, sink: DeltaSink) -> ModelReply:
         if request.model == _BROKEN_FAST:
             raise ProviderError("the fast model is down", {"model": request.model})
+        return await super().complete(request, sink)
+
+
+class RateLimitedFastProvider(WindowedProvider):
+    """The scripted model next to a fast model, ``broken``, whose provider answers every call with a rate limit; it
+    counts the calls the fast model gets."""
+
+    def __init__(self, script: ScriptedProvider, window: int | None) -> None:
+        super().__init__(script, window)
+        self.fast_calls: int = 0
+
+    async def complete(self, request: ChatRequest, sink: DeltaSink) -> ModelReply:
+        if request.model == _BROKEN_FAST:
+            self.fast_calls += 1
+            raise ProviderRateLimitError("the fast model is rate limited", 429, None, {"model": request.model})
         return await super().complete(request, sink)
 
 
@@ -299,6 +315,32 @@ async def test_a_fast_model_that_fails_leaves_the_summary_to_the_runs_own_model_
     for compaction in played.compactions:
         assert (compaction["method"], compaction["model"]) == ("model", own)
         assert compaction["fast_problem"] == "the fast model is down"
+
+
+async def test_a_fast_model_paused_after_a_rate_limit_is_not_asked_again_and_the_runs_own_model_writes_at_once(
+    login_env: dict[str, str],
+) -> None:
+    config: AppConfig = _config({}, 6)
+    limited: AppConfig = config.model_copy(
+        update={"models": config.models.model_copy(update={"fast": f"{_PROVIDER}:{_BROKEN_FAST}"})}
+    )
+    model: RateLimitedFastProvider = RateLimitedFastProvider(ScriptedProvider(_PROVIDER, _reading(40)), 24_000)
+    played: Played = await _play_with(limited, login_env, model)
+    assert played.record.status == "done"
+    assert len(played.compactions) > 1
+    # The first compaction met the rate limit, which paused the fast model; the later ones did not ask it (item 240).
+    assert model.fast_calls == 1
+    own: str = parse_model_ref(SCRIPTED_MODEL).label
+    first, *later = played.compactions
+    assert (first["method"], first["model"], first["fast_problem"]) == ("model", own, "the fast model is rate limited")
+    for compaction in later:
+        assert (compaction["method"], compaction["model"]) == ("model", own)
+        problem: JsonValue = compaction["fast_problem"]
+        assert isinstance(problem, str)
+        assert re.fullmatch(
+            rf"{_PROVIDER}:{_BROKEN_FAST} \(rate limited until (\d{{4}}-\d\d-\d\d )?\d\d:\d\d\) cannot answer now",
+            problem,
+        ), problem
 
 
 async def test_a_summary_that_lacks_a_section_is_asked_for_again_with_the_section_named(
