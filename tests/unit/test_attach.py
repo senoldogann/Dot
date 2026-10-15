@@ -17,7 +17,9 @@ from dotagent.browser.attach import (
     read_debug_endpoint,
     redact_endpoint,
 )
+from dotagent.browser.modes import CHROME_APP_ID, chrome_app_for
 from dotagent.core.errors import BrowserError
+from dotagent.core.paths import default_chrome_data_dir
 
 _GUID: str = "5c1f0f6e-2b57-4d0a-9d3a-0f6b8d6f2e11"
 _PATH: str = f"/devtools/browser/{_GUID}"
@@ -153,3 +155,10 @@ def test_a_port_file_that_cannot_be_read_is_reported_with_its_path(tmp_path: Pat
     with pytest.raises(BrowserError, match="could not be read") as raised:
         read_debug_endpoint(running_chrome(tmp_path))
     assert raised.value.context["path"] == str(tmp_path / "DevToolsActivePort")
+
+
+def test_a_closed_chrome_is_opened_only_on_its_own_data_directory(tmp_path: Path) -> None:
+    """Item 261: a switch to a closed Chrome opens Google Chrome for its own data directory, and no app for another
+    (``DOT_CHROME_DIR``, as in the tests), so the tests never open the Chrome of the user."""
+    assert chrome_app_for(default_chrome_data_dir()) == CHROME_APP_ID == "com.google.Chrome"
+    assert chrome_app_for(tmp_path / "chrome") is None

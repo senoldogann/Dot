@@ -1772,8 +1772,12 @@ Dot works with are the ones of your Chrome, so nothing is copied and nothing goe
 
 The mode can also switch without a restart: Settings › Browser in the web UI, or `POST /api/browser/mode` with
 `{"mode": "own"}` or `{"mode": "attach"}`. The live switch runs the same one-blank-tab proof; it is refused with 409
-while runs are active, and a failed proof leaves the session in the Chrome it had (422). `dotx browser attach` and
-`dotx browser detach` only write the mode, which the service takes up on its next start. The same tab's switch "Bring
+while runs are active, and a failed proof leaves the session in the Chrome it had (422). When your Chrome is closed,
+the live switch opens it first, as a click on its icon does, and waits up to 30 seconds for it to start and 10 more for
+it to listen; with remote debugging off, the switch then says how to turn it on (item 261). While the switch is under
+way, Settings says what it waits for, and after a failed one it shows how Chrome stands. Runs, campaigns and
+`dotx browser attach` never open Chrome; `dotx browser attach` and `dotx browser detach` only write the mode, which the
+service takes up on its next start. The same tab's switch "Bring
 Chrome to the front while working" is `POST /api/browser/raise` with `{"raise_window": true}` or `false`: it takes
 effect at the next browser call, Chrome is not restarted, and the value is written to `config.toml` the same way.
 

@@ -2,7 +2,9 @@
 
 The scratch Chrome plays the Chrome of the user: hidden, on its own temporary data directory, with a debugging port and
 one tab of "the user" open. What only the real Chrome of the user can show, the Allow dialog that it puts up when a
-program connects, is not part of this: only the user can click it.
+program connects, is not part of this: only the user can click it. Nor is the click on Chrome's icon that a switch to
+a closed Chrome makes (item 261): the scratch Chrome is started in its place, and the Chrome of the user is never
+opened.
 """
 
 import asyncio
@@ -10,17 +12,21 @@ import io
 import re
 import threading
 import time
-from collections.abc import AsyncIterator, Iterator
+from collections.abc import AsyncIterator, Awaitable, Callable, Iterator
+from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+from typing import Literal
 
 import httpx
 import pytest
 import pytest_asyncio
 from PIL import Image
+from playwright.async_api import Browser, Locator, Page, Route, async_playwright, expect
 from pydantic import BaseModel, TypeAdapter
 
+from dotagent.agent.manager import RunManager
 from dotagent.browser.attach import DebugEndpoint, parse_port_file
 from dotagent.browser.keychain import KeychainMode, read_keychain_mode
 from dotagent.browser.login import chrome_arguments
@@ -32,11 +38,23 @@ from dotagent.browser.types import ActOutcome, Attachment, PageView, Screenshot,
 from dotagent.config import BrowserConfig, ServerConfig, load_config, load_default_config
 from dotagent.core.errors import BrowserError
 from dotagent.core.paths import ensure_layout
+from dotagent.runtime import Runtime, build_runtime, close_runtime
+from dotagent.server.app import create_app
+from dotagent.server.context import ServerContext
+from dotagent.server.daemon import DotServer, bind_listener, serving_config
+from dotagent.server.links import ui_url
 
 pytestmark = pytest.mark.browser
 
 # Whose interface the browser never opens: the daemon's default address.
 SERVER: ServerConfig = load_default_config().server
+TOKEN: str = "open-chrome-token"
+_SHOTS: tuple[tuple[int, Literal["light", "dark"]], ...] = (
+    (1280, "light"),
+    (1280, "dark"),
+    (390, "light"),
+    (390, "dark"),
+)
 _PORT_FILE: str = "DevToolsActivePort"
 _READY_TIMEOUT_S: float = 30.0
 _EXIT_TIMEOUT_S: float = 20.0
@@ -105,13 +123,37 @@ async def wait_for_port(data_dir: Path) -> int:
                 await asyncio.sleep(_POLL_S)
 
 
-async def start_chrome(data_dir: Path, url: str) -> ScratchChrome:
-    """Start a hidden Chrome on ``data_dir`` with one tab on ``url``; Chrome picks its debugging port itself."""
+async def spawn_chrome(data_dir: Path, url: str) -> asyncio.subprocess.Process:
+    """Start a hidden Chrome on ``data_dir`` with one tab on ``url`` and return at once, as a click on Chrome's icon
+    does; Chrome picks its debugging port itself."""
     keychain: KeychainMode = read_keychain_mode(data_dir)
     command: list[str] = [*chrome_arguments(data_dir, url, keychain), "--headless=new", "--remote-debugging-port=0"]
-    process: asyncio.subprocess.Process = await asyncio.create_subprocess_exec(
+    return await asyncio.create_subprocess_exec(
         *command, stdout=asyncio.subprocess.DEVNULL, stderr=asyncio.subprocess.DEVNULL
     )
+
+
+async def spawn_chrome_without_debugging(data_dir: Path, url: str) -> asyncio.subprocess.Process:
+    """Start a hidden Chrome on ``data_dir`` whose remote debugging is off, and return at once."""
+    keychain: KeychainMode = read_keychain_mode(data_dir)
+    command: list[str] = [*chrome_arguments(data_dir, url, keychain), "--headless=new"]
+    return await asyncio.create_subprocess_exec(
+        *command, stdout=asyncio.subprocess.DEVNULL, stderr=asyncio.subprocess.DEVNULL
+    )
+
+
+async def wait_for_profile(data_dir: Path) -> None:
+    """Wait until a Chrome holds the profile lock of ``data_dir``."""
+    deadline: float = time.monotonic() + _READY_TIMEOUT_S
+    while profile_holder_pid(data_dir) is None:
+        if time.monotonic() > deadline:
+            raise AssertionError(f"no Chrome took the profile at {data_dir}")
+        await asyncio.sleep(_POLL_S)
+
+
+async def start_chrome(data_dir: Path, url: str) -> ScratchChrome:
+    """Start a hidden Chrome on ``data_dir`` with one tab on ``url``, once it answers on its debugging port."""
+    process: asyncio.subprocess.Process = await spawn_chrome(data_dir, url)
     ready: bool = False
     try:
         port: int = await wait_for_port(data_dir)
@@ -124,15 +166,24 @@ async def start_chrome(data_dir: Path, url: str) -> ScratchChrome:
 
 
 async def stop_chrome(chrome: ScratchChrome) -> None:
+    await stop_process(chrome.process)
+
+
+async def stop_process(process: asyncio.subprocess.Process) -> None:
     """Quit Chrome the way the system asks a program to quit; a Chrome that does not quit in time is killed."""
-    if chrome.process.returncode is None:
-        chrome.process.terminate()
+    if process.returncode is None:
+        process.terminate()
     try:
-        await asyncio.wait_for(chrome.process.wait(), _EXIT_TIMEOUT_S)
+        await asyncio.wait_for(process.wait(), _EXIT_TIMEOUT_S)
     except TimeoutError:
-        chrome.process.kill()
-        await chrome.process.wait()
+        process.kill()
+        await process.wait()
         raise
+
+
+async def never_opened(data_dir: Path) -> None:
+    """The opener of a switch whose Chrome runs already: it is never called."""
+    raise AssertionError(f"the Chrome on {data_dir} runs; nothing is opened")
 
 
 async def open_tabs(port: int) -> list[str]:
@@ -352,7 +403,7 @@ async def test_a_session_moves_between_dots_own_chrome_and_the_chrome_of_the_use
         assert session.connected
         assert profile_holder_pid(own_profile) is not None
 
-        await adopt_mode(session, "attach")
+        await adopt_mode(session, "attach", never_opened)
         assert (session.mode, session.profile_dir) == ("attach", chrome.data_dir)
         assert profile_holder_pid(own_profile) is None
         await wait_for_tabs(chrome.port, [f"{site}/mine"])
@@ -360,7 +411,7 @@ async def test_a_session_moves_between_dots_own_chrome_and_the_chrome_of_the_use
         assert popup.title == "Popup"
         await wait_for_tabs(chrome.port, [f"{site}/mine", f"{site}/popup"])
 
-        await adopt_mode(session, "own")
+        await adopt_mode(session, "own", never_opened)
         assert (session.mode, session.profile_dir, session.connected) == ("own", own_profile, False)
         await wait_for_tabs(chrome.port, [f"{site}/mine"])
         other: PageView = await session.open_url("own", f"{site}/other")
@@ -381,7 +432,161 @@ async def test_a_switch_that_chrome_refuses_leaves_the_session_where_it_was(
     session: BrowserSession = BrowserSession(own_config, SERVER, own_profile, own_home / "downloads")
     try:
         with pytest.raises(BrowserError, match="did not accept the connection"):
-            await adopt_mode(session, "attach")
+            await adopt_mode(session, "attach", never_opened)
         assert (session.mode, session.profile_dir, session.connected) == ("own", own_profile, False)
     finally:
         await session.aclose()
+
+
+async def test_a_switch_to_the_chrome_of_the_user_while_it_is_closed_opens_it_first(
+    data_dir: Path, own_config: BrowserConfig, own_home: Path, site: str
+) -> None:
+    """Item 261: the switch opens the closed Chrome, as a click on its icon does, waits until it runs and listens, and
+    attaches to it; the opener returns at once, as ``open`` does, so the switch itself does the waiting."""
+    opened: list[asyncio.subprocess.Process] = []
+
+    async def open_as_a_click_does(directory: Path) -> None:
+        opened.append(await spawn_chrome(directory, f"{site}/mine"))
+
+    session: BrowserSession = BrowserSession(own_config, SERVER, browser_data_dir("own"), own_home / "downloads")
+    try:
+        assert profile_holder_pid(data_dir) is None
+        await adopt_mode(session, "attach", open_as_a_click_does)
+        assert len(opened) == 1
+        assert (session.mode, session.profile_dir) == ("attach", data_dir)
+        port: int = await wait_for_port(data_dir)
+        await wait_for_tabs(port, [f"{site}/mine"])
+        popup: PageView = await session.open_url("agent", f"{site}/popup")
+        assert popup.title == "Popup"
+    finally:
+        await session.aclose()
+        for process in opened:
+            await stop_process(process)
+
+
+async def test_a_chrome_opened_with_its_remote_debugging_off_is_named_and_the_session_stays(
+    data_dir: Path, own_config: BrowserConfig, own_home: Path, site: str
+) -> None:
+    """Item 261: a Chrome the switch opened whose remote debugging is off is not "not running": the switch says how to
+    turn remote debugging on, and the session stays on Dot's own Chrome."""
+    opened: list[asyncio.subprocess.Process] = []
+
+    async def open_as_a_click_does(directory: Path) -> None:
+        opened.append(await spawn_chrome_without_debugging(directory, f"{site}/mine"))
+
+    own_profile: Path = browser_data_dir("own")
+    session: BrowserSession = BrowserSession(own_config, SERVER, own_profile, own_home / "downloads")
+    try:
+        with pytest.raises(BrowserError, match="does not allow remote debugging"):
+            await adopt_mode(session, "attach", open_as_a_click_does)
+        assert len(opened) == 1 and profile_holder_pid(data_dir) is not None
+        assert (session.mode, session.profile_dir, session.connected) == ("own", own_profile, False)
+    finally:
+        await session.aclose()
+        for process in opened:
+            await stop_process(process)
+
+
+def held_until(released: asyncio.Event) -> Callable[[Route], Awaitable[None]]:
+    """A route handler that lets the request through once ``released`` is set."""
+
+    async def hold(route: Route) -> None:
+        await released.wait()
+        await route.continue_()
+
+    return hold
+
+
+@asynccontextmanager
+async def _served(home: Path) -> AsyncIterator[str]:
+    """A daemon on the Dot home ``home``, its own Chrome hidden, at the address it yields."""
+    (home / "config.toml").write_text("[browser]\nheadless = true\n", encoding="utf-8")
+    runtime: Runtime = await build_runtime(load_config(home / "config.toml"))
+    manager: RunManager = RunManager(runtime)
+    try:
+        stopping: asyncio.Event = asyncio.Event()
+        listener = bind_listener("127.0.0.1", 0)
+        port: int = listener.getsockname()[1]
+        context: ServerContext = ServerContext(
+            runtime=runtime,
+            manager=manager,
+            scheduler=None,
+            token=TOKEN,
+            host="127.0.0.1",
+            port=port,
+            started_at=time.time(),
+            stopping=stopping,
+        )
+        server: DotServer = DotServer(serving_config(create_app(context)), stopping)
+        serving: asyncio.Task[None] = asyncio.create_task(server.serve(sockets=[listener]))
+        while not server.started:
+            assert not serving.done(), "the server stopped while starting"
+            await asyncio.sleep(0.05)
+        try:
+            yield f"http://127.0.0.1:{port}"
+        finally:
+            server.should_exit = True
+            stopping.set()
+            await serving
+    finally:
+        await manager.shutdown()
+        await close_runtime(runtime)
+
+
+async def test_the_settings_card_says_what_a_switch_waits_for_and_how_chrome_stands_after_it(
+    data_dir: Path, own_home: Path, site: str, tmp_path: Path
+) -> None:
+    """Item 261: while the switch to My Chrome is under way the card says what it waits for; when the switch fails, the
+    card says why and reads Chrome again, which the switch may have opened (here a Chrome whose remote debugging is
+    off), and Own Chrome stays chosen. In Chrome, wide and on a phone, light and dark."""
+    opened: list[asyncio.subprocess.Process] = []
+    async with _served(own_home) as address, async_playwright() as playwright:
+        host, port = "127.0.0.1", int(address.rpartition(":")[2])
+        browser: Browser = await playwright.chromium.launch(
+            channel=load_default_config().browser.channel, headless=True
+        )
+        try:
+            for width, scheme in _SHOTS:
+                # Without the service worker: once it controls the page, the switch's request passes through it and
+                # not through the route that holds it.
+                page: Page = await browser.new_page(
+                    viewport={"width": width, "height": 900},
+                    color_scheme=scheme,
+                    reduced_motion="reduce",
+                    service_workers="block",
+                )
+                await page.goto(ui_url(host, port, TOKEN))
+                await page.goto(f"{address}/#/settings/browser")
+                card: Locator = page.locator("section.card").filter(
+                    has=page.locator(".card-head .grow", has_text=re.compile(r"^Browser$"))
+                )
+                chrome_fact: Locator = (
+                    card.locator("dl div")
+                    .filter(has=page.locator("dt", has_text=re.compile(r"^Chrome$")))
+                    .locator("dd")
+                )
+                await expect(chrome_fact).to_have_text("running" if opened else "not running")
+                released: asyncio.Event = asyncio.Event()
+                await page.route("**/api/browser/mode", held_until(released))
+                await card.get_by_role("button", name="My Chrome").click()
+                waiting: Locator = card.locator(".note[role='status']")
+                await expect(waiting).to_be_visible()
+                await expect(waiting).to_contain_text("Dot opens it when it is closed")
+                await expect(waiting).to_contain_text("choose Allow")
+                await card.scroll_into_view_if_needed()
+                await page.screenshot(path=tmp_path / f"waiting-{width}-{scheme}.png")
+                if not opened:
+                    # What the switch's click on Chrome's icon starts here: a Chrome whose remote debugging is off.
+                    opened.append(await spawn_chrome_without_debugging(data_dir, f"{site}/mine"))
+                    await wait_for_profile(data_dir)
+                released.set()
+                await expect(card.locator(".note.bad")).to_contain_text("does not allow remote debugging")
+                await expect(waiting).to_be_hidden()
+                await expect(chrome_fact).to_have_text("running")
+                await expect(card.get_by_role("button", name="Own Chrome")).to_have_attribute("aria-pressed", "true")
+                await page.screenshot(path=tmp_path / f"after-{width}-{scheme}.png")
+                await page.close()
+        finally:
+            await browser.close()
+            for process in opened:
+                await stop_process(process)

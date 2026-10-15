@@ -56,13 +56,18 @@ def browser_profile_dir() -> Path:
     return dot_home() / "browser-profile"
 
 
+def default_chrome_data_dir() -> Path:
+    """Where Google Chrome keeps its profiles on this Mac."""
+    return Path.home() / "Library" / "Application Support" / "Google" / "Chrome"
+
+
 def chrome_data_dir() -> Path:
     """Where the Chrome of the user keeps its profiles on this Mac (``DOT_CHROME_DIR`` overrides, so that tests point at
     a scratch Chrome and never at the user's). Dot reads it only when the user asks for it."""
     override: str | None = os.environ.get("DOT_CHROME_DIR")
     if override is not None and override != "":
         return Path(override).expanduser()
-    return Path.home() / "Library" / "Application Support" / "Google" / "Chrome"
+    return default_chrome_data_dir()
 
 
 def evals_dir() -> Path:

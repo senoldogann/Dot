@@ -28,6 +28,7 @@ _SHOWN_CHARS: int = 20
 _CONNECT_TIMEOUT_S: float = 0.5
 _BROWSER_PATH: re.Pattern[str] = re.compile(r"/devtools/browser/[^\s'\"<>]+")
 _REDACTED: str = "/devtools/browser/<redacted>"
+CHROME_NOT_RUNNING: str = "Chrome is not running; open Chrome and try again"
 _NOT_ALLOWED: str = (
     f"Chrome does not allow remote debugging; open {INSPECT_PAGE} in Chrome, switch on 'Allow remote debugging for "
     "this browser instance' and try again"
@@ -115,7 +116,7 @@ def read_debug_endpoint(data_dir: Path) -> DebugEndpoint:
     debugging; the message says what to do."""
     holder: int | None = profile_holder_pid(data_dir)
     if holder is None:
-        raise BrowserError("Chrome is not running; open Chrome and try again", {"data_dir": str(data_dir)})
+        raise BrowserError(CHROME_NOT_RUNNING, {"data_dir": str(data_dir)})
     port_file: Path = data_dir / _PORT_FILE
     try:
         text: str = port_file.read_text(encoding="utf-8")
