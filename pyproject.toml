@@ -9,13 +9,13 @@ requires-python = ">=3.13"
 dependencies = [
     "aiosqlite>=0.22.1",
     "croniter>=6.2.4",
-    "fastapi>=0.142.2",
+    "fastapi>=0.143.0",
     "httpx>=0.28.1",
     "mcp>=2.3.0",
     "openpyxl>=3.1.5",
     "pillow>=12.3.0",
     "playwright>=1.63.0",
-    "pydantic>=2.13.5",
+    "pydantic>=2.14.1",
     "pyobjc-framework-applicationservices>=12.2.2",
     "pyobjc-framework-cocoa>=12.2.2",
     "pyobjc-framework-quartz>=12.2.2",
@@ -32,7 +32,7 @@ dependencies = [
 dotx = "dotagent.cli:main"
 
 [build-system]
-requires = ["uv_build>=0.10.9,<0.11.0"]
+requires = ["uv_build>=0.13.0,<0.14.0"]
 build-backend = "uv_build"
 
 [dependency-groups]
@@ -40,7 +40,7 @@ dev = [
     "mypy>=2.4.0",
     "pytest>=9.1.1",
     "pytest-asyncio>=1.4.0",
-    "ruff>=0.16.10",
+    "ruff>=0.17.0",
     "types-openpyxl>=3.1.5.20260827",
     "types-pyyaml>=6.0.12.20260906",
 ]
