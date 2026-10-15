@@ -11,6 +11,7 @@ from docx.document import Document as DocumentObject
 from docx.text.paragraph import Paragraph
 from openpyxl import Workbook, load_workbook
 
+from dotagent.agent.plan import PLAN_EVENT
 from dotagent.config import AppConfig, load_default_config
 from dotagent.core.errors import EvalError
 from dotagent.core.types import JsonObject
@@ -346,6 +347,9 @@ def test_a_run_took_the_easy_way_when_a_call_of_its_tool_for_its_skill_ran() -> 
     )
     searched: tuple[EventRecord, ...] = _used("c5", FIND_HELP_TOOL, {"need": "the house style of a memo"}, True)
     assert run_metrics(run, (*searched, *read)).help_calls == 1
+    # The plan made and the mark of a step: two changes (item 252), none in a run that kept no plan.
+    plans: tuple[EventRecord, ...] = (_event(3, PLAN_EVENT, {"steps": []}), _event(4, PLAN_EVENT, {"steps": []}))
+    assert (run_metrics(run, (*read, *plans)).plan_changes, run_metrics(run, read).plan_changes) == (2, 0)
 
 
 def test_a_task_that_must_fail_needs_a_reference_that_reports_failure() -> None:
@@ -472,6 +476,20 @@ def test_the_shares_of_one_step_acts_and_cached_tokens_skip_the_attempts_that_di
     ) in render_scorecard(old)
 
 
+def test_a_report_says_how_many_attempts_kept_a_plan() -> None:
+    # Item 252: an attempt that kept no plan tells nothing of a change to how the plan reaches the model, so a report
+    # says how many kept one; one saved before counted none.
+    planned: RunMetrics = _metrics(2, 2000, 2, 0).model_copy(update={"plan_changes": 3})
+    unplanned: RunMetrics = _metrics(2, 2000, 2, 0).model_copy(update={"plan_changes": 0})
+    counted: Scorecard = score_report(
+        _report((_outcome("a", 1, True, "done", planned), _outcome("a", 2, True, "done", unplanned)))
+    )
+    old: Scorecard = score_report(_report((_outcome("a", 1, True, "done", _metrics(2, 2000, 2, 0)),)))
+    assert (counted.planned_attempts, old.planned_attempts) == (1, None)
+    assert "a plan kept in 1 of 2 attempts" in "".join(render_scorecard(counted))
+    assert "a plan kept in - of 1 attempts" in "".join(render_scorecard(old))
+
+
 def test_the_evidence_counts_sum_the_attempts_that_counted_them() -> None:
     counted: RunMetrics = _metrics(4, 4000, 4, 0).model_copy(update={"unevidenced_steps": 0, "unproven_steps": 2})
     also: RunMetrics = _metrics(2, 2000, 2, 0).model_copy(update={"unevidenced_steps": 1, "unproven_steps": 0})
@@ -480,8 +498,8 @@ def test_the_evidence_counts_sum_the_attempts_that_counted_them() -> None:
     )
     assert (card.unevidenced_steps, card.unproven_steps) == (1, 2)
     assert (
-        "  plan steps done without evidence 1, with evidence the goal check could not bear out 2"
-        in render_scorecard(card)
+        "  plan steps done without evidence 1, with evidence the goal check could not bear out 2, a plan kept in - of "
+        "2 attempts" in render_scorecard(card)
     )
     old: Scorecard = score_report(_report((_outcome("b", 1, True, "done", _metrics(2, 2000, 2, 0)),)))
     assert (old.unevidenced_steps, old.unproven_steps) == (None, None)

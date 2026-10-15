@@ -33,7 +33,8 @@ class RunMetrics(FrozenModel):
     page or host that is not there (an address the model guessed), ``rejected_arguments`` the calls refused because
     their arguments did not fit the tool (a turn lost each); a report saved before item 53 counted none of the three.
     ``help_calls`` are the calls of find_help, the search of the help the Mac offers (none in a report saved before
-    item 167 counted them)."""
+    item 167 counted them). ``plan_changes`` are the run's plan events, the plan it made and each change of it, the
+    marks of its steps too (none in a report saved before item 252 counted them)."""
 
     steps: int
     input_tokens: int
@@ -55,6 +56,7 @@ class RunMetrics(FrozenModel):
     not_found: int | None = None
     rejected_arguments: int | None = None
     help_calls: int | None = None
+    plan_changes: int | None = None
 
 
 class TaskOutcome(FrozenModel):

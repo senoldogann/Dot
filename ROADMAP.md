@@ -5189,8 +5189,8 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 248 | A run a restart cut off goes on by itself by default                                 | done        | 8d3efd5 |
 | 249 | What the review model declines to write goes to the run's own model                  | done        | 0416d83 |
 | 250 | Each model's context size can be set in Settings                                     | done        | ee7252b |
-| 251 | Ultrathink and Ultracode in the reasoning menu                                       | in progress |         |
-| 252 | The plan at the end of the request, if an eval shows it holds                        | planned     |         |
+| 251 | Ultrathink and Ultracode in the reasoning menu                                       | done        | c605d56 |
+| 252 | The plan at the end of the request, if an eval shows it holds                        | in progress |         |
 
 ### 77. The type system: Inter and Geist Mono, seven sizes, three weights
 
@@ -11219,7 +11219,7 @@ model has when it starts.
 
 ### 251. Ultrathink and Ultracode in the reasoning menu
 
-**Status: in progress.**
+**Status: done.** Merged as `c605d56` (PR #295; no Linear issue, the Linear connector was signed out).
 
 **As built (2026-10-15).** `llm/types.py` names the choices for one message, `OneMessage`: `ultrathink` asks the model
 for its Max level, `ultracode` for its Extra high level (`ONE_MESSAGE_LEVELS`) with the run told to split
@@ -11243,7 +11243,23 @@ those levels; each says in the menu what it does.
 
 ### 252. The plan at the end of the request, if an eval shows it holds
 
-**Status: planned.**
+**Status: in progress.**
+
+**As built (2026-10-15).** The A/B ran first, as the item says: a setting put the plan in a note after the conversation,
+which no step stored, with the cache mark of the Messages format moved before the note, and `dotx eval run` played
+`checklist-ten-files`, `digest-twelve-days`, `rename-helper-in-ten-modules`, `branch-totals-json`, `quarterly-report`
+and `pipeline-with-flaky-stage` on OpenCode Go's DeepSeek V4.1 Flash with the plan in each place. The 18 attempts it
+played before it was stopped all passed, and none kept a plan: the model does each of these tasks in 3 to 9 steps with
+several calls a step, so both places sent the same requests (73.7 % and 75.5 % of the input from the cache) and the eval
+could not tell them apart. The owner's runs of the last 30 days on that model measured what the place is worth: 19 of 26
+task runs kept a plan, it changed 113 times in 2,346 steps, and the 77 steps right after a change took 14 % of their
+input from the cache, against 77 % for the others. With the plan after the conversation those steps would read the cache
+as the others do: about 2 points more of the input from the cache (75 % to 77 %), against the 15 the eval's design asked
+for, while what a note after the conversation does to a thinking model's turn stayed unmeasured. So the plan stays at
+the end of the system prompt, and the setting and the moved mark were not kept. What stays: `RunMetrics.plan_changes`
+counts a run's plan events and a report says in how many attempts a plan was kept (`Scorecard.planned_attempts`, `-` for
+a report saved before), so an eval of how the plan reaches the model shows whether its attempts planned. Tests:
+`tests/unit/test_evals.py`.
 
 **What.** An A/B eval of the plan at the end of the system prompt against the plan at the end of the request, on the
 owner's main model, decides: the plan moves only if the share of cached input rises and the passes, the steps and the
@@ -11940,3 +11956,4 @@ plan steps marked done without evidence hold.
 - 2026-10-15 (Opus 5.5): item 248 merged as `8d3efd5` (PR #292; no Linear issue, the connector was signed out): a run that a restart, a crash or a shutdown cut off goes on by itself by default, when the calls it cut off only read and it was cut off at most 30 minutes before.
 - 2026-10-15 (Opus 5.5): item 249 merged as `0416d83` (PR #293; no Linear issue, the connector was signed out): a run's lessons and its skill that the review model declines to write go to the run's own model, and the owner section to the model of the newest run it reads; an approval and the goal check keep asking the review model alone.
 - 2026-10-15 (Opus 5.5): item 250 merged as `ee7252b` (PR #294; no Linear issue, the connector was signed out): a model's context size is set in Settings › Models from 48,000 tokens up to three quarters of its window, with what it does, where the window comes from and what the model's runs of the last 30 days measured; the run's budget, its tool output and the point past which it summarizes follow it from the next run on.
+- 2026-10-15 (Opus 5.5): item 251 merged as `c605d56` (PR #295; no Linear issue, the connector was signed out): the Reasoning menu has Ultrathink (Max) and Ultracode (Extra high, the run told to split its independent parts across helpers that work at the same time) for one message, where the model offers those levels; the chat keeps its level, and the run, its resumption and a campaign's sessions keep the choice.

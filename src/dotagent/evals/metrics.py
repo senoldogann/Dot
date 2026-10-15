@@ -122,6 +122,7 @@ def run_metrics(run: RunRecord, events: Sequence[EventRecord]) -> RunMetrics:
         not_found=sum(1 for tool, text in failures if tool in WEB_TOOLS and failure_cause(tool, text) == "not_found"),
         rejected_arguments=sum(1 for tool, text in failures if failure_cause(tool, text) == "rejected_arguments"),
         help_calls=sum(1 for event in events if event.kind == "tool_call" and event.data.get("tool") == FIND_HELP_TOOL),
+        plan_changes=sum(1 for event in events if event.kind == PLAN_EVENT),
     )
 
 
