@@ -59,6 +59,32 @@ class ProofView(FrozenModel):
     proof: str
 
 
+class PhoneView(FrozenModel):
+    """How a phone reaches Dot (item 267): the addresses a reverse proxy on the owner's network serves it at, one for
+    each name of ``[server] reach``."""
+
+    addresses: list[str]
+
+
+class PairingView(FrozenModel):
+    """A pairing code (item 267), as Settings › Phone shows it, and when it stops being good (seconds since the epoch)."""
+
+    code: str
+    expires_at: float
+
+
+class PairRequest(FrozenModel):
+    """A pairing code as a phone's app sends it (item 267)."""
+
+    code: str = Field(min_length=1, max_length=32)
+
+
+class PairedView(FrozenModel):
+    """The access token a pairing code was traded for (item 267)."""
+
+    token: str
+
+
 # ----------------------------------------------------------------------------------------------- queries
 
 

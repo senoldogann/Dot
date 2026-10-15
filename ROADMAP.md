@@ -5205,10 +5205,11 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 264 | Dot's own Chrome loads extensions                                                     | done        | 10eb5d5 |
 | 265 | Dot's own Chrome can take DevTools connections from a run's scripts                   | done        | dbb21d5 |
 | 266 | A batch carries several public or social actions while no pace is set                 | done        | ab56000 |
-| 267 | The phone reaches Dot from anywhere, and its home-screen app signs in with a code     | planned     |         |
+| 267 | The phone reaches Dot from anywhere, and its home-screen app signs in with a code     | in progress |         |
 | 268 | Office files show in the side panel as Quick Look draws them                          | planned     |         |
-| 269 | A long paste goes as a file, and a Markdown file shows clean in the side panel        | in progress |         |
+| 269 | A long paste goes as a file, and a Markdown file shows clean in the side panel        | done        | c4da0ed |
 | 270 | A script's navigation is settled after it, also one that commits after its value      | done        | a27c018 |
+| 271 | Settings › Phone sets up Tailscale and keeps the Mac awake                            | planned     |         |
 
 ### 77. The type system: Inter and Geist Mono, seven sizes, three weights
 
@@ -11818,18 +11819,33 @@ app asks for the token again, which a phone cannot type: the token went to the o
 
 ### 267. The phone reaches Dot from anywhere, and its home-screen app signs in with a code
 
-**Status: planned.**
+**Status: in progress.** Built on `item-267-phone-pairing`.
 
-**What.** Settings › Phone shows whether Tailscale runs, whether the daemon is served on the tailnet and whether
-`[server] reach` names it, sets up what is missing with one button (reach is taken up without a restart), shows the
-address as a QR code, and offers to keep the Mac awake while it charges. The sign-in screen of a phone says to open
-Settings › Phone on the Mac and type the short code shown there: a one-time code of a few characters, valid for a few
-minutes and limited in tries, which gives the phone the token.
+**As built (2026-10-15).** `server/pairing.py` (new): a code of eight characters of Crockford's base32 (40 bits), shown
+as two groups of four and read back in any case, with or without the dash, O as 0 and I or L as 1; good for ten minutes
+and once, five wrong tries use it up (`new_code`, `redeem`, pure). `server/routes_phone.py` (new): `GET /api/phone` (the
+addresses, `https://` each name of `[server] reach`), `POST /api/phone/pairing` (a new code in place of the one before,
+held in memory only) and `POST /api/phone/pair` (the token for the good code; `PairingRefused`, 403, otherwise, so that
+the page's lost-token path does not run). `server/guard.py`: the pair route takes no token, while the Host and Origin
+checks hold for it. `views.py`, `core/errors.py`, `app.py`. `api.js`: `pairWithCode` sends the code alone and brings
+back the token, which is then proven as any other. `main.js`: the sign-in screen takes a pairing code first, says where
+it is, and still takes the token. `views/phone.js` (new), `settings.js`, `icons.js` (smartphone), `settings.css`:
+Settings › Phone, the steps with the address to copy and Pair a phone, the code large, until when it is good, and that
+the Mac must be awake. The code and the token are never logged. README: Dot on the phone and the API table. Tests:
+`tests/unit/test_pairing.py` (new) and `tests/smoke/test_phone_pairing.py` (new; through the API a code needs the token
+to be given and none to be traded, is traded once as a person types it, five wrong tries and a newer code use it up,
+another site's page is turned away; in Chrome a page on the Mac gets a code from Settings › Phone and a phone with no
+token is let in with it after a wrong one is told, wide and on a phone, light and dark, and once in WebKit). The smoke
+tests fail on the code of before.
+
+**What.** Settings › Phone lists the address a phone reaches Dot at and gives a pairing code: a one-time code of a few
+characters, good for minutes and limited in tries, which the sign-in screen of a phone's app trades for the token. What
+the plan also named for this item, the state of Tailscale, setting it up with one button, a QR code and keeping the Mac
+awake, is item 271.
 
 **Why.** The QR code works in Safari, but the app on the home screen asks for a token nobody can type on a phone.
 
-**Tests.** A smoke test of the code (given once, expires, refused after too many tries) through a served daemon, and
-the screen on a phone in Chrome and WebKit, light and dark.
+**Tests.** As built.
 
 ### 268. Office files show in the side panel as Quick Look draws them
 
@@ -11846,7 +11862,7 @@ PowerPoint.
 
 ### 269. A long paste goes as a file, and a Markdown file shows clean in the side panel
 
-**Status: in progress.** Built on `item-269-paste-as-file`.
+**Status: done.** Merged as `c4da0ed` (PR #312; no Linear issue, the Linear connector was signed out).
 
 **As built (2026-10-15).** `markdown.js`: `readsAsMarkdown` (a block that is more than a paragraph, or bold, italics,
 code or a link with words of its own). `attachments.js`: a text of 2,000 characters or 40 lines pasted into a message
@@ -11895,9 +11911,22 @@ a script that keeps the page busy for 4 s, given 1 s, comes back in under 3 s; b
 
 **Tests.** As built.
 
+### 271. Settings › Phone sets up Tailscale and keeps the Mac awake
+
+**Status: planned.**
+
+**What.** Settings › Phone shows whether Tailscale runs, whether the daemon is served on the tailnet and whether
+`[server] reach` names it, sets up what is missing with one button (reach taken up without a restart), shows the
+signed-in address as a QR code, and offers to keep the Mac awake while it charges, so that the phone reaches Dot away
+from home.
+
+**Why.** Split from item 267, which made the phone's app sign in; the owner's Mac was set up by hand meanwhile.
+
+**Tests.** The state read from a stand-in for the Tailscale command; the screen wide and on a phone, light and dark.
+
 ### How to start part 47 (the handoff prompt)
 
-> Read ROADMAP.md part 47 and the status table of part 9 (rows 267 to 270). The protocol of part 5 is unchanged; the
+> Read ROADMAP.md part 47 and the status table of part 9 (rows 267 to 271). The protocol of part 5 is unchanged; the
 > Linear connector is signed out, so say so in the PR. The tailnet name, the token and the codes are never written to
 > the repository, a log or a PR. UI changes are checked wide and on a phone, light and dark, in Chrome and WebKit.
 
@@ -12609,3 +12638,4 @@ a script that keeps the page busy for 4 s, given 1 s, comes back in under 3 s; b
 - 2026-10-15 (Opus 5.5): item 265 merged as `dbb21d5` (PR #309; no Linear issue, the connector was signed out): `[browser] debug_port` (0 for none, else 1024 to 65535; Settings › Browser) has Dot's own Chrome also take DevTools connections on that port of 127.0.0.1, and a run in Dot's Chrome with a tool that runs scripts is told the address, to connect with `connect_over_cdp` and `no_defaults=True`; Dot's Chrome does not start while another program holds the port, and the pool checks every session before it changes any. A review of 263 to 266 found the first commit's claim that a script never drives another Chrome too strong, ports below 1024 taken and the pool's change not atomic; the second commit fixed them. CI was clean.
 - 2026-10-15 (Opus 5.5): item 266 merged as `ab56000` (PR #310; no Linear issue, the connector was signed out): `browser_act` lets a batch carry several follows, likes, posts or messages while `[policy.pace]` sets no limit for their kind (the default), counted once by the gate; with a pace set for a kind it carries, one per batch as before, and the refusal names the paced kinds and says that a script in the page would go around the owner's pace. The prompt's line that sent such actions one per call is gone, so every run's prompt is shorter. CI and the pace tests were clean.
 - 2026-10-15 (Opus 5.5): item 270 merged as `a27c018` (PR #311; no Linear issue, the connector was signed out): browser_eval settles the page after every script, as a step is settled, before the address rules are checked, so that a forbidden page answering after the value came back has the tab reset; after a script still running when its wait ended only a navigation under way is let commit, so a busy script no longer holds the call; full offline smoke on the stack top 565 passed.
+- 2026-10-15 (Opus 5.5): item 269 merged as `c4da0ed` (PR #312; no Linear issue, the connector was signed out): a text of 2,000 characters or 40 lines pasted into a message box goes as pasted-text-<time>.md when it reads as Markdown, else .txt, with a pencil that puts it back as text; a chip opens its file beside a conversation or in a dialog elsewhere, a Markdown file formatted with its source a click away; a send with only files asks for words, and a listed file keeps the send from turning into the Stop of a working run.

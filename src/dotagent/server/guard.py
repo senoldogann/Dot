@@ -3,7 +3,8 @@
 Binding to a loopback address keeps other machines out. The Host check defeats DNS rebinding, the Origin check keeps
 the pages of other sites from using the API through the browser, and the token keeps other programs of this Mac out.
 The clients send the token only to a server that first proves it holds it (:func:`daemon_proof`), so a program that took
-the port while the daemon was down is sent nothing. A page that a run showed (``/pages/<id>``) is served without the
+the port while the daemon was down is sent nothing. A phone's app trades a pairing code for the token without it
+(``/api/phone/pair``, item 267; :mod:`dotagent.server.pairing`). A page that a run showed (``/pages/<id>``) is served without the
 token, to whoever names its id, which cannot be guessed; it runs the run's scripts, so it is sandboxed wherever it
 opens (:data:`PAGE_HEADERS`).
 """
@@ -26,7 +27,8 @@ from dotagent.core.types import FrozenModel
 API_ROOT: str = "/api"
 API_PREFIX: str = f"{API_ROOT}/"
 PROOF_PATH: str = f"{API_ROOT}/proof"
-PUBLIC_PATHS: frozenset[str] = frozenset({f"{API_ROOT}/health", PROOF_PATH})
+PAIR_PATH: str = f"{API_ROOT}/phone/pair"
+PUBLIC_PATHS: frozenset[str] = frozenset({f"{API_ROOT}/health", PROOF_PATH, PAIR_PATH})
 PAGES_PREFIX: str = "/pages/"
 
 _PRIVATE_FILE_MODE: int = 0o600
