@@ -1,4 +1,4 @@
-// A cue on a box that scrolls sideways (the Models table on a phone): `data-scroll` on it says whether more lies to
+// A cue on a box that scrolls sideways (the Models table on a phone, the row of the Settings tabs): `data-scroll` on it says whether more lies to
 // the right ("more"), so the sheet can fade the edge, or not ("end"); the box is read again on scroll and on resize.
 
 const END_PX = 2;

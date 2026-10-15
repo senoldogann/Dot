@@ -3,6 +3,7 @@
 import { el } from "../dom.js";
 import { setStageTitle } from "../stage.js";
 import { icon } from "../icons.js";
+import { scrollCue } from "../scrollcue.js";
 import * as appearance from "./appearance.js";
 import * as keys from "./keys.js";
 import * as memory from "./memory.js";
@@ -46,20 +47,20 @@ export function mount(root, ctx) {
   }
   ctx.setTitle(`${tab.label} · Settings`);
   const pane = el("div", { class: "settings-pane" });
-  root.append(
-    el(
-      "div",
-      { class: "settings-frame" },
-      el(
-        "div",
-        { class: "settings" },
-        el("div", { class: "settings-side" }, el("nav", { class: "settings-nav", "aria-label": "Settings" }, TABS.map((candidate) => tabLink(candidate, candidate.id === tab.id)))),
-        pane,
-      ),
-    ),
-  );
+  const links = TABS.map((candidate) => tabLink(candidate, candidate.id === tab.id));
+  const nav = el("nav", { class: "settings-nav", "aria-label": "Settings" }, links);
+  root.append(el("div", { class: "settings-frame" }, el("div", { class: "settings" }, el("div", { class: "settings-side" }, nav), pane)));
+  // In the row that scrolls sideways (a narrow window, item 272) the open tab is brought to its middle, and the row's
+  // edge fades while more tabs lie to the right.
+  const open = links[TABS.indexOf(tab)].getBoundingClientRect();
+  const row = nav.getBoundingClientRect();
+  nav.scrollLeft = open.left - row.left - (row.width - open.width) / 2;
+  const stopCue = scrollCue(nav);
   const dispose = tab.mount(pane, ctx);
   // The bar names the page; the open tab names the pane.
   setStageTitle(el("h1", { class: "stage-h1" }, "Settings"));
-  return dispose;
+  return () => {
+    stopCue();
+    dispose();
+  };
 }

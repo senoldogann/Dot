@@ -5205,11 +5205,14 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 264 | Dot's own Chrome loads extensions                                                     | done        | 10eb5d5 |
 | 265 | Dot's own Chrome can take DevTools connections from a run's scripts                   | done        | dbb21d5 |
 | 266 | A batch carries several public or social actions while no pace is set                 | done        | ab56000 |
-| 267 | The phone reaches Dot from anywhere, and its home-screen app signs in with a code     | in progress |         |
+| 267 | The phone reaches Dot from anywhere, and its home-screen app signs in with a code     | done        | a8c5cb0 |
 | 268 | Office files show in the side panel as Quick Look draws them                          | planned     |         |
 | 269 | A long paste goes as a file, and a Markdown file shows clean in the side panel        | done        | c4da0ed |
 | 270 | A script's navigation is settled after it, also one that commits after its value      | done        | a27c018 |
 | 271 | Settings › Phone sets up Tailscale and keeps the Mac awake                            | planned     |         |
+| 272 | The Settings tabs are one row on a phone, and it stays under the bar                  | in progress |         |
+| 273 | On a phone the stop stays in the sidebar, the switches match, the level reads         | planned     |         |
+| 274 | A streamed message is drawn as it will stay                                           | planned     |         |
 
 ### 77. The type system: Inter and Geist Mono, seven sizes, three weights
 
@@ -11819,7 +11822,7 @@ app asks for the token again, which a phone cannot type: the token went to the o
 
 ### 267. The phone reaches Dot from anywhere, and its home-screen app signs in with a code
 
-**Status: in progress.** Built on `item-267-phone-pairing`.
+**Status: done.** Merged as `a8c5cb0` (PR #313; no Linear issue, the Linear connector was signed out).
 
 **As built (2026-10-15).** `server/pairing.py` (new): a code of eight characters of Crockford's base32 (40 bits), shown
 as two groups of four and read back in any case, with or without the dash, O as 0 and I or L as 1; good for ten minutes
@@ -11929,6 +11932,87 @@ from home.
 > Read ROADMAP.md part 47 and the status table of part 9 (rows 267 to 271). The protocol of part 5 is unchanged; the
 > Linear connector is signed out, so say so in the PR. The tailnet name, the token and the codes are never written to
 > the repository, a log or a PR. UI changes are checked wide and on a phone, light and dark, in Chrome and WebKit.
+
+## Part 48: Dot on a phone, as the owner uses it (planned 2026-10-15)
+
+The owner's fiftieth word, on 2026-10-15, from the phone: "Telefonda Ayarlar ekranının menüsü daha mobil uyumlu olsun ve
+aşağıya scroll yapıldığında beraber gelsin. Ayrıca mobilde model effort görünmüyor, seçemiyorum. Bir diğer sorun:
+deepseek-v4.1-flash modelinin effort seviyeleri neden kayboldu, daha önce Max'a kadar vardı? Composer'ı bir şekilde
+mobile uygun hâle getir. Yanlış mı görüyorum bilmiyorum ama mobilde streaming sırasında UI sürekli render oluyor gibi,
+bunu da kontrol et ve düzelt. Sol menü gizlendiğinde durdurma butonu top barda görünmesin, sol menüde kalsın; kullanıcı
+isterse sol menüyü açıp oradan durdurur. Ve mobilde sol menünün kapatma ikonu ile sağ menünün açma kapama ikonu aynı
+boyutta değil, bunu da düzelt." (the Settings menu friendlier on a phone and coming along as the page scrolls down; on
+the phone the model's effort is not to be seen or chosen; why DeepSeek v4.1 Flash lost its levels, Max among them; the
+composer friendlier on a phone; the page seems to draw itself again all the time while a message streams on the phone;
+the emergency stop out of the bar while the sidebar is hidden, in the sidebar alone; and on the phone the sidebar's
+close icon and the side panel's switch are not the same size.)
+
+What a probe measured the same day, at 390 px in Chrome and in WebKit, with a model that streams a thought and a message
+of ten parts:
+
+- Over 648 painted frames of the stream only the scroll, which follows the end, changes from one frame to the next;
+  nothing flickers. What reads as drawing again: the live message is plain text, its `**` showing, in the page's line
+  height, and when it ends it becomes formatted prose in the message's own, so that the whole message reflows; its
+  caret, a `::after` of the bubble's grid, stands in the face's column under the avatar and goes down a line at a time;
+  and the arrow down shows for one frame when the answer comes.
+- The Settings tabs wrap into four rows at 390 px, a third of the screen, and scroll away with the page.
+- The reasoning pill shows its brain alone under 600 px of bar; the box's text is 15 px, under the 16 px below which
+  iOS zooms the page into a box that gets the focus.
+- The emergency stop stands beside the sidebar's opener while the sidebar is closed (item 120); the side panel's switch
+  is a 32 px button with a 15 px icon, the sidebar's a 36 px one with a 19 px icon.
+- DeepSeek v4.1 Flash on OpenCode Go has had no levels since item 258, measured then to be ignored by the gateway; on
+  Ollama Cloud it keeps Off, Low, High and Max. Nothing to build: the owner is told.
+
+### 272. The Settings tabs are one row on a phone, and it stays under the bar
+
+**Status: in progress.** Built on `item-272-settings-tabs-phone`.
+
+**As built (2026-10-15).** `settings.css`: where the tabs and the pane do not fit side by side, the strip is one row
+that scrolls sideways, without a scroll bar, and stays under the bar while the page scrolls, over the pane, its ground
+reaching the window's edges; its edge fades while more tabs lie to the right (`scrollcue.js`, as the Models table's).
+`views/settings.js`: the open tab is brought to the middle of the row. Side by side the tabs are a column, as before.
+Tests: `tests/smoke/test_phone_pages.py` (new; at 390 px light and dark and at 1280 px: one row with the open tab in
+sight, the row under the bar and on top of the pane 700 px down the page, a tab chosen from it opening at the top of its
+pane; at 1680 px a column; once in WebKit). It fails on the code of before (four rows at 390 px).
+
+**What.** The tabs of Settings in one row on a phone that stays in reach down the page.
+
+**Why.** The owner's ask: four rows of tabs took a third of a phone's screen and scrolled away.
+
+**Tests.** As built.
+
+### 273. On a phone the stop stays in the sidebar, the switches match, the level reads
+
+**Status: planned.**
+
+**What.** The bar beside a closed sidebar holds its opener alone: the emergency stop is in the sidebar's foot, a tap
+away. The side panel's switch and its close are the sidebar's size (36 px, a 19 px icon). On a phone the box's text is
+16 px, and the reasoning pill shows its level as a word, not the brain alone.
+
+**Why.** The owner's ask. iOS zooms the page into a box whose text is under 16 px.
+
+**Tests.** Smoke at 390 px and wide, light and dark, in Chrome and WebKit: no stop in the bar, the switches the same
+size, the level's word in sight and chosen from its menu, the box's text 16 px on a phone.
+
+### 274. A streamed message is drawn as it will stay
+
+**Status: planned.**
+
+**What.** The live message is drawn as formatted prose in the message's own type, at most once a frame, so that its end
+changes nothing on the page; the caret stands at the end of its text; the arrow down never flashes while the page
+follows.
+
+**Why.** The owner's word: on the phone the page seemed to draw itself again all the time while a message streamed.
+
+**Tests.** Smoke with a model that streams slowly, on a phone and wide, in Chrome and WebKit: the message formatted
+while it streams, its height the same just before and after its end, the caret in its last line, the arrow never shown
+while the page follows.
+
+### How to start part 48 (the handoff prompt)
+
+> Read ROADMAP.md part 48 and the status table of part 9 (rows 272 to 274). The protocol of part 5 is unchanged; the
+> Linear connector is signed out, so say so in the PR. UI changes are checked on a phone and wide, light and dark, in
+> Chrome and WebKit.
 
 ## Log
 
@@ -12639,3 +12723,4 @@ from home.
 - 2026-10-15 (Opus 5.5): item 266 merged as `ab56000` (PR #310; no Linear issue, the connector was signed out): `browser_act` lets a batch carry several follows, likes, posts or messages while `[policy.pace]` sets no limit for their kind (the default), counted once by the gate; with a pace set for a kind it carries, one per batch as before, and the refusal names the paced kinds and says that a script in the page would go around the owner's pace. The prompt's line that sent such actions one per call is gone, so every run's prompt is shorter. CI and the pace tests were clean.
 - 2026-10-15 (Opus 5.5): item 270 merged as `a27c018` (PR #311; no Linear issue, the connector was signed out): browser_eval settles the page after every script, as a step is settled, before the address rules are checked, so that a forbidden page answering after the value came back has the tab reset; after a script still running when its wait ended only a navigation under way is let commit, so a busy script no longer holds the call; full offline smoke on the stack top 565 passed.
 - 2026-10-15 (Opus 5.5): item 269 merged as `c4da0ed` (PR #312; no Linear issue, the connector was signed out): a text of 2,000 characters or 40 lines pasted into a message box goes as pasted-text-<time>.md when it reads as Markdown, else .txt, with a pencil that puts it back as text; a chip opens its file beside a conversation or in a dialog elsewhere, a Markdown file formatted with its source a click away; a send with only files asks for words, and a listed file keeps the send from turning into the Stop of a working run.
+- 2026-10-15 (Opus 5.5): item 267 merged as `a8c5cb0` (PR #313; no Linear issue, the connector was signed out): Settings › Phone gives a one-time pairing code (eight characters of Crockford's base32, ten minutes, five tries) that the sign-in screen of an app added to a phone's home screen trades for the token over the one public route besides the health check and the proof; only what can be a code is sent, so a token pasted into the code's field stays on the phone; neither the code nor the token is logged.

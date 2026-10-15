@@ -230,6 +230,8 @@
   }
 }
 
+/* The strip is one row that scrolls sideways rather than rows that push the pane down, and it stays under the bar while
+   the page scrolls, over the pane, its ground reaching the window's edges (item 272). */
 @container (max-width: 1099.98px) {
   .settings {
     grid-template-columns: minmax(0, 1fr);
@@ -237,17 +239,36 @@
   }
 
   .settings-side {
-    position: static;
+    top: var(--stagebar-h);
+    z-index: 10;
+    padding-block: 8px;
+    margin-block: -8px;
+    background: var(--bg);
+    box-shadow: 0 0 0 100vmax var(--bg);
+    clip-path: inset(0 -100vmax);
   }
 
   .settings-nav {
     flex-direction: row;
-    flex-wrap: wrap;
     gap: 4px;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    scrollbar-width: none;
+  }
+
+  .settings-nav::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* While more tabs lie to the right (scrollcue.js), the edge fades to say so. */
+  .settings-nav[data-scroll="more"] {
+    mask-image: linear-gradient(to right, var(--bg) calc(100% - 40px), transparent);
   }
 
   .settings-tab {
+    flex: none;
     padding: 8px 12px;
+    white-space: nowrap;
   }
 }
 

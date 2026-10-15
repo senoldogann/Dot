@@ -1454,7 +1454,8 @@ providers](#models-and-providers)), **Browser** (which Chrome Dot browses with a
 [Browser use](#browser-use)), **Rules**, **Memory**, **Skills**, **Schedules**, **Phone** (the addresses a phone reaches
 Dot at and a pairing code for its home-screen app; see [Dot on the phone](#dot-on-the-phone)) and **System** (the
 daemon, the emergency stop and the health checks in a fold, closed, with the number of failures on its line). Which folds are open is kept in
-the browser. The tabs sit beside their content when the window has the room and above it otherwise; the earlier
+the browser. The tabs sit beside their content when the window has the room and above it otherwise, in one row that
+scrolls sideways with the open tab in sight and stays under the bar as the page scrolls (item 272); the earlier
 addresses of the memory, schedules, rules and system pages lead to their tabs.
 
 Settings › Appearance (⌥⌘A), after T3 Code's page, holds the look of this browser. **Colour scheme** is three cards,
