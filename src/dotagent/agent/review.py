@@ -66,6 +66,8 @@ _DECLINED_FINISHES: frozenset[str] = frozenset({"refusal", "content_filter"})
 _MAX_INSTRUCTIONS: int = 12
 _INSTRUCTION_CHARS: int = 1500
 _FIELD_CHARS: int = 1500
+# What an action acts on is read whole up to here (item 242): a command of a few hundred lines, a long path or address.
+_TARGET_CHARS: int = 12_000
 _REASON_CHARS: int = 400
 _DIGEST_CHARS: int = 30_000
 _ANSWER_CHARS: int = 8000
@@ -516,7 +518,7 @@ def _render_action(action: ActionInfo) -> str:
             f"risk: {action.risk}",
             f"flags: {', '.join(action.flags) if action.flags else 'none'}",
             f"summary: {truncate_middle(action.summary, _FIELD_CHARS)}",
-            f"target: {truncate_middle(action.target, _FIELD_CHARS)}",
+            f"target: {truncate_middle(action.target, _TARGET_CHARS)}",
         )
     )
 

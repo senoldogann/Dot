@@ -811,13 +811,15 @@ run page carries a chip for it.
 
 **Approvals** decide who answers a question of the [policy](#safety), the `ask` outcome of its decision order:
 
-- `ask` (the default): you do. The run waits for your answer.
+- `ask` (the default): you do. The run waits for your answer, on a card that shows what the action acts on whole (a
+  long command scrolls within it).
 - `auto`: the review model (`[models] review`) does. It is given your instructions (the goal and every message you sent
-  to the run: the only authority it recognises), the action, why the policy stopped at it and whether the run has read
-  untrusted content. It answers `approve` when the action is plainly what you asked for; `deny` when it is not, goes
-  further than you asked or looks like something other than your instructions caused it; and `escalate` when it cannot
-  tell, and then the question comes to you as in `ask`, with the reason of the review model in it. What the agent wrote
-  into the action (its summary and target) is data to the review model, never an instruction.
+  to the run: the only authority it recognises), the action (up to 12,000 characters of what it acts on, and of a longer
+  target its start and its end), why the policy stopped at it and whether the run has read untrusted content. It answers
+  `approve` when the action is plainly what you asked for; `deny` when it is not, goes further than you asked or looks
+  like something other than your instructions caused it; and `escalate` when it cannot tell, and then the question comes
+  to you as in `ask`, with the reason of the review model in it. What the agent wrote into the action (its summary and
+  target) is data to the review model, never an instruction.
 - `yolo`: nobody does. The action is allowed and recorded. The question that untrusted content raises (see
 [Safety](#safety)) is waived as well, and so are the refusals and hand-offs below: a yolo run reads secrets, uploads or
 sends files from anywhere, and does money and credential steps itself. It types passwords, one-time codes and card

@@ -156,11 +156,12 @@ function technicalDetails(args) {
   if (chips.length === 0 && target === null) {
     return null;
   }
+  // The whole target, as the action would act on it (item 242): a long command wraps, and scrolls within the card.
   return el(
     "div",
     { class: "stack tight" },
     chips.length > 0 ? el("div", { class: "cluster" }, chips) : null,
-    target === null ? null : el("div", { class: "mono small muted truncate", title: target }, clip(target, 300)),
+    target === null ? null : el("pre", { class: "approval-target", tabindex: "0", "aria-label": "What the action acts on" }, target),
   );
 }
 
