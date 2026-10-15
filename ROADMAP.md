@@ -5191,7 +5191,9 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 250 | Each model's context size can be set in Settings                                     | done        | ee7252b |
 | 251 | Ultrathink and Ultracode in the reasoning menu                                       | done        | c605d56 |
 | 252 | The plan at the end of the request, if an eval shows it holds                        | done        | a786a28 |
-| 253 | The line of what a yolo run did without asking says its reason once                   | in progress |         |
+| 253 | The line of what a yolo run did without asking says its reason once                   | done        | 0250d88 |
+| 254 | A model the plan does not include is paused at once                                   | in progress |         |
+| 255 | The typed judge switches on and off in Settings                                       | planned     |         |
 
 ### 77. The type system: Inter and Geist Mono, seven sizes, three weights
 
@@ -11287,7 +11289,7 @@ written in the same pull request.
 
 ### 253. The line of what a yolo run did without asking says its reason once
 
-**Status: in progress.** Built on `item-253-yolo-line`.
+**Status: done.** Merged as `0250d88` (PR #297; no Linear issue, the Linear connector was signed out).
 
 **As built (2026-10-15).** `agent/gate.py` `_waive` records the action's summary as the summary and the policy's reason
 as the note; `timeline.js` `approval_auto` reads "YOLO, not asked: <action> — <reason>" ("Reviewer approved" or
@@ -11316,6 +11318,77 @@ dark: a new record and an old one each give one line with the reason once). Both
 > Read ROADMAP.md part 42 and the status table of part 9 (rows 252 and 253). The protocol of part 5 (branch, gate, PR,
 > squash merge, hash in the table, log line) is unchanged; the Linear connector is signed out, so no issue. Check the
 > run's page wide and on a phone, light and dark, in Chrome and WebKit. Tests never start a real model call.
+
+## Part 43: the plan of a provider, and the judge's switch (planned 2026-10-15)
+
+The owner's forty-third word, on 2026-10-15: whether a key saved in Settings is the one in use when the models of a
+provider still fail; that Claude's fast mode may stay off; that the Office and OneDrive permissions will be granted when
+the next step asks; and whether the typed judge (Jev) should be tried, or switched on and off in Settings at will.
+
+**Status (2026-10-15): planned.** On the code at `0250d88`: a key saved in Settings is written to the `.env` file of
+the data directory and the daemon reads it (the launchd job carries no key of its own), so the key in use was the
+saved one; its provider answered HTTP 402 for the models the plan of the key does not include, which
+`classify_generic` makes a plain `ProviderHttpError`: the model is not paused, every use of it fails again, and nothing
+says why. A 429 of Ollama that says the plan's included usage is used up is a rate limit to retry. The typed judge is
+chosen by `[judge] provider` in the config file alone, read once at start (`judge_for`), while the TypeSafe key has a
+row in Settings › Keys; the step router (`[agent] step_router`) offers the fast model to the judge without asking the
+router whether it is paused (found in part 42's report). The desktop permissions macOS asks for (Accessibility, input
+events, screen capture) are granted to the app that runs Dot, as the doctor reports; nothing is left to ask for. Claude's
+fast mode stays as item 223 left it, off until the organization is let in; no item.
+
+**The shape of this part.** Two items, each a pull request of its own: a model the plan does not include is paused at
+once (254), and the typed judge switches on and off in Settings (255).
+
+### 254. A model the plan does not include is paused at once
+
+**Status: in progress.** Built on `item-254-plan-errors`.
+
+**As built (2026-10-15).** `llm/provider_errors.py`: `classify_generic` makes a 402 a `ProviderQuotaError`, and
+`classify_ollama` (the Ollama connector's classifier at its four sites) makes a 429 whose words say the included usage
+is used up one too, the rest as before. `llm/router.py` `unavailable_reason` names a 402 "not in the plan". README:
+the pause paragraph of the helpers. Tests: `tests/unit/test_provider_errors.py` (new) and `tests/unit/test_helpers.py`.
+
+**What.** A provider's HTTP 402 (payment required: the plan does not include the model, or asks for credits) is a
+`ProviderQuotaError` on every provider, terminal like a spent quota: the connector does not retry it, and the router
+pauses the model for `helper_cooldown_s` with the reason "not in the plan", which the fast model's work (item 240),
+the helpers and the standby read as they read a spent quota. Ollama's 429 that says the plan's included usage is used
+up ("used all included") is a `ProviderQuotaError` too, through a classifier of Ollama's own; another 429 stays a rate
+limit. README says so.
+
+**Why.** The owner saved a new key and the models kept failing: each call to a model the plan does not include failed
+again, nothing was paused and nothing said why. A paused model with its reason is what Settings, the timeline and the
+doctor already show.
+
+**Tests.** `tests/unit/test_provider_errors.py` (the 402 and the two 429s) and `tests/unit/test_helpers.py` (the pause
+names the reason). They fail on the code of before.
+
+### 255. The typed judge switches on and off in Settings
+
+**Status: planned.**
+
+**What.** Settings › Keys, on the row of TypeSafe's key: a switch "Typed judge (Jev)" that writes `[judge] provider`
+(`"typesafe"` or `"none"`) into the config file and takes effect at once, with no restart, as the resume switch of
+item 231 does: the runtime's judge answers through TypeSafe's service from the next judgment on, or answers nothing.
+The TypeSafe service exists whether or not the judge is on, so the switch needs only the key. `GET` and `PUT
+/api/judge` carry it; the doctor's judge row reads the switch, not the file alone. The step router leaves a paused fast
+model out of the models it offers the judge, as item 240 leaves it out of the fast model's work. README says how the
+judge is switched on.
+
+**Why.** The owner asked whether to try Jev, or to switch it at will; the key is saved and the judge is off, and
+switching it on took a line in the config file and a restart. With the switch the owner tries it on their own runs and
+turns it off when it does not help.
+
+**Tests.** `tests/unit/test_config_edit.py` (the setting written and the rest kept), `tests/unit/test_judge.py` (the
+switched judge answers through the service or not), `tests/unit/test_stepmodel.py` or the loop's test (a paused fast
+model is not offered), a smoke test of the route and of the Keys page in Chrome, wide and on a phone, light and dark,
+with a WebKit copy. They fail on the code of before.
+
+### How to start part 43 (the handoff prompt)
+
+> Read ROADMAP.md part 43 and the status table of part 9 (rows 253 to 255). One item at a time, in order; the protocol
+> of part 5 (branch, gate, PR, squash merge, hash in the table, log line) is unchanged; the Linear connector is signed
+> out, so no issue. Give each change a test that fails on the code of before, and check each page it touches wide and
+> on a phone, light and dark, in Chrome and WebKit. Tests never start a real model call.
 
 ## Log
 
@@ -12010,3 +12083,4 @@ dark: a new record and an old one each give one line with the reason once). Both
 - 2026-10-15 (Opus 5.5): item 250 merged as `ee7252b` (PR #294; no Linear issue, the connector was signed out): a model's context size is set in Settings › Models from 48,000 tokens up to three quarters of its window, with what it does, where the window comes from and what the model's runs of the last 30 days measured; the run's budget, its tool output and the point past which it summarizes follow it from the next run on.
 - 2026-10-15 (Opus 5.5): item 251 merged as `c605d56` (PR #295; no Linear issue, the connector was signed out): the Reasoning menu has Ultrathink (Max) and Ultracode (Extra high, the run told to split its independent parts across helpers that work at the same time) for one message, where the model offers those levels; the chat keeps its level, and the run, its resumption and a campaign's sessions keep the choice.
 - 2026-10-15 (Opus 5.5): item 252 merged as `a786a28` (PR #296; no Linear issue, the connector was signed out): the plan stays at the end of the system prompt; the A/B could not tell the places apart (none of its 18 attempts planned) and the owner's runs of 30 days put the move at about 2 points more of cached input against the 15 the design asked for; eval reports now say in how many attempts a plan was kept.
+- 2026-10-15 (Fable 5.1): item 253 merged as `0250d88` (PR #297; no Linear issue, the connector was signed out): the record of an action a yolo run did without asking keeps the action as its summary and the policy's reason as its note, and the timeline's line reads them once; the reason an allowed action asks for once untrusted content is in context says what holds in every mode.

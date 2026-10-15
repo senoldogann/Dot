@@ -49,6 +49,8 @@ _OPENCODE_QUOTA: frozenset[str] = frozenset(
     {"GoUsageLimitError", "CreditsError", "MonthlyLimitError", "UserLimitError"}
 )
 _ANTHROPIC_QUOTA: frozenset[str] = frozenset({"billing_error"})
+# How ollama.com words a plan whose included usage is spent ("You used all included … usage"), with HTTP 429.
+_OLLAMA_PLAN_SPENT: str = "used all included"
 # How Anthropic words a spent prepaid balance, which it answers with HTTP 400 and the type invalid_request_error.
 _ANTHROPIC_NO_CREDIT: str = "credit balance is too low"
 
@@ -133,16 +135,28 @@ def error_message(status: int, wire: WireError | None) -> str:
 def classify_generic(
     status: int, wire: WireError | None, retry_after_s: float | None, detail: JsonObject
 ) -> ProviderHttpError:
-    """401 is a refused key, 403 a refused access (the key is known, what it asked is not allowed), 429 a rate
-    limit, anything else a plain HTTP failure."""
+    """401 is a refused key, 402 a model the plan does not include (payment required: terminal, like a spent quota),
+    403 a refused access (the key is known, what it asked is not allowed), 429 a rate limit, anything else a plain
+    HTTP failure."""
     message: str = error_message(status, wire)
     if status == 401:
         return ProviderAuthError(message, status, detail)
+    if status == 402:
+        return ProviderQuotaError(message, status, retry_after_s, detail)
     if status == 403:
         return ProviderAccessError(message, status, detail)
     if status == 429:
         return ProviderRateLimitError(message, status, retry_after_s, detail)
     return ProviderHttpError(message, status, detail)
+
+
+def classify_ollama(
+    status: int, wire: WireError | None, retry_after_s: float | None, detail: JsonObject
+) -> ProviderHttpError:
+    """Ollama: a 429 that says the plan's included usage is used up is terminal, not a burst to retry."""
+    if status == 429 and wire is not None and _OLLAMA_PLAN_SPENT in wire.message.lower():
+        return ProviderQuotaError(error_message(status, wire), status, retry_after_s, detail)
+    return classify_generic(status, wire, retry_after_s, detail)
 
 
 def classify_openai(
