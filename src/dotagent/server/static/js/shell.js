@@ -3,7 +3,7 @@
 // one of a page that Dot's update left out of date.
 
 import { el } from "./dom.js";
-import { failsafeButton, releaseFailsafe } from "./failsafe.js";
+import { releaseFailsafe } from "./failsafe.js";
 import { icon } from "./icons.js";
 import { setSidebarOpen, sidebarOpen, trackStagebar } from "./layout.js";
 import { installShortcuts, requestCompose } from "./shortcuts.js";
@@ -92,8 +92,9 @@ export function buildShell({ homeRoute }) {
     },
     icon("panelLeft"),
   );
-  // While the sidebar is closed its opener brings the emergency stop of the sidebar's foot along.
-  const opener = el("div", { class: "stagebar-left" }, menu, failsafeButton());
+  // While the sidebar is closed the bar holds its opener alone: the emergency stop stays in the sidebar's foot, a tap
+  // away (item 273).
+  const opener = el("div", { class: "stagebar-left" }, menu);
   const main = el("main", { class: "page", tabindex: "-1" });
   const stagebar = el(
     "header",

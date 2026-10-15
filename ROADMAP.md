@@ -5211,7 +5211,7 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 270 | A script's navigation is settled after it, also one that commits after its value      | done        | a27c018 |
 | 271 | Settings › Phone sets up Tailscale and keeps the Mac awake                            | planned     |         |
 | 272 | The Settings tabs are one row on a phone, and it stays under the bar                  | in progress |         |
-| 273 | On a phone the stop stays in the sidebar, the switches match, the level reads         | planned     |         |
+| 273 | On a phone the stop stays in the sidebar, the switches match, the level reads         | in progress |         |
 | 274 | A streamed message is drawn as it will stay                                           | planned     |         |
 
 ### 77. The type system: Inter and Geist Mono, seven sizes, three weights
@@ -11983,7 +11983,20 @@ pane; at 1680 px a column; once in WebKit). It fails on the code of before (four
 
 ### 273. On a phone the stop stays in the sidebar, the switches match, the level reads
 
-**Status: planned.**
+**Status: in progress.** Built on `item-273-phone-bar-composer`.
+
+**As built (2026-10-15).** `shell.js`: the bar beside a closed sidebar holds its opener alone; the emergency stop stays
+in the sidebar's foot (`failsafe.js`). `inspector.js`: the side panel's switch and the drawer's close are the sidebar's
+buttons (`icon-btn`, 36 px with a 19 px icon), on every width. `app.css`: the reasoning pill keeps its level's word at
+every width of the bar; on a phone, and on any touch screen, the box's text and its copy are at least `--touch-text`
+(16 px; `--composer-leading-ratio` keeps one leading for both) and the bar's buttons 36 px. README: the sidebar's foot,
+the emergency stop and the composer's bar. Tests: `tests/smoke/test_phone_pages.py` (at 390 px light and dark and at
+1280 px: no stop in the bar beside a closed sidebar and one in its foot; the opener, the sidebar's button, the panel's
+switch and, on a phone, the drawer's close all 36 px with a 19 px icon; the level's word in sight, Low and then High
+chosen from its menu; every button inside the bar; the box's text 16 px on a phone and 15 px wide; once in WebKit) and
+`tests/smoke/test_desktop_lights.py` (the closed sidebar's bar holds no stop). They fail on the code of before: the stop
+in the bar; with `app.css` alone as before, the level's word hidden; with `inspector.js` alone, a 32 px switch with a
+15 px icon.
 
 **What.** The bar beside a closed sidebar holds its opener alone: the emergency stop is in the sidebar's foot, a tap
 away. The side panel's switch and its close are the sidebar's size (36 px, a 19 px icon). On a phone the box's text is

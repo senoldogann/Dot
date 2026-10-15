@@ -64,7 +64,11 @@
   --text-2xl: calc(24px * var(--type-scale));
   --leading-2xl: calc(32px * var(--type-scale));
   --composer-size: 15px;
-  --composer-leading: calc(var(--composer-size) * 1.6);
+  --composer-leading-ratio: 1.6;
+  --composer-leading: calc(var(--composer-size) * var(--composer-leading-ratio));
+  /* The least a box's text is on a touch screen: iOS zooms the page into a box whose text is smaller as it gets the
+     focus (item 273). */
+  --touch-text: 16px;
   --code-size: 13px;
   --code-leading: calc(var(--code-size) * 18 / 13);
   --weight-text: 400;
@@ -1726,6 +1730,21 @@ a.pill:hover {
   user-select: none;
 }
 
+/* On a phone, and on any touch screen, the box's text is never under --touch-text, and its copy keeps the same size and
+   leading (item 273). */
+@media (max-width: 720px), (pointer: coarse) {
+  .composer {
+    --composer-touch-size: max(var(--touch-text), var(--composer-size));
+    --composer-touch-leading: calc(var(--composer-touch-size) * var(--composer-leading-ratio));
+  }
+
+  .composer .textarea,
+  .composer .composer-mirror {
+    font-size: var(--composer-touch-size);
+    line-height: var(--composer-touch-leading);
+  }
+}
+
 .composer-field.mirrored .textarea {
   position: relative;
   color: transparent;
@@ -1787,9 +1806,9 @@ a.pill:hover {
   height: 40px;
 }
 
-/* The bar never wraps. It is a size container: as it narrows, the mode's and the reasoning's names fold to their
-   icons, then the chevrons go and the agent's name and the model's give way with an ellipsis; the approvals and the
-   send never move. */
+/* The bar never wraps. It is a size container: as it narrows, the mode's name folds to its icon, then the chevrons go
+   and the agent's name and the model's give way with an ellipsis; the reasoning keeps its level's word (item 273), and
+   the approvals and the send never move. */
 .composer-bar {
   container: composer-bar / inline-size;
   display: flex;
@@ -2056,9 +2075,22 @@ a.pill:hover {
 }
 
 @container composer-bar (max-width: 600px) {
-  .composer-pill[data-pill="mode"] .composer-pill-value,
-  .composer-pill[data-pill="reasoning"] .composer-pill-value {
+  .composer-pill[data-pill="mode"] .composer-pill-value {
     display: none;
+  }
+}
+
+/* On a phone, and on any touch screen, the bar's buttons are a finger's size (item 273). */
+@media (max-width: 720px), (pointer: coarse) {
+  .composer .attach-button,
+  .composer .btn.send {
+    width: 36px;
+    height: 36px;
+    min-height: 36px;
+  }
+
+  .composer-pill {
+    height: 36px;
   }
 }
 
