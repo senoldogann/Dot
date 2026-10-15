@@ -1749,6 +1749,10 @@ profile that Dot made uses Playwright's mock keychain in the sign-in window and 
 Keychain item is involved; the profile of an import uses the system keychain in both (`dotx doctor` shows which). A
 sign-in made with an older version of `dotx browser login`, which used the real key, has to be made again.
 
+Dot's own Chrome loads the extensions installed in its profile: Playwright starts Chrome with `--disable-extensions`,
+which Dot leaves out (item 264). Install one from the Chrome Web Store in the window of `dotx browser login`; it stays
+in the profile and loads at every start of Dot's Chrome.
+
 **`attach`** works in new tabs of the Chrome you already have open, signed in as you are, and starts no Chrome of its
 own. It needs Chrome 144 or later and its switch "Allow remote debugging for this browser instance" at
 `chrome://inspect/#remote-debugging`, which only you can turn on.

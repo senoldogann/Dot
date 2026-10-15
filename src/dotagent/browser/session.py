@@ -109,6 +109,9 @@ _LAUNCH_ARGS: list[str] = [
     "--no-first-run",
     "--no-default-browser-check",
 ]
+# Playwright's own switches that Dot's Chrome starts without: the bar that says software controls it, and
+# --disable-extensions, which would keep the extensions installed in its profile from loading (item 264).
+_PLAYWRIGHT_SWITCHES_LEFT_OUT: list[str] = ["--enable-automation", "--disable-extensions"]
 _LAUNCH_ERROR_CHARS: int = 900
 # A page that answered with a bot wall gets this long to pass its own check (a challenge page reloads itself) before
 # it is read as it stands: 202 is DuckDuckGo's check, the others are the usual walls.
@@ -337,7 +340,7 @@ class BrowserSession:
                 # Playwright adds --no-sandbox unless asked not to; Chrome then shows its "unsupported flag" banner.
                 chromium_sandbox=True,
                 # The cookies of the profile must be read with the key they were written with (see keychain.py).
-                ignore_default_args=["--enable-automation", *playwright_defaults_to_drop(keychain)],
+                ignore_default_args=[*_PLAYWRIGHT_SWITCHES_LEFT_OUT, *playwright_defaults_to_drop(keychain)],
                 args=[*_LAUNCH_ARGS, *keychain_switches(keychain)],
             )
         )
