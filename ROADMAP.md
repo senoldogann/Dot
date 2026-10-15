@@ -5207,7 +5207,7 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 266 | A batch carries several public or social actions while no pace is set                 | done        | ab56000 |
 | 267 | The phone reaches Dot from anywhere, and its home-screen app signs in with a code     | in progress |         |
 | 268 | Office files show in the side panel as Quick Look draws them                          | planned     |         |
-| 269 | A long paste goes as a file, and a Markdown file shows clean in the side panel        | in progress |         |
+| 269 | A long paste goes as a file, and a Markdown file shows clean in the side panel        | done        | c4da0ed |
 | 270 | A script's navigation is settled after it, also one that commits after its value      | done        | a27c018 |
 | 271 | Settings › Phone sets up Tailscale and keeps the Mac awake                            | planned     |         |
 
@@ -11862,7 +11862,7 @@ PowerPoint.
 
 ### 269. A long paste goes as a file, and a Markdown file shows clean in the side panel
 
-**Status: in progress.** Built on `item-269-paste-as-file`.
+**Status: done.** Merged as `c4da0ed` (PR #312; no Linear issue, the Linear connector was signed out).
 
 **As built (2026-10-15).** `markdown.js`: `readsAsMarkdown` (a block that is more than a paragraph, or bold, italics,
 code or a link with words of its own). `attachments.js`: a text of 2,000 characters or 40 lines pasted into a message
@@ -12638,3 +12638,4 @@ from home.
 - 2026-10-15 (Opus 5.5): item 265 merged as `dbb21d5` (PR #309; no Linear issue, the connector was signed out): `[browser] debug_port` (0 for none, else 1024 to 65535; Settings › Browser) has Dot's own Chrome also take DevTools connections on that port of 127.0.0.1, and a run in Dot's Chrome with a tool that runs scripts is told the address, to connect with `connect_over_cdp` and `no_defaults=True`; Dot's Chrome does not start while another program holds the port, and the pool checks every session before it changes any. A review of 263 to 266 found the first commit's claim that a script never drives another Chrome too strong, ports below 1024 taken and the pool's change not atomic; the second commit fixed them. CI was clean.
 - 2026-10-15 (Opus 5.5): item 266 merged as `ab56000` (PR #310; no Linear issue, the connector was signed out): `browser_act` lets a batch carry several follows, likes, posts or messages while `[policy.pace]` sets no limit for their kind (the default), counted once by the gate; with a pace set for a kind it carries, one per batch as before, and the refusal names the paced kinds and says that a script in the page would go around the owner's pace. The prompt's line that sent such actions one per call is gone, so every run's prompt is shorter. CI and the pace tests were clean.
 - 2026-10-15 (Opus 5.5): item 270 merged as `a27c018` (PR #311; no Linear issue, the connector was signed out): browser_eval settles the page after every script, as a step is settled, before the address rules are checked, so that a forbidden page answering after the value came back has the tab reset; after a script still running when its wait ended only a navigation under way is let commit, so a busy script no longer holds the call; full offline smoke on the stack top 565 passed.
+- 2026-10-15 (Opus 5.5): item 269 merged as `c4da0ed` (PR #312; no Linear issue, the connector was signed out): a text of 2,000 characters or 40 lines pasted into a message box goes as pasted-text-<time>.md when it reads as Markdown, else .txt, with a pencil that puts it back as text; a chip opens its file beside a conversation or in a dialog elsewhere, a Markdown file formatted with its source a click away; a send with only files asks for words, and a listed file keeps the send from turning into the Stop of a working run.
