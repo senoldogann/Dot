@@ -1,8 +1,9 @@
 // Dot's computer: the page of the run's browser as Chrome paints it, and the handover of that browser to the reader.
-// Nothing is cast while the view is closed; the card is shown for a run that is going on and keeps its last frame once
-// the run has ended, when Watch goes too (there is no page left to watch).
+// Nothing is cast while the view is closed or the page is out of sight, and a view whose stream broke comes back by
+// itself (`watchInView`); the card is shown for a run that is going on and keeps its last frame once the run has ended,
+// when Watch goes too (there is no page left to watch).
 
-import { api, sse } from "./api.js";
+import { api, watchInView } from "./api.js";
 import { el } from "./dom.js";
 import { icon } from "./icons.js";
 import { panelSection } from "./panels.js";
@@ -106,12 +107,15 @@ export function createComputer({ runId, active, elsewhere, held, name, sizes }) 
     paint();
     (async () => {
       try {
-        const frames = sse(`/runs/${encodeURIComponent(runId)}/screencast`, signal, () => undefined);
-        for await (const message of frames) {
-          if (message.event === "frame") {
-            show(message.data);
-          }
-        }
+        await watchInView({
+          path: `/runs/${encodeURIComponent(runId)}/screencast`,
+          signal,
+          onMessage: (message) => {
+            if (message.event === "frame") {
+              show(message.data);
+            }
+          },
+        });
       } catch (error) {
         if (!signal.aborted) {
           toast("error", `The view of Dot's computer stopped: ${error.message}`);

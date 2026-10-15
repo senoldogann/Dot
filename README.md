@@ -1421,8 +1421,10 @@ rest for the panel), and the handle between the conversation and the panel drags
 move it a step, a double click gives it back its own width); the size is kept in the browser (`dot.computer.size`).
 While the panel is wider than its own width, the computer's view grows with the panel in its warm frame. The drawer of a
 narrow page has one width. **Dot's computer**, on the panel's Screen tab, shows the page of the run's browser as Chrome
-paints it (`GET /api/runs/{id}/screencast`, Chrome's own screencast, sent only while the view is open; a tab that does
-not change sends nothing). The view starts by itself at the run's first browser step; until a frame comes it keeps the
+paints it (`GET /api/runs/{id}/screencast`, Chrome's own screencast, sent only while the view is open and the page in
+sight; a tab that does not change sends nothing). A view whose stream breaks or goes silent is made again by itself
+after a short pause, and one put out of sight (a phone that put the app away) starts again once it is back (item 276).
+The view starts by itself at the run's first browser step; until a frame comes it keeps the
 shape of a screen and says why, with a mark and a title (no page yet, waiting for the page, the view closed, the run
 ended, or a run in a `dotx` command, item 220). **Watch** and **Close the view** open and close it by hand; once the run
 has ended it keeps the last screen and Watch goes. A pill under it says who has the browser ("Dot has control", or the

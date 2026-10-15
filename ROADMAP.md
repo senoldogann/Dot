@@ -5213,8 +5213,8 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 272 | The Settings tabs are one row on a phone, and it stays under the bar                  | done        | 2aa0600 |
 | 273 | On a phone the stop stays in the sidebar, the switches match, the level reads         | done        | 0eb267f |
 | 274 | A streamed message is drawn as it will stay                                           | done        | 428ad94 |
-| 275 | On a phone the page fits the screen and holds still                                   | in progress |         |
-| 276 | The view of Dot's computer comes back by itself                                       | planned     |         |
+| 275 | On a phone the page fits the screen and holds still                                   | done        | d332e29 |
+| 276 | The view of Dot's computer comes back by itself                                       | in progress |         |
 | 277 | Every chat wears a creature, its last message under its name                          | planned     |         |
 | 278 | Connect apps: the Mac's applications and the web's, set up from the sidebar           | planned     |         |
 | 279 | Connect apps: the tools of other services, over MCP, signed in from Dot               | planned     |         |
@@ -12114,7 +12114,7 @@ mind and do not tie new work to the Mac where they need not.
 
 ### 275. On a phone the page fits the screen and holds still
 
-**Status: in progress.** Built on `item-275-phone-holds-still`.
+**Status: done.** Merged as `d332e29` (PR #317; no Linear issue, the Linear connector was signed out).
 
 **As built (2026-10-15).** `index.html`: `viewport-fit=cover`. `app.css`: `--safe-top`, `--safe-right`,
 `--safe-bottom` and `--safe-left` over `env(safe-area-inset-*)`, kept out of by the bar and the sidebar's head
@@ -12150,7 +12150,20 @@ top of the seen page while the keyboard pans it.
 
 ### 276. The view of Dot's computer comes back by itself
 
-**Status: planned.**
+**Status: in progress.** Built on `item-276-view-comes-back`.
+
+**As built (2026-10-15).** `api.js`: `watchInView` reads a stream whose events stand alone while the page is in view:
+out of sight it closes the stream and waits for the page to come back; a stream that breaks, or that `sse` cuts after
+45 s of silence, is made again after the pause `follow` takes (0.5 s, doubling to 8 s, the shortest again once a stream
+is taken); a refused stream (401, 404) ends the read with the error, as in `follow` (`refused`, shared with it); a fault
+in showing one frame is told as in `follow`. `computer.js`: the view reads its screencast through it, so only a refused
+stream ends it with the toast "The view of Dot's computer stopped"; before, any break or silence of the stream did, and
+a phone breaks or stalls a page's streams whenever the app is put away. README: Dot's computer. Tests:
+`tests/smoke/test_takeover.py` (one new test): in Chrome and in WebKit at a phone's width, the view's stream broken at
+the network once and then silent until the page's clock jumps 46 s (a phone put away and taken up again) is made again
+with no toast and shows the frame of the third stream; watched again and put out of sight, no stream is asked for while
+out of sight, even past the stall, and the next comes once the page is back. It fails on the code of before (no second
+stream is asked for) and with the wait for the page taken out (a fifth stream is asked for while out of sight).
 
 **What.** The live view of the run's browser is made again when its stream breaks or goes silent, after the same pause
 as the run's own stream, with no toast; it stops while the page is out of sight and starts again when it is back. A
@@ -12962,3 +12975,4 @@ before it, the model's next run without the third.
 - 2026-10-15 (Opus 5.5): item 272 merged as `2aa0600` (PR #314; no Linear issue, the connector was signed out): where the Settings tabs and the pane do not fit side by side, the tabs are one row that scrolls sideways with the open tab brought into sight and its edge fading while more lie beyond, and the row stays under the bar while the page scrolls; side by side they stay a column.
 - 2026-10-15 (Opus 5.5): item 273 merged as `0eb267f` (PR #315; no Linear issue, the connector was signed out): the bar beside a closed sidebar holds its opener alone, the emergency stop staying in the sidebar's foot; the side panel's switch and the drawer's close are the sidebar's buttons, 36 px with a 19 px icon; the reasoning pill keeps its level's word at every width; on a phone and on any touch screen the composer's text is at least 16 px, so that iOS does not zoom into it, and the bar's buttons are 36 px.
 - 2026-10-15 (Opus 5.5): item 274 merged as `428ad94` (PR #316; no Linear issue, the connector was signed out): a live message is drawn as the formatted prose it ends as, at most once a frame, the blocks already written left as they were drawn (2 ms a draw at 35,000 characters with the CPU four times slower, 31 ms drawn whole), its caret at the end of its text, its end moving nothing; the arrow down no longer flashes, nor does the follow stop, when the page's own scroll comes after the conversation grew.
+- 2026-10-15 (Opus 5.5): item 275 merged as `d332e29` (PR #317; no Linear issue, the connector was signed out): on a phone the page fits the screen and holds still: viewport-fit=cover and the --safe-* tokens keep the bar, the sidebar's head and foot, the composer, the side panel and the toasts out of the safe areas; touch-action manipulation and overscroll none; every field at least 16 px on touch; a select clips its label and a note breaks a long path; holdBarInSight keeps the bar at the top of what is seen while the keyboard pans the page. test_phone_fit.py (new) in WebKit as two iPhones and in Chrome as a Pixel 7; full offline smoke 570 passed, 1 timing failure under load that passes 3 of 3 alone.

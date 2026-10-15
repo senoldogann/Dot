@@ -367,6 +367,27 @@ function untilRetry(ms, signal) {
   });
 }
 
+/** Settles once the page is in view, or at once when `signal` aborts. */
+function untilInView(signal) {
+  return new Promise((resolve) => {
+    function check() {
+      if (document.visibilityState === "visible" || signal.aborted) {
+        document.removeEventListener("visibilitychange", check);
+        signal.removeEventListener("abort", check);
+        resolve();
+      }
+    }
+    document.addEventListener("visibilitychange", check);
+    signal.addEventListener("abort", check);
+    check();
+  });
+}
+
+/** Whether the daemon refused a stream: a rejected token or a missing resource, which no retry mends. */
+function refused(error) {
+  return error instanceof ApiError && (error.status === 401 || error.status === 404);
+}
+
 function withAfter(path, after) {
   return `${path}${path.includes("?") ? "&" : "?"}after=${after}`;
 }
@@ -421,7 +442,7 @@ export async function follow({ path, after, signal, onMessage, onState, isFinish
       if (signal.aborted) {
         return;
       }
-      if (error instanceof ApiError && (error.status === 401 || error.status === 404)) {
+      if (refused(error)) {
         throw error;
       }
       console.warn("stream interrupted; reconnecting", { path, after: lastId, error });
@@ -430,6 +451,62 @@ export async function follow({ path, after, signal, onMessage, onState, isFinish
       return;
     }
     onState("reconnecting");
+    await untilRetry(pause, signal);
+    pause = Math.min(pause * 2, RECONNECT_MAX_MS);
+  }
+}
+
+/**
+ * Read a stream whose events stand alone (the frames of a screencast: nothing to resume from) while the page is in
+ * view, until the server ends it or `signal` aborts. Out of sight the stream is closed and made again once the page is
+ * back, so a phone that put the page away finds it going on; a stream that breaks or goes silent is made again after
+ * the pause `follow` takes (item 276). A refused stream ends the read with the error, and a fault of the page in showing
+ * one event is told as in `follow`.
+ */
+export async function watchInView({ path, signal, onMessage }) {
+  let pause = RECONNECT_MIN_MS;
+  while (!signal.aborted) {
+    await untilInView(signal);
+    if (signal.aborted) {
+      return;
+    }
+    // Closed by the read's end or by the page going out of sight; `sse` cuts it itself when it goes silent.
+    const seen = new AbortController();
+    const close = () => seen.abort();
+    const hide = () => {
+      if (document.visibilityState === "hidden") {
+        seen.abort();
+      }
+    };
+    signal.addEventListener("abort", close, { once: true });
+    document.addEventListener("visibilitychange", hide);
+    try {
+      const opened = () => {
+        pause = RECONNECT_MIN_MS;
+      };
+      for await (const message of sse(path, seen.signal, opened)) {
+        try {
+          onMessage(message);
+        } catch (error) {
+          eventNotShown(path, message, error);
+        }
+      }
+      return;
+    } catch (error) {
+      if (signal.aborted) {
+        return;
+      }
+      if (refused(error)) {
+        throw error;
+      }
+      if (seen.signal.aborted) {
+        continue;
+      }
+      console.warn("stream interrupted; reconnecting", { path, error });
+    } finally {
+      signal.removeEventListener("abort", close);
+      document.removeEventListener("visibilitychange", hide);
+    }
     await untilRetry(pause, signal);
     pause = Math.min(pause * 2, RECONNECT_MAX_MS);
   }
