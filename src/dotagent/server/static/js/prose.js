@@ -44,7 +44,8 @@ function cellRow(tag, cells) {
   return el("tr", null, cells.map((cell) => el(tag, null, inlineNodes(cell))));
 }
 
-function blockNode(block) {
+/** The node of one block that `parseBlocks` read, as `prose` draws it in its `div.prose`. */
+export function blockNode(block) {
   switch (block.type) {
     case "code":
       return el("pre", null, el("code", null, block.text));
