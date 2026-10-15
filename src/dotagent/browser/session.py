@@ -809,15 +809,19 @@ class BrowserSession:
 
     # ------------------------------------------------------------------ observation
 
+    async def _let_commit(self, tab: Tab) -> None:
+        """Let a navigation that is under way commit."""
+        try:
+            await asyncio.wait_for(tab.nav_idle.wait(), timeout=self._config.navigation_timeout_s)
+        except TimeoutError:
+            add_note(tab, _STILL_LOADING)
+
     async def _settle(self, tab: Tab) -> None:
         """Let a navigation that is under way commit, then wait for a quiet DOM."""
         if tab.page.is_closed():
             return
         config: BrowserConfig = self._config
-        try:
-            await asyncio.wait_for(tab.nav_idle.wait(), timeout=config.navigation_timeout_s)
-        except TimeoutError:
-            add_note(tab, _STILL_LOADING)
+        await self._let_commit(tab)
         await wait_dom_quiet(tab.page, config.settle_quiet_ms, config.settle_max_ms, _ms(config.navigation_timeout_s))
 
     async def _viewport(self, tab: Tab) -> Viewport:
@@ -1270,9 +1274,11 @@ class BrowserSession:
 
     async def run_script(self, thread_id: str, script: str, timeout_s: float) -> ScriptRun:
         """Run ``script`` in the page of the thread's current tab and wait at most ``timeout_s`` for its value (item
-        263). What the script led to is waited for as after a step (a tab it opened, a dialog), a page it navigated to
-        is let load, and the address rules hold after it as after a step: a tab that ended on an address they forbid is
-        reset to a blank page and the call fails."""
+        263). What the script led to is waited for as after a step (a tab it opened, a dialog), and the page is settled
+        after every script as after a step (item 270), so that a navigation it started is let load, also one that
+        commits after its value came back; the address rules then hold as after a step: a tab that ended on an address
+        they forbid is reset to a blank page and the call fails. After a script still running when the wait ended, only
+        a navigation under way is let commit: the page cannot tell its DOM is quiet while the script holds it."""
         async with self._locked(thread_id) as thread:
             tab: Tab = await self._current_tab(thread)
             before: _Watch = self._watch(thread, tab)
@@ -1280,10 +1286,12 @@ class BrowserSession:
             end, text = await run_script(tab.page, script, timeout_s)
             seconds: float = time.monotonic() - started
             await self._let_events_land()
-            after: _Watch = self._watch(thread, tab)
             current: Tab = await self._current_tab(thread)
-            if end == "navigated" or current is not tab or after.url != before.url:
+            if end == "timeout":
+                await self._let_commit(current)
+            else:
                 await self._settle(current)
+            after: _Watch = self._watch(thread, tab)
             await self._enforce_landing(current)
             return ScriptRun(
                 end=end,

@@ -5204,7 +5204,11 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 263 | A run runs JavaScript in its own tab                                                  | done        | 24a22d2 |
 | 264 | Dot's own Chrome loads extensions                                                     | done        | 10eb5d5 |
 | 265 | Dot's own Chrome can take DevTools connections from a run's scripts                   | done        | dbb21d5 |
-| 266 | A batch carries several public or social actions while no pace is set                 | in progress |         |
+| 266 | A batch carries several public or social actions while no pace is set                 | done        | ab56000 |
+| 267 | The phone reaches Dot from anywhere, and its home-screen app signs in with a code     | planned     |         |
+| 268 | Office files show in the side panel as Quick Look draws them                          | planned     |         |
+| 269 | A long paste goes as a file, and a Markdown file shows clean in the side panel        | planned     |         |
+| 270 | A script's navigation is settled after it, also one that commits after its value      | in progress |         |
 
 ### 77. The type system: Inter and Geist Mono, seven sizes, three weights
 
@@ -11758,7 +11762,7 @@ environment, and so that no window or tab is mistaken.
 
 ### 266. A batch carries several public or social actions while no pace is set
 
-**Status: in progress.** Built on `item-266-social-batch`.
+**Status: done.** Merged as `ab56000` (PR #310; no Linear issue, the Linear connector was signed out).
 
 **As built (2026-10-15).** `policy/pace.py`: `pace_is_set` (a number in an hour or a day, or for public actions a
 spacing) and `paced_in_batch` (the classes with a pace set that keep a batch of more than one public or social step to
@@ -11784,6 +11788,98 @@ limit for that kind of action; with a limit set, one per batch as before, so tha
 > Linear connector is signed out, so say so in the PR. Nothing here may take away a freedom the owner has: a new
 > setting defaults to what Dot did before unless the item says otherwise. UI changes are checked wide and on a phone,
 > light and dark, in Chrome and WebKit.
+
+## Part 47: Office files, the phone, long pastes (planned 2026-10-15)
+
+The owner's forty-seventh word, on 2026-10-15: "Dot sistemi artık Excel, Word, OneDrive ve diğer programları
+kullanabilecek mi? Dot içerisinde bu dosyaları açıp sağ menüden görebilecek ve inceleyebilecek mi, önizleme gibi? Ayrıca
+artık telefonuma Dot kurabilmek ve evde olmadığımda da kontrol edebilmek istiyorum, bunu da bana mümkün kıl" (will Dot
+use Excel, Word, OneDrive and the other programs; can it open these files and show them in the side panel; and let me
+install Dot on my phone and control it when I am away from home). The forty-eighth: "Composer'a uzun metinler
+yapıştırdığımızda düz metin yerine .md ya da .txt dosyasına dönüşüp öyle gitmesini sağlayalım ... Ardından tıklarsam o
+dosyaya, Markdown temiz şekilde önizleme göstermeli. Tailscale açtım, şu an açık. Onaylıyorum" (a long paste goes as
+a .md or .txt file, which shows as clean Markdown when clicked; Tailscale is on; the phone set-up on the Mac is
+approved). The forty-ninth, with a picture of the app added to the phone's home screen asking for the access token:
+"Telefon ekranına ekleyince böyle, ama QR kodu okuttuğumda Safari'de direkt sohbette başlıyor. Bunu da aklında tut,
+öyle devam et" (added to the home screen it asks for the token, while the QR code opens the chat in Safari at once;
+keep it in mind).
+
+**Status (2026-10-15): planned.** Checked on this Mac, read only and without names: the desktop tools work in the
+owner's runs (in the last 14 days `desktop_act` 5 times, `desktop_open_app` 2, `apple_script` 1, `desktop_screenshot`
+1); Excel, Word, PowerPoint and OneDrive are installed, with OneDrive's folder under `~/Library/CloudStorage`; Quick
+Look (`qlmanage -p -o`) draws a `.docx` as HTML with its bold and italics, and an `.xlsx` as one HTML page per sheet
+with its tabs and fills; the side panel (item 195) already shows a document's headings, paragraphs, lists and tables, a
+workbook's values as a grid with a tab per sheet, a presentation's slides, PDF pages and images, but not their look
+(fonts, fills, pictures in a document), and Markdown as plain text. The phone: Tailscale serves the daemon to the
+owner's tailnet only (`tailscale serve`, no Funnel), `[server] reach` names the Mac's tailnet name, and through it the
+page answers 200 and the API 200 with the token and 401 without; no phone has subscribed to notifications yet. Safari
+keeps the token the QR code's address carries, but iOS gives an app added to the home screen storage of its own, so that
+app asks for the token again, which a phone cannot type: the token went to the owner's clipboard once as a stopgap.
+
+### 267. The phone reaches Dot from anywhere, and its home-screen app signs in with a code
+
+**Status: planned.**
+
+**What.** Settings › Phone shows whether Tailscale runs, whether the daemon is served on the tailnet and whether
+`[server] reach` names it, sets up what is missing with one button (reach is taken up without a restart), shows the
+address as a QR code, and offers to keep the Mac awake while it charges. The sign-in screen of a phone says to open
+Settings › Phone on the Mac and type the short code shown there: a one-time code of a few characters, valid for a few
+minutes and limited in tries, which gives the phone the token.
+
+**Why.** The QR code works in Safari, but the app on the home screen asks for a token nobody can type on a phone.
+
+**Tests.** A smoke test of the code (given once, expires, refused after too many tries) through a served daemon, and
+the screen on a phone in Chrome and WebKit, light and dark.
+
+### 268. Office files show in the side panel as Quick Look draws them
+
+**Status: planned.**
+
+**What.** A Word, Excel or PowerPoint file a run made or the owner attached can be seen in the side panel as Quick Look
+draws it (a sandboxed frame, one tab per sheet), its fonts, fills and pictures included, beside the panel's own view of
+its text and values, which stays when Quick Look cannot draw it. `apple_script`'s description names Excel, Word and
+PowerPoint.
+
+**Why.** The owner asked to see these files in Dot as they look; the panel shows their text and values only.
+
+**Tests.** A smoke test with a small `.docx` and `.xlsx` made in the test, wide and on a phone, light and dark.
+
+### 269. A long paste goes as a file, and a Markdown file shows clean in the side panel
+
+**Status: planned.**
+
+**What.** Text pasted into the composer that is long (thousands of characters or dozens of lines) becomes an
+attachment, `.md` when it reads as Markdown and `.txt` otherwise, instead of filling the box; pasting as text stays one
+shortcut away. A chip of the composer, and a sent file, opens in the side panel, where a Markdown file shows as
+formatted text, with its source a click away.
+
+**Why.** The owner's ask: a long paste buries the message, and a Markdown file should read cleanly.
+
+**Tests.** A smoke test that pastes a long Markdown and a long plain text in Chrome, sends them, and opens each in the
+side panel, wide and on a phone, light and dark, and the same in WebKit.
+
+### 270. A script's navigation is settled after it, also one that commits after its value
+
+**Status: in progress.** Built on `item-270-eval-settles`.
+
+**As built (2026-10-15).** `browser/session.py`: `run_script` settles the page after every script, as a step is
+settled, and reads what changed after that, so that a navigation the script started is let commit before the address
+rules are checked. Before, it settled only when the page had already moved, so a script that led to a forbidden
+address whose server answered after the script's value came back left the tab on that address. Tests:
+`tests/smoke/test_browser_eval.py`, a forbidden page that answers after 1.5 s has the tab reset and the call fail; it
+fails on the code of before.
+
+**What.** The address rules hold after `browser_eval` whatever the speed of the page it led to.
+
+**Why.** Found by the review of items 263 to 266.
+
+**Tests.** As built.
+
+### How to start part 47 (the handoff prompt)
+
+> Read ROADMAP.md part 47 and the status table of part 9 (rows 267 to 270). The protocol of part 5 is unchanged; the
+> Linear connector is signed out, so say so in the PR. The tailnet name, the token and the codes are never written to
+> the repository, a log or a PR. UI changes are checked wide and on a phone, light and dark, in Chrome and WebKit.
 
 ## Log
 
@@ -12491,3 +12587,4 @@ limit for that kind of action; with a limit set, one per batch as before, so tha
 - 2026-10-15 (Opus 5.5): item 263 merged as `24a22d2` (PR #307; no Linear issue, the connector was signed out): `browser_eval` runs JavaScript in the page of the run's own tab, in Dot's Chrome or the owner's, and gives back its value as JSON (an expression, a function or an awaited promise, `timeout_s` 30 s by default); a thrown error and a timeout fail the call, a page the script leads to is let land and the address rules hold after it; the value is fenced and untrusted; a `browser_click` of medium risk (the cautious preset asks, research runs lack it); its descriptions are kept short (about 200 tokens) and the system prompt is unchanged.
 - 2026-10-15 (Opus 5.5): item 264 merged as `10eb5d5` (PR #308; no Linear issue, the connector was signed out): Dot's own Chrome starts without Playwright's `--disable-extensions` (as it already did without `--enable-automation`), so an extension installed in its profile from the Chrome Web Store loads and stays; the offline smoke suite on the stack top (561 passed, 1 skipped) and CI were clean.
 - 2026-10-15 (Opus 5.5): item 265 merged as `dbb21d5` (PR #309; no Linear issue, the connector was signed out): `[browser] debug_port` (0 for none, else 1024 to 65535; Settings › Browser) has Dot's own Chrome also take DevTools connections on that port of 127.0.0.1, and a run in Dot's Chrome with a tool that runs scripts is told the address, to connect with `connect_over_cdp` and `no_defaults=True`; Dot's Chrome does not start while another program holds the port, and the pool checks every session before it changes any. A review of 263 to 266 found the first commit's claim that a script never drives another Chrome too strong, ports below 1024 taken and the pool's change not atomic; the second commit fixed them. CI was clean.
+- 2026-10-15 (Opus 5.5): item 266 merged as `ab56000` (PR #310; no Linear issue, the connector was signed out): `browser_act` lets a batch carry several follows, likes, posts or messages while `[policy.pace]` sets no limit for their kind (the default), counted once by the gate; with a pace set for a kind it carries, one per batch as before, and the refusal names the paced kinds and says that a script in the page would go around the owner's pace. The prompt's line that sent such actions one per call is gone, so every run's prompt is shorter. CI and the pace tests were clean.

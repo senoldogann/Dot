@@ -2,8 +2,9 @@
 local fixture server, in Dot's own Chrome and in a scratch Chrome attached as the Chrome of the user.
 
 A script gives the value of an expression, of a function and of a promise as JSON; each thread runs it in its own tab;
-an error and a wait that ends first are told apart, and the page is usable after both; a script that leads the tab
-elsewhere is let land and says so, and one that leads it to an address the rules forbid has the tab reset and fails.
+an error and a wait that ends first are told apart, also for a script that keeps the page busy, and the page is usable
+after them; a script that leads the tab elsewhere is let land and says so, and one that leads it to an address the rules
+forbid has the tab reset and fails, also when that page answers only after the script's value came back (item 270).
 As a tool of a run it is a click of medium risk, which the cautious preset asks about and a research run does not
 have, and what it gives back is fenced as the page's and marked untrusted, a thrown error as a failure.
 """
@@ -11,6 +12,7 @@ have, and what it gives back is fenced as the page's and marked untrusted, a thr
 import asyncio
 import json
 import threading
+import time
 from collections.abc import AsyncIterator, Iterator
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -48,12 +50,20 @@ _PAGES: dict[str, str] = {
     "/next": "<!doctype html><title>Next page</title><h1>Arrived</h1>",
     "/other": "<!doctype html><title>Other page</title><p>Elsewhere</p>",
     "/mine": "<!doctype html><title>The user's page</title>",
+    "/slow": "<!doctype html><title>Slow page</title><h1>Late</h1>",
 }
+# How long /slow takes to answer: far longer than a script's value takes to come back.
+_SLOW_S: float = 1.5
 _LIST: str = "() => [...document.querySelectorAll('li')].map((item) => item.textContent)"
+# A script that holds the page this long, far past the wait it is given.
+_BUSY_S: float = 4.0
+_BUSY: str = f"() => {{ const end = Date.now() + {int(_BUSY_S * 1000)}; while (Date.now() < end) {{}} }}"
 
 
 class _Handler(BaseHTTPRequestHandler):
     def do_GET(self) -> None:
+        if urlsplit(self.path).path == "/slow":
+            time.sleep(_SLOW_S)
         body: bytes = _PAGES.get(urlsplit(self.path).path, "not found").encode()
         self.send_response(200 if urlsplit(self.path).path in _PAGES else 404)
         self.send_header("Content-Type", "text/html; charset=utf-8")
@@ -125,7 +135,12 @@ async def test_an_error_and_a_wait_that_ends_first_are_told_apart(browser: Brows
     waited: ScriptRun = await browser.run_script("ends", "() => new Promise(() => {})", 1.0)
     assert (waited.end, waited.text) == ("timeout", "")
     assert 1.0 <= waited.seconds < 3.0
-    # The page goes on after both: the script left running holds nothing.
+    # A script that keeps the page busy past the wait comes back when the wait ends, not when it lets the page go.
+    started: float = time.monotonic()
+    busy: ScriptRun = await browser.run_script("ends", _BUSY, 1.0)
+    assert busy.end == "timeout"
+    assert time.monotonic() - started < _BUSY_S - 1.0
+    # The page goes on after all three: the scripts left running hold nothing once done.
     again: ScriptRun = await browser.run_script("ends", "document.title", 10.0)
     assert (again.end, json.loads(again.text)) == ("value", "Eval page")
 
@@ -150,6 +165,16 @@ async def test_a_script_that_leads_to_an_address_the_rules_forbid_has_the_tab_re
     with pytest.raises(BrowserError, match="may not be opened"):
         await browser.run_script("blocked", f"() => {{ location.href = {json.dumps(forbidden)}; }}", 10.0)
     assert browser.current_url("blocked") == "about:blank"
+
+
+async def test_a_forbidden_address_that_answers_after_the_value_came_back_has_the_tab_reset_too(
+    browser: BrowserSession, site: str
+) -> None:
+    await browser.open_url("slow", f"{site}/")
+    forbidden: str = site.replace("127.0.0.1", "localhost") + "/slow"
+    with pytest.raises(BrowserError, match="may not be opened"):
+        await browser.run_script("slow", f"() => {{ location.href = {json.dumps(forbidden)}; return 1; }}", 10.0)
+    assert browser.current_url("slow") == "about:blank"
 
 
 @pytest.fixture
