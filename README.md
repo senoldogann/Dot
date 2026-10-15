@@ -1268,9 +1268,10 @@ opens it until you have decided, and a row you never opened or closed yourself c
 row, or moving the focus to it, shows its card (item 226, after T3 Code's): the whole goal, the model with its reasoning
 level, how the run stands and for how long, counting on while it works, and what it does now or did last; the pointer
 leaving, a click or Escape puts it away, and on a touch screen a tap opens the row as before. Its own page names the
-parent in the top bar as a breadcrumb (the parent's goal, a link, then its own) and closes the conversation with a pill:
-the model, how long it took ("Completed in 1m 46s", "Working for 2m"), whether its parent still works ("Runs on its own"
-once not), "Open parent" and, while it works, **Stop**. The tool calls of one stretch of work fold into a single "Worked
+parent in the top bar as a breadcrumb (the parent's goal, a link, then its own) and has a pill where the box would be,
+which stays at the window's foot as the conversation scrolls (item 244), as T3 Code keeps a subagent's bar: the model,
+how long it took ("Completed in 1m 46s", "Working for 2m"), whether its parent still works ("Runs on its own" once not),
+"Open parent" and, while it works, **Stop**. The tool calls of one stretch of work fold into a single "Worked
 for 12 s (model 8 s) · 5 tool calls" line, where the part in brackets is how much of that time the model's turns took
 (open it for every call, result and screenshot: each call one quiet line with its icon, its result on a hairline under
 it once opened), while approvals, questions and policy notes stay in the open. The answer of the run is the last

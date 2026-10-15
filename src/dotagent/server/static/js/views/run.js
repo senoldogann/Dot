@@ -211,7 +211,8 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
     resumeButton,
   );
   // A delegated run (item 82) names its parent in the bar as a breadcrumb, the parent's goal a link before its own, and
-  // closes its conversation with a pill: the model, how long it took, whether its parent still works, the way back.
+  // has a pill where the composer would be: the model, how long it took, whether its parent still works, the way back.
+  // The pill is in the dock, so it stays at the window's foot as the conversation scrolls (item 244).
   const parentId = run.parent_run_id;
   const crumb = parentId === null ? null : el("a", { class: "stage-crumb", href: `#/runs/${parentId}` }, "Parent run");
   const crumbSep = parentId === null ? null : el("span", { class: "stage-sep", "aria-hidden": "true" }, "/");
@@ -530,7 +531,7 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
   const stopStatus = onChange(choices.sync);
   // The chat's commands at work (item 229), between the queue and the composer, as T3 Code shows its background work.
   const background = backgroundWork({ threadId: run.thread_id });
-  const dock = el("div", { class: "dock" }, resumeLine, queue.element, background.element, frame.element);
+  const dock = el("div", { class: "dock" }, resumeLine, queue.element, background.element, frame.element, foot);
 
   // Steer messages that are sent but not read yet; each one leaves when the run reports reading it.
   const waitingMessages = [];
@@ -744,7 +745,7 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
 
   function syncControls() {
     resumeLine.hidden = active || !resumable;
-    // A delegated run is not steered: its dock keeps only the arrow down (item 96), and its Stop is in its pill.
+    // A delegated run is not steered: its dock keeps the arrow down (item 96) and its pill, whose Stop stops it.
     const delegated = run.parent_run_id !== null;
     frame.element.hidden = delegated;
     dock.classList.toggle("dock-bare", delegated);
@@ -1173,7 +1174,7 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
   paintWorking();
   const filesWatch = new MutationObserver(debounce(() => paintFiles(thread), FILES_SETTLE_MS));
   filesWatch.observe(thread, { childList: true, subtree: true });
-  const main = el("div", { class: "run-main" }, thread, dock, foot);
+  const main = el("div", { class: "run-main" }, thread, dock);
   // The marks of the conversation's messages stand at the layout's left edge (item 201).
   const outline = messageOutline({ layout, main, thread, dock });
   layout.append(outline.element, main, stage.handle, inspector.element, inspector.scrim);
