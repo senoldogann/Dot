@@ -258,8 +258,16 @@ def runs_router(ctx: ServerContext) -> APIRouter:
 
     @router.post("/runs/{run_id}/lessons/{index}/save")
     async def save_run_lesson(run_id: str, index: int) -> RunDetail:
-        """Save a lesson proposed for a run that ended as a note tagged ``lesson`` (see ``agent.lessons``)."""
+        """Save a lesson of a run that ended, proposed or left out by ``auto``, as a note tagged ``lesson`` (see
+        ``agent.lessons``)."""
         await ctx.manager.save_lesson(run_id, index)
+        return await detail(run_id)
+
+    @router.post("/runs/{run_id}/lessons/{index}/undo")
+    async def undo_run_lesson(run_id: str, index: int) -> RunDetail:
+        """Take back the save of a lesson of a run: the note it wrote is forgotten and the lesson is dismissed (see
+        ``agent.lessons.undo_lesson``)."""
+        await ctx.manager.undo_lesson(run_id, index)
         return await detail(run_id)
 
     @router.post("/runs/{run_id}/lessons/{index}/dismiss")

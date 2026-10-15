@@ -1049,7 +1049,7 @@ after T3 Code's (item 299): "Dot restarted and resumed this turn" when the daemo
 ended, and links to it. A run that waits for you wears the same bolt over its composer, with what cut it off ("Dot
 restarted while this run worked.") and Continue.
 
-**Lessons.** With `lessons = "propose"` or `"auto"` in `[agent]`, a task or research run of its own that reached its
+**Lessons.** With `lessons = "auto"` (the default) or `"propose"` in `[agent]`, a task or research run of its own that reached its
 goal after something went wrong on the way (a call failed, whether the run found its way around it or not; the progress
 watchdog raised an alert; the goal check sent it back; its answer named paths that did not exist) is followed, once it
 has ended, by one call of the review model (`[models] review`). It reads a digest of the run, what went wrong, the
@@ -1059,16 +1059,26 @@ more than one line, of fewer than 20 or more than 300 characters (or `[memory] m
 address or a path in a home folder, or that says what the goal, another lesson or a saved note already says, is dropped;
 one that says not to do what a saved note says to do (or the other way round) is no repeat of it, however alike their
 words and meaning are (`not`, `never`, `n't`, the Turkish `değil`, `yok`, `asla`; the suffix `-ma`/`-me` is not
-recognised). With `propose` the lessons wait under "Lessons from this run" on the run's page: Save to memory keeps one
-as a note tagged `lesson` whose source is the run, Dismiss drops it (`POST /api/runs/{id}/lessons/{index}/save` and
-`/dismiss`). A lesson is decided once: a second save or dismissal of it, from another page or after `auto` saved it, is
-refused. `dotx run` and `dotx resume` show the lessons after the answer; Ctrl-C skips the wait, and the exit status
-stays the run's. With `auto` they are saved at once, except after a run that read content others can write (web pages,
-mail, downloads), which could plant a lesson: those are only proposed, and the page says why. A saved lesson is a note
-of the agent like the others: a later run gets it when it fits its goal, and the Memory page edits or forgets it; a
-lesson of an agent's run is that agent's own (see Agents). Delegated runs, chats, runs that failed or were stopped, and
-evals (which always run without lessons) are not asked at their end; the nightly reflection asks about the failed and
-the stopped ones. `lessons` is `"propose"` by default; `"off"` learns nothing. Every note a run is handed (at its start,
+recognised). With `auto` nobody is asked: each lesson gets a second look first, one more call of the review model that
+is shown the goal and the lessons and nothing the run read, so that a page the run read cannot speak to it. It keeps
+only know-how about how a tool, a command, a site, an application or a file format behaves, and leaves out a lesson
+that tells the agent to send, post, buy, sign in, contact someone, change a setting or go to an address, to trust some
+content or to skip a check, or that holds private data; when in doubt it leaves it out. After a run that read content
+others can write (web pages, mail, downloads), a lesson with a link or an account name in it, which such content may
+have planted, is left out before it is asked. The kept lessons are saved as notes tagged `lesson` whose source is the
+run, and "Lessons from this run" on the run's page says "Saved on its own" with Undo, which forgets the note (a note
+that was there before, or that was rewritten since, stays); a lesson left out says why, with Save anyway. With
+`propose` the lessons wait on that card: Save to memory keeps one, Dismiss drops it
+(`POST /api/runs/{id}/lessons/{index}/save`, `/dismiss` and `/undo`). A lesson is what its last decision made it, and
+every decision waits for the one before it: a second save or dismissal of a lesson decided already is refused, save the
+Save anyway of one `auto` left out. `dotx run` and `dotx resume` show the lessons after the answer; Ctrl-C skips the
+wait, and the exit status stays the run's. A saved lesson is a note of the agent like the others: a later run gets it
+when it fits its goal, and the Memory page edits or forgets it; a lesson of an agent's run is that agent's own (see
+Agents), and the notes it is checked against are the ones that agent's runs are handed. The same text saved again is
+the same note, also one that rested, which is awake again. Delegated runs, chats, runs that failed or were stopped,
+and evals (which always run without lessons) are not asked at their end; the nightly reflection asks about the failed
+and the stopped ones, once each (a run whose lessons were drawn and none kept says so). `"off"` learns nothing. Every
+note a run is handed (at its start,
 by `memory_search`, or changed while it ran) is recorded with how the run ended, so the Memory page says "Handed to 5
 runs, 4 done" under a note and `dotx stats` scores the notes.
 
@@ -1076,12 +1086,14 @@ runs, 4 done" under a note and `dotx stats` scores the notes.
 daemon reflects on the runs that ended since the last reflection (the last day, the first time): it asks the review
 model for the lessons of the task and research runs the loop did not ask at their end, the failed and the stopped ones
 included, with how the run ended as one more signal and in words that say it did not reach its goal, under the
-`lessons` setting above (`propose` leaves them on the run's page, `auto` saves them, `off` draws none); it folds the
-lesson notes of one agent that say the same, the same way round, into the newer one (by the embeddings when both have
-one, by the words otherwise; a resting lesson is left alone, so one learnt again does not take its rest); it rests a
-lesson that no run was handed for
-`lesson_rest_days` (60), or whose score says it did not help (handed to `[memory] score_min_uses` runs in the last
-`score_days`, more of which failed than ended done; a lesson you saved yourself is never retired this way), by tagging
+`lessons` setting above (`propose` leaves them on the run's page, `auto` saves the ones its second look keeps, `off`
+draws none), and it reads whether such a run read content others can write from all its results; it folds the lesson
+notes of one agent that say the same, the same way round, into the newer one, or into the older one when you saved
+that one yourself (by the embeddings when both have one, by the words otherwise, compared off the daemon's event loop;
+a resting lesson is left alone, so one learnt again does not take its rest, and two you saved stay two); it rests a
+lesson that no run was handed, and that was not written again, for `lesson_rest_days` (60), or whose score says it did
+not help (handed to `[memory] score_min_uses` runs in the last `score_days`, more of which failed than ended done); a
+lesson you saved yourself is never folded away nor retired. It rests a lesson by tagging
 it `rest`, after which searches skip it while `dotx memory list` and the Memory page still show it, and the log line
 `lesson_retired` says which reason with the numbers; and when anything happened it writes a journal note, tagged
 `journal`, of the day it read: the day of the middle of that time, so the reflection at 03:30 names the day before ("On

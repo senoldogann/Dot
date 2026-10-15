@@ -533,6 +533,12 @@ def _queued(row: aiosqlite.Row) -> QueuedMessage:
     )
 
 
+# The note with a text that a run of an agent (the second value; NULL for Dot) is handed: its own first, else Dot's.
+_SAME_TEXT: str = (
+    "SELECT * FROM memories WHERE content = ? AND (agent_id IS ? OR agent_id IS NULL) ORDER BY agent_id IS NULL LIMIT 1"
+)
+
+
 def _memory(row: aiosqlite.Row) -> MemoryRecord:
     tags: str = row["tags"]
     return MemoryRecord(
@@ -1746,6 +1752,20 @@ class Store:
         )
         return [_event(row) for row in rows]
 
+    async def read_outside(self, run_id: str, kinds: Sequence[str], channels: Sequence[str]) -> bool:
+        """Whether a run read content third parties can author, from every one of its ``tool_result`` events: one of
+        ``kinds`` or over one of ``channels``, or one the run made while it was tainted."""
+        kind_marks: str = ",".join("?" for _ in kinds)
+        channel_marks: str = ",".join("?" for _ in channels)
+        row: aiosqlite.Row | None = await self._one(
+            "SELECT EXISTS(SELECT 1 FROM events WHERE run_id = ? AND kind = 'tool_result' AND ("
+            "json_extract(data, '$.tainted') = 1"
+            f" OR json_extract(data, '$.kind') IN ({kind_marks})"
+            f" OR json_extract(data, '$.channel') IN ({channel_marks})))",
+            (run_id, *kinds, *channels),
+        )
+        return row is not None and bool(row[0])
+
     async def model_profile(self, model: str, runs: int) -> ModelProfile:
         """How reliably ``model`` worked in its newest ``runs`` finished runs, read on a read-only connection."""
         return await asyncio.to_thread(read_model_profile, self._database, model, runs)
@@ -2273,12 +2293,13 @@ class Store:
         agent_id: str | None,
         vector: Sequence[float] | None,
     ) -> tuple[MemoryRecord, bool]:
-        """Add a note unless one has this text already (saved meanwhile, in this process or another): the look and the
-        add are one transaction. Returns the note with the text and whether it was added."""
+        """Add a note unless one that a run of ``agent_id`` is handed has this text already (saved meanwhile, in this
+        process or another; :meth:`find_memory_by_content`): the look and the add are one transaction. Returns the note
+        with the text and whether it was added."""
         outcome: list[tuple[MemoryRecord, bool]] = []
 
         async def statements() -> None:
-            row: aiosqlite.Row | None = await self._one("SELECT * FROM memories WHERE content = ? LIMIT 1", (content,))
+            row: aiosqlite.Row | None = await self._one(_SAME_TEXT, (content, agent_id))
             if row is not None:
                 outcome.append((_memory(row), False))
             else:
@@ -2420,9 +2441,21 @@ class Store:
         rows = await self._all("SELECT id, vec FROM memory_vectors", ())
         return [(str(row["id"]), unpack_vector(bytes(row["vec"]))) for row in rows]
 
-    async def find_memory_by_content(self, content: str) -> MemoryRecord | None:
-        row = await self._one("SELECT * FROM memories WHERE content = ? LIMIT 1", (content,))
+    async def find_memory_by_content(self, content: str, agent_id: str | None) -> MemoryRecord | None:
+        """The note with this text that a run of ``agent_id`` (``None`` for Dot) is handed: the agent's own first, else
+        Dot's; another agent's note with the same text is not the saver's to merge into."""
+        row = await self._one(_SAME_TEXT, (content, agent_id))
         return None if row is None else _memory(row)
+
+    @_writing
+    async def wake_memory(self, memory_id: str, tags: Sequence[str], when: float) -> MemoryRecord:
+        """Give a note ``tags`` and write it anew at ``when`` (its ``updated_at``): a resting lesson learnt again is
+        awake, and its rest is counted from now. Its text and vector stay."""
+        tag_text: str = ",".join(tags)
+        await self._db.execute("UPDATE memories SET tags = ?, updated_at = ? WHERE id = ?", (tag_text, when, memory_id))
+        await self._db.execute("UPDATE memories_fts SET tags = ? WHERE id = ?", (fold_search(tag_text), memory_id))
+        await self._db.commit()
+        return await self.get_memory(memory_id)
 
     async def memories_with_tag(self, tag: str, limit: int) -> list[MemoryRecord]:
         """The most recently changed memories carrying ``tag`` (tags never contain commas)."""

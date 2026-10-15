@@ -7,7 +7,7 @@ import time
 
 import pytest
 
-from dotagent.core.text import redact_secrets
+from dotagent.core.text import redact_json, redact_secrets
 
 _MOMENT_S: float = 1.0
 _LETTERS: str = "AbCdEfGhIjKlMnOpQrStUvWxYz0123456789aBcDeFgHiJ"
@@ -54,6 +54,12 @@ _MASKED: list[tuple[str, str]] = [
     (f"Authorization: {_LETTERS[:40]}", "Authorization: ***"),
     (f"Cookie: sessionid={_LETTERS[:32]}; theme=dark\nnext", "Cookie: ***\nnext"),
     (f"Set-Cookie: sid={_LETTERS[:24]}; Path=/; HttpOnly", "Set-Cookie: ***"),
+    # The code review of 2026-10-15 (Y3): a value in single quotes, a key with a word after its secret, a header of a
+    # Python dict.
+    (f"export API_KEY='{_LETTERS[:19]}'", "export API_KEY='***'"),
+    ("DB_PASSWORD='hunter2hunter2' ./migrate.sh", "DB_PASSWORD='***' ./migrate.sh"),
+    (f"SECRET_KEY={_LETTERS[:20]}", "SECRET_KEY=***"),
+    (f"{{'Authorization': 'Token {_LETTERS[:19]}'}}", "{'Authorization': 'Token ***'}"),
 ]
 _KEPT: list[str] = [
     '"max_tokens": 4096',
@@ -70,6 +76,10 @@ _KEPT: list[str] = [
     "npm_config_registry=https://registry.npmjs.org/",
     "Cookie: the browser keeps it until it expires",
     "Authorization: required for every request",
+    # Words that end in "sk" before a dash are no key (Y4).
+    "https://example.com/blog/task-management-best-practices",
+    "feature/ask-for-confirmation-before-delete",
+    "token_count=12345",
 ]
 
 
@@ -90,3 +100,14 @@ def test_a_long_text_of_short_words_is_masked_in_a_moment() -> None:
     started: float = time.monotonic()
     assert redact_secrets(text).endswith("password: ***")
     assert time.monotonic() - started < _MOMENT_S
+
+
+def test_a_field_named_for_a_secret_is_masked_whatever_its_value_looks_like() -> None:
+    assert redact_json(
+        {"password": "hunter2hunter2", "db": {"api_key": "x"}, "max_tokens": "4096", "note": "token"}
+    ) == {
+        "password": "***",
+        "db": {"api_key": "***"},
+        "max_tokens": "4096",
+        "note": "token",
+    }

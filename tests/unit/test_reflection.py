@@ -153,10 +153,22 @@ def test_two_lesson_notes_that_say_the_same_make_a_pair_older_first_each_note_on
     d: MemoryRecord = _note(
         "d", "Create notes.txt with write_file before read_file reads it again.", 40.0, None, ("lesson",)
     )
-    assert duplicate_pairs([c, d, b, a], {}) == [(a, b)]
+    assert duplicate_pairs([c, d, b, a], {}, set()) == [(a, b)]
     # With embeddings the cosine decides: close vectors pair, far ones with the same words do not.
     close: dict[str, tuple[float, ...]] = {"a": (1.0, 0.0), "b": (0.0, 1.0), "c": (0.6, 0.8), "d": (0.8, 0.6)}
-    assert duplicate_pairs([a, b, c, d], close) == [(c, d)]
+    assert duplicate_pairs([a, b, c, d], close, set()) == [(c, d)]
+
+
+def test_a_lesson_the_owner_saved_is_the_one_kept_and_two_of_theirs_make_no_pair() -> None:
+    """Audit defect 4: the reflection folded the older of two notes into the newer, a lesson the owner saved too."""
+    saved: MemoryRecord = _note(
+        "a", "Create notes.txt with write_file before read_file reads it.", 10.0, None, ("lesson",)
+    )
+    learnt: MemoryRecord = _note(
+        "b", "Create notes.txt with write_file before read_file reads it back.", 20.0, None, ("lesson",)
+    )
+    assert duplicate_pairs([saved, learnt], {}, {"a"}) == [(learnt, saved)]
+    assert duplicate_pairs([saved, learnt], {}, {"a", "b"}) == []
 
 
 def test_a_resting_note_and_a_note_of_another_agent_make_no_pair() -> None:
@@ -171,8 +183,8 @@ def test_a_resting_note_and_a_note_of_another_agent_make_no_pair() -> None:
         "c", "Create notes.txt with write_file before read_file reads it again.", 30.0, None, ("lesson",)
     ).model_copy(update={"agent_id": "agent_1"})
     same: dict[str, tuple[float, ...]] = {"a": (1.0, 0.0), "b": (1.0, 0.0), "c": (1.0, 0.0)}
-    assert duplicate_pairs([resting, learnt, theirs], {}) == []
-    assert duplicate_pairs([resting, learnt, theirs], same) == []
+    assert duplicate_pairs([resting, learnt, theirs], {}, set()) == []
+    assert duplicate_pairs([resting, learnt, theirs], same, set()) == []
 
 
 def test_a_lesson_and_the_one_that_says_not_to_do_it_make_no_pair() -> None:
@@ -183,8 +195,8 @@ def test_a_lesson_and_the_one_that_says_not_to_do_it_make_no_pair() -> None:
     avoid: MemoryRecord = _note(
         "v", "Do not use --force when git push is refused on the deploy branch.", 20.0, None, ("lesson",)
     )
-    assert duplicate_pairs([use, avoid], {}) == []
-    assert duplicate_pairs([use, avoid], {"u": (1.0, 0.0), "v": (1.0, 0.0)}) == []
+    assert duplicate_pairs([use, avoid], {}, set()) == []
+    assert duplicate_pairs([use, avoid], {"u": (1.0, 0.0), "v": (1.0, 0.0)}, set()) == []
 
 
 def test_a_lesson_rests_after_sixty_days_without_a_run_being_handed_it() -> None:
@@ -194,7 +206,11 @@ def test_a_lesson_rests_after_sixty_days_without_a_run_being_handed_it() -> None
     stale: MemoryRecord = _note("stale", "z" * 30, now - 90 * DAY_S, now - 61 * DAY_S, ("lesson",))
     never: MemoryRecord = _note("never", "w" * 30, now - 61 * DAY_S, None, ("lesson",))
     resting: MemoryRecord = _note("resting", "v" * 30, now - 90 * DAY_S, None, ("lesson", "rest"))
-    assert to_retire([fresh, used, stale, never, resting], now, 60) == [stale, never]
+    assert to_retire([fresh, used, stale, never, resting], now, 60, set()) == [stale, never]
+    # A lesson the owner saved never rests for its age, and one learnt again rests from then on (audit defects 4, 5).
+    assert to_retire([stale, never], now, 60, {"never"}) == [stale]
+    again: MemoryRecord = stale.model_copy(update={"updated_at": now - 5 * DAY_S})
+    assert to_retire([again], now, 60, set()) == []
 
 
 def test_the_summary_and_the_journal_say_what_happened() -> None:

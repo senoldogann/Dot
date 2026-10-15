@@ -174,11 +174,13 @@ async def save_memory(
     index: MemoryIndex, content: str, tags: Sequence[str], run_id: str | None, agent_id: str | None
 ) -> SavedMemory:
     """Save a note, Dot's or, with ``agent_id``, an agent's own (:func:`visible_to`). The same text twice stays one
-    note (the tags are merged, the owner kept), saved one after the other or at once; a new note comes back with the
-    existing notes that are nearly the same, so the caller can retire the ones that are outdated."""
+    note (the tags are merged, the owner kept), saved one after the other or at once, as long as the saver is handed
+    the note that has it (another agent's note is not merged into); a resting note saved again is awake. A new note
+    comes back with the existing notes the saver is handed that are nearly the same, so the caller can retire the ones
+    that are outdated."""
     text: str = _checked_text(content, index.config.max_chars)
     clean_tags: tuple[str, ...] = normalize_tags(tags)
-    existing: MemoryRecord | None = await index.store.find_memory_by_content(text)
+    existing: MemoryRecord | None = await index.store.find_memory_by_content(text, agent_id)
     if existing is not None:
         return await _saved_again(index.store, existing, clean_tags)
     vector: Vector | None = None
@@ -186,7 +188,7 @@ async def save_memory(
     if index.embedder is not None:
         await backfill(index)
         vector = (await index.embedder.embed([text]))[0]
-        similar = await _similar_notes(index, vector)
+        similar = tuple(hit for hit in await _similar_notes(index, vector) if visible_to(hit.record, agent_id))
     record, created = await index.store.add_memory_once(text, clean_tags, run_id, agent_id, vector)
     if not created:
         # Another save of the text, by another run or process, added it meanwhile.
@@ -195,8 +197,12 @@ async def save_memory(
 
 
 async def _saved_again(store: Store, existing: MemoryRecord, tags: tuple[str, ...]) -> SavedMemory:
-    """The note ``existing``, whose text was saved again with ``tags``: the tags are merged into its own."""
+    """The note ``existing``, whose text was saved again with ``tags``: the tags are merged into its own, and a note
+    the reflection rested (tagged ``rest``) is awake, written anew now, since a run found it worth saving again."""
     merged: tuple[str, ...] = normalize_tags([*existing.tags, *tags])
+    if REST_TAG in existing.tags:
+        awake: tuple[str, ...] = tuple(tag for tag in merged if tag != REST_TAG)
+        return SavedMemory(record=await store.wake_memory(existing.id, awake, time.time()), created=False, similar=())
     record: MemoryRecord = existing if merged == existing.tags else await store.set_memory_tags(existing.id, merged)
     return SavedMemory(record=record, created=False, similar=())
 
@@ -221,7 +227,7 @@ def resting(record: MemoryRecord, now: float, rest_days: int, score: MemoryScore
         return True
     if score is not None and score.handed >= min_uses and score.done < score.failed:
         return True
-    return record.used_count == 0 and record.created_at < now - rest_days * 86400.0
+    return record.used_count == 0 and max(record.created_at, record.updated_at) < now - rest_days * 86400.0
 
 
 async def recent_scores(index: MemoryIndex, memory_ids: Sequence[str], now: float) -> dict[str, MemoryScore]:

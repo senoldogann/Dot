@@ -4,11 +4,13 @@ A reflection reads the runs that ended since the last one (the last day, the fir
 on Dot's own notes only, never on the owner's: it asks the review model for the lessons of the runs the loop did not
 ask about at their end, the failed and the stopped runs among them (:func:`dotagent.agent.lessons.learn_from`, with
 the run's ending as one more signal, under the same ``[agent] lessons`` setting: ``propose`` leaves them on the run's
-page, ``auto`` saves them, ``off`` draws none); it folds the near-duplicates among the notes tagged ``lesson`` into the
-newer note (by the cosine of their embeddings when both have one, by their words otherwise); it retires the lessons
-that no run was handed for ``[agent] lesson_rest_days`` to the ``rest`` tag, after which a search no longer finds them
-and the Memory page still lists them; and it writes one journal note of the days it read (:func:`journal_span`),
-tagged ``journal``, when anything happened. The last reflection is kept in the store's key/value table, so the next
+page, ``auto`` saves the ones its second look keeps, ``off`` draws none); it folds the near-duplicates among the notes
+tagged ``lesson`` into one (by the cosine of their embeddings when both have one, by their words otherwise), the newer
+unless the older is one the owner saved, off the event loop; it retires the lessons that no run was handed for
+``[agent] lesson_rest_days`` to the ``rest`` tag, after which a search no longer finds them and the Memory page still
+lists them; and it writes one journal note of the days it read (:func:`journal_span`), tagged ``journal``, when
+anything happened. A lesson the owner saved from a run's page is never folded away nor retired. Whether a run read
+content third parties can author is read from all its results, not only the ones its digest shows. The last reflection is kept in the store's key/value table, so the next
 one knows where to start and the Activity list can show it.
 
 The scheduler fires it at ``[agent] reflection_time`` (:func:`reflection_due`), ``dotx reflect`` runs it by hand. Every
@@ -16,6 +18,7 @@ function here is pure except the ones that take the store or the runtime.
 """
 
 import asyncio
+import math
 from collections.abc import Mapping, Sequence, Set
 from datetime import datetime
 from zoneinfo import ZoneInfo
@@ -25,6 +28,7 @@ from pydantic import BaseModel, ConfigDict, ValidationError
 from dotagent.agent.lessons import (
     LESSON_TAG,
     LESSONS_FAILED,
+    LESSONS_NONE,
     LESSONS_PROPOSED,
     LessonCase,
     learn_from,
@@ -200,8 +204,9 @@ def read_outside(results: Sequence[_Result]) -> bool:
     return any(result.kind in TAINTING_KINDS or result.channel in _OUTSIDE_CHANNELS for result in results)
 
 
-def stored_case(run: RunRecord, events: Sequence[EventRecord]) -> LessonCase:
-    """The lesson case of a run that ended, from the run and its ``tool_result`` events."""
+def stored_case(run: RunRecord, events: Sequence[EventRecord], tainted: bool) -> LessonCase:
+    """The lesson case of a run that ended, from the run and its newest ``tool_result`` events; ``tainted`` is whether
+    any of its results read content third parties can author (:meth:`dotagent.store.db.Store.read_outside`)."""
     results: tuple[_Result, ...] = _results(events)
     failures, resolved = call_facts(results)
     return LessonCase(
@@ -213,7 +218,7 @@ def stored_case(run: RunRecord, events: Sequence[EventRecord]) -> LessonCase:
         failures=failures,
         resolved=resolved,
         answer=run.result,
-        tainted=read_outside(results),
+        tainted=tainted or read_outside(results),
         reached_goal=run.status == "done",
     )
 
@@ -224,17 +229,19 @@ def _close(older: MemoryRecord, newer: MemoryRecord, vectors: Mapping[str, Vecto
     mine: Vector | None = vectors.get(older.id)
     theirs: Vector | None = vectors.get(newer.id)
     if mine is not None and theirs is not None and len(mine) == len(theirs):
-        return sum(a * b for a, b in zip(mine, theirs, strict=True)) >= _MERGE_SIMILARITY
+        return math.sumprod(mine, theirs) >= _MERGE_SIMILARITY
     return repeats(older.content, newer.content)
 
 
 def duplicate_pairs(
-    notes: Sequence[MemoryRecord], vectors: Mapping[str, Vector]
+    notes: Sequence[MemoryRecord], vectors: Mapping[str, Vector], owner_saved: Set[str]
 ) -> list[tuple[MemoryRecord, MemoryRecord]]:
-    """The pairs (older, newer) of ``notes`` that say the same the same way round, each note in at most one pair: by
-    the cosine of their embeddings when both have one, by their words otherwise. A resting note is in no pair, and two
-    notes pair only when they are the same agent's: a lesson learnt again would take the resting one's rest along,
-    and an agent would lose its lesson to another's."""
+    """The pairs (folded, kept) of ``notes`` that say the same the same way round, each note in at most one pair: by
+    the cosine of their embeddings when both have one, by their words otherwise. The newer note is kept, unless the
+    older is one the owner saved (``owner_saved``) and the newer is not; two the owner saved make no pair, as nothing
+    the owner chose is folded away. A resting note is in no pair, and two notes pair only when they are the same
+    agent's: a lesson learnt again would take the resting one's rest along, and an agent would lose its lesson to
+    another's."""
     by_age: list[MemoryRecord] = sorted(
         (note for note in notes if REST_TAG not in note.tags), key=lambda note: note.created_at
     )
@@ -247,25 +254,29 @@ def duplicate_pairs(
             (
                 note
                 for note in by_age[index + 1 :]
-                if note.id not in taken and note.agent_id == older.agent_id and _close(older, note, vectors)
+                if note.id not in taken
+                and note.agent_id == older.agent_id
+                and not (older.id in owner_saved and note.id in owner_saved)
+                and _close(older, note, vectors)
             ),
             None,
         )
         if newer is not None:
             taken.update((older.id, newer.id))
-            pairs.append((older, newer))
+            pairs.append((newer, older) if older.id in owner_saved else (older, newer))
     return pairs
 
 
-def to_retire(notes: Sequence[MemoryRecord], now: float, rest_days: int) -> list[MemoryRecord]:
-    """The lesson notes that rest from now on: not resting yet, and last handed to a run (or, never handed to one,
-    written) more than ``rest_days`` days before ``now``."""
+def to_retire(notes: Sequence[MemoryRecord], now: float, rest_days: int, owner_saved: Set[str]) -> list[MemoryRecord]:
+    """The lesson notes that rest from now on: not resting yet, not saved by the owner (``owner_saved``), and last
+    handed to a run or written (a lesson learnt again is written anew) more than ``rest_days`` days before ``now``."""
     limit: float = now - rest_days * 86400.0
     return [
         note
         for note in notes
         if REST_TAG not in note.tags
-        and (note.last_used_at if note.last_used_at is not None else note.created_at) < limit
+        and note.id not in owner_saved
+        and max(note.last_used_at or note.created_at, note.updated_at) < limit
     ]
 
 
@@ -340,10 +351,11 @@ async def last_reflection(store: Store) -> Reflection | None:
 
 
 async def _asked_already(store: Store, run_id: str) -> bool:
-    return (
-        await store.last_event(run_id, LESSONS_PROPOSED) is not None
-        or await store.last_event(run_id, LESSONS_FAILED) is not None
-    )
+    """Whether the run was asked for its lessons already: some were proposed, none was kept, or drawing them failed."""
+    for kind in (LESSONS_PROPOSED, LESSONS_NONE, LESSONS_FAILED):
+        if await store.last_event(run_id, kind) is not None:
+            return True
+    return False
 
 
 async def _learn(runtime: Runtime, deciding: asyncio.Lock, runs: Sequence[RunRecord]) -> list[str]:
@@ -353,7 +365,11 @@ async def _learn(runtime: Runtime, deciding: asyncio.Lock, runs: Sequence[RunRec
     for run in runs:
         if await _asked_already(runtime.store, run.id):
             continue
-        case: LessonCase = stored_case(run, await runtime.store.events_of_kind(run.id, "tool_result", _RESULTS_READ))
+        case: LessonCase = stored_case(
+            run,
+            await runtime.store.events_of_kind(run.id, "tool_result", _RESULTS_READ),
+            await runtime.store.read_outside(run.id, tuple(TAINTING_KINDS), tuple(_OUTSIDE_CHANNELS)),
+        )
         ending: str | None = ending_signal(run.status, run.result)
         signals: tuple[str, ...] = (*await stored_signals(runtime.store, case), *(() if ending is None else (ending,)))
         if not signals:
@@ -362,30 +378,38 @@ async def _learn(runtime: Runtime, deciding: asyncio.Lock, runs: Sequence[RunRec
     return written
 
 
-async def _merge(runtime: Runtime, notes: Sequence[MemoryRecord]) -> int:
-    """Fold each older of two lesson notes that say the same into the newer: the newer keeps both notes' tags, the
-    older is deleted, and the log keeps where it came from."""
+async def _merge(runtime: Runtime, notes: Sequence[MemoryRecord], owner_saved: Set[str]) -> int:
+    """Fold each pair of lesson notes that say the same into one (:func:`duplicate_pairs`, compared in a thread: the
+    cosines of hundreds of notes would hold the event loop for seconds): the kept one takes both notes' tags, the other
+    is deleted, and the log keeps where it came from."""
     vectors: dict[str, Vector] = (
         dict(await runtime.store.all_memory_vectors()) if runtime.memory.embedder is not None else {}
     )
+    pairs: list[tuple[MemoryRecord, MemoryRecord]] = await asyncio.to_thread(
+        duplicate_pairs, notes, vectors, owner_saved
+    )
     merged: int = 0
-    for older, newer in duplicate_pairs(notes, vectors):
-        tags: tuple[str, ...] = normalize_tags([*newer.tags, *older.tags])
-        if tags != newer.tags:
-            await runtime.store.set_memory_tags(newer.id, tags)
-        await runtime.store.delete_memory(older.id)
+    for folded, kept in pairs:
+        tags: tuple[str, ...] = normalize_tags([*kept.tags, *folded.tags])
+        if tags != kept.tags:
+            await runtime.store.set_memory_tags(kept.id, tags)
+        await runtime.store.delete_memory(folded.id)
         log.info(
-            "lesson_merged", older=older.id, newer=newer.id, older_source_run=older.source_run, older_text=older.content
+            "lesson_merged",
+            folded=folded.id,
+            kept=kept.id,
+            folded_source_run=folded.source_run,
+            folded_text=folded.content,
         )
         merged += 1
     return merged
 
 
-async def _retire(runtime: Runtime, notes: Sequence[MemoryRecord], now: float) -> int:
-    """Rest the lessons no run was handed for long, and the ones whose score says they did not help; the log says
-    which reason, with the numbers."""
+async def _retire(runtime: Runtime, notes: Sequence[MemoryRecord], now: float, owner_saved: Set[str]) -> int:
+    """Rest the lessons no run was handed for long, and the ones whose score says they did not help, but none the owner
+    saved; the log says which reason, with the numbers."""
     retired: int = 0
-    aged: list[MemoryRecord] = to_retire(notes, now, runtime.config.agent.lesson_rest_days)
+    aged: list[MemoryRecord] = to_retire(notes, now, runtime.config.agent.lesson_rest_days, owner_saved)
     for note in aged:
         await runtime.store.set_memory_tags(note.id, (*note.tags, REST_TAG))
         log.info(
@@ -399,7 +423,6 @@ async def _retire(runtime: Runtime, notes: Sequence[MemoryRecord], now: float) -
     rested: set[str] = {note.id for note in aged}
     left: list[MemoryRecord] = [note for note in notes if note.id not in rested]
     scores: dict[str, MemoryScore] = await recent_scores(runtime.memory, [note.id for note in left], now)
-    owner_saved: set[str] = await runtime.store.owner_saved_memory_ids()
     for note, score in to_retire_by_score(left, scores, runtime.config.memory.score_min_uses, owner_saved):
         await runtime.store.set_memory_tags(note.id, (*note.tags, REST_TAG))
         log.info(
@@ -461,9 +484,10 @@ async def reflect(runtime: Runtime, deciding: asyncio.Lock, now: float) -> Refle
     ]
     lessons: list[str] = await _learn(runtime, deciding, runs) if runtime.config.agent.lessons != "off" and runs else []
     own: list[MemoryRecord] = _own(await store.memories_with_tag(LESSON_TAG, _LESSON_NOTES))
-    merged: int = await _merge(runtime, own)
+    owner_saved: set[str] = await store.owner_saved_memory_ids()
+    merged: int = await _merge(runtime, own, owner_saved)
     kept: list[MemoryRecord] = _own(await store.memories_with_tag(LESSON_TAG, _LESSON_NOTES)) if merged else own
-    retired: int = await _retire(runtime, kept, now)
+    retired: int = await _retire(runtime, kept, now, owner_saved)
     owner_updated: bool = await _describe_owner(runtime, runs, now) if runs else False
     journal: str | None = None
     if runs or merged or retired:

@@ -275,12 +275,16 @@ resume = "safe"
 resume_within_s = 1800
 # After a task or research run that ended with success although something went wrong on the way (a failed call, an
 # alert of the progress watchdog, a send-back by the goal check or for paths that do not exist), one call to the
-# review model draws at most three lessons from it: one sentence each, about how to do things. "propose" leaves them on
-# the run's page, where each can be saved to memory or dismissed; "auto" saves them as notes tagged lesson, except
-# after a run that read content third parties can author (web pages, files from others), whose lessons are only
-# proposed. Later runs find a saved lesson like any note of the agent; what each lesson did for the runs it was handed
-# to is scored (dotx stats, the Memory page). "off" learns nothing.
-lessons = "propose"
+# review model draws at most three lessons from it: one sentence each, about how to do things. "auto" (the default)
+# asks nobody: a second call of the review model, which sees the goal and the lessons and nothing the run read, keeps
+# only know-how about how tools, commands, sites, applications and formats behave, nothing that sends the agent
+# somewhere, has it trust some content or holds private data; after a run that read content third parties can author
+# (web pages, files from others), a lesson with a link or an account name in it is left out before that. The kept ones
+# are saved as notes tagged lesson, and the run's page shows them with Undo and the others with why and Save anyway.
+# "propose" leaves every lesson on the run's page, where each can be saved to memory or dismissed. Later runs find a
+# saved lesson like any note of the agent; what each lesson did for the runs it was handed to is scored (dotx stats,
+# the Memory page). "off" learns nothing.
+lessons = "auto"
 # Once a day at reflection_time (a time of day in [scheduler] timezone; "off" never), Dot reflects on the runs that
 # ended since the last reflection: it draws lessons from the runs the loop did not ask at their end, the failed and
 # the stopped ones among them, under the lessons setting above (none while it is "off"); folds the lesson notes that

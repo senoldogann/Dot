@@ -13,10 +13,11 @@ _SECRET_PATTERNS: tuple[re.Pattern[str], ...] = (
     re.compile(r"-----BEGIN [A-Z0-9 ]*PRIVATE KEY-----[\s\S]*?(?:-----END [A-Z0-9 ]*PRIVATE KEY-----|\Z)"),
     # The password of a URL: scheme://user:password@host.
     re.compile(r"(?i)\b([a-z][a-z0-9+.\-]{0,30}://[^\s/@:]+)(:)[^\s/]+(?=@[^\s/@]+)"),
-    # Keys and tokens by the forms their services give them: OpenAI's and Anthropic's; GitHub's, an AWS access key id,
-    # a Google API key, Slack's and a JSON web token (tried only where a run of its letters starts); Stripe's secret and
-    # restricted keys and its webhook secrets, GitLab's tokens, npm's, Hugging Face's, a Twilio API key and SendGrid's.
-    re.compile(r"sk-[A-Za-z0-9_\-]{16,}"),
+    # Keys and tokens by the forms their services give them: OpenAI's and Anthropic's (where a word starts, so the end
+    # of "task-management" is a word); GitHub's, an AWS access key id, a Google API key, Slack's and a JSON web token
+    # (tried only where a run of its letters starts); Stripe's secret and restricted keys and its webhook secrets,
+    # GitLab's tokens, npm's, Hugging Face's, a Twilio API key and SendGrid's.
+    re.compile(r"(?<![A-Za-z0-9_\-])sk-[A-Za-z0-9_\-]{16,}"),
     re.compile(
         r"\b(?:gh[pousr]_[A-Za-z0-9]{36,}|github_pat_[A-Za-z0-9_]{22,}|(?:AKIA|ASIA)[0-9A-Z]{16}\b"
         r"|AIza[0-9A-Za-z_\-]{35}|xox[abprs]-[0-9A-Za-z\-]{10,}"
@@ -27,17 +28,25 @@ _SECRET_PATTERNS: tuple[re.Pattern[str], ...] = (
         r"|npm_[0-9A-Za-z]{36}\b|hf_[0-9A-Za-z]{30,}|SK[0-9a-fA-F]{32}\b|SG\.[0-9A-Za-z_\-]{16,}\.[0-9A-Za-z_\-]{16,})"
     ),
     # The credentials of an Authorization header: Basic ones, a bearer token, and those of any other scheme or of none.
-    re.compile(r"(?i)(authorization\"?\s*[:=]\s*\"?basic)(\s+)[A-Za-z0-9+/=]{4,}"),
+    re.compile(r"(?i)(authorization[\"']?\s*[:=]\s*[\"']?basic)(\s+)[A-Za-z0-9+/=]{4,}"),
     re.compile(r"(?i)bearer\s+[A-Za-z0-9._\-]{16,}"),
-    re.compile(r"(?i)(authorization\"?\s*[:=]\s*\"?)((?:[a-z][a-z0-9\-]*\s+)?)[A-Za-z0-9._~+/=\-]{16,}"),
+    re.compile(r"(?i)(authorization[\"']?\s*[:=]\s*[\"']?)((?:[a-z][a-z0-9\-]*\s+)?)[A-Za-z0-9._~+/=\-]{16,}"),
     # The cookies of a Cookie or Set-Cookie header, with the attributes among them.
-    re.compile(r"(?i)\b((?:set-)?cookie)(\"?\s*:\s*\"?)[^\s=;\"]+=[^\s;\"]*(?:;\s*[^\s=;\"]+(?:=[^\s;\"]*)?)*"),
-    # The value of key=value or "key": "value" whose key names a secret, and a password's however short it is.
+    re.compile(
+        r"(?i)\b((?:set-)?cookie)([\"']?\s*:\s*[\"']?)[^\s=;\"']+=[^\s;\"']*(?:;\s*[^\s=;\"']+(?:=[^\s;\"']*)?)*"
+    ),
+    # The value of key=value, key='value' or "key": "value" whose key names a secret (SECRET_KEY, token_value and
+    # db_password too), and a password's however short it is.
     re.compile(
         r"(?i)(?<![\w.\-])([\w.\-]{0,40}?(?:api[_-]?key|access[_-]?key|account[_-]?key|private[_-]?key(?:[_-]?id)?"
-        r"|secret|token|password|passwd|credentials?))(\"?\s*[:=]\s*\"?)[^\s\"',}]{8,}"
+        r"|secret|token|password|passwd|credentials?)[\w\-]{0,20}?)([\"']?\s*[:=]\s*[\"']?)[^\s\"',}]{8,}"
     ),
-    re.compile(r"(?i)(?<![\w.\-])([\w.\-]{0,40}?(?:password|passwd))(\"?\s*[:=]\s*\"?)[^\s\"',}]+"),
+    re.compile(r"(?i)(?<![\w.\-])([\w.\-]{0,40}?(?:password|passwd))([\"']?\s*[:=]\s*[\"']?)[^\s\"',}]+"),
+)
+# The name of a field whose value is a secret whatever it looks like (a JSON object's key): a word of it names one.
+_SECRET_FIELD: re.Pattern[str] = re.compile(
+    r"(?i)(?:^|[_\-.])(?:api[_-]?key|access[_-]?key|account[_-]?key|private[_-]?key|secret|token|password|passwd"
+    r"|credentials?|authorization|cookie)(?:$|[_\-.])"
 )
 
 # The marks of Markdown a plain line leaves out (``plain_line``): a fence's line whole; a heading's, a quote's and a list
@@ -156,13 +165,17 @@ def strip_blobs(value: JsonValue) -> JsonValue:
 
 
 def redact_json(value: JsonValue) -> JsonValue:
-    """Mask secrets inside every string of a JSON value."""
+    """Mask secrets inside every string of a JSON value, and the whole string of a field whose name names a secret
+    (``{"password": "hunter2"}``), however it looks."""
     if isinstance(value, str):
         return redact_secrets(value)
     if isinstance(value, list):
         return [redact_json(item) for item in value]
     if isinstance(value, dict):
-        return {key: redact_json(item) for key, item in value.items()}
+        return {
+            key: "***" if isinstance(item, str) and item and _SECRET_FIELD.search(key) else redact_json(item)
+            for key, item in value.items()
+        }
     return value
 
 

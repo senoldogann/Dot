@@ -18,7 +18,10 @@ from dotagent.agent.playbooks import (
     write_playbook,
 )
 from dotagent.agent.review import PlaybookDraft
-from dotagent.memory.service import visible_to
+from dotagent.config import load_default_config
+from dotagent.core.types import JsonObject
+from dotagent.memory.service import REST_TAG, MemoryIndex, SavedMemory, save_memory, visible_to
+from dotagent.policy.types import TAINTING_KINDS
 from dotagent.skills.catalog import SkillRoot, load_catalog
 from dotagent.skills.types import Skill
 from dotagent.store.db import Store
@@ -137,5 +140,87 @@ async def test_the_store_keeps_an_agents_lessons_and_scores_them_by_its_own_runs
         await store.delete_agent(scout.id)
         assert (await store.get_memory(lesson.id)).agent_id is None
         assert await store.agent_memories(scout.id, 10) == []
+    finally:
+        await store.close()
+
+
+async def test_a_text_saved_again_merges_only_into_a_note_the_saver_is_handed(tmp_path: Path) -> None:
+    """Audit defect 7: the same text saved by Dot after an agent, or by another agent, merged into the first agent's
+    note, which the saver's runs are never handed; a note Dot has is the agent's to merge into."""
+    store: Store = await Store.open(tmp_path / "dot.sqlite3", tmp_path / "screenshots")
+    index: MemoryIndex = MemoryIndex(store=store, embedder=None, config=load_default_config().memory)
+    try:
+        scout: AgentRecord = await store.create_agent("Scout", "Finds sources", "", "", None, None, [], None, None)
+        clerk: AgentRecord = await store.create_agent("Clerk", "Files things", "", "", None, None, [], None, None)
+        theirs: SavedMemory = await save_memory(index, "Log in before the search.", ("lesson",), "run_1", scout.id)
+        dots: SavedMemory = await save_memory(index, "Log in before the search.", ("lesson",), "run_2", None)
+        others: SavedMemory = await save_memory(index, "Log in before the search.", ("lesson",), "run_3", clerk.id)
+        assert theirs.created and dots.created and not others.created
+        assert (theirs.record.agent_id, dots.record.agent_id) == (scout.id, None)
+        assert others.record.id == dots.record.id
+        # The agent's own note comes first when it and Dot both have the text.
+        again: SavedMemory = await save_memory(index, "Log in before the search.", ("lesson",), "run_4", scout.id)
+        assert again.record.id == theirs.record.id
+    finally:
+        await store.close()
+
+
+async def test_a_resting_lesson_saved_again_is_awake(tmp_path: Path) -> None:
+    """Audit defect 5: a lesson learnt again kept its rest tag, so no run was handed it although it was "saved"."""
+    store: Store = await Store.open(tmp_path / "dot.sqlite3", tmp_path / "screenshots")
+    index: MemoryIndex = MemoryIndex(store=store, embedder=None, config=load_default_config().memory)
+    try:
+        first: SavedMemory = await save_memory(index, "Log in before the search.", ("lesson",), "run_1", None)
+        await store.set_memory_tags(first.record.id, ("lesson", REST_TAG))
+        before: float = time.time()
+        again: SavedMemory = await save_memory(index, "Log in before the search.", ("lesson",), "run_2", None)
+        assert again.record.id == first.record.id and not again.created
+        assert again.record.tags == ("lesson",) and again.record.updated_at >= before
+    finally:
+        await store.close()
+
+
+async def test_a_run_read_outside_when_any_of_its_results_did_not_only_its_newest(tmp_path: Path) -> None:
+    """Audit defect 3: the nightly reflection judged a run by its newest 60 results, so a long run that read a web page
+    early had its lessons saved as if it had read none."""
+    store: Store = await Store.open(tmp_path / "dot.sqlite3", tmp_path / "screenshots")
+    try:
+        thread: ThreadRecord = await store.create_thread("t", "test")
+        run: RunRecord = await _run(store, thread, None, "done")
+        page: JsonObject = {
+            "tool": "web_fetch",
+            "ok": True,
+            "text": "<html>",
+            "kind": "network",
+            "target": "",
+            "channel": "web",
+        }
+        await store.add_event(run.id, "tool_result", page)
+        for _ in range(60):
+            await store.add_event(
+                run.id,
+                "tool_result",
+                {
+                    "tool": "read_file",
+                    "ok": True,
+                    "text": "x",
+                    "kind": "read",
+                    "target": "a",
+                    "channel": "",
+                    "tainted": False,
+                },
+            )
+        kinds: tuple[str, ...] = tuple(TAINTING_KINDS)
+        assert await store.read_outside(run.id, kinds, ("web", "browser"))
+        # A run whose results read only this Mac read nothing outside; one that was tainted when a result came did.
+        clean: RunRecord = await _run(store, thread, None, "done")
+        await store.add_event(
+            clean.id, "tool_result", {"tool": "read_file", "kind": "read", "channel": "", "tainted": False}
+        )
+        assert not await store.read_outside(clean.id, kinds, ("web", "browser"))
+        await store.add_event(
+            clean.id, "tool_result", {"tool": "read_file", "kind": "read", "channel": "", "tainted": True}
+        )
+        assert await store.read_outside(clean.id, kinds, ("web", "browser"))
     finally:
         await store.close()

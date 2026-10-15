@@ -26,7 +26,7 @@ from dotagent.agent.campaign import (
 )
 from dotagent.agent.gate import HANDBACK_EVENT, TAINT_EVENTS, TAKEOVER_EVENT, RunGate, tainted_after
 from dotagent.agent.keep_going import keep_going_ask
-from dotagent.agent.lessons import LessonCase, dismiss_lesson, learn, save_lesson
+from dotagent.agent.lessons import LessonCase, dismiss_lesson, learn, save_lesson, undo_lesson
 from dotagent.agent.loop import AgentRun, RunEnd, RunOpening, browser_of, run_agent
 from dotagent.agent.owners import RunOwner, clear_gone_owners, owner_alive
 from dotagent.agent.plan import EMPTY_PLAN, PLAN_EVENT, plan_from_event
@@ -1211,6 +1211,10 @@ class RunManager:
     async def dismiss_lesson(self, run_id: str, index: int) -> None:
         """Dismiss a lesson proposed for a run that ended (see :func:`dotagent.agent.lessons.dismiss_lesson`)."""
         await dismiss_lesson(self._runtime, self._deciding, run_id, index)
+
+    async def undo_lesson(self, run_id: str, index: int) -> bool:
+        """Take back the save of a lesson of a run (see :func:`dotagent.agent.lessons.undo_lesson`)."""
+        return await undo_lesson(self._runtime, self._deciding, run_id, index)
 
     async def shutdown(self) -> None:
         """Stop every live run. They end as cancelled with a result that says the daemon shut down, so the owner can tell

@@ -13,7 +13,7 @@ from pydantic import BaseModel, ConfigDict, Field, JsonValue
 
 from dotagent.agent.gate import YOLO_DECIDER
 from dotagent.agent.helpers import Unavailable, unavailable_text
-from dotagent.agent.lessons import RunLessons
+from dotagent.agent.lessons import LessonView, RunLessons
 from dotagent.agent.limits import LimitReached, RunLimits, limit_spent
 from dotagent.agent.plan import StepStatus
 from dotagent.agent.progress import Rung
@@ -34,6 +34,16 @@ _ARG_PREVIEW_CHARS: int = 140
 _RESULT_PREVIEW_CHARS: int = 170
 _PREFERRED_ARGS: tuple[str, ...] = ("command", "url", "path", "query", "goal", "text", "title", "name")
 _CHILD_INDENT: str = "    │ "
+
+
+def _lesson_mark(lesson: LessonView) -> str:
+    """How a lesson of a run that ended is marked: saved (on its own or by the owner), left out with why, dismissed or
+    proposed."""
+    if lesson.state == "saved":
+        return "◆ lesson saved on its own" if lesson.by == "auto" else "◆ lesson saved as a note"
+    if lesson.state == "dismissed":
+        return f"◇ lesson left out ({lesson.reason})" if lesson.by == "auto" else "◇ lesson dismissed"
+    return "◇ lesson proposed"
 
 
 class Payload(BaseModel):
@@ -342,14 +352,9 @@ class TerminalUi:
         """Show what became of the lessons drawn from a run that ended."""
         self._indent = ""
         for lesson in lessons.lessons:
-            mark: str = "◆ lesson saved as a note" if lesson.state == "saved" else "◇ lesson proposed"
-            self._line(self._paint(f"  {mark}: {lesson.text}", "35"))
+            self._line(self._paint(f"  {_lesson_mark(lesson)}: {lesson.text}", "35"))
         if any(lesson.state == "proposed" for lesson in lessons.lessons):
-            untrusted: str = (
-                " (the run read content that third parties can author, so its lessons are never saved on their own)"
-                if lessons.tainted
-                else ""
-            )
+            untrusted: str = " (the run read content that third parties can author)" if lessons.tainted else ""
             self._line(
                 self._paint(f"    the run's page in the web UI saves or dismisses a proposed lesson{untrusted}", "2")
             )
