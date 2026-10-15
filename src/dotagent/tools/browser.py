@@ -401,7 +401,7 @@ def _act_tool() -> RegisteredTool:
             raise ToolInputError(
                 "A batch takes one public or social action at most (a post, a reply, a repost, a message, a follow, a "
                 "like) while the owner sets a pace for them: each one counts toward the pace of the site. Send them one "
-                "call at a time.",
+                "call at a time; doing them with a script in the page (browser_eval) would go around the owner's pace.",
                 {"public_or_social_steps": len(paced), "paced_classes": list(limited)},
             )
         notes: list[str] = [judgment.note for judgment in judgments if judgment.note]
