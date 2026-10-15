@@ -171,6 +171,9 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
   let costTicker = null;
   let scrollQueued = false;
   let answerNode = null;
+  // From the answer's coming until the frame that lands the page on it, the way down is not offered: the page is about
+  // to move there (item 274).
+  let landing = false;
   // A run that is over when the page opens lands on its answer; a live one only when the reader follows it.
   const openedFinished = !active;
   const seen = { steps: 0, input: 0, output: 0, calls: 0, failed: 0, compactions: 0, flagged: 0 };
@@ -823,15 +826,23 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
 
   /** The button leads to the answer once there is one that is still below the window, else to the end of a live run. */
   function paintJump() {
-    const unseen = answerNode !== null ? answerNode.getBoundingClientRect().top > window.innerHeight : active && !following;
+    const below = answerNode !== null ? answerNode.getBoundingClientRect().top > window.innerHeight : active && !following;
+    const unseen = below && !landing;
     jump.hidden = !unseen;
     const words = answerNode !== null ? "Jump to the answer" : "Jump to latest";
     jump.title = words;
     jump.setAttribute("aria-label", words);
   }
 
+  // The reader leaves the end by scrolling up, not because the end moved on while a scroll of the page's own was on its
+  // way: a scroll event that comes after the conversation grew reads as far from the end without the reader having
+  // moved (item 274).
+  let lastScrollY = window.scrollY;
+
   function onScroll() {
-    following = nearBottom();
+    const y = window.scrollY;
+    following = y < lastScrollY ? nearBottom() : following || nearBottom();
+    lastScrollY = y;
     paintJump();
   }
 
@@ -856,9 +867,12 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
     answerNode = node;
     if (following || openedFinished) {
       following = false;
+      landing = true;
       requestAnimationFrame(() => {
+        landing = false;
         if (!signal.aborted) {
           node.scrollIntoView({ block: "start" });
+          paintJump();
         }
       });
     }

@@ -14,9 +14,10 @@ import { faceState } from "./face.js";
 import { helperCard } from "./helpercard.js";
 import { icon } from "./icons.js";
 import { foldSteps } from "./layout.js";
+import { parseSourcedBlocks } from "./markdown.js";
 import { answerMessage, userMessage } from "./messages.js";
 import { pageCard } from "./pageframe.js";
-import { prose } from "./prose.js";
+import { blockNode, prose } from "./prose.js";
 import { describeArguments, toolRow } from "./tools.js";
 
 const GOAL_CHARS = 160;
@@ -74,13 +75,53 @@ function flockState(statuses) {
     .join(" · ");
 }
 
-// A turn of the agent opens with its still face (item 103).
+// A turn of the agent opens with its still face (item 103). A live one is drawn as the message it becomes (item 274):
+// `drawn` holds the lines each of its blocks was drawn from, `queued` is set while a draw waits for the next frame and
+// `ended` once the message is in or the step is asked again.
 function newBubble(scope, step, live) {
-  const body = el("div", { class: live ? "stream" : "" });
+  const body = el("div", { class: live ? "prose stream" : "" });
   const face = el("span", { class: "turn-face" }, actorFace(scope.actorId, "idle", null));
   const node = el("div", { class: live ? "bubble live" : "bubble", role: "article", "aria-label": "Dot" }, face, body);
   scope.container.append(node);
-  return { node, body, step, text: "" };
+  const caret = el("span", { class: "stream-caret", "aria-hidden": "true" });
+  return { node, body, step, text: "", drawn: [], caret, queued: false, ended: false };
+}
+
+// What holds the last line of a message: a list's last item, a table's last cell.
+const LINE_HOLDERS = new Set(["UL", "OL", "TABLE", "THEAD", "TBODY", "TR"]);
+
+/** The element the last line of `node` (a `div.prose`) ends in: its last block, or the last item or cell in it. */
+function lastLine(node) {
+  let at = node.lastElementChild ?? node;
+  while (LINE_HOLDERS.has(at.tagName) && at.lastElementChild !== null) {
+    at = at.lastElementChild;
+  }
+  return at.tagName === "HR" ? node : at;
+}
+
+/**
+ * The live message `live` drawn as it stands, formatted as the message will stay once it ends, with the caret at the
+ * end of its last line (item 274). It is drawn at most once a frame however fast the model writes, and a block read
+ * from the same lines as at the draw before stays as it was drawn: a draw changes the block being written and what
+ * follows it alone. The message that ends it is drawn the same, so its end moves nothing on the page.
+ */
+function drawLive(live) {
+  live.queued = false;
+  if (live.ended) {
+    return;
+  }
+  const blocks = parseSourcedBlocks(live.text);
+  let kept = 0;
+  while (kept < live.drawn.length && kept < blocks.length && live.drawn[kept] === blocks[kept].source) {
+    kept += 1;
+  }
+  live.caret.remove();
+  for (const stale of [...live.body.children].slice(kept)) {
+    stale.remove();
+  }
+  live.body.append(...blocks.slice(kept).map((sourced) => blockNode(sourced.block)));
+  live.drawn = blocks.map((sourced) => sourced.source);
+  lastLine(live.body).append(live.caret);
 }
 
 // How a call of the step a resumed run was in ended (agent/resume.py).
@@ -672,6 +713,9 @@ export function createTimeline({ rootRunId, actorId, startedAt, onGrow, onPlan, 
       }
       const bubble = scope.live !== null && scope.live.step === data.step ? scope.live : null;
       scope.live = null;
+      if (bubble !== null) {
+        bubble.ended = true;
+      }
       const hasText = data.text.trim() !== "";
       if (!hasText) {
         if (bubble !== null) {
@@ -714,6 +758,7 @@ export function createTimeline({ rootRunId, actorId, startedAt, onGrow, onPlan, 
       }
       if (data.kind === "reset") {
         if (scope.live !== null) {
+          scope.live.ended = true;
           scope.live.node.remove();
           scope.live = null;
         }
@@ -726,8 +771,12 @@ export function createTimeline({ rootRunId, actorId, startedAt, onGrow, onPlan, 
         liftThought(scope);
         scope.live = newBubble(scope, data.step, true);
       }
-      scope.live.text += data.text;
-      scope.live.body.textContent = scope.live.text;
+      const live = scope.live;
+      live.text += data.text;
+      if (!live.queued) {
+        live.queued = true;
+        requestAnimationFrame(() => drawLive(live));
+      }
     },
 
     tool_call(scope, record) {

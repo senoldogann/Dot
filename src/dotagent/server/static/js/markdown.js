@@ -167,6 +167,14 @@ function readParagraph(lines, start) {
 
 /** The blocks of a text: `code`, `heading`, `list`, `table`, `quote`, `rule` and `paragraph`. */
 export function parseBlocks(text) {
+  return parseSourcedBlocks(text).map((sourced) => sourced.block);
+}
+
+/**
+ * The blocks of a text, each with the lines it was read from as its `source` (item 274). A block is read from its own
+ * lines alone, so two texts whose first blocks were read from the same lines have the same first blocks.
+ */
+export function parseSourcedBlocks(text) {
   const lines = text.replace(/\r\n/g, "\n").split("\n");
   const blocks = [];
   let index = 0;
@@ -195,7 +203,7 @@ export function parseBlocks(text) {
     } else {
       read = readParagraph(lines, index);
     }
-    blocks.push(read.block);
+    blocks.push({ block: read.block, source: lines.slice(index, read.next).join("\n") });
     index = read.next;
   }
   return blocks;
