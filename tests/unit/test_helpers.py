@@ -55,7 +55,7 @@ def test_a_model_is_paused_for_the_time_its_provider_named_at_most_a_day_else_fo
         reason="quota exhausted", until=NOW + 3600.0
     )
     assert pause_for(ProviderQuotaError("credits", 402, None, {}), COOLDOWN_S, NOW) == Pause(
-        reason="quota exhausted", until=NOW + COOLDOWN_S
+        reason="not in the plan", until=NOW + COOLDOWN_S
     )
     assert pause_for(ProviderRateLimitError("slow down", 429, 300.0, {}), COOLDOWN_S, NOW) == Pause(
         reason="rate limited", until=NOW + 300.0

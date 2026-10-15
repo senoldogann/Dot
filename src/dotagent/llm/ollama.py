@@ -26,7 +26,7 @@ from dotagent.llm.http import (
     transport_error_types,
     wrap_transport_error,
 )
-from dotagent.llm.provider_errors import WireError, classify_generic, error_from_stream, wire_error_from_object
+from dotagent.llm.provider_errors import WireError, classify_ollama, error_from_stream, wire_error_from_object
 from dotagent.llm.traits import effort_ladder, is_known_label, label_rank
 from dotagent.llm.types import (
     ChatRequest,
@@ -238,7 +238,7 @@ def apply_chunk(
         raise error_from_stream(
             wire if wire is not None else WireError(kind="", code="", message=str(error), limit_name=""),
             context,
-            classify_generic,
+            classify_ollama,
         )
     deltas: list[StreamDelta] = []
     text: str = state.text
@@ -376,7 +376,7 @@ class OllamaProvider:
 
     async def _post_json(self, path: str, payload: JsonObject, label: str) -> JsonObject:
         return await post_json(
-            self._client, self._url(path), self._headers, payload, classify_generic, self._policy, label
+            self._client, self._url(path), self._headers, payload, classify_ollama, self._policy, label
         )
 
     async def _details(self, model: str) -> OllamaModelDetails:
@@ -396,7 +396,7 @@ class OllamaProvider:
         212): with no network in between, a refused connection means it is not running, and retries would only keep
         the menu of models and the doctor waiting for it."""
         tags: JsonObject = await get_json(
-            self._client, self._url("/api/tags"), self._headers, classify_generic, self._list_policy, "ollama.tags"
+            self._client, self._url("/api/tags"), self._headers, classify_ollama, self._list_policy, "ollama.tags"
         )
         listed: JsonValue = tags.get("models")
         names: list[str] = []
@@ -429,7 +429,7 @@ class OllamaProvider:
         state: StreamState = initial_state(model)
         try:
             async with self._client.stream("POST", url, content=json.dumps(payload), headers=self._headers) as response:
-                await raise_for_provider_status(response, context, classify_generic)
+                await raise_for_provider_status(response, context, classify_ollama)
                 async for chunk in iter_ndjson(response, context):
                     state, deltas = apply_chunk(state, chunk, context)
                     for delta in deltas:

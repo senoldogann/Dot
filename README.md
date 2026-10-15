@@ -132,7 +132,9 @@ with `review` on the same provider as `main` a goal check or an `auto` approval 
 
 A model is left out of both lists while its provider has no key (an Ollama model needs none), and after such an error
 for the time the provider named (at most a day) or for `helper_cooldown_s` seconds, until a call to it is answered or a
-new key of its provider is saved. The fast model's work leaves a paused fast model out as well (item 240): a run's
+new key of its provider is saved. A model the plan of its provider does not include (HTTP 402, "not in the plan") and
+a plan whose included usage is used up (Ollama's 429 that says so) are such errors too: the connector does not retry
+them, and the model is paused for `helper_cooldown_s` at once (item 254). The fast model's work leaves a paused fast model out as well (item 240): a run's
 summary is written by the run's own model at once, and `web_extract` reads no source and says until when the fast model
 cannot answer, instead of spending the connector's retries on a provider that has refused already. Each model is paused
 alone: a local Ollama model stays available while a cloud one is paused, and a provider whose key or quota fails all its
