@@ -286,11 +286,11 @@ class RunGate:
 
     async def _waive(self, info: ActionInfo, decision: Decision) -> str:
         """Yolo: the question is not asked and the refusal does not hold. The action goes ahead and the record says what
-        the policy wanted."""
+        the policy wanted: the action is its summary, the policy's reason its note, each once."""
         await self._approvals.record_automatic(
             self._run_id,
             info.tool,
-            f"{info.summary} — {decision.reason}",
+            info.summary,
             approval_severity(info),
             _describe(info),
             "approved",

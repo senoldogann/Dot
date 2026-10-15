@@ -192,6 +192,9 @@ async def test_yolo_lets_the_action_run_without_asking_and_keeps_the_record(room
     assert await room.store.list_approvals("pending", 10) == []
     (record,) = await _decided(room)
     assert (record.status, record.decided_by, record.tool) == ("approved", YOLO_DECIDER, "write_file")
+    # The record carries the action and the policy's reason once each (item 253): the timeline line joins them.
+    assert record.summary == WRITE.summary
+    assert record.note != "" and record.note not in record.summary
     kinds: list[str] = await _kinds(room)
     assert "approval_auto" in kinds
     assert "approval_requested" not in kinds
