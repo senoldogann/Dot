@@ -63,6 +63,9 @@ class PromptInputs(FrozenModel):
     agent: AgentBrief | None
     # The other agents the run may message (item 87), by name and role; empty when there are none.
     team: tuple[AgentBrief, ...]
+    # Where the run's scripts reach its Chrome with the DevTools Protocol (item 265): Dot's own Chrome with a port set,
+    # else None.
+    devtools: str | None
 
 
 _MODE_TEXT: dict[RunMode, str] = {
@@ -337,6 +340,14 @@ _DELEGATED: str = (
     "you could not verify."
 )
 
+# Where the run's scripts reach Dot's own Chrome (item 265).
+_DEVTOOLS: str = (
+    "Dot's Chrome also takes DevTools connections at {address} while it runs (it starts with your first browser "
+    "call): a script of yours can drive it with the Chrome DevTools Protocol (Playwright's connect_over_cdp, "
+    "Puppeteer's connect) for what the browser tools do not do. Work in tabs your script opens, and leave the tabs "
+    "of the browser tools to them."
+)
+
 _MCP_TOOL_PREFIX: str = "mcp__"
 
 _MCP_SECTION: str = """# MCP tools
@@ -435,6 +446,8 @@ def _environment(inputs: PromptInputs) -> str:
     # A delegated run has no ask_user, so it has no questions to leave.
     if inputs.questions == "leave" and ASK_USER_TOOL in inputs.tool_names:
         lines.append(f"- {_LEFT_QUESTIONS}")
+    if inputs.devtools is not None:
+        lines.append(f"- {_DEVTOOLS.format(address=inputs.devtools)}")
     return "\n".join(lines)
 
 
@@ -609,6 +622,7 @@ def collect_prompt_inputs(
     agent: AgentBrief | None,
     team: Sequence[AgentBrief],
     owner: Sequence[str],
+    devtools: str | None,
 ) -> PromptInputs:
     """Gather the facts about this machine and moment that the prompt states."""
     return PromptInputs(
@@ -633,4 +647,5 @@ def collect_prompt_inputs(
         helpers=tuple(helpers),
         agent=agent,
         team=tuple(team),
+        devtools=devtools,
     )

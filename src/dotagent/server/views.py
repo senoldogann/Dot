@@ -373,6 +373,12 @@ class BrowserRaiseRequest(FrozenModel):
     raise_window: bool
 
 
+class BrowserDebugPortRequest(FrozenModel):
+    """The port of this Mac on which Dot's own Chrome takes DevTools connections (item 265); 0 for none."""
+
+    debug_port: int = Field(ge=0, le=65535)
+
+
 class KeyRequest(FrozenModel):
     """An API key to save: printable characters without spaces, as the keys of every provider are."""
 
@@ -771,7 +777,9 @@ class DeletedThreads(FrozenModel):
 class BrowserView(FrozenModel):
     """Which Chrome the browser tools work in (``mode`` is the live one, which a switch changes without a restart),
     whether one is started or connected now, and what the files of the Chrome of the user say: whether it runs and
-    allows remote debugging, and on which port. ``inspect_page`` is where the user switches that on."""
+    allows remote debugging, and on which port. ``inspect_page`` is where the user switches that on. ``debug_port``
+    is the port Dot's own Chrome takes DevTools connections on (item 265; 0 for none), and ``devtools_address`` where
+    a run's scripts reach it: set while the main session is Dot's own Chrome and a port is."""
 
     mode: BrowserMode
     connected: bool
@@ -781,6 +789,8 @@ class BrowserView(FrozenModel):
     inspect_page: str
     attach_timeout_s: float
     raise_window: bool
+    debug_port: int
+    devtools_address: str | None
 
 
 class KeyView(FrozenModel):

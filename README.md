@@ -1637,6 +1637,7 @@ The REST API (all under `/api`; bodies and replies are JSON, event streams are s
 | `GET\|POST /schedules`, `GET\|PATCH /schedules/{id}`, `POST /schedules/{id}/enable\|disable`, `DELETE /schedules/{id}` | schedules (`PATCH` takes the whole schedule) |
 | `GET\|POST\|DELETE /failsafe`, `GET /images/{name}`                             | emergency stop; screenshots of runs                          |
 | `GET /browser`, `POST /browser/mode` (`{"mode": "own"\|"attach"}`)              | which Chrome Dot browses with and what Chrome allows; switch it (409 while runs are active, 422 when Chrome refuses) |
+| `POST /browser/debug-port` (`{"debug_port": 9222}`, 0 for none)                 | the DevTools port of Dot's own Chrome (409 while runs are active, 422 when another program holds the port) |
 | `POST /desktop/permissions`                                                     | make macOS ask for the desktop permissions the daemon lacks  |
 
 `POST /runs`, `POST /runs/{id}/steer` and `POST /threads/{id}/queue` take a `key` of the caller's own (16 to 64 letters,
@@ -1788,6 +1789,16 @@ way, Settings says what it waits for, and after a failed one it shows how Chrome
 service takes up on its next start. The same tab's switch "Bring
 Chrome to the front while working" is `POST /api/browser/raise` with `{"raise_window": true}` or `false`: it takes
 effect at the next browser call, Chrome is not restarted, and the value is written to `config.toml` the same way.
+
+`[browser] debug_port` (0, none, by default) is a port of this Mac on which Dot's own Chrome also takes DevTools
+connections, besides Playwright's pipe (item 265): Chrome listens on `127.0.0.1:<port>`, and a run whose browser is
+Dot's own is told the address in its instructions, so a script it writes can drive Chrome with the Chrome DevTools
+Protocol (Playwright's `connect_over_cdp`, Puppeteer's `connect`) in tabs of its own. A port another program holds
+keeps Dot's Chrome from starting, with an error that names the port, so a script told the address never drives
+another Chrome. Settings › Browser sets it (`POST /api/browser/debug-port`, refused while runs are active and when the
+port is taken): Dot's Chrome, open on another port, is closed and starts on the new one with the next call that needs
+it, and the value is written to `config.toml`. The port asks for no token: while Dot's Chrome runs, any program on
+this Mac can connect to it and drive Chrome with the sign-ins of Dot's profile.
 
 Both modes share what follows.
 

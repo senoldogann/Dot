@@ -26,6 +26,7 @@ from playwright.async_api import Error as PlaywrightError
 from pydantic import JsonValue
 
 from dotagent.browser.attach import INSPECT_PAGE, DebugEndpoint, endpoint_url, read_debug_endpoint, redact_endpoint
+from dotagent.browser.devtools import devtools_switches, port_is_taken, port_taken
 from dotagent.browser.driver import (
     bring_to_front,
     capture_lines,
@@ -316,7 +317,9 @@ class BrowserSession:
                 return await self._attach()
 
     async def _launch_own(self) -> _Opened:
-        """Start Dot's own Chrome on its own profile."""
+        """Start Dot's own Chrome on its own profile, taking DevTools connections on ``[browser] debug_port`` when
+        one is set (item 265): a port another program holds stops the start, so that no script told the address drives
+        another Chrome."""
         config: BrowserConfig = self._config
         holder: int | None = await asyncio.to_thread(profile_holder_pid, self._profile)
         if holder is not None:
@@ -324,6 +327,8 @@ class BrowserSession:
                 "the Dot browser profile is open in another process; close that Chrome window and try again",
                 {"profile": str(self._profile), "pid": holder},
             )
+        if config.debug_port and await asyncio.to_thread(port_is_taken, config.debug_port):
+            raise port_taken(config.debug_port)
         keychain: KeychainMode = await asyncio.to_thread(read_keychain_mode, self._profile)
         playwright: Playwright = await self._driver()
         # With the window kept in the background (item 97), whoever has the focus now gets it back after the launch.
@@ -341,7 +346,7 @@ class BrowserSession:
                 chromium_sandbox=True,
                 # The cookies of the profile must be read with the key they were written with (see keychain.py).
                 ignore_default_args=[*_PLAYWRIGHT_SWITCHES_LEFT_OUT, *playwright_defaults_to_drop(keychain)],
-                args=[*_LAUNCH_ARGS, *keychain_switches(keychain)],
+                args=[*_LAUNCH_ARGS, *keychain_switches(keychain), *devtools_switches(config.debug_port)],
             )
         )
         try:
@@ -367,6 +372,7 @@ class BrowserSession:
             channel=config.channel,
             headless=config.headless,
             raise_window=config.raise_window,
+            debug_port=config.debug_port,
             profile=str(self._profile),
             keychain=keychain,
         )
@@ -497,6 +503,26 @@ class BrowserSession:
         """Whether the window is raised while a run works, from the next call on; Chrome is not restarted."""
         self._config = self._config.model_copy(update={"raise_window": raise_window})
         _log.info("browser_raise_window", raise_window=raise_window)
+
+    async def set_debug_port(self, port: int) -> None:
+        """The port Dot's own Chrome takes DevTools connections on (item 265; 0 for none), from its next start: Dot's
+        own Chrome, when it runs on another port, is closed, so that the next call starts it on this one. Refused while
+        a thread is in the middle of a step, as a switch is, and when another program holds the port; nothing changes
+        then."""
+        async with self._launch_lock:
+            if self._closed:
+                raise BrowserError("the browser session was closed", {})
+            if port == self._config.debug_port:
+                return
+            if port and await asyncio.to_thread(port_is_taken, port):
+                raise port_taken(port)
+            busy: list[JsonValue] = [thread_id for thread_id, thread in self._threads.items() if thread.lock.locked()]
+            if busy:
+                raise BrowserError("the browser is in use; wait for the running work to finish", {"threads": busy})
+            if self._config.mode == "own":
+                await self._let_go()
+            self._config = self._config.model_copy(update={"debug_port": port})
+            _log.info("browser_debug_port", mode=self._config.mode, debug_port=port)
 
     async def switch(self, config: BrowserConfig, profile_dir: Path) -> None:
         """Work in the Chrome that ``config`` and ``profile_dir`` name from the next call on: the current one is let go

@@ -39,6 +39,12 @@ class BrowserPool:
             self._others[mode] = found
         return found
 
+    async def set_debug_port(self, port: int) -> None:
+        """The port Dot's own Chrome takes DevTools connections on (item 265), for every session: the own Chrome of a
+        campaign takes it as well."""
+        for session in (self.main, *self._others.values()):
+            await session.set_debug_port(port)
+
     async def aclose(self) -> None:
         """Close every session; one that fails to close does not keep the others open (the error is raised once all
         were tried)."""

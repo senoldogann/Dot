@@ -264,6 +264,9 @@ class BrowserConfig(FrozenModel):
     headless: bool
     # Whether Dot's Chrome is brought to the front while a run works (item 97); Take over brings it either way.
     raise_window: bool
+    # The port of this Mac on which Dot's own Chrome also takes DevTools connections, from a run's scripts (item 265);
+    # 0 for none.
+    debug_port: int = Field(ge=0, le=65535)
     # A page Chrome can open: from a small phone's to a 4K screen's.
     viewport_width: int = Field(ge=320, le=3840)
     viewport_height: int = Field(ge=240, le=2160)

@@ -5203,7 +5203,7 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 262 | The sandbox of a run's commands switches on and off in Settings                       | done        | eb6b1dc |
 | 263 | A run runs JavaScript in its own tab                                                  | done        | 24a22d2 |
 | 264 | Dot's own Chrome loads extensions                                                     | in progress |         |
-| 265 | Dot's own Chrome can take DevTools connections from a run's scripts                   | planned     |         |
+| 265 | Dot's own Chrome can take DevTools connections from a run's scripts                   | in progress |         |
 | 266 | A batch carries several public or social actions while no pace is set                 | planned     |         |
 
 ### 77. The type system: Inter and Geist Mono, seven sizes, three weights
@@ -11723,7 +11723,24 @@ works there, as it does in the owner's Chrome.
 
 ### 265. Dot's own Chrome can take DevTools connections from a run's scripts
 
-**Status: planned.**
+**Status: in progress.** Built on `item-265-debug-port`.
+
+**As built (2026-10-15).** `config.py`, `defaults.toml`: `[browser] debug_port` (0 to 65535, 0 for none).
+`browser/devtools.py` (new): `port_is_taken` (a program that listens on the loopback port, or is bound to it),
+`port_taken` (the error that names the port), `devtools_switches` (`--remote-debugging-port`) and `devtools_address`
+(Dot's own Chrome with a port set, else none). `browser/session.py`: `_launch_own` refuses a taken port before
+Chrome starts and has Chrome listen on it; `set_debug_port` closes Dot's own Chrome open on another port, so that the
+next call starts it on the new one, and refuses a taken port or a thread in the middle of a step, changing nothing.
+`browser/pool.py`: the port goes to every session. `config_edit.py`: `debug_port`. `server/routes_browser.py` and
+`views.py`: `POST /api/browser/debug-port` (409 while runs are active), `debug_port` and `devtools_address` in the
+browser's view. `views/system.js`, `settings.css`: the port field of Settings › Browser and what it does.
+`agent/prompt.py`, `agent/loop.py`: the run's environment names the address when its browser is Dot's own Chrome with
+a port. README (the browser section, the API table). Tests: `tests/smoke/test_devtools_port.py` (new; a headless
+Chrome answers `/json/version` and `connect_over_cdp` on the port, sees the run's tab and works in a tab of its own
+while the session goes on; a taken port stops the start with its name and leaves the profile free; the API sets,
+keeps and refuses; Settings in Chrome wide and on a phone, light and dark, with a WebKit copy run and deleted),
+`tests/unit/test_devtools.py` (new; the address and the prompt line) and `tests/unit/test_config_edit.py`. They fail
+on the code of before. The other tests that build a prompt pass no address.
 
 **What.** `[browser] debug_port` (0, off, by default), set in Settings › Browser: Dot's own Chrome also listens for
 DevTools on that port of this Mac, and a run whose browser is Dot's Chrome is told the address, so that a script it

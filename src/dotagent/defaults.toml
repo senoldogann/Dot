@@ -445,6 +445,11 @@ headless = false
 # focus gets it back when Chrome starts, and switching tabs does not raise the window); the run's page shows the page
 # under "Dot's computer" either way, and Take over always brings the tab to the front. Settings › Browser switches it.
 raise_window = false
+# A port of this Mac (127.0.0.1) on which Dot's own Chrome also takes DevTools connections, so that a run's scripts can
+# drive it with the Chrome DevTools Protocol (Playwright's connect_over_cdp, Puppeteer); 0 for none. Another program
+# on the port keeps Dot's Chrome from starting, so that no script drives another Chrome. The port asks for no token:
+# any program on this Mac can drive Dot's Chrome through it while it runs. Settings › Browser sets it.
+debug_port = 0
 viewport_width = 1280
 viewport_height = 860
 navigation_timeout_s = 30.0
