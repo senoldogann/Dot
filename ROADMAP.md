@@ -11852,14 +11852,18 @@ PowerPoint.
 code or a link with words of its own). `attachments.js`: a text of 2,000 characters or 40 lines pasted into a message
 box goes as `pasted-text-<HHMMSS>.md` when it reads as Markdown, else `.txt`, uploaded at once while the message has
 room for a file (else it goes into the box); the pencil on a pasted file's chip puts the text back at the caret; the
-name in a chip is a button that opens its file once uploaded. `filepanel.js`: a `.md` or `.markdown` file shows
+name in a chip is a button that opens its file once uploaded; a send with files and no words asks for words (a paste
+leaves the box empty), and `composer.js` makes the send a Stop only while the box holds no text and no file, so that a
+paste into a working run's box never turns the button that sends it into the one that ends the run (both found by the
+review of 267, 269 and 270). `filepanel.js`: a `.md` or `.markdown` file shows
 formatted (prose.js, text nodes only) with Formatted and Source; `fileDialog` shows a file over a page without the
 panel. `main.js`: a file asked for outside a conversation opens in that dialog, while `views/run.js` keeps the request
 to its panel. `app.css`, `run.css`: the chip's button, the dialog, a Markdown file's headings as a document's. README:
 the attachments and the panel. Tests: `tests/smoke/test_paste_as_file.py` (new; in the new chat's box a long Markdown
-paste and a long plain one become `.md` and `.txt` files and a short one stays the box's, the pencil puts the text back,
-the chip opens the formatted file in a dialog with its source a click away; wide and on a phone, light and dark, and
-once in WebKit) and `tests/smoke/test_file_panel.py` (a Markdown file formatted with its source a click away; a long
+paste and a long plain one become `.md` and `.txt` files and a short one stays the box's, a send with only the files
+asks for words and starts nothing, the pencil puts the text back, the chip opens the formatted file in a dialog with its
+source a click away, and on a run at work a paste keeps the send a send; wide and on a phone, light and dark, and once in
+WebKit) and `tests/smoke/test_file_panel.py` (a Markdown file formatted with its source a click away; a long
 paste in a conversation's box opens beside it; once in WebKit too). They fail on the code of before. The pencil, not a
 key, puts the text back, so that a phone can do it too.
 

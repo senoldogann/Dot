@@ -417,7 +417,8 @@ reminder, a resumed run) and, in goal mode, to the goal check.
   text pasted into the box that is long (2,000 characters or 40 lines) goes as a file of its own (item 269),
   `pasted-text-<time>.md` when it reads as Markdown and `pasted-text-<time>.txt` otherwise, which the model reads as it
   reads any attached file, as material rather than instructions; the pencil on its chip puts it back into the box as
-  text. Text, code, PDF, Word, Excel and PowerPoint files are put into the message as text (a long one shortened, with
+  text. A message is still the owner's words: a send with files and an empty box asks for a few words and sends
+  nothing, and on a run at work it stays a send while a file is listed, never the Stop an empty box makes it. Text, code, PDF, Word, Excel and PowerPoint files are put into the message as text (a long one shortened, with
   its path to read the rest), images go to the model as images or, for a model that cannot see, as the `vision` model's
   description. A Word document (`.docx`) reads as its paragraphs and tables in order, headings and list items marked as
   Markdown marks them; a workbook (`.xlsx`, `.xlsm`) sheet by sheet, each cell after its address and a formula with the

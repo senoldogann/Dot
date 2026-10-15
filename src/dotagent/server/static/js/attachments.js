@@ -74,8 +74,8 @@ export function sentFiles(files) {
  * dropped files and `input` pasted ones, and a long text pasted into `input` as a file (item 269), which can be put back
  * into the box as text. A file uploaded opens beside the conversation from its chip (`requestFile`). `ids()` names the
  * uploaded files for the message, `ready()` describes them (`{ id, name, size }`) for a draft and `restore(files)` lists
- * them again from one, `busy()` is true while one is still uploading, `clear()` empties the list after the message
- * went, and `onChange()` runs after every change.
+ * them again from one, `count()` counts the files listed, whatever their state, `busy()` is true while one is still
+ * uploading, `clear()` empties the list after the message went, and `onChange()` runs after every change.
  */
 export function createAttachments({ dropTarget, input, onChange }) {
   const entries = [];
@@ -243,6 +243,7 @@ export function createAttachments({ dropTarget, input, onChange }) {
       }
       paint();
     },
+    count: () => entries.length,
     busy: () => entries.some((entry) => entry.state === "uploading"),
     failed: () => entries.some((entry) => entry.state === "failed"),
     clear: () => {
@@ -251,6 +252,16 @@ export function createAttachments({ dropTarget, input, onChange }) {
       }
     },
   };
+}
+
+/**
+ * A message is the owner's words, and the files that come with it are material to work with: with files listed and no
+ * words, a send says so rather than nothing (item 269), since a long paste leaves the box empty.
+ */
+export function askForWords(attachments) {
+  if (attachments.count() > 0) {
+    toast("error", "Say in a few words what to do with the files, or put a pasted text back into the box with its pencil");
+  }
 }
 
 /** Whether a message may go now; says why not when files are still uploading or failed. */

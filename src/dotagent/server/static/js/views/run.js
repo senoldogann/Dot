@@ -6,7 +6,7 @@ import { agentList } from "../agentlist.js";
 import { api, follow } from "../api.js";
 import { BUSY_SEND, valueOf } from "../appearance/settings.js";
 import { approvalCard, fromRecord, LEFT_IN_CAMPAIGN, LEFT_IN_RUN } from "../approvals.js";
-import { readyToSend } from "../attachments.js";
+import { askForWords, readyToSend } from "../attachments.js";
 import { backgroundWork } from "../background.js";
 import { runChoices } from "../choices.js";
 import { createComputer } from "../computer.js";
@@ -608,6 +608,7 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
     }
     const text = input.value.trim();
     if (text === "") {
+      askForWords(attachments);
       input.focus();
       return;
     }

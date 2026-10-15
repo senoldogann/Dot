@@ -5,7 +5,7 @@
 
 import { actorFace, dotFace, fallbackLook, rememberLook } from "../actors.js";
 import { api } from "../api.js";
-import { readyToSend } from "../attachments.js";
+import { askForWords, readyToSend } from "../attachments.js";
 import { composerFrame } from "../composer.js";
 import { ago, clip, el, modelName } from "../dom.js";
 import { allModels, levelLabel } from "../efforts.js";
@@ -330,6 +330,9 @@ function agentComposer(record, ctx) {
 
   async function submit() {
     const text = goal.value.trim();
+    if (text === "" && !starting) {
+      askForWords(attachments);
+    }
     if (starting || text === "") {
       goal.focus();
       return;
