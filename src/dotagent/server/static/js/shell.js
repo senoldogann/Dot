@@ -5,7 +5,7 @@
 import { el } from "./dom.js";
 import { releaseFailsafe } from "./failsafe.js";
 import { icon } from "./icons.js";
-import { setSidebarOpen, sidebarOpen, trackStagebar } from "./layout.js";
+import { holdBarInSight, setSidebarOpen, sidebarOpen, trackStagebar } from "./layout.js";
 import { installShortcuts, requestCompose } from "./shortcuts.js";
 import { buildSidebar } from "./sidebar.js";
 import { stageTitleSlot, stageToolsSlot } from "./stage.js";
@@ -105,6 +105,7 @@ export function buildShell({ homeRoute }) {
   );
   const stage = el("div", { class: "stage" }, stagebar, main);
   trackStagebar(stagebar);
+  holdBarInSight(stagebar);
   const scrim = el("div", { class: "scrim", onclick: closeToOpener });
   const frame = el("div", { class: "shell" }, sidebar.element, scrim, stage);
 

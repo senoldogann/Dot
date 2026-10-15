@@ -69,6 +69,12 @@
   /* The least a box's text is on a touch screen: iOS zooms the page into a box whose text is smaller as it gets the
      focus (item 273). */
   --touch-text: 16px;
+  /* The screen's safe areas (item 275): where a phone's rounded corners, notch and home indicator are, for a page that
+     runs to the screen's edges as the app added to the home screen does; 0 elsewhere. */
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-right: env(safe-area-inset-right, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left: env(safe-area-inset-left, 0px);
   --code-size: 13px;
   --code-leading: calc(var(--code-size) * 18 / 13);
   --weight-text: 400;
@@ -145,8 +151,12 @@
   box-sizing: border-box;
 }
 
+/* On a phone a double tap does not zoom, and the page does not stretch past its ends and take the top bar along
+   (item 275). */
 html {
   -webkit-text-size-adjust: 100%;
+  touch-action: manipulation;
+  overscroll-behavior: none;
 }
 
 body {
@@ -835,11 +845,15 @@ a.pill:hover {
   line-height: var(--leading-ui);
 }
 
-/* A select draws its own chevron (static/icons/chevron.svg, a grey that reads in both schemes); the native one is hidden. */
+/* A select draws its own chevron (static/icons/chevron.svg, a grey that reads in both schemes); the native one is hidden.
+   It clips its chosen label: WebKit draws a long one past the box and widens the page by it (item 275). */
 .select {
   width: auto;
   max-width: 100%;
   padding-right: 32px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   appearance: none;
   background: var(--surface) url("../icons/chevron.svg") no-repeat right 8px center / 16px 16px;
 }
@@ -1730,16 +1744,20 @@ a.pill:hover {
   user-select: none;
 }
 
-/* On a phone, and on any touch screen, the box's text is never under --touch-text, and its copy keeps the same size and
-   leading (item 273). */
+/* On a phone, and on any touch screen, no text field's text is under --touch-text (item 275), and the composer's box,
+   whose size the owner chooses, never under it either, its copy keeping the same size and leading (item 273). */
 @media (max-width: 720px), (pointer: coarse) {
+  :root :is(input:not([type="checkbox"], [type="radio"], [type="range"], [type="color"], [type="file"]), select, textarea) {
+    font-size: max(var(--touch-text), 1em);
+  }
+
   .composer {
     --composer-touch-size: max(var(--touch-text), var(--composer-size));
     --composer-touch-leading: calc(var(--composer-touch-size) * var(--composer-leading-ratio));
   }
 
-  .composer .textarea,
-  .composer .composer-mirror {
+  :root .composer .textarea,
+  :root .composer .composer-mirror {
     font-size: var(--composer-touch-size);
     line-height: var(--composer-touch-leading);
   }
@@ -3155,6 +3173,7 @@ details[open] > summary .chev {
   max-width: 100%;
 }
 
+/* A note breaks a path or a command too long for its line rather than widen the page (item 275). */
 .note {
   display: flex;
   align-items: flex-start;
@@ -3162,6 +3181,11 @@ details[open] > summary .chev {
   padding: 0 4px;
   color: var(--muted);
   font-size: var(--text-sm);
+  overflow-wrap: anywhere;
+}
+
+.note > span {
+  min-width: 0;
 }
 
 .note .icon {
@@ -3877,11 +3901,12 @@ details[open] > summary .chev {
   white-space: nowrap;
 }
 
+/* The dock keeps the composer above a phone's home indicator (item 275). */
 .dock {
   position: sticky;
   bottom: 0;
   margin-top: 24px;
-  padding: 16px 0 16px;
+  padding: 16px 0 calc(16px + var(--safe-bottom));
   background: linear-gradient(to top, var(--bg) 72%, transparent);
 }
 
@@ -4331,8 +4356,8 @@ details[open] > summary .chev {
 
 .toast-region {
   position: fixed;
-  right: 18px;
-  bottom: 18px;
+  right: calc(18px + var(--safe-right));
+  bottom: calc(18px + var(--safe-bottom));
   z-index: 60;
   display: flex;
   flex-direction: column;

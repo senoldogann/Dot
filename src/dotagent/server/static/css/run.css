@@ -626,14 +626,15 @@
 }
 
 /* On a narrow page the panel slides in over the conversation (item 85): inspector.js shows it, then opens it on the
-   next frame; closing, it waits for the slide before it hides. The scrim fades with it. */
+   next frame; closing, it waits for the slide before it hides. The scrim fades with it. It keeps out of a phone's safe
+   areas (item 275). */
 .inspector[data-mode="drawer"] {
   position: fixed;
   inset: 0 0 0 auto;
   z-index: 40;
   width: min(360px, 92vw);
   max-height: none;
-  padding: 16px 0 24px;
+  padding: calc(16px + var(--safe-top)) var(--safe-right) calc(24px + var(--safe-bottom)) 0;
   border: 0;
   border-left: 1px solid var(--border);
   border-radius: 0;
