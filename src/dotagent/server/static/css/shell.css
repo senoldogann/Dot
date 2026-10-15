@@ -33,11 +33,19 @@
 
 /* ---------- stage ---------- */
 
+/* Turned sideways, a phone's notch and corners are at the stage's sides; the sidebar keeps the left one while it is
+   beside the stage (item 275). */
 .stage {
   min-width: 0;
   display: flex;
   flex-direction: column;
   min-height: 100vh;
+  padding-right: var(--safe-right);
+  padding-left: var(--safe-left);
+}
+
+.shell[data-nav="docked"][data-sidebar="open"] .stage {
+  padding-left: 0;
 }
 
 .stage > .page {
@@ -50,11 +58,14 @@
 }
 
 /* The top bar (item 78): one solid bar on every page with a hairline under it; nothing scrolls under a blur. It
-   carries the sidebar opener, the page's name (stage.js), the page's tools and the daemon's pills. */
+   carries the sidebar opener, the page's name (stage.js), the page's tools and the daemon's pills. It keeps out of a
+   phone's top safe area, and layout.js holds it at the top of what is seen while the keyboard pans the page (item
+   275). */
 .stagebar {
   position: sticky;
   top: 0;
   z-index: 20;
+  padding-top: var(--safe-top);
   background: var(--bg);
   border-bottom: 1px solid var(--border);
 }
@@ -90,6 +101,9 @@
   flex-direction: column;
   height: 100vh;
   height: 100dvh;
+  /* Out of a phone's top and left safe areas; its foot keeps out of the bottom one (item 275). */
+  padding-top: var(--safe-top);
+  padding-left: var(--safe-left);
   /* A tone darker than the page and no line between them (item 121). */
   background: var(--sidebar);
 }
@@ -502,13 +516,13 @@
 }
 
 /* The foot holds the way to the settings (the look itself is chosen there) and, at the right of its row, the emergency
-   stop (item 120). */
+   stop (item 120), above a phone's home indicator and out of its rounded corners (item 275). */
 .side-foot {
   flex: none;
   display: flex;
   align-items: center;
   gap: 4px;
-  padding: 8px;
+  padding: 8px 8px calc(8px + var(--safe-bottom));
 }
 
 .side-foot > .side-link {

@@ -1,0 +1,346 @@
+"""On a phone the page fits the screen and holds still (item 275), on a served daemon, in WebKit as the narrowest and
+the widest iPhone and in Chrome as a Pixel, with the meta viewport and touch on. No page of Dot slides sideways, every
+Settings tab, a run whose message holds a long link, a long line of code and a wide table, and the sidebar open among
+them, and no text field there is under 16 px, below which iOS zooms the page into the field that gets the focus. With
+the safe areas of an iPhone added to the home screen, the bar, the sidebar's head and foot, the composer and the side
+panel keep out of them. While the keyboard pans the page, the bar stays at the top of what is seen. Before, Settings ›
+Models slid 51 px on an iPhone SE, the names, the selects, the searches and the sign-in's fields were 13 or 14 px, the
+sidebar's foot sat 8 px from the screen's bottom edge whatever the safe area, and the bar went out of sight with a pan.
+
+No network and no model service is used: the model is a scripted one.
+"""
+
+import asyncio
+import time
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
+from pathlib import Path
+from typing import TypedDict
+
+import httpx
+import pytest
+from playwright.async_api import Browser, FloatRect, Locator, Page, Playwright, async_playwright, expect
+
+from dotagent.agent.manager import RunManager
+from dotagent.config import load_config
+from dotagent.core.paths import ensure_layout
+from dotagent.evals.runner import SCRIPTED_MODEL
+from dotagent.evals.scripted import ScriptedProvider
+from dotagent.evals.types import ScriptedCall, ScriptedTurn
+from dotagent.llm.router import parse_model_ref
+from dotagent.runtime import Runtime, build_runtime, close_runtime
+from dotagent.server.app import create_app
+from dotagent.server.context import ServerContext
+from dotagent.server.daemon import DotServer, bind_listener, serving_config
+from dotagent.server.links import ui_url
+from dotagent.store.models import RunRecord
+from dotagent.tools.meta import FINISH_TOOL
+
+pytestmark = [pytest.mark.browser, pytest.mark.asyncio]
+
+TOKEN: str = "phone-fit-test-token"
+_PROVIDER: str = parse_model_ref(SCRIPTED_MODEL).provider
+MESSAGE: str = (
+    "A long link: https://example.com/" + "a" * 160 + "\n\n"
+    "```\nvalue = " + "1234567890" * 16 + "\n```\n\n"
+    "| "
+    + " | ".join(f"Column {number}" for number in range(1, 10))
+    + " |\n|"
+    + "---|" * 9
+    + "\n| "
+    + " | ".join("a value" for _ in range(9))
+    + " |\n\n"
+    + "A word too long for any line: "
+    + "Donaudampfschifffahrtsgesellschaftskapitän" * 2
+    + "."
+)
+TABS: tuple[str, ...] = (
+    "general",
+    "appearance",
+    "models",
+    "keys",
+    "browser",
+    "rules",
+    "memory",
+    "skills",
+    "schedules",
+    "phone",
+    "system",
+)
+# The narrowest iPhone and the owner's, in WebKit, and an Android phone in Chrome.
+_PHONES: tuple[tuple[str, str], ...] = (
+    ("webkit", "iPhone SE"),
+    ("webkit", "iPhone 17 Pro Max"),
+    ("chromium", "Pixel 7"),
+)
+_OWNERS_PHONE: str = "iPhone 17 Pro Max"
+# The safe areas of an iPhone with a home indicator, as an app added to its home screen has them.
+_SAFE_TOP_PX: int = 47
+_SAFE_BOTTOM_PX: int = 34
+# Set on the page as the page sets its own measures; the content security policy keeps a stylesheet out.
+_SAFE: str = (
+    f"() => {{ document.documentElement.style.setProperty('--safe-top', '{_SAFE_TOP_PX}px');"
+    f" document.documentElement.style.setProperty('--safe-bottom', '{_SAFE_BOTTOM_PX}px'); }}"
+)
+# How far the keyboard pans the page in the check of the bar.
+_PAN_PX: int = 300
+_FIT: str = """() => {
+  const root = document.scrollingElement;
+  const before = window.scrollX;
+  window.scrollTo(400, window.scrollY);
+  const slid = window.scrollX;
+  window.scrollTo(before, window.scrollY);
+  const small = [...document.querySelectorAll('input, select, textarea')]
+    .filter((node) => !['checkbox', 'radio', 'range', 'color', 'file', 'hidden'].includes(node.type))
+    .filter((node) => node.getClientRects().length > 0)
+    .filter((node) => parseFloat(getComputedStyle(node).fontSize) < 16)
+    .map((node) => (node.getAttribute('aria-label') ?? node.getAttribute('placeholder') ?? node.className) + ' '
+      + getComputedStyle(node).fontSize);
+  return { wider: root.scrollWidth - root.clientWidth, slid, small };
+}"""
+# A visual viewport that the test pans, as iOS's keyboard pans the page.
+_KEYBOARD: str = """(() => {
+  const seen = new EventTarget();
+  let top = 0;
+  Object.defineProperty(seen, 'offsetTop', { get: () => top });
+  seen.panTo = (value) => { top = value; seen.dispatchEvent(new Event('scroll')); };
+  Object.defineProperty(window, 'visualViewport', { configurable: true, get: () => seen });
+})();"""
+
+
+class Fit(TypedDict):
+    wider: float
+    slid: float
+    small: list[str]
+
+
+@pytest.fixture
+def own_home(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+    home: Path = tmp_path / "home"
+    monkeypatch.setenv("DOT_HOME", str(home))
+    monkeypatch.setenv("DOT_CHROME_DIR", str(tmp_path / "chrome"))
+    ensure_layout()
+    return home
+
+
+@asynccontextmanager
+async def _served(home: Path) -> AsyncIterator[tuple[RunManager, str]]:
+    """A daemon on the Dot home ``home`` whose main model is the scripted one: its run manager and its address."""
+    (home / "config.toml").write_text(
+        f'[browser]\nheadless = true\n\n[models]\nmain = "{SCRIPTED_MODEL}"\n', encoding="utf-8"
+    )
+    runtime: Runtime = await build_runtime(load_config(home / "config.toml"))
+    finish: ScriptedCall = ScriptedCall(tool=FINISH_TOOL, arguments={"answer": "Here it is.", "success": True})
+    turns: list[ScriptedTurn] = [ScriptedTurn(text=MESSAGE, calls=(finish,)) for _ in range(2)]
+    await runtime.router.register(_PROVIDER, ScriptedProvider(_PROVIDER, turns))
+    manager: RunManager = RunManager(runtime)
+    try:
+        stopping: asyncio.Event = asyncio.Event()
+        listener = bind_listener("127.0.0.1", 0)
+        port: int = listener.getsockname()[1]
+        context: ServerContext = ServerContext(
+            runtime=runtime,
+            manager=manager,
+            scheduler=None,
+            token=TOKEN,
+            host="127.0.0.1",
+            port=port,
+            started_at=time.time(),
+            stopping=stopping,
+        )
+        server: DotServer = DotServer(serving_config(create_app(context)), stopping)
+        serving: asyncio.Task[None] = asyncio.create_task(server.serve(sockets=[listener]))
+        while not server.started:
+            assert not serving.done(), "the server stopped while starting"
+            await asyncio.sleep(0.05)
+        try:
+            yield manager, f"http://127.0.0.1:{port}"
+        finally:
+            server.should_exit = True
+            stopping.set()
+            await serving
+    finally:
+        await manager.shutdown()
+        await close_runtime(runtime)
+
+
+async def _box(locator: Locator) -> FloatRect:
+    found: FloatRect | None = await locator.bounding_box()
+    assert found is not None
+    return found
+
+
+async def _phone(playwright: Playwright, browser: Browser, device: str, address: str) -> Page:
+    context = await browser.new_context(**playwright.devices[device], reduced_motion="reduce")
+    page: Page = await context.new_page()
+    await page.goto(ui_url("127.0.0.1", int(address.rpartition(":")[2]), TOKEN))
+    return page
+
+
+async def _misfits(page: Page, where: str) -> list[str]:
+    fit: Fit = await page.evaluate(_FIT)
+    found: list[str] = []
+    if fit["wider"] > 0 or fit["slid"] > 0:
+        found.append(f"{where}: {fit['wider']} px wider than the screen, slides {fit['slid']} px")
+    if fit["small"]:
+        found.append(f"{where}: fields under 16 px: {fit['small']}")
+    return found
+
+
+async def _pages_of(playwright: Playwright, browser: Browser, device: str, address: str, run_id: str) -> list[str]:
+    page: Page = await _phone(playwright, browser, device, address)
+    found: list[str] = []
+    hashes: list[str] = ["#/activity", "#/runs", f"#/runs/{run_id}", "#/agents", "#/campaigns"]
+    hashes.extend(f"#/settings/{tab}" for tab in TABS)
+    for where in hashes:
+        await page.goto(f"{address}/{where}")
+        await expect(page.locator("main.page")).not_to_be_empty()
+        await page.wait_for_timeout(300)
+        found.extend(await _misfits(page, f"{device} {where}"))
+    await page.goto(f"{address}/#/runs/{run_id}")
+    await expect(page.get_by_text("Column 9")).to_be_visible()
+    await page.get_by_role("button", name="Show sidebar").click()
+    await expect(page.get_by_role("complementary", name="Sidebar")).to_be_visible()
+    found.extend(await _misfits(page, f"{device} the sidebar"))
+    await page.context.close()
+    signed_out = await browser.new_context(**playwright.devices[device])
+    sign_in: Page = await signed_out.new_page()
+    await sign_in.goto(f"{address}/")
+    await expect(sign_in.locator("input").first).to_be_visible()
+    found.extend(await _misfits(sign_in, f"{device} the sign-in"))
+    await signed_out.close()
+    return found
+
+
+async def test_no_page_slides_sideways_or_has_a_field_under_16_px_on_a_phone(own_home: Path) -> None:
+    async with _served(own_home) as (manager, address), async_playwright() as playwright:
+        async with httpx.AsyncClient(base_url=address, headers={"Authorization": f"Bearer {TOKEN}"}) as client:
+            made: httpx.Response = await client.post(
+                "/api/agents",
+                json={
+                    "name": "Scout",
+                    "role": "Finds and checks sources",
+                    "instructions": "Prefer primary sources.",
+                    "model": "",
+                    "effort": None,
+                    "approvals": None,
+                    "tools": [],
+                },
+            )
+            assert made.status_code == 201, made.text
+        run: RunRecord = await manager.start(
+            "Show me the long things",
+            "task",
+            SCRIPTED_MODEL,
+            None,
+            "test",
+            None,
+            None,
+            "standard",
+            None,
+            "ask",
+            False,
+            (),
+        )
+        await manager.wait(run.id)
+        found: list[str] = []
+        for engine, device in _PHONES:
+            browser: Browser = await getattr(playwright, engine).launch(
+                **({"channel": "chrome"} if engine == "chromium" else {}), headless=True
+            )
+            try:
+                found.extend(await _pages_of(playwright, browser, device, address, run.id))
+            finally:
+                await browser.close()
+        assert found == [], "\n".join(found)
+
+
+async def test_the_bar_the_sidebar_the_composer_and_the_panel_keep_out_of_the_safe_areas(
+    own_home: Path, tmp_path: Path
+) -> None:
+    async with _served(own_home) as (manager, address), async_playwright() as playwright:
+        run: RunRecord = await manager.start(
+            "Show me the long things",
+            "task",
+            SCRIPTED_MODEL,
+            None,
+            "test",
+            None,
+            None,
+            "standard",
+            None,
+            "ask",
+            False,
+            (),
+        )
+        await manager.wait(run.id)
+        browser: Browser = await playwright.webkit.launch(headless=True)
+        try:
+            page: Page = await _phone(playwright, browser, _OWNERS_PHONE, address)
+            await page.goto(f"{address}/#/runs/{run.id}")
+            await expect(page.get_by_text("Column 9")).to_be_visible()
+            # A double tap does not zoom, and the page does not stretch past its ends.
+            assert await page.evaluate("getComputedStyle(document.documentElement).touchAction") == "manipulation"
+            assert await page.evaluate("getComputedStyle(document.documentElement).overscrollBehaviorY") == "none"
+            await page.evaluate(_SAFE)
+            height: int = await page.evaluate("window.innerHeight")
+            bar: FloatRect = await _box(page.locator(".stagebar-row"))
+            assert bar["y"] >= _SAFE_TOP_PX - 0.5, bar
+            composer: FloatRect = await _box(page.locator(".dock .composer"))
+            assert composer["y"] + composer["height"] <= height - _SAFE_BOTTOM_PX + 0.5, (composer, height)
+            await page.screenshot(path=str(tmp_path / "safe-run.png"))
+
+            await page.get_by_role("button", name="Show sidebar").click()
+            head: FloatRect = await _box(page.locator(".side-head"))
+            settings: FloatRect = await _box(page.locator(".side-foot .side-link"))
+            assert head["y"] >= _SAFE_TOP_PX - 0.5, head
+            assert settings["y"] + settings["height"] <= height - _SAFE_BOTTOM_PX + 0.5, (settings, height)
+            await page.screenshot(path=str(tmp_path / "safe-sidebar.png"))
+            await page.get_by_role("button", name="Hide sidebar").click()
+
+            await page.get_by_role("button", name="Run details").click()
+            panel: Locator = page.locator(".inspector[data-mode='drawer']")
+            await expect(panel).to_have_attribute("data-open", "true")
+            await page.wait_for_timeout(500)
+            tabs: FloatRect = await _box(panel.locator(".inspector-head"))
+            assert tabs["y"] >= _SAFE_TOP_PX - 0.5, tabs
+            await page.screenshot(path=str(tmp_path / "safe-panel.png"))
+            await page.context.close()
+        finally:
+            await browser.close()
+
+
+async def test_the_bar_stays_at_the_top_of_what_is_seen_while_the_keyboard_pans_the_page(own_home: Path) -> None:
+    async with _served(own_home) as (manager, address), async_playwright() as playwright:
+        run: RunRecord = await manager.start(
+            "Show me the long things",
+            "task",
+            SCRIPTED_MODEL,
+            None,
+            "test",
+            None,
+            None,
+            "standard",
+            None,
+            "ask",
+            False,
+            (),
+        )
+        await manager.wait(run.id)
+        browser: Browser = await playwright.webkit.launch(headless=True)
+        try:
+            context = await browser.new_context(**playwright.devices[_OWNERS_PHONE])
+            await context.add_init_script(_KEYBOARD)
+            page: Page = await context.new_page()
+            await page.goto(ui_url("127.0.0.1", int(address.rpartition(":")[2]), TOKEN))
+            await page.goto(f"{address}/#/runs/{run.id}")
+            await expect(page.get_by_text("Column 9")).to_be_visible()
+            top: str = "() => Math.round(document.querySelector('header.stagebar').getBoundingClientRect().top)"
+            assert await page.evaluate(top) == 0
+            await page.evaluate(f"window.visualViewport.panTo({_PAN_PX})")
+            await page.wait_for_function(f"(want) => ({top})() === want", arg=_PAN_PX)
+            await page.evaluate("window.visualViewport.panTo(0)")
+            await page.wait_for_function(f"() => ({top})() === 0")
+            await context.close()
+        finally:
+            await browser.close()

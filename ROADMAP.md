@@ -5212,7 +5212,15 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 271 | Settings › Phone sets up Tailscale and keeps the Mac awake                            | planned     |         |
 | 272 | The Settings tabs are one row on a phone, and it stays under the bar                  | done        | 2aa0600 |
 | 273 | On a phone the stop stays in the sidebar, the switches match, the level reads         | done        | 0eb267f |
-| 274 | A streamed message is drawn as it will stay                                           | in progress |         |
+| 274 | A streamed message is drawn as it will stay                                           | done        | 428ad94 |
+| 275 | On a phone the page fits the screen and holds still                                   | in progress |         |
+| 276 | The view of Dot's computer comes back by itself                                       | planned     |         |
+| 277 | Every chat wears a creature, its last message under its name                          | planned     |         |
+| 278 | Connect apps: the Mac's applications and the web's, set up from the sidebar           | planned     |         |
+| 279 | Connect apps: the tools of other services, over MCP, signed in from Dot               | planned     |         |
+| 280 | Dot starts lean: the fewest words and tools, the rest found when needed               | planned     |         |
+| 281 | A chat can be a loop that asks Dot again until it is done                             | planned     |         |
+| 282 | A chat can be rewound to an earlier message, its files with it                        | planned     |         |
 
 ### 77. The type system: Inter and Geist Mono, seven sizes, three weights
 
@@ -12010,7 +12018,7 @@ size, the level's word in sight and chosen from its menu, the box's text 16 px o
 
 ### 274. A streamed message is drawn as it will stay
 
-**Status: in progress.** Built on `item-274-stream-drawn`.
+**Status: done.** Merged as `428ad94` (PR #316; no Linear issue, the Linear connector was signed out).
 
 **As built (2026-10-15).** `timeline.js`: a live message is drawn in the frame after a piece comes, as the formatted
 prose it ends as (`prose.js`' `blockNode`), and a block read from the same lines as at the draw before stays as it was
@@ -12041,6 +12049,203 @@ while the page follows.
 ### How to start part 48 (the handoff prompt)
 
 > Read ROADMAP.md part 48 and the status table of part 9 (rows 272 to 274). The protocol of part 5 is unchanged; the
+> Linear connector is signed out, so say so in the PR. UI changes are checked on a phone and wide, light and dark, in
+> Chrome and WebKit.
+
+## Part 49: Creatures, apps, loops, less context, rewind, and a phone that holds still (planned 2026-10-15)
+
+The owner's fifty-first word, on 2026-10-15, from the phone, with four pictures: three sayings of Claude Code's maker
+and the sidebar of a chat application. "3. fotoğraftaki gibi bir sol menü yapalım, yani sohbetlerde hayvancık ikonları
+görünsün. Connect apps alanı da olsun ve oradan da uygulamalarla bağlantı kurabilelim. Kolay kurulum olsun, ne
+gerekiyorsa yönlendirsin. Ayrıca diğer 3 fotoğraf Claude Code kurucusunun önerileri; bizde onun bu söylediklerini dikkate
+alarak bir yapı ya da sistem geliştirelim, çünkü Dot 7/24 çalışan bir ajanın yanında kodlama, araştırma, computer use,
+browser use, her şeyde rol alacak. Belki de ileride cloud'da kendine ait bilgisayarı olacak. Bir diğer sorun: mobilde
+sürekli UI'da sağa sola kaymalar olabiliyor, zoom yapmalar vs.; bunun olmamasını sağla, her telefona tam oturan sabit bir
+UI. Ayrıca ekrana uygulamayı ekledikten sonra sol menüyü açtığımda Settings yazısı sanki telefonun biraz dışına çıkıyor;
+bu kaymayı da bul ve düzelt. Ayrıca mobilde sürekli 'the view' ile başlıyor ve error yazısı gösteriyor; tam göremedim
+ama bunu da kontrol et. Bir diğer şey ise üst menü mobilde her zaman sabit gelsin." (A sidebar like the picture's: a
+little creature for every chat. A Connect apps place to connect applications from, with an easy setup that leads the
+way. A structure after the three sayings, since Dot is to take part in coding, research, computer use and browser use
+besides working around the clock, and may one day have a computer of its own in a cloud. On the phone the page slides
+sideways and zooms; it is to hold still and fit every phone. In the app added to the home screen the sidebar's Settings
+seems to go off the screen. On the phone something starting "The view" shows an error. The top bar always in place on
+the phone.)
+
+The three sayings, as the pictures give them: "Try using loops. I don't talk to an agent anymore. I talk to a loop, or I
+talk to a routine, and it prompts Claude for me." (`/loop`) "Give Claude less context. Give it the minimal possible
+system prompt, the minimal possible tools, and then you let the model figure it out." (`/context`) "Be open to being
+wrong. I'm actually wrong so often now. So much of this engineering stuff that I've learned over the years I just have
+to throw out." (`/rewind`) The fourth picture: every chat a coloured creature with two eyes, its name in bold and its
+last message in grey under it, a blue dot at the right while it is unread; at the foot, the owner's picture and a
+Connect apps pill with three small application icons.
+
+What probes and a survey of the code measured the same day:
+
+- In WebKit as an iPhone SE, 13 and 14 Pro Max and in Chrome as a Pixel 7, the meta viewport and touch on, the page
+  slides sideways on Settings › Models alone: 51 px at 320 px, 9 px at 390 px. WebKit draws a select's chosen label past
+  the select's box (`appearance: none`) and counts it in the row's overflow, 342 px in a row of 262; Chrome clips it.
+- Text fields under 16 px, which iOS zooms the page into when they get the focus: the names of Settings › General
+  (14 px), the model selects (13 px), the sign-in's code and token fields (13 px), the searches, and every other input,
+  select and textarea but the composer's box.
+- No safe area is used: the meta viewport has no `viewport-fit=cover` and no rule reads `env(safe-area-inset-*)`. The
+  app added to the home screen runs to the screen's edges, so the sidebar's foot, Settings and the emergency stop 8 px
+  from the bottom and the left, sits in the rounded corner and under the home indicator.
+- The top bar is sticky and stays at the top as the page scrolls; iOS's rubber band at the top and its keyboard, which
+  pans the page without resizing it, take it out of sight.
+- "The view" is the toast "The view of Dot's computer stopped: …" of `computer.js`: the live view of the run's browser is
+  a stream that, unlike the run's own, is not made again when it breaks, as iOS breaks every stream of a page put in the
+  background.
+- A chat in the sidebar is a status dot, its title and its age. Agents have a look (8 shapes, 12 colours, 16
+  expressions); a chat has none, and no last message; unread is yes or no (item 131).
+- Apps: no connector and no OAuth. MCP servers are set in `config.toml` alone, with no page to add, try or remove one;
+  keys are for model providers; the Mac's applications are driven through AppleScript; My Chrome lends the owner's
+  signed-in browser (item 261).
+- Context: a task run's first step carries a system prompt of 25,591 characters and 57 tool schemas of 45,348, about
+  22 k tokens at the loop's 3.2 characters a token. Tool groups exist (`tool_surface = "grouped"`, `use_tools`), but the
+  default is "full" until evals show that groups help.
+- Loops: schedules (cron or once), campaigns (sessions that plan the next until a check accepts the outcome) and goal
+  mode (a checker sends a run back to work); a chat cannot be a loop.
+- Rewind: the file tools' writes can be taken back per run and file (item 8); nothing rewinds a chat, forks it or edits a
+  sent message.
+
+A computer of Dot's own in a cloud is not planned: commands, the browser and the desktop are called on the Mac directly,
+and such a machine would first need the one seam where work runs. Until the owner asks for it, items keep that seam in
+mind and do not tie new work to the Mac where they need not.
+
+### 275. On a phone the page fits the screen and holds still
+
+**Status: in progress.** Built on `item-275-phone-holds-still`.
+
+**As built (2026-10-15).** `index.html`: `viewport-fit=cover`. `app.css`: `--safe-top`, `--safe-right`,
+`--safe-bottom` and `--safe-left` over `env(safe-area-inset-*)`, kept out of by the bar and the sidebar's head
+(`shell.css`), the sidebar's foot, the stage turned sideways, the composer's dock, the side panel as a drawer
+(`run.css`) and the toasts; on `html`, `touch-action: manipulation` and `overscroll-behavior: none`; on a phone and on
+any touch screen every input, select and textarea at least `--touch-text` (`max(16px, 1em)`), the composer's box
+keeping its own size over it; a select clips its chosen label (WebKit drew it past the box and counted it in the row's
+width, so Settings › Models slid 51 px on an iPhone SE); a note breaks a path or a command too long for its line
+(Settings › API keys slid 143 px). `layout.js`: `holdBarInSight` moves the bar down by the visual viewport's offset,
+which iOS's keyboard pans, so the bar stays at the top of what is seen. README: the phone. Tests:
+`tests/smoke/test_phone_fit.py` (new): in WebKit as an iPhone SE and an iPhone 17 Pro Max and in Chrome as a Pixel 7,
+the meta viewport and touch on, no page slides sideways and no text field is under 16 px on Activity, the new chat, a
+run whose message holds a long link, a long line of code, a wide table and a long word, Agents, Campaigns, the eleven
+Settings tabs, the sidebar open and the sign-in; with an iPhone's safe areas set (47 px at the top, 34 at the bottom),
+the bar, the sidebar's head, Settings in its foot, the composer and the side panel keep out of them; a pan of the visual
+viewport by 300 px takes the bar 300 px down and back. They fail on the code of before: fields of 14 px (the search of
+the chats first), `touch-action: auto`, the bar at 0 under the top safe area, and the bar left behind by the pan.
+
+**What.** The page uses the screen's safe areas (`viewport-fit=cover`; the bar, the sidebar's foot, the composer and
+the side panel keep out of the rounded corners and the home indicator, through `--safe-*` tokens over
+`env(safe-area-inset-*)`). Every text field is at least 16 px on a phone and on any touch screen, so iOS never zooms
+into one; a double tap does not zoom (`touch-action: manipulation`); no page slides sideways (a select clips its label);
+the page does not stretch at its ends (`overscroll-behavior: none`); and the top bar stays at the top of what is seen,
+also while the keyboard is up.
+
+**Why.** The owner's ask: the page slides and zooms on the phone; the home-screen app's sidebar foot goes off the
+screen; the top bar is to stay.
+
+**Tests.** Smoke in WebKit as three iPhones and in Chrome as a Pixel: no page of Dot slides sideways (every Settings tab,
+a run with a long link, a long line of code and a wide table, the sidebar open); every visible text field at least
+16 px; with the bottom safe area set to an iPhone's 34 px, the sidebar's foot and the composer above it; the bar at the
+top of the seen page while the keyboard pans it.
+
+### 276. The view of Dot's computer comes back by itself
+
+**Status: planned.**
+
+**What.** The live view of the run's browser is made again when its stream breaks or goes silent, after the same pause
+as the run's own stream, with no toast; it stops while the page is out of sight and starts again when it is back. A
+stream the daemon refuses (the run is gone, the token is wrong) ends as today.
+
+**Why.** The owner's ask: on the phone a toast starting "The view" shows an error whenever the app comes back.
+
+**Tests.** Smoke: the view's stream broken once, and once silent; no toast, the next frame shown.
+
+### 277. Every chat wears a creature, its last message under its name
+
+**Status: planned.**
+
+**What.** A chat in the sidebar shows a creature of the character engine: the agent's look for a chat with an agent, a
+look of its own for one with Dot (a shape and a colour from its id); its name; its last message in one grey line under
+it; and the unread dot at the right. The creature works while the chat's run works, and looks as the run ended.
+
+**Why.** The owner's ask, after the picture: a creature for every chat.
+
+**Tests.** Smoke on a phone and wide, light and dark: every chat a creature, two chats with Dot two creatures, the last
+message under the name, the unread dot at the right; the creature at work while a run works.
+
+### 278. Connect apps: the Mac's applications and the web's, set up from the sidebar
+
+**Status: planned.**
+
+**What.** A Connect apps pill in the sidebar's foot opens a page of applications, each with what Dot needs to use it and
+one step to give it: the Mac's applications Dot drives (Mail, Calendar, Notes, Reminders, Messages, Excel, Word,
+PowerPoint, OneDrive, …), installed or not and allowed or not, where the step asks macOS and, if the answer was no,
+opens the right pane of System Settings with a line that says what to switch on; and web applications (Gmail, Google
+Calendar and Drive, Outlook, WhatsApp, Slack, Notion, GitHub, LinkedIn, X, Instagram, …), signed in in Dot's browser or
+not, where the step opens the sign-in page in Dot's browser, or says that My Chrome lends the owner's own.
+
+**Why.** The owner's ask: connect applications from the sidebar, with an easy setup that leads the way.
+
+**Tests.** Unit: the catalogue and the state of each kind. Smoke: the pill opens the page; an application allowed, one
+refused with its guide, a web application signed in and one not.
+
+### 279. Connect apps: the tools of other services, over MCP, signed in from Dot
+
+**Status: planned.**
+
+**What.** The same page lists the MCP servers Dot has, with their state and tools, and adds one from a short catalogue of
+services that offer one (Notion, Linear, GitHub, Atlassian, Asana, …) or by its address or command: Dot tries it, and a
+server that asks for a sign-in gets it in the browser (OAuth with PKCE, as MCP's authorization asks), the tokens kept
+with Dot's keys and renewed; a server can be removed.
+
+**Why.** The owner's ask; the services that offer tools over MCP are the shortest way to many applications.
+
+**Tests.** Unit: the authorization's steps against a scripted server. Smoke: a server added, tried, listed with its
+tools, removed.
+
+### 280. Dot starts lean: the fewest words and tools, the rest found when needed
+
+**Status: planned.**
+
+**What.** A run starts with a short system prompt and the core tools; the other groups of tools are named in a line and
+come when the run asks for them (`use_tools`), as `tool_surface = "grouped"` does. Evals of both ways on the same tasks
+and model decide the default: the lean way if it does as well with fewer tokens.
+
+**Why.** The second saying: the minimal possible system prompt and tools, and the model figures it out. A task run starts
+with about 22 k tokens of prompt and tools today.
+
+**Tests.** The evals' numbers in the as-built paragraph (passed tasks, steps, tokens), unit tests of the lean prompt's
+parts, `dotx eval check`.
+
+### 281. A chat can be a loop that asks Dot again until it is done
+
+**Status: planned.**
+
+**What.** `/loop` in the composer makes the message a loop of the chat: asked again every so often (`/loop 30m …`) or
+when the last run said to look again, in the same chat, until the owner stops it or a run says it is done. The chat
+shows that it loops, when it asks next and a Stop.
+
+**Why.** The first saying: talk to a loop, which prompts the agent.
+
+**Tests.** Unit: the loop's next time from a cadence and from a run's word. Smoke: a loop that asks twice in the chat
+and stops when its run says done; Stop ends it.
+
+### 282. A chat can be rewound to an earlier message, its files with it
+
+**Status: planned.**
+
+**What.** On a message of the owner's, Rewind to here: the changes the later runs made with the file tools are taken
+back (a command's are not, and the step says so), the later turns leave what the model reads and stay greyed in the
+chat, and the message comes back into the box to be changed and sent again.
+
+**Why.** The third saying: open to being wrong, with a way back.
+
+**Tests.** Unit: what a rewind takes back. Smoke: a chat of three turns rewound to the second; the file of the third as
+before it, the model's next run without the third.
+
+### How to start part 49 (the handoff prompt)
+
+> Read ROADMAP.md part 49 and the status table of part 9 (rows 275 to 282). The protocol of part 5 is unchanged; the
 > Linear connector is signed out, so say so in the PR. UI changes are checked on a phone and wide, light and dark, in
 > Chrome and WebKit.
 
@@ -12756,3 +12961,4 @@ while the page follows.
 - 2026-10-15 (Opus 5.5): item 267 merged as `a8c5cb0` (PR #313; no Linear issue, the connector was signed out): Settings › Phone gives a one-time pairing code (eight characters of Crockford's base32, ten minutes, five tries) that the sign-in screen of an app added to a phone's home screen trades for the token over the one public route besides the health check and the proof; only what can be a code is sent, so a token pasted into the code's field stays on the phone; neither the code nor the token is logged.
 - 2026-10-15 (Opus 5.5): item 272 merged as `2aa0600` (PR #314; no Linear issue, the connector was signed out): where the Settings tabs and the pane do not fit side by side, the tabs are one row that scrolls sideways with the open tab brought into sight and its edge fading while more lie beyond, and the row stays under the bar while the page scrolls; side by side they stay a column.
 - 2026-10-15 (Opus 5.5): item 273 merged as `0eb267f` (PR #315; no Linear issue, the connector was signed out): the bar beside a closed sidebar holds its opener alone, the emergency stop staying in the sidebar's foot; the side panel's switch and the drawer's close are the sidebar's buttons, 36 px with a 19 px icon; the reasoning pill keeps its level's word at every width; on a phone and on any touch screen the composer's text is at least 16 px, so that iOS does not zoom into it, and the bar's buttons are 36 px.
+- 2026-10-15 (Opus 5.5): item 274 merged as `428ad94` (PR #316; no Linear issue, the connector was signed out): a live message is drawn as the formatted prose it ends as, at most once a frame, the blocks already written left as they were drawn (2 ms a draw at 35,000 characters with the CPU four times slower, 31 ms drawn whole), its caret at the end of its text, its end moving nothing; the arrow down no longer flashes, nor does the follow stop, when the page's own scroll comes after the conversation grew.

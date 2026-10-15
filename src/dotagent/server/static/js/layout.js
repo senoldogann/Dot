@@ -107,3 +107,21 @@ export function trackHeight(element, holder, property) {
 export function trackStagebar(stagebar) {
   return trackHeight(stagebar, document.documentElement, STAGEBAR_PROPERTY);
 }
+
+/** Hold the stage bar at the top of what is seen (item 275): iOS's keyboard pans the page without resizing it, which
+ * takes a bar that sticks to the page's top out of sight, so the bar goes down as far as the seen part is panned.
+ * Returns the function that stops it. */
+export function holdBarInSight(stagebar) {
+  const seen = window.visualViewport;
+  function place() {
+    const down = Math.max(0, Math.round(seen.offsetTop));
+    stagebar.style.translate = down === 0 ? "" : `0 ${down}px`;
+  }
+  seen.addEventListener("resize", place);
+  seen.addEventListener("scroll", place);
+  place();
+  return () => {
+    seen.removeEventListener("resize", place);
+    seen.removeEventListener("scroll", place);
+  };
+}
