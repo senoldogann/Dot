@@ -11680,8 +11680,10 @@ forbidden address resets the tab and fails the call) and says what else happened
 `browser/types.py`: `ScriptRun`. `browser/render.py`: `render_script_run` (a line per end, the value cut in the
 middle to the page budget, fenced as the page's). `tools/browser.py`: `browser_eval` (`script` up to 100 000
 characters, `timeout_s` 30 by default and 1 to 600; acting modes only; a `browser_click` of medium risk on the tab's
-page; the result marked untrusted, a thrown error and a timeout failures). `agent/prompt.py`: the browser line, which
-also says never to drive Chrome through AppleScript. README (the tool table, the browser section). Tests:
+page; the result marked untrusted, a thrown error and a timeout failures; its descriptions kept short, about 200
+tokens, since a run that is sent every tool carries them at every step). `tools/apple.py`: `apple_script`'s
+description sends a web page to `browser_eval`, as a script sent to Chrome reaches whichever Chrome window macOS
+picks; the system prompt is unchanged. README (the tool table, the browser section). Tests:
 `tests/smoke/test_browser_eval.py` (new; local pages in Dot's headless Chrome and in a scratch Chrome attached: the
 value of an expression, a function and a promise, two threads each in its own tab, an error and a timeout told apart
 with the page usable after both, a navigation let land and told, a forbidden address resetting the tab; and through a

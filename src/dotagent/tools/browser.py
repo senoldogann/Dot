@@ -450,17 +450,13 @@ class EvalArgs(ToolArgs):
     script: str = Field(
         min_length=1,
         max_length=_SCRIPT_CHARS,
-        description=(
-            "JavaScript run in the page: an expression (document.title) or a function "
-            "(() => [...document.querySelectorAll('a')].map((a) => a.href)); a promise it gives is awaited. Return "
-            "plain data (strings, numbers, arrays, objects), not DOM nodes."
-        ),
+        description="An expression or a function; a promise is awaited. Return plain data, not DOM nodes.",
     )
     timeout_s: float | None = Field(
         default=None,
         ge=1,
         le=_MAX_SCRIPT_S,
-        description="Seconds to wait for the value (default 30). A script still running then goes on in the page.",
+        description="Seconds to wait for the value (default 30); the script runs on after it.",
     )
 
 
@@ -482,14 +478,8 @@ def _eval_tool() -> RegisteredTool:
     return make_tool(
         name="browser_eval",
         description=(
-            "Run JavaScript in the page of your current tab, in the page's own world with the session it has, and get "
-            "its value back as JSON. Use it to read what the element list shortens (a whole list, a table, the data "
-            "behind the page) and to do in one call what would take many steps (a loop over the items of a list). For "
-            "work longer than timeout_s, start it without awaiting it, keep its progress on window, and read that "
-            "with another call. A script that throws fails the call with its message; the URL rules hold after it as "
-            "after a step. It reaches your own tab only: never drive Chrome through AppleScript, which lands in the "
-            "front window of whichever Chrome macOS picks. Unlike browser_act's steps, what a script does is not "
-            "checked or paced action by action."
+            "Run JavaScript in your tab's page, with its session, and get the value as JSON: read a whole list or the "
+            "data behind the page, or do many like actions in one call. A thrown error fails the call."
         ),
         args_model=EvalArgs,
         modes=ACTING_MODES,

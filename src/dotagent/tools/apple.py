@@ -78,7 +78,8 @@ def build_apple_tool() -> RegisteredTool:
             "find_help says which applications of this Mac can do a task, from their dictionaries, and `sdef` with "
             "an application's path prints its whole dictionary. The first use of an application can make macOS ask "
             "the user for Automation permission; a call that times out may be waiting for that answer. Prefer "
-            "desktop_act for anything that needs the interface itself."
+            "desktop_act for anything that needs the interface itself, and browser_eval for a web page: a script "
+            "sent to Chrome reaches whichever Chrome window macOS picks."
         ),
         args_model=AppleScriptArgs,
         modes=ACTING_MODES,
