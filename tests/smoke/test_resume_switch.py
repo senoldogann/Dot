@@ -1,6 +1,7 @@
-"""Whether runs go on after a restart (item 231): the switch of Settings › System writes ``[agent] resume`` into the
-config file, which the daemon's next start reads, and leaves the comments and the other settings as they were; the
-daemon's status says it at once. Served by a real server in a throw-away home, wide and on a phone, light and dark."""
+"""Whether runs go on after a restart (item 231), which they do by default (item 248): the switch of Settings › System
+writes ``[agent] resume`` into the config file, which the daemon's next start reads, and leaves the comments and the
+other settings as they were; the daemon's status says it at once. Served by a real server in a throw-away home, wide and
+on a phone, light and dark."""
 
 import asyncio
 import os
@@ -111,7 +112,8 @@ async def test_the_switch_writes_whether_the_next_start_resumes_the_runs_it_cut_
         httpx.AsyncClient(base_url=served, headers={"Authorization": f"Bearer {TOKEN}"}) as http,
         async_playwright() as playwright,
     ):
-        assert await _resume(http) == {"resume": "off", "resume_within_s": 1800}
+        # On by default (item 248): the next start resumes the runs it cut off.
+        assert await _resume(http) == {"resume": "safe", "resume_within_s": 1800}
         browser: Browser = await playwright.chromium.launch(channel=runtime.config.browser.channel, headless=True)
         try:
             for width, scheme in _SHOTS:
@@ -122,26 +124,26 @@ async def test_the_switch_writes_whether_the_next_start_resumes_the_runs_it_cut_
                 await page.goto(f"{served}/#/settings/system")
                 switch: Locator = page.get_by_role("switch", name="Go on after a restart")
                 setting: Locator = page.locator(".setting").filter(has=switch)
-                await expect(switch).to_have_attribute("aria-checked", "false")
-                await expect(setting.locator(".hint")).to_contain_text("in the last 30 min goes on by itself")
-
-                # On: the next start resumes the runs it cut off; the file says so, the rest of it as it was.
-                await switch.click()
                 await expect(switch).to_have_attribute("aria-checked", "true")
-                assert await _resume(http) == {"resume": "safe", "resume_within_s": 1800}
-                text: str = await _file(path)
-                assert text.endswith('[agent]\nresume = "safe"\n# mine: keep this\ngoal_mode = false\n'), text
-                assert load_config(path).agent.resume == "safe"
+                await expect(setting.locator(".hint")).to_contain_text("in the last 30 min goes on by itself")
                 assert not (await setting.evaluate("(row) => row.scrollWidth > row.clientWidth"))
                 await setting.scroll_into_view_if_needed()
                 await page.mouse.move(0, 0)
                 await page.screenshot(path=str(tmp_path / f"resume-{width}-{scheme}.png"), animations="disabled")
 
-                # Off again: they wait for the owner.
+                # Off: the runs it cut off wait for the owner; the file says so, the rest of it as it was.
                 await switch.click()
                 await expect(switch).to_have_attribute("aria-checked", "false")
                 assert await _resume(http) == {"resume": "off", "resume_within_s": 1800}
+                text: str = await _file(path)
+                assert text.endswith('[agent]\nresume = "off"\n# mine: keep this\ngoal_mode = false\n'), text
                 assert load_config(path).agent.resume == "off"
+
+                # On again.
+                await switch.click()
+                await expect(switch).to_have_attribute("aria-checked", "true")
+                assert await _resume(http) == {"resume": "safe", "resume_within_s": 1800}
+                assert load_config(path).agent.resume == "safe"
                 await page.close()
         finally:
             await browser.close()

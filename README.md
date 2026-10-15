@@ -951,14 +951,14 @@ check before it runs it again. The plan of that run is the plan of the new one. 
 resumed, and never a run that you stopped or that another run started. After a shutdown, the chat's queue goes on once
 the new run ends done; after a crash or a restart, it waits until you resume it.
 
-With `resume = "safe"` in `[agent]` the daemon also resumes runs on its own when it starts: runs of the web UI, cut off
-at most `resume_within_s` seconds before (30 minutes), whose calls that were cut off only read (a question to you
-counts: it is asked again). A run of `dotx run`, of a schedule or of an eval, a run that itself resumed another (so a
-run that brings the daemon down is not resumed again and again), and a run cut off in a call that may have changed
-something (a command, a write, a click, or a delegation, whose run may have done anything) wait for you. `resume` is
-`"off"` by default until evals show that it helps; **Go on after a restart** in Settings › System › Daemon writes it
-into the config file (item 231), and the daemon's next start reads it. The timeline of the new run shows how each call
-ended, with a link to the run it resumes.
+By default (`resume = "safe"` in `[agent]`, item 248) the daemon also resumes runs on its own when it starts: runs of
+the web UI, cut off at most `resume_within_s` seconds before (30 minutes), whose calls that were cut off only read (a
+question to you counts: it is asked again). A run of `dotx run`, of a schedule or of an eval, a run that itself resumed
+another (so a run that brings the daemon down is not resumed again and again), and a run cut off in a call that may have
+changed something (a command, a write, a click, or a delegation, whose run may have done anything) wait for you. `resume
+= "off"` leaves every such run to you; **Go on after a restart** in Settings › System › Daemon writes the choice into
+the config file (item 231), and the daemon's next start reads it. The timeline of the new run shows how each call ended,
+with a link to the run it resumes.
 
 **Lessons.** With `lessons = "propose"` or `"auto"` in `[agent]`, a task or research run of its own that reached its
 goal after something went wrong on the way (a call failed, whether the run found its way around it or not; the progress

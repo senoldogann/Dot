@@ -5185,8 +5185,8 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 244 | The pill of a helper's page stays in the window                                      | done        | 5cfec1c |
 | 245 | Helpers that follow one another sit in one group                                     | done        | 6b86a8d |
 | 246 | Each step's thinking is a block that folds                                           | done        | 5ef5a7b |
-| 247 | The repository has a licence, a security policy and Dependabot                       | in progress |         |
-| 248 | A run a restart cut off goes on by itself by default                                 | planned     |         |
+| 247 | The repository has a licence, a security policy and Dependabot                       | done        | 66f49a3 |
+| 248 | A run a restart cut off goes on by itself by default                                 | in progress |         |
 | 249 | What the review model declines to write goes to the run's own model                  | planned     |         |
 | 250 | Each model's context size can be set in Settings                                     | planned     |         |
 | 251 | Ultrathink and Ultracode in the reasoning menu                                       | planned     |         |
@@ -11127,7 +11127,7 @@ Mac.
 
 ### 247. The repository has a licence, a security policy and Dependabot
 
-**Status: in progress.**
+**Status: done.** Merged as `66f49a3` (PR #288; no Linear issue, the Linear connector was signed out).
 
 **As built (2026-10-15).** `LICENSE` holds the MIT licence and `pyproject.toml` says so (`license = "MIT"`,
 `license-files`), which the wheel carries (`License-Expression: MIT`). `SECURITY.md` sends a report through GitHub's
@@ -11147,7 +11147,15 @@ brings each kind of dependency up to date once a week in one pull request; and t
 
 ### 248. A run a restart cut off goes on by itself by default
 
-**Status: planned.**
+**Status: in progress.**
+
+**As built (2026-10-15).** `defaults.toml` sets `[agent] resume = "safe"`: when the daemon starts, a run of the web UI
+that a restart, a crash or a shutdown cut off at most `resume_within_s` (30 minutes) before, whose calls that were cut
+off only read, goes on by itself as a new run on its thread; every other run that was cut off waits for the owner, and
+`"off"` leaves them all to the owner, as before. The README says it is the default. Tests:
+`tests/smoke/test_resume_switch.py` finds the switch of Settings › System on in a home that chose nothing, turns it off
+(the config file says `"off"`, the rest of it as it was) and on again, wide and on a phone, light and dark; on the code
+of before the daemon says `"off"`.
 
 **What.** `[agent] resume` is `"safe"` by default: a run of the web UI that a restart, a crash or a shutdown of the
 daemon cut off at most 30 minutes before, in calls that only read, goes on by itself when the daemon starts. `"off"`
@@ -11873,3 +11881,4 @@ plan steps marked done without evidence hold.
 - 2026-10-15 (Opus 5.5): item 244 merged as `5cfec1c` (PR #285; no Linear issue, the connector was signed out): the pill of a helper's page is in the dock, so it stays at the window's foot as the conversation scrolls.
 - 2026-10-15 (Opus 5.5): item 245 merged as `6b86a8d` (PR #286; no Linear issue, the connector was signed out): helpers that follow one another sit in one group, as T3 Code groups its subagents, with a head that counts them, says how they stand and folds them away; a row that is done shows the start of its answer.
 - 2026-10-15 (Opus 5.5): item 246 merged as `5ef5a7b` (PR #287; no Linear issue, the connector was signed out): each step's thinking is a block with a brain that folds and unfolds, "Thinking…" while the model thinks and "Thought" once it is done, among its step's calls or before its message; the `assistant` event keeps the thinking, its secrets masked, up to 12,000 characters, and a step the loop asks again drops what its failed try streamed. Part 40 is done.
+- 2026-10-15 (Opus 5.5): item 247 merged as `66f49a3` (PR #288; no Linear issue, the connector was signed out): the repository has the MIT licence, a security policy that sends reports through GitHub's private vulnerability reporting, now on, a weekly Dependabot configuration and the notice of the icons' licence.
