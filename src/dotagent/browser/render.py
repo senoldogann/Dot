@@ -8,7 +8,17 @@ from collections import Counter
 from collections.abc import Sequence
 
 from dotagent.browser.snapshot import fence_untrusted, fit_to_budget
-from dotagent.browser.types import ActOutcome, PageView, Step, StepReport, TabSummary, TextView, TextWait
+from dotagent.browser.types import (
+    ActOutcome,
+    PageView,
+    ScriptRun,
+    Step,
+    StepReport,
+    TabSummary,
+    TextView,
+    TextWait,
+)
+from dotagent.core.text import truncate_middle
 
 _TITLE_CHARS: int = 120
 _TAB_URL_CHARS: int = 160
@@ -113,6 +123,26 @@ def render_text_wait(wait: TextWait, nonce: str, body_budget: int) -> str:
         else f"The text did not appear within {wait.waited_s:.1f} s; the page now"
     )
     return f"{outcome} · {render_page_view(wait.view, nonce, body_budget)}"
+
+
+def render_script_run(run: ScriptRun, waited_s: float, nonce: str, body_budget: int) -> str:
+    """How a script run in a page ended (item 263), then what it gave back and what else happened, all of it fenced:
+    the value and the error are the page's, and so is where it went."""
+    shown: str = truncate_middle(run.text, body_budget)
+    cut: str = f", cut to {len(shown)}: return less" if len(shown) < len(run.text) else ""
+    match run.end:
+        case "value":
+            header: str = f"The script returned after {run.seconds:.1f} s: {len(run.text)} characters of JSON{cut}"
+        case "error":
+            header = f"The script threw an error after {run.seconds:.1f} s"
+        case "timeout":
+            header = f"The script gave no value within {waited_s:g} s; it may still be running in the page"
+        case "navigated":
+            header = f"The page navigated while the script ran, which ended it, after {run.seconds:.1f} s"
+    body: str = shown if run.text else "(no value)"
+    if run.surprise is not None:
+        body = f"{body}\n[then: {_clip(run.surprise, _NOTE_CHARS)}]"
+    return "\n".join((header, fence_untrusted(run.url, body, nonce)))
 
 
 def render_text_view(view: TextView, nonce: str) -> str:

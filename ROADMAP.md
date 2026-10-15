@@ -5200,8 +5200,8 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 259 | Ultrathink and ultracode as words in the composer                                     | done        | 4a37ee7 |
 | 260 | The compaction notes leave the conversation                                           | done        | a8d8641 |
 | 261 | My Chrome opens Chrome when it is closed                                              | done        | aaf2132 |
-| 262 | The sandbox of a run's commands switches on and off in Settings                       | in progress |         |
-| 263 | A run runs JavaScript in its own tab                                                  | planned     |         |
+| 262 | The sandbox of a run's commands switches on and off in Settings                       | done        | eb6b1dc |
+| 263 | A run runs JavaScript in its own tab                                                  | in progress |         |
 | 264 | Dot's own Chrome loads extensions                                                     | planned     |         |
 | 265 | Dot's own Chrome can take DevTools connections from a run's scripts                   | planned     |         |
 | 266 | A batch carries several public or social actions while no pace is set                 | planned     |         |
@@ -11641,7 +11641,7 @@ gone.
 
 ### 262. The sandbox of a run's commands switches on and off in Settings
 
-**Status: in progress.** Built on `item-262-sandbox-switch`.
+**Status: done.** Merged as `eb6b1dc` (PR #306; no Linear issue, the Linear connector was signed out).
 
 **As built (2026-10-15).** `policy/sandbox.py`: `SwitchedSandbox` holds the sandbox built at start whatever `[shell]
 sandbox` says; `current()` is it or `UNSANDBOXED`, `switch(on)` checks that its profiles start before it switches on
@@ -11669,7 +11669,24 @@ they want it.
 
 ### 263. A run runs JavaScript in its own tab
 
-**Status: planned.**
+**Status: in progress.** Built on `item-263-browser-eval`.
+
+**As built (2026-10-15).** `browser/driver.py`: `run_script` evaluates the script with Playwright's `page.evaluate`
+within the time the call names and tells apart a value (its JSON, `null` for none), an error (the message without
+Playwright's prefix and the lines of the call stack), a wait that ended first and a navigation that ended the script;
+a tab closed under it is a `BrowserError`. `browser/session.py`: `BrowserSession.run_script` runs it in the thread's
+own tab under the thread's lock, lets a page it led to load, holds the address rules after it as after a step (a
+forbidden address resets the tab and fails the call) and says what else happened (`describe_surprise`).
+`browser/types.py`: `ScriptRun`. `browser/render.py`: `render_script_run` (a line per end, the value cut in the
+middle to the page budget, fenced as the page's). `tools/browser.py`: `browser_eval` (`script` up to 100 000
+characters, `timeout_s` 30 by default and 1 to 600; acting modes only; a `browser_click` of medium risk on the tab's
+page; the result marked untrusted, a thrown error and a timeout failures). `agent/prompt.py`: the browser line, which
+also says never to drive Chrome through AppleScript. README (the tool table, the browser section). Tests:
+`tests/smoke/test_browser_eval.py` (new; local pages in Dot's headless Chrome and in a scratch Chrome attached: the
+value of an expression, a function and a promise, two threads each in its own tab, an error and a timeout told apart
+with the page usable after both, a navigation let land and told, a forbidden address resetting the tab; and through a
+run's tools on a real runtime, the classification under the three presets, the tool missing from research runs, the
+value fenced and untrusted, a thrown error a failure). They fail on the code of before.
 
 **What.** A browser tool, `browser_eval`, runs a script in the page of the run's own tab (Dot's Chrome or the owner's)
 and returns its value: an expression, a function, or a promise it waits for, up to a time the call names. A script that
@@ -11683,7 +11700,7 @@ do in one call what took a hundred.
 
 **Tests.** A smoke test on a local page in Dot's Chrome and in the scratch Chrome attached: the value of an expression,
 of a function and of a promise, two runs each in its own tab, an error, a timeout, a script that leads to a blocked
-address; a unit test of its classification under the presets.
+address; its classification under the presets. As built.
 
 ### 264. Dot's own Chrome loads extensions
 
@@ -12430,3 +12447,4 @@ limit for that kind of action; with a limit set, one per batch as before, so tha
 - 2026-10-15 (Opus 5.5): item 256 merged as `a9f8b68` (PR #303; no Linear issue, the connector was signed out): Ollama's 400 or 5xx whose words are a reset, refused or cut-short request to its local runner is a `ProviderRunnerError` the retry policy asks again, the embedder included; when the embedding still fails at a run's start, notes are recalled and skills listed by their words alone, with an `embedding_failed` warning in the timeline and the terminal; the memory's own calls still fail loudly.
 - 2026-10-15 (Opus 5.5): item 257 merged as `9e5cd51` (PR #304; no Linear issue, the connector was signed out): a firing's first message carries, in front of the goal, the dated final answers of the schedule's last ended runs (`[scheduler] history_runs`, 3), quoted and marked as what the schedule found before, while the run keeps the goal alone as its record; with `same_chat` a firing goes on in the chat of the one before; a firing that reads a tainted earlier run starts tainted.
 - 2026-10-15 (Opus 5.5): item 261 merged as `aaf2132` (PR #305; no Linear issue, the connector was signed out): in Settings › Browser, My Chrome chosen while Chrome is closed opens it as a click on its icon does (`open -b com.google.Chrome`, for Chrome's own data directory only), waits for it to start and listen, and goes on as before; the card says what the switch waits for and reads Chrome again after a failed one; runs, campaigns and `dotx browser attach` open nothing.
+- 2026-10-15 (Opus 5.5): item 262 merged as `eb6b1dc` (PR #306; no Linear issue, the connector was signed out): Settings › Rules switches the macOS sandbox of the commands, terminal sessions, AppleScript and searches of runs that are not yolo on and off from the next one on, without a restart (`GET` and `PUT /api/shell/sandbox`, kept as `[shell] sandbox`); switching it on where `sandbox-exec` does not start is refused; a yolo run is never sandboxed, and the default stays on.
