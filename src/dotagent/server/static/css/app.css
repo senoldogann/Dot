@@ -3117,6 +3117,21 @@ details[open] > summary .chev {
   word-break: break-word;
 }
 
+/* What an action acts on, whole (item 242): a long command wraps, and past a dozen lines scrolls within the card. */
+.approval-target {
+  margin: 0;
+  max-height: calc(var(--code-leading) * 12 + 2 * var(--space-1) + 2px);
+  overflow: auto;
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xs);
+  background: var(--surface);
+  color: var(--muted);
+  font: var(--code-size) / var(--code-leading) var(--mono);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
 .approval-actions {
   display: flex;
   flex-wrap: wrap;
