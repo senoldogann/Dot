@@ -4367,6 +4367,21 @@ dialog.modal.import-dialog {
   max-width: min(560px, calc(100vw - 32px));
 }
 
+/* A file shown on a page without the panel beside the conversation (item 269, filepanel.js): the panel's view, at the
+   size of a page. */
+dialog.modal.file-dialog {
+  width: min(760px, calc(100vw - 32px));
+  max-width: min(760px, calc(100vw - 32px));
+  height: min(860px, calc(100vh - 64px));
+  height: min(860px, calc(100dvh - 64px));
+  max-height: none;
+}
+
+dialog.modal.file-dialog[open] {
+  display: flex;
+  flex-direction: column;
+}
+
 .import-all {
   display: flex;
   align-items: center;
@@ -5000,6 +5015,28 @@ button.attach-chip {
 button.attach-chip:hover {
   border-color: var(--border-strong);
   background: var(--surface-3);
+}
+
+/* A file in the box, once uploaded, shows beside the conversation from its name (item 269). */
+.attach-open {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+}
+
+.attach-open:not(:disabled) {
+  cursor: pointer;
+}
+
+.attach-open:not(:disabled):hover > span:first-of-type {
+  text-decoration: underline;
 }
 
 .attach-chip.uploading {

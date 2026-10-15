@@ -1,13 +1,15 @@
 // What the panel beside the conversation shows of a file (item 195): a file a message carries, or one the conversation
 // names by its path. The daemon reads the file (server/routes_files.py) and this draws what it read with text nodes only:
 // the pages of a PDF as pictures the daemon draws, an image, a workbook or a CSV table as a grid with a tab for each
-// sheet, a document's headings, paragraphs, lists and tables, a presentation's slides, and any other text as text.
+// sheet, a document's headings, paragraphs, lists and tables, a presentation's slides, a Markdown file formatted with
+// its source a click away (item 269), and any other text as text. A page without the panel shows a file in a dialog.
 
 import { api, blobUrl, query } from "./api.js";
 import { sizeLabel } from "./attachments.js";
 import { el } from "./dom.js";
 import { icon } from "./icons.js";
 import { segmented } from "./panels.js";
+import { prose } from "./prose.js";
 import { toast } from "./ui.js";
 
 const KINDS = {
@@ -26,6 +28,8 @@ const GRID_CELLS = 40_000;
 const PAGE_MARGIN = "800px 0px";
 // A value a grid aligns to the right, as a spreadsheet does a number.
 const NUMBER = /^[-+]?[\d\s.,']*\d%?$/;
+// A file read as Markdown (item 269).
+const MARKDOWN_NAME = /\.(md|markdown)$/i;
 
 function baseName(path) {
   return path.slice(path.lastIndexOf("/") + 1);
@@ -269,6 +273,30 @@ function presentationView(preview) {
   );
 }
 
+// ------------------------------------------------------------------------------------------------ text
+/** A text as text; a Markdown file formatted as an answer is, its HTML never drawn, with its source a click away. */
+function textView(file, toolbar, body) {
+  const cut = file.preview.cut ? hint("The file is longer than this; open it on the Mac to read it all.") : null;
+  const source = () => el("pre", { class: "file-text" }, file.preview.text);
+  if (!MARKDOWN_NAME.test(file.name)) {
+    fill(body, source(), cut);
+    return;
+  }
+  const show = (id) => fill(body, id === "formatted" ? el("div", { class: "file-markdown" }, prose(file.preview.text)) : source(), cut);
+  const views = segmented(
+    [
+      { id: "formatted", label: "Formatted", hint: "Show the Markdown formatted" },
+      { id: "source", label: "Source", hint: "Show the Markdown as it is written" },
+    ],
+    "formatted",
+    show,
+  ).element;
+  views.classList.add("file-tabs");
+  views.setAttribute("aria-label", "View");
+  fill(toolbar, views);
+  show("formatted");
+}
+
 // ------------------------------------------------------------------------------------------------ pictures
 /** The smallest of the widths a page is drawn at that fills `pixels`, or the largest. */
 function pageWidth(widths, pixels) {
@@ -409,11 +437,7 @@ export function fileView(source, onClose) {
         body.replaceChildren(presentationView(file.preview));
         break;
       case "text":
-        fill(
-          body,
-          el("pre", { class: "file-text" }, file.preview.text),
-          file.preview.cut ? hint("The file is longer than this; open it on the Mac to read it all.") : null,
-        );
+        textView(file, toolbar, body);
         break;
       default:
         fill(body, note(null, `This file is not shown here: ${file.preview.reason}.`), file.opens ? hint("Open it on the Mac to see it.") : null);
@@ -447,4 +471,27 @@ export function fileView(source, onClose) {
       }
     },
   };
+}
+
+/**
+ * Show the file `source` names in a dialog (item 269), on a page without the panel beside the conversation: the home's
+ * box, an agent's. Escape, a click beside it or its Close button closes it, and `opener` gets the focus back.
+ */
+export function fileDialog(source, opener) {
+  const dialog = el("dialog", { class: "modal file-dialog" });
+  const view = fileView(source, () => dialog.close());
+  dialog.append(view.element);
+  dialog.addEventListener("click", (event) => {
+    if (event.target === dialog) {
+      dialog.close();
+    }
+  });
+  dialog.addEventListener("close", () => {
+    view.dispose();
+    dialog.remove();
+    opener.focus({ preventScroll: true });
+  });
+  document.body.append(dialog);
+  dialog.showModal();
+  view.element.focus({ preventScroll: true });
 }

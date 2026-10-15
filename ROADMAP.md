@@ -5207,7 +5207,7 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 266 | A batch carries several public or social actions while no pace is set                 | done        | ab56000 |
 | 267 | The phone reaches Dot from anywhere, and its home-screen app signs in with a code     | planned     |         |
 | 268 | Office files show in the side panel as Quick Look draws them                          | planned     |         |
-| 269 | A long paste goes as a file, and a Markdown file shows clean in the side panel        | planned     |         |
+| 269 | A long paste goes as a file, and a Markdown file shows clean in the side panel        | in progress |         |
 | 270 | A script's navigation is settled after it, also one that commits after its value      | in progress |         |
 
 ### 77. The type system: Inter and Geist Mono, seven sizes, three weights
@@ -11846,17 +11846,31 @@ PowerPoint.
 
 ### 269. A long paste goes as a file, and a Markdown file shows clean in the side panel
 
-**Status: planned.**
+**Status: in progress.** Built on `item-269-paste-as-file`.
+
+**As built (2026-10-15).** `markdown.js`: `readsAsMarkdown` (a block that is more than a paragraph, or bold, italics,
+code or a link with words of its own). `attachments.js`: a text of 2,000 characters or 40 lines pasted into a message
+box goes as `pasted-text-<HHMMSS>.md` when it reads as Markdown, else `.txt`, uploaded at once while the message has
+room for a file (else it goes into the box); the pencil on a pasted file's chip puts the text back at the caret; the
+name in a chip is a button that opens its file once uploaded. `filepanel.js`: a `.md` or `.markdown` file shows
+formatted (prose.js, text nodes only) with Formatted and Source; `fileDialog` shows a file over a page without the
+panel. `main.js`: a file asked for outside a conversation opens in that dialog, while `views/run.js` keeps the request
+to its panel. `app.css`, `run.css`: the chip's button, the dialog, a Markdown file's headings as a document's. README:
+the attachments and the panel. Tests: `tests/smoke/test_paste_as_file.py` (new; in the new chat's box a long Markdown
+paste and a long plain one become `.md` and `.txt` files and a short one stays the box's, the pencil puts the text back,
+the chip opens the formatted file in a dialog with its source a click away; wide and on a phone, light and dark, and
+once in WebKit) and `tests/smoke/test_file_panel.py` (a Markdown file formatted with its source a click away; a long
+paste in a conversation's box opens beside it; once in WebKit too). They fail on the code of before. The pencil, not a
+key, puts the text back, so that a phone can do it too.
 
 **What.** Text pasted into the composer that is long (thousands of characters or dozens of lines) becomes an
-attachment, `.md` when it reads as Markdown and `.txt` otherwise, instead of filling the box; pasting as text stays one
-shortcut away. A chip of the composer, and a sent file, opens in the side panel, where a Markdown file shows as
-formatted text, with its source a click away.
+attachment, `.md` when it reads as Markdown and `.txt` otherwise, instead of filling the box; the text goes back into
+the box from the file's chip. A chip of the composer, and a sent file, opens in the side panel, where a Markdown file
+shows as formatted text, with its source a click away.
 
 **Why.** The owner's ask: a long paste buries the message, and a Markdown file should read cleanly.
 
-**Tests.** A smoke test that pastes a long Markdown and a long plain text in Chrome, sends them, and opens each in the
-side panel, wide and on a phone, light and dark, and the same in WebKit.
+**Tests.** As built.
 
 ### 270. A script's navigation is settled after it, also one that commits after its value
 

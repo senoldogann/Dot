@@ -1127,7 +1127,10 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
   // A helper that starts or ends changes the list; the events of one moment are read as one.
   const agentsChanged = debounce(() => paintAgents(), AGENTS_SETTLE_MS);
   // A file a message carries, or one the conversation names, takes the panel (item 195).
-  layout.addEventListener(OPEN_FILE_EVENT, (event) => inspector.showFile(event.detail, event.target));
+  layout.addEventListener(OPEN_FILE_EVENT, (event) => {
+    event.stopPropagation();
+    inspector.showFile(event.detail, event.target);
+  });
   const timeline = createTimeline({
     rootRunId: runId,
     actorId: agent !== null ? agent.id : run.parent_run_id === null ? "dot" : run.id,
