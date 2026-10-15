@@ -7,7 +7,7 @@
 import { api } from "./api.js";
 import { composerPill } from "./composer.js";
 import { el, modelName } from "./dom.js";
-import { allModels, levelLabel, offersChoice, oneMessageChoices, SPEED_HINTS } from "./efforts.js";
+import { allModels, levelLabel, offersChoice, ONE_MESSAGE, oneMessageChoices, SPEED_HINTS } from "./efforts.js";
 import { icon } from "./icons.js";
 import { modelPicker } from "./modelpicker.js";
 import { anchoredPopover } from "./popover.js";
@@ -28,6 +28,12 @@ const NOTHING_SHOWN = false;
 // What the pills add to their tooltips while a run works on a chat's page: a message waits in the queue and starts
 // with them once that run, which keeps its own, has ended (item 148).
 const WAITING_NOTE = "For the next follow-up: the run under way keeps its own";
+
+/** Where `word` stands in `text` as a whole word of its own, any case, or -1. */
+function wordAt(text, word) {
+  const match = new RegExp(`(?<![\\p{L}\\p{N}_])${word}(?![\\p{L}\\p{N}_])`, "iu").exec(text);
+  return match === null ? -1 : match.index;
+}
 
 function defaultRefOf(snapshot) {
   return snapshot.status === null ? null : snapshot.status.models.main;
@@ -67,7 +73,8 @@ export function optionRow({ lead, label, hint, selected, onPick }) {
  * effort, speed, approvals, goal_mode, once }`, `once` the id of a choice for one message, item 251, whose level the
  * daemon asks for instead of `effort`), `kept()` (the same without `once`, as a chat keeps them), `sent()` once a
  * message went, which puts the choice for one message away, `sync()` after a status change, `setWaiting(on)` (while a
- * run works, the choices wait for the next follow-up and the pills say so) and `dispose()`.
+ * run works, the choices wait for the next follow-up and the pills say so), `setWords(on)` (whether the word ultrathink
+ * or ultracode in the box arms its choice, item 259) and `dispose()`.
  */
 export function runChoices({ frame, kept, optionsTitle, more, onMode, onChange }) {
   let waiting = false;
@@ -162,6 +169,23 @@ export function runChoices({ frame, kept, optionsTitle, more, onMode, onChange }
   // The choice for one message armed (item 251), an id of ONE_MESSAGE (efforts.js), or null: the next message goes with
   // it, and the one after with the kept level again.
   let once = null;
+  // The choice the word in the box named when the frame was last painted (item 259), and whether a word may arm one:
+  // not while the box edits a queued message, whose save changes its text alone, nor while its send steers the run
+  // under way, which keeps its level (`setWords`).
+  let typedShown = null;
+  let wordsOn = true;
+
+  // The choice for one message a word of the box names (item 259): `ultrathink` or `ultracode` as a whole word of its
+  // own, any case, the first of the two when both are there, or null. The word stays in the text, as in Claude Code.
+  function typedChoice() {
+    if (!wordsOn) {
+      return null;
+    }
+    const text = frame.textarea.value;
+    const found = ONE_MESSAGE.map((choice) => ({ id: choice.id, at: wordAt(text, choice.id) })).filter((hit) => hit.at >= 0);
+    found.sort((first, second) => first.at - second.at);
+    return found.length === 0 ? null : found[0].id;
+  }
 
   // The model a run would use now: the one picked, else the daemon's default.
   function selectedInfo() {
@@ -174,9 +198,11 @@ export function runChoices({ frame, kept, optionsTitle, more, onMode, onChange }
     return info !== null && info.fast_mode && kept.speed.read() === "fast";
   }
 
-  // The choice for one message the next message goes with: the one armed, when the model `info` offers it.
+  // The choice for one message the next message goes with: the one armed by the menu, else the one the word in the box
+  // names, when the model `info` offers it.
   function onceFor(info) {
-    return info === null ? null : (oneMessageChoices(info).find((choice) => choice.id === once) ?? null);
+    const id = once ?? typedChoice();
+    return info === null || id === null ? null : (oneMessageChoices(info).find((choice) => choice.id === id) ?? null);
   }
 
   // The Model pill shows the mark and the name, its tooltip the whole reference; the Reasoning pill the level chosen,
@@ -190,13 +216,21 @@ export function runChoices({ frame, kept, optionsTitle, more, onMode, onChange }
     const choice = info !== null && offersChoice(info);
     const shown = choice || (info !== null && info.fast_mode);
     reasoningPill.element.hidden = !shown;
+    // The frame wears the choice for one message while it is armed (item 259): its border is the gradient.
+    const boost = onceFor(info);
+    typedShown = typedChoice();
+    if (boost === null) {
+      delete frame.element.dataset.boost;
+    } else {
+      frame.element.dataset.boost = boost.id;
+    }
     if (shown) {
-      const boost = onceFor(info);
       const level = choice ? (kept.level.read(info) ?? info.default_effort) : null;
       const words = boost !== null ? boost.label : choice ? (level === null ? "Default" : levelLabel(level)) : "";
       reasoningPill.setValue(fastOn(info) ? (words === "" ? "Fast" : `${words} · Fast`) : words, "");
       reasoningPill.setIcon(icon(boost !== null ? boost.icon : fastOn(info) ? "bolt" : "brain"));
-      setTitle(reasoningPill.element, boost === null ? "Reasoning level" : `${boost.label}: ${boost.hint}`);
+      const typed = boost !== null && once === null ? " (the word in the box)" : "";
+      setTitle(reasoningPill.element, boost === null ? "Reasoning level" : `${boost.label}: ${boost.hint}${typed}`);
     } else {
       reasoningMenu.close();
     }
@@ -272,7 +306,7 @@ export function runChoices({ frame, kept, optionsTitle, more, onMode, onChange }
             "div",
             { role: "listbox", "aria-label": "This message only" },
             ...single.map((choice) =>
-              optionRow({ lead: icon(choice.icon), label: choice.label, hint: choice.hint, selected: once === choice.id, onPick: () => pickOnce(choice.id) }),
+              optionRow({ lead: icon(choice.icon), label: choice.label, hint: choice.hint, selected: (once ?? typedChoice()) === choice.id, onPick: () => pickOnce(choice.id) }),
             ),
           ),
         ),
@@ -357,6 +391,13 @@ export function runChoices({ frame, kept, optionsTitle, more, onMode, onChange }
     };
   }
 
+  // The word in the box arms or puts away the choice as it is typed or cleared; the frame is painted when it changed.
+  const unwatch = frame.watchText(() => {
+    if (typedChoice() !== typedShown) {
+      paintModel();
+    }
+  });
+
   const pills = { mode: modePill.element, model: modelPill.element, reasoning: reasoningPill.element, options: optionsPill.element };
   return {
     pills,
@@ -378,6 +419,12 @@ export function runChoices({ frame, kept, optionsTitle, more, onMode, onChange }
       approvals.sync();
       goalMode.sync();
     },
+    setWords: (on) => {
+      wordsOn = on;
+      if (typedChoice() !== typedShown) {
+        paintModel();
+      }
+    },
     setWaiting: (on) => {
       waiting = on;
       for (const pill of Object.values(pills)) {
@@ -386,6 +433,7 @@ export function runChoices({ frame, kept, optionsTitle, more, onMode, onChange }
       }
     },
     dispose: () => {
+      unwatch();
       optionsMenu.dispose();
       modeMenu.dispose();
       modelMenu.dispose();

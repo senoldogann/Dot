@@ -230,7 +230,13 @@ and every session of a campaign started with it (`once` in `POST /api/runs` and 
 `ultracode`; the Details panel says `Max, Ultrathink`). A model without the level is refused (a 422 over HTTP), and a
 helper, which cannot delegate, is never told to split. The names are Claude Code's, where ultrathink is a word in a
 prompt that asks for deeper thinking on that turn and Ultracode runs a task as a workflow of many agents; in Dot they
-are these levels, the second with the split.
+are these levels, the second with the split. The word `ultrathink` or `ultracode` typed in the composer (a whole word,
+any case; the first of the two when both are there) is the same choice for that message when the model offers its
+level (item 259): the pill reads it while the word is in the box, the message goes with it and the word stays in the
+text; while the choice is armed, by the word or by the menu, the composer's border is a gradient of green, orange and
+purple. A model without the level reads the word as any other word. While a run works, the word goes with a queued
+message; the box arms nothing while it edits a queued message, and a steer, which joins the run under way at its
+level, says the choice waits for a message that starts a run.
 
 **Keys** are read from the environment of the process, then from `<home>/.env`, then from the macOS Keychain (service
 `dot-agent`, account = the variable name); a Keychain that does not answer within 15 seconds (locked, or waiting for a

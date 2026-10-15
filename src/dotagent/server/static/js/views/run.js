@@ -686,6 +686,11 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
       return null;
     }
     if (active) {
+      // A steer joins the run under way, which keeps its level: an armed choice for one message waits for a message
+      // that starts a run, and the person is told (item 259).
+      if (choices.value().once !== null) {
+        toast("ok", "Steered: the run under way keeps its level. Ultrathink and Ultracode wait for a message that starts a run.");
+      }
       const entry = holdMessage(text);
       const body = { text, attachments: files };
       try {
@@ -759,6 +764,8 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
     // A message waits in the queue with the pills' choices as the next follow-up (a campaign's steers its session); the
     // run under way keeps its own.
     choices.setWaiting(active);
+    // The word in the box arms a choice for one message only where the send can carry it (item 259).
+    choices.setWords(!editing && !(active && steers(false)));
     footStop.hidden = !active;
     // Short enough for one line of a phone's composer (item 111).
     const working = steers(false) ? "Steer this run, or /btw to ask on the side" : "Queue a message, or /btw to ask on the side";

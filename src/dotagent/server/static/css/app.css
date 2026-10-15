@@ -1648,6 +1648,38 @@ a.pill:hover {
   background: color-mix(in srgb, var(--accent) 6%, var(--surface));
 }
 
+/* A choice for one message armed (item 259), by the word in the box or by the menu: the border is a gradient of green,
+   orange and purple two pixels wide, a ring over the hairline that takes no room, so nothing in the frame moves; the
+   ring in focus takes its middle colour. The mask keeps the ring and cuts out its middle (any opaque colour does). */
+.composer[data-boost],
+.composer[data-boost]:hover,
+.composer[data-boost]:focus-within {
+  border-color: transparent;
+}
+
+.composer[data-boost]::after {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  padding: var(--space-half);
+  border-radius: inherit;
+  background: linear-gradient(135deg, var(--boost-start), var(--boost-mid) 50%, var(--boost-end));
+  pointer-events: none;
+  -webkit-mask:
+    linear-gradient(var(--text) 0 0) content-box,
+    linear-gradient(var(--text) 0 0);
+  -webkit-mask-composite: xor;
+  mask:
+    linear-gradient(var(--text) 0 0) content-box exclude,
+    linear-gradient(var(--text) 0 0);
+}
+
+.composer[data-boost]:focus-within {
+  box-shadow:
+    var(--shadow-composer),
+    0 0 0 3px color-mix(in srgb, var(--boost-mid) 18%, transparent);
+}
+
 /* The box starts one line high, its text on the left edge of the attach button's icon. */
 .composer .textarea {
   min-height: 0;

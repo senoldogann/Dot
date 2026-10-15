@@ -228,7 +228,9 @@ export function wireComposer(textarea, { maxPx, send, commands, edited }) {
  * `data-empty` while the box holds no text, so the send rests quiet. `setStop(handler)` (item 120) turns the send into a
  * Stop, a round button in the danger colour with a square, while the box holds no text: pressed, it runs `handler`; a
  * word typed brings the send back, and `setStop(null)` ends it. Returns `element`, `textarea`, `attachments`,
- * `options`, `sendButton`, `setSendLabel(text)`, `setStop(handler)`, `autosize()`, `clear()` and `dispose()`.
+ * `options`, `sendButton`, `setSendLabel(text)`, `setStop(handler)`, `autosize()`, `watchText(watcher)` (runs
+ * `watcher()` after every change of the text, a clear among them, and returns what stops it; item 259), `clear()`
+ * and `dispose()`.
  */
 export function composerFrame({ label, boxLabel, placeholder, maxPx, commands, send, sendLabel, draftKey, listener }) {
   const textarea = el("textarea", { class: "textarea", rows: "1", placeholder, "aria-label": boxLabel });
@@ -271,10 +273,15 @@ export function composerFrame({ label, boxLabel, placeholder, maxPx, commands, s
     sendButton.setAttribute("aria-label", words);
   }
 
-  // Every change of the text, typed or put there by the slash menu, keeps the draft and repaints the send.
+  const watchers = new Set();
+  // Every change of the text, typed, put there by the slash menu or cleared, keeps the draft, repaints the send and
+  // tells the watchers (`watchText`, item 259).
   function edited() {
     keep();
     paintEmpty();
+    for (const watcher of watchers) {
+      watcher();
+    }
   }
 
   const wired = wireComposer(textarea, { maxPx, send, commands, edited });
@@ -315,9 +322,13 @@ export function composerFrame({ label, boxLabel, placeholder, maxPx, commands, s
       paintEmpty();
     },
     autosize: wired.autosize,
+    watchText: (watcher) => {
+      watchers.add(watcher);
+      return () => watchers.delete(watcher);
+    },
     clear: () => {
       textarea.value = "";
-      paintEmpty();
+      edited();
       wired.autosize();
       attachments.clear();
       if (key !== null) {
