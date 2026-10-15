@@ -5196,8 +5196,8 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 255 | The typed judge switches on and off in Settings                                       | done        | b3cddbc |
 | 256 | A failed embedding never fails a run                                                  | planned     |         |
 | 257 | A schedule's run knows its earlier runs                                               | planned     |         |
-| 258 | Only reasoning levels the gateway honours are offered                                 | in progress |         |
-| 259 | Ultrathink and ultracode as words in the composer                                     | planned     |         |
+| 258 | Only reasoning levels the gateway honours are offered                                 | done        | 3118d17 |
+| 259 | Ultrathink and ultracode as words in the composer                                     | in progress |         |
 | 260 | The compaction notes leave the conversation                                           | planned     |         |
 
 ### 77. The type system: Inter and Geist Mono, seven sizes, three weights
@@ -11464,7 +11464,10 @@ second's goal carries the first's answer; the same-chat option continues the thr
 
 ### 258. Only reasoning levels the gateway honours are offered
 
-**Status: in progress.** Built on `item-258-true-levels`.
+**Status: done.** Merged as `3118d17` (PR #300; no Linear issue, the Linear connector was signed out).
+
+**As built (2026-10-15).** `llm/opencode_go.py`: the four DeepSeek entries take `_NO_EFFORT`, with the method in a
+comment; README: the OpenCode Go paragraph. Test: `tests/unit/test_true_levels.py`.
 
 **What.** OpenCode Go's catalog (`llm/opencode_go.py`) offers no reasoning level for DeepSeek's four models, since the
 chat route thinks the same at every label (measured above); the Reasoning pill, the Settings and the API offer them
@@ -11479,7 +11482,19 @@ before.
 
 ### 259. Ultrathink and ultracode as words in the composer
 
-**Status: planned.**
+**Status: in progress.** Built on `item-259-composer-words`.
+
+**As built (2026-10-15).** `composer.js`: the frame tells its watchers (`watchText`) of every change of the text, a
+clear among them. `choices.js`: `wordAt` finds a whole word, any case; `typedChoice` names the choice the box's word
+asks for, `onceFor` takes the menu's choice else the word's, `paintModel` writes `data-boost` on the frame and says
+"(the word in the box)" in the pill's tooltip, the menu's option reads selected for the word too, and the frame is
+painted when the word changed; `setWords` turns the word off where the send cannot carry it. `views/run.js`: the
+word is off while the box edits a queued message (whose save changes its text alone) and while the send steers the
+run under way (which keeps its level); a steer with an armed choice says the choice waits. `themes.css`: the three
+stops (`--boost-start`, `--boost-mid`, `--boost-end`); `app.css`: `.composer[data-boost]`, a two-pixel gradient
+ring over the hairline (`::after` with a mask) that takes no room, so nothing moves when the word is typed; the
+ring in focus in the middle colour. README: the Ultrathink paragraph. Test: `tests/smoke/test_composer_words.py`
+(new; a run held by the stand-in for the queue, the edit and the steer), with a WebKit copy run and deleted.
 
 **What.** The word `ultrathink` or `ultracode` typed in the composer (the home's box or a chat's dock; a whole word,
 any case; the first of the two when both are there) is the choice for one message of item 251 for that message, when
@@ -12216,3 +12231,4 @@ Fails on the code of before.
 - 2026-10-15 (Fable 5.1): item 253 merged as `0250d88` (PR #297; no Linear issue, the connector was signed out): the record of an action a yolo run did without asking keeps the action as its summary and the policy's reason as its note, and the timeline's line reads them once; the reason an allowed action asks for once untrusted content is in context says what holds in every mode.
 - 2026-10-15 (Opus 5.5): item 254 merged as `8e6cbfb` (PR #298; no Linear issue, the connector was signed out): a provider's HTTP 402 is a `ProviderQuotaError` on every provider and pauses the model with the reason "not in the plan", and Ollama's 429 that says the plan's included usage is used up does the same; another 429 stays a rate limit.
 - 2026-10-15 (Opus 5.5): item 255 merged as `b3cddbc` (PR #299; no Linear issue, the connector was signed out): the typed judge switches on and off in Settings › API keys, on the row of TypeSafe's key, and takes effect at once; `GET` and `PUT /api/judge` carry the switch and write `[judge] provider`; the step router leaves a paused fast model out of the models it offers the judge.
+- 2026-10-15 (Opus 5.5): item 258 merged as `3118d17` (PR #300; no Linear issue, the connector was signed out): OpenCode Go's catalog offers no reasoning level for DeepSeek's four models (the chat route thinks the same at every label, measured), so the Reasoning pill, Settings and the API offer them none and Ultrathink and Ultracode do not show for them; the models whose level holds keep theirs.

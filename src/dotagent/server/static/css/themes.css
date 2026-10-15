@@ -58,6 +58,11 @@
   /* Dot's mark (item 114): the yellow of its disc and the ink of its eyes, the same in every look and scheme, as in
      the favicon and the app's icon (desktop/icons/render.py). */
   --brand: #ffcd3c;
+  /* The border of a composer with a choice for one message armed (item 259): green, orange and purple, the same in
+     every look and scheme. */
+  --boost-start: #35b27a;
+  --boost-mid: #f08a24;
+  --boost-end: #8a5cf5;
   --on-brand: #1c1b19;
   /* The twelve colours of a character's body (character/skins.js, item 101), bloub's palette; ink and cream follow the
      scheme so a body is never the colour of the ground, and the pastille is bloub's notification blue. */
