@@ -30,6 +30,7 @@ from dotagent.llm.types import (
     ModelReply,
     split_model_ref,
 )
+from dotagent.opencode.bridge import ToolBridge
 from dotagent.opencode.server import OpenCodeServer
 from dotagent.secrets import require_secret, resolve_secret
 
@@ -178,7 +179,7 @@ class ModelRouter:
                 claude_key: str = await asyncio.to_thread(require_secret, claude.api_key_env, "the anthropic provider")
                 return AnthropicProvider(claude, claude_key)
             case "opencode":
-                return OpenCodeProvider(OpenCodeServer(self._config.providers.opencode, self._login_env))
+                return OpenCodeProvider(OpenCodeServer(self._config.providers.opencode, self._login_env), ToolBridge())
             case _:
                 raise ConfigError("unknown provider", {"provider": name})
 

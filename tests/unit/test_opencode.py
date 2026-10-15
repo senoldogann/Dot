@@ -1,12 +1,19 @@
 """Item 283's data: OpenCode's event stream as a run reads it (recorded from OpenCode 1.19.0 on one of Zen's free models,
 for a command whose permission the agent asked for, with an event of another session put in), Zen's free models as
 ``opencode models opencode --verbose`` prints them, a permission as Dot's policy weighs it, and the environment of the
-server Dot starts."""
+server Dot starts. Item 284's: the tools of Dot's the agent gets, each chat's door and the rules that keep a session to
+its own, and a result of Dot's tool as an MCP result."""
 
 import json
+import re
+from fnmatch import fnmatchcase
 from pathlib import Path
 
-from dotagent.llm.types import assistant_message, user_message
+from mcp.types import CallToolResult, ImageContent, TextContent
+from pydantic import JsonValue
+
+from dotagent.llm.types import ImageData, assistant_message, user_message
+from dotagent.opencode.bridge import door_name, mcp_result, session_rules
 from dotagent.opencode.events import (
     MessageSeen,
     PartSeen,
@@ -18,8 +25,19 @@ from dotagent.opencode.events import (
     ToolSeen,
     read_event,
 )
-from dotagent.opencode.run import FREE_TIER_REFUSED, agent_failed, meanwhile, permission_action
+from dotagent.opencode.run import FREE_TIER_REFUSED, agent_failed, bridged_tools, meanwhile, permission_action
 from dotagent.opencode.server import PERMISSIONS, FreeModel, free_models, server_environment
+from dotagent.tools.base import ToolResult
+from dotagent.tools.browser import build_browser_tools
+from dotagent.tools.delegate import build_delegate_tools
+from dotagent.tools.files import build_file_tools
+from dotagent.tools.memory import build_memory_tools
+from dotagent.tools.meta import build_meta_tools
+from dotagent.tools.registry import ToolRegistry, build_registry
+from dotagent.tools.schedule import build_schedule_tools
+from dotagent.tools.shell import build_shell_tool
+from dotagent.tools.terminal import build_terminal_tools
+from dotagent.tools.web import build_web_tools
 
 _STREAM: Path = Path(__file__).parents[1] / "fixtures" / "opencode_events.jsonl"
 _SESSION: str = "ses_ec014f256ffeJqrkLkfivVnEKB"
@@ -187,3 +205,67 @@ def test_zens_free_tier_refusal_is_said_as_what_it_is() -> None:
     )
     other: dict[str, object] = {"name": "APIError", "data": {"message": "Overloaded", "responseBody": "Overloaded"}}
     assert agent_failed("Overloaded", other).message == "OpenCode's agent failed: Overloaded"
+
+
+def _registry() -> ToolRegistry:
+    return build_registry(
+        (
+            build_file_tools(),
+            (build_shell_tool(),),
+            build_web_tools(),
+            build_browser_tools(),
+            build_memory_tools(),
+            build_schedule_tools(),
+            build_delegate_tools(),
+            build_meta_tools(),
+            build_terminal_tools(),
+        )
+    )
+
+
+def test_the_agent_gets_dots_tools_for_what_opencode_has_none_of() -> None:
+    names: set[str] = set(bridged_tools(_registry(), "task", None).tools)
+    assert {"browser_open", "browser_act", "memory_save", "memory_search", "memory_forget", "schedule_create"} <= names
+    assert {"ask_user", "notify"} <= names
+    # OpenCode's agent has its own for files, commands and the web; the plan, finish, tool groups and helpers are Dot's
+    # loop's.
+    left_out: set[str] = {"read_file", "write_file", "shell", "web_fetch", "web_search", "terminal_send", "finish"}
+    assert not names & (left_out | {"update_plan", "use_tools", "delegate"})
+
+
+def test_an_agent_bounded_to_some_tools_gives_only_those() -> None:
+    bounded: frozenset[str] = frozenset({"browser_open", "finish", "ask_user", "read_file"})
+    assert set(bridged_tools(_registry(), "task", bounded).tools) == {"browser_open", "ask_user"}
+
+
+def _decided(tool: str, rules: list[JsonValue]) -> str:
+    """The action OpenCode takes for ``tool``: that of the last rule whose permission matches it."""
+    for rule in reversed(rules):
+        assert isinstance(rule, dict)
+        permission: JsonValue = rule["permission"]
+        action: JsonValue = rule["action"]
+        assert isinstance(permission, str) and isinstance(action, str)
+        if fnmatchcase(tool, permission):
+            return action
+    return "unmatched"
+
+
+def test_each_chat_has_its_own_door_and_its_session_keeps_to_it() -> None:
+    first: str = door_name("thread-a")
+    other: str = door_name("thread-b")
+    assert first == door_name("thread-a") != other
+    assert re.fullmatch(r"dot_[0-9a-f]{8}", first)
+    rules: list[JsonValue] = session_rules(first)
+    assert _decided(f"{first}_browser_open", rules) == "allow"
+    assert _decided(f"{other}_browser_open", rules) == "deny"
+    # OpenCode's own tools are left to the agent's rules.
+    assert _decided("bash", rules) == "unmatched"
+
+
+def test_a_result_of_dots_tool_goes_back_with_its_pictures_and_its_failure() -> None:
+    picture: ImageData = ImageData(media_type="image/png", data_b64="iVBORw0KGgo=")
+    result: CallToolResult = mcp_result(ToolResult(text="no such page", images=(picture,), is_error=True))
+    assert result.is_error
+    text, image = result.content
+    assert isinstance(text, TextContent) and text.text == "no such page"
+    assert isinstance(image, ImageContent) and image.data == picture.data_b64 and image.mime_type == "image/png"

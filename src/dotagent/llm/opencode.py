@@ -1,10 +1,12 @@
 """Zen's free models as Dot's model picker lists them (item 283), provider ``opencode``: the free models of the OpenCode
 server Dot starts (:mod:`dotagent.opencode.server`) that call tools. They answer OpenCode's own agent only, so a run on
 one goes to that agent whole (:func:`dotagent.opencode.run.run_in_opencode`) and no single call of Dot's reaches one:
-:meth:`OpenCodeProvider.complete` refuses."""
+:meth:`OpenCodeProvider.complete` refuses. The agent gets Dot's own tools through the provider's bridge
+(:mod:`dotagent.opencode.bridge`, item 284)."""
 
 from dotagent.core.errors import ConfigError, ProviderRefusedError
 from dotagent.llm.types import ChatRequest, DeltaSink, ModelInfo, ModelReply
+from dotagent.opencode.bridge import ToolBridge
 from dotagent.opencode.server import FreeModel, OpenCodeServer
 
 OPENCODE_PROVIDER: str = "opencode"
@@ -27,8 +29,9 @@ def _info(model: FreeModel) -> ModelInfo:
 class OpenCodeProvider:
     """A connector to Zen's free models through the OpenCode server Dot starts."""
 
-    def __init__(self, server: OpenCodeServer) -> None:
+    def __init__(self, server: OpenCodeServer, bridge: ToolBridge) -> None:
         self._server: OpenCodeServer = server
+        self._bridge: ToolBridge = bridge
 
     @property
     def name(self) -> str:
@@ -38,6 +41,11 @@ class OpenCodeProvider:
     def server(self) -> OpenCodeServer:
         """The OpenCode server, which a run on one of the models drives (:mod:`dotagent.opencode.run`)."""
         return self._server
+
+    @property
+    def bridge(self) -> ToolBridge:
+        """Dot's MCP server that gives the agent Dot's own tools while a run works (:mod:`dotagent.opencode.run`)."""
+        return self._bridge
 
     async def complete(self, request: ChatRequest, sink: DeltaSink) -> ModelReply:
         raise ProviderRefusedError(
@@ -62,3 +70,4 @@ class OpenCodeProvider:
 
     async def aclose(self) -> None:
         await self._server.aclose()
+        await self._bridge.aclose()

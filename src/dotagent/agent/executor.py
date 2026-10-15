@@ -139,6 +139,10 @@ async def _run_checked(call: ToolCall, tool: RegisteredTool, ctx: ToolContext, g
     try:
         prepared: PreparedCall = await tool.prepare(call.arguments, ctx)
         action = prepared.action
+        # A call that would step on another run at work does not run, and is not asked about (item 301).
+        held: str | None = ctx.runtime.peers.conflict(ctx.run_id, call.name, action)
+        if held is not None:
+            return _Checked(result=fail(held), action=action, waited_s=0.0)
         asked_at: float = time.monotonic()
         try:
             note = await gate.authorize(action)
@@ -161,6 +165,7 @@ async def _run_checked(call: ToolCall, tool: RegisteredTool, ctx: ToolContext, g
         return _Checked(result=failed, action=action, waited_s=at_gate.seconds)
     if action is not None and not result.is_error:
         gate.observe(action)
+        ctx.runtime.peers.saw(ctx.run_id, call.name, action)
     if result.untrusted:
         gate.taint()
     noted: ToolResult = _with_approval_note(result, note)

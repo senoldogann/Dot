@@ -66,6 +66,7 @@ from dotagent.agent.limits import (
     limit_result,
     limits_of,
 )
+from dotagent.agent.peers import peers_note
 from dotagent.agent.plan import (
     EMPTY_PLAN,
     PLAN_EVENT,
@@ -1506,6 +1507,8 @@ async def run_agent(agent: AgentRun) -> RunEnd:
         specs = tuple(spec for spec in specs if spec.name != USE_TOOLS_TOOL)
     callable_tools: ToolRegistry = _run_tools(runtime.registry, run.mode, specs)
     memory_seen_at: float = time.time()
+    # The last note about the other runs at work (item 301); empty while there were none.
+    peers_said: str = ""
     notes_budget: int = memory_budget(runtime.config.memory, info.context_length)
     query: str = await _goal_query(runtime, run)
     recalled: Remembered = await _start_notes(runtime, run, query, notes_budget)
@@ -1677,6 +1680,11 @@ async def run_agent(agent: AgentRun) -> RunEnd:
             if newcomers:
                 known_agents.update(member.id for member in newcomers)
                 history.append(await _stored_note(agent, _new_teammates_note(newcomers)))
+        # The other runs at work and what they hold, said again whenever that changes (item 301).
+        others: str = peers_note(runtime.peers.others(run.id), runtime.workspace)
+        if others and others != peers_said:
+            history.append(await _stored_note(agent, others))
+        peers_said = others
         if run_limits is not None and past_limit is None:
             past_limit = await _limit_seen(agent, run_limits, started)
             if past_limit is not None:

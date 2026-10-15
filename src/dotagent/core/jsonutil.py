@@ -19,6 +19,17 @@ def parse_json_object(text: str, label: str) -> JsonObject:
         raise JsonParseError("expected a JSON object", {"label": label, "text": text[:500], "error": str(exc)}) from exc
 
 
+def json_object(value: object, label: str) -> JsonObject:
+    """``value``, a decoded JSON object from elsewhere (a library's parsed message), as a JSON object, or
+    ``JsonParseError`` with context."""
+    try:
+        return _OBJECT_ADAPTER.validate_python(value)
+    except ValueError as exc:
+        raise JsonParseError(
+            "expected a JSON object", {"label": label, "value": repr(value)[:500], "error": str(exc)}
+        ) from exc
+
+
 def parse_json_value(text: str, label: str) -> JsonValue:
     """Parse ``text`` as any JSON value or raise ``JsonParseError`` with context."""
     try:

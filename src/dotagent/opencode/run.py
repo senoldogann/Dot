@@ -7,13 +7,20 @@ the owner's rules and preset, the review model or the owner, as the run's approv
 why, and it goes on. The owner's messages go to the agent while it works, and a stop of the run stops it. The run ends
 done with the agent's last answer once the agent has nothing left to do, and failed when its session fails.
 
-A run here has none of what Dot's own runs bring besides (Dot's tools, memory and skills, the checks of a finish, the
-lessons and playbooks): item 284 brings Dot's tools to the agent over MCP."""
+The agent has Dot's own tools besides its own (item 284): those of what OpenCode has no tool for (Dot's browser, the
+Mac's applications, memory, schedules, a notification, a page in the conversation, skills, a question to the owner and
+the apps the owner connected), served by Dot's bridge (:mod:`dotagent.opencode.bridge`) at the chat's door while the run
+works. A call of one runs as a call of Dot's own loop (:func:`dotagent.agent.executor.execute_calls`: the run's gate, the
+tool's time limit, the run's timeline under the tool's own name), and the session keeps to its own chat's door. A run here
+has none of the rest of what Dot's own runs bring (the memory recalled at the start, the checks of a finish, the lessons
+and playbooks)."""
 
 import asyncio
 import time
 from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
+from functools import partial
 from pathlib import Path
 
 from dotagent.agent.attachments import (
@@ -23,7 +30,12 @@ from dotagent.agent.attachments import (
     attachment_summary,
     message_with_attachments,
 )
-from dotagent.agent.loop import AgentRun, RunEnd, RunOutcome
+from dotagent.agent.executor import ToolOutcome, execute_calls
+from dotagent.agent.gate import RunGate
+from dotagent.agent.loop import AGENT_CORE_TOOLS, AgentRun, RunEnd, RunOutcome, browser_of
+from dotagent.agent.progress import can_ask_user, question_mode
+from dotagent.agent.scaffold import PROFILE_RUNS, Scaffold, scaffold_for
+from dotagent.agent.verify import RunFacts, new_facts
 from dotagent.browser.safety import UrlVerdict, check_url
 from dotagent.core.errors import (
     ApprovalRejected,
@@ -40,8 +52,10 @@ from dotagent.core.text import redact_json, redact_secrets, truncate_middle
 from dotagent.core.types import FrozenModel, JsonObject
 from dotagent.llm.opencode import OpenCodeProvider
 from dotagent.llm.router import ModelRef, parse_model_ref
-from dotagent.llm.types import ChatProvider, Message, ModelInfo, assistant_message
+from dotagent.llm.types import ChatProvider, Message, ModelInfo, ToolCall, assistant_message
 from dotagent.llm.wire import get_obj, get_str
+from dotagent.mcp.naming import PREFIX as MCP_PREFIX
+from dotagent.opencode.bridge import Door, ToolBridge, new_door, server_config, session_rules
 from dotagent.opencode.events import (
     MessageSeen,
     PartSeen,
@@ -61,8 +75,13 @@ from dotagent.policy.paths import expand_path
 from dotagent.policy.shell import ShellAssessment, assess_shell
 from dotagent.policy.types import ActionInfo
 from dotagent.runtime import Runtime
+from dotagent.store.models import AgentRecord, RunMode
+from dotagent.tools.base import ToolResult
 from dotagent.tools.channels import Channel
+from dotagent.tools.context import ToolContext
 from dotagent.tools.files import read_action, write_action
+from dotagent.tools.groups import group_of
+from dotagent.tools.registry import ToolRegistry, tools_for_mode
 
 log = get_logger(__name__)
 
@@ -86,6 +105,12 @@ DOOM_LOOP_NOTE: str = (
     " or say what stops you."
 )
 _WEB_TOOLS: frozenset[str] = frozenset({"webfetch", "websearch", "codesearch"})
+# Dot's tools the agent gets besides its own (item 284): the groups of what OpenCode has no tool for, every connected
+# app's (``mcp__<server>``), and a few of the core group's. The agent's own tools read, write and search files, run
+# commands and fetch and search the web, so Dot's for those stay out, and so do those of Dot's own loop (the plan, finish,
+# the tool groups, helpers, teammates and a campaign's).
+_BRIDGED_GROUPS: frozenset[str] = frozenset({"browser", "desktop", "schedule", "memory_admin", "pages"})
+_BRIDGED_CORE: frozenset[str] = frozenset({"memory_save", "memory_search", "notify", "ask_user", "skill"})
 # What a run says when Zen's free tier turns a request down. Its own words say that the free tier serves OpenCode alone,
 # but it says them to OpenCode's own command line as well, for a few minutes after many requests in a short time
 # (measured 2026-10-15: refused from 17:48 to about 17:56, answered at 17:57, the same program and setup throughout).
@@ -158,6 +183,24 @@ def agent_failed(text: str, error: JsonObject) -> OpenCodeError:
     if free_tier_refused(error):
         return OpenCodeError(FREE_TIER_REFUSED, {"error": error})
     return OpenCodeError(f"OpenCode's agent failed: {text}", {"error": error})
+
+
+def bridged(name: str) -> bool:
+    """Whether Dot's tool ``name`` is one the agent gets besides its own."""
+    group: str = group_of(name)
+    return group in _BRIDGED_GROUPS or group.startswith(MCP_PREFIX) or name in _BRIDGED_CORE
+
+
+def bridged_tools(registry: ToolRegistry, mode: RunMode, agent_tools: frozenset[str] | None) -> ToolRegistry:
+    """The tools of Dot's a run in ``mode`` gives the agent: the :func:`bridged` ones of the mode, and of those only the
+    ones ``agent_tools`` names when the run is an agent's whose tools are bounded (item 86)."""
+    return ToolRegistry(
+        tools={
+            tool.spec.name: tool
+            for tool in tools_for_mode(registry, mode)
+            if bridged(tool.spec.name) and (agent_tools is None or tool.spec.name in agent_tools)
+        }
+    )
 
 
 def _patterns(asked: PermissionAsked) -> str:
@@ -281,6 +324,8 @@ class _Follow:
     variant: str | None
     vision: bool
     queue: asyncio.Queue[_Item]
+    # What the names of Dot's own tools start with in the session (``dot_1a2b3c4d_``): their calls show as Dot's.
+    door: str
     steps: int = 0
     prompts: int = 0
     users: set[str] = field(default_factory=set)
@@ -384,6 +429,12 @@ class _Follow:
         if step is None or event.status == "pending":
             return
         call: _Call = self.calls.setdefault(event.call_id, _Call())
+        if event.tool.startswith(self.door):
+            # A tool of Dot's: the call runs as Dot's loop runs one, which shows it in the timeline under its own name.
+            if not call.announced:
+                call.announced = True
+                step.tools.append(event.tool.removeprefix(self.door))
+            return
         name: str = f"{TOOL_PREFIX}{event.tool}"
         if not call.announced:
             call.announced = True
@@ -396,6 +447,7 @@ class _Follow:
         ok: bool = event.status == "completed"
         if ok and call.action is not None:
             self.agent.gate.observe(call.action)
+            self.runtime.peers.saw(self.agent.run.id, name, call.action)
         text: str = event.output if ok else event.error
         seconds: float = (
             (event.ended_ms - event.started_ms) / 1000
@@ -483,6 +535,11 @@ class _Follow:
             return
         action: ActionInfo = permission_action(event, self.directory, runtime.protected, runtime.dot_paths)
         call.action = action
+        # An edit that would step on another run at work is refused, as a call of Dot's own tools is (item 301).
+        held: str | None = runtime.peers.conflict(self.agent.run.id, action.tool, action)
+        if held is not None:
+            await self.server.reply(event.request_id, self.directory, "reject", held)
+            return
         if action.kind == "network" and event.permission == "webfetch":
             verdict: UrlVerdict = check_url(
                 action.target, runtime.config.browser.allowed_hosts, runtime.config.browser.blocked_hosts
@@ -592,6 +649,80 @@ async def _session(server: OpenCodeServer, thread_id: str, directory: Path, titl
     return ChatSession(session_id=await server.create_session(directory, title), seen=0)
 
 
+def _ignore(outcome: ToolOutcome) -> None:
+    """A call of the agent to one of Dot's tools ends alone: only its caller waits for its outcome."""
+
+
+async def _bridged_call(registry: ToolRegistry, context: ToolContext, gate: RunGate, call: ToolCall) -> ToolResult:
+    """A call of the agent to one of Dot's tools, run as Dot's loop runs a call of its own model's: checked, decided by
+    the run's gate (the owner's rules, the preset and the approvals), held to the tool's time limit and shown in the
+    run's timeline under the tool's own name."""
+    outcomes: list[ToolOutcome] = await execute_calls((call,), registry, {}, context, gate, 1, _ignore)
+    return outcomes[0].result
+
+
+async def _tool_context(agent: AgentRun, ref: ModelRef, info: ModelInfo) -> ToolContext:
+    """What Dot's tools get while they run for the agent: what a run of Dot's own loop gives them, without delegation."""
+    runtime: Runtime = agent.runtime
+    run = agent.run
+    scaffold: Scaffold = scaffold_for(
+        runtime.config.agent,
+        info,
+        await runtime.store.model_profile(ref.label, PROFILE_RUNS),
+        runtime.context_sizes.of(ref.label),
+    )
+    facts: RunFacts = new_facts()
+    return ToolContext(
+        runtime=runtime,
+        browser=await browser_of(runtime, run),
+        run_id=run.id,
+        agent_id=run.agent_id,
+        thread_id=run.thread_id,
+        mode=run.mode,
+        approvals=run.approvals,
+        questions=question_mode(
+            runtime.config.agent.questions, can_ask_user(run.source, run.parent_run_id, run.approvals)
+        ),
+        workspace=runtime.workspace,
+        gate=agent.gate,
+        cancel=agent.cancel,
+        output_chars=scaffold.tool_output_chars,
+        facts=lambda: facts,
+        spawner=None,
+    )
+
+
+async def _agent_tools(runtime: Runtime, agent_id: str | None) -> frozenset[str] | None:
+    """The tools the agent ``agent_id`` is bounded to, with the core ones (item 86); ``None`` when it is not bounded."""
+    record: AgentRecord | None = None if agent_id is None else await runtime.store.get_agent(agent_id)
+    if record is None or not record.tools:
+        return None
+    return frozenset(record.tools) | frozenset(AGENT_CORE_TOOLS)
+
+
+async def _drop_door(server: OpenCodeServer, directory: Path, name: str) -> None:
+    """Take Dot's tools of a run that ends away from OpenCode; a failure is logged, the run's own ending is what counts
+    (a server started later has none of them in any case)."""
+    try:
+        await server.drop_mcp(directory, name)
+    except OpenCodeError as error:
+        log.warning("opencode_drop_tools_failed", door=name, error=error.message, context=error.context)
+
+
+@asynccontextmanager
+async def _dot_tools(bridge: ToolBridge, server: OpenCodeServer, directory: Path, door: Door) -> AsyncIterator[None]:
+    """Dot's tools at ``door`` for the agents of ``directory`` while the block runs; nothing when it has none."""
+    if not door.specs:
+        yield
+        return
+    async with bridge.opened(door) as address:
+        await server.add_mcp(directory, door.name, server_config(address, door))
+        try:
+            yield
+        finally:
+            await asyncio.shield(_drop_door(server, directory, door.name))
+
+
 async def _server_of(runtime: Runtime, ref: ModelRef) -> OpenCodeProvider:
     provider: ChatProvider = await runtime.router.provider(ref.provider)
     if not isinstance(provider, OpenCodeProvider):
@@ -610,10 +741,18 @@ async def run_in_opencode(agent: AgentRun) -> RunEnd:
     variant: str | None = run.effort if run.effort is not None and run.effort in info.efforts else None
     directory: Path = runtime.workspace
     earlier: list[Message] = await runtime.store.load_messages(run.thread_id, 0)
+    tools: ToolRegistry = bridged_tools(runtime.registry, run.mode, await _agent_tools(runtime, run.agent_id))
+    door: Door = new_door(
+        run.thread_id,
+        tuple(tool.spec for tool in tools.tools.values()),
+        partial(_bridged_call, tools, await _tool_context(agent, ref, info), agent.gate),
+    )
     async with server.hold():
         chat: ChatSession = await _session(
             server, run.thread_id, directory, truncate_middle(" ".join(agent.opening.text.split()), _TITLE_CHARS)
         )
+        # The session keeps to its own chat's door: the tools of other chats' doors are hidden from its model.
+        await server.keep_to(chat.session_id, directory, session_rules(door.name))
         goal: Message = await message_with_attachments(
             runtime, run.thread_id, run.id, agent.opening.text, agent.opening.files, info.vision
         )
@@ -630,8 +769,9 @@ async def run_in_opencode(agent: AgentRun) -> RunEnd:
             variant=variant,
             vision=info.vision,
             queue=queue,
+            door=f"{door.name}_",
         )
-        async with server.events(directory) as stream:
+        async with _dot_tools(provider.bridge, server, directory, door), server.events(directory) as stream:
             pumps: tuple[asyncio.Task[None], ...] = (
                 asyncio.create_task(_pump_events(stream, queue), name="opencode-events"),
                 asyncio.create_task(_pump_inbox(agent.inbox, queue), name="opencode-inbox"),

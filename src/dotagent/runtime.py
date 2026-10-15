@@ -10,6 +10,7 @@ from zoneinfo import ZoneInfo
 from dotagent.agent.approvals import ApprovalBroker
 from dotagent.agent.gate import SiteLocks
 from dotagent.agent.judge import SwitchedJudge, TypeSafeService, judge_for
+from dotagent.agent.peers import Peers
 from dotagent.agent.sizes import ContextSizes
 from dotagent.browser.pool import BrowserPool
 from dotagent.browser.session import BrowserSession
@@ -133,6 +134,8 @@ class Runtime:
     schedule_zone: ZoneInfo
     undo_dir: Path
     notify: Notifier
+    # The runs at work in this process and what each holds (item 301), so that they leave each other's alone.
+    peers: Peers
 
 
 def _tool_groups(config: AppConfig, judge_items: bool) -> tuple[tuple[RegisteredTool, ...], ...]:
@@ -372,6 +375,7 @@ async def open_runtime(config: AppConfig, login_env: dict[str, str]) -> Runtime:
             schedule_zone=schedule_zone,
             undo_dir=undo_dir(),
             notify=show_notification,
+            peers=Peers(),
         )
         cleanup.pop_all()
     return runtime

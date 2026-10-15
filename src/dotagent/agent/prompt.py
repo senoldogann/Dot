@@ -309,6 +309,8 @@ _SECRETS_ENTERED: str = (
 
 _CLOSING: str = """- Prefer reversible actions. Before deleting, overwriting or sending something, make sure the target is \
 the right one.
+- Other runs of Dot may work at the same time on this Mac, in other chats; a note names them and what they hold. Leave \
+the apps they drive and the files they change to them.
 
 # Communication
 - Answer in the language the user writes in. Be brief and concrete; no filler, no restating the task.

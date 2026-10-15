@@ -1801,6 +1801,8 @@ class RunManager:
                     run.id, "run_started", {"model": run.model, "parent_run_id": run.parent_run_id}, True
                 )
                 agent: AgentRun = AgentRun(runtime, run, gate, cancel, inbox, self, opening)
+                # The other runs know it from now on, and what it holds (item 301).
+                runtime.peers.begin(run.id, run.thread_id, run.goal)
                 # A run on one of Zen's free models goes whole to OpenCode's own agent (item 283).
                 in_opencode: bool = parse_model_ref(run.model).provider == OPENCODE_PROVIDER
                 ended: RunEnd = await (run_in_opencode(agent) if in_opencode else run_agent(agent))
@@ -1821,6 +1823,7 @@ class RunManager:
             status, result = "failed", f"{PREFIX_INTERNAL_ERROR}{type(exc).__name__}: {exc}"
             log.exception("run crashed", run_id=run.id)
         finally:
+            runtime.peers.end(run.id)
             inbox.shutdown()
             recorded: bool = await self._close(run, status, result, needs, error, inbox, finished)
         # Registered before anything awaits, so that a waiter that ``finished`` wakes finds it.
