@@ -371,6 +371,25 @@ def _keyboard_target(env: StepEnv) -> Target:
     return Target(ref=None, state=state, owner=owner, point=None, window=_window_title(focused, root, pid))
 
 
+def _require_keyboard(env: StepEnv) -> None:
+    """Refuse to send keys unless the application of the step's ref holds the keyboard, as the previous step left it:
+    keys go to the frontmost application, whichever control a step focused in another (the code review's Y2)."""
+    pid: int | None = apps.frontmost_pid()
+    if pid != env.app.pid:
+        holder: str = "No application" if pid is None else _app_for(env, pid, "").name
+        raise DesktopError(
+            f"{holder} has the keyboard focus, not {env.app.name}, whose control the step names; the keys would go "
+            f"to the wrong place, so nothing was typed. Use activate to bring {env.app.name} to the front",
+            {"pid": pid, "expected_pid": env.app.pid},
+        )
+    if env.expected_front is not None and pid != env.expected_front:
+        raise DesktopError(
+            f"{env.app.name} took the keyboard focus after the previous step left it with another application, so "
+            "someone else may be using the Mac; nothing was typed",
+            {"pid": pid, "expected_pid": env.expected_front},
+        )
+
+
 def refuse_secrets(context: StepContext) -> None:
     """Refuse, in every approval mode, a step that touches an application holding passwords or keys: such an
     application is never controlled."""
@@ -592,6 +611,7 @@ def _type(env: StepEnv, step: Step, inspection: Inspection) -> Effect:
     _check_secure(env, inspection, "typing")
     if step.ref is not None:
         _focus(env, step.ref)
+        _require_keyboard(env)
     hid.post(hid.text_events(env.source, text))
     return _effect(f"typed {len(text)} chars into {inspection.target}", None, False)
 
@@ -600,6 +620,7 @@ def _paste(env: StepEnv, step: Step, inspection: Inspection) -> Effect:
     _check_secure(env, inspection, "pasting")
     if step.ref is not None:
         _focus(env, step.ref)
+        _require_keyboard(env)
     text: str = _required(step.text, "text")
     hid.paste_text(env.source, text, env.config.paste_settle_ms / 1000)
     return _effect(f"pasted {len(text)} chars into {inspection.target}", None, False)
