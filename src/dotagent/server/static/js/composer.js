@@ -226,8 +226,9 @@ export function wireComposer(textarea, { maxPx, send, commands, edited }) {
  * `draftKey` (or null) keeps the text and the ready files under `dot.draft.<key>` until `clear()` after a send.
  * `listener` (`{ focus(on), typing() }`, or null) hears the box, for a face that listens. The frame carries
  * `data-empty` while the box holds no text, so the send rests quiet. `setStop(handler)` (item 120) turns the send into a
- * Stop, a round button in the danger colour with a square, while the box holds no text: pressed, it runs `handler`; a
- * word typed brings the send back, and `setStop(null)` ends it. Returns `element`, `textarea`, `attachments`,
+ * Stop, a round button in the danger colour with a square, while the box holds no text and no file: pressed, it runs
+ * `handler`; a word typed or a file listed (a long paste among them, item 269) brings the send back, and
+ * `setStop(null)` ends it. Returns `element`, `textarea`, `attachments`,
  * `options`, `sendButton`, `setSendLabel(text)`, `setStop(handler)`, `autosize()`, `watchText(watcher)` (runs
  * `watcher()` after every change of the text, a clear among them, and returns what stops it; item 259), `clear()`
  * and `dispose()`.
@@ -249,7 +250,13 @@ export function composerFrame({ label, boxLabel, placeholder, maxPx, commands, s
     writePref(key, JSON.stringify({ text: textarea.value, files }));
   }
 
-  const attachments = createAttachments({ dropTarget: element, input: textarea, onChange: keep });
+  // A file listed or taken away keeps the draft and repaints the send: with a file there it is never a Stop.
+  function filesChanged() {
+    keep();
+    paintEmpty();
+  }
+
+  const attachments = createAttachments({ dropTarget: element, input: textarea, onChange: filesChanged });
   const sendText = el("span", { class: "label" }, sendLabel);
   const arrow = icon("arrowUp");
   const square = icon("stop");
@@ -259,7 +266,7 @@ export function composerFrame({ label, boxLabel, placeholder, maxPx, commands, s
   let stop = null;
 
   function stopping() {
-    return stop !== null && textarea.value.trim() === "";
+    return stop !== null && textarea.value.trim() === "" && attachments.count() === 0;
   }
 
   function paintEmpty() {

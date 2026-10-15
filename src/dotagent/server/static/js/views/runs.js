@@ -5,7 +5,7 @@
 import { actorFace, DOT_ID } from "../actors.js";
 import { approvalCard, fromRecord, LEFT_IN_RUN } from "../approvals.js";
 import { api } from "../api.js";
-import { readyToSend } from "../attachments.js";
+import { askForWords, readyToSend } from "../attachments.js";
 import { MODES, optionRow, runChoices } from "../choices.js";
 import { composerFrame, composerPill } from "../composer.js";
 import { el } from "../dom.js";
@@ -141,6 +141,7 @@ function buildComposer(ctx, listener) {
     }
     const text = goal.value.trim();
     if (text === "") {
+      askForWords(attachments);
       goal.focus();
       return;
     }

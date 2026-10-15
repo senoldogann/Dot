@@ -866,11 +866,17 @@
   overflow-wrap: anywhere;
 }
 
-/* A document's headings and a slide's title stand out from their text more than an answer's headings do. */
+/* A document's headings, a Markdown file's (item 269) and a slide's title stand out from their text more than an
+   answer's headings do. */
 .file-doc h2,
+.file-markdown h2,
 .file-slide h3 {
   font-size: var(--text-lg);
   line-height: var(--leading-lg);
+  font-weight: var(--weight-title);
+}
+
+.file-markdown h3 {
   font-weight: var(--weight-title);
 }
 

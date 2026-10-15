@@ -6,7 +6,7 @@ import { agentList } from "../agentlist.js";
 import { api, follow } from "../api.js";
 import { BUSY_SEND, valueOf } from "../appearance/settings.js";
 import { approvalCard, fromRecord, LEFT_IN_CAMPAIGN, LEFT_IN_RUN } from "../approvals.js";
-import { readyToSend } from "../attachments.js";
+import { askForWords, readyToSend } from "../attachments.js";
 import { backgroundWork } from "../background.js";
 import { runChoices } from "../choices.js";
 import { createComputer } from "../computer.js";
@@ -608,6 +608,7 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
     }
     const text = input.value.trim();
     if (text === "") {
+      askForWords(attachments);
       input.focus();
       return;
     }
@@ -1127,7 +1128,10 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
   // A helper that starts or ends changes the list; the events of one moment are read as one.
   const agentsChanged = debounce(() => paintAgents(), AGENTS_SETTLE_MS);
   // A file a message carries, or one the conversation names, takes the panel (item 195).
-  layout.addEventListener(OPEN_FILE_EVENT, (event) => inspector.showFile(event.detail, event.target));
+  layout.addEventListener(OPEN_FILE_EVENT, (event) => {
+    event.stopPropagation();
+    inspector.showFile(event.detail, event.target);
+  });
   const timeline = createTimeline({
     rootRunId: runId,
     actorId: agent !== null ? agent.id : run.parent_run_id === null ? "dot" : run.id,

@@ -6,7 +6,8 @@ import { loadOwnThemes } from "./appearance/own.js";
 import { applyStoredSettings } from "./appearance/settings.js";
 import { setPageTitle, watchAttention } from "./attention.js";
 import { wireConversationCopy } from "./clipboard.js";
-import { el } from "./dom.js";
+import { el, OPEN_FILE_EVENT } from "./dom.js";
+import { fileDialog } from "./filepanel.js";
 import { icon, wordmark } from "./icons.js";
 import { buildShell } from "./shell.js";
 import { requestCompose } from "./shortcuts.js";
@@ -331,6 +332,9 @@ if ("serviceWorker" in navigator) {
 onAuthLost(handleAuthLost);
 // A copy out of the conversation goes on the clipboard as the markdown it was written in (item 206).
 wireConversationCopy(document);
+// A file asked for on a page without the panel beside the conversation shows in a dialog (item 269); a conversation's
+// page shows it in its panel and keeps the request to itself.
+document.addEventListener(OPEN_FILE_EVENT, (event) => fileDialog(event.detail, event.target));
 
 window.addEventListener("unhandledrejection", (event) => {
   const reason = event.reason;

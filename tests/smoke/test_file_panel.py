@@ -2,10 +2,12 @@
 opens beside the conversation when its chip is clicked: a PDF's pages as pictures the daemon draws, a workbook as a grid
 with a tab for each sheet and what a cell holds, a document's headings, list and table, a presentation's slides with
 their charts. A file the answer names by its path opens the same way: a CSV file as a grid, which opens on the Mac, an
-image, and a text as text, its markup never drawn; a path the panel does not show says why. The side panel lists the
-conversation's files, and the file the run wrote opens from its path in Actions. Closing the file gives the
-panel back as it was and the focus to what opened it. Wide and on a phone, light and dark. The daemon's routes refuse a
-file outside the home folder and a script to open, and serve a PDF's page as a PNG.
+image, and a Markdown file formatted, its HTML never drawn, with its source a click away (item 269); a path the panel
+does not show says why. The side panel lists the conversation's files, and the file the run wrote opens from its path
+in Actions. A long text pasted into the conversation's box goes as a file, which opens beside the conversation from its
+chip (item 269). Closing the file gives the panel back as it was and the focus to what opened it. Wide and on a phone,
+light and dark. The daemon's routes refuse a file outside the home folder and a script to open, and serve a PDF's page
+as a PNG.
 
 No network and no model service is used: the scripted model plays the runs of a daemon served by a real server, the
 home folder the daemon shows files of is a scratch one, and a stand-in takes the place of Launch Services: a test
@@ -62,6 +64,8 @@ ANSWER: str = (
 TODO: str = "# To do\n\nPay the <b>rent</b> first.\n"
 # What each run writes in the workspace before it answers.
 SUMMARY: str = "# Summary\n\nAll paid.\n"
+# A long text pasted into a conversation's box (item 269).
+PASTED: str = "# Pasted plan\n\n" + "".join(f"- Point {number}\n" for number in range(1, 41))
 _PROVIDER: str = parse_model_ref(SCRIPTED_MODEL).provider
 _SHOTS: tuple[tuple[int, Literal["light", "dark"]], ...] = (
     (1280, "light"),
@@ -321,12 +325,15 @@ async def _one_size(
     await page.screenshot(path=str(shots / f"table-{width}-{scheme}.png"))
     await _close(page, view, rows)
 
-    # A text, its markup shown as written.
+    # A Markdown file, formatted (item 269), its HTML never drawn, and as it is written a click away.
     todo: Locator = paths.filter(has_text="todo.md")
     await todo.click()
     await expect(view).to_have_attribute("data-kind", "text")
+    await expect(view.locator(".file-markdown").get_by_role("heading", name="To do")).to_be_visible()
+    await expect(view.locator(".file-markdown p")).to_have_text("Pay the <b>rent</b> first.")
+    await expect(view.locator("b")).to_have_count(0)
+    await view.get_by_role("button", name="Source").click()
     await expect(view.locator("pre.file-text")).to_have_text(TODO)
-    await expect(view.locator("pre.file-text b")).to_have_count(0)
     await _close(page, view, todo)
 
     # An image, as it is.
@@ -344,6 +351,25 @@ async def _one_size(
     await page.keyboard.press("Escape")
     await expect(view).to_have_count(0)
     assert await layout.get_attribute("data-inspector") == panel
+
+    # A long text pasted into the box goes as a file, which opens beside the conversation from its chip (item 269).
+    box: Locator = page.get_by_role("textbox", name=re.compile(r"^Message for "))
+    assert await box.evaluate(
+        "(box, text) => { const data = new DataTransfer(); data.setData('text/plain', text);"
+        " return !box.dispatchEvent(new ClipboardEvent('paste', { clipboardData: data, bubbles: true, cancelable: true })); }",
+        PASTED,
+    )
+    pasted: Locator = page.locator(".composer .attach-chip")
+    await expect(pasted).to_have_class(re.compile(r"\bready\b"))
+    await pasted.locator("button.attach-open").click()
+    await expect(view).to_have_attribute("data-kind", "text")
+    await expect(view.locator(".file-markdown").get_by_role("heading", name="Pasted plan")).to_be_visible()
+    await expect(view.locator(".file-markdown li")).to_have_count(40)
+    await expect(page.locator("dialog.file-dialog")).to_have_count(0)
+    assert await box.input_value() == ""
+    await page.screenshot(path=str(shots / f"pasted-{width}-{scheme}.png"))
+    await page.keyboard.press("Escape")
+    await expect(view).to_have_count(0)
 
     # The side panel's Actions tab lists the conversation's files, each opening beside it; the tab comes back after it.
     if width < 960 or panel != "on":
@@ -381,9 +407,11 @@ async def _one_size(
     await expect(written).to_have_text(str(_summary(runtime.workspace)))
     await written.click()
     await expect(view).to_have_attribute("data-kind", "text")
-    await expect(view.locator("pre.file-text")).to_have_text(SUMMARY)
+    await expect(view.locator(".file-markdown").get_by_role("heading", name="Summary")).to_be_visible()
+    await expect(view.locator(".file-markdown p")).to_have_text("All paid.")
     await page.keyboard.press("Escape")
     await expect(view).to_have_count(0)
+
     await page.close()
 
 

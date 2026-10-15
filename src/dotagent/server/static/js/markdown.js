@@ -201,6 +201,16 @@ export function parseBlocks(text) {
   return blocks;
 }
 
+/**
+ * Whether `text` reads as Markdown (item 269): one of its blocks is more than a paragraph, or a paragraph holds bold,
+ * italics, code or a link with words of its own, as `parseBlocks` reads them. A bare address does not count.
+ */
+export function readsAsMarkdown(text) {
+  return parseBlocks(text).some(
+    (block) => block.type !== "paragraph" || block.inline.some((part) => part.type !== "text" && !(part.type === "link" && part.value === part.href)),
+  );
+}
+
 function piece(kind, text) {
   return { kind, text };
 }

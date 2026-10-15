@@ -5207,8 +5207,8 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 266 | A batch carries several public or social actions while no pace is set                 | done        | ab56000 |
 | 267 | The phone reaches Dot from anywhere, and its home-screen app signs in with a code     | planned     |         |
 | 268 | Office files show in the side panel as Quick Look draws them                          | planned     |         |
-| 269 | A long paste goes as a file, and a Markdown file shows clean in the side panel        | planned     |         |
-| 270 | A script's navigation is settled after it, also one that commits after its value      | in progress |         |
+| 269 | A long paste goes as a file, and a Markdown file shows clean in the side panel        | in progress |         |
+| 270 | A script's navigation is settled after it, also one that commits after its value      | done        | a27c018 |
 
 ### 77. The type system: Inter and Geist Mono, seven sizes, three weights
 
@@ -11846,28 +11846,48 @@ PowerPoint.
 
 ### 269. A long paste goes as a file, and a Markdown file shows clean in the side panel
 
-**Status: planned.**
+**Status: in progress.** Built on `item-269-paste-as-file`.
+
+**As built (2026-10-15).** `markdown.js`: `readsAsMarkdown` (a block that is more than a paragraph, or bold, italics,
+code or a link with words of its own). `attachments.js`: a text of 2,000 characters or 40 lines pasted into a message
+box goes as `pasted-text-<HHMMSS>.md` when it reads as Markdown, else `.txt`, uploaded at once while the message has
+room for a file (else it goes into the box); the pencil on a pasted file's chip puts the text back at the caret; the
+name in a chip is a button that opens its file once uploaded; a send with files and no words asks for words (a paste
+leaves the box empty), and `composer.js` makes the send a Stop only while the box holds no text and no file, so that a
+paste into a working run's box never turns the button that sends it into the one that ends the run (both found by the
+review of 267, 269 and 270). `filepanel.js`: a `.md` or `.markdown` file shows
+formatted (prose.js, text nodes only) with Formatted and Source; `fileDialog` shows a file over a page without the
+panel. `main.js`: a file asked for outside a conversation opens in that dialog, while `views/run.js` keeps the request
+to its panel. `app.css`, `run.css`: the chip's button, the dialog, a Markdown file's headings as a document's. README:
+the attachments and the panel. Tests: `tests/smoke/test_paste_as_file.py` (new; in the new chat's box a long Markdown
+paste and a long plain one become `.md` and `.txt` files and a short one stays the box's, a send with only the files
+asks for words and starts nothing, the pencil puts the text back, the chip opens the formatted file in a dialog with its
+source a click away, and on a run at work a paste keeps the send a send; wide and on a phone, light and dark, and once in
+WebKit) and `tests/smoke/test_file_panel.py` (a Markdown file formatted with its source a click away; a long
+paste in a conversation's box opens beside it; once in WebKit too). They fail on the code of before. The pencil, not a
+key, puts the text back, so that a phone can do it too.
 
 **What.** Text pasted into the composer that is long (thousands of characters or dozens of lines) becomes an
-attachment, `.md` when it reads as Markdown and `.txt` otherwise, instead of filling the box; pasting as text stays one
-shortcut away. A chip of the composer, and a sent file, opens in the side panel, where a Markdown file shows as
-formatted text, with its source a click away.
+attachment, `.md` when it reads as Markdown and `.txt` otherwise, instead of filling the box; the text goes back into
+the box from the file's chip. A chip of the composer, and a sent file, opens in the side panel, where a Markdown file
+shows as formatted text, with its source a click away.
 
 **Why.** The owner's ask: a long paste buries the message, and a Markdown file should read cleanly.
 
-**Tests.** A smoke test that pastes a long Markdown and a long plain text in Chrome, sends them, and opens each in the
-side panel, wide and on a phone, light and dark, and the same in WebKit.
+**Tests.** As built.
 
 ### 270. A script's navigation is settled after it, also one that commits after its value
 
-**Status: in progress.** Built on `item-270-eval-settles`.
+**Status: done.** Merged as `a27c018` (PR #311; no Linear issue, the Linear connector was signed out).
 
 **As built (2026-10-15).** `browser/session.py`: `run_script` settles the page after every script, as a step is
 settled, and reads what changed after that, so that a navigation the script started is let commit before the address
 rules are checked. Before, it settled only when the page had already moved, so a script that led to a forbidden
-address whose server answered after the script's value came back left the tab on that address. Tests:
-`tests/smoke/test_browser_eval.py`, a forbidden page that answers after 1.5 s has the tab reset and the call fail; it
-fails on the code of before.
+address whose server answered after the script's value came back left the tab on that address. After a script still
+running when its wait ended only a navigation under way is let commit (`_let_commit`): the quiet-DOM check runs in the
+page and would wait behind a busy script until the tool's own limit (found by the review of 267, 269 and 270). Tests:
+`tests/smoke/test_browser_eval.py`, a forbidden page that answers after 1.5 s has the tab reset and the call fail, and
+a script that keeps the page busy for 4 s, given 1 s, comes back in under 3 s; both fail on the code of before.
 
 **What.** The address rules hold after `browser_eval` whatever the speed of the page it led to.
 
@@ -12588,3 +12608,4 @@ fails on the code of before.
 - 2026-10-15 (Opus 5.5): item 264 merged as `10eb5d5` (PR #308; no Linear issue, the connector was signed out): Dot's own Chrome starts without Playwright's `--disable-extensions` (as it already did without `--enable-automation`), so an extension installed in its profile from the Chrome Web Store loads and stays; the offline smoke suite on the stack top (561 passed, 1 skipped) and CI were clean.
 - 2026-10-15 (Opus 5.5): item 265 merged as `dbb21d5` (PR #309; no Linear issue, the connector was signed out): `[browser] debug_port` (0 for none, else 1024 to 65535; Settings › Browser) has Dot's own Chrome also take DevTools connections on that port of 127.0.0.1, and a run in Dot's Chrome with a tool that runs scripts is told the address, to connect with `connect_over_cdp` and `no_defaults=True`; Dot's Chrome does not start while another program holds the port, and the pool checks every session before it changes any. A review of 263 to 266 found the first commit's claim that a script never drives another Chrome too strong, ports below 1024 taken and the pool's change not atomic; the second commit fixed them. CI was clean.
 - 2026-10-15 (Opus 5.5): item 266 merged as `ab56000` (PR #310; no Linear issue, the connector was signed out): `browser_act` lets a batch carry several follows, likes, posts or messages while `[policy.pace]` sets no limit for their kind (the default), counted once by the gate; with a pace set for a kind it carries, one per batch as before, and the refusal names the paced kinds and says that a script in the page would go around the owner's pace. The prompt's line that sent such actions one per call is gone, so every run's prompt is shorter. CI and the pace tests were clean.
+- 2026-10-15 (Opus 5.5): item 270 merged as `a27c018` (PR #311; no Linear issue, the connector was signed out): browser_eval settles the page after every script, as a step is settled, before the address rules are checked, so that a forbidden page answering after the value came back has the tab reset; after a script still running when its wait ended only a navigation under way is let commit, so a busy script no longer holds the call; full offline smoke on the stack top 565 passed.
