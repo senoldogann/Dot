@@ -5186,8 +5186,8 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 245 | Helpers that follow one another sit in one group                                     | done        | 6b86a8d |
 | 246 | Each step's thinking is a block that folds                                           | done        | 5ef5a7b |
 | 247 | The repository has a licence, a security policy and Dependabot                       | done        | 66f49a3 |
-| 248 | A run a restart cut off goes on by itself by default                                 | in progress |         |
-| 249 | What the review model declines to write goes to the run's own model                  | planned     |         |
+| 248 | A run a restart cut off goes on by itself by default                                 | done        | 8d3efd5 |
+| 249 | What the review model declines to write goes to the run's own model                  | in progress |         |
 | 250 | Each model's context size can be set in Settings                                     | planned     |         |
 | 251 | Ultrathink and Ultracode in the reasoning menu                                       | planned     |         |
 | 252 | The plan at the end of the request, if an eval shows it holds                        | planned     |         |
@@ -11147,7 +11147,7 @@ brings each kind of dependency up to date once a week in one pull request; and t
 
 ### 248. A run a restart cut off goes on by itself by default
 
-**Status: in progress.**
+**Status: done.** Merged as `8d3efd5` (PR #292; no Linear issue, the Linear connector was signed out).
 
 **As built (2026-10-15).** `defaults.toml` sets `[agent] resume = "safe"`: when the daemon starts, a run of the web UI
 that a restart, a crash or a shutdown cut off at most `resume_within_s` (30 minutes) before, whose calls that were cut
@@ -11163,7 +11163,17 @@ leaves every such run to the owner, as before.
 
 ### 249. What the review model declines to write goes to the run's own model
 
-**Status: planned.**
+**Status: in progress.**
+
+**As built (2026-10-15).** `review.py` asks with `_decide_passing_on`: a question the review model declines (its
+provider ends the reply as a refusal, item 225) goes to each of the other models the writer was given, in turn, until
+one answers; any other failure is raised as it comes, and a question that every model declines raises a refusal that
+names them all. The writers of a run's lessons and of its skill are given the run's own model (`LessonCase.model`,
+`RunRecord.model`), the writer of the owner section the model of the newest run it reads; an approval and the goal check
+keep asking the review model alone. Tests: `tests/unit/test_review_declined.py`: the lessons the review model declines
+are written by the run's model, asked once; a run whose model is the review model asks nobody else; two refusals name
+both models; a reply that only lacks the call is asked again of the review model and never of the run's; on the code of
+before the run's model is never asked.
 
 **What.** When the review model declines to write a run's lessons or its skill, or the owner section of the nightly
 reflection, the same question goes once to the run's own model (for the owner section, the model of the latest run), if
@@ -11882,3 +11892,4 @@ plan steps marked done without evidence hold.
 - 2026-10-15 (Opus 5.5): item 245 merged as `6b86a8d` (PR #286; no Linear issue, the connector was signed out): helpers that follow one another sit in one group, as T3 Code groups its subagents, with a head that counts them, says how they stand and folds them away; a row that is done shows the start of its answer.
 - 2026-10-15 (Opus 5.5): item 246 merged as `5ef5a7b` (PR #287; no Linear issue, the connector was signed out): each step's thinking is a block with a brain that folds and unfolds, "Thinking…" while the model thinks and "Thought" once it is done, among its step's calls or before its message; the `assistant` event keeps the thinking, its secrets masked, up to 12,000 characters, and a step the loop asks again drops what its failed try streamed. Part 40 is done.
 - 2026-10-15 (Opus 5.5): item 247 merged as `66f49a3` (PR #288; no Linear issue, the connector was signed out): the repository has the MIT licence, a security policy that sends reports through GitHub's private vulnerability reporting, now on, a weekly Dependabot configuration and the notice of the icons' licence.
+- 2026-10-15 (Opus 5.5): item 248 merged as `8d3efd5` (PR #292; no Linear issue, the connector was signed out): a run that a restart, a crash or a shutdown cut off goes on by itself by default, when the calls it cut off only read and it was cut off at most 30 minutes before.

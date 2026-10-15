@@ -1142,6 +1142,7 @@ def _run_end(
     case: LessonCase = LessonCase(
         run_id=run.id,
         thread_id=run.thread_id,
+        model=run.model,
         goal=run.goal,
         digest=goal_digest(render_transcript(_since_goal(history, goal))),
         failures=facts.failures,
