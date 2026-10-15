@@ -1261,9 +1261,12 @@ turn has its answer, stand the time it was sent (the day too when it was not tod
 rests), a copy of it as you wrote it and **Send again**, which sends it once more with its files, as the box would, and
 leaves what you typed in the box (item 205, after T3 Code); the files a message came with stand between it and that
 line. A delegated run is a row: the face with its state at the corner (turning while it works, amber while it waits for
-you, green with a check when it is done, red when it failed), its goal over the last thing it did, the time it has taken
-(counting on every second while it works), the way to its own page and a chevron that opens its steps; rows that follow
-each other share one card. The row is closed from the start, as T3 Code draws a subagent: an approval the run asks for
+you, green with a check when it is done, red when it failed), its goal over the last thing it did and, once it ended,
+the start of its answer (item 245), the time it has taken (counting on every second while it works), the way to its own
+page and a chevron that opens its steps. Rows that follow each other gather in one group, as T3 Code groups its
+subagents: its head shows their faces, how many they are and how they stand ("3 helpers", "1 working · 2 done"), the
+time from the first one's start to the last one's end and a chevron that folds the rows away; an approval a helper asks
+for opens the group. The row is closed from the start, as T3 Code draws a subagent: an approval the run asks for
 opens it until you have decided, and a row you never opened or closed yourself closes again. Resting the pointer on a
 row, or moving the focus to it, shows its card (item 226, after T3 Code's): the whole goal, the model with its reasoning
 level, how the run stands and for how long, counting on while it works, and what it does now or did last; the pointer

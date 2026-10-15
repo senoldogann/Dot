@@ -28,6 +28,19 @@ const VERDICT_TEXT = { ask: "Needs approval", handoff: "Handed to you", deny: "B
 const ORDINARY_ENDS = new Set(["stop", "tool_calls", ""]);
 // The words of a delegated run's status ring, for its tooltip and for a screen reader.
 const RING_LABELS = { blocked: "waiting" };
+// The faces the head of a group of helpers shows, the rest counted (item 245), and how much of a helper's answer its row
+// keeps for its last line.
+const FLOCK_FACES = 3;
+const PREVIEW_CHARS = 240;
+// How the helpers of a group stand, in the order a reader scans them, after T3 Code's: those under way first, then how
+// the others ended.
+const FLOCK_WORDS = [
+  ["working", ["queued", "running"]],
+  ["waiting for you", ["blocked"]],
+  ["done", ["done"]],
+  ["failed", ["failed"]],
+  ["stopped", ["cancelled"]],
+];
 
 /** Show the status of a delegated run on the ring of its chip. */
 function paintRing(ring, status) {
@@ -40,6 +53,25 @@ function paintRing(ring, status) {
 /** Whether two texts read the same, whatever their line breaks and spacing. */
 function sameText(first, second) {
   return first.replace(/\s+/g, " ").trim() === second.replace(/\s+/g, " ").trim();
+}
+
+/** A markdown text as one plain line (item 245): without the marks of its headings, lists, bold and code, its links as
+ * their words. */
+function plainLine(text) {
+  return text
+    .replace(/\[([^\]]*)\]\([^)]*\)/g, "$1")
+    .replace(/^[ \t]*(?:#{1,6}|[-*+]|\d+[.)])[ \t]+/gm, "")
+    .replace(/\*\*|__|`/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+/** How the helpers of a group stand, from their statuses: "2 working · 1 done". */
+function flockState(statuses) {
+  return FLOCK_WORDS.map(([word, kinds]) => ({ word, count: statuses.filter((status) => kinds.includes(status)).length }))
+    .filter(({ count }) => count > 0)
+    .map(({ word, count }) => `${count} ${word}`)
+    .join(" · ");
 }
 
 // A turn of the agent opens with its still face (item 103).
@@ -109,6 +141,23 @@ function paintGroup(group) {
 }
 
 /**
+ * The group of helpers that follow one another (item 245), after T3 Code's group of subagents: a head with their faces,
+ * how many they are and how they stand, the time from the first one's start to the last one's end and a chevron that
+ * folds their rows away. It is open from the start.
+ */
+function buildFlock() {
+  const faces = el("span", { class: "helpers-faces", "aria-hidden": "true" });
+  const title = el("span", { class: "helpers-title" });
+  const state = el("span", { class: "helpers-state" });
+  const time = el("span", { class: "helpers-time" });
+  const main = el("span", { class: "helpers-main" }, title, state);
+  const head = el("summary", { class: "helpers-head" }, faces, main, time, el("span", { class: "chev" }, icon("chevron")));
+  const body = el("div", { class: "helpers-body" });
+  const node = el("details", { class: "helpers", open: true }, head, body);
+  return { node, body, faces, title, state, time };
+}
+
+/**
  * The timeline of the run `rootRunId`, which was created at `startedAt` (seconds). `push(record)` takes events in order; the
  * callbacks tell the page about what the timeline cannot show by itself: `onGrow()` after every event, `onPlan(steps, targets)`,
  * `onStats({ step, input, output })` after every model turn and every side call of the run (`step` 0: a compaction, a
@@ -153,6 +202,9 @@ export function createTimeline({ rootRunId, actorId, startedAt, onGrow, onPlan, 
       asking: 0,
       // While the run waits for its model to be reached again: the note that says so and the attempts it counts.
       unreachable: null,
+      // The helpers whose rows follow one another at the end of the scope (item 245): `members` (their scopes),
+      // `anchor` (the last element they make up) and `group` (null while there is only one).
+      flock: null,
     };
   }
 
@@ -173,6 +225,56 @@ export function createTimeline({ rootRunId, actorId, startedAt, onGrow, onPlan, 
     endGroup(scope, ts);
     scope.container.append(node);
     scope.boundary = ts;
+  }
+
+  /**
+   * Put the row of the delegated run of `scope` at the end of its parent's scope, as `place` does. Rows that follow one
+   * another gather in one group (item 245): the second one makes it and takes the first one in.
+   */
+  function placeHelper(scope, ts) {
+    const parent = scope.parent;
+    endGroup(parent, ts);
+    const flock = parent.flock;
+    if (flock !== null && parent.container.lastElementChild === flock.anchor) {
+      if (flock.group === null) {
+        flock.group = buildFlock();
+        flock.anchor.replaceWith(flock.group.node);
+        flock.group.body.append(flock.anchor);
+        flock.anchor = flock.group.node;
+      }
+      flock.group.body.append(scope.panel.node);
+      flock.members.push(scope);
+      paintFaces(flock);
+    } else {
+      parent.container.append(scope.panel.node);
+      parent.flock = { members: [scope], anchor: scope.panel.node, group: null };
+    }
+    scope.panel.flock = parent.flock;
+    parent.boundary = ts;
+    paintFlock(parent.flock, ts);
+  }
+
+  /** The faces in the head of a group of helpers: the first ones', the rest counted. */
+  function paintFaces(flock) {
+    const shown = flock.members.slice(0, FLOCK_FACES).map((member) => actorFace(member.actorId, "idle", null));
+    const more = flock.members.length - FLOCK_FACES;
+    flock.group.faces.replaceChildren(...shown, ...(more > 0 ? [el("span", { class: "helpers-more" }, `+${more}`)] : []));
+  }
+
+  /** The head of a group of helpers as it stands at `now` (seconds): how many they are, how they stand, and the time from
+   * the first one's start to the last one's end, which counts on while one works. */
+  function paintFlock(flock, now) {
+    if (flock.group === null) {
+      return;
+    }
+    const helpers = flock.members.map((member) => member.panel.helper);
+    const live = helpers.some((helper) => helper.ended === null);
+    const began = Math.min(...helpers.map((helper) => helper.began));
+    const ended = live ? now : Math.max(...helpers.map((helper) => helper.ended));
+    flock.group.title.textContent = plural(helpers.length, "helper", "helpers");
+    flock.group.state.textContent = flockState(helpers.map((helper) => helper.status));
+    flock.group.state.classList.toggle("bad", !live && helpers.some((helper) => helper.status === "failed"));
+    flock.group.time.textContent = duration(Math.max(ended - began, 0));
   }
 
   /**
@@ -211,12 +313,15 @@ export function createTimeline({ rootRunId, actorId, startedAt, onGrow, onPlan, 
     return scope.group;
   }
 
-  /** A delegated run asks the reader something (item 123): its row opens, and so do the rows it sits in, so the card
-   * is in sight. */
+  /** A delegated run asks the reader something (item 123): its row opens, and so do the rows it sits in and their
+   * groups (item 245), so the card is in sight. */
   function reveal(scope) {
     for (let at = scope; at.panel !== null; at = at.parent) {
       at.asking += 1;
       at.panel.node.open = true;
+      if (at.panel.flock.group !== null) {
+        at.panel.flock.group.node.open = true;
+      }
     }
   }
 
@@ -270,7 +375,6 @@ export function createTimeline({ rootRunId, actorId, startedAt, onGrow, onPlan, 
     summary.addEventListener("click", () => {
       scope.touched = true;
     });
-    place(parent, node, ts);
     // What the row's card tells of the delegated run, kept up to date by its events (see helperCard).
     const helper = {
       goal: data.goal ?? "",
@@ -284,9 +388,11 @@ export function createTimeline({ rootRunId, actorId, startedAt, onGrow, onPlan, 
       calls: 0,
     };
     card.attach(summary, helper, () => actorFace(data.agent_id ?? runId, faceState(helper.status), null));
-    const scope = makeScope({ runId, actorId: data.agent_id ?? runId, container: inner, panel: { node, face, status, meta, progress, time, steps: 0, helper }, parent, began: ts });
+    const panel = { node, face, status, meta, progress, time, steps: 0, helper, flock: null };
+    const scope = makeScope({ runId, actorId: data.agent_id ?? runId, container: inner, panel, parent, began: ts });
     scopes.set(runId, scope);
     liveChildren.add(scope);
+    placeHelper(scope, ts);
     return scope;
   }
 
@@ -296,14 +402,20 @@ export function createTimeline({ rootRunId, actorId, startedAt, onGrow, onPlan, 
     scope.panel.time.textContent = duration(Math.max(ts - scope.began, 0));
   }
 
-  /** The row of the delegated run of `scope` shows that the run ended with `status` at `ts` after `steps` steps. */
-  function endChild(scope, status, steps, ts) {
+  /** The row of the delegated run of `scope` shows that the run ended with `status` at `ts` after `steps` steps, its
+   * answer `result`. */
+  function endChild(scope, status, steps, ts, result) {
     Object.assign(scope.panel.helper, { status, ended: ts, calls: 0 });
     paintRing(scope.panel.status, status);
     scope.panel.face.setAttribute("data-state", faceState(status));
     scope.panel.face.classList.add("ended");
-    paintChild(scope, ts, [status, plural(steps, "step", "steps")]);
+    // Its last line is the start of its answer, as T3 Code's rows show (item 245), after how it ended unless it is done;
+    // a run with no answer says how it ended and in how many steps.
+    const answer = clip(plainLine(result), PREVIEW_CHARS);
+    const facts = answer === "" ? [status, plural(steps, "step", "steps")] : status === "done" ? [answer] : [status, answer];
+    paintChild(scope, ts, facts);
     liveChildren.delete(scope);
+    paintFlock(scope.panel.flock, ts);
     // Whatever it asked is moot now: a row the reader never opened or closed by hand is closed again.
     if (!scope.touched) {
       scope.panel.node.open = false;
@@ -320,17 +432,23 @@ export function createTimeline({ rootRunId, actorId, startedAt, onGrow, onPlan, 
       const scope = scopes.get(run.id);
       if (scope !== undefined && liveChildren.has(scope) && run.finished_at !== null) {
         settleGroups(scope, run.finished_at);
-        endChild(scope, run.status, run.steps, run.finished_at);
+        endChild(scope, run.status, run.steps, run.finished_at, run.result);
       }
     }
   }
 
   /** The row of every delegated run that has not ended says how long it has worked at `now` (seconds): the page calls
    * this every second while the run works, so a folded row's time counts on between the events of its run, as T3 Code
-   * counts a working subagent's (item 123), and as an event comes. The card a row shows follows (item 226). */
+   * counts a working subagent's (item 123), and as an event comes. The card a row shows follows (item 226), and so does
+   * the head of the group the row is in (item 245). */
   function tick(now) {
+    const flocks = new Set();
     for (const scope of liveChildren) {
       scope.panel.time.textContent = duration(Math.max(now - scope.began, 0));
+      flocks.add(scope.panel.flock);
+    }
+    for (const flock of flocks) {
+      paintFlock(flock, now);
     }
     card.refresh(now);
   }
@@ -359,13 +477,14 @@ export function createTimeline({ rootRunId, actorId, startedAt, onGrow, onPlan, 
     }
   }
 
-  function markWaiting(scope, waiting) {
+  function markWaiting(scope, waiting, ts) {
     if (scope.runId === rootRunId) {
       onRunStatus({ status: waiting ? "blocked" : "running", model: null, endedAt: null });
       return;
     }
     scope.panel.helper.status = waiting ? "blocked" : "running";
     paintRing(scope.panel.status, scope.panel.helper.status);
+    paintFlock(scope.panel.flock, ts);
   }
 
   function showThinking(scope, characters) {
@@ -432,7 +551,7 @@ export function createTimeline({ rootRunId, actorId, startedAt, onGrow, onPlan, 
         onRunStatus({ status, model: null, endedAt: record.ts });
         return;
       }
-      endChild(scope, status, scope.panel.steps, record.ts);
+      endChild(scope, status, scope.panel.steps, record.ts, result);
       // The parent resumes when the delegated run is over; the time in between was spent on the delegation.
       scope.parent.boundary = record.ts;
     },
@@ -569,7 +688,7 @@ export function createTimeline({ rootRunId, actorId, startedAt, onGrow, onPlan, 
       cards.set(record.data.approval_id, { card, scope });
       place(scope, card.node, record.ts);
       reveal(scope);
-      markWaiting(scope, true);
+      markWaiting(scope, true, record.ts);
     },
 
     // A question the run left for the user and went on without; it waits in the run's "Dot asked you" list.
@@ -590,7 +709,7 @@ export function createTimeline({ rootRunId, actorId, startedAt, onGrow, onPlan, 
         // The time spent waiting for the decision was not spent working.
         entry.scope.boundary = record.ts;
         unreveal(entry.scope);
-        markWaiting(entry.scope, false);
+        markWaiting(entry.scope, false, record.ts);
       }
     },
 

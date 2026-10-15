@@ -5182,8 +5182,8 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 241 | The redactor masks more keys, any Authorization and cookies                          | done        | dfbebce |
 | 242 | The approval card and the reviewer see the whole command                             | done        | cbd4a68 |
 | 243 | A run that goes on from another keeps its taint                                      | done        | bbe607e |
-| 244 | The pill of a helper's page stays in the window                                      | in progress |         |
-| 245 | Helpers that follow one another sit in one group                                     | planned     |         |
+| 244 | The pill of a helper's page stays in the window                                      | done        | 5cfec1c |
+| 245 | Helpers that follow one another sit in one group                                     | in progress |         |
 | 246 | Each step's thinking is a block that folds                                           | planned     |         |
 
 ### 77. The type system: Inter and Geist Mono, seven sizes, three weights
@@ -11021,7 +11021,7 @@ the group, the thinking. None changes what Dot does; they change what the owner 
 
 ### 244. The pill of a helper's page stays in the window
 
-**Status: in progress.**
+**Status: done.** Merged as `5cfec1c` (PR #285; no Linear issue, the Linear connector was signed out).
 
 **As built (2026-10-15).** `views/run.js` puts the pill (`child-foot-row`) in the dock, after the composer's frame that
 a delegated run hides, instead of after the dock: the dock stands at the window's foot (`position: sticky`), and so does
@@ -11036,7 +11036,21 @@ foot as the conversation scrolls, with the arrow down above it.
 
 ### 245. Helpers that follow one another sit in one group
 
-**Status: planned.**
+**Status: in progress.**
+
+**As built (2026-10-15).** `timeline.js` places a helper's row with `placeHelper`: rows that follow one another at the
+end of a scope gather in one group (`.helpers`, open from the start), which the second row makes, taking the first in.
+Its head (`paintFlock`) shows the first three faces and "+N", "N helpers", how they stand in the order T3 Code reads
+them (working, waiting for you, done, failed, stopped), and the time from the first one's start to the last one's end,
+counting on every second while one works; an approval a helper asks for opens its group. A row that ended shows the
+start of its answer as one plain line (`plainLine`: no marks of headings, lists, bold or code, links as their words),
+after how it ended unless it is done; a run with no answer says how it ended and in how many steps, as before. Tests:
+`tests/smoke/test_helper_group.py` delegates four helpers in one step, three answering and one working, wide and on a
+phone, light and dark, in Chrome and (copied for the check) in WebKit: one group, "4 helpers", "1 working · 3 done",
+three faces and "+1", a time that counts on, rows with the start of their answers, a head that folds the rows away and
+brings them back, "3 done · 1 stopped" once the working one is stopped, and the same group on the page loaded again; on
+the code of before there is no group. `tests/smoke/test_helper_fold.py` reads the start of the answer where it read
+"done".
 
 **What.** Helpers whose rows follow one another sit in one group, as T3 Code groups its subagents: a head with their
 faces (three, then "+N"), how many they are, how they stand ("1 working · 3 done") and the time from the first one's
@@ -11736,3 +11750,4 @@ its start and its end), so a page loaded later shows it.
 - 2026-10-15 (Opus 5.5): item 241 merged as `dfbebce` (PR #282; no Linear issue, the connector was signed out): the redactor also masks the keys of Stripe, GitLab, npm, Hugging Face, Twilio and SendGrid by their prefixes, an Azure account key and a service account's `private_key_id`, the credentials of an Authorization header of any scheme, and the cookies of a Cookie or Set-Cookie header.
 - 2026-10-15 (Opus 5.5): item 242 merged as `cbd4a68` (PR #283; no Linear issue, the connector was signed out): an approval card shows the whole of what an action acts on, wrapped, in a box that scrolls past twelve lines; the reviewer of an `auto` run reads up to 12,000 characters of it, and of a longer one its start and its end.
 - 2026-10-15 (Opus 5.5): item 243 merged as `bbe607e` (PR #284; no Linear issue, the connector was signed out): a resumed run starts as tainted as the run it resumes was when it was cut off, and the run that tells a chat that its command in the background ended as the chat's last run ended; `tool_result` and `run_queued` events hold whether the run was tainted. Part 39 is done.
+- 2026-10-15 (Opus 5.5): item 244 merged as `5cfec1c` (PR #285; no Linear issue, the connector was signed out): the pill of a helper's page is in the dock, so it stays at the window's foot as the conversation scrolls.
