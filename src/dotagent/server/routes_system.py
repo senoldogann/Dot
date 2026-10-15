@@ -30,6 +30,7 @@ from dotagent.core.errors import (
     ElsewhereError,
     MissingSecretError,
     NotFoundError,
+    OpenCodeMissing,
     ProviderAccessError,
     ProviderAuthError,
 )
@@ -63,9 +64,11 @@ from dotagent.help.elsewhere import (
     FoundSkill,
     found_elsewhere,
 )
+from dotagent.llm.opencode import OPENCODE_PROVIDER
 from dotagent.llm.router import ModelRef, ModelRouter, offers_fast_mode, parse_model_ref
 from dotagent.llm.traits import effective_effort
 from dotagent.llm.types import KNOWN_PROVIDERS, Effort, ModelInfo
+from dotagent.opencode.server import learns_from_data
 from dotagent.secrets import secret_state
 from dotagent.server.context import ServerContext
 from dotagent.server.guard import daemon_proof
@@ -147,6 +150,7 @@ def _option(
         efforts=list(info.efforts),
         default_effort=effective_effort(info.efforts, default_effort),
         free=info.free,
+        learns=provider == OPENCODE_PROVIDER and learns_from_data(info.id),
         fast_mode=offers_fast_mode(ref),
     )
 
@@ -156,6 +160,8 @@ def _problem(exc: DotError) -> ProviderProblem:
     that the provider refused access, which a key does not change."""
     if isinstance(exc, MissingSecretError):
         return "no_key"
+    if isinstance(exc, OpenCodeMissing):
+        return "not_installed"
     if isinstance(exc, ProviderAuthError):
         return "key_refused"
     if isinstance(exc, ProviderAccessError):
@@ -344,9 +350,16 @@ def system_router(ctx: ServerContext, pages: str) -> APIRouter:
         summaries of long runs first, reads pages for the facts asked of them and may take a run's simpler steps; the
         review model, which checks runs and draws their lessons; or the vision model, which reads images for a model
         that cannot. The config file keeps it as ``[models] <role>``. A model its provider does not offer is refused, as
-        is one that cannot call tools for the fast or the review model, or one that cannot see for the vision model;
-        nothing changes then."""
-        info: ModelInfo = await ctx.runtime.router.model_info(parse_model_ref(request.model))
+        is one that cannot call tools for the fast or the review model, or one that cannot see for the vision model,
+        and one of Zen's free models, which answer only as OpenCode's own agent (item 283); nothing changes then."""
+        ref: ModelRef = parse_model_ref(request.model)
+        if ref.provider == OPENCODE_PROVIDER:
+            raise ConfigError(
+                f"Zen's free models answer only as OpenCode's own agent, so none can be the {request.role} model;"
+                " pick another",
+                {"model": request.model},
+            )
+        info: ModelInfo = await ctx.runtime.router.model_info(ref)
         if request.role == "vision" and not info.vision:
             raise ConfigError("the vision model must be one that can see images", {"model": request.model})
         if request.role != "vision" and not info.tools:

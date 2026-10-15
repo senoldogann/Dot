@@ -2,6 +2,7 @@
 
 import asyncio
 import getpass
+import os
 import sys
 
 from dotagent.cli_commands import (
@@ -23,7 +24,7 @@ from dotagent.secrets import resolve_secret, write_env_value
 
 async def cmd_models(command: ModelsCommand) -> int:
     config: AppConfig = load_user_config()
-    router: ModelRouter = ModelRouter(config, log_model_call)
+    router: ModelRouter = ModelRouter(config, log_model_call, os.environ)
     failures: int = 0
     names: list[str] = [command.provider] if command.provider is not None else list(KNOWN_PROVIDERS)
     try:

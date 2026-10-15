@@ -49,6 +49,8 @@ from dotagent.core.paths import playbooks_dir
 from dotagent.core.text import redact_secrets, truncate_tail
 from dotagent.core.types import FrozenModel, JsonObject
 from dotagent.evals import EVAL_SOURCE
+from dotagent.llm.opencode import OPENCODE_PROVIDER
+from dotagent.llm.router import parse_model_ref
 from dotagent.memory.ranking import Similar, Vector, most_similar
 from dotagent.skills.catalog import PLAYBOOK_SOURCE, playbook_root
 from dotagent.skills.parse import parse_skill
@@ -172,8 +174,11 @@ def playbook_name(kind: str) -> str:
 
 def playbook_case(config: AppConfig, run: RunRecord, status: RunStatus) -> RunRecord | None:
     """``run`` when its end calls for playbook work (recording the playbooks it read, writing one from it), else
-    ``None``: playbooks are on, it is a task run of its own and not an eval, and it ended done or failed."""
+    ``None``: playbooks are on, it is a task run of its own and not an eval nor one of OpenCode's agent (item 283),
+    whose tools a playbook of Dot's cannot name, and it ended done or failed."""
     if not config.agent.playbooks or run.mode != "task" or run.parent_run_id is not None or run.source == EVAL_SOURCE:
+        return None
+    if parse_model_ref(run.model).provider == OPENCODE_PROVIDER:
         return None
     return run if status in ("done", "failed") else None
 

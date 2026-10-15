@@ -40,7 +40,7 @@ def _command(names: int) -> str:
 async def _read(command: str) -> str:
     """What the review model is sent about a shell call of ``command``."""
     provider: ReadProvider = ReadProvider()
-    router: ModelRouter = ModelRouter(load_default_config(), _ignore)
+    router: ModelRouter = ModelRouter(load_default_config(), _ignore, {})
     await router.register("ollama", provider)
     review: Reviewer = reviewer_for(router, "ollama:scripted", 30.0, "review:test", None)
     action: ActionInfo = ActionInfo(

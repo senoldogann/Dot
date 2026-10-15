@@ -128,6 +128,19 @@ def added_servers_path() -> Path:
     return dot_home() / "added-servers.json"
 
 
+def opencode_command(configured: str) -> str:
+    """The ``opencode`` program Dot starts (item 283): ``[providers.opencode] command``, unless ``DOT_OPENCODE`` names
+    another, so that tests point at their own and never start the owner's."""
+    override: str | None = os.environ.get("DOT_OPENCODE")
+    return override if override is not None and override != "" else configured
+
+
+def opencode_dir() -> Path:
+    """The home of the OpenCode server Dot starts (item 283): its config, its data (the sessions of the runs on Zen's
+    free models), its state and cache, the chats' sessions and the list of free models; none of the owner's own."""
+    return dot_home() / "opencode"
+
+
 def plugins_data_dir() -> Path:
     """Where a plugin keeps its own files: ``<name>`` below here is its ``${CLAUDE_PLUGIN_DATA}``."""
     return dot_home() / "plugins-data"

@@ -726,6 +726,7 @@ class ModelOption(FrozenModel):
     when it is larger and ``window_source`` where the window comes from (see ``ModelInfo``); ``context`` is the context
     size of its runs (item 250); ``efforts`` are its reasoning levels, lowest first (fewer than two: no choice);
     ``default_effort`` is the level the configured default effort selects on it; ``free``: served at no cost;
+    ``learns``: its provider may use what is sent to it to improve its models (some of Zen's free models, item 283);
     ``fast_mode``: it has fast mode (item 223)."""
 
     ref: str
@@ -739,16 +740,18 @@ class ModelOption(FrozenModel):
     efforts: list[Effort]
     default_effort: Effort | None
     free: bool
+    learns: bool
     fast_mode: bool
 
 
-type ProviderProblem = Literal["no_key", "key_refused", "access_refused", "failed"]
+type ProviderProblem = Literal["no_key", "not_installed", "key_refused", "access_refused", "failed"]
 
 
 class ProviderModels(FrozenModel):
     """The models of one provider, or why it listed none: ``error`` is the message and ``problem`` what kind of failure
-    it is (``no_key``: no key is set for it, ``key_refused``: it answered HTTP 401, ``access_refused``: it answered
-    HTTP 403, ``failed``: anything else); both are ``None`` when the provider answered."""
+    it is (``no_key``: no key is set for it, ``not_installed``: the program it runs on is not installed, OpenCode for
+    Zen's free models, ``key_refused``: it answered HTTP 401, ``access_refused``: it answered HTTP 403, ``failed``:
+    anything else); both are ``None`` when the provider answered."""
 
     provider: str
     models: list[ModelOption]

@@ -151,6 +151,14 @@ class McpError(DotError):
     """An MCP server failed to start, list tools or run a tool."""
 
 
+class OpenCodeError(DotError):
+    """OpenCode's own agent (item 283) could not be started, reached or used, or its session failed."""
+
+
+class OpenCodeMissing(OpenCodeError):
+    """The ``opencode`` program that runs Zen's free models (item 283) is not installed."""
+
+
 class SkillError(DotError):
     """A skill folder does not follow the Agent Skills layout, so it is left out."""
 

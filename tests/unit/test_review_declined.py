@@ -64,7 +64,7 @@ async def _writer(raw_finish: str, others: tuple[str, ...], calls: list[ModelCal
     async def record(call: ModelCall) -> None:
         calls.append(call)
 
-    router: ModelRouter = ModelRouter(load_default_config(), record)
+    router: ModelRouter = ModelRouter(load_default_config(), record, {})
     await router.register("ollama", EndingProvider(raw_finish))
     return lesson_writer_for(router, "ollama:scripted", others, 30.0, "lessons:test", None)
 

@@ -2240,7 +2240,8 @@ a.pill:hover {
   mask-image: url("../icons/providers/ollama.svg");
 }
 
-.provider-mark[data-provider="opencode_go"] {
+.provider-mark[data-provider="opencode_go"],
+.provider-mark[data-provider="opencode"] {
   mask-image: url("../icons/providers/opencode_go.svg");
 }
 

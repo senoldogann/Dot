@@ -61,9 +61,11 @@ from dotagent.core.logs import get_logger
 from dotagent.core.paths import chrome_data_dir, failsafe_path, run_owners_dir
 from dotagent.core.text import redact_json, redact_secrets, truncate_tail
 from dotagent.core.types import JsonObject
+from dotagent.llm.opencode import OPENCODE_PROVIDER
 from dotagent.llm.router import ModelRef, offers_fast_mode, parse_model_ref
 from dotagent.llm.types import ONE_MESSAGE_LEVELS, Effort, ModelInfo, OneMessage, Speed, user_message
 from dotagent.memory.service import SavedMemory
+from dotagent.opencode.run import run_in_opencode
 from dotagent.policy.types import ApprovalMode
 from dotagent.runtime import Runtime
 from dotagent.scheduler import SCHEDULE_SOURCE
@@ -1790,7 +1792,10 @@ class RunManager:
                 await runtime.bus.emit(
                     run.id, "run_started", {"model": run.model, "parent_run_id": run.parent_run_id}, True
                 )
-                ended: RunEnd = await run_agent(AgentRun(runtime, run, gate, cancel, inbox, self, opening))
+                agent: AgentRun = AgentRun(runtime, run, gate, cancel, inbox, self, opening)
+                # A run on one of Zen's free models goes whole to OpenCode's own agent (item 283).
+                in_opencode: bool = parse_model_ref(run.model).provider == OPENCODE_PROVIDER
+                ended: RunEnd = await (run_in_opencode(agent) if in_opencode else run_agent(agent))
                 status, result, needs, lessons = (
                     ended.outcome.status,
                     ended.outcome.result,

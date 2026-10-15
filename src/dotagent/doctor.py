@@ -339,7 +339,7 @@ async def check_provider_key(config: AppConfig, provider: str) -> CheckResult:
         return await _check_ollama_search(config)
     if provider == "typesafe":
         return await _check_typesafe_key(config.judge)
-    router: ModelRouter = ModelRouter(config, log_model_call)
+    router: ModelRouter = ModelRouter(config, log_model_call, os.environ)
     try:
         match provider:
             case "openai":
@@ -701,7 +701,7 @@ async def _service_checks(config: AppConfig) -> list[CheckResult]:
         ("review", config.models.review),
     )
     used: set[str] = {reference.partition(":")[0] for _, reference in configured}
-    router: ModelRouter = ModelRouter(config, log_model_call)
+    router: ModelRouter = ModelRouter(config, log_model_call, os.environ)
     openai_present: bool = await asyncio.to_thread(_has_secret, config.providers.openai.api_key_env)
     go_present: bool = await asyncio.to_thread(_has_secret, config.providers.opencode_go.api_key_env)
     anthropic_present: bool = await asyncio.to_thread(_has_secret, config.providers.anthropic.api_key_env)
