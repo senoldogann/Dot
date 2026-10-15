@@ -1270,9 +1270,10 @@ class BrowserSession:
 
     async def run_script(self, thread_id: str, script: str, timeout_s: float) -> ScriptRun:
         """Run ``script`` in the page of the thread's current tab and wait at most ``timeout_s`` for its value (item
-        263). What the script led to is waited for as after a step (a tab it opened, a dialog), a page it navigated to
-        is let load, and the address rules hold after it as after a step: a tab that ended on an address they forbid is
-        reset to a blank page and the call fails."""
+        263). What the script led to is waited for as after a step (a tab it opened, a dialog), and the page is settled
+        after every script as after a step (item 270), so that a navigation it started is let load, also one that
+        commits after its value came back; the address rules then hold as after a step: a tab that ended on an address
+        they forbid is reset to a blank page and the call fails."""
         async with self._locked(thread_id) as thread:
             tab: Tab = await self._current_tab(thread)
             before: _Watch = self._watch(thread, tab)
@@ -1280,10 +1281,9 @@ class BrowserSession:
             end, text = await run_script(tab.page, script, timeout_s)
             seconds: float = time.monotonic() - started
             await self._let_events_land()
-            after: _Watch = self._watch(thread, tab)
             current: Tab = await self._current_tab(thread)
-            if end == "navigated" or current is not tab or after.url != before.url:
-                await self._settle(current)
+            await self._settle(current)
+            after: _Watch = self._watch(thread, tab)
             await self._enforce_landing(current)
             return ScriptRun(
                 end=end,
