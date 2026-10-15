@@ -1,0 +1,33 @@
+# Dependabot (item 247): each week, one pull request per kind of dependency that brings it up to date: the Python
+# packages of uv.lock, the desktop app's npm and Cargo packages, and the actions of the CI. Its alerts and security
+# fixes for known vulnerable dependencies are on in the repository's settings; the weekly audit (audit.yml) stays.
+version: 2
+updates:
+  - package-ecosystem: "uv"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    groups:
+      python:
+        patterns: ["*"]
+  - package-ecosystem: "npm"
+    directory: "/desktop"
+    schedule:
+      interval: "weekly"
+    groups:
+      desktop-npm:
+        patterns: ["*"]
+  - package-ecosystem: "cargo"
+    directory: "/desktop/src-tauri"
+    schedule:
+      interval: "weekly"
+    groups:
+      desktop-cargo:
+        patterns: ["*"]
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    groups:
+      actions:
+        patterns: ["*"]

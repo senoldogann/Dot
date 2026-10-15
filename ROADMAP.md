@@ -5184,7 +5184,13 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 243 | A run that goes on from another keeps its taint                                      | done        | bbe607e |
 | 244 | The pill of a helper's page stays in the window                                      | done        | 5cfec1c |
 | 245 | Helpers that follow one another sit in one group                                     | done        | 6b86a8d |
-| 246 | Each step's thinking is a block that folds                                           | in progress |         |
+| 246 | Each step's thinking is a block that folds                                           | done        | 5ef5a7b |
+| 247 | The repository has a licence, a security policy and Dependabot                       | in progress |         |
+| 248 | A run a restart cut off goes on by itself by default                                 | planned     |         |
+| 249 | What the review model declines to write goes to the run's own model                  | planned     |         |
+| 250 | Each model's context size can be set in Settings                                     | planned     |         |
+| 251 | Ultrathink and Ultracode in the reasoning menu                                       | planned     |         |
+| 252 | The plan at the end of the request, if an eval shows it holds                        | planned     |         |
 
 ### 77. The type system: Inter and Geist Mono, seven sizes, three weights
 
@@ -11059,7 +11065,7 @@ the start of its answer as one plain line.
 
 ### 246. Each step's thinking is a block that folds
 
-**Status: in progress.**
+**Status: done.** Merged as `5ef5a7b` (PR #287; no Linear issue, the Linear connector was signed out).
 
 **As built (2026-10-15).** The `assistant` event keeps the step's thinking (`agent/loop.py`, `_THINKING_CHARS`): its
 secrets masked, up to 12,000 characters, of a longer one its start and its end. `timeline.js` makes each step's thinking
@@ -11086,6 +11092,99 @@ could not be reached. On the code of before there is no block and no such reset.
 thinks and "Thought" once it is done, the start of the thought beside it; folded at first, it opens to the whole thought
 and folds again. The `assistant` event keeps the thinking, its secrets masked, up to 12,000 characters (of a longer one
 its start and its end), so a page loaded later shows it.
+
+## Part 41: the owner's answers and each model's context size (planned 2026-10-15)
+
+The owner's forty-first word, on 2026-10-15: yes to the open questions of the last report, each to be done the most
+correct way, and the context size of each provider's models to be set in Settings, with sensible explanations backed by
+evidence.
+
+**Status (2026-10-15): planned.** On the code at `5ef5a7b`: the repository has no licence, no security policy and no
+Dependabot configuration (its alerts and security fixes are on, private vulnerability reporting is off), and the icons
+follow Lucide's without its notice. A run that a restart cut off goes on by itself only with `[agent] resume = "safe"`,
+which is off by default. A run's lessons, its skill or the owner section that the review model declines to write fail
+(item 225) and are asked of no other model. A run's context budget is `min([agent] context_tokens, 0.75 × window)`,
+96,000 tokens on every model whose window is 128,000 or more, with no setting for one model. The reasoning menu offers
+the API's levels and Claude's fast mode, not Ultrathink or Ultracode. The open plan ends the system prompt of every
+step, so each change of it costs the provider's cache of the whole request.
+
+**The shape of this part.** Six items, each a pull request of its own: the repository (247), resuming by default (248),
+a declined review passed on (249), each model's context size (250), Ultrathink and Ultracode (251), and the plan at the
+end of the request, measured first (252). Of the questions the owner left to Dot, two change nothing: the default preset
+stays `aggressive`, for the autonomy the owner asked for, and the models stay the cloud ones the README says leave the
+Mac.
+
+### How to start part 41 (the handoff prompt)
+
+> Read ROADMAP.md part 41 and the status table of part 9 (rows 247 to 252). One item at a time, in order; the protocol
+> of part 5 (branch, gate, PR, Linear MYP issue when the connector is signed in, squash merge, hash in the table, log
+> line) is unchanged. Give each change a test that fails on the code of before, and check each page it touches wide
+> and on a phone, light and dark, in Chrome and WebKit. Tests never start a real model call or read the other agents'
+> files of the Mac; item 252's eval is the one place where real models are called, on the owner's word. Never touch
+> the owner's data directory except to read it, by the kinds and numbers of what is stored, and to restart the daemon
+> when `/api/status` shows no active run; PLAN.md stays untracked. The owner reads Turkish; everything written is
+> English.
+
+### 247. The repository has a licence, a security policy and Dependabot
+
+**Status: in progress.**
+
+**As built (2026-10-15).** `LICENSE` holds the MIT licence and `pyproject.toml` says so (`license = "MIT"`,
+`license-files`), which the wheel carries (`License-Expression: MIT`). `SECURITY.md` sends a report through GitHub's
+private vulnerability reporting, which is now on for the repository, and says what to put in it, what is in scope and
+that fixes land on `main`. `.github/dependabot.yml` asks Dependabot each week for one pull request per kind of
+dependency: the Python packages of `uv.lock`, the desktop app's npm and Cargo packages, the CI's actions; its alerts and
+security fixes were on already. `static/js/LICENSE-Lucide.txt` carries the notice of the icons, which are Lucide's (ISC,
+and MIT for those Lucide took from Feather), and `icons.js` points to it. The README ends with the licences of Dot and
+of what it carries, and where to report a security problem. Checks: the wheel built from the branch carries the licence
+and its notice, `dependabot.yml` parses with the four kinds, and the repository's settings read back on. Nothing of what
+Dot does changes, so no test does either.
+
+**What.** An MIT licence (`LICENSE`, and the `license` of `pyproject.toml`); a security policy (`SECURITY.md`) that
+sends reports through GitHub's private vulnerability reporting, which is turned on; a Dependabot configuration that
+brings each kind of dependency up to date once a week in one pull request; and the notice of the icons' licence
+(Lucide's ISC, Feather's MIT).
+
+### 248. A run a restart cut off goes on by itself by default
+
+**Status: planned.**
+
+**What.** `[agent] resume` is `"safe"` by default: a run of the web UI that a restart, a crash or a shutdown of the
+daemon cut off at most 30 minutes before, in calls that only read, goes on by itself when the daemon starts. `"off"`
+leaves every such run to the owner, as before.
+
+### 249. What the review model declines to write goes to the run's own model
+
+**Status: planned.**
+
+**What.** When the review model declines to write a run's lessons or its skill, or the owner section of the nightly
+reflection, the same question goes once to the run's own model (for the owner section, the model of the latest run), if
+that is another model. Other failures stay as they are, and an approval or a goal check never goes to another model.
+
+### 250. Each model's context size can be set in Settings
+
+**Status: planned.**
+
+**What.** Settings › Models sets each model's context size, from a floor up to three quarters of its window, or leaves
+it to Dot's default. Beside it: the window and where that number comes from, the budget Dot uses and why, what a larger
+or a smaller one changes, and the owner's own numbers for the model from the runs it made. A run takes the size its
+model has when it starts.
+
+### 251. Ultrathink and Ultracode in the reasoning menu
+
+**Status: planned.**
+
+**What.** The reasoning menu offers Ultrathink, the model's deepest level for one message, and Ultracode, a high level
+with the run told to split the independent parts of its work across helpers that work at once, on the models that offer
+those levels; each says in the menu what it does.
+
+### 252. The plan at the end of the request, if an eval shows it holds
+
+**Status: planned.**
+
+**What.** An A/B eval of the plan at the end of the system prompt against the plan at the end of the request, on the
+owner's main model, decides: the plan moves only if the share of cached input rises and the passes, the steps and the
+plan steps marked done without evidence hold.
 
 ## Log
 
@@ -11773,3 +11872,4 @@ its start and its end), so a page loaded later shows it.
 - 2026-10-15 (Opus 5.5): item 243 merged as `bbe607e` (PR #284; no Linear issue, the connector was signed out): a resumed run starts as tainted as the run it resumes was when it was cut off, and the run that tells a chat that its command in the background ended as the chat's last run ended; `tool_result` and `run_queued` events hold whether the run was tainted. Part 39 is done.
 - 2026-10-15 (Opus 5.5): item 244 merged as `5cfec1c` (PR #285; no Linear issue, the connector was signed out): the pill of a helper's page is in the dock, so it stays at the window's foot as the conversation scrolls.
 - 2026-10-15 (Opus 5.5): item 245 merged as `6b86a8d` (PR #286; no Linear issue, the connector was signed out): helpers that follow one another sit in one group, as T3 Code groups its subagents, with a head that counts them, says how they stand and folds them away; a row that is done shows the start of its answer.
+- 2026-10-15 (Opus 5.5): item 246 merged as `5ef5a7b` (PR #287; no Linear issue, the connector was signed out): each step's thinking is a block with a brain that folds and unfolds, "Thinking…" while the model thinks and "Thought" once it is done, among its step's calls or before its message; the `assistant` event keeps the thinking, its secrets masked, up to 12,000 characters, and a step the loop asks again drops what its failed try streamed. Part 40 is done.

@@ -3,6 +3,8 @@ name = "dotagent"
 version = "0.1.0"
 description = "Dot: an always-on autonomous agent for macOS with browser and computer use, running on Ollama, OpenAI or OpenCode Go models."
 readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
 requires-python = ">=3.13"
 dependencies = [
     "aiosqlite>=0.22.1",

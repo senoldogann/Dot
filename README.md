@@ -2418,3 +2418,16 @@ folder (discovery, `dotx skills list` and the `skill` tool ran on real folders).
   keeps a copy of a file at its first change to it only, within `undo_max_file_bytes` and `undo_max_run_bytes`. Runs
   that change the same file are taken back in the order their changes were noted. The web UI has no undo button: use
   `dotx undo`, which needs the run in the database (the journals of a deleted chat stay until `dotx prune --apply`).
+
+## License and security
+
+Dot is released under the MIT License ([LICENSE](LICENSE)). The parts it carries from others keep their own licences,
+each beside them: the Inter and Geist Mono fonts (SIL Open Font License, `static/fonts`), the icons, which are Lucide's
+(ISC, and MIT for those Lucide took from Feather, `static/js/LICENSE-Lucide.txt`), the providers' marks
+(`static/icons/providers/LICENSE`), the parts of the appearance settings ported from T3 Code (MIT,
+`static/js/appearance/LICENSE`) and the character, a port of bloub (MIT, `static/js/character/LICENSE`).
+
+Report a security problem privately, as [SECURITY.md](SECURITY.md) says, not in a public issue. Dependabot raises
+alerts and fixes for dependencies with a known vulnerability, and each week one pull request per kind of dependency
+that brings it up to date (`.github/dependabot.yml`: Python, the desktop app's npm and Cargo packages, the CI's
+actions); the weekly audit of the CI (`audit.yml`, item 217) stays.
