@@ -3314,6 +3314,119 @@ details[open] > summary .chev {
   border-left: 1px solid var(--border);
 }
 
+/* A row's last line stays one line (item 245): the start of the answer is cut where the row ends. */
+.child-progress {
+  flex-wrap: nowrap;
+}
+
+.child-progress > :last-child {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Helpers that follow one another (item 245), after T3 Code's group of subagents: a head with their faces, how many
+   they are and how they stand, the time from the first one's start to the last one's end and a chevron; under it, their
+   rows in one box. */
+.helpers > summary {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-1);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  list-style: none;
+}
+
+.helpers > summary:hover {
+  background: var(--surface-2);
+}
+
+.helpers > summary::-webkit-details-marker {
+  display: none;
+}
+
+.helpers-faces {
+  display: inline-flex;
+  flex: none;
+}
+
+.helpers-faces > * + * {
+  margin-left: calc(-1 * var(--space-2));
+}
+
+.helpers-faces .avatar,
+.helpers-more {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  box-shadow: 0 0 0 2px var(--bg);
+}
+
+.helpers-more {
+  display: inline-grid;
+  place-items: center;
+  background: var(--surface-2);
+  color: var(--muted);
+  font-size: var(--text-xs);
+}
+
+.helpers-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-half);
+}
+
+.helpers-title {
+  font-weight: var(--weight-label);
+}
+
+.helpers-state {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--muted);
+  font-size: var(--text-sm);
+}
+
+.helpers-state.bad {
+  color: var(--bad);
+}
+
+.helpers-time {
+  flex: none;
+  color: var(--muted);
+  font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
+}
+
+.helpers-body {
+  margin-top: var(--space-1);
+  padding: var(--space-1);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+
+/* In a group the rows share its box: no card of their own, a little room between them. */
+.helpers-body > .child {
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+}
+
+.helpers-body > .child + .child {
+  margin-top: var(--space-half);
+}
+
+.helpers-body > .child > summary {
+  border-top: 0;
+  border-radius: var(--radius-sm);
+}
+
 /* The card of a delegated run (item 226): its face and whole goal, its model and level, its state with the time it has
    taken, and what it does or did last. It stands on the window by its row (helpercard.js places it), over the dock and
    under the drawer, and takes no pointer, so that it never comes between the pointer and the row. */

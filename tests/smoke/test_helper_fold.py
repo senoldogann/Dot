@@ -218,7 +218,8 @@ async def test_a_helper_is_a_closed_row_that_opens_for_its_approval_and_folds_ag
             async with asyncio.timeout(_RUN_WAIT_S):
                 assert (await asking_task).run.status == "done"
             await expect(open_row).to_have_js_property("open", False)
-            await expect(open_row.locator(".child-progress")).to_contain_text("done")
+            # Its last line is the start of its answer (item 245).
+            await expect(open_row.locator(".child-progress")).to_contain_text("Left the shelf as it was.")
             # The reader opens the working helper: its steps hang under it, and it stays open when it ends.
             closed = _row(page, working.id)
             await closed.locator("summary.child-row").click()
