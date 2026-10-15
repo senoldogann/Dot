@@ -388,6 +388,11 @@ class SchedulerConfig(FrozenModel):
     min_interval_s: int
     misfire_grace_s: int
     max_schedules: int
+    # Item 257: how many earlier runs of a schedule a firing's opening carries the answers of (0: none), in how many
+    # characters at most, and whether a firing goes on in the chat of the one before instead.
+    history_runs: int = Field(ge=0, le=20)
+    history_chars: int = Field(ge=500, le=20_000)
+    same_chat: bool
 
 
 type McpTransport = Literal["stdio", "http", "sse"]

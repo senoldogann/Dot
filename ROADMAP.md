@@ -5194,8 +5194,8 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 253 | The line of what a yolo run did without asking says its reason once                   | done        | 0250d88 |
 | 254 | A model the plan does not include is paused at once                                   | done        | 8e6cbfb |
 | 255 | The typed judge switches on and off in Settings                                       | done        | b3cddbc |
-| 256 | A failed embedding never fails a run                                                  | in progress |         |
-| 257 | A schedule's run knows its earlier runs                                               | planned     |         |
+| 256 | A failed embedding never fails a run                                                  | done        | a9f8b68 |
+| 257 | A schedule's run knows its earlier runs                                               | in progress |         |
 | 258 | Only reasoning levels the gateway honours are offered                                 | done        | 3118d17 |
 | 259 | Ultrathink and ultracode as words in the composer                                     | done        | 4a37ee7 |
 | 260 | The compaction notes leave the conversation                                           | done        | a8d8641 |
@@ -11433,7 +11433,7 @@ levels (258) first, since the words of 259 are only as true as the levels behind
 
 ### 256. A failed embedding never fails a run
 
-**Status: in progress.** Built on `item-256-embedding-fallback`.
+**Status: done.** Merged as `a9f8b68` (PR #303; no Linear issue, the Linear connector was signed out).
 
 **As built (2026-10-15).** A run's start had two embedding calls without a guard: the recall of its notes and
 the ranking of its skills by meaning (more skills than `[skills] listed`, `HelpVectors.closest`); the owner's run
@@ -11463,7 +11463,22 @@ a smoke test of a run whose embedder fails (the run ends done). They fail on the
 
 ### 257. A schedule's run knows its earlier runs
 
-**Status: planned.**
+**Status: in progress.** Built on `item-257-schedule-memory`.
+
+**As built (2026-10-15).** `scheduler/history.py` (new): `history_digest` and `firing_opening`; the answers are
+quoted with `<` escaped, so none closes the digest, and `Digest` names the runs it shows. `agent/manager.py`
+`start_firing`: the run keeps the schedule's goal (its record, its chat, its reviewer's instructions, goal mode) and is
+told the opening, a late start's note in it; `RunOpening.carried` lists the earlier runs it reads, and
+`_starts_tainted` starts it tainted when one of them ended so, as the background note of item 243 does.
+`scheduler/runner.py` `_fire` and `_firing_chat`: the digest of `[scheduler] history_runs` earlier ended firings
+within `history_chars`, or the chat of the last firing with `same_chat` (its last run carried); a chat made for a
+firing whose run did not start is deleted, the one it went on in is not. `store/db.py`: `threads.schedule_id` with
+its index, `schedules.history_runs` and `same_chat`, `link_schedule_thread` and `schedule_runs` (ended runs only).
+`ScheduleOptions`, the schedule API, the status (the defaults) and Settings › Schedules (two choices, and chips on the
+row). README: the Schedules section. Tests: `tests/unit/test_schedule_history.py` and
+`tests/smoke/test_schedule_memory.py` (new; a tainted first run makes the second start tainted, in a new chat and in
+the same one); `tests/smoke/test_scheduler.py` and `tests/smoke/test_campaigns.py` follow `start_firing` and the two
+new options.
 
 **What.** A schedule's firing carries, in front of its goal, a dated digest of the schedule's last runs (their final
 answers and statuses, the newest first, within a budget), so the run can build on them instead of doing the same work
@@ -12254,3 +12269,4 @@ Fails on the code of before.
 - 2026-10-15 (Opus 5.5): item 258 merged as `3118d17` (PR #300; no Linear issue, the connector was signed out): OpenCode Go's catalog offers no reasoning level for DeepSeek's four models (the chat route thinks the same at every label, measured), so the Reasoning pill, Settings and the API offer them none and Ultrathink and Ultracode do not show for them; the models whose level holds keep theirs.
 - 2026-10-15 (Opus 5.5): item 259 merged as `4a37ee7` (PR #301; no Linear issue, the connector was signed out): the word ultrathink or ultracode typed in the composer (a whole word, any case) is the choice for one message of item 251 where the model offers its level: the Reasoning pill reads it and the frame wears a gradient ring; editing a queued message or steering arms nothing.
 - 2026-10-15 (Opus 5.5): item 260 merged as `a8d8641` (PR #302; no Linear issue, the connector was signed out): the timeline shows no note for a compaction: the Details panel's Context fact counts the compactions of the run and of its helpers, and the event stays in the run's record and the API.
+- 2026-10-15 (Opus 5.5): item 256 merged as `a9f8b68` (PR #303; no Linear issue, the connector was signed out): Ollama's 400 or 5xx whose words are a reset, refused or cut-short request to its local runner is a `ProviderRunnerError` the retry policy asks again, the embedder included; when the embedding still fails at a run's start, notes are recalled and skills listed by their words alone, with an `embedding_failed` warning in the timeline and the terminal; the memory's own calls still fail loudly.

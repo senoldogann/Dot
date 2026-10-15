@@ -18,7 +18,6 @@ import httpx
 import pytest
 import pytest_asyncio
 
-from dotagent.agent.attachments import StoredAttachment
 from dotagent.agent.manager import RunManager
 from dotagent.agent.verify import new_facts
 from dotagent.config import ModelsConfig, load_config
@@ -26,7 +25,7 @@ from dotagent.core.errors import ConfigError, StoreError, ToolExecutionError, To
 from dotagent.core.paths import failsafe_path, workspace_dir
 from dotagent.core.types import JsonObject
 from dotagent.events import SYSTEM_RUN_ID, EventBus, Subscription
-from dotagent.llm.types import Effort, OneMessage, Speed
+from dotagent.llm.types import Effort
 from dotagent.policy.types import ActionInfo, ApprovalMode
 from dotagent.runtime import Runtime, build_runtime, close_runtime
 from dotagent.scheduler import SCHEDULE_MISSED_EVENT, SCHEDULE_SOURCE
@@ -324,20 +323,17 @@ class _OwnerSwitchesTheOtherOff(RunManager):
         self._schedule_of: dict[str, str] = schedule_of
         self.started: list[str] = []
 
-    async def start(
+    async def start_firing(
         self,
         goal: str,
+        opening: str,
         mode: RunMode,
         model: str | None,
-        thread_id: str | None,
-        source: str,
-        parent_run_id: str | None,
+        thread_id: str,
         effort: Effort | None,
-        speed: Speed,
-        once: OneMessage | None,
         approvals: ApprovalMode | None,
         goal_mode: bool | None,
-        files: tuple[StoredAttachment, ...],
+        carried: tuple[str, ...],
     ) -> RunRecord:
         self.started.append(goal)
         for other, schedule_id in self._schedule_of.items():
@@ -387,34 +383,35 @@ async def test_while_the_emergency_stop_is_engaged_a_due_schedule_is_skipped_to_
 
 
 class _Starts(RunManager):
-    """Keeps the goal of every run a firing starts; no run starts in these tests, so each firing fails to start."""
+    """Keeps the opening and the goal of every run a firing starts; no run starts in these tests, so each firing fails
+    to start."""
 
     def __init__(self, runtime: Runtime) -> None:
         super().__init__(runtime)
         self.started: list[str] = []
+        self.goals: list[str] = []
 
-    async def start(
+    async def start_firing(
         self,
         goal: str,
+        opening: str,
         mode: RunMode,
         model: str | None,
-        thread_id: str | None,
-        source: str,
-        parent_run_id: str | None,
+        thread_id: str,
         effort: Effort | None,
-        speed: Speed,
-        once: OneMessage | None,
         approvals: ApprovalMode | None,
         goal_mode: bool | None,
-        files: tuple[StoredAttachment, ...],
+        carried: tuple[str, ...],
     ) -> RunRecord:
-        self.started.append(goal)
+        self.started.append(opening)
+        self.goals.append(goal)
         raise ConfigError("no run starts in this test", {"goal": goal})
 
 
 async def test_a_one_time_schedule_overdue_fires_late_saying_when_it_was_due(runtime: Runtime) -> None:
     """Item 152: a one-time schedule whose moment passed while the daemon was off or the Mac slept has no next time to
-    wait for: it fires late, and its run reads when it was due, where before it was switched off unseen."""
+    wait for: it fires late, and its run reads when it was due, where before it was switched off unseen; the run keeps
+    the goal alone (item 257)."""
     single: ScheduleRecord = await _schedule(runtime, _once(runtime, "Once", 3600))
     due: float = _planned(single)
     late: float = due + runtime.config.scheduler.misfire_grace_s + 120
@@ -425,6 +422,7 @@ async def test_a_one_time_schedule_overdue_fires_late_saying_when_it_was_due(run
     assert manager.started == [
         f"(Scheduled for {format_local(due, zone)}; it starts late, at {format_local(late, zone)}.)\n\n{GOAL}"
     ]
+    assert manager.goals == [GOAL]
     assert (fired.enabled, fired.next_run_at, fired.last_run_at) == (False, None, late)
 
 
@@ -501,7 +499,13 @@ async def test_a_schedule_is_edited_whole_and_keeps_its_history(runtime: Runtime
     created: ScheduleRecord = await _schedule(runtime, _cron("Morning", "0 9 * * *"))
     assert created.options == UNSET_OPTIONS
     options: ScheduleOptions = ScheduleOptions(
-        model=CHOSEN_REF, effort="low", approvals="yolo", goal_mode=True, timezone=OTHER_ZONE
+        model=CHOSEN_REF,
+        effort="low",
+        approvals="yolo",
+        goal_mode=True,
+        timezone=OTHER_ZONE,
+        history_runs=None,
+        same_chat=None,
     )
     edited: ScheduleRecord = await edit_schedule(
         runtime.store,
@@ -593,7 +597,13 @@ async def test_a_schedule_starts_its_runs_with_the_mode_model_and_approvals_it_w
     runtime: Runtime, scheduler: Scheduler
 ) -> None:
     options: ScheduleOptions = ScheduleOptions(
-        model=CHOSEN_REF, effort=None, approvals="yolo", goal_mode=True, timezone=OTHER_ZONE
+        model=CHOSEN_REF,
+        effort=None,
+        approvals="yolo",
+        goal_mode=True,
+        timezone=OTHER_ZONE,
+        history_runs=None,
+        same_chat=None,
     )
     request: ScheduleRequest = _once(runtime, "Chosen", 3).model_copy(update={"mode": "task", "options": options})
     # The moment was written in the configured zone; read it in the schedule's own zone instead it would move, so give

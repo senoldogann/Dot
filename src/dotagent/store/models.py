@@ -296,13 +296,16 @@ class MemoryScore(FrozenModel):
 
 class ScheduleOptions(FrozenModel):
     """How the runs of a schedule are started. ``None`` takes what the configuration says when the schedule fires:
-    the main model, its default reasoning level, the configured approvals, no goal mode, the configured time zone."""
+    the main model, its default reasoning level, the configured approvals, no goal mode, the configured time zone,
+    ``[scheduler] history_runs`` earlier runs' answers in front of the goal and ``[scheduler] same_chat`` (item 257)."""
 
     model: str | None
     effort: Effort | None
     approvals: ApprovalMode | None
     goal_mode: bool | None
     timezone: str | None
+    history_runs: int | None
+    same_chat: bool | None
 
 
 class ScheduleRecord(FrozenModel):

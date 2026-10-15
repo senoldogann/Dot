@@ -872,7 +872,13 @@ async def test_an_emergency_stop_engaged_while_a_schedule_starts_its_run_ends_th
         scheduler: Scheduler = Scheduler(runtime, manager)
         try:
             options: ScheduleOptions = ScheduleOptions(
-                model=SCRIPTED_MODEL, effort=None, approvals="yolo", goal_mode=False, timezone=None
+                model=SCRIPTED_MODEL,
+                effort=None,
+                approvals="yolo",
+                goal_mode=False,
+                timezone=None,
+                history_runs=None,
+                same_chat=None,
             )
             request: ScheduleRequest = ScheduleRequest(
                 name="Leads", goal=GOAL, cron="0 9 * * *", at=None, mode="task", options=options
