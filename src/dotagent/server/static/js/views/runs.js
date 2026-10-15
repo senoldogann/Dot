@@ -56,7 +56,7 @@ function buildComposer(ctx, listener) {
     })),
     send: submit,
     sendLabel: "Start",
-    draftKey: "home",
+    draftKey: NEW_CHAT_DRAFT,
     listener,
   });
   const { textarea: goal, attachments } = frame;

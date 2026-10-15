@@ -9,10 +9,11 @@ from fastapi import APIRouter, Query
 from fastapi.responses import StreamingResponse
 
 from dotagent.agent.aside import AsideAnswer, answer_aside
-from dotagent.agent.attachments import StoredAttachment, load_attachments, store_attachment
+from dotagent.agent.attachments import AttachedFile, StoredAttachment, load_attachments, store_attachment
 from dotagent.agent.campaign import session_number
 from dotagent.agent.keep_going import keep_going_ask
 from dotagent.agent.lessons import run_lessons
+from dotagent.agent.rewind import FilesTakenBack, opening_files, rewind_chat, take_back_files
 from dotagent.core.errors import InvalidValueError
 from dotagent.llm.router import parse_model_ref
 from dotagent.server import UI_SOURCE
@@ -30,6 +31,8 @@ from dotagent.server.views import (
     CampaignChip,
     DecisionRequest,
     EventsQuery,
+    RewindRequest,
+    RewindView,
     RunActions,
     RunDetail,
     RunsQuery,
@@ -39,7 +42,7 @@ from dotagent.server.views import (
     UndoRequest,
 )
 from dotagent.store.db import Store
-from dotagent.store.models import AgentRecord, ApprovalRecord, CampaignRecord, EventRecord, RunRecord
+from dotagent.store.models import AgentRecord, ApprovalRecord, CampaignRecord, EventRecord, RewindCut, RunRecord
 from dotagent.store.stats import RunCosts
 from dotagent.undo.runs import UndoPlan, active_run_ids, plan_for, runs_with_children, undo_path
 
@@ -179,6 +182,27 @@ def runs_router(ctx: ServerContext) -> APIRouter:
         runs: list[RunRecord] = await runs_with_children(store, await store.get_run(run_id))
         await undo_path(ctx.runtime.undo_dir, runs, request.path)
         return await actions(run_id)
+
+    @router.post("/runs/{run_id}/rewind")
+    async def rewind_run(run_id: str, request: RewindRequest) -> RewindView:
+        """Rewind the run's chat to before its first message, as T3 Code's Edit from here does (item 282, see
+        ``agent.rewind``), and take back the file changes of the runs taken out when ``files`` is ``revert``. Returns
+        where the chat ends now and what goes back to the composer."""
+        files: list[AttachedFile] = await opening_files(store, run_id)
+        cut: RewindCut = await rewind_chat(ctx.runtime, run_id)
+        taken: FilesTakenBack = (
+            await take_back_files(ctx.runtime, cut.rewound)
+            if request.files == "revert"
+            else FilesTakenBack(reverted=(), left=())
+        )
+        return RewindView(
+            thread_id=cut.thread_id,
+            back_to=cut.back_to,
+            text=cut.rewound[0].goal,
+            files=files,
+            reverted=file_edits(taken.reverted),
+            left=file_edits(taken.left),
+        )
 
     @router.get("/runs/{run_id}/events")
     async def run_events(run_id: str, query: Annotated[EventsQuery, Query()]) -> list[EventRecord]:

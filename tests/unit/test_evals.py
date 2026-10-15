@@ -344,6 +344,7 @@ def test_a_run_took_the_easy_way_when_a_call_of_its_tool_for_its_skill_ran() -> 
         goal_mode=False,
         campaign_id=None,
         agent_id=None,
+        rewindable=False,
     )
     searched: tuple[EventRecord, ...] = _used("c5", FIND_HELP_TOOL, {"need": "the house style of a memo"}, True)
     assert run_metrics(run, (*searched, *read)).help_calls == 1

@@ -51,6 +51,7 @@ from dotagent.store.models import (
     MemoryUseHow,
     PushSubscription,
     QueuedMessage,
+    RewindCut,
     RuleRecord,
     RunMode,
     RunRecord,
@@ -81,6 +82,10 @@ CREATE TABLE IF NOT EXISTS threads (
 CREATE TABLE IF NOT EXISTS messages (
     thread_id TEXT NOT NULL, seq INTEGER NOT NULL, body TEXT NOT NULL,
     PRIMARY KEY (thread_id, seq)
+);
+CREATE TABLE IF NOT EXISTS message_archive (
+    thread_id TEXT NOT NULL, version INTEGER NOT NULL, seq INTEGER NOT NULL, body TEXT NOT NULL,
+    PRIMARY KEY (thread_id, version, seq)
 );
 CREATE TABLE IF NOT EXISTS runs (
     id TEXT PRIMARY KEY, thread_id TEXT NOT NULL, goal TEXT NOT NULL, mode TEXT NOT NULL,
@@ -384,6 +389,7 @@ def _run(row: aiosqlite.Row) -> RunRecord:
         goal_mode=bool(row["goal_mode"]),
         campaign_id=row["campaign_id"],
         agent_id=row["agent_id"],
+        rewindable=row["history_version"] is not None and row["history_seq"] is not None,
     )
 
 
@@ -596,6 +602,12 @@ _ADDED_RUN_COLUMNS: tuple[tuple[str, str], ...] = (
     ("owner", "TEXT"),
     ("speed", "TEXT NOT NULL DEFAULT 'standard'"),
     ("once", "TEXT"),
+    # Where the run's first message went in its chat's history (item 282): the version of that history and the place in
+    # it, NULL for a delegated run, which has a chat of its own, and for a run from before; and when a rewind took the run
+    # out of its chat, NULL while it is in it.
+    ("history_version", "INTEGER"),
+    ("history_seq", "INTEGER"),
+    ("rewound_at", "REAL"),
 )
 # Columns of ``memories`` added later: notes of an older database were never counted as used, and are Dot's.
 _ADDED_MEMORY_COLUMNS: tuple[tuple[str, str], ...] = (
@@ -633,12 +645,14 @@ _ADDED_QUEUE_COLUMNS: tuple[tuple[str, str], ...] = (
 # Columns of ``threads`` added later: NULL means a chat the owner has not pinned (item 130), one the owner has not seen
 # since its runs began or since they marked it unread (item 131), and one without choices of its own yet (a
 # ``ChatChoices`` as JSON, item 199), and one that is no chat of a schedule (a firing's chat names its schedule, item
-# 257; a firing from before names none).
+# 257; a firing from before names none). ``history_version`` counts the times the chat's history was written anew,
+# by a compaction or by a rewind to a version before (item 282).
 _ADDED_THREAD_COLUMNS: tuple[tuple[str, str], ...] = (
     ("pinned_at", "REAL"),
     ("seen_at", "REAL"),
     ("choices", "TEXT"),
     ("schedule_id", "TEXT"),
+    ("history_version", "INTEGER NOT NULL DEFAULT 0"),
 )
 # Columns of ``agents`` added later: NULL means the owner made the agent (item 99).
 _ADDED_AGENT_COLUMNS: tuple[tuple[str, str], ...] = (
@@ -919,13 +933,14 @@ class Store:
         """The chats, the pinned ones first (the last pinned first, so they are listed however old), then the latest
         activity first: every thread with a run a person started on it, with the latest of those runs. Threads holding
         only delegated runs are left out, and so are the threads of a campaign's sessions after the first, which start
-        in threads of their own: the campaign's page lists them, and the campaign's conversation stays a chat."""
+        in threads of their own: the campaign's page lists them, and the campaign's conversation stays a chat. The runs a
+        rewind took out of their chat (item 282) are not counted."""
         rows: list[aiosqlite.Row] = await self._all(
             "WITH ranked AS ("
             " SELECT thread_id, id, status, mode, created_at, finished_at,"
             "  ROW_NUMBER() OVER (PARTITION BY thread_id ORDER BY created_at DESC, rowid DESC) AS place,"
             "  COUNT(*) OVER (PARTITION BY thread_id) AS run_count"
-            " FROM runs WHERE parent_run_id IS NULL"
+            " FROM runs WHERE parent_run_id IS NULL AND rewound_at IS NULL"
             " AND (campaign_id IS NULL OR thread_id IN (SELECT thread_id FROM campaigns)))"
             " SELECT t.id, t.title, t.source, t.created_at, MAX(t.updated_at, r.created_at) AS updated_at,"
             "  t.pinned_at, r.run_count, r.id AS latest_run_id, r.status AS latest_status, r.mode AS latest_mode,"
@@ -942,7 +957,8 @@ class Store:
 
     @_writing
     async def delete_threads(self, thread_ids: Sequence[str]) -> list[str]:
-        """Delete chats with everything they hold, in one transaction: their messages and queue, their runs, the runs
+        """Delete chats with everything they hold, in one transaction: their messages (with what was kept aside of their
+        history) and queue, their runs, the runs
         those delegated to (recursively) with the events, approvals and shown pages of all of them, and the threads of
         the delegated runs, with their messages and any queue, unless a run of their own remains there. Returns the ids
         that named a thread, in the order given; the others are skipped. A schedule keeps the id of the thread it last
@@ -957,7 +973,7 @@ class Store:
             " UNION SELECT runs.id FROM runs JOIN doomed ON runs.parent_run_id = doomed.id)"
         )
         await self._db.execute("BEGIN IMMEDIATE")
-        await self._refuse_working_chats(named)
+        await self._refuse_working_chats(named, "chats with a run under way cannot be deleted")
         found: list[aiosqlite.Row] = await self._all(f"SELECT id FROM threads WHERE id IN ({marks})", named)
         existing: set[str] = {str(row["id"]) for row in found}
         hosts: list[aiosqlite.Row] = await self._all(
@@ -972,6 +988,7 @@ class Store:
         await self._db.execute(f"{doomed} DELETE FROM shown_pages WHERE run_id IN (SELECT id FROM doomed)", named)
         await self._db.execute(f"{doomed} DELETE FROM runs WHERE id IN (SELECT id FROM doomed)", named)
         await self._db.execute(f"DELETE FROM messages WHERE thread_id IN ({marks})", named)
+        await self._db.execute(f"DELETE FROM message_archive WHERE thread_id IN ({marks})", named)
         await self._db.execute(f"DELETE FROM queued_messages WHERE thread_id IN ({marks})", named)
         await self._db.execute(f"DELETE FROM queue_holds WHERE thread_id IN ({marks})", named)
         await self._db.execute(f"DELETE FROM threads WHERE id IN ({marks})", named)
@@ -998,10 +1015,10 @@ class Store:
         await self._return_free_pages()
         return [thread_id for thread_id in named if thread_id in existing]
 
-    async def _refuse_working_chats(self, named: tuple[str, ...]) -> None:
-        """Raise ``RunConflict`` when a run of any process works on one of the chats ``named``, itself or through a run
-        it delegated to, or when a queued message of one is starting as its next run (:meth:`claim_queued`); the chats
-        it names are those given."""
+    async def _refuse_working_chats(self, named: tuple[str, ...], refusal: str) -> None:
+        """Raise ``RunConflict`` with the message ``refusal`` when a run of any process works on one of the chats
+        ``named``, itself or through a run it delegated to, or when a queued message of one is starting as its next run
+        (:meth:`claim_queued`); the chats it names are those given."""
         working: tuple[RunStatus, ...] = tuple(sorted(WORKING_STATUSES))
         rows: list[aiosqlite.Row] = await self._all(
             "WITH RECURSIVE doomed(id, chat) AS ("
@@ -1020,16 +1037,17 @@ class Store:
                 dict.fromkeys([*(str(row["chat"]) for row in rows), *(str(row["thread_id"]) for row in starting)])
             )
             runs: JsonArray = list(dict.fromkeys(str(row["run"]) for row in rows))
-            raise RunConflict("chats with a run under way cannot be deleted", {"thread_ids": chats, "run_ids": runs})
+            raise RunConflict(refusal, {"thread_ids": chats, "run_ids": runs})
 
     async def _screenshots_of(self, doomed: str, named: tuple[str, ...], delegated: tuple[str, ...]) -> set[str]:
-        """The screenshot files named by what ``delete_threads`` is about to delete: the events of the doomed runs and
-        the messages of the named threads and of the threads of delegated runs."""
+        """The screenshot files named by what ``delete_threads`` is about to delete: the events of the doomed runs, the
+        messages of the named threads and of the threads of delegated runs, and what the named threads kept aside."""
         threads: tuple[str, ...] = named + delegated
         rows: list[aiosqlite.Row] = await self._all(
             f"{doomed} SELECT data AS text FROM events WHERE run_id IN (SELECT id FROM doomed)"
-            f" UNION ALL SELECT body FROM messages WHERE thread_id IN ({','.join('?' * len(threads))})",
-            named + threads,
+            f" UNION ALL SELECT body FROM messages WHERE thread_id IN ({','.join('?' * len(threads))})"
+            f" UNION ALL SELECT body FROM message_archive WHERE thread_id IN ({','.join('?' * len(named))})",
+            named + threads + named,
         )
         return await asyncio.to_thread(image_names_in, [str(row["text"]) for row in rows])
 
@@ -1050,9 +1068,10 @@ class Store:
             await cursor.fetchall()
 
     async def referenced_images(self) -> set[str]:
-        """The screenshot files that a stored message or event names."""
+        """The screenshot files that a stored message (one kept aside too) or event names."""
         rows: list[aiosqlite.Row] = await self._all(
-            "SELECT body AS text FROM messages UNION ALL SELECT data FROM events", ()
+            "SELECT body AS text FROM messages UNION ALL SELECT body FROM message_archive UNION ALL SELECT data FROM events",
+            (),
         )
         return await asyncio.to_thread(image_names_in, [str(row["text"]) for row in rows])
 
@@ -1137,11 +1156,23 @@ class Store:
         await self._unit(statements)
 
     async def replace_messages(self, thread_id: str, messages: Sequence[Message]) -> None:
-        """Swap the thread's whole history for ``messages`` in one step: a failure or a stop leaves the old history."""
+        """Swap the thread's whole history for ``messages`` in one step: a failure or a stop leaves the old history. The
+        history starts a new version (item 282): of the old one, what came before the latest run that started on it is
+        kept aside, so that the chat can still be rewound to before any of its runs (:meth:`rewind_chat`)."""
         bodies: list[str] = await asyncio.to_thread(self._encoded, messages)
         now: float = time.time()
 
         async def statements() -> None:
+            await self._db.execute(
+                "INSERT INTO message_archive(thread_id, version, seq, body)"
+                " SELECT m.thread_id, t.history_version, m.seq, m.body FROM messages AS m JOIN threads AS t"
+                " ON t.id = m.thread_id WHERE m.thread_id = ? AND m.seq < (SELECT MAX(history_seq) FROM runs"
+                " WHERE thread_id = ? AND history_version = t.history_version AND rewound_at IS NULL)",
+                (thread_id, thread_id),
+            )
+            await self._db.execute(
+                "UPDATE threads SET history_version = history_version + 1 WHERE id = ?", (thread_id,)
+            )
             await self._db.execute("DELETE FROM messages WHERE thread_id = ?", (thread_id,))
             await self._db.executemany(
                 "INSERT INTO messages(thread_id, seq, body) VALUES(?, ?, ?)",
@@ -1169,6 +1200,89 @@ class Store:
             return [_decoded(message, self._image_dir, index in allowed) for index, message in enumerate(parsed)]
 
         return await asyncio.to_thread(decode_all)
+
+    async def rewind_chat(self, run_id: str) -> RewindCut:
+        """Rewind the chat of the run ``run_id`` to before the run's first message (item 282), in one transaction. The
+        run and the chat's later runs leave the chat: they stay stored, with what they cost, but no list of the chat's
+        runs holds them. The history the model reads ends where it ended before the run: cut back, or, when it was
+        written anew since, made of what was kept aside of the version the run started on, as a new version. What a
+        version kept aside after that place goes, and so do the versions after it; the screenshots only they named are
+        left to :meth:`orphan_images`. Refused for a delegated run, for a run from before the places of messages were
+        kept (``InvalidValueError``), for one a rewind took out already and while a run works on the chat
+        (``RunConflict``)."""
+
+        async def statements() -> RewindCut:
+            row: aiosqlite.Row | None = await self._one("SELECT rowid AS place, * FROM runs WHERE id = ?", (run_id,))
+            if row is None:
+                raise NotFoundError("run not found", {"run_id": run_id})
+            run: RunRecord = _run(row)
+            context: JsonObject = {"run_id": run_id, "thread_id": run.thread_id}
+            if run.parent_run_id is not None:
+                raise InvalidValueError("a helper's run has no message of the owner's to go back to", context)
+            if not run.rewindable:
+                raise InvalidValueError(
+                    "this message was sent before Dot kept the place of each message in its chat, so the chat cannot be"
+                    " rewound to it",
+                    context,
+                )
+            if row["rewound_at"] is not None:
+                raise RunConflict("the chat was rewound to before this message already", context)
+            await self._refuse_working_chats((run.thread_id,), "a chat cannot be rewound while a run works on it")
+            later: list[aiosqlite.Row] = await self._all(
+                "SELECT * FROM runs WHERE thread_id = ? AND parent_run_id IS NULL AND rewound_at IS NULL"
+                " AND (created_at, rowid) >= (?, ?) ORDER BY created_at, rowid",
+                (run.thread_id, run.created_at, row["place"]),
+            )
+            rewound: tuple[RunRecord, ...] = tuple(_run(item) for item in later)
+            now: float = time.time()
+            await self._db.execute(
+                f"UPDATE runs SET rewound_at = ? WHERE id IN ({','.join('?' * len(rewound))})",
+                (now, *(item.id for item in rewound)),
+            )
+            version: int = int(row["history_version"])
+            place: int = int(row["history_seq"])
+            thread: aiosqlite.Row | None = await self._one(
+                "SELECT history_version FROM threads WHERE id = ?", (run.thread_id,)
+            )
+            if thread is None:
+                raise NotFoundError("thread not found", context)
+            if int(thread["history_version"]) == version:
+                await self._db.execute("DELETE FROM messages WHERE thread_id = ? AND seq >= ?", (run.thread_id, place))
+                await self._db.execute("UPDATE threads SET updated_at = ? WHERE id = ?", (now, run.thread_id))
+            else:
+                kept: aiosqlite.Row | None = await self._one(
+                    "SELECT COUNT(*) AS n FROM message_archive WHERE thread_id = ? AND version = ? AND seq < ?",
+                    (run.thread_id, version, place),
+                )
+                if kept is None or int(kept["n"]) != place:
+                    raise StoreError(
+                        "the history kept aside for this message is not whole",
+                        {**context, "version": version, "place": place, "kept": 0 if kept is None else int(kept["n"])},
+                    )
+                await self._db.execute("DELETE FROM messages WHERE thread_id = ?", (run.thread_id,))
+                await self._db.execute(
+                    "INSERT INTO messages(thread_id, seq, body) SELECT thread_id, seq, body FROM message_archive"
+                    " WHERE thread_id = ? AND version = ? AND seq < ?",
+                    (run.thread_id, version, place),
+                )
+                await self._db.execute(
+                    "UPDATE threads SET history_version = history_version + 1, updated_at = ? WHERE id = ?",
+                    (now, run.thread_id),
+                )
+            await self._db.execute(
+                "DELETE FROM message_archive WHERE thread_id = ? AND (version > ? OR (version = ? AND seq >= ?))",
+                (run.thread_id, version, version, place),
+            )
+            back: aiosqlite.Row | None = await self._one(
+                "SELECT id FROM runs WHERE thread_id = ? AND parent_run_id IS NULL AND rewound_at IS NULL"
+                " ORDER BY created_at DESC, rowid DESC LIMIT 1",
+                (run.thread_id,),
+            )
+            return RewindCut(
+                thread_id=run.thread_id, rewound=rewound, back_to=None if back is None else str(back["id"])
+            )
+
+        return await self._unit(statements)
 
     async def save_images(self, images: Sequence[ImageData]) -> list[str]:
         """Write images to the screenshot directory (idempotent) and return their file names."""
@@ -1217,8 +1331,18 @@ class Store:
             goal_mode=goal_mode,
             campaign_id=campaign_id,
             agent_id=agent_id,
+            rewindable=parent_run_id is None,
         )
         working: tuple[RunStatus, ...] = tuple(sorted(WORKING_STATUSES))
+        # Where the run's first message goes in the chat's history (item 282): the history's version and the place after
+        # its last message. Nothing comes in between, as a chat has one run at work at a time and a run stores all it
+        # says before it stops working. A delegated run works in a chat of its own, which is never rewound.
+        place: str = (
+            "NULL, NULL"
+            if parent_run_id is not None
+            else "(SELECT history_version FROM threads WHERE id = ?),"
+            " (SELECT COALESCE(MAX(seq), -1) + 1 FROM messages WHERE thread_id = ?)"
+        )
         # A chat has one run at work at a time, whichever process drives it, and none beside a queued message that
         # another process is starting (:meth:`claim_queued`); a delegated run works in a chat of its own. A process
         # keeps its own runs on a chat apart itself (``RunManager``), its run whose end is still to be stored too.
@@ -1232,8 +1356,8 @@ class Store:
         async with self._db.execute(
             "INSERT INTO runs(id, thread_id, goal, mode, model, status, created_at, finished_at, result, steps,"
             " input_tokens, output_tokens, parent_run_id, source, effort, speed, once, approvals, goal_mode,"
-            " campaign_id, agent_id, owner) SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,"
-            f" ?{refusal} RETURNING id",
+            " campaign_id, agent_id, owner, history_version, history_seq) SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,"
+            f" ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, {place}{refusal} RETURNING id",
             (
                 record.id,
                 record.thread_id,
@@ -1257,6 +1381,7 @@ class Store:
                 record.campaign_id,
                 record.agent_id,
                 owner,
+                *(() if parent_run_id is not None else (thread_id, thread_id)),
                 *(() if parent_run_id is not None else (thread_id, *working, owner, thread_id, owner)),
             ),
         ) as cursor:
@@ -1329,11 +1454,16 @@ class Store:
         return _run(row)
 
     async def list_runs(self, limit: int, thread_id: str | None) -> list[RunRecord]:
+        """The latest ``limit`` runs, of the chat ``thread_id`` when it is given, newest first; the runs a rewind took out
+        of their chat (item 282) are left out."""
         if thread_id is None:
-            rows = await self._all("SELECT * FROM runs ORDER BY created_at DESC LIMIT ?", (limit,))
+            rows = await self._all(
+                "SELECT * FROM runs WHERE rewound_at IS NULL ORDER BY created_at DESC LIMIT ?", (limit,)
+            )
         else:
             rows = await self._all(
-                "SELECT * FROM runs WHERE thread_id = ? ORDER BY created_at DESC LIMIT ?", (thread_id, limit)
+                "SELECT * FROM runs WHERE thread_id = ? AND rewound_at IS NULL ORDER BY created_at DESC LIMIT ?",
+                (thread_id, limit),
             )
         return [_run(row) for row in rows]
 
@@ -1344,9 +1474,10 @@ class Store:
 
     async def list_thread_helpers(self, thread_id: str, limit: int) -> list[RunRecord]:
         """The runs that the runs of the chat ``thread_id`` started on their behalf (item 227), newest first, at most
-        ``limit``. A helper's own runs are not among them: a delegated run delegates no further."""
+        ``limit``, those of the runs a rewind took out of the chat (item 282) left out. A helper's own runs are not among
+        them: a delegated run delegates no further."""
         rows = await self._all(
-            "SELECT * FROM runs WHERE parent_run_id IN (SELECT id FROM runs WHERE thread_id = ?)"
+            "SELECT * FROM runs WHERE parent_run_id IN (SELECT id FROM runs WHERE thread_id = ? AND rewound_at IS NULL)"
             " ORDER BY created_at DESC LIMIT ?",
             (thread_id, limit),
         )

@@ -98,6 +98,7 @@ def _run(status: str, result: str) -> RunRecord:
         goal_mode=False,
         campaign_id=None,
         agent_id="agt_1",
+        rewindable=False,
     )
 
 

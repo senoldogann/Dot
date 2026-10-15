@@ -119,6 +119,12 @@ def _write_chat(thread_id: str, chat: ChatSession) -> None:
     staged.replace(path)
 
 
+def forget_chat(thread_id: str) -> None:
+    """Let the chat's OpenCode session go (item 282): a rewind took out of the chat what the session saw, so the chat's
+    next run on OpenCode starts a new session, which reads the chat's history. Blocking."""
+    _chat_path(thread_id).unlink(missing_ok=True)
+
+
 def meanwhile(text: str, messages: list[Message]) -> str:
     """``text`` as the agent gets it when the chat said more on other models than its session saw: those messages'
     words first, the newest of them, so that the agent knows what the chat is at."""

@@ -45,7 +45,7 @@ export function backgroundNote(goal) {
 }
 
 /** One earlier run as what was asked and how it ended; a run still going keeps the foot of its message back. */
-function turn(past, sendAgainOf) {
+function turn(past, editFromHereOf) {
   const href = `#/runs/${past.id}`;
   const ended = FINISHED.has(past.status);
   const answer = ended
@@ -56,15 +56,15 @@ function turn(past, sendAgainOf) {
       ? el("div", { class: "note" }, icon("refresh"), el("span", null, "Resumed where the run above was cut off"))
       : past.source === BACKGROUND_SOURCE
         ? backgroundNote(past.goal)
-        : userMessage({ text: past.goal, sentAt: past.created_at, files: [], sendAgain: sendAgainOf(past) });
+        : userMessage({ text: past.goal, sentAt: past.created_at, files: [], editFromHere: editFromHereOf(past) });
   return el("section", { class: ended ? "turn" : "turn turn-working" }, asked, answer);
 }
 
 /**
- * The earlier turns of the conversation as one block, or null when there are none. `sendAgainOf(run)` gives what sends
- * the message of an earlier run again (item 205).
+ * The earlier turns of the conversation as one block, or null when there are none. `editFromHereOf(run)` gives what
+ * rewinds the chat to before the message of an earlier run (item 282), or null where it cannot be.
  */
-export function earlierTurns(earlier, sendAgainOf) {
+export function earlierTurns(earlier, editFromHereOf) {
   if (earlier.length === 0) {
     return null;
   }
@@ -82,7 +82,7 @@ export function earlierTurns(earlier, sendAgainOf) {
           el("span", null, `${plural(left, "earlier run is", "earlier runs are")} not shown.`),
           el("a", { class: "small", href: `#/runs/${earlier[0].id}` }, "Open the first run"),
         ),
-    shown.map((past) => turn(past, sendAgainOf)),
+    shown.map((past) => turn(past, editFromHereOf)),
   );
 }
 

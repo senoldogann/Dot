@@ -5220,7 +5220,7 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 279 | Connect apps: the tools of other services, over MCP, signed in from Dot               | in progress |         |
 | 280 | Dot starts lean: the fewest words and tools, the rest found when needed               | planned     |         |
 | 281 | A chat can be a loop that asks Dot again until it is done                             | planned     |         |
-| 282 | A chat can be rewound to an earlier message, its files with it                        | planned     |         |
+| 282 | A chat can be rewound to an earlier message, its files with it                        | in progress |         |
 | 283 | Zen's free models work in Dot, as OpenCode's own agent                                | done        | aeee10b |
 | 284 | OpenCode's agent uses Dot's own tools over MCP                                        | planned     |         |
 | 285 | A helper that starts late joins its siblings, and stopped ones stand still            | in progress |         |
@@ -12335,16 +12335,33 @@ and stops when its run says done; Stop ends it.
 
 ### 282. A chat can be rewound to an earlier message, its files with it
 
-**Status: planned.**
+**Status: in progress.** Built on `item-282-rewind`.
 
-**What.** On a message of the owner's, Rewind to here: the changes the later runs made with the file tools are taken
-back (a command's are not, and the step says so), the later turns leave what the model reads and stay greyed in the
-chat, and the message comes back into the box to be changed and sent again.
+**What.** On a message of the owner's that opened a turn, Edit from here, as T3 Code has it (the owner asked for its
+way): a dialog, "Edit from here? Rewind chat to before this message. Your prompt and attachments return to the
+composer.", with Cancel, Revert files too and Revert and keep changes. Either way the turn and the later ones leave the
+chat (their runs stay stored, marked, with what they cost), the history the model reads ends where it ended before the
+message, and the message with its files comes back into the box of the turn before it, or of a new chat when none is
+left. Revert files too also takes back what those runs and their helpers changed with the file tools, each file that is
+as they left it; a file changed since is left and named, and a command's changes stay. The chat's OpenCode session is
+let go, so that its next run there reads the rewound history.
 
-**Why.** The third saying: open to being wrong, with a way back.
+- A run of a chat keeps, as it is made, where its first message goes in the chat's history: the history's version and
+  the place (`runs.history_version`, `runs.history_seq`). A compaction writes the history anew as the next version and
+  keeps aside what came before the latest run of the old one (`message_archive`), so that a rewind across a compaction
+  gives the history back as it was.
+- `POST /api/runs/{id}/rewind` with `files` `revert` or `keep`. Refused for a helper's run, a run from before the places
+  were kept, a run taken out already and a chat with a run at work. A live `chat_rewound` event has the pages read their
+  lists of chats again.
+- Send again (item 205) gives way to it: the box sends the message again, changed or not.
 
-**Tests.** Unit: what a rewind takes back. Smoke: a chat of three turns rewound to the second; the file of the third as
-before it, the model's next run without the third.
+**Why.** The third saying: open to being wrong, with a way back. The plan had the later turns stay greyed in the chat;
+in T3 Code they leave it, and so they do here.
+
+**Tests.** Smoke, `test_rewind.py`: a chat of three turns rewound from its page to its second message, the files as the
+first turn left them, the second message and its file in the box, the next run without the third; a rewind that keeps
+the changes; one across a compaction; the refusals; the dialog wide and light and on a phone in the dark.
+`test_message_feet.py` follows the new foot.
 
 ### How to start part 49 (the handoff prompt)
 

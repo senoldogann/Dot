@@ -12,9 +12,9 @@ import { runChoices } from "../choices.js";
 import { createComputer } from "../computer.js";
 import { createCostCard } from "../cost.js";
 import { createDetails } from "../details.js";
-import { composerFrame } from "../composer.js";
+import { composerFrame, keepDraft, NEW_CHAT_DRAFT } from "../composer.js";
 import { createContextMeter } from "../contextmeter.js";
-import { clip, dateTimeFull, debounce, duration, el, FILE_BUTTONS, fileSource, modelName, OPEN_FILE_EVENT, requestFile, showAfter } from "../dom.js";
+import { clip, dateTimeFull, debounce, duration, el, FILE_BUTTONS, fileSource, modelName, OPEN_FILE_EVENT, plural, requestFile, showAfter } from "../dom.js";
 import { levelLabel } from "../efforts.js";
 import { BACKGROUND_SOURCE, backgroundNote, continuedIn, earlierTurns, loadHistory, RESUME_SOURCE } from "../history.js";
 import { dotName, faceState, faceStateAtEnd } from "../face.js";
@@ -30,7 +30,7 @@ import { setStageTitle, setStageTools } from "../stage.js";
 import { createStageSize } from "../stagesize.js";
 import { getSnapshot, onChange, onLifecycle, onStreamBack, readFailed } from "../state.js";
 import { createTimeline } from "../timeline.js";
-import { attempt, confirmDialog, toast } from "../ui.js";
+import { attempt, choiceDialog, confirmDialog, toast } from "../ui.js";
 
 const TERMINAL = new Set(["done", "failed", "cancelled"]);
 // A delegated run's goal in the bar and the words of its pill (item 82).
@@ -44,9 +44,12 @@ const BTW_PATTERN = /^\/btw(?:\s+([\s\S]*))?$/i;
 const MAX_INPUT_PX = 160;
 const TITLE_CHARS = 70;
 const QUOTE_CHARS = 160;
-// The first events of a run, read for the files that came with its goal: its `attachments` event is among them
-// (agent/loop.py).
-const OPENING_EVENTS = 100;
+// Edit from here (item 282), worded as T3 Code words it: the dialog's line and the owner's two ways of rewinding.
+const REWIND_MESSAGE = "Rewind chat to before this message. Your prompt and attachments return to the composer.";
+const REWIND_CHOICES = [
+  { value: "revert", label: "Revert files too", tone: "danger" },
+  { value: "keep", label: "Revert and keep changes", tone: "primary" },
+];
 // The events that change what became of the lessons of a run; they come on the lifecycle stream, after the run's end.
 const LESSON_KINDS = new Set(["lessons_proposed", "lesson_saved", "lesson_dismissed", "lessons_failed"]);
 const LESSON_STATES = { saved: { mark: "check", text: "Saved to memory" }, dismissed: { mark: "x", text: "Dismissed" } };
@@ -72,6 +75,16 @@ const EDIT_STATES = {
   as_before: { tone: "b-muted", text: "as before the run" },
 };
 const APPROVAL_TONES = { approved: "b-ok", denied: "b-bad", expired: "b-muted", pending: "b-warn", left: "b-warn" };
+
+/** What a rewind did (item 282), said in a toast, and the files it left as they are, with why, in one of its own. */
+function tellRewound(cut) {
+  const taken = cut.reverted.length === 0 ? "" : `, and ${plural(cut.reverted.length, "file is as it was", "files are as they were")}`;
+  toast("ok", `The chat went back to before your message${taken}.`);
+  if (cut.left.length > 0) {
+    const named = cut.left.map((edit) => `${edit.path} (${edit.reason})`).join("; ");
+    toast("error", `${plural(cut.left.length, "file was", "files were")} left as they are: ${named}`);
+  }
+}
 
 function backLink() {
   return el("a", { class: "back", href: "#/runs" }, icon("arrowLeft"), "All runs");
@@ -736,32 +749,20 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
     return next.id;
   }
 
-  // The owner's message `text` sent again with the files it carried (item 205), as the composer sends: what is typed in
-  // the composer stays. `filesOf()` reads the files when they are wanted.
-  async function sendAgain(text, filesOf) {
-    if (sending) {
+  // Edit from here (item 282, after T3 Code): the chat goes back to before the message of the run `past`, and the message
+  // with its files goes to the composer of the run the chat ends with now, or of a new chat when none is left; the files
+  // the runs taken out changed are taken back too when the owner chooses so.
+  async function editFromHere(past) {
+    const files = await choiceDialog({ title: "Edit from here?", message: REWIND_MESSAGE, choices: REWIND_CHOICES });
+    if (files === null) {
       return;
     }
-    sending = true;
-    send.disabled = true;
-    try {
-      await attempt(async () => {
-        const files = await filesOf();
-        const next = await deliver(text, files.map((file) => file.id), false);
-        if (next !== null) {
-          ctx.navigate(`/runs/${next}`);
-        }
-      });
-    } finally {
-      sending = false;
-      send.disabled = false;
-    }
-  }
-
-  /** The files that came with the goal of the run `id`: its `attachments` event, among its first events. */
-  async function filesOfRun(id) {
-    const events = await api.get(`/runs/${id}/events?limit=${OPENING_EVENTS}`);
-    return events.find((event) => event.kind === "attachments")?.data.files ?? [];
+    await attempt(async () => {
+      const cut = await api.post(`/runs/${past.id}/rewind`, { files });
+      keepDraft(cut.back_to ?? NEW_CHAT_DRAFT, { text: cut.text, files: cut.files });
+      tellRewound(cut);
+      ctx.navigate(cut.back_to === null ? "/runs" : `/runs/${cut.back_to}`);
+    });
   }
 
   function syncControls() {
@@ -956,7 +957,7 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
       ? null
       : run.source === BACKGROUND_SOURCE
         ? backgroundNote(run.goal)
-        : userMessage({ text: run.goal, sentAt: run.created_at, files: [], sendAgain: ownsMessages ? () => sendAgain(run.goal, () => filesOfRun(run.id)) : null });
+        : userMessage({ text: run.goal, sentAt: run.created_at, files: [], editFromHere: ownsMessages && run.rewindable ? () => editFromHere(run) : null });
   // ------------------------------------------------------------------------------------------- actions
   // What the run did and what can be undone: its acting steps, its approvals and its file changes (see server.actions).
   const actionsBody = el("div", { class: "actions-list" });
@@ -1182,7 +1183,6 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
     onQuestionLeft: debounce(() => reconcile(), QUESTIONS_SETTLE_MS),
     onHeld: computer.setHeld,
     onBrowserStep: (page) => computer.notePage(page),
-    sendAgain: ownsMessages ? (text, files) => sendAgain(text, async () => files) : null,
     onGoalFiles: goalMessage === null ? null : (files) => showMessageFiles(goalMessage, files),
   });
   const problem =
@@ -1203,7 +1203,7 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
     el("h1", { class: "visually-hidden" }, run.goal),
     connectionNote,
     problem,
-    earlierTurns(history.earlier, (past) => () => sendAgain(past.goal, () => filesOfRun(past.id))),
+    earlierTurns(history.earlier, (past) => (past.rewindable ? () => editFromHere(past) : null)),
     goalMessage,
     timeline.element,
     waitingList,

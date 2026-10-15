@@ -4474,6 +4474,20 @@ dialog.modal::backdrop {
   padding: 16px 20px 16px;
 }
 
+/* Three ways out of a dialog (Edit from here, item 282) stand side by side in a dialog made wider for them; where even
+   that does not fit, they stand one above the other, as wide as the dialog, the last choice on top and Cancel at the
+   foot. */
+dialog.modal:has(.modal-actions > :nth-child(3)) {
+  max-width: min(540px, calc(100vw - 32px));
+}
+
+@media (max-width: 580px) {
+  .modal-actions:has(> :nth-child(3)) {
+    flex-direction: column-reverse;
+    align-items: stretch;
+  }
+}
+
 /* Import from other apps (item 219, skills.js): a checklist by agent that scrolls inside past its first rows; a row is
    a label, so its name and its detail tick its box too. */
 dialog.modal.import-dialog {

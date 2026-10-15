@@ -1,8 +1,8 @@
 """The feet of a conversation's messages (item 205), after T3 Code's: under each of the owner's messages, once its turn
-has its answer, when it was sent, a copy of it as it was written and a button that sends it again with its files; under
-each answer, a copy of it and when it came. A turn at work keeps the feet of its messages back until its answer is in;
-sending a message again leaves what is typed in the composer. A real server on a scripted model, wide and on a phone,
-light and dark."""
+has its answer, when it was sent and a copy of it as it was written, and under a message that opened a turn Edit from
+here (item 282, which ``test_rewind`` follows through); under each answer, a copy of it and when it came. A turn at work
+keeps the feet of its messages back until its answer is in. A real server on a scripted model, wide and on a phone, light
+and dark."""
 
 import asyncio
 import re
@@ -38,8 +38,6 @@ _FIRST: str = "Plan the garden beds."
 _FIRST_ANSWER: str = "The beds **face south**, with paths between them."
 _SECOND: str = "Which seeds go in first?"
 _STEER: str = "Add the beans too."
-_AGAIN_ANSWER: str = "Again: the beds face south."
-_DRAFT: str = "A draft for later"
 # The second message works in a short command, while it is steered, then in a long one, until it is stopped.
 _SHORT_WAIT: str = "sleep 5"
 _LONG_WAIT: str = "sleep 300"
@@ -60,8 +58,8 @@ def _shell(command: str) -> ScriptedTurn:
 
 @pytest_asyncio.fixture(scope="module", loop_scope="module")
 async def runtime(tmp_path_factory: pytest.TempPathFactory) -> AsyncIterator[Runtime]:
-    """A runtime in a throw-away home, on a scripted model: the first message is answered at once, the second works
-    until it is stopped, and the first sent again is answered at once."""
+    """A runtime in a throw-away home, on a scripted model: the first message is answered at once, and the second works
+    until it is stopped."""
     home: Path = tmp_path_factory.mktemp("home")
     (home / "config.toml").write_text(
         f'[browser]\nheadless = true\n\n[models]\nmain = "{SCRIPTED_MODEL}"\n', encoding="utf-8"
@@ -74,7 +72,6 @@ async def runtime(tmp_path_factory: pytest.TempPathFactory) -> AsyncIterator[Run
         _finish(_FIRST_ANSWER),
         _shell(_SHORT_WAIT),
         _shell(_LONG_WAIT),
-        _finish(_AGAIN_ANSWER),
     ]
     await built.router.register(_PROVIDER, ScriptedProvider(_PROVIDER, answers))
     try:
@@ -167,13 +164,6 @@ async def _clipboard(page: Page) -> str | None:
     return str(await page.evaluate("() => navigator.clipboard.readText()"))
 
 
-def _file_ids(event: EventRecord) -> list[str]:
-    """The ids of the files an ``attachments`` event lists."""
-    files = event.data["files"]
-    assert isinstance(files, list), files
-    return [str(entry["id"]) for entry in files if isinstance(entry, dict)]
-
-
 async def _copies(page: Page, button: Locator, label: str, text: str) -> None:
     """``button`` puts ``text`` on the clipboard and says so with a check for a moment, then reads ``label`` again.
     ``button`` is found by its place, as its name changes."""
@@ -193,7 +183,7 @@ async def _edges(foot: Locator, bubble: Locator) -> tuple[float, float]:
     return bubble_box["x"] + bubble_box["width"], icon_box["x"] + icon_box["width"]
 
 
-async def test_the_messages_have_their_time_a_copy_and_a_send_again_once_answered(
+async def test_the_messages_have_their_time_a_copy_and_edit_from_here_once_answered(
     runtime: Runtime, served: tuple[RunManager, str], tmp_path: Path
 ) -> None:
     manager, address = served
@@ -219,13 +209,13 @@ async def test_the_messages_have_their_time_a_copy_and_a_send_again_once_answere
             goal: Locator = page.locator(".run-thread > .user-message")
             steered: Locator = page.locator(".timeline .user-message")
             await expect(steered).to_contain_text(_STEER)
-            # The earlier turn has its answer: its message shows when it was sent, a copy and a send again.
+            # The earlier turn has its answer: its message shows when it was sent, a copy and Edit from here.
             await expect(earlier.locator(".message-foot")).to_be_visible()
             sent: Locator = earlier.locator(".message-time")
             await expect(sent).to_have_text(_TODAY_TIME)
             assert re.search(r"\d{4}", await sent.get_attribute("title") or ""), "no full date where the pointer rests"
             await expect(earlier.get_by_role("button", name="Copy the message")).to_be_visible()
-            await expect(earlier.get_by_role("button", name="Send again")).to_be_visible()
+            await expect(earlier.get_by_role("button", name="Edit from here")).to_be_visible()
             # Its answer shows a copy and when it came; how long the run took waits for the pointer.
             answer: Locator = page.locator(".history article.answer")
             await expect(answer.get_by_role("button", name="Copy the answer")).to_be_visible()
@@ -240,32 +230,24 @@ async def test_the_messages_have_their_time_a_copy_and_a_send_again_once_answere
             assert (await _ended(runtime, second.id)).status == "cancelled"
             await expect(goal.locator(".message-foot")).to_be_visible()
             await expect(steered.locator(".message-foot")).to_be_visible()
+            # The message that opened the turn has Edit from here; one that steered the run opens no turn of its own.
+            await expect(goal.get_by_role("button", name="Edit from here")).to_be_visible()
+            await expect(steered.get_by_role("button", name="Edit from here")).to_have_count(0)
             bubble_edge, icon_edge = await _edges(goal.locator(".message-foot"), goal.locator(".bubble.user"))
             assert abs(bubble_edge - icon_edge) <= _EDGE_PX, (bubble_edge, icon_edge)
             # A copy takes the message, and the answer, as they were written.
             await _copies(page, goal.locator(".message-foot button").first, "Copy the message", _SECOND)
             await _copies(page, steered.locator(".message-foot button").first, "Copy the message", _STEER)
             await _copies(page, answer.locator(".answer-foot button").first, "Copy the answer", _FIRST_ANSWER)
-            # Sent again, the first message starts the chat's next run with its file; what is typed in the composer stays.
-            composer: Locator = page.locator(".dock textarea")
-            await composer.fill(_DRAFT)
-            await earlier.get_by_role("button", name="Send again").click()
-            await expect(page).not_to_have_url(f"{address}/#/runs/{second.id}")
-            again_id: str = page.url.rpartition("/")[2]
-            again: RunRecord = await _ended(runtime, again_id)
-            assert (again.goal, again.thread_id, again.status) == (_FIRST, first.thread_id, "done")
-            files: list[EventRecord] = await _events(runtime, again.id, "attachments", 1)
-            assert _file_ids(files[0]) == [file.id]
             # The file stands under the message it came with, over its foot.
-            sent_again: Locator = page.locator(".run-thread > .user-message")
-            await expect(sent_again.locator(".bubble.user")).to_have_text(_FIRST)
-            await expect(sent_again.locator(".attach-list.sent")).to_contain_text("beds.txt")
-            await expect(sent_again.locator(".message-foot")).to_be_visible()
-            parts: list[str] = await sent_again.evaluate("node => [...node.children].map((child) => child.className)")
+            await page.goto(f"{address}/#/runs/{first.id}")
+            opened: Locator = page.locator(".run-thread > .user-message")
+            await expect(opened.locator(".bubble.user")).to_have_text(_FIRST)
+            await expect(opened.locator(".attach-list.sent")).to_contain_text("beds.txt")
+            await expect(opened.locator(".message-foot")).to_be_visible()
+            parts: list[str] = await opened.evaluate("node => [...node.children].map((child) => child.className)")
             assert parts == ["bubble user", "attach-list sent", "message-foot"], parts
             await page.screenshot(path=str(tmp_path / "feet-1280-light.png"), animations="disabled")
-            await page.goto(f"{address}/#/runs/{second.id}")
-            await expect(page.locator(".dock textarea")).to_have_value(_DRAFT)
             # The time of a message is as short as its day allows.
             shown: list[str] = await page.evaluate(
                 """async () => {
@@ -279,9 +261,10 @@ async def test_the_messages_have_their_time_a_copy_and_a_send_again_once_answere
             assert shown == ["00:05", "Yesterday, 14:03", "5 Mar 2020, 14:03"], shown
             assert errors == []
             await page.context.close()
-            # The look, wide in the dark and on a phone: the chat that was sent again, its feet under its messages.
+            # The look, wide in the dark and on a phone: the chat whose second turn was stopped, its feet under its
+            # messages (the first turn's, the second's and the one that steered it).
             for width, scheme in _SHOTS:
-                look, look_errors = await _page(browser, address, again.id, width, scheme)
+                look, look_errors = await _page(browser, address, second.id, width, scheme)
                 messages: Locator = look.locator(".run-thread .user-message")
                 await expect(messages).to_have_count(3)
                 for index in range(3):
@@ -291,7 +274,7 @@ async def test_the_messages_have_their_time_a_copy_and_a_send_again_once_answere
                         message.locator(".message-foot"), message.locator(".bubble.user")
                     )
                     assert abs(bubble_edge - icon_edge) <= _EDGE_PX, (width, index, bubble_edge, icon_edge)
-                await expect(look.locator("article.answer .message-time")).to_have_count(3)
+                await expect(look.locator("article.answer .message-time")).to_have_count(2)
                 await look.screenshot(path=str(tmp_path / f"feet-{width}-{scheme}.png"), animations="disabled")
                 assert look_errors == []
                 await look.context.close()

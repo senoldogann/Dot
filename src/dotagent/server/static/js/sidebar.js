@@ -25,7 +25,7 @@ import { attempt, confirmDialog, toast } from "./ui.js";
 const LIST_LIMIT = 200;
 const LIST_CAP = 500;
 // The moments a run changes status; a run that waits for an approval is "blocked" until it is answered.
-const RELOAD_KINDS = new Set(["run_queued", "run_started", "run_finished", "approval_requested", "approval_decided", "takeover", "handback"]);
+const RELOAD_KINDS = new Set(["run_queued", "run_started", "run_finished", "approval_requested", "approval_decided", "takeover", "handback", "chat_rewound"]);
 // The sections above the chats: what waits for you and what works now (`GET /activity`), each hidden while empty.
 const ACTIVITY_SECTIONS = [
   { key: "waiting", label: "Waiting for you" },

@@ -95,7 +95,9 @@ class RunRecord(FrozenModel):
     asks for); ``approvals`` and ``goal_mode`` are the approval mode and the goal mode it ran with (runs stored before
     they were kept hold ``standard``, ``None``, ``ask`` and ``False``, which is how those runs behaved). ``campaign_id``
     is the campaign the run is a session of, ``None`` for any other run. ``agent_id`` is the agent the run belongs to
-    (item 86), ``None`` for Dot."""
+    (item 86), ``None`` for Dot. ``rewindable`` says whether its chat can be rewound to before its first message (item
+    282): Dot kept where that message went in the chat's history, which it does not for a delegated run, nor did for
+    runs from before."""
 
     id: str
     thread_id: str
@@ -118,6 +120,16 @@ class RunRecord(FrozenModel):
     goal_mode: bool
     campaign_id: str | None
     agent_id: str | None
+    rewindable: bool
+
+
+class RewindCut(FrozenModel):
+    """What a rewind of a chat to before one of its runs took out of it (item 282): ``rewound`` is that run and the
+    chat's later runs, oldest first, and ``back_to`` the run the chat ends with now (``None`` when none is left)."""
+
+    thread_id: str
+    rewound: tuple[RunRecord, ...]
+    back_to: str | None
 
 
 CharacterShape = Literal["circle", "pebble", "squircle", "capsule", "triangle", "hexagon", "cloud", "droplet"]
