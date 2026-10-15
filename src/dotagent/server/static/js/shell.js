@@ -2,7 +2,8 @@
 // owner: the approvals that wait, the connection while it is not live, the banner of an engaged emergency stop and the
 // one of a page that Dot's update left out of date.
 
-import { el } from "./dom.js";
+import { QUIET_BREAK_MS } from "./api.js";
+import { el, showAfter } from "./dom.js";
 import { releaseFailsafe } from "./failsafe.js";
 import { icon } from "./icons.js";
 import { holdBarInSight, setSidebarOpen, sidebarOpen, trackStagebar } from "./layout.js";
@@ -26,7 +27,8 @@ function buildIndicators() {
   );
   const dot = el("span", { class: "live-dot connecting" });
   const connectionLabel = el("span", { class: "label" }, STREAM_LABEL.connecting);
-  const connection = el("span", { class: "pill" }, dot, connectionLabel);
+  const connection = el("span", { class: "pill", hidden: true }, dot, connectionLabel);
+  const showConnection = showAfter(connection, QUIET_BREAK_MS);
   const banner = el(
     "div",
     { class: "banner", hidden: true, role: "alert" },
@@ -49,9 +51,9 @@ function buildIndicators() {
       waiting.hidden = snapshot.approvals.length === 0;
       dot.className = `live-dot ${snapshot.stream}`;
       connectionLabel.textContent = STREAM_LABEL[snapshot.stream];
-      // The connection shows while it is being made or lost; a live one says nothing (item 120). The runs that work
-      // are counted in the sidebar's Working section.
-      connection.hidden = snapshot.stream === "live";
+      // The connection shows while it is being made or lost; a live one says nothing (item 120), nor does a break that
+      // mends at once (item 286). The runs that work are counted in the sidebar's Working section.
+      showConnection(snapshot.stream !== "live");
       connection.title = `Connection to the daemon: ${STREAM_LABEL[snapshot.stream]}`;
       banner.hidden = snapshot.status === null || !snapshot.status.failsafe_engaged;
       updated.hidden = !snapshot.outdated;
@@ -92,8 +94,7 @@ export function buildShell({ homeRoute }) {
     },
     icon("panelLeft"),
   );
-  // While the sidebar is closed the bar holds its opener alone: the emergency stop stays in the sidebar's foot, a tap
-  // away (item 273).
+  // While the sidebar is closed the bar holds its opener alone (item 273).
   const opener = el("div", { class: "stagebar-left" }, menu);
   const main = el("main", { class: "page", tabindex: "-1" });
   const stagebar = el(

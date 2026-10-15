@@ -1,7 +1,9 @@
 """Privacy permissions the desktop needs, checked without ever showing a prompt, plus the Settings panes that grant them."""
 
+import ctypes
+import os
 import subprocess
-import sys
+from functools import cache
 from pathlib import Path
 from typing import Literal
 
@@ -30,6 +32,9 @@ _PANE_TITLES: dict[Pane, str] = {
 }
 _OPEN: str = "/usr/bin/open"
 _OPEN_TIMEOUT_S: float = 10.0
+_LIBSYSTEM: str = "/usr/lib/libSystem.B.dylib"
+# PROC_PIDPATHINFO_MAXSIZE, the room proc_pidpath needs.
+_PID_PATH_BYTES: int = 4096
 
 
 def check_permissions() -> Permissions:
@@ -41,10 +46,46 @@ def check_permissions() -> Permissions:
     )
 
 
-def program_of_this_process() -> Path:
-    """The program macOS sees running this process. A launchd job has no terminal, so its permissions are granted to
-    this program (the real file behind the virtual environment's link), not to an app."""
-    return Path(sys.executable).resolve()
+@cache
+def _libsystem() -> ctypes.CDLL:
+    library: ctypes.CDLL = ctypes.CDLL(_LIBSYSTEM, use_errno=True)
+    library.responsibility_get_pid_responsible_for_pid.argtypes = (ctypes.c_int,)
+    library.responsibility_get_pid_responsible_for_pid.restype = ctypes.c_int
+    library.proc_pidpath.argtypes = (ctypes.c_int, ctypes.c_char_p, ctypes.c_uint32)
+    library.proc_pidpath.restype = ctypes.c_int
+    return library
+
+
+def app_of(program: Path) -> Path:
+    """The app whose program ``program`` is (``X.app/Contents/MacOS/x`` is ``X.app``), else ``program`` itself."""
+    contents: Path = program.parent.parent
+    if program.parent.name == "MacOS" and contents.name == "Contents" and contents.parent.suffix == ".app":
+        return contents.parent
+    return program
+
+
+def responsible_program() -> Path:
+    """The program macOS holds responsible for this process: what its privacy questions and the lists of System Settings
+    name, and what a permission is granted to. It is the app this process was started from (Terminal, iTerm, Claude;
+    Dot.app for the service, item 288), as its bundle, or a program started on its own. macOS tells it through
+    ``responsibility_get_pid_responsible_for_pid``, which it uses for its own questions and has no public name."""
+    library: ctypes.CDLL = _libsystem()
+    pid: int = library.responsibility_get_pid_responsible_for_pid(os.getpid())
+    if pid <= 0:
+        raise DesktopError("macOS did not say which program it holds responsible for Dot", {"pid": os.getpid()})
+    buffer: ctypes.Array[ctypes.c_char] = ctypes.create_string_buffer(_PID_PATH_BYTES)
+    length: int = library.proc_pidpath(pid, buffer, _PID_PATH_BYTES)
+    if length <= 0:
+        raise DesktopError(
+            "macOS did not give the path of the program it holds responsible for Dot",
+            {"pid": pid, "errno": ctypes.get_errno()},
+        )
+    return app_of(Path(buffer.value.decode("utf-8")))
+
+
+def program_name(program: Path) -> str:
+    """The name System Settings shows for ``program``: an app's without ``.app``, else the program's file name."""
+    return program.stem if program.suffix == ".app" else program.name
 
 
 def request_permissions() -> Permissions:
@@ -81,9 +122,10 @@ def missing_panes(permissions: Permissions) -> tuple[Pane, ...]:
 
 
 def grant_hint(pane: Pane) -> str:
+    """What to switch on, and where, naming the program macOS asks for (``responsible_program``)."""
     return (
-        f"Open System Settings > Privacy & Security > {_PANE_TITLES[pane]} and switch on the app that runs Dot "
-        "(Terminal, iTerm, Claude, or the Dot service), then start it again. `dotx desktop setup` opens the pane; "
+        f"Open System Settings > Privacy & Security > {_PANE_TITLES[pane]} and switch on "
+        f"{program_name(responsible_program())}, then start it again. `dotx desktop setup` opens the pane; "
         "for the service use `dotx service permissions`."
     )
 

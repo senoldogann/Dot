@@ -2,6 +2,7 @@
 
 import asyncio
 import time
+from pathlib import Path
 
 from fastapi import APIRouter
 
@@ -12,6 +13,7 @@ from dotagent.connections.states import (
     ConnectionState,
     folder_state,
     folder_step,
+    mac_state,
     mac_step,
     web_state,
     web_step,
@@ -23,6 +25,7 @@ from dotagent.desktop import perms
 from dotagent.server.context import ServerContext
 from dotagent.server.views import ConnectionsView, ConnectionView
 from dotagent.skills.office import CLOUD_STORAGE, onedrive_folders
+from dotagent.store.db import Store
 
 log = get_logger(__name__)
 
@@ -31,6 +34,14 @@ _SIGN_IN_THREAD: str = "connect-apps"
 # How long a step waits for the owner's answer to macOS's question before it answers that the question waits; the
 # question stays on the Mac until it is answered.
 _ASK_WAIT_S: float = 60.0
+# The answers of macOS about an application that are kept for the time it does not run (item 288).
+_KEPT_ANSWERS: dict[str, mac.AutomationState] = {"allowed": "allowed", "not_asked": "not_asked", "refused": "refused"}
+
+
+def _answer_key(program: Path, bundle_id: str) -> str:
+    """The kv key of the last answer macOS gave about the application ``bundle_id`` for ``program``, the program it
+    holds responsible for Dot: an answer is about that program alone."""
+    return f"automation:{program}:{bundle_id}"
 
 
 def _first_time(bundle_id: str) -> mac.AutomationState:
@@ -44,13 +55,21 @@ def _first_time(bundle_id: str) -> mac.AutomationState:
 def connections_router(ctx: ServerContext) -> APIRouter:
     router: APIRouter = APIRouter(prefix="/api")
     session: BrowserSession = ctx.runtime.browser
+    store: Store = ctx.runtime.store
     # The questions macOS asks the owner now, by application: each ends with the owner's answer.
     asking: dict[str, asyncio.Future[mac.AutomationState]] = {}
 
-    def mac_view(app: MacApp) -> ConnectionView:
-        state: ConnectionState = (
-            "not_installed" if mac.installed_app(app.bundle_id) is None else mac.automation_state(app.bundle_id)
-        )
+    def live_state(app: MacApp) -> ConnectionState:
+        return "not_installed" if mac.installed_app(app.bundle_id) is None else mac.automation_state(app.bundle_id)
+
+    async def mac_view(app: MacApp, program: Path) -> ConnectionView:
+        """Where ``app`` stands for ``program``; an answer macOS gives about it is kept for when it does not run."""
+        live: ConnectionState = await asyncio.to_thread(live_state, app)
+        key: str = _answer_key(program, app.bundle_id)
+        kept: str | None = await store.kv_get(key)
+        if live in _KEPT_ANSWERS and live != kept:
+            await store.kv_set(key, live)
+        state: ConnectionState = mac_state(live, None if kept is None else _KEPT_ANSWERS.get(kept))
         return ConnectionView(
             id=app.id,
             kind="mac",
@@ -90,17 +109,20 @@ def connections_router(ctx: ServerContext) -> APIRouter:
             return live
         return await asyncio.to_thread(profile_cookies, session.profile_dir, time.time())
 
-    def local_views() -> list[ConnectionView]:
-        return [*(mac_view(app) for app in MAC_APPS), *(folder_view(app) for app in FOLDER_APPS)]
+    def folder_views() -> list[ConnectionView]:
+        return [folder_view(app) for app in FOLDER_APPS]
 
     @router.get("/connections")
     async def list_connections() -> ConnectionsView:
-        local: list[ConnectionView] = await asyncio.to_thread(local_views)
+        program: Path = await asyncio.to_thread(perms.responsible_program)
+        macs: list[ConnectionView] = [await mac_view(app, program) for app in MAC_APPS]
+        folders: list[ConnectionView] = await asyncio.to_thread(folder_views)
         held: frozenset[CookieKey] = await cookies()
         return ConnectionsView(
-            apps=(*local, *(web_view(app, held) for app in WEB_APPS)),
+            apps=(*macs, *folders, *(web_view(app, held) for app in WEB_APPS)),
             browser_mode=session.mode,
             headless=session.config.headless,
+            runner=perms.program_name(program),
         )
 
     async def ask(app: MacApp) -> None:
@@ -127,12 +149,13 @@ def connections_router(ctx: ServerContext) -> APIRouter:
         its sign-in page in Dot's browser, or open the application to sign in there."""
         found_mac: MacApp | None = next((app for app in MAC_APPS if app.id == app_id), None)
         if found_mac is not None:
-            current: ConnectionView = await asyncio.to_thread(mac_view, found_mac)
+            program: Path = await asyncio.to_thread(perms.responsible_program)
+            current: ConnectionView = await mac_view(found_mac, program)
             if current.step == "settings":
                 await asyncio.to_thread(perms.open_settings, "automation")
             elif current.step == "ask":
                 await ask(found_mac)
-            return await asyncio.to_thread(mac_view, found_mac)
+            return await mac_view(found_mac, program)
         found_folder: FolderApp | None = next((app for app in FOLDER_APPS if app.id == app_id), None)
         if found_folder is not None:
             current = await asyncio.to_thread(folder_view, found_folder)

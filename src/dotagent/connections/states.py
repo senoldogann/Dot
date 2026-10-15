@@ -23,6 +23,13 @@ type ConnectionStep = Literal["ask", "settings", "sign_in", "open_app"]
 _MAC_STEPS: dict[ConnectionState, ConnectionStep] = {"not_asked": "ask", "not_open": "ask", "refused": "settings"}
 
 
+def mac_state(live: ConnectionState, kept: ConnectionState | None) -> ConnectionState:
+    """Where an application of the Mac stands: what macOS says about it now, ``live``, or while it does not run, when
+    macOS tells nothing about it, the last answer macOS gave about it, ``kept`` (item 288), so that an application
+    allowed once does not ask for Allow again each time it is closed."""
+    return kept if live == "not_open" and kept is not None else live
+
+
 def mac_step(state: ConnectionState) -> ConnectionStep | None:
     """macOS's question for an application it was not asked about (one that does not run is started hidden for it),
     the Automation pane for one it refused; none for one allowed or not installed."""

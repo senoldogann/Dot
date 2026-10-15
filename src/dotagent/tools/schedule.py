@@ -14,7 +14,6 @@ from pydantic import Field
 from dotagent.policy.types import ActionInfo, Risk
 from dotagent.scheduler import DAEMON_NOTE
 from dotagent.scheduler.plans import (
-    UNSET_OPTIONS,
     ScheduleRequest,
     create_schedule,
     remove_schedule,
@@ -25,7 +24,8 @@ from dotagent.scheduler.plans import (
     schedule_zone,
 )
 from dotagent.scheduler.timing import Timing, describe_timing, plan_timing
-from dotagent.store.models import ScheduleRecord
+from dotagent.store.db import Store
+from dotagent.store.models import ChatChoices, RunMode, RunRecord, ScheduleOptions, ScheduleRecord
 from dotagent.tools.base import (
     ACTING_MODES,
     ALL_MODES,
@@ -64,8 +64,9 @@ class CreateArgs(ToolArgs):
         min_length=10,
         max_length=4000,
         description=(
-            "The complete task for the future run. It starts in a new thread without this conversation and without "
-            "anyone watching, so it must say everything it needs: what to do, where to look, how to report."
+            "The complete task for the future run. It goes on in this chat, with this chat's model, reasoning level, "
+            "speed, approvals and goal mode, without anyone watching, so it must say everything it needs: what to do, "
+            "where to look, how to report."
         ),
     )
     cron: str | None = Field(
@@ -80,8 +81,46 @@ class CreateArgs(ToolArgs):
         default=None,
         description="For a single run: the local date and time, for example '2026-10-06T09:30'. Give cron or at.",
     )
-    mode: Literal["task", "research"] = Field(
-        default="task", description="task may act on the Mac and the web; research only reads and reports."
+    mode: Literal["task", "research"] | None = Field(
+        default=None,
+        description=(
+            "task may act on the Mac and the web; research only reads and reports. Leave it out to keep this chat's."
+        ),
+    )
+
+
+def schedule_mode(asked: Literal["task", "research"] | None, chat: RunMode) -> Literal["task", "research"]:
+    """The mode of a schedule a chat makes: the one asked, else the chat's own; a chat that only talks schedules
+    tasks, which is what a schedule's run can be."""
+    if asked is not None:
+        return asked
+    return "research" if chat == "research" else "task"
+
+
+def chat_options(run: RunRecord, choices: ChatChoices | None) -> ScheduleOptions:
+    """How the runs of a schedule that the run ``run`` makes start (item 291): as the next follow-up of its chat starts,
+    ``choices`` (those its first run started with, until the owner picked others), else as ``run`` started, its chat's
+    runs being older than kept choices; and in that chat. They are the owner's choices, never the model's."""
+    if choices is None:
+        return ScheduleOptions(
+            model=run.model,
+            effort=run.effort,
+            speed=run.speed,
+            approvals=run.approvals,
+            goal_mode=run.goal_mode,
+            timezone=None,
+            history_runs=None,
+            same_chat=True,
+        )
+    return ScheduleOptions(
+        model=choices.model,
+        effort=choices.effort,
+        speed=choices.speed,
+        approvals=choices.approvals,
+        goal_mode=choices.goal_mode,
+        timezone=None,
+        history_runs=None,
+        same_chat=True,
     )
 
 
@@ -94,25 +133,40 @@ def tool_timing(cron: str | None, at: str | None, ctx: ToolContext) -> Timing:
 def _create_tool() -> RegisteredTool:
     def classify(args: CreateArgs, ctx: ToolContext) -> ActionInfo:
         when: str = describe_timing(tool_timing(args.cron, args.at, ctx), ctx.runtime.schedule_zone)
-        return _action("schedule_create", f'Schedule "{args.name}" ({when}, {args.mode}): {args.goal}', "medium")
+        mode: str = "this chat's mode" if args.mode is None else args.mode
+        return _action("schedule_create", f'Schedule "{args.name}" ({when}, {mode}): {args.goal}', "medium")
 
     async def run(args: CreateArgs, ctx: ToolContext) -> ToolResult:
         zone: ZoneInfo = ctx.runtime.schedule_zone
-        # A run cannot choose how unattended runs start (model, approvals, goal mode): that stays the user's call.
+        store: Store = ctx.runtime.store
+        # A run cannot choose how unattended runs start (model, approvals, goal mode): they start as the owner's chat
+        # does, in that chat (item 291); a helper's schedule is its parent's chat's.
+        current: RunRecord = await store.get_run(ctx.run_id)
+        owner: RunRecord = current if current.parent_run_id is None else await store.get_run(current.parent_run_id)
+        choices: ChatChoices | None = await store.chat_choices(owner.thread_id)
         request: ScheduleRequest = ScheduleRequest(
-            name=args.name, goal=args.goal, cron=args.cron, at=args.at, mode=args.mode, options=UNSET_OPTIONS
+            name=args.name,
+            goal=args.goal,
+            cron=args.cron,
+            at=args.at,
+            mode=schedule_mode(args.mode, owner.mode if choices is None else choices.mode),
+            options=chat_options(owner, choices),
         )
         record: ScheduleRecord = await create_schedule(
-            ctx.runtime.store, ctx.runtime.config.scheduler, zone, request, time.time()
+            store, ctx.runtime.config.scheduler, zone, request, time.time(), owner.thread_id
         )
-        return ok(f"Scheduled: {render_schedule(record, zone)}\nEach run starts in a new thread. {DAEMON_NOTE}")
+        return ok(
+            f"Scheduled: {render_schedule(record, zone)}\nEach run goes on in this chat, with its model, reasoning "
+            f"level, speed, approvals and goal mode. {DAEMON_NOTE}"
+        )
 
     return make_tool(
         name="schedule_create",
         description=(
             "Run a goal later, once or repeatedly, without the user being present. Use it when the user asks for "
             "something to happen at a time or on a rhythm ('every weekday at 9', 'tomorrow at 18:30'). Times are the "
-            "Mac's local time. Check schedule_list first so you do not create a duplicate."
+            "Mac's local time. Each run goes on in this chat with this chat's settings. Check schedule_list first so "
+            "you do not create a duplicate."
         ),
         args_model=CreateArgs,
         modes=ACTING_MODES,

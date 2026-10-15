@@ -1,15 +1,15 @@
-// The sidebar: a new chat, a search over the chats, the ways to the agents, the activity and the campaigns, what waits
-// and what works (folded or not, as the owner left them), the chats themselves (several of them can be deleted at once)
-// and, in the foot, the way to the settings and the emergency stop (item 120). A row whose run works says Working and
-// for how long (item 122). A chat's menu (item 130), after T3 Code's thread menu, pins it, names it, copies its link,
-// starts choosing chats with it and deletes it; the pinned chats come first, under Pinned. A chat whose latest run
-// ended after it was last seen is unread (item 131): an accent dot, until it is opened, or Mark read. Each chat stands
-// once (item 202), after T3 Code's Working shelf: a chat at work stands under Working, with the runs it delegated folded
-// under it, and goes back among the days once it rests; a pinned one stays under Pinned, its delegated runs under it.
+// The sidebar: a new chat, a search over the chats, the ways to the agents, the activity, the campaigns and Connect apps,
+// what waits and what works (folded or not, as the owner left them), the chats themselves (several of them can be
+// deleted at once) and, in the foot, the way to the settings; a run stops from its composer (item 289). A row whose
+// run works says Working and for how long (item 122). A chat's menu (item 130), after T3 Code's thread menu, pins it,
+// names it, copies its link, starts choosing chats with it and deletes it; the pinned chats come first, under Pinned.
+// A chat whose latest run ended after it was last seen is unread (item 131): an accent dot, until it is opened, or Mark
+// read. Each chat stands once (item 202), after T3 Code's Working shelf: a chat at work stands under Working, with the
+// runs it delegated folded under it, and goes back among the days once it rests; a pinned one stays under Pinned, its
+// delegated runs under it.
 
 import { ApiError, api, request } from "./api.js";
 import { age, clip, clipWords, copyText, dateTime, debounce, el, foldSearch, plural, workingFor } from "./dom.js";
-import { failsafeButton } from "./failsafe.js";
 import { icon } from "./icons.js";
 import { actorFace, lookOf } from "./actors.js";
 import { faceState } from "./face.js";
@@ -366,8 +366,8 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
   const activityLink = el("a", { class: "side-link", href: "#/activity", onclick: onNavigate }, icon("bolt"), el("span", null, "Activity"));
   const campaignsLink = el("a", { class: "side-link", href: "#/campaigns", onclick: onNavigate }, icon("target"), el("span", null, "Campaigns"));
   const settingsLink = el("a", { class: "side-link", href: "#/settings", onclick: onNavigate }, icon("sliders"), el("span", null, "Settings"));
-  // Connect apps (item 278), above the foot as a messenger's sidebar has it: the applications Dot is set up with.
-  const connectLink = el("a", { class: "side-connect", href: "#/connect", onclick: onNavigate }, icon("plug"), el("span", null, "Connect apps"));
+  // Connect apps (item 278): the applications Dot is set up with, a page among the others under Campaigns (item 289).
+  const connectLink = el("a", { class: "side-link", href: "#/connect", onclick: onNavigate }, icon("plug"), el("span", null, "Connect apps"));
 
   // The rows the arrow keys walk and the search's Enter opens, in order: Working's and the list's, the delegated runs
   // under a chat among them; while chats are being chosen, their boxes. A row folded away is left out.
@@ -1086,11 +1086,11 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
         el("span", { class: "grow" }, "New chat"),
         el("kbd", { "aria-hidden": "true" }, "⇧⌘O"),
       ),
-      el("nav", { class: "side-links", "aria-label": "Pages" }, agentsLink, activityLink, campaignsLink),
+      el("nav", { class: "side-links", "aria-label": "Pages" }, agentsLink, activityLink, campaignsLink, connectLink),
       activityNav,
       el("nav", { class: "side-recent", "aria-label": "Chats" }, head, bar, list),
     ),
-    el("div", { class: "side-foot" }, connectLink, settingsLink, failsafeButton()),
+    el("div", { class: "side-foot" }, settingsLink),
   );
   const workTicker = setInterval(() => {
     for (const node of element.querySelectorAll(".side-working-time")) {

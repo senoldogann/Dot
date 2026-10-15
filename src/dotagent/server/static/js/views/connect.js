@@ -1,9 +1,9 @@
-// Connect apps (item 278): the applications Dot is set up with, opened from the sidebar's foot. Each says what Dot does
-// with it, where it stands and the one step that sets it up: macOS's question for an application of the Mac, and after
-// a no the Automation pane of System Settings with what to switch on there; OneDrive itself, to sign in; the sign-in
-// page in Dot's browser for an application of the web. Below them (item 279), the MCP servers Dot has, with their
-// tools, and the services and addresses to add one from: Dot tries a server first, and one that asks for a sign-in
-// gets it in this browser, on the service's own page, which comes back to this page's address.
+// Connect apps (item 278): the applications Dot is set up with, a page of the sidebar under Campaigns (item 289). Each
+// says what Dot does with it, where it stands and the one step that sets it up: macOS's question for an application of
+// the Mac, and after a no the Automation pane of System Settings with what to switch on there; OneDrive itself, to sign
+// in; the sign-in page in Dot's browser for an application of the web. Below them (item 279), the MCP servers Dot has,
+// with their tools, and the services and addresses to add one from: Dot tries a server first, and one that asks for a
+// sign-in gets it in this browser, on the service's own page, which comes back to this page's address.
 
 import { api } from "../api.js";
 import { el, plural } from "../dom.js";
@@ -56,14 +56,15 @@ function webNote(listing) {
     : "Sign in opens the page in Dot's browser on the Mac; check again once you are in.";
 }
 
-/** What to do or to know for one application, by where it stands: one line, or none. */
-function guide(app) {
+/** What to do or to know for one application, by where it stands: one line, or none. `runner` is the name macOS asks
+ * for Dot under and lists in Privacy & Security (Dot for the service, item 288). */
+function guide(app, runner) {
   if (app.waiting) {
     return "macOS is asking on the Mac: answer its question there, then check again.";
   }
   switch (app.state) {
     case "refused":
-      return `macOS was told no. In Privacy & Security › Automation, open the app that runs Dot (Terminal, iTerm, Claude, or the Dot service) and switch on ${app.name}.`;
+      return `macOS was told no. In Privacy & Security › Automation, open ${runner} and switch on ${app.name}.`;
     case "not_installed":
       return `Install ${app.name} to use it with Dot.`;
     case "not_synced":
@@ -104,7 +105,7 @@ export function mount(root, ctx) {
   const recheck = el("button", { class: "btn", type: "button", onclick: () => attempt(load) }, icon("refresh"), "Check again");
 
   function row(app) {
-    const line = guide(app);
+    const line = guide(app, listing.runner);
     const button =
       app.step === null
         ? null

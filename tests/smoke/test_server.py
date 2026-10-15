@@ -9,7 +9,6 @@ import asyncio
 import base64
 import io
 import secrets
-import sys
 import time
 from collections.abc import AsyncIterator
 from contextlib import aclosing
@@ -33,7 +32,7 @@ from dotagent.config import AppConfig, load_config
 from dotagent.core.errors import NotFoundError, ServiceError
 from dotagent.core.paths import themes_dir
 from dotagent.core.types import JsonObject
-from dotagent.desktop.perms import check_permissions
+from dotagent.desktop.perms import check_permissions, responsible_program
 from dotagent.desktop.types import Permissions
 from dotagent.llm.types import ChatProvider, ImageData, Message
 from dotagent.runtime import Runtime, build_runtime, close_runtime
@@ -55,8 +54,8 @@ EMBED_MODEL: str = "bge-m3"
 TOKEN: str = f"MARKER-{secrets.token_hex(8)}"
 PORT: int = 18765
 BASE: str = f"http://127.0.0.1:{PORT}"
-# The program macOS sees running this process; the daemon of the tests runs in it.
-PROGRAM: str = str(Path(sys.executable).resolve())
+# The program macOS holds responsible for this process; the daemon of the tests runs in it.
+PROGRAM: str = str(responsible_program())
 RUN_TIMEOUT_S: float = 240.0
 POLL_S: float = 0.25
 SSE_TIMEOUT_S: float = 120.0

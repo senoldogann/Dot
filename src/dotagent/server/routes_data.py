@@ -233,6 +233,7 @@ def schedules_router(ctx: ServerContext) -> APIRouter:
             options=ScheduleOptions(
                 model=request.model,
                 effort=request.effort,
+                speed=request.speed,
                 approvals=request.approvals,
                 goal_mode=request.goal_mode,
                 timezone=request.timezone,
@@ -240,7 +241,7 @@ def schedules_router(ctx: ServerContext) -> APIRouter:
                 same_chat=request.same_chat,
             ),
         )
-        return await view_of(await create_schedule(store, config, zone, plan, time.time()))
+        return await view_of(await create_schedule(store, config, zone, plan, time.time(), None))
 
     @router.patch("/schedules/{schedule_id}")
     async def change_schedule(schedule_id: str, request: ScheduleUpdateRequest) -> ScheduleView:
@@ -253,6 +254,7 @@ def schedules_router(ctx: ServerContext) -> APIRouter:
             options=ScheduleOptions(
                 model=request.model,
                 effort=request.effort,
+                speed=request.speed,
                 approvals=request.approvals,
                 goal_mode=request.goal_mode,
                 timezone=request.timezone,

@@ -13,9 +13,17 @@ const RECONNECT_MAX_MS = 8000;
 // silent for three of them has stopped without closing (a network that changed, a Mac that slept) and is cut, to be
 // followed again (item 200).
 const STALL_MS = 45000;
+// A page back in view whose stream has been silent for longer than a keepalive takes was put away (a phone that locked,
+// a Mac that slept): its stream is cut at once and followed again, rather than after the rest of `STALL_MS` (item 286).
+const BACK_SILENCE_MS = 20000;
 // An event the page fails to show, or a read of a page that fails, is logged every time and told at most this often,
 // so a fault that hits every event of a busy run does not bury the page in toasts.
 const NOT_SHOWN_TOLD_EVERY_MS = 10000;
+// How long a stream may be down before the page says so: one that is followed again sooner, as a page back in view
+// does, says nothing (item 286).
+export const QUIET_BREAK_MS = 2000;
+// What a request says when no answer came at all: the daemon is down, or the network is not there yet.
+const UNREACHABLE = "Cannot reach the Dot daemon. Is it running?";
 
 let token = null;
 let authLostHandler = null;
@@ -29,6 +37,11 @@ export class ApiError extends Error {
     this.status = status;
     this.context = context;
   }
+}
+
+/** Whether `error` is a request that got no answer at all (`UNREACHABLE`), as while a phone's network wakes. */
+export function unreachable(error) {
+  return error instanceof ApiError && error.status === 0 && error.message === UNREACHABLE;
 }
 
 /** The token kept in this browser, or null. Storage can be unavailable (private windows), so it is only a convenience. */
@@ -133,7 +146,7 @@ async function proveDaemon() {
   try {
     response = await fetch(`/api/proof?nonce=${nonce}`, { cache: "no-store" });
   } catch (cause) {
-    throw new ApiError(0, "Cannot reach the Dot daemon. Is it running?", { path: "/proof", cause: String(cause) });
+    throw new ApiError(0, UNREACHABLE, { path: "/proof", cause: String(cause) });
   }
   const text = await response.text();
   const data = response.ok ? parseJson(text) : null;
@@ -179,7 +192,7 @@ export async function request(method, path, body) {
   try {
     response = await fetch(`/api${path}`, { method, headers, body: payload, cache: "no-store" });
   } catch (cause) {
-    throw new ApiError(0, "Cannot reach the Dot daemon. Is it running?", { path, cause: String(cause) });
+    throw new ApiError(0, UNREACHABLE, { path, cause: String(cause) });
   }
   if (!response.ok) {
     throw await errorOf(response, path);
@@ -231,7 +244,7 @@ export async function pairWithCode(code) {
       cache: "no-store",
     });
   } catch (cause) {
-    throw new ApiError(0, "Cannot reach the Dot daemon. Is it running?", { path, cause: String(cause) });
+    throw new ApiError(0, UNREACHABLE, { path, cause: String(cause) });
   }
   if (!response.ok) {
     throw await errorOf(response, path);
@@ -288,7 +301,8 @@ function parseBlock(block) {
 /**
  * Read a server-sent event stream with fetch, so the bearer token travels in a header and not in the URL. `onOpen` is
  * called once the server has taken the stream, before its first event. A stream from which nothing came for
- * `STALL_MS`, not even a keepalive, is cut: the read fails, as for a stream that broke.
+ * `STALL_MS`, not even a keepalive, is cut: the read fails, as for a stream that broke; so is one silent for
+ * `BACK_SILENCE_MS` when the page comes back into view.
  */
 export async function* sse(path, signal, onOpen) {
   await proven();
@@ -299,10 +313,18 @@ export async function* sse(path, signal, onOpen) {
     stop();
   }
   let silence = null;
+  let heardAt = Date.now();
   const watch = () => {
+    heardAt = Date.now();
     clearTimeout(silence);
     silence = setTimeout(() => cut.abort(new ApiError(0, "The stream went silent.", { path })), STALL_MS);
   };
+  const back = () => {
+    if (document.visibilityState === "visible" && Date.now() - heardAt >= BACK_SILENCE_MS) {
+      cut.abort(new ApiError(0, "The stream went silent while the page was away.", { path }));
+    }
+  };
+  document.addEventListener("visibilitychange", back);
   let reader = null;
   try {
     watch();
@@ -335,6 +357,7 @@ export async function* sse(path, signal, onOpen) {
     }
   } finally {
     clearTimeout(silence);
+    document.removeEventListener("visibilitychange", back);
     signal.removeEventListener("abort", stop);
     if (reader !== null) {
       await reader.cancel().catch(() => undefined);
@@ -535,7 +558,7 @@ export async function blobUrl(path) {
   try {
     response = await fetch(`/api${path}`, { headers: authHeaders(), cache: "no-store" });
   } catch (cause) {
-    throw new ApiError(0, "Cannot reach the Dot daemon. Is it running?", { path, cause: String(cause) });
+    throw new ApiError(0, UNREACHABLE, { path, cause: String(cause) });
   }
   if (!response.ok) {
     throw await errorOf(response, path);

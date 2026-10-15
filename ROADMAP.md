@@ -5223,6 +5223,13 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 282 | A chat can be rewound to an earlier message, its files with it                        | planned     |         |
 | 283 | Zen's free models work in Dot, as OpenCode's own agent                                | done        | aeee10b |
 | 284 | OpenCode's agent uses Dot's own tools over MCP                                        | planned     |         |
+| 285 | A helper that starts late joins its siblings, and stopped ones stand still            | in progress |         |
+| 286 | The phone comes back quietly, on the chat it was in                                   | in progress |         |
+| 287 | Connect apps' sections give their lines room                                          | in progress |         |
+| 288 | macOS asks for Dot, and a closed Mac app keeps its answer                             | in progress |         |
+| 289 | Connect apps sits under Campaigns; the sidebar has no stop button                     | in progress |         |
+| 290 | DeepSeek V4.1 Flash's reasoning levels are back                                       | in progress |         |
+| 291 | A schedule made in a chat runs as that chat does, and knows five runs                 | in progress |         |
 
 ### 77. The type system: Inter and Geist Mono, seven sizes, three weights
 
@@ -12459,6 +12466,160 @@ Zen's free tier must still answer with the MCP tools added (measured first).
 
 > Read ROADMAP.md part 50 and the status table of part 9 (rows 283 and 284). The protocol of part 5 is unchanged;
 > the Linear connector is signed out, so say so in the PR. OpenCode 1.19.0 is at `/opt/homebrew/bin/opencode`.
+
+## Part 51: The owner's eight fixes, in one batch (2026-10-15)
+
+The owner's fifty-third word, on 2026-10-15, with a picture of a chat whose helpers the sidebar showed cancelled: "Hem
+mobilde, hem desktopda hem web de örnegin sol menüde subagentler cancel olmasina ragmen hala sohbet icinde calisiyor
+gibi gözüküyor ve sonradan 1 agent daha eklenmis ama hala 4 tane gösteriyor ve cancel olanlar normalde loading
+animasyonu vs dönmemeli. Bu problemleride cöz. ve lütfen bundan sonra her kücük olayda pr acma ile ugrasip zaman
+kaybetme, büyük cok fazla degisiklilik olduktan sonra pr acialim her seferide bu sekilde zaman kaybediyoruz." (On the
+phone, the desktop and the web the chat still shows helpers working that the sidebar shows cancelled; one more helper
+was added later and it still says 4; cancelled ones should not spin. And no PR for every small thing: one PR after a
+big batch.)
+
+The owner's fifty-fourth word, the same day, eight points: (1) cancelled helpers must not look active, their spinners
+stop, and the count follows what is, a helper added later too; (2) on the phone, the app back from the background shows
+its connection and sync smoothly, opens on the chat or the last session instead of another page, and "the error in the
+second picture" goes (no picture came with the word); (3) the lines under On this Mac and Your files look cramped or on
+top of each other; (4) Open System Settings asks for `python3.13` instead of Dot, and the feature does not work after
+the grant; (5) Connect apps under Campaigns like the other items, and no emergency stop button at the bottom right (the
+composer has a stop); (6) DeepSeek V4.1 Flash's reasoning options are gone, bring them back; (7) a schedule keeps the
+settings its first run started with (YOLO, goal mode), by default the same chat, mode and model, and knows the last 5
+runs by default; (8) Connected apps ask for Allow again although allowed. "Tüm bu sorunları ilgili kodu ve mevcut
+akışları inceleyerek çöz. Gereksiz refactor yapmadan mevcut yapıya uygun değişiklikler uygula." (Fix them from the code
+and the flows as they are, without needless refactoring; check the phone, the desktop and the web; run the tests.)
+
+The batch is built on `item-279-mcp-sign-in` with item 279, and goes in one PR.
+
+### 285. A helper that starts late joins its siblings, and stopped ones stand still
+
+**Status: in progress.** Built on `item-279-mcp-sign-in`.
+
+**What was found.** The delegate tool's own limit (`_TIMEOUT_S`, an hour, `tools/delegate.py`) stopped helpers that
+worked longer: they ended cancelled, as the sidebar showed. `[agent] parallel_tools = 4` runs four calls of a step at a
+time, so a fifth `delegate` of the same step waits for a slot, and its `tool_call` and its helper's `run_queued` come
+only once one of the four has ended. The timeline put that late call in a group of its own after the card of helpers
+(`showCall` through `groupFor`), so `placeHelper`, which joins a helper to the card only while the card is the last
+thing of the conversation, gave it a row of its own: the card kept saying "4 helpers". A page that missed a helper's
+end (a phone put away) kept its row as it last knew it, spinning.
+
+**As built (2026-10-15).** `static/js/timeline.js`: the group of the model turn under way is kept (`turnGroup`, set by
+`groupFor` and by the turn's message, dropped once a text reply ends it); a call of that turn that comes while the card
+of helpers is the last thing joins the turn's group (`callGroup`), so its helper joins the card. `settle(runs, now)`
+makes the rows of helpers the page did not know from the run's children, ends the rows whose run ended and counts the
+steps of the others; `knows(runId)`. `static/js/views/run.js`: `reconcile` settles the card from `/runs/{id}`'s
+children each time it reads the run, which it does when the stream comes back and 1.5 s after the last `run_queued`,
+`run_started` or `run_finished` of one of its helpers (`HELPERS_SETTLE_MS`). Tests:
+`tests/smoke/test_late_helper.py`: a run delegates five helpers with four calls at a time and the delegate tool's limit
+cut to 8 s; the card says "4 helpers", "4 working", then "5 helpers", "1 working · 4 stopped" with four still rings
+and one spinning, then "5 stopped" with none spinning, and the page loaded again on a phone, dark, the same. On the code
+of before it fails: the head says "4 helpers" for the 32 s the test waits.
+
+### 286. The phone comes back quietly, on the chat it was in
+
+**Status: in progress.** Built on `item-279-mcp-sign-in`.
+
+**What was found.** The manifest's `start_url` was `/#/activity` (item 52), so the home-screen app opened on Activity.
+A phone put away leaves the page's streams open and silent; back in view, the lifecycle stream was cut only after
+`STALL_MS` (45 s) of silence, and meanwhile the bar said Reconnecting and a read that failed while the network came back
+showed the toast "Cannot reach the Dot daemon". The picture the word names did not come; the toasts of coming back are
+the errors found.
+
+**As built (2026-10-15).** `static/js/api.js`: `sse` keeps when it last heard from its stream; a page back in view
+whose stream has been silent for 20 s or more (`BACK_SILENCE_MS`) cuts it, and `follow` makes it again at once.
+`QUIET_BREAK_MS` (2 s) and `unreachable(error)`. `static/js/dom.js`: `showAfter(node, ms)` shows a node once a state
+has held that long and hides it at once; the bar's connection pill (`shell.js`) and a run's connection note
+(`views/run.js`) show only a break longer than 2 s. `static/js/state.js`: for 10 s after the page comes back or the
+stream is back (`settle`), a read that cannot reach the daemon is tried again after 2.5 s without a toast. `main.js`:
+Dot opens on the chat screen it was on last (`dot.lastChat`: a run's page or New chat), else New chat, for an address
+without a route and for a home-screen app that starts on `#/activity` (added before; `standalone()`); in a browser's
+tab Activity stays a page. `manifest.webmanifest`: `start_url` `/`. README: Dot on the phone. Tests:
+`tests/smoke/test_reconnect.py` (one new test): at a phone's width, the page put away with its stream frozen at a proxy
+and its clock moved 25 s, back in view, makes its second stream and shows the chat made meanwhile within 3 s, with the
+pill hidden; with the cut on return taken out it fails. `tests/smoke/test_phone.py`: `start_url` is `/`; the address
+without a route and a home-screen app on `#/activity` open the run the page was on last; a tab on `#/activity` shows
+Activity.
+
+### 287. Connect apps' sections give their lines room
+
+**Status: in progress.** Built on `item-279-mcp-sign-in`.
+
+**As built (2026-10-15).** `static/css/app.css`: a section's line under its head (On this Mac, Your files, On the web)
+had no room above it and sat on the head's line; it has a row's padding now, and a second line follows the first
+closely. Screenshots of `tests/smoke/test_connect_apps.py`, wide and light and on a phone and dark.
+
+### 288. macOS asks for Dot, and a closed Mac app keeps its answer
+
+**Status: in progress.** Built on `item-279-mcp-sign-in`.
+
+**What was found.** macOS holds the program launchd starts responsible for all it starts, and the job started the
+virtual environment's Python: `responsibility_get_pid_responsible_for_pid` of the owner's daemon was the daemon itself,
+`~/.local/share/uv/python/cpython-3.13.12-macos-aarch64-none/bin/python3.13`. So macOS's questions and System Settings
+named `python3.13`, and a grant went to that binary alone: another Python (a uv update) had none, while the old row
+still showed it switched on. Connect apps reads Automation through `AEDeterminePermissionToAutomateTarget`, which
+answers `procNotFound` for an application that is not running: a row then said Not checked and offered Allow, although
+macOS had said yes, each time the application was closed.
+
+**As built (2026-10-15).** `dot_app.c` and `dot_app.py`: Dot.app in Dot's home, whose program starts the program its
+arguments name as its child (`posix_spawn`), hands SIGTERM, SIGINT, SIGHUP, SIGQUIT and SIGUSR1/2 on to it (blocked
+while it starts) and ends as it ended. `service install` builds it with `xcrun clang` and signs it ad hoc
+(`codesign --sign -`, identifier `dev.dotagent.dot`), with an Info.plist named Dot (`LSUIElement`, the usage lines of
+Apple events, the Desktop, Documents and Downloads folders and the local network); an app built from the same source and
+Info.plist is left as it is, so that what macOS granted it holds. `launchd.py`: the job runs
+`[Dot.app's program, python, -P, -m, dotagent, daemon]`. `desktop/perms.py`: `responsible_program()` asks macOS which
+program it holds responsible for the process (Terminal, Claude, Dot.app), as an app's bundle; `program_name`;
+`grant_hint` names it. `/desktop/permissions` and `dotx service permissions` name it, and `service install` says to
+allow Dot. `server/routes_connections.py` and `connections/states.py`: the last answer macOS gave about a Mac
+application (allowed, not asked, refused) is kept in the store's kv per program and application, and a closed
+application shows it (`mac_state`) with no Allow; `ConnectionsView.runner` names the program, which the refused line
+says to open in Privacy & Security › Automation. README: the service, Connect apps. Tests:
+`tests/smoke/test_dot_app.py`: the app built in a throw-away home is signed ad hoc as `dev.dotagent.dot`, built again it
+is the same file, started the way launchd starts a job (a stand-in that spawns it disclaiming responsibility) the
+Python it starts reads Dot.app as responsible and "Dot" as its name, and it ends with its child's status and hands
+SIGTERM on. `tests/smoke/test_connect_apps.py`: Calendar allowed, then closed, still says Allowed with no button (Not
+checked on the code of before); the refused line says "open Dot and switch on Notes". `tests/unit/test_launchd.py`:
+the job's words. Moving from the Python job, the owner grants the permissions to Dot once, at the Mac: the first start
+asks whether Dot may use the Desktop folder, where the owner's checkout is.
+
+### 289. Connect apps sits under Campaigns; the sidebar has no stop button
+
+**Status: in progress.** Built on `item-279-mcp-sign-in`.
+
+**As built (2026-10-15).** `static/js/sidebar.js`: Connect apps is a link of the sidebar's pages after Campaigns, like
+the others; the foot holds Settings alone, without the emergency stop button (a chat's composer has its stop, and
+Settings › System and `POST /api/failsafe` the emergency stop). `failsafe.js` keeps `engageFailsafe` and
+`releaseFailsafe`; `shell.css` and `app.css` lose the button's and the pill's rules. README: Emergency stop. Tests:
+`tests/smoke/test_connect_apps.py` (the pages read Agents, Activity, Campaigns, Connect apps), `test_run_stop.py` (no
+`.failsafe` button).
+
+### 290. DeepSeek V4.1 Flash's reasoning levels are back
+
+**Status: in progress.** Built on `item-279-mcp-sign-in`.
+
+**What was found.** Item 258 (`3118d17`) took the levels off OpenCode Go's DeepSeek models after measuring that the
+chat route did not honour them (the reasoning tokens of one prompt were the same at low, high, max and a made-up
+label). The owner asked for them back.
+
+**As built (2026-10-15).** `llm/opencode_go.py`: `deepseek-v4.1-flash` offers low, high and max again, sent as
+OpenCode's own client sends them; the other DeepSeek models offer none. README: the providers. Tests:
+`tests/unit/test_true_levels.py`.
+
+### 291. A schedule made in a chat runs as that chat does, and knows five runs
+
+**Status: in progress.** Built on `item-279-mcp-sign-in`.
+
+**What was found.** `schedule_create` made a schedule with the defaults: a new chat each time, the default model, the
+approvals of the config and no goal mode, whatever the chat it was made in had chosen.
+
+**As built (2026-10-15).** `tools/schedule.py`: the schedule a run makes keeps its chat's choices (`chat_options`: the
+chat's kept choices, else the run's own; a helper's are its parent's chat's) for its model, level, speed, approvals and
+goal mode, goes on in that chat, and takes the chat's mode unless one is asked (`schedule_mode`; a chat that only talks
+schedules tasks). `store`: a schedule keeps `speed` (a column added), `add_schedule` takes the chat; `start_firing`
+starts a firing at the schedule's speed. API: `speed` in a schedule's create and update; the Schedules form keeps it and
+shows Fast. `defaults.toml`: `[scheduler] history_runs = 5`. README: Schedules. Tests: `tests/smoke/test_scheduler.py`
+(a chat with YOLO, goal mode, research and a chosen model and level makes a schedule that keeps them, in that chat),
+`tests/unit/test_schedule_choices.py`, and the five-run default in `test_schedule_memory.py`.
 
 ## Log
 

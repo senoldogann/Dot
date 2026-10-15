@@ -2,7 +2,8 @@
 reconnects, is live again once the daemon is back and reads what changed meanwhile, without loading again. A page loaded
 while the daemon is down (from the service worker's copy of the shell) says that the daemon is out of reach and tries
 again by itself until it is back. A stream that goes silent without closing, as a network that changed or a Mac that
-slept leaves it, is cut and followed again. A real server, stopped and started again on its address, in Chrome."""
+slept leaves it, is cut and followed again; a phone back from the background cuts such a stream at once and says
+nothing of so short a break (item 286). A real server, stopped and started again on its address, in Chrome."""
 
 import asyncio
 import re
@@ -13,7 +14,7 @@ from typing import Literal
 
 import pytest
 import pytest_asyncio
-from playwright.async_api import Browser, BrowserContext, Locator, Page, async_playwright, expect
+from playwright.async_api import Browser, BrowserContext, Error, Locator, Page, async_playwright, expect
 
 from dotagent.agent.manager import RunManager
 from dotagent.config import load_config
@@ -43,6 +44,14 @@ _READ_CHUNK: int = 65_536
 # Narrower than this, the side menu is a drawer that its button opens.
 _DRAWER_BELOW: int = 860
 _STREAM_REQUEST: bytes = b"GET /api/stream"
+# Longer than a page away may leave its stream silent before it cuts it once back in view (BACK_SILENCE_MS in
+# static/js/api.js), shorter than the silence that cuts a stream in any case (STALL_MS).
+_AWAY_MS: int = 25_000
+# Put the page out of sight or back in view, as a phone does when the app is put away and taken up again.
+_SIGHT: str = """(state) => {
+  Object.defineProperty(document, "visibilityState", { configurable: true, get: () => state });
+  document.dispatchEvent(new Event("visibilitychange"));
+}"""
 
 
 @pytest_asyncio.fixture(scope="module", loop_scope="module")
@@ -365,3 +374,51 @@ async def test_a_stream_gone_silent_is_cut_and_followed_again(runtime: Runtime) 
             await browser.close()
             await behind.stop()
             await proxy.close()
+
+
+async def test_a_phone_back_from_the_background_follows_again_at_once_and_quietly(runtime: Runtime) -> None:
+    async with async_playwright() as playwright:
+        # Chrome, and WebKit as Safari on the phone.
+        for engine in ("chromium", "webkit"):
+            proxy: Proxy = Proxy()
+            await proxy.start()
+            behind: Daemon = Daemon(runtime, proxy.port)
+            await behind.start()
+            proxy.target = behind.port
+            await _chat(runtime, f"Water the plants in {engine}.")
+            browser: Browser = await getattr(playwright, engine).launch(
+                **({"channel": runtime.config.browser.channel} if engine == "chromium" else {}), headless=True
+            )
+            try:
+                context: BrowserContext = await browser.new_context(
+                    viewport={"width": 390, "height": 844}, color_scheme="light", reduced_motion="reduce"
+                )
+                page: Page = await context.new_page()
+                errors: list[Error] = []
+                page.on("pageerror", errors.append)
+                await page.add_init_script("sessionStorage.setItem('dot.opened', '1')")
+                await page.clock.install()
+                await page.goto(ui_url("127.0.0.1", proxy.port, TOKEN))
+                await _open_side_menu(page, 390)
+                await expect(_chat_row(page, f"Water the plants in {engine}.")).to_be_visible()
+                await expect(page.locator(".live-dot.live")).to_be_attached()
+                assert proxy.streams == 1
+
+                # Put away: the stream stays open and passes nothing, and a chat is made meanwhile.
+                await page.evaluate(_SIGHT, "hidden")
+                proxy.freeze()
+                await _chat(runtime, f"Call the plumber in {engine}.")
+                await page.clock.fast_forward(_AWAY_MS)
+
+                # Back in view, the page cuts the silent stream, follows again at once and reads what changed, and
+                # the break was too short for the bar to say that it reconnects.
+                await page.evaluate(_SIGHT, "visible")
+                await expect(_chat_row(page, f"Call the plumber in {engine}.")).to_be_visible(timeout=_AT_ONCE_MS)
+                assert proxy.streams == 2, engine
+                await expect(page.locator(".live-dot.live")).to_be_attached()
+                await expect(page.locator(".pill:has(.live-dot)")).to_be_hidden()
+                assert errors == [], engine
+            finally:
+                await browser.close()
+                await behind.stop()
+                await proxy.close()

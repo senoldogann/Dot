@@ -110,6 +110,7 @@ function optionChips(record) {
     goalMode === null ? null : el("span", { class: "chip" }, `Goal mode ${goalMode ? "on" : "off"}${fromDefault(options.goal_mode)}`),
     model === null ? null : el("span", { class: "chip", title: model }, `${modelName(model)}${fromDefault(options.model)}`),
     options.effort === null ? null : el("span", { class: "chip" }, `Reasoning ${levelLabel(options.effort)}`),
+    options.speed === "fast" ? el("span", { class: "chip", title: "Its runs start in fast mode" }, "Fast") : null,
     options.history_runs === null ? null : el("span", { class: "chip", title: "Earlier runs it knows" }, `Knows: ${historyLabel(options.history_runs)}`),
     options.same_chat === null ? null : el("span", { class: "chip" }, chatLabel(options.same_chat)),
   ];
@@ -203,7 +204,7 @@ function scheduleForm({ view, onSaved, onCancel }) {
   const record = view === null ? null : view.record;
   const options =
     record === null
-      ? { model: null, effort: null, approvals: null, goal_mode: null, timezone: null, history_runs: null, same_chat: null }
+      ? { model: null, effort: null, speed: null, approvals: null, goal_mode: null, timezone: null, history_runs: null, same_chat: null }
       : record.options;
   const now = defaultsNow();
   const id = ++formCount;
@@ -389,6 +390,8 @@ function scheduleForm({ view, onSaved, onCancel }) {
       timezone: zone.value.trim() === "" ? null : zone.value.trim(),
       history_runs: history.value === "" ? null : Number(history.value),
       same_chat: chat.value === "" ? null : chat.value === "same",
+      // The form has no speed of its own: a schedule keeps the one its chat gave it (item 291).
+      speed: options.speed,
     };
     save.disabled = true;
     try {

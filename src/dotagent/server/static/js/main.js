@@ -14,6 +14,7 @@ import { requestCompose } from "./shortcuts.js";
 import { clearStage } from "./stage.js";
 import { getSnapshot, onChange, refresh, runLifecycle } from "./state.js";
 import { applyStoredDensity } from "./layout.js";
+import { readPref, writePref } from "./prefs.js";
 import { applyStoredScheme, applyStoredTheme } from "./theme.js";
 import { attempt, toast } from "./ui.js";
 import * as activity from "./views/activity.js";
@@ -27,6 +28,10 @@ import * as runs from "./views/runs.js";
 import * as settings from "./views/settings.js";
 
 const DEFAULT_ROUTE = "/runs";
+// The chat screen the owner was on last, a run's page or New chat: Dot opens there (item 286).
+const LAST_CHAT_KEY = "dot.lastChat";
+// Where a home-screen app added before item 286 starts (its manifest's start_url then): it opens the last chat instead.
+const OLD_START = "#/activity";
 // The pages of the earlier sidebar live on as tabs of the settings; their old addresses lead there.
 const MOVED = new Map([
   ["/memory", "/settings/memory"],
@@ -61,9 +66,21 @@ function findRoute(path) {
   return null;
 }
 
+/** Where Dot opens: the chat screen the owner was on last (`LAST_CHAT_KEY`), else New chat. */
+function startPath() {
+  const last = readPref(LAST_CHAT_KEY);
+  const found = last === null ? null : findRoute(last);
+  return found !== null && found.route.tab === "runs" ? last : DEFAULT_ROUTE;
+}
+
 function currentPath() {
   const fragment = location.hash.startsWith("#") ? location.hash.slice(1) : "";
-  return fragment === "" ? DEFAULT_ROUTE : fragment.split("?")[0];
+  return fragment === "" ? startPath() : fragment.split("?")[0];
+}
+
+/** Whether the page runs as an app of the home screen (a phone's) rather than in a browser's tab. */
+function standalone() {
+  return window.matchMedia("(display-mode: standalone)").matches || navigator.standalone === true;
 }
 
 /** The token from `#token=...`, which `dotx open` and `dotx url` put in the address; it is moved out of the address bar. */
@@ -74,7 +91,7 @@ function takeFragmentToken() {
     return false;
   }
   setToken(value);
-  history.replaceState(null, "", `${location.pathname}${location.search}#${DEFAULT_ROUTE}`);
+  history.replaceState(null, "", `${location.pathname}${location.search}#${startPath()}`);
   return true;
 }
 
@@ -266,6 +283,9 @@ function beginSession() {
       location.replace(`${location.pathname}${location.search}#${DEFAULT_ROUTE}`);
       return;
     }
+    if (found.route.tab === "runs") {
+      writePref(LAST_CHAT_KEY, path);
+    }
     shell.setRoute({
       tab: found.route.tab,
       runId: found.route.layout === "run" ? found.params[0] : null,
@@ -294,6 +314,10 @@ function beginSession() {
   shell.paint(getSnapshot());
   const stopAttention = watchAttention();
   window.addEventListener("hashchange", show);
+  // Opened at no page, or as a home-screen app added before item 286: the last chat screen, in the address too.
+  if (location.hash === "" || location.hash === "#" || (standalone() && location.hash === OLD_START)) {
+    history.replaceState(null, "", `${location.pathname}${location.search}#${startPath()}`);
+  }
   show();
 
   runLifecycle(controller.signal, () => handleAuthLost()).catch((error) => {

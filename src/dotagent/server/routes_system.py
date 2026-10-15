@@ -44,7 +44,7 @@ from dotagent.core.paths import (
     screenshots_dir,
     skills_dir,
 )
-from dotagent.desktop.perms import missing_panes, program_of_this_process, request_permissions
+from dotagent.desktop.perms import missing_panes, request_permissions, responsible_program
 from dotagent.desktop.types import Permissions
 from dotagent.doctor import CheckResult, run_quick_checks
 from dotagent.help.added import (
@@ -503,10 +503,11 @@ def system_router(ctx: ServerContext, pages: str) -> APIRouter:
 
     @router.post("/desktop/permissions")
     async def ask_for_desktop_permissions() -> PermissionsView:
-        """Make macOS ask, in the name of the program that runs this daemon, for what the desktop is missing."""
+        """Make macOS ask, in the name of the program it holds responsible for this daemon, for what the desktop is
+        missing."""
         granted: Permissions = await asyncio.to_thread(request_permissions)
         return PermissionsView(
-            program=str(program_of_this_process()),
+            program=str(responsible_program()),
             accessibility=granted.accessibility,
             input_events=granted.post_event,
             screen_recording=granted.screen_recording,

@@ -192,6 +192,7 @@ async def test_the_home_greets_says_what_is_going_on_and_follows_the_day(
             options=UNSET_OPTIONS,
         ),
         time.time(),
+        None,
     )
     # A run that waits for an answer, then a run that works until the test lets it end (``stop``), however long the
     # pages take to look at under load.
