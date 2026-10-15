@@ -818,14 +818,16 @@ export function createTimeline({ rootRunId, actorId, startedAt, onGrow, onPlan, 
     },
 
     // An action that nobody was asked about (YOLO) or that the review model answered. The line goes into the group of the call
-    // it belongs to, so a run in YOLO mode keeps its steps together; the stored approval has the same facts.
+    // it belongs to, so a run in YOLO mode keeps its steps together; the stored approval has the same facts. The action and
+    // the reason read once each: a record kept before item 253 ended its summary with its note, which is not said again.
     approval_auto(scope, record) {
       const data = record.data;
       const yolo = data.decided_by === "yolo";
       const denied = data.status === "denied";
-      const verdict = yolo ? "allowed without asking" : denied ? "denied" : "approved";
-      const reason = data.note === "" ? "" : ` — ${clip(data.note, 240)}`;
-      const text = `${yolo ? "YOLO" : "Reviewer"} ${verdict}: ${clip(data.summary, 200)}${reason}`;
+      const verdict = yolo ? "YOLO, not asked" : denied ? "Reviewer denied" : "Reviewer approved";
+      const said = data.note === "" || data.summary.endsWith(data.note);
+      const reason = said ? "" : ` — ${clip(data.note, 240)}`;
+      const text = `${verdict}: ${clip(data.summary, 200)}${reason}`;
       const tone = denied ? "auto-decision denied" : yolo ? "auto-decision yolo" : "auto-decision";
       groupFor(scope).body.append(el("div", { class: tone }, icon(yolo ? "bolt" : "shield"), el("span", null, text)));
     },

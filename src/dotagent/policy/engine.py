@@ -21,6 +21,8 @@ from dotagent.policy.types import (
 from dotagent.store.models import Behavior, RuleRecord, RunMode
 
 _DENY_FLAGS: frozenset[Flag] = frozenset({"secret_access", "exfiltration"})
+# Why an allowed action asks once untrusted content is in context; a yolo run reads it in the line of what it did.
+_TAINT_REASON: str = "untrusted content is in context and this action reaches outside the Mac"
 # What a yolo run lets through as well: the always-on refusals and the hand-offs of money and credentials, unless a
 # hand-off rule of the user matches the action (:func:`owner_handoff`). A research run stays read-only (``mode``).
 YOLO_WAIVED_SOURCES: frozenset[DecisionSource] = frozenset({"auto_review", "hard_stop"})
@@ -167,7 +169,7 @@ def decide(
             return Decision(
                 verdict="ask",
                 source="taint",
-                reason="untrusted content is in context, so this outward-facing action needs confirmation",
+                reason=_TAINT_REASON,
                 rule_id=rule.id,
             )
         return Decision(verdict=verdict, source="rule", reason=rule.description or f"rule {rule.id}", rule_id=rule.id)
@@ -176,7 +178,7 @@ def decide(
         return Decision(
             verdict="ask",
             source="taint",
-            reason="untrusted content is in context, so this outward-facing action needs confirmation",
+            reason=_TAINT_REASON,
             rule_id=None,
         )
     return Decision(verdict=preset_choice, source="preset", reason=reason, rule_id=None)

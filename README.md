@@ -863,9 +863,10 @@ a hostile page can send your files out, pay or sign in without asking you. Only 
 password managers and Keychain Access in every mode; through the shell and the file tools a yolo run reads the keychain
 like any other secret.
 
-Every automatic answer is an ordinary approval record (`decided_by` is `reviewer` or `yolo`, and the note holds the
-reason), an `approval_auto` event and a line in the timeline of the run, so you can see afterwards what went through and
-why.
+Every automatic answer is an ordinary approval record (`decided_by` is `reviewer` or `yolo`, the summary is the action
+and the note holds the reason), an `approval_auto` event and one line in the timeline of the run ("YOLO, not asked:
+click 'Reply' — untrusted content is in context and this action reaches outside the Mac"), so you can see afterwards
+what went through and why.
 
 **What only yolo waives.** Secrets and exfiltration stay denied in `ask` and `auto`. Money and credentials stay yours
 there: Dot stops and asks you to do that step yourself, and the review model is never asked about them. A `yolo` run

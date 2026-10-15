@@ -5190,7 +5190,8 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 249 | What the review model declines to write goes to the run's own model                  | done        | 0416d83 |
 | 250 | Each model's context size can be set in Settings                                     | done        | ee7252b |
 | 251 | Ultrathink and Ultracode in the reasoning menu                                       | done        | c605d56 |
-| 252 | The plan at the end of the request, if an eval shows it holds                        | in progress |         |
+| 252 | The plan at the end of the request, if an eval shows it holds                        | done        | a786a28 |
+| 253 | The line of what a yolo run did without asking says its reason once                   | in progress |         |
 
 ### 77. The type system: Inter and Geist Mono, seven sizes, three weights
 
@@ -11243,7 +11244,7 @@ those levels; each says in the menu what it does.
 
 ### 252. The plan at the end of the request, if an eval shows it holds
 
-**Status: in progress.**
+**Status: done.** Merged as `a786a28` (PR #296; no Linear issue, the Linear connector was signed out).
 
 **As built (2026-10-15).** The A/B ran first, as the item says: a setting put the plan in a note after the conversation,
 which no step stored, with the cache mark of the Messages format moved before the note, and `dotx eval run` played
@@ -11264,6 +11265,57 @@ a report saved before), so an eval of how the plan reaches the model shows wheth
 **What.** An A/B eval of the plan at the end of the system prompt against the plan at the end of the request, on the
 owner's main model, decides: the plan moves only if the share of cached input rises and the passes, the steps and the
 plan steps marked done without evidence hold.
+
+## Part 42: the line of what a yolo run did, and the audit of the owner's requests (planned 2026-10-15)
+
+The owner's forty-second word, on 2026-10-15: whether the line "YOLO allowed without asking: … — untrusted content is
+in context, so this outward-facing action needs confirmation — untrusted content is in context, so this outward-facing
+action needs confirmation" of a yolo run needs to be seen; and to make sure that every request of the earlier prompts
+was done, that the project's progress is complete and that every feature works.
+
+**Status (2026-10-15): planned.** On the code at `7b8ad86`: the waiver of a yolo run (`agent/gate.py`, `_waive`)
+records the action's summary with the policy's reason appended and the same reason as the note, and the line of the
+timeline (`timeline.js`, `approval_auto`) prints the summary and then the note, so the reason reads twice; the reason
+itself says the action "needs confirmation", which a yolo run does not ask for. The audit of the owner's requests: the
+374 messages of the owner's sessions since 2026-10-07 were read against the status table; every request became an item
+or an answer, and of the 252 items 249 are done, 25 is parked (its reason is in the item), 76 is a measurement due on
+or after 2026-10-18, and 252 was done at `a786a28` with its status not yet written here. The gate at `7b8ad86` passes
+(1,412 unit tests) and the full smoke of item 252 passed (531 tests, 1 skipped).
+
+**The shape of this part.** One item: the line of what a yolo run did without asking (253). The status of 252 is
+written in the same pull request.
+
+### 253. The line of what a yolo run did without asking says its reason once
+
+**Status: in progress.** Built on `item-253-yolo-line`.
+
+**As built (2026-10-15).** `agent/gate.py` `_waive` records the action's summary as the summary and the policy's reason
+as the note; `timeline.js` `approval_auto` reads "YOLO, not asked: <action> — <reason>" ("Reviewer approved" or
+"Reviewer denied" for the review model) and leaves the note out when the summary already ends with it, so a record kept
+before reads once too; `policy/engine.py` `_TAINT_REASON` says "untrusted content is in context and this action reaches
+outside the Mac" in every mode. README: the line's form. Tests: `tests/smoke/test_approval_modes.py` (the record) and
+`tests/smoke/test_yolo_line.py` (the run's page in Chrome at 1280 and 390, light and dark; a WebKit copy passed).
+
+**What.** The record of an action a yolo run did without asking keeps the action as its summary and the policy's reason
+as its note, each once; the line of the timeline reads "YOLO, not asked: <action> — <reason>", and a record kept
+before, whose summary ended with its note, is not read twice. The reason an allowed action asks for once untrusted
+content is in context says what holds in every mode: "untrusted content is in context and this action reaches outside
+the Mac". The line stays: yolo's contract (item 10) is that nobody is asked and the record is kept, and the line is
+where the owner sees afterwards what the policy would have asked about.
+
+**Why.** The owner read the reason twice on every such line of a yolo run and asked whether the line needs to be seen
+at all. It does, once: the approvals of the run's page and the timeline are the record of what went through without a
+question.
+
+**Tests.** `tests/smoke/test_approval_modes.py` (the record's summary is the action and its note the reason, which the
+summary does not hold) and `tests/smoke/test_yolo_line.py` (the run's page in Chrome, wide and on a phone, light and
+dark: a new record and an old one each give one line with the reason once). Both fail on the code of before.
+
+### How to start part 42 (the handoff prompt)
+
+> Read ROADMAP.md part 42 and the status table of part 9 (rows 252 and 253). The protocol of part 5 (branch, gate, PR,
+> squash merge, hash in the table, log line) is unchanged; the Linear connector is signed out, so no issue. Check the
+> run's page wide and on a phone, light and dark, in Chrome and WebKit. Tests never start a real model call.
 
 ## Log
 
@@ -11957,3 +12009,4 @@ plan steps marked done without evidence hold.
 - 2026-10-15 (Opus 5.5): item 249 merged as `0416d83` (PR #293; no Linear issue, the connector was signed out): a run's lessons and its skill that the review model declines to write go to the run's own model, and the owner section to the model of the newest run it reads; an approval and the goal check keep asking the review model alone.
 - 2026-10-15 (Opus 5.5): item 250 merged as `ee7252b` (PR #294; no Linear issue, the connector was signed out): a model's context size is set in Settings › Models from 48,000 tokens up to three quarters of its window, with what it does, where the window comes from and what the model's runs of the last 30 days measured; the run's budget, its tool output and the point past which it summarizes follow it from the next run on.
 - 2026-10-15 (Opus 5.5): item 251 merged as `c605d56` (PR #295; no Linear issue, the connector was signed out): the Reasoning menu has Ultrathink (Max) and Ultracode (Extra high, the run told to split its independent parts across helpers that work at the same time) for one message, where the model offers those levels; the chat keeps its level, and the run, its resumption and a campaign's sessions keep the choice.
+- 2026-10-15 (Opus 5.5): item 252 merged as `a786a28` (PR #296; no Linear issue, the connector was signed out): the plan stays at the end of the system prompt; the A/B could not tell the places apart (none of its 18 attempts planned) and the owner's runs of 30 days put the move at about 2 points more of cached input against the 15 the design asked for; eval reports now say in how many attempts a plan was kept.
