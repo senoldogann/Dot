@@ -1,9 +1,11 @@
 """The pace of a site on a real headless Chrome: a repost and a follow are flagged from their labels, public actions are
 spaced and stop at the hourly limit with the time of the next one, even in ``yolo``, a follow is counted apart, and a
-batch with two such clicks is sent back. No model is called.
+batch with a repost and a follow is sent back, since the pace of reposts is set; two follows and a like, which no pace
+limits here, go in one call and each click lands (item 266). No model is called.
 """
 
 import asyncio
+import json
 import re
 import threading
 from collections.abc import AsyncIterator, Iterator
@@ -16,6 +18,7 @@ import pytest_asyncio
 from dotagent.agent.gate import RunGate
 from dotagent.agent.review import ReviewRequest, ReviewVerdict
 from dotagent.agent.verify import new_facts
+from dotagent.browser.types import ScriptRun
 from dotagent.config import load_config
 from dotagent.core.errors import PolicyDenied, ToolInputError
 from dotagent.core.paths import workspace_dir
@@ -31,7 +34,14 @@ GOAL: str = "Share the post and follow its author."
 SPACING_S: float = 1.0
 _PAGE: bytes = b"""<!doctype html><title>Timeline</title><h1>Timeline</h1><p>A post worth sharing.</p>
 <button type="button">Repost</button>
-<button type="button">Follow @author</button>"""
+<button type="button" onclick="clicked(this)">Follow @author</button>
+<button type="button" onclick="clicked(this)">Follow @editor</button>
+<button type="button" onclick="clicked(this)">Like</button>
+<script>
+function clicked(button) {
+  document.body.dataset.clicks = (document.body.dataset.clicks || "") + button.textContent + ";";
+}
+</script>"""
 
 
 class _Handler(BaseHTTPRequestHandler):
@@ -165,3 +175,20 @@ async def test_public_actions_are_spaced_and_stop_at_the_limit_in_yolo_and_a_fol
     assert [(event.data["verdict"], event.data["source"]) for event in events] == [("deny", "pace")]
     assert (followed.action.risk, followed.action.flags) == ("low", ("social",))
     assert await runtime.store.paced_times("127.0.0.1", "social", 0.0) != []
+
+
+async def test_a_batch_carries_several_social_actions_while_no_social_pace_is_set(runtime: Runtime, site: str) -> None:
+    """Item 266: the pace here limits public actions and leaves social ones free, so two follows and a like go in one
+    call, each click lands, and the gate counts the call once."""
+    ctx: ToolContext = await _yolo_context(runtime)
+    opened: PreparedCall = await runtime.registry.tools["browser_open"].prepare({"url": site}, ctx)
+    page: str = (await opened.run(ctx)).text
+    steps: list[JsonObject] = [
+        {"action": "click", "ref": _ref(page, name)} for name in ("Follow @author", "Follow @editor", "Like")
+    ]
+    before: int = len(await runtime.store.paced_times("127.0.0.1", "social", 0.0))
+    batch: PreparedCall = await _act(ctx, steps)
+    assert (batch.action.risk, batch.action.flags) == ("low", ("social",))
+    clicks: ScriptRun = await ctx.browser.run_script(ctx.thread_id, "document.body.dataset.clicks", 5.0)
+    assert json.loads(clicks.text) == "Follow @author;Follow @editor;Like;"
+    assert len(await runtime.store.paced_times("127.0.0.1", "social", 0.0)) == before + 1

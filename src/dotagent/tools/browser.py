@@ -51,10 +51,10 @@ from dotagent.config import AppConfig, BrowserConfig
 from dotagent.core.errors import ToolInputError
 from dotagent.llm.types import ImageData
 from dotagent.policy.elements import Element, StepAssessment, assessment_for, combine_assessments
-from dotagent.policy.pace import pace_class
+from dotagent.policy.pace import pace_class, paced_in_batch
 from dotagent.policy.paths import PathClass, classify_path, expand_path
 from dotagent.policy.spend import amount_in_label, render_amount, total_on_page
-from dotagent.policy.types import ActionInfo, ActionKind, Amount, Flag, Risk
+from dotagent.policy.types import ActionInfo, ActionKind, Amount, Flag, PaceClass, Risk
 from dotagent.tools.base import (
     ACTING_MODES,
     ALL_MODES,
@@ -391,13 +391,18 @@ def _act_tool() -> RegisteredTool:
         found: list[StepAssessment] = [assessment_for(judgment.reasons) for judgment in judgments if judgment.reasons]
         if found:
             assessment = combine_assessments([assessment, *found])
-        # The pace of a site counts actions, so a batch carries one public or social action at most.
-        paced: int = sum(1 for part in [*assessed, *found] if pace_class(part.flags) is not None)
-        if paced > 1:
+        # The pace of a site counts a call as one action, so while a pace is set for a class of the batch's public or
+        # social actions the batch carries one of them at most; with none set it carries as many (item 266).
+        paced: list[PaceClass] = [
+            pace for pace in (pace_class(part.flags) for part in [*assessed, *found]) if pace is not None
+        ]
+        limited: list[PaceClass] = paced_in_batch(ctx.runtime.config.policy.pace, paced)
+        if limited:
             raise ToolInputError(
                 "A batch takes one public or social action at most (a post, a reply, a repost, a message, a follow, a "
-                "like): each one counts toward the pace of the site. Send them one call at a time.",
-                {"public_or_social_steps": paced},
+                "like) while the owner sets a pace for them: each one counts toward the pace of the site. Send them one "
+                "call at a time; doing them with a script in the page (browser_eval) would go around the owner's pace.",
+                {"public_or_social_steps": len(paced), "paced_classes": list(limited)},
             )
         notes: list[str] = [judgment.note for judgment in judgments if judgment.note]
         if notes:

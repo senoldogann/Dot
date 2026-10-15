@@ -56,6 +56,22 @@ def _windows(config: PaceConfig, pace: PaceClass) -> tuple[tuple[str, float, int
     return (("hour", HOUR_S, config.social_per_hour), ("day", DAY_S, config.social_per_day))
 
 
+def pace_is_set(config: PaceConfig, pace: PaceClass) -> bool:
+    """Whether ``[policy.pace]`` limits the actions of class ``pace`` at all: a number in an hour or a day, or for public
+    ones a spacing."""
+    spacing_s: float = config.public_spacing_s if pace == "public" else 0.0
+    return spacing_s > 0 or any(limit > 0 for _, _, limit in _windows(config, pace))
+
+
+def paced_in_batch(config: PaceConfig, classes: Sequence[PaceClass]) -> list[PaceClass]:
+    """The classes with a pace set that keep a batch whose public and social steps are of ``classes`` (one entry a
+    step) to one such step, since the pace counts a call as one action (item 266): none when it carries one at most,
+    or when no pace is set for any class it carries."""
+    if len(classes) <= 1:
+        return []
+    return sorted({pace for pace in classes if pace_is_set(config, pace)})
+
+
 def pace_refusal(config: PaceConfig, action: PacedAction, times: Sequence[float], now: float) -> str | None:
     """Why ``action`` would break the pace of its site, from the times of the actions of its class there in the last
     day; ``None`` when it keeps to it. The text names the next time one is allowed."""

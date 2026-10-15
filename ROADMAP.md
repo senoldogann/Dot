@@ -5203,8 +5203,8 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 262 | The sandbox of a run's commands switches on and off in Settings                       | done        | eb6b1dc |
 | 263 | A run runs JavaScript in its own tab                                                  | done        | 24a22d2 |
 | 264 | Dot's own Chrome loads extensions                                                     | done        | 10eb5d5 |
-| 265 | Dot's own Chrome can take DevTools connections from a run's scripts                   | in progress |         |
-| 266 | A batch carries several public or social actions while no pace is set                 | planned     |         |
+| 265 | Dot's own Chrome can take DevTools connections from a run's scripts                   | done        | dbb21d5 |
+| 266 | A batch carries several public or social actions while no pace is set                 | in progress |         |
 
 ### 77. The type system: Inter and Geist Mono, seven sizes, three weights
 
@@ -11723,7 +11723,7 @@ works there, as it does in the owner's Chrome.
 
 ### 265. Dot's own Chrome can take DevTools connections from a run's scripts
 
-**Status: in progress.** Built on `item-265-debug-port`.
+**Status: done.** Merged as `dbb21d5` (PR #309; no Linear issue, the Linear connector was signed out).
 
 **As built (2026-10-15).** `config.py`, `defaults.toml`: `[browser] debug_port` (0 for none, else 1024 to 65535).
 `browser/devtools.py` (new): `port_is_taken` (a program that listens on the loopback port, or is bound to it; a port the
@@ -11758,14 +11758,25 @@ environment, and so that no window or tab is mistaken.
 
 ### 266. A batch carries several public or social actions while no pace is set
 
-**Status: planned.**
+**Status: in progress.** Built on `item-266-social-batch`.
+
+**As built (2026-10-15).** `policy/pace.py`: `pace_is_set` (a number in an hour or a day, or for public actions a
+spacing) and `paced_in_batch` (the classes with a pace set that keep a batch of more than one public or social step to
+one). `tools/browser.py`: `browser_act` refuses such a batch only while a pace is set for a class it carries, and the
+refusal names those classes and says that a script in the page would go around the owner's pace; a batch of a class with
+no pace set goes in one call, which the gate counts once. `agent/prompt.py`: the line that sent such actions one per
+`browser_act` goes (the refusal says what to do when a pace holds), so every run's prompt is shorter. README: the pace
+paragraph (and that a script run with `browser_eval` is not counted). Tests: `tests/unit/test_pace.py` (the rule with no
+pace, a public one, a spacing and a social one) and `tests/smoke/test_pace.py` (two follows and a like in one call on a
+real headless Chrome, each click landing and the call counted once, while the pace of reposts still sends back a batch
+with a repost and a follow). They fail on the code of before.
 
 **What.** `browser_act` lets a batch carry more than one follow, like, post or message when `[policy.pace]` sets no
 limit for that kind of action; with a limit set, one per batch as before, so that each is counted.
 
 **Why.** With no pace set, the rule only cost a call per action.
 
-**Tests.** Unit tests of the classification with and without a limit.
+**Tests.** Unit tests of the classification with and without a limit. As built.
 
 ### How to start part 46 (the handoff prompt)
 
@@ -12479,3 +12490,4 @@ limit for that kind of action; with a limit set, one per batch as before, so tha
 - 2026-10-15 (Opus 5.5): item 262 merged as `eb6b1dc` (PR #306; no Linear issue, the connector was signed out): Settings › Rules switches the macOS sandbox of the commands, terminal sessions, AppleScript and searches of runs that are not yolo on and off from the next one on, without a restart (`GET` and `PUT /api/shell/sandbox`, kept as `[shell] sandbox`); switching it on where `sandbox-exec` does not start is refused; a yolo run is never sandboxed, and the default stays on.
 - 2026-10-15 (Opus 5.5): item 263 merged as `24a22d2` (PR #307; no Linear issue, the connector was signed out): `browser_eval` runs JavaScript in the page of the run's own tab, in Dot's Chrome or the owner's, and gives back its value as JSON (an expression, a function or an awaited promise, `timeout_s` 30 s by default); a thrown error and a timeout fail the call, a page the script leads to is let land and the address rules hold after it; the value is fenced and untrusted; a `browser_click` of medium risk (the cautious preset asks, research runs lack it); its descriptions are kept short (about 200 tokens) and the system prompt is unchanged.
 - 2026-10-15 (Opus 5.5): item 264 merged as `10eb5d5` (PR #308; no Linear issue, the connector was signed out): Dot's own Chrome starts without Playwright's `--disable-extensions` (as it already did without `--enable-automation`), so an extension installed in its profile from the Chrome Web Store loads and stays; the offline smoke suite on the stack top (561 passed, 1 skipped) and CI were clean.
+- 2026-10-15 (Opus 5.5): item 265 merged as `dbb21d5` (PR #309; no Linear issue, the connector was signed out): `[browser] debug_port` (0 for none, else 1024 to 65535; Settings › Browser) has Dot's own Chrome also take DevTools connections on that port of 127.0.0.1, and a run in Dot's Chrome with a tool that runs scripts is told the address, to connect with `connect_over_cdp` and `no_defaults=True`; Dot's Chrome does not start while another program holds the port, and the pool checks every session before it changes any. A review of 263 to 266 found the first commit's claim that a script never drives another Chrome too strong, ports below 1024 taken and the pool's change not atomic; the second commit fixed them. CI was clean.

@@ -1,9 +1,9 @@
-"""What a click on a social platform is, from its label, and the pace of a site: its windows, its spacing and the actions
-it counts."""
+"""What a click on a social platform is, from its label, and the pace of a site: its windows, its spacing, the actions
+it counts, and the batches it keeps to one public or social step (item 266)."""
 
 from dotagent.config import PaceConfig
 from dotagent.policy.elements import Element, StepAssessment, assessment_for, naming_reasons
-from dotagent.policy.pace import PacedAction, pace_refusal, paced_action, spacing_wait
+from dotagent.policy.pace import PacedAction, pace_refusal, paced_action, paced_in_batch, spacing_wait
 from dotagent.policy.types import ActionInfo, Flag
 
 NOW: float = 1_800_000_000.0
@@ -54,3 +54,20 @@ def test_the_pace_counts_public_and_social_browser_actions_by_their_site() -> No
     assert paced_action(action("browser_click", "https://x.com/home", ())) is None
     assert paced_action(action("browser_click", "about:blank", ("public_post",))) is None
     assert paced_action(action("message", "https://x.com/home", ("external_send",))) is None
+
+
+def test_a_batch_is_kept_to_one_public_or_social_step_only_by_a_pace_set_for_a_class_it_carries() -> None:
+    unset: PaceConfig = PaceConfig(
+        public_per_hour=0, public_per_day=0, social_per_hour=0, social_per_day=0, public_spacing_s=0.0
+    )
+    assert paced_in_batch(unset, ["social", "social", "social"]) == []
+    assert paced_in_batch(unset, ["public", "public", "social"]) == []
+    # PACE limits public actions and leaves social ones free.
+    assert paced_in_batch(PACE, ["social", "social", "social"]) == []
+    assert paced_in_batch(PACE, ["public", "social"]) == ["public"]
+    assert paced_in_batch(PACE, ["public"]) == []
+    spaced: PaceConfig = unset.model_copy(update={"public_spacing_s": 5.0})
+    assert paced_in_batch(spaced, ["public", "public"]) == ["public"]
+    followed: PaceConfig = unset.model_copy(update={"social_per_day": 100})
+    assert paced_in_batch(followed, ["social", "social"]) == ["social"]
+    assert paced_in_batch(followed, ["public", "public"]) == []
