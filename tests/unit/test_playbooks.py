@@ -17,6 +17,7 @@ from dotagent.agent.playbooks import (
     drop_playbook,
     list_playbooks,
     main_site,
+    offered_skills,
     playbook_name,
     read_meta,
     record_use,
@@ -180,6 +181,38 @@ def test_a_playbook_is_a_skill_the_catalog_loads(tmp_path: Path) -> None:
     # By meaning: the first vector is the new kind's, the rest the entries' in order.
     assert same_kind("price of a product", entries, [(1.0, 0.0), (0.9, 0.1)]) is entries[0]
     assert same_kind("price of a product", entries, [(1.0, 0.0), (0.0, 1.0)]) is None
+
+
+def test_a_description_with_a_backslash_a_quote_and_a_colon_is_written_and_read_back(tmp_path: Path) -> None:
+    """The frontmatter is written by the YAML library: what a hand-quoted one made unreadable (the ``\\d`` of a regular
+    expression, which left the daemon with no learned skill it could list and no run it could start) reads back as it
+    was written."""
+    draft: PlaybookDraft = _playbook().draft.model_copy(
+        update={"description": r'Match the ids with \d+ in "logs": then stop # done'}
+    )
+    playbook: Playbook = _playbook().model_copy(update={"draft": draft})
+    file: Path = write_playbook(tmp_path, playbook)
+    skill: Skill = parse_skill(file, file.read_text(encoding="utf-8"), "learned")
+    assert skill.description == r"Match the ids with \d+ in 'logs': then stop # done"
+    catalog: SkillCatalog = load_catalog((SkillRoot(path=tmp_path, source="learned"),))
+    assert [entry.name for entry in catalog.skills] == [playbook.name] and catalog.problems == ()
+    assert [entry.skill.name for entry in list_playbooks(tmp_path)] == [playbook.name]
+
+
+def test_a_learned_skill_the_loader_cannot_read_is_left_out_and_the_others_are_still_offered(tmp_path: Path) -> None:
+    """A SKILL.md edited by hand, or written by an older Dot, is skipped as the catalog skips it: the listing, and with
+    it the start of every run, goes on with the other learned skills."""
+    write_playbook(tmp_path, _playbook())
+    broken_name: str = playbook_name("audit an X profile")
+    broken: Path = write_playbook(
+        tmp_path, _playbook().model_copy(update={"name": broken_name, "kind": "audit an X profile"})
+    )
+    broken.write_text(f'---\nname: {broken_name}\ndescription: "a \\d regex"\n---\n\nbody\n', encoding="utf-8")
+    entries = list_playbooks(tmp_path)
+    assert [entry.skill.name for entry in entries] == [_playbook().name]
+    catalog: SkillCatalog = load_catalog((SkillRoot(path=tmp_path, source="learned"),))
+    assert [skill.name for skill in offered_skills(catalog.skills, entries, None)] == [_playbook().name]
+    assert [problem.path for problem in catalog.problems] == [broken]
 
 
 def _counted(meta: PlaybookMeta | None) -> PlaybookMeta:

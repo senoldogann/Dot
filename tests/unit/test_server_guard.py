@@ -13,6 +13,7 @@ from dotagent.server.guard import (
     bearer_token,
     check_request,
     daemon_proof,
+    navigation_is_foreign,
     read_or_create_token,
     read_token,
     require_loopback,
@@ -84,8 +85,45 @@ def test_only_a_bearer_header_carries_the_token(header: str | None, expected: st
 def test_a_request_is_served_only_from_this_mac_to_pages_of_this_server_with_the_token(
     path: str, host: str | None, origin: str | None, authorization: str | None, refused_with: int | None
 ) -> None:
-    refusal: Refusal | None = check_request(path, host, origin, authorization, TOKEN, PORT, frozenset())
+    refusal: Refusal | None = check_request(path, host, origin, None, None, authorization, TOKEN, PORT, frozenset())
     assert (None if refusal is None else refusal.status) == refused_with
+
+
+@pytest.mark.parametrize(
+    ("fetch_site", "fetch_mode", "refused"),
+    [
+        ("cross-site", "navigate", True),
+        ("Cross-Site", "Navigate", True),
+        ("cross-site", "cors", False),
+        ("cross-site", "no-cors", False),
+        ("same-origin", "navigate", False),
+        ("same-site", "navigate", False),
+        ("none", "navigate", False),
+        (None, "navigate", False),
+        ("cross-site", None, False),
+        (None, None, False),
+    ],
+)
+def test_a_navigation_a_page_of_another_site_started_is_refused(
+    fetch_site: str | None, fetch_mode: str | None, refused: bool
+) -> None:
+    """A page of another site that sends a browser to the UI (a link, a script, a redirect) is refused on its Fetch
+    Metadata, on every path; a request without any (a program, an older browser) is not. The address bar and the
+    desktop shell send ``none``, the UI's own links ``same-origin``, and cross-site subresource requests are the
+    Origin check's."""
+    assert navigation_is_foreign(fetch_site, fetch_mode) is refused
+    for path in ("/", "/index.html", "/api/status"):
+        refusal: Refusal | None = check_request(
+            path, LOCAL_HOST, None, fetch_site, fetch_mode, GOOD_AUTH, TOKEN, PORT, frozenset()
+        )
+        assert (refusal is not None and refusal.status == 403) is refused, (path, refusal)
+
+
+@pytest.mark.parametrize("path", ["/oauth/callback", "/pages/abc123"])
+def test_what_other_sites_send_a_browser_to_by_design_is_served_to_a_foreign_navigation(path: str) -> None:
+    """A sign-in comes back from the authorization server's site (item 279), and a page a run showed opens with an
+    opaque origin wherever it is opened from: neither is the UI, so neither is refused on Fetch Metadata."""
+    assert check_request(path, LOCAL_HOST, None, "cross-site", "navigate", None, TOKEN, PORT, frozenset()) is None
 
 
 def test_the_proof_of_the_daemon_is_an_hmac_of_the_nonce_keyed_with_the_token() -> None:
@@ -111,7 +149,7 @@ def test_a_name_of_reach_is_served_like_the_loopback_address_over_https(
     host: str, origin: str | None, refused_with: int | None
 ) -> None:
     """``[server] reach``: the names a reverse proxy on the owner's network presents the daemon as (item 52)."""
-    refusal: Refusal | None = check_request("/api/status", host, origin, GOOD_AUTH, TOKEN, PORT, REACH)
+    refusal: Refusal | None = check_request("/api/status", host, origin, None, None, GOOD_AUTH, TOKEN, PORT, REACH)
     assert (None if refusal is None else refusal.status) == refused_with
 
 

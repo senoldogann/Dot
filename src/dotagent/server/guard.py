@@ -1,7 +1,8 @@
 """Who may reach the server: this Mac only, pages of the server itself only, and only with the bearer token.
 
 Binding to a loopback address keeps other machines out. The Host check defeats DNS rebinding, the Origin check keeps
-the pages of other sites from using the API through the browser, and the token keeps other programs of this Mac out.
+the pages of other sites from using the API through the browser, the Fetch Metadata check keeps them from sending a
+browser to the UI (:func:`navigation_is_foreign`), and the token keeps other programs of this Mac out.
 The clients send the token only to a server that first proves it holds it (:func:`daemon_proof`), so a program that took
 the port while the daemon was down is sent nothing. A phone's app trades a pairing code for the token without it
 (``/api/phone/pair``, item 267; :mod:`dotagent.server.pairing`). A page that a run showed (``/pages/<id>``) is served without the
@@ -23,6 +24,7 @@ from starlette.types import ASGIApp, Message, Receive, Scope, Send
 from dotagent.agent.pages import LIBRARY_HOSTS
 from dotagent.core.errors import ConfigError
 from dotagent.core.types import FrozenModel
+from dotagent.mcp.signin import CALLBACK_PATH
 
 API_ROOT: str = "/api"
 API_PREFIX: str = f"{API_ROOT}/"
@@ -39,6 +41,9 @@ _LOOPBACK_NAME: str = "localhost"
 _HTTP_MISDIRECTED: int = 421
 _HTTP_FORBIDDEN: int = 403
 _HTTP_UNAUTHORIZED: int = 401
+# Fetch Metadata (``Sec-Fetch-Mode``, ``Sec-Fetch-Site``) of a navigation that a page of another site started.
+_NAVIGATE_MODE: str = "navigate"
+_CROSS_SITE: str = "cross-site"
 # What the proof of the daemon puts before the nonce, so that it is good for nothing else keyed with the token.
 _PROOF_LABEL: bytes = b"dot daemon proof\n"
 
@@ -125,6 +130,25 @@ def origin_is_local(origin: str | None, port: int, reach: frozenset[str]) -> boo
     return origin.lower() in allowed
 
 
+def navigation_is_foreign(fetch_site: str | None, fetch_mode: str | None) -> bool:
+    """Whether a request is a navigation that a page of another site started: a link or a script of that page, or a
+    redirect it sent the browser through (Chrome reads the whole redirect chain into ``Sec-Fetch-Site``). The address
+    bar, a bookmark, the desktop shell and a program send ``none``; the UI's own links and the pages it frames
+    ``same-origin``; a browser that sends no Fetch Metadata is not refused on it. A run's browser that is sent to the
+    interface through such a page is stopped here even where its own rules were not asked (item 135)."""
+    if fetch_site is None or fetch_mode is None:
+        return False
+    return fetch_mode.lower() == _NAVIGATE_MODE and fetch_site.lower() == _CROSS_SITE
+
+
+def reached_from_other_sites(path: str) -> bool:
+    """The paths that other sites send a browser to by design, which a foreign navigation reaches: the page a sign-in
+    comes back to (an authorization server redirects the browser there, item 279) and the pages runs showed, whose
+    origin is opaque wherever they open (:data:`PAGE_HEADERS`), so a page of another site gains nothing by opening
+    one. The UI and the API, where the token is, are reached from this server's own pages alone."""
+    return path == CALLBACK_PATH or is_page_path(path)
+
+
 def bearer_token(authorization: str | None) -> str | None:
     """The token of an ``Authorization: Bearer`` header; ``None`` for any other header."""
     if authorization is None:
@@ -169,6 +193,8 @@ def check_request(
     path: str,
     host: str | None,
     origin: str | None,
+    fetch_site: str | None,
+    fetch_mode: str | None,
     authorization: str | None,
     token: str,
     port: int,
@@ -179,6 +205,8 @@ def check_request(
         return Refusal(status=_HTTP_MISDIRECTED, message="this server answers only to its loopback address")
     if not origin_is_local(origin, port, reach):
         return Refusal(status=_HTTP_FORBIDDEN, message="requests from other origins are refused")
+    if navigation_is_foreign(fetch_site, fetch_mode) and not reached_from_other_sites(path):
+        return Refusal(status=_HTTP_FORBIDDEN, message="navigations from pages of other sites are refused")
     if needs_token(path) and not token_matches(token, bearer_token(authorization)):
         return Refusal(status=_HTTP_UNAUTHORIZED, message="a valid bearer token is required")
     return None
@@ -247,6 +275,8 @@ class LocalGuard:
             path,
             headers.get("host"),
             headers.get("origin"),
+            headers.get("sec-fetch-site"),
+            headers.get("sec-fetch-mode"),
             headers.get("authorization"),
             self._token,
             self._port,

@@ -37,11 +37,12 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+import yaml
 from pydantic import JsonValue, ValidationError
 
 from dotagent.agent.review import PlaybookDraft, PlaybookRequest, PlaybookWriter, playbook_writer_for, shorten_reason
 from dotagent.config import AppConfig
-from dotagent.core.errors import DotError, InvalidValueError, NotFoundError
+from dotagent.core.errors import DotError, InvalidValueError, NotFoundError, SkillError
 from dotagent.core.files import write_whole
 from dotagent.core.jsonutil import dumps_compact
 from dotagent.core.logs import get_logger
@@ -83,6 +84,8 @@ _RESULT_CHARS: int = 160
 # The kind of work names the folder: its letters and digits with single hyphens between.
 _UNSAFE: re.Pattern[str] = re.compile(r"[^a-z0-9]+")
 _SLUG_CHARS: int = 50
+# A frontmatter value stays on one line: the loader reads a folded one too, but a line is what the file shows.
+_FRONTMATTER_WIDTH: int = 1 << 16
 # The tool calls that are not acting: they plan, ask, remember, consult, read a skill, find help or end the run.
 _NOT_ACTING: frozenset[str] = frozenset(
     {
@@ -252,6 +255,15 @@ def _date(written_at: float) -> str:
     return datetime.fromtimestamp(written_at, tz=UTC).strftime("%Y-%m-%d")
 
 
+def _frontmatter(name: str, description: str) -> str:
+    """The YAML the skills loader reads, written by the YAML library: a description with a backslash, a quote or a
+    colon in it (a regular expression, a shell line) reads back as it is, where one quoted by hand did not (a ``\\d``
+    made the SKILL.md unreadable, and with it every learned skill of the daemon)."""
+    return yaml.safe_dump(
+        {"name": name, "description": description}, sort_keys=False, allow_unicode=True, width=_FRONTMATTER_WIDTH
+    )
+
+
 def render_playbook(playbook: Playbook, earlier: PlaybookMeta | None) -> str:
     """The SKILL.md of a learned skill: the frontmatter the skills loader reads, then the kind, when it fits, the
     steps, the parameters and the evidence (the runs of ``earlier``, when the skill is updated, before this one)."""
@@ -264,7 +276,7 @@ def render_playbook(playbook: Playbook, earlier: PlaybookMeta | None) -> str:
     evidence: str = "\n".join(f"- Run {run}: {count} acting steps" for run, count in zip(runs, counts, strict=True))
     where: str = f" on {playbook.host}" if playbook.host != NO_SITE else ""
     return (
-        f'---\nname: {playbook.name}\ndescription: "{description}"\n---\n\n'
+        f"---\n{_frontmatter(playbook.name, description)}---\n\n"
         f"# {playbook.name}\n\n"
         f"Learned by Dot from its own work{where} ({len(runs)} {'run' if len(runs) == 1 else 'runs'}, the last one "
         f"verified on {_date(playbook.written_at)}): a record of the steps that worked, not instructions from the "
@@ -350,15 +362,24 @@ def _changing(root: Path) -> Iterator[None]:
         os.close(descriptor)
 
 
+def rendered_skill(file: Path, playbook: Playbook, earlier: PlaybookMeta | None) -> str:
+    """The SKILL.md of ``playbook`` for ``file``, read back the way the skills loader reads it before it is written:
+    one the loader would not read raises :class:`SkillError`, and nothing is written."""
+    text: str = render_playbook(playbook, earlier)
+    parse_skill(file, text, PLAYBOOK_SOURCE)
+    return text
+
+
 def write_playbook(root: Path, playbook: Playbook) -> Path:
     """Write the skill's folder under ``root`` and return its SKILL.md. The folder must not exist. The record is
     written before the skill, so a listing never meets the skill without it."""
     folder: Path = playbook_folder(root, playbook.name)
     file: Path = folder / SKILL_FILE
+    text: str = rendered_skill(file, playbook, None)
     with _changing(root):
         folder.mkdir(exist_ok=False)
         _save_meta(folder, meta_of(playbook, None))
-        write_whole(file, render_playbook(playbook, None))
+        write_whole(file, text)
     return file
 
 
@@ -370,7 +391,7 @@ def update_playbook(root: Path, name: str, playbook: Playbook) -> Path:
     file: Path = folder / SKILL_FILE
     with _changing(root):
         earlier: PlaybookMeta = read_meta(folder)
-        write_whole(file, render_playbook(renamed, earlier))
+        write_whole(file, rendered_skill(file, renamed, earlier))
         _save_meta(folder, meta_of(renamed, earlier))
     return file
 
@@ -453,7 +474,13 @@ def _entries(folder: Path, retired: bool) -> list[PlaybookEntry]:
         file: Path = child / SKILL_FILE
         if not child.name.startswith((PLAYBOOK_PREFIX, _OLD_PREFIX)) or not file.is_file():
             continue
-        skill: Skill = parse_skill(file, file.read_text(encoding="utf-8"), PLAYBOOK_SOURCE)
+        try:
+            skill: Skill = parse_skill(file, file.read_text(encoding="utf-8"), PLAYBOOK_SOURCE)
+        except SkillError as error:
+            # One skill the loader cannot read (edited by hand, written by an older Dot) is left out, as the catalog
+            # leaves it out; the others, and the runs that are offered them, go on.
+            log.warning("playbook_unreadable", path=str(file), error=error.message, context=error.context)
+            continue
         entries.append(PlaybookEntry(skill=skill, meta=read_meta(child), retired=retired))
     return entries
 

@@ -30,6 +30,8 @@ from dotagent.policy.elements import (
 from dotagent.policy.types import Flag
 
 _ALLOWED_SCHEMES: frozenset[str] = frozenset({"http", "https"})
+# Addresses a page makes itself, whose data never leaves the page: no server answers them.
+_PAGE_OWN_SCHEMES: frozenset[str] = frozenset({"blob", "data"})
 _DEFAULT_PORTS: dict[str, int] = {"http": 80, "https": 443}
 _LOOPBACK_NAME: str = "localhost"
 _MAX_URL_CHARS: int = 2000
@@ -137,12 +139,13 @@ def _is_loopback(host: str) -> bool:
     return address.is_loopback or address.is_unspecified
 
 
-def check_browser_url(
-    url: str, allowed_hosts: Sequence[str], blocked_hosts: Sequence[str], server: ServerConfig
-) -> UrlVerdict:
-    """What :func:`check_url` allows, save Dot's own interface: this Mac on the daemon's port, or a name of ``[server]
-    reach``. The owner's Chrome may be signed in there, and a run that opened it could answer its own questions."""
-    verdict: UrlVerdict = check_url(url, allowed_hosts, blocked_hosts)
+def forbidden_target(url: str, blocked_hosts: Sequence[str], server: ServerConfig) -> UrlVerdict:
+    """Whether the browser may send a request to ``url`` at all, for a page it opens or a resource a page loads alike:
+    a web address that is neither a blocked host nor Dot's own interface (this Mac on the daemon's port, or a name of
+    ``[server] reach``). The owner's Chrome may be signed in there, and a run that opened it could answer its own
+    questions. ``browser.allowed_hosts`` is not read here: a page of an allowed host loads its scripts and images from
+    wherever it has them (:func:`check_browser_url` reads it for the pages themselves)."""
+    verdict: UrlVerdict = check_url(url, (), blocked_hosts)
     if not verdict.allowed or url == "about:blank":
         return verdict
     parts = urlsplit(url)
@@ -156,6 +159,39 @@ def check_browser_url(
     if host_matches(host, server.reach) or (reached == server.port and _is_loopback(host)):
         return UrlVerdict(allowed=False, reason="it is Dot's own interface, which a run never opens")
     return verdict
+
+
+def check_browser_url(
+    url: str, allowed_hosts: Sequence[str], blocked_hosts: Sequence[str], server: ServerConfig
+) -> UrlVerdict:
+    """What the browser may open as a page: no :func:`forbidden_target`, and a host of ``allowed_hosts`` when that is
+    set."""
+    verdict: UrlVerdict = forbidden_target(url, blocked_hosts, server)
+    if not verdict.allowed or url == "about:blank" or not allowed_hosts:
+        return verdict
+    host: str = urlsplit(url).hostname or ""
+    if not host_matches(host, allowed_hosts):
+        return UrlVerdict(allowed=False, reason=f"host {host!r} is not in browser.allowed_hosts")
+    return verdict
+
+
+def request_verdict(
+    url: str, navigation: bool, allowed_hosts: Sequence[str], blocked_hosts: Sequence[str], server: ServerConfig
+) -> UrlVerdict:
+    """Whether Chrome may send one request it is about to send, judged on the address as Chrome read it (so a spelling
+    that reads differently here cannot slip by): a navigation of a frame is a page and must pass
+    :func:`check_browser_url`; any other request (a script, an image, a fetch, a worker) must not be a
+    :func:`forbidden_target`. What a page made itself (a ``blob:`` or ``data:`` address) reaches no server and is let
+    through."""
+    if navigation:
+        return check_browser_url(url, allowed_hosts, blocked_hosts, server)
+    try:
+        scheme: str = urlsplit(url).scheme
+    except ValueError as exc:
+        return UrlVerdict(allowed=False, reason=f"malformed URL ({exc})")
+    if scheme in _PAGE_OWN_SCHEMES:
+        return UrlVerdict(allowed=True, reason="the page's own data")
+    return forbidden_target(url, blocked_hosts, server)
 
 
 def url_flags(url: str) -> tuple[Flag, ...]:
