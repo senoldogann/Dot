@@ -182,6 +182,8 @@ async def test_every_chat_wears_a_creature_over_its_last_line_and_its_unread_dot
                 await page.goto(ui_url("127.0.0.1", port, TOKEN))
                 if width < _PHONE_PX:
                     await page.get_by_role("button", name="Show sidebar").first.click()
+                    # The boxes are read once the drawer has slid in, not on its way.
+                    await expect(page.locator("#sidebar")).to_have_css("transform", "none")
                 # One creature for every chat, the one at work among them.
                 await expect(page.locator("#sidebar .side-chat")).to_have_count(5)
                 await expect(page.locator("#sidebar .side-chat .avatar")).to_have_count(5)
