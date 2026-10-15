@@ -5220,7 +5220,7 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 279 | Connect apps: the tools of other services, over MCP, signed in from Dot               | done        | 8aa45dd |
 | 280 | Dot starts lean: the fewest words and tools, the rest found when needed               | planned     |         |
 | 281 | A chat can be a loop that asks Dot again until it is done                             | planned     |         |
-| 282 | A chat can be rewound to an earlier message, its files with it                        | in progress |         |
+| 282 | A chat can be rewound to an earlier message, its files with it                        | done        | 427c51e |
 | 283 | Zen's free models work in Dot, as OpenCode's own agent                                | done        | aeee10b |
 | 284 | OpenCode's agent uses Dot's own tools over MCP                                        | planned     |         |
 | 285 | A helper that starts late joins its siblings, and stopped ones stand still            | done        | 8aa45dd |
@@ -12335,7 +12335,7 @@ and stops when its run says done; Stop ends it.
 
 ### 282. A chat can be rewound to an earlier message, its files with it
 
-**Status: in progress.** Built on `item-282-rewind`.
+**Status: done.** Merged as `427c51e` (PR #323; no Linear issue, the Linear connector was signed out).
 
 **What.** On a message of the owner's that opened a turn, Edit from here, as T3 Code has it (the owner asked for its
 way): a dialog, "Edit from here? Rewind chat to before this message. Your prompt and attachments return to the
@@ -13370,3 +13370,4 @@ shows Fast. `defaults.toml`: `[scheduler] history_runs = 5`. README: Schedules. 
 - 2026-10-15 (Opus 5.5): item 289 merged as `8aa45dd` (PR #322; no Linear issue, the connector was signed out): Connect apps sits under Campaigns in the sidebar, and the sidebar has no emergency stop; it stays in Settings › System and POST /api/failsafe.
 - 2026-10-15 (Opus 5.5): item 290 merged as `8aa45dd` (PR #322; no Linear issue, the connector was signed out): DeepSeek V4.1 Flash offers low, high and max again on OpenCode Go, at the owner's choice.
 - 2026-10-15 (Opus 5.5): item 291 merged as `8aa45dd` (PR #322; no Linear issue, the connector was signed out): a schedule made in a chat keeps the chat's model, level, speed, approvals, goal mode, mode and chat, stores its speed, and reads five runs back by default.
+- 2026-10-15 (Opus 5.5): item 282 merged as `427c51e` (PR #323; no Linear issue, the connector was signed out): Edit from here on the owner's message: Cancel, Revert files too, or Revert and keep changes; the chat goes back to before the message (the history the model reads with it, across compactions), the text and files return to the composer, and the run's file changes are taken back on request. CI gate 8m38s pass; the owner's daemon restarted on 427c51e at 21:57:45 (the first bootstrap failed with 5 while the old job was still going; bootstrapped again by hand), live check clean.
