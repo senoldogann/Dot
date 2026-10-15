@@ -12350,10 +12350,16 @@ command's changes stay. The chat's OpenCode session is let go, so that its next 
   the place (`runs.history_version`, `runs.history_seq`). A compaction writes the history anew as the next version and
   keeps aside what came before the latest run of the old one (`message_archive`), so that a rewind across a compaction
   gives the history back as it was.
-- `POST /api/runs/{id}/rewind` with `files` `revert` or `keep`. Refused for a helper's run, a run from before the places
-  were kept, a run taken out already and a chat with a run at work. A live `chat_rewound` event has the pages read their
-  lists of chats again.
+- `POST /api/runs/{id}/rewind` with `files` `revert` or `keep`. The take-back is planned first, so that a journal that
+  cannot be read stops the rewind; a file that cannot be put back afterwards is named with why. Refused for a helper's
+  run, a run from before the places were kept, a run taken out already, a chat with a run at work or messages in its
+  queue, and a chat that changed since its runs were read for the plan. A live `chat_rewound` event has the pages read
+  their lists of chats again.
 - Send again (item 205) gives way to it: the box sends the message again, changed or not.
+- What it costs: the history is written anew whenever a run drops old screenshots or shortens old outputs, not only when
+  it compacts, and each run that does so keeps aside the history before it, with the screenshots that history names.
+  A long chat's share of the database grows with its turns (the owner's largest chat holds 3.4 MB of history over 11
+  turns, which comes to about 20 MB kept aside). Keeping each distinct message once would bring that down.
 
 **Why.** The third saying: open to being wrong, with a way back. The plan had the later turns stay greyed in the chat;
 in T3 Code they leave it, and so they do here.

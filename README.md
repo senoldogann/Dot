@@ -1351,14 +1351,16 @@ first message, in the bubble of your messages on the raised surface. What you wr
 answer does: its headings, lists, tables, code, quotes and emphasis (item 206). Under each of your messages, once its
 turn has its answer, stand the time it was sent (the day too when it was not today, the full date where the pointer
 rests) and a copy of it as you wrote it (item 205, after T3 Code); the files a message came with stand between it and
-that line. Under a message that opened a turn stands **Edit from here** too (item 282, after T3 Code), which asks whether
-to "rewind chat to before this message". **Revert and keep changes** takes that turn and the ones after it out of the
-chat (they still count in what Dot spent, and a question they left for you waits no more) and ends the history the model
-reads where it ended before the message, a summary made since included; the message comes back into the box of the turn before it with its files, to be changed
-and sent again, or into a new chat's box when it was the first. **Revert files too** also takes back what those turns,
-and their helpers, changed with the file tools, each file that is as they left it; a file changed since is left and
-named, and what a command changed stays. A message sent before Dot kept the place of each message in its chat has no
-Edit from here, nor has one that steered a turn at work, and a chat is not rewound while a run works on it. A delegated run is a row: the face with its state at the corner (turning while it works, amber while it waits for
+that line. Under a message that opened a turn stands **Edit from here** too (item 282, after T3 Code), which asks
+whether to "rewind chat to before this message". **Revert and keep changes** takes that turn and the ones after it out
+of the chat (they still count in what Dot spent, and a question they left for you waits no more) and ends the history
+the model reads where it ended before the message, a summary made since included; the message comes back into the box of
+the turn before it with its files, to be changed and sent again, or into a new chat's box when it was the first.
+**Revert files too** also takes back what those turns, and their helpers, changed with the file tools, each file that is
+as they left it; a file changed since is left and named, and what a command changed stays. A message sent before Dot
+kept the place of each message in its chat has no Edit from here, nor has one that steered a turn at work, and a chat is
+not rewound while a run works on it or messages wait in its queue.
+A delegated run is a row: the face with its state at the corner (turning while it works, amber while it waits for
 you, green with a check when it is done, red when it failed), its goal over the last thing it did and, once it ended,
 the start of its answer (item 245), the time it has taken (counting on every second while it works), the way to its own
 page and a chevron that opens its steps. Rows that follow each other gather in one group, as T3 Code groups its
