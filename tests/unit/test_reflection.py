@@ -55,6 +55,7 @@ def _run(status: RunStatus, mode: str, parent: str | None, source: str) -> RunRe
         source=source,
         effort=None,
         speed="standard",
+        once=None,
         approvals="ask",
         goal_mode=False,
         campaign_id=None,

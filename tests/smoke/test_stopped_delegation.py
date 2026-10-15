@@ -174,6 +174,7 @@ async def _stored_the_old_way(runtime: Runtime) -> RunRecord:
         "test",
         "medium",
         "standard",
+        None,
         "yolo",
         False,
         None,
@@ -190,6 +191,7 @@ async def _stored_the_old_way(runtime: Runtime) -> RunRecord:
         "delegate",
         "medium",
         "standard",
+        None,
         "yolo",
         False,
         None,
@@ -216,7 +218,7 @@ async def test_a_stopped_run_stops_the_runs_it_delegated_and_their_rows_end(
 ) -> None:
     manager, address = served
     run: RunRecord = await manager.start(
-        "Count the shelves", "task", SCRIPTED_MODEL, None, "test", None, None, "standard", "yolo", False, ()
+        "Count the shelves", "task", SCRIPTED_MODEL, None, "test", None, None, "standard", None, "yolo", False, ()
     )
     delegated: list[RunRecord] = await _children_of(runtime, run.id, len(_SHELVES))
     for child in delegated:

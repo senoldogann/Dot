@@ -333,6 +333,7 @@ async def _context_in(runtime: Runtime, campaign_id: str | None, approvals: Appr
         "test",
         "medium",
         "standard",
+        None,
         approvals,
         False,
         campaign_id,
@@ -445,7 +446,7 @@ async def test_a_campaign_claim_the_judge_finds_unlikely_is_refused_before_the_g
 ) -> None:
     thread: ThreadRecord = await runtime.store.create_thread("leads", "test")
     campaign: CampaignRecord = await runtime.store.create_campaign(
-        "Leads", GOAL, thread.id, "ollama:none", "medium", "standard", "ask", (), "own"
+        "Leads", GOAL, thread.id, "ollama:none", "medium", "standard", None, "ask", (), "own"
     )
     await runtime.store.set_campaign_targets(campaign.id, "50 leads in leads.csv", "wc -l leads.csv counts 51 lines")
     ctx: ToolContext = await _context(runtime, campaign.id)
@@ -566,6 +567,7 @@ async def _campaign_context(runtime: Runtime) -> tuple[ToolContext, CampaignReco
         "ollama:none",
         "medium",
         "standard",
+        None,
         "ask",
         (),
         "own",
@@ -771,7 +773,7 @@ async def test_in_goal_mode_a_claim_the_judge_finds_false_is_sent_back_without_t
     manager: RunManager = RunManager(runtime)
     try:
         run: RunRecord = await manager.start(
-            GOAL, "task", SCRIPTED_MODEL, None, "test", None, None, "standard", "ask", True, ()
+            GOAL, "task", SCRIPTED_MODEL, None, "test", None, None, "standard", None, "ask", True, ()
         )
         async with asyncio.timeout(60.0):
             ended: RunRecord = await manager.wait(run.id)
@@ -814,7 +816,7 @@ async def test_a_typed_judgment_sends_a_routine_step_to_the_fast_model_and_a_har
     manager: RunManager = RunManager(runtime)
     try:
         run: RunRecord = await manager.start(
-            "Echo three markers.", "task", SCRIPTED_MODEL, None, "test", None, None, "standard", "ask", False, ()
+            "Echo three markers.", "task", SCRIPTED_MODEL, None, "test", None, None, "standard", None, "ask", False, ()
         )
         async with asyncio.timeout(60.0):
             ended: RunRecord = await manager.wait(run.id)

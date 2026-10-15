@@ -171,7 +171,7 @@ async def test_the_side_panel_shows_one_tab_at_a_time_and_keeps_the_one_chosen_w
 ) -> None:
     manager, address = served
     run: RunRecord = await manager.start(
-        "Summarise the brief", "task", SCRIPTED_MODEL, None, "test", None, None, "standard", "yolo", False, ()
+        "Summarise the brief", "task", SCRIPTED_MODEL, None, "test", None, None, "standard", None, "yolo", False, ()
     )
     await _tool_calls(runtime, run.id, 2)
     async with async_playwright() as playwright:
@@ -264,6 +264,7 @@ async def _ended_run(runtime: Runtime) -> RunRecord:
         "test",
         "medium",
         "standard",
+        None,
         "yolo",
         False,
         None,

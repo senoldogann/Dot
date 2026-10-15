@@ -47,7 +47,23 @@ def test_schedules_follow_the_policy_layers(
 def _prompt(source: str) -> str:
     return build_system_prompt(
         collect_prompt_inputs(
-            "task", source, "aggressive", "ask", "wait", False, Path("/tmp/work"), [], [], [], 0, None, [], None, (), ()
+            "task",
+            source,
+            "aggressive",
+            "ask",
+            "wait",
+            False,
+            False,
+            Path("/tmp/work"),
+            [],
+            [],
+            [],
+            0,
+            None,
+            [],
+            None,
+            (),
+            (),
         )
     )
 

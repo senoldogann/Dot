@@ -179,10 +179,12 @@ from dotagent.llm.types import (
     Message,
     ModelInfo,
     ModelReply,
+    OneMessage,
     StreamDelta,
     ToolCall,
     ToolSpec,
     assistant_from_reply,
+    splits_work,
     system_message,
     tool_message,
     user_message,
@@ -307,11 +309,13 @@ _SWITCH_NOTE: str = (
 
 class RunOpening(FrozenModel):
     """How a run starts: ``text`` is its first message to the model (its goal, or the note of a resumed run), ``files``
-    the attachments that came with it, and ``resumed`` what a resumed run takes over from the run it resumes."""
+    the attachments that came with it, ``resumed`` what a resumed run takes over from the run it resumes, and ``once``
+    the choice for one message it was asked with (item 251), which the run keeps (``RunRecord.once``)."""
 
     text: str
     files: tuple[StoredAttachment, ...]
     resumed: Resumption | None
+    once: OneMessage | None
 
 
 @dataclass(frozen=True)
@@ -1481,6 +1485,7 @@ async def run_agent(agent: AgentRun) -> RunEnd:
                 run.approvals,
                 questions,
                 run.goal_mode,
+                splits_work(run.once),
                 runtime.workspace,
                 [render_note(record) for record in remembered],
                 tools_in_order(specs, query),

@@ -206,6 +206,7 @@ async def test_each_steps_thinking_is_a_block_that_folds_live_and_loaded_again(
                 None,
                 None,
                 "standard",
+                None,
                 "ask",
                 False,
                 (),

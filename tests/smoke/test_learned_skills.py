@@ -133,7 +133,7 @@ async def _client(home: Home) -> AsyncIterator[httpx.AsyncClient]:
 async def _run(home: Home) -> RunRecord:
     """``GOAL`` as a task run, once it ended and its skill work is done."""
     run: RunRecord = await home.manager.start(
-        GOAL, "task", SCRIPTED_MODEL, None, SOURCE, None, None, "standard", "ask", False, ()
+        GOAL, "task", SCRIPTED_MODEL, None, SOURCE, None, None, "standard", None, "ask", False, ()
     )
     async with asyncio.timeout(_TIME_LIMIT_S):
         record: RunRecord = await home.manager.wait(run.id)

@@ -108,6 +108,7 @@ def _prompt(approvals: ApprovalMode, goal_mode: bool) -> str:
             approvals,
             "wait",
             goal_mode,
+            False,
             Path("/tmp/work"),
             [],
             [],
@@ -169,6 +170,7 @@ def _asking(source: str, questions: QuestionMode, tool_names: list[str]) -> str:
             "ask",
             questions,
             False,
+            False,
             Path("/tmp/work"),
             [],
             tool_names,
@@ -201,7 +203,23 @@ def test_the_prompt_mentions_goal_mode_only_when_it_is_on() -> None:
 def _in_mode(mode: RunMode) -> str:
     return build_system_prompt(
         collect_prompt_inputs(
-            mode, "cli", "aggressive", "ask", "wait", False, Path("/tmp/work"), [], [], [], 0, None, [], None, (), ()
+            mode,
+            "cli",
+            "aggressive",
+            "ask",
+            "wait",
+            False,
+            False,
+            Path("/tmp/work"),
+            [],
+            [],
+            [],
+            0,
+            None,
+            [],
+            None,
+            (),
+            (),
         )
     )
 
@@ -223,7 +241,23 @@ def test_task_and_research_runs_keep_acting_and_take_an_ask_to_keep_going_at_its
     )
     session: str = build_system_prompt(
         collect_prompt_inputs(
-            "task", "cli", "aggressive", "ask", "wait", False, Path("/tmp/work"), [], [], [], 0, 2, [], None, (), ()
+            "task",
+            "cli",
+            "aggressive",
+            "ask",
+            "wait",
+            False,
+            False,
+            Path("/tmp/work"),
+            [],
+            [],
+            [],
+            0,
+            2,
+            [],
+            None,
+            (),
+            (),
         )
     )
     for rule in rules:
@@ -278,7 +312,13 @@ async def test_a_database_from_before_the_switches_gets_their_defaults(tmp_path:
         store: Store = await Store.open(database, tmp_path / "images")
         try:
             old: RunRecord = await store.get_run("run_old")
-            assert (old.approvals, old.goal_mode, old.effort, old.result) == ("ask", False, None, "an old result")
+            assert (old.approvals, old.goal_mode, old.effort, old.once, old.result) == (
+                "ask",
+                False,
+                None,
+                None,
+                "an old result",
+            )
         finally:
             await store.close()
     store = await Store.open(database, tmp_path / "images")
@@ -292,6 +332,7 @@ async def test_a_database_from_before_the_switches_gets_their_defaults(tmp_path:
             "cli",
             "medium",
             "standard",
+            None,
             "yolo",
             True,
             None,

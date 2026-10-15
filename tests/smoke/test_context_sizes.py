@@ -118,6 +118,7 @@ async def _seed_history(runtime: Runtime) -> None:
         "test",
         "medium",
         "standard",
+        None,
         "yolo",
         False,
         None,

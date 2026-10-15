@@ -142,6 +142,7 @@ async def test_the_pill_of_a_helpers_page_stays_in_the_window_as_its_conversatio
                 None,
                 None,
                 "standard",
+                None,
                 "ask",
                 False,
                 (),

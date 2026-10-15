@@ -11,7 +11,7 @@ from dotagent.core.types import FrozenModel
 from dotagent.desktop.perms import Pane
 from dotagent.help.elsewhere import FoundElsewhere
 from dotagent.llm.roles import ModelRole
-from dotagent.llm.types import Effort, Speed, WindowSource
+from dotagent.llm.types import Effort, OneMessage, Speed, WindowSource
 from dotagent.mcp.types import McpFailure
 from dotagent.policy.types import ApprovalMode
 from dotagent.secrets import SecretSource
@@ -127,8 +127,10 @@ MessageKey = Annotated[str, StringConstraints(pattern=r"^[A-Za-z0-9-]{16,64}$")]
 
 class StartRunRequest(FrozenModel):
     """Start a run. ``model``, ``effort``, ``approvals`` and ``goal_mode`` left out take the configured ones; ``speed``
-    is ``fast`` for fast mode, on a model that has it (item 223). ``standing`` ("Keep going until done") starts a
-    campaign on the goal instead, with this run as its opening session: a task, without goal mode (see
+    is ``fast`` for fast mode, on a model that has it (item 223); ``once`` is a choice for this message only (item 251):
+    ``ultrathink`` asks the model for its Max level, ``ultracode`` for its Extra high level and tells the run to split
+    its independent parts across delegated runs, while the chat keeps ``effort``. ``standing`` ("Keep going until
+    done") starts a campaign on the goal instead, with this run as its opening session: a task, without goal mode (see
     ``RunManager.start_campaign``)."""
 
     goal: str = Field(min_length=1, max_length=_GOAL_CHARS)
@@ -137,6 +139,7 @@ class StartRunRequest(FrozenModel):
     thread_id: str | None = None
     effort: Effort | None = None
     speed: Speed = "standard"
+    once: OneMessage | None = None
     approvals: ApprovalMode | None = None
     goal_mode: bool | None = None
     standing: bool = False
@@ -193,6 +196,7 @@ class QueueMessageRequest(FrozenModel):
     model: str | None = None
     effort: Effort | None = None
     speed: Speed = "standard"
+    once: OneMessage | None = None
     approvals: ApprovalMode | None = None
     goal_mode: bool | None = None
     agent_id: str | None = None

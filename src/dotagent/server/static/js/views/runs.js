@@ -161,6 +161,7 @@ function buildComposer(ctx, listener) {
           model: chosen.model,
           effort: chosen.effort,
           speed: chosen.speed,
+          once: chosen.once,
           approvals: chosen.approvals,
           goal_mode: standing.value() ? null : chosen.goal_mode,
           standing: standing.value(),
@@ -170,6 +171,7 @@ function buildComposer(ctx, listener) {
         };
         const created = await api.post("/runs", { ...body, key: keys.of("run", body) });
         keys.sent();
+        choices.sent();
         frame.clear();
         ctx.navigate(`/runs/${created.id}`);
       });

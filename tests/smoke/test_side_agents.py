@@ -145,7 +145,7 @@ async def test_the_side_menu_shows_every_agent_of_a_run_and_folds_them(
 ) -> None:
     manager, address = served
     run: RunRecord = await manager.start(
-        "Read the shelves", "task", SCRIPTED_MODEL, None, "test", None, None, "standard", "yolo", False, ()
+        "Read the shelves", "task", SCRIPTED_MODEL, None, "test", None, None, "standard", None, "yolo", False, ()
     )
     delegated: list[RunRecord] = await _two_done_one_working(runtime, run.id)
     async with async_playwright() as playwright:

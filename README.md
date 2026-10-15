@@ -214,6 +214,19 @@ speed, as do helpers on a model without it. Dot never falls back by itself: a re
 fast mode's own rate limit, once retried) is the run's error, as Anthropic says it. Fast mode for a model without it
 is refused (a 422 over HTTP). Switching the speed of a chat starts the prompt cache again.
 
+**Ultrathink and Ultracode.** The Reasoning menu has two choices for one message, under This message only (item 251).
+Ultrathink, for a model that offers `max`, asks it for Max for this message. Ultracode, for a model that offers `xhigh`,
+asks it for Extra high and tells the run, in its instructions, to split the goal: each part that needs no other part's
+result goes to a helper of its own (a `delegate`, several in one turn, each with its plan step), and the run does itself
+only what joins or checks their reports; the helpers work at the run's level, or at the one their agent names. The pill
+reads the choice until the message goes, and the next message goes with the level the chat keeps, which the choice never
+changes. The run keeps it as it was started: the run that resumes it, the one that carries on after an answered question
+and every session of a campaign started with it (`once` in `POST /api/runs` and in the queue, `ultrathink` or
+`ultracode`; the Details panel says `Max, Ultrathink`). A model without the level is refused (a 422 over HTTP), and a
+helper, which cannot delegate, is never told to split. The names are Claude Code's, where ultrathink is a word in a
+prompt that asks for deeper thinking on that turn and Ultracode runs a task as a workflow of many agents; in Dot they
+are these levels, the second with the split.
+
 **Keys** are read from the environment of the process, then from `<home>/.env`, then from the macOS Keychain (service
 `dot-agent`, account = the variable name); a Keychain that does not answer within 15 seconds (locked, or waiting for a
 prompt nobody answers) is an error that says so. `dotx auth set OPENAI_API_KEY` reads the value from the terminal

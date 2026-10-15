@@ -142,7 +142,9 @@ async def test_the_agent_types_presses_and_ticks_in_a_mac_application(runtime: R
         "the Enabled checkbox. Work only in that application. Then call finish and tell me what the counter label says."
     )
     try:
-        run: RunRecord = await manager.start(goal, "task", None, None, "test", None, None, "standard", None, None, ())
+        run: RunRecord = await manager.start(
+            goal, "task", None, None, "test", None, None, "standard", None, None, None, ()
+        )
         finished: RunRecord = await asyncio.wait_for(manager.wait(run.id), RUN_TIMEOUT_S)
     finally:
         await manager.shutdown()

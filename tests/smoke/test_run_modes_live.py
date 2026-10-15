@@ -231,7 +231,7 @@ async def test_the_goal_checker_sends_the_agent_back_for_what_the_digest_does_no
 async def test_a_yolo_run_does_what_it_is_told_without_asking(runtime: Runtime, manager: RunManager) -> None:
     path: Path = runtime.workspace / f"yolo-{secrets.token_hex(3)}.txt"
     run: RunRecord = await manager.start(
-        _touch_goal(path), "task", None, None, "test", None, None, "standard", "yolo", None, ()
+        _touch_goal(path), "task", None, None, "test", None, None, "standard", None, "yolo", None, ()
     )
     finished: RunRecord = await _run_to_the_end(manager, run)
     events: list[EventRecord] = await _events(runtime, run.id)
@@ -251,7 +251,7 @@ async def test_an_auto_run_has_the_review_model_answer_what_the_policy_asks(
 ) -> None:
     path: Path = runtime.workspace / f"auto-{secrets.token_hex(3)}.txt"
     run: RunRecord = await manager.start(
-        _touch_goal(path), "task", None, None, "test", None, None, "standard", "auto", None, ()
+        _touch_goal(path), "task", None, None, "test", None, None, "standard", None, "auto", None, ()
     )
     finished: RunRecord = await _run_to_the_end(manager, run)
     events: list[EventRecord] = await _events(runtime, run.id)
@@ -276,7 +276,9 @@ async def test_a_goal_mode_run_is_checked_against_its_goal_before_it_ends(
         f"Create two empty files with the shell: first `touch {first}`, then `touch {second}`. "
         "Then call finish and name both files in the answer."
     )
-    run: RunRecord = await manager.start(goal, "task", None, None, "test", None, None, "standard", "yolo", True, ())
+    run: RunRecord = await manager.start(
+        goal, "task", None, None, "test", None, None, "standard", None, "yolo", True, ()
+    )
     finished: RunRecord = await _run_to_the_end(manager, run)
     checks: list[EventRecord] = [event for event in await _events(runtime, run.id) if event.kind == "goal_check"]
     assert finished.status == "done", finished
@@ -293,7 +295,7 @@ async def test_a_delegated_run_inherits_the_approval_mode_but_not_goal_mode(
 ) -> None:
     thread: ThreadRecord = await runtime.store.create_thread("modes test", "test")
     parent: RunRecord = await runtime.store.create_run(
-        thread.id, "goal", "task", MODEL_REF, None, "test", "medium", "standard", "auto", True, None, None, None
+        thread.id, "goal", "task", MODEL_REF, None, "test", "medium", "standard", None, "auto", True, None, None, None
     )
     outcome: DelegateOutcome = await asyncio.wait_for(
         manager.delegate(parent.id, "Call finish with the answer ok.", "task", None, None), RUN_TIMEOUT_S
@@ -305,5 +307,5 @@ async def test_a_delegated_run_inherits_the_approval_mode_but_not_goal_mode(
 
 async def test_a_chat_has_no_goal_mode(manager: RunManager) -> None:
     with pytest.raises(ConfigError) as refused:
-        await manager.start("hello", "chat", None, None, "test", None, None, "standard", None, True, ())
+        await manager.start("hello", "chat", None, None, "test", None, None, "standard", None, None, True, ())
     assert "goal mode" in refused.value.message

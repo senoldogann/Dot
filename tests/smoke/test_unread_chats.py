@@ -101,7 +101,7 @@ async def served(runtime: Runtime) -> AsyncIterator[tuple[RunManager, str]]:
 async def _ended(manager: RunManager, goal: str, thread_id: str | None) -> RunRecord:
     """``goal`` as a task on ``thread_id`` (a new chat for ``None``) that the scripted model finishes, once it is over."""
     run: RunRecord = await manager.start(
-        goal, "task", SCRIPTED_MODEL, thread_id, "test", None, None, "standard", "ask", False, ()
+        goal, "task", SCRIPTED_MODEL, thread_id, "test", None, None, "standard", None, "ask", False, ()
     )
     async with asyncio.timeout(_RUN_WAIT_S):
         ended: RunRecord = await manager.wait(run.id)

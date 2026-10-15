@@ -138,7 +138,7 @@ async def test_a_run_a_shutdown_cut_off_while_it_asked_goes_on_by_itself_with_it
             try:
                 async with runtime.bus.subscribe(None) as subscription:
                     run: RunRecord = await manager.start(
-                        GOAL, "task", SCRIPTED_MODEL, None, UI_SOURCE, None, None, "standard", "yolo", False, ()
+                        GOAL, "task", SCRIPTED_MODEL, None, UI_SOURCE, None, None, "standard", None, "yolo", False, ()
                     )
                     async with asyncio.timeout(_TIME_LIMIT_S):
                         await _until(subscription, run.id, "approval_requested")

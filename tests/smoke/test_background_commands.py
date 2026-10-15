@@ -132,7 +132,9 @@ async def _heard(runtime: Runtime, kind: str) -> AsyncIterator[asyncio.Queue[Eve
 
 async def _start(manager: RunManager) -> RunRecord:
     """A new chat's run, at work until the scripted model ends it."""
-    return await manager.start(GOAL, "task", SCRIPTED_MODEL, None, UI_SOURCE, None, None, "standard", "yolo", False, ())
+    return await manager.start(
+        GOAL, "task", SCRIPTED_MODEL, None, UI_SOURCE, None, None, "standard", None, "yolo", False, ()
+    )
 
 
 async def _ended(manager: RunManager, run_id: str) -> RunRecord:

@@ -189,7 +189,20 @@ async def _chat(runtime: Runtime, title: str) -> ThreadRecord:
     """A chat with one run that is over, made in the store as a dotx command would make it, with no event to the page."""
     thread: ThreadRecord = await runtime.store.create_thread(title, "test")
     run: RunRecord = await runtime.store.create_run(
-        thread.id, title, "chat", "ollama:scripted", None, "test", "medium", "standard", "ask", False, None, None, None
+        thread.id,
+        title,
+        "chat",
+        "ollama:scripted",
+        None,
+        "test",
+        "medium",
+        "standard",
+        None,
+        "ask",
+        False,
+        None,
+        None,
+        None,
     )
     await runtime.store.finish_run(run.id, "done", "Done.")
     return thread

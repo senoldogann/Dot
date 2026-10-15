@@ -30,7 +30,7 @@ from dotagent.core.logs import get_logger
 from dotagent.core.text import fold_search
 from dotagent.core.types import JsonArray, JsonObject
 from dotagent.llm.calls import CALL_EVENT, CallPurpose
-from dotagent.llm.types import Effort, ImageData, Message, Speed
+from dotagent.llm.types import Effort, ImageData, Message, OneMessage, Speed
 from dotagent.policy.types import ApprovalMode, PaceClass
 from dotagent.store.endings import RESULT_RESTARTED
 from dotagent.store.models import (
@@ -371,6 +371,7 @@ def _run(row: aiosqlite.Row) -> RunRecord:
         source=row["source"],
         effort=row["effort"],
         speed=row["speed"],
+        once=row["once"],
         approvals=row["approvals"],
         goal_mode=bool(row["goal_mode"]),
         campaign_id=row["campaign_id"],
@@ -422,6 +423,7 @@ def _campaign(row: aiosqlite.Row) -> CampaignRecord:
             "model": row["model"],
             "effort": row["effort"],
             "speed": row["speed"],
+            "once": row["once"],
             "approvals": row["approvals"],
             "files": parse_json_value(row["files"], "campaign files"),
             "cron": row["cron"],
@@ -500,6 +502,7 @@ def _queued(row: aiosqlite.Row) -> QueuedMessage:
         model=row["model"],
         effort=row["effort"],
         speed=row["speed"],
+        once=row["once"],
         approvals=row["approvals"],
         goal_mode=None if goal_mode is None else bool(goal_mode),
         agent_id=row["agent_id"],
@@ -555,7 +558,8 @@ def _option_values(options: ScheduleOptions) -> tuple[str | None, str | None, st
 
 # Columns of ``runs`` added after the first version, with the definition that gives the rows of an older database the
 # value those runs had in effect: no reasoning level kept, ``ask``, no goal mode, no campaign, no owner (a run of a
-# process of before owners, which a daemon that starts takes for gone, as it took every run then), the standard speed.
+# process of before owners, which a daemon that starts takes for gone, as it took every run then), the standard speed,
+# no choice for one message (item 251).
 _ADDED_RUN_COLUMNS: tuple[tuple[str, str], ...] = (
     ("effort", "TEXT"),
     ("approvals", "TEXT NOT NULL DEFAULT 'ask'"),
@@ -564,6 +568,7 @@ _ADDED_RUN_COLUMNS: tuple[tuple[str, str], ...] = (
     ("agent_id", "TEXT"),
     ("owner", "TEXT"),
     ("speed", "TEXT NOT NULL DEFAULT 'standard'"),
+    ("once", "TEXT"),
 )
 # Columns of ``memories`` added later: notes of an older database were never counted as used, and are Dot's.
 _ADDED_MEMORY_COLUMNS: tuple[tuple[str, str], ...] = (
@@ -583,13 +588,18 @@ _ADDED_SCHEDULE_COLUMNS: tuple[tuple[str, str], ...] = (
 
 
 # Columns of ``campaigns`` added later: NULL means the daemon's browser, which is where an older campaign's sessions ran;
-# they ran at the standard speed too.
+# they ran at the standard speed too, and without a choice for one message.
 _ADDED_CAMPAIGN_COLUMNS: tuple[tuple[str, str], ...] = (
     ("browser", "TEXT"),
     ("speed", "TEXT NOT NULL DEFAULT 'standard'"),
+    ("once", "TEXT"),
 )
-# Columns of ``queued_messages`` added later: an older message was sent at the standard speed.
-_ADDED_QUEUE_COLUMNS: tuple[tuple[str, str], ...] = (("speed", "TEXT NOT NULL DEFAULT 'standard'"),)
+# Columns of ``queued_messages`` added later: an older message was sent at the standard speed, without a choice for one
+# message.
+_ADDED_QUEUE_COLUMNS: tuple[tuple[str, str], ...] = (
+    ("speed", "TEXT NOT NULL DEFAULT 'standard'"),
+    ("once", "TEXT"),
+)
 # Columns of ``threads`` added later: NULL means a chat the owner has not pinned (item 130), one the owner has not seen
 # since its runs began or since they marked it unread (item 131), and one without choices of its own yet (a
 # ``ChatChoices`` as JSON, item 199).
@@ -1136,6 +1146,7 @@ class Store:
         source: str,
         effort: Effort,
         speed: Speed,
+        once: OneMessage | None,
         approvals: ApprovalMode,
         goal_mode: bool,
         campaign_id: str | None,
@@ -1160,6 +1171,7 @@ class Store:
             source=source,
             effort=effort,
             speed=speed,
+            once=once,
             approvals=approvals,
             goal_mode=goal_mode,
             campaign_id=campaign_id,
@@ -1178,8 +1190,9 @@ class Store:
         )
         async with self._db.execute(
             "INSERT INTO runs(id, thread_id, goal, mode, model, status, created_at, finished_at, result, steps,"
-            " input_tokens, output_tokens, parent_run_id, source, effort, speed, approvals, goal_mode, campaign_id,"
-            f" agent_id, owner) SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?{refusal} RETURNING id",
+            " input_tokens, output_tokens, parent_run_id, source, effort, speed, once, approvals, goal_mode,"
+            " campaign_id, agent_id, owner) SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,"
+            f" ?{refusal} RETURNING id",
             (
                 record.id,
                 record.thread_id,
@@ -1197,6 +1210,7 @@ class Store:
                 record.source,
                 record.effort,
                 record.speed,
+                record.once,
                 record.approvals,
                 int(record.goal_mode),
                 record.campaign_id,
@@ -1788,6 +1802,7 @@ class Store:
         model: str | None,
         effort: Effort | None,
         speed: Speed,
+        once: OneMessage | None,
         approvals: ApprovalMode | None,
         goal_mode: bool | None,
         agent_id: str | None,
@@ -1807,6 +1822,7 @@ class Store:
             model=model,
             effort=effort,
             speed=speed,
+            once=once,
             approvals=approvals,
             goal_mode=goal_mode,
             agent_id=agent_id,
@@ -1820,8 +1836,8 @@ class Store:
     async def _insert_queued(self, record: QueuedMessage) -> None:
         """Store ``record`` in its chat's queue; the caller commits."""
         await self._db.execute(
-            "INSERT INTO queued_messages(id, thread_id, position, text, attachments, mode, model, effort, speed,"
-            " approvals, goal_mode, agent_id, source, created_at) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            "INSERT INTO queued_messages(id, thread_id, position, text, attachments, mode, model, effort, speed, once,"
+            " approvals, goal_mode, agent_id, source, created_at) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (
                 record.id,
                 record.thread_id,
@@ -1832,6 +1848,7 @@ class Store:
                 record.model,
                 record.effort,
                 record.speed,
+                record.once,
                 record.approvals,
                 None if record.goal_mode is None else int(record.goal_mode),
                 record.agent_id,
@@ -2468,6 +2485,7 @@ class Store:
         model: str,
         effort: Effort,
         speed: Speed,
+        once: OneMessage | None,
         approvals: ApprovalMode,
         files: Sequence[str],
         browser: BrowserMode,
@@ -2485,6 +2503,7 @@ class Store:
             model=model,
             effort=effort,
             speed=speed,
+            once=once,
             approvals=approvals,
             files=tuple(files),
             cron=None,
@@ -2496,8 +2515,8 @@ class Store:
         )
         await self._db.execute(
             "INSERT INTO campaigns(id, title, goal, targets, verification, status, thread_id, model, effort, speed,"
-            " approvals, files, cron, next_session_at, created_at, updated_at, evidence, browser)"
-            " VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            " once, approvals, files, cron, next_session_at, created_at, updated_at, evidence, browser)"
+            " VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (
                 record.id,
                 record.title,
@@ -2509,6 +2528,7 @@ class Store:
                 record.model,
                 record.effort,
                 record.speed,
+                record.once,
                 record.approvals,
                 dumps_compact(list(record.files)),
                 record.cron,

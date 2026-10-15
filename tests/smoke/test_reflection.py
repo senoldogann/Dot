@@ -186,7 +186,7 @@ def _lessons(*lessons: str) -> ScriptedTurn:
 
 async def _start(home: Home, goal: str, approvals: str) -> RunRecord:
     return await home.manager.start(
-        goal, "task", SCRIPTED_MODEL, None, "test", None, None, "standard", approvals, False, ()
+        goal, "task", SCRIPTED_MODEL, None, "test", None, None, "standard", None, approvals, False, ()
     )  # type: ignore[arg-type]
 
 

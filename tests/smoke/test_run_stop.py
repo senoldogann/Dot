@@ -113,6 +113,7 @@ async def test_the_send_is_the_runs_stop_while_the_box_is_empty_and_the_top_bar_
                     None,
                     None,
                     "standard",
+                    None,
                     "yolo",
                     False,
                     (),

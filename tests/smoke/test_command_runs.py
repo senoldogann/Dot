@@ -311,7 +311,7 @@ async def _queued_beside_a_command(runtime: Runtime, manager: RunManager, home: 
     ):
         run: RunRecord = await runtime.store.get_run(await _working(child, relayed))
         await manager.queue(
-            run.thread_id, SUMMARY, (), "task", SCRIPTED_MODEL, None, "standard", "yolo", False, None, UI_SOURCE
+            run.thread_id, SUMMARY, (), "task", SCRIPTED_MODEL, None, "standard", None, "yolo", False, None, UI_SOURCE
         )
         assert [other.id for other in await runtime.store.list_runs(10, run.thread_id)] == [run.id]
         await asyncio.to_thread(_let_the_command_end)
@@ -388,6 +388,7 @@ async def test_a_new_run_on_a_chat_closes_first_the_run_a_dead_command_left_at_w
                 "cli",
                 "medium",
                 "standard",
+                None,
                 "yolo",
                 False,
                 None,
@@ -395,7 +396,7 @@ async def test_a_new_run_on_a_chat_closes_first_the_run_a_dead_command_left_at_w
                 "0" * 32,
             )
             run: RunRecord = await manager.start(
-                SUMMARY, "task", SCRIPTED_MODEL, thread.id, UI_SOURCE, None, None, "standard", "yolo", False, ()
+                SUMMARY, "task", SCRIPTED_MODEL, thread.id, UI_SOURCE, None, None, "standard", None, "yolo", False, ()
             )
             assert (await runtime.store.get_run(left.id)).status == "failed"
             async with asyncio.timeout(WAIT_S):

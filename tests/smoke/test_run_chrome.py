@@ -70,7 +70,7 @@ async def served(login_env: dict[str, str]) -> AsyncIterator[tuple[Runtime, RunR
             manager: RunManager = RunManager(runtime)
             try:
                 run: RunRecord = await manager.start(
-                    GOAL, "task", SCRIPTED_MODEL, None, EVAL_SOURCE, None, None, "standard", "yolo", False, ()
+                    GOAL, "task", SCRIPTED_MODEL, None, EVAL_SOURCE, None, None, "standard", None, "yolo", False, ()
                 )
                 async with asyncio.timeout(_TIME_LIMIT_S):
                     record: RunRecord = await manager.wait(run.id)

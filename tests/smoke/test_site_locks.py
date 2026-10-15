@@ -95,7 +95,7 @@ async def test_two_runs_of_one_manager_cannot_both_take_the_last_public_action_o
     async with _session(login_env, model) as (runtime, manager):
         runs: list[RunRecord] = [
             await manager.start(
-                GOAL, "task", SCRIPTED_MODEL, None, UI_SOURCE, None, None, "standard", "yolo", False, ()
+                GOAL, "task", SCRIPTED_MODEL, None, UI_SOURCE, None, None, "standard", None, "yolo", False, ()
             )
             for _ in range(_RUNS)
         ]

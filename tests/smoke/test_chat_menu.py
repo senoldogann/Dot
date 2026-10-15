@@ -108,6 +108,7 @@ async def _seed(runtime: Runtime, title: str) -> RunRecord:
         "test",
         "medium",
         "standard",
+        None,
         "ask",
         False,
         None,

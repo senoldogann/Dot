@@ -311,6 +311,7 @@ async def _run_in(
                 None,
                 None,
                 "standard",
+                None,
                 "ask",
                 _chosen_goal_mode(task),
                 (),

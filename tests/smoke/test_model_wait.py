@@ -143,7 +143,7 @@ async def _play(login_env: dict[str, str], wait_s: float, model: Unreachable, st
                 async with runtime.bus.subscribe(None) as subscription:
                     started: float = time.monotonic()
                     run: RunRecord = await manager.start(
-                        GOAL, "task", SCRIPTED_MODEL, None, EVAL_SOURCE, None, None, "standard", "ask", False, ()
+                        GOAL, "task", SCRIPTED_MODEL, None, EVAL_SOURCE, None, None, "standard", None, "ask", False, ()
                     )
                     async with asyncio.timeout(_TIME_LIMIT_S):
                         if stop_when_waiting:

@@ -34,7 +34,7 @@ async def main(goal: str, turn: ScriptedTurn) -> None:
     manager: RunManager = RunManager(runtime)
     async with runtime.bus.subscribe(None) as subscription:
         run: RunRecord = await manager.start(
-            goal, "task", SCRIPTED_MODEL, None, UI_SOURCE, None, None, "standard", "yolo", False, ()
+            goal, "task", SCRIPTED_MODEL, None, UI_SOURCE, None, None, "standard", None, "yolo", False, ()
         )
         _say(f"run {run.id}")
         while True:

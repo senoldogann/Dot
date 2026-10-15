@@ -118,7 +118,9 @@ async def test_the_agent_fills_in_and_submits_a_form_in_the_browser(runtime: Run
         "the confirmation page says."
     )
     try:
-        run: RunRecord = await manager.start(goal, "task", None, None, "test", None, None, "standard", None, None, ())
+        run: RunRecord = await manager.start(
+            goal, "task", None, None, "test", None, None, "standard", None, None, None, ()
+        )
         finished: RunRecord = await asyncio.wait_for(manager.wait(run.id), RUN_TIMEOUT_S)
     finally:
         await manager.shutdown()

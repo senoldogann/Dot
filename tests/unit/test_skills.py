@@ -381,6 +381,7 @@ def _prompt(tool_names: list[str], skills: list[Skill], left: int) -> str:
             "ask",
             "wait",
             False,
+            False,
             Path("/tmp/work"),
             [],
             tool_names,

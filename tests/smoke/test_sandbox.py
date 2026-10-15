@@ -67,7 +67,20 @@ async def _nobody(request: ReviewRequest) -> ReviewVerdict:
 async def _context(runtime: Runtime, approvals: ApprovalMode) -> ToolContext:
     thread: ThreadRecord = await runtime.store.create_thread("sandbox", "test")
     run: RunRecord = await runtime.store.create_run(
-        thread.id, GOAL, "task", "ollama:none", None, "test", "medium", "standard", approvals, False, None, None, None
+        thread.id,
+        GOAL,
+        "task",
+        "ollama:none",
+        None,
+        "test",
+        "medium",
+        "standard",
+        None,
+        approvals,
+        False,
+        None,
+        None,
+        None,
     )
     return ToolContext(
         runtime=runtime,

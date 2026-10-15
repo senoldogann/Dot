@@ -495,7 +495,7 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
     keeping = keeping.then(() =>
       attempt(async () => {
         await choices.ready();
-        await api.patch(`/threads/${run.thread_id}`, { choices: choices.value() });
+        await api.patch(`/threads/${run.thread_id}`, { choices: choices.kept() });
       }),
     );
   }
@@ -674,6 +674,7 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
         model: chosen.model,
         effort: chosen.effort,
         speed: chosen.speed,
+        once: chosen.once,
         approvals: chosen.approvals,
         goal_mode: chosen.goal_mode,
         agent_id: run.agent_id,
@@ -681,6 +682,7 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
       };
       await queue.add({ ...body, key: keys.of("queue", run.thread_id, body) });
       keys.sent();
+      choices.sent();
       return null;
     }
     if (active) {
@@ -704,6 +706,7 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
       model: chosen.model,
       effort: chosen.effort,
       speed: chosen.speed,
+      once: chosen.once,
       approvals: chosen.approvals,
       goal_mode: chosen.goal_mode,
       thread_id: run.thread_id,
@@ -712,6 +715,7 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
     };
     const next = await api.post("/runs", { ...body, key: keys.of("run", body) });
     keys.sent();
+    choices.sent();
     return next.id;
   }
 

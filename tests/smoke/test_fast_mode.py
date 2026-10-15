@@ -241,7 +241,7 @@ async def test_the_reasoning_menu_offers_fast_mode_and_the_chats_next_run_asks_f
 ) -> None:
     manager, address = served
     first: RunRecord = await manager.start(
-        "Say hi.", "chat", OPUS, None, "test", None, None, "standard", "yolo", None, ()
+        "Say hi.", "chat", OPUS, None, "test", None, None, "standard", None, "yolo", None, ()
     )
     ended: RunRecord = await _ended(manager, first.id)
     assert ended.status == "done", ended.result

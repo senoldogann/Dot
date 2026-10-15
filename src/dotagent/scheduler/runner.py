@@ -259,6 +259,7 @@ class Scheduler:
                 None,
                 record.options.effort,
                 "standard",
+                None,
                 record.options.approvals,
                 record.options.goal_mode,
                 (),

@@ -88,7 +88,7 @@ async def _start_and_wait_until_running(runtime: Runtime, manager: RunManager, g
     """Start a run on the chosen model and return once its first step is under way."""
     async with runtime.bus.subscribe(None) as subscription, asyncio.timeout(RUN_TIMEOUT_S):
         run: RunRecord = await manager.start(
-            goal, "task", CHOSEN_REF, None, "test", None, None, "standard", "yolo", False, ()
+            goal, "task", CHOSEN_REF, None, "test", None, None, "standard", None, "yolo", False, ()
         )
         while True:
             event: EventRecord = await subscription.queue.get()

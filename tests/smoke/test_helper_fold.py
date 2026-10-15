@@ -160,7 +160,7 @@ async def test_a_helper_is_a_closed_row_that_opens_for_its_approval_and_folds_ag
     manager, address = served
     host, port = "127.0.0.1", int(address.rpartition(":")[2])
     parent: RunRecord = await manager.start(
-        "Sort the shelves", "task", SCRIPTED_MODEL, None, "test", None, None, "standard", "ask", False, ()
+        "Sort the shelves", "task", SCRIPTED_MODEL, None, "test", None, None, "standard", None, "ask", False, ()
     )
     await _first_tool_call(runtime, parent.id)
     asking_task: asyncio.Task[DelegateOutcome] = asyncio.create_task(

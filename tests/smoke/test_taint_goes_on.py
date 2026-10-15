@@ -78,7 +78,7 @@ async def _start(manager: RunManager, thread_id: str | None) -> RunRecord:
     """A run of the owner's message in the chat ``thread_id`` (a new chat when ``None``), whose questions the owner
     answers."""
     return await manager.start(
-        GOAL, "task", SCRIPTED_MODEL, thread_id, UI_SOURCE, None, None, "standard", "ask", False, ()
+        GOAL, "task", SCRIPTED_MODEL, thread_id, UI_SOURCE, None, None, "standard", None, "ask", False, ()
     )
 
 

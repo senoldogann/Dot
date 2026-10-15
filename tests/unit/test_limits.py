@@ -41,7 +41,20 @@ async def test_the_tokens_of_a_run_count_the_runs_it_delegated_to(tmp_path: Path
     try:
         thread: ThreadRecord = await store.create_thread("t", "test")
         parent: RunRecord = await store.create_run(
-            thread.id, "goal", "task", "ollama:a", None, "test", "medium", "standard", "ask", False, None, None, None
+            thread.id,
+            "goal",
+            "task",
+            "ollama:a",
+            None,
+            "test",
+            "medium",
+            "standard",
+            None,
+            "ask",
+            False,
+            None,
+            None,
+            None,
         )
         child: RunRecord = await store.create_run(
             thread.id,
@@ -52,6 +65,7 @@ async def test_the_tokens_of_a_run_count_the_runs_it_delegated_to(tmp_path: Path
             "delegate",
             "medium",
             "standard",
+            None,
             "ask",
             False,
             None,
@@ -59,7 +73,20 @@ async def test_the_tokens_of_a_run_count_the_runs_it_delegated_to(tmp_path: Path
             None,
         )
         other: RunRecord = await store.create_run(
-            thread.id, "goal", "task", "ollama:a", None, "test", "medium", "standard", "ask", False, None, None, None
+            thread.id,
+            "goal",
+            "task",
+            "ollama:a",
+            None,
+            "test",
+            "medium",
+            "standard",
+            None,
+            "ask",
+            False,
+            None,
+            None,
+            None,
         )
         await store.add_run_tokens(parent.id, 1000, 50)
         await store.add_run_tokens(child.id, 300, 20)

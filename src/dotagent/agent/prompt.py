@@ -37,6 +37,8 @@ class PromptInputs(FrozenModel):
     approvals: ApprovalMode
     questions: QuestionMode
     goal_mode: bool
+    # The owner asked for the goal's independent parts to run at the same time on delegated runs (Ultracode, item 251).
+    split: bool
     workspace: str
     home: str
     user: str
@@ -102,6 +104,12 @@ _GOAL_MODE_TEXT: str = (
     "Goal mode is on: when you call finish, a checker compares your answer with the goal and sends you back to work "
     "when something is missing. Call finish only once the goal is really reached, and put the evidence (what you ran "
     "and saw) into the answer."
+)
+_SPLIT_TEXT: str = (
+    "Split: the user asked for the independent parts of this goal to be done at the same time by delegated runs. Plan "
+    "first; then give each part that needs no other part's result a delegate of its own with its plan step named, "
+    "several in one turn, and do yourself only what joins or checks their reports. A part that one or two tool calls "
+    "can do stays yours."
 )
 
 _WORK: str = """You are Dot, an autonomous agent that works on the user's Mac. You act through tools: shell, files, a \
@@ -417,6 +425,9 @@ def _environment(inputs: PromptInputs) -> str:
         lines.append(f"- Approvals: {_APPROVALS_TEXT[inputs.approvals]}")
     if inputs.goal_mode:
         lines.append(f"- {_GOAL_MODE_TEXT}")
+    # Only a run that can delegate is told to split: a delegated run cannot delegate again.
+    if inputs.split and DELEGATE_TOOL in inputs.tool_names:
+        lines.append(f"- {_SPLIT_TEXT}")
     if inputs.source == SCHEDULE_SOURCE:
         lines.append(f"- {_UNATTENDED_LEAVING if inputs.questions == 'leave' else _UNATTENDED}")
     if inputs.source == DELEGATE_SOURCE:
@@ -587,6 +598,7 @@ def collect_prompt_inputs(
     approvals: ApprovalMode,
     questions: QuestionMode,
     goal_mode: bool,
+    split: bool,
     workspace: Path,
     memories: Sequence[str],
     tool_names: Sequence[str],
@@ -606,6 +618,7 @@ def collect_prompt_inputs(
         approvals=approvals,
         questions=questions,
         goal_mode=goal_mode,
+        split=split,
         workspace=str(workspace),
         home=str(Path.home()),
         user=getpass.getuser(),

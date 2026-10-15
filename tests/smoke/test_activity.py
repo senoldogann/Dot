@@ -166,7 +166,7 @@ async def test_the_sections_show_what_waits_what_works_and_a_campaign_session_wi
 ) -> None:
     thread: ThreadRecord = await runtime.store.create_thread("Leads campaign", "test")
     campaign: CampaignRecord = await runtime.store.create_campaign(
-        "Find leads", "Find ten leads", thread.id, SCRIPTED_MODEL, "medium", "standard", "yolo", (), "own"
+        "Find leads", "Find ten leads", thread.id, SCRIPTED_MODEL, "medium", "standard", None, "yolo", (), "own"
     )
     MODEL.script = ScriptedProvider(
         _PROVIDER,
@@ -178,11 +178,11 @@ async def test_the_sections_show_what_waits_what_works_and_a_campaign_session_wi
         ],
     )
     asking: RunRecord = await manager.start(
-        "Pick a colour", "task", SCRIPTED_MODEL, None, "test", None, None, "standard", "ask", False, ()
+        "Pick a colour", "task", SCRIPTED_MODEL, None, "test", None, None, "standard", None, "ask", False, ()
     )
     question: ApprovalRecord = await _pending_question(runtime, asking.id)
     working: RunRecord = await manager.start(
-        "Count to twelve", "task", SCRIPTED_MODEL, None, "test", None, None, "standard", "yolo", False, ()
+        "Count to twelve", "task", SCRIPTED_MODEL, None, "test", None, None, "standard", None, "yolo", False, ()
     )
     await _first_tool_call(runtime, working.id)
     # A run the working run delegated (item 68): it works at the same time and hangs under its parent in the lists.

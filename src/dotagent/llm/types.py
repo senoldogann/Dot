@@ -18,6 +18,16 @@ Speed = Literal["standard", "fast"]
 # Where a model's window comes from (item 250): its provider's API names it, Dot's table of the windows its provider
 # publishes holds it, Dot assumes it for a model neither names, or it is the window Dot asks Ollama for (num_ctx).
 WindowSource = Literal["provider", "published", "assumed", "asked"]
+# More for one message (item 251), after Claude Code's words: ``ultrathink`` asks the model for its Max level,
+# ``ultracode`` for its Extra high level and tells the run to split its independent parts across delegated runs.
+OneMessage = Literal["ultrathink", "ultracode"]
+ONE_MESSAGE_LEVELS: dict[OneMessage, Effort] = {"ultrathink": "max", "ultracode": "xhigh"}
+
+
+def splits_work(once: OneMessage | None) -> bool:
+    """Whether a run started with ``once`` is told to split its work across delegated runs."""
+    return once == "ultracode"
+
 
 INVALID_ARGUMENTS_KEY: str = "__invalid_arguments__"
 

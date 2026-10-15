@@ -757,6 +757,7 @@ async def _stored_run(runtime: Runtime, parent_run_id: str | None) -> RunRecord:
         "test",
         "medium",
         "standard",
+        None,
         "ask",
         False,
         None,
@@ -1128,6 +1129,7 @@ async def _chat(runtime: Runtime, title: str, runs: int) -> tuple[ThreadRecord, 
                 "test",
                 "medium",
                 "standard",
+                None,
                 "ask",
                 False,
                 None,
@@ -1199,6 +1201,7 @@ async def test_deleting_chats_takes_their_runs_delegations_events_and_approvals_
         "test",
         "medium",
         "standard",
+        None,
         "ask",
         False,
         None,
@@ -1221,7 +1224,9 @@ async def test_deleting_chats_takes_their_runs_delegations_events_and_approvals_
     # A queue on the child's thread (as the API took one before item 170) goes with the thread; the grandchild's
     # thread, a chat of its own, keeps its queue.
     for thread_id in (child.thread_id, grandchild.thread_id):
-        await runtime.store.add_queued(thread_id, "next", [], "task", None, None, "standard", None, None, None, "test")
+        await runtime.store.add_queued(
+            thread_id, "next", [], "task", None, None, "standard", None, None, None, None, "test"
+        )
         await runtime.store.hold_queue(thread_id)
     # Runs this daemon does not drive, as a dotx command's, keep their chat while they work (item 179).
     refused: httpx.Response = await client.request("DELETE", "/api/threads", json={"ids": [doomed.id]})
