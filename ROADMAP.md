@@ -5204,7 +5204,7 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 263 | A run runs JavaScript in its own tab                                                  | done        | 24a22d2 |
 | 264 | Dot's own Chrome loads extensions                                                     | done        | 10eb5d5 |
 | 265 | Dot's own Chrome can take DevTools connections from a run's scripts                   | in progress |         |
-| 266 | A batch carries several public or social actions while no pace is set                 | planned     |         |
+| 266 | A batch carries several public or social actions while no pace is set                 | in progress |         |
 
 ### 77. The type system: Inter and Geist Mono, seven sizes, three weights
 
@@ -11758,14 +11758,25 @@ environment, and so that no window or tab is mistaken.
 
 ### 266. A batch carries several public or social actions while no pace is set
 
-**Status: planned.**
+**Status: in progress.** Built on `item-266-social-batch`.
+
+**As built (2026-10-15).** `policy/pace.py`: `pace_is_set` (a number in an hour or a day, or for public actions a
+spacing) and `paced_in_batch` (the classes with a pace set that keep a batch of more than one public or social step to
+one). `tools/browser.py`: `browser_act` refuses such a batch only while a pace is set for a class it carries, and the
+refusal names those classes; a batch of a class with no pace set goes in one call, which the gate counts once.
+`agent/prompt.py`: the line that sent such actions one per `browser_act` goes (the refusal says what to do when a pace
+holds), so every run's prompt is shorter. README: the pace paragraph (and that a script run with `browser_eval` is
+not counted). Tests: `tests/unit/test_pace.py` (the rule with no pace, a public one, a spacing and a social one)
+and `tests/smoke/test_pace.py` (two follows and a like in one call on a real headless Chrome, each click landing and
+the call counted once, while the pace of reposts still sends back a batch with a repost and a follow). They fail on
+the code of before.
 
 **What.** `browser_act` lets a batch carry more than one follow, like, post or message when `[policy.pace]` sets no
 limit for that kind of action; with a limit set, one per batch as before, so that each is counted.
 
 **Why.** With no pace set, the rule only cost a call per action.
 
-**Tests.** Unit tests of the classification with and without a limit.
+**Tests.** Unit tests of the classification with and without a limit. As built.
 
 ### How to start part 46 (the handoff prompt)
 

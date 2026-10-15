@@ -802,9 +802,11 @@ and day, and nothing limits them by default: Dot posts, follows and likes as oft
 sets limits (`public_per_hour`, `public_per_day`, `social_per_hour`, `social_per_day`, and `public_spacing_s` between
 public actions, which the browser waits out; 0 removes a limit). An action past a limit that is set is refused in every
 approval mode, `yolo` too, with the time the next one is allowed, and the timeline shows the refusal. The actions of
-two runs on one site are judged one after the other, so the second counts the first. A `browser_act`
-call takes one public or social click at most, so that each one counts. Only the clicks the policy recognises are
-counted: a post sent with a keyboard shortcut or through an API from the shell is not. X publishes limits of its own (an
+two runs on one site are judged one after the other, so the second counts the first. While a limit of public or
+social actions is set, a `browser_act` call takes one public or social click at most, so that each one counts; with
+none set, as by default, a call takes as many as its steps (item 266). Only the clicks the policy recognises are
+counted: a post sent with a keyboard shortcut, by a script in the page (`browser_eval`) or through an API from the
+shell is not. X publishes limits of its own (an
 unverified account: 50 posts and 200 replies a day, 400 follows, 500 messages), and its automation rules forbid
 automated likes and bulk or aggressive following, and warn that scripting its website can get an account suspended.
 
