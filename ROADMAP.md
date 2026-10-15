@@ -5205,7 +5205,7 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 264 | Dot's own Chrome loads extensions                                                     | done        | 10eb5d5 |
 | 265 | Dot's own Chrome can take DevTools connections from a run's scripts                   | done        | dbb21d5 |
 | 266 | A batch carries several public or social actions while no pace is set                 | done        | ab56000 |
-| 267 | The phone reaches Dot from anywhere, and its home-screen app signs in with a code     | in progress |         |
+| 267 | The phone reaches Dot from anywhere, and its home-screen app signs in with a code     | done        | a8c5cb0 |
 | 268 | Office files show in the side panel as Quick Look draws them                          | planned     |         |
 | 269 | A long paste goes as a file, and a Markdown file shows clean in the side panel        | done        | c4da0ed |
 | 270 | A script's navigation is settled after it, also one that commits after its value      | done        | a27c018 |
@@ -11822,7 +11822,7 @@ app asks for the token again, which a phone cannot type: the token went to the o
 
 ### 267. The phone reaches Dot from anywhere, and its home-screen app signs in with a code
 
-**Status: in progress.** Built on `item-267-phone-pairing`.
+**Status: done.** Merged as `a8c5cb0` (PR #313; no Linear issue, the Linear connector was signed out).
 
 **As built (2026-10-15).** `server/pairing.py` (new): a code of eight characters of Crockford's base32 (40 bits), shown
 as two groups of four and read back in any case, with or without the dash, O as 0 and I or L as 1; good for ten minutes
@@ -12723,3 +12723,4 @@ while the page follows.
 - 2026-10-15 (Opus 5.5): item 266 merged as `ab56000` (PR #310; no Linear issue, the connector was signed out): `browser_act` lets a batch carry several follows, likes, posts or messages while `[policy.pace]` sets no limit for their kind (the default), counted once by the gate; with a pace set for a kind it carries, one per batch as before, and the refusal names the paced kinds and says that a script in the page would go around the owner's pace. The prompt's line that sent such actions one per call is gone, so every run's prompt is shorter. CI and the pace tests were clean.
 - 2026-10-15 (Opus 5.5): item 270 merged as `a27c018` (PR #311; no Linear issue, the connector was signed out): browser_eval settles the page after every script, as a step is settled, before the address rules are checked, so that a forbidden page answering after the value came back has the tab reset; after a script still running when its wait ended only a navigation under way is let commit, so a busy script no longer holds the call; full offline smoke on the stack top 565 passed.
 - 2026-10-15 (Opus 5.5): item 269 merged as `c4da0ed` (PR #312; no Linear issue, the connector was signed out): a text of 2,000 characters or 40 lines pasted into a message box goes as pasted-text-<time>.md when it reads as Markdown, else .txt, with a pencil that puts it back as text; a chip opens its file beside a conversation or in a dialog elsewhere, a Markdown file formatted with its source a click away; a send with only files asks for words, and a listed file keeps the send from turning into the Stop of a working run.
+- 2026-10-15 (Opus 5.5): item 267 merged as `a8c5cb0` (PR #313; no Linear issue, the connector was signed out): Settings › Phone gives a one-time pairing code (eight characters of Crockford's base32, ten minutes, five tries) that the sign-in screen of an app added to a phone's home screen trades for the token over the one public route besides the health check and the proof; only what can be a code is sent, so a token pasted into the code's field stays on the phone; neither the code nor the token is logged.
