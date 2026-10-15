@@ -5230,14 +5230,15 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 289 | Connect apps sits under Campaigns; the sidebar has no stop button                     | done        | 8aa45dd |
 | 290 | DeepSeek V4.1 Flash's reasoning levels are back                                       | done        | 8aa45dd |
 | 291 | A schedule made in a chat runs as that chat does, and knows five runs                 | done        | 8aa45dd |
-| 292 | Every free model of Zen, from OpenCode's refreshed catalog                            | in progress |         |
-| 293 | On a phone, the bar, the composer and the drawers stay on what is seen                | in progress |         |
-| 294 | A phone's sidebar is the list of chats, with search and a new chat at the thumb       | in progress |         |
-| 295 | A phone's chat bar: back, the chat over its agent and model, tools in one pill        | in progress |         |
-| 296 | The details rise as a sheet on a phone; helpers say their state, model and work       | in progress |         |
-| 297 | A line over a phone's composer: how long the run has worked, and its helpers          | in progress |         |
-| 298 | Dot's computer opens over the whole phone, with its address and Take over             | in progress |         |
-| 299 | A turn that goes on after Dot restarted says so, with a bolt                          | in progress |         |
+| 292 | Every free model of Zen, from OpenCode's refreshed catalog                            | done        | b4e554f |
+| 293 | On a phone, the bar, the composer and the drawers stay on what is seen                | done        | b4e554f |
+| 294 | A phone's sidebar is the list of chats, with search and a new chat at the thumb       | done        | b4e554f |
+| 295 | A phone's chat bar: back, the chat over its agent and model, tools in one pill        | done        | b4e554f |
+| 296 | The details rise as a sheet on a phone; helpers say their state, model and work       | done        | b4e554f |
+| 297 | A line over a phone's composer: how long the run has worked, and its helpers          | done        | b4e554f |
+| 298 | Dot's computer opens over the whole phone, with its address and Take over             | done        | b4e554f |
+| 299 | A turn that goes on after Dot restarted says so, with a bolt                          | done        | b4e554f |
+| 300 | The code review's first fixes: requests, typing, a skill's YAML                       | in progress |         |
 
 ### 77. The type system: Inter and Geist Mono, seven sizes, three weights
 
@@ -12654,7 +12655,7 @@ shows Fast. `defaults.toml`: `[scheduler] history_runs = 5`. README: Schedules. 
 
 ### 292. Every free model of Zen, from OpenCode's refreshed catalog
 
-**Status: in progress.** Built on `item-292-phone-like-t3`.
+**Status: done.** Merged as `b4e554f` (PR #324; no Linear issue, the Linear connector was signed out).
 
 **What was found.** OpenCode answers `/provider` from the catalog it read when it started and refreshes models.dev only
 after. The owner's list was read a second after OpenCode's refreshed cache had been written, from the server's older
@@ -12670,7 +12671,7 @@ README: the providers. Tests: `tests/unit/test_opencode.py` (the listing read in
 
 ### 293. On a phone, the bar, the composer and the drawers stay on what is seen
 
-**Status: in progress.** Built on `item-292-phone-like-t3`.
+**Status: done.** Merged as `b4e554f` (PR #324; no Linear issue, the Linear connector was signed out).
 
 **What was found.** The owner's home-screen app on an iPhone 17 Pro Max (iOS 26) showed a 62 pt band at the top and a 69
 pt one at the bottom, with the sidebar's head and the details drawer's tabs under the top band. The top band is the
@@ -12696,7 +12697,7 @@ test's `visualViewport`.
 
 ### 294. A phone's sidebar is the list of chats, with search and a new chat at the thumb
 
-**Status: in progress.** Built on `item-292-phone-like-t3`.
+**Status: done.** Merged as `b4e554f` (PR #324; no Linear issue, the Linear connector was signed out).
 
 **As built (2026-10-16).** After T3 Code's phone app. `static/js/sidebar.js`: the head holds Dot's name (`.side-title`)
 and the close button (an x on a phone, the panel's icon otherwise); on a phone the search moves to the foot after
@@ -12710,7 +12711,7 @@ Settings at its foot, light and dark).
 
 ### 295. A phone's chat bar: back, the chat over its agent and model, tools in one pill
 
-**Status: in progress.** Built on `item-292-phone-like-t3`.
+**Status: done.** Merged as `b4e554f` (PR #324; no Linear issue, the Linear connector was signed out).
 
 **As built (2026-10-16).** `server/views.py`: `RunDetail.title`, the title of the run's chat. `static/js/views/run.js`:
 on a phone the bar names the chat (`.stage-heading`: its title, or a helper's goal) over "Dot · model" ("Helper · model"
@@ -12722,7 +12723,7 @@ bar is as it was: the face, the name and the switch alone (`css/app.css`). READM
 
 ### 296. The details rise as a sheet on a phone; helpers say their state, model and work
 
-**Status: in progress.** Built on `item-292-phone-like-t3`.
+**Status: done.** Merged as `b4e554f` (PR #324; no Linear issue, the Linear connector was signed out).
 
 **As built (2026-10-16).** `static/js/inspector.js`: on a phone the details drawer is a sheet that rises from the foot
 (`css/run.css`: 90 % of what is seen high, round top corners, a grabber); a drag of its head down by more than 96 px
@@ -12736,7 +12737,7 @@ phone).
 
 ### 297. A line over a phone's composer: how long the run has worked, and its helpers
 
-**Status: in progress.** Built on `item-292-phone-like-t3`.
+**Status: done.** Merged as `b4e554f` (PR #324; no Linear issue, the Linear connector was signed out).
 
 **As built (2026-10-16).** `static/js/capsule.js`: `createCapsule`, a line over the composer after T3 Code's: "Working
 <time>" with a turning mark, or "Waiting for you" with a bell while the run waits, and how its helpers stand while it
@@ -12749,7 +12750,7 @@ helpers' part opens the sheet on Agents; no line at 1280 px).
 
 ### 298. Dot's computer opens over the whole phone, with its address and Take over
 
-**Status: in progress.** Built on `item-292-phone-like-t3`.
+**Status: done.** Merged as `b4e554f` (PR #324; no Linear issue, the Linear connector was signed out).
 
 **As built (2026-10-16).** `static/js/computer.js`: `openFull()` moves the card of Dot's computer into a dialog over the
 whole page (`dialog.computer-full`, on what is seen) with a round close; the page's address in a pill, the live frame
@@ -12760,7 +12761,7 @@ Screen tab once it closes).
 
 ### 299. A turn that goes on after Dot restarted says so, with a bolt
 
-**Status: in progress.** Built on `item-292-phone-like-t3`.
+**Status: done.** Merged as `b4e554f` (PR #324; no Linear issue, the Linear connector was signed out).
 
 **What was found.** A run that went on after a restart opened with one long muted line ("Resumed on its own when the
 daemon started: …") and an earlier turn of it with "Resumed where the run above was cut off"; a run that waited for the
@@ -12778,6 +12779,50 @@ wears the bolt and says what cut the run off ("Dot was shut down while this run 
 the web UI goes on by itself under "Dot restarted and resumed this turn", which opens to how the run was cut off,
 "ask_user cut off" and the link to that run; the other's line says "Dot was shut down while this run worked.", and its
 Continue opens a turn under "Resumed this turn after Dot was shut down".
+
+## Part 52: the code review's fixes, Dot's tools for OpenCode's agent, runs side by side, learning (2026-10-16)
+
+The owner's fifty-eighth and fifty-ninth words, on 2026-10-16, with a picture of a chat on a free model of Zen that
+would not open the owner's Outlook link (it said it had no browser and could not leave its folder): "Acik kalan
+görevlerin hepsini özveri ile en dogru sekilde arastirarak, kanitlarla tamamla ve siradaki su adimlari cöz ; Opencode
+zen free modeli neden reddediyor dedigimi ? normalde diger provider ajanlari yapiyor. Sorun nedir ? bunuda arastir ve
+düzelt. Dediklerimi yapmali sistem. Ayrica birden fazla agent calisirken birbirlerinin sekmelerine ve calisma
+alanlarina saygi göstersinler Bunun farkindaligiyla calisinlar ve session sonunda learning olaylarinida otomatik
+kaydetsinler bana sormasinlar ama cok dikkatli ve secici olsunlar. Hafiza , yetenek ögrenme vs bunlar cok önemli
+seyler dikkatli yapmali bu alt yapiyida iyi incele ve problem varsa düzelt." (Finish every open task with evidence; find
+out why Zen's free model refuses and fix it, the system must do what the owner says; runs at work at once must respect
+each other's tabs and work areas, knowing of each other; at a session's end the learnings are saved on their own,
+without asking, but carefully and selectively; look into memory and skill learning and fix what is wrong.)
+
+The open tasks include the code review of 2026-10-15 (`reports/Dot kod review 2026-10-15.md`, kept out of the
+repository): its first fixes (K2, K1, Y6) were written and reviewed by the session that made the review and left
+uncommitted; item 300 ships them.
+
+### 300. The code review's first fixes: requests, typing, a skill's YAML
+
+**Status: in progress.** Built on `item-300-review-first-fixes`.
+
+**What was found.** K2: a page in Dot's own Chrome could reach Dot's interface: a redirect from an allowed address to a
+refused one was never checked (only the first request was), a popup's first request escaped the page's route, and the
+daemon did not look at `Sec-Fetch-Site`, so a page of another site could open the interface (whose token the page keeps
+in `localStorage`). K1: `terminal_send` wrote to the pty with a blocking `os.write` on the event loop; a program that
+did not read (a busy `python -i`) froze the daemon. Y6: a learned skill's description was quoted by hand into its
+YAML frontmatter, so a `\d` in it made the SKILL.md unreadable, and `offered_to_run` let the error stop every run.
+
+**As built (2026-10-16).** `browser/session.py`, `browser/safety.py`: in Dot's own Chrome every request of the context,
+popups included, is checked (`forbidden_target` on every request, `navigable` on navigations), a redirect is followed
+step by step, and a tab of Dot's that lands on a refused address is reset; in attach mode no request is held (the
+owner's own tabs would wait on Dot), and the landing check does the work. `server/guard.py`: a navigation to the
+interface that a page of another site started (`Sec-Fetch-Site: cross-site`) is refused, save to the page a sign-in
+comes back to and the pages runs showed. `terminal/session.py`: the pty is non-blocking, what the program has not read
+waits for it (`loop.add_writer`) up to 64 KB, and past that `terminal_send` fails with `TerminalInputFullError`
+(`core/errors.py`) until the program reads; `EAGAIN` on a read is not an end. `agent/playbooks.py`: the frontmatter is
+written by the YAML library (`_frontmatter`) and the SKILL.md read back before it is written (`rendered_skill`); a
+SKILL.md the loader cannot read is left out of the list (`playbook_unreadable` in the log). README: the browser's hosts
+and the terminal. Tests: `tests/smoke/test_browser_boundary.py` (new: a redirect and a popup to a refused address in
+Dot's Chrome), `tests/smoke/test_terminal_input.py` (new: a program that does not read, 64 KB, then the error),
+`tests/unit/test_server_guard.py`, `tests/unit/test_own_interface.py`, `tests/unit/test_playbooks.py` (a `\d` in a
+description reads back; an unreadable SKILL.md is left out).
 
 ## Log
 
@@ -13506,3 +13551,11 @@ Continue opens a turn under "Resumed this turn after Dot was shut down".
 - 2026-10-15 (Opus 5.5): item 290 merged as `8aa45dd` (PR #322; no Linear issue, the connector was signed out): DeepSeek V4.1 Flash offers low, high and max again on OpenCode Go, at the owner's choice.
 - 2026-10-15 (Opus 5.5): item 291 merged as `8aa45dd` (PR #322; no Linear issue, the connector was signed out): a schedule made in a chat keeps the chat's model, level, speed, approvals, goal mode, mode and chat, stores its speed, and reads five runs back by default.
 - 2026-10-15 (Opus 5.5): item 282 merged as `427c51e` (PR #323; no Linear issue, the connector was signed out): Edit from here on the owner's message: Cancel, Revert files too, or Revert and keep changes; the chat goes back to before the message (the history the model reads with it, across compactions), the text and files return to the composer, and the run's file changes are taken back on request. CI gate 8m38s pass; the owner's daemon restarted on 427c51e at 21:57:45 (the first bootstrap failed with 5 while the old job was still going; bootstrapped again by hand), live check clean.
+- 2026-10-16 (Opus 5.5): item 292 merged as `b4e554f` (PR #324; no Linear issue, the connector was signed out): every free model of Zen, from `opencode models opencode --refresh` in the server's own home, kept for an hour.
+- 2026-10-16 (Opus 5.5): item 293 merged as `b4e554f` (PR #324; no Linear issue, the connector was signed out): on a phone the bar, the composer, the drawers, the dialogs and the toasts stand on what is seen (visualViewport and a fixed box), also after iOS 26 left the page panned.
+- 2026-10-16 (Opus 5.5): item 294 merged as `b4e554f` (PR #324; no Linear issue, the connector was signed out): a phone's sidebar is the list of chats over the whole screen, with Settings, the search and a new chat at its foot.
+- 2026-10-16 (Opus 5.5): item 295 merged as `b4e554f` (PR #324; no Linear issue, the connector was signed out): a phone's chat bar: a round back button, the chat's title over Dot · model, and Dot's computer, the helpers and the details in one pill.
+- 2026-10-16 (Opus 5.5): item 296 merged as `b4e554f` (PR #324; no Linear issue, the connector was signed out): the details are a sheet from the foot on a phone, with a grabber and a drag down; helpers say their state, model and what they do now.
+- 2026-10-16 (Opus 5.5): item 297 merged as `b4e554f` (PR #324; no Linear issue, the connector was signed out): a line over a phone's composer says how long the run has worked, or that it waits, and how its helpers stand.
+- 2026-10-16 (Opus 5.5): item 298 merged as `b4e554f` (PR #324; no Linear issue, the connector was signed out): Dot's computer opens over the whole phone with its address, Dot has control and Take over.
+- 2026-10-16 (Opus 5.5): item 299 merged as `b4e554f` (PR #324; no Linear issue, the connector was signed out): a resumed turn opens with a bolt, Dot restarted and resumed this turn, which opens to how the run was cut off.
