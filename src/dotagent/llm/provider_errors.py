@@ -7,6 +7,7 @@ code below decides whether a failure is worth retrying by choosing the error cla
 """
 
 import json
+import re
 from collections.abc import Callable, Mapping
 
 from pydantic import JsonValue
@@ -17,6 +18,7 @@ from dotagent.core.errors import (
     ProviderHttpError,
     ProviderQuotaError,
     ProviderRateLimitError,
+    ProviderRunnerError,
 )
 from dotagent.core.text import redact_secrets
 from dotagent.core.types import FrozenModel, JsonObject
@@ -51,6 +53,11 @@ _OPENCODE_QUOTA: frozenset[str] = frozenset(
 _ANTHROPIC_QUOTA: frozenset[str] = frozenset({"billing_error"})
 # How ollama.com words a plan whose included usage is spent ("You used all included … usage"), with HTTP 429.
 _OLLAMA_PLAN_SPENT: str = "used all included"
+# How Ollama's server words a model runner that broke off: its request to the runner on the loopback failed (item 256;
+# seen as an HTTP 400 of the embedding route, `Post "http://127.0.0.1:<port>/tokenize": ... connection reset by peer`).
+_OLLAMA_RUNNER_LOST: re.Pattern[str] = re.compile(
+    r'post "http://127\.0\.0\.1:\d+/[^"]*":.*\b(?:connection reset by peer|connection refused|eof)\b', re.IGNORECASE
+)
 # How Anthropic words a spent prepaid balance, which it answers with HTTP 400 and the type invalid_request_error.
 _ANTHROPIC_NO_CREDIT: str = "credit balance is too low"
 
@@ -150,12 +157,21 @@ def classify_generic(
     return ProviderHttpError(message, status, detail)
 
 
+def runner_lost(message: str) -> bool:
+    """Whether Ollama's error ``message`` says its request to the model's runner on the loopback broke off."""
+    return _OLLAMA_RUNNER_LOST.search(message) is not None
+
+
 def classify_ollama(
     status: int, wire: WireError | None, retry_after_s: float | None, detail: JsonObject
 ) -> ProviderHttpError:
-    """Ollama: a 429 that says the plan's included usage is used up is terminal, not a burst to retry."""
+    """Ollama: a 429 that says the plan's included usage is used up is terminal, not a burst to retry; an answer that
+    says the model's runner broke off (a 400 or a 5xx whose words are the failed request to the runner) is retryable
+    (item 256)."""
     if status == 429 and wire is not None and _OLLAMA_PLAN_SPENT in wire.message.lower():
         return ProviderQuotaError(error_message(status, wire), status, retry_after_s, detail)
+    if (status == 400 or status >= 500) and wire is not None and runner_lost(wire.message):
+        return ProviderRunnerError(error_message(status, wire), status, detail)
     return classify_generic(status, wire, retry_after_s, detail)
 
 

@@ -74,6 +74,11 @@ class ProviderQuotaError(ProviderHttpError):
         self.retry_after_s: float | None = retry_after_s
 
 
+class ProviderRunnerError(ProviderHttpError):
+    """The provider's server answered, but the process behind it that runs the model broke off (Ollama's runner,
+    reached over the loopback, reset the connection): as retryable as a connection that broke."""
+
+
 class ProviderTransportError(ProviderError):
     """Connection, timeout or stream-interruption failure."""
 

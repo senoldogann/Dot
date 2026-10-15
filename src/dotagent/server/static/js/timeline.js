@@ -985,6 +985,12 @@ export function createTimeline({ rootRunId, actorId, startedAt, onGrow, onPlan, 
       note(scope, record.ts, "database", text, "");
     },
 
+    // The run's start found its notes or its skills by their words alone: the embedding service failed (item 256).
+    embedding_failed(scope, record) {
+      const what = record.data.purpose === "skills" ? "Skills listed" : "Notes recalled";
+      note(scope, record.ts, "database", `${what} by their words alone: the embedding service failed — ${clip(record.data.error, 240)}`, "warn");
+    },
+
     // A compaction is counted for the Details panel, not told in the conversation (item 260); the Cost panel has the
     // summaries' share, and the event keeps the model, the method and the check.
     compacted(scope, record) {

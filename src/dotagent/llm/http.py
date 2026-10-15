@@ -13,6 +13,7 @@ from dotagent.core.errors import (
     ProviderProtocolError,
     ProviderQuotaError,
     ProviderRateLimitError,
+    ProviderRunnerError,
     ProviderTransportError,
 )
 from dotagent.core.text import redact_secrets, strip_blobs
@@ -64,6 +65,8 @@ def is_retryable_provider_error(exc: Exception) -> bool:
         return False
     if isinstance(exc, ProviderRateLimitError) and (exc.retry_after_s or 0.0) > _MAX_AUTOMATIC_WAIT_S:
         return False
+    if isinstance(exc, ProviderRunnerError):
+        return True
     if isinstance(exc, ProviderHttpError):
         return exc.status in _RETRYABLE_STATUS
     return isinstance(exc, ProviderTransportError)

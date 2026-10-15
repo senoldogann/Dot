@@ -1918,9 +1918,12 @@ dotx memory reindex      # embed every note again, for example after changing [m
   prompt no longer shows the model's words as yours. You edit one on the Memory page or with `PATCH /api/memories/{id}`,
   and it keeps its author. The page also shows who wrote each note and how often runs used it.
 - Search combines SQLite full-text search (BM25) with cosine similarity of embeddings and fuses both rankings.
-  `embed_enabled = false` searches by words only. The word search does not mind case, accents or the Turkish dotted and
-  dotless i (`toplanti` finds `Toplantı`), and a word of five letters or more also finds the words that start with its
-  first five letters, so Turkish endings meet the root (`toplantıda`, `toplantılar`).
+  `embed_enabled = false` searches by words only. An answer of Ollama that says its model runner broke off is asked
+  again, as a broken connection is; when the embedding service still fails at the start of a run, the run recalls its
+  notes and lists its skills by their words alone and goes on, and the timeline and the terminal say so in a warning
+  line (`embedding_failed`, item 256). The word search does not mind case, accents or the Turkish dotted and dotless i
+  (`toplanti` finds `Toplantı`), and a word of five letters or more also finds the words that start with its first
+  five letters, so Turkish endings meet the root (`toplantıda`, `toplantılar`).
 - Saving a note close to an existing one (`similar_threshold`) tells the model, which decides whether the old note is
   outdated.
 - The default embedding model, `bge-m3`, is multilingual: English and Turkish notes are found by meaning (on a small

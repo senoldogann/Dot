@@ -160,6 +160,7 @@ from dotagent.core.errors import (
     ProviderError,
     ProviderTransportError,
     RunCancelled,
+    StoreError,
     ToolInputError,
 )
 from dotagent.core.jsonutil import dumps_compact
@@ -199,6 +200,7 @@ from dotagent.memory.service import (
     owner_prompt_lines,
     owner_section,
     prompt_memories,
+    words_only,
 )
 from dotagent.policy.types import QuestionMode
 from dotagent.runtime import Runtime
@@ -218,6 +220,8 @@ from dotagent.tools.registry import ToolRegistry, specs_for_mode
 from dotagent.tools.team import CREATE_AGENT_TOOL, MESSAGE_AGENT_TOOL
 
 log = get_logger(__name__)
+# The event of a run's start that found its notes or skills by their words alone (item 256).
+EMBEDDING_FAILED: str = "embedding_failed"
 
 # A delegated run reports to its parent: it neither delegates again nor asks the user, and its parent asks the helpers.
 # The tools every agent keeps whatever its list says (item 86): the ones that end a run, ask, and turn groups on.
@@ -618,6 +622,42 @@ async def _fit_context(
     if current != history:
         await agent.runtime.store.replace_messages(agent.run.thread_id, current)
     return current, estimated, ledger
+
+
+async def _embedding_failed(runtime: Runtime, run: RunRecord, purpose: str, error: DotError) -> None:
+    """Tell the log and the timeline that the start of ``run`` found its ``purpose`` (\"notes\" or \"skills\") by
+    their words alone, since the embedding service failed with ``error`` after its retries (item 256)."""
+    log.warning(
+        "embedding_failed",
+        run_id=run.id,
+        purpose=purpose,
+        error_type=type(error).__name__,
+        status=error.context.get("status"),
+        error=error.message,
+    )
+    await runtime.bus.emit(run.id, EMBEDDING_FAILED, {"purpose": purpose, "error": error.message}, True)
+
+
+async def _start_notes(runtime: Runtime, run: RunRecord, query: str, budget: int) -> Remembered:
+    """The notes ``run`` starts with: by meaning and words, or by words alone when the embedding service fails."""
+    try:
+        return await prompt_memories(runtime.memory, query, budget, run.agent_id)
+    except ProviderError as error:
+        await _embedding_failed(runtime, run, "notes", error)
+        return await prompt_memories(words_only(runtime.memory), query, budget, run.agent_id)
+
+
+async def _close_skills(runtime: Runtime, run: RunRecord, query: str, texts: list[str]) -> list[int]:
+    """The places of the skills ``texts`` close to ``query`` in meaning, the closest first; none when embeddings are
+    off, or when the embedding service fails (the skills are then listed by their words, and the run says so)."""
+    if runtime.help_vectors is None:
+        return []
+    try:
+        return await runtime.help_vectors.closest(query, texts)
+    except (ProviderError, StoreError) as error:
+        # The service failed, or answered in another dimension than the texts kept: another model.
+        await _embedding_failed(runtime, run, "skills", error)
+        return []
 
 
 async def _tool_messages(agent: AgentRun, outcomes: Sequence[ToolOutcome], can_see: bool) -> list[Message]:
@@ -1464,7 +1504,7 @@ async def run_agent(agent: AgentRun) -> RunEnd:
     memory_seen_at: float = time.time()
     notes_budget: int = memory_budget(runtime.config.memory, info.context_length)
     query: str = await _goal_query(runtime, run)
-    recalled: Remembered = await prompt_memories(runtime.memory, query, notes_budget, run.agent_id)
+    recalled: Remembered = await _start_notes(runtime, run, query, notes_budget)
     remembered: tuple[MemoryRecord, ...] = recalled.records
     if remembered:
         await runtime.store.mark_memories_used(run.id, [record.id for record in remembered], memory_seen_at, "start")
@@ -1473,11 +1513,11 @@ async def run_agent(agent: AgentRun) -> RunEnd:
         )
     can_ask: bool = can_ask_user(run.source, run.parent_run_id, run.approvals)
     questions: QuestionMode = question_mode(config.questions, can_ask)
-    # More skills than the instructions list are picked by meaning too (item 169); the embeddings fail the start as
-    # the run's notes do.
+    # More skills than the instructions list are picked by meaning too (item 169), or by their words when the
+    # embeddings fail (item 256).
     close: list[int] = (
-        await runtime.help_vectors.closest(query, [skill_text(skill) for skill in skills.skills])
-        if runtime.help_vectors is not None and len(skills.skills) > runtime.config.skills.listed
+        await _close_skills(runtime, run, query, [skill_text(skill) for skill in skills.skills])
+        if len(skills.skills) > runtime.config.skills.listed
         else []
     )
     listing: SkillListing = listed_skills(skills.skills, query, close, runtime.config.skills.listed)

@@ -60,6 +60,12 @@ class MemoryIndex:
     config: MemoryConfig
 
 
+def words_only(index: MemoryIndex) -> MemoryIndex:
+    """``index`` searched by the words of its notes alone, as with embeddings off: what a run starts with when the
+    embedding service failed (item 256), which the run says."""
+    return MemoryIndex(store=index.store, embedder=None, config=index.config)
+
+
 class MemoryHit(FrozenModel):
     """A note found by a search; ``similarity`` is its cosine to the query, ``None`` when only the words matched."""
 
