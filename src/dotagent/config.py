@@ -462,6 +462,10 @@ class PluginsConfig(FrozenModel):
     dirs: list[str] = Field(default_factory=list)
 
 
+# Who the typed judge asks: nobody, or TypeSafe's System One API.
+JudgeProvider = Literal["none", "typesafe"]
+
+
 class JudgeConfig(FrozenModel):
     """The typed judge (``[judge]``, :mod:`dotagent.agent.judge`): ``provider = "none"`` leaves its two questions to the
     policy's patterns and the goal checker; ``"typesafe"`` asks TypeSafe's System One API at ``base_url`` with the key
@@ -471,7 +475,7 @@ class JudgeConfig(FrozenModel):
     timeout whatever ``provider`` says, and asks about ``items_per_request`` items in one request; so do the post tools
     of a campaign (:mod:`dotagent.tools.posts`), whose check of a draft fires at ``draft_check_threshold``."""
 
-    provider: Literal["none", "typesafe"]
+    provider: JudgeProvider
     api_key_env: str
     base_url: ServiceAddress
     model: str

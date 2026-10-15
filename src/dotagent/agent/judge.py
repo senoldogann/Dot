@@ -34,7 +34,7 @@ from urllib.parse import SplitResult, urlsplit, urlunsplit
 
 from pydantic import JsonValue
 
-from dotagent.config import AppConfig, JudgeConfig
+from dotagent.config import AppConfig, JudgeConfig, JudgeProvider
 from dotagent.core.errors import (
     ConfigError,
     DotError,
@@ -529,13 +529,51 @@ class TypeSafeJudge:
             return None
 
 
-def judge_for(config: AppConfig, typesafe: TypeSafeService | None) -> Judge:
-    """The judge ``[judge] provider`` names; ``typesafe`` is the runtime's service, present whenever the provider is
-    ``typesafe``."""
-    match config.judge.provider:
-        case "none":
-            return NoJudge()
-        case "typesafe":
-            if typesafe is None:
-                raise ConfigError("the typed judge needs the TypeSafe service", {"provider": "typesafe"})
-            return TypeSafeJudge(typesafe, config.judge)
+class SwitchedJudge:
+    """The judge ``[judge] provider`` names, switched in Settings without a restart (item 255): ``"typesafe"`` answers
+    through the runtime's TypeSafe service, ``"none"`` answers nothing. The service, when the runtime has one, is
+    retired and closed through here whatever the switch says."""
+
+    def __init__(self, service: TypeSafeService | None, config: JudgeConfig, provider: JudgeProvider) -> None:
+        self._none: NoJudge = NoJudge()
+        self._typed: TypeSafeJudge | None = None if service is None else TypeSafeJudge(service, config)
+        self.provider: JudgeProvider = provider
+        if provider == "typesafe":
+            self._require_service()
+
+    def set_provider(self, provider: JudgeProvider) -> None:
+        """Switch to ``provider`` from the next judgment on; ``"typesafe"`` needs the service, else nothing changes."""
+        if provider == "typesafe":
+            self._require_service()
+        self.provider = provider
+
+    def _require_service(self) -> None:
+        if self._typed is None:
+            raise ConfigError(
+                "the typed judge needs the TypeSafe service: save TYPESAFE_API_KEY, then dotx service install",
+                {"provider": "typesafe"},
+            )
+
+    def _active(self) -> Judge:
+        return self._typed if self.provider == "typesafe" and self._typed is not None else self._none
+
+    async def judge_click(self, facts: ClickFacts, run_id: str) -> ClickJudgment:
+        return await self._active().judge_click(facts, run_id)
+
+    async def judge_claim(self, claim: JsonObject, run_id: str) -> ClaimJudgment:
+        return await self._active().judge_claim(claim, run_id)
+
+    async def judge_page(self, facts: PageFacts, run_id: str) -> PageCheck | None:
+        return await self._active().judge_page(facts, run_id)
+
+    async def retire(self) -> None:
+        await (self._none if self._typed is None else self._typed).retire()
+
+    async def aclose(self) -> None:
+        await (self._none if self._typed is None else self._typed).aclose()
+
+
+def judge_for(config: AppConfig, typesafe: TypeSafeService | None) -> SwitchedJudge:
+    """The judge ``[judge] provider`` names, switchable; ``typesafe`` is the runtime's service, present whenever the
+    provider is ``typesafe`` or its key is set."""
+    return SwitchedJudge(typesafe, config.judge, config.judge.provider)

@@ -13,7 +13,7 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Literal
 
-from dotagent.config import ResumeMode
+from dotagent.config import JudgeProvider, ResumeMode
 from dotagent.core.errors import ConfigError
 from dotagent.core.types import JsonObject
 from dotagent.llm.roles import ModelRole
@@ -30,11 +30,12 @@ _FILE_MODE: int = 0o600
 _EDITING: threading.Lock = threading.Lock()
 
 # The tables this module changes a setting of, the settings of each, and the TOML literal of each value.
-type ConfigTable = Literal["agent", "browser", "models"]
+type ConfigTable = Literal["agent", "browser", "judge", "models"]
 type AgentSetting = Literal["resume"]
 type BrowserSetting = Literal["mode", "raise_window"]
+type JudgeSetting = Literal["provider"]
 type ModelsSetting = Literal["main", "fast", "review", "vision"]
-type SettingKey = AgentSetting | BrowserSetting | ModelsSetting
+type SettingKey = AgentSetting | BrowserSetting | JudgeSetting | ModelsSetting
 type SettingValue = str | bool | int
 
 
@@ -203,6 +204,12 @@ def set_resume(path: Path, mode: ResumeMode) -> None:
     """Write ``[agent] resume``, whether the daemon resumes on its own, when it starts, the runs it cut off, into the
     config file at ``path`` (see :func:`set_setting`)."""
     set_setting(path, "agent", "resume", mode)
+
+
+def set_judge_provider(path: Path, provider: JudgeProvider) -> None:
+    """Write ``[judge] provider``, whether the typed judge answers through TypeSafe or answers nothing, into the config
+    file at ``path`` (see :func:`set_setting`)."""
+    set_setting(path, "judge", "provider", provider)
 
 
 def set_setting(path: Path, table: ConfigTable, key: SettingKey, value: SettingValue) -> None:

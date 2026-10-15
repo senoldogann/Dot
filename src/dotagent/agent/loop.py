@@ -1338,6 +1338,11 @@ async def _routing(agent: AgentRun, ref: ModelRef, offers_tools: bool, fixed_tok
         target: ModelRef = parse_model_ref(label)
         if target.label == ref.label:
             continue
+        # A paused fast model is not offered (item 255), as the fast model's work leaves it out (item 240).
+        paused: Unavailable | None = paused_model(runtime.router, target.label, time.time())
+        if paused is not None:
+            log.warning("step_route_candidate_skipped", run_id=agent.run.id, model=target.label, problem=paused.reason)
+            continue
         fitted: tuple[ModelInfo, Scaffold] | str = await _fitted(agent, target, offers_tools, fixed_tokens)
         if isinstance(fitted, str):
             log.warning("step_route_candidate_skipped", run_id=agent.run.id, model=target.label, problem=fitted)

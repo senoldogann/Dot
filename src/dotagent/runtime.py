@@ -9,7 +9,7 @@ from zoneinfo import ZoneInfo
 
 from dotagent.agent.approvals import ApprovalBroker
 from dotagent.agent.gate import SiteLocks
-from dotagent.agent.judge import Judge, TypeSafeService, judge_for
+from dotagent.agent.judge import SwitchedJudge, TypeSafeService, judge_for
 from dotagent.agent.sizes import ContextSizes
 from dotagent.browser.pool import BrowserPool
 from dotagent.browser.session import BrowserSession
@@ -98,7 +98,7 @@ class Runtime:
     roles: ModelRoles
     # The context sizes chosen for models, as the config file names them or as the owner chose them since (item 250).
     context_sizes: ContextSizes
-    judge: Judge
+    judge: SwitchedJudge
     # TypeSafe's service, shared by the judge and judge_items; ``None`` when neither is on.
     typesafe: TypeSafeService | None
     # The browser sessions: ``browser`` is the main one (the configured mode), ``browsers`` gives the one of a mode.

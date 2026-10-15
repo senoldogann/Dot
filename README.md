@@ -730,8 +730,10 @@ Dot's, not yours. A message you send starts a run unmarked.
 **Typed judgments (optional, off by default).** The policy reads what a click does from the control's label, with
 patterns in English and Turkish, and a few in Finnish ("Post", "Send", "Delete", "Pay now", "Paylaş", "Lähetä"…); a
 label they do not know (Mastodon's "Boost", the German "Teilen") passes as an ordinary click. With `[judge] provider =
-"typesafe"` and `TYPESAFE_API_KEY` saved (made at console.typesafe.ai; Settings › API keys, or `dotx auth set
-TYPESAFE_API_KEY`), TypeSafe's System One API is asked about such a click in four yes/no questions (does it publish,
+"typesafe"` (the switch "Typed judge (Jev)" on the row of the key in Settings › API keys writes it and switches the
+judge from the next judgment on, with no restart; item 255) and `TYPESAFE_API_KEY` saved (made at console.typesafe.ai;
+Settings › API keys, or `dotx auth set TYPESAFE_API_KEY`), TypeSafe's System One API is asked about such a click in four
+yes/no questions (does it publish,
 send, pay or delete?) over the label, the role and the page's address (without its query and fragment). A probability of
 at least `public_action_threshold` (0.45: below each yes measured; a wrong flag only asks) gives the click that flag, so
 the policy treats it as a click on "Post" or "Delete", and the action's summary says so: `(judge: public_post 0.93)`.
