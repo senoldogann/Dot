@@ -1647,6 +1647,8 @@ The REST API (all under `/api`; bodies and replies are JSON, event streams are s
 | `GET\|POST\|DELETE /failsafe`, `GET /images/{name}`                             | emergency stop; screenshots of runs                          |
 | `GET /browser`, `POST /browser/mode` (`{"mode": "own"\|"attach"}`)              | which Chrome Dot browses with and what Chrome allows; switch it (409 while runs are active, 422 when Chrome refuses) |
 | `POST /browser/debug-port` (`{"debug_port": 9222}`, 0 for none)                 | the DevTools port of Dot's own Chrome (409 while runs are active, 422 below 1024 or when another program holds the port) |
+| `GET /phone`, `POST /phone/pairing`                                             | the addresses a phone reaches Dot at (`[server] reach`); a new pairing code (item 267) |
+| `POST /phone/pair` (public; `{"code": "7KQ2-M9XD"}`)                            | the access token for a good pairing code, once (403 when it is wrong, used or out of date) |
 | `POST /desktop/permissions`                                                     | make macOS ask for the desktop permissions the daemon lacks  |
 
 `POST /runs`, `POST /runs/{id}/steer` and `POST /threads/{id}/queue` take a `key` of the caller's own (16 to 64 letters,
@@ -1717,9 +1719,9 @@ needs to reach the Mac, and a push needs a secure address, so the way there is y
 
 1. The daemon stays on the loopback address. With Tailscale on the Mac and the phone, `tailscale serve --bg 8765`
    presents it as `https://<mac>.<tailnet>.ts.net`, with a certificate of its own, to your tailnet only.
-2. Put that name in `[server] reach = ["<mac>.<tailnet>.ts.net"]` and restart the daemon: a request with that
-   `Host`, and a page from `https://` that name, is served like a local one. `dotx url` then prints the signed-in
-   address for the phone too (the token stays in the fragment).
+2. Put that name in `[server] reach = ["<mac>.<tailnet>.ts.net"]` and restart the daemon: a request with that `Host`,
+   and a page from `https://` that name, is served like a local one. `dotx url` then prints the signed-in address for
+   the phone too (the token stays in the fragment). Settings › Phone lists the address (item 267).
 3. On the phone, Settings › General › Notifications on: the browser subscribes to the daemon's web push, and from then
    on the daemon tells the phone what the desktop notifications say, in the same words, page open or closed, and while
    you look at that run on the phone too: the rule that keeps a notification quiet while you look at its run holds for
@@ -1728,6 +1730,16 @@ needs to reach the Mac, and a push needs a secure address, so the way there is y
    ended with an error; it leaves `<home>/daemon.running` while it runs), with how many runs that cut off. The daemon
    signs the pushes with a key pair it makes on first start (`<home>/vapid-key.pem`); subscriptions live in the store
    and go when their push service says they are gone. Settings › General › Notifications off drops the subscription.
+
+An app added to the home screen keeps storage of its own, apart from Safari's (iOS does so), so it has none of the token
+that the signed-in address gave Safari, and its sign-in screen asks for a pairing code instead (item 267): Settings ›
+Phone, on the Mac or in Safari where Dot is open, shows one with **Pair a phone**, eight characters in two groups
+(Crockford's base32, typed in any case, with or without the dash), good for ten minutes and for one use; a new code
+takes the place of the one before, and five wrong tries use a code up. The app trades it for the token (`POST
+/api/phone/pair`, the one route besides the health check and the proof that takes no token; the Host and Origin checks
+hold for it as for any other) and proves the daemon with it as with any token. `POST /api/phone/pairing` gives a code,
+`GET /api/phone` the addresses. Neither the code nor the token is logged. The phone reaches Dot while the Mac is on and
+awake.
 
 The service worker (`sw.js`) keeps the shell files as a fallback for when the Mac is out of reach and caches nothing
 under `/api`. A page loaded from them while the daemon is out of reach says so and tries again by itself (item 200):

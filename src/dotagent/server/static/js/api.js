@@ -199,6 +199,33 @@ export async function request(method, path, body) {
   }
 }
 
+/**
+ * Trade a pairing code from Settings › Phone for the access token (item 267), for an app on a phone's home screen,
+ * whose storage is its own. Only the code is sent; the token brought back is proven as any other before it is used.
+ */
+export async function pairWithCode(code) {
+  const path = "/phone/pair";
+  let response;
+  try {
+    response = await fetch(`/api${path}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ code }),
+      cache: "no-store",
+    });
+  } catch (cause) {
+    throw new ApiError(0, "Cannot reach the Dot daemon. Is it running?", { path, cause: String(cause) });
+  }
+  if (!response.ok) {
+    throw await errorOf(response, path);
+  }
+  const data = parseJson(await response.text());
+  if (data === null || typeof data !== "object" || typeof data.token !== "string") {
+    throw new ApiError(response.status, "Something other than the Dot daemon answered the pairing code.", { path });
+  }
+  return data.token;
+}
+
 export const api = {
   get: (path) => request("GET", path, null),
   post: (path, body) => request("POST", path, body),

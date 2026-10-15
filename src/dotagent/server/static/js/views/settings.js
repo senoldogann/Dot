@@ -6,6 +6,7 @@ import { icon } from "../icons.js";
 import * as appearance from "./appearance.js";
 import * as keys from "./keys.js";
 import * as memory from "./memory.js";
+import * as phone from "./phone.js";
 import * as rules from "./rules.js";
 import * as schedules from "./schedules.js";
 import * as skills from "./skills.js";
@@ -22,6 +23,7 @@ const TABS = [
   { id: "memory", label: "Memory", icon: "database", mount: memory.mount },
   { id: "skills", label: "Skills", icon: "sparkle", mount: skills.mount },
   { id: "schedules", label: "Schedules", icon: "calendar", mount: schedules.mount },
+  { id: "phone", label: "Phone", icon: "smartphone", mount: phone.mount },
   { id: "system", label: "System", icon: "monitor", mount: mountSystem },
 ];
 

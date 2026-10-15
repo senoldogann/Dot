@@ -103,6 +103,10 @@ class PolicyDenied(DotError):
     """The policy engine refused an action outright."""
 
 
+class PairingRefused(DotError):
+    """A phone's pairing code is wrong, used or out of date (item 267)."""
+
+
 class ApprovalRejected(DotError):
     """A human rejected, or let expire, an approval request."""
 

@@ -1,7 +1,7 @@
 // The entry point: sign-in, the frame with its sidebar and live indicators, and routing between the pages.
 
 import { loadLooks } from "./actors.js";
-import { ApiError, clearToken, forgetImages, hasToken, loadToken, onAuthLost, setToken } from "./api.js";
+import { ApiError, clearToken, forgetImages, hasToken, loadToken, onAuthLost, pairWithCode, setToken } from "./api.js";
 import { loadOwnThemes } from "./appearance/own.js";
 import { applyStoredSettings } from "./appearance/settings.js";
 import { setPageTitle, watchAttention } from "./attention.js";
@@ -89,7 +89,28 @@ function screen(...children) {
   );
 }
 
+/** Run `action` when Enter is pressed in `input`. */
+function onEnter(input, action) {
+  input.addEventListener("keydown", (event) => {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      action();
+    }
+  });
+}
+
 function renderSignIn(message) {
+  // A pairing code from Settings › Phone (item 267): the way in for an app on a phone's home screen, whose storage is
+  // its own, so that it has none of the token Safari was given.
+  const code = el("input", {
+    class: "input mono",
+    type: "text",
+    autocomplete: "one-time-code",
+    autocapitalize: "characters",
+    spellcheck: "false",
+    placeholder: "Pairing code",
+    "aria-label": "Pairing code",
+  });
   const input = el("input", {
     class: "input mono",
     type: "password",
@@ -99,6 +120,24 @@ function renderSignIn(message) {
     placeholder: "Access token",
     "aria-label": "Access token",
   });
+  const pairButton = el("button", { class: "btn primary", type: "button" }, "Pair");
+  const pair = async () => {
+    const value = code.value.trim();
+    if (value === "") {
+      code.focus();
+      return;
+    }
+    pairButton.disabled = true;
+    let token;
+    try {
+      token = await pairWithCode(value);
+    } catch (error) {
+      renderSignIn(error.message);
+      return;
+    }
+    setToken(token);
+    attempt(connect);
+  };
   const submit = () => {
     const value = input.value.trim();
     if (value === "") {
@@ -108,17 +147,17 @@ function renderSignIn(message) {
     setToken(value);
     attempt(connect);
   };
-  input.addEventListener("keydown", (event) => {
-    if (event.key === "Enter") {
-      event.preventDefault();
-      submit();
-    }
-  });
+  pairButton.addEventListener("click", () => attempt(pair));
+  onEnter(code, () => attempt(pair));
+  onEnter(input, submit);
   screen(
-    el("p", { class: "muted" }, "Paste the access token of your Dot daemon to continue."),
+    el("p", { class: "muted" }, "Type a pairing code: in Dot on your Mac, or in Safari where Dot is open, go to Settings › Phone and press Pair a phone."),
     message === "" ? null : el("div", { class: "note bad" }, icon("alert"), el("span", null, message)),
+    code,
+    pairButton,
+    el("div", { class: "hint" }, "Or paste the access token of your Dot daemon:"),
     input,
-    el("button", { class: "btn primary", type: "button", onclick: submit }, "Connect"),
+    el("button", { class: "btn", type: "button", onclick: submit }, "Connect"),
     el(
       "div",
       { class: "stack tight" },
@@ -130,7 +169,7 @@ function renderSignIn(message) {
       el("code", { class: "code-line" }, ".venv/bin/dotx open"),
     ),
   );
-  input.focus();
+  code.focus();
 }
 
 // A daemon out of reach is asked again by itself (item 200): soon at first, since it may be starting or the Mac waking,
@@ -279,7 +318,7 @@ function handleAuthLost() {
   }
   endSession();
   clearToken();
-  renderSignIn("The daemon did not accept the saved access token. Paste the current one, or open this page with dotx open.");
+  renderSignIn("The daemon did not accept the saved access token. Pair again with a new code, paste the current token, or open this page with dotx open.");
 }
 
 async function connect() {

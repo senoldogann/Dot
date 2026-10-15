@@ -110,6 +110,29 @@
   overflow-x: auto;
 }
 
+/* ---------- Phone tab (item 267) ---------- */
+
+/* The steps to Dot on a phone, each with what it needs: the address, then the pairing code. */
+.phone-steps {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin: 0;
+  padding-left: 1.5em;
+}
+
+.phone-steps > li > * + * {
+  margin-top: 8px;
+}
+
+/* The pairing code, large enough to read off the screen and type on a phone. */
+.pair-code {
+  display: block;
+  font-size: var(--text-xl);
+  font-weight: var(--weight-title);
+  letter-spacing: var(--tracking-caps);
+}
+
 /* ---------- API keys tab ---------- */
 
 /* The mark beside each provider: plain while it has no key, green once a key is in use. */

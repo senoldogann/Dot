@@ -20,6 +20,7 @@ from dotagent.core.errors import (
     ElsewhereError,
     InvalidValueError,
     NotFoundError,
+    PairingRefused,
     ProviderError,
     RunConflict,
     ToolExecutionError,
@@ -37,6 +38,7 @@ from dotagent.server.routes_data import memories_router, rules_router, schedules
 from dotagent.server.routes_files import files_router
 from dotagent.server.routes_keys import keys_router
 from dotagent.server.routes_pages import pages_router
+from dotagent.server.routes_phone import phone_router
 from dotagent.server.routes_queue import queue_router
 from dotagent.server.routes_runs import runs_router
 from dotagent.server.routes_system import health_router, proof_router, system_router
@@ -58,6 +60,7 @@ _FAULT_CHARS: int = 500
 # a conflict), a failing model service to 502; every other error is a fault of Dot itself: it is answered with 500 and
 # logged.
 _STATUS_BY_ERROR: tuple[tuple[type[DotError], int], ...] = (
+    (PairingRefused, 403),
     (NotFoundError, 404),
     (RunConflict, 409),
     (UndoError, 409),
@@ -113,6 +116,7 @@ def create_app(ctx: ServerContext) -> FastAPI:
     app.include_router(themes_router())
     app.include_router(pages_router(ctx))
     app.include_router(files_router(ctx))
+    app.include_router(phone_router(ctx))
 
     @app.exception_handler(DotError)
     async def dot_error(request: Request, exc: DotError) -> JSONResponse:

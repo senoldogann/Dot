@@ -57,6 +57,10 @@ const SHAPES = {
     ["path", { d: "M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20" }],
     ["path", { d: "M2 12h20" }],
   ],
+  smartphone: [
+    ["rect", { width: 14, height: 20, x: 5, y: 2, rx: 2, ry: 2 }],
+    ["path", { d: "M12 18h.01" }],
+  ],
   monitor: [
     ["rect", { width: 20, height: 14, x: 2, y: 3, rx: 2 }],
     ["line", { x1: 8, x2: 16, y1: 21, y2: 21 }],
