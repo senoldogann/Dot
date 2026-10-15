@@ -1,7 +1,8 @@
 """A run whose model cannot be reached for a while, on a scripted model in a throw-away home: the run waits for the
-connection and asks the same step again, a stop ends the wait at once, a model that stays out of reach fails the run once
-the wait is over, and a request the provider refuses or a rate limit fails it at once; a run that an error fails
-keeps the error's message as its result and the error's context with its end. No model is called.
+connection and asks the same step again, the page told to drop what the failed try streamed, a stop ends the wait at
+once, a model that stays out of reach fails the run once the wait is over, and a request the provider refuses or a
+rate limit fails it at once; a run that an error fails keeps the error's message as its result and the error's context
+with its end. No model is called.
 """
 
 import asyncio
@@ -84,15 +85,21 @@ class Unreachable:
 
 
 class Played:
-    """A run that is over: its record, its events and how long it took."""
+    """A run that is over: its record, its events, the deltas it streamed (the store keeps none) and how long it took."""
 
-    def __init__(self, record: RunRecord, events: Sequence[EventRecord], seconds: float) -> None:
+    def __init__(
+        self, record: RunRecord, events: Sequence[EventRecord], streamed: Sequence[EventRecord], seconds: float
+    ) -> None:
         self.record: RunRecord = record
         self.events: tuple[EventRecord, ...] = tuple(events)
+        self.streamed: tuple[EventRecord, ...] = tuple(streamed)
         self.seconds: float = seconds
 
     def kind(self, kind: str) -> list[EventRecord]:
         return [event for event in self.events if event.kind == kind]
+
+    def deltas(self, kind: str) -> list[EventRecord]:
+        return [event for event in self.streamed if event.kind == "delta" and event.data["kind"] == kind]
 
 
 @pytest_asyncio.fixture(scope="module", loop_scope="module")
@@ -111,6 +118,16 @@ async def _until(subscription: Subscription, run_id: str, kind: str) -> EventRec
         event: EventRecord = await subscription.queue.get()
         if event.run_id == run_id and event.kind == kind:
             return event
+
+
+def _left(subscription: Subscription, run_id: str) -> list[EventRecord]:
+    """The events of run ``run_id`` still in the queue of ``subscription``."""
+    events: list[EventRecord] = []
+    while not subscription.queue.empty():
+        event: EventRecord = subscription.queue.get_nowait()
+        if event.run_id == run_id:
+            events.append(event)
+    return events
 
 
 async def _play(login_env: dict[str, str], wait_s: float, model: Unreachable, stop_when_waiting: bool) -> Played:
@@ -135,12 +152,13 @@ async def _play(login_env: dict[str, str], wait_s: float, model: Unreachable, st
                             manager.cancel(run.id)
                         record: RunRecord = await manager.wait(run.id)
                     seconds: float = time.monotonic() - started
+                    streamed: list[EventRecord] = _left(subscription, run.id)
             finally:
                 await manager.shutdown()
             events: list[EventRecord] = await runtime.store.list_events(run.id, 0, _MAX_EVENTS)
         finally:
             await close_runtime(runtime)
-    return Played(record, events, seconds)
+    return Played(record, events, streamed, seconds)
 
 
 async def test_a_run_waits_for_its_model_to_be_reached_again_and_goes_on(login_env: dict[str, str]) -> None:
@@ -158,6 +176,8 @@ async def test_a_run_waits_for_its_model_to_be_reached_again_and_goes_on(login_e
     # The step was asked again, not counted again: two failed calls and the run's two steps.
     assert model.calls == 4
     assert played.record.steps == 2
+    # Each time, the page was told to drop what the failed try streamed (item 246).
+    assert [event.data["step"] for event in played.deltas("reset")] == [1, 1]
 
 
 async def test_a_server_that_fails_with_a_status_retrying_gets_past_is_waited_for(login_env: dict[str, str]) -> None:
