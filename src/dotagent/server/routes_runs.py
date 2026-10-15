@@ -13,6 +13,7 @@ from dotagent.agent.attachments import AttachedFile, StoredAttachment, load_atta
 from dotagent.agent.campaign import session_number
 from dotagent.agent.keep_going import keep_going_ask
 from dotagent.agent.lessons import run_lessons
+from dotagent.agent.resume import cut_off_by
 from dotagent.agent.rewind import (
     NOTHING_TO_TAKE_BACK,
     FilesTakenBack,
@@ -79,10 +80,12 @@ def runs_router(ctx: ServerContext) -> APIRouter:
         run: RunRecord = await store.get_run(run_id)
         return RunDetail(
             run=run,
+            title=(await store.get_thread(run.thread_id)).title,
             children=await store.list_child_runs(run_id),
             active=active,
             elsewhere=elsewhere,
             resumable=await ctx.manager.resumable(run),
+            cut_off=cut_off_by(run),
             lessons=await run_lessons(store, run_id),
             questions=await store.list_left_questions(run_id),
             campaign=await campaign_of(run),

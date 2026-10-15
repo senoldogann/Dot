@@ -10,7 +10,7 @@ import { MODES, optionRow, runChoices } from "../choices.js";
 import { composerFrame, composerPill, NEW_CHAT_DRAFT } from "../composer.js";
 import { el } from "../dom.js";
 import { forgetLevel, KEPT_SPEED, savedLevel, saveLevel } from "../efforts.js";
-import { trackHeight } from "../layout.js";
+import { touchFirst, trackHeight } from "../layout.js";
 import { anchoredPopover } from "../popover.js";
 import { buildPresence } from "../presence.js";
 import { KEPT_APPROVALS, KEPT_GOAL_MODE, standingPicker } from "../runmodes.js";
@@ -247,8 +247,14 @@ export function mount(root, ctx) {
   const stopCentring = trackHeight(start, home, "--home-start-h");
   approvals.sync(getSnapshot());
   const stopApprovals = onChange(approvals.sync);
-  const stopCompose = onCompose(composer.focus);
-  composer.focus();
+  // On a touch screen the caret waits for a tap: a box that takes the focus opens the keyboard over the page (item 293).
+  function offerCaret() {
+    if (!touchFirst()) {
+      composer.focus();
+    }
+  }
+  const stopCompose = onCompose(offerCaret);
+  offerCaret();
   return () => {
     stopCentring();
     stopApprovals();

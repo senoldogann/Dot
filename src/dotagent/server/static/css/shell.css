@@ -59,11 +59,11 @@
 
 /* The top bar (item 78): one solid bar on every page with a hairline under it; nothing scrolls under a blur. It
    carries the sidebar opener, the page's name (stage.js), the page's tools and the daemon's pills. It keeps out of a
-   phone's top safe area, and layout.js holds it at the top of what is seen while the keyboard pans the page (item
-   275). */
+   phone's top safe area, and stays at the top of what is seen while the keyboard pans the page (items 275 and 293). */
 .stagebar {
   position: sticky;
   top: 0;
+  translate: 0 var(--seen-top);
   z-index: 20;
   padding-top: var(--safe-top);
   background: var(--bg);
@@ -116,7 +116,7 @@
 
 .shell[data-nav="drawer"] .sidebar {
   position: fixed;
-  inset: 0 auto 0 0;
+  inset: var(--seen-top) auto var(--seen-bottom) 0;
   width: min(86vw, 320px);
   height: auto;
   visibility: hidden;
@@ -150,7 +150,7 @@
 .shell[data-nav="drawer"][data-sidebar="open"] .scrim {
   display: block;
   position: fixed;
-  inset: 0;
+  inset: var(--seen-top) 0 var(--seen-bottom);
   z-index: 25;
   background: var(--scrim);
 }
@@ -688,4 +688,124 @@
 
 :root[data-shell="desktop"] .shell:not([data-nav="docked"][data-sidebar="open"]) .stagebar-row {
   padding-left: 96px;
+}
+
+/* ---------- a phone, after T3 Code's phone app (items 294 and 295) ---------- */
+
+/* The sidebar's title and its round new chat are a phone's. */
+.side-title,
+.side-compose {
+  display: none;
+}
+
+/* A screen used by touch shows no keys to press. */
+@media (hover: none) and (pointer: coarse) {
+  .sidebar kbd {
+    display: none;
+  }
+}
+
+@media (max-width: 720px) {
+  /* The way back to the chats and the sidebar's close are round buttons on a surface, as T3 Code's back button. */
+  .stagebar-left > .icon-btn,
+  .side-head > .icon-btn {
+    border: 1px solid var(--border);
+    border-radius: var(--radius-pill);
+    background: var(--surface);
+    color: var(--text);
+  }
+
+  /* The list of chats covers the screen on the page's own ground (item 294): it slides in from the left, as the list a
+     chat goes back to, and nothing of the page shows beside it. */
+  .shell[data-nav="drawer"] .sidebar {
+    width: 100%;
+    background: var(--bg);
+  }
+
+  .shell[data-nav="drawer"][data-sidebar="open"] .sidebar {
+    box-shadow: none;
+  }
+
+  /* Its head: the close where the bar's way back stands, then Dot's name in large type. */
+  .side-head {
+    gap: 12px;
+    padding: 8px 16px 4px 8px;
+  }
+
+  .side-title {
+    display: block;
+    min-width: 0;
+    overflow: hidden;
+    color: var(--text);
+    font-size: var(--text-2xl);
+    line-height: var(--leading-2xl);
+    font-weight: var(--weight-title);
+    letter-spacing: var(--tracking-title);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .side-body {
+    padding: 8px 12px 12px;
+  }
+
+  /* The rows a step roomier, on hairlines as T3 Code's list. */
+  .side-chat > .side-run {
+    padding-top: 12px;
+    padding-bottom: 12px;
+  }
+
+  .side-chat + .side-chat {
+    border-top: 1px solid var(--border);
+  }
+
+  /* The foot under the thumb: Settings and a new chat in round buttons either side of the search, a pill. The body's
+     own New chat gives way to the foot's. */
+  .side-body > .side-btn {
+    display: none;
+  }
+
+  .side-foot {
+    flex-wrap: nowrap;
+    gap: 8px;
+    padding: 12px 16px calc(12px + var(--safe-bottom));
+  }
+
+  .side-foot > .side-link,
+  .side-compose {
+    display: grid;
+    place-items: center;
+    flex: none;
+    width: 44px;
+    height: 44px;
+    padding: 0;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-pill);
+    background: var(--surface);
+    color: var(--text);
+  }
+
+  .side-foot > .side-link > span {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  .side-foot .side-search {
+    flex: 1;
+    min-width: 0;
+    height: 44px;
+    margin: 0;
+    padding: 0 16px;
+    border-color: var(--border);
+    border-radius: var(--radius-pill);
+  }
+
+  .side-foot .icon {
+    width: 20px;
+    height: 20px;
+  }
 }

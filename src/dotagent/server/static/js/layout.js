@@ -108,20 +108,84 @@ export function trackStagebar(stagebar) {
   return trackHeight(stagebar, document.documentElement, STAGEBAR_PROPERTY);
 }
 
-/** Hold the stage bar at the top of what is seen (item 275): iOS's keyboard pans the page without resizing it, which
- * takes a bar that sticks to the page's top out of sight, so the bar goes down as far as the seen part is panned.
- * Returns the function that stops it. */
-export function holdBarInSight(stagebar) {
+const TOUCH_FIRST = window.matchMedia("(hover: none) and (pointer: coarse)");
+// A phone held upright, which gets the layout after T3 Code's phone app (items 294 to 298); the stylesheets share the
+// width.
+export const PHONE = window.matchMedia("(max-width: 720px)");
+
+/** Whether the page is used by touch first, on a phone or a tablet: a box that takes the focus there opens the screen's
+ * keyboard over half the page, so a page leaves the caret for a tap as it opens (item 293). */
+export function touchFirst() {
+  return TOUCH_FIRST.matches;
+}
+
+// iOS does not always tell of the last step of the keyboard's slide (iOS 26.5): after a change, the seen part is read
+// again on every frame until it has held still for this many.
+const STILL_FRAMES = 30;
+
+/** Follow the part of the page that is seen (items 275 and 293). iOS's keyboard pans the page without resizing it, and
+ * iOS 26 can leave it panned once the keyboard has gone: what is fixed to the window or sticks to its edges would go
+ * out of sight at the top and leave a band at the bottom. `--seen-top` on the page element is how far the seen part
+ * starts below the window's top, `--seen-bottom` how far it ends above the window's bottom (below it, negative); the
+ * top bar, the dock, the drawers, the scrims and the dialogs stand on them (app.css, shell.css, run.css). The window's
+ * bottom is that of the box what is fixed stands in, measured with an element fixed to its top and bottom
+ * (`.seen-box`): with the keyboard up, iOS 26.5 shrinks `innerHeight` (to 636 px) and not that box (796 px). Returns the
+ * function that stops it. */
+export function followSeen() {
   const seen = window.visualViewport;
+  const root = document.documentElement.style;
+  const box = document.createElement("div");
+  box.className = "seen-box";
+  box.setAttribute("aria-hidden", "true");
+  document.body.append(box);
+  let top = null;
+  let bottom = null;
+  let still = 0;
+  let frame = 0;
+
+  /** Write where the seen part is; true when it moved. */
   function place() {
-    const down = Math.max(0, Math.round(seen.offsetTop));
-    stagebar.style.translate = down === 0 ? "" : `0 ${down}px`;
+    const nextTop = Math.max(0, Math.round(seen.offsetTop));
+    const nextBottom = Math.round(box.getBoundingClientRect().height - seen.offsetTop - seen.height);
+    if (nextTop === top && nextBottom === bottom) {
+      return false;
+    }
+    top = nextTop;
+    bottom = nextBottom;
+    root.setProperty("--seen-top", `${top}px`);
+    root.setProperty("--seen-bottom", `${bottom}px`);
+    return true;
   }
-  seen.addEventListener("resize", place);
-  seen.addEventListener("scroll", place);
+
+  function watch() {
+    still = place() ? 0 : still + 1;
+    frame = still < STILL_FRAMES ? requestAnimationFrame(watch) : 0;
+  }
+
+  function changed() {
+    place();
+    still = 0;
+    if (frame === 0) {
+      frame = requestAnimationFrame(watch);
+    }
+  }
+
+  const sources = [
+    [seen, "resize"],
+    [seen, "scroll"],
+    [window, "resize"],
+    [document, "focusin"],
+    [document, "focusout"],
+  ];
+  for (const [source, kind] of sources) {
+    source.addEventListener(kind, changed);
+  }
   place();
   return () => {
-    seen.removeEventListener("resize", place);
-    seen.removeEventListener("scroll", place);
+    for (const [source, kind] of sources) {
+      source.removeEventListener(kind, changed);
+    }
+    cancelAnimationFrame(frame);
+    box.remove();
   };
 }

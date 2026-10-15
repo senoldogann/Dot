@@ -53,7 +53,7 @@ function turn(past, editFromHereOf) {
     : el("div", { class: "note" }, icon("clock"), el("span", null, "This run is still going."), el("a", { class: "small", href }, "Open run"));
   const asked =
     past.source === RESUME_SOURCE
-      ? el("div", { class: "note" }, icon("refresh"), el("span", null, "Resumed where the run above was cut off"))
+      ? el("div", { class: "note restart-note" }, icon("bolt"), el("span", null, "Resumed where the run above was cut off"))
       : past.source === BACKGROUND_SOURCE
         ? backgroundNote(past.goal)
         : userMessage({ text: past.goal, sentAt: past.created_at, files: [], editFromHere: editFromHereOf(past) });

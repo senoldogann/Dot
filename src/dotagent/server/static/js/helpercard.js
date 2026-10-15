@@ -46,8 +46,8 @@ function modelLine(helper) {
 }
 
 /** What `helper` is doing, as a label and the words: the call that is out, else the model's turn; once it ended, its
- * last call. `null` when there is nothing to say. */
-function actionLine(helper) {
+ * last call. `null` when there is nothing to say. The side panel's list of agents says it too (item 296). */
+export function actionLine(helper) {
   if (helper.ended !== null) {
     return helper.action === null ? null : ["Last", helper.action];
   }

@@ -1,7 +1,7 @@
 """Stop in the send button's place (item 120): while a run works and the box is empty, the run page's send is a Stop in
 the danger colour; a typed word brings the send back, as Queue (item 148), and pressed, the Stop cancels the run, after
-which the send follows up. The top bar keeps the face, the name and the panel's switch; the emergency stop is in the
-sidebar's foot. A scripted run waits in a shell command, served by a real server, wide and on a phone, light and
+which the send follows up. The top bar keeps the face, the name (on a phone the chat's title) and the panel's switch;
+there is no emergency stop in the bar. A scripted run waits in a shell command, served by a real server, wide and on a phone, light and
 dark."""
 
 import asyncio
@@ -38,6 +38,8 @@ _WAIT_COMMAND: str = "sleep 300"
 _RUN_WAIT_S: float = 30.0
 # The longest transition of a button (320 ms) and a breath: a shot shows where the colours settle.
 _SETTLE_MS: int = 400
+# The widest window that gets a phone's bar (app.css).
+_PHONE_PX: int = 720
 _SHOTS: tuple[tuple[int, Literal["light", "dark"]], ...] = (
     (1280, "light"),
     (1280, "dark"),
@@ -123,8 +125,10 @@ async def test_the_send_is_the_runs_stop_while_the_box_is_empty_and_the_top_bar_
                 )
                 await page.goto(ui_url(host, port, TOKEN))
                 await page.goto(f"{address}/#/runs/{run.id}")
-                await expect(page.locator(".stage-title .stage-name")).to_be_visible()
-                # The bar: the face, the name and the panel's switch; no state, no date, no chips, no Cancel.
+                # The bar: the face, the name (on a phone the chat's title over the agent and the model, item 295) and
+                # the panel's switch; no state, no date, no chips, no Cancel.
+                name: str = ".stage-heading" if width <= _PHONE_PX else ".stage-name"
+                await expect(page.locator(f".stage-title {name}")).to_be_visible()
                 await expect(page.locator(".stage-tools > *")).to_have_count(1)
                 await expect(page.locator(".stage-tools button[aria-label='Run details']")).to_be_visible()
                 await expect(page.locator(".stagebar .chip")).to_have_count(0)

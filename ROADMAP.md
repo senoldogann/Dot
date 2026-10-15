@@ -5230,6 +5230,14 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 289 | Connect apps sits under Campaigns; the sidebar has no stop button                     | done        | 8aa45dd |
 | 290 | DeepSeek V4.1 Flash's reasoning levels are back                                       | done        | 8aa45dd |
 | 291 | A schedule made in a chat runs as that chat does, and knows five runs                 | done        | 8aa45dd |
+| 292 | Every free model of Zen, from OpenCode's refreshed catalog                            | in progress |         |
+| 293 | On a phone, the bar, the composer and the drawers stay on what is seen                | in progress |         |
+| 294 | A phone's sidebar is the list of chats, with search and a new chat at the thumb       | in progress |         |
+| 295 | A phone's chat bar: back, the chat over its agent and model, tools in one pill        | in progress |         |
+| 296 | The details rise as a sheet on a phone; helpers say their state, model and work       | in progress |         |
+| 297 | A line over a phone's composer: how long the run has worked, and its helpers          | in progress |         |
+| 298 | Dot's computer opens over the whole phone, with its address and Take over             | in progress |         |
+| 299 | A turn that goes on after Dot restarted says so, with a bolt                          | in progress |         |
 
 ### 77. The type system: Inter and Geist Mono, seven sizes, three weights
 
@@ -12643,6 +12651,133 @@ starts a firing at the schedule's speed. API: `speed` in a schedule's create and
 shows Fast. `defaults.toml`: `[scheduler] history_runs = 5`. README: Schedules. Tests: `tests/smoke/test_scheduler.py`
 (a chat with YOLO, goal mode, research and a chosen model and level makes a schedule that keeps them, in that chat),
 `tests/unit/test_schedule_choices.py`, and the five-run default in `test_schedule_memory.py`.
+
+### 292. Every free model of Zen, from OpenCode's refreshed catalog
+
+**Status: in progress.** Built on `item-292-phone-like-t3`.
+
+**What was found.** OpenCode answers `/provider` from the catalog it read when it started and refreshes models.dev only
+after. The owner's list was read a second after OpenCode's refreshed cache had been written, from the server's older
+catalog: it lacked `deepseek-v4.1-flash-free`, `cat-jam-free` and `nemotron-3.5-super-vl-free`, still had three
+deprecated models, and Dot kept it 24 h.
+
+**As built (2026-10-15).** `opencode/server.py`: the free models come from `opencode models opencode --refresh
+--verbose` in the server's own home and environment (`_catalog`; `free_models` reads the listing), kept for
+`[providers.opencode] models_ttl_s` (3600 s; OpenCode refreshes its own catalog hourly). A server that started before
+the catalog Dot listed, and serves no run, makes way, so the next one reads the refreshed catalog (`_drop_outdated`).
+README: the providers. Tests: `tests/unit/test_opencode.py` (the listing read into free models),
+`tests/smoke/test_opencode_live.py` (the free models are the refreshed catalog's, and an older server makes way).
+
+### 293. On a phone, the bar, the composer and the drawers stay on what is seen
+
+**Status: in progress.** Built on `item-292-phone-like-t3`.
+
+**What was found.** The owner's home-screen app on an iPhone 17 Pro Max (iOS 26) showed a 62 pt band at the top and a 69
+pt one at the bottom, with the sidebar's head and the details drawer's tabs under the top band. The top band is the
+status bar, opaque in the page's colour; it stays (`black-translucent` is the riskier choice on iOS 26). The bottom band
+is the page left panned by the keyboard: iOS 26 can leave `visualViewport.offsetTop` above 0 once the keyboard has gone
+(WebKit bugs 301108 and 301994, Apple's forum thread 800154), so what is fixed to the window sat 69 pt up, its top out
+of sight and a band under it. The home and agent pages gave the composer the caret as they opened, which brought the
+keyboard up on every visit. In the iOS 26.5 simulator, iOS at times told of no last step of the keyboard's slide, and
+the composer stayed where the slide had left it.
+
+**As built (2026-10-16).** `static/js/layout.js`: `followSeen()` writes `--seen-top` and `--seen-bottom` on the page
+element from `visualViewport` (how far the seen part starts below the window's top, and ends above its bottom) on its
+resize and scroll, the window's resize and the focus coming and going, then reads them on every frame until they have
+held still for 30 (`STILL_FRAMES`); `shell.js` follows it while the page lives. `touchFirst()` and `PHONE` (720 px and
+under). `css/shell.css`, `app.css`, `run.css`: the bar moves down by `--seen-top` and the dock up by `--seen-bottom`;
+the sidebar drawer, the details drawer, their scrims, the dialogs and their backdrops and the toasts stand on both.
+`views/runs.js`, `views/agents.js`: the composer takes the caret as the page opens only where the page is not used by
+touch first. README: Dot on the phone. Tests: `tests/smoke/test_phone_fit.py`: with a `visualViewport` left panned 69
+px, the bar's top, the dock's foot, the sidebar and the details drawer stand on the seen part; with a 340 px keyboard,
+the dock stands on it. Seen in Safari on the iOS 26.5 simulator: with the keyboard up the composer sits on it, and with
+it gone everything is back. The simulator opens a home-screen app in Safari, so the stuck pan itself is proven with the
+test's `visualViewport`.
+
+### 294. A phone's sidebar is the list of chats, with search and a new chat at the thumb
+
+**Status: in progress.** Built on `item-292-phone-like-t3`.
+
+**As built (2026-10-16).** After T3 Code's phone app. `static/js/sidebar.js`: the head holds Dot's name (`.side-title`)
+and the close button (an x on a phone, the panel's icon otherwise); on a phone the search moves to the foot after
+Settings, with a round New chat (`.side-compose`), and back to the top of the body on a wider window (`placeForWidth`,
+on `PHONE`'s change). `static/js/shell.js`: the bar's opener is a round chevron on a phone. `css/shell.css`: on a phone
+the sidebar covers the screen in the page's colour, its rows are taller with hairlines between chats, the body's own
+buttons give way, and the foot holds a round Settings (its word kept for a screen reader), the search as a 44 px pill
+and the round New chat; a touch screen shows no keyboard hints. README: Dot on the phone. Tests:
+`tests/smoke/test_phone_t3.py` (the sidebar is as wide as the screen, "Dot" at its head, the search, New chat and
+Settings at its foot, light and dark).
+
+### 295. A phone's chat bar: back, the chat over its agent and model, tools in one pill
+
+**Status: in progress.** Built on `item-292-phone-like-t3`.
+
+**As built (2026-10-16).** `server/views.py`: `RunDetail.title`, the title of the run's chat. `static/js/views/run.js`:
+on a phone the bar names the chat (`.stage-heading`: its title, or a helper's goal) over "Dot · model" ("Helper · model"
+on a helper's page; `paintHeading`), and holds its tools in one pill (`.stage-pill`): Dot's computer once the run has
+had a page, the helpers with their count once the chat has some (both `.stage-quick`), and the details' switch. A wider
+bar is as it was: the face, the name and the switch alone (`css/app.css`). README: Dot on the phone. Tests:
+`tests/smoke/test_phone_t3.py` (title, "Dot · scripted", the three tools; at 1280 px the name and one tool),
+`tests/smoke/test_run_stop.py` (the heading on a phone, the name on a wide window).
+
+### 296. The details rise as a sheet on a phone; helpers say their state, model and work
+
+**Status: in progress.** Built on `item-292-phone-like-t3`.
+
+**As built (2026-10-16).** `static/js/inspector.js`: on a phone the details drawer is a sheet that rises from the foot
+(`css/run.css`: 90 % of what is seen high, round top corners, a grabber); a drag of its head down by more than 96 px
+closes it, and a shorter one puts it back. `openTab(id)` opens the details on a tab. `static/js/agentlist.js`: an Agents
+row says, under its goal, the provider's mark, the model and the state ("Running", "Waiting for you" in amber, "Failed"
+in red), and a line of what the helper does now or did last ("Now: shell · sleep 600", from the conversation on the
+page: `timeline.helper(id)`, `helpercard.actionLine`), with its time and a chevron, wide and on a phone. README: the
+side panel, Dot on the phone. Tests: `tests/smoke/test_phone_t3.py` (the sheet's place and grabber, its rows' states,
+model and "Now:" line, a drag closes it), `tests/smoke/test_previous_agents.py` (state words and model, wide and on a
+phone).
+
+### 297. A line over a phone's composer: how long the run has worked, and its helpers
+
+**Status: in progress.** Built on `item-292-phone-like-t3`.
+
+**As built (2026-10-16).** `static/js/capsule.js`: `createCapsule`, a line over the composer after T3 Code's: "Working
+<time>" with a turning mark, or "Waiting for you" with a bell while the run waits, and how its helpers stand while it
+works ("2 working", from `timeline.flockState`). Each part opens what it tells of (the Run tab, the Agents tab), and the
+line shows only while the run works. T3 Code's line also counts the queued messages; Dot's queue has its banner right
+under the line (item 148), so the line does not say it again. `static/js/views/run.js` paints it each second and on each
+change of the run and its helpers. A wider page shows no line (`css/app.css`). README: Dot on the phone. Tests:
+`tests/smoke/test_phone_t3.py` ("Working", "2 working", no "queued" while the banner shows the queued message; the
+helpers' part opens the sheet on Agents; no line at 1280 px).
+
+### 298. Dot's computer opens over the whole phone, with its address and Take over
+
+**Status: in progress.** Built on `item-292-phone-like-t3`.
+
+**As built (2026-10-16).** `static/js/computer.js`: `openFull()` moves the card of Dot's computer into a dialog over the
+whole page (`dialog.computer-full`, on what is seen) with a round close; the page's address in a pill, the live frame
+and "Dot has control" with Take over, as on the side panel; closed, the card goes back to the panel's Screen tab. The
+bar's Dot's computer opens it. Input from the phone to the page is not part of it. README: Dot on the phone. Tests:
+`tests/smoke/test_phone_t3.py` (the address, "Dot has control", Take over, the full screen, and the card back on the
+Screen tab once it closes).
+
+### 299. A turn that goes on after Dot restarted says so, with a bolt
+
+**Status: in progress.** Built on `item-292-phone-like-t3`.
+
+**What was found.** A run that went on after a restart opened with one long muted line ("Resumed on its own when the
+daemon started: …") and an earlier turn of it with "Resumed where the run above was cut off"; a run that waited for the
+owner said "This run was cut off while it worked." The owner asked for T3 Code's row: a bolt and "T3 Code restarted and
+resumed this turn", opened for the details.
+
+**As built (2026-10-16).** `static/js/timeline.js`: the `resumed` event is a folded line (`details.restart`) with an
+amber bolt: "Dot restarted and resumed this turn" when the daemon went on with the run by itself after it stopped, else
+"Resumed this turn after" what cut it off (`CUT_OFFS`); opened, how that run was cut off and how it went on, "Its last
+step" with how each call ended, and "Open the run it resumes". `server/views.py`: `RunDetail.cut_off`
+(`agent.resume.cut_off_by`). `static/js/views/run.js`: the line over the composer of a run that waits to be resumed
+wears the bolt and says what cut the run off ("Dot was shut down while this run worked."), with Continue.
+`static/js/history.js`: an earlier turn that resumed a run wears the bolt. README: resuming a run. Tests:
+`tests/smoke/test_restart_row.py`: two chats wait on a question when the daemon is shut down; started again, the chat of
+the web UI goes on by itself under "Dot restarted and resumed this turn", which opens to how the run was cut off,
+"ask_user cut off" and the link to that run; the other's line says "Dot was shut down while this run worked.", and its
+Continue opens a turn under "Resumed this turn after Dot was shut down".
 
 ## Log
 
