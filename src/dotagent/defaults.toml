@@ -252,8 +252,8 @@ verify_answer_paths = false
 # also resumes on its own, when the daemon starts, a run of the web UI that was cut off at most resume_within_s
 # seconds before and whose calls that were cut off while they ran only read; a run of a dotx command never. A run the
 # owner stopped (Ctrl-C too), a run another run started and a run after which the thread went on are never resumed.
-# "off" until evals show that it helps.
-resume = "off"
+# "safe" by default since item 248, on the owner's word; "off" leaves every such run to the owner.
+resume = "safe"
 resume_within_s = 1800
 # After a task or research run that ended with success although something went wrong on the way (a failed call, an
 # alert of the progress watchdog, a send-back by the goal check or for paths that do not exist), one call to the
