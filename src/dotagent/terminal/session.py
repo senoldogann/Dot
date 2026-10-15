@@ -27,7 +27,7 @@ import time
 from pathlib import Path
 from typing import Protocol
 
-from dotagent.core.errors import ToolExecutionError, ToolInputError
+from dotagent.core.errors import TerminalInputFullError, ToolExecutionError, ToolInputError
 from dotagent.core.logs import get_logger
 from dotagent.core.text import duration_text, truncate_middle
 from dotagent.policy.shell import typed_lines
@@ -41,6 +41,11 @@ _SECRET_PROMPT: re.Pattern[str] = re.compile(r"(?i)\b(?:password|passphrase|pass
 _KEPT_CHARS: int = 192 * 1024
 _RECENT_CHARS: int = 2048
 _READ_BYTES: int = 65536
+# The most that may wait to be typed into a program that has not read it: a pseudo-terminal takes 1022 bytes ahead of
+# the program, and a blocking write of more held the daemon for as long as the program did not read (measured
+# 2026-10-15), so the rest waits here and is written as the program reads. One send is at most 10_000 characters
+# (``terminal_send``), so a send into an empty wait always fits.
+_PENDING_INPUT_MAX: int = 64 * 1024
 # A read returns once the program has printed nothing for this long, so that a burst of output comes back whole.
 _QUIET_S: float = 0.3
 _CLOSE_GRACE_S: float = 1.0
@@ -103,6 +108,9 @@ class TerminalSession:
         self.started_at: float = time.time()
         self._process: asyncio.subprocess.Process = process
         self._master: int = master
+        # What was typed and the program has not read yet, and whether the loop is asked to say when it takes more.
+        self._pending: bytearray = bytearray()
+        self._writing: bool = False
         self._decoder: codecs.IncrementalDecoder = codecs.getincrementaldecoder("utf-8")(errors="replace")
         self._unread: str = ""
         self._dropped: int = 0
@@ -121,6 +129,9 @@ class TerminalSession:
         # The program's exit status, once it ended by itself.
         self.exit_status: int | None = None
         self._arrived: asyncio.Event = asyncio.Event()
+        # Neither a read nor a write of the terminal waits in the event loop: what is not there yet comes with the
+        # loop's next word on the descriptor.
+        os.set_blocking(master, False)
         asyncio.get_running_loop().add_reader(master, self._on_readable)
 
     @property
@@ -131,6 +142,9 @@ class TerminalSession:
     def _on_readable(self) -> None:
         try:
             data: bytes = os.read(self._master, _READ_BYTES)
+        except BlockingIOError:
+            # The loop spoke too soon: nothing to read after all, and nothing ended.
+            return
         except OSError as error:
             # EIO is how the terminal says that nothing holds its other end any more: the program is gone.
             if error.errno != errno.EIO:
@@ -144,23 +158,79 @@ class TerminalSession:
                 self._unread = self._unread[-_KEPT_CHARS:]
             self._recent = (self._recent + text)[-_RECENT_CHARS:]
         else:
+            self._drop_pending()
             asyncio.get_running_loop().remove_reader(self._master)
             self.ended = True
             self.finished.set()
         self._arrived.set()
 
+    def _ended_error(self) -> ToolExecutionError:
+        return ToolExecutionError(
+            "the program of this terminal session has ended: terminal_read returns what it printed last and closes "
+            "the session",
+            {"session": self.id},
+        )
+
     def send(self, text: str) -> None:
-        """Type ``text``; a line end in it presses Enter."""
+        """Type ``text``; a line end in it presses Enter. What the program has not read yet waits here and is written
+        as it reads (:meth:`_on_writable`), so a program that stopped reading holds nothing but its own session; one
+        that left more than :data:`_PENDING_INPUT_MAX` unread is typed nothing more until it reads."""
         if self.ended:
-            raise ToolExecutionError(
-                "the program of this terminal session has ended: terminal_read returns what it printed last and "
-                "closes the session",
-                {"session": self.id},
+            raise self._ended_error()
+        data: bytes = text.encode()
+        waiting: int = len(self._pending)
+        if waiting + len(data) > _PENDING_INPUT_MAX:
+            raise TerminalInputFullError(
+                f"the program of this terminal session has not read {waiting} bytes typed into it before: read its "
+                "output with terminal_read and wait for it to take input, or close the session",
+                {"session": self.id, "waiting_bytes": waiting, "limit_bytes": _PENDING_INPUT_MAX},
             )
         self.used_at = time.monotonic()
-        os.write(self._master, text.encode())
+        self._pending.extend(data)
+        try:
+            self._write_pending()
+        except OSError as error:
+            self._drop_pending()
+            if error.errno == errno.EIO:
+                raise self._ended_error() from error
+            raise ToolExecutionError(
+                "typing into the terminal session failed",
+                {"session": self.id, "errno": error.errno, "error": str(error)},
+            ) from error
         lines, self.pending_line = typed_lines(self.pending_line, text)
         self.cwd_known = self.cwd_known and not lines
+
+    def _write_pending(self) -> None:
+        """Write what waits, as much as the terminal takes now; for the rest the loop says when it takes more."""
+        loop: asyncio.AbstractEventLoop = asyncio.get_running_loop()
+        while self._pending:
+            try:
+                written: int = os.write(self._master, self._pending)
+            except BlockingIOError:
+                break
+            del self._pending[:written]
+        if self._pending and not self._writing:
+            loop.add_writer(self._master, self._on_writable)
+            self._writing = True
+        elif not self._pending and self._writing:
+            loop.remove_writer(self._master)
+            self._writing = False
+
+    def _on_writable(self) -> None:
+        try:
+            self._write_pending()
+        except OSError as error:
+            # EIO: the program is gone, which the read side says and ends the session on.
+            if error.errno != errno.EIO:
+                log.warning("terminal_write_failed", session=self.id, errno=error.errno, error=str(error))
+            self._drop_pending()
+
+    def _drop_pending(self) -> None:
+        """Forget what waited to be typed, and stop asking the loop when the terminal takes more."""
+        self._pending.clear()
+        if self._writing:
+            asyncio.get_running_loop().remove_writer(self._master)
+            self._writing = False
 
     async def read(self, wait_s: float) -> str:
         """What the program printed since the last read, as plain text: after waiting up to ``wait_s`` for something
@@ -197,6 +267,7 @@ class TerminalSession:
                 await asyncio.wait_for(self._process.wait(), _CLOSE_GRACE_S)
         kill_group(self._process.pid)
         await self._process.wait()
+        self._drop_pending()
         if not self.ended:
             asyncio.get_running_loop().remove_reader(self._master)
             self.ended = True

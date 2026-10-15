@@ -99,6 +99,11 @@ class ToolExecutionError(DotError):
     """A tool failed while running; the message is shown to the model."""
 
 
+class TerminalInputFullError(ToolExecutionError):
+    """The program of a terminal session has not read what was typed into it before, as much as waits for it at most;
+    nothing more is typed until it reads."""
+
+
 class PolicyDenied(DotError):
     """The policy engine refused an action outright."""
 
@@ -121,6 +126,18 @@ class RunCancelled(DotError):
 
 class BrowserError(DotError):
     """Browser automation failed."""
+
+
+class ForbiddenUrlError(BrowserError):
+    """The browser rules refuse an address: Dot's own interface, a blocked host, a host outside ``browser.allowed_hosts``
+    or a scheme that is not the web's. ``url`` is the address as Chrome read it, ``reason`` why it is refused and
+    ``resource_type`` what the request was for (``document`` for a page, else Chrome's name for the resource)."""
+
+    def __init__(self, message: str, url: str, reason: str, resource_type: str) -> None:
+        super().__init__(message, {"url": url, "reason": reason, "resource_type": resource_type})
+        self.url: str = url
+        self.reason: str = reason
+        self.resource_type: str = resource_type
 
 
 class DesktopError(DotError):

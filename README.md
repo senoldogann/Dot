@@ -575,7 +575,8 @@ A terminal session is for a program that does not run to its end by itself: one 
 first output; `terminal_send` types into it and returns the answer, `terminal_read` waits for more (a server's log),
 `terminal_close` ends it and everything it started. The output is read as plain text, without a terminal emulator, so
 full-screen programs such as vim or htop show as garbled text. The command and every line typed into it are judged as
-a `shell` command is, a line typed in parts as a whole. A key a line editor acts upon (Tab, an arrow, a Ctrl- shortcut
+a `shell` command is, a line typed in parts as a whole. Typing never holds Dot: what the program has not read yet waits
+for it, up to 64 KB, and past that `terminal_send` fails with an error that says so until the program reads. A key a line editor acts upon (Tab, an arrow, a Ctrl- shortcut
 other than Ctrl-C, Ctrl-U) leaves a line Dot cannot tell, and running it asks; once a line has run, the program may be
 in another directory, so later lines are judged from the home folder. A chat keeps at most `[shell] terminal_sessions`
 sessions open (3; 0 removes the tools), each closed after `terminal_idle_s` without use (30 minutes) and all of them
@@ -1960,7 +1961,15 @@ Both modes share what follows.
   matches its subdomains, and an empty `allowed_hosts` means every site. The blocked list starts with the
   cloud-metadata hosts. Dot's own interface is never opened, whatever the lists say: this Mac on `[server] port` in any
   spelling (`localhost`, `127.0.0.1`, `[::1]` and the like), and the names of `[server] reach`; your Chrome may be
-  signed in there. A server of this Mac on another port opens as any site.
+  signed in there. A server of this Mac on another port opens as any site. In Dot's own Chrome every request is
+  checked as Chrome sends it, not only the address a tool opens: a page (in a tab or a popup, and each hop of a
+  redirect) must pass both lists, and anything a page loads (a script, a picture, a fetch, a worker) must be neither a
+  blocked host nor Dot's interface, so a page of an allowed site still loads its parts from wherever it keeps them; what
+  a page makes itself (`blob:` and `data:` addresses) reaches no server and passes. In your Chrome (`mode = "attach"`)
+  Dot holds none of its requests, so as not to slow or stall your own tabs; a tab of Dot's that lands on a refused
+  address is reset. Whatever the browser, the daemon itself refuses a navigation to its interface that a page of
+  another site started (`Sec-Fetch-Site: cross-site`), save to the page a sign-in comes back to and to the pages runs
+  showed.
 - `raise_window = false` (the default) keeps the window in the background while a run works: every tab Dot opens, a
   run's or a quiet read's, is created in the background (a new tab opened the usual way brings Chrome to the front of
   the Mac), and it still paints the page under Dot's computer. macOS brings a newly started Chrome to the front, and

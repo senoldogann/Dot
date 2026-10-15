@@ -11,9 +11,10 @@ produced here as value types (``PageView``, ``ActOutcome``, ``TextView``); rende
 import asyncio
 import base64
 import contextlib
+import re
 import secrets
 import time
-from collections.abc import AsyncGenerator, AsyncIterator, Sequence
+from collections.abc import AsyncGenerator, AsyncIterator, Mapping, Sequence
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from functools import partial
@@ -28,10 +29,13 @@ from playwright.async_api import (
     Cookie,
     Page,
     Playwright,
+    Request,
     Response,
+    Route,
     async_playwright,
 )
 from playwright.async_api import Error as PlaywrightError
+from playwright.async_api import Frame as PlaywrightFrame
 from pydantic import JsonValue
 
 from dotagent.browser.attach import INSPECT_PAGE, DebugEndpoint, endpoint_url, read_debug_endpoint, redact_endpoint
@@ -58,7 +62,7 @@ from dotagent.browser.keychain import KeychainMode, keychain_switches, playwrigh
 from dotagent.browser.pages import Tab, ThreadTabs, add_note, attach_handlers
 from dotagent.browser.profile_lock import profile_holder_pid
 from dotagent.browser.render import describe_step
-from dotagent.browser.safety import check_browser_url
+from dotagent.browser.safety import UrlVerdict, check_browser_url, request_verdict
 from dotagent.browser.snapshot import (
     SnapshotLine,
     count_refs,
@@ -92,7 +96,7 @@ from dotagent.browser.types import (
 from dotagent.browser.upstream import ignore_repeated_frame_detach
 from dotagent.browser.window import chrome_to_watch, focused_app, front_pid, give_focus_back, return_front
 from dotagent.config import BrowserConfig, ServerConfig
-from dotagent.core.errors import ApprovalRejected, BrowserError, HandedOff, PolicyDenied
+from dotagent.core.errors import ApprovalRejected, BrowserError, ForbiddenUrlError, HandedOff, PolicyDenied
 from dotagent.core.logs import get_logger
 from dotagent.core.text import truncate_middle
 from dotagent.core.types import JsonObject
@@ -128,6 +132,18 @@ _LAUNCH_ERROR_CHARS: int = 900
 _CHALLENGE_STATUS: frozenset[int] = frozenset({202, 403, 429, 503, 999})
 _CHALLENGE_WAIT_MS: int = 8000
 _DRIVER_LOST: str = "Connection closed while reading from the driver"
+# The URL rules on every request of Dot's own Chrome (item 135, measured 2026-10-15 with Playwright 1.63 and Chrome
+# 155): a route on the context sees the first request of every page, popups included, each resource a page loads and
+# the fetches of a service worker, on the address as Chrome read it; what it does not see is the hops of a redirect
+# (Chrome follows them before it asks), so each tab is asked about those through a Fetch session of its own
+# (:meth:`BrowserSession._guard_hops`). The owner's Chrome (attach mode) gets neither: its tabs are the owner's.
+_EVERY_URL: re.Pattern[str] = re.compile(".*")
+_FETCH_PATTERNS: list[dict[str, str]] = [{"urlPattern": "*", "requestStage": "Request"}]
+_DOCUMENT_RESOURCE: str = "Document"
+_BLOCKED_BY_CLIENT: str = "ERR_BLOCKED_BY_CLIENT"
+_ABORT_REASON: str = "blockedbyclient"
+_FAIL_REASON: str = "BlockedByClient"
+_FORBIDDEN_MESSAGE: str = "this URL may not be opened"
 # Chrome exits by itself a few seconds after the driver that started it died.
 _CHROME_EXIT_WAIT_S: float = 10.0
 _CHROME_EXIT_POLL_S: float = 0.2
@@ -199,6 +215,81 @@ class _Opened:
 
     context: BrowserContext
     spare_pages: tuple[Page, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class _Paused:
+    """A request Chrome holds for an answer (``Fetch.requestPaused``): its id, the address as Chrome read it, and what
+    it is for; a navigation of a frame loads a document."""
+
+    request_id: str
+    url: str
+    resource_type: str
+    frame_id: str
+
+    @property
+    def navigation(self) -> bool:
+        return self.resource_type == _DOCUMENT_RESOURCE
+
+
+def paused_request(event: Mapping[str, object]) -> _Paused | None:
+    """The request a ``Fetch.requestPaused`` event holds, ``None`` when the event lacks what an answer needs."""
+    request_id: object = event.get("requestId")
+    request: object = event.get("request")
+    resource_type: object = event.get("resourceType")
+    frame_id: object = event.get("frameId")
+    if not isinstance(request_id, str) or not isinstance(request, Mapping):
+        return None
+    url: object = request.get("url")
+    if not isinstance(url, str):
+        return None
+    return _Paused(
+        request_id=request_id,
+        url=url,
+        resource_type=resource_type if isinstance(resource_type, str) else "",
+        frame_id=frame_id if isinstance(frame_id, str) else "",
+    )
+
+
+def main_frame_id(tree: Mapping[str, object]) -> str | None:
+    """The id of the main frame in what ``Page.getFrameTree`` answered, ``None`` when it is not there."""
+    frame_tree: object = tree.get("frameTree")
+    if not isinstance(frame_tree, Mapping):
+        return None
+    frame: object = frame_tree.get("frame")
+    if not isinstance(frame, Mapping):
+        return None
+    identifier: object = frame.get("id")
+    return identifier if isinstance(identifier, str) else None
+
+
+def main_page_of(request: Request) -> Page | None:
+    """The page whose main frame ``request`` navigates; ``None`` for any other request: a resource, a frame inside the
+    page, a service worker's (which has no frame), or the first request of a popup, whose frame Playwright does not
+    know yet."""
+    if not request.is_navigation_request():
+        return None
+    try:
+        frame: PlaywrightFrame = request.frame
+    except PlaywrightError:
+        return None
+    page: Page = frame.page
+    return page if frame == page.main_frame else None
+
+
+def blocked_by_rules(error: BrowserError) -> bool:
+    """Whether a navigation failed because a request of it was refused by the URL rules: Chrome reports an aborted or
+    failed request as ``net::ERR_BLOCKED_BY_CLIENT``."""
+    return _BLOCKED_BY_CLIENT in str(error)
+
+
+@dataclass(frozen=True, slots=True)
+class _Refusal:
+    """A navigation of a page's main frame that the URL rules refused, for the error of the call that ran into it: the
+    page shows Chrome's error page, which says nothing of why."""
+
+    url: str
+    reason: str
 
 
 @dataclass(frozen=True, slots=True)
@@ -286,6 +377,12 @@ class BrowserSession:
         self._threads: dict[str, ThreadTabs] = {}
         self._initial_pages: list[Page] = []
         self._adopting: set[asyncio.Task[None]] = set()
+        # The answers under way to requests Chrome holds (:meth:`_guard_hops`), and by page the navigation of its main
+        # frame that the rules refused last, which the error page the page then shows is about.
+        self._answering: set[asyncio.Task[None]] = set()
+        self._refusals: dict[Page, _Refusal] = {}
+        # The pages of Dot's own Chrome whose requests a Fetch session of their own judges (:meth:`_guard_hops`).
+        self._guarded: set[Page] = set()
         self._reaper: asyncio.Task[None] | None = None
         self._closed: bool = False
         # The front of the Mac around Dot's own Chrome (item 118): Chrome's process, the application that had the front
@@ -351,6 +448,9 @@ class BrowserSession:
                 headless=config.headless,
                 viewport={"width": config.viewport_width, "height": config.viewport_height},
                 accept_downloads=True,
+                # A service worker of a page would fetch on the page's behalf from outside the route that reads the
+                # URL rules (``_EVERY_URL``); none is registered.
+                service_workers="block",
                 # Playwright adds --no-sandbox unless asked not to; Chrome then shows its "unsupported flag" banner.
                 chromium_sandbox=True,
                 # The cookies of the profile must be read with the key they were written with (see keychain.py).
@@ -388,6 +488,8 @@ class BrowserSession:
         # Until the session holds the context, nothing else would close this Chrome: one that is left running keeps
         # the profile locked, and every later launch is refused.
         try:
+            # Before any page of it is used: the rules read every request of this Chrome (``_EVERY_URL``).
+            await context.route(_EVERY_URL, self._on_request)
             self._chrome_pid = None if config.headless else await asyncio.to_thread(chrome_to_watch, self._profile)
             if earlier is not None:
                 await asyncio.to_thread(give_focus_back, earlier)
@@ -465,6 +567,8 @@ class BrowserSession:
     def _forget_tabs(self) -> None:
         self._initial_pages = []
         self._chrome_pid = None
+        self._refusals.clear()
+        self._guarded.clear()
         for thread in self._threads.values():
             thread.tabs.clear()
             thread.active = 0
@@ -573,7 +677,7 @@ class BrowserSession:
         """Close Dot's own Chrome, or close the tabs Dot opened in the Chrome of the user and drop the connection; then
         stop the Playwright driver, also when the close failed, so no driver (and no Chrome it started) is left running.
         The tabs of every thread are gone with it."""
-        for task in [*self._adopting, *self._front_returns]:
+        for task in [*self._adopting, *self._front_returns, *self._answering]:
             task.cancel()
         context: BrowserContext | None = self._context
         browser: Browser | None = self._browser
@@ -669,6 +773,12 @@ class BrowserSession:
     # ------------------------------------------------------------------ tabs
 
     def _on_page(self, page: Page) -> None:
+        if self._config.mode == "own":
+            # Every page of Dot's own Chrome has its requests judged, whoever opened it: a popup opened with noopener
+            # has no opener to adopt it by, and is a page of Dot's Chrome all the same.
+            guarding: asyncio.Task[None] = asyncio.create_task(self._guard_quietly(page))
+            self._answering.add(guarding)
+            guarding.add_done_callback(self._answering.discard)
         task: asyncio.Task[None] = asyncio.create_task(self._adopt_popup(page))
         self._adopting.add(task)
         task.add_done_callback(self._adopting.discard)
@@ -750,11 +860,14 @@ class BrowserSession:
         page.on("close", partial(self._on_page_closed, tab))
         if self._config.mode == "attach":
             await keep_focused(page)
+        else:
+            await self._guard_hops(page)
         if self._config.decline_cookie_banners:
             await install_consent_handler(page)
         return tab
 
     def _on_page_closed(self, tab: Tab, _page: Page) -> None:
+        self._refusals.pop(tab.page, None)
         for thread in self._threads.values():
             if tab in thread.tabs:
                 thread.remove(tab)
@@ -937,33 +1050,195 @@ class BrowserSession:
         return await self._assemble(thread, tab, capture, capture.rendered, "full")
 
     def _require_allowed(self, url: str) -> None:
+        """The rules on an address before the browser is sent to it, as the model wrote it: a refusal this early costs
+        no request. Chrome reads the address again on the way (:meth:`_on_request`), in its own spelling."""
         verdict = check_browser_url(url, self._config.allowed_hosts, self._config.blocked_hosts, self._server)
         if not verdict.allowed:
-            raise BrowserError("this URL may not be opened", {"url": url, "reason": verdict.reason})
+            raise ForbiddenUrlError(_FORBIDDEN_MESSAGE, url, verdict.reason, "document")
+
+    # ------------------------------------------------------------------ the rules on what Chrome sends
+
+    def _judge(self, url: str, navigation: bool, resource_type: str, page: Page | None) -> UrlVerdict:
+        """The rules on one request Chrome is about to send; ``page`` the page whose main frame it navigates, when it
+        is one, so that the error page it then shows can be told from a page that failed to load. A rule that fails on
+        an address refuses it: the request must be answered either way, or Chrome holds it for good."""
+        try:
+            verdict: UrlVerdict = request_verdict(
+                url, navigation, self._config.allowed_hosts, self._config.blocked_hosts, self._server
+            )
+        except Exception:
+            _log.exception("browser_request_unjudged", url=truncate_middle(url, _LAUNCH_ERROR_CHARS))
+            verdict = UrlVerdict(allowed=False, reason="the URL rules could not read this address")
+        if not verdict.allowed:
+            if page is not None:
+                self._refusals[page] = _Refusal(url=url, reason=verdict.reason)
+            _log.info(
+                "browser_request_refused",
+                url=truncate_middle(url, _LAUNCH_ERROR_CHARS),
+                resource_type=resource_type,
+                reason=verdict.reason,
+            )
+        return verdict
+
+    async def _on_request(self, route: Route, request: Request) -> None:
+        """The route of Dot's own Chrome: a request the rules refuse fails in the page as blocked by the client; the
+        rest go on. A page that closed under its request has nothing left to answer."""
+        verdict: UrlVerdict = self._judge(
+            request.url, request.is_navigation_request(), request.resource_type, main_page_of(request)
+        )
+        try:
+            if verdict.allowed:
+                await route.continue_()
+            else:
+                await route.abort(_ABORT_REASON)
+        except PlaywrightError as error:
+            _log.info(
+                "browser_request_unanswered",
+                url=truncate_middle(request.url, _LAUNCH_ERROR_CHARS),
+                error=truncate_middle(str(error), _LAUNCH_ERROR_CHARS),
+            )
+
+    async def _guard_hops(self, page: Page) -> None:
+        """Ask Chrome about every request of ``page`` through a Fetch session of the tab's own, redirect hops included:
+        the route of the context is asked about the first address of a navigation only (measured 2026-10-15: of
+        localhost → 302 → Dot's port, the route saw localhost and Chrome fetched Dot's port). A frame of another site,
+        which Chrome runs as a target of its own, is not reached from here; the route sees its first requests."""
+        if page in self._guarded:
+            return
+        self._guarded.add(page)
+        page.on("close", self._forget_page)
+        try:
+            cdp: CDPSession = await page.context.new_cdp_session(page)
+            main: str | None = main_frame_id(await cdp.send("Page.getFrameTree"))
+            cdp.on("Fetch.requestPaused", partial(self._on_paused, cdp, page, main))
+            await cdp.send("Fetch.enable", {"patterns": _FETCH_PATTERNS})
+        except PlaywrightError:
+            self._guarded.discard(page)
+            raise
+
+    async def _guard_quietly(self, page: Page) -> None:
+        """:meth:`_guard_hops` for a page that nothing waits for: one that closed meanwhile needs no guard, and one
+        that could not be guarded is logged (the route still judges its first requests)."""
+        try:
+            await self._guard_hops(page)
+        except PlaywrightError as error:
+            if page.is_closed():
+                return
+            _log.warning(
+                "browser_page_unguarded",
+                url=truncate_middle(page.url, _LAUNCH_ERROR_CHARS),
+                error=truncate_middle(str(error), _LAUNCH_ERROR_CHARS),
+            )
+
+    def _forget_page(self, page: Page) -> None:
+        self._guarded.discard(page)
+        self._refusals.pop(page, None)
+
+    def _on_paused(self, cdp: CDPSession, page: Page, main: str | None, event: Mapping[str, object]) -> None:
+        task: asyncio.Task[None] = asyncio.create_task(self._answer_paused(cdp, page, main, event))
+        self._answering.add(task)
+        task.add_done_callback(self._answering.discard)
+
+    async def _answer_paused(self, cdp: CDPSession, page: Page, main: str | None, event: Mapping[str, object]) -> None:
+        paused: _Paused | None = paused_request(event)
+        if paused is None:
+            # A request that cannot be read is refused rather than held, when it can be answered at all.
+            _log.warning("browser_hop_unreadable", fields=sorted(event))
+            request_id: object = event.get("requestId")
+            if isinstance(request_id, str):
+                await self._answer_hop(cdp, page, request_id, "", False)
+            return
+        # The main frame's navigation is the page's; when its id is not known, any navigation is taken for it.
+        navigated: Page | None = page if paused.navigation and main in (None, paused.frame_id) else None
+        verdict: UrlVerdict = self._judge(paused.url, paused.navigation, paused.resource_type, navigated)
+        await self._answer_hop(cdp, page, paused.request_id, paused.url, verdict.allowed)
+
+    async def _answer_hop(self, cdp: CDPSession, page: Page, request_id: str, url: str, allowed: bool) -> None:
+        """Let the request ``request_id`` go on, or fail it as blocked by the client. A page that closed under its
+        request has nothing left to answer."""
+        try:
+            if allowed:
+                await cdp.send("Fetch.continueRequest", {"requestId": request_id})
+            else:
+                await cdp.send("Fetch.failRequest", {"requestId": request_id, "errorReason": _FAIL_REASON})
+        except PlaywrightError as error:
+            if page.is_closed():
+                return
+            _log.warning(
+                "browser_hop_unanswered",
+                url=truncate_middle(url, _LAUNCH_ERROR_CHARS),
+                error=truncate_middle(str(error), _LAUNCH_ERROR_CHARS),
+            )
+
+    def _refused_navigation(self, error: BrowserError, page: Page) -> ForbiddenUrlError | None:
+        """The refusal behind a failed navigation of ``page``, ``None`` when it failed for another reason: Chrome says
+        a request was blocked, and the navigation the rules refused on that page says which and why. Without such a
+        refusal the block is another's (an extension of the profile blocks the same way, item 264) and the failure
+        is reported as it is."""
+        if not blocked_by_rules(error):
+            return None
+        refusal: _Refusal | None = self._refusals.pop(page, None)
+        if refusal is None:
+            return None
+        return ForbiddenUrlError(_FORBIDDEN_MESSAGE, refusal.url, refusal.reason, "document")
+
+    async def _navigate_checked(self, page: Page, url: str, attempts: int) -> int | None:
+        """:func:`navigate`, with a navigation the rules refused on the way reported as such."""
+        config: BrowserConfig = self._config
+        try:
+            return await navigate(page, url, _ms(config.navigation_timeout_s), attempts, config.navigation_backoff_ms)
+        except BrowserError as error:
+            refused: ForbiddenUrlError | None = self._refused_navigation(error, page)
+            if refused is None:
+                raise
+            raise refused from error
 
     async def _enforce_landing(self, tab: Tab) -> None:
-        """A redirect or click may have ended on a URL the rules forbid; leave it before anything is read from it."""
+        """A redirect or click may have ended on a URL the rules forbid; leave it before anything is read from it. One
+        the rules refused on the way shows Chrome's error page, which is left the same way."""
         landed: str = tab.page.url
-        if landed.startswith("chrome-error://"):
-            add_note(tab, "the page failed to load (Chrome error page)")
-            return
-        verdict = check_browser_url(landed, self._config.allowed_hosts, self._config.blocked_hosts, self._server)
-        if verdict.allowed:
-            return
         config: BrowserConfig = self._config
+        if landed.startswith("chrome-error://"):
+            refused: _Refusal | None = self._refusals.pop(tab.page, None)
+            if refused is None:
+                add_note(tab, "the page failed to load (Chrome error page)")
+                return
+            await navigate(tab.page, "about:blank", _ms(config.navigation_timeout_s), 1, config.navigation_backoff_ms)
+            raise ForbiddenUrlError(
+                "the page was sent to a URL that may not be opened; the request was refused and the tab was reset to "
+                "a blank page",
+                refused.url,
+                refused.reason,
+                "document",
+            )
+        verdict = check_browser_url(landed, config.allowed_hosts, config.blocked_hosts, self._server)
+        if verdict.allowed:
+            # The page is where it may be: a refusal on the way there, which it then left, is over.
+            self._refusals.pop(tab.page, None)
+            return
         await navigate(tab.page, "about:blank", _ms(config.navigation_timeout_s), 1, config.navigation_backoff_ms)
-        raise BrowserError(
+        raise ForbiddenUrlError(
             "the page ended up on a URL that may not be opened; the tab was reset to a blank page",
-            {"landed": landed, "reason": verdict.reason},
+            landed,
+            verdict.reason,
+            "document",
         )
 
     async def _load(self, thread: ThreadTabs, tab: Tab, url: str) -> PageView:
         self._require_allowed(url)
         config: BrowserConfig = self._config
         tab.status = None
-        status: int | None = await navigate(
-            tab.page, url, _ms(config.navigation_timeout_s), config.navigation_attempts, config.navigation_backoff_ms
-        )
+        try:
+            status: int | None = await self._navigate_checked(tab.page, url, config.navigation_attempts)
+        except ForbiddenUrlError as refused:
+            # The tab shows Chrome's error page for the refused request; it is left as a page the rules forbid is.
+            await navigate(tab.page, "about:blank", _ms(config.navigation_timeout_s), 1, config.navigation_backoff_ms)
+            raise ForbiddenUrlError(
+                f"{refused.message}; the tab was reset to a blank page",
+                refused.url,
+                refused.reason,
+                refused.resource_type,
+            ) from refused
         if status is not None:
             tab.status = status
         await self._settle(tab)
@@ -1037,9 +1312,9 @@ class BrowserSession:
         statuses: list[int] = []
         page.on("response", lambda response: _note_main_status(page, response, statuses))
         try:
-            first: int | None = await navigate(
-                page, url, _ms(config.navigation_timeout_s), config.navigation_attempts, config.navigation_backoff_ms
-            )
+            if config.mode == "own":
+                await self._guard_hops(page)
+            first: int | None = await self._navigate_checked(page, url, config.navigation_attempts)
             if first is None:
                 raise BrowserError("the address started a download, not a page", {"url": url})
             if first in _CHALLENGE_STATUS:
@@ -1047,10 +1322,18 @@ class BrowserSession:
                     await page.wait_for_event("load", timeout=_CHALLENGE_WAIT_MS)
             await wait_dom_quiet(page, config.settle_quiet_ms, config.settle_max_ms, _ms(config.navigation_timeout_s))
             landed: str = page.url
+            refused: _Refusal | None = self._refusals.pop(page, None)
+            if refused is not None and landed.startswith("chrome-error://"):
+                raise ForbiddenUrlError(
+                    "the page was sent to a URL that may not be opened; the request was refused",
+                    refused.url,
+                    refused.reason,
+                    "document",
+                )
             verdict = check_browser_url(landed, config.allowed_hosts, config.blocked_hosts, self._server)
             if not verdict.allowed:
-                raise BrowserError(
-                    "the page ended up on a URL that may not be opened", {"landed": landed, "reason": verdict.reason}
+                raise ForbiddenUrlError(
+                    "the page ended up on a URL that may not be opened", landed, verdict.reason, "document"
                 )
             try:
                 html: str = await page.content()
@@ -1097,6 +1380,7 @@ class BrowserSession:
         return await self._background_tab(context)
 
     async def _close_scratch(self, page: Page) -> None:
+        self._refusals.pop(page, None)
         try:
             await page.close()
         except Exception as error:
