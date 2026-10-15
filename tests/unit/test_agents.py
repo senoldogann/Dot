@@ -140,6 +140,7 @@ def test_a_request_with_a_look_outside_the_catalogue_is_refused() -> None:
         "effort": None,
         "approvals": None,
         "tools": [],
+        "every_tool": True,
     }
     assert AgentRequest.model_validate({**body, "look": None}).look is None
     chosen: AgentRequest = AgentRequest.model_validate(
