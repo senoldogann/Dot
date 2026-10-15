@@ -230,7 +230,7 @@ async def test_a_terminal_of_a_run_starts_in_the_sandbox_and_one_of_a_yolo_run_t
     match: re.Match[str] | None = re.match(r"\[session (t\d+): ", repl)
     assert match is not None, repl
     try:
-        with pytest.raises(ToolInputError, match="was opened by a yolo run"):
+        with pytest.raises(ToolInputError, match="was opened outside the sandbox"):
             await runtime.registry.tools["terminal_send"].prepare({"session": match.group(1), "text": "1 + 1\n"}, ctx)
     finally:
         await _run(yolo, "terminal_close", {"session": match.group(1)})

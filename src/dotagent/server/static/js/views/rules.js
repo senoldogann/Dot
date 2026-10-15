@@ -2,12 +2,13 @@
 // sentence: "When Dot would use {tool}, matching {pattern}: {answer}", and the answer is one of four. A rule can be
 // said in your own words (item 110): the review model drafts its parts, the daemon writes the pattern from them, and
 // the draft fills the form, its description the sentence the rule reads back as, to be checked and added;
-// `#/settings/rules?sentence=…` (an approval card's "Make a rule of this") puts a sentence in the box.
+// `#/settings/rules?sentence=…` (an approval card's "Make a rule of this") puts a sentence in the box. Above the rules,
+// the switch of the macOS sandbox of a run's commands (item 262).
 
 import { api } from "../api.js";
 import { clip, el } from "../dom.js";
 import { icon } from "../icons.js";
-import { emptyPanel, errorPanel, field, loadingPanel, paneHead, segmented } from "../panels.js";
+import { emptyPanel, errorPanel, field, loadingPanel, paneHead, segmented, switchSetting } from "../panels.js";
 import { onLifecycle, onStreamBack, readFailed } from "../state.js";
 import { attempt, confirmDialog, toast } from "../ui.js";
 
@@ -314,6 +315,45 @@ function buildWords(onDrafted, isDisposed) {
   };
 }
 
+/** The macOS sandbox of a run's commands (item 262), switched here while the daemon runs; the config file keeps it. */
+function buildSandbox(isDisposed) {
+  let view = null;
+  const setting = switchSetting({
+    label: "Sandbox for a run's commands",
+    hint:
+      "On, the shell commands, terminal sessions, AppleScript and searches of a run that is not yolo start in a macOS sandbox: they can neither read nor change Dot's own files (its keys, token, settings, database and browser profiles) nor change what Dot loads and runs, and macOS starts no program that runs as root there (ps, top, sudo). Off, they run with your account's rights, and the shell guard still reads every line. A yolo run is never sandboxed. Takes effect from the next command, without a restart; kept in the config file as [shell] sandbox.",
+    read: () => view !== null && view.sandbox,
+    write: async (on) => {
+      view = await api.put("/shell/sandbox", { sandbox: on });
+      toast("ok", on ? "From the next command on, a run that is not yolo works in the sandbox." : "From the next command on, every run works without the sandbox.");
+    },
+    onToggled: () => {
+      if (!isDisposed()) {
+        setting.paint();
+      }
+    },
+  });
+  setting.toggle.disabled = true;
+
+  async function load() {
+    try {
+      const found = await api.get("/shell/sandbox");
+      if (isDisposed()) {
+        return;
+      }
+      view = found;
+      setting.toggle.disabled = false;
+      setting.paint();
+    } catch (error) {
+      if (!isDisposed()) {
+        readFailed("The sandbox", error);
+      }
+    }
+  }
+
+  return { element: el("section", { class: "card card-pad", "aria-label": "Sandbox" }, setting.element), load };
+}
+
 export function mount(root, ctx) {
   let disposed = false;
   let rules = null;
@@ -385,6 +425,7 @@ export function mount(root, ctx) {
     await reload();
   });
   const words = buildWords((drafted) => form.fill(drafted), () => disposed);
+  const sandbox = buildSandbox(() => disposed);
   root.append(
     paneHead("Your own answers to “may Dot do this?”, applied before the safety preset.", null),
     el(
@@ -397,6 +438,7 @@ export function mount(root, ctx) {
         "Rules cannot lift the protections that are always on: reading secrets and sending them out is refused, research runs stay read-only, and money or credentials are handed to you. A yolo run goes past all of these but the read-only research runs, and a hand-off rule still stops it there too.",
       ),
     ),
+    sandbox.element,
     words.element,
     form.element,
     el(
@@ -420,6 +462,7 @@ export function mount(root, ctx) {
   });
   const stopBack = onStreamBack(reload);
   attempt(reload);
+  attempt(sandbox.load);
   return () => {
     disposed = true;
     stopLifecycle();

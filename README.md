@@ -726,7 +726,10 @@ Dot's, not yours. A message you send starts a run unmarked.
   what it found elsewhere and names the places it did not read, as a search of any run does with a folder whose reading
   macOS broke off (it does now and then under `~/Library/Containers` when the home folder is searched). macOS starts no
   program that runs as root inside the sandbox (`ps`, `top`, `sudo`, `crontab`): `pgrep -lf` and `lsof` work, a `yolo`
-  run runs them, `[shell] sandbox = false` turns the sandbox off.
+  run runs them, `[shell] sandbox = false` turns the sandbox off. Settings › Rules switches it while the daemon runs
+  ("Sandbox for a run's commands", `PUT /api/shell/sandbox`): from the next command on, with no restart, and the config
+  file keeps it; a terminal session already open keeps how it started. Switching it on where `sandbox-exec` does not
+  start is refused, and nothing changes.
 - What Dot runs at its start is kept from a run's commands too: the login shell whose environment it reads runs its
   startup files, which a command may change, in the same sandbox, and the daemon's launchd job starts Python with `-P`,
   so a file a command left in Dot's home, the job's working directory, is never imported (run `dotx service install`
@@ -1612,6 +1615,7 @@ The REST API (all under `/api`; bodies and replies are JSON, event streams are s
 | `POST /models/main` (`{"model": "provider:model"}`)                            | make the default model, kept in `config.toml` (422 for one that cannot call tools or of no known provider; the provider's error, 502, for one it does not know) |
 | `POST /models/roles` (`{"role": "review", "model": "provider:model"}`)         | make the fast, review or vision model, kept in `config.toml` (422 for one that cannot do that work) |
 | `PUT /agent/resume` (`{"resume": "safe"}`)                                     | whether the daemon's next start resumes the runs it cut off (`"safe"` or `"off"`), kept in `config.toml` |
+| `GET\|PUT /shell/sandbox` (`{"sandbox": false}`)                                | whether a run's commands outside yolo start in the macOS sandbox, from the next one on, kept in `config.toml` (422 when the sandbox does not start) |
 | `PUT /models/context` (`{"model": "provider:model", "tokens": 192000}`)        | the context size of the model's runs from its next one, kept in `config.toml`; `null` for `[agent] context_tokens` (422 below 48 000 or past three quarters of its window) |
 | `GET /models/context?model=provider:model`                                    | what the model's runs of the last 30 days measured about its context size |
 | `GET /runs`, `POST /runs`, `GET /runs/{id}`, `GET /runs/{id}/events`            | list, start and read runs                                    |

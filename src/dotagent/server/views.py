@@ -355,6 +355,18 @@ class JudgeView(FrozenModel):
     key_set: bool
 
 
+class SandboxRequest(FrozenModel):
+    """Whether the processes of a run outside yolo start in the macOS sandbox (item 262): ``[shell] sandbox``."""
+
+    sandbox: bool
+
+
+class SandboxView(FrozenModel):
+    """Whether the processes of a run outside yolo start in the macOS sandbox now (item 262)."""
+
+    sandbox: bool
+
+
 class BrowserRaiseRequest(FrozenModel):
     """Whether Dot's Chrome is brought to the front while a run works (item 97)."""
 

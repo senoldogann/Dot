@@ -5199,7 +5199,12 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 258 | Only reasoning levels the gateway honours are offered                                 | done        | 3118d17 |
 | 259 | Ultrathink and ultracode as words in the composer                                     | done        | 4a37ee7 |
 | 260 | The compaction notes leave the conversation                                           | done        | a8d8641 |
-| 261 | My Chrome opens Chrome when it is closed                                              | in progress |         |
+| 261 | My Chrome opens Chrome when it is closed                                              | done        | aaf2132 |
+| 262 | The sandbox of a run's commands switches on and off in Settings                       | in progress |         |
+| 263 | A run runs JavaScript in its own tab                                                  | planned     |         |
+| 264 | Dot's own Chrome loads extensions                                                     | planned     |         |
+| 265 | Dot's own Chrome can take DevTools connections from a run's scripts                   | planned     |         |
+| 266 | A batch carries several public or social actions while no pace is set                 | planned     |         |
 
 ### 77. The type system: Inter and Geist Mono, seven sizes, three weights
 
@@ -11583,7 +11588,7 @@ itself, and a Chrome opened by hand would have met the second refusal (remote de
 
 ### 261. My Chrome opens Chrome when it is closed
 
-**Status: in progress.** Built on `item-261-open-chrome`.
+**Status: done.** Merged as `aaf2132` (PR #305; no Linear issue, the Linear connector was signed out).
 
 **As built (2026-10-15).** `browser/modes.py`: `reach_chrome` opens a closed Chrome with the opener it is given and
 waits until it runs (`START_TIMEOUT_S`, 30 s) and, while its remote debugging is on, listens (`LISTEN_TIMEOUT_S`, 10
@@ -11614,6 +11619,114 @@ nothing is opened, and start a scratch Chrome in its place.
 > Read ROADMAP.md part 45 and the status table of part 9 (row 261). The protocol of part 5 is unchanged; the Linear
 > connector is signed out, so say so in the PR. Tests never open the Chrome of the user: they set `DOT_CHROME_DIR`, for
 > which nothing is opened. UI changes are checked wide and on a phone, light and dark, in Chrome and WebKit.
+
+## Part 46: as free as the owner wants it (planned 2026-10-15)
+
+The owner's forty-sixth word, on 2026-10-15: the answer of a run to "what limits you, and what can I open for you",
+pasted whole, and: "Bunu ayarlardan değiştirebileyim, yani sandbox veya değil; en önemli ilkemiz sistemimizin
+olabildiğince serbest bir yapıya sahip olması. Bizi diğerlerinden ayıracak olan şey budur. Lütfen araştır ve problemleri
+düzelt" (let me change this in Settings, sandbox or not; our first principle is a system as free as possible, which is
+what sets us apart; research it and fix the problems).
+
+**Status (2026-10-15): planned.** What the run said, checked one claim at a time (read only on this Mac, without
+names): Dot's own Chrome is started by Playwright with its own switches, `--disable-extensions` and
+`--remote-debugging-pipe` among them, so it loads no extension and takes no DevTools connection from another program
+(true); no tool runs JavaScript in a page (true), so the run drove Chrome through AppleScript, which reaches the front
+window of whichever Chrome macOS picks and missed in about four calls of ten while three Chromes ran; `browser_act`
+takes a few steps per call but refuses more than one follow, like or post per batch even when no pace is set (true, so
+a hundred unfollows took a hundred calls). That the sandbox kept the run from writing in its workspace was not
+reproduced: the sandbox built from the owner's settings lets `mkdir`, a redirect, Python and `osascript` write there,
+and a yolo run, as the owner's are, starts no process in it. The chat of that run was deleted, so its own record is
+gone.
+
+### 262. The sandbox of a run's commands switches on and off in Settings
+
+**Status: in progress.** Built on `item-262-sandbox-switch`.
+
+**As built (2026-10-15).** `policy/sandbox.py`: `SwitchedSandbox` holds the sandbox built at start whatever `[shell]
+sandbox` says; `current()` is it or `UNSANDBOXED`, `switch(on)` checks that its profiles start before it switches on
+(else `ConfigError`, nothing changes); the errors name the program that did not start. `runtime.py`: `_run_sandbox`
+builds it always and checks it when on; `Runtime.sandbox` is the holder; the login shell starts in `current()`.
+`tools/context.py`: `run_sandbox` reads `current()`. `config_edit.py`: `[shell] sandbox` (`set_shell_sandbox`).
+`server/routes_system.py`: `GET` and `PUT /api/shell/sandbox` (the switch is undone when the config file cannot be
+written). `views/rules.js`: the switch above the rules, with what it does. `tools/shell.py` and `tools/terminal.py`: the
+description and the refusal of a session opened outside the sandbox say "while the sandbox is on". README (the sandbox
+paragraph, the API table), `defaults.toml`. Tests: `tests/smoke/test_sandbox_switch.py` (new; a command of a run that
+is not yolo refused Dot's key file, read once switched off and refused again once on, without a restart; a sandbox
+that does not start not switched on; the Rules page in Chrome wide and on a phone, light and dark, with a WebKit copy
+run and deleted), `tests/unit/test_sandbox_profile.py` and `tests/unit/test_config_edit.py`. They fail on the code of
+before.
+
+**What.** Settings › Rules shows "Sandbox for a run's commands", on as `[shell] sandbox` says. Switched off, the shell
+commands, terminal sessions, AppleScript and searches of runs that are not yolo start without the macOS sandbox from the
+next one on; switched on, in it again; the config file keeps it, and nothing restarts. A yolo run is never sandboxed,
+as before. The default stays on: the owner asked for the switch, and their runs are yolo.
+
+**Why.** The owner wants to choose, from Settings, whether a run's commands are sandboxed, and the system as free as
+they want it.
+
+**Tests.** As built.
+
+### 263. A run runs JavaScript in its own tab
+
+**Status: planned.**
+
+**What.** A browser tool, `browser_eval`, runs a script in the page of the run's own tab (Dot's Chrome or the owner's)
+and returns its value: an expression, a function, or a promise it waits for, up to a time the call names. A script that
+throws fails the call with its message; one that outlasts the time fails saying it may still run in the page. The value
+comes back as page content (fenced, untrusted); the address rules hold after the script as after any step. It is
+classified as a click that may change the page, at medium risk, as the shell guard rates the same script sent through
+AppleScript: the cautious preset asks, the others do not, a research run cannot use it.
+
+**Why.** The run had to reach the page through AppleScript, which lands in the wrong Chrome when several run, and could
+do in one call what took a hundred.
+
+**Tests.** A smoke test on a local page in Dot's Chrome and in the scratch Chrome attached: the value of an expression,
+of a function and of a promise, two runs each in its own tab, an error, a timeout, a script that leads to a blocked
+address; a unit test of its classification under the presets.
+
+### 264. Dot's own Chrome loads extensions
+
+**Status: planned.**
+
+**What.** Dot's own Chrome starts without Playwright's `--disable-extensions`, so an extension installed in its profile
+works there, as it does in the owner's Chrome.
+
+**Why.** The run found the extensions of its Chrome off; nothing asked for that but Playwright's defaults.
+
+**Tests.** A smoke test reads the switches of the Chrome Dot started.
+
+### 265. Dot's own Chrome can take DevTools connections from a run's scripts
+
+**Status: planned.**
+
+**What.** `[browser] debug_port` (0, off, by default), set in Settings › Browser: Dot's own Chrome also listens for
+DevTools on that port of this Mac, and a run whose browser is Dot's Chrome is told the address, so that a script it
+writes (Playwright's `connect_over_cdp`) drives the same Chrome. A port another program holds is refused before Chrome
+starts, so that a script never drives another Chrome.
+
+**Why.** The run asked for it, to work through the Chrome DevTools Protocol with the Playwright already in Dot's
+environment, and so that no window or tab is mistaken.
+
+**Tests.** A smoke test connects to the port, and one with the port taken sees the refusal.
+
+### 266. A batch carries several public or social actions while no pace is set
+
+**Status: planned.**
+
+**What.** `browser_act` lets a batch carry more than one follow, like, post or message when `[policy.pace]` sets no
+limit for that kind of action; with a limit set, one per batch as before, so that each is counted.
+
+**Why.** With no pace set, the rule only cost a call per action.
+
+**Tests.** Unit tests of the classification with and without a limit.
+
+### How to start part 46 (the handoff prompt)
+
+> Read ROADMAP.md part 46 and the status table of part 9 (rows 262 to 266). The protocol of part 5 is unchanged; the
+> Linear connector is signed out, so say so in the PR. Nothing here may take away a freedom the owner has: a new
+> setting defaults to what Dot did before unless the item says otherwise. UI changes are checked wide and on a phone,
+> light and dark, in Chrome and WebKit.
 
 ## Log
 
@@ -12316,3 +12429,4 @@ nothing is opened, and start a scratch Chrome in its place.
 - 2026-10-15 (Opus 5.5): item 260 merged as `a8d8641` (PR #302; no Linear issue, the connector was signed out): the timeline shows no note for a compaction: the Details panel's Context fact counts the compactions of the run and of its helpers, and the event stays in the run's record and the API.
 - 2026-10-15 (Opus 5.5): item 256 merged as `a9f8b68` (PR #303; no Linear issue, the connector was signed out): Ollama's 400 or 5xx whose words are a reset, refused or cut-short request to its local runner is a `ProviderRunnerError` the retry policy asks again, the embedder included; when the embedding still fails at a run's start, notes are recalled and skills listed by their words alone, with an `embedding_failed` warning in the timeline and the terminal; the memory's own calls still fail loudly.
 - 2026-10-15 (Opus 5.5): item 257 merged as `9e5cd51` (PR #304; no Linear issue, the connector was signed out): a firing's first message carries, in front of the goal, the dated final answers of the schedule's last ended runs (`[scheduler] history_runs`, 3), quoted and marked as what the schedule found before, while the run keeps the goal alone as its record; with `same_chat` a firing goes on in the chat of the one before; a firing that reads a tainted earlier run starts tainted.
+- 2026-10-15 (Opus 5.5): item 261 merged as `aaf2132` (PR #305; no Linear issue, the connector was signed out): in Settings › Browser, My Chrome chosen while Chrome is closed opens it as a click on its icon does (`open -b com.google.Chrome`, for Chrome's own data directory only), waits for it to start and listen, and goes on as before; the card says what the switch waits for and reads Chrome again after a failed one; runs, campaigns and `dotx browser attach` open nothing.

@@ -51,7 +51,7 @@ from dotagent.notify.push import PushKeys, read_or_create_keys
 from dotagent.plugins.catalog import load_plugins, plugin_roots
 from dotagent.plugins.types import PluginCatalog
 from dotagent.policy.paths import expand_protected
-from dotagent.policy.sandbox import UNSANDBOXED, Sandbox, build_sandbox, check_sandbox
+from dotagent.policy.sandbox import Sandbox, SwitchedSandbox, build_sandbox, check_sandbox
 from dotagent.scheduler.timing import resolve_zone
 from dotagent.secrets import resolve_secret
 from dotagent.store.db import Store
@@ -121,9 +121,9 @@ class Runtime:
     protected: tuple[Path, ...]
     # What the agent may read but never change (:func:`_dot_paths`).
     dot_paths: tuple[Path, ...]
-    # Where the processes of a run start outside yolo (:mod:`dotagent.policy.sandbox`); UNSANDBOXED when [shell] sandbox
-    # is off.
-    sandbox: Sandbox
+    # Where the processes of a run start outside yolo (:mod:`dotagent.policy.sandbox`), as [shell] sandbox said at start
+    # or as the owner switched it since (item 262).
+    sandbox: SwitchedSandbox
     shell_env: dict[str, str]
     # The web push key pair the daemon signs with (item 52).
     push_keys: PushKeys
@@ -220,16 +220,15 @@ async def _confined_paths(config: AppConfig) -> tuple[tuple[Path, ...], tuple[Pa
     return protected, dot_paths
 
 
-async def _run_sandbox(config: AppConfig, protected: tuple[Path, ...], dot_paths: tuple[Path, ...]) -> Sandbox:
-    """The sandbox the processes of a run start in outside yolo, checked to start: a command kept out of Dot's guarded
-    files and from changing ``dot_paths``, a search out of every ``protected`` location too; ``UNSANDBOXED`` when
-    [shell] sandbox is off."""
-    if not config.shell.sandbox:
-        return UNSANDBOXED
+async def _run_sandbox(config: AppConfig, protected: tuple[Path, ...], dot_paths: tuple[Path, ...]) -> SwitchedSandbox:
+    """The sandbox the processes of a run start in outside yolo: a command kept out of Dot's guarded files and from
+    changing ``dot_paths``, a search out of every ``protected`` location too. It is built whatever [shell] sandbox says,
+    so that Settings can switch it on later, and checked to start when it is on."""
     sealed: tuple[Path, ...] = await asyncio.to_thread(expand_protected, [], _guarded_files())
-    sandbox: Sandbox = build_sandbox(sealed, protected, dot_paths)
-    await check_sandbox(sandbox)
-    return sandbox
+    built: Sandbox = build_sandbox(sealed, protected, dot_paths)
+    if config.shell.sandbox:
+        await check_sandbox(built)
+    return SwitchedSandbox(built, config.shell.sandbox)
 
 
 def _call_recorder(store: Store, bus: EventBus) -> CallRecorder:
@@ -263,8 +262,8 @@ async def build_runtime(config: AppConfig) -> Runtime:
     put there reaches no further at Dot's start than the run could."""
     await asyncio.to_thread(ensure_layout)
     protected, dot_paths = await _confined_paths(config)
-    sandbox: Sandbox = await _run_sandbox(config, protected, dot_paths)
-    login_env: dict[str, str] = await read_login_env(config.shell.login_env_timeout_s, sandbox.commands)
+    sandbox: SwitchedSandbox = await _run_sandbox(config, protected, dot_paths)
+    login_env: dict[str, str] = await read_login_env(config.shell.login_env_timeout_s, sandbox.current().commands)
     return await open_runtime(config, login_env)
 
 
@@ -292,7 +291,7 @@ async def open_runtime(config: AppConfig, login_env: dict[str, str]) -> Runtime:
     """
     await asyncio.to_thread(ensure_layout)
     protected, dot_paths = await _confined_paths(config)
-    sandbox: Sandbox = await _run_sandbox(config, protected, dot_paths)
+    sandbox: SwitchedSandbox = await _run_sandbox(config, protected, dot_paths)
     schedule_zone: ZoneInfo = await asyncio.to_thread(resolve_zone, config.scheduler.timezone)
     shell_env: dict[str, str] = child_env(login_env, config.shell.pass_env)
     ollama_key: str | None = await asyncio.to_thread(resolve_secret, config.providers.ollama.api_key_env)
