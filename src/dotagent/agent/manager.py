@@ -538,7 +538,45 @@ class RunManager:
             speed,
             approvals,
             goal_mode_asked(goal, mode, goal_mode),
-            RunOpening(text=goal, files=files, resumed=None, once=once),
+            RunOpening(text=goal, files=files, resumed=None, once=once, carried=()),
+            None,
+            None,
+        )
+        return run
+
+    async def start_firing(
+        self,
+        goal: str,
+        opening: str,
+        mode: RunMode,
+        model: str | None,
+        thread_id: str,
+        effort: Effort | None,
+        approvals: ApprovalMode | None,
+        goal_mode: bool | None,
+        carried: tuple[str, ...],
+    ) -> RunRecord:
+        """Queue the run of a schedule's firing in the chat ``thread_id`` (item 257). ``goal`` is the schedule's, the
+        owner's words, which the run keeps, its reviewer takes as the owner's instruction and its chat shows;
+        ``opening`` is its first message to the model: the goal, after the note of a late start and the digest of the
+        schedule's earlier runs (``scheduler/history.py``). ``carried`` are the earlier runs whose words the run reads,
+        in the digest or in its chat: it starts tainted when one of them ended so. Goal mode is asked by the goal
+        alone. The rest is as for :meth:`start`."""
+        ref: ModelRef = parse_model_ref(model if model is not None else self._main_model)
+        if effort is not None:
+            await self._check_effort(ref, effort)
+        run, _ = await self._launch(
+            goal,
+            mode,
+            model,
+            thread_id,
+            SCHEDULE_SOURCE,
+            None,
+            effort,
+            "standard",
+            approvals,
+            goal_mode_asked(goal, mode, goal_mode),
+            RunOpening(text=opening, files=(), resumed=None, once=None, carried=carried),
             None,
             None,
         )
@@ -582,7 +620,7 @@ class RunManager:
             speed,
             approval_mode,
             goal_mode_asked(goal, mode, goal_mode),
-            RunOpening(text=goal, files=files, resumed=None, once=once),
+            RunOpening(text=goal, files=files, resumed=None, once=once, carried=()),
             None,
             agent.id,
         )
@@ -660,7 +698,7 @@ class RunManager:
                 speed,
                 approval_mode,
                 False,
-                RunOpening(text=goal, files=files, resumed=None, once=once),
+                RunOpening(text=goal, files=files, resumed=None, once=once, carried=()),
                 campaign.id,
                 None,
             )
@@ -722,7 +760,7 @@ class RunManager:
                 campaign.speed,
                 campaign.approvals,
                 False,
-                RunOpening(text=brief, files=(), resumed=None, once=campaign.once),
+                RunOpening(text=brief, files=(), resumed=None, once=campaign.once, carried=()),
                 campaign.id,
                 None,
             )
@@ -810,7 +848,7 @@ class RunManager:
             if agent is None or agent.approvals is None
             else stricter_approvals(parent.approvals, agent.approvals),
             False,
-            RunOpening(text=goal, files=(), resumed=None, once=None),
+            RunOpening(text=goal, files=(), resumed=None, once=None, carried=()),
             None,
             agent_id,
         )
@@ -1245,7 +1283,7 @@ class RunManager:
             asked.speed,
             asked.approvals,
             asked.goal_mode,
-            RunOpening(text=goal, files=(), resumed=None, once=asked.once),
+            RunOpening(text=goal, files=(), resumed=None, once=asked.once, carried=()),
             None,
             None,
         )
@@ -1358,7 +1396,7 @@ class RunManager:
             old.speed,
             old.approvals,
             old.goal_mode,
-            RunOpening(text=resume_note(old.goal, resumption), files=(), resumed=resumption, once=old.once),
+            RunOpening(text=resume_note(old.goal, resumption), files=(), resumed=resumption, once=old.once, carried=()),
             None,
             None,
         )
@@ -1490,14 +1528,18 @@ class RunManager:
         """Whether a run starts tainted, as the run it goes on from is (item 243): a delegated run as its parent is now,
         a resumed run as the run it resumes was when it was cut off, and the run that tells its chat of a command in the
         background as the chat's last run ended, since that message is Dot's and only a message of the owner restores
-        trust. Any other run starts untainted. Asked before the run's record is made: the chat's last run is the one
-        before it."""
+        trust; a schedule's firing as any earlier run whose words it reads ended (``opening.carried``, item 257), for the
+        same reason. Any other run starts untainted. Asked before the run's record is made: the chat's last run is the
+        one before it."""
         if parent is not None:
             return parent.gate.tainted
         if opening.resumed is not None:
             return await self._ended_tainted(opening.resumed.from_run_id)
         if source == BACKGROUND_SOURCE:
             return await self._ended_tainted(await self._newest_run_id(thread_id))
+        for run_id in opening.carried:
+            if await self._ended_tainted(run_id):
+                return True
         return False
 
     async def _ended_tainted(self, run_id: str) -> bool:

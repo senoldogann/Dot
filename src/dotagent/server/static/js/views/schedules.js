@@ -56,7 +56,20 @@ function defaultsNow() {
     model: status === null ? null : status.models.main,
     approvals: status === null ? null : status.approvals,
     goalMode: status === null ? null : status.goal_mode,
+    historyRuns: status === null ? null : status.schedule_history_runs,
+    sameChat: status === null ? null : status.schedule_same_chat,
   };
+}
+
+// How many earlier runs a schedule's firing may know (item 257); a count saved over the API joins them in the menu.
+const HISTORY_COUNTS = [0, 1, 3, 5, 10];
+
+function historyLabel(count) {
+  return count === 0 ? "None" : count === 1 ? "The last run" : `The last ${count} runs`;
+}
+
+function chatLabel(same) {
+  return same ? "The same chat" : "A new chat each time";
 }
 
 /** The goal of a schedule; a long one shows its beginning with a button to read all of it. */
@@ -97,6 +110,8 @@ function optionChips(record) {
     goalMode === null ? null : el("span", { class: "chip" }, `Goal mode ${goalMode ? "on" : "off"}${fromDefault(options.goal_mode)}`),
     model === null ? null : el("span", { class: "chip", title: model }, `${modelName(model)}${fromDefault(options.model)}`),
     options.effort === null ? null : el("span", { class: "chip" }, `Reasoning ${levelLabel(options.effort)}`),
+    options.history_runs === null ? null : el("span", { class: "chip", title: "Earlier runs it knows" }, `Knows: ${historyLabel(options.history_runs)}`),
+    options.same_chat === null ? null : el("span", { class: "chip" }, chatLabel(options.same_chat)),
   ];
 }
 
@@ -186,7 +201,10 @@ function zoneList() {
  */
 function scheduleForm({ view, onSaved, onCancel }) {
   const record = view === null ? null : view.record;
-  const options = record === null ? { model: null, effort: null, approvals: null, goal_mode: null, timezone: null } : record.options;
+  const options =
+    record === null
+      ? { model: null, effort: null, approvals: null, goal_mode: null, timezone: null, history_runs: null, same_chat: null }
+      : record.options;
   const now = defaultsNow();
   const id = ++formCount;
 
@@ -211,6 +229,24 @@ function scheduleForm({ view, onSaved, onCancel }) {
       { id: "off", label: "Off" },
     ],
     options.goal_mode === null ? "" : options.goal_mode ? "on" : "off",
+  );
+  const counts = [...new Set([...HISTORY_COUNTS, ...(options.history_runs === null ? [] : [options.history_runs])])].sort((a, b) => a - b);
+  const history = select(
+    "Earlier runs it knows",
+    [
+      { id: "", label: now.historyRuns === null ? "Default" : `Default (${historyLabel(now.historyRuns)})` },
+      ...counts.map((count) => ({ id: String(count), label: historyLabel(count) })),
+    ],
+    options.history_runs === null ? "" : String(options.history_runs),
+  );
+  const chat = select(
+    "Chat",
+    [
+      { id: "", label: now.sameChat === null ? "Default" : `Default (${chatLabel(now.sameChat)})` },
+      { id: "new", label: chatLabel(false) },
+      { id: "same", label: chatLabel(true) },
+    ],
+    options.same_chat === null ? "" : options.same_chat ? "same" : "new",
   );
   const model = el(
     "select",
@@ -351,6 +387,8 @@ function scheduleForm({ view, onSaved, onCancel }) {
       approvals: approvals.value === "" ? null : approvals.value,
       goal_mode: goalMode.value === "" ? null : goalMode.value === "on",
       timezone: zone.value.trim() === "" ? null : zone.value.trim(),
+      history_runs: history.value === "" ? null : Number(history.value),
+      same_chat: chat.value === "" ? null : chat.value === "same",
     };
     save.disabled = true;
     try {
@@ -386,6 +424,8 @@ function scheduleForm({ view, onSaved, onCancel }) {
       field("Model", model, "The model every step and every compaction of the run uses, until it moves to a standby model."),
       effortField,
       field("Time zone", zone, "A name such as Europe/Istanbul; empty uses the configured zone."),
+      field("Earlier runs it knows", history, "Each run starts with the dated answers of the last runs, to build on them instead of doing the same work again."),
+      field("Chat", chat, "In the same chat each run reads the conversation of the runs before it instead."),
       record === null ? null : el("div", { class: "field" }, el("span", { class: "field-label" }, "Switched on"), enabled),
       el("div", { class: "field wide" }, el("span", { class: "field-label" }, "Runs"), el("div", { class: "cluster" }, repeats.element)),
       cronField,

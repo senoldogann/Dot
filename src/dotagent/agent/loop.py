@@ -313,13 +313,16 @@ _SWITCH_NOTE: str = (
 
 class RunOpening(FrozenModel):
     """How a run starts: ``text`` is its first message to the model (its goal, or the note of a resumed run), ``files``
-    the attachments that came with it, ``resumed`` what a resumed run takes over from the run it resumes, and ``once``
-    the choice for one message it was asked with (item 251), which the run keeps (``RunRecord.once``)."""
+    the attachments that came with it, ``resumed`` what a resumed run takes over from the run it resumes, ``once`` the
+    choice for one message it was asked with (item 251), which the run keeps (``RunRecord.once``), and ``carried`` the
+    earlier runs whose words its opening or its chat brings it without the owner's message (a schedule's firing, item
+    257), whose taint it starts with."""
 
     text: str
     files: tuple[StoredAttachment, ...]
     resumed: Resumption | None
     once: OneMessage | None
+    carried: tuple[str, ...]
 
 
 @dataclass(frozen=True)

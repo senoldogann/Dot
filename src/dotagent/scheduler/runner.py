@@ -7,12 +7,14 @@ from zoneinfo import ZoneInfo
 
 from dotagent.agent.manager import RunManager, thread_title
 from dotagent.agent.reflection import Reflection, last_reflection, reflection_due, summary_line
+from dotagent.config import SchedulerConfig
 from dotagent.core.errors import DotError, NotFoundError, RunConflict, StoreError
 from dotagent.core.logs import get_logger
 from dotagent.core.paths import failsafe_path
 from dotagent.events import SYSTEM_RUN_ID
 from dotagent.runtime import Runtime
 from dotagent.scheduler import SCHEDULE_MISSED_EVENT, SCHEDULE_SOURCE, ScheduleMissed
+from dotagent.scheduler.history import NO_DIGEST, Digest, firing_opening, history_digest
 from dotagent.scheduler.plans import schedule_zone
 from dotagent.scheduler.timing import format_local, next_firing
 from dotagent.store.db import Store
@@ -32,7 +34,8 @@ HELD_STATUS: str = "waiting: the emergency stop is engaged"
 
 
 def late_goal(goal: str, due: float, now: float, zone: ZoneInfo) -> str:
-    """The goal of a one-time schedule that fires late, after a note of when it was due and when it starts."""
+    """The goal of a one-time schedule that fires late, after a note of when it was due and when it starts: what its
+    run reads first, while the run keeps the goal alone (:meth:`RunManager.start_firing`)."""
     return f"(Scheduled for {format_local(due, zone)}; it starts late, at {format_local(now, zone)}.)\n\n{goal}"
 
 
@@ -214,7 +217,7 @@ class Scheduler:
         """Start the run of a due schedule; a firing the emergency stop, a run still going or a long absence of the
         daemon keeps from starting is skipped to the schedule's next time, with the reason as its status. A one-time
         schedule has no next time and is never dropped: while the emergency stop is engaged it waits, still due, for
-        the release, and one overdue fires late, its goal saying when it was due (:func:`late_goal`). An emergency
+        the release, and one overdue fires late, its opening saying when it was due (:func:`late_goal`). An emergency
         stop engaged while the run was being started ends it as one. A firing missed where nobody saw it, one overdue
         or one whose run could not start, is told (:meth:`_tell_missed`)."""
         store: Store = self._runtime.store
@@ -244,37 +247,53 @@ class Scheduler:
             await store.record_schedule_skip(record.id, following, overdue)
             await self._tell_missed(record, overdue)
             return
-        title: str = thread_title(f"{record.name} · {format_local(now, zone)}")
-        thread: ThreadRecord = await store.create_thread(title, SCHEDULE_SOURCE)
-        await store.record_schedule_fire(record.id, now, following, thread.id, "starting")
+        config: SchedulerConfig = self._runtime.config.scheduler
+        same_chat: bool = config.same_chat if record.options.same_chat is None else record.options.same_chat
+        kept: int = config.history_runs if record.options.history_runs is None else record.options.history_runs
+        # In the same chat the run reads the earlier runs' conversation; in a new one, the digest of their answers.
+        digest: Digest = (
+            NO_DIGEST
+            if same_chat or kept == 0
+            else history_digest(await store.schedule_runs(record.id, SCHEDULE_SOURCE, kept), zone, config.history_chars)
+        )
+        thread_id, made = await self._firing_chat(record, now, zone, same_chat)
+        await store.record_schedule_fire(record.id, now, following, thread_id, "starting")
         if late:
             log.warning("schedule_fired_late", schedule_id=record.id, overdue_s=round(overdue_s))
+        told: str = late_goal(record.goal, record.next_run_at, now, zone) if late else record.goal
+        # The run reads the earlier runs of the digest, or in the chat it goes on in that chat's last run.
+        carried: tuple[str, ...] = (
+            digest.run_ids if made else tuple(run.id for run in await store.list_runs(1, thread_id))
+        )
         try:
-            run: RunRecord = await self._manager.start(
-                late_goal(record.goal, record.next_run_at, now, zone) if late else record.goal,
+            run: RunRecord = await self._manager.start_firing(
+                record.goal,
+                firing_opening(told, digest),
                 record.mode,
                 record.options.model,
-                thread.id,
-                SCHEDULE_SOURCE,
-                None,
+                thread_id,
                 record.options.effort,
-                "standard",
-                None,
                 record.options.approvals,
                 record.options.goal_mode,
-                (),
+                carried,
             )
         except DotError as exc:
             log.error("schedule_start_failed", schedule_id=record.id, error=exc.message, context=exc.context)
             failed: str = f"failed to start: {exc.message}"
             await store.set_schedule_status(record.id, failed)
-            try:
-                await store.delete_threads([thread.id])
-            except DotError as kept:
-                # The thread of a run whose failed start the store did not take yet stays; the missed firing is told.
-                log.error(
-                    "schedule_thread_not_deleted", schedule_id=record.id, error=kept.message, context=kept.context
-                )
+            # A chat made for the firing goes with its run that did not start; the chat it went on in stays.
+            if made:
+                try:
+                    await store.delete_threads([thread_id])
+                except DotError as left:
+                    # The thread of a run whose failed start the store did not take yet stays; the missed firing is
+                    # told.
+                    log.error(
+                        "schedule_thread_not_deleted",
+                        schedule_id=record.id,
+                        error=left.message,
+                        context=left.context,
+                    )
             await self._tell_missed(record, failed)
             return
         if await _emergency_stop_engaged():
@@ -286,7 +305,9 @@ class Scheduler:
             "schedule_fired",
             schedule_id=record.id,
             run_id=run.id,
-            thread_id=thread.id,
+            thread_id=thread_id,
+            same_chat=not made,
+            history=len(digest.run_ids),
             mode=run.mode,
             model=run.model,
             approvals=run.approvals,
@@ -295,6 +316,26 @@ class Scheduler:
         watcher: asyncio.Task[None] = asyncio.create_task(self._watch(record.id, run.id), name=f"watch-{run.id}")
         self._watchers.add(watcher)
         watcher.add_done_callback(self._watcher_done)
+
+    async def _firing_chat(
+        self, record: ScheduleRecord, now: float, zone: ZoneInfo, same_chat: bool
+    ) -> tuple[str, bool]:
+        """The chat a firing's run goes in, and whether it was made for it: with ``same_chat``, the chat of the
+        schedule's last firing while it is there; otherwise, and when the owner deleted that chat, a new one. Either
+        is marked as the schedule's, whose next firings read its runs (item 257)."""
+        store: Store = self._runtime.store
+        if same_chat and record.thread_id is not None:
+            try:
+                await store.get_thread(record.thread_id)
+            except NotFoundError:
+                log.info("schedule_chat_deleted", schedule_id=record.id, thread_id=record.thread_id)
+            else:
+                await store.link_schedule_thread(record.thread_id, record.id)
+                return record.thread_id, False
+        title: str = thread_title(f"{record.name} · {format_local(now, zone)}")
+        thread: ThreadRecord = await store.create_thread(title, SCHEDULE_SOURCE)
+        await store.link_schedule_thread(thread.id, record.id)
+        return thread.id, True
 
     async def _tell_missed(self, record: ScheduleRecord, status: str) -> None:
         """Tell the owner that the schedule ``record`` (as it was before this firing) missed it, with ``status`` saying

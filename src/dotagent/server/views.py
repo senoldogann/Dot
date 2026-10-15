@@ -286,10 +286,14 @@ class ScheduleCreateRequest(FrozenModel):
     approvals: ApprovalMode | None = None
     goal_mode: bool | None = None
     timezone: str | None = Field(default=None, max_length=64)
+    # Item 257: how many earlier runs' answers a firing carries, and whether it goes on in the same chat.
+    history_runs: int | None = Field(default=None, ge=0, le=20)
+    same_chat: bool | None = None
 
 
 class ScheduleUpdateRequest(FrozenModel):
-    """The whole new state of a schedule: as for a new one, plus whether it is switched on."""
+    """The whole new state of a schedule: as for a new one, plus whether it is switched on. ``history_runs`` and
+    ``same_chat`` left out take the configured ones, as a client from before item 257 sends neither."""
 
     name: str = Field(min_length=1, max_length=_NAME_CHARS)
     goal: str = Field(min_length=1, max_length=_GOAL_CHARS)
@@ -301,6 +305,8 @@ class ScheduleUpdateRequest(FrozenModel):
     approvals: ApprovalMode | None
     goal_mode: bool | None
     timezone: str | None = Field(max_length=64)
+    history_runs: int | None = Field(default=None, ge=0, le=20)
+    same_chat: bool | None = None
     enabled: bool
 
 
@@ -802,6 +808,9 @@ class StatusView(FrozenModel):
     preset: str
     approvals: ApprovalMode
     goal_mode: bool
+    # What a schedule that leaves them open does (item 257): the earlier runs it knows, and whether it keeps its chat.
+    schedule_history_runs: int
+    schedule_same_chat: bool
     browser_mode: BrowserMode
     desktop_enabled: bool
     mcp_tools: int

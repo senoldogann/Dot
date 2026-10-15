@@ -546,14 +546,29 @@ def _schedule(row: aiosqlite.Row) -> ScheduleRecord:
             approvals=row["approvals"],
             goal_mode=None if row["goal_mode"] is None else bool(row["goal_mode"]),
             timezone=row["timezone"],
+            history_runs=row["history_runs"],
+            same_chat=None if row["same_chat"] is None else bool(row["same_chat"]),
         ),
     )
 
 
-def _option_values(options: ScheduleOptions) -> tuple[str | None, str | None, str | None, int | None, str | None]:
-    """The schedule columns that hold ``options``, in the order model, effort, approvals, goal_mode, timezone."""
+type _OptionValues = tuple[str | None, str | None, str | None, int | None, str | None, int | None, int | None]
+
+
+def _option_values(options: ScheduleOptions) -> _OptionValues:
+    """The schedule columns that hold ``options``, in the order model, effort, approvals, goal_mode, timezone,
+    history_runs, same_chat."""
     goal_mode: int | None = None if options.goal_mode is None else int(options.goal_mode)
-    return options.model, options.effort, options.approvals, goal_mode, options.timezone
+    same_chat: int | None = None if options.same_chat is None else int(options.same_chat)
+    return (
+        options.model,
+        options.effort,
+        options.approvals,
+        goal_mode,
+        options.timezone,
+        options.history_runs,
+        same_chat,
+    )
 
 
 # Columns of ``runs`` added after the first version, with the definition that gives the rows of an older database the
@@ -584,6 +599,8 @@ _ADDED_SCHEDULE_COLUMNS: tuple[tuple[str, str], ...] = (
     ("approvals", "TEXT"),
     ("goal_mode", "INTEGER"),
     ("timezone", "TEXT"),
+    ("history_runs", "INTEGER"),
+    ("same_chat", "INTEGER"),
 )
 
 
@@ -602,8 +619,14 @@ _ADDED_QUEUE_COLUMNS: tuple[tuple[str, str], ...] = (
 )
 # Columns of ``threads`` added later: NULL means a chat the owner has not pinned (item 130), one the owner has not seen
 # since its runs began or since they marked it unread (item 131), and one without choices of its own yet (a
-# ``ChatChoices`` as JSON, item 199).
-_ADDED_THREAD_COLUMNS: tuple[tuple[str, str], ...] = (("pinned_at", "REAL"), ("seen_at", "REAL"), ("choices", "TEXT"))
+# ``ChatChoices`` as JSON, item 199), and one that is no chat of a schedule (a firing's chat names its schedule, item
+# 257; a firing from before names none).
+_ADDED_THREAD_COLUMNS: tuple[tuple[str, str], ...] = (
+    ("pinned_at", "REAL"),
+    ("seen_at", "REAL"),
+    ("choices", "TEXT"),
+    ("schedule_id", "TEXT"),
+)
 # Columns of ``agents`` added later: NULL means the owner made the agent (item 99).
 _ADDED_AGENT_COLUMNS: tuple[tuple[str, str], ...] = (
     ("made_by", "TEXT"),
@@ -654,6 +677,8 @@ async def _add_missing_columns(connection: aiosqlite.Connection) -> None:
     await connection.execute("CREATE INDEX IF NOT EXISTS runs_thread ON runs(thread_id, created_at)")
     await connection.execute("CREATE INDEX IF NOT EXISTS runs_parent ON runs(parent_run_id, created_at)")
     await connection.execute("CREATE INDEX IF NOT EXISTS runs_agent ON runs(agent_id, created_at)")
+    # The chats of a schedule, whose runs its next firing reads (item 257).
+    await connection.execute("CREATE INDEX IF NOT EXISTS threads_schedule ON threads(schedule_id)")
     await connection.execute("CREATE INDEX IF NOT EXISTS approvals_status ON approvals(status, created_at)")
     await connection.commit()
 
@@ -2375,8 +2400,8 @@ class Store:
         )
         await self._db.execute(
             "INSERT INTO schedules(id, name, cron, run_at, goal, mode, enabled, created_at, last_run_at, next_run_at,"
-            " thread_id, last_status, model, effort, approvals, goal_mode, timezone)"
-            " VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            " thread_id, last_status, model, effort, approvals, goal_mode, timezone, history_runs, same_chat)"
+            " VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (
                 record.id,
                 name,
@@ -2412,7 +2437,8 @@ class Store:
         """Replace what a schedule does and when; its history (last run, thread, status) stays."""
         await self._db.execute(
             "UPDATE schedules SET name = ?, cron = ?, run_at = ?, goal = ?, mode = ?, model = ?, effort = ?,"
-            " approvals = ?, goal_mode = ?, timezone = ?, enabled = ?, next_run_at = ? WHERE id = ?",
+            " approvals = ?, goal_mode = ?, timezone = ?, history_runs = ?, same_chat = ?, enabled = ?,"
+            " next_run_at = ? WHERE id = ?",
             (name, cron, run_at, goal, mode, *_option_values(options), 1 if enabled else 0, next_run_at, schedule_id),
         )
         await self._db.commit()
@@ -2445,6 +2471,25 @@ class Store:
             (fired_at, next_run_at, thread_id, status, next_run_at, schedule_id),
         )
         await self._db.commit()
+
+    @_writing
+    async def link_schedule_thread(self, thread_id: str, schedule_id: str) -> None:
+        """Mark the chat ``thread_id`` as one of the schedule ``schedule_id`` (item 257), whose next firings read the
+        runs it started there."""
+        await self._db.execute("UPDATE threads SET schedule_id = ? WHERE id = ?", (schedule_id, thread_id))
+        await self._db.commit()
+
+    async def schedule_runs(self, schedule_id: str, source: str, limit: int) -> list[RunRecord]:
+        """The last ``limit`` ended runs of ``source`` (the scheduler's) in the chats of the schedule ``schedule_id``,
+        newest first: its firings that have an answer, without the runs they delegated or the owner's follow-ups (item
+        257)."""
+        rows = await self._all(
+            "SELECT r.* FROM runs r JOIN threads t ON t.id = r.thread_id"
+            " WHERE t.schedule_id = ? AND r.source = ? AND r.parent_run_id IS NULL"
+            " AND r.status IN ('done', 'failed', 'cancelled') ORDER BY r.created_at DESC LIMIT ?",
+            (schedule_id, source, limit),
+        )
+        return [_run(row) for row in rows]
 
     @_writing
     async def record_schedule_skip(self, schedule_id: str, next_run_at: float | None, status: str) -> None:

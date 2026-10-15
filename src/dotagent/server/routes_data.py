@@ -236,6 +236,8 @@ def schedules_router(ctx: ServerContext) -> APIRouter:
                 approvals=request.approvals,
                 goal_mode=request.goal_mode,
                 timezone=request.timezone,
+                history_runs=request.history_runs,
+                same_chat=request.same_chat,
             ),
         )
         return await view_of(await create_schedule(store, config, zone, plan, time.time()))
@@ -254,6 +256,8 @@ def schedules_router(ctx: ServerContext) -> APIRouter:
                 approvals=request.approvals,
                 goal_mode=request.goal_mode,
                 timezone=request.timezone,
+                history_runs=request.history_runs,
+                same_chat=request.same_chat,
             ),
         )
         edited: ScheduleRecord = await edit_schedule(

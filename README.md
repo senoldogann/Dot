@@ -1966,12 +1966,22 @@ dotx schedule disable|enable|delete ID
 
 A schedule is a complete goal that Dot runs later, once (`--at`) or on a cron rhythm (`--cron`, five fields, read in
 `[scheduler] timezone`, which defaults to the zone `TZ` names when it is set, else the zone of this Mac). Each firing
-starts a fresh run without any conversation, so the goal has to say everything. The agent can create schedules too
+starts a run in a new chat, so the goal has to say everything; its first message carries, in front of the goal, the
+dated final answers of the schedule's last ended runs (`[scheduler] history_runs`, 3; 0 for none; at most
+`history_chars` characters, each answer cut at 600), marked as what the schedule found before and not as instructions,
+so the run builds on them instead of doing the same work again (item 257). The chat shows the goal alone, and the run's
+reviewer takes only the goal as your words; a one-time schedule that fires late says when it was due in that first
+message too. With `same_chat` a firing goes on in the chat of the one before (a new one when you deleted it), where the
+run reads their conversation instead of the digest. Either way it reads earlier runs' words without a message of
+yours, so it starts tainted (asking before outward-facing actions) when one of the runs it reads ended so. The digest
+counts the firings since item 257: a firing from before names no schedule. The agent can create schedules too
 (`schedule_create`). The scheduler also fires the nightly reflection at `[agent] reflection_time` (see Reflection
 above); it is not a schedule and does not count against `max_schedules`.
 
 On Settings › Schedules a schedule is created and edited whole: its name, goal, repetition (cron or one moment), time
-zone, kind of run (task, chat, research), model, reasoning level, approval mode, goal mode and whether it is on. Options
+zone, kind of run (task, chat, research), model, reasoning level, approval mode, goal mode, the earlier runs it knows,
+whether it keeps its chat and whether it is on (`history_runs` and `same_chat` in `POST` and `PATCH /api/schedules`,
+left out for the configured ones). Options
 left on "default" take the configured value when the schedule fires. A schedule the agent creates always uses the
 defaults: a run cannot schedule itself into another approval mode.
 

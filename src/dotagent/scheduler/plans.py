@@ -23,7 +23,9 @@ from dotagent.store.models import ScheduleOptions, ScheduleRecord
 
 _GOAL_CHARS: int = 160
 # Options that leave every choice to the configuration at firing time.
-UNSET_OPTIONS: ScheduleOptions = ScheduleOptions(model=None, effort=None, approvals=None, goal_mode=None, timezone=None)
+UNSET_OPTIONS: ScheduleOptions = ScheduleOptions(
+    model=None, effort=None, approvals=None, goal_mode=None, timezone=None, history_runs=None, same_chat=None
+)
 
 
 def _clip(text: str, limit: int) -> str:
