@@ -1277,7 +1277,12 @@ how long it took ("Completed in 1m 46s", "Working for 2m"), whether its parent s
 "Open parent" and, while it works, **Stop**. The tool calls of one stretch of work fold into a single "Worked
 for 12 s (model 8 s) · 5 tool calls" line, where the part in brackets is how much of that time the model's turns took
 (open it for every call, result and screenshot: each call one quiet line with its icon, its result on a hairline under
-it once opened), while approvals, questions and policy notes stay in the open. The answer of the run is the last
+it once opened), while approvals, questions and policy notes stay in the open. What the model thought in a step is a
+line of its own there, before the step's calls (item 246, after T3 Code), or out of the fold before the message the
+step writes or the answer it ends the run with: a brain where a call has its icon, "Thinking…" while the model thinks
+and "Thought" once it is done, the start of the thought beside it; opened, the whole thought: up to 12,000 characters
+of it, of a longer one its start and its end, its secrets masked; it is there when the page is loaded again. A step
+asked again from its start drops what its failed try streamed. The answer of the run is the last
 message, with a copy button (its icon turns to a check once the answer is on the clipboard), when it came and how the
 run ended under it; how long the run took shows where the pointer rests on it (on a touch screen it always shows). A
 copy out of the conversation keeps its markdown, as T3 Code's does (item 206): a selection that starts in a message or

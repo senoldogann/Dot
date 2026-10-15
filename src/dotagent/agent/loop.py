@@ -236,6 +236,12 @@ _RETRY_LEAST: int = 4
 # A summary is never asked for in more words than this, whatever the budget: a longer one costs the writer's seconds
 # at every compaction and fills the note that every later step carries (item 55).
 _SUMMARY_MAX_WORDS: int = 1500
+# The thinking of a step that its `assistant` event keeps for the page to show (item 246), its secrets masked: of a
+# longer one, its start and its end. Steps think 3,500 characters on average, the longest seen near 100,000.
+_THINKING_CHARS: int = 12_000
+# What a step asked again first streams (item 246): the page drops what the failed try streamed, its text and its
+# thinking, as after a retry of the connector (llm/connector.py).
+_RESET: StreamDelta = StreamDelta(kind="reset", text="")
 # A summary may take this share of the run's context budget. Each compaction summarises the previous summary again, so
 # without a limit the summary grows until it alone fills the budget and every step compacts.
 _SUMMARY_SHARE: float = 0.1
@@ -1671,6 +1677,7 @@ async def run_agent(agent: AgentRun) -> RunEnd:
                     True,
                 )
                 route_skip = True
+                await sink(_RESET)
                 steps -= 1
                 continue
             standby: _Standby | None = await _to_standby(
@@ -1710,6 +1717,7 @@ async def run_agent(agent: AgentRun) -> RunEnd:
                     },
                     True,
                 )
+                await sink(_RESET)
                 await _wait_unless_stopped(agent.cancel, retry_in)
                 # The same step is asked again once the wait is over; a stop meanwhile ends the run at the loop's top.
                 steps -= 1
@@ -1732,6 +1740,7 @@ async def run_agent(agent: AgentRun) -> RunEnd:
             if not info.vision:
                 history = drop_old_images(history, 0)
             # The step is asked again on the new model, whose tokens the estimate has not been fitted to.
+            await sink(_RESET)
             steps -= 1
             ratio = 1.0
             continue
@@ -1760,6 +1769,7 @@ async def run_agent(agent: AgentRun) -> RunEnd:
             {
                 "step": steps,
                 "text": redact_secrets(reply.text),
+                "thinking": truncate_middle(redact_secrets(reply.thinking), _THINKING_CHARS),
                 "thinking_chars": len(reply.thinking),
                 "tool_calls": [call.name for call in reply.tool_calls],
                 "input_tokens": reply.usage.input_tokens,

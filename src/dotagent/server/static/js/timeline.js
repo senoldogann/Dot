@@ -195,7 +195,8 @@ export function createTimeline({ rootRunId, actorId, startedAt, onGrow, onPlan, 
       group: null,
       groups: [],
       live: null,
-      thinking: null,
+      // The block of the latest step's thinking (item 246; see startThought).
+      thought: null,
       reply: null,
       touched: false,
       // The cards that wait for the reader's answer in this scope and the delegated runs inside it.
@@ -213,6 +214,7 @@ export function createTimeline({ rootRunId, actorId, startedAt, onGrow, onPlan, 
   /** The group is over at `ts`: whatever comes next starts a new one. */
   function endGroup(scope, ts) {
     if (scope.group !== null) {
+      liftThought(scope);
       scope.group.tail = false;
       scope.group.end = Math.max(scope.group.end, ts);
       paintGroup(scope.group);
@@ -292,6 +294,7 @@ export function createTimeline({ rootRunId, actorId, startedAt, onGrow, onPlan, 
   /** The run is over: no group works any more, and a call that never reported back was cut off. */
   function settleGroups(scope, ts) {
     endGroup(scope, ts);
+    endThought(scope);
     for (const { row, group } of scope.calls.values()) {
       if (row.settle()) {
         group.cutCalls += 1;
@@ -308,6 +311,13 @@ export function createTimeline({ rootRunId, actorId, startedAt, onGrow, onPlan, 
       const group = buildGroup(scope.boundary);
       scope.group = group;
       scope.groups.push(group);
+      // The thinking of the step whose calls start the group, with nothing after it, is the group's first row (item 246);
+      // a thought the reader opened stays in sight, the group opening with it.
+      if (scope.thought !== null && scope.container.lastElementChild === scope.thought.node) {
+        group.body.append(scope.thought.node);
+        group.node.open = group.node.open || scope.thought.node.open;
+        scope.thought.group = group;
+      }
       scope.container.append(group.node);
     }
     return scope.group;
@@ -470,10 +480,111 @@ export function createTimeline({ rootRunId, actorId, startedAt, onGrow, onPlan, 
     }
   }
 
-  function dropThinking(scope) {
-    if (scope.thinking !== null) {
-      scope.thinking.node.remove();
-      scope.thinking = null;
+  /**
+   * A folded block for the thinking of step `step` (item 246), after T3 Code's: a line with the brain, "Thinking…"
+   * while the model thinks and "Thought" once it is done, the start of the thought beside it; opened, the whole thought.
+   * It goes into the open group of steps, else at the end of the scope, where the group that the step's calls start
+   * takes it in (`groupFor`); a group that ends before a call of the step comes leaves it out (`liftThought`).
+   */
+  function startThought(scope, step) {
+    const label = el("span", { class: "thought-label" }, "Thinking…");
+    const preview = el("span", { class: "tool-sum thought-preview" });
+    const text = el("div", { class: "thought-text" });
+    const head = el(
+      "summary",
+      { class: "tool-head" },
+      el("span", { class: "tool-state" }),
+      el("span", { class: "tool-kind" }, icon("brain")),
+      label,
+      preview,
+      el("span", { class: "chev" }, icon("chevron")),
+    );
+    const node = el("details", { class: "thought", dataset: { live: "true" } }, head, el("div", { class: "tool-body" }, text));
+    const group = scope.group;
+    (group === null ? scope.container : group.body).append(node);
+    // `line` is what the group said of its last call before: a folded group says that the model thinks until it is done.
+    scope.thought = { node, label, preview, text, step, start: "", live: true, settled: false, group, line: group === null ? "" : group.last };
+    if (group !== null) {
+      group.last = "Thinking…";
+      paintGroup(group);
+    }
+    return scope.thought;
+  }
+
+  /** The group the thought sits in says what it said of its last call again, not that the model thinks. */
+  function restoreLine(thought) {
+    if (thought.group !== null && thought.group.last === "Thinking…") {
+      thought.group.last = thought.line;
+      paintGroup(thought.group);
+    }
+  }
+
+  /**
+   * A thought that ends its group, no call of its step after it, stands after the group, out of the fold: before the
+   * message its step writes or the answer the run ends with (item 246).
+   */
+  function liftThought(scope) {
+    const thought = scope.thought;
+    if (thought !== null && thought.group !== null && thought.group.body.lastElementChild === thought.node) {
+      restoreLine(thought);
+      thought.group.node.after(thought.node);
+      thought.group = null;
+    }
+  }
+
+  /** The block of step `step`'s thinking, which grows by `piece` as the model streams it. A step that thinks again
+   * after it wrote goes on in the same block. */
+  function growThought(scope, step, piece) {
+    let thought = scope.thought;
+    if (thought === null || thought.step !== step || thought.settled) {
+      thought = startThought(scope, step);
+    } else if (!thought.live) {
+      thought.live = true;
+      thought.node.dataset.live = "true";
+      thought.label.textContent = "Thinking…";
+    }
+    thought.text.append(piece);
+    if (thought.start.length < PREVIEW_CHARS) {
+      thought.start += piece;
+      thought.preview.textContent = clip(plainLine(thought.start), PREVIEW_CHARS);
+    }
+  }
+
+  /** The model is done thinking: its block says "Thought", folded or open as the reader left it. */
+  function endThought(scope) {
+    const thought = scope.thought;
+    if (thought !== null && thought.live) {
+      thought.live = false;
+      thought.node.dataset.live = "false";
+      thought.label.textContent = "Thought";
+      restoreLine(thought);
+    }
+  }
+
+  /** The step is asked again from its start: what it thought goes with what it wrote. */
+  function dropThought(scope, step) {
+    const thought = scope.thought;
+    if (thought !== null && thought.step === step && !thought.settled) {
+      restoreLine(thought);
+      thought.node.remove();
+      scope.thought = null;
+    }
+  }
+
+  /** The step's `assistant` event: the thinking it keeps, its secrets masked (agent/loop.py), stands for what streamed;
+   * on a page that reads the run's events afterwards it makes the block. Events stored before item 246 keep none. */
+  function settleThought(scope, data) {
+    const kept = typeof data.thinking === "string" ? data.thinking : "";
+    const current = scope.thought !== null && scope.thought.step === data.step && !scope.thought.settled ? scope.thought : null;
+    if (current === null && kept === "") {
+      return;
+    }
+    const thought = current ?? startThought(scope, data.step);
+    endThought(scope);
+    thought.settled = true;
+    if (kept !== "") {
+      thought.text.textContent = kept;
+      thought.preview.textContent = clip(plainLine(kept.slice(0, PREVIEW_CHARS * 2)), PREVIEW_CHARS);
     }
   }
 
@@ -485,17 +596,6 @@ export function createTimeline({ rootRunId, actorId, startedAt, onGrow, onPlan, 
     scope.panel.helper.status = waiting ? "blocked" : "running";
     paintRing(scope.panel.status, scope.panel.helper.status);
     paintFlock(scope.panel.flock, ts);
-  }
-
-  function showThinking(scope, characters) {
-    if (scope.thinking === null) {
-      const count = el("span", { class: "faint" });
-      const node = el("div", { class: "thinking" }, icon("sparkle"), el("span", { class: "label" }, "Thinking…"), count);
-      scope.container.append(node);
-      scope.thinking = { node, count, characters: 0 };
-    }
-    scope.thinking.characters += characters;
-    scope.thinking.count.textContent = `${compact(scope.thinking.characters)} characters`;
   }
 
   /** Add a tool call as a row to the group it belongs to; `call` is `{ id, tool, args }`. */
@@ -558,8 +658,8 @@ export function createTimeline({ rootRunId, actorId, startedAt, onGrow, onPlan, 
 
     assistant(scope, record) {
       const data = record.data;
-      dropThinking(scope);
       addModelTime(scope, data);
+      settleThought(scope, data);
       if (scope.panel !== null) {
         scope.panel.steps = Math.max(scope.panel.steps, data.step);
         scope.panel.progress.textContent = `step ${scope.panel.steps}`;
@@ -603,7 +703,7 @@ export function createTimeline({ rootRunId, actorId, startedAt, onGrow, onPlan, 
     delta(scope, record) {
       const data = record.data;
       if (data.kind === "thinking") {
-        showThinking(scope, data.text.length);
+        growThought(scope, data.step, data.text);
         return;
       }
       if (data.kind === "reset") {
@@ -611,10 +711,13 @@ export function createTimeline({ rootRunId, actorId, startedAt, onGrow, onPlan, 
           scope.live.node.remove();
           scope.live = null;
         }
+        dropThought(scope, data.step);
         return;
       }
-      dropThinking(scope);
+      endThought(scope);
       if (scope.live === null || scope.live.step !== data.step) {
+        // The step writes: its thought comes out of the group before its message, as on a page loaded later.
+        liftThought(scope);
         scope.live = newBubble(scope, data.step, true);
       }
       scope.live.text += data.text;

@@ -5183,8 +5183,8 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 242 | The approval card and the reviewer see the whole command                             | done        | cbd4a68 |
 | 243 | A run that goes on from another keeps its taint                                      | done        | bbe607e |
 | 244 | The pill of a helper's page stays in the window                                      | done        | 5cfec1c |
-| 245 | Helpers that follow one another sit in one group                                     | in progress |         |
-| 246 | Each step's thinking is a block that folds                                           | planned     |         |
+| 245 | Helpers that follow one another sit in one group                                     | done        | 6b86a8d |
+| 246 | Each step's thinking is a block that folds                                           | in progress |         |
 
 ### 77. The type system: Inter and Geist Mono, seven sizes, three weights
 
@@ -11036,7 +11036,7 @@ foot as the conversation scrolls, with the arrow down above it.
 
 ### 245. Helpers that follow one another sit in one group
 
-**Status: in progress.**
+**Status: done.** Merged as `6b86a8d` (PR #286; no Linear issue, the Linear connector was signed out).
 
 **As built (2026-10-15).** `timeline.js` places a helper's row with `placeHelper`: rows that follow one another at the
 end of a scope gather in one group (`.helpers`, open from the start), which the second row makes, taking the first in.
@@ -11059,7 +11059,28 @@ the start of its answer as one plain line.
 
 ### 246. Each step's thinking is a block that folds
 
-**Status: planned.**
+**Status: in progress.**
+
+**As built (2026-10-15).** The `assistant` event keeps the step's thinking (`agent/loop.py`, `_THINKING_CHARS`): its
+secrets masked, up to 12,000 characters, of a longer one its start and its end. `timeline.js` makes each step's thinking
+a folded block (`startThought`) with the brain where a call has its icon: it grows as the thinking streams, says
+"Thinking…" while the model thinks (a folded group of steps says so in its line) and "Thought" once it is done, the
+start of the thought beside it. It is a row of the open group of steps; with none open, it stands at the end of the
+conversation until the group its step's calls start takes it in as its first row, and that group opens with it when the
+reader opened the thought. A group that ends before a call of the step comes, as the step writes a message or ends the
+run, leaves the thought out of the fold, before the message or the answer (`liftThought`), and its line says its last
+call again. The event's thinking stands for what streamed and makes the blocks of a page that reads the run afterwards,
+in the same places. A step asked again from its start drops its block: one the connector asks again, as before, and now
+one that `agent/loop.py` asks again (its routed model failed, its model could not be reached, or the run moved to a
+standby model), which first streams the same reset, so the page also drops the text the failed try streamed. Tests:
+`tests/smoke/test_thinking_blocks.py` streams the thoughts of three steps while the page follows the run: "Thinking…"
+with the start of the first thought, which the reader opens and reads as it comes, then "Thought", the first row of its
+step's group, which opened with it; the thought of the step that writes a message stands before it and that of the last
+step before the answer, out of the groups; the events keep a short thought whole and of one of 21,489 characters its
+start and its end; the page loaded again, wide and on a phone, light and dark, in Chrome and (copied for the check) in
+WebKit, shows the blocks in the same places, folded, each opening to its thought and folding again, the long one
+scrolling within its box. `tests/smoke/test_model_wait.py` sees a reset each time a step is asked again after its model
+could not be reached. On the code of before there is no block and no such reset.
 
 **What.** Each step's thinking is a block among the step's tool calls, a brain for its icon: "Thinking…" while the model
 thinks and "Thought" once it is done, the start of the thought beside it; folded at first, it opens to the whole thought
@@ -11751,3 +11772,4 @@ its start and its end), so a page loaded later shows it.
 - 2026-10-15 (Opus 5.5): item 242 merged as `cbd4a68` (PR #283; no Linear issue, the connector was signed out): an approval card shows the whole of what an action acts on, wrapped, in a box that scrolls past twelve lines; the reviewer of an `auto` run reads up to 12,000 characters of it, and of a longer one its start and its end.
 - 2026-10-15 (Opus 5.5): item 243 merged as `bbe607e` (PR #284; no Linear issue, the connector was signed out): a resumed run starts as tainted as the run it resumes was when it was cut off, and the run that tells a chat that its command in the background ended as the chat's last run ended; `tool_result` and `run_queued` events hold whether the run was tainted. Part 39 is done.
 - 2026-10-15 (Opus 5.5): item 244 merged as `5cfec1c` (PR #285; no Linear issue, the connector was signed out): the pill of a helper's page is in the dock, so it stays at the window's foot as the conversation scrolls.
+- 2026-10-15 (Opus 5.5): item 245 merged as `6b86a8d` (PR #286; no Linear issue, the connector was signed out): helpers that follow one another sit in one group, as T3 Code groups its subagents, with a head that counts them, says how they stand and folds them away; a row that is done shows the start of its answer.

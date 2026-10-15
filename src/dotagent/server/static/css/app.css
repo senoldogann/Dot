@@ -3061,22 +3061,42 @@ details[open] > summary .chev {
   color: var(--bad);
 }
 
-.thinking {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  color: var(--muted);
-  font-size: var(--text-sm);
-  padding: 0 4px;
+/* A step's thinking (item 246), after T3 Code's: a line among the step's tool calls, the brain where a call has its
+   icon, "Thinking…" shimmering while the model thinks and "Thought" once it is done, the start of the thought beside
+   it; opened, the whole thought hangs under it on a hairline, as a call's result does. */
+.thought {
+  min-width: 0;
 }
 
-.thinking .label {
+.thought-label {
+  flex: none;
+  color: var(--muted);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-label);
+}
+
+.thought[data-live="true"] .thought-label {
   background: linear-gradient(90deg, var(--muted) 30%, var(--text) 50%, var(--muted) 70%);
   background-size: 200% 100%;
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
   animation: shimmer var(--motion-shimmer) linear infinite;
+}
+
+/* Opened, the thought stands under its line, which keeps only its label. */
+.thought[open] .thought-preview {
+  visibility: hidden;
+}
+
+.thought-text {
+  max-height: calc(var(--leading-sm) * 20);
+  overflow: auto;
+  color: var(--text-2);
+  font-size: var(--text-sm);
+  line-height: var(--leading-sm);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 
 .approval {
