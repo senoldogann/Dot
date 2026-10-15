@@ -5193,7 +5193,12 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 252 | The plan at the end of the request, if an eval shows it holds                        | done        | a786a28 |
 | 253 | The line of what a yolo run did without asking says its reason once                   | done        | 0250d88 |
 | 254 | A model the plan does not include is paused at once                                   | done        | 8e6cbfb |
-| 255 | The typed judge switches on and off in Settings                                       | in progress |         |
+| 255 | The typed judge switches on and off in Settings                                       | done        | b3cddbc |
+| 256 | A failed embedding never fails a run                                                  | planned     |         |
+| 257 | A schedule's run knows its earlier runs                                               | planned     |         |
+| 258 | Only reasoning levels the gateway honours are offered                                 | in progress |         |
+| 259 | Ultrathink and ultracode as words in the composer                                     | planned     |         |
+| 260 | The compaction notes leave the conversation                                           | planned     |         |
 
 ### 77. The type system: Inter and Geist Mono, seven sizes, three weights
 
@@ -11364,7 +11369,7 @@ names the reason). They fail on the code of before.
 
 ### 255. The typed judge switches on and off in Settings
 
-**Status: in progress.** Built on `item-255-judge-switch`.
+**Status: done.** Merged as `b3cddbc` (PR #299; no Linear issue, the Linear connector was signed out).
 
 **As built (2026-10-15).** `agent/judge.py` `SwitchedJudge`: the runtime's judge, with `provider` and `set_provider`,
 answers through `TypeSafeJudge` while the provider is `"typesafe"` and through `NoJudge` otherwise; switching on
@@ -11400,6 +11405,120 @@ with a WebKit copy. They fail on the code of before.
 > of part 5 (branch, gate, PR, squash merge, hash in the table, log line) is unchanged; the Linear connector is signed
 > out, so no issue. Give each change a test that fails on the code of before, and check each page it touches wide and
 > on a phone, light and dark, in Chrome and WebKit. Tests never start a real model call.
+
+## Part 44: the levels that hold, the words in the box, and the quiet compaction (planned 2026-10-15)
+
+The owner's forty-fourth word, on 2026-10-15: whether DeepSeek and Grok really support a choice like Ultrathink, and
+that the levels offered must be true ones ("we cannot use what is not valid"); that typing ultrathink or ultracode in
+the composer should be the choice for that message, the composer's border turning into a gradient while it is (a
+screenshot of T3 Code's composer with Ultrathink chosen: a green, orange and purple gradient around the box); whether
+constant compaction harms long runs, and that the compaction notes should leave the conversation; that Excel and
+OneDrive are now open; and, from the forty-third word and the report of part 43, a DeepSeek run that failed with a
+`tokenize` error of the local Ollama runner, and that a schedule starting a fresh chat with the same prompt every day
+repeats the same work. "Do whatever the best needs."
+
+**Status (2026-10-15): planned.** On the code at `0250d88`, measured through the probe of part 43 on OpenCode Go
+(counts only): the reasoning tokens of DeepSeek V4.1 Flash were the same at `low`, `high`, `max` and at a label that
+does not exist (an easy prompt: 51, 53, 55 and 52; a harder one: 198 and 236 at low, 233 and 241 at max), while GLM 5.2
+at `max` thought at length (453 reasoning tokens on the easy prompt); the gateway accepts any label for DeepSeek and
+changes nothing. Grok 4.7 and GPT-6 Luna answer on the Responses route alone, which the probe did not
+measure; their levels are the ones models.dev lists and the official client sends. The composer reads no word: the
+choice for one message is the Reasoning menu's alone (item 251). The `compacted` event is a note in the timeline
+("Context compacted: N earlier messages were summarised · by <model>"), one per compaction; over the last seven days the
+owner's runs compacted 122 times in 26 runs (all by a model; the longest run 22 times; 9 checks flagged something). The run of a schedule starts a fresh thread each firing (`scheduler/runner.py`); a failed
+embedding of the local Ollama runner (`/tokenize` reset) ends the run at its memory recall instead of being skipped.
+
+**The shape of this part.** Five items, each a pull request of its own, in the order 258, 259, 260, 256, 257: the
+levels (258) first, since the words of 259 are only as true as the levels behind them.
+
+### 256. A failed embedding never fails a run
+
+**Status: planned.**
+
+**What.** A memory recall or a playbook match whose embedding call fails (the local Ollama runner reset, a `tokenize`
+error, a connection reset) is retried once and then falls back to the text search, with a warning in the log
+(`embedding_failed`) and the reason in the recall's event; the run goes on. The schedule's run that failed on 2026-10-15
+at its `memories` event would have run.
+
+**Why.** The owner asked why a DeepSeek run failed with `Post "http://127.0.0.1:<port>/tokenize": connection reset by
+peer`: the run's model was fine; the embedding of its memory recall, on the local Ollama runner, failed and the failure
+went uncaught.
+
+**Tests.** A unit test of the recall with an embedder that raises (the text search answers, the warning is logged), and
+a smoke test of a run whose embedder fails (the run ends done). They fail on the code of before.
+
+### 257. A schedule's run knows its earlier runs
+
+**Status: planned.**
+
+**What.** A schedule's firing carries, in front of its goal, a dated digest of the schedule's last runs (their final
+answers and statuses, the newest first, within a budget), so the run can build on them instead of doing the same work
+again; Settings › Schedules has the number of runs the digest keeps and an option to continue in the same chat instead,
+where the run's conversation is the earlier runs' own. README says so.
+
+**Why.** The owner asked whether a schedule starting a fresh chat with the same prompt every day makes sense, since it
+repeats the same work.
+
+**Tests.** A unit test of the digest (the budget, the order, an empty history) and a smoke test of two firings (the
+second's goal carries the first's answer; the same-chat option continues the thread). They fail on the code of before.
+
+### 258. Only reasoning levels the gateway honours are offered
+
+**Status: in progress.** Built on `item-258-true-levels`.
+
+**What.** OpenCode Go's catalog (`llm/opencode_go.py`) offers no reasoning level for DeepSeek's four models, since the
+chat route thinks the same at every label (measured above); the Reasoning pill, the Settings and the API offer them
+none, so Ultrathink and Ultracode (which need `max` and `xhigh`) do not show for them, and a level asked over the API is
+refused as for any model without it. The models whose level holds (GLM 5.2, Grok, GPT Luna, Muse Spark, Longcat,
+MiMo, Hy) keep theirs. The catalog says why, with the method.
+
+**Why.** The owner asked whether DeepSeek and Grok really support such a choice, and that a choice must be a true one.
+
+**Tests.** `tests/unit/test_true_levels.py` (DeepSeek offers none; GLM 5.2 and Grok keep theirs). Fails on the code of
+before.
+
+### 259. Ultrathink and ultracode as words in the composer
+
+**Status: planned.**
+
+**What.** The word `ultrathink` or `ultracode` typed in the composer (the home's box or a chat's dock; a whole word,
+any case; the first of the two when both are there) is the choice for one message of item 251 for that message, when
+the model offers its level: the Reasoning pill reads it while the word is in the box, the message goes with `once`, and
+the word stays in the text, as in Claude Code. While the choice is armed, by the word or by the menu, the composer's
+border is a gradient of green, orange and purple (`data-boost` on the frame), the same in light and dark, still under
+reduced motion. A model without the level reads the word as any other word, and the border stays plain. README says so.
+
+**Why.** The owner asked for the word as the key, and for the border of the screenshot.
+
+**Tests.** A smoke test in Chrome of the home's box and a chat's dock: the word arms the pill and the gradient, the
+run starts with `once`, the word stays in the goal, deleting it puts the choice away, a model without the level shows
+nothing, wide and on a phone, light and dark, with a WebKit copy. Fails on the code of before.
+
+### 260. The compaction notes leave the conversation
+
+**Status: planned.**
+
+**What.** The timeline no longer shows a note for the `compacted` event: the conversation reads as the owner's messages
+and the run's work. The event stays in the run's record and in the API; the Cost panel keeps the share of the summaries,
+and the Details panel says how many times the run compacted its context and whether a check flagged anything, so what the
+note said is still in sight, off the conversation. README says where it moved.
+
+**Why.** The owner asked that the compaction notes not be shown in the conversation. On the frequency: a compaction
+summarises the older part past `context_summarise_share` of the configured size and keeps the pinned ledger (goal, plan,
+owner's messages, paths touched) whole, so a long run loses the detail of its oldest tool results, not its course; the
+counts above are the measure. A wider context size for the model (item 250, Settings › Models) compacts less and costs
+more a step; the choice is the owner's.
+
+**Tests.** A smoke test of a run with a `compacted` event: no note in the conversation, the count in the Details panel.
+Fails on the code of before.
+
+### How to start part 44 (the handoff prompt)
+
+> Read ROADMAP.md part 44 and the status table of part 9 (rows 256 to 260). In the order 258, 259, 260, 256, 257, one
+> item at a time; the protocol of part 5 (branch, gate, PR, squash merge, hash in the table, log line) is unchanged; the
+> Linear connector is signed out, so say so in the PR. Measure, never assume, that a provider honours a level before
+> offering it; keep the owner's quota and plan details out of the file. UI changes are checked wide and on a phone,
+> light and dark, in Chrome and WebKit.
 
 ## Log
 
@@ -12096,3 +12215,4 @@ with a WebKit copy. They fail on the code of before.
 - 2026-10-15 (Opus 5.5): item 252 merged as `a786a28` (PR #296; no Linear issue, the connector was signed out): the plan stays at the end of the system prompt; the A/B could not tell the places apart (none of its 18 attempts planned) and the owner's runs of 30 days put the move at about 2 points more of cached input against the 15 the design asked for; eval reports now say in how many attempts a plan was kept.
 - 2026-10-15 (Fable 5.1): item 253 merged as `0250d88` (PR #297; no Linear issue, the connector was signed out): the record of an action a yolo run did without asking keeps the action as its summary and the policy's reason as its note, and the timeline's line reads them once; the reason an allowed action asks for once untrusted content is in context says what holds in every mode.
 - 2026-10-15 (Opus 5.5): item 254 merged as `8e6cbfb` (PR #298; no Linear issue, the connector was signed out): a provider's HTTP 402 is a `ProviderQuotaError` on every provider and pauses the model with the reason "not in the plan", and Ollama's 429 that says the plan's included usage is used up does the same; another 429 stays a rate limit.
+- 2026-10-15 (Opus 5.5): item 255 merged as `b3cddbc` (PR #299; no Linear issue, the connector was signed out): the typed judge switches on and off in Settings › API keys, on the row of TypeSafe's key, and takes effect at once; `GET` and `PUT /api/judge` carry the switch and write `[judge] provider`; the step router leaves a paused fast model out of the models it offers the judge.

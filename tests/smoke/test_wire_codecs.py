@@ -376,9 +376,9 @@ def test_anthropic_billing_and_a_spent_balance_are_terminal_but_an_overloaded_ap
 
 
 def test_request_bodies_end_with_stream_and_follow_each_gateway_flavour() -> None:
-    traits: ModelTraits = go_traits("deepseek-v4-pro")
+    traits: ModelTraits = go_traits("glm-5.2")
     request: ChatRequest = request_for(
-        "deepseek-v4-pro", (system_message("be brief"), user_message("hi", ())), (TEMPERATURE_TOOL,)
+        "glm-5.2", (system_message("be brief"), user_message("hi", ())), (TEMPERATURE_TOOL,)
     )
     gateway_chat: JsonObject = build_chat_body(
         request,

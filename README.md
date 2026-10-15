@@ -176,7 +176,10 @@ answer keeps its words, Ollama's too.
   on, at a tenth of the price and with a faster first token (Claude caches only so); the Chat Completions models cache
   it by themselves. A model Go serves at no cost (its id ends in `-free`) says Free in the model picker and in
   Settings › Models. The free models of OpenCode Zen are not offered: OpenCode serves them only to its own programs and
-  answers any other with a 403 (checked on 2026-10-12, with and without a key).
+  answers any other with a 403 (checked on 2026-10-12, with and without a key). The reasoning levels offered are the
+  ones the gateway honours: DeepSeek's models offer none, since the chat route thinks the same at every label (measured
+  2026-10-15, item 258), so Ultrathink and Ultracode do not show for them; GLM 5.2, Grok, GPT Luna, Muse Spark,
+  Longcat, MiMo and Hy keep theirs.
 - **Anthropic**: what a model can do (pictures, its window and output limit, whether it thinks and at which levels) is
   read from the Models API, so a new Claude model needs no update of Dot. A model that thinks gets adaptive thinking at
   the run's reasoning level, with the summary of its thinking shown; `off` turns thinking off where the model allows it,
