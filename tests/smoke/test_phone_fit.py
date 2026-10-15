@@ -255,6 +255,7 @@ async def test_no_page_slides_sideways_or_has_a_field_under_16_px_on_a_phone(own
                     "effort": None,
                     "approvals": None,
                     "tools": [],
+                    "every_tool": True,
                 },
             )
             assert made.status_code == 201, made.text

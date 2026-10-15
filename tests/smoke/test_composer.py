@@ -331,6 +331,7 @@ async def test_the_bar_keeps_one_line_from_the_desk_to_the_phone(
             "effort": None,
             "approvals": None,
             "tools": [],
+            "every_tool": True,
         },
     )
     assert made.status_code == 201, made.text

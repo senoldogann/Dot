@@ -8,7 +8,7 @@ import { api } from "../api.js";
 import { askForWords, readyToSend } from "../attachments.js";
 import { composerFrame } from "../composer.js";
 import { ago, clip, el, modelName } from "../dom.js";
-import { allModels, levelLabel } from "../efforts.js";
+import { allModels, chosenLevel, levelLabel } from "../efforts.js";
 import { icon } from "../icons.js";
 import { touchFirst } from "../layout.js";
 import { lookPicker } from "../lookpicker.js";
@@ -143,7 +143,7 @@ function agentForm({ record, onSaved, onCancel }) {
   }
 
   model.addEventListener("change", paintEffort);
-  loadModels()
+  const modelsListed = loadModels()
     .then((providers) => {
       models = allModels(providers).filter((candidate) => candidate.tools);
       const chosen = model.value;
@@ -159,10 +159,13 @@ function agentForm({ record, onSaved, onCancel }) {
     .catch((error) => {
       console.warn("the models could not be listed", error);
     });
-  api
+  // Saved only once the tools are listed: a form without them would send none, which is no bound at all.
+  let toolsListed = false;
+  const toolsLoaded = api
     .get("/tools")
     .then((names) => {
       tools.replaceChildren(toolPicks(names, record === null ? [] : record.tools));
+      toolsListed = true;
     })
     .catch((error) => {
       tools.replaceChildren(el("span", { class: "muted" }, `The tools could not be listed: ${error.message}`));
@@ -172,7 +175,10 @@ function agentForm({ record, onSaved, onCancel }) {
     role.value = record.role;
     instructions.value = record.instructions;
   }
-  const save = el("button", { class: "btn primary", type: "button" }, icon(record === null ? "plus" : "check"), record === null ? "Create agent" : "Save changes");
+  const save = el("button", { class: "btn primary", type: "button", disabled: true }, icon(record === null ? "plus" : "check"), record === null ? "Create agent" : "Save changes");
+  Promise.allSettled([modelsListed, toolsLoaded]).then(() => {
+    save.disabled = !toolsListed;
+  });
   const cancel = el("button", { class: "btn ghost", type: "button", onclick: onCancel }, "Cancel");
 
   async function submit() {
@@ -181,14 +187,16 @@ function agentForm({ record, onSaved, onCancel }) {
       name.focus();
       return;
     }
+    const picked = [...tools.querySelectorAll("input:checked")].map((input) => input.value);
     const body = {
       name: nameText,
       role: role.value.trim(),
       instructions: instructions.value.trim(),
       model: model.value,
-      effort: effort.value === "" ? null : effort.value,
+      effort: chosenLevel(models, model.value, effort.value, record === null ? "" : record.model, record === null ? null : record.effort),
       approvals: approvals.value === "" ? null : approvals.value,
-      tools: [...tools.querySelectorAll("input:checked")].map((input) => input.value),
+      tools: picked,
+      every_tool: picked.length === 0,
       look: look.value(),
     };
     save.disabled = true;

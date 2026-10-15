@@ -423,8 +423,9 @@ class KeyRequest(FrozenModel):
 
 class AgentRequest(FrozenModel):
     """Make or change an agent (item 86). ``model`` empty and ``effort``/``approvals`` ``None`` take the configured
-    ones; ``tools`` empty lets the agent use every tool; ``look`` ``None`` leaves the face its id's hue gives it (item
-    102)."""
+    ones; ``tools`` names the tools the agent may use, or is empty with ``every_tool`` for every tool, so a list that
+    did not load can never lift the bounds of an agent (the code review's Y5); ``look`` ``None`` leaves the face its
+    id's hue gives it (item 102)."""
 
     name: str = Field(min_length=1, max_length=60)
     role: str = Field(max_length=120)
@@ -433,7 +434,16 @@ class AgentRequest(FrozenModel):
     effort: Effort | None
     approvals: ApprovalMode | None
     tools: list[str]
+    every_tool: StrictBool = False
     look: AgentLook | None = None
+
+    @model_validator(mode="after")
+    def _tools_said(self) -> Self:
+        if self.every_tool and self.tools:
+            raise ValueError("every_tool lets the agent use every tool: it goes with no tools named")
+        if not self.every_tool and not self.tools:
+            raise ValueError("name the tools the agent may use, or say every_tool for all of them")
+        return self
 
 
 class AgentSummary(FrozenModel):

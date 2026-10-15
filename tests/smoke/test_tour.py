@@ -352,6 +352,7 @@ async def test_every_page_in_both_schemes_at_both_widths(
             "effort": None,
             "approvals": None,
             "tools": [],
+            "every_tool": True,
         },
     )
     assert made.status_code == 201, made.text
