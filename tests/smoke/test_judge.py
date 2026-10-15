@@ -32,6 +32,7 @@ from dotagent.agent.review import ReviewRequest, ReviewVerdict
 from dotagent.agent.stepmodel import STEP_ROUTED_EVENT
 from dotagent.agent.verify import new_facts
 from dotagent.config import JudgeConfig, load_config
+from dotagent.core.errors import ProviderQuotaError
 from dotagent.core.paths import workspace_dir
 from dotagent.core.types import JsonObject
 from dotagent.evals.runner import SCRIPTED_MODEL
@@ -795,6 +796,40 @@ async def test_in_goal_mode_a_claim_the_judge_finds_false_is_sent_back_without_t
 
 def _shell(command: str) -> ScriptedTurn:
     return ScriptedTurn(text="", calls=(ScriptedCall(tool="shell", arguments={"command": command}),))
+
+
+async def test_a_paused_fast_model_is_not_offered_to_the_step_router(runtime: Runtime, service: _Service) -> None:
+    """Item 255: while the fast model is paused (its provider's plan does not include it), the judge chooses over the
+    run's model and the helper alone, so the step the stand-in would send to the fast model stays on the run's model."""
+    turns: list[ScriptedTurn] = [
+        _shell("echo ROUTE:fast"),
+        _shell("echo plain"),
+        ScriptedTurn(
+            text="", calls=(ScriptedCall(tool=FINISH_TOOL, arguments={"answer": "Echoed.", "success": True}),)
+        ),
+    ]
+    MODEL.script = ScriptedProvider(_PROVIDER, turns)
+    MODEL.models.clear()
+    before: int = len(service.requests)
+    # The pause a 402 of the fast model's provider leaves (item 254); the router's own method, as a call would.
+    runtime.router._pause(parse_model_ref(FAST_MODEL), ProviderQuotaError("not included in the plan", 402, None, {}))
+    manager: RunManager = RunManager(runtime)
+    try:
+        run: RunRecord = await manager.start(
+            "Echo two markers.", "task", SCRIPTED_MODEL, None, "test", None, None, "standard", None, "ask", False, ()
+        )
+        async with asyncio.timeout(60.0):
+            ended: RunRecord = await manager.wait(run.id)
+    finally:
+        await manager.shutdown()
+        await runtime.router.retire(_PROVIDER)
+    assert ended.status == "done", ended
+    assert MODEL.models == ["scripted", "scripted", "scripted"]
+    assert await runtime.store.events_of_kind(run.id, STEP_ROUTED_EVENT, 10) == []
+    asked: list[JsonObject] = [body for _, _, body in service.requests[before:]]
+    question: JsonValue = asked[1]["questions"]
+    assert isinstance(question, dict) and isinstance(question["step_model"], dict)
+    assert list(question["step_model"]["criteria"]) == ["main", "helper"]
 
 
 async def test_a_typed_judgment_sends_a_routine_step_to_the_fast_model_and_a_hard_one_to_the_helper(

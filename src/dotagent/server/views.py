@@ -6,7 +6,7 @@ from pydantic import Field, JsonValue, StrictBool, StringConstraints, model_vali
 
 from dotagent.agent.attachments import MAX_ATTACHMENT_BYTES, MAX_ATTACHMENTS
 from dotagent.agent.lessons import RunLessons
-from dotagent.config import ModelReference, ModelsConfig, ResumeMode
+from dotagent.config import JudgeProvider, ModelReference, ModelsConfig, ResumeMode
 from dotagent.core.types import FrozenModel
 from dotagent.desktop.perms import Pane
 from dotagent.help.elsewhere import FoundElsewhere
@@ -333,6 +333,20 @@ class ResumeView(FrozenModel):
 
     resume: ResumeMode
     resume_within_s: int
+
+
+class JudgeRequest(FrozenModel):
+    """Whether the typed judge answers through TypeSafe or answers nothing (item 255): ``[judge] provider``."""
+
+    provider: JudgeProvider
+
+
+class JudgeView(FrozenModel):
+    """The typed judge as it stands: its provider, and whether the key of its service (``key_name``) is set."""
+
+    provider: JudgeProvider
+    key_name: str
+    key_set: bool
 
 
 class BrowserRaiseRequest(FrozenModel):

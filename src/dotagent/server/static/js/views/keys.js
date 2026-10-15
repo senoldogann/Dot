@@ -4,7 +4,7 @@
 import { api } from "../api.js";
 import { el } from "../dom.js";
 import { icon } from "../icons.js";
-import { errorPanel, loadingPanel, paneHead } from "../panels.js";
+import { errorPanel, loadingPanel, paneHead, switchSetting } from "../panels.js";
 import { providerLabel, providerOf } from "../providers.js";
 import { forgetModels, getSnapshot, onChange, refresh } from "../state.js";
 import { attempt, confirmDialog, toast } from "../ui.js";
@@ -56,6 +56,10 @@ const ROLES = [
 // A key as the daemon takes one: printable characters without spaces.
 const KEY_PATTERN = /^[!-~]+$/;
 const KEY_CHARS = 1000;
+// The provider whose key the typed judge signs in with.
+const JUDGE_SERVICE = "typesafe";
+// The typed judge as the daemon last reported it (item 255): `{ provider, key_name, key_set }`, read with the keys.
+let judge = null;
 
 function aboutProvider(provider) {
   const about = PROVIDERS[provider];
@@ -203,6 +207,21 @@ function buildKeyRow(initial, isDisposed) {
     icon("trash"),
   );
   const form = buildForm(about.label, (value) => saveKey(value), () => closeForm());
+  // The switch of the typed judge sits on the row of its service's key (item 255): on, TypeSafe answers from the next
+  // judgment on; off, the patterns and the goal checker decide alone. It needs the key the daemon started with.
+  const judgeSwitch =
+    view.provider !== JUDGE_SERVICE
+      ? null
+      : switchSetting({
+          label: "Typed judge (Jev)",
+          hint: "Asks TypeSafe what a click no rule knows does and whether a run's claim holds. Saved in the config file; no restart.",
+          read: () => judge !== null && judge.provider === "typesafe",
+          write: async (on) => {
+            judge = await api.put("/judge", { provider: on ? "typesafe" : "none" });
+            toast("ok", on ? "The typed judge answers from the next judgment on." : "The typed judge is off; the patterns and the goal checker decide alone.");
+          },
+          onToggled: () => judgeSwitch.paint(),
+        });
   const element = el(
     "div",
     { class: "list-row key-row" },
@@ -216,6 +235,7 @@ function buildKeyRow(initial, isDisposed) {
       shadow,
       outcome,
       form.element,
+      judgeSwitch === null ? null : judgeSwitch.element,
       el(
         "a",
         { class: "key-page", href: about.page, target: "_blank", rel: "noopener noreferrer" },
@@ -261,6 +281,10 @@ function buildKeyRow(initial, isDisposed) {
       ? `The daemon was started with ${view.name} in its environment, which comes before the key saved in Dot: that one is not in use.`
       : `The daemon was started with ${view.name} in its environment, which comes before a key saved here.`;
     check.hidden = !set;
+    if (judgeSwitch !== null) {
+      judgeSwitch.paint();
+      judgeSwitch.toggle.disabled = !set || judge === null || !judge.key_set;
+    }
     edit.className = set ? "btn sm" : "btn sm primary";
     edit.replaceChildren(icon(set ? "pencil" : "plus"), set ? "Replace" : "Add key");
     edit.hidden = form.isOpen();
@@ -351,7 +375,7 @@ export function mount(root, ctx) {
   async function load() {
     let found;
     try {
-      found = await api.get("/keys");
+      [found, judge] = await Promise.all([api.get("/keys"), api.get("/judge")]);
     } catch (error) {
       if (!disposed) {
         holder.replaceChildren(errorPanel(error, () => attempt(retry)));

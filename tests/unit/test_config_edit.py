@@ -13,6 +13,7 @@ from dotagent.config_edit import (
     set_browser_mode,
     set_browser_setting,
     set_default_model,
+    set_judge_provider,
     set_resume,
     set_role_model,
     with_browser_mode,
@@ -188,4 +189,18 @@ def test_a_model_of_dots_own_work_is_replaced_under_models_and_the_others_stay(t
     set_role_model(path, "vision", "ollama:llava")
     assert path.read_text(encoding="utf-8") == (
         '[models]\nvision = "ollama:llava"\nmain = "ollama:x"\nreview = "anthropic:claude-x"  # mine\n'
+    )
+
+
+def test_the_judges_provider_is_written_under_judge_and_the_rest_stays(tmp_path: Path) -> None:
+    path: Path = tmp_path / "config.toml"
+    path.write_text('[models]\nmain = "ollama:x"\n', encoding="utf-8")
+    set_judge_provider(path, "typesafe")
+    assert path.read_text(encoding="utf-8") == '[models]\nmain = "ollama:x"\n\n[judge]\nprovider = "typesafe"\n'
+    path.write_text(
+        '[judge]\nprovider = "typesafe"  # mine\ntimeout_s = 5\n\n[models]\nprovider = "x"\n', encoding="utf-8"
+    )
+    set_judge_provider(path, "none")
+    assert path.read_text(encoding="utf-8") == (
+        '[judge]\nprovider = "none"  # mine\ntimeout_s = 5\n\n[models]\nprovider = "x"\n'
     )

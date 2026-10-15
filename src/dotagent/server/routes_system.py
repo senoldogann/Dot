@@ -15,8 +15,8 @@ from dotagent import __version__
 from dotagent.agent.playbooks import PlaybookEntry, drop_playbook, list_playbooks, share_playbook
 from dotagent.agent.scaffold import context_budget, context_ceiling, context_choices, summarise_point
 from dotagent.agent.sizes import ContextSizes
-from dotagent.config import CONTEXT_FLOOR, AgentConfig, AppConfig, ModelsConfig
-from dotagent.config_edit import set_context_size, set_default_model, set_resume, set_role_model
+from dotagent.config import CONTEXT_FLOOR, AgentConfig, AppConfig, JudgeConfig, ModelsConfig
+from dotagent.config_edit import set_context_size, set_default_model, set_judge_provider, set_resume, set_role_model
 from dotagent.core.errors import (
     ConfigError,
     DotError,
@@ -59,6 +59,7 @@ from dotagent.help.elsewhere import (
 from dotagent.llm.router import ModelRef, ModelRouter, offers_fast_mode, parse_model_ref
 from dotagent.llm.traits import effective_effort
 from dotagent.llm.types import KNOWN_PROVIDERS, Effort, ModelInfo
+from dotagent.secrets import secret_state
 from dotagent.server.context import ServerContext
 from dotagent.server.guard import daemon_proof
 from dotagent.server.palette import palette_view
@@ -73,6 +74,8 @@ from dotagent.server.views import (
     ElsewhereRefusal,
     FailsafeView,
     HealthView,
+    JudgeRequest,
+    JudgeView,
     LearnedSkillsView,
     LearnedSkillView,
     MainModelRequest,
@@ -285,6 +288,27 @@ def system_router(ctx: ServerContext, pages: str) -> APIRouter:
         ctx.manager.set_resume_mode(request.resume)
         return resume_now()
 
+    def judge_now() -> JudgeView:
+        """The typed judge as the owner last switched it (item 255), and whether its service's key is set."""
+        return JudgeView(
+            provider=ctx.runtime.judge.provider,
+            key_name=config.judge.api_key_env,
+            key_set=secret_state(config.judge.api_key_env).source is not None,
+        )
+
+    @router.get("/judge")
+    async def judge() -> JudgeView:
+        return judge_now()
+
+    @router.put("/judge")
+    async def choose_judge(request: JudgeRequest) -> JudgeView:
+        """Have the typed judge answer through TypeSafe, or answer nothing, from the next judgment on (item 255): the
+        config file keeps it as ``[judge] provider``. Switching it on without the TypeSafe service (its key was not set
+        when the daemon started) is refused, as is a config file that cannot be changed; nothing changes then."""
+        ctx.runtime.judge.set_provider(request.provider)
+        await asyncio.to_thread(set_judge_provider, config_path(), request.provider)
+        return judge_now()
+
     @router.post("/models/roles")
     async def choose_role_model(request: RoleModelRequest) -> ModelsConfig:
         """Have ``model`` do a part of Dot's own work from the next call on (item 232): the fast model, which writes the
@@ -431,7 +455,9 @@ def system_router(ctx: ServerContext, pages: str) -> APIRouter:
 
     @router.get("/doctor")
     async def doctor() -> list[CheckResult]:
-        return await run_quick_checks(config.model_copy(update={"models": models_now()}))
+        # The models and the judge as they stand now, not as the config file said at start.
+        judge_config: JudgeConfig = config.judge.model_copy(update={"provider": ctx.runtime.judge.provider})
+        return await run_quick_checks(config.model_copy(update={"models": models_now(), "judge": judge_config}))
 
     @router.post("/desktop/permissions")
     async def ask_for_desktop_permissions() -> PermissionsView:

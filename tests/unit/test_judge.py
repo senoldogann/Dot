@@ -1,11 +1,19 @@
 """The typed judge's pure parts: which clicks it is asked about, what its probabilities add to a click, and how two
 answers to the same question are read together."""
 
+from typing import cast
+
+import pytest
+
 from dotagent.agent.judge import (
     CLICK_QUESTIONS,
     SECOND_CLICK_QUESTIONS,
     ClaimJudgment,
+    ClickFacts,
     ClickJudgment,
+    NoulQuestion,
+    SwitchedJudge,
+    TypeSafeService,
     agreed_click_judgment,
     claim_refused,
     click_judgment,
@@ -13,6 +21,8 @@ from dotagent.agent.judge import (
 )
 from dotagent.browser.safety import unexplained_clicks
 from dotagent.browser.types import Step
+from dotagent.config import JudgeConfig, load_default_config
+from dotagent.core.errors import ConfigError
 from dotagent.policy.elements import Element
 
 BOOST: Element = Element(role="button", name="Boost")
@@ -65,3 +75,44 @@ def test_a_claim_is_refused_only_when_every_answer_is_below_the_threshold() -> N
     assert not claim_refused(ClaimJudgment(probability=None, second=None), 0.15)
     assert describe_claim(ClaimJudgment(probability=0.08, second=0.11)) == "0.08 and 0.11 on a second phrasing"
     assert describe_claim(ClaimJudgment(probability=0.08, second=None)) == "0.08"
+
+
+class _Service:
+    """A stand-in for the TypeSafe service: it counts the questions and answers each with a probability of 1."""
+
+    def __init__(self) -> None:
+        self.asked: int = 0
+
+    async def nouls(self, state: object, questions: tuple[NoulQuestion, ...], run_id: str) -> dict[str, float]:
+        self.asked += 1
+        return {question.id: 1.0 for question in questions}
+
+    async def retire(self) -> None:
+        return None
+
+    async def aclose(self) -> None:
+        return None
+
+
+async def test_the_switched_judge_answers_through_the_service_only_while_it_is_on() -> None:
+    config: JudgeConfig = load_default_config().judge
+    service: _Service = _Service()
+    judge: SwitchedJudge = SwitchedJudge(cast(TypeSafeService, service), config, "none")
+    facts: ClickFacts = ClickFacts(label="Boost", role="button", url="https://example.org/home")
+    assert await judge.judge_click(facts, "run") == ClickJudgment(reasons=(), note="")
+    assert service.asked == 0
+    judge.set_provider("typesafe")
+    assert await judge.judge_click(facts, "run") != ClickJudgment(reasons=(), note="")
+    assert service.asked == 1
+    judge.set_provider("none")
+    assert await judge.judge_claim({"claim": "done"}, "run") == ClaimJudgment(probability=None, second=None)
+    assert service.asked == 1
+
+
+def test_the_switched_judge_refuses_to_turn_on_without_the_service() -> None:
+    judge: SwitchedJudge = SwitchedJudge(None, load_default_config().judge, "none")
+    with pytest.raises(ConfigError):
+        judge.set_provider("typesafe")
+    assert judge.provider == "none"
+    with pytest.raises(ConfigError):
+        SwitchedJudge(None, load_default_config().judge, "typesafe")
