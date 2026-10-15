@@ -322,7 +322,7 @@ async def test_a_malformed_request_is_answered_with_what_is_wrong(client: httpx.
     assert len(body["context"]["errors"]) == 2
     unknown_model: httpx.Response = await client.post("/api/runs", json={"goal": "x", "model": "gpt-5"})
     assert unknown_model.status_code == 422
-    assert unknown_model.json()["context"]["providers"] == ["ollama", "openai", "opencode_go", "anthropic"]
+    assert unknown_model.json()["context"]["providers"] == ["ollama", "openai", "opencode_go", "anthropic", "opencode"]
     unknown_thread: httpx.Response = await client.post("/api/runs", json={"goal": "x", "thread_id": "thr_nope"})
     assert unknown_thread.status_code == 404
     assert (await client.get("/api/runs/run_nope")).status_code == 404
@@ -596,7 +596,13 @@ async def test_the_status_the_models_and_the_checks_describe_this_installation(c
     assert body["models"]["main"] == MODEL_REF
     models: httpx.Response = await client.get("/api/models")
     assert models.status_code == 200
-    assert [entry["provider"] for entry in models.json()] == ["ollama", "openai", "opencode_go", "anthropic"]
+    assert [entry["provider"] for entry in models.json()] == [
+        "ollama",
+        "openai",
+        "opencode_go",
+        "anthropic",
+        "opencode",
+    ]
     checks: httpx.Response = await client.get("/api/doctor")
     assert checks.status_code == 200
     names: list[str] = [check["name"] for check in checks.json()]

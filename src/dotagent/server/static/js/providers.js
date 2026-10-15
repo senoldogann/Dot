@@ -7,12 +7,14 @@ const LABELS = {
   openai: "OpenAI",
   anthropic: "Anthropic",
   opencode_go: "OpenCode Go",
+  opencode: "OpenCode",
   ollama: "Ollama",
   typesafe: "TypeSafe",
 };
 
-// The providers with a mark of their own under static/icons/providers (item 108); the rest wear the generic one.
-const MARKED = new Set(["anthropic", "openai", "ollama", "opencode_go"]);
+// The providers with a mark of their own under static/icons/providers (item 108), OpenCode's free models wearing OpenCode
+// Go's; the rest wear the generic one.
+const MARKED = new Set(["anthropic", "openai", "ollama", "opencode_go", "opencode"]);
 
 /**
  * The mark of a provider: a span painted by the page as a mask of the provider's SVG (`static/icons/providers/`), in

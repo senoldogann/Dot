@@ -5216,11 +5216,13 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 275 | On a phone the page fits the screen and holds still                                   | done        | d332e29 |
 | 276 | The view of Dot's computer comes back by itself                                       | done        | f7e09a6 |
 | 277 | Every chat wears a creature, its last message under its name                          | done        | d2476f5 |
-| 278 | Connect apps: the Mac's applications and the web's, set up from the sidebar           | in progress |         |
+| 278 | Connect apps: the Mac's applications and the web's, set up from the sidebar           | done        | 4f21322 |
 | 279 | Connect apps: the tools of other services, over MCP, signed in from Dot               | planned     |         |
 | 280 | Dot starts lean: the fewest words and tools, the rest found when needed               | planned     |         |
 | 281 | A chat can be a loop that asks Dot again until it is done                             | planned     |         |
 | 282 | A chat can be rewound to an earlier message, its files with it                        | planned     |         |
+| 283 | Zen's free models work in Dot, as OpenCode's own agent                                | in progress |         |
+| 284 | OpenCode's agent uses Dot's own tools over MCP                                        | planned     |         |
 
 ### 77. The type system: Inter and Geist Mono, seven sizes, three weights
 
@@ -12209,7 +12211,7 @@ message under the name, the unread dot at the right; the creature at work while 
 
 ### 278. Connect apps: the Mac's applications and the web's, set up from the sidebar
 
-**Status: in progress.** Built on `item-278-connect-apps`.
+**Status: done.** Merged as `4f21322` (PR #320; no Linear issue, the Linear connector was signed out).
 
 **As built (2026-10-15).** `connections/catalogue.py`: the applications, ten of the Mac by bundle id (Mail, Calendar,
 Notes, Reminders, Messages, Contacts, Excel, Word, PowerPoint, Outlook), OneDrive among the folders, and eight of the
@@ -12309,6 +12311,121 @@ before it, the model's next run without the third.
 > Read ROADMAP.md part 49 and the status table of part 9 (rows 275 to 282). The protocol of part 5 is unchanged; the
 > Linear connector is signed out, so say so in the PR. UI changes are checked on a phone and wide, light and dark, in
 > Chrome and WebKit.
+
+## Part 50: Zen's free models, through OpenCode itself (planned 2026-10-15)
+
+The owner's fifty-second word, on 2026-10-15: "Bir diğer konu: OpenCode Zen'i, yani free modelleri kullanabilmemiz için
+benim GitHub'daki AgenticSideBar adlı repomdaki OpenCode provider kullanımıma bak. Ben o projede free modelleri OpenCode
+dışında çalıştırabiliyordum, tamamen yasal bir şekilde. Ardından bu OpenCode Zen free modellerini bizim sisteme de dahil
+edelim, çalışır bir şekilde. Ya da OpenCode Zen API key de ekleriz; o zaman da free modelleri seçebilir miyiz,
+bilmiyorum." (Look at how the owner's AgenticSideBar uses OpenCode, where the free models ran outside OpenCode's own
+app; bring Zen's free models into Dot, working; or would a Zen key let Dot pick them?)
+
+**What was found (2026-10-15).** A Zen key does not open them. Zen lists 86 models, 11 of them free (`big-pickle`,
+`cat-jam-free`, `deepseek-v4.1-flash-free`, `jev-1.13-free`, `longcat-2.5-preview-free`, `mimo-v2.6-flash-free`,
+`muse-spark-1.2-contributor-free`, `muse-spark-1.3-contributor-free`, `nemotron-3.5-lightning-free`, `space-bunny-free`,
+`step-5-preview-free`), and a call to one of them from any client but OpenCode's own answers 403 `FreeTierError`
+("OpenCode's free tier can only be used from within OpenCode"), with the owner's key and without, as on 2026-10-12 (item
+119). AgenticSideBar does not call Zen: it starts the official `opencode` program as a local server (`opencode serve
+--hostname 127.0.0.1 --port <free port>`, a password of its own, a config of its own) and drives OpenCode's own agent
+over its HTTP API (a session, a prompt, the event stream, the answers to its permission questions), so OpenCode makes
+every call. Measured here with OpenCode 1.19.0 (`/opt/homebrew/bin/opencode`), in a throw-away config and data folder
+with no key: OpenCode lists 10 free models it may use; a prompt to `big-pickle` through its server answers "OK" with
+OpenCode's agent and tools (6,395 tokens of OpenCode's own prompt and tools, cost 0), and 403 `FreeTierError` when the
+prompt switches every tool off. Zen's free tier serves OpenCode's own agent, not a model behind another agent's loop. A
+run asked to run `ls -1` went through end to end: OpenCode asked for the bash permission, the answer `once` let it run,
+and it answered "It printed 3 entries (alpha.txt, beta.txt, gamma.md)." `opencode serve` takes no tool definitions from
+its client (opencode.ai/docs/server); an MCP server added to it (`POST /mcp`) gives its tools to the agent.
+
+So a run on a free model is OpenCode's: Dot hands the goal to OpenCode's agent and shows what it does, as AgenticSideBar
+does. Zen's docs say the free models are free "for a limited time", and that the providers of Big Pickle, MiMo and Muse
+Spark Contributor may use what is sent to them to improve or train their models; the others keep nothing. OpenCode's
+terms (effective 2026-08-15) ask for use "for your own internal use" and forbid extracting output automatically; the
+owner judged the AgenticSideBar way allowed, and Dot drives OpenCode the same way, on the owner's Mac, for the owner.
+
+### 283. Zen's free models work in Dot, as OpenCode's own agent
+
+**Status: in progress.** Built on `item-283-opencode-free-models`.
+
+**What.** With OpenCode installed, Dot starts it as a local server of its own when a run or the model list needs it (on
+a free loopback port, behind a password Dot makes, with a config and data folder in Dot's home, so that the owner's own
+OpenCode settings and keys stay out), and stops it with the daemon. The model picker offers the free models OpenCode may
+use that call tools, as `opencode:<model>`, marked Free, and says which send what they get to a provider that may learn
+from it. A run on one of them is OpenCode's agent at work in the run's folder: the run's page shows its text as it comes
+and each of its tool calls (read, edit, bash, grep, a web fetch, …) as a step with what it was given and what it gave
+back; a permission OpenCode asks for becomes Dot's approval, answered by itself in yolo; Stop stops OpenCode's session;
+a message to the run at work reaches it; the run ends with OpenCode's answer, or failed with its error. A follow-up in
+the same chat goes on in the same OpenCode session. Without OpenCode, the picker has none of these models, and a run
+that names one fails with how to install OpenCode.
+
+**Why.** The owner's fifty-second word: Zen's free models in Dot, working. They serve only OpenCode's own agent, so that
+is what runs.
+
+**Tests.** Unit: the reading of OpenCode's event stream into a run's events, on a stream recorded from OpenCode 1.19.0
+(text, reasoning, a tool asked for, allowed and done, the end). Smoke, live where OpenCode is installed: a chat message
+on a free model goes through the daemon to OpenCode's agent and back, a tool step and the approval answered on the way.
+
+**As built (2026-10-15).** `opencode/server.py`: `OpenCodeServer`, a connector to the `opencode` program that
+`[providers.opencode] command` names, looked up on the login shell's PATH and in Homebrew's and OpenCode's own folders
+(`DOT_OPENCODE` overrides it; the smoke tests' new `conftest.py` points it at a program that does not exist, so that no
+test starts the owner's), started as `opencode serve` on a free loopback port behind a password Dot makes, its health
+waited for, held while a run uses it, and stopped after `idle_stop_s` with nothing to do and with the daemon. Its
+config, data, state, cache and home folders are in `opencode_dir()`, and its environment is the login PATH and the
+variables a program expects, no key, with `OPENCODE_TEST_HOME` (the one variable that moves where OpenCode looks for the
+home's `.opencode` folder, HOME staying the owner's for the commands of its agent), `OPENCODE_DISABLE_PROJECT_CONFIG`,
+`OPENCODE_DISABLE_CLAUDE_CODE`, `OPENCODE_DISABLE_EXTERNAL_SKILLS`, `OPENCODE_DISABLE_LSP_DOWNLOAD` and `OPENCODE_PURE`:
+a tool planted in the home's `.opencode/tools` stays out of its agent's tools, and comes in without the first (measured:
+the owner's own `~/.opencode` holds ECC's tools, which would run without asking). `OPENCODE_PERMISSION`, which OpenCode
+applies over every config, has each tool that acts or reads and a subagent ask Dot, and switches no tool off: Zen's free
+tier is reported to refuse OpenCode itself with a tool off (anomalyco/opencode#49433, #51315), and a first version that
+switched the subagent and skill tools off was answered and refused alike. The free models come from `GET /provider`
+(Zen's own provider, a price of zero for what they read and write, not deprecated, with vision, tools, thinking, window
+and the variants that are Dot's levels) and are kept in `models.json` for `models_ttl_s`. `opencode/events.py` reads the
+event stream into a run's events, for its session alone (text and reasoning parts and their pieces, tool calls by
+status, steps with their tokens, the cache read counted in and the reasoning out, messages and their errors,
+permissions, idle, error), tested on a stream recorded from OpenCode 1.19.0. `llm/opencode.py`: the provider `opencode`,
+its free models that call tools; `complete` refuses, as no call of Dot's own can use one; `ModelRouter` makes it with
+the login environment, which it now takes. `opencode/run.py`: `run_in_opencode`, which `RunManager._drive` runs for a
+model of `opencode`. A chat's session is kept in `opencode/chats/<chat>.json` with the number of the chat's messages it
+saw, and those it missed (said on other models) come before the goal; the goal is kept in the chat as for any run; the
+stream is opened before the prompt and read in one queue with the owner's messages and Stop; deltas, `tool_call` and
+`tool_result` (`opencode_<tool>`), an `assistant` event per step with its tokens, and the run's tokens and steps go out
+as Dot's own runs send them. Each permission is decided in a task of its own by `RunGate.authorize`, on the action Dot's
+own tools would describe (`permission_action`: a command as the shell tool's, by `assess_shell`; an edit by
+`write_action`; reads, searches and folders outside by `read_action`, both now plain functions of `tools/files.py`; a
+fetch as reading the web, checked against the browser's allowed and blocked hosts first): a refusal or a hand-off is
+answered with its reason and the agent goes on, a repeated call (`doom_loop`) and a subagent are refused with a note,
+and the owner's note on an approval goes on to the agent. The run is done with the agent's last answer once the session
+is idle with every prompt taken and no permission pending; it fails with Zen's free tier's refusal said as what it is
+(`FREE_TIER_REFUSED`: measured, the free tier refused OpenCode's own command line too, from 17:48 to about 17:56, and
+answered again at 17:57). Settings › Models: `not_installed` is a quiet problem, as no key is; the free models whose
+providers may train on what they get say so there and in the picker (`ModelOption.learns`); the context size of a free
+model is OpenCode's own. A free model cannot be a helper role's (`POST /api/models/roles` refuses it) and its runs make
+no playbook. Live tests (`hosted`, `tests/smoke/test_opencode_live.py`): the owner's setup kept out; a run that asks, is
+approved and creates a file, and the next run of its chat remembering the file; a refused command not run, the run still
+answering; a message reaching the agent at work, and Stop stopping a run that waits for the owner, its question decided
+with it. A run that ends before its agent did stops OpenCode's session, then lets its open questions go and gives each
+task up to ten seconds to store its question as decided (`_let_go`); the first version cancelled them in the middle of
+that, which left a stopped run's question pending on its page.
+
+### 284. OpenCode's agent uses Dot's own tools over MCP
+
+**Status: planned.**
+
+**What.** OpenCode's agent gets Dot's own tools besides its own: Dot serves the tools a run may use (the browser, the
+Mac's desktop, memory, notes, schedules, …) as an MCP server of its own for that run, added to the run's OpenCode
+session, so that a run on a free model browses, uses the Mac and remembers, each call passing Dot's policy and approvals
+as a call of Dot's own loop does.
+
+**Why.** A run on a free model can then do what a run on any other model does in Dot.
+
+**Tests.** A run on a free model that opens a page in Dot's browser and reads it, live where OpenCode is installed;
+Zen's free tier must still answer with the MCP tools added (measured first).
+
+### How to start part 50 (the handoff prompt)
+
+> Read ROADMAP.md part 50 and the status table of part 9 (rows 283 and 284). The protocol of part 5 is unchanged;
+> the Linear connector is signed out, so say so in the PR. OpenCode 1.19.0 is at `/opt/homebrew/bin/opencode`.
 
 ## Log
 
@@ -13026,3 +13143,4 @@ before it, the model's next run without the third.
 - 2026-10-15 (Opus 5.5): item 275 merged as `d332e29` (PR #317; no Linear issue, the connector was signed out): on a phone the page fits the screen and holds still: viewport-fit=cover and the --safe-* tokens keep the bar, the sidebar's head and foot, the composer, the side panel and the toasts out of the safe areas; touch-action manipulation and overscroll none; every field at least 16 px on touch; a select clips its label and a note breaks a long path; holdBarInSight keeps the bar at the top of what is seen while the keyboard pans the page. test_phone_fit.py (new) in WebKit as two iPhones and in Chrome as a Pixel 7; full offline smoke 570 passed, 1 timing failure under load that passes 3 of 3 alone.
 - 2026-10-15 (Opus 5.5): item 276 merged as `f7e09a6` (PR #318; no Linear issue, the connector was signed out): the view of Dot's computer comes back by itself: `watchInView` closes the screencast while the page is out of sight and makes it again once the page is back, and makes a stream that broke or went silent again after `follow`'s pause, so that only a refused stream ends the view with "The view of Dot's computer stopped"; test_takeover.py's new test in Chrome and in WebKit at a phone's width.
 - 2026-10-15 (Opus 5.5): item 277 merged as `d2476f5` (PR #319; no Linear issue, the connector was signed out): every chat in the sidebar wears a creature of the character engine (an agent's look, or a look its id picks for a chat with Dot, 64 looks), in the state of its latest run, with its name over its last line in plain words ("You:" before the owner's message while the run works) and its age over the unread dot at its right; creatures kept between paints (200 drawn in 82 ms); test_chat_creatures.py (new) in Chrome and WebKit; full offline smoke 572 passed, 1 timing failure under load that passes 3 of 3 alone
+- 2026-10-15 (Opus 5.5): item 278 merged as `4f21322` (PR #320; no Linear issue, the connector was signed out): the sidebar's Connect apps pill opens a page that shows where each application of the Mac and of the web stands, asks macOS for Automation, opens the right pane of System Settings under a line that says what to switch on there, finds OneDrive's synced folders and the web applications Dot's browser is signed in to, and says once how a browser without a window signs in

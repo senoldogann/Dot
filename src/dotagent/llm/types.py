@@ -32,7 +32,7 @@ def splits_work(once: OneMessage | None) -> bool:
 INVALID_ARGUMENTS_KEY: str = "__invalid_arguments__"
 
 # The providers a model reference ("<provider>:<model>") can name.
-KNOWN_PROVIDERS: tuple[str, ...] = ("ollama", "openai", "opencode_go", "anthropic")
+KNOWN_PROVIDERS: tuple[str, ...] = ("ollama", "openai", "opencode_go", "anthropic", "opencode")
 
 
 def split_model_ref(text: str) -> tuple[str, str] | None:

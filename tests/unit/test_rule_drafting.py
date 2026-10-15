@@ -152,7 +152,7 @@ async def _drafter(turns: list[ScriptedTurn], calls: list[ModelCall]) -> RuleDra
     async def record(call: ModelCall) -> None:
         calls.append(call)
 
-    router: ModelRouter = ModelRouter(load_default_config(), record)
+    router: ModelRouter = ModelRouter(load_default_config(), record, {})
     await router.register("ollama", ScriptedProvider("ollama", turns))
     return rule_drafter_for(router, "ollama:scripted", 30.0, "rules:test")
 

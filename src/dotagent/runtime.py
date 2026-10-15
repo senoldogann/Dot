@@ -323,7 +323,7 @@ async def open_runtime(config: AppConfig, login_env: dict[str, str]) -> Runtime:
             bus=bus,
             approvals=ApprovalBroker(store, bus, config.policy.approval_timeout_s),
             site_locks=SiteLocks(),
-            router=ModelRouter(config, _call_recorder(store, bus)),
+            router=ModelRouter(config, _call_recorder(store, bus), login_env),
             roles=ModelRoles(config.models),
             context_sizes=ContextSizes(config.models.context),
             judge=judge_for(config, typesafe),

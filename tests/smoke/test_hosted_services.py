@@ -193,7 +193,7 @@ async def test_claude_drafts_a_rule_for_everything_and_refuses_what_no_rule_can_
     async def ignore(call: ModelCall) -> None:
         return None
 
-    router: ModelRouter = ModelRouter(DEFAULTS, ignore)
+    router: ModelRouter = ModelRouter(DEFAULTS, ignore, {})
     await router.register("anthropic", anthropic_provider())
     registry: ToolRegistry = build_registry(_tool_groups(DEFAULTS, False))
     tools: tuple[ToolBrief, ...] = tuple(

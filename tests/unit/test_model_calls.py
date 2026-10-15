@@ -81,7 +81,7 @@ def failing(calls: list[ModelCall]) -> CallRecorder:
 
 
 async def router_with(answer: Callable[[], Awaitable[ModelReply]], recorder: CallRecorder) -> ModelRouter:
-    router: ModelRouter = ModelRouter(load_default_config(), recorder)
+    router: ModelRouter = ModelRouter(load_default_config(), recorder, {})
     await router.register("ollama", FakeProvider(answer))
     return router
 

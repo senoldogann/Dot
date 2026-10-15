@@ -2,6 +2,7 @@
 
 import asyncio
 import time
+from collections.abc import Mapping
 
 from dotagent.config import AppConfig
 from dotagent.core.errors import (
@@ -18,6 +19,7 @@ from dotagent.llm.anthropic import FAST_MODE_MODELS, AnthropicProvider
 from dotagent.llm.calls import CANCELLED, CallOrigin, CallRecorder, ModelCall
 from dotagent.llm.ollama import OllamaProvider
 from dotagent.llm.openai import OpenAIProvider
+from dotagent.llm.opencode import OpenCodeProvider
 from dotagent.llm.opencode_go import OpenCodeGoProvider
 from dotagent.llm.types import (
     KNOWN_PROVIDERS,
@@ -28,6 +30,7 @@ from dotagent.llm.types import (
     ModelReply,
     split_model_ref,
 )
+from dotagent.opencode.server import OpenCodeServer
 from dotagent.secrets import require_secret, resolve_secret
 
 log = get_logger(__name__)
@@ -140,11 +143,13 @@ class ModelRouter:
     own pause: a provider's local and cloud models, or its models with limits of their own, are not held back by one
     another, at the cost of one failed call for each model of a provider whose key or quota fails them all. The
     router still sends a paused model every call it is given: the pauses only tell :mod:`dotagent.agent.helpers`
-    which helper or standby model to choose."""
+    which helper or standby model to choose. ``login_env`` is the environment of the login shell, which the OpenCode
+    server of the ``opencode`` provider starts with (:mod:`dotagent.opencode.server`)."""
 
-    def __init__(self, config: AppConfig, recorder: CallRecorder) -> None:
+    def __init__(self, config: AppConfig, recorder: CallRecorder, login_env: Mapping[str, str]) -> None:
         self._config: AppConfig = config
         self._recorder: CallRecorder = recorder
+        self._login_env: dict[str, str] = dict(login_env)
         self._providers: dict[str, ChatProvider] = {}
         self._pauses: dict[str, Pause] = {}
         # The names served by a connector given through `register`; `retire` leaves them alone.
@@ -172,6 +177,8 @@ class ModelRouter:
                 claude = self._config.providers.anthropic
                 claude_key: str = await asyncio.to_thread(require_secret, claude.api_key_env, "the anthropic provider")
                 return AnthropicProvider(claude, claude_key)
+            case "opencode":
+                return OpenCodeProvider(OpenCodeServer(self._config.providers.opencode, self._login_env))
             case _:
                 raise ConfigError("unknown provider", {"provider": name})
 

@@ -336,7 +336,7 @@ async def test_a_file_of_the_workspace_is_read_even_when_its_name_looks_like_a_h
     await asyncio.to_thread(path.parent.mkdir, parents=True, exist_ok=True)
     await asyncio.to_thread(path.write_text, "The jar costs 4,20 EUR.", "utf-8")
     # A router of its own: the module's runtime has a scripted connector already.
-    router: ModelRouter = ModelRouter(runtime.config, log_model_call)
+    router: ModelRouter = ModelRouter(runtime.config, log_model_call, {})
     await router.register(
         "ollama",
         ScriptedProvider(
@@ -385,7 +385,7 @@ async def test_a_fast_model_paused_after_a_rate_limit_is_not_asked_again_and_the
     path: Path = workspace_dir() / name
     await asyncio.to_thread(path.parent.mkdir, parents=True, exist_ok=True)
     await asyncio.to_thread(path.write_text, "The jar costs 4,20 EUR.", "utf-8")
-    router: ModelRouter = ModelRouter(runtime.config, log_model_call)
+    router: ModelRouter = ModelRouter(runtime.config, log_model_call, {})
     limited: _RateLimited = _RateLimited()
     await router.register("ollama", limited)
     offline: Runtime = dataclasses.replace(runtime, router=router, web=_NoFetch())  # type: ignore[arg-type]

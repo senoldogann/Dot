@@ -377,11 +377,11 @@ export function modelPicker({ onPick, onMakeDefault }) {
       choosingText.textContent = making === null ? "Choose the default model" : `Making ${modelName(making)} the default…`;
     }
 
-    // A model's row: in a view of one provider its name, and "Free" when it costs nothing; among the favourites and in a
-    // search its provider's name too.
+    // A model's row: in a view of one provider its name, and "Free" when it costs nothing (and that its provider may
+    // train on what it is sent, when it may); among the favourites and in a search its provider's name too.
     function modelRow({ info, provider }, key, mixed, starred) {
       const name = modelName(info.ref);
-      const free = info.free ? "Free" : "";
+      const free = info.free ? (info.learns ? "Free, may train on your data" : "Free") : "";
       const hint = mixed ? [providerLabel(provider), free.toLowerCase()].filter((part) => part !== "").join(", ") : free;
       const row = optionOf({ lead: providerMark(provider), label: name, hint, key, ref: info.ref });
       row.option.title = info.ref;

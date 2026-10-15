@@ -301,6 +301,7 @@ function capabilities(model) {
     model.tools ? el("span", { class: "chip" }, "tools") : null,
     model.thinking ? el("span", { class: "chip" }, "thinking") : null,
     model.free ? el("span", { class: "chip" }, "free") : null,
+    model.learns ? el("span", { class: "chip", title: "Its provider may use what it is sent to improve its models" }, "may train on your data") : null,
     model.fast_mode ? el("span", { class: "chip", title: "Fast mode, chosen in the composer's Reasoning menu" }, "fast mode") : null,
   );
 }
@@ -502,8 +503,13 @@ function contextControl(initial, remember) {
   return { cell, row };
 }
 
+// OpenCode's agent keeps its own window and summarizes it by itself (item 283): Dot's context size does not reach it.
+function ownWindow() {
+  return { cell: el("td", { class: "hint" }, "OpenCode's own"), row: null };
+}
+
 function modelRows(model, mainModel, remember) {
-  const context = contextControl(model, remember);
+  const context = providerOf(model.ref) === "opencode" ? ownWindow() : contextControl(model, remember);
   return [
     el(
       "tr",
@@ -543,9 +549,13 @@ function providersInUse(status) {
   return MODEL_ROLES.map((role) => providerOf(status.models[role]));
 }
 
-/** Whether a provider that did not answer is a problem: one without a key is not, unless a configured model runs on it. */
+// The problems that are the usual state of a provider the owner does not use: no key, or no program to run it on.
+const QUIET_PROBLEMS = new Set(["no_key", "not_installed"]);
+
+/** Whether a provider that did not answer is a problem: one without a key or a program is not, unless a configured
+ * model runs on it. */
 function isFailing(provider, inUse) {
-  return provider.error !== null && (provider.problem !== "no_key" || inUse);
+  return provider.error !== null && (!QUIET_PROBLEMS.has(provider.problem) || inUse);
 }
 
 /** Why a provider listed no models; a missing or refused key links to the tab that saves keys. */
@@ -557,6 +567,14 @@ function problemNote(provider, inUse) {
       icon("key"),
       el("span", null, `No ${providerLabel(provider.provider)} key is set, so its models cannot be listed.`),
       el("a", { href: KEYS_TAB }, "Add a key"),
+    );
+  }
+  if (provider.problem === "not_installed") {
+    return el(
+      "div",
+      { class: inUse ? "note bad" : "note" },
+      icon("download"),
+      el("span", null, provider.error),
     );
   }
   return el(
@@ -587,6 +605,9 @@ function problemBadge(provider, inUse) {
   }
   if (provider.problem === "no_key") {
     return el("span", { class: inUse ? "badge b-bad" : "badge b-muted" }, "no key");
+  }
+  if (provider.problem === "not_installed") {
+    return el("span", { class: inUse ? "badge b-bad" : "badge b-muted" }, "not installed");
   }
   return el("span", { class: "badge b-bad" }, PROBLEM_BADGES[provider.problem] ?? "unavailable");
 }

@@ -1,7 +1,7 @@
 """``dotx models`` ends with 1 when no provider answers, so a script that runs it can tell; one provider that answers is
 enough for 0, as a provider without a key is the usual state. The real command runs in a child process with a throw-away
-home whose providers all point at a closed port; the keys are not real ones, set in the environment so that the Keychain
-is never read, and no service is asked (item 177)."""
+home whose providers all point at a closed port, and OpenCode's at a program that does not exist (``conftest.py``); the
+keys are not real ones, set in the environment so that the Keychain is never read, and no service is asked (item 177)."""
 
 import os
 import subprocess
@@ -40,5 +40,6 @@ def test_dotx_models_ends_with_1_when_no_provider_answers(tmp_path: Path) -> Non
         timeout=_TIME_LIMIT_S,
         check=False,
     )
-    assert listed.stdout.count(": unavailable - ") == len(PROVIDERS), listed.stdout + listed.stderr
+    assert listed.stdout.count(": unavailable - ") == len(PROVIDERS) + 1, listed.stdout + listed.stderr
+    assert "opencode: unavailable - OpenCode is not installed" in listed.stdout
     assert listed.returncode == 1, listed.stdout + listed.stderr

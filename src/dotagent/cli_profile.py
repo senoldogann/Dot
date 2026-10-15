@@ -2,6 +2,7 @@
 from that and from its window. The database is only read; the window is asked from the model's provider."""
 
 import asyncio
+import os
 import sys
 
 from dotagent.agent.scaffold import PROFILE_RUNS, Scaffold, scaffold_for
@@ -54,7 +55,7 @@ def render_profile(profile: ModelProfile, scaffold: Scaffold) -> list[str]:
 async def cmd_models_profile(command: ModelsProfileCommand) -> int:
     config: AppConfig = load_user_config()
     ref: ModelRef = parse_model_ref(command.model if command.model is not None else config.models.main)
-    router: ModelRouter = ModelRouter(config, log_model_call)
+    router: ModelRouter = ModelRouter(config, log_model_call, os.environ)
     try:
         info: ModelInfo = await router.model_info(ref)
     finally:

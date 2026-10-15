@@ -57,19 +57,44 @@ def resolve_path(raw: str, ctx: ToolContext) -> Path:
 
 
 def read_flags(path: Path, ctx: ToolContext) -> tuple[Flag, ...]:
+    return _read_flags(path, ctx.workspace, ctx.runtime.protected, ctx.runtime.dot_paths)
+
+
+def _read_flags(
+    path: Path, workspace: Path, protected: tuple[Path, ...], dot_paths: tuple[Path, ...]
+) -> tuple[Flag, ...]:
     """The flags of reading the resolved ``path``: a protected location holds secrets."""
-    path_class: PathClass = classify_path(path, ctx.workspace, ctx.runtime.protected, ctx.runtime.dot_paths)
+    path_class: PathClass = classify_path(path, workspace, protected, dot_paths)
     return ("secret_access",) if path_class == "protected" else ()
 
 
 def _read_action(tool: str, path: Path, ctx: ToolContext, verb: str) -> ActionInfo:
+    return read_action(tool, path, ctx.workspace, ctx.runtime.protected, ctx.runtime.dot_paths, verb)
+
+
+def read_action(
+    tool: str, path: Path, workspace: Path, protected: tuple[Path, ...], dot_paths: tuple[Path, ...], verb: str
+) -> ActionInfo:
+    """Reading the resolved ``path``: safe, but for a protected location, which holds secrets."""
     return ActionInfo(
-        tool=tool, kind="read", risk="safe", summary=f"{verb} {path}", target=str(path), flags=read_flags(path, ctx)
+        tool=tool,
+        kind="read",
+        risk="safe",
+        summary=f"{verb} {path}",
+        target=str(path),
+        flags=_read_flags(path, workspace, protected, dot_paths),
     )
 
 
 def _write_action(tool: str, path: Path, ctx: ToolContext, verb: str) -> ActionInfo:
-    path_class: PathClass = classify_path(path, ctx.workspace, ctx.runtime.protected, ctx.runtime.dot_paths)
+    return write_action(tool, path, ctx.workspace, ctx.runtime.protected, ctx.runtime.dot_paths, verb)
+
+
+def write_action(
+    tool: str, path: Path, workspace: Path, protected: tuple[Path, ...], dot_paths: tuple[Path, ...], verb: str
+) -> ActionInfo:
+    """Writing the resolved ``path``, as the policy weighs it by where the path is."""
+    path_class: PathClass = classify_path(path, workspace, protected, dot_paths)
     risk: Risk
     flags: tuple[Flag, ...]
     summary: str = f"{verb} {path}"

@@ -35,7 +35,8 @@ reach = []
 retention_days = 90
 
 [models]
-# "<provider>:<model>"; providers are ollama, openai, opencode_go and anthropic.
+# "<provider>:<model>"; providers are ollama, openai, opencode_go, anthropic and opencode (Zen's free models, which
+# run as OpenCode's own agent: [providers.opencode]).
 # A run uses the model it was started with (main unless one is chosen) for every step, until it moves to a standby
 # model (below); the roles below are only used for what their comments say.
 main = "ollama:minimax-m2.7:cloud"
@@ -87,6 +88,17 @@ connect_timeout_s = 10.0
 read_timeout_s = 600.0
 attempts = 6
 max_concurrent = 4
+
+[providers.opencode]
+# OpenCode's own agent, the one client Zen's free models serve (item 283): a run on "opencode:<model>" is OpenCode's agent
+# at work, in a local server Dot starts with a config and data folder of its own (the owner's OpenCode settings and keys
+# stay out). command: the opencode program, a path or a name looked up on the login PATH and in Homebrew's folders.
+command = "opencode"
+start_timeout_s = 60.0
+# The server stops once it has served nothing this long, and starts again when needed (about 2 s, 340 MB while up).
+idle_stop_s = 600.0
+# How long the list of free models is kept without asking OpenCode again.
+models_ttl_s = 86400.0
 
 [providers.opencode_go]
 base_url = "https://opencode.ai/zen/go/v1"
