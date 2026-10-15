@@ -1,6 +1,6 @@
 """The faces of the actors (items 83 and 102): the hash that picks an actor's hue, the ring of eight it picks from, and
-the look each hue gives. The hash is run in node from the module itself, so the Python mirror here proves the one the
-browser uses."""
+the look each hue gives; the look of a chat with Dot (item 277). The hash is run in node from the module itself, so the
+Python mirror here proves the one the browser uses."""
 
 import json
 import shutil
@@ -57,3 +57,27 @@ def test_every_hue_of_the_ring_gives_a_look_of_its_own_from_the_catalogue() -> N
     assert len({(look["shape"], look["colour"]) for look in looks}) == 8
     for look in looks:
         assert look["shape"] in shapes and look["colour"] in colours and look["expression"] == "neutral"
+
+
+def test_a_chat_with_dot_wears_a_shape_and_a_colour_its_hash_picks_apart() -> None:
+    """A chat with Dot (item 277): its shape is its hash on the ring, its colour the hash's next places on the ring, so
+    two chats of one hue can still differ; sixty-four chats wear more than the ring's eight looks."""
+    node: str | None = shutil.which("node")
+    if node is None:
+        pytest.skip("node is not installed: the looks cannot be read here")
+    ids: list[str] = [f"thr_{index}" for index in range(64)]
+    script: str = (
+        f"import {{ chatLook, HUE_COLOURS }} from '{(STATIC_DIR / 'js' / 'hues.js').as_uri()}';"
+        f"import {{ SHAPE_IDS }} from '{(STATIC_DIR / 'js' / 'character' / 'skins.js').as_uri()}';"
+        f"console.log(JSON.stringify({{ looks: {json.dumps(ids)}.map(chatLook), shapes: SHAPE_IDS, colours: HUE_COLOURS }}));"
+    )
+    result = subprocess.run([node, "--input-type=module", "-e", script], capture_output=True, text=True, check=True)
+    payload = json.loads(result.stdout)
+    shapes: list[str] = payload["shapes"]
+    colours: list[str] = payload["colours"]
+    expected: list[dict[str, str]] = [
+        {"shape": shapes[_fnv1a(text) % 8], "expression": "neutral", "colour": colours[_fnv1a(text) // 8 % 8]}
+        for text in ids
+    ]
+    assert payload["looks"] == expected
+    assert len({(look["shape"], look["colour"]) for look in expected}) > 8

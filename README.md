@@ -1200,29 +1200,32 @@ The web UI is laid out like a chat app: the chats in a sidebar on the left, one 
 page of their own.
 
 The sidebar lists your chats (the conversation threads) grouped by day, newest activity first, the pinned ones above the
-days; a live dot marks those with a run going on, waiting for you or failed, and a chat opens at its latest run. Each
-chat stands once (item 202, after T3 Code's Working shelf): while its latest run works, a chat leaves its day for the
-**Working** section above the list, and goes back once the run ends; a pinned chat stays under Pinned. At the right of a
-chat at work the time gives way to a dashed circle, **Working** and how long since the run was asked for ("12s", "4m",
-"1h 5m", read again every second), as T3 Code's sidebar has it, and the face of the agent or the campaign at work stands
-in its dot's place. Under it hang all the runs it delegated (item 198), each saying the same while it works and how it
-ended once it has, behind a line that says how many there are and, while some have ended, how many work; a click on it
-folds them, and the fold is kept. Working lists too what is no chat's: a schedule about to fire, the session of a
-campaign (which works in a thread of its own). A chat whose run waits for you keeps its amber dot and its time among the
+days, and a chat opens at its latest run. Each chat wears a creature of Dot's character engine, as a messenger's list
+shows faces (item 277): a chat with an agent the agent's look, a chat with Dot a shape and a colour its own id picks;
+the creature works while the chat's run goes on, waits while the run waits for you and is sad once it failed. Its name
+stands over its last line: the answer of its latest run in plain words, or your message, after "You:", while the run
+works. The creatures rest; only those at work move. Each chat stands once (item 202, after T3 Code's Working shelf):
+while its latest run works, a chat leaves its day for the **Working** section above the list, and goes back once the run
+ends; a pinned chat stays under Pinned. At the right of a chat at work the time gives way to a dashed circle,
+**Working** and how long since the run was asked for ("12s", "4m", "1h 5m", read again every second), as T3 Code's
+sidebar has it. Under it hang all the runs it delegated (item 198), each saying the same while it works and how it ended
+once it has, behind a line that says how many there are and, while some have ended, how many work; a click on it folds
+them, and the fold is kept. Working lists too what is no chat's: a schedule about to fire, the session of a campaign
+(which works in a thread of its own). A chat whose run waits for you keeps its waiting creature and its time among the
 days, and what it asks stands under **Waiting for you**. Working counts what it lists, and Activity the runs that work,
 which it shows under the run too. Folded, Working keeps the open chat in sight, and the search finds the chats at work
 too. Above the list: a search over the titles (⌘K or `/`), **New chat** (⇧⌘O) and the ways to **Agents**, **Activity**
 and **Campaigns**; in the foot, **Settings** and the red square of the **Emergency stop**, which stays there while the
 sidebar is closed (item 273): the top bar then holds the sidebar's opener alone, the size of the sidebar's own buttons
-and of the side panel's switch and close. The top bar shows only what needs you: the approvals
-waiting, and the connection to the daemon while it is being made or lost; what works stands under Working. The sections
-(Waiting for you, Working, Chats) fold on a click of their label, and the folds are kept between visits. The sidebar's
-head holds only the button that folds it away. **Select** turns the list into checkboxes: tick chats (or Select all) and
-**Delete** asks once, then removes them with every run, step, event and approval of theirs. A chat with a run under way
-is refused, the run of a `dotx` command too: wait for the run to end, or cancel it (a `dotx` command's with Ctrl-C).
-Escape leaves the selection. Under 860 px the sidebar becomes a drawer. The list stays where you scrolled it while it is
-painted again (a chat deleted, pinned, renamed or marked, chats deleted under Select, a run that starts or ends, a
-follow-up in the open chat): it brings the open chat into view only when the page comes to another chat (item 204).
+and of the side panel's switch and close. The top bar shows only what needs you: the approvals waiting, and the
+connection to the daemon while it is being made or lost; what works stands under Working. The sections (Waiting for you,
+Working, Chats) fold on a click of their label, and the folds are kept between visits. The sidebar's head holds only the
+button that folds it away. **Select** turns the list into checkboxes: tick chats (or Select all) and **Delete** asks
+once, then removes them with every run, step, event and approval of theirs. A chat with a run under way is refused, the
+run of a `dotx` command too: wait for the run to end, or cancel it (a `dotx` command's with Ctrl-C). Escape leaves the
+selection. Under 860 px the sidebar becomes a drawer. The list stays where you scrolled it while it is painted again (a
+chat deleted, pinned, renamed or marked, chats deleted under Select, a run that starts or ends, a follow-up in the open
+chat): it brings the open chat into view only when the page comes to another chat (item 204).
 
 A chat's menu, after T3 Code's thread menu, opens from the **…** button at the right of its row (shown where the pointer
 rests or the focus is, over the time, and always on a touch screen), from a right-click on the row, or from the
@@ -1233,8 +1236,8 @@ chat's address (its latest run) on the clipboard, for this browser or another on
 starts choosing chats with this one ticked, and **Delete** asks first, as Select's does. The daemon keeps the pin and
 the name, so every browser shows them.
 
-A chat whose latest run ended after you last saw it is **unread**: a dot in the accent colour at the left of its row
-(a failed run keeps its red dot), and "unread" for a screen reader. Opening the chat marks it seen, and so does
+A chat whose latest run ended after you last saw it is **unread**: a dot in the accent colour at the right of its row,
+under its time, and "unread" for a screen reader. Opening the chat marks it seen, and so does
 having it open while the page is in view (shown, in a window that has the focus), so a run that ends in front of you
 leaves no dot. **Mark unread** in a read chat's menu (once its run is over) brings the dot back until the chat is
 opened again or the page comes back into view, and **Mark read** clears it. The daemon keeps when each chat was last
@@ -1642,7 +1645,7 @@ The REST API (all under `/api`; bodies and replies are JSON, event streams are s
 | `GET\|POST\|PUT /threads/{id}/queue`, `POST /threads/{id}/queue/resume`         | a chat's queue (`held`, `messages`); queue a message (`text` and the choices of `POST /runs`; 409 for a chat with no run yet, a campaign's, or the thread of a delegated run); reorder it (`{"ids": […]}`, each once); resume a held one |
 | `PATCH\|DELETE /queue/{id}` (`{"text": …}`), `POST /queue/{id}/steer`            | edit or take out a queued message; send it to the run at work now (409 with none); 409 while its run is starting; each answers with the queue |
 | `POST /attachments` (`{"name", "media_type", "data_b64"}`)                      | keep a file for a message; `POST /runs` and `steer` name it in `attachments` |
-| `GET /threads?limit=N`, `DELETE /threads` (`{"ids": […]}`)                      | the chats, the pinned first, then newest activity first; delete some with their runs (409 with the ids while one has a run under way) |
+| `GET /threads?limit=N`, `DELETE /threads` (`{"ids": […]}`)                      | the chats, the pinned first, then newest activity first, each with the face it wears (`actor_id`) and its last line (`last_message`, `last_role`); delete some with their runs (409 with the ids while one has a run under way) |
 | `PATCH /threads/{id}` (`{"title": …, "pinned": …, "seen": …, "choices": …}`)   | name a chat, pin it, mark it seen or unseen, or keep the choices its next follow-up starts with (`mode`, `model`, `effort`, `approvals`, `goal_mode`; `GET /runs/{id}` has them as `choices`); one at least (204; 404 for no chat); a chat's `unread` is in the list |
 | `GET /threads/{id}/helpers?limit=N`                                            | the runs a chat's runs delegated, newest first (the side panel's Agents tab; 404 for no chat) |
 | `GET /threads/{id}/terminals`                                                  | the chat's terminal sessions: command, background or not, start, end and exit status (404 for no chat) |

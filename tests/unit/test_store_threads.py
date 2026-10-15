@@ -3,7 +3,8 @@ pinned chats first, the last pinned first, however old they are. A chat's unread
 its latest run has ended after it was last seen, a store made before the mark takes its chats as seen, even when the
 process that first opened it died part way, and the owner can mark a chat seen or unseen. A chat's choices (item 199):
 a store made before them gains them, a chat keeps those of its first run, or of the next run of a chat from before,
-until its composer picks others."""
+until its composer picks others. A chat's last line and face (item 277): its latest words in plain words, and its
+agent's face."""
 
 import asyncio
 import signal
@@ -247,5 +248,57 @@ async def test_a_chat_keeps_the_choices_of_its_first_run_until_its_composer_pick
             await store.chat_choices("thr_nothing")
         with pytest.raises(ValidationError, match="goal mode is for task and research runs"):
             ChatChoices(mode="chat", model=None, effort=None, speed="standard", approvals=None, goal_mode=True)
+    finally:
+        await store.close()
+
+
+async def test_a_chat_lists_its_latest_words_on_one_plain_line_and_whose_face_it_wears(tmp_path: Path) -> None:
+    """A chat's last line (item 277): the answer of its latest run in plain words once that run ended with one, else
+    the message that started it; a chat with an agent wears the agent's face, one with Dot names no face."""
+    store: Store = await Store.open(tmp_path / "dot.sqlite3", tmp_path / "screenshots")
+    try:
+        with_dot: ThreadRecord = await _chat(store, "With Dot")
+        answered: RunRecord = await store.create_run(
+            with_dot.id,
+            "Rename the file",
+            "chat",
+            "ollama:m",
+            None,
+            "test",
+            "medium",
+            "standard",
+            None,
+            "ask",
+            False,
+            None,
+            None,
+            None,
+        )
+        await store.finish_run(answered.id, "done", "## Done\n\nI **renamed** [the file](https://example.test/a).\n")
+        with_agent: ThreadRecord = await store.create_thread("With an agent", "test")
+        await store.create_run(
+            with_agent.id,
+            "Find `cheap`\nflights",
+            "task",
+            "ollama:m",
+            None,
+            "test",
+            "medium",
+            "standard",
+            None,
+            "ask",
+            False,
+            None,
+            "agt_scout",
+            None,
+        )
+        listed: dict[str, tuple[str | None, str, str]] = {
+            chat.title: (chat.actor_id, chat.last_message, chat.last_role)
+            for chat in await store.list_thread_summaries(10)
+        }
+        assert listed == {
+            "With Dot": (None, "Done I renamed the file.", "assistant"),
+            "With an agent": ("agt_scout", "Find cheap flights", "user"),
+        }
     finally:
         await store.close()

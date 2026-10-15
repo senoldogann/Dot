@@ -232,13 +232,13 @@ async def test_a_chat_at_work_stands_once_in_working_and_a_pinned_one_stays_pinn
                 await expect(pinned.locator("button.side-children-fold")).to_have_text("1 delegated run")
                 await expect(pinned.locator(".side-children a.side-child")).to_have_count(1)
                 await expect(working.locator(f"a[href='#/runs/{boxes.id}']")).to_have_count(0)
-                # What waits for an answer is above; its chat keeps its place among the days, with its amber dot.
+                # What waits for an answer is above; its chat keeps its place among the days, its creature waiting.
                 await expect(sidebar.locator("[data-section=waiting] .side-label")).to_have_text("Waiting for you 1")
                 await expect(sidebar.locator("[data-section=waiting] a.side-activity")).to_contain_text("Which shelf?")
                 today: Locator = chats.locator(".side-group").nth(1)
                 await expect(_titles(today)).to_have_text(["Pick a shelf", "Plan the garden"])
                 await expect(
-                    today.locator(f"a.side-run[href='#/runs/{asking.id}'] .status-dot.s-blocked")
+                    today.locator(f"a.side-run[href='#/runs/{asking.id}'] .avatar[data-state='waiting']")
                 ).to_have_count(1)
                 if index == 0:
                     # Folded, Working keeps the chat that is open in sight, and only while it is open.

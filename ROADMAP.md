@@ -5214,8 +5214,8 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 273 | On a phone the stop stays in the sidebar, the switches match, the level reads         | done        | 0eb267f |
 | 274 | A streamed message is drawn as it will stay                                           | done        | 428ad94 |
 | 275 | On a phone the page fits the screen and holds still                                   | done        | d332e29 |
-| 276 | The view of Dot's computer comes back by itself                                       | in progress |         |
-| 277 | Every chat wears a creature, its last message under its name                          | planned     |         |
+| 276 | The view of Dot's computer comes back by itself                                       | done        | f7e09a6 |
+| 277 | Every chat wears a creature, its last message under its name                          | in progress |         |
 | 278 | Connect apps: the Mac's applications and the web's, set up from the sidebar           | planned     |         |
 | 279 | Connect apps: the tools of other services, over MCP, signed in from Dot               | planned     |         |
 | 280 | Dot starts lean: the fewest words and tools, the rest found when needed               | planned     |         |
@@ -12150,7 +12150,7 @@ top of the seen page while the keyboard pans it.
 
 ### 276. The view of Dot's computer comes back by itself
 
-**Status: in progress.** Built on `item-276-view-comes-back`.
+**Status: done.** Merged as `f7e09a6` (PR #318; no Linear issue, the Linear connector was signed out).
 
 **As built (2026-10-15).** `api.js`: `watchInView` reads a stream whose events stand alone while the page is in view:
 out of sight it closes the stream and waits for the page to come back; a stream that breaks, or that `sse` cuts after
@@ -12175,7 +12175,28 @@ stream the daemon refuses (the run is gone, the token is wrong) ends as today.
 
 ### 277. Every chat wears a creature, its last message under its name
 
-**Status: planned.**
+**Status: in progress.** Built on `item-277-chat-creatures`.
+
+**As built (2026-10-15).** `store/models.py`: `ThreadSummary` carries `actor_id` (the agent of the latest run, else the
+campaign it is a session of; `None` for Dot), `last_message` and `last_role`. `store/db.py`: the list reads the latest
+run's agent, campaign, message and answer (the first 1,000 characters of each, from the latest run alone) and the
+summary takes the answer, else the message, through `core/text.py`'s `plain_line` (the marks of Markdown left out, the
+lines run together, 160 characters). `hues.js`: `chatLook` picks a chat's shape and colour from its id's hash apart, so
+64 looks instead of the ring's 8. `sidebar.js`: every chat's row is its creature (`actorFace` in the state `faceState`
+gives its latest run), its name over its last line ("You:" before the owner's message), and at its right its age or its
+working time over the accent dot of an unread chat (`.side-unread`, in the status dot's place before); the rows of
+Select carry the same creature and lines, so the list keeps its place when the choosing ends. A chat's creature is kept
+from one painting of the list to the next while its look and state hold: drawing 200 creatures took 82 ms, and 181 ms
+with the processor slowed 4 times (`face_cost` probe), at every run that starts or ends. `shell.css`: the 32 px creature,
+the bold name, the muted last line; a resting creature does not breathe in the list. README: the sidebar, the unread
+dot, `GET /threads`. Tests: `tests/smoke/test_chat_creatures.py` (new): wide and light, on a phone and dark, and once in
+WebKit, five chats wear five creatures, the two with Dot the looks their ids give, the one with an agent the agent's;
+the one at work wears the working state and the failed one the failed state; the answer in plain words and "You:" with
+the message of the run at work under the names; the unread chat's dot at its right under its age, none on a chat seen.
+It fails on the code of before (no creature in a chat's row). `tests/unit/test_store_threads.py`: the last line and the
+face of a chat with Dot and of one with an agent; `tests/unit/test_actors.py`: `chatLook` against the Python mirror of
+the hash. `test_unread_chats.py`, `test_side_working.py` and `test_working_rows.py` look for the unread dot and the
+waiting creature where the status dot was.
 
 **What.** A chat in the sidebar shows a creature of the character engine: the agent's look for a chat with an agent, a
 look of its own for one with Dot (a shape and a colour from its id); its name; its last message in one grey line under
@@ -12976,3 +12997,4 @@ before it, the model's next run without the third.
 - 2026-10-15 (Opus 5.5): item 273 merged as `0eb267f` (PR #315; no Linear issue, the connector was signed out): the bar beside a closed sidebar holds its opener alone, the emergency stop staying in the sidebar's foot; the side panel's switch and the drawer's close are the sidebar's buttons, 36 px with a 19 px icon; the reasoning pill keeps its level's word at every width; on a phone and on any touch screen the composer's text is at least 16 px, so that iOS does not zoom into it, and the bar's buttons are 36 px.
 - 2026-10-15 (Opus 5.5): item 274 merged as `428ad94` (PR #316; no Linear issue, the connector was signed out): a live message is drawn as the formatted prose it ends as, at most once a frame, the blocks already written left as they were drawn (2 ms a draw at 35,000 characters with the CPU four times slower, 31 ms drawn whole), its caret at the end of its text, its end moving nothing; the arrow down no longer flashes, nor does the follow stop, when the page's own scroll comes after the conversation grew.
 - 2026-10-15 (Opus 5.5): item 275 merged as `d332e29` (PR #317; no Linear issue, the connector was signed out): on a phone the page fits the screen and holds still: viewport-fit=cover and the --safe-* tokens keep the bar, the sidebar's head and foot, the composer, the side panel and the toasts out of the safe areas; touch-action manipulation and overscroll none; every field at least 16 px on touch; a select clips its label and a note breaks a long path; holdBarInSight keeps the bar at the top of what is seen while the keyboard pans the page. test_phone_fit.py (new) in WebKit as two iPhones and in Chrome as a Pixel 7; full offline smoke 570 passed, 1 timing failure under load that passes 3 of 3 alone.
+- 2026-10-15 (Opus 5.5): item 276 merged as `f7e09a6` (PR #318; no Linear issue, the connector was signed out): the view of Dot's computer comes back by itself: `watchInView` closes the screencast while the page is out of sight and makes it again once the page is back, and makes a stream that broke or went silent again after `follow`'s pause, so that only a refused stream ends the view with "The view of Dot's computer stopped"; test_takeover.py's new test in Chrome and in WebKit at a phone's width.

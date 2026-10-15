@@ -323,8 +323,8 @@
     opacity: 1;
   }
 
-  .side-chat:is(:hover, :focus-within) :is(.side-age, .side-working),
-  .side-chat:has(.side-more[aria-expanded="true"]) :is(.side-age, .side-working) {
+  .side-chat:is(:hover, :focus-within) .side-chat-meta,
+  .side-chat:has(.side-more[aria-expanded="true"]) .side-chat-meta {
     visibility: hidden;
   }
 }
@@ -402,12 +402,6 @@
 .side-run .status-dot.s-done,
 .side-run .status-dot.s-cancelled {
   background: transparent;
-}
-
-/* An unread chat (item 131): the accent where a run that ended well shows no dot; a failed one keeps its red. */
-.side-run .status-dot.unread.s-done,
-.side-run .status-dot.unread.s-cancelled {
-  background: var(--accent);
 }
 
 .side-run-goal {
@@ -579,12 +573,67 @@
   color: var(--muted);
 }
 
-/* A face in a row: an activity row's, and a chat's at work, where the agent or the campaign at work stands in its dot's
-   place (item 202). */
-.side-activity .avatar,
-.side-chat .avatar {
+/* A face in an activity row, where the agent or the campaign at work stands in its dot's place (item 202). */
+.side-activity .avatar {
   width: 20px;
   height: 20px;
+}
+
+/* A chat's row (item 277), after a messenger's list: its creature, its name over its last line, and at its right its
+   age or its working time over the dot of a chat that is unread. The list rests: only the creature of a chat at work
+   moves. */
+.side-chat > .side-run,
+.side-pick {
+  gap: 12px;
+}
+
+.side-chat .avatar,
+.side-pick .avatar {
+  width: 32px;
+  height: 32px;
+}
+
+.side-chat .avatar[data-state="idle"],
+.side-pick .avatar[data-state="idle"] {
+  animation: none;
+}
+
+.side-chat-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.side-chat-text .side-run-goal {
+  flex: none;
+  color: var(--text);
+  font-weight: var(--weight-label);
+}
+
+.side-chat-last {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--muted);
+  font-size: var(--text-sm);
+  line-height: var(--leading-sm);
+}
+
+.side-chat-meta {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+}
+
+/* An unread chat (item 131): the accent's dot under its age. */
+.side-unread {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent);
 }
 
 /* Delegated runs under the run that delegated them (item 68), behind the button that folds them (item 198): it says

@@ -15,6 +15,8 @@ RunStatus = Literal["queued", "running", "done", "blocked", "failed", "cancelled
 # A run in one of these has not ended.
 WORKING_STATUSES: frozenset[RunStatus] = frozenset({"queued", "running", "blocked"})
 RunMode = Literal["task", "chat", "research"]
+# Whose words a chat's last line in the sidebar is: the owner's message, or the answer to it (item 277).
+ChatLineRole = Literal["user", "assistant"]
 # How a run was handed a note: at its start, by a memory_search call, or as a note changed while it ran.
 MemoryUseHow = Literal["start", "search", "live"]
 # ``pending``: a run waits for the answer; ``left``: a question a run left for the user and went on without (it is never
@@ -63,7 +65,11 @@ class ThreadSummary(FrozenModel):
     run; ``latest_created_at`` is when the latest run was created, which a message during the run does not move (the
     sidebar counts a working chat's time from it). ``pinned_at`` is when the owner pinned the chat, ``None`` for one not
     pinned (item 130). ``unread`` is true when the latest run ended after the owner last saw the chat, or ended and the
-    owner marked the chat unread (item 131). Threads that only hold delegated runs are not chats and are never listed."""
+    owner marked the chat unread (item 131). ``actor_id`` names whose face the chat wears (item 277): the agent of the
+    latest run, else the campaign that run is a session of; ``None`` for a chat with Dot, which wears a creature of its
+    own. ``last_message`` is the chat's latest words on one plain line: the answer of the latest run once it ended with
+    one, else the message that started it; ``last_role`` says whose they are. Threads that only hold delegated runs are
+    not chats and are never listed."""
 
     id: str
     title: str
@@ -77,6 +83,9 @@ class ThreadSummary(FrozenModel):
     latest_mode: RunMode
     latest_created_at: float
     unread: bool
+    actor_id: str | None
+    last_message: str
+    last_role: ChatLineRole
 
 
 class RunRecord(FrozenModel):

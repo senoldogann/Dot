@@ -11,8 +11,9 @@ import { ApiError, api, request } from "./api.js";
 import { age, clip, clipWords, copyText, dateTime, debounce, el, foldSearch, plural, workingFor } from "./dom.js";
 import { failsafeButton } from "./failsafe.js";
 import { icon } from "./icons.js";
-import { actorFace } from "./actors.js";
+import { actorFace, lookOf } from "./actors.js";
 import { faceState } from "./face.js";
+import { chatLook } from "./hues.js";
 import { closeMenu, menuOpenedBy, openMenu } from "./menu.js";
 import { nestRows, progressFacts } from "./nesting.js";
 import { readFolds, writePref } from "./prefs.js";
@@ -114,15 +115,33 @@ function workingSlot(since) {
   );
 }
 
-/** A chat's dot: the state of its latest run, in the accent while the chat is unread (item 131); a failed run keeps its
- * red dot. A daemon from before item 131 sends no `unread`, and its chats are read. */
-function chatDot(chat) {
-  return el("span", { class: `status-dot s-${chat.latest_status}${chat.unread === true ? " unread" : ""}` });
+/** Whose face a chat wears and how (item 277): the look of its agent or its campaign, or a look of its own from its id
+ * for a chat with Dot; at work while its latest run works, waiting while that run waits for you, sad once it failed. */
+function chatFaceOf(chat) {
+  const actor = chat.actor_id ?? null;
+  return {
+    id: actor ?? chat.id,
+    state: faceState(chat.latest_status),
+    look: actor === null ? chatLook(chat.id) : lookOf(actor, null),
+  };
 }
 
-/** A chat as a link: it opens on the latest run a person started on it. Its last activity is at the right, in the
- * fewest characters (item 121), or, while its latest run works, Working and for how long (item 122). `face`, the face
- * of the agent or the campaign whose run works (item 202), stands in its dot's place; it is null otherwise. */
+/** A chat's name over its last line (item 277): its latest words, "You:" before the owner's own. */
+function chatText(chat) {
+  const words = chat.last_message ?? "";
+  const last = words === "" || chat.last_role !== "user" ? words : `You: ${words}`;
+  return el(
+    "span",
+    { class: "side-chat-text" },
+    el("span", { class: "side-run-goal" }, clip(chat.title, 120)),
+    last === "" ? null : el("span", { class: "side-chat-last" }, last),
+  );
+}
+
+/** A chat as a link: it opens on the latest run a person started on it. Its creature (`face`, item 277) stands at its
+ * left, its name over its last line; at its right, its last activity in the fewest characters (item 121), or, while its
+ * latest run works, Working and for how long (item 122), over the accent dot of a chat that is unread (item 131). A
+ * daemon from before item 131 sends no `unread`, and its chats are read. */
 function chatLink(chat, onNavigate, face) {
   const word = [STATUS_WORD[chat.latest_status], chat.unread === true ? "unread" : undefined].filter((part) => part !== undefined).join(", ");
   const title = clip(chat.title, 120);
@@ -135,11 +154,16 @@ function chatLink(chat, onNavigate, face) {
       "aria-label": word === "" ? null : `${title} (${word})`,
       onclick: onNavigate,
     },
-    face ?? chatDot(chat),
-    el("span", { class: "side-run-goal" }, title),
-    WORKING.has(chat.latest_status)
-      ? workingSlot(chat.latest_created_at)
-      : el("span", { class: "side-age", "data-ts": String(chat.updated_at), title: dateTime(chat.updated_at) }, age(chat.updated_at)),
+    face,
+    chatText(chat),
+    el(
+      "span",
+      { class: "side-chat-meta" },
+      WORKING.has(chat.latest_status)
+        ? workingSlot(chat.latest_created_at)
+        : el("span", { class: "side-age", "data-ts": String(chat.updated_at), title: dateTime(chat.updated_at) }, age(chat.updated_at)),
+      chat.unread === true ? el("span", { class: "side-unread" }) : null,
+    ),
   );
 }
 
@@ -234,8 +258,9 @@ function placeWork(rows, chats) {
   return { working, pinned };
 }
 
-/** A chat as a row to tick while chats are being chosen for deletion. */
-function chatPick(chat, checked, onToggle) {
+/** A chat as a row to tick while chats are being chosen for deletion, with its creature (`face`), its name and its
+ * last line: as tall as its row at rest, so the list keeps its place when the choosing ends. */
+function chatPick(chat, checked, onToggle, face) {
   const box = el("input", {
     class: "side-check",
     type: "checkbox",
@@ -247,8 +272,8 @@ function chatPick(chat, checked, onToggle) {
     "label",
     { class: "side-run side-pick", title: clip(chat.title, 240) },
     box,
-    chatDot(chat),
-    el("span", { class: "side-run-goal" }, clip(chat.title, 120)),
+    face,
+    chatText(chat),
   );
 }
 
@@ -280,6 +305,10 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
   let disposed = false;
   const selected = new Set();
   const rowNodes = new Map();
+  // The creature of each chat listed (item 277), kept from one painting of the list to the next while the chat wears the
+  // same look in the same state: the list is painted again whenever a run starts or ends, and drawing two hundred
+  // creatures anew took 180 ms with a phone's slower processor.
+  const faces = new Map();
   const list = el("div", { class: "side-runs" });
   const ageTicker = setInterval(() => {
     for (const node of list.querySelectorAll(".side-age")) {
@@ -476,6 +505,12 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
     paintChats();
     paintBar();
     markCurrent();
+    const listed = new Set((chats ?? []).map((chat) => chat.id));
+    for (const id of faces.keys()) {
+      if (!listed.has(id)) {
+        faces.delete(id);
+      }
+    }
     if (focused !== undefined) {
       const node = rowNodes.get(focused[0]);
       const target = node === undefined ? null : onMore ? moreOf(node) : (node.querySelector("input.side-check") ?? node);
@@ -532,7 +567,7 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
           el("h3", { class: "side-label" }, group.label),
           group.chats.map((chat) => {
             if (selecting) {
-              const pick = chatPick(chat, selected.has(chat.id), toggle);
+              const pick = chatPick(chat, selected.has(chat.id), toggle, faceOf(chat));
               rowNodes.set(chat.id, pick);
               return pick;
             }
@@ -581,11 +616,23 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
     return node;
   }
 
+  // A chat's creature: the one drawn for it before, while it wears the same look in the same state.
+  function faceOf(chat) {
+    const { id, state, look } = chatFaceOf(chat);
+    const key = `${state} ${look.shape} ${look.colour} ${look.expression}`;
+    const kept = faces.get(chat.id);
+    if (kept !== undefined && kept.key === key) {
+      return kept.face;
+    }
+    const face = actorFace(id, state, look);
+    faces.set(chat.id, { key, face });
+    return face;
+  }
+
   // A chat's entry: its row and, while its latest run works (`family`, that run's row and the runs it delegated; null
-  // at rest), the face of the agent or the campaign at work in its dot's place and those runs under it (item 202).
+  // at rest), those runs under it (item 202).
   function chatEntry(chat, family) {
-    const face = family === null || family.row.actor_id === null ? null : actorFace(family.row.actor_id, "working", null);
-    const link = chatLink(chat, onNavigate, face);
+    const link = chatLink(chat, onNavigate, faceOf(chat));
     rowNodes.set(chat.id, link);
     const row = chatRow(chat, link);
     return family === null ? row : withDelegated(row, family.row.run_id, family.children, onNavigate, foldedRuns(), foldRun);
