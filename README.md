@@ -1451,8 +1451,9 @@ from the composer's model menu; then one fold per provider, with the reasoning l
 one; a provider without a key, or whose key was refused (HTTP 401), says so and links to API keys, and one that refused
 access (HTTP 403) says that, with its words), **API keys** (the key of each provider; see [Models and
 providers](#models-and-providers)), **Browser** (which Chrome Dot browses with and what Chrome has to allow first; see
-[Browser use](#browser-use)), **Rules**, **Memory**, **Skills**, **Schedules** and **System** (the daemon, the emergency
-stop and the health checks in a fold, closed, with the number of failures on its line). Which folds are open is kept in
+[Browser use](#browser-use)), **Rules**, **Memory**, **Skills**, **Schedules**, **Phone** (the addresses a phone reaches
+Dot at and a pairing code for its home-screen app; see [Dot on the phone](#dot-on-the-phone)) and **System** (the
+daemon, the emergency stop and the health checks in a fold, closed, with the number of failures on its line). Which folds are open is kept in
 the browser. The tabs sit beside their content when the window has the room and above it otherwise; the earlier
 addresses of the memory, schedules, rules and system pages lead to their tabs.
 
