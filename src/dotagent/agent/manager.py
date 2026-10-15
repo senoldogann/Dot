@@ -24,7 +24,7 @@ from dotagent.agent.campaign import (
     render_brief,
     sessions_without_progress,
 )
-from dotagent.agent.gate import HANDBACK_EVENT, TAKEOVER_EVENT, RunGate
+from dotagent.agent.gate import HANDBACK_EVENT, TAINT_EVENTS, TAKEOVER_EVENT, RunGate, tainted_after
 from dotagent.agent.keep_going import keep_going_ask
 from dotagent.agent.lessons import LessonCase, dismiss_lesson, learn, save_lesson
 from dotagent.agent.loop import AgentRun, RunEnd, RunOpening, browser_of, run_agent
@@ -1471,6 +1471,28 @@ class RunManager:
             raise RunConflict("a run is already active on this thread", {"thread_id": thread_id})
         self._claimed.add(thread_id)
 
+    async def _starts_tainted(self, parent: RunHandle | None, thread_id: str, source: str, opening: RunOpening) -> bool:
+        """Whether a run starts tainted, as the run it goes on from is (item 243): a delegated run as its parent is now,
+        a resumed run as the run it resumes was when it was cut off, and the run that tells its chat of a command in the
+        background as the chat's last run ended, since that message is Dot's and only a message of the owner restores
+        trust. Any other run starts untainted. Asked before the run's record is made: the chat's last run is the one
+        before it."""
+        if parent is not None:
+            return parent.gate.tainted
+        if opening.resumed is not None:
+            return await self._ended_tainted(opening.resumed.from_run_id)
+        if source == BACKGROUND_SOURCE:
+            return await self._ended_tainted(await self._newest_run_id(thread_id))
+        return False
+
+    async def _ended_tainted(self, run_id: str) -> bool:
+        """Whether the run ``run_id`` was tainted when it ended, from its events (:func:`tainted_after`)."""
+        store: Store = self._runtime.store
+        found: list[EventRecord] = [
+            event for kind in TAINT_EVENTS if (event := await store.last_event(run_id, kind)) is not None
+        ]
+        return tainted_after(found)
+
     async def _register_run(
         self,
         goal: str,
@@ -1497,6 +1519,7 @@ class RunManager:
             if campaign_id is None
             else await self._session_instructions(goal, campaign_id)
         )
+        starts_tainted: bool = await self._starts_tainted(parent, thread_id, source, opening)
 
         async def stored() -> RunRecord:
             return await runtime.store.create_run(
@@ -1547,6 +1570,7 @@ class RunManager:
                     "goal_mode": with_goal_mode,
                     "parent_run_id": parent_run_id,
                     "agent_id": agent_id,
+                    "tainted": starts_tainted,
                     "models": {
                         "steps": model_ref,
                         "compaction": model_ref,
@@ -1576,7 +1600,7 @@ class RunManager:
                 instructions,
                 runtime.site_locks,
             )
-            if parent is not None and parent.gate.tainted:
+            if starts_tainted:
                 gate.taint()
             cancel: asyncio.Event = asyncio.Event()
             inbox: asyncio.Queue[UserInput] = asyncio.Queue()
