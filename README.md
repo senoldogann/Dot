@@ -196,27 +196,27 @@ answer keeps its words, Ollama's too.
 - **OpenCode** (Zen's free models, item 283): a free model of OpenCode Zen (Big Pickle, Nemotron, Step, Space Bunny and
   the others the day's list has) answers OpenCode's own agent only, so a run on one goes to that agent whole. It needs
   the `opencode` program (`brew install opencode`, or opencode.ai) and no key. Dot starts `opencode serve` on a free
-  loopback port behind a password of its own when a run or the model menu needs it (about 2 s) and stops it after
-  `[providers.opencode] idle_stop_s` (600 s) with nothing to do; it holds about 340 MB while up. The menu lists the free
-  models that call tools, from OpenCode's list kept for a day (`models_ttl_s`), with their reasoning levels. The server
-  keeps to its own folders in Dot's home (`opencode/`) and reads none of your own OpenCode setup: no key, plugin, skill,
-  command, tool or rule of yours, nor a project's `opencode.json` or `AGENTS.md`. Its agent works in Dot's workspace
-  with OpenCode's own tools (commands, reading and editing files, searching, fetching and searching the web, its to-do
-  list), and each of them asks Dot first: Dot weighs it as the same action of its own tools, by your rules, the preset
-  and the run's approval mode, and asks you, the review model or nobody as for any run; a refusal tells the agent why,
-  and it goes on. A subagent it asks for is refused, as its session would not be the run's, and it has no question for
-  you. Its commands run outside Dot's sandbox (Settings › Sandbox), each after Dot's policy. The run's timeline shows
-  the agent's text and thinking as they come, each tool call (`opencode_bash`, `opencode_edit`, ...) with its result and
-  each step with its tokens; your messages reach the agent while it works, and Stop stops it. A chat keeps its OpenCode
-  session from run to run, so the agent remembers it, and a session that missed what the chat said on another model
-  hears it with the next message. What Dot's own runs have besides (Dot's tools, memory notes and skills, the checks of
-  a finish, lessons and playbooks) a run here does not have, and a free model cannot be the fast, review or vision
-  model, whose calls are Dot's own. Zen's terms of the free models apply: the providers of Big Pickle, Exo, MiMo and
-  Muse Spark may use what is sent to them to improve their models (opencode.ai/docs/zen, read 2026-10-15), so keep
-  private work on other models. The free tier is Zen's to give: it turned requests down for a few minutes after many in
-  a short time, OpenCode's own command line's too (measured 2026-10-15), and it is reported to refuse OpenCode with one
-  of its tools switched off, so Dot switches none off and has them ask instead; a run it turns down fails with words
-  that say so.
+  loopback port behind a password of its own when a run needs it (about 2 s) and stops it after `[providers.opencode]
+  idle_stop_s` (600 s) with nothing to do; it holds about 340 MB while up. The menu lists every free model that calls
+  tools, with its reasoning levels, from `opencode models opencode --refresh` (OpenCode's catalog refreshed from
+  models.dev first, so a model Zen has just added is there), kept for an hour (`models_ttl_s`). The server keeps to its
+  own folders in Dot's home (`opencode/`) and reads none of your own OpenCode setup: no key, plugin, skill, command,
+  tool or rule of yours, nor a project's `opencode.json` or `AGENTS.md`. Its agent works in Dot's workspace with
+  OpenCode's own tools (commands, reading and editing files, searching, fetching and searching the web, its to-do list),
+  and each of them asks Dot first: Dot weighs it as the same action of its own tools, by your rules, the preset and the
+  run's approval mode, and asks you, the review model or nobody as for any run; a refusal tells the agent why, and it
+  goes on. A subagent it asks for is refused, as its session would not be the run's, and it has no question for you. Its
+  commands run outside Dot's sandbox (Settings › Sandbox), each after Dot's policy. The run's timeline shows the agent's
+  text and thinking as they come, each tool call (`opencode_bash`, `opencode_edit`, ...) with its result and each step
+  with its tokens; your messages reach the agent while it works, and Stop stops it. A chat keeps its OpenCode session
+  from run to run, so the agent remembers it, and a session that missed what the chat said on another model hears it
+  with the next message. What Dot's own runs have besides (Dot's tools, memory notes and skills, the checks of a finish,
+  lessons and playbooks) a run here does not have, and a free model cannot be the fast, review or vision model, whose
+  calls are Dot's own. Zen's terms of the free models apply: the providers of Big Pickle, Exo, MiMo and Muse Spark may
+  use what is sent to them to improve their models (opencode.ai/docs/zen, read 2026-10-15), so keep private work on
+  other models. The free tier is Zen's to give: it turned requests down for a few minutes after many in a short time,
+  OpenCode's own command line's too (measured 2026-10-15), and it is reported to refuse OpenCode with one of its tools
+  switched off, so Dot switches none off and has them ask instead; a run it turns down fails with words that say so.
 
 `dotx models [ollama|openai|opencode_go|anthropic|opencode]` lists what a provider offers, including the reasoning
 levels of each model, and ends with 1 when no provider answered (the one named, when one is). An Ollama server on this

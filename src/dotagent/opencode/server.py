@@ -11,13 +11,15 @@ environment is the login shell's PATH and the few variables a program expects, n
 HOME stays the owner's, for the commands its agent runs. Every tool of its agent asks Dot before it acts, and Dot's own
 policy answers (:mod:`dotagent.opencode.run`).
 
-The server starts when a run or the list of free models needs it (about 2 s) and stops once it has served nothing for
-``[providers.opencode] idle_stop_s`` (it holds about 340 MB while up), and with the daemon.
+The server starts when a run needs it (about 2 s) and stops once it has served nothing for
+``[providers.opencode] idle_stop_s`` (it holds about 340 MB while up), and with the daemon. The list of free models
+comes from OpenCode's command line instead, in the same home and environment, its catalog refreshed first.
 """
 
 import asyncio
 import json
 import os
+import re
 import secrets
 import shutil
 import socket
@@ -38,12 +40,14 @@ from dotagent.core.logs import get_logger
 from dotagent.core.paths import log_dir, opencode_command, opencode_dir
 from dotagent.core.types import FrozenModel, JsonObject
 from dotagent.llm.types import Effort
-from dotagent.llm.wire import get_int, get_obj, get_objects, get_str
+from dotagent.llm.wire import get_int, get_obj, get_str
 
 log = get_logger(__name__)
 
 # The provider of OpenCode's own catalog that serves Zen's models, free ones among them.
 ZEN_PROVIDER: str = "opencode"
+# The line ``opencode models <provider>`` prints for each of the provider's models, before its JSON with ``--verbose``.
+_CATALOG_ENTRY: re.Pattern[str] = re.compile(rf"^{re.escape(ZEN_PROVIDER)}/(\S+)$", re.MULTILINE)
 _USER: str = "opencode"
 _HOST: str = "127.0.0.1"
 # Where OpenCode is found besides the login shell's PATH: Homebrew on Apple silicon and on Intel, and OpenCode's own
@@ -120,6 +124,8 @@ class _Live:
     process: asyncio.subprocess.Process
     client: httpx.AsyncClient
     log: IO[str]
+    # When it started (monotonic): it knows the models of the catalog it read then.
+    started_at: float
 
 
 def find_program(command: str, login_path: str) -> Path | None:
@@ -142,35 +148,40 @@ def _costs_nothing(cost: JsonObject) -> bool:
     return all(isinstance(price, int | float) and not isinstance(price, bool) and price == 0 for price in prices)
 
 
-def free_models(listing: JsonObject) -> tuple[FreeModel, ...]:
-    """The free models of Zen in OpenCode's list of providers (``GET /provider``): those of its own provider that cost
-    nothing and are not deprecated, by id."""
-    provider: JsonObject | None = next(
-        (item for item in get_objects(listing, "all") if get_str(item, "id") == ZEN_PROVIDER), None
+def _catalog_entries(listing: str) -> list[tuple[str, str]]:
+    """The models of ``opencode models <provider> --verbose``'s output, which prints each one's ``provider/model`` line
+    and then its JSON: each one's id with the text of its JSON."""
+    entries: list[re.Match[str]] = list(_CATALOG_ENTRY.finditer(listing))
+    ends: list[int] = [entry.start() for entry in entries[1:]] + [len(listing)]
+    return [(entry.group(1), listing[entry.end() : end]) for entry, end in zip(entries, ends, strict=True)]
+
+
+def _free_model(model_id: str, raw: JsonObject) -> FreeModel | None:
+    """A model of Zen's as Dot offers it, or ``None`` when it costs something or is deprecated."""
+    if not _costs_nothing(get_obj(raw, "cost")) or get_str(raw, "status") == "deprecated":
+        return None
+    capabilities: JsonObject = get_obj(raw, "capabilities")
+    context: int = get_int(get_obj(raw, "limit"), "context")
+    variants: JsonObject = get_obj(raw, "variants")
+    return FreeModel(
+        id=model_id,
+        name=get_str(raw, "name") or model_id,
+        vision=_flag(get_obj(capabilities, "input"), "image"),
+        tools=_flag(capabilities, "toolcall"),
+        thinking=_flag(capabilities, "reasoning"),
+        context_length=context if context > 0 else None,
+        efforts=tuple(effort for effort in _EFFORTS if effort in variants),
     )
-    if provider is None:
-        return ()
-    found: list[FreeModel] = []
-    for model_id, raw in sorted(get_obj(provider, "models").items()):
-        if not isinstance(raw, dict) or not _costs_nothing(get_obj(raw, "cost")):
-            continue
-        if get_str(raw, "status") == "deprecated":
-            continue
-        capabilities: JsonObject = get_obj(raw, "capabilities")
-        context: int = get_int(get_obj(raw, "limit"), "context")
-        variants: JsonObject = get_obj(raw, "variants")
-        found.append(
-            FreeModel(
-                id=model_id,
-                name=get_str(raw, "name") or model_id,
-                vision=_flag(get_obj(capabilities, "input"), "image"),
-                tools=_flag(capabilities, "toolcall"),
-                thinking=_flag(capabilities, "reasoning"),
-                context_length=context if context > 0 else None,
-                efforts=tuple(effort for effort in _EFFORTS if effort in variants),
-            )
-        )
-    return tuple(found)
+
+
+def free_models(listing: str) -> tuple[FreeModel, ...]:
+    """The free models of Zen in OpenCode's catalog as ``opencode models opencode --verbose`` prints it: those that cost
+    nothing and are not deprecated, by id."""
+    models: list[FreeModel | None] = [
+        _free_model(model_id, parse_json_object(body, f"opencode models: {model_id}"))
+        for model_id, body in _catalog_entries(listing)
+    ]
+    return tuple(sorted((model for model in models if model is not None), key=lambda model: model.id))
 
 
 def learns_from_data(model: str) -> bool:
@@ -188,6 +199,17 @@ def _free_port() -> int:
 def _managed_config() -> JsonObject:
     """The config of the server Dot starts: no update and no sharing; its permissions come by the environment."""
     return {"$schema": "https://opencode.ai/config.json", "autoupdate": False, "share": "disabled"}
+
+
+async def _prepared_home() -> Path:
+    """The server's home in Dot's (:func:`dotagent.core.paths.opencode_dir`), its folders made and its config written."""
+    home: Path = opencode_dir()
+    for name in ("config", "data", "state", "cache", "home"):
+        await asyncio.to_thread((home / name).mkdir, mode=0o700, parents=True, exist_ok=True)
+    await asyncio.to_thread(
+        (home / "opencode.json").write_text, json.dumps(_managed_config(), indent=2) + "\n", encoding="utf-8"
+    )
+    return home
 
 
 def server_environment(login_env: Mapping[str, str], home: Path) -> dict[str, str]:
@@ -227,6 +249,8 @@ class OpenCodeServer:
         self._holds: int = 0
         self._last_used: float = time.monotonic()
         self._idle: asyncio.Task[None] | None = None
+        # When the catalog was last refreshed (monotonic), by :meth:`_catalog`; ``None`` before.
+        self._catalog_at: float | None = None
 
     def program(self) -> Path | None:
         return find_program(opencode_command(self._config.command), self._login_env.get("PATH", ""))
@@ -235,14 +259,10 @@ class OpenCodeServer:
         program: Path | None = self.program()
         if program is None:
             raise OpenCodeMissing(NOT_INSTALLED, {"command": opencode_command(self._config.command)})
-        home: Path = opencode_dir()
-        for name in ("config", "data", "state", "cache", "home"):
-            await asyncio.to_thread((home / name).mkdir, mode=0o700, parents=True, exist_ok=True)
-        await asyncio.to_thread(
-            (home / "opencode.json").write_text, json.dumps(_managed_config(), indent=2) + "\n", encoding="utf-8"
-        )
+        home: Path = await _prepared_home()
         password: str = secrets.token_urlsafe(24)
         port: int = _free_port()
+        started_at: float = time.monotonic()
         env: dict[str, str] = {**server_environment(self._login_env, home), "OPENCODE_SERVER_PASSWORD": password}
         log_path: Path = log_dir() / "opencode.log"
         output: IO[str] = await asyncio.to_thread(log_path.open, "w", encoding="utf-8")
@@ -262,7 +282,7 @@ class OpenCodeServer:
         client: httpx.AsyncClient = httpx.AsyncClient(
             base_url=f"http://{_HOST}:{port}", auth=(_USER, password), timeout=_REQUEST_TIMEOUT_S
         )
-        live: _Live = _Live(process=process, client=client, log=output)
+        live: _Live = _Live(process=process, client=client, log=output, started_at=started_at)
         deadline: float = time.monotonic() + self._config.start_timeout_s
         while True:
             if process.returncode is not None:
@@ -324,9 +344,22 @@ class OpenCodeServer:
                     self._live = None
                     return
 
+    async def _drop_outdated(self) -> None:
+        """Stop the server when it started before the catalog was last refreshed and serves no run, so that the next one
+        starts on the refreshed catalog: a server keeps the catalog it read as it started (measured 2026-10-15, a model
+        put back in its catalog's file stayed out of its list), and would not know a model Zen has just added."""
+        async with self._lock:
+            live: _Live | None = self._live
+            if live is None or self._holds > 0 or self._catalog_at is None or live.started_at >= self._catalog_at:
+                return
+            log.info("opencode_server_stopped_for_catalog", pid=live.process.pid)
+            await self._release(live)
+            self._live = None
+
     @asynccontextmanager
     async def hold(self) -> AsyncIterator[None]:
-        """Keep the server up while a run uses it."""
+        """Keep the server up while a run uses it, one that knows the models listed (:meth:`_drop_outdated`)."""
+        await self._drop_outdated()
         self._holds += 1
         try:
             yield
@@ -355,17 +388,52 @@ class OpenCodeServer:
 
     async def list_free_models(self) -> tuple[FreeModel, ...]:
         """Zen's free models, from the list kept in Dot's home while it is younger than ``models_ttl_s``, else from
-        OpenCode, which is started for it. None is offered while OpenCode is not installed."""
-        if self.program() is None:
+        OpenCode's catalog refreshed from models.dev first (:meth:`_catalog`). None is offered while OpenCode is not
+        installed."""
+        program: Path | None = self.program()
+        if program is None:
             raise OpenCodeMissing(NOT_INSTALLED, {"command": opencode_command(self._config.command)})
         path: Path = opencode_dir() / "models.json"
         kept: _ModelList | None = await asyncio.to_thread(_read_models, path)
         if kept is not None and time.time() - kept.fetched_at < self._config.models_ttl_s:
             return kept.models
-        response: httpx.Response = await self._send("GET", "/provider", opencode_dir(), None)
-        models: tuple[FreeModel, ...] = free_models(parse_json_object(response.text, "opencode /provider"))
+        models: tuple[FreeModel, ...] = free_models(await self._catalog(program))
+        self._catalog_at = time.monotonic()
         await asyncio.to_thread(_write_models, path, _ModelList(fetched_at=time.time(), models=models))
         return models
+
+    async def _catalog(self, program: Path) -> str:
+        """Zen's models in OpenCode's catalog, refreshed from models.dev before they are listed: ``opencode models
+        opencode --refresh --verbose`` in the server's home and environment. A server answers from the catalog it read
+        as it started and refreshes it only after (measured 2026-10-15: its list lacked three free models that its
+        refreshed catalog, written a second earlier, had), and a server started later reads the refreshed one."""
+        home: Path = await _prepared_home()
+        process: asyncio.subprocess.Process = await asyncio.create_subprocess_exec(
+            str(program),
+            "models",
+            ZEN_PROVIDER,
+            "--refresh",
+            "--verbose",
+            cwd=str(home),
+            env=server_environment(self._login_env, home),
+            stdin=asyncio.subprocess.DEVNULL,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+        try:
+            out, err = await asyncio.wait_for(process.communicate(), timeout=self._config.start_timeout_s)
+        except TimeoutError:
+            process.kill()
+            await process.wait()
+            raise OpenCodeError(
+                "OpenCode did not list its models in time", {"timeout_s": self._config.start_timeout_s}
+            ) from None
+        if process.returncode != 0:
+            raise OpenCodeError(
+                "OpenCode did not list its models",
+                {"exit": process.returncode, "stderr": err.decode("utf-8", errors="replace")[-2000:]},
+            )
+        return out.decode("utf-8", errors="replace")
 
     async def tool_ids(self, directory: Path) -> tuple[str, ...]:
         """The tools OpenCode's agent has in ``directory``: its own, and any that another source added."""

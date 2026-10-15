@@ -126,9 +126,9 @@ class OpenCodeGoConfig(FrozenModel):
 
 class OpenCodeConfig(FrozenModel):
     """OpenCode's own agent, the one client Zen's free models serve (item 283), which Dot starts as a local server of
-    its own when a run or the list of models needs it. ``command`` is the ``opencode`` program: a path, or a name looked
-    up on the login shell's PATH and in Homebrew's folders. The server stops once it has served nothing for
-    ``idle_stop_s``; the free models it lists are kept for ``models_ttl_s`` without starting it again."""
+    its own when a run needs it. ``command`` is the ``opencode`` program: a path, or a name looked up on the login
+    shell's PATH and in Homebrew's folders. The server stops once it has served nothing for ``idle_stop_s``; the free
+    models OpenCode lists are kept for ``models_ttl_s`` without asking it again."""
 
     command: str = Field(min_length=1)
     start_timeout_s: float = Field(gt=0, allow_inf_nan=False)

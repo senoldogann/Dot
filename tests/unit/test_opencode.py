@@ -1,6 +1,7 @@
 """Item 283's data: OpenCode's event stream as a run reads it (recorded from OpenCode 1.19.0 on one of Zen's free models,
-for a command whose permission the agent asked for, with an event of another session put in), Zen's free models in
-OpenCode's list of providers, a permission as Dot's policy weighs it, and the environment of the server Dot starts."""
+for a command whose permission the agent asked for, with an event of another session put in), Zen's free models as
+``opencode models opencode --verbose`` prints them, a permission as Dot's policy weighs it, and the environment of the
+server Dot starts."""
 
 import json
 from pathlib import Path
@@ -70,37 +71,30 @@ def test_a_recorded_stream_reads_as_two_steps_around_a_permission() -> None:
 
 
 def test_the_free_models_are_zens_own_that_cost_nothing() -> None:
-    free: dict[str, object] = {"input": 0, "output": 0}
-    listing: dict[str, object] = {
-        "all": [
-            {"id": "elsewhere", "models": {"also-free": {"cost": free}}},
-            {
-                "id": "opencode",
-                "models": {
-                    "space-bunny-free": {
-                        "cost": free,
-                        "status": "active",
-                        "capabilities": {"toolcall": True, "reasoning": True, "input": {"image": True}},
-                        "limit": {"context": 1048576},
-                        "variants": {"low": {}, "high": {}, "max": {}, "turbo": {}},
-                    },
-                    "big-pickle": {
-                        "name": "Big Pickle",
-                        "cost": free,
-                        "status": "beta",
-                        "capabilities": {"toolcall": True, "reasoning": True, "input": {"image": False}},
-                        "limit": {"context": 200000},
-                        "variants": {},
-                    },
-                    "priced": {"cost": {"input": 1.25, "output": 10}},
-                    "half-priced": {"cost": {"input": 0, "output": 0.5}},
-                    "unpriced": {},
-                    "gone-free": {"cost": free, "status": "deprecated"},
-                },
-            },
-        ]
+    free: dict[str, object] = {"input": 0, "output": 0, "cache": {"read": 0, "write": 0}}
+    models: dict[str, dict[str, object]] = {
+        "space-bunny-free": {
+            "cost": free,
+            "status": "active",
+            "capabilities": {"toolcall": True, "reasoning": True, "input": {"image": True}},
+            "limit": {"context": 1048576},
+            "variants": {"low": {}, "high": {}, "max": {}, "turbo": {}},
+        },
+        "big-pickle": {
+            "name": "Big Pickle",
+            "cost": free,
+            "status": "beta",
+            "capabilities": {"toolcall": True, "reasoning": True, "input": {"image": False}},
+            "limit": {"context": 200000},
+            "variants": {},
+        },
+        "priced": {"cost": {"input": 1.25, "output": 10}},
+        "half-priced": {"cost": {"input": 0, "output": 0.5}},
+        "unpriced": {},
+        "gone-free": {"cost": free, "status": "deprecated"},
     }
-    assert free_models(json.loads(json.dumps(listing))) == (
+    listing: str = "".join(f"opencode/{name}\n{json.dumps(model, indent=2)}\n" for name, model in models.items())
+    assert free_models(listing) == (
         FreeModel(
             id="big-pickle",
             name="Big Pickle",
