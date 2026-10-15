@@ -3,9 +3,11 @@ scripted model, is rewound from its page to before its second message. The secon
 files are as the first turn left them (the file the third made is gone, with its folder), the chat's OpenCode session is
 let go, and the second message with its file is back in the composer of the first turn's page; sent from there, the next
 run's history holds no word of the turns taken out. A rewind that keeps the changes leaves the files, and one to a turn
-taken out already is refused. In the store, a rewind across a compaction reads the history kept aside, a question a run
-taken out left waits no more, and a helper's run, a run from before the places were kept and a chat at work are refused. The dialog wide and light, and on a phone
-in the dark. A real server and a real headless Chrome; no model service is called."""
+taken out already is refused; rewound to its first message, the chat gives the message to New chat, and the page of a
+run taken out still opens. In the store, a rewind across a compaction reads the history kept aside, a question a run
+taken out left waits no more, and a helper's run, a run from before the places were kept, a chat at work, a chat whose
+queue holds messages and one that changed since its runs were read are refused. The dialog wide and light, and on a
+phone in the dark. A real server and a real headless Chrome; no model service is called."""
 
 import asyncio
 import sqlite3
@@ -35,7 +37,14 @@ from dotagent.server.context import ServerContext
 from dotagent.server.daemon import DotServer, bind_listener, serving_config
 from dotagent.server.links import ui_url
 from dotagent.store.db import Store
-from dotagent.store.models import ApprovalRecord, RewindCut, RunRecord, ThreadRecord, ThreadSummary
+from dotagent.store.models import (
+    ApprovalRecord,
+    QueuedMessage,
+    RewindCut,
+    RunRecord,
+    ThreadRecord,
+    ThreadSummary,
+)
 from dotagent.tools.meta import FINISH_TOOL
 from dotagent.tools.shell import read_login_env
 
@@ -285,8 +294,17 @@ async def test_a_chat_rewound_to_its_second_message_takes_its_files_back_and_giv
             dialog_box: FloatRect = await _box(phone.locator("dialog.modal"))
             assert keep_box["x"] + keep_box["width"] <= dialog_box["x"] + dialog_box["width"]
             await phone.screenshot(path=str(tmp_path / "rewind-390-dark.png"), animations="disabled")
-            await actions.get_by_role("button", name="Cancel").click()
-            await expect(phone.locator("dialog.modal")).to_have_count(0)
+
+            # Rewound to its first message, the chat holds no turn: New chat opens with the message in its box, and the
+            # page of a run taken out still answers.
+            await actions.get_by_role("button", name="Revert and keep changes").click()
+            await expect(phone).to_have_url(f"{address}/#/runs")
+            await expect(phone.locator(".composer textarea")).to_have_value(_FIRST)
+            assert await runtime.store.list_runs(10, first.thread_id) == []
+            async with httpx.AsyncClient(base_url=address, headers={"Authorization": f"Bearer {TOKEN}"}) as client:
+                opened: httpx.Response = await client.get(f"/api/runs/{first.id}")
+                assert opened.status_code == 200, opened.text
+                assert opened.json()["resumable"] is False
             assert phone_errors == []
             await phone.context.close()
         finally:
@@ -316,6 +334,11 @@ async def _store_turn(store: Store, thread_id: str, said: tuple[str, str]) -> Ru
     return run
 
 
+async def _rewind(store: Store, run_id: str) -> RewindCut:
+    """Rewind to before ``run_id`` as the API does: the runs it takes out are read first, for the plan."""
+    return await store.rewind_chat(run_id, [run.id for run in await store.runs_from(run_id)])
+
+
 async def _history(store: Store, thread_id: str) -> list[str]:
     return [message.content for message in await store.load_messages(thread_id, 0)]
 
@@ -331,7 +354,7 @@ async def test_a_rewind_across_a_compaction_reads_the_history_kept_aside_and_is_
     left: ApprovalRecord = await store.create_left_approval(three.id, "ask_user", "Which bed first?", "low", {})
 
     # Within one version of the history, a rewind cuts it back, and the question the third run left waits no more.
-    cut: RewindCut = await store.rewind_chat(three.id)
+    cut: RewindCut = await _rewind(store, three.id)
     assert ([run.id for run in cut.rewound], cut.back_to) == ([three.id], two.id)
     assert await _history(store, thread.id) == ["one", "a1", "two", "a2"]
     assert (await store.get_approval(left.id)).status == "expired"
@@ -360,7 +383,7 @@ async def test_a_rewind_across_a_compaction_reads_the_history_kept_aside_and_is_
     await store.set_run_status(four.id, "done")
     five: RunRecord = await _store_turn(store, thread.id, ("five", "a5"))
     assert await _history(store, thread.id) == ["one to four, in short", "a4 after", "five", "a5"]
-    cut = await store.rewind_chat(two.id)
+    cut = await _rewind(store, two.id)
     assert ([run.id for run in cut.rewound], cut.back_to) == ([two.id, four.id, five.id], one.id)
     assert await _history(store, thread.id) == ["one", "a1"]
     assert [run.id for run in await store.list_runs(10, thread.id)] == [one.id]
@@ -370,7 +393,7 @@ async def test_a_rewind_across_a_compaction_reads_the_history_kept_aside_and_is_
     six: RunRecord = await _store_turn(store, thread.id, ("six", "a6"))
     assert await _history(store, thread.id) == ["one", "a1", "six", "a6"]
     with pytest.raises(RunConflict, match="rewound to before this message already"):
-        await store.rewind_chat(five.id)
+        await _rewind(store, five.id)
 
     # A helper's run has no message of the owner's; a run from before the places were kept has none kept; a chat at
     # work is not rewound.
@@ -393,7 +416,7 @@ async def test_a_rewind_across_a_compaction_reads_the_history_kept_aside_and_is_
     assert not helper.rewindable
     await store.set_run_status(helper.id, "done")
     with pytest.raises(InvalidValueError, match="no message of the owner's"):
-        await store.rewind_chat(helper.id)
+        await _rewind(store, helper.id)
     connection: sqlite3.Connection = sqlite3.connect(db_path(), timeout=10)
     try:
         with connection:
@@ -401,7 +424,7 @@ async def test_a_rewind_across_a_compaction_reads_the_history_kept_aside_and_is_
     finally:
         connection.close()
     with pytest.raises(InvalidValueError, match="sent before Dot kept the place"):
-        await store.rewind_chat(six.id)
+        await _rewind(store, six.id)
     working: RunRecord = await store.create_run(
         thread.id,
         "seven",
@@ -419,9 +442,19 @@ async def test_a_rewind_across_a_compaction_reads_the_history_kept_aside_and_is_
         None,
     )
     with pytest.raises(RunConflict, match="cannot be rewound while a run works on it"):
-        await store.rewind_chat(one.id)
+        await _rewind(store, one.id)
     await store.set_run_status(working.id, "done")
-    cut = await store.rewind_chat(one.id)
+
+    # A chat that changed since its runs were read for the plan is not rewound, nor is one whose queue holds messages.
+    with pytest.raises(RunConflict, match="changed while it was being rewound"):
+        await store.rewind_chat(one.id, [one.id, six.id])
+    waiting: QueuedMessage = await store.add_queued(
+        thread.id, "eight", (), "task", None, None, "standard", None, None, None, None, "test"
+    )
+    with pytest.raises(RunConflict, match="messages wait in the chat's queue"):
+        await _rewind(store, one.id)
+    await store.delete_queued(waiting.id)
+    cut = await _rewind(store, one.id)
     assert ([run.id for run in cut.rewound], cut.back_to) == ([one.id, six.id, working.id], None)
     assert await _history(store, thread.id) == []
     assert thread.id not in [summary.id for summary in await store.list_thread_summaries(50)]

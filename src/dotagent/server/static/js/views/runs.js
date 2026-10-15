@@ -7,7 +7,7 @@ import { approvalCard, fromRecord, LEFT_IN_RUN } from "../approvals.js";
 import { api } from "../api.js";
 import { askForWords, readyToSend } from "../attachments.js";
 import { MODES, optionRow, runChoices } from "../choices.js";
-import { composerFrame, composerPill } from "../composer.js";
+import { composerFrame, composerPill, NEW_CHAT_DRAFT } from "../composer.js";
 import { el } from "../dom.js";
 import { forgetLevel, KEPT_SPEED, savedLevel, saveLevel } from "../efforts.js";
 import { trackHeight } from "../layout.js";

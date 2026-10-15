@@ -13,7 +13,14 @@ from dotagent.agent.attachments import AttachedFile, StoredAttachment, load_atta
 from dotagent.agent.campaign import session_number
 from dotagent.agent.keep_going import keep_going_ask
 from dotagent.agent.lessons import run_lessons
-from dotagent.agent.rewind import FilesTakenBack, opening_files, rewind_chat, take_back_files
+from dotagent.agent.rewind import (
+    NOTHING_TO_TAKE_BACK,
+    FilesTakenBack,
+    opening_files,
+    plan_take_back,
+    rewind_chat,
+    take_back,
+)
 from dotagent.core.errors import InvalidValueError
 from dotagent.llm.router import parse_model_ref
 from dotagent.server import UI_SOURCE
@@ -189,12 +196,12 @@ def runs_router(ctx: ServerContext) -> APIRouter:
         ``agent.rewind``), and take back the file changes of the runs taken out when ``files`` is ``revert``. Returns
         where the chat ends now and what goes back to the composer."""
         files: list[AttachedFile] = await opening_files(store, run_id)
-        cut: RewindCut = await rewind_chat(ctx.runtime, run_id)
-        taken: FilesTakenBack = (
-            await take_back_files(ctx.runtime, cut.rewound)
-            if request.files == "revert"
-            else FilesTakenBack(reverted=(), left=())
+        taken_out: list[RunRecord] = await store.runs_from(run_id)
+        plan: UndoPlan = (
+            await plan_take_back(ctx.runtime, taken_out) if request.files == "revert" else NOTHING_TO_TAKE_BACK
         )
+        cut: RewindCut = await rewind_chat(ctx.runtime, run_id, [run.id for run in taken_out])
+        taken: FilesTakenBack = await take_back(ctx.runtime, plan)
         return RewindView(
             thread_id=cut.thread_id,
             back_to=cut.back_to,

@@ -193,6 +193,14 @@ _PAGE_ID_BYTES: int = 18
 # and answer are read for it (a fence or a heading at the start of an answer takes some of them).
 _LAST_MESSAGE_CHARS: int = 160
 _LAST_MESSAGE_READ_CHARS: int = 1000
+# A run and the later runs still in its chat, oldest first: what a rewind to before the run takes out (item 282). Its
+# two parameters are the run's id.
+_RUNS_FROM: str = (
+    "SELECT * FROM runs AS later WHERE later.thread_id = (SELECT thread_id FROM runs WHERE id = ?)"
+    " AND later.parent_run_id IS NULL AND later.rewound_at IS NULL"
+    " AND (later.created_at, later.rowid) >= (SELECT created_at, rowid FROM runs WHERE id = ?)"
+    " ORDER BY later.created_at, later.rowid"
+)
 
 
 def _prepare_dirs(database: Path, image_dir: Path) -> None:
@@ -1201,19 +1209,25 @@ class Store:
 
         return await asyncio.to_thread(decode_all)
 
-    async def rewind_chat(self, run_id: str) -> RewindCut:
+    async def runs_from(self, run_id: str) -> list[RunRecord]:
+        """The run ``run_id`` and the later runs still in its chat, oldest first: what :meth:`rewind_chat` would take out
+        of the chat now (item 282). None for a helper's run, which has a chat of its own."""
+        return [_run(row) for row in await self._all(_RUNS_FROM, (run_id, run_id))]
+
+    async def rewind_chat(self, run_id: str, expected: Sequence[str]) -> RewindCut:
         """Rewind the chat of the run ``run_id`` to before the run's first message (item 282), in one transaction. The
         run and the chat's later runs leave the chat: they stay stored, with what they cost, but no list of the chat's
-        runs holds them. The history the model reads ends where it ended before the run: cut back, or, when it was
+        runs holds them. ``expected`` are the ids of those runs as :meth:`runs_from` read them for the caller, who planned
+        for them; a chat that changed since is not rewound (``RunConflict``). The history the model reads ends where it ended before the run: cut back, or, when it was
         written anew since, made of what was kept aside of the version the run started on, as a new version. What a
         version kept aside after that place goes, and so do the versions after it; the screenshots only they named are
         left to :meth:`orphan_images`. The questions those runs, or the runs they delegated to, left for the owner wait
         no more: they expire. Refused for a delegated run, for a run from before the places of messages were kept
-        (``InvalidValueError``), for one a rewind took out already and while a run works on the chat
-        (``RunConflict``)."""
+        (``InvalidValueError``), for one a rewind took out already, while a run works on the chat and while messages
+        wait in its queue (``RunConflict``)."""
 
         async def statements() -> RewindCut:
-            row: aiosqlite.Row | None = await self._one("SELECT rowid AS place, * FROM runs WHERE id = ?", (run_id,))
+            row: aiosqlite.Row | None = await self._one("SELECT * FROM runs WHERE id = ?", (run_id,))
             if row is None:
                 raise NotFoundError("run not found", {"run_id": run_id})
             run: RunRecord = _run(row)
@@ -1229,12 +1243,22 @@ class Store:
             if row["rewound_at"] is not None:
                 raise RunConflict("the chat was rewound to before this message already", context)
             await self._refuse_working_chats((run.thread_id,), "a chat cannot be rewound while a run works on it")
-            later: list[aiosqlite.Row] = await self._all(
-                "SELECT * FROM runs WHERE thread_id = ? AND parent_run_id IS NULL AND rewound_at IS NULL"
-                " AND (created_at, rowid) >= (?, ?) ORDER BY created_at, rowid",
-                (run.thread_id, run.created_at, row["place"]),
+            queued: aiosqlite.Row | None = await self._one(
+                "SELECT COUNT(*) AS n FROM queued_messages WHERE thread_id = ?", (run.thread_id,)
             )
-            rewound: tuple[RunRecord, ...] = tuple(_run(item) for item in later)
+            if queued is not None and int(queued["n"]) > 0:
+                raise RunConflict(
+                    "messages wait in the chat's queue: send them or take them out before rewinding it",
+                    {**context, "queued": int(queued["n"])},
+                )
+            rewound: tuple[RunRecord, ...] = tuple(_run(item) for item in await self._all(_RUNS_FROM, (run_id, run_id)))
+            if [item.id for item in rewound] != list(expected):
+                planned: JsonArray = [*expected]
+                found: JsonArray = [item.id for item in rewound]
+                raise RunConflict(
+                    "the chat changed while it was being rewound; try again",
+                    {**context, "expected": planned, "found": found},
+                )
             now: float = time.time()
             ids: tuple[str, ...] = tuple(item.id for item in rewound)
             marks: str = ",".join("?" * len(ids))
