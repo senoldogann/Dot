@@ -58,6 +58,7 @@ class ScriptedProvider:
             thinking=False,
             context_length=_CONTEXT_LENGTH,
             own_context_length=None,
+            window_source="assumed",
             efforts=(),
             free=False,
         )

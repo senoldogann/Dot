@@ -63,7 +63,14 @@ from dotagent.store.models import (
     ThreadSummary,
     WorkingRun,
 )
-from dotagent.store.stats import ModelProfile, RunCosts, collect_run_costs, read_model_profile
+from dotagent.store.stats import (
+    ContextEvidence,
+    ModelProfile,
+    RunCosts,
+    collect_run_costs,
+    read_context_evidence,
+    read_model_profile,
+)
 from dotagent.tools.team import TEAM_SOURCE
 
 _SCHEMA: str = """
@@ -1525,6 +1532,11 @@ class Store:
     async def model_profile(self, model: str, runs: int) -> ModelProfile:
         """How reliably ``model`` worked in its newest ``runs`` finished runs, read on a read-only connection."""
         return await asyncio.to_thread(read_model_profile, self._database, model, runs)
+
+    async def context_evidence(self, model: str, days: int) -> ContextEvidence:
+        """What the runs of ``model`` created in the last ``days`` days say about its context size (item 250), read on a
+        read-only connection."""
+        return await asyncio.to_thread(read_context_evidence, self._database, model, days, time.time())
 
     async def run_costs(self, run_id: str) -> RunCosts:
         """What the run cost and where it went, read on a read-only connection; its minutes run to now while it works."""

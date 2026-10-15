@@ -70,6 +70,7 @@ def _model(
         traits=ModelTraits(
             vision=vision,
             context_length=context,
+            window_source="published",
             max_output_tokens=max_output,
             efforts=efforts,
             reasoning=True,
@@ -133,6 +134,7 @@ CATALOG: dict[str, GoModel] = {
 _UNKNOWN_TRAITS: ModelTraits = ModelTraits(
     vision=False,
     context_length=200_000,
+    window_source="assumed",
     max_output_tokens=32_768,
     efforts=(),
     reasoning=True,

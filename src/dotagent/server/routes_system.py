@@ -1,5 +1,5 @@
-"""Routes for the state of the installation: health, the proof of the daemon, status, models, checks, desktop
-permissions, the emergency stop and screenshots."""
+"""Routes for the state of the installation: health, the proof of the daemon, status, models and their context sizes,
+checks, desktop permissions, the emergency stop and screenshots."""
 
 import asyncio
 import os
@@ -13,8 +13,10 @@ from fastapi.responses import FileResponse
 
 from dotagent import __version__
 from dotagent.agent.playbooks import PlaybookEntry, drop_playbook, list_playbooks, share_playbook
-from dotagent.config import AppConfig, ModelsConfig
-from dotagent.config_edit import set_default_model, set_resume, set_role_model
+from dotagent.agent.scaffold import context_budget, context_ceiling, context_choices, summarise_point
+from dotagent.agent.sizes import ContextSizes
+from dotagent.config import CONTEXT_FLOOR, AgentConfig, AppConfig, ModelsConfig
+from dotagent.config_edit import set_context_size, set_default_model, set_resume, set_role_model
 from dotagent.core.errors import (
     ConfigError,
     DotError,
@@ -61,6 +63,9 @@ from dotagent.server.context import ServerContext
 from dotagent.server.guard import daemon_proof
 from dotagent.server.palette import palette_view
 from dotagent.server.views import (
+    ContextChoice,
+    ContextEvidenceQuery,
+    ContextSizeRequest,
     ElsewhereChange,
     ElsewhereImport,
     ElsewhereImported,
@@ -89,14 +94,34 @@ from dotagent.server.views import (
 from dotagent.skills.catalog import load_skills, playbook_root
 from dotagent.skills.types import SkillCatalog
 from dotagent.store.models import ApprovalRecord, PushSubscription
+from dotagent.store.stats import ContextEvidence
 
 log = get_logger(__name__)
 
 _IMAGE_NAME: re.Pattern[str] = re.compile(r"^[0-9a-f]{24}\.(png|jpg|webp|gif)$")
 _PENDING_LIMIT: int = 500
+# The days of runs a model's context evidence is drawn from (item 250).
+_EVIDENCE_DAYS: int = 30
 
 
-def _option(provider: str, info: ModelInfo, default_effort: Effort) -> ModelOption:
+def _context_choice(config: AgentConfig, window: int | None, chosen: int | None) -> ContextChoice:
+    """The context size of the runs of a model whose request holds ``window`` tokens and whose size is ``chosen``."""
+    tokens: int = context_budget(config, window, chosen)
+    return ContextChoice(
+        tokens=tokens,
+        chosen=chosen,
+        default=context_budget(config, window, None),
+        configured=config.context_tokens,
+        floor=CONTEXT_FLOOR,
+        ceiling=context_ceiling(window),
+        sizes=list(context_choices(config, window, chosen)),
+        summarise_at=round(summarise_point(config, chosen, tokens)),
+    )
+
+
+def _option(
+    provider: str, info: ModelInfo, default_effort: Effort, agent: AgentConfig, sizes: ContextSizes
+) -> ModelOption:
     ref: ModelRef = ModelRef(provider=provider, model=info.id)
     return ModelOption(
         ref=ref.label,
@@ -105,6 +130,8 @@ def _option(provider: str, info: ModelInfo, default_effort: Effort) -> ModelOpti
         thinking=info.thinking,
         context_length=info.context_length,
         own_context_length=info.own_context_length,
+        window_source=info.window_source,
+        context=_context_choice(agent, info.context_length, sizes.of(ref.label)),
         efforts=list(info.efforts),
         default_effort=effective_effort(info.efforts, default_effort),
         free=info.free,
@@ -124,7 +151,9 @@ def _problem(exc: DotError) -> ProviderProblem:
     return "failed"
 
 
-async def _provider_models(router: ModelRouter, provider: str, default_effort: Effort) -> ProviderModels:
+async def _provider_models(
+    router: ModelRouter, provider: str, default_effort: Effort, agent: AgentConfig, sizes: ContextSizes
+) -> ProviderModels:
     """The models of one provider; a provider that cannot be reached is reported, it does not fail the others."""
     try:
         infos: tuple[ModelInfo, ...] = await (await router.provider(provider)).list_models()
@@ -132,7 +161,7 @@ async def _provider_models(router: ModelRouter, provider: str, default_effort: E
         return ProviderModels(provider=provider, models=[], error=exc.message, problem=_problem(exc))
     return ProviderModels(
         provider=provider,
-        models=[_option(provider, info, default_effort) for info in infos],
+        models=[_option(provider, info, default_effort, agent, sizes) for info in infos],
         error=None,
         problem=None,
     )
@@ -169,9 +198,13 @@ def system_router(ctx: ServerContext, pages: str) -> APIRouter:
         return await asyncio.to_thread(failsafe_path().exists)
 
     def models_now() -> ModelsConfig:
-        """The configured models, the default one and those of Dot's own work as the owner last chose them (items 199
-        and 232)."""
-        return ctx.runtime.roles.applied(config.models.model_copy(update={"main": ctx.manager.main_model()}))
+        """The configured models, the default one, those of Dot's own work and the context sizes as the owner last
+        chose them (items 199, 232 and 250)."""
+        return ctx.runtime.roles.applied(
+            config.models.model_copy(
+                update={"main": ctx.manager.main_model(), "context": ctx.runtime.context_sizes.all()}
+            )
+        )
 
     def resume_now() -> ResumeView:
         """Whether the daemon's next start resumes the runs it cut off, as the owner last chose (item 231)."""
@@ -224,7 +257,10 @@ def system_router(ctx: ServerContext, pages: str) -> APIRouter:
         default_effort: Effort = config.models.effort
         return list(
             await asyncio.gather(
-                *(_provider_models(ctx.runtime.router, name, default_effort) for name in KNOWN_PROVIDERS)
+                *(
+                    _provider_models(ctx.runtime.router, name, default_effort, config.agent, ctx.runtime.context_sizes)
+                    for name in KNOWN_PROVIDERS
+                )
             )
         )
 
@@ -265,6 +301,38 @@ def system_router(ctx: ServerContext, pages: str) -> APIRouter:
         await asyncio.to_thread(set_role_model, config_path(), request.role, request.model)
         ctx.runtime.roles.choose(request.role, request.model)
         return models_now()
+
+    @router.put("/models/context")
+    async def choose_context_size(request: ContextSizeRequest) -> ModelOption:
+        """Give the runs of ``model`` a context size of ``tokens`` from its next run on (item 250), or
+        ``[agent] context_tokens`` for ``None``: the config file keeps it in ``[models.context]``. A model its provider
+        does not offer is refused, as is a size below :data:`CONTEXT_FLOOR` or above three quarters of the model's
+        window, any size for a model whose provider does not say its window, and a config file that cannot be
+        changed; nothing changes then. The runs under way keep theirs."""
+        ref: ModelRef = parse_model_ref(request.model)
+        info: ModelInfo = await ctx.runtime.router.model_info(ref)
+        ceiling: int | None = context_ceiling(info.context_length)
+        if request.tokens is not None and ceiling is None:
+            raise ConfigError(
+                "the model's provider does not say how many tokens it holds, so its context size cannot be chosen",
+                {"model": ref.label},
+            )
+        if request.tokens is not None and ceiling is not None and not CONTEXT_FLOOR <= request.tokens <= ceiling:
+            raise ConfigError(
+                f"the context size of {ref.label} must be from {CONTEXT_FLOOR:,} to {ceiling:,} tokens, three quarters "
+                "of its window",
+                {"model": ref.label, "tokens": request.tokens, "window": info.context_length},
+            )
+        await asyncio.to_thread(set_context_size, config_path(), ref.label, request.tokens)
+        ctx.runtime.context_sizes.choose(ref.label, request.tokens)
+        return _option(ref.provider, info, config.models.effort, config.agent, ctx.runtime.context_sizes)
+
+    @router.get("/models/context")
+    async def context_evidence(query: Annotated[ContextEvidenceQuery, Query()]) -> ContextEvidence:
+        """What the runs of ``model`` of the last 30 days say about its context size (item 250): the input its steps
+        sent, the share of it its provider served from its cache, the compactions, and the seconds of a step by its
+        input. Read from the run history, which it does not change."""
+        return await ctx.runtime.store.context_evidence(parse_model_ref(query.model).label, _EVIDENCE_DAYS)
 
     @router.get("/skills/learned")
     async def learned_skills() -> LearnedSkillsView:

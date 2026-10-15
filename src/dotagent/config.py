@@ -46,9 +46,15 @@ def _spend_site(value: str) -> str:
     return value
 
 
+# The smallest context size a model's runs may be given (item 250, [models] context): the budget every run had before
+# 2026-10-11. A run's first step alone sends its instructions, its tools and the request (29,294 tokens at the median
+# of 48 runs, measured 2026-10-15), so a smaller budget would summarise a run after its first few steps.
+CONTEXT_FLOOR: int = 48_000
+
 type ServiceAddress = Annotated[str, AfterValidator(_service_address)]
 type ModelReference = Annotated[str, AfterValidator(_model_reference)]
 type SpendSite = Annotated[str, AfterValidator(_spend_site)]
+type ContextSize = Annotated[int, Field(ge=CONTEXT_FLOOR)]
 
 
 class ServerConfig(FrozenModel):
@@ -133,6 +139,8 @@ class ModelsConfig(FrozenModel):
     standby: list[ModelReference]
     # At most a day, the longest pause of the router (dotagent.llm.router.MAX_PAUSE_S).
     helper_cooldown_s: float = Field(gt=0, le=86_400, allow_inf_nan=False)
+    # The context size of a model's runs where it is not [agent] context_tokens (item 250); Settings › Models sets it.
+    context: dict[ModelReference, ContextSize]
 
     @field_validator("search")
     @classmethod

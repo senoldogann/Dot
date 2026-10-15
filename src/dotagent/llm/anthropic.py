@@ -76,9 +76,11 @@ def claude_traits(entry: JsonObject) -> ModelTraits:
         if _supported(capabilities, "effort")
         else ()
     )
+    window: int | None = get_int(entry, "max_input_tokens")
     return ModelTraits(
         vision=_supported(capabilities, "image_input"),
-        context_length=get_int(entry, "max_input_tokens") or _DEFAULT_CONTEXT,
+        context_length=window or _DEFAULT_CONTEXT,
+        window_source="provider" if window else "assumed",
         max_output_tokens=get_int(entry, "max_tokens") or _DEFAULT_OUTPUT,
         efforts=(*off, *levels) if adaptive else (),
         reasoning=adaptive,

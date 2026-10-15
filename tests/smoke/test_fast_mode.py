@@ -163,6 +163,7 @@ class Claude:
             thinking=True,
             context_length=1_000_000,
             own_context_length=None,
+            window_source="assumed",
             efforts=("low", "medium", "high", "max"),
             free=False,
         )

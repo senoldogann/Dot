@@ -161,8 +161,9 @@ function buildFlock() {
  * The timeline of the run `rootRunId`, which was created at `startedAt` (seconds). `push(record)` takes events in order; the
  * callbacks tell the page about what the timeline cannot show by itself: `onGrow()` after every event, `onPlan(steps, targets)`,
  * `onStats({ step, input, output })` after every model turn and every side call of the run (`step` 0: a compaction, a
- * review, a description of images), `onScaffold({ context_tokens, window })` for the run's scaffold event (its context
- * budget and its model's window), `onCalls({ calls, failed })` after every tool call of the run,
+ * review, a description of images), `onScaffold({ contextTokens, window, chosen, summariseAt })` for the run's scaffold
+ * event (its context budget, its model's window, the size chosen for the model and the prompt past which the run
+ * summarizes), `onCalls({ calls, failed })` after every tool call of the run,
  * `onRunStatus({ status, model, endedAt })` (`endedAt` is null until the run is over), `onAnswer(node)` when the answer is
  * on the page, `onImage(name)` for every screenshot a tool returned and `onBrowserStep()` for the root run's first
  * browser tool call (Dot's computer starts its view on it). `sendAgain(text, files)` sends a message written to the run
@@ -931,16 +932,22 @@ export function createTimeline({ rootRunId, actorId, startedAt, onGrow, onPlan, 
     },
 
     // How much help the run's model gets. Shown only where it differs from the configuration: a context budget cut to
-    // fit the model's window, and reminders of the goal for a model of the weak tier. The run's own budget and window go
-    // to the context meter (item 222).
+    // fit the model's window or set by the size chosen for the model (item 250), and reminders of the goal for a model
+    // of the weak tier. The run's own budget and window go to the context meter (item 222). A scaffold event of before
+    // item 250 names no chosen size and no point of summary.
     scaffold(scope, record) {
       const data = record.data;
+      const chosen = typeof data.chosen === "number" ? data.chosen : null;
       if (scope.runId === rootRunId) {
-        onScaffold({ context_tokens: data.context_tokens, window: data.window });
+        onScaffold({ contextTokens: data.context_tokens, window: data.window, chosen, summariseAt: typeof data.summarise_at === "number" ? data.summarise_at : null });
       }
-      if (data.cut_to_window) {
-        const output = `tool output up to ${compact(data.tool_output_chars)} characters`;
+      const output = `tool output up to ${compact(data.tool_output_chars)} characters`;
+      if (data.cut_to_window && chosen !== null) {
+        note(scope, record.ts, "sliders", `Context budget ${compact(data.context_tokens)} tokens, the ${compact(chosen)} chosen for the model in Settings cut to fit its window of ${compact(data.window)}, ${output}`, "");
+      } else if (data.cut_to_window) {
         note(scope, record.ts, "sliders", `Context budget ${compact(data.context_tokens)} tokens to fit the model's window of ${compact(data.window)}, ${output}`, "");
+      } else if (chosen !== null) {
+        note(scope, record.ts, "sliders", `Context budget ${compact(data.context_tokens)} tokens, the size chosen for the model in Settings, ${output}`, "");
       }
       if (data.reminder_every !== null) {
         note(scope, record.ts, "target", `The goal is repeated every ${data.reminder_every} steps: ${data.reason}`, "");

@@ -59,6 +59,10 @@ standby = []
 # A model that answered with such an error is left out of the helpers and the standby models for the time its provider
 # named (at most a day), or for this many seconds (at most 86400); a call it answers, or a new key, ends that.
 helper_cooldown_s = 600
+# The context size of a model's runs where it is not [agent] context_tokens (item 250): how much of a run its steps
+# send before the older part is summarised. Settings › Models sets it, at least 48000 and at most three quarters of the
+# model's window, as a table of its own: [models.context] with "anthropic:claude-opus-5-5" = 192000.
+context = {}
 
 [providers.ollama]
 base_url = "http://localhost:11434"

@@ -240,10 +240,11 @@ def test_a_thread_brings_back_the_groups_whose_tools_its_model_called() -> None:
     assert used_groups(history) == frozenset({"browser", "core", "mcp__wiki"})
 
 
-def _scaffold(tier: Tier, context_tokens: int) -> Scaffold:
+def _scaffold(tier: Tier, context_tokens: int, chosen: int | None) -> Scaffold:
     return Scaffold(
         model="ollama:a",
         window=None,
+        chosen=chosen,
         context_tokens=context_tokens,
         tool_output_chars=12_000,
         tier=tier,
@@ -254,17 +255,31 @@ def _scaffold(tier: Tier, context_tokens: int) -> Scaffold:
 
 def test_auto_groups_the_tools_of_a_weak_model_and_of_a_window_that_cut_the_budget() -> None:
     assert DEFAULTS.tool_surface == "full"
-    assert surface_for(DEFAULTS, _scaffold("weak", 18_000)) == ("full", '[agent] tool_surface is "full"')
-    assert surface_for(GROUPED, _scaffold("standard", 48_000)) == ("grouped", '[agent] tool_surface is "grouped"')
-    assert surface_for(AUTO, _scaffold("weak", 48_000)) == (
+    assert surface_for(DEFAULTS, _scaffold("weak", 18_000, None)) == ("full", '[agent] tool_surface is "full"')
+    assert surface_for(GROUPED, _scaffold("standard", 48_000, None)) == ("grouped", '[agent] tool_surface is "grouped"')
+    assert surface_for(AUTO, _scaffold("weak", 48_000, None)) == (
         "grouped",
         '[agent] tool_surface is "auto" and the model is in the weak tier',
     )
-    assert surface_for(AUTO, _scaffold("standard", 18_000)) == (
+    assert surface_for(AUTO, _scaffold("standard", 18_000, None)) == (
         "grouped",
         '[agent] tool_surface is "auto" and the model\'s window cut the context budget to 18,000 tokens',
     )
-    assert surface_for(AUTO, _scaffold("standard", 96_000))[0] == "full"
+    assert surface_for(AUTO, _scaffold("standard", 96_000, None))[0] == "full"
+    # A context size chosen for the model under [agent] context_tokens groups them too (item 250), a larger one not; a
+    # window that cut the chosen size is the window's doing.
+    assert surface_for(AUTO, _scaffold("standard", 64_000, 64_000)) == (
+        "grouped",
+        '[agent] tool_surface is "auto" and the context size chosen for the model, 64,000 tokens, is below '
+        "[agent] context_tokens",
+    )
+    assert surface_for(AUTO, _scaffold("standard", 18_000, 64_000)) == (
+        "grouped",
+        '[agent] tool_surface is "auto" and the model\'s window cut the context budget to 18,000 tokens',
+    )
+    assert surface_for(AUTO, _scaffold("standard", 192_000, 192_000))[0] == "full"
+    # A chosen size the window cut, to a budget still above [agent] context_tokens, keeps them whole as no size does.
+    assert surface_for(AUTO, _scaffold("standard", 153_600, 192_000))[0] == "full"
 
 
 def _outcome(call_id: str, name: str, arguments: JsonObject, result: ToolResult) -> ToolOutcome:

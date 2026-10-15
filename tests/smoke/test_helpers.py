@@ -100,6 +100,7 @@ class SpendingProvider:
             thinking=False,
             context_length=128_000,
             own_context_length=None,
+            window_source="assumed",
             efforts=("low", "medium", "high"),
             free=False,
         )

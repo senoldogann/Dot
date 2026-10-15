@@ -49,6 +49,7 @@ def _model(name: str, tools: bool, free: bool) -> ModelInfo:
         thinking=False,
         context_length=None,
         own_context_length=None,
+        window_source=None,
         efforts=(),
         free=free,
     )

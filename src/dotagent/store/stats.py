@@ -43,6 +43,12 @@ _PER_STEPS: int = 100
 _NOTES_SHOWN: int = 10
 # How much of a failed result's text the statistics read: the cause is in its first line.
 _FAILURE_CHARS: int = 200
+# The buckets of a step's input that the seconds of its model call are told apart by (item 250), each up to its number
+# of tokens; the last one is open.
+_INPUT_BUCKETS: tuple[int, ...] = (32_000, 64_000, 96_000, 192_000)
+# The share of the steps whose input the second input figure of a model's context evidence does not exceed.
+_LARGE_SHARE: float = 0.95
+_DAY_S: float = 86_400.0
 # The scope of the rows: the runs created since a time, or one run.
 _SINCE_SCOPE: str = "r.created_at >= ?"
 _RUN_SCOPE: str = "r.id = ?"
@@ -147,6 +153,30 @@ SELECT (SELECT COUNT(*) FROM recent),
        COALESCE(SUM(e.kind = 'stall'), 0),
        COALESCE(SUM(e.kind = 'compacted'), 0)
 FROM events e WHERE e.run_id IN (SELECT id FROM recent)
+"""
+
+# One row per step call of one model that answered and measured its input, in the runs created since a time: the input
+# tokens it sent, the part of them the provider served from its cache, its seconds and its run.
+_CONTEXT_CALLS_SQL: str = """
+SELECT json_extract(e.data, '$.input_tokens'), json_extract(e.data, '$.cached_tokens'), json_extract(e.data, '$.seconds'),
+       e.run_id
+FROM runs r JOIN events e ON e.run_id = r.id
+WHERE r.created_at >= ? AND e.kind = ? AND json_extract(e.data, '$.purpose') = 'step'
+  AND json_extract(e.data, '$.model') = ? AND json_extract(e.data, '$.error') IS NULL
+  AND json_extract(e.data, '$.input_tokens') > 0
+"""
+# One row per first step of the runs of one model created since a time that measured its input: the input it sent.
+_FIRST_STEPS_SQL: str = """
+SELECT json_extract(e.data, '$.input_tokens')
+FROM runs r JOIN events e ON e.run_id = r.id
+WHERE r.created_at >= ? AND r.model = ? AND e.kind = 'assistant' AND json_extract(e.data, '$.step') = 1
+  AND json_extract(e.data, '$.input_tokens') > 0
+"""
+# One row: the compactions of the runs of one model created since a time, and the runs that had one.
+_COMPACTIONS_SQL: str = """
+SELECT COUNT(*), COUNT(DISTINCT r.id)
+FROM runs r JOIN events e ON e.run_id = r.id
+WHERE r.created_at >= ? AND r.model = ? AND e.kind = 'compacted'
 """
 
 
@@ -460,6 +490,122 @@ def read_model_profile(database: Path, model: str, runs: int) -> ModelProfile:
         empty_replies=int(str(row[6])),
         stalls=int(str(row[7])),
         compactions=int(str(row[8])),
+    )
+
+
+class ContextCall(FrozenModel):
+    """One step call of a model that answered: the input tokens it sent, the part of them the provider served from its
+    cache, its seconds and its run."""
+
+    input_tokens: int
+    cached_tokens: int
+    seconds: float
+    run_id: str
+
+
+class InputBucket(FrozenModel):
+    """The step calls of a model whose input was above ``above`` and at most ``up_to`` tokens (``None`` for the open
+    last bucket), and the median of their seconds."""
+
+    above: int
+    up_to: int | None
+    steps: int
+    seconds_median: float
+
+
+class ContextEvidence(FrozenModel):
+    """What the runs of one model created in the last ``days`` days say about its context size (item 250): ``steps``
+    step calls that answered, in ``runs`` runs; the input tokens a step sent at the median, at most for 95 % of the
+    steps, and at most; the share of the input the provider served from its cache; the input of a run's first step at
+    the median, what a run sends before it has done anything (its instructions, its tools and the request); the
+    compactions and the runs that had one; and the seconds of a step by its input, for the buckets that have steps."""
+
+    model: str
+    days: int
+    runs: int
+    steps: int
+    input_median: int | None
+    input_p95: int | None
+    input_max: int | None
+    cached_share: float | None
+    first_step_median: int | None
+    compactions: int
+    compacted_runs: int
+    buckets: tuple[InputBucket, ...]
+
+
+def input_buckets(calls: Sequence[ContextCall]) -> tuple[InputBucket, ...]:
+    """The seconds of ``calls`` by their input (:data:`_INPUT_BUCKETS`), for the buckets that have calls."""
+    buckets: list[InputBucket] = []
+    for low, high in zip((0, *_INPUT_BUCKETS), (*_INPUT_BUCKETS, None), strict=True):
+        seconds: list[float] = [
+            call.seconds for call in calls if call.input_tokens > low and (high is None or call.input_tokens <= high)
+        ]
+        if seconds:
+            buckets.append(
+                InputBucket(above=low, up_to=high, steps=len(seconds), seconds_median=statistics.median(seconds))
+            )
+    return tuple(buckets)
+
+
+def context_evidence(
+    model: str,
+    days: int,
+    calls: Sequence[ContextCall],
+    first_steps: Sequence[int],
+    compactions: int,
+    compacted_runs: int,
+) -> ContextEvidence:
+    """The context evidence of ``model`` from the step calls, the first steps and the compactions of its runs."""
+    inputs: list[float] = [float(call.input_tokens) for call in calls]
+    total: int = sum(call.input_tokens for call in calls)
+    large: float | None = nearest_rank(inputs, _LARGE_SHARE)
+    return ContextEvidence(
+        model=model,
+        days=days,
+        runs=len({call.run_id for call in calls}),
+        steps=len(calls),
+        input_median=round(statistics.median(inputs)) if inputs else None,
+        input_p95=None if large is None else round(large),
+        input_max=max((call.input_tokens for call in calls), default=None),
+        cached_share=None if total == 0 else sum(call.cached_tokens for call in calls) / total,
+        first_step_median=round(statistics.median(first_steps)) if first_steps else None,
+        compactions=compactions,
+        compacted_runs=compacted_runs,
+        buckets=input_buckets(calls),
+    )
+
+
+def read_context_evidence(database: Path, model: str, days: int, now: float) -> ContextEvidence:
+    """The context evidence of ``model`` from its runs created in the ``days`` days before ``now``. The database is
+    opened read-only, so a running daemon is not disturbed. Blocking."""
+    since: float = now - days * _DAY_S
+    try:
+        with closing(sqlite3.connect(f"{database.as_uri()}?mode=ro", uri=True, timeout=_BUSY_TIMEOUT_S)) as connection:
+            calls: list[tuple[object, ...]] = connection.execute(
+                _CONTEXT_CALLS_SQL, (since, CALL_EVENT, model)
+            ).fetchall()
+            firsts: list[tuple[object, ...]] = connection.execute(_FIRST_STEPS_SQL, (since, model)).fetchall()
+            compacted: tuple[object, ...] = connection.execute(_COMPACTIONS_SQL, (since, model)).fetchone()
+    except sqlite3.Error as error:
+        raise StoreError(
+            "the run history could not be read", {"database": str(database), "model": model, "error": str(error)}
+        ) from error
+    return context_evidence(
+        model,
+        days,
+        [
+            ContextCall(
+                input_tokens=int(_number(row[0], "input_tokens")),
+                cached_tokens=int(_number(row[1], "cached_tokens")),
+                seconds=_number(row[2], "seconds"),
+                run_id=str(row[3]),
+            )
+            for row in calls
+        ],
+        [int(_number(row[0], "input_tokens")) for row in firsts],
+        int(str(compacted[0])),
+        int(str(compacted[1])),
     )
 
 

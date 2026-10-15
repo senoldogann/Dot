@@ -59,6 +59,7 @@ def _reasoning(context: int, max_output: int, efforts: tuple[str, ...], vision: 
     return ModelTraits(
         vision=vision,
         context_length=context,
+        window_source="published",
         max_output_tokens=max_output,
         efforts=efforts,
         reasoning=True,
@@ -71,6 +72,7 @@ def _plain(context: int, max_output: int, vision: bool) -> ModelTraits:
     return ModelTraits(
         vision=vision,
         context_length=context,
+        window_source="published",
         max_output_tokens=max_output,
         efforts=(),
         reasoning=False,
@@ -113,8 +115,10 @@ RULES: tuple[TraitRule, ...] = (
     TraitRule(prefix="o4", traits=_reasoning(200_000, 100_000, _CLASSIC_EFFORTS, True)),
 )
 # An unknown "gpt-" id is assumed to be a newer reasoning model; any other unknown id a plain text model.
-_UNKNOWN_GPT: ModelTraits = _reasoning(128_000, 16_384, _CLASSIC_EFFORTS, True)
-_UNKNOWN_PLAIN: ModelTraits = _plain(128_000, 8_192, False)
+_UNKNOWN_GPT: ModelTraits = _reasoning(128_000, 16_384, _CLASSIC_EFFORTS, True).model_copy(
+    update={"window_source": "assumed"}
+)
+_UNKNOWN_PLAIN: ModelTraits = _plain(128_000, 8_192, False).model_copy(update={"window_source": "assumed"})
 
 
 def openai_traits(model: str) -> ModelTraits:

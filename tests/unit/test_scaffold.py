@@ -47,6 +47,7 @@ def _info(window: int | None) -> ModelInfo:
         thinking=False,
         context_length=window,
         own_context_length=None,
+        window_source=None if window is None else "published",
         efforts=(),
         free=False,
     )
@@ -69,20 +70,23 @@ def _profile(model: str, tool_calls: int, refused_calls: int) -> ModelProfile:
 
 def test_the_budget_follows_a_small_window_and_the_tool_output_shrinks_with_it() -> None:
     quiet: ModelProfile = _profile("ollama:a", 0, 0)
-    small: Scaffold = scaffold_for(DEFAULTS, _info(32768), quiet)
+    small: Scaffold = scaffold_for(DEFAULTS, _info(32768), quiet, None)
     assert (small.window, small.context_tokens, small.tool_output_chars) == (32768, 24576, 3072)
     # Tool output never shrinks below 2000 characters.
-    tiny: Scaffold = scaffold_for(DEFAULTS, _info(8192), quiet)
+    tiny: Scaffold = scaffold_for(DEFAULTS, _info(8192), quiet, None)
     assert (tiny.context_tokens, tiny.tool_output_chars) == (6144, 2000)
     # A large window, or none reported, leaves the configured budgets as they are.
     for window in (128_000, 1_048_576, None):
-        roomy: Scaffold = scaffold_for(DEFAULTS, _info(window), quiet)
+        roomy: Scaffold = scaffold_for(DEFAULTS, _info(window), quiet, None)
         assert (roomy.context_tokens, roomy.tool_output_chars) == (96000, 12000)
         assert scaffold_event(roomy, DEFAULTS)["cut_to_window"] is False
     assert scaffold_event(small, DEFAULTS) == {
         "model": "ollama:a",
         "window": 32768,
+        "chosen": None,
         "context_tokens": 24576,
+        # A budget that small has no share to spare: the run summarises when it is full.
+        "summarise_at": 24576,
         "tool_output_chars": 3072,
         "cut_to_window": True,
         "tier": "standard",
@@ -147,24 +151,24 @@ def test_the_tier_is_measured_only_when_asked_and_a_hand_set_tier_always_wins() 
     assert choose_tier(by_hand, _profile("ollama:a", 0, 0)) == ("weak", "set by hand in [agent] tiers")
     measured_by_hand: AgentConfig = by_hand.model_copy(update={"scaffold": "measured"})
     assert choose_tier(measured_by_hand, _profile("ollama:b", 100, 90))[0] == "standard"
-    assert scaffold_for(by_hand, _info(None), _profile("ollama:a", 0, 0)).reminder_every == 6
-    assert scaffold_for(by_hand, _info(None), _profile("ollama:b", 0, 0)).reminder_every is None
+    assert scaffold_for(by_hand, _info(None), _profile("ollama:a", 0, 0), None).reminder_every == 6
+    assert scaffold_for(by_hand, _info(None), _profile("ollama:b", 0, 0), None).reminder_every is None
 
 
 def test_a_weak_model_is_reminded_every_few_steps_of_a_task_or_research_run() -> None:
-    weak: Scaffold = scaffold_for(MEASURED, _info(None), _profile("ollama:a", 100, 50))
+    weak: Scaffold = scaffold_for(MEASURED, _info(None), _profile("ollama:a", 100, 50), None)
     assert not reminder_due(weak, "task", 5, 0)
     assert reminder_due(weak, "task", 6, 0)
     assert not reminder_due(weak, "task", 11, 6)
     assert reminder_due(weak, "task", 12, 6)
     assert reminder_due(weak, "research", 6, 0)
     assert not reminder_due(weak, "chat", 6, 0)
-    standard: Scaffold = scaffold_for(MEASURED, _info(None), _profile("ollama:a", 100, 0))
+    standard: Scaffold = scaffold_for(MEASURED, _info(None), _profile("ollama:a", 100, 0), None)
     assert not reminder_due(standard, "task", 60, 0)
 
 
 def test_a_window_that_cannot_hold_the_fixed_part_of_the_prompt_refuses_the_run() -> None:
-    tiny: Scaffold = scaffold_for(DEFAULTS, _info(8192), _profile("ollama:a", 0, 0))
+    tiny: Scaffold = scaffold_for(DEFAULTS, _info(8192), _profile("ollama:a", 0, 0), None)
     require_room(tiny, 6143)
     with pytest.raises(ConfigError, match="window is too small"):
         require_room(tiny, 6144)
@@ -258,7 +262,7 @@ def test_the_profile_counts_the_newest_finished_runs_of_one_model(database: Path
 
 def test_a_profile_and_the_scaffold_of_the_next_run_are_rendered_in_plain_words(database: Path) -> None:
     profile: ModelProfile = read_model_profile(database, "ollama:a", 30)
-    assert render_profile(profile, scaffold_for(MEASURED, _info(32768), profile)) == [
+    assert render_profile(profile, scaffold_for(MEASURED, _info(32768), profile, None)) == [
         "ollama:a, its newest 2 finished runs: 13 steps",
         "  tools: 4 calls, 3 failed (75 %), 2 refused before they ran (50 %), 1 with arguments that were not valid JSON",
         "  replies with neither text nor a tool call 1, stalls 1, compactions 1",
@@ -269,7 +273,7 @@ def test_a_profile_and_the_scaffold_of_the_next_run_are_rendered_in_plain_words(
     ]
     unknown: ModelProfile = read_model_profile(database, "ollama:none", 30)
     weak: AgentConfig = DEFAULTS.model_copy(update={"tiers": {"ollama:none": "weak"}})
-    assert render_profile(unknown, scaffold_for(weak, _info(None), unknown)) == [
+    assert render_profile(unknown, scaffold_for(weak, _info(None), unknown, None)) == [
         "ollama:none: no finished runs yet",
         "Its next run:",
         "  window not reported by its provider, context budget 96,000 tokens, tool output up to 12,000 characters",
