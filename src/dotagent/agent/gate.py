@@ -3,7 +3,7 @@ approval modes answers the policy's questions without the user."""
 
 import asyncio
 import time
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 
 from dotagent.agent.approvals import ApprovalBroker, ApprovalOutcome
 from dotagent.agent.review import Reviewer, ReviewRequest, ReviewVerdict, shorten_reason
@@ -17,7 +17,7 @@ from dotagent.policy.pace import DAY_S, PacedAction, pace_refusal, paced_action,
 from dotagent.policy.spend import SpendState, render_amount, spend_allowance, spend_host, spend_state
 from dotagent.policy.types import TAINTING_KINDS, ActionInfo, ApprovalMode, Decision, Preset, Route
 from dotagent.store.db import Store
-from dotagent.store.models import RuleRecord, RunMode
+from dotagent.store.models import EventRecord, RuleRecord, RunMode
 
 log = get_logger(__name__)
 
@@ -30,6 +30,10 @@ REVIEWER_DECIDER: str = "reviewer"
 TAKEOVER_EVENT: str = "takeover"
 HANDBACK_EVENT: str = "handback"
 
+# The events that say whether a run is tainted after them (item 243): it starts so or not (``run_queued``), a tool's
+# result may taint it (``tool_result``), and a message of the owner that steers it clears the taint (``steer``).
+TAINT_EVENTS: tuple[str, ...] = ("run_queued", "tool_result", "steer")
+
 
 def hold_note(seconds: float) -> str:
     """What a tool result says when the user held the run while it waited to run that tool."""
@@ -37,6 +41,16 @@ def hold_note(seconds: float) -> str:
         f"[The user took over the browser and used it themselves for {seconds:.0f} s before this ran. The page may "
         "have changed: take a snapshot before you act on it.]"
     )
+
+
+def tainted_after(events: Sequence[EventRecord]) -> bool:
+    """Whether a run was tainted after the newest of ``events``, its newest event of each of :data:`TAINT_EVENTS`: a
+    steer clears the taint, and the others hold whether the run was tainted then. An event stored before they held it
+    counts as untainted, as a run that went on from it was then."""
+    if not events:
+        return False
+    newest: EventRecord = max(events, key=lambda event: event.id)
+    return newest.kind != "steer" and newest.data.get("tainted") is True
 
 
 def _describe(info: ActionInfo) -> JsonObject:

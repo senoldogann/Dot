@@ -632,7 +632,9 @@ from then on outward-facing or lasting actions (messages, posts, follows and lik
 schedule or a note, and a shell line that sends data out: an upload or a form, a push, a copy to another machine, a
 change on a code host, inline code that reaches the network or runs a command of it) ask even when the preset or an
 `allow` rule would let them through; only a `preapproved` rule skips the question. A message you send to the run clears
-the mark. A delegated run starts as untrusted as its parent.
+the mark. A delegated run starts as untrusted as its parent, a resumed run as the run it resumes was when it was cut off,
+and the run that tells a chat that its command in the background ended as the chat's last run ended: that message is
+Dot's, not yours. A message you send starts a run unmarked.
 
 **Secrets.**
 

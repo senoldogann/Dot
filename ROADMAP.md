@@ -5180,8 +5180,8 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 239 | The meter says why the budget is smaller than the window                             | done        | 75bcb6e |
 | 240 | Dot's own work leaves a paused fast model out                                        | done        | 87b5cfc |
 | 241 | The redactor masks more keys, any Authorization and cookies                          | done        | dfbebce |
-| 242 | The approval card and the reviewer see the whole command                             | in progress |         |
-| 243 | A run that goes on from another keeps its taint                                      | planned     |         |
+| 242 | The approval card and the reviewer see the whole command                             | done        | cbd4a68 |
+| 243 | A run that goes on from another keeps its taint                                      | in progress |         |
 
 ### 77. The type system: Inter and Geist Mono, seven sizes, three weights
 
@@ -10954,7 +10954,7 @@ header. Words that only look like them are left alone.
 
 ### 242. The approval card and the reviewer see the whole command
 
-**Status: in progress.**
+**Status: done.** Merged as `cbd4a68` (PR #283; no Linear issue, the Linear connector was signed out).
 
 **As built (2026-10-15).** An approval card (`js/approvals.js`) shows what the action acts on whole, in a box of its own
 (`.approval-target`): wrapped at any width, it scrolls within the card past twelve lines, and the keyboard reaches it.
@@ -10972,7 +10972,18 @@ and its end, with how much was left out between.
 
 ### 243. A run that goes on from another keeps its taint
 
-**Status: planned.**
+**Status: in progress.**
+
+**As built (2026-10-15).** Each `tool_result` event holds whether the run is tainted after it, and `run_queued` whether
+the run starts so (`agent/executor.py`, `agent/manager.py`). `tainted_after` (`agent/gate.py`) reads it from the newest
+of a run's `run_queued`, `tool_result` and `steer` events: a steer clears the taint, and an event stored before they
+held it counts as untainted. A run starts as tainted as the run it goes on from (`RunManager._starts_tainted`): a
+delegated run as its parent is now, as before; a resumed run as the run it resumes was when it was cut off; and the run
+that tells a chat that its command in the background ended as the chat's last run ended. A message of the owner starts a
+run untainted. Tests: `tests/smoke/test_taint_goes_on.py` plays a run that reads a terminal and leaves a command in the
+background: the run that tells of its end asks before it saves a note, and so does a run resumed after a shutdown cut
+off such a run, while a message of the owner saves its note without asking (on the code of before the first two saved it
+without asking); `tests/unit/test_taint_events.py` reads seven sets of events.
 
 **What.** A run's events say whether it was tainted: each `tool_result` after its result, and `run_queued` as the run
 starts. A run that resumes another starts tainted when that one was at the cut, and so does a run Dot starts in a chat
@@ -11661,3 +11672,4 @@ run untainted and a steer clears the taint, as before.
 - 2026-10-15 (Opus 5.5): item 239 merged as `75bcb6e` (PR #279; no Linear issue, the connector was signed out): the context meter's panel says why a run's budget is smaller than the model's window, as each step sends the model the whole run again, and that `[agent] context_tokens` sets it, up to three quarters of the window.
 - 2026-10-15 (Opus 5.5): item 240 merged as `87b5cfc` (PR #280; no Linear issue, the connector was signed out): a run's summary and `web_extract` leave the fast model out while the router has paused it after a quota, rate-limit or key error: the run's own model writes the summary at once, and `web_extract` says until when the fast model cannot answer. Part 38 is done.
 - 2026-10-15 (Opus 5.5): item 241 merged as `dfbebce` (PR #282; no Linear issue, the connector was signed out): the redactor also masks the keys of Stripe, GitLab, npm, Hugging Face, Twilio and SendGrid by their prefixes, an Azure account key and a service account's `private_key_id`, the credentials of an Authorization header of any scheme, and the cookies of a Cookie or Set-Cookie header.
+- 2026-10-15 (Opus 5.5): item 242 merged as `cbd4a68` (PR #283; no Linear issue, the connector was signed out): an approval card shows the whole of what an action acts on, wrapped, in a box that scrolls past twelve lines; the reviewer of an `auto` run reads up to 12,000 characters of it, and of a longer one its start and its end.

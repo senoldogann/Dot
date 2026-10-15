@@ -228,6 +228,8 @@ async def _execute_one(
             "site": _site(call, action),
             "steps": batch_steps(call.arguments),
             "channel": channel_of(call.name),
+            # Whether the run is tainted after this result: a run that goes on from it takes it over (item 243).
+            "tainted": gate.tainted,
         },
         True,
     )
