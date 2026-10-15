@@ -1215,17 +1215,18 @@ them, and the fold is kept. Working lists too what is no chat's: a schedule abou
 days, and what it asks stands under **Waiting for you**. Working counts what it lists, and Activity the runs that work,
 which it shows under the run too. Folded, Working keeps the open chat in sight, and the search finds the chats at work
 too. Above the list: a search over the titles (⌘K or `/`), **New chat** (⇧⌘O) and the ways to **Agents**, **Activity**
-and **Campaigns**; in the foot, **Settings** and the red square of the **Emergency stop**, which stays there while the
-sidebar is closed (item 273): the top bar then holds the sidebar's opener alone, the size of the sidebar's own buttons
-and of the side panel's switch and close. The top bar shows only what needs you: the approvals waiting, and the
-connection to the daemon while it is being made or lost; what works stands under Working. The sections (Waiting for you,
-Working, Chats) fold on a click of their label, and the folds are kept between visits. The sidebar's head holds only the
-button that folds it away. **Select** turns the list into checkboxes: tick chats (or Select all) and **Delete** asks
-once, then removes them with every run, step, event and approval of theirs. A chat with a run under way is refused, the
-run of a `dotx` command too: wait for the run to end, or cancel it (a `dotx` command's with Ctrl-C). Escape leaves the
-selection. Under 860 px the sidebar becomes a drawer. The list stays where you scrolled it while it is painted again (a
-chat deleted, pinned, renamed or marked, chats deleted under Select, a run that starts or ends, a follow-up in the open
-chat): it brings the open chat into view only when the page comes to another chat (item 204).
+and **Campaigns**; in the foot, the **Connect apps** pill ([Connect apps](#connect-apps)) above **Settings** and the red
+square of the **Emergency stop**, which stays there while the sidebar is closed (item 273): the top bar then holds the
+sidebar's opener alone, the size of the sidebar's own buttons and of the side panel's switch and close. The top bar
+shows only what needs you: the approvals waiting, and the connection to the daemon while it is being made or lost; what
+works stands under Working. The sections (Waiting for you, Working, Chats) fold on a click of their label, and the folds
+are kept between visits. The sidebar's head holds only the button that folds it away. **Select** turns the list into
+checkboxes: tick chats (or Select all) and **Delete** asks once, then removes them with every run, step, event and
+approval of theirs. A chat with a run under way is refused, the run of a `dotx` command too: wait for the run to end, or
+cancel it (a `dotx` command's with Ctrl-C). Escape leaves the selection. Under 860 px the sidebar becomes a drawer. The
+list stays where you scrolled it while it is painted again (a chat deleted, pinned, renamed or marked, chats deleted
+under Select, a run that starts or ends, a follow-up in the open chat): it brings the open chat into view only when the
+page comes to another chat (item 204).
 
 A chat's menu, after T3 Code's thread menu, opens from the **…** button at the right of its row (shown where the pointer
 rests or the focus is, over the time, and always on a touch screen), from a right-click on the row, or from the
@@ -1658,6 +1659,7 @@ The REST API (all under `/api`; bodies and replies are JSON, event streams are s
 | `GET\|POST\|DELETE /failsafe`, `GET /images/{name}`                             | emergency stop; screenshots of runs                          |
 | `GET /browser`, `POST /browser/mode` (`{"mode": "own"\|"attach"}`)              | which Chrome Dot browses with and what Chrome allows; switch it (409 while runs are active, 422 when Chrome refuses) |
 | `POST /browser/debug-port` (`{"debug_port": 9222}`, 0 for none)                 | the DevTools port of Dot's own Chrome (409 while runs are active, 422 below 1024 or when another program holds the port) |
+| `GET /connections`, `POST /connections/{id}`                                    | the applications of Connect apps, where each stands (`state`) and its step (`step`); take the step: ask macOS (a minute for your answer), show the Automation pane, open OneDrive, or open the sign-in page in Dot's browser (404 for no such application, 409 for a sign-in in My Chrome or in a browser without a window) |
 | `GET /phone`, `POST /phone/pairing`                                             | the addresses a phone reaches Dot at (`[server] reach`); a new pairing code (item 267) |
 | `POST /phone/pair` (public; `{"code": "7KQ2-M9XD"}`)                            | the access token for a good pairing code, once (403 when it is wrong, used or out of date) |
 | `POST /desktop/permissions`                                                     | make macOS ask for the desktop permissions the daemon lacks  |
@@ -2203,6 +2205,30 @@ last one was cut off. A session whose `dotx` command died (the first one, from `
 daemon within half a minute, and the next one starts `campaign_gap_minutes` after that. The threads of the sessions
 after the first are not in the chat list; the campaign's page links them. What you write in the campaign's conversation,
 and your answers to their questions, are instructions of the sessions after it.
+
+## Connect apps
+
+**Connect apps**, the pill in the sidebar's foot (item 278), lists the applications Dot works with, each with what Dot
+does with it, where it stands and the one step that sets it up; **Check again** reads them all anew.
+
+- **On this Mac**: Mail, Calendar, Notes, Reminders, Messages, Contacts, Excel, Word, PowerPoint and Outlook, which Dot
+  drives with AppleScript. macOS lets an app send Apple events to another only once you have said yes to its question
+  (Privacy & Security › Automation), so a row says **Allowed**, **Not asked yet**, **Refused**, **Not checked** (macOS
+  tells about an application only while it runs) or **Not installed**. **Allow** asks macOS, which shows its question
+  on the Mac; an application that is not open is opened hidden first, without coming to the front. The page waits a
+  minute for your answer, then says that the question waits on the Mac. After a no macOS does not ask again: **Open
+  System Settings** opens the Automation pane, and the row says what to switch on there, under the app that runs Dot
+  (Terminal, iTerm, Claude, or the Dot service).
+- **Your files**: OneDrive, whose folders (`~/Library/CloudStorage/OneDrive-*`) Dot's `onedrive` skill works in. It
+  says **Syncing** once a folder of it is there; else **Open** opens OneDrive to sign in.
+- **On the web**: Google, Microsoft 365, GitHub, Slack, Notion, LinkedIn, X and Instagram, used in Dot's own browser.
+  A row says **Signed in** when that browser holds a cookie the site keeps only for a signed-in visitor, read by host
+  and name and never by value: from Chrome while it runs, else from a copy of its profile's cookie file. **Sign in**
+  opens the sign-in page in a tab of Dot's browser on the Mac. With My Chrome (Settings › Browser) Dot works in your own
+  Chrome, where you are signed in as you always are; a browser without a window (`headless = true` under `[browser]`)
+  has none to sign in in, which the section says once.
+
+A sign-in is told by its cookie alone: a session the site ended stays **Signed in** until its cookie expires.
 
 ## MCP servers
 

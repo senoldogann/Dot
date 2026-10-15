@@ -34,6 +34,7 @@ from dotagent.server.guard import LocalGuard
 from dotagent.server.routes_agents import agents_router
 from dotagent.server.routes_browser import browser_router
 from dotagent.server.routes_campaigns import campaigns_router
+from dotagent.server.routes_connections import connections_router
 from dotagent.server.routes_data import memories_router, rules_router, schedules_router
 from dotagent.server.routes_files import files_router
 from dotagent.server.routes_keys import keys_router
@@ -112,6 +113,7 @@ def create_app(ctx: ServerContext) -> FastAPI:
     app.include_router(campaigns_router(ctx))
     app.include_router(agents_router(ctx))
     app.include_router(browser_router(ctx))
+    app.include_router(connections_router(ctx))
     app.include_router(keys_router(ctx))
     app.include_router(themes_router())
     app.include_router(pages_router(ctx))

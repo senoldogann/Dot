@@ -21,7 +21,16 @@ from pathlib import Path
 from typing import Literal
 from urllib.parse import urldefrag
 
-from playwright.async_api import Browser, BrowserContext, CDPSession, Page, Playwright, Response, async_playwright
+from playwright.async_api import (
+    Browser,
+    BrowserContext,
+    CDPSession,
+    Cookie,
+    Page,
+    Playwright,
+    Response,
+    async_playwright,
+)
 from playwright.async_api import Error as PlaywrightError
 from pydantic import JsonValue
 
@@ -622,6 +631,21 @@ class BrowserSession:
                 "this session works in Dot's own Chrome, not in the open one", {"mode": self._config.mode}
             )
         return Attachment(browser_version=browser.version, open_tabs=len(context.pages))
+
+    async def live_cookies(self) -> frozenset[tuple[str, str]] | None:
+        """The host and name of every cookie Dot's own Chrome holds now (item 278); ``None`` while it does not run, and
+        in attach mode, whose Chrome is the owner's own."""
+        context: BrowserContext | None = self._context
+        if context is None or self.mode != "own":
+            return None
+        try:
+            cookies: list[Cookie] = await context.cookies()
+        except PlaywrightError as error:
+            raise BrowserError(
+                "the cookies of Dot's browser could not be listed",
+                {"profile": str(self._profile), "error": truncate_middle(str(error), _LAUNCH_ERROR_CHARS)},
+            ) from error
+        return frozenset((cookie.get("domain", ""), cookie.get("name", "")) for cookie in cookies)
 
     async def stored_cookie_count(self) -> int:
         """How many cookies Chrome could read from the profile; cookies it cannot decrypt are not counted."""

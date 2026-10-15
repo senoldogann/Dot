@@ -514,6 +514,7 @@
 .side-foot {
   flex: none;
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 4px;
   padding: 8px 8px calc(8px + var(--safe-bottom));
@@ -522,6 +523,31 @@
 .side-foot > .side-link {
   flex: 1;
   min-width: 0;
+}
+
+/* Connect apps (item 278): a pill on a line of its own above Settings, as a messenger's sidebar has it. */
+.side-connect {
+  flex: 1 0 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-bottom: 4px;
+  padding: 8px 12px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-pill);
+  color: var(--text);
+  font-weight: var(--weight-label);
+}
+
+.side-connect:hover {
+  background: color-mix(in srgb, var(--text) 4%, transparent);
+  text-decoration: none;
+}
+
+.side-connect[aria-current="page"] {
+  background: var(--surface);
+  box-shadow: 0 1px 2px var(--shadow-ink);
 }
 
 /* With the sidebar next to the page, the way back to the list is always in sight. */

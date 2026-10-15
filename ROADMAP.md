@@ -5216,7 +5216,7 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 275 | On a phone the page fits the screen and holds still                                   | done        | d332e29 |
 | 276 | The view of Dot's computer comes back by itself                                       | done        | f7e09a6 |
 | 277 | Every chat wears a creature, its last message under its name                          | in progress |         |
-| 278 | Connect apps: the Mac's applications and the web's, set up from the sidebar           | planned     |         |
+| 278 | Connect apps: the Mac's applications and the web's, set up from the sidebar           | in progress |         |
 | 279 | Connect apps: the tools of other services, over MCP, signed in from Dot               | planned     |         |
 | 280 | Dot starts lean: the fewest words and tools, the rest found when needed               | planned     |         |
 | 281 | A chat can be a loop that asks Dot again until it is done                             | planned     |         |
@@ -12209,7 +12209,34 @@ message under the name, the unread dot at the right; the creature at work while 
 
 ### 278. Connect apps: the Mac's applications and the web's, set up from the sidebar
 
-**Status: planned.**
+**Status: in progress.** Built on `item-278-connect-apps`.
+
+**As built (2026-10-15).** `connections/catalogue.py`: the applications, ten of the Mac by bundle id (Mail, Calendar,
+Notes, Reminders, Messages, Contacts, Excel, Word, PowerPoint, Outlook), OneDrive among the folders, and eight of the
+web (Google, Microsoft 365, GitHub, Slack, Notion, LinkedIn, X, Instagram) by their domains, the cookies only a
+signed-in visitor holds and their sign-in page; Google's one sign-in stands for Gmail, Calendar and Drive, and WhatsApp
+is not on the page, as its web app keeps its session in the page's storage rather than in a cookie.
+`connections/mac.py`: whether an application is installed (Launch Services) and what Automation lets
+(`AEDeterminePermissionToAutomateTarget` through ctypes, which pyobjc does not wrap: allowed, not asked, refused, or not
+open, as macOS tells only about an application that runs); the question is asked once the application runs, started
+hidden (`open -g -j`) when it did not. `connections/web.py`: the cookies of Dot's browser by host and name, never by
+value, from the browser while it runs (`BrowserSession.live_cookies`), else from a copy of its profile's cookie file,
+those expired left out. `connections/states.py`: the states of each kind and the step each offers.
+`server/routes_connections.py`: `GET /api/connections`; `POST /api/connections/{id}` takes the step: one question at a
+time for an application, waited for a minute and then said to wait on the Mac; the Automation pane after a no; OneDrive
+opened; the sign-in page in a tab of Dot's browser (409 in My Chrome and in a browser without a window).
+`views/connect.js`: the page in three cards (On this Mac, Your files, On the web), a badge for each state, a line where
+there is something to do (what to switch on after a no, what to install, OneDrive to sign in to), and how to sign in to
+the web once above its rows; a button too wide for its row goes under the text on a phone. `sidebar.js` and `shell.css`:
+the Connect apps pill above Settings in the foot. README: the sidebar's foot, Connect apps, the API. Tests:
+`tests/unit/test_connections.py` (the catalogue; macOS's answers and the step of each state; macOS asked for real but
+without a question, about Finder and an application that does not exist; the sign-ins read from a profile's cookie file
+by host and name, an expired cookie and a look-alike host left out); `tests/smoke/test_connect_apps.py` (new): wide and
+light, on a phone and dark, and once in WebKit, with macOS's answers given by the test, the pill opens the page; Mail is
+allowed, Outlook not installed, OneDrive syncing, GitHub signed in by a cookie file in the profile of Dot's browser and
+Slack not, with no Sign in in a browser without a window; Notes is refused, with what to switch on, and its Open System
+Settings shows the Automation pane; Allow asks macOS about Calendar and its row turns Allowed. It fails on the code of
+before (no Connect apps).
 
 **What.** A Connect apps pill in the sidebar's foot opens a page of applications, each with what Dot needs to use it and
 one step to give it: the Mac's applications Dot drives (Mail, Calendar, Notes, Reminders, Messages, Excel, Word,
