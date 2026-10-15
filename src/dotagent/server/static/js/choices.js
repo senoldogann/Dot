@@ -7,7 +7,7 @@
 import { api } from "./api.js";
 import { composerPill } from "./composer.js";
 import { el, modelName } from "./dom.js";
-import { allModels, levelLabel, offersChoice, SPEED_HINTS } from "./efforts.js";
+import { allModels, levelLabel, offersChoice, oneMessageChoices, SPEED_HINTS } from "./efforts.js";
 import { icon } from "./icons.js";
 import { modelPicker } from "./modelpicker.js";
 import { anchoredPopover } from "./popover.js";
@@ -63,9 +63,11 @@ export function optionRow({ lead, label, hint, selected, onPick }) {
  * after a mode was chosen, and `onChange()` after any choice was made (`value()` has it then).
  *
  * Returns `pills` (`{ mode, model, reasoning, options }`, the elements), `setMode(id)`, `goalMode` (its picker),
- * `ready()` (resolves once the models are loaded), `value()` (what a run starts with: `{ mode, model, effort, speed,
- * approvals, goal_mode }`), `sync()` after a status change, `setWaiting(on)` (while a run works, the choices wait for the next
- * follow-up and the pills say so) and `dispose()`.
+ * `ready()` (resolves once the models are loaded), `value()` (what the next message starts its run with: `{ mode, model,
+ * effort, speed, approvals, goal_mode, once }`, `once` the id of a choice for one message, item 251, whose level the
+ * daemon asks for instead of `effort`), `kept()` (the same without `once`, as a chat keeps them), `sent()` once a
+ * message went, which puts the choice for one message away, `sync()` after a status change, `setWaiting(on)` (while a
+ * run works, the choices wait for the next follow-up and the pills say so) and `dispose()`.
  */
 export function runChoices({ frame, kept, optionsTitle, more, onMode, onChange }) {
   let waiting = false;
@@ -157,6 +159,9 @@ export function runChoices({ frame, kept, optionsTitle, more, onMode, onChange }
   let chosenRef = kept.model;
   let providers = [];
   let shownDefault = NOTHING_SHOWN;
+  // The choice for one message armed (item 251), an id of ONE_MESSAGE (efforts.js), or null: the next message goes with
+  // it, and the one after with the kept level again.
+  let once = null;
 
   // The model a run would use now: the one picked, else the daemon's default.
   function selectedInfo() {
@@ -169,8 +174,13 @@ export function runChoices({ frame, kept, optionsTitle, more, onMode, onChange }
     return info !== null && info.fast_mode && kept.speed.read() === "fast";
   }
 
+  // The choice for one message the next message goes with: the one armed, when the model `info` offers it.
+  function onceFor(info) {
+    return info === null ? null : (oneMessageChoices(info).find((choice) => choice.id === once) ?? null);
+  }
+
   // The Model pill shows the mark and the name, its tooltip the whole reference; the Reasoning pill the level chosen,
-  // or the one the daemon would use, and Fast while fast mode is on.
+  // or the one the daemon would use, or the choice for one message armed, and Fast while fast mode is on.
   function paintModel() {
     const info = selectedInfo();
     const ref = chosenRef === "" ? defaultRefOf(getSnapshot()) : chosenRef;
@@ -181,10 +191,12 @@ export function runChoices({ frame, kept, optionsTitle, more, onMode, onChange }
     const shown = choice || (info !== null && info.fast_mode);
     reasoningPill.element.hidden = !shown;
     if (shown) {
+      const boost = onceFor(info);
       const level = choice ? (kept.level.read(info) ?? info.default_effort) : null;
-      const words = choice ? (level === null ? "Default" : levelLabel(level)) : "";
+      const words = boost !== null ? boost.label : choice ? (level === null ? "Default" : levelLabel(level)) : "";
       reasoningPill.setValue(fastOn(info) ? (words === "" ? "Fast" : `${words} · Fast`) : words, "");
-      reasoningPill.setIcon(icon(fastOn(info) ? "bolt" : "brain"));
+      reasoningPill.setIcon(icon(boost !== null ? boost.icon : fastOn(info) ? "bolt" : "brain"));
+      setTitle(reasoningPill.element, boost === null ? "Reasoning level" : `${boost.label}: ${boost.hint}`);
     } else {
       reasoningMenu.close();
     }
@@ -194,6 +206,10 @@ export function runChoices({ frame, kept, optionsTitle, more, onMode, onChange }
 
   function pickModel(ref) {
     chosenRef = ref;
+    // A choice for one message the new model does not offer is put away, not kept for another model.
+    if (onceFor(selectedInfo()) === null) {
+      once = null;
+    }
     modelMenu.close();
     paintModel();
     modelPill.element.focus();
@@ -202,10 +218,19 @@ export function runChoices({ frame, kept, optionsTitle, more, onMode, onChange }
 
   function pickLevel(info, level) {
     kept.level.write(info, level);
+    once = null;
     reasoningMenu.close();
     paintModel();
     reasoningPill.element.focus();
     onChange();
+  }
+
+  // A choice for one message stays armed until a message goes, or until it is picked again.
+  function pickOnce(id) {
+    once = once === id ? null : id;
+    reasoningMenu.close();
+    paintModel();
+    reasoningPill.element.focus();
   }
 
   function pickSpeed(speed) {
@@ -216,7 +241,8 @@ export function runChoices({ frame, kept, optionsTitle, more, onMode, onChange }
     onChange();
   }
 
-  // The levels of a model that offers a choice, then the speeds of one with fast mode (item 223).
+  // The levels of a model that offers a choice, the choices for one message it offers (item 251), then the speeds of
+  // one with fast mode (item 223).
   function reasoningRows() {
     const info = selectedInfo();
     if (info === null) {
@@ -232,6 +258,23 @@ export function runChoices({ frame, kept, optionsTitle, more, onMode, onChange }
           { role: "listbox", "aria-label": "Reasoning" },
           optionRow({ lead: null, label: fallback, hint: "The daemon's own choice", selected: chosen === null, onPick: () => pickLevel(info, null) }),
           ...info.efforts.map((level) => optionRow({ lead: null, label: levelLabel(level), hint: "", selected: chosen === level, onPick: () => pickLevel(info, level) })),
+        ),
+      );
+    }
+    const single = oneMessageChoices(info);
+    if (single.length > 0) {
+      rows.push(
+        el(
+          "div",
+          { class: "pop-group", role: "group", "aria-label": "This message only" },
+          el("div", { class: "pop-heading", "aria-hidden": "true" }, "This message only"),
+          el(
+            "div",
+            { role: "listbox", "aria-label": "This message only" },
+            ...single.map((choice) =>
+              optionRow({ lead: icon(choice.icon), label: choice.label, hint: choice.hint, selected: once === choice.id, onPick: () => pickOnce(choice.id) }),
+            ),
+          ),
         ),
       );
     }
@@ -300,6 +343,20 @@ export function runChoices({ frame, kept, optionsTitle, more, onMode, onChange }
   });
   syncDefault();
 
+  // The choices kept for the next message, as a chat keeps them.
+  function keptNow() {
+    const info = selectedInfo();
+    const level = info !== null && offersChoice(info) ? kept.level.read(info) : null;
+    return {
+      mode: modeId,
+      model: chosenRef === "" ? null : chosenRef,
+      effort: level,
+      speed: fastOn(info) ? "fast" : "standard",
+      approvals: approvals.value(),
+      goal_mode: modeId === "chat" ? null : goalMode.value(),
+    };
+  }
+
   const pills = { mode: modePill.element, model: modelPill.element, reasoning: reasoningPill.element, options: optionsPill.element };
   return {
     pills,
@@ -307,16 +364,13 @@ export function runChoices({ frame, kept, optionsTitle, more, onMode, onChange }
     goalMode,
     ready,
     value: () => {
-      const info = selectedInfo();
-      const level = info !== null && offersChoice(info) ? kept.level.read(info) : null;
-      return {
-        mode: modeId,
-        model: chosenRef === "" ? null : chosenRef,
-        effort: level,
-        speed: fastOn(info) ? "fast" : "standard",
-        approvals: approvals.value(),
-        goal_mode: modeId === "chat" ? null : goalMode.value(),
-      };
+      const boost = onceFor(selectedInfo());
+      return { ...keptNow(), once: boost === null ? null : boost.id };
+    },
+    kept: keptNow,
+    sent: () => {
+      once = null;
+      paintModel();
     },
     // The status carries the daemon's defaults; the pickers show them until the person chose something else.
     sync: () => {

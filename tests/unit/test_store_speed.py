@@ -41,15 +41,15 @@ async def test_a_store_keeps_the_speed_and_one_from_before_fast_mode_holds_the_s
     try:
         thread: ThreadRecord = await store.create_thread("Say hi.", "test")
         run: RunRecord = await store.create_run(
-            thread.id, "Say hi.", "chat", OPUS, None, "test", "high", "fast", "ask", False, None, None, None
+            thread.id, "Say hi.", "chat", OPUS, None, "test", "high", "fast", None, "ask", False, None, None, None
         )
         await store.finish_run(run.id, "done", "Done.")
         await store.set_chat_choices(
             thread.id, ChatChoices(mode="chat", model=OPUS, effort=None, speed="fast", approvals=None, goal_mode=None)
         )
-        await store.add_queued(thread.id, "Again.", [], "chat", OPUS, None, "fast", None, None, None, "test")
+        await store.add_queued(thread.id, "Again.", [], "chat", OPUS, None, "fast", None, None, None, None, "test")
         campaign: CampaignRecord = await store.create_campaign(
-            "Keep at it", "Keep at it.", thread.id, OPUS, "high", "fast", "ask", [], "own"
+            "Keep at it", "Keep at it.", thread.id, OPUS, "high", "fast", None, "ask", [], "own"
         )
         assert await _speeds(store, run, campaign) == ("fast", "fast", "fast", "fast")
     finally:

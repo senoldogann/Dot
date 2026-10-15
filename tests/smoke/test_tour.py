@@ -309,6 +309,7 @@ async def test_every_page_in_both_schemes_at_both_widths(
         None,
         None,
         "standard",
+        None,
         "yolo",
         False,
         (),

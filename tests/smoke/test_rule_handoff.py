@@ -150,7 +150,18 @@ async def test_a_hand_it_to_me_rule_stops_the_write_asks_and_the_run_goes_on_whe
         ],
     )
     run: RunRecord = await manager.start(
-        "Write the shopping notes", "task", SCRIPTED_MODEL, None, "test", None, None, "standard", "ask", False, ()
+        "Write the shopping notes",
+        "task",
+        SCRIPTED_MODEL,
+        None,
+        "test",
+        None,
+        None,
+        "standard",
+        None,
+        "ask",
+        False,
+        (),
     )
     asked: ApprovalRecord = await _pending(runtime, run.id)
     assert (asked.severity, asked.tool) == ("handoff", "write_file")
@@ -216,7 +227,7 @@ async def test_a_hand_off_of_a_browser_step_offers_the_takeover(
     opening: ScriptedTurn = _turn("browser_open", {"url": "https://example.com/"})
     MODEL.script = ScriptedProvider(_PROVIDER, [opening, _turn(FINISH_TOOL, {"answer": "Opened.", "success": True})])
     run: RunRecord = await manager.start(
-        "Open example.com", "task", SCRIPTED_MODEL, None, "test", None, None, "standard", "ask", False, ()
+        "Open example.com", "task", SCRIPTED_MODEL, None, "test", None, None, "standard", None, "ask", False, ()
     )
     asked: ApprovalRecord = await _pending(runtime, run.id)
     assert (asked.severity, asked.tool) == ("handoff", "browser_open")

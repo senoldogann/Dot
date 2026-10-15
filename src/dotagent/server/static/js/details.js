@@ -3,7 +3,7 @@
 // shows none of them (item 120). The facts that never change are written once; `paint` brings the others up to date.
 
 import { compact, copyText, dateTimeFull, duration, el, modelName } from "./dom.js";
-import { levelLabel } from "./efforts.js";
+import { askedLabel } from "./efforts.js";
 import { icon } from "./icons.js";
 import { panelSection, statusBadge } from "./panels.js";
 import { approvalLabel } from "./runmodes.js";
@@ -57,7 +57,7 @@ export function createDetails(run, agent, campaign, keepGoing) {
       agent === null ? null : fact("Agent", el("dd", null, el("a", { href: `#/agents/${agent.id}`, title: agent.role }, agent.name))),
       fact("Mode", el("dd", null, run.mode)),
       fact("Model", model),
-      fact("Reasoning", el("dd", null, run.effort === null ? "Model default" : levelLabel(run.effort))),
+      fact("Reasoning", el("dd", null, run.effort === null ? "Model default" : askedLabel(run.effort, run.once))),
       run.speed === "fast" ? fact("Speed", el("dd", null, "Fast mode, on the steps of a model that has it")) : null,
       fact("Approvals", el("dd", null, approvalLabel(run.approvals))),
       fact("Goal mode", el("dd", null, run.goal_mode ? (keepGoing ? "On, asked not to stop" : "On") : "Off")),

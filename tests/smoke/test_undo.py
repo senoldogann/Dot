@@ -80,7 +80,7 @@ async def test_dotx_undo_takes_back_the_file_changes_of_a_run_and_of_the_run_it_
             manager: RunManager = RunManager(runtime)
             try:
                 run: RunRecord = await manager.start(
-                    GOAL, "task", SCRIPTED_MODEL, None, EVAL_SOURCE, None, None, "standard", "ask", False, ()
+                    GOAL, "task", SCRIPTED_MODEL, None, EVAL_SOURCE, None, None, "standard", None, "ask", False, ()
                 )
                 async with asyncio.timeout(_TIME_LIMIT_S):
                     record: RunRecord = await manager.wait(run.id)

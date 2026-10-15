@@ -17,7 +17,23 @@ from dotagent.tools.meta import ASK_USER_TOOL, FINISH_TOOL, USE_TOOLS_TOOL
 def _prompt(agent: AgentBrief | None) -> str:
     return build_system_prompt(
         collect_prompt_inputs(
-            "task", "ui", "aggressive", "ask", "wait", False, Path("/tmp/work"), [], [], [], 0, None, [], agent, (), ()
+            "task",
+            "ui",
+            "aggressive",
+            "ask",
+            "wait",
+            False,
+            False,
+            Path("/tmp/work"),
+            [],
+            [],
+            [],
+            0,
+            None,
+            [],
+            agent,
+            (),
+            (),
         )
     )
 
@@ -47,13 +63,39 @@ async def test_the_store_keeps_agents_and_their_runs_and_a_deleted_agents_runs_b
         assert await store.latest_agent_runs() == {}
         thread: ThreadRecord = await store.create_thread("t", "ui")
         first: RunRecord = await store.create_run(
-            thread.id, "first", "task", "ollama:m", None, "ui", None, "standard", "ask", False, None, agent.id, None
+            thread.id,
+            "first",
+            "task",
+            "ollama:m",
+            None,
+            "ui",
+            None,
+            "standard",
+            None,
+            "ask",
+            False,
+            None,
+            agent.id,
+            None,
         )
         second: RunRecord = await store.create_run(
-            thread.id, "second", "task", "ollama:m", None, "ui", None, "standard", "ask", False, None, agent.id, None
+            thread.id,
+            "second",
+            "task",
+            "ollama:m",
+            None,
+            "ui",
+            None,
+            "standard",
+            None,
+            "ask",
+            False,
+            None,
+            agent.id,
+            None,
         )
         dots: RunRecord = await store.create_run(
-            thread.id, "dot", "task", "ollama:m", None, "ui", None, "standard", "ask", False, None, None, None
+            thread.id, "dot", "task", "ollama:m", None, "ui", None, "standard", None, "ask", False, None, None, None
         )
         assert dots.agent_id is None
         assert [run.id for run in await store.agent_runs(agent.id, 10)] == [second.id, first.id]

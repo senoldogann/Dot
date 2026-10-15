@@ -28,7 +28,7 @@ class _CutShort(Store):
 async def _runs_and_thread(store: Store) -> tuple[ThreadRecord, str]:
     thread: ThreadRecord = await store.create_thread("t", "test")
     run = await store.create_run(
-        thread.id, "goal", "task", "ollama:m", None, "test", "medium", "standard", "ask", False, None, None, None
+        thread.id, "goal", "task", "ollama:m", None, "test", "medium", "standard", None, "ask", False, None, None, None
     )
     return thread, run.id
 
@@ -120,6 +120,7 @@ async def test_a_chat_a_run_works_on_is_not_deleted_whichever_process_drives_the
             "delegate",
             "medium",
             "standard",
+            None,
             "ask",
             False,
             None,

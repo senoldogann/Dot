@@ -113,6 +113,7 @@ async def _ended(runtime: Runtime, thread_id: str, goal: str, parent: str | None
         "test" if parent is None else "delegate",
         "medium",
         "standard",
+        None,
         "yolo",
         False,
         None,

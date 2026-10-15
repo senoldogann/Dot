@@ -44,7 +44,7 @@ async def _play(login_env: dict[str, str], goal: str, goal_mode: bool, turns: Se
     model: RecordingProvider = RecordingProvider(ScriptedProvider(_PROVIDER, turns))
     async with _session(_config(0.0, 0, False), login_env, model) as (runtime, manager):
         run: RunRecord = await manager.start(
-            goal, "task", SCRIPTED_MODEL, None, EVAL_SOURCE, None, None, "standard", "ask", goal_mode, ()
+            goal, "task", SCRIPTED_MODEL, None, EVAL_SOURCE, None, None, "standard", None, "ask", goal_mode, ()
         )
         async with asyncio.timeout(_TIME_LIMIT_S):
             record: RunRecord = await manager.wait(run.id)

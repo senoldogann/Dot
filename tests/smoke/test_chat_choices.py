@@ -249,7 +249,7 @@ async def test_the_default_model_chosen_in_settings_starts_the_runs_that_name_no
             await page.goto(f"{address}/#/runs")
             await expect(page.locator(".composer-pill[data-pill='model']")).to_contain_text("other")
             started: RunRecord = await manager.start(
-                "Sort the photos.", "task", None, None, "test", None, None, "standard", "ask", False, ()
+                "Sort the photos.", "task", None, None, "test", None, None, "standard", None, "ask", False, ()
             )
             assert started.model == OTHER
             async with asyncio.timeout(_RUN_WAIT_S):
@@ -276,7 +276,7 @@ async def test_a_chat_keeps_what_its_composer_chose_after_a_reload_and_in_anothe
 ) -> None:
     manager, address = served
     started: RunRecord = await manager.start(
-        "Sort the photos.", "task", SCRIPTED_MODEL, None, "test", None, None, "standard", "ask", False, ()
+        "Sort the photos.", "task", SCRIPTED_MODEL, None, "test", None, None, "standard", None, "ask", False, ()
     )
     async with asyncio.timeout(_RUN_WAIT_S):
         first: RunRecord = await manager.wait(started.id)
@@ -339,7 +339,7 @@ async def test_a_run_moved_to_a_standby_model_leaves_the_chats_model(
 ) -> None:
     manager, address = served
     started: RunRecord = await manager.start(
-        "Count the files.", "task", THINKER, None, "test", None, "low", "standard", "ask", False, ()
+        "Count the files.", "task", THINKER, None, "test", None, "low", "standard", None, "ask", False, ()
     )
     async with asyncio.timeout(_RUN_WAIT_S):
         first: RunRecord = await manager.wait(started.id)

@@ -45,6 +45,7 @@ def queue_router(ctx: ServerContext) -> APIRouter:
                 request.model,
                 request.effort,
                 request.speed,
+                request.once,
                 request.approvals,
                 request.goal_mode,
                 request.agent_id,

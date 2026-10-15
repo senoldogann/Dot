@@ -171,7 +171,7 @@ async def _client(home: Home) -> AsyncIterator[httpx.AsyncClient]:
 async def _run(home: Home) -> RunRecord:
     """``GOAL`` as an unattended task run, once it ended done and its lessons are drawn."""
     run: RunRecord = await home.manager.start(
-        GOAL, "task", SCRIPTED_MODEL, None, EVAL_SOURCE, None, None, "standard", "ask", False, ()
+        GOAL, "task", SCRIPTED_MODEL, None, EVAL_SOURCE, None, None, "standard", None, "ask", False, ()
     )
     async with asyncio.timeout(_TIME_LIMIT_S):
         record: RunRecord = await home.manager.wait(run.id)
@@ -286,7 +286,7 @@ async def test_auto_leaves_a_lesson_alone_that_the_owner_dismissed_while_it_save
         home.runtime.bus.subscribe(None) as heard,
     ):
         run: RunRecord = await home.manager.start(
-            GOAL, "task", SCRIPTED_MODEL, None, EVAL_SOURCE, None, None, "standard", "ask", False, ()
+            GOAL, "task", SCRIPTED_MODEL, None, EVAL_SOURCE, None, None, "standard", None, "ask", False, ()
         )
         async with asyncio.timeout(_TIME_LIMIT_S):
             while (await heard.queue.get()).kind != "lessons_proposed":

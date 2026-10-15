@@ -163,6 +163,7 @@ async def _chat(runtime: Runtime) -> RunRecord:
         "test",
         "medium",
         "standard",
+        None,
         "yolo",
         False,
         None,

@@ -73,7 +73,20 @@ async def _nobody(request: ReviewRequest) -> ReviewVerdict:
 async def _yolo_context(runtime: Runtime) -> ToolContext:
     thread: ThreadRecord = await runtime.store.create_thread("terminal", "test")
     run: RunRecord = await runtime.store.create_run(
-        thread.id, GOAL, "task", "ollama:none", None, "test", "medium", "standard", "yolo", False, None, None, None
+        thread.id,
+        GOAL,
+        "task",
+        "ollama:none",
+        None,
+        "test",
+        "medium",
+        "standard",
+        None,
+        "yolo",
+        False,
+        None,
+        None,
+        None,
     )
     return ToolContext(
         runtime=runtime,
@@ -230,6 +243,7 @@ async def test_a_command_in_the_background_needs_a_chat_to_tell(runtime: Runtime
         "delegate",
         "medium",
         "standard",
+        None,
         "yolo",
         False,
         None,

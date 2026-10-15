@@ -153,7 +153,7 @@ async def test_a_helpers_row_shows_its_card_on_a_rest_or_the_focus_wide_and_none
 ) -> None:
     manager, address = served
     parent: RunRecord = await manager.start(
-        "Sort the shelves", "task", SCRIPTED_MODEL, None, "test", None, None, "standard", "ask", False, ()
+        "Sort the shelves", "task", SCRIPTED_MODEL, None, "test", None, None, "standard", None, "ask", False, ()
     )
     await _first_tool_call(runtime, parent.id)
     working_task: asyncio.Task[DelegateOutcome] = asyncio.create_task(

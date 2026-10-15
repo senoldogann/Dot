@@ -110,7 +110,9 @@ async def _runtime(login_env: dict[str, str]) -> AsyncIterator[Runtime]:
 
 
 async def _start(manager: RunManager) -> RunRecord:
-    return await manager.start(GOAL, "task", SCRIPTED_MODEL, None, UI_SOURCE, None, None, "standard", "yolo", False, ())
+    return await manager.start(
+        GOAL, "task", SCRIPTED_MODEL, None, UI_SOURCE, None, None, "standard", None, "yolo", False, ()
+    )
 
 
 async def _ended(manager: RunManager, run: RunRecord) -> RunRecord:
@@ -205,6 +207,7 @@ async def test_a_delegated_run_whose_end_was_not_kept_is_an_error_for_the_run_th
             UI_SOURCE,
             "medium",
             "standard",
+            None,
             "yolo",
             False,
             None,
@@ -325,7 +328,7 @@ async def test_the_error_of_a_failed_campaign_start_stays_when_its_cleanup_fails
         try:
             with pytest.raises(StoreError, match="the gate of the run could not be made"):
                 await manager.start_campaign(
-                    GOAL, "task", SCRIPTED_MODEL, None, UI_SOURCE, None, "standard", "yolo", None, (), None
+                    GOAL, "task", SCRIPTED_MODEL, None, UI_SOURCE, None, "standard", None, "yolo", None, (), None
                 )
             assert await runtime.store.list_campaigns() == []
         finally:
@@ -366,6 +369,7 @@ async def test_the_half_minute_check_outlives_a_write_the_database_refuses(
             UI_SOURCE,
             "medium",
             "standard",
+            None,
             "yolo",
             False,
             None,

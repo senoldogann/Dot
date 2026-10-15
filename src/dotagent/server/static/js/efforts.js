@@ -1,6 +1,6 @@
 // The reasoning level a person prefers for each model. A model lists the levels it offers, lowest first (fewer than two
 // means there is nothing to choose); the choice is kept per browser and goes with every run started from here. Beside
-// it, fast mode (item 223), for the Claude models that have it.
+// it, fast mode (item 223), for the Claude models that have it, and the choices for one message (item 251).
 
 import { readPref, writePref } from "./prefs.js";
 
@@ -26,9 +26,34 @@ function keyOf(model) {
   return `${KEY_PREFIX}${model.ref}`;
 }
 
+// The choices for one message (item 251), named after Claude Code's: the level each asks the model for (the daemon's
+// ONE_MESSAGE_LEVELS in llm/types.py), and what it does, under its name in the reasoning menu. Nothing keeps them: the
+// message after goes with the level chosen before.
+export const ONE_MESSAGE = [
+  { id: "ultrathink", label: "Ultrathink", level: "max", icon: "sparkle", hint: "Max reasoning for this message only" },
+  {
+    id: "ultracode",
+    label: "Ultracode",
+    level: "xhigh",
+    icon: "branch",
+    hint: "Extra high for this message only, its independent parts given to helpers that work at the same time",
+  },
+];
+
+/** The choices for one message that `model` offers: those whose level it has. */
+export function oneMessageChoices(model) {
+  return ONE_MESSAGE.filter((choice) => model.efforts.includes(choice.level));
+}
+
 /** The words for a level, for buttons and chips. */
 export function levelLabel(level) {
   return LABELS[level] ?? level;
+}
+
+/** The words for the level a run asked for, and the choice for one message it was started with (item 251) beside it. */
+export function askedLabel(level, once) {
+  const choice = ONE_MESSAGE.find((candidate) => candidate.id === once);
+  return choice === undefined ? levelLabel(level) : `${levelLabel(level)}, ${choice.label}`;
 }
 
 /** The home's choice of speed, kept per browser: "fast" for fast mode, else "standard". */

@@ -162,6 +162,7 @@ async def test_helpers_that_follow_one_another_sit_in_one_group_that_folds(
                 None,
                 None,
                 "standard",
+                None,
                 "ask",
                 False,
                 (),

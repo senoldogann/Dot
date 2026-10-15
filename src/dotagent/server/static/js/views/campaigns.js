@@ -6,7 +6,7 @@ import { actorFace } from "../actors.js";
 import { api } from "../api.js";
 import { approvalCard, fromRecord, LEFT_IN_CAMPAIGN } from "../approvals.js";
 import { ago, clip, compact, dateTime, debounce, el, modelName, plural } from "../dom.js";
-import { levelLabel } from "../efforts.js";
+import { askedLabel } from "../efforts.js";
 import { icon } from "../icons.js";
 import { emptyPanel, errorPanel, loadingPanel, pageHead, statusBadge } from "../panels.js";
 import { approvalLabel } from "../runmodes.js";
@@ -169,7 +169,7 @@ function outline(detail) {
         { class: "chip", title: "The Chrome its sessions work in" },
         record.browser === "attach" ? "Browser: your Chrome" : record.browser === "own" ? "Browser: Dot's own" : "Browser: the daemon's",
       ),
-      el("span", { class: "chip" }, `Reasoning ${levelLabel(record.effort)}`),
+      el("span", { class: "chip" }, `Reasoning ${askedLabel(record.effort, record.once)}`),
       approvals,
       el("span", { class: "chip", title: "Tokens of its sessions and of the runs they delegated to" }, `${compact(detail.tokens)} tokens`),
       el("span", { class: "faint" }, `Started ${dateTime(record.created_at)}`),

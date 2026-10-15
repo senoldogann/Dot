@@ -5188,8 +5188,8 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 247 | The repository has a licence, a security policy and Dependabot                       | done        | 66f49a3 |
 | 248 | A run a restart cut off goes on by itself by default                                 | done        | 8d3efd5 |
 | 249 | What the review model declines to write goes to the run's own model                  | done        | 0416d83 |
-| 250 | Each model's context size can be set in Settings                                     | in progress |         |
-| 251 | Ultrathink and Ultracode in the reasoning menu                                       | planned     |         |
+| 250 | Each model's context size can be set in Settings                                     | done        | ee7252b |
+| 251 | Ultrathink and Ultracode in the reasoning menu                                       | in progress |         |
 | 252 | The plan at the end of the request, if an eval shows it holds                        | planned     |         |
 
 ### 77. The type system: Inter and Geist Mono, seven sizes, three weights
@@ -11181,7 +11181,7 @@ that is another model. Other failures stay as they are, and an approval or a goa
 
 ### 250. Each model's context size can be set in Settings
 
-**Status: in progress.**
+**Status: done.** Merged as `ee7252b` (PR #294; no Linear issue, the Linear connector was signed out).
 
 **As built (2026-10-15).** `[models.context]` names a model's context size where it is not `[agent] context_tokens`
 (`ModelsConfig.context`, at least `CONTEXT_FLOOR`, 48,000: the budget of before 2026-10-11, above the 29,294 tokens a
@@ -11219,7 +11219,23 @@ model has when it starts.
 
 ### 251. Ultrathink and Ultracode in the reasoning menu
 
-**Status: planned.**
+**Status: in progress.**
+
+**As built (2026-10-15).** `llm/types.py` names the choices for one message, `OneMessage`: `ultrathink` asks the model
+for its Max level, `ultracode` for its Extra high level (`ONE_MESSAGE_LEVELS`) with the run told to split
+(`splits_work`). `POST /api/runs` and the queue take `once` beside `effort`: the run asks for the choice's level and
+keeps the choice (`RunRecord.once`, a column of `runs`, `queued_messages` and `campaigns`), while its chat keeps
+`effort`, so the message after goes with the level chosen before. A model without the level refuses it (a 422, a queued
+message at once). The run that resumes one, the one that carries on after an answered question and every session of a
+campaign keep the choice; a delegated run, which cannot delegate, starts without one. An Ultracode run that can delegate
+is told in its Environment section to give each part that needs no other part's result a delegate of its own, several in
+one turn, each with its plan step, and to do only what joins or checks their reports. The Reasoning menu has **This
+message only** after the levels: Ultrathink where the model offers `max`, Ultracode where it offers `xhigh`, each with
+what it does; the pill reads the choice until the message goes (a run started, a follow-up, a queued message), and the
+Details panel and a campaign's chip say `Max, Ultrathink`. Tests: `tests/unit/test_one_message.py` (the levels, the
+instructions only for a run that can delegate, the store), `tests/smoke/test_one_message.py` (the level of each run and
+the chat's level kept, the queue, a resumed run, the refusals; the menu on the home and in a chat for each model, wide
+and on a phone, light and dark); on the code of before they fail.
 
 **What.** The reasoning menu offers Ultrathink, the model's deepest level for one message, and Ultracode, a high level
 with the run told to split the independent parts of its work across helpers that work at once, on the models that offer
@@ -11923,3 +11939,4 @@ plan steps marked done without evidence hold.
 - 2026-10-15 (Opus 5.5): item 247 merged as `66f49a3` (PR #288; no Linear issue, the connector was signed out): the repository has the MIT licence, a security policy that sends reports through GitHub's private vulnerability reporting, now on, a weekly Dependabot configuration and the notice of the icons' licence.
 - 2026-10-15 (Opus 5.5): item 248 merged as `8d3efd5` (PR #292; no Linear issue, the connector was signed out): a run that a restart, a crash or a shutdown cut off goes on by itself by default, when the calls it cut off only read and it was cut off at most 30 minutes before.
 - 2026-10-15 (Opus 5.5): item 249 merged as `0416d83` (PR #293; no Linear issue, the connector was signed out): a run's lessons and its skill that the review model declines to write go to the run's own model, and the owner section to the model of the newest run it reads; an approval and the goal check keep asking the review model alone.
+- 2026-10-15 (Opus 5.5): item 250 merged as `ee7252b` (PR #294; no Linear issue, the connector was signed out): a model's context size is set in Settings › Models from 48,000 tokens up to three quarters of its window, with what it does, where the window comes from and what the model's runs of the last 30 days measured; the run's budget, its tool output and the point past which it summarizes follow it from the next run on.

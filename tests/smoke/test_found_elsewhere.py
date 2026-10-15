@@ -298,6 +298,7 @@ async def test_find_help_tells_a_run_of_a_skill_another_agent_set_up_and_to_ask_
                     None,
                     None,
                     "standard",
+                    None,
                     "yolo",
                     False,
                     (),

@@ -122,6 +122,7 @@ async def _seeded_run(runtime: Runtime, prompts: tuple[int, ...], scaffold: Json
         "test",
         "medium",
         "standard",
+        None,
         "yolo",
         False,
         None,

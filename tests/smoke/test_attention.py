@@ -152,7 +152,9 @@ def _working_then_done(answer: str) -> list[ScriptedTurn]:
 
 
 async def _start(manager: RunManager, goal: str) -> RunRecord:
-    return await manager.start(goal, "task", SCRIPTED_MODEL, None, "test", None, None, "standard", "yolo", False, ())
+    return await manager.start(
+        goal, "task", SCRIPTED_MODEL, None, "test", None, None, "standard", None, "yolo", False, ()
+    )
 
 
 async def _ended(manager: RunManager, run: RunRecord) -> RunRecord:

@@ -12,7 +12,7 @@ from dotagent.store.models import EventRecord, RunRecord, RunStatus, ThreadRecor
 
 async def _run_with_status(store: Store, thread: ThreadRecord, status: RunStatus) -> RunRecord:
     run: RunRecord = await store.create_run(
-        thread.id, "goal", "task", "ollama:m", None, "test", "medium", "standard", "ask", False, None, None, None
+        thread.id, "goal", "task", "ollama:m", None, "test", "medium", "standard", None, "ask", False, None, None, None
     )
     await store.set_run_status(run.id, status)
     return run
@@ -74,6 +74,7 @@ async def test_only_the_runs_of_owners_that_are_gone_are_closed_with_the_approva
                 "test",
                 "medium",
                 "standard",
+                None,
                 "ask",
                 False,
                 None,
@@ -103,11 +104,37 @@ async def _working_family(store: Store, owner: str | None) -> tuple[RunRecord, R
     """A run at work of ``owner`` and a run it delegated, at work too; the run is made first."""
     thread: ThreadRecord = await store.create_thread("t", "test")
     run: RunRecord = await store.create_run(
-        thread.id, "goal", "task", "ollama:m", None, "test", "medium", "standard", "ask", False, None, None, owner
+        thread.id,
+        "goal",
+        "task",
+        "ollama:m",
+        None,
+        "test",
+        "medium",
+        "standard",
+        None,
+        "ask",
+        False,
+        None,
+        None,
+        owner,
     )
     side: ThreadRecord = await store.create_thread("part", "delegate")
     delegated: RunRecord = await store.create_run(
-        side.id, "part", "task", "ollama:m", run.id, "delegate", "medium", "standard", "ask", False, None, None, owner
+        side.id,
+        "part",
+        "task",
+        "ollama:m",
+        run.id,
+        "delegate",
+        "medium",
+        "standard",
+        None,
+        "ask",
+        False,
+        None,
+        None,
+        owner,
     )
     for record in (run, delegated):
         await store.set_run_status(record.id, "running")

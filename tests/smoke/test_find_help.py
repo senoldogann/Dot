@@ -129,7 +129,7 @@ async def test_a_run_asks_find_help_and_is_told_first_of_the_skill_installed_for
             manager: RunManager = RunManager(runtime)
             try:
                 run: RunRecord = await manager.start(
-                    GOAL, "task", SCRIPTED_MODEL, None, UI_SOURCE, None, None, "standard", "yolo", False, ()
+                    GOAL, "task", SCRIPTED_MODEL, None, UI_SOURCE, None, None, "standard", None, "yolo", False, ()
                 )
                 async with asyncio.timeout(_TIME_LIMIT_S):
                     done: RunRecord = await manager.wait(run.id)
@@ -177,6 +177,7 @@ async def test_a_run_offered_more_skills_than_its_instructions_list_is_listed_th
                     None,
                     None,
                     "standard",
+                    None,
                     "yolo",
                     False,
                     (),
@@ -233,7 +234,18 @@ async def test_with_the_embeddings_a_goal_and_a_need_in_turkish_find_the_skills_
             manager: RunManager = RunManager(runtime)
             try:
                 run: RunRecord = await manager.start(
-                    TURKISH_GOAL, "task", SCRIPTED_MODEL, None, UI_SOURCE, None, None, "standard", "yolo", False, ()
+                    TURKISH_GOAL,
+                    "task",
+                    SCRIPTED_MODEL,
+                    None,
+                    UI_SOURCE,
+                    None,
+                    None,
+                    "standard",
+                    None,
+                    "yolo",
+                    False,
+                    (),
                 )
                 async with asyncio.timeout(_TIME_LIMIT_S):
                     done: RunRecord = await manager.wait(run.id)
@@ -280,7 +292,7 @@ async def test_with_the_embedding_service_out_of_reach_find_help_answers_by_the_
             manager: RunManager = RunManager(runtime)
             try:
                 run: RunRecord = await manager.start(
-                    GOAL, "task", SCRIPTED_MODEL, None, UI_SOURCE, None, None, "standard", "yolo", False, ()
+                    GOAL, "task", SCRIPTED_MODEL, None, UI_SOURCE, None, None, "standard", None, "yolo", False, ()
                 )
                 async with asyncio.timeout(_TIME_LIMIT_S):
                     done: RunRecord = await manager.wait(run.id)

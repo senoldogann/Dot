@@ -136,6 +136,7 @@ def _inputs(tool_names: list[str]) -> PromptInputs:
         "ask",
         "wait",
         False,
+        False,
         Path("/tmp/work"),
         [],
         tool_names,

@@ -113,7 +113,7 @@ async def test_a_running_run_is_handed_the_changed_notes_it_may_be_handed_within
             manager: RunManager = RunManager(runtime)
             try:
                 run: RunRecord = await manager.start(
-                    GOAL, "task", SCRIPTED_MODEL, None, EVAL_SOURCE, None, None, "standard", "ask", False, ()
+                    GOAL, "task", SCRIPTED_MODEL, None, EVAL_SOURCE, None, None, "standard", None, "ask", False, ()
                 )
                 async with asyncio.timeout(_TIME_LIMIT_S):
                     record: RunRecord = await manager.wait(run.id)

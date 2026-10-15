@@ -161,7 +161,7 @@ async def _daemon(login_env: dict[str, str]) -> AsyncIterator[tuple[Runtime, Run
 async def _shown(runtime: Runtime, manager: RunManager, goal: str) -> tuple[RunRecord, str]:
     """A run started for ``goal`` that shows the page, once it has ended, and the id of the page it showed."""
     run: RunRecord = await manager.start(
-        goal, "task", SCRIPTED_MODEL, None, "test", None, None, "standard", "ask", False, ()
+        goal, "task", SCRIPTED_MODEL, None, "test", None, None, "standard", None, "ask", False, ()
     )
     async with asyncio.timeout(WAIT_S):
         assert (await manager.wait(run.id)).status == "done"

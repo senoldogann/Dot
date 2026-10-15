@@ -49,7 +49,20 @@ async def test_deleting_a_thread_removes_its_screenshots_but_keeps_shared_ones(t
         await store.append_messages(first.id, [user_message("a", (own, shared))])
         await store.append_messages(second.id, [user_message("b", (shared,))])
         run: RunRecord = await store.create_run(
-            first.id, "goal", "task", "ollama:x", None, "test", "medium", "standard", "ask", False, None, None, None
+            first.id,
+            "goal",
+            "task",
+            "ollama:x",
+            None,
+            "test",
+            "medium",
+            "standard",
+            None,
+            "ask",
+            False,
+            None,
+            None,
+            None,
         )
         await store.add_event(run.id, "tool_result", {"images": await store.save_images([from_event])})
         await store.finish_run(run.id, "done", "Done.")
@@ -156,7 +169,20 @@ async def test_a_chat_whose_delete_is_refused_keeps_its_screenshots(tmp_path: Pa
         thread: ThreadRecord = await store.create_thread("at work", "test")
         await store.append_messages(thread.id, [user_message("a", (_image(b"of a chat at work"),))])
         run: RunRecord = await store.create_run(
-            thread.id, "goal", "task", "ollama:x", None, "test", "medium", "standard", "ask", False, None, None, None
+            thread.id,
+            "goal",
+            "task",
+            "ollama:x",
+            None,
+            "test",
+            "medium",
+            "standard",
+            None,
+            "ask",
+            False,
+            None,
+            None,
+            None,
         )
         await store.add_event(run.id, "tool_result", {"images": await store.save_images([_image(b"of its run")])})
         _age(images, 7200)

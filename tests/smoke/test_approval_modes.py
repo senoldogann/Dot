@@ -109,6 +109,7 @@ async def room(tmp_path: Path) -> AsyncIterator[Room]:
             "test",
             "medium",
             "standard",
+            None,
             "ask",
             False,
             None,
