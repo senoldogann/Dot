@@ -1,6 +1,8 @@
 """Dot's computer end to end (item 46): the screencast of a tab from a real headless Chrome on a local fixture page, and
 the handover of a run: a takeover holds the run at its next tool call, the screencast route keeps the client posted in
-the meantime, and the handback lets the run end with a note to the model in the result of the call that waited.
+the meantime, and the handback lets the run end with a note to the model in the result of the call that waited. The
+page's view of that browser comes back by itself when its stream breaks or goes silent, and rests while the page is
+out of sight (item 276).
 
 The run is played by the scripted model (no model quota); its tools are shell commands, so no Chrome is started for
 it and no window opens, which is what lets the takeover be exercised with ``[browser] headless = false``.
@@ -17,7 +19,7 @@ from typing import Literal
 import httpx
 import pytest
 import pytest_asyncio
-from playwright.async_api import Browser, Locator, Page, async_playwright, expect
+from playwright.async_api import Browser, Locator, Page, Route, async_playwright, expect
 
 from dotagent.agent.gate import HANDBACK_EVENT, TAKEOVER_EVENT
 from dotagent.agent.manager import RunManager
@@ -35,6 +37,7 @@ from dotagent.server.app import create_app
 from dotagent.server.context import ServerContext
 from dotagent.server.daemon import DotServer, bind_listener, serving_config
 from dotagent.server.links import ui_url
+from dotagent.server.stream import encode_frame
 from dotagent.store.models import EventRecord, RunRecord
 from dotagent.tools.meta import FINISH_TOOL
 
@@ -50,6 +53,32 @@ _HOLD_S: float = 1.5
 _RUN_WAIT_S: float = 60.0
 _JPEG_MAGIC: bytes = b"\xff\xd8"
 _PAGE: bytes = b"<!doctype html><title>Cast</title><h1>A page to cast</h1><p>It paints once and then stays still.</p>"
+# The answers of the view's streams in its test (``_Casts``).
+_BREAK: str = "break"
+_SILENT: str = "silent"
+_ASK_WAIT_S: float = 10.0
+# How far the view's test moves the page's clock while a stream is silent: past the 45 s after which the page cuts a
+# stream that sent nothing (``STALL_MS`` in api.js), as a phone put away and taken up again does.
+_STALL_PAST_MS: int = 46_000
+# Every toast the page draws, kept on the page: an error toast goes after a few seconds, and the view's test moves the
+# clock past that.
+_TOASTS: str = """
+window.dotToasts = [];
+new MutationObserver((changes) => {
+  for (const change of changes) {
+    for (const node of change.addedNodes) {
+      if (node instanceof HTMLElement && node.classList.contains("toast")) {
+        window.dotToasts.push(node.textContent);
+      }
+    }
+  }
+}).observe(document, { childList: true, subtree: true });
+"""
+# Put the page out of sight or back in view, as a phone does when the app is put away and taken up again.
+_SIGHT: str = """(state) => {
+  Object.defineProperty(document, "visibilityState", { configurable: true, get: () => state });
+  document.dispatchEvent(new Event("visibilitychange"));
+}"""
 
 
 class _Site(ThreadingHTTPServer):
@@ -449,3 +478,86 @@ async def test_the_run_page_shows_the_computer_card_with_the_pill_wide_and_on_a_
             await expect(page.locator("section.computer .computer-pill")).to_be_hidden()
         finally:
             await browser.close()
+
+
+class _Casts:
+    """The view's streams as the page asks for them, answered in turn from ``answers``: ``_BREAK`` fails the stream at
+    the network, ``_SILENT`` never answers, and an address answers with one frame of that page and the stream's end."""
+
+    def __init__(self, answers: list[str], jpeg: bytes) -> None:
+        self.answers: list[str] = answers
+        self.jpeg: bytes = jpeg
+        self.asked: int = 0
+        self.changed: asyncio.Event = asyncio.Event()
+
+    async def answer(self, route: Route) -> None:
+        answer: str = self.answers[self.asked]
+        self.asked += 1
+        self.changed.set()
+        if answer == _BREAK:
+            await route.abort("connectionreset")
+        elif answer != _SILENT:
+            body: bytes = encode_frame(Frame(url=answer, data=self.jpeg))
+            await route.fulfill(status=200, headers={"Content-Type": "text/event-stream"}, body=body)
+
+    async def until_asked(self, count: int) -> None:
+        async with asyncio.timeout(_ASK_WAIT_S):
+            while self.asked < count:
+                self.changed.clear()
+                await self.changed.wait()
+
+
+async def test_the_view_comes_back_by_itself_after_a_break_and_a_silence_and_rests_out_of_sight(
+    runtime: Runtime, manager: RunManager, client: httpx.AsyncClient
+) -> None:
+    """The view of a held run's browser on a phone (item 276): its stream broken at the network once, then silent until
+    the page's clock jumps past the stall (a phone put away and taken up again), is made again with no toast, and the
+    frame of the next stream is shown. Watched again and put out of sight, the stream is closed and none is made until
+    the page is back in view, when the next frame comes."""
+    MODEL.script = ScriptedProvider(_PROVIDER, [_shell("echo one"), _FINISH])
+    run: RunRecord = await manager.start(
+        "Echo once", "task", SCRIPTED_MODEL, None, "test", None, None, "standard", None, "yolo", False, ()
+    )
+    assert (await client.post(f"/api/runs/{run.id}/takeover")).status_code == 202
+    host: str = client.base_url.host
+    port: int | None = client.base_url.port
+    assert port is not None
+    first: str = "http://cast.test/first"
+    second: str = "http://cast.test/second"
+    async with async_playwright() as playwright:
+        browser: Browser = await playwright.chromium.launch(channel=runtime.config.browser.channel, headless=True)
+        try:
+            # The page's service worker would take the view's streams past the routes in WebKit.
+            page: Page = await browser.new_page(viewport={"width": 390, "height": 844}, service_workers="block")
+            await page.add_init_script(_TOASTS)
+            await page.clock.install()
+            await page.goto(ui_url(host, port, TOKEN))
+            await page.goto(f"http://{host}:{port}/#/runs/{run.id}")
+            jpeg: bytes = await page.screenshot(type="jpeg", clip={"x": 0, "y": 0, "width": 8, "height": 8})
+            casts: _Casts = _Casts([_BREAK, _SILENT, first, _SILENT, second], jpeg)
+            await page.route("**/api/runs/*/screencast", casts.answer)
+            await page.get_by_role("button", name="Run details").click()
+            await page.get_by_role("tab", name="Screen").click()
+            card: Locator = page.locator("section.computer")
+            await card.get_by_role("button", name="Watch").click()
+            await casts.until_asked(2)
+            await page.clock.fast_forward(_STALL_PAST_MS)
+            await expect(card.locator(".computer-url")).to_have_text(first)
+            assert await card.locator(".computer-image").evaluate("(image) => image.naturalWidth") > 0
+            # That stream ended after its frame, which closes the view; opened again, it is put out of sight.
+            await card.get_by_role("button", name="Watch").click()
+            await casts.until_asked(4)
+            await page.evaluate(_SIGHT, "hidden")
+            await page.clock.fast_forward(_STALL_PAST_MS)
+            await asyncio.sleep(_QUIET_WAIT_S)
+            assert casts.asked == 4
+            await page.evaluate(_SIGHT, "visible")
+            await expect(card.locator(".computer-url")).to_have_text(second)
+            assert await page.evaluate("window.dotToasts") == []
+            await page.unroute_all(behavior="ignoreErrors")
+        finally:
+            await browser.close()
+    assert (await client.post(f"/api/runs/{run.id}/handback")).status_code == 202
+    async with asyncio.timeout(_RUN_WAIT_S):
+        ended: RunRecord = await manager.wait(run.id)
+    assert ended.status == "done", ended
