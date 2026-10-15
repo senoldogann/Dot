@@ -173,7 +173,7 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
   let answerNode = null;
   // A run that is over when the page opens lands on its answer; a live one only when the reader follows it.
   const openedFinished = !active;
-  const seen = { steps: 0, input: 0, output: 0, calls: 0, failed: 0 };
+  const seen = { steps: 0, input: 0, output: 0, calls: 0, failed: 0, compactions: 0, flagged: 0 };
 
   ctx.setTitle(clip(run.goal, TITLE_CHARS));
 
@@ -296,6 +296,8 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
       steps: Math.max(run.steps, seen.steps),
       calls: seen.calls,
       failed: seen.failed,
+      compactions: seen.compactions,
+      flagged: seen.flagged,
       input: Math.max(run.input_tokens, seen.input),
       output: Math.max(run.output_tokens, seen.output),
       finishedAt,
@@ -1145,6 +1147,11 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
     onCalls: ({ calls, failed }) => {
       seen.calls = calls;
       seen.failed = failed;
+      paintStats();
+    },
+    onCompacted: ({ count, flagged }) => {
+      seen.compactions = count;
+      seen.flagged = flagged;
       paintStats();
     },
     onRunStatus,

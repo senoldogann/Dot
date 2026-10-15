@@ -5197,8 +5197,8 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 256 | A failed embedding never fails a run                                                  | planned     |         |
 | 257 | A schedule's run knows its earlier runs                                               | planned     |         |
 | 258 | Only reasoning levels the gateway honours are offered                                 | done        | 3118d17 |
-| 259 | Ultrathink and ultracode as words in the composer                                     | in progress |         |
-| 260 | The compaction notes leave the conversation                                           | planned     |         |
+| 259 | Ultrathink and ultracode as words in the composer                                     | done        | 4a37ee7 |
+| 260 | The compaction notes leave the conversation                                           | in progress |         |
 
 ### 77. The type system: Inter and Geist Mono, seven sizes, three weights
 
@@ -11482,7 +11482,7 @@ before.
 
 ### 259. Ultrathink and ultracode as words in the composer
 
-**Status: in progress.** Built on `item-259-composer-words`.
+**Status: done.** Merged as `4a37ee7` (PR #301; no Linear issue, the Linear connector was signed out).
 
 **As built (2026-10-15).** `composer.js`: the frame tells its watchers (`watchText`) of every change of the text, a
 clear among them. `choices.js`: `wordAt` finds a whole word, any case; `typedChoice` names the choice the box's word
@@ -11511,7 +11511,13 @@ nothing, wide and on a phone, light and dark, with a WebKit copy. Fails on the c
 
 ### 260. The compaction notes leave the conversation
 
-**Status: planned.**
+**Status: in progress.** Built on `item-260-quiet-compaction`.
+
+**As built (2026-10-15).** `timeline.js`: the `compacted` handler counts the root run's compactions and the checks
+that flagged something and tells `onCompacted({ count, flagged })`; no note. `views/run.js`: the counts are kept with
+what the page has seen and painted into the Details. `details.js`: a Context fact ("Never compacted", "Compacted N
+times", "N checks flagged"). README: the compaction paragraph. Test: `tests/smoke/test_quiet_compaction.py` (new),
+with a WebKit copy run and deleted.
 
 **What.** The timeline no longer shows a note for the `compacted` event: the conversation reads as the owner's messages
 and the run's work. The event stays in the run's record and in the API; the Cost panel keeps the share of the summaries,
@@ -12232,3 +12238,4 @@ Fails on the code of before.
 - 2026-10-15 (Opus 5.5): item 254 merged as `8e6cbfb` (PR #298; no Linear issue, the connector was signed out): a provider's HTTP 402 is a `ProviderQuotaError` on every provider and pauses the model with the reason "not in the plan", and Ollama's 429 that says the plan's included usage is used up does the same; another 429 stays a rate limit.
 - 2026-10-15 (Opus 5.5): item 255 merged as `b3cddbc` (PR #299; no Linear issue, the connector was signed out): the typed judge switches on and off in Settings › API keys, on the row of TypeSafe's key, and takes effect at once; `GET` and `PUT /api/judge` carry the switch and write `[judge] provider`; the step router leaves a paused fast model out of the models it offers the judge.
 - 2026-10-15 (Opus 5.5): item 258 merged as `3118d17` (PR #300; no Linear issue, the connector was signed out): OpenCode Go's catalog offers no reasoning level for DeepSeek's four models (the chat route thinks the same at every label, measured), so the Reasoning pill, Settings and the API offer them none and Ultrathink and Ultracode do not show for them; the models whose level holds keep theirs.
+- 2026-10-15 (Opus 5.5): item 259 merged as `4a37ee7` (PR #301; no Linear issue, the connector was signed out): the word ultrathink or ultracode typed in the composer (a whole word, any case) is the choice for one message of item 251 where the model offers its level: the Reasoning pill reads it and the frame wears a gradient ring; editing a queued message or steering arms nothing.

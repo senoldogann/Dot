@@ -2,7 +2,7 @@
 // with, its approvals, the campaign it is a session of, the work it did and how long it took. The run page's top bar
 // shows none of them (item 120). The facts that never change are written once; `paint` brings the others up to date.
 
-import { compact, copyText, dateTimeFull, duration, el, modelName } from "./dom.js";
+import { compact, copyText, dateTimeFull, duration, el, modelName, plural } from "./dom.js";
 import { askedLabel } from "./efforts.js";
 import { icon } from "./icons.js";
 import { panelSection, statusBadge } from "./panels.js";
@@ -17,7 +17,9 @@ function fact(label, value) {
  * The details card of `run`, of the chat with `agent` (`{ id, name, role }`, or null) and a session of `campaign`
  * (`{ id, title, session }`, or null); `keepGoing` says that its goal asked it not to stop until it is done, which put
  * it in goal mode (item 132). `paint(state)` takes what changes while the run goes, as
- * `{ status, model, steps, calls, failed, input, output, finishedAt }`; `finishedAt` is null until the run is over.
+ * `{ status, model, steps, calls, failed, compactions, flagged, input, output, finishedAt }`; `finishedAt` is null until the
+ * run is over; `compactions` counts the times the run compacted its context and `flagged` those whose check found
+ * something (item 260).
  */
 export function createDetails(run, agent, campaign, keepGoing) {
   const status = el("dd");
@@ -25,6 +27,7 @@ export function createDetails(run, agent, campaign, keepGoing) {
   const turns = el("dd");
   const calls = el("dd", { class: "meta-facts" });
   const tokens = el("dd", { class: "meta-facts" });
+  const context = el("dd", { class: "meta-facts" });
   const took = el("dd");
   const copy = el(
     "button",
@@ -67,6 +70,7 @@ export function createDetails(run, agent, campaign, keepGoing) {
       fact("Model turns", turns),
       fact("Tool calls", calls),
       fact("Tokens", tokens),
+      fact("Context", context),
       fact("Duration", took),
       fact("Started", el("dd", null, dateTimeFull(run.created_at))),
       fact("Run id", el("dd", { class: "run-id" }, el("code", { class: "mono" }, run.id), copy)),
@@ -83,6 +87,11 @@ export function createDetails(run, agent, campaign, keepGoing) {
     turns.textContent = String(state.steps);
     calls.replaceChildren(...[el("span", null, String(state.calls)), ...(state.failed === 0 ? [] : [el("span", null, `${state.failed} failed`)])]);
     tokens.replaceChildren(el("span", null, `${compact(state.input)} in`), el("span", null, `${compact(state.output)} out`));
+    const compacted = state.compactions === 0 ? "Never compacted" : `Compacted ${plural(state.compactions, "time", "times")}`;
+    context.replaceChildren(
+      el("span", null, compacted),
+      ...(state.flagged === 0 ? [] : [el("span", null, `${plural(state.flagged, "check", "checks")} flagged`)]),
+    );
     const end = state.finishedAt === null ? Date.now() / 1000 : state.finishedAt;
     took.textContent = duration(Math.max(0, end - run.created_at));
   }

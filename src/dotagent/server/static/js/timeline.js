@@ -163,14 +163,16 @@ function buildFlock() {
  * `onStats({ step, input, output })` after every model turn and every side call of the run (`step` 0: a compaction, a
  * review, a description of images), `onScaffold({ contextTokens, window, chosen, summariseAt })` for the run's scaffold
  * event (its context budget, its model's window, the size chosen for the model and the prompt past which the run
- * summarizes), `onCalls({ calls, failed })` after every tool call of the run,
+ * summarizes), `onCalls({ calls, failed })` after every tool call of the run, `onCompacted({ count, flagged })` after
+ * every compaction of the run (item 260: the conversation shows no note of one; `flagged` counts the checks that found
+ * a section missing or a name the conversation never had),
  * `onRunStatus({ status, model, endedAt })` (`endedAt` is null until the run is over), `onAnswer(node)` when the answer is
  * on the page, `onImage(name)` for every screenshot a tool returned and `onBrowserStep()` for the root run's first
  * browser tool call (Dot's computer starts its view on it). `sendAgain(text, files)` sends a message written to the run
  * again with its files (item 205); null where the page sends nothing. `onGoalFiles(files)` takes the files that came
  * with the run's goal, to show them under it; null where the page shows no goal, and they stand in the timeline.
  */
-export function createTimeline({ rootRunId, actorId, startedAt, onGrow, onPlan, onStats, onScaffold, onCalls, onRunStatus, onAnswer, onImage, onQuestionLeft, onHeld, onBrowserStep, sendAgain, onGoalFiles }) {
+export function createTimeline({ rootRunId, actorId, startedAt, onGrow, onPlan, onStats, onScaffold, onCalls, onCompacted, onRunStatus, onAnswer, onImage, onQuestionLeft, onHeld, onBrowserStep, sendAgain, onGoalFiles }) {
   const element = el("div", { class: "timeline" });
   // The card a delegated run's row shows when the pointer rests on it or the focus comes to it (item 226).
   const card = helperCard(element);
@@ -346,6 +348,9 @@ export function createTimeline({ rootRunId, actorId, startedAt, onGrow, onPlan, 
       }
     }
   }
+
+  // The compactions of the run so far, and those whose check flagged something (item 260).
+  const compactions = { count: 0, flagged: 0 };
 
   function note(scope, ts, iconName, text, tone) {
     place(scope, el("div", { class: tone === "" ? "note" : `note ${tone}` }, icon(iconName), el("span", null, text)), ts);
@@ -980,20 +985,18 @@ export function createTimeline({ rootRunId, actorId, startedAt, onGrow, onPlan, 
       note(scope, record.ts, "database", text, "");
     },
 
+    // A compaction is counted for the Details panel, not told in the conversation (item 260); the Cost panel has the
+    // summaries' share, and the event keeps the model, the method and the check.
     compacted(scope, record) {
-      const data = record.data;
-      const parts = [`Context compacted: ${data.summarised_messages} earlier messages were summarised`];
-      if (data.model !== undefined) {
-        parts.push(data.method === "model" ? `by ${data.model}` : `without a model (${data.problem ?? "no summary"})`);
+      if (scope.runId !== rootRunId) {
+        return;
       }
-      const check = data.check;
+      const check = record.data.check;
+      compactions.count += 1;
       if (check !== undefined && check !== null && !check.ok) {
-        const unverified = check.unverified.length > 0 ? `unverified: ${check.unverified.join(", ")}` : "";
-        const missing = check.missing_sections.length > 0 ? `missing: ${check.missing_sections.join(", ")}` : "";
-        parts.push(`check flagged ${[unverified, missing].filter((part) => part !== "").join("; ")}`);
+        compactions.flagged += 1;
       }
-      const tone = data.method === "mechanical" || (check !== undefined && check !== null && !check.ok) ? "warn" : "";
-      note(scope, record.ts, "layers", parts.join(" · "), tone);
+      onCompacted({ ...compactions });
     },
 
     // A side question (/btw) and its answer: shown in the conversation, never part of the run's own context.
